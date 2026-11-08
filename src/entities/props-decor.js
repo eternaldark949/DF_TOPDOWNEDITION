@@ -2,16 +2,7 @@
         // before artwork transforms and never baked into a rotating furniture sprite.
         function drawGroundContactShadow(ctx, x, y, rx, ry, angle = 0) {
             let cv = drawGroundContactShadow.sprite;
-            if (!cv) {
-                cv = drawGroundContactShadow.sprite = document.createElement('canvas');
-                cv.width = cv.height = 64;
-                const c = cv.getContext('2d'), g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
-                g.addColorStop(0, 'rgba(0,0,0,0.30)');
-                g.addColorStop(0.65, 'rgba(0,0,0,0.24)');
-                g.addColorStop(0.85, 'rgba(0,0,0,0.12)');
-                g.addColorStop(1, 'rgba(0,0,0,0)');
-                c.fillStyle = g; c.fillRect(0, 0, 64, 64);
-            }
+            if (!cv) cv = drawGroundContactShadow.sprite = canvasKit.glow([64, [[0, 'rgba(0,0,0,0.30)'], [0.65, 'rgba(0,0,0,0.24)'], [0.85, 'rgba(0,0,0,0.12)'], [1, 'rgba(0,0,0,0)']]]);
             if (angle) {
                 // The contact footprint follows the base. Its centre never gains a
                 // facing-dependent light offset like the old displaced silhouette.
@@ -1175,9 +1166,7 @@
 
         function paintGraveStone(p) {
             const L = gyStoneLayout(p), w = p.width, h = p.height, r = L.rnd;
-            const cv = document.createElement('canvas');
-            cv.width = Math.ceil((w + GY_PAD * 2) * GY_SCALE); cv.height = Math.ceil((h + GY_PAD * 2) * GY_SCALE);
-            const c = cv.getContext('2d'); c.scale(GY_SCALE, GY_SCALE); c.translate(GY_PAD, GY_PAD);
+            const { canvas: cv, ctx: c } = canvasKit.createLayer([Math.ceil((w + GY_PAD * 2) * GY_SCALE), Math.ceil((h + GY_PAD * 2) * GY_SCALE)]); c.scale(GY_SCALE, GY_SCALE); c.translate(GY_PAD, GY_PAD);
             const TONES = {
                 grey:  ['#9a96a6', '#5e5a6a', '#34303e'], blue: ['#8e98b0', '#56607a', '#2e3446'],
                 rose:  ['#a8949c', '#6e5a62', '#3a2e36'], black: ['#4a4658', '#24222e', '#121018']
@@ -2727,49 +2716,7 @@
              * Wall and prop-prop collisions are handled by CollisionSystem.
              */
             update() {
-                // A broken number never spreads: restore the last good state
-                if (!Number.isFinite(this.x + this.y + this.vx + this.vy + this.angle + this.angularVel)) {
-                    const g = this._good || { x: 0, y: 0, angle: 0 };
-                    this.x = g.x; this.y = g.y; this.angle = g.angle; this.vx = this.vy = this.angularVel = 0;
-                }
-                if (this.fixedRotation) this.angularVel = 0;
-                // Settled furniture still wakes on any assigned velocity/rotation or
-                // edited pose. Keep all externally visible sleeping bookkeeping.
-                if (this.vx === 0 && this.vy === 0 && this.angularVel === 0 && Number.isFinite(this.friction) && Number.isFinite(this.angularFriction)) {
-                    // Retain even signed-zero arithmetic and the original zero normalization.
-                    this.x += this.vx; this.y += this.vy; this.angle += this.angularVel;
-                    this.vx = this.vy = this.angularVel = 0;
-                    this._still = (this._still || 0) + 1;
-                    if (!this._good) this._good = {};
-                    this._good.x = this.x; this._good.y = this.y; this._good.angle = this.angle;
-                    this.w = this.width; this.h = this.height;
-                    return;
-                }
-                // Speed cap: no faster than about half its own thickness a tick (walls can't be skipped)
-                const sp = Math.hypot(this.vx, this.vy), cap = Math.max(4, Math.min(14, Math.min(this.width, this.height) * 0.9));
-                if (sp > cap) { this.vx *= cap / sp; this.vy *= cap / sp; }
-                if (Math.abs(this.angularVel) > 0.35) this.angularVel = Math.sign(this.angularVel) * 0.35;
-
-                // Apply velocity
-                this.x += this.vx;
-                this.y += this.vy;
-
-                // Apply rotation
-                this.angle += this.angularVel;
-
-                // Apply friction
-                this.vx *= this.friction;
-                this.vy *= this.friction;
-                this.angularVel *= this.angularFriction;
-
-                // Stop if very slow (prevents micro-drift)
-                if (Math.abs(this.vx) < 0.1) this.vx = 0;
-                if (Math.abs(this.vy) < 0.1) this.vy = 0;
-                if (Math.abs(this.angularVel) < 0.001) this.angularVel = 0;
-                // Asleep after a still half-second (CollisionSystem skips sleeper pairs); a contact wakes it
-                this._still = (this.vx || this.vy || this.angularVel) ? 0 : (this._still || 0) + 1;
-                if (!this._good) this._good = {};
-                this._good.x = this.x; this._good.y = this.y; this._good.angle = this.angle;
+                collisionWorld.integrate(this);   // velocity, spin, damping, locks, caps, sleep: the body step (basement/collision-kit.js)
 
                 // Keep w/h in sync for legacy compatibility
                 this.w = this.width;

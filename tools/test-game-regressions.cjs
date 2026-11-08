@@ -92,7 +92,7 @@ test('Legacy save/load and cap PP settlement preserve XP without duplicate payou
 
 function flitFixture(env, walls) {
   env.run(`
-    game.isDriving=false; game.paused=false; game.hud={has:()=>true}; game.keys={}; game.joystick={active:false};
+    game.isDriving=false; game.paused=false; game.hud={has:()=>true}; controls.keyboard.setInputs([]); game.joystick={active:false};
     game.useNewCollisionSystem=false; game._staticBillboardEntities=[]; game.roomSystem={active:false,doors:[]};
     game.activeMap={width:1000,height:1000,walls:${JSON.stringify(walls)},buildings:[],buildingColliders:[]};
     Object.assign(game.player,{x:100,y:100,angle:0,radius:12});
@@ -246,7 +246,7 @@ function setupDrive(env, {taxi=false,lane='R0.S0.L2',destination='clinic',endpoi
     game._doLoadMap('sdc'); game.story.update=()=>{}; game.running=true; game.paused=false;
     game.traffic.vehicles=[]; game.traffic.spawnTimer=1e9; GameSettings.getMaxTraffic=()=>0;
     game.zibSystem.passengerRide=null; game.zibSystem.activeZibs=[]; game.zibSystem.trySpawn=()=>{};
-    game.keys={}; game.joystick.active=false; game.joystick.dx=game.joystick.dy=0; game.handbrakeHeld=false;
+    controls.keyboard.setInputs([]); game.joystick.active=false; game.joystick.dx=game.joystick.dy=0; controls.touch.setInputs([]);
     const selected=game.traffic.network.allLanes.find(l=>l.id===${JSON.stringify(lane)});
     const offset=${endpoint} ? selected.length-12 : Math.min(200,selected.length*.3);
     game.car=game.ownedCar; game.car.disableAutoDrive(); game.car.clearNavWaypoints();
@@ -397,10 +397,10 @@ test('Autodrive keyboard repeat, player takeover and passenger input guards', en
   equal(env.probe.game.car.controlMode, 'AI');
   env.dispatchWindow({type:'keydown',key:'q',repeat:true,preventDefault(){}});
   equal(env.probe.game.car.controlMode, 'AI');
-  env.run('game.keys.ArrowLeft=true;game.update();');
+  env.run('controls.keyboard.setInputs(["ArrowLeft"]);game.update();');
   equal(env.probe.game.car.controlMode, 'PLAYER');
   setupDrive(env, {taxi:true});
-  env.run('game.toggleAutoDrive();game.keys.ArrowLeft=true;game.handbrakeHeld=true;game.update();');
+  env.run('game.toggleAutoDrive();controls.keyboard.setInputs(["ArrowLeft"]);controls.touch.setInputs(["touchHandbrake"]);game.update();');
   equal(env.probe.game.car.controlMode, 'AI'); equal(env.probe.game.zibSystem.isPassenger, true);
 }, {events:true,timers:true});
 
@@ -1165,7 +1165,7 @@ function carsFixture(env) {
     game.story.update=()=>{}; game._doLoadMap('sdc'); game.running=true; game.paused=false;
     game.traffic.vehicles=[]; game.traffic.spawnTimer=1e9; GameSettings.getMaxTraffic=()=>0;
     game.zibSystem.passengerRide=null; game.zibSystem.activeZibs=[]; game.zibSystem.trySpawn=()=>{};
-    game.keys={}; game.joystick.active=false; game.joystick.dx=game.joystick.dy=0;
+    controls.keyboard.setInputs([]); game.joystick.active=false; game.joystick.dx=game.joystick.dy=0;
     globalThis.__lane=game.traffic.network.allLanes.find(l=>l.id==='R0.S0.L2');
     globalThis.__street=(along,brand='LADY')=>{
       const c=new TrafficVehicle(__lane,brand,brand==='LADY'?'suv2':Object.keys(VEHICLE_BRANDS[brand].models)[0],'AI');
@@ -1266,8 +1266,8 @@ test('Her car on foot: Drive from behind or in front walks round the corner with
     const slide=c=>{
       park(c,500); const nx=-sa, ny=ca; game.player.x=c.x+nx*60; game.player.y=c.y+ny*60;
       const ix=(-nx+ca)/Math.SQRT2, iy=(-ny+sa)/Math.SQRT2, l0=(game.player.x-c.x)*ca+(game.player.y-c.y)*sa;
-      game.keys={ArrowLeft:ix<-0.3,ArrowRight:ix>0.3,ArrowUp:iy<-0.3,ArrowDown:iy>0.3};
-      for(let i=0;i<20;i++) game.update(); game.keys={};
+      controls.keyboard.setInputs([ix<-0.3&&'ArrowLeft',ix>0.3&&'ArrowRight',iy<-0.3&&'ArrowUp',iy>0.3&&'ArrowDown'].filter(Boolean));
+      for(let i=0;i<20;i++) game.update(); controls.keyboard.setInputs([]);
       return Math.round((game.player.x-c.x)*ca+(game.player.y-c.y)*sa-l0);
     };
     if(game.isDriving) game.toggleVehicle();
@@ -1630,7 +1630,7 @@ test('Pedestrians walk on: turn back only at a dead end or full crossing, never 
   env.run(`{
     let s=4242; Math.random=()=>(s=(s*16807)%2147483647)/2147483647;
     game.story.update=()=>{}; game._doLoadMap('sdc'); game.running=true; game.paused=false;
-    game.keys={}; game.joystick.active=false; globalThis.__hops=new Map();
+    controls.keyboard.setInputs([]); game.joystick.active=false; globalThis.__hops=new Map();
   }`);
   for (let c = 0; c < 6; c++) env.run(`{
     for(let t=0;t<500;t++){ game.update();

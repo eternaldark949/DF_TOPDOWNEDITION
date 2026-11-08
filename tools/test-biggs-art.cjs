@@ -20,10 +20,10 @@ test('Warm ride and pavilion painting reuses bounded art and balances canvas sta
   game._doLoadMap('biggs_arena');const ctx=game.ctx,b=createBiggsAmusementPark(100,200),car=new BumperCar({x:300,y:300}),wheel=new FerrisWheel(500,500);
   game.camera.x=450;game.camera.y=450;
   b.drawBase(ctx);b.drawTop(ctx);b.drawEmissive(ctx,1);car.draw(ctx);wheel.draw(ctx);
-  const roof=b._lkSprites.biggs_roof,body=car._biggsPaint,frame=wheel._lkSprites.biggs_frame,cabins=wheel._biggsCabins.map(c=>c.cv);
+  const roof=b._lkSprites.tk_roof_0,body=car._biggsPaint,frame=wheel._lkSprites.biggs_frame,cabins=wheel._biggsCabins.map(c=>c.cv);
   for(let i=0;i<80;i++){game.camera.x+=1;car.x+=.2;wheel.update();b.drawBase(ctx);b.drawTop(ctx);b.drawEmissive(ctx,.8);car.draw(ctx);wheel.draw(ctx);}
   const m=ctx.getTransform();
-  return {retained:roof===b._lkSprites.biggs_roof&&body===car._biggsPaint&&frame===wheel._lkSprites.biggs_frame&&cabins.every((c,i)=>c===wheel._biggsCabins[i].cv),pixels:roof.cv.width*roof.cv.height,transform:[m.a,m.b,m.c,m.d,m.e,m.f]};
+  return {retained:roof===b._lkSprites.tk_roof_0&&body===car._biggsPaint&&frame===wheel._lkSprites.biggs_frame&&cabins.every((c,i)=>c===wheel._biggsCabins[i].cv),pixels:roof.cv.width*roof.cv.height,transform:[m.a,m.b,m.c,m.d,m.e,m.f]};
  `);
  assert.equal(r.retained,true);assert.ok(r.pixels<250000);assert.deepEqual(r.transform,[1,0,0,1,0,0]);assert.deepEqual(e.errors,[]);
 });

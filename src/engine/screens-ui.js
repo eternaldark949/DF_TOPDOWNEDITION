@@ -56,7 +56,7 @@
                 if (++U.vizT >= 6) {
                     U.vizT = 0;
                     if (!U.bars || !U.bars.length) U.bars = document.querySelectorAll('#audio-viz .viz-bar');
-                    U.bars.forEach(bar => bar.style.height = `${20 + Math.random() * 80}%`);
+                    U.bars.forEach(bar => bar.style.height = `${20 + fxRandom() * 80}%`);
                 }
             },
             
@@ -141,7 +141,7 @@
                         this.npcNameEl.textContent = entity.name;
                         this.npcNameEl.style.color = SPEAKER_COLORS[entity.name] || '#ff0055';
                         this.renderDialoguePortrait(entity.name);
-                        document.getElementById('dialogue-caption').style.display = 'none';
+                        uiKit.hide('dialogue-caption');
                         const cooldownLines = {
                             'Victoria': "We already talked. Go shoot something.",
                             'Yenna': "We've spoken. I'll be here.",
@@ -166,7 +166,7 @@
                 this.npcNameEl.style.color = SPEAKER_COLORS[entity.name] || '#ff0055';
                 
                 // 1. HIDE RANDOM CAPTIONS (Cleanup the screen)
-                document.getElementById('dialogue-caption').style.display = 'none';
+                uiKit.hide('dialogue-caption');
                 
                 // 2. Track Meeting (For Phone Contacts)
                 if (typeof phoneSystem !== 'undefined') {
@@ -478,7 +478,7 @@
                 this.dialogueBox.style.display = 'none'; 
                 
                 // 1. RESTORE RANDOM CAPTIONS
-                document.getElementById('dialogue-caption').style.display = 'block';
+                uiKit.show('dialogue-caption');
                 
                 // 2. RESTORE DIALOGUE BUTTON DEFAULTS
                 this.btnAccept.textContent = 'Accept';

@@ -60,7 +60,7 @@
                 const P = SCENE_VISION_PAINT[this.name];
                 if (P) {
                     const cv = this.cv, k = Math.min(1.5, window.devicePixelRatio || 1), w = Math.round(innerWidth * k), h = Math.round(innerHeight * k);
-                    if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+                    canvasKit.fitLayer(cv, w, h);
                     P.call(this, cv.getContext('2d'), w, h, this.t, this.S);
                 }
             }

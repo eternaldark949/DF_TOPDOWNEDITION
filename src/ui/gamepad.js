@@ -5,9 +5,10 @@
            aiming, driving and firing need no new paths in the engine:
              left stick  → game.joystick       (analog walk / steer, like the move stick)
              right stick → game.fireJoystick   (aim; RT fires, like pushing past the ring)
-           Buttons call the same methods as the HUD buttons and keyboard keys.
+           The controls system (basement/controls-system.js) reads the pad; in play its
+           buttons are actions in the keymap (directory/game-controls.js), like the keys.
 
-           Its own requestAnimationFrame loop runs whether or not the game is paused,
+           This runs every frame after the pad is read, whether or not the game is paused,
            so the pad also works the title screen and every menu: the D-pad or left
            stick moves a highlight between the visible things you can click, A clicks
            it, B goes back (Escape), Start pauses. Standard mapping (Xbox names):
@@ -18,23 +19,16 @@
              Back  map                    Start pause             D-pad ↑ phone · ↓ night vision
            ========================================================================= */
         const GamepadInput = (() => {
-            const B = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, BACK: 8, START: 9, L3: 10, R3: 11, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
-            const MOVE_DEAD = 0.18, AIM_DEAD = 0.3, TRIGGER = 0.4, NAV_DEAD = 0.55;
+            const P = controls.gamepad;                          // basement/controls-system.js reads the pad
+            const B = { A: 'gamepadA', B: 'gamepadB', START: 'gamepadStart', BACK: 'gamepadBack', UP: 'gamepadDUp', DOWN: 'gamepadDDown', LEFT: 'gamepadDLeft', RIGHT: 'gamepadDRight' };
+            const MOVE_DEAD = 0.18, AIM_DEAD = 0.3, NAV_DEAD = 0.55;
             const REPEAT_FIRST = 380, REPEAT_NEXT = 110;          // ms: held D-pad / stick in menus
-            const HOLD_ALLY = 300;                               // ms: RB held → booster on the nearest ally (as the HUD button)
 
-            const state = { index: null, prev: [], raf: 0, focus: null, navDir: null, navAt: 0, autoAt: 0, aDown: null, rbAt: 0, rbHeld: false, ownsMove: false, ownsAim: false, lastMode: null };
+            const state = { focus: null, navDir: null, navAt: 0, autoAt: 0, aDown: null, ownsMove: false, ownsAim: false, lastMode: null, had: false };
 
-            const pressed = (pad, i) => { const b = pad.buttons[i]; return !!b && (b.pressed || b.value > TRIGGER); };
-            const down = (pad, i) => pressed(pad, i) && !state.prev[i];
-            const up = (pad, i) => !pressed(pad, i) && state.prev[i];
-            /** A stick with a radial dead zone, rescaled so the edge of the dead zone is 0. */
-            const stick = (x, y, dead) => {
-                const m = Math.hypot(x, y);
-                if (m < dead) return { x: 0, y: 0, m: 0 };
-                const k = Math.min(1, (m - dead) / (1 - dead)) / m;
-                return { x: x * k, y: y * k, m: Math.min(1, (m - dead) / (1 - dead)) };
-            };
+            const pressed = (i) => P.input_active.has(i);
+            const down = (i) => P.input_just_activated.has(i);
+            const up = (i) => P.input_just_released.has(i);
             const key = (k) => {                                // the keyboard paths already handle Escape, Enter …
                 const target = document.activeElement && document.activeElement !== document.body ? document.activeElement : document.body;
                 target.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
@@ -46,11 +40,6 @@
                 if (phase === 'down') { el.dispatchEvent(new PointerEvent('pointerdown', o)); el.dispatchEvent(new MouseEvent('mousedown', o)); }
                 else { el.dispatchEvent(new PointerEvent('pointerup', o)); el.dispatchEvent(new MouseEvent('mouseup', o)); el.dispatchEvent(new MouseEvent('click', o)); }
             };
-            const visibleBtn = (el) => !!el && el.offsetParent !== null && getComputedStyle(el).display !== 'none';
-            const rumble = (ms, strength) => {
-                const pad = state.index !== null && navigator.getGamepads ? navigator.getGamepads()[state.index] : null;
-                try { pad?.vibrationActuator?.playEffect('dual-rumble', { duration: ms, strongMagnitude: strength, weakMagnitude: strength }); } catch (e) { /* no rumble */ }
-            };
 
             // ── Gameplay ────────────────────────────────────────────────────────
             function releaseSticks(g) {
@@ -60,21 +49,21 @@
                     document.getElementById('game-ui')?.classList.remove('aiming');
                 }
                 state.ownsMove = state.ownsAim = false;
-                g.handbrakeHeld = false;
             }
 
-            function gameplay(g, pad) {
+            /** Play: the sticks feed the same state the touch sticks do. The buttons are actions (directory/game-controls.js). */
+            function gameplay(g) {
                 const J = g.joystick, F = g.fireJoystick;
                 // Left stick: walk / steer — unless a finger already has the move stick
-                const L = stick(pad.axes[0] || 0, pad.axes[1] || 0, MOVE_DEAD);
+                const L = P.stick('left', MOVE_DEAD);
                 if (J.id === null || J.id === 'pad') {
                     if (L.m > 0) { Object.assign(J, { active: true, id: 'pad', dx: L.x, dy: L.y }); state.ownsMove = true; }
                     else if (state.ownsMove) { Object.assign(J, { active: false, id: null, dx: 0, dy: 0 }); state.ownsMove = false; }
                 }
 
                 // Right stick aims; RT fires (along the stick, or straight ahead with no stick)
-                const R = stick(pad.axes[2] || 0, pad.axes[3] || 0, AIM_DEAD);
-                const rt = pressed(pad, B.RT), canAim = !g.weaponHolstered || g._quickDraw || g.isDriving;
+                const R = P.stick('right', AIM_DEAD);
+                const rt = pressed('gamepadRTrigger'), canAim = !g.weaponHolstered || g._quickDraw || g.isDriving;
                 if (F.id === null || F.id === 'pad') {
                     if (canAim && (R.m > 0 || rt)) {
                         let dx = R.x, dy = R.y;
@@ -93,31 +82,11 @@
                         state.ownsAim = false;
                     }
                     // Quick draw fires on release, like lifting the thumb off the fire stick
-                    if (g._quickDraw && up(pad, B.RT)) g.requestQuickDraw(Math.atan2(F.dy || Math.sin(g.player.angle), F.dx || Math.cos(g.player.angle)));
+                    if (g._quickDraw && up('gamepadRTrigger')) g.requestQuickDraw(Math.atan2(F.dy || Math.sin(g.player.angle), F.dx || Math.cos(g.player.angle)));
                 }
-
-                // Driving: LT is the handbrake, L3 auto-drive
-                g.handbrakeHeld = !!(g.isDriving && pressed(pad, B.LT));
-                document.getElementById('btn-handbrake')?.classList.toggle('held', g.handbrakeHeld);
-                if (g.isDriving && down(pad, B.L3)) g.toggleAutoDrive();
-
-                if (down(pad, B.A)) g.interact();
-                if (down(pad, B.B) && !g.isDriving) { if (g.triggerFlit(undefined, 'pad')) rumble(90, 0.5); }
-                if (down(pad, B.X) && !g.isDriving) {
-                    if (g._quickDraw) { g.cancelQuickDraw(); g.setWeaponHolstered(false); }
-                    else g.setWeaponHolstered(!g.weaponHolstered);
-                }
-                if (down(pad, B.Y) && visibleBtn(g.transitionBtn)) g.triggerTransition();
-                if (down(pad, B.LB) && !g.isDriving) g.toggleSneak();
-                // RB: tap = booster, hold = booster on the nearest damaged ally
-                if (down(pad, B.RB)) { state.rbAt = performance.now(); state.rbHeld = false; }
-                if (pressed(pad, B.RB) && !state.rbHeld && performance.now() - state.rbAt > HOLD_ALLY) { state.rbHeld = true; g.useBoosterOnAlly(); }
-                if (up(pad, B.RB) && !state.rbHeld) g.useBooster();
-
-                if (down(pad, B.BACK)) Screens.open('map');
-                if (down(pad, B.UP)) phoneSystem.open();
-                if (down(pad, B.DOWN)) document.getElementById('btn-nv')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-                if (down(pad, B.START)) key('Escape');
+                // LT is the handbrake (the 'handbrake' action, read by engine/update.js): light its button
+                const hb = !!(g.isDriving && pressed('gamepadLTrigger'));
+                if (hb !== !!state.hb) { state.hb = hb; document.getElementById('btn-handbrake')?.classList.toggle('held', hb || controls.touch.isActive('touchHandbrake')); }
             }
 
             // ── Menus: a highlight that moves between the visible clickable things ──
@@ -183,14 +152,14 @@
                 }
                 if (best) setFocus(best);
             }
-            function menus(g, pad) {
+            function menus(g) {
                 // Direction: D-pad, or the left stick past halfway; held → repeats
-                const ax = pad.axes[0] || 0, ay = pad.axes[1] || 0;
+                const [ax, ay] = P.left_stick_value;
                 let dir = null;
-                if (pressed(pad, B.UP) || ay < -NAV_DEAD) dir = 'up';
-                else if (pressed(pad, B.DOWN) || ay > NAV_DEAD) dir = 'down';
-                else if (pressed(pad, B.LEFT) || ax < -NAV_DEAD) dir = 'left';
-                else if (pressed(pad, B.RIGHT) || ax > NAV_DEAD) dir = 'right';
+                if (pressed(B.UP) || ay < -NAV_DEAD) dir = 'up';
+                else if (pressed(B.DOWN) || ay > NAV_DEAD) dir = 'down';
+                else if (pressed(B.LEFT) || ax < -NAV_DEAD) dir = 'left';
+                else if (pressed(B.RIGHT) || ax > NAV_DEAD) dir = 'right';
                 const now = performance.now();
                 if (!dir && now >= state.autoAt) { state.autoAt = now + 200; if (!isLive(state.focus)) autoFocus(g); }
                 if (dir && (dir !== state.navDir || now >= state.navAt)) {
@@ -200,7 +169,7 @@
                 }
                 state.navDir = dir;
                 // Right stick scrolls whatever list is under the highlight
-                const ry = pad.axes[3] || 0;
+                const ry = P.right_stick_value[1];
                 if (Math.abs(ry) > AIM_DEAD) {
                     let s = state.focus || document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
                     while (s && s !== document.body && !(s.scrollHeight > s.clientHeight + 2 && /auto|scroll/.test(getComputedStyle(s).overflowY))) s = s.parentElement;
@@ -208,57 +177,45 @@
                 }
                 // A presses the highlighted item the way a mouse does (down on press, up + click on release),
                 // so buttons wired to pointerdown, mousedown, pointerup or click all answer, and hold buttons hold
-                if (down(pad, B.A)) {
+                if (down(B.A)) {
                     const el = state.focus;
                     if (isLive(el) && el.matches('input:not([type="checkbox"]):not([type="radio"]), select, textarea')) el.focus();
                     else if (isLive(el)) { state.aDown = el; mouse(el, 'down'); }
                     else key('Enter');                          // nothing highlighted: advance a line
                 }
-                if (up(pad, B.A) && state.aDown) { const el = state.aDown; state.aDown = null; if (el.isConnected) mouse(el, 'up'); }
-                if (down(pad, B.B) || down(pad, B.START)) key('Escape');
-                if (down(pad, B.BACK) && (Screens.mapOpen() || Screens.menuOpen())) Screens.close();
+                if (up(B.A) && state.aDown) { const el = state.aDown; state.aDown = null; if (el.isConnected) mouse(el, 'up'); }
+                if (down(B.B) || down(B.START)) key('Escape');
+                if (down(B.BACK) && (Screens.mapOpen() || Screens.menuOpen())) Screens.close();
             }
 
-            // ── The loop ────────────────────────────────────────────────────────
+            // ── Each frame, after the controls system has read the pad ─────────────
             function frame() {
-                state.raf = requestAnimationFrame(frame);
-                const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-                let pad = state.index !== null ? pads[state.index] : null;
-                if (!pad || !pad.connected) { pad = [...pads].find(p => p && p.connected) || null; state.index = pad ? pad.index : null; }
-                if (!pad) return;
+                if (!P.connected) { if (state.had) { state.had = false; if (typeof game !== 'undefined') releaseSticks(game); setFocus(null); } return; }
+                state.had = true;
                 const g = typeof game !== 'undefined' ? game : null;
-                const menuMode = !g || !g.running || g.paused || hudInputBlocked() || !!(g.scenes && g.scenes.running);
+                const menuMode = dfMenuMode(g);
                 if (menuMode !== state.lastMode) {
                     if (menuMode && g) releaseSticks(g);
                     if (!menuMode) setFocus(null);
                     state.lastMode = menuMode; state.navDir = null;
+                    return;   // a button that just opened a menu (Start, Back, A) mustn't also press inside it
                 }
                 // Escape/Start in a scene opens the pause menu; everything else in a scene is the dialogue (A = next line)
-                if (menuMode) menus(g, pad); else gameplay(g, pad);
-                state.prev = pad.buttons.map(b => b.pressed || b.value > TRIGGER);
+                if (menuMode) menus(g); else gameplay(g);
             }
 
             function start() {
+                controls.hooks.push(frame);
                 if (!('getGamepads' in navigator)) return;
-                window.addEventListener('gamepadconnected', (e) => {
-                    if (state.index === null) state.index = e.gamepad.index;
+                window.addEventListener('gamepadconnected', () => {
                     document.body.classList.add('gamepad-active');
                     if (typeof showMessage === 'function') showMessage('CONTROLLER CONNECTED');
-                    if (!state.raf) state.raf = requestAnimationFrame(frame);
                 });
-                window.addEventListener('gamepaddisconnected', (e) => {
-                    if (e.gamepad.index !== state.index) return;
-                    state.index = null; state.prev = [];
-                    if (typeof game !== 'undefined') releaseSticks(game);
-                    setFocus(null);
-                    if (![...navigator.getGamepads()].some(p => p && p.connected)) {
-                        document.body.classList.remove('gamepad-active');
-                        cancelAnimationFrame(state.raf); state.raf = 0;
-                        if (typeof showMessage === 'function') showMessage('CONTROLLER DISCONNECTED');
-                    }
+                window.addEventListener('gamepaddisconnected', () => {
+                    if ([...navigator.getGamepads()].some(p => p && p.connected)) return;
+                    document.body.classList.remove('gamepad-active');
+                    if (typeof showMessage === 'function') showMessage('CONTROLLER DISCONNECTED');
                 });
-                // A pad already plugged in before the page loaded only reports itself on its first button press,
-                // which fires gamepadconnected above; nothing else to do here.
             }
 
             return { start, state, _frame: frame };

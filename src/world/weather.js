@@ -702,14 +702,14 @@
                 for(let i=0; i<count; i++) {
                     const p = this._particlePool.acquire();
                     p.type = 'spray';
-                    p.x = x + (Math.random()-0.5)*5;
-                    p.y = y + (Math.random()-0.5)*5;
-                    p.vx = -Math.cos(angle)*(Math.random()*3) + (Math.random()-0.5);
-                    p.vy = -Math.sin(angle)*(Math.random()*3) + (Math.random()-0.5);
+                    p.x = x + (fxRandom()-0.5)*5;
+                    p.y = y + (fxRandom()-0.5)*5;
+                    p.vx = -Math.cos(angle)*(fxRandom()*3) + (fxRandom()-0.5);
+                    p.vy = -Math.sin(angle)*(fxRandom()*3) + (fxRandom()-0.5);
                     p.life = 1.0;
-                    p.decay = (0.08 + Math.random()*0.05) / lifeMult;
+                    p.decay = (0.08 + fxRandom()*0.05) / lifeMult;
                     p.color = color;
-                    p.size = 2 + Math.random() * 3;
+                    p.size = 2 + fxRandom() * 3;
                     this.particles.push(p);
                 }
             }
@@ -717,17 +717,17 @@
             // Explosion: Radial burst of particles (combat/destruction)
             spawnExplosion(x, y, color = 'rgba(0, 243, 255, 1)', count = 15, speed = 6) {
                 for(let i=0; i<count; i++) {
-                    const ang = Math.random() * Math.PI * 2;
-                    const spd = Math.random() * speed;
+                    const ang = fxRandom() * Math.PI * 2;
+                    const spd = fxRandom() * speed;
                     const p = this._particlePool.acquire();
                     p.type = 'explosion';
                     p.x = x; p.y = y;
                     p.vx = Math.cos(ang) * spd;
                     p.vy = Math.sin(ang) * spd;
                     p.life = 1.0;
-                    p.decay = 0.05 + Math.random() * 0.05;
+                    p.decay = 0.05 + fxRandom() * 0.05;
                     p.color = color;
-                    p.size = 3 + Math.random() * 3;
+                    p.size = 3 + fxRandom() * 3;
                     this.particles.push(p);
                 }
             }
@@ -747,17 +747,17 @@
             // Sparks: Bright particles from impacts (metal collisions)
             spawnSparks(x, y, amount = 15) {
                 for(let i=0; i<amount; i++) {
-                    const ang = Math.random() * Math.PI * 2;
-                    const speed = 3 + Math.random() * 5;
+                    const ang = fxRandom() * Math.PI * 2;
+                    const speed = 3 + fxRandom() * 5;
                     const p = this._particlePool.acquire();
                     p.type = 'spark';
                     p.x = x; p.y = y;
                     p.vx = Math.cos(ang) * speed;
                     p.vy = Math.sin(ang) * speed;
                     p.life = 1.0;
-                    p.decay = 0.1 + Math.random() * 0.1;
+                    p.decay = 0.1 + fxRandom() * 0.1;
                     p.color = '#fff5aa';
-                    p.size = 1 + Math.random();
+                    p.size = 1 + fxRandom();
                     this.particles.push(p);
                 }
             }
@@ -765,16 +765,16 @@
             /** A spray of droplets (blood, coolant…) fanning out along `dir`. color: 'rgba(r, g, b, 1)'. */
             spawnSpray(x, y, dir, color, amount = 8) {
                 for (let i = 0; i < amount; i++) {
-                    const ang = dir + (Math.random() - 0.5) * 1.1;
-                    const spd = 1.5 + Math.random() * 4.5;
+                    const ang = dir + (fxRandom() - 0.5) * 1.1;
+                    const spd = 1.5 + fxRandom() * 4.5;
                     const p = this._particlePool.acquire();
                     p.type = 'explosion';                                    // damped, drawn as a fading dot
                     p.x = x; p.y = y;
                     p.vx = Math.cos(ang) * spd; p.vy = Math.sin(ang) * spd;
                     p.life = 1.0;
-                    p.decay = 0.06 + Math.random() * 0.05;
+                    p.decay = 0.06 + fxRandom() * 0.05;
                     p.color = color;
-                    p.size = 1 + Math.random() * 1.8;
+                    p.size = 1 + fxRandom() * 1.8;
                     this.particles.push(p);
                 }
             }
@@ -834,7 +834,7 @@
                         this.triggerLightning();
                         if (typeof audioSys !== 'undefined' && audioSys.sfx) {
                             // Thunder trails the flash slightly — light before sound.
-                            setTimeout(() => audioSys.sfx('thunder', { muffled: this.indoorSuppressed }), 220 + Math.random() * 500);
+                            game_timers.after(0.22 + Math.random() * 0.5, () => audioSys.sfx('thunder', { muffled: this.indoorSuppressed }));
                         }
                     }
                 }
@@ -866,11 +866,11 @@
                     const baseRate = Math.max(1, Math.floor(rainCfg.dropRate * areaScale * wScale));
                     
                     // Spawn new drops in world space within visible area
-                    const toSpawn = baseRate + Math.floor(Math.random() * baseRate * 0.4);
+                    const toSpawn = baseRate + Math.floor(fxRandom() * baseRate * 0.4);
                     for (let i = 0; i < toSpawn && this.drops.length < maxDrops; i++) {
-                        const gx = viewLeft + Math.random() * viewW;
-                        const gy = viewTop + Math.random() * viewH;
-                        const h0 = 0.6 + Math.random() * 0.4;
+                        const gx = viewLeft + fxRandom() * viewW;
+                        const gy = viewTop + fxRandom() * viewH;
+                        const h0 = 0.6 + fxRandom() * 0.4;
                         
                         // Convert ground target to screen space for direction calc
                         const sx = (gx - camera.x) * zoom + hw;
@@ -891,8 +891,8 @@
                         this.drops.push({
                             groundX: gx, groundY: gy,  // WORLD space
                             height: h0,
-                            fallSpeed: RC.RAIN_FALL_SPEED_MIN + Math.random() * (RC.RAIN_FALL_SPEED_MAX - RC.RAIN_FALL_SPEED_MIN),
-                            brightness: 0.35 + Math.random() * 0.65,
+                            fallSpeed: RC.RAIN_FALL_SPEED_MIN + fxRandom() * (RC.RAIN_FALL_SPEED_MAX - RC.RAIN_FALL_SPEED_MIN),
+                            brightness: 0.35 + fxRandom() * 0.65,
                             dirX: dirX, dirY: dirY
                         });
                     }
@@ -921,9 +921,9 @@
                             if (this.splashes.length < rainCfg.maxSplashes * areaScale * wScale) {
                                 this.splashes.push({
                                     x: d.groundX, y: d.groundY,  // WORLD space
-                                    t: 0, lifespan: 300 + Math.random() * 250,
-                                    maxR: CONFIG.WEATHER.SPLASH_RADIUS_MIN + Math.random() * (CONFIG.WEATHER.SPLASH_RADIUS_MAX - CONFIG.WEATHER.SPLASH_RADIUS_MIN),
-                                    rings: Math.random() > (1 - CONFIG.WEATHER.SPLASH_RINGS_CHANCE) ? 2 : 1,
+                                    t: 0, lifespan: 300 + fxRandom() * 250,
+                                    maxR: CONFIG.WEATHER.SPLASH_RADIUS_MIN + fxRandom() * (CONFIG.WEATHER.SPLASH_RADIUS_MAX - CONFIG.WEATHER.SPLASH_RADIUS_MIN),
+                                    rings: fxRandom() > (1 - CONFIG.WEATHER.SPLASH_RINGS_CHANCE) ? 2 : 1,
                                     br: d.brightness
                                 });
                             }
@@ -1092,16 +1092,16 @@
                 const want = Math.min(4000, Math.floor(this._cineDensity * vw * vh));
                 let have = 0; for (const d of this.drops) if (d.groundX > L && d.groundX < L + vw && d.groundY > T && d.groundY < T + vh) have++;
                 for (let k = 0, tries = 0; have < want && tries < want * 4 && this.drops.length < 6000; tries++) {
-                    const gx = L + Math.random() * vw, gy = T + Math.random() * vh;
+                    const gx = L + fxRandom() * vw, gy = T + fxRandom() * vh;
                     if (inC(gx, gy)) continue;                                      // that ground already has its rain
-                    const h0 = 0.05 + Math.random() * 0.95;
+                    const h0 = 0.05 + fxRandom() * 0.95;
                     const sx = (gx - view.x) * zoom + hw, sy = (gy - view.y) * zoom + hh, dx = sx - hw, dy = sy - hh;
                     const par = h0 * h0 * RC.RAIN_PARALLAX;
                     const stx = sx + dx * par - this.windVec.x * RC.RAIN_WIND_DRIFT * h0, sty = sy + dy * par - this.windVec.y * RC.RAIN_WIND_DRIFT * h0;
                     const tx = sx - stx - this.windVec.x * RC.RAIN_WIND_DIR_STR, ty = sy - sty - this.windVec.y * RC.RAIN_WIND_DIR_STR, dist = Math.hypot(tx, ty);
                     this.drops.push({ groundX: gx, groundY: gy, height: h0,
-                        fallSpeed: RC.RAIN_FALL_SPEED_MIN + Math.random() * (RC.RAIN_FALL_SPEED_MAX - RC.RAIN_FALL_SPEED_MIN),
-                        brightness: 0.35 + Math.random() * 0.65, dirX: dist > 0.1 ? tx / dist : 0, dirY: dist > 0.1 ? ty / dist : 1 });
+                        fallSpeed: RC.RAIN_FALL_SPEED_MIN + fxRandom() * (RC.RAIN_FALL_SPEED_MAX - RC.RAIN_FALL_SPEED_MIN),
+                        brightness: 0.35 + fxRandom() * 0.65, dirX: dist > 0.1 ? tx / dist : 0, dirY: dist > 0.1 ? ty / dist : 1 });
                     have++; k++;
                 }
             }

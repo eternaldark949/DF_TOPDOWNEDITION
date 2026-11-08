@@ -15,14 +15,13 @@
             g._cancelQuickDrawHold?.();
             g.interruptQuickDrawShot?.();
             g.mouseDown = false;
-            if (g.keys) for (const k in g.keys) g.keys[k] = false;
+            if (typeof controls !== 'undefined') controls.clear();
             if (g.joystick) Object.assign(g.joystick, { active: false, dx: 0, dy: 0, id: null, armed: true, ringArmed: true, trail: [] });
             if (g.fireJoystick) Object.assign(g.fireJoystick, { active: false, dx: 0, dy: 0, id: null, firing: false, armed: false, aimed: false, remembered: false });
             g._releaseShot = null; g._releaseWait = 0; g._aimMemory = null;
-            clearTimeout(g._healHoldTimer); g._healHoldTimer = null; g._healHeld = false; g._healPressed = false;
             g._cancelGrabHold?.();
             g._cancelLookDrag?.();
-            g.handbrakeHeld = false; if (g.car) g.car.handbrake = false;
+            if (g.car) g.car.handbrake = false;
             document.getElementById('btn-handbrake')?.classList.remove('held');
             if (g.emoteJoystick) Object.assign(g.emoteJoystick, { active: false, touchId: null, highlighted: null });
             g.emoteBtn?.classList.remove('dragging');
@@ -60,8 +59,7 @@
         // GLOBAL FRAME TIME CACHE — Set once per frame, used everywhere
         // Replaces scattered Date.now() calls to eliminate redundant syscalls + GC
         // ============================================================================
-        let _frameTime = performance.now();
-        let _frameTimeSec = _frameTime / 1000;
+        // (_frameTime and _frameTimeSec are declared in basement/frame-clock.js)
         let _profileSampling = false;   // detailed clocks are idle when the profiler and benchmark are off
         let _zoomLOD = 0; // 0 = full quality, 1 = reduced, 2 = minimal (updated per frame)
         
@@ -472,6 +470,18 @@
                 OFFHAND_PULL: 4.5,      // px the other fist pulls back
                 TWIST: 0.75,            // Torso twist in radians (~43°)
                 BODY_LEAN: 3            // px the body shifts back at full extension
+            },
+            // The knuckles' haymaker: an arcing hook in place of the jab (humanoidHookPose, penthouse/procedural-humanoid.js).
+            // KEYS [tick, sweep°, reach, twist, lunge]: the fist rides an arc round her chest, 90° out to her side and 0° dead
+            // ahead, `reach` px from it; twist turns the torso into it (negative winds away), lunge carries the body forward
+            // (negative sits back). Cocked out wide, swung round and across, carried through.
+            HAYMAKER: {
+                KEYS: [[0, 55, 14, 0, 0], [3, 92, 19, -0.45, -0.4], [6, -2, 26, 1.1, 1], [8, -16, 24, 1.25, 1]],
+                RECOVER_TICKS: 7,       // after the last key, back to guard (smoothstep)
+                LUNGE: 4,               // px the body drives forward at full lunge
+                OFFHAND_PULL: 5,        // px the other fist draws back as the body drives in (with the lunge)
+                OFFHAND_ELBOW: 1.4,     // its elbow draws back this much more than the fist (driving past the ribs)
+                OFFHAND_TURN: 0.6       // how much of the torso's twist the other arm turns with
             },
 
             VEHICLE_AI: {

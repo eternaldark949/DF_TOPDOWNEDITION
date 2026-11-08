@@ -121,7 +121,7 @@
          */
         function clothGeometry(ctx, owner, key, spec, dyn) {
             const shape = _clothShape(owner, key, spec);
-            const T = owner && !_crowdLite && (typeof _zoomLOD === 'undefined' || _zoomLOD < 2) ? _simTransform(ctx) : null;
+            const T = owner && ctx && !_crowdLite && (typeof _zoomLOD === 'undefined' || _zoomLOD < 2) ? _simTransform(ctx) : null;
             if (!T) return _clothRest(spec, shape);
             const { toLInto, sc, ang: baseAngle, M } = T;
             const n = spec.segs || 3, chains = spec.chains;

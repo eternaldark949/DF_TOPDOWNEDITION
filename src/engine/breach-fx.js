@@ -19,14 +19,7 @@
         const _breachSprites = new Map();
         /** A soft radial sprite (128×128) from gradient stops, cached by key. */
         function breachSprite(key, stops) {
-            let cv = _breachSprites.get(key);
-            if (cv) return cv;
-            cv = document.createElement('canvas'); cv.width = cv.height = 128;
-            const c = cv.getContext('2d'), g = c.createRadialGradient(64, 64, 0, 64, 64, 64);
-            for (const [o, col] of stops) g.addColorStop(o, col);
-            c.fillStyle = g; c.fillRect(0, 0, 128, 128);
-            _breachSprites.set(key, cv);
-            return cv;
+            return canvasKit.bake(_breachSprites, key, () => canvasKit.glow([128, stops]));
         }
         const _bFire = () => breachSprite('fire', [[0, 'rgba(255,250,235,1)'], [0.18, 'rgba(255,224,150,0.95)'], [0.42, 'rgba(255,140,50,0.6)'], [0.7, 'rgba(200,60,30,0.22)'], [1, 'rgba(120,20,40,0)']]);
         const _bCore = () => breachSprite('core', [[0, 'rgba(255,255,255,1)'], [0.4, 'rgba(255,240,210,0.6)'], [1, 'rgba(255,220,180,0)']]);

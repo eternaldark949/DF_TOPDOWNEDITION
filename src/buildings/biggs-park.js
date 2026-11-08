@@ -6,8 +6,7 @@
             cabin(wheel, i, color) {
                 const cabins=wheel._biggsCabins || (wheel._biggsCabins=[]);
                 if(cabins[i] && cabins[i].color===color)return cabins[i].cv;
-                const cv=document.createElement('canvas');cv.width=96;cv.height=112;
-                const c=cv.getContext('2d');c.scale(4,4);
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([96, 112]);c.scale(4,4);
                 const g=c.createLinearGradient(0,0,24,22);
                 g.addColorStop(0,lightenHex(color,35));g.addColorStop(.5,color);g.addColorStop(1,darkenHex(color,45));
                 BiggsArt.box(c,2,2,20,24,g,'#d2b689',5,.45);

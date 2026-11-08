@@ -330,49 +330,31 @@
                     const next = (ringHead + ringCount++) % ringTimes.length;
                     ringTimes[next] = now; ringRadii[next] = radius;
                 };
-                inputZone.addEventListener('touchstart', (e) => {
-                    e.preventDefault(); if (J.active) return;
-                    const touch = e.changedTouches[0];
-                    // Keep the whole ring on screen: shift the stick's centre in from the edges
-                    const ox = Math.max(EDGE, Math.min(window.innerWidth - EDGE, touch.clientX)), EY = Math.min(EDGE, window.innerHeight * 0.24), oy = Math.max(EY, Math.min(window.innerHeight - EY, touch.clientY));   // a short (landscape) screen: less margin top and bottom
-                    J.id = touch.identifier; J.active = true; J.originX = ox; J.originY = oy; J.dx = 0; J.dy = 0; J.armed = true;
-                    J.landX = touch.clientX; J.landY = touch.clientY;      // drags count from where the thumb landed
-                    J.trail = [{ x: 0, y: 0, t: performance.now() }];
-                    J.ringArmed = true; ringCount = 0;
-                    if (GameSettings.flitRing) seedRing(0, ringTime(e));
-                    visualZone.style.display = 'block'; visualZone.style.left = (ox - BASE) + 'px'; visualZone.style.top = (oy - BASE) + 'px';
-                    knob.style.transform = `translate(-50%, -50%)`;
-                    if (this.flitRingEl) this.flitRingEl.classList.toggle('off', !GameSettings.flitRing || !canFlit());
-                }, { passive: false });
-                inputZone.addEventListener('touchmove', (e) => {
-                    e.preventDefault(); if (!J.active) return;
-                    for (let i = 0; i < e.changedTouches.length; i++) {
-                        const touch = e.changedTouches[i];
-                        if (touch.identifier !== J.id) continue;
-                        const deltaX = touch.clientX - J.landX, deltaY = touch.clientY - J.landY, far = Math.hypot(deltaX, deltaY);
-                        const distance = Math.min(far, WALK), angle = Math.atan2(deltaY, deltaX);
-                        const moveX = Math.cos(angle) * distance, moveY = Math.sin(angle) * distance;
-                        knob.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`;
-                        if (GameSettings.preciseStick) {
-                            const push = shapePush(far);
-                            J.dx = Math.cos(angle) * push; J.dy = Math.sin(angle) * push;
-                        } else { J.dx = moveX / WALK; J.dy = moveY / WALK; }
+                // The stick itself (basement/controls-system.js touchStick): the base appears under the thumb
+                controls.touch.stick('move', { zone: inputZone, knob, base: visualZone, base_radius: BASE, anchor: 'touch', edge: EDGE, travel: WALK, free: () => !J.active,
+                    onStart: (S, e) => {
+                        Object.assign(J, { id: S.id, active: true, originX: S.x0, originY: S.y0, dx: 0, dy: 0, armed: true, landX: S.landX, landY: S.landY, trail: [{ x: 0, y: 0, t: performance.now() }], ringArmed: true });
+                        ringCount = 0;
+                        if (GameSettings.flitRing) seedRing(0, ringTime(e));
+                        if (this.flitRingEl) this.flitRingEl.classList.toggle('off', !GameSettings.flitRing || !canFlit());
+                    },
+                    onMove: (S, e) => {
+                        if (GameSettings.preciseStick) { const push = shapePush(S.far); J.dx = Math.cos(S.angle) * push; J.dy = Math.sin(S.angle) * push; }
+                        else { J.dx = S.kx / WALK; J.dy = S.ky / WALK; }
                         // A held-touch ring flick needs fresh, substantial outward speed.
                         // Keep the standalone flick's existing shared latch/re-arm behavior.
-                        if (far <= RING_OUT) J.armed = true;
-                        sampleRing(e, deltaX, deltaY, far);
+                        if (S.far <= RING_OUT) J.armed = true;
+                        sampleRing(e, S.dx, S.dy, S.far);
                         // A flick: from near the centre to well out, fast
                         if (GameSettings.flitFlick && J.armed) {
-                            const now = performance.now(); J.trail.push({ x: deltaX, y: deltaY, t: now });
+                            const now = performance.now(); J.trail.push({ x: S.dx, y: S.dy, t: now });
                             while (J.trail.length > 2 && now - J.trail[0].t > 150) J.trail.shift();
                             const t0 = J.trail[0];
-                            if (Math.hypot(t0.x, t0.y) < 14 && far > 30 && now - t0.t < 150 && canFlit()) { J.armed = false; if (!this.triggerFlit(angle, 'flick')) J.armed = true; }
+                            if (Math.hypot(t0.x, t0.y) < 14 && S.far > 30 && now - t0.t < 150 && canFlit()) { J.armed = false; if (!this.triggerFlit(S.angle, 'flick')) J.armed = true; }
                         }
-                        break;
-                    }
-                }, { passive: false });
-                const endHandler = (e) => { e.preventDefault(); for (let i = 0; i < e.changedTouches.length; i++) { if (e.changedTouches[i].identifier === J.id) { J.active = false; J.dx = 0; J.dy = 0; J.armed = true; J.ringArmed = true; ringCount = 0; visualZone.style.display = 'none'; break; } } };
-                inputZone.addEventListener('touchend', endHandler); inputZone.addEventListener('touchcancel', endHandler);
+                    },
+                    onEnd: () => { Object.assign(J, { active: false, dx: 0, dy: 0, armed: true, ringArmed: true }); ringCount = 0; },
+                });
                 // Two-Finger Flit: while the fire stick is held, a tap on the right half (not on a button)
                 document.addEventListener('touchstart', (e) => {
                     if (!GameSettings.flitTwoFinger || !this.fireJoystick.active || !this.running || this.paused) return;
@@ -398,7 +380,7 @@
                 const F = this.fireJoystick, MEMORY = 0.6, DRAG = 8, DEAD = 6, FIRE_IN = 62, FIRE_OUT = 45;   // fire past 62 px, stop inside 45
                 const aimMode = () => !!this._quickDraw || GameSettings.aimBeforeFire !== false;
                 const sniperRelease = () => !!this._quickDraw || (aimMode() && GameSettings.sniperRelease !== false && this.weaponMode === 'sniper');
-                const setKnob = (x, y) => { knob.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`; };
+                const setKnob = (x, y) => controls.touch.sticks.fire.setKnob(x, y);
                 const buzz = () => { try { if (navigator.vibrate) navigator.vibrate(10); } catch (e) { /* no haptics */ } };
                 const showRing = () => { for (const el of [ring, band]) { if (!el) continue; el.classList.toggle('off', !aimMode()); el.classList.toggle('hot', !!F.firing); el.classList.toggle('armed', !!F.armed); } };
                 // Past the ring → fire (or arm, for a sniper on release); back inside → stop
@@ -409,58 +391,41 @@
                     else { if (out && !F.firing) buzz(); F.firing = out; F.armed = false; }
                     showRing();
                 };
-                fireZone.addEventListener('touchstart', (e) => {
-                    e.preventDefault(); if (F.active) return;
-                    const touch = e.changedTouches[0], rect = fireZone.getBoundingClientRect();
-                    F.id = touch.identifier; F.active = true; F.originX = rect.left + rect.width / 2; F.originY = rect.top + rect.height / 2;
-                    F.dx = 0; F.dy = 0; F.landX = touch.clientX; F.landY = touch.clientY; F.remembered = false;
-                    F.aimed = !aimMode(); F.firing = !aimMode(); F.armed = false;
-                    if (gameUI) gameUI.classList.add('aiming');
-                    // Aim memory: back within 0.6 s → the old aim (and fire again only if she was firing)
-                    const m = this._aimMemory;
-                    if (!this._quickDraw && m && performance.now() / 1000 - m.at <= MEMORY) {
-                        F.dx = Math.cos(m.angle); F.dy = Math.sin(m.angle); F.remembered = true; F.aimed = true;
-                        if (aimMode()) { F.firing = !!m.firing && !sniperRelease(); F.armed = !!m.firing && sniperRelease(); }
-                        const r = aimMode() && (F.firing || F.armed) ? FIRE_IN + 5 : 30;
-                        setKnob(F.dx * r, F.dy * r);
-                    } else knob.style.transform = `translate(-50%, -50%)`;
-                    showRing();
-                }, { passive: false });
-                fireZone.addEventListener('touchmove', (e) => {
-                    e.preventDefault(); if (!F.active) return;
-                    for (let i = 0; i < e.changedTouches.length; i++) {
-                        const touch = e.changedTouches[i];
-                        if (touch.identifier !== F.id) continue;
-                        if (F.remembered && Math.hypot(touch.clientX - F.landX, touch.clientY - F.landY) < DRAG) break;   // still on the remembered aim
+                // The stick (basement/controls-system.js touchStick): fixed on the paw, in the paw's own (zoomed) pixels
+                controls.touch.stick('fire', { zone: fireZone, knob, anchor: 'centre', travel: () => aimMode() ? 74 : 35, scale: () => this.hudScale || 1, free: () => !F.active,
+                    onStart: (S) => {
+                        Object.assign(F, { id: S.id, active: true, originX: S.x0, originY: S.y0, dx: 0, dy: 0, landX: S.landX, landY: S.landY, remembered: false, aimed: !aimMode(), firing: !aimMode(), armed: false });
+                        if (gameUI) gameUI.classList.add('aiming');
+                        // Aim memory: back within 0.6 s → the old aim (and fire again only if she was firing)
+                        const m = this._aimMemory;
+                        if (!this._quickDraw && m && performance.now() / 1000 - m.at <= MEMORY) {
+                            F.dx = Math.cos(m.angle); F.dy = Math.sin(m.angle); F.remembered = true; F.aimed = true;
+                            if (aimMode()) { F.firing = !!m.firing && !sniperRelease(); F.armed = !!m.firing && sniperRelease(); }
+                            const r = aimMode() && (F.firing || F.armed) ? FIRE_IN + 5 : 30;
+                            setKnob(F.dx * r, F.dy * r);
+                        }
+                        showRing();
+                    },
+                    onMove: (S, e) => {
+                        const t = [...e.changedTouches].find(t => t.identifier === S.id) || {};
+                        if (F.remembered && Math.hypot(t.clientX - F.landX, t.clientY - F.landY) < DRAG) return false;   // still on the remembered aim
                         F.remembered = false;
-                        // In the stick's own pixels: the paw is zoomed by --hud (hudScale), so its ring is too
-                        const k = this.hudScale || 1, deltaX = (touch.clientX - F.originX) / k, deltaY = (touch.clientY - F.originY) / k, far = Math.hypot(deltaX, deltaY);
-                        const MAX = aimMode() ? 74 : 35, distance = Math.min(far, MAX), angle = Math.atan2(deltaY, deltaX);
-                        setKnob(Math.cos(angle) * distance, Math.sin(angle) * distance);
                         if (aimMode()) {
-                            if (far > DEAD) { F.aimed = true; F.dx = Math.cos(angle); F.dy = Math.sin(angle); }   // direction only: she aims wherever the thumb points
-                            setFiring(far);
-                        } else { F.dx = Math.cos(angle) * distance / MAX; F.dy = Math.sin(angle) * distance / MAX; }
-                        break;
-                    }
-                }, { passive: false });
-                const endHandler = (e) => {
-                    e.preventDefault();
-                    for (let i = 0; i < e.changedTouches.length; i++) {
-                        if (e.changedTouches[i].identifier !== F.id) continue;
+                            if (S.far > DEAD) { F.aimed = true; F.dx = Math.cos(S.angle); F.dy = Math.sin(S.angle); }   // direction only: she aims wherever the thumb points
+                            setFiring(S.far);
+                        } else { const T = 35; F.dx = S.kx / T; F.dy = S.ky / T; }
+                    },
+                    onEnd: (S, e) => {
                         if (e.type !== 'touchcancel' && F.armed && F.aimed) {
                             if (this._quickDraw) this.requestQuickDraw(Math.atan2(F.dy, F.dx));
                             else this._releaseShot = Math.atan2(F.dy, F.dx);
                         }   // sniper: lifting the thumb takes the shot (update.js)
                         if (F.aimed && Math.hypot(F.dx, F.dy) > 0.2) this._aimMemory = { angle: Math.atan2(F.dy, F.dx), at: performance.now() / 1000, firing: F.firing || F.armed };   // real time, not game time
-                        F.active = false; F.dx = 0; F.dy = 0; F.remembered = false; F.aimed = false; F.firing = false; F.armed = false;
-                        knob.style.transform = `translate(-50%, -50%)`;
+                        Object.assign(F, { active: false, dx: 0, dy: 0, remembered: false, aimed: false, firing: false, armed: false });
                         if (gameUI) gameUI.classList.remove('aiming');
                         showRing();
-                        break;
-                    }
-                };
-                fireZone.addEventListener('touchend', endHandler); fireZone.addEventListener('touchcancel', endHandler);
+                    },
+                });
             },
 
             /* Drag-to-look: the empty screen above the cat's paw (#input-zone-look). Drag there and the

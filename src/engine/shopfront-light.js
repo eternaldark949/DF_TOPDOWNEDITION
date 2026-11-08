@@ -55,9 +55,7 @@
             let s = _shopLightBakes.get(key);
             if (s) return s;
             const L = SHOP_LIGHT, D = L.DEPTH, W = w + D * 1.2, ox = W / 2;
-            const cv = document.createElement('canvas');
-            cv.width = Math.ceil(W * L.K); cv.height = Math.ceil(D * L.K);
-            const c = cv.getContext('2d');
+            const { canvas: cv, ctx: c } = canvasKit.createLayer([Math.ceil(W * L.K), Math.ceil(D * L.K)]);
             c.scale(L.K, L.K); c.globalCompositeOperation = 'lighter';
             const n = Math.max(2, Math.floor((w - 24) / (L.PANE + L.MULL))), span = n * (L.PANE + L.MULL) - L.MULL, x0 = -span / 2;
             const neonRGB = _shopRGB(neon), panes = [];

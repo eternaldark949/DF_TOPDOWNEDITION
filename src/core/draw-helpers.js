@@ -251,17 +251,13 @@
         function glowSprite(color, core = 0.35) {
             let byCore = _glowSprites.get(color);                              // colour → core → sprite (a hit builds no key string)
             if (!byCore) _glowSprites.set(color, byCore = new Map());
-            let cv = byCore.get(core);
-            if (cv) return cv;
-            const rgb = color[0] === '#' ? hexToRgb(color) : color;
-            cv = document.createElement('canvas'); cv.width = cv.height = 64;
-            const c = cv.getContext('2d'), g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
-            g.addColorStop(0, `rgba(${rgb}, 1)`);
-            if (core > 0) g.addColorStop(core, `rgba(${rgb}, 0.45)`);        // core 0: a plain linear falloff
-            g.addColorStop(1, `rgba(${rgb}, 0)`);
-            c.fillStyle = g; c.fillRect(0, 0, 64, 64);
-            byCore.set(core, cv);
-            return cv;
+            return canvasKit.bake(byCore, core, () => {
+                const rgb = color[0] === '#' ? hexToRgb(color) : color;
+                const stops = [[0, `rgba(${rgb}, 1)`]];
+                if (core > 0) stops.push([core, `rgba(${rgb}, 0.45)`]);        // core 0: a plain linear falloff
+                stops.push([1, `rgba(${rgb}, 0)`]);
+                return canvasKit.glow([64, stops]);
+            });
         }
         /* ---------------------------------------------------------------------
            LENS GLARE — the bloom of ETERNAL's UPBGE renders, two stacked layers

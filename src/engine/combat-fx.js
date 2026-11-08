@@ -162,20 +162,20 @@
                 if (!texts || !texts.length) return;
                 ctx.save();
                 ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
-                for (let i = texts.length - 1; i >= 0; i--) {
-                    const t = texts[i], age = now - t.t0;
+                lifeKit.sweep(texts, (t) => {
+                    const age = now - t.t0;
                     const life = t.big ? 1.6 : t.crit ? 1.1 : 0.85;
-                    if (age > life || age < -1) { texts.splice(i, 1); continue; }
+                    if (age > life || age < -1) return true;
                     if (t.target && !t.target.dead) { t.x = t.target.x; t.y = t.target.y - 16; }
                     const x = t.x + t.drift * age * 14, y = t.y - age * 30;
-                    if (!inView(x, y)) continue;
+                    if (!inView(x, y)) return;
                     const pop = Math.max(0, 1 - (now - t.pop) / 0.12);
                     ctx.globalAlpha = 1 - Math.pow(age / life, 2);
                     ctx.font = `bold ${Math.round((t.big ? 10 : t.bleed ? 8 : t.crit ? 15 : 11) + pop * (t.bleed ? 1 : t.crit ? 9 : 4) + Math.min(5, t.value / 20))}px Orbitron, sans-serif`;
                     const s = t.text || String(Math.round(t.value)) + (t.crit ? '!' : '');
                     ctx.lineWidth = t.crit ? 4 : 3; ctx.strokeStyle = t.crit ? 'rgba(90, 10, 0, 0.85)' : 'rgba(0,0,0,0.75)'; ctx.strokeText(s, x, y);
                     ctx.fillStyle = t.color; ctx.fillText(s, x, y);
-                }
+                });
                 ctx.restore();
             },
         });

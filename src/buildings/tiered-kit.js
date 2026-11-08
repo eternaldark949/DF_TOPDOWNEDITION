@@ -72,8 +72,7 @@
             litMask(cv, S) {
                 let px;
                 try {                                                                   // (read from a throwaway copy: reading the strip itself could move it off the GPU)
-                    const tmp = document.createElement('canvas'); tmp.width = cv.width; tmp.height = cv.height;
-                    const tc = tmp.getContext('2d', { willReadFrequently: true }); tc.drawImage(cv, 0, 0);
+                    const { canvas: tmp, ctx: tc } = canvasKit.createLayer([cv.width, cv.height, { willReadFrequently: true }]); tc.drawImage(cv, 0, 0);
                     px = tc.getImageData(0, 0, cv.width, cv.height).data;
                 } catch (e) { return null; }
                 const W = cv.width, Hh = cv.height, cw = TierKit.LIT_CU * S, ch = TierKit.LIT_CZ * S;
@@ -255,7 +254,7 @@
             _tkArt(t) {
                 if (t.art) return t.art;
                 const S = t.S || 2, H = t.z1 - t.z0, L = t.perimeter;
-                const mk = () => { const cv = document.createElement('canvas'); cv.width = Math.max(1, Math.ceil(L * S)); cv.height = Math.max(1, Math.ceil(H * S)); const c = cv.getContext('2d'); c.scale(S, S); return [cv, c]; };
+                const mk = () => { const { canvas: cv, ctx: c } = canvasKit.createLayer([Math.max(1, Math.ceil(L * S)), Math.max(1, Math.ceil(H * S))]); c.scale(S, S); return [cv, c]; };
                 const [dcv, d] = mk(), [lcv, l] = mk();
                 t.paint(d, l, t, H, L);
                 TierKit.litLater(lcv, S);

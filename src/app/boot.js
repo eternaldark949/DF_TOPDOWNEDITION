@@ -128,7 +128,7 @@
             const P = box.querySelector('.cg-presets'), S = box.querySelector('.cg-sliders');
             if (P && !P.childElementCount) {
                 GAME_GRADE_PRESETS.forEach((p, i) => {
-                    const b = document.createElement('button'); b.className = 'df-chip cg-preset'; b.dataset.preset = i; b.textContent = p.name; P.appendChild(b);
+                    const b = uiKit.make(['button', 'df-chip cg-preset']); b.dataset.preset = i; b.textContent = p.name; P.appendChild(b);
                 });
             }
             if (S && !S.childElementCount) {

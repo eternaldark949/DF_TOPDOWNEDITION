@@ -568,8 +568,7 @@
             }
 
             _renderEntry(entry) {
-                const el = document.createElement('div');
-                el.className = `ui-pill type-${entry.type}${entry.isEquipped ? ' active-item' : ''}`;
+                const el = uiKit.make(['div', `ui-pill type-${entry.type}${entry.isEquipped ? ' active-item' : ''}`]);
                 el.dataset.id = entry.id;
                 el.dataset.source = entry.source;
                 el.dataset.category = entry.category;
@@ -607,10 +606,8 @@
 
                 const qty = document.createElement('div');
                 qty.className = 'pill-qty';
-                const qtyLabel = document.createElement('span');
-                qtyLabel.className = 'pill-qty-label'; qtyLabel.textContent = 'QTY';
-                const qtyValue = document.createElement('span');
-                qtyValue.className = 'pill-qty-value'; qtyValue.textContent = String(entry.quantity ?? entry.item?.quantity ?? 1);
+                const qtyLabel = uiKit.make(['span', 'pill-qty-label', 'QTY']);
+                const qtyValue = uiKit.make(['span', 'pill-qty-value', String(entry.quantity ?? entry.item?.quantity ?? 1)]);
                 qty.append(qtyLabel, qtyValue);
                 el.appendChild(qty);
 
@@ -837,8 +834,7 @@
                 for (const [category, label] of Object.entries(labels)) {
                     const group = this._ordered(entries.filter(entry => entry.category === category));
                     if (!group.length) continue;
-                    const heading = document.createElement('h2');
-                    heading.className = 'inventory-section-title';
+                    const heading = uiKit.make(['h2', 'inventory-section-title']);
                     heading.dataset.category = category;
                     heading.textContent = `${label} · ${group.length}`;
                     this.uiList.appendChild(heading);

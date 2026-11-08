@@ -184,7 +184,7 @@
                 return { gender: 'androgynous', body: { kind: 'android', finish: 'silver' }, top: { type: 'dn_uniform', ...PALETTE.dnSilver },
                          bottom: { type: 'pants', color: '#1a1a1a' }, shoes: { type: 'loafers', color: '#111111' }, pose: 'concierge', faceRoom: true };
             },
-            // Double Nights floor staff (the lobby's crowd, world/lobby-life.js): plating in the house
+            // Double Nights floor staff (the lobby's crowd, directory/lobby-life.js): plating in the house
             // finishes — gold bellhops, Blood Moon concierges, silver valets — uniforms to match
             dn_staff(finish, r) {
                 const uni = finish === 'gold' ? PALETTE.dnGold : finish === 'bloodmoon' ? PALETTE.dnCrimson : PALETTE.dnSilver;
@@ -192,7 +192,7 @@
                          body: { kind: 'android', finish }, top: { type: 'dn_uniform', ...uni },
                          bottom: { type: 'pants', color: '#141216' }, shoes: { type: 'loafers', color: '#0e0e10' }, pose: 'concierge' };
             },
-            // Moon City's clubgoers (world/club-life.js): evening wear in the house colours —
+            // Moon City's clubgoers (directory/club-life.js): evening wear in the house colours —
             // black lacquer, plum and wine velvet, violet, lavender, rose, champagne gold, chrome
             clubgoer(r) {
                 const pick = l => pickFrom(r, l), P = PALETTE;
@@ -220,7 +220,7 @@
                 }
                 return look;
             },
-            // The Cozy Cafe's guests (world/cafe-life.js): knitwear and coats in warm, muted tones —
+            // The Cozy Cafe's guests (directory/cafe-life.js): knitwear and coats in warm, muted tones —
             // oat, cream, rust, mustard, sage, camel, cocoa, denim — beanies and berets, a scarf-red here and there
             cafegoer(r) {
                 const pick = l => pickFrom(r, l), P = PALETTE;

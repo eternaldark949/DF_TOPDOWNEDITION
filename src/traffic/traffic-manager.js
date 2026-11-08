@@ -98,6 +98,12 @@
                 for (const ix of this.network.intersections) if (ix.signal && ix.signal.inView(view)) ix.signal.drawGlow(ctx, dark, crosswalks, t);
             }
 
+            /** Nobody on the road: the cars gone, the spawn clock and the lanes-near list as at a fresh start (a replay). */
+            clearStreet() {   // the cars gone and the junctions as they were built (queues, lights: a replay's start)
+                for (const v of this.vehicles) if (!v.markedForDestroy) v.destroy(); this.vehicles = []; this.spawnTimer = 0; this._near = null; this.grid.clear();
+                for (const ix of this.network.intersections || []) { ix.clearAndRecollect(); ix.currentVehicle = ix.occupiedBy = null; ix.clearanceTimer = 0; ix.signal = undefined; }
+                this.sensing.active = false; this.sensing.source = null; this.sensing.cars.clear(true); this.sensing.people.clear(true);
+            }
             reset() { 
                 // Properly destroy all vehicle entities before clearing
                 for (let v of this.vehicles) {
@@ -355,46 +361,27 @@
                 if (parked) for (const c of parked) if (!allVehicles.includes(c)) allVehicles.push(c);   // her cars standing about
                 this.grid.clear();
                 for (const v of allVehicles) this.grid.add(v);
-                // Each pair once, at the turn of whichever comes first in the list (as the old pair-key Set did:
-                // neighbours are mutual, so the first to meet the other is the earlier one)
-                for (let i = 0; i < allVehicles.length; i++) allVehicles[i]._colIdx = i;
-            
-                // 2. BROAD PHASE: SPATIAL GRID
-                for (let n1 = 0; n1 < allVehicles.length; n1++) {
-                    const v1 = allVehicles[n1];
-                    const neighbors = this.grid.getNearby(v1, this._collisionNeighbours || (this._collisionNeighbours = []));
-                    
-                    for (let v2 of neighbors) {
-                        if (v1 === v2) continue; 
-                        if (v2._colIdx === undefined || allVehicles[v2._colIdx] !== v2 || v2._colIdx < n1) continue;   // met already (or not in the list)
-                        
-                        // 3. NARROW PHASE: SAT RESOLUTION
-                        const collided = PhysicsSystem.resolveOBBCollision(v1, v2);
-                        
-                        // 4. GAME FEEL (VISUALS/AUDIO): scaled by how hard they met, not a coin flip
-                        const imp = collided ? (v1._lastImpact || 0) : 0;
-                        if (imp > 1.2) {
-                            const midX = (v1.x + v2.x) / 2;
-                            const midY = (v1.y + v2.y) / 2;
-                            
-                            // Sparks (Temporary)
-                            weather.spawnSparks(midX, midY, Math.min(12, Math.round(2 + imp * 2)));
-                            
-                            // Debris (Persistent)
-                            if (decalSystem && imp > 2) {
-                                decalSystem.addDebris(midX, midY, '#aaddff', 4); // Glass
-                                decalSystem.addDebris(midX, midY, v1.color, 3);  // Paint
-                            }
-                            
-                            // Sound (the driven car's own hits crunch in TrafficVehicle.onImpact)
-                            const pd = Math.hypot(player.x - midX, player.y - midY);
-                            if (v1.controlMode !== 'PLAYER' && v2.controlMode !== 'PLAYER' && pd < 500 && !(this._crunchCd > 0)) {
-                                this._crunchCd = 10;
-                                audioSys.sfx('crunch', { gain: Math.min(1, imp / 5) * (1 - pd / 600) });
-                            }
+                // 2. EVERY PAIR THAT TOUCHES (collisionWorld.streetCars: each pair once, masks, ghosts, onCollide), then the
+                // knock (car-contact.js) and the feel: scaled by how hard they met, not a coin flip
+                CollisionSystem.streetCars(allVehicles, this.grid, this._collisionNeighbours || (this._collisionNeighbours = []), (v1, v2, packet) => {
+                    PhysicsSystem.carContact(v1, v2, packet.nx, packet.ny, packet.depth);
+                    const imp = v1._lastImpact || 0;
+                    if (imp > 1.2) {
+                        const midX = (v1.x + v2.x) / 2;
+                        const midY = (v1.y + v2.y) / 2;
+                        weather.spawnSparks(midX, midY, Math.min(12, Math.round(2 + imp * 2)));   // sparks (temporary)
+                        if (decalSystem && imp > 2) {                                              // debris (persistent): glass, paint
+                            decalSystem.addDebris(midX, midY, '#aaddff', 4);
+                            decalSystem.addDebris(midX, midY, v1.color, 3);
+                        }
+                        // Sound (the driven car's own hits crunch in TrafficVehicle.onImpact)
+                        const pd = Math.hypot(player.x - midX, player.y - midY);
+                        if (v1.controlMode !== 'PLAYER' && v2.controlMode !== 'PLAYER' && pd < 500 && !(this._crunchCd > 0)) {
+                            this._crunchCd = 10;
+                            audioSys.sfx('crunch', { gain: Math.min(1, imp / 5) * (1 - pd / 600) });
                         }
                     }
-                }
+                });
             }
         
         

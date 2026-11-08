@@ -31,16 +31,10 @@
         //  An entity that has never reported a command falls back to measured
         //  displacement, so any mover that isn't hooked up still animates.
 
-        /** Sim tick counter — advanced once per fixed update step in GameEngine.update(). */
-        let _simTick = 0;
+        // (_simTick and _gameTimeSec are declared in basement/frame-clock.js)
         /** Game time in ms from sim ticks: frozen while paused, so lifetimes measured with it (projectiles, decals) survive a pause */
         function _gameTimeMs() { return _simTick * CONFIG.LOOP.STEP_MS; }
 
-        /** Smooth GAME time in seconds for draw code: advances with sim ticks (so it
-         *  follows CONFIG.LOOP.GAME_SPEED and stops while paused), blended between
-         *  ticks. Use it for world motion drawn from a clock (foliage sway, bobbing);
-         *  keep _frameTime for real-time effects like light flicker and UI. */
-        let _gameTimeSec = 0;
 
         /** Stand-in for throwaway render proxies with no position (VFX silhouettes). */
         const _STATIC_GAIT = Object.freeze({ speed: 0, dirX: 1, dirY: 0 });
@@ -98,9 +92,7 @@
          *  centre if no weapon has been drawn). The renderer records ent._muzzleLocal each
          *  frame in the actor's own frame (x forward, y to its right). */
         function muzzleWorld(ent, dirAngle, m = ent._muzzleLocal) {
-            if (!m) return { x: ent.x, y: ent.y };
-            const c = Math.cos(dirAngle), s = Math.sin(dirAngle);
-            return { x: ent.x + m.x * c - m.y * s, y: ent.y + m.x * s + m.y * c };
+            return m ? virtualChild.toWorld(ent, [m.x, m.y], dirAngle) : { x: ent.x, y: ent.y };   // basement/virtual-child.js
         }
 
         /** Shot origin + direction for an actor facing `dirAngle`: leaves from the muzzle and
@@ -128,6 +120,20 @@
             const a = RenderInterp.stepAdvanced ? RenderInterp.alpha : 1;
             const s = Math.max(0, _simTick - ent._shotTick - 1 + a);
             return Math.max(0, 1 - s / ticks);
+        }
+
+        /** The haymaker's hook from ticks since the punch started: out = [weight 0..1, sweep (rad), reach, twist, lunge].
+         *  Keys ease into each other (smoothstep); the weight snaps in over the first key and fades over RECOVER_TICKS. */
+        function humanoidHookPose(t, out = [0, 0, 0, 0, 0]) {
+            const H = CONFIG.HAYMAKER, K = H.KEYS, last = K[K.length - 1];
+            t = Math.max(0, t || 0);
+            let i = 0; while (i < K.length - 2 && t >= K[i + 1][0]) i++;
+            const a = K[i], b = K[i + 1], u = Math.min(1, Math.max(0, (t - a[0]) / (b[0] - a[0]))), e = u * u * (3 - 2 * u);
+            for (let j = 1; j < 5; j++) out[j] = a[j] + (b[j] - a[j]) * e;
+            out[1] *= Math.PI / 180;
+            const w1 = K[1][0], r = (t - last[0]) / H.RECOVER_TICKS;
+            out[0] = t < w1 ? 1 - (1 - t / w1) ** 2 : r <= 0 ? 1 : r >= 1 ? 0 : 1 - r * r * (3 - 2 * r);
+            return out;
         }
 
         /** Punch strike 0..1 from ticks since the punch started (fractional ticks OK). */

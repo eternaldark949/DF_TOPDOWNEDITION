@@ -1,6 +1,7 @@
         // GameEngine — Noise: sounds that give 949 (and fights) away. Methods are added to
         // GameEngine.prototype (see engineMixin in game-engine.js). Enemies hear by sound and
         // see by light (calculatePlayerVisibility); there's no radar. See CONFIG.NOISE.
+        const PED_ALARM = new Set(['shot', 'enemyShot', 'glass', 'execute']);   // the sounds that alarm passers-by
         engineMixin({
             /**
              * A sound at (x, y) that carries `reach` px in the open. Every ganger in earshot
@@ -22,6 +23,11 @@
                     if (d > r) continue;
                     const k = d / r;                                          // 0 close … 1 at the edge of hearing
                     if (e.hearNoise(x, y, 1 - k, N.ERR_NEAR + (N.ERR_FAR - N.ERR_NEAR) * k)) { heard++; if (this.debugMode) (this._dbgHeard || (this._dbgHeard = [])).push(e); }
+                }
+                // The street hears the loud ones too (entities/pedestrians.js hearNoise): they flinch and hurry off
+                if (opts.hear !== false && PED_ALARM.has(kind) && this.pedestrians) for (const p of this.pedestrians.pedestrians) {
+                    const d = Math.hypot(p.x - x, p.y - y);
+                    if (d <= reach) p.hearNoise(x, y, 1 - d / reach, kind);
                 }
                 // Debug view's Hearing layer: what this sound reached and who heard it
                 if (this.debugMode) {
@@ -73,7 +79,7 @@
             /** Ripples grow to their reach and fade over half a second. */
             updateNoiseRipples() {
                 const R = this.noiseRipples; if (!R || !R.length) return;
-                for (let i = R.length - 1; i >= 0; i--) if ((R[i].t += 1 / 30) >= 1) R.splice(i, 1);
+                lifeKit.sweep(R, (r) => (r.t += 1 / 30) >= 1);
             },
 
             /** The ring's progress this frame: blended between ticks so it glides at any refresh rate */
@@ -109,7 +115,7 @@
                 let cv = this._mirageCv;
                 if (!cv) { cv = this._mirageCv = document.createElement('canvas'); this._mirageCtx = cv.getContext('2d'); }
                 const sw = Math.max(1, W >> 2), sh = Math.max(1, H >> 2);
-                if (cv.width !== sw || cv.height !== sh) { cv.width = sw; cv.height = sh; }
+                canvasKit.fitLayer(cv, sw, sh);
                 let copied = false;
                 const N = 72, TAU = Math.PI * 2;
                 ctx.save();

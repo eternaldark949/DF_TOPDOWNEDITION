@@ -99,10 +99,7 @@
             update() {
                 const now = _simTick, ix = this.ix, occ = ix.occupants;
                 // Off the list: anyone gone, or who moved on without saying and isn't in the box
-                for (let i = occ.length - 1; i >= 0; i--) {
-                    const o = occ[i];
-                    if (o.dead || o.markedForDestroy || (o.currentIntersection !== ix && !ix.isVehicleInside(o))) occ.splice(i, 1);
-                }
+                lifeKit.sweep(occ, (o) => o.dead || o.markedForDestroy || (o.currentIntersection !== ix && !ix.isVehicleInside(o)));
 
                 // The gauges
                 const dem = this.demand, load = this.load, cnt = this._cnt || (this._cnt = [0, 0, 0, 0]);

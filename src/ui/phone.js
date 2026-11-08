@@ -466,7 +466,7 @@
                 this.currentApp = 'maps';
                 this.broadcast('APP_OPENED', { app: 'maps' }); // Report Event
                 this.homeScreen.style.display = 'none';
-                document.getElementById('screen-maps').style.display = 'flex';
+                uiKit.show('screen-maps', 'flex');
                 this.mapView.zoom = 1.2; this.mapView.offsetX = 0; this.mapView.offsetY = 0;
                 this.drawMap(true); 
             },
@@ -506,13 +506,13 @@
                 ctx.fillText(`${this.mapView.zoom.toFixed(1)}×`, 28 * D, canvas.height - 14 * D);
             },
             
-            showHelp() { this.currentApp = 'help'; this.homeScreen.style.display = 'none'; document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none'); document.getElementById('screen-help').style.display = 'flex'; },
+            showHelp() { this.currentApp = 'help'; this.homeScreen.style.display = 'none'; document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none'); uiKit.show('screen-help', 'flex'); },
 
             showSkyMe() {
                 this.currentApp = 'skyme';
                 this.homeScreen.style.display = 'none';
                 document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
-                document.getElementById('screen-skyme').style.display = 'flex';
+                uiKit.show('screen-skyme', 'flex');
                 this._renderSkyMe();
             },
 
@@ -693,7 +693,7 @@
                 this.currentApp = 'log';
                 this.homeScreen.style.display = 'none';
                 document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
-                document.getElementById('screen-log').style.display = 'flex';
+                uiKit.show('screen-log', 'flex');
                 this._renderLog();
             },
 
@@ -905,7 +905,7 @@
                 this.currentApp = 'carme';
                 this.homeScreen.style.display = 'none';
                 document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
-                document.getElementById('screen-carme').style.display = 'flex';
+                uiKit.show('screen-carme', 'flex');
 
                 const container = document.getElementById('carme-content'), G = game.garage;
                 const isIndoor = game.activeMap.type === 'indoor';
@@ -1011,7 +1011,7 @@
         // --- NEU.ME APP LOGIC ---
         document.getElementById('app-neume').addEventListener('click', () => {
             phoneSystem.homeScreen.style.display = 'none';
-            document.getElementById('screen-neume').style.display = 'flex';
+            uiKit.show('screen-neume', 'flex');
             updateNeumeUI();
         });
         
@@ -1043,7 +1043,7 @@
                 const r = cv.getBoundingClientRect(), k = Math.min(window.devicePixelRatio || 1, 2);
                 const w = Math.round(r.width * k), h = Math.min(1600, Math.round(r.height * k));
                 if (w < 8 || h < 8) return;
-                if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+                canvasKit.fitLayer(cv, w, h);
                 const x = cv.getContext('2d');
                 x.clearRect(0, 0, w, h);
                 RealPortrait.figure(x, w, h, neumeFigureConfig());
@@ -1153,125 +1153,5 @@
         window.visualViewport?.addEventListener('resize', () => phoneSystem.fit());
         phoneSystem.fit();
 
-        // Close phone with Escape key
-        // Close phone OR Map with Escape key
-        document.addEventListener('keydown', (e) => {
-            // 1. Handle ESCAPE - Pause Menu Priority
-            if (e.key === 'Escape') {
-                // Cinematic view owns Escape, even if she was holding furniture.
-                if (document.body.classList.contains('cinematic-view')) { pauseMenu.exitCinematic(); return; }
-                // Holding furniture / choosing a side: Esc lets go
-                if (game.furniture && game.furniture.busy()) { game.furniture.release(); return; }
-                // If pause menu is open, close it
-                if (pauseMenu && pauseMenu.isOpen) {
-                    pauseMenu.close();
-                    return;
-                }
-                
-                // Close Phone if open
-                if (phoneSystem.overlay.style.display === 'flex') {
-                    phoneSystem.close();
-                    return;
-                }
-                
-                // Close the map or the freelancer menu if open
-                if (Screens.mapOpen() || Screens.menuOpen()) {
-                    Screens.close();
-                    return;
-                }
-                
-                // Close whichever shop or menu is open (each through its own close, so pauses are released)
-                const SHOPS = [
-                    ['cosmetics-shop-overlay', () => document.getElementById('cosmetics-shop-close').click()],
-                    ['auto-shop-overlay', () => game.closeAutoShop()],
-                    ['augment-shop', () => document.getElementById('aug-shop-close').click()],
-                    ['craft-shop', () => document.getElementById('craft-shop-close').click()],
-                    ['dye-shop', () => document.getElementById('dye-shop-close').click()],
-                    ['zib-menu', () => game.closeZibMenu()],
-                    ['gauntlet-menu', () => game.closeGauntletMenu()],
-                    ['tuning-overlay', () => game.closeTuning()],
-                    ['vending-menu', () => game.closeVendingMenu()]
-                ];
-                for (const [id, close] of SHOPS) {
-                    const el = document.getElementById(id);
-                    if (el && getComputedStyle(el).display !== 'none') { close(); return; }
-                }
-                
-                // Otherwise, toggle pause menu (if game is running)
-                if (game.running && pauseMenu) {
-                    pauseMenu.toggle(true); // intentional keyboard pause remains available during a story scene
-                }
-            }
-            
-            // Editable menu controls retain their native keys; Escape was handled above.
-            if (e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable="true"]')) return;
-            // Consume a pause action before it can reach a scene, even if Resume
-            // releases the pause token while this same event is still bubbling.
-            if (pauseMenu && pauseMenu.isOpen) {
-                if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(e.key)) e.stopPropagation();
-                if (e.key === 'ArrowUp') {
-                    e.preventDefault();
-                    pauseMenu.navigateUp();
-                } else if (e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    pauseMenu.navigateDown();
-                } else if (e.key === 'ArrowLeft') {
-                    e.preventDefault();
-                    pauseMenu.navigateLeft();
-                } else if (e.key === 'ArrowRight') {
-                    e.preventDefault();
-                    pauseMenu.navigateRight();
-                } else if (e.key === 'Enter') {
-                    e.preventDefault();
-                    pauseMenu.selectCurrent();
-                }
-                return; // Don't process other keys when pause menu is open
-            }
-        
-            // 2. Handle 'M' Key (Smart Toggle)
-            if (e.key === 'm' || e.key === 'M') {
-                // the map holds a pause token, so check for it before the !paused gate
-                if (Screens.mapOpen()) Screens.close();
-                else if (game.running && !game.paused) Screens.open('map');
-            }
-        
-            // 3. Handle 'P' Key (Phone)
-            if (e.key === 'p' || e.key === 'P') {
-                if (phoneSystem.overlay.style.display === 'flex') {
-                    phoneSystem.close();
-                } else if (!game.paused) {
-                    phoneSystem.open();
-                }
-            }
-            
-            // 4. Handle 'B' Key (Back - closes map/inventory)
-            if (e.key === 'b' || e.key === 'B') {
-                if (Screens.mapOpen() || Screens.menuOpen()) {
-                    Screens.close();
-                    return;
-                }
-            }
-            
-            // 5. Handle 'E' Key (Interact - talk, enter car, etc.)
-            if ((e.key === 'e' || e.key === 'E') && game.running && !game.paused) game.interact();   // the same action as the pill (engine/events.js)
-            
-            // 6. Handle 'F' Key (Use Transition Point)
-            if ((e.key === 'f' || e.key === 'F') && game.running && !game.paused) {
-                // Check if player is in a transition zone
-                if (game.activeMap.transitions && !game.isDriving) {
-                    const t = game._transitionGrid.query(game.player.x, game.player.y);
-                    if (t) {
-                        game.triggerTransition();
-                    }
-                }
-            }
-
-            // 7. Handle 'T' Key (Zib Teleport to Destination)
-            if ((e.key === 't' || e.key === 'T') && game.running && !game.paused) {
-                if (game.zibSystem && game.zibSystem.isPassenger) {
-                    game.zibSystem.teleportToDestination(game);
-                    if (game.zibSkipBtn) game.zibSkipBtn.style.display = 'none';
-                }
-            }
-        });
+        // Its keys (P, M, B, Escape, E, F, T): directory/game-controls.js
         

@@ -54,8 +54,7 @@
         /** An aurora streak: a soft upright blade of light, brightest at its foot (the seam). */
         function _edgeStreakSprite() {
             if (_edgeStreak) return _edgeStreak;
-            const cv = document.createElement('canvas'); cv.width = 32; cv.height = 128;
-            const c = cv.getContext('2d');
+            const { canvas: cv, ctx: c } = canvasKit.createLayer([32, 128]);
             const h = c.createLinearGradient(0, 0, 32, 0);
             h.addColorStop(0, 'rgba(214, 196, 255, 0)'); h.addColorStop(0.5, 'rgba(214, 196, 255, 1)'); h.addColorStop(1, 'rgba(214, 196, 255, 0)');
             c.fillStyle = h; c.fillRect(0, 0, 32, 128);
@@ -175,15 +174,15 @@
                     if (fn < 26 && moved && t - (st[id + 'T'] || -9) > E.RIPPLE_EVERY && R.length < 6) { R.push({ id, u: fu, t0: t }); st[id + 'T'] = t; }
                 }
                 const R = this._edgeRipples;
-                if (R && R.length) for (let i = R.length - 1; i >= 0; i--) {
-                    const r = R[i], age = t - r.t0;
-                    if (age > E.RIPPLE_LIFE || age < 0) { R.splice(i, 1); continue; }
-                    if (r.id !== id) continue;
+                if (R && R.length) lifeKit.sweep(R, (r) => {
+                    const age = t - r.t0;
+                    if (age > E.RIPPLE_LIFE || age < 0) return true;
+                    if (r.id !== id) return;
                     const k = 1 - age / E.RIPPLE_LIFE, d = 20 + age * E.RIPPLE_SPEED;
                     ctx.globalAlpha = 0.55 * k * k; drawGlow(ctx, r.u, 0, 40 + 40 * (1 - k), '214, 196, 255', 0);
                     ctx.globalAlpha = 0.85 * k;
                     drawGlow(ctx, r.u - d, 0, 22, '241, 232, 254', 0.3); drawGlow(ctx, r.u + d, 0, 22, '241, 232, 254', 0.3);
-                }
+                });
                 ctx.restore();
             }
         });

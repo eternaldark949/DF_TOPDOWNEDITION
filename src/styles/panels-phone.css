@@ -160,42 +160,20 @@
         
         /* --- ACTION BUTTONS & INPUTS --- */
         
+        /* Touch sticks (basement/controls-system.js touchStick): one look for every stick.
+           .df-stick: the base disc, almost black with a hint of crimson; size it with width/height.
+           .df-stick-knob: the champagne knob, moved by --lx / --ly (px from the centre); .emoji: a face instead */
+        .df-stick { position: absolute; border-radius: 50%; border: none; background: rgba(20, 0, 10, 0.4); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); backdrop-filter: blur(2px); user-select: none; }
+        .df-stick-knob {
+            position: absolute; top: 50%; left: 50%; width: 36px; height: 36px; border-radius: 50%; pointer-events: none;
+            --lx: 0px; --ly: 0px; transform: translate(calc(-50% + var(--lx)), calc(-50% + var(--ly)));
+            background: radial-gradient(circle at 35% 35%, #fffbf2 0%, #e8dcc0 40%, #c4a980 100%);   /* champagne luxe */
+            box-shadow: inset 2px 2px 3px rgba(255, 255, 255, 1.0), inset -2px -2px 4px rgba(100, 80, 60, 0.4), 0 5px 10px rgba(0, 0, 0, 0.5);   /* bevel */
+        }
+        .df-stick-knob.emoji { width: auto; height: auto; border-radius: 0; background: none; box-shadow: none; font-size: max(6px, 2.2rem - var(--font-trim)); line-height: 1; }
+
         /* 1. Fire Button (Right Joystick Container) */
-        #btn-fire { 
-            position: absolute; 
-            bottom: 140px; 
-            right: 60px; 
-            width: 80px; 
-            height: 80px; 
-            border-radius: 50%; 
-            /* Darker, almost black background with hint of crimson */
-            background: rgba(20, 0, 10, 0.4); 
-            border: none; 
-            color: #ff0055; 
-            font-size: max(6px, 1.5rem - var(--font-trim)); 
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            z-index: 25; 
-            pointer-events: auto; 
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(2px);
-        }
-        
-        #fire-joystick-knob {
-            position: absolute; 
-            top: 50%; 
-            left: 50%; 
-            width: 36px; 
-            height: 36px; 
-            border-radius: 50%; 
-            transform: translate(-50%, -50%); 
-            pointer-events: none;
-            /* Champagne Luxe Gradient */
-            background: radial-gradient(circle at 35% 35%, #fffbf2 0%, #e8dcc0 40%, #c4a980 100%);
-            /* Bevel Effect */
-            box-shadow: inset 2px 2px 3px rgba(255, 255, 255, 1.0), inset -2px -2px 4px rgba(100, 80, 60, 0.4), 0 5px 10px rgba(0, 0, 0, 0.5);
-        }
+        #btn-fire { bottom: 140px; right: 60px; width: 80px; height: 80px; color: #ff0055; font-size: max(6px, 1.5rem - var(--font-trim)); display: flex; justify-content: center; align-items: center; z-index: 25; pointer-events: auto; }
 
         /* 2. Utility Buttons (Heal, NV, Flit, Auto) */
         /* Updated: Tighter spacing ("Cat's Paw") & Darker Background */
@@ -299,39 +277,10 @@
 
         /* Emote Joystick (replaces fire button when holstered)
            Pattern matches #btn-fire: stationary outer ring + inner knob that moves. */
-        #btn-emote {
-            position: absolute;
-            bottom: 140px;
-            right: 60px;
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            background: rgba(20, 0, 10, 0.4);
-            border: none;
-            display: none; /* shown when weaponHolstered */
-            z-index: 25;
-            pointer-events: auto;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(2px);
-            user-select: none;
-        }
+        #btn-emote { bottom: 140px; right: 60px; width: 80px; height: 80px; display: none; /* shown when weaponHolstered */ z-index: 25; pointer-events: auto; }
         #btn-emote.dragging { background: rgba(255, 170, 68, 0.25); }
 
-        #emote-joystick-knob {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            /* Default centered transform — JS adds an extra translate during drag.
-               --lx/--ly are CSS custom properties so JS can set them once and the
-               transform recomposes; on release we clear them and the knob eases home. */
-            --lx: 0px;
-            --ly: 0px;
-            transform: translate(calc(-50% + var(--lx)), calc(-50% + var(--ly)));
-            pointer-events: none;
-            font-size: max(6px, 2.2rem - var(--font-trim));
-            line-height: 1;
-            transition: transform 0.18s ease;
-        }
+        #emote-joystick-knob { transition: transform 0.18s ease; }   /* let go: the face eases home */
         #btn-emote.dragging #emote-joystick-knob {
             transition: none; /* live drag — no easing while finger moves */
         }
@@ -401,30 +350,9 @@
 
         /* 4. Movement Joystick Visuals */
         #joystick-zone { 
-            position: absolute; 
-            width: 128px;   /* the knob's full-speed reach (WALK, initJoystick) sits just inside; BASE there is half of this */
-            height: 128px; 
-            background: rgba(20, 0, 10, 0.4); /* Almost black */
-            border: none;
-            border-radius: 50%; 
+            width: 128px; height: 128px;   /* the knob's full-speed reach (WALK, initJoystick) sits just inside; BASE there is half of this */
             pointer-events: none; /* Must be none so touches pass through to input-zone */
-            display: none; 
-            z-index: 26; 
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(2px);
-        }
-        
-        #joystick-knob { 
-            position: absolute; 
-            top: 50%; 
-            left: 50%; 
-            width: 36px; 
-            height: 36px; 
-            border-radius: 50%; 
-            transform: translate(-50%, -50%); 
-            /* Champagne Luxe Style */
-            background: radial-gradient(circle at 35% 35%, #fffbf2 0%, #e8dcc0 40%, #c4a980 100%);
-            box-shadow: inset 2px 2px 3px rgba(255, 255, 255, 1.0), inset -2px -2px 4px rgba(100, 80, 60, 0.4), 0 5px 10px rgba(0, 0, 0, 0.5);
+            display: none; z-index: 26;
         }
 
 

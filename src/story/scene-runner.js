@@ -232,7 +232,7 @@
                 if (g.joystick) { g.joystick.active = false; g.joystick.dx = 0; g.joystick.dy = 0; }
                 if (g.fireJoystick) { g.fireJoystick.active = false; g.fireJoystick.firing = false; }
                 g.mouseDown = false;
-                if (g.keys) for (const k in g.keys) g.keys[k] = false;
+                if (typeof controls !== 'undefined') controls.clear();
             }
 
             /** The HUD inside a scene (for the playable beats): shown over the letterbox, or hidden again. */

@@ -167,16 +167,16 @@
                     // where she steps on it, a ring of light runs out from her feet
                     const R = q._ripples || (q._ripples = []);
                     if (p && Math.hypot(p.x - q.x, p.y - q.y) < q.r && !(t - (q._rippleAt || -1e9) < P.RIPPLE_EVERY)) { R.push({ x: p.x, y: p.y, t0: t }); q._rippleAt = t; }
-                    for (let i = R.length - 1; i >= 0; i--) {
-                        const w = R[i], age = t - w.t0, a = 1 - age / P.RIPPLE_LIFE;
-                        if (a <= 0 || age < 0) { R.splice(i, 1); continue; }
+                    lifeKit.sweep(R, (w) => {
+                        const age = t - w.t0, a = 1 - age / P.RIPPLE_LIFE;
+                        if (a <= 0 || age < 0) return true;
                         const rad = age * q.r * P.RIPPLE_SPEED;
                         ctx.save();
                         ctx.beginPath(); ctx.arc(w.x, w.y, rad + P.RIPPLE_BAND, 0, _PTAU); ctx.arc(w.x, w.y, Math.max(0, rad - P.RIPPLE_BAND), 0, _PTAU, true); ctx.clip();
                         ctx.globalAlpha = night * a;
                         ctx.drawImage(G.cv, gx, gy); ctx.drawImage(G.cv, gx, gy);
                         ctx.restore();
-                    }
+                    });
                 }
                 ctx.restore();
             }

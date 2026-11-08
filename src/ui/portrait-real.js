@@ -38,8 +38,7 @@
             function supported() {
                 if (_ok !== null) return _ok;
                 try {
-                    const c = document.createElement('canvas'); c.width = c.height = 9;
-                    const x = c.getContext('2d');
+                    const { canvas: c, ctx: x } = canvasKit.createLayer([9, 9]);
                     x.filter = 'blur(2px)'; x.fillStyle = '#000'; x.fillRect(4, 0, 1, 9);
                     _ok = x.getImageData(1, 4, 1, 1).data[3] > 0;
                 } catch (e) { _ok = false; }
@@ -49,9 +48,7 @@
             // ── Layers ── each part is painted flat in its own layer, shaded inside its own shape, then laid down
             const pool = [];
             function layer(i) {
-                let c = pool[i];
-                if (!c) c = pool[i] = document.createElement('canvas');
-                if (c.width !== W || c.height !== H) { c.width = W; c.height = H; }
+                const c = canvasKit.scratch(pool, i, W, H);
                 const x = c.getContext('2d');
                 x.setTransform(1, 0, 0, 1, 0, 0); x.globalCompositeOperation = 'source-over'; x.globalAlpha = 1; x.filter = 'none';
                 x.clearRect(0, 0, W, H);
@@ -1136,17 +1133,18 @@
                         if (shoes.type === 'loafers') { x.fillStyle = rgb(mul(col, 1.8 + 0.2)); x.fillRect(f.x - 26, f.y + 86, 52, 10); }
                         if (boots) limbForm(x, limbPart(rig.legs[s], 0.3, 1, 6), col, 1);
                     }
-                    if (shoes.finish === 'sparkle') for (let k = 0; k < 140; k++) {
+                    const F = materialKit.finishOf(shoes);                   // (directory/game-materials.js)
+                    if (F.flecks) for (let k = 0; k < 140; k++) {
                         const s = rnd() < 0.5 ? -1 : 1, P0 = limbPart(rig.legs[s], R(0.3, 1), 1)[0];
                         blob(x, P0[0] + R(-P0[2], P0[2]) * 0.8, P0[1], R(2, 5), R(2, 5), [255, 255, 255], R(0.5, 1), 1, 0, 'source-atop');
                     }
-                    const gloss = shoes.finish === 'velvet' ? 0.15 : boots || heel ? 0.7 : 0.35;
+                    const gloss = F.portrait_shine ?? (boots || heel ? 0.7 : 0.35);
                     for (const s of [-1, 1]) {
                         const f = rig.feet[s];
                         if (boots) softLine(x, [f.x + s * 10 + 18, 2150, f.x + 30, 2700, f.x + 22, 3500], [255, 255, 255], gloss * 0.6, 14, 8, 'source-atop');
                         softLine(x, [f.x + 22, f.y + 40, f.x + 30, f.y + 140, f.x + 20, f.y + 220], [255, 255, 255], gloss * 0.6, 10, 7, 'source-atop');
                     }
-                    if (shoes.finish === 'velvet') atop(x, rgb(mul(col, 0.5)), 0.15);
+                    if (F.nap) atop(x, rgb(mul(col, 0.5)), 0.15);
                     modelLayer(lay, rim, 0.7);
                     put(c, lay);
                 }
@@ -1565,7 +1563,7 @@
             let frame = null;
             const stable = v => v === null || typeof v !== 'object' ? JSON.stringify(v)
                 : Array.isArray(v) ? '[' + v.map(stable).join(',') + ']'
-                : '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}';
+                : '{' + Object.keys(v).filter(k => k !== 'material').sort().map(k => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}';   // (a linked material is already in its colour, fabric and finish)
 
             function draw(ctx, w, h, config) {
                 w = Math.max(8, Math.round(w)); h = Math.max(8, Math.round(h));
@@ -1581,7 +1579,7 @@
                 }
                 setSpace(w, h);
                 if (!frame) frame = document.createElement('canvas');
-                if (frame.width !== w || frame.height !== h) { frame.width = w; frame.height = h; }
+                canvasKit.fitLayer(frame, w, h);
                 const c = frame.getContext('2d');
                 c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; c.filter = 'none';
                 c.clearRect(0, 0, w, h);

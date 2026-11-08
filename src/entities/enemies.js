@@ -208,10 +208,24 @@
                 return this.state === 'idle' ? this.idleBehavior : null;
             }
 
+            /** A car (CollisionSystem's people-vs-cars pass has put her just outside it): she leaps clear of it */
+            hitByCar(car, contact, speed) {
+                if (speed < 0.5) return;
+                const f = Math.min(9, 3 + speed * 0.6);
+                this._leap = { vx: contact.nx * f, vy: contact.ny * f, t: 10 };
+                this.state = 'following'; this.idleBehavior = null; this.idleTimer = 0;
+            }
+
             update(player, dt = 1, map = null, adopted = true) {
                 if (!this.visible || this.inCar) return;
                 dt = Number.isFinite(dt) ? Math.max(0, Math.min(3, dt)) : 1;
                 if (!dt) return;
+                if (this._leap && this._leap.t > 0) {   // mid-leap (hitByCar): carried clear, then back to herself
+                    const L = this._leap, nav = map ? NavGrid.for(map) : null, nx = this.x + L.vx * dt, ny = this.y + L.vy * dt;
+                    if (!nav || nav.walkable(nx, ny)) { this.x = nx; this.y = ny; }
+                    L.vx *= 0.8; L.vy *= 0.8; L.t -= dt; this.angle = Math.atan2(L.vy, L.vx); this.walkPhase += 0.6 * dt;
+                    return;
+                }
                 const nav = map ? NavGrid.for(map) : null;
                 const dist = Math.hypot(player.x - this.x, player.y - this.y);
                 const prevAngle = this.angle;
@@ -952,14 +966,7 @@
                 }
                 
                 // Apply knockback physics
-                if (this.knockbackVx || this.knockbackVy) {
-                    this.x += this.knockbackVx;
-                    this.y += this.knockbackVy;
-                    this.knockbackVx *= this.knockbackFriction;
-                    this.knockbackVy *= this.knockbackFriction;
-                    if (Math.abs(this.knockbackVx) < 0.1) this.knockbackVx = 0;
-                    if (Math.abs(this.knockbackVy) < 0.1) this.knockbackVy = 0;
-                }
+                collisionWorld.carry(this);   // knockback: the body step (basement/collision-kit.js)
 
                 // A warden: what it knows of her, its own move; out of sight, its burst goes on into her cover
                 const S = this.persona ? this._wardenSense(playerX, playerY) : null;
@@ -1168,8 +1175,7 @@
                     ['rgba(90,14,3,0)', '#8e2108', '#ee6913', '#ffc34d'],
                     ['rgba(110,25,4,0)', '#ad420d', '#ffc245', '#fff1ba']
                 ].map((colors,stage) => {
-                    const cv = document.createElement('canvas'); cv.width = 120; cv.height = 16;
-                    const c = cv.getContext('2d'), g = c.createLinearGradient(0,0,120,0);
+                    const { canvas: cv, ctx: c } = canvasKit.createLayer([120, 16]), g = c.createLinearGradient(0,0,120,0);
                     for (const [i,stop] of [0,0.22,0.72,1].entries()) g.addColorStop(stop,colors[i]);
                     c.fillStyle = g; c.fillRect(0,0,120,16);
                     c.fillStyle = stage === 2 ? 'rgba(255,250,214,0.85)' : stage === 1 ? 'rgba(255,204,100,0.55)' : 'rgba(255,100,24,0.35)';
@@ -1490,6 +1496,10 @@
                 // AI Properties
                 this.visionRange = cfg.visionRange || 320;
                 this.visionFov = Math.PI / 2.5;
+                // What they know of what's around them (basement/awareness-kit.js): up close (50) they sense her unless
+                // she comes from behind; past that, only what's in the cone, in range and in plain sight. Bumping into him
+                // (touch: their bodies, 15 + 15) gives her away whatever the light or the angle
+                this.awareness = new awarenessMatrix(this, { evaluation_radius: () => this.visionRange, personal_space: 50, touch: 32, fov: () => this.visionFov, sight: (x, y, walls, buildings) => this._sightClear(x, y, walls, buildings) });
                 this.state = 'IDLE';
                 this.suspicion = 0;
                 this.suspicionDrainDelay = 0;
@@ -1560,20 +1570,12 @@
                 return true;
             }
 
-            // ... [canSeePoint method from previous turn] ...
-            canSeePoint(tx, ty, walls, buildings) {
-                const dist = Math.hypot(tx - this.x, ty - this.y);
-                if (dist > this.visionRange) return false;
-
-                const angleToPoint = Math.atan2(ty - this.y, tx - this.x);
-                let angleDiff = angleToPoint - this.angle;
-                angleDiff = normalizeAngle(angleDiff);
-
-                if (Math.abs(angleDiff) > this.visionFov / 2) return false;
-
+            /** In range, in the cone, and the way clear (not through a shut door; a restricted zone's own shot lines) */
+            canSeePoint(tx, ty, walls, buildings) { return this.awareness.canSee(tx, ty, walls, buildings); }
+            _sightClear(tx, ty, walls, buildings) {
                 if (typeof game !== 'undefined' && game.roomSystem.doorBlocks(this.x, this.y, tx, ty)) return false;   // not through a shut door
                 if (this._restrictedZoneId && typeof game !== 'undefined') return hasShotLine(this.x,this.y,tx,ty,game.activeMap);
-                return !isLineBlocked(this.x, this.y, tx, ty, walls, buildings); 
+                return !isLineBlocked(this.x, this.y, tx, ty, walls, buildings);
             }
 
             // ... [update method from previous turn] ...
@@ -1589,15 +1591,10 @@
                 if (this.invincibleTimer > 0) this.invincibleTimer--;
                 
                 // Physics Knockback
-                if (this.knockbackVx || this.knockbackVy) {
-                    this.x += this.knockbackVx;
-                    this.y += this.knockbackVy;
-                    this.knockbackVx *= this.knockbackFriction;
-                    this.knockbackVy *= this.knockbackFriction;
-                }
+                collisionWorld.carry(this);   // knockback: the body step (basement/collision-kit.js)
                 if (this._staggerUntil && _gameTimeSec < this._staggerUntil) return null;   // slipped in a spill (engine/spills.js): no step, no shot
                 
-                const distToPlayer = Math.hypot(player.x - this.x, player.y - this.y);
+                const her = this.awareness.observe(player, 'her'), distToPlayer = her[AWARE.DIST];
                 const isVisible = player.visible && !player.isHidden;
                 
                 // Detection range (reduced by active buffs like Ms. Jean Soda)
@@ -1606,14 +1603,22 @@
                 // --- 1. DETECTION LOGIC ---
                 let canSee = false;
                 // Up close they sense her, unless she comes from behind, slowly or hidden, out of the light (an execution)
-                const toHer = Math.atan2(player.y - this.y, player.x - this.x);
                 const pg = player._gait, hg = typeof game !== 'undefined' ? game : null;
-                const sneaking = Math.abs(normalizeAngle(toHer - this.angle)) > Math.PI * 0.6
+                const sneaking = her[AWARE.BEHIND]
                     && ((hg && hg.sneaking && player === hg.player) || player.isHidden || ((pg ? pg.speed : 0) < 2.3 && (player.visibility ?? 0) < 0.75));
-                if (distToPlayer < 50 && isVisible && !sneaking) {
+                if (her[AWARE.TOUCHING] && isVisible && !this._bumped) {
+                    // She bumped into him (in the dark, from behind, sneaking or not): he startles round to face her
+                    this._bumped = true;
+                    if (typeof game !== 'undefined' && game.emitNoise) game.emitNoise(player.x, player.y, 140, 'bump', false, { ring: false });   // "hey!": he and the ones close by hear where she is
+                    this.angle = her[AWARE.BEARING];
+                    this.investigateTarget = { x: player.x, y: player.y }; this.sweep = null;
+                    this.suspicion = Math.max(this.suspicion, 70);
+                    this.suspicionDrainDelay = 180;
+                } else if (!her[AWARE.TOUCHING]) this._bumped = false;
+                if (her[AWARE.CLOSE] && isVisible && !sneaking) {
                     canSee = true;
                     this.suspicion += 5;
-                } else if (isVisible && distToPlayer <= effectiveVisionRange && this.canSeePoint(player.x, player.y, walls, buildings)) {
+                } else if (isVisible && distToPlayer <= effectiveVisionRange && this.awareness.look(her, this.visionRange, walls, buildings)) {
                     canSee = true;
                     let detectSpeed = 1.0;
                     detectSpeed *= (1.0 - (distToPlayer / effectiveVisionRange));
@@ -1888,16 +1893,7 @@
                 if (trafficCars) {
                     for (let car of trafficCars) {
                         const dist = Math.hypot(this.x - car.x, this.y - car.y);
-                        if (dist < 40) { 
-                            if (Math.abs(car.speed) > 2.0) {
-                                const damage = Math.abs(car.speed) * 10;
-                                const pushAngle = Math.atan2(this.y - car.y, this.x - car.x);
-                                const force = Math.abs(car.speed) * 3;
-                                this.takeDamage(damage, Math.cos(pushAngle) * force, Math.sin(pushAngle) * force);
-                                showMessage("GANGER HIT BY VEHICLE!");
-                                hitObstacle = false; 
-                            } else { hitObstacle = true; }
-                        }
+                        if (dist < 40 && Math.abs(car.speed) <= 2.0) hitObstacle = true;   // a fast one hits him (hitByCar)
                     }
                 }
                 if (hitObstacle) {
@@ -1906,6 +1902,15 @@
                 }
             }
             
+            /** A car (CollisionSystem's people-vs-cars pass has put him just outside it): a fast one hurts, once a hit */
+            hitByCar(car, contact, speed) {
+                if (speed <= 2.0 || _simTick - (this._carHitAt ?? -1e9) < 20) return;
+                this._carHitAt = _simTick;
+                const force = speed * 3;
+                this.takeDamage(speed * 10, contact.nx * force, contact.ny * force);
+                showMessage("GANGER HIT BY VEHICLE!");
+            }
+
             /**
              * A sound (engine/noise.js): unless already fighting her, turn toward roughly where it
              * came from (`err` px off) and go to look. `strength` 0…1 — louder or closer is
@@ -1920,6 +1925,7 @@
                 this.suspicionDrainDelay = 180;
                 this.state = 'SEARCHING';
                 this.angle = Math.atan2(ny - this.y, nx - this.x);
+                this.awareness.hear(nx, ny, strength);   // what he heard, and where (the matrix keeps it)
                 return true;
             }
 
@@ -2638,11 +2644,7 @@
                 this.active = false;
                 this.waveDelay = 0;
                 // Clean up
-                for (let i = game.enemies.length - 1; i >= 0; i--) {
-                    if (game.enemies[i]._gauntletWave) {
-                        game.enemies.splice(i, 1);
-                    }
-                }
+                lifeKit.sweep(game.enemies, (e) => e._gauntletWave);
                 this.hostiles = [];
                 if (this.wave > 0) {
                     showMessage(`GAUNTLET OVER — WAVE ${this.wave} — ${this.totalKills} KILLS`);

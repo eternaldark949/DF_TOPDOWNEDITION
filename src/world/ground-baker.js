@@ -158,8 +158,7 @@
 
             _bake(i, j, lod = 0) {
                 const S = this.S, g = this.game, map = g.activeMap, k = 1 / (1 << lod);
-                const cv = document.createElement('canvas'); cv.width = S * k; cv.height = S * k;
-                const c = cv.getContext('2d');
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([S * k, S * k]);
                 c.scale(k, k);
                 const x0 = i * S, y0 = j * S, R = { left: x0, top: y0, right: x0 + S, bottom: y0 + S };
                 const hits = (x, y, w, h) => x < R.right && x + w > R.left && y < R.bottom && y + h > R.top;

@@ -77,8 +77,7 @@
             if (_carPortraits.has(key)) return _carPortraits.get(key);
             const sp = carSprite({ brand, model, visualStyle: B.visualStyle, length: m.length, width: m.width,
                 noHearseCap: !!m.noHearseCap, color: color || B.colors[0], glowColor: glow || null });
-            const cv = document.createElement('canvas'); cv.width = sp.cv.height; cv.height = sp.cv.width;
-            const c = cv.getContext('2d'); c.translate(cv.width / 2, cv.height / 2); c.rotate(-Math.PI / 2);
+            const { canvas: cv, ctx: c } = canvasKit.createLayer([sp.cv.height, sp.cv.width]); c.translate(cv.width / 2, cv.height / 2); c.rotate(-Math.PI / 2);
             c.drawImage(sp.cv, -sp.cv.width / 2, -sp.cv.height / 2);
             const url = cv.toDataURL();
             _carPortraits.set(key, url);
@@ -421,7 +420,7 @@
                     showMessage(`ZIB REROUTING...`);
                     const ride = this.passengerRide;
                     // our routing failed, not her ride: the teleport is on the house
-                    setTimeout(() => { if (this.passengerRide === ride) this.teleportToDestination(game, { free: true }); }, 500);
+                    game_timers.after(0.5, () => { if (this.passengerRide === ride) this.teleportToDestination(game, { free: true }); });
                 }
                 // Ensure driverType stays 'zib' after enableAutoDrive
                 zib.driverType = 'zib';
@@ -606,7 +605,7 @@
                 game.car = game.ownedCar;
                 game.autodriveBtn.classList.remove('engaged');
                 game.autodriveBtn.style.display = 'none';
-                game.handbrakeHeld = false;
+                controls.touch.drop('touchHandbrake');
                 if (game.handbrakeBtn) { game.handbrakeBtn.style.display = 'none'; game.handbrakeBtn.classList.remove('held'); }
                 if (game.zibSkipBtn) game.zibSkipBtn.style.display = 'none';
                 if (game.holsterBtn) game.holsterBtn.style.display = 'flex';

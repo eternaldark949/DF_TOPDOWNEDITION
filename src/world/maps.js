@@ -54,7 +54,7 @@
             },
             // Double Nights Hotel — "Think excellence, think Double Nights." A grand interdimensional
             // hotel: black marble and gold, a rift fountain, a chandelier over the twin crescents,
-            // guests and AI staff coming and going (world/lobby-life.js). Floor: drawLobbyInterior;
+            // guests and AI staff coming and going (directory/lobby-life.js). Floor: drawLobbyInterior;
             // glows, the motto and the elevator doors: drawLobbyGlow; furniture: dn_* (props-decor.js).
             'hotel_lobby': {
                 id: 'hotel_lobby', width: 1000, height: 1200, type: 'indoor',
@@ -245,7 +245,7 @@
                 id: 'cozy_cafe_interior', width: 1200, height: 1000, type: 'indoor',
                 label: 'Cozy Cafe', floorColor: '#2a1a0e',
                 ambientDarkness: 0.5,                               // warm and lamp-lit, never dark
-                navProps: 'all',                                    // the guests walk round the furniture (world/cafe-life.js)
+                navProps: 'all',                                    // the guests walk round the furniture (directory/cafe-life.js)
                 wallStyle: { fill: '#2b1a12', stroke: 'rgba(240,190,120,0.35)' },   // dark walnut panelling, honey trim
                 spawn: { x: 600, y: 900 },
                 zones: [],

@@ -74,18 +74,14 @@
         // Shared feathered ellipses: four tiny sprites for every puddle, with no live blur.
         const _puddleEdgeSprites = new Map();
         function _puddleEdgeSprite(kind = 'mask') {
-            let cv = _puddleEdgeSprites.get(kind);
-            if (cv) return cv;
-            const colors = { mask: '255,255,255', night: '6,4,18', day: '178,190,226', rim: '214,196,255' };
-            const rgb = colors[kind] || colors.mask;
-            cv = document.createElement('canvas'); cv.width = cv.height = 96;
-            const c = cv.getContext('2d'), g = c.createRadialGradient(48, 48, 0, 48, 48, 48);
-            const stops = kind === 'rim'
-                ? [[0,0],[.74,0],[.84,.12],[.9,1],[.95,.3],[1,0]]
-                : [[0,1],[.72,1],[.83,.96],[.93,.5],[1,0]];
-            for (const [at,a] of stops) g.addColorStop(at, `rgba(${rgb},${a})`);
-            c.fillStyle = g; c.fillRect(0, 0, 96, 96);
-            _puddleEdgeSprites.set(kind, cv); return cv;
+            return canvasKit.bake(_puddleEdgeSprites, kind, () => {
+                const colors = { mask: '255,255,255', night: '6,4,18', day: '178,190,226', rim: '214,196,255' };
+                const rgb = colors[kind] || colors.mask;
+                const stops = kind === 'rim'
+                    ? [[0,0],[.74,0],[.84,.12],[.9,1],[.95,.3],[1,0]]
+                    : [[0,1],[.72,1],[.83,.96],[.93,.5],[1,0]];
+                return canvasKit.glow([96, stops.map(([at, a]) => [at, `rgba(${rgb},${a})`])]);
+            });
         }
 
         function _paintPuddleLobes(ctx, p, growth, sprite, alpha, ox = p.x, oy = p.y) {
@@ -114,7 +110,7 @@
             const T = PUDDLE_BAKE_TOL, al = b.al;
             if (b.q === q && Math.abs(b.g - g) <= T && Math.abs(al[0] - a1) <= T && Math.abs(al[1] - a2) <= T && Math.abs(al[2] - a3) <= T) return b;
             const size = Math.max(2, Math.ceil((p.r + 2) * 2 * q));
-            if (b.cv.width !== size || b.cv.height !== size) { b.cv.width = size; b.cv.height = size; }
+            canvasKit.fitLayer(b.cv, size, size);
             const c = b.cv.getContext('2d');
             c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
             c.clearRect(0, 0, size, size);
@@ -581,8 +577,7 @@
                 }
                 x0 = Math.max(0, Math.floor(x0)); y0 = Math.max(0, Math.floor(y0)); x1 = Math.min(rw, Math.ceil(x1)); y1 = Math.min(rh, Math.ceil(y1));
                 if (x1 <= x0 || y1 <= y0) return;
-                const T = this._reflTierCv || (this._reflTierCv = document.createElement('canvas'));
-                if (T.width !== rw || T.height !== rh) { T.width = rw; T.height = rh; }
+                const T = canvasKit.scratch(this, '_reflTierCv', rw, rh);
                 const tc = T.getContext('2d');
                 tc.setTransform(1, 0, 0, 1, 0, 0); tc.clearRect(x0, y0, x1 - x0, y1 - y0); toView(tc);
                 for (const b of list) { try { b.drawReflection(tc, dark); } catch (e) { /* a facade that can't mirror is left out */ } }
@@ -1141,13 +1136,13 @@
              */
             updatePuddles() {
                 const R = this._ripples || (this._ripples = []);
-                for (let i = R.length - 1; i >= 0; i--) if (++R[i].t >= R[i].life) R.splice(i, 1);
+                lifeKit.sweep(R, (r) => ++r.t >= r.life);
                 const wet = this._wetHere(), surf = this._surfaces();
                 if (!this.reflectQuality() || !this.view) return;
                 // the fountains and pools stir by themselves
-                if (surf) for (const [x, y, r] of surf.water) if (Math.random() < 0.12 && R.length < 70) {
-                    const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * r * 0.8;
-                    R.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d, t: 0, life: 40, r: 7 + Math.random() * 6 });
+                if (surf) for (const [x, y, r] of surf.water) if (fxRandom() < 0.12 && R.length < 70) {
+                    const a = fxRandom() * Math.PI * 2, d = Math.sqrt(fxRandom()) * r * 0.8;
+                    R.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d, t: 0, life: 40, r: 7 + fxRandom() * 6 });
                 }
                 if (wet < 0.05) return;
                 const v = this.view, z = v.zoom, hw = this.canvas.width / 2 / z + 40, hh = this.canvas.height / 2 / z + 40;
@@ -1169,12 +1164,12 @@
                 if (!vis.length) return;
                 const W = this.weather, rain = W && W.isRaining ? W.intensity : 0;
                 // raindrops
-                let drops = rain * 2.2 + (Math.random() < (rain * 2.2) % 1 ? 1 : 0);
+                let drops = rain * 2.2 + (fxRandom() < (rain * 2.2) % 1 ? 1 : 0);
                 while (drops-- >= 1 && R.length < 70) {
-                    const [p, k] = vis[(Math.random() * vis.length) | 0], L = p.lobes[(Math.random() * p.lobes.length) | 0];
-                    const g = 0.65 + 0.35 * k, a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * 0.8;
+                    const [p, k] = vis[(fxRandom() * vis.length) | 0], L = p.lobes[(fxRandom() * p.lobes.length) | 0];
+                    const g = 0.65 + 0.35 * k, a = fxRandom() * Math.PI * 2, rr = Math.sqrt(fxRandom()) * 0.8;
                     const lx = L.dx + Math.cos(a) * L.rx * g * rr, ly = L.dy + Math.sin(a) * L.ry * g * rr, c = Math.cos(p.ang), sn = Math.sin(p.ang);
-                    R.push({ x: p.x + lx * c - ly * sn, y: p.y + lx * sn + ly * c, t: 0, life: 26 + (Math.random() * 12 | 0), r: 5 + Math.random() * 4 });
+                    R.push({ x: p.x + lx * c - ly * sn, y: p.y + lx * sn + ly * c, t: 0, life: 26 + (fxRandom() * 12 | 0), r: 5 + fxRandom() * 4 });
                 }
                 // splashes: footsteps every so often, tyres often
                 const inside = (p, k, x, y) => {

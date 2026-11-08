@@ -203,19 +203,12 @@
                 this.vx = this.moveDir.x * this.curSpeed;
                 this.vy = this.moveDir.y * this.curSpeed;
         
-                // 4. APPLY KNOCKBACK (Additive)
-                this.vx += this.knockbackVx;
-                this.vy += this.knockbackVy;
+                // 4. KNOCKBACK on top (the body step: added, then damped; basement/collision-kit.js carry)
+                collisionWorld.carry(this, 'velocity');
         
                 // 5. APPLY TO POSITION
                 this.x += this.vx;
                 this.y += this.vy;
-        
-                // 6. DECAY KNOCKBACK
-                this.knockbackVx *= this.knockbackFriction;
-                this.knockbackVy *= this.knockbackFriction;
-                if (Math.abs(this.knockbackVx) < 0.1) this.knockbackVx = 0;
-                if (Math.abs(this.knockbackVy) < 0.1) this.knockbackVy = 0;
             }
         
             // Standard helper to set direction for AI/Input
@@ -418,15 +411,7 @@
                 // Movement is applied in GameEngine.update() BEFORE CollisionSystem runs
                 // CollisionSystem will then resolve any wall/prop penetrations
                 
-                // Apply knockback (if any, from damage)
-                this.x += this.knockbackVx;
-                this.y += this.knockbackVy;
-                
-                // Decay knockback
-                this.knockbackVx *= this.knockbackFriction;
-                this.knockbackVy *= this.knockbackFriction;
-                if (Math.abs(this.knockbackVx) < 0.1) this.knockbackVx = 0;
-                if (Math.abs(this.knockbackVy) < 0.1) this.knockbackVy = 0;
+                collisionWorld.carry(this);   // knockback (from damage, shoves, slips): the body step (basement/collision-kit.js)
             }
             
             /**
@@ -613,8 +598,7 @@
         function _getFireTrailSprites() {
             if (_fireTrailSprites) return _fireTrailSprites;
             const K = 4, frames = 16, cols = 4, w = 32, h = 36, TAU = Math.PI * 2;
-            const atlas = document.createElement('canvas'); atlas.width = w * cols * K; atlas.height = h * cols * K;
-            const c = atlas.getContext('2d');
+            const { canvas: atlas, ctx: c } = canvasKit.createLayer([w * cols * K, h * cols * K]);
             for (let i = 0; i < frames; i++) {
                 const p = i / frames * TAU, sway = Math.sin(p), curl = Math.cos(p);
                 c.setTransform(K, 0, 0, K, ((i % cols) * w + 22) * K, (Math.floor(i / cols) * h + 18) * K);
@@ -741,8 +725,7 @@
                 }
                 c.fillStyle = '#fffdeb'; c.beginPath(); c.arc(0, 0, 4.1, 0, TAU); c.fill();
             }
-            const halo = document.createElement('canvas'); halo.width = halo.height = 48 * K;
-            const h = halo.getContext('2d'); h.setTransform(K, 0, 0, K, 24 * K, 24 * K);
+            const { canvas: halo, ctx: h } = canvasKit.createLayer([48 * K, 48 * K]); h.setTransform(K, 0, 0, K, 24 * K, 24 * K);
             const glow = h.createRadialGradient(0, 0, 3, 0, 0, 23);
             glow.addColorStop(0, 'rgba(255,158,21,0.42)'); glow.addColorStop(0.35, 'rgba(255,97,10,0.23)');
             glow.addColorStop(0.7, 'rgba(255,55,8,0.065)'); glow.addColorStop(1, 'rgba(255,55,8,0)');
@@ -1195,6 +1178,12 @@
                 this.entitiesInside = new Set();
             }
             
+            /** The collision step tells it who's touching it (a ghost: nobody's pushed): onEnter on 'begin', onExit on 'end'. */
+            onCollide(other, contact, phase) {
+                if (phase === 'begin' && !this.entitiesInside.has(other)) { this.entitiesInside.add(other); if (this.onEnter) this.onEnter(other, this); }
+                else if (phase === 'end' && this.entitiesInside.delete(other) && this.onExit) this.onExit(other, this);
+            }
+
             containsEntity(entity) {
                 const bb = this.getBoundingBox();
                 const center = entity.getCenter();

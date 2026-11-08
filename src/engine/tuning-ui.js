@@ -98,7 +98,7 @@
             },
 
             closeTuning() {
-                document.getElementById('tuning-overlay').style.display = 'none';
+                uiKit.hide('tuning-overlay');
                 this.pauseSystem.release('tuning');
                 this._tuneReveal = null;
             },

@@ -46,8 +46,7 @@
             /** Bake the strip: frame 0 standing, 1..FRAMES the walk cycle, in the body's own frame (facing +x) */
             _bake(e, c, sig) {
                 const F = CROWD_BAKE.FRAMES, R = CROWD_BAKE.R, Q = CROWD_BAKE.Q, cell = Math.ceil(R * 2 * Q);
-                const cv = document.createElement('canvas'); cv.width = cell * (F + 1); cv.height = cell;
-                const g = cv.getContext('2d'); if (!g) return null;
+                const { canvas: cv, ctx: g } = canvasKit.createLayer([cell * (F + 1), cell]); if (!g) return null;
                 const parts = sig.split('|'), sp = +parts[4] || 0;
                 // a stand-in body: same look and place, its gait pinned (no ticks pass, so syncHumanoidGait keeps it)
                 const B = { x: e.x, y: e.y, angle: 0, look: e.look, walkPhase: 0 };
@@ -192,8 +191,7 @@
 
             _startJob(owner, e, c, look, env, light, sp, rot) {
                 const F = CROWD_HQ.FRAMES, R = CROWD_HQ.R, Q = CROWD_HQ.Q, cell = Math.ceil(R * 2 * Q);
-                const cv = document.createElement('canvas'); cv.width = cell * (sp > 0 ? F : 1); cv.height = cell;
-                const g = cv.getContext('2d'); if (!g) return null;
+                const { canvas: cv, ctx: g } = canvasKit.createLayer([cell * (sp > 0 ? F : 1), cell]); if (!g) return null;
                 // A stand-in walker: their look, walking along +x through its own little world
                 const B = { x: 0, y: 0, angle: 0, look: e.look, walkPhase: 0, _bakePed: typeof Pedestrian !== 'undefined' && e instanceof Pedestrian, _wxSeed: 0 };
                 syncHumanoidGait(B);

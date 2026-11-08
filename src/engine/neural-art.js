@@ -69,7 +69,7 @@ function neuralCanopy(){
 engineMixin({
     drawNeuralInterior(c){if(!this._neuralFloor)this._neuralFloor=this._paintNeuralFloor();c.drawImage(this._neuralFloor,0,0);},
     _paintNeuralFloor(){
-        const cv=document.createElement('canvas');cv.width=1000;cv.height=800;const c=cv.getContext('2d'),B=NeuralArt.box,T=NEURAL,r=seededRandom(808);
+        const { canvas: cv, ctx: c } = canvasKit.createLayer([1000, 800]),B=NeuralArt.box,T=NEURAL,r=seededRandom(808);
         // Veined marble: each slab its own shade, silver-white veins, a polished diagonal sheen.
         const marble=(x,y,w,h,cw,ch,a,b,vein,n)=>{
             c.save();c.beginPath();c.rect(x,y,w,h);c.clip();

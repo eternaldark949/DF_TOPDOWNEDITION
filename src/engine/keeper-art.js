@@ -51,8 +51,7 @@
 
             _paintKeeperHill() {
                 const W = KEEPER.HILL.w, H = KEEPER.HILL.h, k = 0.5;                 // painted at half size, drawn at full
-                const cv = document.createElement('canvas'); cv.width = W * k; cv.height = H * k;
-                const c = cv.getContext('2d'), r = seededRandom(6125);
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([W * k, H * k]), r = seededRandom(6125);
                 c.scale(k, k);
                 // The sea of clouds far below: deep violet, rolling bands of lighter mist
                 const sky = c.createLinearGradient(0, 0, 0, H); sky.addColorStop(0, '#140a26'); sky.addColorStop(0.5, '#1c0f33'); sky.addColorStop(1, '#241238'); c.fillStyle = sky; c.fillRect(0, 0, W, H);
@@ -101,8 +100,7 @@
 
             /** The house, from above: a country home made strange. Canvas origin = world (540, 320). */
             _paintKeeperHouse() {
-                const cv = document.createElement('canvas'); cv.width = 720; cv.height = 560;
-                const c = cv.getContext('2d'), r = seededRandom(747), O = { x: 540, y: 320 };
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([720, 560]), r = seededRandom(747), O = { x: 540, y: 320 };
                 c.translate(-O.x, -O.y);
                 // Shadow on the lawn
                 c.fillStyle = 'rgba(4,2,10,0.55)'; c.fillRect(708, 452, 450, 250);
@@ -209,8 +207,7 @@
 
             _paintKeeperParlor() {
                 const { w: W, h: H } = KEEPER.PARLOR;
-                const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
-                const c = cv.getContext('2d'), r = seededRandom(212), GOLD = '#e8c27a';
+                const { canvas: cv, ctx: c } = canvasKit.createLayer([W, H]), r = seededRandom(212), GOLD = '#e8c27a';
                 // Checkerboard tiles, black and ivory, a soft sheen across them
                 const T = 44;
                 for (let y = 0; y < H; y += T) for (let x = 0; x < W; x += T) {
@@ -351,11 +348,11 @@
                     glow(450, 84, 26, '255, 90, 30', 0.35);
                     // Sparks from a popped ember
                     const S = this._keeperSparks || [];
-                    for (let i = S.length - 1; i >= 0; i--) {
-                        const p = S[i]; p.x += p.vx; p.y += p.vy; p.vy *= 0.97; p.vx *= 0.98; p.life--;
-                        if (p.life <= 0) { S.splice(i, 1); continue; }
+                    lifeKit.sweep(S, (p) => {
+                        p.x += p.vx; p.y += p.vy; p.vy *= 0.97; p.vx *= 0.98; p.life--;
+                        if (p.life <= 0) return true;
                         glow(p.x, p.y, 4, '255, 200, 110', Math.min(1, p.life / 25));
-                    }
+                    });
                     if (this._keeperSurge) this._keeperSurge = Math.max(0, this._keeperSurge - 0.012);
                     // Candles
                     for (const [x, y] of [[374, 40], [526, 40], [96, 618], [564, 200]]) glow(x, y, 16, '255, 200, 130', 0.35 * (0.85 + 0.15 * Math.sin(t * 9 + x)));

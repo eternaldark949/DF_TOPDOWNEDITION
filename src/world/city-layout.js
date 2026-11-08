@@ -2,7 +2,7 @@
         /** Full-profiler-only stage hooks. Restored entirely when Full mode is off. */
         const PeopleProfiler = {
             active: false, hooks: null,
-            keys: ['Body shapes', 'Clothing', 'Hair physics', 'Hair drawing', 'Cloth physics', 'Cloth drawing', 'Shading', 'Held items', 'Crowd sprites', 'Crowd baking'],
+            keys: ['Pose and joints', 'Legs', 'Hips', 'Arms', 'Torso', 'Head', 'Seated', 'Body shapes', 'Clothing', 'Hair physics', 'Hair drawing', 'Cloth physics', 'Cloth drawing', 'Shading', 'Held items', 'Crowd sprites', 'Crowd baking'],
 
             _wrap(part, original, entry, opaque) {
                 return function() {
@@ -33,12 +33,18 @@
                         const original = get();
                         hooks.push({ original, wrapped: this._wrap(part, original, entry, opaque), set });
                     };
+                    // The body's own stages (penthouse/procedural-humanoid.js); the shapes, clothes and hair they call are charged to their own rows
+                    const H = proceduralHumanoid.prototype;
+                    for (const [part, names] of [['Pose and joints', ['configure', 'dress', 'stride', 'strikePose', 'placeHands', 'settle', 'rig']], ['Legs', ['drawLegs']], ['Hips', ['drawHips']],
+                                                 ['Arms', ['drawArms']], ['Torso', ['drawTorso']], ['Head', ['drawHead']], ['Seated', ['drawSeated']], ['Held items', ['drawWeapons', 'drawHeld']]])
+                        for (const name of names) bind(part, () => H[name], fn => { H[name] = fn; });
                     bind('Hair physics', () => hairGeometry, fn => { hairGeometry = fn; });
                     bind('Cloth physics', () => clothGeometry, fn => { clothGeometry = fn; });
                     bind('Cloth drawing', () => drawClothPanel, fn => { drawClothPanel = fn; });
                     bind('Shading', () => humanShade, fn => { humanShade = fn; });
                     bind('Shading', () => drawHumanContactShadow, fn => { drawHumanContactShadow = fn; });
                     bind('Shading', () => _softSpot, fn => { _softSpot = fn; });
+                    bind('Shading', () => drawHumanRim, fn => { drawHumanRim = fn; });
                     bind('Held items', () => drawHeldGlass, fn => { drawHeldGlass = fn; });
                     bind('Held items', () => drawWeapon, fn => { drawWeapon = fn; });
                     bind('Held items', () => drawUmbrella, fn => { drawUmbrella = fn; });
@@ -63,6 +69,7 @@
                     // High's shaded walk bakes (ui/crowd-impostors.js CrowdBakes): drawing from a bake, and the bake work spread over frames
                     bind('Crowd sprites', () => CrowdBakes.draw, fn => { CrowdBakes.draw = fn; }, true);
                     bind('Crowd baking', () => CrowdBakes._bakeSteps, fn => { CrowdBakes._bakeSteps = fn; }, false, true);
+                    bind('Hair drawing', () => _hairFinish, fn => { _hairFinish = fn; });
                     for (const type of Object.keys(HAIR_RENDERERS)) {
                         bind('Hair drawing', () => HAIR_RENDERERS[type], fn => { HAIR_RENDERERS[type] = fn; });
                     }
@@ -86,8 +93,8 @@
                     const value = S.peopleParts[key]; known += value;
                     profiler.add('People: ' + key, value, true);
                 }
-                // Uninstrumented body, limbs, outfits and pose setup, plus hook overhead.
-                profiler.add('People: Body and limbs', Math.max(0, ms - known), true);
+                // What's left: the way in (silhouettes, scale), outside the body's stages, plus hook overhead.
+                profiler.add('People: Other', Math.max(0, ms - known), true);
             }
         };
         /** Buildings/World tops detail hooks exist only while the Full profiler is shown.

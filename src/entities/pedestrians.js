@@ -100,6 +100,10 @@
                 this.quipAge = 0;        // Frames since current quip began
                 this.quipDuration = 0;   // Frames the current quip lasts
                 this.quipCooldown = 60 + Math.floor(Math.random() * 240); // Stagger first quips so the city doesn't all speak at once on spawn
+                // What they know of what's around them (basement/awareness-kit.js): they notice her weapon only when it's
+                // in front of them (a wide cone), feel it when she bumps into them, and hear gunfire (hearNoise)
+                this.awareness = new awarenessMatrix(this, { evaluation_radius: 500, personal_space: 180, touch: 29, fov: Math.PI * 1.3, facing: () => this.facingAngle });
+                this._startleUntil = 0;
                 
                 // Find nearest node to start
                 this._findNearestNode();
@@ -196,6 +200,11 @@
              * spamming. Skips entirely if a quip is already active.
              */
             tryQuip(player, weaponOut, enemies) {
+                // Bumped into on foot: they feel it (whatever else they were saying) and say so
+                const her = player && !(typeof game !== 'undefined' && game.isDriving) ? this.awareness.observe(player, 'her') : null;
+                if (her && her[AWARE.TOUCHING]) {
+                    if (!this._bumped) { this._bumped = true; if (!this.quipText) this._setQuip(this._pickQuip('bumpedOnFoot')); }
+                } else this._bumped = false;
                 if (this.quipText || this.quipCooldown > 0) return;
                 
                 const QUIP_DANGER_RANGE = 500;
@@ -219,10 +228,8 @@
                 }
                 
                 // 2. SEES WEAPON — player nearby with weapon out
-                if (weaponOut && player) {
-                    const dx = player.x - this.x, dy = player.y - this.y;
-                    if (Math.abs(dx) < QUIP_WEAPON_RANGE && Math.abs(dy) < QUIP_WEAPON_RANGE
-                        && Math.hypot(dx, dy) < QUIP_WEAPON_RANGE) {
+                if (weaponOut && her) {
+                    if (her[AWARE.CLOSE] && this.awareness.look(her, QUIP_WEAPON_RANGE)) {   // close, and in front of them
                         if (Math.random() < 0.012) {
                             this._setQuip(this._pickQuip('seesWeapon'));
                         }
@@ -236,6 +243,23 @@
                 }
             }
             
+            /**
+             * A sound (engine/noise.js: gunfire, glass, a takedown): they flinch, say so, and hurry away from it
+             * (back the way they came, if the way on leads toward it). `strength` 0…1, louder or closer.
+             */
+            hearNoise(nx, ny, strength) {
+                if (this.dead || this.state === 'sprawled' || this.state === 'recovering') return false;
+                this.awareness.hear(nx, ny, strength);
+                this._startleUntil = _simTick + Math.round(120 + 120 * strength);
+                if (!this.quipText && Math.random() < 0.25 + 0.6 * strength) this._setQuip(this._pickQuip('danger'));
+                const t = this._getNode(this.targetNodeId), c = this._getNode(this.currentNodeId);
+                if (this.state === 'walking' && t && c && (t.x - this.x) * (nx - this.x) + (t.y - this.y) * (ny - this.y) > 0) {
+                    this.prevNodeId = this.targetNodeId; this.targetNodeId = this.currentNodeId; this.currentNodeId = this.prevNodeId;   // turn back
+                }
+                return true;
+            }
+            get startled() { return _simTick < this._startleUntil; }
+
             _pickQuip(category) {
                 const arr = PEDESTRIAN_QUIPS[category];
                 if (!arr || arr.length === 0) return null;
@@ -258,7 +282,7 @@
                 // pedestrian goes quiet for a beat before they can speak again.
                 this.quipCooldown = this.quipDuration + 480 + Math.floor(Math.random() * 240);
                 // Reserve the line for its readable lifetime plus a grace beat.
-                _activeQuipLines.set(text, _frameTime + this.quipDuration * (1000 / 60) + QUIP_LINE_GRACE_MS);
+                _activeQuipLines.set(text, _simTick + this.quipDuration + QUIP_LINE_GRACE_TICKS);
             }
 
             /**
@@ -297,14 +321,7 @@
                 if (this.quipCooldown > 0) this.quipCooldown--;
                 
                 // Apply knockback physics from ActorEntity
-                if (this.knockbackVx || this.knockbackVy) {
-                    this.x += this.knockbackVx;
-                    this.y += this.knockbackVy;
-                    this.knockbackVx *= this.knockbackFriction;
-                    this.knockbackVy *= this.knockbackFriction;
-                    if (Math.abs(this.knockbackVx) < 0.1) this.knockbackVx = 0;
-                    if (Math.abs(this.knockbackVy) < 0.1) this.knockbackVy = 0;
-                }
+                collisionWorld.carry(this);   // knockback: the body step (basement/collision-kit.js)
                 
                 if (this.invincibleTimer > 0) this.invincibleTimer--;
                 
@@ -429,6 +446,11 @@
              *
              * No HP damage. The world refuses to enact what it shows.
              */
+            /** A car (CollisionSystem's people-vs-cars pass has put them just outside it): fast enough, they go down */
+            hitByCar(car, contact, speed) {
+                if (speed > 1.5 && this.state !== 'sprawled' && this.state !== 'recovering') this._handleVehicleImpact(car);
+            }
+
             _handleVehicleImpact(car) {
                 if (this.invincibleTimer > 0) return; // brief grace after a bump
                 
@@ -587,7 +609,7 @@
                 // Move towards target
                 if (dist > 5) {
                     this._noteOnCrossing(targetNode);
-                    const pace = this.speed * (this._raining() ? (this.look.hurry || 1.25) : 1);   // hurrying in the rain
+                    const pace = this.speed * (this.startled ? 1.8 : this._raining() ? (this.look.hurry || 1.25) : 1);   // hurrying from gunfire, or in the rain
                     let moveX = (dx / dist) * pace;
                     let moveY = (dy / dist) * pace;
                     
@@ -1032,6 +1054,8 @@
             /**
              * Reset all pedestrians (called on map change)
              */
+            /** Nobody on the pavements: as at a fresh start, the network kept (a replay). */
+            clearStreet() { for (const p of this.pedestrians) if (!p.markedForDestroy) p.destroy(); this.pedestrians = []; this.spawnTimer = 0; this._near = null; this.crossingQueues.clear(); _activeQuipLines.clear(); }
             reset() {
                 for (let p of this.pedestrians) {
                     if (!p.markedForDestroy) p.destroy();

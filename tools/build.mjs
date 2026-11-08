@@ -43,10 +43,27 @@ const STYLES = [
 ];
 
 const SCRIPTS = [
+    'basement/frame-clock.js',     // LV0 Basement: the frame clock's globals (_frameTime, _simTick, _gameTimeSec), first
+    'basement/timer-kit.js',       // LV0 Basement: gTimer and game_timers (timers in game time, on the sim ticks)
+    'basement/canvas-kit.js',      // LV0 Basement: canvasKit (off-screen layers)
+    'basement/life-kit.js',        // LV0 Basement: lifeKit (lists of short-lived things)
+    'basement/sound-kit.js',       // LV0 Basement: soundKit (Web Audio building blocks)
+    'basement/sound-system.js',    // LV0 Basement: soundSystem (context, channels, volume dial, reverb, sounds by packet)
+    'basement/controls-system.js', // LV0 Basement: controlsSystem (keyboard, mouse, touch and gamepad instances, touch sticks, keymap, action table)
+    'basement/recorder-kit.js',    // LV0 Basement: gRecorder (inputs recorded per tick, played back through the controls)
+    'basement/entity-base.js',     // LV0 Basement: GameEntity (the base of everything that moves or collides)
+    'basement/shape-kit.js',       // LV0 Basement: shapeKit (collision geometry)
+    'basement/spatial-grid.js',    // LV0 Basement: SpatialHashGrid and the render / transition grids
+    'basement/collision-kit.js',   // LV0 Basement: collisionKit and collisionWorld (the collision step, game-free: layers, grid, passes, solver)
+    'basement/ui-kit.js',          // LV0 Basement: uiKit (making, showing and hiding DOM panels)
+    'basement/material-kit.js',    // LV0 Basement: materialKit (linked materials and finish rules)
+    'basement/virtual-child.js',   // LV0 Basement: virtualChild (things that ride on a parent without being its child)
+    'basement/awareness-kit.js',   // LV0 Basement: awarenessMatrix (what a character knows of what's around them)
     'core/config.js',
     '@assets',              // generated from the assets/ folder
     'core/assets.js',
     'core/registries.js',
+    'directory/game-materials.js',    // LV2 Directory: the game's finishes and named materials (links the cosmetics)
     'core/resonance.js',
     'core/utils.js',
     'world/navigation.js',
@@ -57,16 +74,16 @@ const SCRIPTS = [
     'core/settings.js',
     'story/story-db.js',
     'story/captions.js',
-    'audio/audio.js',
+    'directory/game-sound.js',
+    'directory/game-controls.js',    // LV2 Directory: dfKeyMap and dfActions (which keys and buttons do what)
     'world/weather.js',
     'world/weather-response.js',
     'world/particles-decals.js',
     'world/rooms.js',
     'world/maps.js',
     'world/map-entities.js',
-    'physics/spatial.js',
-    'physics/game-entity.js',
-    'physics/collision.js',
+    'directory/car-contact.js',
+    'directory/collision-system.js',
     'entities/props-decor.js',
     'entities/prop-sprites.js',
     'entities/vehicles-minigames.js',
@@ -77,9 +94,10 @@ const SCRIPTS = [
     'entities/street-objects.js',
     'entities/npc.js',
     'entities/pedestrians.js',
-    'world/lobby-life.js',
-    'world/club-life.js',
-    'world/cafe-life.js',
+    'directory/venue-crowd.js',
+    'directory/lobby-life.js',
+    'directory/club-life.js',
+    'directory/cafe-life.js',
     'engine/furniture.js',
     'entities/enemies.js',
     'entities/hunters.js',
@@ -138,6 +156,7 @@ const SCRIPTS = [
     'ui/color-picker.js',
     'ui/weapon-models.js',
     'ui/humanoid-render.js',
+    'penthouse/procedural-humanoid.js',
     'ui/portrait-real.js',
     'ui/face-cache.js',
     'ui/comms.js',
@@ -160,6 +179,9 @@ const SCRIPTS = [
     'story/scenes/cast.js',
     'story/scenes/prologue.js',
     'story/scenes/van.js',
+    'lobby/level-lobby.js',        // LV1 Lobby: the game loop's clock (GameEngine builds one)
+    'lobby/level-pause.js',       // LV1 Lobby: levelPause (the pause registry)
+    'lobby/level-stages.js',      // LV1 Lobby: levelStages (which stage the engine is on: menu, loading, world)
     'engine/pause-system.js',
     'engine/game-engine.js',
     'engine/events.js',
@@ -211,6 +233,8 @@ const SCRIPTS = [
     'engine/lighting.js',
     'engine/daylight.js',
     'engine/player-draw-input.js',
+    'directory/new-game-state.js',   // LV2 Directory: resetGameState, the game's new-game defaults
+    'directory/world-session.js',    // LV2 Directory: menu <-> world (enterWorld, the loading screen, stop)
     'engine/loop.js',
     'app/menu-wiring.js',
     'ui/phone.js',

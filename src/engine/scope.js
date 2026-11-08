@@ -102,8 +102,7 @@
                     [...(this.activeMap.walls || []), ...getColliders(this.activeMap)], SCOPE.RANGE);
                 // The veil on its own half-resolution layer (it's all soft), with the lane cut out of it
                 const R = 0.5, W = Math.ceil(this.canvas.width * R), H = Math.ceil(this.canvas.height * R);
-                const v = this._scopeVeil || (this._scopeVeil = document.createElement('canvas'));
-                if (v.width !== W || v.height !== H) { v.width = W; v.height = H; }
+                const v = canvasKit.scratch(this, '_scopeVeil', W, H);
                 const vc = v.getContext('2d');
                 vc.setTransform(1, 0, 0, 1, 0, 0);
                 vc.clearRect(0, 0, W, H);

@@ -61,7 +61,7 @@ test('New game clears quick draw and restores ordinary drawn controls',`
  e.run(`(()=>{${setup}
  game.holsterBtn.dispatchEvent({type:'pointerdown',pointerId:1,button:0,preventDefault(){},stopPropagation(){}});
  })()`);
- const hold=e.pendingTimers.find(t=>t.ms===450);assert.ok(hold);hold.f();
+ e.run('controls.update(controlsSystem.now()+0.46)');   // held past 0.45 s (the controls system's HELD binding)
  e.run(`game.holsterBtn.dispatchEvent({type:'pointerup',pointerId:1,preventDefault(){}})`);
  assert.equal(e.run('!!game._quickDraw&&game.weaponHolstered'),true);
  e.run(`game.holsterBtn.dispatchEvent({type:'pointerdown',pointerId:2,button:0,preventDefault(){},stopPropagation(){}});

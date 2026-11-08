@@ -115,40 +115,18 @@
                 if (pm && !pm.isOpen && !this.paused && !(this.scenes && this.scenes.running)) pm.open(true);
             },
 
+            /** Night vision on or off (the 👁️ button, D-pad ↓). */
+            toggleNightVision() {
+                this.nightVision = !this.nightVision;
+                document.getElementById('btn-nv')?.classList.toggle('active', this.nightVision);
+                audioSys.sfx('ui'); showMessage(this.nightVision ? "NIGHT VISION: ON" : "NIGHT VISION: OFF");
+            },
+
             initEvents() {
                 window.addEventListener('resize', () => { this.resize(); });
                 document.addEventListener('visibilitychange', () => { if (document.hidden) this.onPageHidden(); });
                 window.addEventListener('pagehide', () => this.onPageHidden());
-                window.addEventListener('keydown', (e) => {
-                    if (!this.running || this.paused || hudInputBlocked() || e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable="true"]')) return;
-                    this.keys[e.key] = true; 
-                    if (e.key === 'h' || e.key === 'H') this.useBooster();
-                    // Furniture (engine/furniture.js): G grabs / confirms / lets go, R turns, directions pick a side
-                    if (this.furniture && this.running && !this.paused) {
-                        if (e.key === 'g' || e.key === 'G') this.furniture.press();
-                        if ((e.key === 'r' || e.key === 'R') && this.furniture.holding) this.furniture.rotate(e.shiftKey ? -1 : 1);
-                        if (this.furniture.state === 'choose') {
-                            const D = { ArrowUp: [0, -1], w: [0, -1], W: [0, -1], ArrowDown: [0, 1], s: [0, 1], S: [0, 1], ArrowLeft: [-1, 0], a: [-1, 0], A: [-1, 0], ArrowRight: [1, 0], d: [1, 0], D: [1, 0] }[e.key];
-                            if (D) { this.furniture.chooseDir(D[0], D[1]); e.preventDefault(); }
-                        }
-                    }
-                    if (e.key === 'j' || e.key === 'J') this.useBoosterOnAlly();
-                    if ((e.key === 'c' || e.key === 'C') && this.running && !this.paused && !e.ctrlKey && !e.metaKey) this.toggleSneak();   // engine/sneak.js
-                    
-                    // AUTO-DRIVE TOGGLE (only while driving)
-                    if ((e.key === 'q' || e.key === 'Q') && !e.repeat && this.isDriving && this.running && !this.paused) {
-                        this.toggleAutoDrive();
-                    }
-                    
-                    if (e.key === ' ') {
-                        e.preventDefault();
-                        // Behind the wheel Space is the handbrake (update.js); the mouse still fires
-                        if (!this.isDriving && this.shootCooldown <= 0 && this.player.visible && !this.paused) {
-                            this.fireWeapon();
-                        }
-                    }
-                });
-                window.addEventListener('keyup', (e) => this.keys[e.key] = false);
+                // Keys and controller buttons: directory/game-controls.js (the controls system)
                 
                 // DESKTOP MOUSE CONTROLS for aiming and shooting
                 this.mouseX = 0;
@@ -186,26 +164,9 @@
                     this.mouseDown = false;
                 });
                 
-                const toggleAction = (e) => { e.preventDefault(); this.interact(); };
-
-                this.interactBtn.addEventListener('click', toggleAction); this.interactBtn.addEventListener('touchstart', toggleAction);
-                // The hand (engine/furniture.js): tap to grab / confirm / let go; hold it a moment to reset the layout
-                const grabBtn = document.getElementById('btn-grab');
-                if (grabBtn) {
-                    let held = null, long = false;
-                    this._cancelGrabHold = () => { clearTimeout(held); held = null; long = false; };
-                    grabBtn.addEventListener('pointerdown', (e) => {
-                        e.preventDefault(); e.stopPropagation(); long = false;
-                        held = setTimeout(() => { long = true; if (this.furniture.state === 'idle') this.furniture.resetLayout(); }, 900);
-                    });
-                    const up = (e) => { if (held === null) return; clearTimeout(held); held = null; e.preventDefault(); if (!long) this.furniture.press(); };
-                    grabBtn.addEventListener('pointerup', up);
-                    grabBtn.addEventListener('pointercancel', () => { clearTimeout(held); held = null; });
-                    for (const [id, dir] of [['btn-rot-l', -1], ['btn-rot-r', 1]]) {
-                        const b = document.getElementById(id);
-                        if (b) b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); this.furniture.rotate(dir); });
-                    }
-                }
+                // The HUD's buttons are inputs of the controls system (directory/game-controls.js: dfTouchButtons)
+                controls.touch.buttons(dfTouchButtons);
+                this._cancelGrabHold = () => controls.touch.drop('touchGrab');
                 // Choosing a side: a tap on a handle (world space) picks it, before anything else hears the tap
                 this.canvas.addEventListener('pointerdown', (e) => {
                     if (!this.running || this.paused || hudInputBlocked() || !this.furniture || this.furniture.state !== 'choose') return;
@@ -228,257 +189,30 @@
                 });
 
                 
-                // In initEvents()
-                const toggleNV = (e) => {
-                    e.preventDefault();
-                    this.nightVision = !this.nightVision;
-                    
-                    // Visual Feedback logic...
-                    const btn = document.getElementById('btn-nv');
-                    if(this.nightVision) {
-                        btn.classList.add('active');
-                        audioSys.sfx('ui');
-                        showMessage("NIGHT VISION: ON");
-                    } else {
-                        btn.classList.remove('active');
-                        audioSys.sfx('ui');
-                        showMessage("NIGHT VISION: OFF");
-                    }
-                };
-                
-                const btnNv = document.getElementById('btn-nv');
-                btnNv.addEventListener('mousedown', toggleNV); // For mouse users
-                btnNv.addEventListener('touchstart', toggleNV); // For touch users (INSTANT RESPONSE)
-
-
-                
-                    // --- PAUSE BUTTON LOGIC ---
-                    const btnPause = document.getElementById('btn-pause');
-                    const pauseMenuEl = document.getElementById('pause-menu');
-                    
-                    const togglePause = (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                    
-                        // Option 1: Use existing PauseMenu class if available (Best practice)
-                        if (typeof pauseMenu !== 'undefined') {
-                            if (pauseMenu.isOpen) pauseMenu.close();
-                            else pauseMenu.open();
-                            return;
-                        }
-                    
-                        // Option 2: Fallback manual toggle (If PauseMenu class is missing)
-                        if (game.paused) {
-                            // Resume
-                            pauseMenuEl.classList.remove('active');
-                            pauseMenuEl.style.display = 'none';
-                            game.pauseSystem.release('pause_menu');
-                        } else {
-                            // Pause
-                            pauseMenuEl.style.display = 'flex';
-                            // Small delay to allow display:flex to apply before adding class for transition
-                            requestAnimationFrame(() => {
-                                pauseMenuEl.classList.add('active');
-                            });
-                            game.pauseSystem.acquire('pause_menu');
-                        }
-                        
-                        // Play sound
-                        if (typeof audioSys !== 'undefined') audioSys.sfx('ui');
-                    };
-                    
-                    // Add listeners for both touch and mouse
-                    btnPause.addEventListener('mousedown', togglePause);
-                    btnPause.addEventListener('touchstart', togglePause);
-
-                
-                this.transitionBtn.addEventListener('click', (e) => { e.preventDefault(); this.triggerTransition(); });
-                this.transitionBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.triggerTransition(); });
-                // Fire button is now a joystick - handlers in initFireJoystick()
-                this.shootCooldown = 0; // Cooldown for automatic fire
-                // --- HEAL BUTTON: Tap = self, Hold (300ms+) = nearest damaged ally ---
-                this._healHoldTimer = null;
-                this._healHeld = false;
-                
-                const healStart = (e) => {
-                    e.preventDefault();
-                    if (!this.running || this.paused || hudInputBlocked() || this._healPressed) return;
-                    this._healPressed = true;
-                    this._healHeld = false;
-                    this._healHoldTimer = setTimeout(() => {
-                        this._healHeld = true;
-                        this.useBoosterOnAlly();
-                    }, 300);
-                };
-                const healEnd = (e) => {
-                    e.preventDefault();
-                    if (!this._healPressed) return;
-                    this._healPressed = false;
-                    if (this._healHoldTimer) {
-                        clearTimeout(this._healHoldTimer);
-                        this._healHoldTimer = null;
-                    }
-                    if (!this._healHeld) {
-                        // Quick tap — self heal
-                        this.useBooster();
-                    }
-                    this._healHeld = false;
-                };
-                this.healBtn.addEventListener('mousedown', healStart);
-                this.healBtn.addEventListener('touchstart', healStart);
-                this.healBtn.addEventListener('mouseup', healEnd);
-                this.healBtn.addEventListener('touchend', healEnd);
-                this.healBtn.addEventListener('mouseleave', healEnd);
-                this.flitBtn.addEventListener('mousedown', (e) => { e.preventDefault(); this.triggerFlit(); });
-                this.flitBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.triggerFlit(); });
-                this.autodriveBtn.addEventListener('mousedown', (e) => { e.preventDefault(); this.toggleAutoDrive(); });
-                this.autodriveBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.toggleAutoDrive(); });
-                // Handbrake: held for as long as a finger (or the mouse) is on it
-                const hbBtn = document.getElementById('btn-handbrake');
-                if (hbBtn) {
-                    const hbSet = (on) => { this.handbrakeHeld = on; hbBtn.classList.toggle('held', on); };
-                    hbBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); try { hbBtn.setPointerCapture(e.pointerId); } catch (_) {} hbSet(true); });
-                    for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) hbBtn.addEventListener(ev, () => hbSet(false));
-                    hbBtn.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
-                    this.handbrakeBtn = hbBtn;
-                }
-
-                this.zibSkipBtn.addEventListener('mousedown', (e) => { e.preventDefault(); if (this.zibSystem) this.zibSystem.teleportToDestination(this); this.zibSkipBtn.style.display = 'none'; });
-                this.zibSkipBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if (this.zibSystem) this.zibSystem.teleportToDestination(this); this.zibSkipBtn.style.display = 'none'; });
-
-                const sneakBtn = document.getElementById('btn-sneak');
-                if (sneakBtn) { const tog = (e) => { e.preventDefault(); e.stopPropagation(); this.toggleSneak(); }; sneakBtn.addEventListener('mousedown', tog); sneakBtn.addEventListener('touchstart', tog, { passive: false }); }
+                this.shootCooldown = 0; // Cooldown for automatic fire (the fire button is a joystick: initFireJoystick())
+                this.handbrakeBtn = document.getElementById('btn-handbrake');
                 this.initQuickDrawControl();
 
                 // ── Emote Joystick ──
                 // Drag from emote button, four overlays appear over heal/nv/flit/holster slots.
                 // Drag finger to a slot → release fires that emote.
                 const gameUi = document.getElementById('game-ui');
-                const emoteEntries = Object.entries(this.emoteOverlays);
 
-                const emoteStart = (clientX, clientY, touchId) => {
-                    if (this.emoteJoystick.active) return;
-                    this.emoteJoystick.active = true;
-                    this.emoteJoystick.touchId = touchId;
-                    this.emoteJoystick.highlighted = null;
-                    this.emoteBtn.classList.add('dragging');
-                    // Single class toggle drives the cat's-paw crossfade —
-                    // utility buttons fade out, emote overlays fade in.
-                    gameUi.classList.add('emote-active');
-                    // Cache rects AFTER class toggle — getBoundingClientRect forces
-                    // synchronous layout so values are valid even mid-fade.
-                    // Using rect math (not elementFromPoint) because the overlays carry
-                    // pointer-events: none to keep the drag from being stolen.
-                    this.emoteJoystick.rects = emoteEntries.map(([key, el]) => ({
-                        key,
-                        rect: el.getBoundingClientRect()
-                    }));
-                    // Cache emote button center for knob-lean translation.
-                    const btnRect = this.emoteBtn.getBoundingClientRect();
-                    this.emoteJoystick.centerX = btnRect.left + btnRect.width / 2;
-                    this.emoteJoystick.centerY = btnRect.top + btnRect.height / 2;
-                };
-                const emoteMove = (clientX, clientY) => {
-                    if (!this.emoteJoystick.active) return;
-                    let nextHighlight = null;
-                    for (const { key, rect } of this.emoteJoystick.rects) {
-                        if (clientX >= rect.left && clientX <= rect.right &&
-                            clientY >= rect.top  && clientY <= rect.bottom) {
-                            nextHighlight = key;
-                            break;
-                        }
-                    }
-                    if (nextHighlight !== this.emoteJoystick.highlighted) {
-                        if (this.emoteJoystick.highlighted) {
-                            this.emoteOverlays[this.emoteJoystick.highlighted].classList.remove('highlighted');
-                        }
-                        if (nextHighlight) {
-                            this.emoteOverlays[nextHighlight].classList.add('highlighted');
-                        }
-                        this.emoteJoystick.highlighted = nextHighlight;
-                    }
-                    // Knob-lean — translate the inner knob toward the finger,
-                    // clamped to MAX_LEAN so it stays inside the ring.
-                    // Using CSS custom properties means the knob's base centering
-                    // transform (translate(-50%, -50%)) stays intact; --lx/--ly
-                    // just add the offset.
-                    const dx = clientX - this.emoteJoystick.centerX;
-                    const dy = clientY - this.emoteJoystick.centerY;
-                    const dist = Math.hypot(dx, dy);
-                    const MAX_LEAN = 18;
-                    if (dist > 0) {
-                        const clamped = Math.min(dist, MAX_LEAN);
-                        const tx = (dx / dist) * clamped;
-                        const ty = (dy / dist) * clamped;
-                        this.emoteKnob.style.setProperty('--lx', tx + 'px');
-                        this.emoteKnob.style.setProperty('--ly', ty + 'px');
-                    } else {
-                        this.emoteKnob.style.setProperty('--lx', '0px');
-                        this.emoteKnob.style.setProperty('--ly', '0px');
-                    }
-                };
-                const emoteEnd = () => {
-                    if (!this.emoteJoystick.active) return;
-                    const fired = this.emoteJoystick.highlighted;
-                    // Clear highlight class but leave the crossfade to CSS — class
-                    // toggle on game-ui handles the fade-out for both groups.
-                    if (fired) {
-                        this.emoteOverlays[fired].classList.remove('highlighted');
-                    }
-                    gameUi.classList.remove('emote-active');
-                    this.emoteBtn.classList.remove('dragging');
-                    // Snap-back — clearing the inline custom props lets the CSS
-                    // `transition: transform 0.18s` ease the knob home.
-                    this.emoteKnob.style.setProperty('--lx', '0px');
-                    this.emoteKnob.style.setProperty('--ly', '0px');
-                    this.emoteJoystick.active = false;
-                    this.emoteJoystick.touchId = null;
-                    this.emoteJoystick.highlighted = null;
-                    if (fired) this.firePlayerEmote(fired);
-                };
-
-                // Touch
-                this.emoteBtn.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    const t = e.changedTouches[0];
-                    emoteStart(t.clientX, t.clientY, t.identifier);
-                }, { passive: false });
-                this.emoteBtn.addEventListener('touchmove', (e) => {
-                    e.preventDefault();
-                    for (let i = 0; i < e.changedTouches.length; i++) {
-                        const t = e.changedTouches[i];
-                        if (t.identifier === this.emoteJoystick.touchId) {
-                            emoteMove(t.clientX, t.clientY);
-                            break;
-                        }
-                    }
-                }, { passive: false });
-                const touchEndEmote = (e) => {
-                    e.preventDefault();
-                    for (let i = 0; i < e.changedTouches.length; i++) {
-                        if (e.changedTouches[i].identifier === this.emoteJoystick.touchId) {
-                            emoteEnd();
-                            break;
-                        }
-                    }
-                };
-                this.emoteBtn.addEventListener('touchend', touchEndEmote);
-                this.emoteBtn.addEventListener('touchcancel', touchEndEmote);
-
-                // Mouse (for desktop playtesting)
-                this.emoteBtn.addEventListener('mousedown', (e) => {
-                    e.preventDefault();
-                    emoteStart(e.clientX, e.clientY, 'mouse');
-                });
-                window.addEventListener('mousemove', (e) => {
-                    if (this.emoteJoystick.active && this.emoteJoystick.touchId === 'mouse') {
-                        emoteMove(e.clientX, e.clientY);
-                    }
-                });
-                window.addEventListener('mouseup', (e) => {
-                    if (this.emoteJoystick.active && this.emoteJoystick.touchId === 'mouse') {
-                        emoteEnd();
-                    }
+                // The stick (basement/controls-system.js touchStick): the knob leans up to 18 px; the slot under the finger lights
+                const E = this.emoteJoystick;
+                controls.touch.stick('emote', { zone: this.emoteBtn, knob: this.emoteKnob, travel: 18, slots: this.emoteOverlays, mouse: true,
+                    onStart: (S) => {
+                        Object.assign(E, { active: true, touchId: S.id, highlighted: null });
+                        this.emoteBtn.classList.add('dragging');
+                        gameUi.classList.add('emote-active');   // one class: the utility buttons fade out, the emote overlays in
+                    },
+                    onMove: (S) => { E.highlighted = S.slot; },
+                    onEnd: (S) => {
+                        gameUi.classList.remove('emote-active');
+                        this.emoteBtn.classList.remove('dragging');   // the knob eases home (CSS transition)
+                        Object.assign(E, { active: false, touchId: null, highlighted: null });
+                        if (S.slot) this.firePlayerEmote(S.slot);
+                    },
                 });
 
                 // Dialogue buttons: what each NPC's Accept and Decline do lives in story/npc-dialogue.js

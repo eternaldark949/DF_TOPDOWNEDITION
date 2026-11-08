@@ -603,7 +603,8 @@
             // Surface detail stays clipped to the actual boot pieces. Velvet has a broad soft nap;
             // stardust has fixed flecks with a slow glint, rather than random per-frame noise.
             const bootSurface = (ctx, c, length, radius, seed) => {
-                if (c.finish === 'velvet') {
+                const F = materialKit.finishOf(c);                           // (directory/game-materials.js)
+                if (F.nap) {
                     const nap = ctx.createLinearGradient(0, -radius, 0, radius);
                     nap.addColorStop(0, 'rgba(0,0,0,0.18)');
                     nap.addColorStop(0.4, 'rgba(255,220,225,0.13)');
@@ -616,7 +617,7 @@
                         ctx.moveTo(x, y); ctx.lineTo(x + 0.7, y + 0.45);
                     }
                     ctx.stroke();
-                } else if (c.finish === 'sparkle' && _zoomLOD < 2) {
+                } else if (F.flecks && _zoomLOD < 2) {
                     const count = _zoomLOD ? 5 : 12;
                     for (let i = 0; i < count; i++) {
                         const x = ((i * 7 + seed) % 13) / 13 * length;
@@ -657,23 +658,23 @@
                 // Stiletto boots past the knee: a pointed pump on the foot, a glossy shaft up the whole calf and
                 // `thigh` of the way up the thigh (the renderer draws the shafts, ui/humanoid-render.js).
                 thigh_heels: { calf: 1, thigh: 0.6, gloss: true, draw(ctx, g, c) {
-                    const velvet = c.finish === 'velvet', sparkle = c.finish === 'sparkle';
+                    const F = materialKit.finishOf(c);
                     for (let i = 0; i < 2; i++) {
                         const [x, y] = g.feet[i], side = i ? 1 : -1;
-                        ctx.fillStyle = g.darken(c.color, velvet ? 0.2 : c.finish ? 0.26 : 0.5);
+                        ctx.fillStyle = g.darken(c.color, F.pump_shade);
                         drawBodyFoot(ctx, x, y, side, 0.45, true, g.body.foot);
-                        if (!velvet) {
+                        if (F.pump_shine) {
                             ctx.fillStyle = 'rgba(255,255,255,0.28)';
                             ctx.beginPath(); ctx.ellipse(x + 4.4, y + side * 0.35, 1.7, 0.45, side * 0.08, 0, Math.PI * 2); ctx.fill();
                         }
-                        if (velvet || sparkle) {
+                        if (F.surface) {
                             ctx.save();
                             ctx.translate(x, y); ctx.clip(bodyFootPath(side, 0.45, true, g.body.foot));
                             bootSurface(ctx, c, 8, 3, i + 3); ctx.restore(); ctx.beginPath();
                         }
                     }
                 }, fabric(ctx, g, c) {
-                    if (c.finish !== 'velvet' && c.finish !== 'sparkle') return;
+                    if (!materialKit.finishOf(c).surface) return;
                     for (let i = 0; i < 2; i++) {
                         bootFabricSpan(ctx, c, g.knees[i], g.feet[i], g.body.calf, null, i * 3);
                         bootFabricSpan(ctx, c, g.hipPt[i], g.knees[i], g.body.thigh, 0.4, i * 3 + 1);
@@ -1020,7 +1021,7 @@
                     ctx.stroke();
                 } }
             };
-            return { tops, bottoms, shoes, hats, jewelry, trains };
+            return { tops, bottoms, shoes, hats, jewelry, trains, specs: { pieceSpec, pleatedSpec } };   // (specs: for the garment kit)
         })();
 
         /** A top's colour: the look's own, else its WARDROBE piece's default (the lab coat's white), else null. */
