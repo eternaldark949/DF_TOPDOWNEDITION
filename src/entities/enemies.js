@@ -745,11 +745,7 @@
         /* The Sanctum's three (the Triumvirate): the same gatling automaton, each in its own guise.
            A persona switches on boss mode (dormant until the intro, sight-gated fire, a longer telegraph)
            and its own art; the gauntlet's gunners have none and keep the plain look. */
-        const WARDENS = {
-            vesper:   { name: 'Vesper, the Censer',     accent: '#c42a3c', trim: '#e8c27a', mantle: '#5a0c1c', eye: '255, 60, 40' },
-            matins:   { name: 'Matins, the Choir',      accent: '#e8c27a', trim: '#fff1c2', mantle: '#1a1216', eye: '255, 190, 80' },
-            compline: { name: 'Compline, the Penitent', accent: '#8a5cff', trim: '#e6ddd0', mantle: '#24163a', eye: '200, 120, 255' }
-        };
+        const WARDENS = GAME_DB.enemies.wardens;   // directory/game-db/enemies.json
         /* How the Triumvirate fights (a persona; times in seconds unless noted):
              HP each; RELOAD frames between bursts, and they stagger them (STAGGER frames apart on waking, and a
              warden whose burst ends while the others reload fires EXTEND more, so all three never go quiet);
@@ -758,9 +754,7 @@
              Vesper lobs a burning censer over cover (CENSER_EVERY, a WIND tell); Matins sings through walls
              (HYMN_EVERY, a CHARGE tell); Compline throws its chain hook past cover (HOOK_EVERY, a HOOK_TELL),
              within HOOK_RANGE (engine/boss-hazards.js does the rest). */
-        const WARDEN = { HP: 1500, RELOAD: 120, STAGGER: 40, EXTEND: 4, COVER_FIRE: 0.5, FLANK_AFTER: 2,
-            CENSER_EVERY: 7, CENSER_WIND: 0.5, CENSER_RANGE: 640, HYMN_EVERY: 6, HYMN_CHARGE: 0.6,
-            HOOK_EVERY: 8, HOOK_TELL: 0.7, HOOK_RANGE: 420 };
+        const WARDEN = GAME_DB.enemies.warden;
 
         class GatlingGunner extends ActorEntity {
             constructor(x, y, id, opts = {}) {
@@ -768,16 +762,17 @@
                 super({
                     x: x,
                     y: y,
-                    radius: 20,
+                    radius: GAME_DB.enemies.kinds.gatling_gunner.radius,
                     type: 'gatlinggunner',
                     alliance: 'hostile',
-                    hp: 200,          // Boss-level HP
-                    mass: 25,         // Heavy
-                    friction: 0.85,
-                    speed: 2,
+                    hp: GAME_DB.enemies.kinds.gatling_gunner.hp,          // Boss-level HP (directory/game-db/enemies.json)
+                    mass: GAME_DB.enemies.kinds.gatling_gunner.mass,      // Heavy
+                    friction: GAME_DB.enemies.kinds.gatling_gunner.friction,
+                    speed: GAME_DB.enemies.kinds.gatling_gunner.speed,
                     hasCollision: true,
-                    invincibleDuration: 10
+                    invincibleDuration: GAME_DB.enemies.kinds.gatling_gunner.invincible_frames
                 });
+                const K = GAME_DB.enemies.kinds.gatling_gunner;
                 
                 this.id = id; // Unique ID (0, 1, 2) for squad formation
                 this.angle = 0;
@@ -785,17 +780,17 @@
                 // Gatling mechanics
                 this.burstCooldown = 0;
                 this.burstCount = 0;
-                this.maxBurstCount = 10;
-                this.burstDelay = 6; 
+                this.maxBurstCount = K.burst_count;
+                this.burstDelay = K.burst_delay; 
                 this.burstTimer = 0;
-                this.reloadTime = 210; 
+                this.reloadTime = K.reload; 
                 
                 // Movement
                 this.moveTimer = 0;
                 this.strafeDirection = 1;
                 
                 // Telegraph (warns before burst starts)
-                this.telegraphThreshold = 12; // ~0.2s window
+                this.telegraphThreshold = K.telegraph_frames; // ~0.2s window
                 this.telegraphAngle = 0;
                 this.isTelegraphing = false;
                 this._prevPlayerX = 0;
@@ -1471,19 +1466,19 @@
             static makeLook(r) { return ROLE_LOOKS.ganger(r); }
 
             constructor(x, y, config) {
-                const cfg = config || {};
+                const cfg = config || {}, K = GAME_DB.enemies.kinds.ganger;   // directory/game-db/enemies.json
                 super({
                     x: x,
                     y: y,
-                    radius: 15,
+                    radius: K.radius,
                     type: 'ganger',
                     alliance: 'hostile',
-                    hp: cfg.hp || 40,
-                    mass: 10,
-                    friction: 0.9,
-                    speed: cfg.speed || 2.5,
+                    hp: cfg.hp || K.hp,
+                    mass: K.mass,
+                    friction: K.friction,
+                    speed: cfg.speed || K.speed,
                     hasCollision: true,
-                    invincibleDuration: 20
+                    invincibleDuration: K.invincible_frames
                 });
                 
                 this.angle = Math.random() * 6.28;
@@ -1494,7 +1489,7 @@
                 this.walkPhase = 0; 
 
                 // AI Properties
-                this.visionRange = cfg.visionRange || 320;
+                this.visionRange = cfg.visionRange || K.vision_range;
                 this.visionFov = Math.PI / 2.5;
                 // What they know of what's around them (basement/awareness-kit.js): up close (50) they sense her unless
                 // she comes from behind; past that, only what's in the cone, in range and in plain sight. Bumping into him
@@ -1513,7 +1508,7 @@
                 this.cooldown = 0;
                 
                 // ── TELEGRAPH (aim line before firing) ──
-                this.telegraphThreshold = cfg.telegraphThreshold || 9; // ~0.15s window
+                this.telegraphThreshold = cfg.telegraphThreshold || K.telegraph_frames; // ~0.15s window
                 this.telegraphAngle = 0;
                 this.isTelegraphing = false;
                 
@@ -1532,12 +1527,13 @@
                 if (this.equippedWeaponId && typeof ITEM_REGISTRY !== 'undefined') {
                     const def = ITEM_REGISTRY[this.equippedWeaponId];
                     if (def && def.stats) {
+                        const G = GAME_DB.enemies.kinds.ganger.gun;
                         return {
-                            fireRate: def.stats.fireRate || 45,
-                            damage: def.stats.damage || 10,
-                            color: def.stats.projectileColor || '#ff0055',
-                            speed: def.stats.projectileSpeed || 24,
-                            spread: def.stats.spread || 0.15,
+                            fireRate: def.stats.fireRate || G.fireRate,
+                            damage: def.stats.damage || G.damage,
+                            color: def.stats.projectileColor || G.color,
+                            speed: def.stats.projectileSpeed || G.speed,
+                            spread: def.stats.spread || G.spread,
                             penetrating: def.stats.penetrating || false,
                             sticky: def.stats.sticky || false,
                             dotDamage: def.stats.dotDamage || 0,
@@ -1546,16 +1542,8 @@
                         };
                     }
                 }
-                // Default ganger weapon (hot pink pistol)
-                return {
-                    fireRate: 45,
-                    damage: 10,
-                    color: '#ff0055',
-                    speed: 24,
-                    spread: 0.15,
-                    penetrating: false,
-                    sticky: false,
-                };
+                // Default ganger weapon (hot pink pistol): kinds.ganger.gun, directory/game-db/enemies.json
+                return { ...GAME_DB.enemies.kinds.ganger.gun };
             }
 
             /** A landed melee hit breaks an ordinary gunner's aim; repeat hits cannot lock it down. */
@@ -2172,63 +2160,33 @@
            walkable spots in every room, kept ≥ SPAWN_MIN_DIST from 949) and where the heavy
            gunners stand (gunnerSpawns — the big rooms). Sealed entries are placeholders for
            maps to come: shown in the menu, greyed out. */
-        const GAUNTLET_MAPS = [
-            {
-                id: 'house_of_death', label: 'The House of Death', mapId: 'house_of_death',
-                blurb: 'A gothic villa of glass and black marble. Doors swing under fire, rooms sink into shadow — hold the house, wave after wave.',
-                spawns: [
-                    [120, 380], [440, 390], [280, 110],                     // library
-                    [900, 300], [610, 100], [1195, 380],                    // chapel
-                    [1300, 300], [1450, 250], [1620, 200],                  // bedroom, bath
-                    [80, 800], [480, 850], [300, 520],                      // dining
-                    [650, 500], [1150, 950], [760, 960], [1150, 700],       // grand hall
-                    [1350, 600], [1700, 700], [1400, 880], [1650, 580],     // courtyard
-                    [100, 1100], [450, 1350], [300, 1120],                  // kitchen
-                    [650, 1300], [1150, 1100],                              // foyer
-                    [1300, 1090], [1710, 1250], [1560, 1090],               // gallery
-                    [1300, 1320], [1560, 1330]                              // reliquary
-                ],
-                gunnerSpawns: [[760, 700], [1380, 560], [280, 820], [700, 380]]
-            },
-            {
-                id: 'demoness_palace', label: 'The Demoness Palace', mapId: 'demoness_palace',
-                blurb: 'Obsidian and gold, lit by embers. Her hunters see in the dark and cross a room in a blink, and every fifth wave she hunts you herself.',
-                spawns: [
-                    [150, 180], [760, 180], [1000, 150], [1300, 150], [1600, 310],     // garden, shrine, bath
-                    [140, 520], [460, 900], [1350, 520], [1650, 900],                  // the galleries
-                    [690, 490], [1110, 960], [420, 1300], [120, 1250], [1300, 1300], [1700, 1300]   // throne hall, dressing room, kennels
-                ],
-                gunnerSpawns: [],
-                // Waves of hunters (night vision, dashes); an alpha from wave 3; the Demoness every fifth wave —
-                // with her hunters on 5, 15, 25…, and alone (Lilitu's duel, `solo`) on 10, 20, 30…
+        /** The wave rules a gauntlet map names in its `hooks` (directory/game-db/enemies.json has the maps). */
+        const GAUNTLET_WAVE_HOOKS = {
+            // The palace: waves of hunters (night vision, dashes); an alpha from wave 3; the Demoness every fifth wave —
+            // with her hunters on 5, 15, 25…, and alone (Lilitu's duel, `solo`) on 10, 20, 30…
+            demoness_palace: {
                 waves: (w) => {
                     const solo = w % 10 === 0;
                     return { hunters: solo ? 0 : Math.min(3 + w, 10), alphas: solo || w < 3 ? 0 : 1 + Math.floor((w - 3) / 4), demoness: w % 5 === 0, solo,
                              hp: 55 + w * 8, speed: 2.6 + Math.min(w * 0.08, 1) };
                 }
-            },
-            { id: 'sealed_2', label: 'Sealed', locked: true, blurb: 'Coming soon.' },
-            { id: 'sealed_3', label: 'Sealed', locked: true, blurb: 'Coming soon.' }
-        ];
-        const GAUNTLET_SPAWN_MIN_DIST = 350;
+            }
+        };
+        const GAUNTLET_MAPS = attachDataHooks(GAME_DB.enemies.gauntlet_maps, GAUNTLET_WAVE_HOOKS);   // directory/game-db/enemies.json
+        const GAUNTLET_SPAWN_MIN_DIST = GAME_DB.enemies.gauntlet.spawn_min_dist;
         /* Past the early waves (both maps): from wave FROM every hostile's HP grows ×HP_GROWTH a wave and its
            damage +DMG_STEP a wave (claws too); from ELITE_FROM about one in ELITE_EVERY is an elite (Armored,
            Swift or Warded: ELITES). A cleared wave pays SCRAP × wave, and BONUS_SCRAP more every BONUS_EVERY-th.
            The Demoness: DEMONESS_HP + DEMONESS_HP_W × wave with her hunters; alone, SOLO_HP + SOLO_HP_W × wave. */
-        const GAUNTLET_SCALE = { FROM: 15, HP_GROWTH: 1.04, DMG_STEP: 0.02, ELITE_FROM: 12, ELITE_EVERY: 6,
-            SCRAP: 5, BONUS_EVERY: 5, BONUS_SCRAP: 100, DEMONESS_HP: 1000, DEMONESS_HP_W: 80, SOLO_HP: 3000, SOLO_HP_W: 100 };
+        const GAUNTLET_SCALE = GAME_DB.enemies.gauntlet.scale;
         /* The elites (a gauntlet's rank and file, from ELITE_FROM): each wears its mark — a ring and a word
            under it in its colour — and fights its own way.
              armored  steel plates: burn and bleed do half, and it shrugs off shoves
              swift    quicker on its feet (a hunter dashes sooner)
              warded   a gold ward before it turns shots from the front (WARD_ARC either side) until it
                       has turned WARD_HP × its health in them; then it shatters. Blades and burns go through */
-        const ELITES = {
-            armored: { label: 'ARMORED', col: '180, 196, 214' },
-            swift:   { label: 'SWIFT',   col: '110, 230, 255' },
-            warded:  { label: 'WARDED',  col: '255, 214, 110' }
-        };
-        const ELITE_WARD = { ARC: 1.05, HP: 0.6 };
+        const ELITES = GAME_DB.enemies.elites.marks;
+        const ELITE_WARD = GAME_DB.enemies.elites.ward;
         /** Make a hostile an elite (restore: from a save, its numbers are already in place) */
         function applyElite(h, kind, restore) {
             if (!ELITES[kind]) return;
@@ -2284,9 +2242,9 @@
             const n = Math.max(0, w - GAUNTLET_SCALE.FROM);
             return { hp: Math.pow(GAUNTLET_SCALE.HP_GROWTH, n), dmg: 1 + GAUNTLET_SCALE.DMG_STEP * n };
         }
-        const GAUNTLET_LEAD_ERR = 300;           // a wave arrives knowing only her rough area (px off)
-        const GAUNTLET_STALL_SECS = 20;          // no one has seen or heard her this long → a vague lead…
-        const GAUNTLET_STALL_ERR = 220;          // …this far off: enough to sweep the right rooms
+        const GAUNTLET_LEAD_ERR = GAME_DB.enemies.gauntlet.lead_err;           // a wave arrives knowing only her rough area (px off)
+        const GAUNTLET_STALL_SECS = GAME_DB.enemies.gauntlet.stall_secs;          // no one has seen or heard her this long → a vague lead…
+        const GAUNTLET_STALL_ERR = GAME_DB.enemies.gauntlet.stall_err;          // …this far off: enough to sweep the right rooms
         // Save values, never live navigation, entity or intro references.
         const GAUNTLET_HOSTILE_NUMBERS = ['x', 'y', 'angle', 'hp', 'maxHp', 'speed', 'huntSpeed', 'visionRange',
             'suspicion', 'cooldown', 'telegraphAngle', 'telegraphThreshold', 'dashMax', 'dashCDBase', 'dashCD',

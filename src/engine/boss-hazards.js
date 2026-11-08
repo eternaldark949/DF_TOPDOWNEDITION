@@ -14,14 +14,7 @@
         // She burns (`_playerBurn`, burnPlayer) for a few seconds after fire touches her; a flit puts it out.
         // The duel's dimming (`_duelDimK`) lives here too: the palace darkens while Lilitu hunts alone.
 
-        const HAZARD = {
-            SIGIL_ARM: 1.0, SIGIL_R: 58, SIGIL_HIT: 16, FIRE_SECS: 1.6,
-            BURN_TICK: 0.5,
-            CENSER_FLIGHT: 0.9, CENSER_FIRE_R: 62, CENSER_FIRE_SECS: 4, CENSER_SMOKE_R: 96, CENSER_SMOKE_SECS: 6, CENSER_HIT: 12,
-            HYMN_SECS: 1.1, HYMN_RANGE: 760, HYMN_HIT: 10, REVEAL_SECS: 2.5,
-            HOOK_SPEED: 17, HOOK_RANGE: 430, HOOK_HIT: 8, HOOK_PULL: 8, HOOK_STOP: 80, HOOK_PULL_SECS: 0.6,
-            RITE_SECS: 8, RITE_WARN: 1.0, RITE_DPS: 14
-        };
+        const HAZARD = GAME_DB.enemies.hazards;   // directory/game-db/enemies.json
 
         engineMixin({
             bossHazards() { return this._hazards || (this._hazards = []); },

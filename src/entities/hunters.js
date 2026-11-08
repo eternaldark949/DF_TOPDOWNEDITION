@@ -25,26 +25,18 @@
            defeat unlocks the Golden Retribution schematic; every one leaves two
            Dark Elements (update.js).
            ===================================================================== */
-        const DUEL = {
-            P2: 0.66, P3: 0.33,
-            SIGIL_EVERY: [0, 4.5, 3.8, 3.2], SIGILS: [0, 1, 2, 3], SIGIL_SPREAD: 95,
-            BOLT_EVERY: 2.8, BOLT_TELL: 0.35, BOLT_FAN: 3, BOLT_SPREAD: 0.17, BOLT_DMG: 12, BOLT_SPEED: 13,
-            STEP_EVERY: 7, STEP_TELL: 0.4, STEP_BEHIND: 46,
-            GALE_EVERY: 8, GALE_TELL: 0.5, GALE_REACH: 170, GALE_SPREAD: 0.75, GALE_PUSH: 140, GALE_HIT: 12, GUARD_BREAK: 1.2,
-            MIRROR_EVERY: 16, MIRROR_SECS: 9, MIRROR_SPREAD: 80,
-            RITE_EVERY: 20, RITE_R0: 430, RITE_R1: 140,
-            DASH_CD_P3: 95, WHIP2_DELAY: 0.16
-        };
+        const DUEL = GAME_DB.enemies.duel;   // directory/game-db/enemies.json
         class Hunter extends Ganger {
             constructor(x, y, cfg = {}) {
-                super(x, y, { hp: cfg.hp || 70, speed: cfg.speed || 2.8, visionRange: cfg.visionRange || 520, weaponId: cfg.weaponId || 'pistol_ganger' });
+                const K = GAME_DB.enemies.kinds.hunter;   // directory/game-db/enemies.json
+                super(x, y, { hp: cfg.hp || K.hp, speed: cfg.speed || K.speed, visionRange: cfg.visionRange || K.vision_range, weaponId: cfg.weaponId || K.weapon });
                 this.hunter = true;
                 this.nightVision = true;
                 this.alpha = !!cfg.alpha;
-                this.dashMax = cfg.dashes || 1; this.dashCDBase = cfg.dashCD || 230;
+                this.dashMax = cfg.dashes || K.dashes; this.dashCDBase = cfg.dashCD || K.dash_cd;
                 this.dashCD = 90 + Math.random() * 120; this._chain = 0;
-                this.clawCD = 0; this.clawDmg = cfg.claw || 14; this.clawReach = cfg.clawReach || 44;
-                this.huntSpeed = cfg.huntSpeed || 2.4;
+                this.clawCD = 0; this.clawDmg = cfg.claw || K.claw; this.clawReach = cfg.clawReach || K.claw_reach;
+                this.huntSpeed = cfg.huntSpeed || K.hunt_speed;
                 this.look = cfg.look || Hunter.makeLook(this.alpha);
             }
 
@@ -115,16 +107,17 @@
 
         class Demoness extends Hunter {
             constructor(x, y, cfg = {}) {
-                super(x, y, { hp: cfg.hp || 900, speed: 3.0, visionRange: 640, dashes: 2, dashCD: 150, claw: 22, clawReach: 50, huntSpeed: 2.9, look: Demoness.look() });
+                const K = GAME_DB.enemies.kinds.demoness;   // directory/game-db/enemies.json
+                super(x, y, { hp: cfg.hp || K.hp, speed: K.speed, visionRange: K.vision_range, dashes: K.dashes, dashCD: K.dash_cd, claw: K.claw, clawReach: K.claw_reach, huntSpeed: K.hunt_speed, look: Demoness.look() });
                 this.bossName = 'Lilitu, the Demoness';
                 this.maxHp = this.hp;
                 this._noExecute = true;
-                this.whipCD = 60; this.telegraphThreshold = 30; this.whipDmg = 18;
+                this.whipCD = K.whip_cd; this.telegraphThreshold = K.telegraph_frames; this.whipDmg = K.whip_dmg;
                 this._eyeK = 1; this._eyeT = 1; this._riseK = 1; this._riseT = 1; this._igniteFlash = 0;
                 this.solo = !!cfg.solo; this.phase = 1;
                 if (cfg.decoy) {                                     // a Blood Mirror decoy: her shape, dead eyes, one hit
                     this.decoy = true; this.bossName = null; this.hp = this.maxHp = 1; this._noExecute = true;
-                    this.look = { ...this.look, eyeColor: '#2a0508' }; this.clawDmg = 6; this.whipDmg = 5;
+                    this.look = { ...this.look, eyeColor: '#2a0508' }; this.clawDmg = K.decoy.claw; this.whipDmg = K.decoy.whip_dmg;
                 }
             }
 

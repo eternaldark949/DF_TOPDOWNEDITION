@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'e48cf749c139';
+        const DFAB_BUILD = '21ee87f113b9';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -10534,6 +10534,9 @@
     </script>
     <script type="text/dfab" data-src="directory/game-db/audio.json" data-cost="54">
         GAME_DB.audio = {"_about":{"chapter":"Audio: which music plays where, how each place echoes, the sound effects' lengths and voice caps, each car brand's motor, and the floors footsteps hear.","how_to_edit":"Plain JSON, inlined by tools/build.mjs as GAME_DB.audio and checked by tools/test-game-db.cjs. Map ids are the ids in world/maps.js. A \"note\" is for people only.","tables":{"buffers":"Settings > Audio Buffer: each choice and the AudioContext latencyHint it opens with (read as AUDIO_BUFFERS, directory/game-sound.js).","sfx_length":"How long each sfx() recipe rings, in seconds (SFX_DUR).","sfx_voices":"How many of each sound may ring at once; a sound not listed gets 6 (SFX_CAP).","engine_hum":"Each car brand's electric motor (ENGINE_HUM): root pitch in Hz; body, shimmer and whine are the voices' weights; level is its volume. Brands are VEHICLE_BRANDS.","reverb":"The rooms as reverb (REVERB), each [decay s, predelay ms, damping Hz, wet], and for valley also [echo delay s, echo feedback, echo level]: street (a short slap off the buildings), open (a hillside), room (a furnished room), bathroom (tile and marble), hall (a lobby, a club floor), stone (a church, a palace), cabin (the van), void (the ethereal plane), valley (open ground under cliffs).","map_reverb":"Each map's room, by map id (MAP_REVERB). Indoor maps not listed are room, outdoor ones street.","room_reverb":"Rooms inside a map whose echo differs, by room kind (ROOM_REVERB).","map_music":"A soundtrack per map (MAP_MUSIC): track is a file in assets/audio without its extension; room is where its speakers are (fullest there); volume its level; bpm and beat0 give a tempo the lights can follow. A list holds area tracks (the nearest wins): area names a place (hub_graveyard) or building names a building footprint; fade is px; lowpass Hz muffles it.","club_bpm":"Moon City's tempo when no track is playing (CLUB_BPM).","floors":"Floors per painted map for footsteps (FLOOR_MATERIALS, engine/footsteps.js): def is the floor everywhere else; rects are [x, y, w, h, material], first match wins. Materials: marble, wood, carpet, stone, concrete, asphalt, grass, metal, water."}},"buffers":{"low":"interactive","balanced":"balanced","smooth":"playback"},"sfx_length":{"shoot":0.16,"explode":0.31,"thunder":2.8,"knock":0.14,"bump":0.32,"crunch":0.3,"ui":0.06,"flit":0.21,"crit":0.14},"sfx_voices":{"shoot":4,"explode":3,"thunder":2,"ui":3,"crunch":3,"crit":3},"engine_hum":{"LADY":{"root":44,"body":1.15,"shimmer":0.8,"whine":0.8,"level":0.11},"Zenxera":{"root":55,"body":1,"shimmer":1.2,"whine":1,"level":0.1},"Gelfash":{"root":62,"body":0.85,"shimmer":0.9,"whine":0.5,"level":0.09}},"reverb":{"street":[1,24,4200,0.1],"open":[0.6,12,3500,0.05],"room":[0.5,6,6000,0.14],"bathroom":[1.1,4,9000,0.26],"hall":[2,22,5200,0.22],"stone":[3.2,32,4000,0.3],"cabin":[0.25,2,2800,0.1],"void":[5.5,60,2600,0.38],"valley":[1.2,40,3500,0.1,0.45,0.4,0.32]},"map_reverb":{"hotel_lobby":"hall","moon_city_nightclub":"hall","enni_cole_interior":"hall","biggs_arena":"hall","auto_shop":"hall","church_boss":"stone","demoness_palace":"stone","house_of_death":"stone","van_interior":"cabin","keepers_hill":"open","ethereal_plane":"void"},"room_reverb":{"bathroom":"bathroom"},"map_music":{"apt_949":{"track":"silver queen tst","room":"main_room","volume":0.5,"note":"The Silver Queen suite."},"moon_city_nightclub":{"track":"moon city nightclub - swig","room":"hall","volume":0.55,"bpm":140,"beat0":0,"note":"Swig, the club's cut: a 24-bar loop at 140 BPM, the kick on the first sample; the club's lights dance to it."},"keepers_hill":{"track":"the visitor","volume":0.5,"note":"The Visitor: the Keeper's fireside. The same track on the hill and in the parlor, so it plays on across the cut."},"keepers_parlor":{"track":"the visitor","volume":0.5},"church_boss":{"track":"triumvirate boss fight","volume":0.55,"note":"The Sanctum: the Triumvirate."},"van_interior":{"track":"van 2","volume":0.45,"note":"The van on the way to the job (the intro), over the rain on the roof and the road."},"sdc":[{"track":"grave stories (1)","volume":0.5,"area":"hub_graveyard","fade":600,"note":"Grave Stories: the southern graveyard in Southern Dimensions City (its walls, engine/map-loading.js)."},{"track":"moon city nightclub - swig","building":"moon_city","volume":0.32,"fade":420,"lowpass":260,"bpm":140,"beat0":0,"note":"Moon City's bass through its walls: heard as you come up to the club, low-passed to the thump; its lights keep time."}]},"club_bpm":140,"floors":{"house_of_death":{"def":"wood","rects":[[840,1014,120,486,"carpet"],[840,130,120,300,"carpet"],[1250,1064,480,50,"carpet"],[1686,1064,50,412,"carpet"],[574,1014,652,486,"marble"],[574,444,652,556,"marble"],[1574,14,212,416,"marble"],[574,14,652,416,"stone"],[14,1014,546,472,"concrete"],[1240,14,320,416,"carpet"],[1240,444,546,556,"stone"],[1240,1178,382,308,"stone"]]},"hotel_lobby":{"def":"marble","rects":[[440,612,120,538,"carpet"]]},"moon_city_nightclub":{"def":"wood","rects":[[590,310,420,380,"marble"]]},"van_interior":{"def":"metal"},"ethereal_plane":{"def":"marble"},"church_boss":{"def":"stone"},"keepers_hill":{"def":"grass"},"demoness_palace":{"def":"stone","rects":[[840,760,120,226,"carpet"],[840,1000,120,386,"carpet"],[14,1000,572,386,"carpet"],[600,380,600,606,"marble"],[600,1000,600,386,"marble"],[14,14,872,352,"grass"]]}}};
+    </script>
+    <script type="text/dfab" data-src="directory/game-db/enemies.json" data-cost="77">
+        GAME_DB.enemies = {"_about":{"chapter":"Enemies and encounters: what each enemy kind starts with, the drones, the Triumvirate and Lilitu, their hazards, and the Horde Gauntlet.","how_to_edit":"Plain JSON, inlined by tools/build.mjs as GAME_DB.enemies and checked by tools/test-game-db.cjs. Times are seconds unless a name says frames (60 a second); distances px; damage HP. Keys in UPPER_SNAKE are read by the code under those names. Gauntlet ids and kind ids are in save files: never rename one.","tables":{"kinds":"Each enemy class's starting numbers, read by its constructor (entities/enemies.js, entities/hunters.js, entities/drones.js); a spawn can still pass its own hp, speed or vision range. ganger.gun is the gun a ganger with no weapon carries (and the fallback for any stat a weapon leaves out). hunter.weapon is an ITEM or weapon-model id. demoness.decoy is a Blood Mirror decoy's claw and whip. gatling_gunner burst_count shots burst_delay frames apart, then reload frames.","drone":"The drones (DRONE, entities/drones.js): HP, armour and how much the open eye takes; how they descend, hover and land; the bolt; and each kind's move (LANCE, GRAPPLE, BEAM) and keep-away distance (KEEP).","drone_kinds":"The drone kinds, one picked at random when a spawn names none (DRONE_KINDS).","duel":"Lilitu's duel (DUEL, entities/hunters.js): phase thresholds P2 and P3 as shares of her health; SIGIL_EVERY and SIGILS per phase; her bolt fan, Shadow Step, Wing Gale, Blood Mirror and Infernal Rite.","wardens":"The Triumvirate's three wardens (WARDENS): name and colours (eye is an r, g, b string).","warden":"How the wardens fight (WARDEN): HP each; RELOAD and STAGGER in frames; EXTEND shots; COVER_FIRE and FLANK_AFTER in seconds; each one's move: Vesper's censer, Matins' hymn, Compline's hook.","triumvirate":"Where the wardens kneel in the Sanctum (TRIUMVIRATE, engine/boss-intro.js): [x, y, squad index, warden id].","hazards":"The bosses' hazards (HAZARD, engine/boss-hazards.js): sigils, burning, the censer's fire and smoke, the hymn, the hook, the rite.","gauntlet_maps":"The Horde Gauntlet's maps (GAUNTLET_MAPS): mapId is a map in world/maps.js; spawns and gunnerSpawns are [x, y]; locked ones show as Sealed. hooks names the wave rule in entities/enemies.js (GAUNTLET_WAVE_HOOKS); a map without one uses the standard waves.","gauntlet":"The gauntlet's rules: spawn_min_dist px from her; scale (GAUNTLET_SCALE): from wave FROM, HP x HP_GROWTH and damage + DMG_STEP a wave; elites from ELITE_FROM, about one in ELITE_EVERY; SCRAP x wave a cleared wave, BONUS_SCRAP every BONUS_EVERY-th; the Demoness' HP with her hunters and alone. lead_err px: how far off a wave's first guess of where she is; stall_secs and stall_err: a vaguer lead when no one has found her.","elites":"The elite marks (ELITES): label and colour (r, g, b); ward (ELITE_WARD): the warded elite's front arc in radians either side and the share of its health it turns away."}},"kinds":{"ganger":{"radius":15,"hp":40,"mass":10,"friction":0.9,"speed":2.5,"invincible_frames":20,"vision_range":320,"telegraph_frames":9,"gun":{"fireRate":45,"damage":10,"color":"#ff0055","speed":24,"spread":0.15,"penetrating":false,"sticky":false}},"hunter":{"hp":70,"speed":2.8,"vision_range":520,"weapon":"pistol_ganger","dashes":1,"dash_cd":230,"claw":14,"claw_reach":44,"hunt_speed":2.4},"demoness":{"hp":900,"speed":3,"vision_range":640,"dashes":2,"dash_cd":150,"claw":22,"claw_reach":50,"hunt_speed":2.9,"whip_cd":60,"whip_dmg":18,"telegraph_frames":30,"decoy":{"claw":6,"whip_dmg":5}},"gatling_gunner":{"radius":20,"hp":200,"mass":25,"friction":0.85,"speed":2,"invincible_frames":10,"burst_count":10,"burst_delay":6,"reload":210,"telegraph_frames":12},"drone":{"radius":20,"mass":30,"speed":3,"invincible_frames":15}},"drone":{"HP":110,"ARMOR":0.3,"OPEN":0.7,"BLADE":0.6,"EYE_MULT":1.8,"EYE_R":10,"EYE_FWD":15,"DESCENT":0.9,"RISE":0.6,"LOST":5,"LAND_HIT":10,"LAND_R":48,"HOVER_PX":7,"BOLT_EVERY":2.2,"BOLT_TELL":0.25,"LANCE":{"EVERY":4.5,"RANGE":330,"TELL":0.65,"LOCK":0.15,"SPEED":15,"DIST":400,"HIT":18,"BURN_DPS":6,"BURN_SECS":2.5,"RECOVER":1},"GRAPPLE":{"EVERY":6.5,"RANGE":320,"TELL":0.5,"SPEED":15,"HIT":6,"PULL":2.8,"SECS":2.4,"TICK":0.5,"TICK_DMG":4,"HOLD":64},"BEAM":{"EVERY":5.5,"RANGE":640,"CHARGE":1.2,"LOCK":0.2,"FIRE":0.3,"HIT":22,"WIDTH":15},"KEEP":{"lancer":230,"grappler":210,"seer":330}},"drone_kinds":["lancer","grappler","seer"],"duel":{"P2":0.66,"P3":0.33,"SIGIL_EVERY":[0,4.5,3.8,3.2],"SIGILS":[0,1,2,3],"SIGIL_SPREAD":95,"BOLT_EVERY":2.8,"BOLT_TELL":0.35,"BOLT_FAN":3,"BOLT_SPREAD":0.17,"BOLT_DMG":12,"BOLT_SPEED":13,"STEP_EVERY":7,"STEP_TELL":0.4,"STEP_BEHIND":46,"GALE_EVERY":8,"GALE_TELL":0.5,"GALE_REACH":170,"GALE_SPREAD":0.75,"GALE_PUSH":140,"GALE_HIT":12,"GUARD_BREAK":1.2,"MIRROR_EVERY":16,"MIRROR_SECS":9,"MIRROR_SPREAD":80,"RITE_EVERY":20,"RITE_R0":430,"RITE_R1":140,"DASH_CD_P3":95,"WHIP2_DELAY":0.16},"wardens":{"vesper":{"name":"Vesper, the Censer","accent":"#c42a3c","trim":"#e8c27a","mantle":"#5a0c1c","eye":"255, 60, 40"},"matins":{"name":"Matins, the Choir","accent":"#e8c27a","trim":"#fff1c2","mantle":"#1a1216","eye":"255, 190, 80"},"compline":{"name":"Compline, the Penitent","accent":"#8a5cff","trim":"#e6ddd0","mantle":"#24163a","eye":"200, 120, 255"}},"warden":{"HP":1500,"RELOAD":120,"STAGGER":40,"EXTEND":4,"COVER_FIRE":0.5,"FLANK_AFTER":2,"CENSER_EVERY":7,"CENSER_WIND":0.5,"CENSER_RANGE":640,"HYMN_EVERY":6,"HYMN_CHARGE":0.6,"HOOK_EVERY":8,"HOOK_TELL":0.7,"HOOK_RANGE":420},"triumvirate":[[360,330,0,"vesper"],[600,290,1,"matins"],[840,330,2,"compline"]],"hazards":{"SIGIL_ARM":1,"SIGIL_R":58,"SIGIL_HIT":16,"FIRE_SECS":1.6,"BURN_TICK":0.5,"CENSER_FLIGHT":0.9,"CENSER_FIRE_R":62,"CENSER_FIRE_SECS":4,"CENSER_SMOKE_R":96,"CENSER_SMOKE_SECS":6,"CENSER_HIT":12,"HYMN_SECS":1.1,"HYMN_RANGE":760,"HYMN_HIT":10,"REVEAL_SECS":2.5,"HOOK_SPEED":17,"HOOK_RANGE":430,"HOOK_HIT":8,"HOOK_PULL":8,"HOOK_STOP":80,"HOOK_PULL_SECS":0.6,"RITE_SECS":8,"RITE_WARN":1,"RITE_DPS":14},"gauntlet_maps":[{"id":"house_of_death","label":"The House of Death","mapId":"house_of_death","blurb":"A gothic villa of glass and black marble. Doors swing under fire, rooms sink into shadow — hold the house, wave after wave.","spawns":[[120,380],[440,390],[280,110],[900,300],[610,100],[1195,380],[1300,300],[1450,250],[1620,200],[80,800],[480,850],[300,520],[650,500],[1150,950],[760,960],[1150,700],[1350,600],[1700,700],[1400,880],[1650,580],[100,1100],[450,1350],[300,1120],[650,1300],[1150,1100],[1300,1090],[1710,1250],[1560,1090],[1300,1320],[1560,1330]],"gunnerSpawns":[[760,700],[1380,560],[280,820],[700,380]]},{"id":"demoness_palace","label":"The Demoness Palace","mapId":"demoness_palace","blurb":"Obsidian and gold, lit by embers. Her hunters see in the dark and cross a room in a blink, and every fifth wave she hunts you herself.","spawns":[[150,180],[760,180],[1000,150],[1300,150],[1600,310],[140,520],[460,900],[1350,520],[1650,900],[690,490],[1110,960],[420,1300],[120,1250],[1300,1300],[1700,1300]],"gunnerSpawns":[],"hooks":"demoness_palace"},{"id":"sealed_2","label":"Sealed","locked":true,"blurb":"Coming soon."},{"id":"sealed_3","label":"Sealed","locked":true,"blurb":"Coming soon."}],"gauntlet":{"spawn_min_dist":350,"scale":{"FROM":15,"HP_GROWTH":1.04,"DMG_STEP":0.02,"ELITE_FROM":12,"ELITE_EVERY":6,"SCRAP":5,"BONUS_EVERY":5,"BONUS_SCRAP":100,"DEMONESS_HP":1000,"DEMONESS_HP_W":80,"SOLO_HP":3000,"SOLO_HP_W":100},"lead_err":300,"stall_secs":20,"stall_err":220},"elites":{"marks":{"armored":{"label":"ARMORED","col":"180, 196, 214"},"swift":{"label":"SWIFT","col":"110, 230, 255"},"warded":{"label":"WARDED","col":"255, 214, 110"}},"ward":{"ARC":1.05,"HP":0.6}}};
     </script>
     <script type="text/dfab" data-src="assets#0" data-cost="1">
         const ASSETS = { images: {}, audio: {} };
@@ -31820,7 +31823,7 @@
             }
         }
     </script>
-    <script type="text/dfab" data-src="entities/enemies.js" data-cost="1649">
+    <script type="text/dfab" data-src="entities/enemies.js" data-cost="1627">
         /**
          * =====================================================================
          *  VELVET CAT — Dreampunk Feline Companion
@@ -32568,11 +32571,7 @@
         /* The Sanctum's three (the Triumvirate): the same gatling automaton, each in its own guise.
            A persona switches on boss mode (dormant until the intro, sight-gated fire, a longer telegraph)
            and its own art; the gauntlet's gunners have none and keep the plain look. */
-        const WARDENS = {
-            vesper:   { name: 'Vesper, the Censer',     accent: '#c42a3c', trim: '#e8c27a', mantle: '#5a0c1c', eye: '255, 60, 40' },
-            matins:   { name: 'Matins, the Choir',      accent: '#e8c27a', trim: '#fff1c2', mantle: '#1a1216', eye: '255, 190, 80' },
-            compline: { name: 'Compline, the Penitent', accent: '#8a5cff', trim: '#e6ddd0', mantle: '#24163a', eye: '200, 120, 255' }
-        };
+        const WARDENS = GAME_DB.enemies.wardens;   // directory/game-db/enemies.json
         /* How the Triumvirate fights (a persona; times in seconds unless noted):
              HP each; RELOAD frames between bursts, and they stagger them (STAGGER frames apart on waking, and a
              warden whose burst ends while the others reload fires EXTEND more, so all three never go quiet);
@@ -32581,9 +32580,7 @@
              Vesper lobs a burning censer over cover (CENSER_EVERY, a WIND tell); Matins sings through walls
              (HYMN_EVERY, a CHARGE tell); Compline throws its chain hook past cover (HOOK_EVERY, a HOOK_TELL),
              within HOOK_RANGE (engine/boss-hazards.js does the rest). */
-        const WARDEN = { HP: 1500, RELOAD: 120, STAGGER: 40, EXTEND: 4, COVER_FIRE: 0.5, FLANK_AFTER: 2,
-            CENSER_EVERY: 7, CENSER_WIND: 0.5, CENSER_RANGE: 640, HYMN_EVERY: 6, HYMN_CHARGE: 0.6,
-            HOOK_EVERY: 8, HOOK_TELL: 0.7, HOOK_RANGE: 420 };
+        const WARDEN = GAME_DB.enemies.warden;
 
         class GatlingGunner extends ActorEntity {
             constructor(x, y, id, opts = {}) {
@@ -32591,16 +32588,17 @@
                 super({
                     x: x,
                     y: y,
-                    radius: 20,
+                    radius: GAME_DB.enemies.kinds.gatling_gunner.radius,
                     type: 'gatlinggunner',
                     alliance: 'hostile',
-                    hp: 200,          // Boss-level HP
-                    mass: 25,         // Heavy
-                    friction: 0.85,
-                    speed: 2,
+                    hp: GAME_DB.enemies.kinds.gatling_gunner.hp,          // Boss-level HP (directory/game-db/enemies.json)
+                    mass: GAME_DB.enemies.kinds.gatling_gunner.mass,      // Heavy
+                    friction: GAME_DB.enemies.kinds.gatling_gunner.friction,
+                    speed: GAME_DB.enemies.kinds.gatling_gunner.speed,
                     hasCollision: true,
-                    invincibleDuration: 10
+                    invincibleDuration: GAME_DB.enemies.kinds.gatling_gunner.invincible_frames
                 });
+                const K = GAME_DB.enemies.kinds.gatling_gunner;
                 
                 this.id = id; // Unique ID (0, 1, 2) for squad formation
                 this.angle = 0;
@@ -32608,17 +32606,17 @@
                 // Gatling mechanics
                 this.burstCooldown = 0;
                 this.burstCount = 0;
-                this.maxBurstCount = 10;
-                this.burstDelay = 6; 
+                this.maxBurstCount = K.burst_count;
+                this.burstDelay = K.burst_delay; 
                 this.burstTimer = 0;
-                this.reloadTime = 210; 
+                this.reloadTime = K.reload; 
                 
                 // Movement
                 this.moveTimer = 0;
                 this.strafeDirection = 1;
                 
                 // Telegraph (warns before burst starts)
-                this.telegraphThreshold = 12; // ~0.2s window
+                this.telegraphThreshold = K.telegraph_frames; // ~0.2s window
                 this.telegraphAngle = 0;
                 this.isTelegraphing = false;
                 this._prevPlayerX = 0;
@@ -33294,19 +33292,19 @@
             static makeLook(r) { return ROLE_LOOKS.ganger(r); }
 
             constructor(x, y, config) {
-                const cfg = config || {};
+                const cfg = config || {}, K = GAME_DB.enemies.kinds.ganger;   // directory/game-db/enemies.json
                 super({
                     x: x,
                     y: y,
-                    radius: 15,
+                    radius: K.radius,
                     type: 'ganger',
                     alliance: 'hostile',
-                    hp: cfg.hp || 40,
-                    mass: 10,
-                    friction: 0.9,
-                    speed: cfg.speed || 2.5,
+                    hp: cfg.hp || K.hp,
+                    mass: K.mass,
+                    friction: K.friction,
+                    speed: cfg.speed || K.speed,
                     hasCollision: true,
-                    invincibleDuration: 20
+                    invincibleDuration: K.invincible_frames
                 });
                 
                 this.angle = Math.random() * 6.28;
@@ -33317,7 +33315,7 @@
                 this.walkPhase = 0; 
 
                 // AI Properties
-                this.visionRange = cfg.visionRange || 320;
+                this.visionRange = cfg.visionRange || K.vision_range;
                 this.visionFov = Math.PI / 2.5;
                 // What they know of what's around them (basement/awareness-kit.js): up close (50) they sense her unless
                 // she comes from behind; past that, only what's in the cone, in range and in plain sight. Bumping into him
@@ -33336,7 +33334,7 @@
                 this.cooldown = 0;
                 
                 // ── TELEGRAPH (aim line before firing) ──
-                this.telegraphThreshold = cfg.telegraphThreshold || 9; // ~0.15s window
+                this.telegraphThreshold = cfg.telegraphThreshold || K.telegraph_frames; // ~0.15s window
                 this.telegraphAngle = 0;
                 this.isTelegraphing = false;
                 
@@ -33355,12 +33353,13 @@
                 if (this.equippedWeaponId && typeof ITEM_REGISTRY !== 'undefined') {
                     const def = ITEM_REGISTRY[this.equippedWeaponId];
                     if (def && def.stats) {
+                        const G = GAME_DB.enemies.kinds.ganger.gun;
                         return {
-                            fireRate: def.stats.fireRate || 45,
-                            damage: def.stats.damage || 10,
-                            color: def.stats.projectileColor || '#ff0055',
-                            speed: def.stats.projectileSpeed || 24,
-                            spread: def.stats.spread || 0.15,
+                            fireRate: def.stats.fireRate || G.fireRate,
+                            damage: def.stats.damage || G.damage,
+                            color: def.stats.projectileColor || G.color,
+                            speed: def.stats.projectileSpeed || G.speed,
+                            spread: def.stats.spread || G.spread,
                             penetrating: def.stats.penetrating || false,
                             sticky: def.stats.sticky || false,
                             dotDamage: def.stats.dotDamage || 0,
@@ -33369,16 +33368,8 @@
                         };
                     }
                 }
-                // Default ganger weapon (hot pink pistol)
-                return {
-                    fireRate: 45,
-                    damage: 10,
-                    color: '#ff0055',
-                    speed: 24,
-                    spread: 0.15,
-                    penetrating: false,
-                    sticky: false,
-                };
+                // Default ganger weapon (hot pink pistol): kinds.ganger.gun, directory/game-db/enemies.json
+                return { ...GAME_DB.enemies.kinds.ganger.gun };
             }
 
             /** A landed melee hit breaks an ordinary gunner's aim; repeat hits cannot lock it down. */
@@ -33995,63 +33986,33 @@
            walkable spots in every room, kept ≥ SPAWN_MIN_DIST from 949) and where the heavy
            gunners stand (gunnerSpawns — the big rooms). Sealed entries are placeholders for
            maps to come: shown in the menu, greyed out. */
-        const GAUNTLET_MAPS = [
-            {
-                id: 'house_of_death', label: 'The House of Death', mapId: 'house_of_death',
-                blurb: 'A gothic villa of glass and black marble. Doors swing under fire, rooms sink into shadow — hold the house, wave after wave.',
-                spawns: [
-                    [120, 380], [440, 390], [280, 110],                     // library
-                    [900, 300], [610, 100], [1195, 380],                    // chapel
-                    [1300, 300], [1450, 250], [1620, 200],                  // bedroom, bath
-                    [80, 800], [480, 850], [300, 520],                      // dining
-                    [650, 500], [1150, 950], [760, 960], [1150, 700],       // grand hall
-                    [1350, 600], [1700, 700], [1400, 880], [1650, 580],     // courtyard
-                    [100, 1100], [450, 1350], [300, 1120],                  // kitchen
-                    [650, 1300], [1150, 1100],                              // foyer
-                    [1300, 1090], [1710, 1250], [1560, 1090],               // gallery
-                    [1300, 1320], [1560, 1330]                              // reliquary
-                ],
-                gunnerSpawns: [[760, 700], [1380, 560], [280, 820], [700, 380]]
-            },
-            {
-                id: 'demoness_palace', label: 'The Demoness Palace', mapId: 'demoness_palace',
-                blurb: 'Obsidian and gold, lit by embers. Her hunters see in the dark and cross a room in a blink, and every fifth wave she hunts you herself.',
-                spawns: [
-                    [150, 180], [760, 180], [1000, 150], [1300, 150], [1600, 310],     // garden, shrine, bath
-                    [140, 520], [460, 900], [1350, 520], [1650, 900],                  // the galleries
-                    [690, 490], [1110, 960], [420, 1300], [120, 1250], [1300, 1300], [1700, 1300]   // throne hall, dressing room, kennels
-                ],
-                gunnerSpawns: [],
-                // Waves of hunters (night vision, dashes); an alpha from wave 3; the Demoness every fifth wave —
-                // with her hunters on 5, 15, 25…, and alone (Lilitu's duel, `solo`) on 10, 20, 30…
+        /** The wave rules a gauntlet map names in its `hooks` (directory/game-db/enemies.json has the maps). */
+        const GAUNTLET_WAVE_HOOKS = {
+            // The palace: waves of hunters (night vision, dashes); an alpha from wave 3; the Demoness every fifth wave —
+            // with her hunters on 5, 15, 25…, and alone (Lilitu's duel, `solo`) on 10, 20, 30…
+            demoness_palace: {
                 waves: (w) => {
                     const solo = w % 10 === 0;
                     return { hunters: solo ? 0 : Math.min(3 + w, 10), alphas: solo || w < 3 ? 0 : 1 + Math.floor((w - 3) / 4), demoness: w % 5 === 0, solo,
                              hp: 55 + w * 8, speed: 2.6 + Math.min(w * 0.08, 1) };
                 }
-            },
-            { id: 'sealed_2', label: 'Sealed', locked: true, blurb: 'Coming soon.' },
-            { id: 'sealed_3', label: 'Sealed', locked: true, blurb: 'Coming soon.' }
-        ];
-        const GAUNTLET_SPAWN_MIN_DIST = 350;
+            }
+        };
+        const GAUNTLET_MAPS = attachDataHooks(GAME_DB.enemies.gauntlet_maps, GAUNTLET_WAVE_HOOKS);   // directory/game-db/enemies.json
+        const GAUNTLET_SPAWN_MIN_DIST = GAME_DB.enemies.gauntlet.spawn_min_dist;
         /* Past the early waves (both maps): from wave FROM every hostile's HP grows ×HP_GROWTH a wave and its
            damage +DMG_STEP a wave (claws too); from ELITE_FROM about one in ELITE_EVERY is an elite (Armored,
            Swift or Warded: ELITES). A cleared wave pays SCRAP × wave, and BONUS_SCRAP more every BONUS_EVERY-th.
            The Demoness: DEMONESS_HP + DEMONESS_HP_W × wave with her hunters; alone, SOLO_HP + SOLO_HP_W × wave. */
-        const GAUNTLET_SCALE = { FROM: 15, HP_GROWTH: 1.04, DMG_STEP: 0.02, ELITE_FROM: 12, ELITE_EVERY: 6,
-            SCRAP: 5, BONUS_EVERY: 5, BONUS_SCRAP: 100, DEMONESS_HP: 1000, DEMONESS_HP_W: 80, SOLO_HP: 3000, SOLO_HP_W: 100 };
+        const GAUNTLET_SCALE = GAME_DB.enemies.gauntlet.scale;
         /* The elites (a gauntlet's rank and file, from ELITE_FROM): each wears its mark — a ring and a word
            under it in its colour — and fights its own way.
              armored  steel plates: burn and bleed do half, and it shrugs off shoves
              swift    quicker on its feet (a hunter dashes sooner)
              warded   a gold ward before it turns shots from the front (WARD_ARC either side) until it
                       has turned WARD_HP × its health in them; then it shatters. Blades and burns go through */
-        const ELITES = {
-            armored: { label: 'ARMORED', col: '180, 196, 214' },
-            swift:   { label: 'SWIFT',   col: '110, 230, 255' },
-            warded:  { label: 'WARDED',  col: '255, 214, 110' }
-        };
-        const ELITE_WARD = { ARC: 1.05, HP: 0.6 };
+        const ELITES = GAME_DB.enemies.elites.marks;
+        const ELITE_WARD = GAME_DB.enemies.elites.ward;
         /** Make a hostile an elite (restore: from a save, its numbers are already in place) */
         function applyElite(h, kind, restore) {
             if (!ELITES[kind]) return;
@@ -34107,9 +34068,9 @@
             const n = Math.max(0, w - GAUNTLET_SCALE.FROM);
             return { hp: Math.pow(GAUNTLET_SCALE.HP_GROWTH, n), dmg: 1 + GAUNTLET_SCALE.DMG_STEP * n };
         }
-        const GAUNTLET_LEAD_ERR = 300;           // a wave arrives knowing only her rough area (px off)
-        const GAUNTLET_STALL_SECS = 20;          // no one has seen or heard her this long → a vague lead…
-        const GAUNTLET_STALL_ERR = 220;          // …this far off: enough to sweep the right rooms
+        const GAUNTLET_LEAD_ERR = GAME_DB.enemies.gauntlet.lead_err;           // a wave arrives knowing only her rough area (px off)
+        const GAUNTLET_STALL_SECS = GAME_DB.enemies.gauntlet.stall_secs;          // no one has seen or heard her this long → a vague lead…
+        const GAUNTLET_STALL_ERR = GAME_DB.enemies.gauntlet.stall_err;          // …this far off: enough to sweep the right rooms
         // Save values, never live navigation, entity or intro references.
         const GAUNTLET_HOSTILE_NUMBERS = ['x', 'y', 'angle', 'hp', 'maxHp', 'speed', 'huntSpeed', 'visionRange',
             'suspicion', 'cooldown', 'telegraphAngle', 'telegraphThreshold', 'dashMax', 'dashCDBase', 'dashCD',
@@ -34474,7 +34435,7 @@
         }
 
     </script>
-    <script type="text/dfab" data-src="entities/hunters.js" data-cost="292">
+    <script type="text/dfab" data-src="entities/hunters.js" data-cost="291">
         /* =====================================================================
            HUNTERS — the Demoness's own (the Demoness Palace gauntlet)
            ---------------------------------------------------------------------
@@ -34502,26 +34463,18 @@
            defeat unlocks the Golden Retribution schematic; every one leaves two
            Dark Elements (update.js).
            ===================================================================== */
-        const DUEL = {
-            P2: 0.66, P3: 0.33,
-            SIGIL_EVERY: [0, 4.5, 3.8, 3.2], SIGILS: [0, 1, 2, 3], SIGIL_SPREAD: 95,
-            BOLT_EVERY: 2.8, BOLT_TELL: 0.35, BOLT_FAN: 3, BOLT_SPREAD: 0.17, BOLT_DMG: 12, BOLT_SPEED: 13,
-            STEP_EVERY: 7, STEP_TELL: 0.4, STEP_BEHIND: 46,
-            GALE_EVERY: 8, GALE_TELL: 0.5, GALE_REACH: 170, GALE_SPREAD: 0.75, GALE_PUSH: 140, GALE_HIT: 12, GUARD_BREAK: 1.2,
-            MIRROR_EVERY: 16, MIRROR_SECS: 9, MIRROR_SPREAD: 80,
-            RITE_EVERY: 20, RITE_R0: 430, RITE_R1: 140,
-            DASH_CD_P3: 95, WHIP2_DELAY: 0.16
-        };
+        const DUEL = GAME_DB.enemies.duel;   // directory/game-db/enemies.json
         class Hunter extends Ganger {
             constructor(x, y, cfg = {}) {
-                super(x, y, { hp: cfg.hp || 70, speed: cfg.speed || 2.8, visionRange: cfg.visionRange || 520, weaponId: cfg.weaponId || 'pistol_ganger' });
+                const K = GAME_DB.enemies.kinds.hunter;   // directory/game-db/enemies.json
+                super(x, y, { hp: cfg.hp || K.hp, speed: cfg.speed || K.speed, visionRange: cfg.visionRange || K.vision_range, weaponId: cfg.weaponId || K.weapon });
                 this.hunter = true;
                 this.nightVision = true;
                 this.alpha = !!cfg.alpha;
-                this.dashMax = cfg.dashes || 1; this.dashCDBase = cfg.dashCD || 230;
+                this.dashMax = cfg.dashes || K.dashes; this.dashCDBase = cfg.dashCD || K.dash_cd;
                 this.dashCD = 90 + Math.random() * 120; this._chain = 0;
-                this.clawCD = 0; this.clawDmg = cfg.claw || 14; this.clawReach = cfg.clawReach || 44;
-                this.huntSpeed = cfg.huntSpeed || 2.4;
+                this.clawCD = 0; this.clawDmg = cfg.claw || K.claw; this.clawReach = cfg.clawReach || K.claw_reach;
+                this.huntSpeed = cfg.huntSpeed || K.hunt_speed;
                 this.look = cfg.look || Hunter.makeLook(this.alpha);
             }
 
@@ -34592,16 +34545,17 @@
 
         class Demoness extends Hunter {
             constructor(x, y, cfg = {}) {
-                super(x, y, { hp: cfg.hp || 900, speed: 3.0, visionRange: 640, dashes: 2, dashCD: 150, claw: 22, clawReach: 50, huntSpeed: 2.9, look: Demoness.look() });
+                const K = GAME_DB.enemies.kinds.demoness;   // directory/game-db/enemies.json
+                super(x, y, { hp: cfg.hp || K.hp, speed: K.speed, visionRange: K.vision_range, dashes: K.dashes, dashCD: K.dash_cd, claw: K.claw, clawReach: K.claw_reach, huntSpeed: K.hunt_speed, look: Demoness.look() });
                 this.bossName = 'Lilitu, the Demoness';
                 this.maxHp = this.hp;
                 this._noExecute = true;
-                this.whipCD = 60; this.telegraphThreshold = 30; this.whipDmg = 18;
+                this.whipCD = K.whip_cd; this.telegraphThreshold = K.telegraph_frames; this.whipDmg = K.whip_dmg;
                 this._eyeK = 1; this._eyeT = 1; this._riseK = 1; this._riseT = 1; this._igniteFlash = 0;
                 this.solo = !!cfg.solo; this.phase = 1;
                 if (cfg.decoy) {                                     // a Blood Mirror decoy: her shape, dead eyes, one hit
                     this.decoy = true; this.bossName = null; this.hp = this.maxHp = 1; this._noExecute = true;
-                    this.look = { ...this.look, eyeColor: '#2a0508' }; this.clawDmg = 6; this.whipDmg = 5;
+                    this.look = { ...this.look, eyeColor: '#2a0508' }; this.clawDmg = K.decoy.claw; this.whipDmg = K.decoy.whip_dmg;
                 }
             }
 
@@ -34890,7 +34844,7 @@
         }
 
     </script>
-    <script type="text/dfab" data-src="entities/drones.js" data-cost="308">
+    <script type="text/dfab" data-src="entities/drones.js" data-cost="302">
         /* =====================================================================
            DRONES — the hunter-killers that come for the Dark Maker (the Double
            Nights ambush, story/story-db.js), after ETERNAL's concept sheet
@@ -34912,21 +34866,14 @@
                        straight through walls and cover
            The lancer and the grappler also spit violet bolts between moves.
            ===================================================================== */
-        const DRONE = {
-            HP: 110, ARMOR: 0.3, OPEN: 0.7, BLADE: 0.6, EYE_MULT: 1.8, EYE_R: 10, EYE_FWD: 15,
-            DESCENT: 0.9, RISE: 0.6, LOST: 5, LAND_HIT: 10, LAND_R: 48, HOVER_PX: 7,
-            BOLT_EVERY: 2.2, BOLT_TELL: 0.25,
-            LANCE: { EVERY: 4.5, RANGE: 330, TELL: 0.65, LOCK: 0.15, SPEED: 15, DIST: 400, HIT: 18, BURN_DPS: 6, BURN_SECS: 2.5, RECOVER: 1.0 },
-            GRAPPLE: { EVERY: 6.5, RANGE: 320, TELL: 0.5, SPEED: 15, HIT: 6, PULL: 2.8, SECS: 2.4, TICK: 0.5, TICK_DMG: 4, HOLD: 64 },
-            BEAM: { EVERY: 5.5, RANGE: 640, CHARGE: 1.2, LOCK: 0.2, FIRE: 0.3, HIT: 22, WIDTH: 15 },
-            KEEP: { lancer: 230, grappler: 210, seer: 330 }
-        };
-        const DRONE_KINDS = ['lancer', 'grappler', 'seer'];
+        const DRONE = GAME_DB.enemies.drone;   // directory/game-db/enemies.json
+        const DRONE_KINDS = GAME_DB.enemies.drone_kinds;
 
         class Drone extends ActorEntity {
             constructor(x, y, kind) {
-                super({ x, y, radius: 20, type: 'drone', alliance: 'hostile', hp: DRONE.HP, mass: 30, friction: 0.9, speed: 3,
-                        hasCollision: true, invincibleDuration: 15 });
+                const K = GAME_DB.enemies.kinds.drone;
+                super({ x, y, radius: K.radius, type: 'drone', alliance: 'hostile', hp: DRONE.HP, mass: K.mass, friction: 0.9, speed: K.speed,
+                        hasCollision: true, invincibleDuration: K.invincible_frames });
                 this.kind = DRONE_KINDS.includes(kind) ? kind : DRONE_KINDS[Math.floor(Math.random() * DRONE_KINDS.length)];
                 this.angle = Math.PI / 2;
                 this.hoverOffset = Math.random() * Math.PI * 2;
@@ -76220,7 +76167,7 @@ engineMixin({
         // telegraphs. Replays (or once seen) get the short version: no pan, eyes and rising in place.
         // A tap or a key skips to the pan back. Runs on frames (updateBossIntro, from update.js).
         /** The Sanctum's three wardens: where they kneel on the dais (x, y, id, persona). */
-        const TRIUMVIRATE = [[360, 330, 0, 'vesper'], [600, 290, 1, 'matins'], [840, 330, 2, 'compline']];
+        const TRIUMVIRATE = GAME_DB.enemies.triumvirate;   // directory/game-db/enemies.json
 
         engineMixin({
             /** Spawn the Triumvirate dormant and play their awakening (the story's first visit, or Grum's replay). */
@@ -76350,7 +76297,7 @@ engineMixin({
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/boss-hazards.js" data-cost="258">
+    <script type="text/dfab" data-src="engine/boss-hazards.js" data-cost="253">
         // GameEngine — boss hazards: what the bosses leave on the floor and throw at her. Methods are added to
         // GameEngine.prototype (see engineMixin in game-engine.js).
         //
@@ -76367,14 +76314,7 @@ engineMixin({
         // She burns (`_playerBurn`, burnPlayer) for a few seconds after fire touches her; a flit puts it out.
         // The duel's dimming (`_duelDimK`) lives here too: the palace darkens while Lilitu hunts alone.
 
-        const HAZARD = {
-            SIGIL_ARM: 1.0, SIGIL_R: 58, SIGIL_HIT: 16, FIRE_SECS: 1.6,
-            BURN_TICK: 0.5,
-            CENSER_FLIGHT: 0.9, CENSER_FIRE_R: 62, CENSER_FIRE_SECS: 4, CENSER_SMOKE_R: 96, CENSER_SMOKE_SECS: 6, CENSER_HIT: 12,
-            HYMN_SECS: 1.1, HYMN_RANGE: 760, HYMN_HIT: 10, REVEAL_SECS: 2.5,
-            HOOK_SPEED: 17, HOOK_RANGE: 430, HOOK_HIT: 8, HOOK_PULL: 8, HOOK_STOP: 80, HOOK_PULL_SECS: 0.6,
-            RITE_SECS: 8, RITE_WARN: 1.0, RITE_DPS: 14
-        };
+        const HAZARD = GAME_DB.enemies.hazards;   // directory/game-db/enemies.json
 
         engineMixin({
             bossHazards() { return this._hazards || (this._hazards = []); },
