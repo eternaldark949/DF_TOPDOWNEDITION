@@ -32,6 +32,9 @@
 
         /** Where a night can be: the map it plays on, where everyone is, and who asks her there on their own */
         const CREW_VENUES = GAME_DB.story.crew.venues;   // directory/game-db/story.json
+        // The data gives which way everyone faces in degrees (deg); the scene reads radians (a)
+        for (const v of Object.values(CREW_VENUES)) for (const night of [v.group, v.solo]) if (night)
+            for (const spot of [night.me, night.them, ...(night.seats || [])]) angleKit.degToRad(spot);
         /** Each of the crew's own place (the pins they used to send) */
         const CREW_HOME_VENUE = GAME_DB.story.crew.home_venue;   // directory/game-db/story.json
 

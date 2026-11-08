@@ -1,11 +1,11 @@
 {
   "_about": {
     "chapter": "Story and missions: the story's parts, chapters, missions and steps; the mission kinds; where the crew's nights out happen; and how the van scene leaves everyone.",
-    "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.story and checked by tools/test-game-db.cjs. Positions are world px on the named map; a (and angle) are radians: 0 faces east (right), 1.5708 south (down), 3.1416 west, -1.5708 north. A step's name is in save files (StoryManager.serialize) and the code moves between steps by name: never rename one. _about.notes keeps the explanations that were comments in the code, keyed by path.",
+    "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.story and checked by tools/test-game-db.cjs. Positions are world px on the named map; deg is an angle in degrees, clockwise on screen: 0 faces east (right), 90 south (down), 180 west, -90 north (angleKit turns it into radians, basement/angle-kit.js); van.drop's angle is radians. A step's name is in save files (StoryManager.serialize) and the code moves between steps by name: never rename one. _about.notes keeps the explanations that were comments in the code, keyed by path.",
     "tables": {
       "parts": "The story (STORY_DB, story/story-db.js): Part → chapters → missions → steps, each keyed by its number. A mission has its name, desc, location, locationDesc, completionTime, target, its steps (in order) and optional side quests (id, name, trigger, steps). A step has a name, the banner shown when it starts (null: none), targetMap and target (the landmark its marker points at, or player), and condition: a string the story checks each frame (LOC_<map> she's on that map, TIMER_<n>, or a named check in StoryManager.checkCondition), or null for a step that ends the chain. A step with code names it in hooks (STORY_STEP_HOOKS in story/story-db.js): its onStart, and its condition when that's a function.",
       "mission_types": "The kinds of side job (MISSION_TYPES, story/missions.js). Saves keep these values.",
-      "crew": "The crew's nights out (story/crew-nights.js): ids (each one's id, CREW_IDS), venues (CREW_VENUES: the map, label, what the night is, its host, and where everyone sits or stands for a group night and a solo one; me, them and seats are x, y, a and an optional pose; cam and zoom frame it; after is where she stands when it's over), and home_venue (each one's own place, CREW_HOME_VENUE).",
+      "crew": "The crew's nights out (story/crew-nights.js): ids (each one's id, CREW_IDS), venues (CREW_VENUES: the map, label, what the night is, its host, and where everyone sits or stands for a group night and a solo one; me, them and seats are x, y, deg (which way they face) and an optional pose; cam and zoom frame it; after is where she stands when it's over), and home_venue (each one's own place, CREW_HOME_VENUE).",
       "van": "The end of the van scene (story/scenes/van.js): drop is where the van and everyone stand (VAN_DROP), poses how each one sits in the back (VAN_POSES), deposit Mirabel's payment up front (MIRABEL_DEPOSIT)."
     },
     "notes": {
@@ -156,22 +156,22 @@
         "what": "Drinks at Moon City",
         "host": "Sabrina",
         "group": {
-          "me": {"x":535,"y":950,"a":-1.5707963267948966,"pose":"sit"},
+          "me": {"x":535,"y":950,"deg":-90,"pose":"sit"},
           "cam": {"x":590,"y":898},
           "zoom": 2.5,
           "seats": [
-            {"x":486,"y":916,"a":0},
-            {"x":584,"y":916,"a":3.141592653589793},
-            {"x":505,"y":866,"a":1.5707963267948966,"pose":"lean"},
-            {"x":566,"y":866,"a":1.5707963267948966,"pose":"arms_crossed"},
-            {"x":446,"y":912,"a":0,"pose":"lean"},
-            {"x":624,"y":912,"a":3.141592653589793,"pose":"lean"}
+            {"x":486,"y":916,"deg":0},
+            {"x":584,"y":916,"deg":180},
+            {"x":505,"y":866,"deg":90,"pose":"lean"},
+            {"x":566,"y":866,"deg":90,"pose":"arms_crossed"},
+            {"x":446,"y":912,"deg":0,"pose":"lean"},
+            {"x":624,"y":912,"deg":180,"pose":"lean"}
           ],
           "after": {"x":535,"y":860}
         },
         "solo": {
-          "me": {"x":510,"y":596,"a":3.141592653589793,"pose":"sit"},
-          "them": {"x":510,"y":659,"a":3.141592653589793,"pose":"sit"},
+          "me": {"x":510,"y":596,"deg":180,"pose":"sit"},
+          "them": {"x":510,"y":659,"deg":180,"pose":"sit"},
           "cam": {"x":495,"y":628},
           "zoom": 3.2,
           "after": {"x":560,"y":628}
@@ -183,8 +183,8 @@
         "what": "Coffee at Cozy Cafe",
         "host": "747",
         "solo": {
-          "me": {"x":167,"y":433,"a":1.5707963267948966,"pose":"sit"},
-          "them": {"x":309,"y":540,"a":3.141592653589793,"pose":"sit"},
+          "me": {"x":167,"y":433,"deg":90,"pose":"sit"},
+          "them": {"x":309,"y":540,"deg":180,"pose":"sit"},
           "cam": {"x":230,"y":500},
           "zoom": 2.9,
           "after": {"x":380,"y":520}
@@ -196,8 +196,8 @@
         "what": "Wraps at Torque Auto",
         "host": "Victoria",
         "solo": {
-          "me": {"x":470,"y":296,"a":-1.2,"pose":"arms_crossed"},
-          "them": {"x":566,"y":288,"a":-1.9,"pose":"lean"},
+          "me": {"x":470,"y":296,"deg":-69,"pose":"arms_crossed"},
+          "them": {"x":566,"y":288,"deg":-109,"pose":"lean"},
           "cam": {"x":518,"y":248},
           "zoom": 2.8,
           "after": {"x":600,"y":380}
@@ -211,8 +211,8 @@
         "park": {"x":8260,"y":8160,"r":600},
         "inside": "biggs_arena",
         "solo": {
-          "me": {"x":8230,"y":8320,"a":-1.5707963267948966},
-          "them": {"x":8290,"y":8320,"a":-1.5707963267948966,"pose":"arms_crossed"},
+          "me": {"x":8230,"y":8320,"deg":-90},
+          "them": {"x":8290,"y":8320,"deg":-90,"pose":"arms_crossed"},
           "cam": {"x":8260,"y":8250},
           "zoom": 2.4,
           "after": {"x":8230,"y":8340}
@@ -224,8 +224,8 @@
         "what": "Browsing at Neural Systems",
         "host": "Josh",
         "solo": {
-          "me": {"x":470,"y":340,"a":-1.5707963267948966},
-          "them": {"x":530,"y":340,"a":-1.5707963267948966,"pose":"arms_crossed"},
+          "me": {"x":470,"y":340,"deg":-90},
+          "them": {"x":530,"y":340,"deg":-90,"pose":"arms_crossed"},
           "cam": {"x":500,"y":310},
           "zoom": 2.9,
           "after": {"x":500,"y":400}
@@ -237,8 +237,8 @@
         "what": "Shopping at Enni Cole",
         "host": "Max",
         "solo": {
-          "me": {"x":440,"y":985,"a":3.141592653589793},
-          "them": {"x":445,"y":1035,"a":3.141592653589793,"pose":"arms_crossed"},
+          "me": {"x":440,"y":985,"deg":180},
+          "them": {"x":445,"y":1035,"deg":180,"pose":"arms_crossed"},
           "cam": {"x":415,"y":1000},
           "zoom": 2.8,
           "after": {"x":480,"y":1010}
