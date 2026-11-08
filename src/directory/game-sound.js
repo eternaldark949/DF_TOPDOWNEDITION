@@ -348,6 +348,7 @@
                     if (k > areaK) { spec = sp; areaK = k; }
                 }
                 this._activeSpec = spec;
+                if (spec && spec.bpm) this.audio.system.setTempo(spec.bpm);   // synced effects keep time with the track (the club: 140)
                 const M = this._mus || (this._mus = (() => {
                     const f = ctx.createBiquadFilter(), g = ctx.createGain();
                     f.type = 'lowpass'; f.frequency.value = 18000; f.Q.value = 0.5; g.gain.value = 0;

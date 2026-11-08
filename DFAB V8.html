@@ -5868,7 +5868,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '04151eb1c2b8';
+        const DFAB_BUILD = 'eeb3d433772c';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="26">
         // ===== LV0 BASEMENT =====
@@ -6175,7 +6175,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="basement/sound-system.js" data-cost="213">
+    <script type="text/dfab" data-src="basement/sound-system.js" data-cost="290">
         // ===== LV0 BASEMENT =====
         // The sound system: one owner for the audio. The context, the mix (channels into a master), the
         // volume control with its dial, a room's reverb, and sound files played by packet. Like the sound
@@ -6207,6 +6207,14 @@
         //   ['crush', bits]                bit depth (16: clean .. 4: crushed)
         //   ['comp', threshold, ratio, attack, release, knee, makeup]   a compressor (dB, :1, s, s, dB, dB)
         //   ['gain', db]                   a trim
+        //   ['delay', time, feedback, mix, damp, pingpong]   echoes `time` apart, each darker by `damp` Hz
+        //   ['chorus', rate, depth_ms, mix]                  two short delays swept against each other
+        //   ['phaser', rate, depth, freq, feedback, mix]     four allpass stages swept around freq
+        //   ['tremolo', rate, depth, shape]                  the level pulses
+        //   ['autopan', rate, depth]                         it swings left and right
+        //   TIMES and RATES: a number (seconds; Hz), or a note value that follows the tempo (setTempo):
+        //   '1/4' a beat, '1/8d' a dotted eighth, '1/16t' a sixteenth triplet, '1' a bar. A rate as a note
+        //   value is one cycle per note: ['autopan', '1/2'] swings across every half bar.
         //   Setting the same effects again glides their values (an EQ sweep, a filter opening); a different
         //   list rebuilds the chain. [] is a straight wire.
         // SOUND PACKET:  [channel, name, layer, volume, options]   a sound file, through soundSystem.playSound
@@ -6232,10 +6240,11 @@
                 this.limiter = ctx.createDynamicsCompressor();          // a stack of loud sounds would sum past full scale and clip
                 const L = this.limiter;
                 L.threshold.value = -1; L.knee.value = 0; L.ratio.value = 20; L.attack.value = 0.001; L.release.value = 0.1;
-                this.master_insert = new soundInsert(ctx, this.master, L); L.connect(ctx.destination);
+                this.clock = { bpm: 120 };                                // the tempo synced effects follow (setTempo)
+                this.master_insert = new soundInsert(ctx, this.master, L, this.clock); L.connect(ctx.destination);
                 this.reverb = new soundReverb(ctx, this.master);
                 this.channels = {};
-                for (const name of soundSystem.CHANNELS) this.channels[name] = new soundChannel(ctx, this.master, this.reverb, levels[name] ?? 1, soundSystem.SENDS[name]);
+                for (const name of soundSystem.CHANNELS) this.channels[name] = new soundChannel(ctx, this.master, this.reverb, levels[name] ?? 1, soundSystem.SENDS[name], this.clock);
                 this.volume = new volumeControl(this, levels, dial);
             }
 
@@ -6280,6 +6289,24 @@
                 });
             }
 
+            /** The tempo (bpm): every effect timed in note values follows it, gliding over `glide` s. */
+            setTempo(bpm, glide = 0.1) {
+                if (!(bpm > 0) || bpm === this.clock.bpm) return;
+                this.clock.bpm = bpm;
+                for (const ins of [this.master_insert, ...Object.values(this.channels).map(c => c.insert)]) for (const e of ins.effects) e.tune(e.op, glide);
+            }
+
+            /** A time in seconds from a number (s) or a note value at `bpm`: '1/4' a beat, '1/8d' dotted, '1/16t' triplet, '2' two bars. */
+            static seconds(v, bpm) {
+                if (typeof v === 'number') return v;
+                const m = /^(\d+)(?:\/(\d+))?([dt]?)$/.exec(String(v).trim());
+                if (!m) return 0.25;
+                const bars = (+m[1]) / (m[2] ? +m[2] : 1), k = m[3] === 'd' ? 1.5 : m[3] === 't' ? 2 / 3 : 1;
+                return bars * 4 * 60 / bpm * k;
+            }
+            /** A rate in Hz from a number (Hz) or a note value (one cycle each: '1/2' every half bar). */
+            static rate(v, bpm) { return typeof v === 'number' ? v : 1 / Math.max(1e-3, soundSystem.seconds(v, bpm)); }
+
             /** A track's insert chain (INSERT PACKET): 'master' or a channel's, gliding over `glide` s. */
             insert(name, chain, glide = 0.05) {
                 const ins = name === 'master' ? this.master_insert : (this.channels[name] || {}).insert;
@@ -6299,10 +6326,10 @@
         /** A channel: its level (into the master) and its send (into the reverb). Sounds connect to `wet`
          *  (heard in the room) or `dry` (beside the ear: the phone, the HUD, the car's own cabin). */
         class soundChannel {
-            constructor(ctx, master, reverb, level, send = 1) {
+            constructor(ctx, master, reverb, level, send = 1, clock = { bpm: 120 }) {
                 this.level = level;
                 this.bus = ctx.createGain();                              // its level's output, into its inserts
-                this.insert = new soundInsert(ctx, this.bus, master);
+                this.insert = new soundInsert(ctx, this.bus, master, clock);
                 this.gain_wet = soundKit.gain(ctx, level, this.bus);
                 this.gain_dry = soundKit.gain(ctx, level, this.bus);
                 this.send = soundKit.gain(ctx, level * send, reverb.input);
@@ -6322,8 +6349,8 @@
 
         /** A track's inserts: effects in a row between `input` and `output` (INSERT PACKET). */
         class soundInsert {
-            constructor(ctx, input, output) {
-                this.ctx = ctx; this.input = input; this.output = output;
+            constructor(ctx, input, output, clock = { bpm: 120 }) {
+                this.ctx = ctx; this.input = input; this.output = output; this.clock = clock;
                 this.effects = []; this.shape = '';
                 input.connect(output);
             }
@@ -6366,6 +6393,59 @@
                 if (kind === 'gain') {
                     const g = ctx.createGain();
                     return { in: g, out: g, op, tune: (o, glide) => at(g.gain, Math.pow(10, (o[1] || 0) / 20), glide) };
+                }
+                const T = (v) => soundSystem.seconds(v, this.clock.bpm), Hz = (v) => soundSystem.rate(v, this.clock.bpm);
+                // Wet effects: in → (dry) → out, and in → the effect → (wet) → out; mix 0..1 sets the balance
+                const wetDry = () => { const i = ctx.createGain(), o = ctx.createGain(), dry = ctx.createGain(), wet = ctx.createGain(); i.connect(dry); dry.connect(o); wet.connect(o); return { i, o, dry, wet }; };
+                const mixTo = (W, mix, glide) => { at(W.dry.gain, Math.cos(mix * Math.PI / 2), glide); at(W.wet.gain, Math.sin(mix * Math.PI / 2), glide); };   // equal power
+                const lfo = (type = 'sine') => { const o = ctx.createOscillator(), g = ctx.createGain(); o.type = type; o.connect(g); o.start(); return { o, g }; };
+                if (kind === 'delay') {
+                    // [delay, time, feedback, mix, damp, pingpong]: echoes `time` apart (a note value follows the tempo),
+                    // each darker by `damp` Hz; pingpong bounces them left and right
+                    const W = wetDry(), dL = ctx.createDelay(8), dR = ctx.createDelay(8), lp = ctx.createBiquadFilter(), fbL = ctx.createGain(), fbR = ctx.createGain(), merge = ctx.createChannelMerger(2), mono = ctx.createGain();
+                    lp.type = 'lowpass'; mono.channelCount = 1; mono.channelCountMode = 'explicit';
+                    W.i.connect(mono); mono.connect(dL);
+                    dL.connect(fbL); fbL.connect(dR); dR.connect(fbR); fbR.connect(lp); lp.connect(dL);   // L → R → (darker) → L ...
+                    dL.connect(merge, 0, 0); dR.connect(merge, 0, 1); merge.connect(W.wet);
+                    return { in: W.i, out: W.o, op, tune: (o, glide) => {
+                        const [, time = '1/4', feedback = 0.35, mix = 0.3, damp = 6000, pingpong = false] = o, t = Math.min(4, T(time));
+                        at(lp.frequency, damp, glide); mixTo(W, mix, glide);
+                        // (a feedback loop in Web Audio runs one render block (128 samples) late: the times give it back)
+                        const q = 128 / ctx.sampleRate;
+                        if (pingpong) { at(dL.delayTime, Math.max(q, t - q / 2), glide); at(dR.delayTime, Math.max(q, t - q / 2), glide); at(fbL.gain, Math.sqrt(Math.min(0.95, feedback)), glide); at(fbR.gain, Math.sqrt(Math.min(0.95, feedback)), glide); }
+                        else {                                                     // straight: R holds one render block (a loop can't be shorter), L the rest
+                            at(dL.delayTime, Math.max(q, t - 2 * q), glide); at(dR.delayTime, q, glide); at(fbL.gain, 1, glide); at(fbR.gain, Math.min(0.95, feedback), glide);
+                        }
+                    } };
+                }
+                if (kind === 'chorus') {
+                    // [chorus, rate, depth, mix]: two short delays swept in opposite directions (depth in ms)
+                    const W = wetDry(), merge = ctx.createChannelMerger(2), a = ctx.createDelay(0.1), b = ctx.createDelay(0.1), L = lfo(), inv = ctx.createGain();
+                    W.i.connect(a); W.i.connect(b); a.connect(merge, 0, 0); b.connect(merge, 0, 1); merge.connect(W.wet);
+                    L.g.connect(a.delayTime); L.g.connect(inv); inv.gain.value = -1; inv.connect(b.delayTime);
+                    a.delayTime.value = 0.018; b.delayTime.value = 0.018;
+                    return { in: W.i, out: W.o, op, tune: (o, glide) => { const [, rate = 0.8, depth = 4, mix = 0.5] = o; at(L.o.frequency, Hz(rate), glide); at(L.g.gain, depth / 1000, glide); mixTo(W, mix, glide); } };
+                }
+                if (kind === 'phaser') {
+                    // [phaser, rate, depth, freq, feedback, mix]: four allpass stages swept around `freq` Hz by ±depth (0..1)
+                    const W = wetDry(), stages = [0, 1, 2, 3].map(() => { const f = ctx.createBiquadFilter(); f.type = 'allpass'; f.Q.value = 0.6; return f; }), L = lfo(), fb = ctx.createGain();
+                    let n = W.i; for (const s of stages) { n.connect(s); n = s; L.g.connect(s.frequency); }
+                    n.connect(W.wet); n.connect(fb); fb.connect(stages[0]);
+                    return { in: W.i, out: W.o, op, tune: (o, glide) => {
+                        const [, rate = '1/2', depth = 0.7, freq = 900, feedback = 0.4, mix = 0.5] = o;
+                        at(L.o.frequency, Hz(rate), glide); at(L.g.gain, freq * depth, glide); at(fb.gain, Math.min(0.9, feedback), glide);
+                        for (const s of stages) at(s.frequency, freq, glide); mixTo(W, mix, glide);
+                    } };
+                }
+                if (kind === 'tremolo') {
+                    // [tremolo, rate, depth, shape]: the level pulses (shape 'sine' | 'square' | 'triangle')
+                    const g = ctx.createGain(), L = lfo(op[3] || 'sine'); L.g.connect(g.gain);
+                    return { in: g, out: g, op, tune: (o, glide) => { const [, rate = '1/8', depth = 0.5] = o; at(L.o.frequency, Hz(rate), glide); at(g.gain, 1 - depth / 2, glide); at(L.g.gain, depth / 2, glide); } };
+                }
+                if (kind === 'autopan') {
+                    // [autopan, rate, depth]: it swings left and right
+                    const p = ctx.createStereoPanner(), L = lfo(); L.g.connect(p.pan);
+                    return { in: p, out: p, op, tune: (o, glide) => { const [, rate = '1/2', depth = 0.7] = o; at(L.o.frequency, Hz(rate), glide); at(L.g.gain, Math.min(1, depth), glide); } };
                 }
                 const f = ctx.createBiquadFilter(); f.type = kind;               // the filter shapes
                 return { in: f, out: f, op, tune: (o, glide) => {
@@ -12803,7 +12883,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         captionSystem.init();
 
     </script>
-    <script type="text/dfab" data-src="directory/game-sound.js" data-cost="488">
+    <script type="text/dfab" data-src="directory/game-sound.js" data-cost="490">
         /* =====================================================================
            AUDIO SYSTEM
            ---------------------------------------------------------------------
@@ -13154,6 +13234,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     if (k > areaK) { spec = sp; areaK = k; }
                 }
                 this._activeSpec = spec;
+                if (spec && spec.bpm) this.audio.system.setTempo(spec.bpm);   // synced effects keep time with the track (the club: 140)
                 const M = this._mus || (this._mus = (() => {
                     const f = ctx.createBiquadFilter(), g = ctx.createGain();
                     f.type = 'lowpass'; f.frequency.value = 18000; f.Q.value = 0.5; g.gain.value = 0;
