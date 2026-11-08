@@ -9,21 +9,7 @@
         // away, and walking slowly halves it all. Settings → Footsteps.
 
         // Floors per map (the painted interiors have no zone data): rects [x, y, w, h, material], first match wins, then the default
-        const FLOOR_MATERIALS = {
-            house_of_death: { def: 'wood', rects: [
-                [840, 1014, 120, 486, 'carpet'], [840, 130, 120, 300, 'carpet'], [1250, 1064, 480, 50, 'carpet'], [1686, 1064, 50, 412, 'carpet'],
-                [574, 1014, 652, 486, 'marble'], [574, 444, 652, 556, 'marble'], [1574, 14, 212, 416, 'marble'],
-                [574, 14, 652, 416, 'stone'], [14, 1014, 546, 472, 'concrete'], [1240, 14, 320, 416, 'carpet'],
-                [1240, 444, 546, 556, 'stone'], [1240, 1178, 382, 308, 'stone']] },
-            hotel_lobby: { def: 'marble', rects: [[440, 612, 120, 538, 'carpet']] },
-            moon_city_nightclub: { def: 'wood', rects: [[590, 310, 420, 380, 'marble']] },
-            van_interior: { def: 'metal' },
-            ethereal_plane: { def: 'marble' },
-            church_boss: { def: 'stone' },
-            keepers_hill: { def: 'grass' },
-            demoness_palace: { def: 'stone', rects: [[840, 760, 120, 226, 'carpet'], [840, 1000, 120, 386, 'carpet'], [14, 1000, 572, 386, 'carpet'],
-                               [600, 380, 600, 606, 'marble'], [600, 1000, 600, 386, 'marble'], [14, 14, 872, 352, 'grass']] }
-        };
+        const FLOOR_MATERIALS = GAME_DB.audio.floors;   // directory/game-db/audio.json
 
         engineMixin({
             /** What's underfoot at (x, y): marble | wood | carpet | stone | concrete | asphalt | grass | metal | water */

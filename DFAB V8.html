@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'fcac15545c67';
+        const DFAB_BUILD = 'e48cf749c139';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -10532,6 +10532,9 @@
     <script type="text/dfab" data-src="directory/game-db/progression.json" data-cost="51">
         GAME_DB.progression = {"_about":{"chapter":"Progression: Resonance (949's levels), the three tuning trees, castable abilities, and the perks closeness unlocks.","how_to_edit":"Plain JSON, inlined by tools/build.mjs as GAME_DB.progression and checked by tools/test-game-db.cjs. Node ids, tree ids and ability ids are in save files: never rename one. A \"note\" is for people only.","tables":{"resonance":"Level rules (read as RESONANCE, core/resonance.js). CAP: top level. level_cost: Resonance from level L to the next = base + per_level x L. DEATH_LOSS: share of unsettled Resonance lost on death. RESPEC_COST and POST_CAP_XP_PER_PP: in PP. BASE: Resonance per kill by enemy class; USUAL_HP: the HP that base assumes (tougher pays up to 3x). FLIT_KILL, PUNCH, UNTOUCHED, POISE: style multipliers; CHAIN_STEP per chained kill up to CHAIN_MAX; FLIT_WINDOW, CHAIN_WINDOW, UNTOUCHED_SECS in seconds; TEAMMATE_SHARE: share for a crew kill; POISE_LEVEL: drink level for POISE.","trees":"The three trees of six nodes (read as RESONANCE_TREES). Each node has up to 3 ranks; a node opens once the one above it has a rank; unlockLevel gates it by level. per_rank: the node's numbers, multiplied by its rank (shares are 0.10 = 10%, times in seconds unless the name says frames). The text the tuning screen shows is built from these in core/resonance.js (RESONANCE_NODE_TEXT). last_stand.cooldown_secs is indexed by rank; double_step halves a flit's cost (half_cost) within half_cost_window s of the last one from rank half_cost_rank; grounded.slip_secs is added to SPILL.SLIP_SECS (engine/spills.js).","abilities":"Castable abilities (read as ABILITY_REGISTRY, ui/inventory-augments.js). stats.fireRate: frames between casts; projectileSpeed px per frame; projectileLife frames; range px; spread radians.","talk_perks":"What closeness with a person unlocks, by name and closeness tier (read as TALK_PERKS, story/talks.js)."}},"resonance":{"CAP":50,"level_cost":{"base":120,"per_level":70},"DEATH_LOSS":0.5,"RESPEC_COST":200,"POST_CAP_XP_PER_PP":100,"BASE":{"Ganger":20,"Drone":30,"GatlingGunner":80},"USUAL_HP":{"Ganger":40,"Drone":60,"GatlingGunner":200},"FLIT_KILL":1.5,"PUNCH":1.4,"CHAIN_STEP":0.25,"CHAIN_MAX":2,"UNTOUCHED":1.3,"FLIT_WINDOW":1,"CHAIN_WINDOW":2.5,"UNTOUCHED_SECS":20,"TEAMMATE_SHARE":0.3,"POISE":1.25,"POISE_LEVEL":0.75},"trees":[{"id":"flit","name":"Flit","color":"#b89cff","blurb":"Tune the jump between dimensions.","nodes":[{"id":"reach","name":"Reach","per_rank":{"distance":0.1}},{"id":"quick_return","name":"Quick Return","per_rank":{"cost":0.1}},{"id":"flit_strike","name":"Flit-Strike","per_rank":{"window":1,"damage":0.2}},{"id":"afterimage","name":"Afterimage","per_rank":{"secs":0.5}},{"id":"double_step","name":"Double Step","per_rank":{"attunement":20,"half_cost_rank":3,"half_cost_window":0.6,"half_cost":0.5}},{"id":"long_echo","name":"Long Echo","unlockLevel":30,"per_rank":{"window":0.25}}]},{"id":"frame","name":"Frame","color":"#c4566e","blurb":"What Dr. Yin builds into you.","nodes":[{"id":"reinforced","name":"Reinforced","per_rank":{"health":10}},{"id":"plating","name":"Plating","per_rank":{"damage_taken":0.06}},{"id":"stim_potency","name":"Stim Potency","per_rank":{"heal":15}},{"id":"idle_mend","name":"Idle Mend","per_rank":{"delay_frames":120,"min_delay_frames":60,"hp_per_sec":1}},{"id":"last_stand","name":"Last Stand","per_rank":{"cooldown_secs":[0,120,90,60]}},{"id":"grounded","name":"Grounded","unlockLevel":30,"per_rank":{"knockback":0.15,"slip_secs":0.2}}]},{"id":"arms","name":"Arms","color":"#e8c27a","blurb":"Steadier hands, heavier hits.","nodes":[{"id":"steady","name":"Steady","per_rank":{"spread":0.12,"spill":0.15}},{"id":"quick_hands","name":"Quick Hands","per_rank":{"cooldown":0.08}},{"id":"hollow_points","name":"Hollow Points","per_rank":{"damage":0.08}},{"id":"heavy_hands","name":"Heavy Hands","per_rank":{"damage":0.25}},{"id":"quick_draw","name":"Quick-Draw","per_rank":{"damage":0.25,"window":0.8}},{"id":"low_signature","name":"Low Signature","unlockLevel":30,"per_rank":{"noise":0.1}}]}],"abilities":{"fireball":{"name":"Fireball","desc":"Red-hot projectile cast from the palm.","stats":{"fireRate":70,"damage":50,"projectileColor":"#ff3300","projectileSpeed":18,"spread":0.15,"flashRadius":60,"flashColor":"#ff6600","projectileLife":50,"range":400},"note":"damage 50 one-shots a ganger (40 HP) without trivialising the gauntlet's gunners."},"shadow_bolt":{"name":"Shadow Bolt","desc":"A fast-moving bolt of dark energy.","stats":{"fireRate":50,"damage":20,"projectileColor":"#8a2be2","projectileSpeed":24,"spread":0.1,"flashRadius":40,"flashColor":"#9966ff","projectileLife":60,"range":500}},"ember_burst":{"name":"Ember Burst","desc":"A rapid volley of small fire projectiles.","stats":{"fireRate":25,"damage":12,"projectileColor":"#ff6600","projectileSpeed":22,"spread":0.25,"flashRadius":35,"flashColor":"#ffaa00","projectileLife":40,"range":350}}},"talk_perks":{"Anavia":{"1":"HER SALVAGE JOBS PAY 20% MORE"},"Barista Ren":{"1":"AMBER DELIVERIES PAY 10% MORE"},"Bartender":{"1":"BOUNTIES PAY 10% MORE"},"Dr. Yin":{"1":"A FREE STIM WHEN YOU STOP BY (ONCE A DAY)"}}};
     </script>
+    <script type="text/dfab" data-src="directory/game-db/audio.json" data-cost="54">
+        GAME_DB.audio = {"_about":{"chapter":"Audio: which music plays where, how each place echoes, the sound effects' lengths and voice caps, each car brand's motor, and the floors footsteps hear.","how_to_edit":"Plain JSON, inlined by tools/build.mjs as GAME_DB.audio and checked by tools/test-game-db.cjs. Map ids are the ids in world/maps.js. A \"note\" is for people only.","tables":{"buffers":"Settings > Audio Buffer: each choice and the AudioContext latencyHint it opens with (read as AUDIO_BUFFERS, directory/game-sound.js).","sfx_length":"How long each sfx() recipe rings, in seconds (SFX_DUR).","sfx_voices":"How many of each sound may ring at once; a sound not listed gets 6 (SFX_CAP).","engine_hum":"Each car brand's electric motor (ENGINE_HUM): root pitch in Hz; body, shimmer and whine are the voices' weights; level is its volume. Brands are VEHICLE_BRANDS.","reverb":"The rooms as reverb (REVERB), each [decay s, predelay ms, damping Hz, wet], and for valley also [echo delay s, echo feedback, echo level]: street (a short slap off the buildings), open (a hillside), room (a furnished room), bathroom (tile and marble), hall (a lobby, a club floor), stone (a church, a palace), cabin (the van), void (the ethereal plane), valley (open ground under cliffs).","map_reverb":"Each map's room, by map id (MAP_REVERB). Indoor maps not listed are room, outdoor ones street.","room_reverb":"Rooms inside a map whose echo differs, by room kind (ROOM_REVERB).","map_music":"A soundtrack per map (MAP_MUSIC): track is a file in assets/audio without its extension; room is where its speakers are (fullest there); volume its level; bpm and beat0 give a tempo the lights can follow. A list holds area tracks (the nearest wins): area names a place (hub_graveyard) or building names a building footprint; fade is px; lowpass Hz muffles it.","club_bpm":"Moon City's tempo when no track is playing (CLUB_BPM).","floors":"Floors per painted map for footsteps (FLOOR_MATERIALS, engine/footsteps.js): def is the floor everywhere else; rects are [x, y, w, h, material], first match wins. Materials: marble, wood, carpet, stone, concrete, asphalt, grass, metal, water."}},"buffers":{"low":"interactive","balanced":"balanced","smooth":"playback"},"sfx_length":{"shoot":0.16,"explode":0.31,"thunder":2.8,"knock":0.14,"bump":0.32,"crunch":0.3,"ui":0.06,"flit":0.21,"crit":0.14},"sfx_voices":{"shoot":4,"explode":3,"thunder":2,"ui":3,"crunch":3,"crit":3},"engine_hum":{"LADY":{"root":44,"body":1.15,"shimmer":0.8,"whine":0.8,"level":0.11},"Zenxera":{"root":55,"body":1,"shimmer":1.2,"whine":1,"level":0.1},"Gelfash":{"root":62,"body":0.85,"shimmer":0.9,"whine":0.5,"level":0.09}},"reverb":{"street":[1,24,4200,0.1],"open":[0.6,12,3500,0.05],"room":[0.5,6,6000,0.14],"bathroom":[1.1,4,9000,0.26],"hall":[2,22,5200,0.22],"stone":[3.2,32,4000,0.3],"cabin":[0.25,2,2800,0.1],"void":[5.5,60,2600,0.38],"valley":[1.2,40,3500,0.1,0.45,0.4,0.32]},"map_reverb":{"hotel_lobby":"hall","moon_city_nightclub":"hall","enni_cole_interior":"hall","biggs_arena":"hall","auto_shop":"hall","church_boss":"stone","demoness_palace":"stone","house_of_death":"stone","van_interior":"cabin","keepers_hill":"open","ethereal_plane":"void"},"room_reverb":{"bathroom":"bathroom"},"map_music":{"apt_949":{"track":"silver queen tst","room":"main_room","volume":0.5,"note":"The Silver Queen suite."},"moon_city_nightclub":{"track":"moon city nightclub - swig","room":"hall","volume":0.55,"bpm":140,"beat0":0,"note":"Swig, the club's cut: a 24-bar loop at 140 BPM, the kick on the first sample; the club's lights dance to it."},"keepers_hill":{"track":"the visitor","volume":0.5,"note":"The Visitor: the Keeper's fireside. The same track on the hill and in the parlor, so it plays on across the cut."},"keepers_parlor":{"track":"the visitor","volume":0.5},"church_boss":{"track":"triumvirate boss fight","volume":0.55,"note":"The Sanctum: the Triumvirate."},"van_interior":{"track":"van 2","volume":0.45,"note":"The van on the way to the job (the intro), over the rain on the roof and the road."},"sdc":[{"track":"grave stories (1)","volume":0.5,"area":"hub_graveyard","fade":600,"note":"Grave Stories: the southern graveyard in Southern Dimensions City (its walls, engine/map-loading.js)."},{"track":"moon city nightclub - swig","building":"moon_city","volume":0.32,"fade":420,"lowpass":260,"bpm":140,"beat0":0,"note":"Moon City's bass through its walls: heard as you come up to the club, low-passed to the thump; its lights keep time."}]},"club_bpm":140,"floors":{"house_of_death":{"def":"wood","rects":[[840,1014,120,486,"carpet"],[840,130,120,300,"carpet"],[1250,1064,480,50,"carpet"],[1686,1064,50,412,"carpet"],[574,1014,652,486,"marble"],[574,444,652,556,"marble"],[1574,14,212,416,"marble"],[574,14,652,416,"stone"],[14,1014,546,472,"concrete"],[1240,14,320,416,"carpet"],[1240,444,546,556,"stone"],[1240,1178,382,308,"stone"]]},"hotel_lobby":{"def":"marble","rects":[[440,612,120,538,"carpet"]]},"moon_city_nightclub":{"def":"wood","rects":[[590,310,420,380,"marble"]]},"van_interior":{"def":"metal"},"ethereal_plane":{"def":"marble"},"church_boss":{"def":"stone"},"keepers_hill":{"def":"grass"},"demoness_palace":{"def":"stone","rects":[[840,760,120,226,"carpet"],[840,1000,120,386,"carpet"],[14,1000,572,386,"carpet"],[600,380,600,606,"marble"],[600,1000,600,386,"marble"],[14,14,872,352,"grass"]]}}};
+    </script>
     <script type="text/dfab" data-src="assets#0" data-cost="1">
         const ASSETS = { images: {}, audio: {} };
     </script>
@@ -14682,7 +14685,7 @@
         captionSystem.init();
 
     </script>
-    <script type="text/dfab" data-src="directory/game-sound.js" data-cost="490">
+    <script type="text/dfab" data-src="directory/game-sound.js" data-cost="466">
         /* =====================================================================
            AUDIO SYSTEM
            ---------------------------------------------------------------------
@@ -14707,10 +14710,10 @@
            - engine(s) : The driven car's electric hum (ENGINE_HUM per brand)
            ===================================================================== */
         /** The Audio Buffer setting → the context's latencyHint (read once, at launch) */
-        const AUDIO_BUFFERS = { low: 'interactive', balanced: 'balanced', smooth: 'playback' };
+        const AUDIO_BUFFERS = GAME_DB.audio.buffers;   // directory/game-db/audio.json
         /** sfx(): the recipes there are, how long each one rings (s) and how many may ring at once (default 6) */
-        const SFX_DUR = { shoot: 0.16, explode: 0.31, thunder: 2.8, knock: 0.14, bump: 0.32, crunch: 0.3, ui: 0.06, flit: 0.21, crit: 0.14 };
-        const SFX_CAP = { shoot: 4, explode: 3, thunder: 2, ui: 3, crunch: 3, crit: 3 };
+        const SFX_DUR = GAME_DB.audio.sfx_length;
+        const SFX_CAP = GAME_DB.audio.sfx_voices;
 
         class AudioSystem {
             constructor() {
@@ -14887,11 +14890,7 @@
             }
         }
         /** Each brand's motor (AudioSystem.engine): root pitch in Hz and how the voices sit. */
-        const ENGINE_HUM = {
-            LADY:    { root: 44, body: 1.15, shimmer: 0.8, whine: 0.8, level: 0.11 },   // darkest, most body
-            Zenxera: { root: 55, body: 1.0,  shimmer: 1.2, whine: 1.0, level: 0.1 },    // brighter, more shimmer
-            Gelfash: { root: 62, body: 0.85, shimmer: 0.9, whine: 0.5, level: 0.09 }    // thinner, little whine
-        };
+        const ENGINE_HUM = GAME_DB.audio.engine_hum;   // directory/game-db/audio.json
 
         // Global audio system instance
         const audioSys = new AudioSystem();
@@ -15270,44 +15269,19 @@
            keeps it to one part of the map, fading in over `fade` px as you come up to it. */
         /** The game's rooms as reverb (ROOM PACKET [decay s, predelay ms, damp Hz, wet], basement/sound-system.js).
          *  The sound system makes each tail on the spot and fades between them as she goes. */
-        const REVERB = {
-            street:   [1.0, 24, 4200, 0.10],   // out in the city: a short slap off the buildings
-            open:     [0.6, 12, 3500, 0.05],   // a hillside: almost nothing comes back
-            room:     [0.5,  6, 6000, 0.14],   // a furnished room
-            bathroom: [1.1,  4, 9000, 0.26],   // tile and marble: bright and close
-            hall:     [2.0, 22, 5200, 0.22],   // a lobby, a club's floor
-            stone:    [3.2, 32, 4000, 0.30],   // a church, a palace: long and dark
-            cabin:    [0.25, 2, 2800, 0.10],   // the van: boxed in
-            void:     [5.5, 60, 2600, 0.38],   // the ethereal plane
-            valley:   [1.2, 40, 3500, 0.10, 0.45, 0.4, 0.32]   // open ground under cliffs: echoes coming back off the far side
-        };
+        const REVERB = GAME_DB.audio.reverb;   // directory/game-db/audio.json
         /** Each map's room (indoor maps default to `room`, outdoor ones to `street`) and rooms that differ inside them. */
-        const MAP_REVERB = {
-            hotel_lobby: 'hall', moon_city_nightclub: 'hall', enni_cole_interior: 'hall', biggs_arena: 'hall', auto_shop: 'hall',
-            church_boss: 'stone', demoness_palace: 'stone', house_of_death: 'stone',
-            van_interior: 'cabin', keepers_hill: 'open', ethereal_plane: 'void'
-        };
-        const ROOM_REVERB = { bathroom: 'bathroom' };
+        const MAP_REVERB = GAME_DB.audio.map_reverb;
+        const ROOM_REVERB = GAME_DB.audio.room_reverb;
 
-        const MAP_MUSIC = {
-            apt_949: { track: 'silver queen tst', room: 'main_room', volume: 0.5 },   // the Silver Queen suite
-            // Swig (the club's cut): a 24-bar loop at 140 BPM, the kick on the first sample; the club's lights dance to it
-            moon_city_nightclub: { track: 'moon city nightclub - swig', room: 'hall', volume: 0.55, bpm: 140, beat0: 0 },
-            // The Visitor: the Keeper's fireside — the same track on the hill and in the parlor, so it plays on across the cut
-            keepers_hill: { track: 'the visitor', volume: 0.5 },
-            keepers_parlor: { track: 'the visitor', volume: 0.5 },
-            // The Sanctum: the Triumvirate
-            church_boss: { track: 'triumvirate boss fight', volume: 0.55 },
-            // The van, on the way to the job (the intro): over the rain on the roof and the road
-            van_interior: { track: 'van 2', volume: 0.45 },
-            // Grave Stories: the southern graveyard in Southern Dimensions City (its walls, engine/map-loading.js 11d)
-            sdc: [
-                { track: 'grave stories (1)', volume: 0.5, area: HUB_GRAVEYARD, fade: 600 },
-                // Moon City's bass through its walls: heard as you come up to the club, low-passed to the thump; its lights keep time
-                { track: 'moon city nightclub - swig', building: 'moon_city', volume: 0.32, fade: 420, lowpass: 260, bpm: 140, beat0: 0 }
-            ],
-        };
-        const CLUB_BPM = 140;
+        /** Places a MAP_MUSIC area can name (an area track's `area`, in the data, is one of these). */
+        const MUSIC_AREAS = { hub_graveyard: HUB_GRAVEYARD };
+        const MAP_MUSIC = GAME_DB.audio.map_music;   // directory/game-db/audio.json
+        for (const e of Object.values(MAP_MUSIC)) for (const spec of [].concat(e)) if (typeof spec.area === 'string') {
+            if (!MUSIC_AREAS[spec.area]) throw new Error(`MAP_MUSIC: no area '${spec.area}' (MUSIC_AREAS)`);
+            spec.area = MUSIC_AREAS[spec.area];
+        }
+        const CLUB_BPM = GAME_DB.audio.club_bpm;
         const CLUB_PAL = ['176, 120, 255', '220, 190, 255', '255, 90, 150', '232, 194, 122'];   // the club's lights: violet, lavender, rose, gold
 
         /** The current map's beat count, if its track has a tempo (MAP_MUSIC bpm): from the music while
@@ -79054,7 +79028,7 @@ engineMixin({
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/footsteps.js" data-cost="82">
+    <script type="text/dfab" data-src="engine/footsteps.js" data-cost="71">
         // GameEngine — Footsteps. Methods are added to GameEngine.prototype (see engineMixin in
         // game-engine.js).
         //
@@ -79066,21 +79040,7 @@ engineMixin({
         // away, and walking slowly halves it all. Settings → Footsteps.
 
         // Floors per map (the painted interiors have no zone data): rects [x, y, w, h, material], first match wins, then the default
-        const FLOOR_MATERIALS = {
-            house_of_death: { def: 'wood', rects: [
-                [840, 1014, 120, 486, 'carpet'], [840, 130, 120, 300, 'carpet'], [1250, 1064, 480, 50, 'carpet'], [1686, 1064, 50, 412, 'carpet'],
-                [574, 1014, 652, 486, 'marble'], [574, 444, 652, 556, 'marble'], [1574, 14, 212, 416, 'marble'],
-                [574, 14, 652, 416, 'stone'], [14, 1014, 546, 472, 'concrete'], [1240, 14, 320, 416, 'carpet'],
-                [1240, 444, 546, 556, 'stone'], [1240, 1178, 382, 308, 'stone']] },
-            hotel_lobby: { def: 'marble', rects: [[440, 612, 120, 538, 'carpet']] },
-            moon_city_nightclub: { def: 'wood', rects: [[590, 310, 420, 380, 'marble']] },
-            van_interior: { def: 'metal' },
-            ethereal_plane: { def: 'marble' },
-            church_boss: { def: 'stone' },
-            keepers_hill: { def: 'grass' },
-            demoness_palace: { def: 'stone', rects: [[840, 760, 120, 226, 'carpet'], [840, 1000, 120, 386, 'carpet'], [14, 1000, 572, 386, 'carpet'],
-                               [600, 380, 600, 606, 'marble'], [600, 1000, 600, 386, 'marble'], [14, 14, 872, 352, 'grass']] }
-        };
+        const FLOOR_MATERIALS = GAME_DB.audio.floors;   // directory/game-db/audio.json
 
         engineMixin({
             /** What's underfoot at (x, y): marble | wood | carpet | stone | concrete | asphalt | grass | metal | water */

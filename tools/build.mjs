@@ -67,6 +67,7 @@ const SCRIPTS = [
     'directory/game-db/items.json',   // GAME_DB.items: gear, augments, furniture, consumables, drinks, notes, schematics
     'directory/game-db/shops.json',   // GAME_DB.shops: the auto shop's prices and colours, the dyer's fee and palette
     'directory/game-db/progression.json',   // GAME_DB.progression: Resonance, the three trees, abilities, talk perks
+    'directory/game-db/audio.json',   // GAME_DB.audio: music per map, reverb rooms, sound lengths and caps, motors, footstep floors
     '@assets',              // generated from the assets/ folder
     'core/assets.js',
     'core/registries.js',
