@@ -290,9 +290,8 @@ test('Dialogue: every line has a speaker and words, the crew is the same six eve
  const castIds=new Set(Object.values(load('story.json').crew.ids).concat(['949']));
  const line=(l,where)=>{ assert.ok(Array.isArray(l)&&l.length===2&&typeof l[0]==='string'&&typeof l[1]==='string'&&l[1].length>0,`${where}: a line is [speaker, text]`);
   assert.ok(castIds.has(l[0]),`${where}: '${l[0]}' is no cast id`); };
- for(const k of ['openers','closers','toast_taste','yes','no','stood_up','ask_back','intel','stim','solo','moments'])
+ for(const k of ['openers','closers','toast_taste','yes','no','stood_up','ask_back','intel','stim','solo','moments','solo_ask'])
   assert.deepEqual(Object.keys(C[k]).sort(),crew,`crew.${k}: not one entry for each of the crew`);
- for(const who of Object.keys(C.solo_ask)) assert.ok(crew.includes(who),`crew.solo_ask: '${who}' is not one of the crew`);   // (who has none never asks again)
  for(const k of Object.keys(C.job_talk)) assert.deepEqual(Object.keys(C.job_talk[k]).sort(),crew,`crew.job_talk.${k}: not one line for each of the crew`);
  for(const [who,t] of Object.entries(C.toast_taste)) assert.ok(C.toasts[t]!==undefined,`crew.toast_taste.${who}: no toast ${t}`);
  for(const [who,s] of Object.entries(C.solo)){
