@@ -196,7 +196,9 @@
                 const len = Math.max(1, Math.floor(sr * Math.min(6, decay * 1.1))), buf = ctx.createBuffer(2, len, sr);
                 const k60 = Math.log(1000) / (decay * sr);                   // per-sample fall to -60 dB at `decay`
                 let seed = 0x2f6b ^ len;
-                const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296) * 2 - 1;
+                // mulberry32: 32-bit integer maths throughout. (A plain LCG multiplied in doubles loses its low
+                // bits and repeats every few hundred samples: a ~100 Hz buzz in every tail.)
+                const rnd = () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 2147483648 - 1; };
                 const fall = Math.exp(-k60), fade_in = Math.floor(sr * 0.004);
                 for (let c = 0; c < 2; c++) {
                     const d = buf.getChannelData(c); let lp = 0, env = 1;
