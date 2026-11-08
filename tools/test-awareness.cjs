@@ -31,6 +31,10 @@ const r = structuredClone(e.run(`(() => {
   ganger.bumped = sense(975, 1000, true); ganger.turned = Math.abs(normalizeAngle(g.angle - Math.PI)) < 0.6;   // round toward her (then he looks about, searching)
   ganger.sawHerNext = (g.update(P, walls, [], [], [], null, [g]), g.suspicion);
   ganger.heard = g.awareness.heard && [g.awareness.heard[AWARE.KIND], g.awareness.heard[AWARE.HEARD] > 0];
+  // the debug view draws it: rings, the cone, a line to her, the sound heard
+  const calls = {}; const ctx = new Proxy({}, { get: (t, k) => k in t ? t[k] : (...a) => { calls[k] = (calls[k] || 0) + 1; }, set: (t, k, v) => (t[k] = v, true) });
+  g.awareness.drawDebug(ctx, { now: _gameTimeSec, label: () => { calls.label = (calls.label || 0) + 1; } });
+  ganger.drawn = [calls.arc >= 3, calls.lineTo >= 2, calls.label >= 1];
   return { kit, ganger };
 })()`));
 const { kit, ganger } = r;
@@ -50,6 +54,7 @@ assert.equal(ganger.nearlyBumped, 0, 'sneaking up close behind him in the dark, 
 assert.ok(ganger.bumped >= 70 && ganger.turned, 'bumping into him: he startles round to face her: ' + JSON.stringify(ganger));
 assert.ok(ganger.sawHerNext > ganger.bumped, 'and then he sees her, up close in front of him');
 assert.deepEqual(ganger.heard, ['sound', true], 'the matrix keeps what he heard');
+assert.deepEqual(ganger.drawn, [true, true, true], 'the debug view draws the matrix');
 // passers-by: a bump, gunfire, and a weapon only when it's in front of them
 const q = structuredClone(e.run(`(() => {
   game._doLoadMap('sdc', null); game.running = true; game.paused = false; game.enemies = []; for (let i = 0; i < 120 && !game.pedestrians.pedestrians.length; i++) game.update();

@@ -24,6 +24,7 @@
         //   analyzeSurroundings(things, kind)    observe each one within evaluation_radius; entries holds them
         //   forwards_point, backwards_point      [x, y] a personal space ahead of and behind them
         //   entries (Map id -> ENTRY), forget(id), clear()
+        //   drawDebug(ctx, { px, colour, now, fade, label })   the matrix drawn (the debug view)
         const AWARE = { ID: 0, KIND: 1, DIST: 2, BEARING: 3, SEEN: 4, HEARD: 5, CLOSE: 6, BEHIND: 7, TOUCHING: 8 };
 
         class awarenessMatrix {
@@ -76,6 +77,32 @@
             hear(x, y, strength = 1, kind = 'sound') {
                 const e = this.observe({ id: 'sound', x, y }, 'sound'); e[5] = strength; e.kind_of = kind; e.at_time = typeof _gameTimeSec !== 'undefined' ? _gameTimeSec : 0;
                 return this.heard = e;
+            }
+            /** The debug view (ui/dev-overlay.js 'Awareness'): personal space (dashed), the touch ring, the cone out to the
+             *  evaluation radius (or `range`), a line to everything noticed (solid: seen; dashed: noticed, not seen), and the last sound
+             *  heard (dotted, fading over `fade` s, its strength). `px` is one screen pixel in world units. */
+            drawDebug(ctx, { px = 1, colour = '#9fe0ff', now = 0, fade = 3, label = null, range = null } = {}) {
+                const o = this.owner, a = this.face, r = range ?? this.radius, s = this.space, cone = this.cone, t = this._val(this.touch);
+                ctx.save(); ctx.strokeStyle = colour; ctx.fillStyle = colour; ctx.lineWidth = px;
+                ctx.globalAlpha = 0.5; ctx.setLineDash([4 * px, 4 * px]); ctx.beginPath(); ctx.arc(o.x, o.y, s, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+                if (t > 0) { ctx.globalAlpha = 0.8; ctx.beginPath(); ctx.arc(o.x, o.y, t, 0, Math.PI * 2); ctx.stroke(); }
+                ctx.globalAlpha = 0.25; ctx.beginPath();
+                if (cone < Math.PI * 2 - 1e-6) { ctx.moveTo(o.x, o.y); ctx.arc(o.x, o.y, r, a - cone / 2, a + cone / 2); ctx.closePath(); } else ctx.arc(o.x, o.y, r, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.globalAlpha = 0.9; ctx.beginPath(); ctx.arc(o.x + Math.cos(a) * s, o.y + Math.sin(a) * s, 2.5 * px, 0, Math.PI * 2); ctx.fill();   // forwards_point
+                for (const e of this.entries.values()) {
+                    if (e[1] === 'sound' || !e.at || e[2] > this.radius || (e[4] === null && !e[6])) continue;   // only what's in reach and looked at, or close
+                    ctx.globalAlpha = e[4] ? 0.95 : 0.45; ctx.setLineDash(e[4] ? [] : [6 * px, 4 * px]);
+                    ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(e.at[0], e.at[1]); ctx.stroke(); ctx.setLineDash([]);
+                    if (e[8]) { ctx.globalAlpha = 0.9; ctx.beginPath(); ctx.arc(e.at[0], e.at[1], 8 * px, 0, Math.PI * 2); ctx.stroke(); if (label) label('bump', e.at[0], e.at[1] - 12 * px, colour); }
+                }
+                const h = this.heard, age = h ? now - (h.at_time || 0) : Infinity;
+                if (h && age < fade) {
+                    ctx.globalAlpha = 0.9 * (1 - age / fade); ctx.setLineDash([2 * px, 3 * px]);
+                    ctx.beginPath(); ctx.moveTo(o.x, o.y); ctx.lineTo(h.at[0], h.at[1]); ctx.stroke(); ctx.setLineDash([]);
+                    if (label) label('heard ' + h[5].toFixed(2), (o.x + h.at[0]) / 2, (o.y + h.at[1]) / 2, colour);
+                }
+                ctx.restore();
             }
             forget(id) { this.entries.delete(id); }
             clear() { this.entries.clear(); this.heard = null; }
