@@ -310,7 +310,31 @@ test('Dialogue: every line has a speaker and words, the crew is the same six eve
   assert.ok(T[t],`bonding.dialogues.${who}: no tier ${t}`);
   pool.forEach((ex,i)=>ex.forEach((l,j)=>assert.ok(l.speaker&&l.text,`bonding.dialogues.${who}[${t}][${i}][${j}]: speaker and text`)));
  }
+ assert.deepEqual(Object.keys(d.talk_ids).sort(),Object.keys(d.talks).sort(),'talk_ids: one id for each person with talks');
+ const hookNames=[];
+ const beat=(b,at)=>{
+  if(b&&b.hook){hookNames.push(b.hook);return;}
+  if(Array.isArray(b)){ if(typeof b[0]==='string'){ assert.ok(b[0]==='@'||b[0]==='949',`${at}: speaker is @ or 949`); if(b[1]&&b[1].hook) hookNames.push(b[1].hook); else assert.ok(typeof b[1]==='string'&&b[1].length,`${at}: a line has words`); }
+   else b.forEach((x,i)=>beat(x,`${at}[${i}]`)); return; }
+  if(b.choose){ assert.ok(b.gain.length===b.choose.length&&b.then.length===b.choose.length,`${at}: choose, gain and then are the same length`);
+   if(b.vals) assert.equal(b.vals.length,b.choose.length,`${at}: one val for each choice`); b.then.forEach((x,i)=>beat(x,`${at}.then[${i}]`)); return; }
+  if(b.act){ assert.ok(b.act.hook,`${at}: act is a hook`); hookNames.push(b.act.hook); return; }
+  assert.fail(`${at}: not a line, a choice, an act or a hook`);
+ };
+ for(const [who,P] of Object.entries(d.talks)){
+  const ids=P.topics.map(t=>t.id); assert.equal(new Set(ids).size,ids.length,`talks.${who}: a topic id is used twice (saves keep them)`);
+  for(const k of ['hello','needs']) if(P[k]&&P[k].hook) hookNames.push(P[k].hook);
+  for(const t of P.topics){ const at=`talks.${who}.${t.id}`;
+   assert.ok(t.label&&t.tier>=0&&t.tier<=3,`${at}: label and a tier 0 to 3`);
+   for(const k of ['needs','text']) if(t[k]&&t[k].hook) hookNames.push(t[k].hook);
+   t.beats.forEach((b,i)=>beat(b,`${at}.beats[${i}]`)); }
+  (P.small||[]).forEach((tier,i)=>tier.forEach((ex,j)=>beat(ex,`talks.${who}.small[${i}][${j}]`)));
+ }
  const e=runtime(join(ROOT,'DFAB V8.html'),{affine:true});
+ const talk=JSON.parse(e.run(`JSON.stringify({hooks:Object.keys(TALK_HOOKS),left:JSON.stringify(TALKS).includes('"hook"'),
+  hello:typeof TALKS.Anavia.hello, ids:TALK_IDS===GAME_DB.dialogue.talk_ids, same:TALKS===GAME_DB.dialogue.talks})`));
+ assert.deepEqual([...new Set(hookNames)].sort(),talk.hooks.slice().sort(),'talks: the hooks the data names and TALK_HOOKS differ');
+ assert.deepEqual([talk.left,talk.hello,talk.ids,talk.same],[false,'function',true,true],'talks: hooks did not all resolve');
  const got=JSON.parse(e.run(`JSON.stringify({same:BONDING_DIALOGUES===GAME_DB.dialogue.bonding.dialogues&&BONDING_TIERS===GAME_DB.dialogue.bonding.tiers&&PROLOGUE_EPIGRAPH===GAME_DB.dialogue.prologue_epigraph
   &&[CREW_OPENERS,CREW_BOOTH,CREW_TOASTS,CREW_TOAST_TASTE,CREW_TOAST_LINES,CREW_JOB_TALK,CREW_CLOSERS,CREW_SOLO,CREW_MOMENTS,CREW_GROUP_INVITE,CREW_YES,CREW_NO,CREW_STOOD_UP,CREW_ASK_BACK,CREW_INTEL,CREW_STIM,CREW_SOLO_ASK]
      .every((t,i)=>t===Object.values(GAME_DB.dialogue.crew)[i])})`));

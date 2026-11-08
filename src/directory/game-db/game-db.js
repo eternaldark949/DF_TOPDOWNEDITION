@@ -17,3 +17,19 @@
             }
             return table;
         }
+
+        /** Put code into a tree of data: every { hook: '<name>' } anywhere in `tree` (an object holding only that key) becomes
+            hooks[name], a function. Throws on a name nothing provides. Returns the tree. (See TALK_HOOKS, story/talks.js.) */
+        function resolveDataHooks(tree, hooks, where = 'GAME_DB') {
+            const swap = (v, at) => {
+                if (!v || typeof v !== 'object') return v;
+                const keys = Object.keys(v);
+                if (keys.length === 1 && keys[0] === 'hook' && typeof v.hook === 'string') {
+                    if (typeof hooks[v.hook] !== 'function') throw new Error(`${at}: hook '${v.hook}', which nothing provides`);
+                    return hooks[v.hook];
+                }
+                for (const k of keys) v[k] = swap(v[k], `${at}.${k}`);
+                return v;
+            };
+            return swap(tree, where);
+        }
