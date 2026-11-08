@@ -242,4 +242,47 @@ test('Places: maps, rooms, doors, fireplaces and notes point at things that exis
  assert.deepEqual(e.errors,[]);
 });
 
+test('Story: steps are named once, point at real maps and checks, crew nights at real places, and step code attaches',()=>{
+ const st=load('story.json'), maps=new Set(Object.keys(load('places.json').maps));
+ const checker=fs.readFileSync(join(ROOT,'src','story','narrative-cutscenes.js'),'utf8');
+ const checks=new Set([...checker.slice(checker.indexOf('checkCondition(')).matchAll(/case "([A-Z_0-9]+)"/g)].map(m=>m[1]));
+ const known=c=>c===null||checks.has(c)||/^TIMER_\d+$/.test(c)||(c.startsWith('LOC_')&&maps.has(c.slice(4).toLowerCase()));
+ const steps=[];
+ for(const [pn,part] of Object.entries(st.parts)) for(const [cn,ch] of Object.entries(part.chapters)) for(const [mn,m] of Object.entries(ch.missions)){
+  steps.push(...Object.values(m.steps));
+  unique(m.optional||[],`parts.${pn}.chapters.${cn}.missions.${mn}.optional`);
+  for(const o of m.optional||[]){ assert.ok(known(o.trigger),`optional ${o.id}: trigger '${o.trigger}' is no check`); steps.push(...Object.values(o.steps)); }
+ }
+ const names=steps.map(s=>s.name); assert.equal(new Set(names).size,names.length,'a step name is used twice (the story moves by name)');
+ for(const s of steps){
+  if(s.targetMap!==null) assert.ok(maps.has(s.targetMap),`step ${s.name}: targetMap '${s.targetMap}' is no map`);
+  if('condition' in s) assert.ok(known(s.condition),`step ${s.name}: condition '${s.condition}' is no check (StoryManager.checkCondition)`);
+  else assert.ok(s.hooks,`step ${s.name}: no condition, and no hooks to give it one`);
+ }
+ const ids=new Set(Object.keys(st.crew.ids));
+ for(const [id,v] of Object.entries(st.crew.venues)){
+  assert.ok(maps.has(v.map),`crew venue ${id}: map '${v.map}' is no map`);
+  assert.ok(ids.has(v.host),`crew venue ${id}: host '${v.host}' is not in crew.ids`);
+  assert.ok(v.solo&&v.solo.me&&v.solo.them,`crew venue ${id}: solo needs me and them`);
+  for(const night of [v.group,v.solo].filter(Boolean)) for(const spot of [night.me,night.them,...(night.seats||[])].filter(Boolean))
+   assert.ok(typeof spot.deg==='number'&&!('a' in spot),`crew venue ${id}: a spot faces by deg (degrees), not a`);
+ }
+ for(const [who,venue] of Object.entries(st.crew.home_venue)){ assert.ok(ids.has(who),`home_venue: '${who}' is not in crew.ids`); assert.ok(st.crew.venues[venue],`home_venue.${who}: no venue '${venue}'`); }
+ const kinds=Object.values(st.mission_types); assert.equal(new Set(kinds).size,kinds.length,'mission_types: a value is used twice');
+ for(const who of Object.keys(st.van.poses)) assert.ok(st.van.drop[who],`van.drop: nowhere for ${who}`);
+ const e=runtime(join(ROOT,'DFAB V8.html'),{affine:true});
+ const got=JSON.parse(e.run(`JSON.stringify((()=>{const steps=[];for(const p of Object.values(STORY_DB))for(const c of Object.values(p.chapters))for(const m of Object.values(c.missions)){steps.push(...Object.values(m.steps));for(const o of m.optional||[])steps.push(...Object.values(o.steps));}
+  return {same:STORY_DB===GAME_DB.story.parts&&MISSION_TYPES===GAME_DB.story.mission_types&&CREW_VENUES===GAME_DB.story.crew.venues&&CREW_IDS===GAME_DB.story.crew.ids
+    &&CREW_HOME_VENUE===GAME_DB.story.crew.home_venue&&VAN_DROP===GAME_DB.story.van.drop&&VAN_POSES===GAME_DB.story.van.poses&&MIRABEL_DEPOSIT===GAME_DB.story.van.deposit,
+   hooked:steps.filter(s=>s.hooks).map(s=>[s.name,Object.keys(STORY_STEP_HOOKS[s.hooks]).every(k=>typeof s[k]==='function')]),
+   used:Object.keys(STORY_STEP_HOOKS).filter(k=>!steps.some(s=>s.hooks===k)),
+   seat:CREW_VENUES.moon_city.group.seats.map(s=>[s.a,'deg' in s]), turn:[angleKit.toRad(90)===Math.PI/2,angleKit.toRad(-90)===-Math.PI/2,angleKit.toRad(180)===Math.PI,angleKit.toDeg(Math.PI)]};})())`));
+ assert.equal(got.same,true,'an old name no longer reads the chapter');
+ for(const [name,ok] of got.hooked) assert.ok(ok,`step ${name}: its hooks did not attach`);
+ assert.deepEqual(got.used,[],'STORY_STEP_HOOKS has code no step names');
+ assert.deepEqual(got.seat,st.crew.venues.moon_city.group.seats.map(s=>[s.deg*Math.PI/180,false]),'the crew seats read radians from the data\'s degrees');
+ assert.deepEqual(got.turn,[true,true,true,180],'angleKit: right angles convert exactly');
+ assert.deepEqual(e.errors,[]);
+});
+
 console.log(`test-game-db: ${tests.length} passed`);

@@ -61,6 +61,7 @@ const SCRIPTS = [
     'basement/draw-list.js',       // LV0 Basement: drawList and canvasRenderer (what to draw, apart from how)
     'basement/material-kit.js',    // LV0 Basement: materialKit (linked materials and finish rules)
     'basement/virtual-child.js',   // LV0 Basement: virtualChild (things that ride on a parent without being its child)
+    'basement/angle-kit.js',       // LV0 Basement: angleKit (degrees in the data, radians in the code)
     'basement/awareness-kit.js',   // LV0 Basement: awarenessMatrix (what a character knows of what's around them)
     'directory/game-db/game-db.js',   // LV2 Directory: GAME_DB, the game's data; its chapters (JSON) follow
     'directory/game-db/items.json',   // GAME_DB.items: gear, augments, furniture, consumables, drinks, notes, schematics
@@ -70,6 +71,7 @@ const SCRIPTS = [
     'directory/game-db/enemies.json',   // GAME_DB.enemies: enemy kinds, drones, the bosses and their hazards, the Horde Gauntlet
     'directory/game-db/vehicles.json',  // GAME_DB.vehicles: car brands and models, the BlackMark's look, the Zibs, traffic tempers, the driving feel
     'directory/game-db/places.json',    // GAME_DB.places: the maps, their rooms and doors, the city's landmark blocks, the fireplaces
+    'directory/game-db/story.json',     // GAME_DB.story: the story's parts and steps (code in STORY_STEP_HOOKS), mission kinds, crew nights, the van's drop
     'core/config.js',                   // reads GAME_DB.vehicles and .places, so it comes after the chapters
     '@assets',              // generated from the assets/ folder
     'core/assets.js',

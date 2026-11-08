@@ -1,0 +1,271 @@
+{
+  "_about": {
+    "chapter": "Story and missions: the story's parts, chapters, missions and steps; the mission kinds; where the crew's nights out happen; and how the van scene leaves everyone.",
+    "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.story and checked by tools/test-game-db.cjs. Positions are world px on the named map; deg is an angle in degrees, clockwise on screen: 0 faces east (right), 90 south (down), 180 west, -90 north (angleKit turns it into radians, basement/angle-kit.js); van.drop's angle is radians. A step's name is in save files (StoryManager.serialize) and the code moves between steps by name: never rename one. _about.notes keeps the explanations that were comments in the code, keyed by path.",
+    "tables": {
+      "parts": "The story (STORY_DB, story/story-db.js): Part → chapters → missions → steps, each keyed by its number. A mission has its name, desc, location, locationDesc, completionTime, target, its steps (in order) and optional side quests (id, name, trigger, steps). A step has a name, the banner shown when it starts (null: none), targetMap and target (the landmark its marker points at, or player), and condition: a string the story checks each frame (LOC_<map> she's on that map, TIMER_<n>, or a named check in StoryManager.checkCondition), or null for a step that ends the chain. A step with code names it in hooks (STORY_STEP_HOOKS in story/story-db.js): its onStart, and its condition when that's a function.",
+      "mission_types": "The kinds of side job (MISSION_TYPES, story/missions.js). Saves keep these values.",
+      "crew": "The crew's nights out (story/crew-nights.js): ids (each one's id, CREW_IDS), venues (CREW_VENUES: the map, label, what the night is, its host, and where everyone sits or stands for a group night and a solo one; me, them and seats are x, y, deg (which way they face) and an optional pose; cam and zoom frame it; after is where she stands when it's over), and home_venue (each one's own place, CREW_HOME_VENUE).",
+      "van": "The end of the van scene (story/scenes/van.js): drop is where the van and everyone stand (VAN_DROP), poses how each one sits in the back (VAN_POSES), deposit Mirabel's payment up front (MIRABEL_DEPOSIT)."
+    },
+    "notes": {
+      "parts[\"1\"]": "PART 1",
+      "parts[\"1\"].chapters[\"1\"]": "CHAPTER 1",
+      "parts[\"1\"].chapters[\"1\"].missions[\"1\"]": "MISSION 1",
+      "parts[\"1\"].chapters[\"1\"].missions[\"1\"].steps": "Steps are addressed by name (story.goTo / isAt / isBefore). The numbers are just their order; saves keep the name (StoryManager.serialize).",
+      "parts[\"1\"].chapters[\"1\"].missions[\"1\"].steps[\"0\"]": "The van ride and the night before (story/scenes/van.js). Ends at the hotel door.",
+      "parts[\"1\"].chapters[\"1\"].missions[\"1\"].steps[\"1\"]": "Out of the van: she walks (the move stick), the door pill shows her how to go in",
+      "parts[\"1\"].chapters[\"1\"].missions[\"1\"].steps[\"2\"]": "The lobby: Seven holds it; the elevator to the penthouse",
+      "parts[\"1\"].chapters[\"1\"].missions[\"1\"].steps[\"3\"]": "The penthouse: she draws her FP-X (the fire stick), and walks in deeper",
+      "parts[\"1\"].chapters[\"1\"].missions[\"1\"].steps[\"4\"]": "The red light, the wall blows in, the drones",
+      "parts[\"1\"].chapters[\"1\"].missions[\"1\"].steps[\"5\"]": "The aftermath: search the rubble; Yenna spots the note",
+      "parts[\"1\"].chapters[\"1\"].missions[\"1\"].steps[\"6\"]": "Josh's rage, then out before the news arrives: the BlackMark is at the curb",
+      "parts[\"1\"].chapters[\"1\"].missions[\"1\"].steps[\"7\"]": "Mirabel, in person for the first time: the balance, and her favour",
+      "parts[\"1\"].chapters[\"1\"].missions[\"1\"].steps[\"8\"]": "Chapter complete (terminal)",
+      "parts[\"1\"].chapters[\"1\"].missions[\"1\"].steps[\"8\"].condition": "Terminal — no auto-advance",
+      "parts[\"1\"].chapters[\"1\"].missions[\"1\"].optional": "── OPTIONAL CONTENT ── Activates when trigger condition is met. Does not block main story progression.",
+      "parts[\"1\"].chapters[\"1\"].missions[\"1\"].optional[0].steps[\"1\"].condition": "Terminal",
+      "crew.venues.moon_city.group": "The booth by the foyer: a U of velvet round an oval table, open to the floor",
+      "crew.venues.moon_city.group.seats": "the two arms of the U, then standing at the open end and by the arms (leaning on the velvet)",
+      "crew.venues.moon_city.solo": "Sabrina alone: two stools at the bar",
+      "crew.venues.torque_auto": "at the wrap bay",
+      "crew.venues.biggs_park.solo": "The open plaza west of the pavilion, facing north up a clear lane (room for a range: cans along y≈7960)",
+      "van.drop.van": "where everyone stands when the scene hands over (sdc, under the Double Nights canopy) on the drive, in front of the porte-cochère (buildings/double-nights.js)",
+      "van.drop": "Where everyone stands when the van scene hands over (sdc, under the Double Nights canopy)",
+      "van.deposit": "Mirabel pays 50 percent down"
+    }
+  },
+  "parts": {
+    "1": {
+      "name": "BEYOND STEEL AND SYNTHETICS",
+      "chapters": {
+        "1": {
+          "name": "THE AWAKENING",
+          "missions": {
+            "1": {
+              "name": "OLD CONTACTS",
+              "desc": "A call from a woman named Mirabel sends you on a wild chase after infamous killer, the Dark Maker. Will you be able to catch him and stay in one piece?",
+              "location": "SOUTHERN DIMENSIONS CITY",
+              "locationDesc": "Melting pot of cultures traveling to this location.",
+              "completionTime": "1HR",
+              "target": "THE DARK MAKER",
+              "steps": {
+                "0": {"name":"VAN_RIDE","banner":null,"targetMap":null,"target":"player","hooks":"VAN_RIDE"},
+                "1": {
+                  "name": "ENTER_HOTEL",
+                  "banner": "ENTER DOUBLE NIGHTS",
+                  "targetMap": "sdc",
+                  "target": "hotel_entrance",
+                  "condition": "LOC_HOTEL_LOBBY",
+                  "hooks": "ENTER_HOTEL"
+                },
+                "2": {
+                  "name": "TAKE_ELEVATOR",
+                  "banner": "TAKE THE ELEVATOR TO THE PENTHOUSE",
+                  "targetMap": "hotel_lobby",
+                  "target": "suite_elevator",
+                  "condition": "LOC_HOTEL_SUITE",
+                  "hooks": "TAKE_ELEVATOR"
+                },
+                "3": {
+                  "name": "SEARCH_SUITE",
+                  "banner": "SEARCH THE PENTHOUSE",
+                  "targetMap": "hotel_suite",
+                  "target": "suite_balcony",
+                  "condition": "PLAYER_DEEP_IN_SUITE",
+                  "hooks": "SEARCH_SUITE"
+                },
+                "4": {
+                  "name": "SURVIVE_AMBUSH",
+                  "banner": null,
+                  "targetMap": "hotel_suite",
+                  "target": "player",
+                  "condition": "AMBUSH_CLEARED",
+                  "hooks": "SURVIVE_AMBUSH"
+                },
+                "5": {
+                  "name": "FIND_NOTE",
+                  "banner": "SEARCH THE RUBBLE",
+                  "targetMap": "hotel_suite",
+                  "target": "dark_maker_note",
+                  "hooks": "FIND_NOTE"
+                },
+                "6": {
+                  "name": "LEAVE_HOTEL",
+                  "banner": "GET TO THE BLACKMARK",
+                  "targetMap": "sdc",
+                  "target": "player_car",
+                  "condition": "PLAYER_IN_OWNED_CAR",
+                  "hooks": "LEAVE_HOTEL"
+                },
+                "7": {
+                  "name": "REPORT_TO_MIRABEL",
+                  "banner": "MEET MIRABEL AT MOON CITY NIGHTCLUB",
+                  "targetMap": "sdc",
+                  "target": "club_entrance",
+                  "condition": "CONTRACTOR_REWARDED",
+                  "hooks": "REPORT_TO_MIRABEL"
+                },
+                "8": {
+                  "name": "CHAPTER_COMPLETE",
+                  "banner": null,
+                  "targetMap": null,
+                  "target": "player",
+                  "condition": null,
+                  "hooks": "CHAPTER_COMPLETE"
+                }
+              },
+              "optional": [
+                {
+                  "id": "sanctum",
+                  "name": "THE SANCTUM",
+                  "trigger": "LOC_CHURCH_BOSS",
+                  "steps": {
+                    "0": {
+                      "name": "DEFEAT_TRIUMVIRATE",
+                      "banner": null,
+                      "targetMap": "church_boss",
+                      "target": "boss_spawn",
+                      "condition": "CHURCH_BOSS_DEFEATED",
+                      "hooks": "DEFEAT_TRIUMVIRATE"
+                    },
+                    "1": {
+                      "name": "SANCTUM_CLEARED",
+                      "banner": null,
+                      "targetMap": "church_boss",
+                      "target": "player",
+                      "condition": null,
+                      "hooks": "SANCTUM_CLEARED"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "mission_types": {"DELIVERY":"delivery","BOUNTY":"bounty","SALVAGE":"salvage"},
+  "crew": {
+    "ids": {"747":"747","Victoria":"victoria","Yenna":"yenna","Sabrina":"sabrina","Max":"max","Josh":"josh"},
+    "venues": {
+      "moon_city": {
+        "map": "moon_city_nightclub",
+        "label": "Moon City",
+        "what": "Drinks at Moon City",
+        "host": "Sabrina",
+        "group": {
+          "me": {"x":535,"y":950,"deg":-90,"pose":"sit"},
+          "cam": {"x":590,"y":898},
+          "zoom": 2.5,
+          "seats": [
+            {"x":486,"y":916,"deg":0},
+            {"x":584,"y":916,"deg":180},
+            {"x":505,"y":866,"deg":90,"pose":"lean"},
+            {"x":566,"y":866,"deg":90,"pose":"arms_crossed"},
+            {"x":446,"y":912,"deg":0,"pose":"lean"},
+            {"x":624,"y":912,"deg":180,"pose":"lean"}
+          ],
+          "after": {"x":535,"y":860}
+        },
+        "solo": {
+          "me": {"x":510,"y":596,"deg":180,"pose":"sit"},
+          "them": {"x":510,"y":659,"deg":180,"pose":"sit"},
+          "cam": {"x":495,"y":628},
+          "zoom": 3.2,
+          "after": {"x":560,"y":628}
+        }
+      },
+      "cozy_cafe": {
+        "map": "cozy_cafe_interior",
+        "label": "Cozy Cafe",
+        "what": "Coffee at Cozy Cafe",
+        "host": "747",
+        "solo": {
+          "me": {"x":167,"y":433,"deg":90,"pose":"sit"},
+          "them": {"x":309,"y":540,"deg":180,"pose":"sit"},
+          "cam": {"x":230,"y":500},
+          "zoom": 2.9,
+          "after": {"x":380,"y":520}
+        }
+      },
+      "torque_auto": {
+        "map": "auto_shop",
+        "label": "Torque Auto",
+        "what": "Wraps at Torque Auto",
+        "host": "Victoria",
+        "solo": {
+          "me": {"x":470,"y":296,"deg":-69,"pose":"arms_crossed"},
+          "them": {"x":566,"y":288,"deg":-109,"pose":"lean"},
+          "cam": {"x":518,"y":248},
+          "zoom": 2.8,
+          "after": {"x":600,"y":380}
+        }
+      },
+      "biggs_park": {
+        "map": "sdc",
+        "label": "Biggs Park",
+        "what": "Cans at Biggs Park",
+        "host": "Yenna",
+        "park": {"x":8260,"y":8160,"r":600},
+        "inside": "biggs_arena",
+        "solo": {
+          "me": {"x":8230,"y":8320,"deg":-90},
+          "them": {"x":8290,"y":8320,"deg":-90,"pose":"arms_crossed"},
+          "cam": {"x":8260,"y":8250},
+          "zoom": 2.4,
+          "after": {"x":8230,"y":8340}
+        }
+      },
+      "neural_sys": {
+        "map": "neural_sys_interior",
+        "label": "Neural Systems",
+        "what": "Browsing at Neural Systems",
+        "host": "Josh",
+        "solo": {
+          "me": {"x":470,"y":340,"deg":-90},
+          "them": {"x":530,"y":340,"deg":-90,"pose":"arms_crossed"},
+          "cam": {"x":500,"y":310},
+          "zoom": 2.9,
+          "after": {"x":500,"y":400}
+        }
+      },
+      "enni_cole": {
+        "map": "enni_cole_interior",
+        "label": "Enni Cole",
+        "what": "Shopping at Enni Cole",
+        "host": "Max",
+        "solo": {
+          "me": {"x":440,"y":985,"deg":180},
+          "them": {"x":445,"y":1035,"deg":180,"pose":"arms_crossed"},
+          "cam": {"x":415,"y":1000},
+          "zoom": 2.8,
+          "after": {"x":480,"y":1010}
+        }
+      }
+    },
+    "home_venue": {
+      "747": "cozy_cafe",
+      "Victoria": "torque_auto",
+      "Sabrina": "moon_city",
+      "Yenna": "biggs_park",
+      "Josh": "neural_sys",
+      "Max": "enni_cole"
+    }
+  },
+  "van": {
+    "drop": {
+      "747": {"x":2036,"y":792},
+      "949": {"x":2000,"y":784},
+      "van": {"x":2010,"y":836,"angle":0},
+      "Yenna": {"x":1962,"y":792},
+      "Sabrina": {"x":1940,"y":806},
+      "Max": {"x":2060,"y":806},
+      "Victoria": {"x":1918,"y":800},
+      "Josh": {"x":2082,"y":800}
+    },
+    "poses": {"747":"sit","949":"sit_work","Yenna":"sit","Sabrina":"sit","Max":"sit_lean","Victoria":"sit","Josh":"sit"},
+    "deposit": 250
+  }
+}

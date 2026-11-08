@@ -8,14 +8,9 @@
            knocks; they pour out in front of the hotel.
            The novel's lines, verbatim where it has them.
            ===================================================================== */
-        const VAN_DROP = {                                   // where everyone stands when the scene hands over (sdc, under the Double Nights canopy)
-            van: { x: 2010, y: 836, angle: 0 },              // on the drive, in front of the porte-cochère (buildings/double-nights.js)
-            '949': { x: 2000, y: 784 }, '747': { x: 2036, y: 792 },
-            Yenna: { x: 1962, y: 792 }, Sabrina: { x: 1940, y: 806 }, Max: { x: 2060, y: 806 },
-            Victoria: { x: 1918, y: 800 }, Josh: { x: 2082, y: 800 }
-        };
-        const VAN_POSES = { '949': 'sit_work', '747': 'sit', Yenna: 'sit', Sabrina: 'sit', Max: 'sit_lean', Victoria: 'sit', Josh: 'sit' };
-        const MIRABEL_DEPOSIT = 250;                          // 50 percent down
+        const VAN_DROP = GAME_DB.story.van.drop;     // where everyone stands when the scene hands over: directory/game-db/story.json
+        const VAN_POSES = GAME_DB.story.van.poses;   // directory/game-db/story.json
+        const MIRABEL_DEPOSIT = GAME_DB.story.van.deposit;   // 50 percent down (directory/game-db/story.json)
 
         /** 949 as she looks right now (her cosmetics), with or without her field mask. */
         function stellaSceneLook(g, masked) {
