@@ -157,13 +157,13 @@
                 this.value = [0, 0];
                 if (!this.zone) return;
                 const z = this.zone, own = (e, fn) => { for (let i = 0; i < e.changedTouches.length; i++) if (e.changedTouches[i].identifier === this.s.id) return fn(e.changedTouches[i]), true; return false; };
-                z.addEventListener('touchstart', e => { e.preventDefault(); if (this.free()) this.start(e.changedTouches[0], e); }, { passive: false });
+                z.addEventListener('touchstart', e => { e.preventDefault(); if (this.free() && !system.muted) this.start(e.changedTouches[0], e); }, { passive: false });
                 z.addEventListener('touchmove', e => { e.preventDefault(); if (this.s.active) own(e, t => this.move(t, e)); }, { passive: false });
                 const end = e => { e.preventDefault(); if (this.s.active) own(e, () => this.end(e)); };
                 z.addEventListener('touchend', end); z.addEventListener('touchcancel', end);
                 if (this.mouse) {
                     const m = e => ({ identifier: 'mouse', clientX: e.clientX, clientY: e.clientY });
-                    z.addEventListener('mousedown', e => { e.preventDefault(); if (this.free()) this.start(m(e), e); });
+                    z.addEventListener('mousedown', e => { e.preventDefault(); if (this.free() && !system.muted) this.start(m(e), e); });
                     window.addEventListener('mousemove', e => { if (this.s.active && this.s.id === 'mouse') this.move(m(e), e); });
                     window.addEventListener('mouseup', e => { if (this.s.active && this.s.id === 'mouse') this.end(e); });
                 }
@@ -278,6 +278,9 @@
                 this.queue = [];            // [action, type, time]
                 this.pending = [];          // taps waiting to see if a second press comes: [input, action, ev]
                 this.hooks = [];            // run each frame after the pad is read: fn(system, now)
+                this.on_fire = [];          // told of every fired action: fn(action, type, ev)
+                this.muted = false;         // true: devices are not heard (a playback), except the inputs in unmuted
+                this.unmuted = ['Escape'];
                 for (const [name, when, run] of actions) this.actions[name] = [when, run];
                 this.setKeymap(keymap);
                 this.keyboard = new keyboardInstance(this);
@@ -336,9 +339,11 @@
                 ev.type = type;
                 this.queue.push([action, type, ev.time]);
                 this.actions[action][1]?.(this.context(), ev);
+                for (const fn of this.on_fire) fn(action, type, ev);   // a recorder listening (basement/recorder-kit.js)
                 return true;
             }
             press(inst, input, ev) {
+                if (this.muted && !this.unmuted.includes(input)) return;   // a playback has the controls
                 const list = this.bindings[input] || [];
                 if (inst.input_active.has(input)) { for (const [a, t] of list) if (t === REPEAT) this.fire(a, t, { ...ev, repeat: true }); return; }
                 if (!ev.typing) { inst.input_active.add(input); inst.input_just_activated.add(input); inst.input_time[input] = ev.time; inst.armed[input] = new Set(list.filter(b => this.can(b[0], ev)).map(b => b[0])); }
@@ -348,6 +353,7 @@
                 for (const [a, t] of list) if (t === PRESS || t === REPEAT) this.fire(a, t, ev);
             }
             release(inst, input, ev) {
+                if (this.muted && !this.unmuted.includes(input)) return;
                 const armed = inst.armed[input], since = inst.input_time[input];
                 const was = inst.input_active.delete(input);
                 inst.spent.delete(input); delete inst.armed[input];
@@ -367,6 +373,7 @@
 
             // ── The frame ───────────────────────────────────────────────────────
             update(now = controlsSystem.now()) {
+                if (this.muted) { this.generateAll(); return; }   // a playback holds the inputs; the pad and menus wait
                 this.gamepad.updateGamepads();
                 for (const inst of [this.keyboard, this.mouse, this.touch, this.gamepad]) for (const input in inst.armed) {
                     const armed = inst.armed[input], since = inst.input_time[input];
@@ -379,7 +386,8 @@
                 this.pending = this.pending.filter(([, a, ev]) => now - ev.time <= this.tap_wait_time || (this.fire(a, TAP, ev), false));
                 this.queue = this.queue.filter(q => now - q[2] <= this.queue_wait_time);
                 for (const fn of this.hooks) fn(this, now);
-                for (const inst of [this.keyboard, this.mouse, this.touch, this.gamepad]) inst.generateGhostImage();
+                this.generateAll();
             }
+            generateAll() { for (const inst of [this.keyboard, this.mouse, this.touch, this.gamepad]) inst.generateGhostImage(); }
             frame() { requestAnimationFrame(this.frame); this.update(); }
         }

@@ -110,3 +110,17 @@
         ];
 
         const controls = new controlsSystem({ keymap: dfKeyMap, actions: dfActions, context: () => typeof game !== 'undefined' ? game : null });
+
+        /** The game's recorder (basement/recorder-kit.js): the sticks and the mouse aim ride along with the held inputs;
+         *  her, her car and her crew are the recorded things. game_recorder.startRecording() … stopRecording() → a recording. */
+        const game_recorder = new gRecorder(controls, {
+            sources: {
+                joystick: [() => { const J = game.joystick; return [+J.active, J.dx, J.dy]; }, ([a, dx, dy]) => Object.assign(game.joystick, { active: !!a, id: a ? 'replay' : null, dx, dy })],
+                fire: [() => { const F = game.fireJoystick; return [+F.active, F.dx, F.dy, +F.firing, +F.armed, +F.aimed]; },
+                    ([a, dx, dy, firing, armed, aimed]) => Object.assign(game.fireJoystick, { active: !!a, id: a ? 'replay' : null, dx, dy, firing: !!firing, armed: !!armed, aimed: !!aimed })],
+                mouse: [() => [game.mouseX, game.mouseY, +game.mouseDown], ([x, y, down]) => Object.assign(game, { mouseX: x, mouseY: y, mouseDown: !!down })],
+            },
+            objects: () => [['player', game.player.x, game.player.y, game.player.angle], ...(game.isDriving && game.car ? [['car', game.car.x, game.car.y, game.car.angle]] : []),
+                ...(game.teammates || []).map((t, i) => ['crew' + i, t.x, t.y, t.angle])],
+            centre: () => [game.player.x, game.player.y],
+        });

@@ -49,7 +49,8 @@ const SCRIPTS = [
     'basement/life-kit.js',        // LV0 Basement: lifeKit (lists of short-lived things)
     'basement/sound-kit.js',       // LV0 Basement: soundKit (Web Audio building blocks)
     'basement/sound-system.js',    // LV0 Basement: soundSystem (context, channels, volume dial, reverb, sounds by packet)
-    'basement/controls-system.js', // LV0 Basement: controlsSystem (keyboard, mouse and gamepad instances, keymap, action table)
+    'basement/controls-system.js', // LV0 Basement: controlsSystem (keyboard, mouse, touch and gamepad instances, touch sticks, keymap, action table)
+    'basement/recorder-kit.js',    // LV0 Basement: gRecorder (inputs recorded per tick, played back through the controls)
     'basement/entity-base.js',     // LV0 Basement: GameEntity (the base of everything that moves or collides)
     'basement/shape-kit.js',       // LV0 Basement: shapeKit (collision geometry)
     'basement/spatial-grid.js',    // LV0 Basement: SpatialHashGrid and the render / transition grids
