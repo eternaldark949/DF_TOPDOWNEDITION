@@ -12,46 +12,46 @@
            `stat(key, base)` gives any stat with the installed
            ranks applied — the game asks it wherever a number could be tuned.
            ===================================================================== */
-        const RESONANCE = {
-            CAP: 50,
-            nextLevel: level => 120 + 70 * level,                 // Resonance from `level` to the next
-            DEATH_LOSS: 0.5,
-            RESPEC_COST: 200,
-            POST_CAP_XP_PER_PP: 100,                            // Dr. Yin exchanges settled surplus; fractions carry forward
-            // Kill awards: base by toughness, then style multipliers (they stack)
-            BASE: { Ganger: 20, Drone: 30, GatlingGunner: 80 },
-            USUAL_HP: { Ganger: 40, Drone: 60, GatlingGunner: 200 },
-            FLIT_KILL: 1.5, PUNCH: 1.4, CHAIN_STEP: 0.25, CHAIN_MAX: 2, UNTOUCHED: 1.3,
-            FLIT_WINDOW: 1.0, CHAIN_WINDOW: 2.5, UNTOUCHED_SECS: 20, TEAMMATE_SHARE: 0.3,
-            POISE: 1.25, POISE_LEVEL: 0.75,                     // a kill with her glass still three-quarters full (engine/spills.js)
+        // The numbers live in directory/game-db/progression.json (GAME_DB.progression): the level rules, the trees
+        // and every node's per-rank values. This file keeps the code: the level curve, each node's text and stat().
+        const RESONANCE = Object.assign(GAME_DB.progression.resonance, {
+            /** Resonance from `level` to the next */
+            nextLevel: level => RESONANCE.level_cost.base + RESONANCE.level_cost.per_level * level,
+        });
+
+        /** A node's text on the tuning screen, at rank r (R: her ResonanceSystem, when there is one), built from its per_rank values */
+        const _resPct = v => Math.round(v * 100);
+        const RESONANCE_NODE_TEXT = {
+            reach:         (r, R, v) => `+${_resPct(v.distance) * r}% flit distance`,
+            quick_return:  (r, R, v) => `−${_resPct(v.cost) * r}% attunement per flit`,
+            flit_strike:   (r, R, v) => `Shots and blade hits within ${R ? R.flitStrikeWindow() : v.window} s after a flit deal +${_resPct(v.damage) * r}%`,
+            afterimage:    (r, R, v) => `Your flit ghost draws gangers' eyes for ${(v.secs * r).toFixed(1)} s`,
+            double_step:   (r, R, v) => `+${v.attunement * r} max attunement${r >= v.half_cost_rank ? `; a second flit within ${v.half_cost_window} s costs half` : ''}`,
+            long_echo:     (r, R, v) => `Flit-Strike lasts ${(resonanceNode('flit_strike').per_rank.window + v.window * r).toFixed(2)} s; its damage bonus stays the same`,
+            reinforced:    (r, R, v) => `+${v.health * r} max health`,
+            plating:       (r, R, v) => `−${_resPct(v.damage_taken) * r}% damage taken`,
+            stim_potency:  (r, R, v) => `Stims heal +${v.heal * r}`,
+            idle_mend:     (r, R, v) => `Regen starts ${v.delay_frames / 60 * r} s sooner, +${v.hp_per_sec * r} HP/s`,
+            last_stand:    (r, R, v) => `Survive a lethal hit at 1 HP (every ${v.cooldown_secs[r]} s)`,
+            grounded:      (r, R, v) => `−${_resPct(v.knockback) * r}% knockback from damage; gangers who step in your spills slip for ${(SPILL.SLIP_SECS + v.slip_secs * r).toFixed(1)} s`,
+            steady:        (r, R, v) => `−${_resPct(v.spread) * r}% spread, −${_resPct(v.spill) * r}% drink spilt`,
+            quick_hands:   (r, R, v) => `−${_resPct(v.cooldown) * r}% time between shots`,
+            hollow_points: (r, R, v) => `+${_resPct(v.damage) * r}% gun damage`,
+            heavy_hands:   (r, R, v) => `+${_resPct(v.damage) * r}% punch damage and knockback`,
+            quick_draw:    (r, R, v) => `First shot within ${v.window} s of drawing: +${_resPct(v.damage) * r}%`,
+            low_signature: (r, R, v) => `Gunshots carry ${_resPct(v.noise) * r}% less far to enemies`,
         };
 
-        const RESONANCE_TREES = [
-            { id: 'flit', name: 'Flit', color: '#b89cff', blurb: 'Tune the jump between dimensions.', nodes: [
-                { id: 'reach',        name: 'Reach',        desc: r => `+${10 * r}% flit distance` },
-                { id: 'quick_return', name: 'Quick Return', desc: r => `−${10 * r}% attunement per flit` },
-                { id: 'flit_strike',  name: 'Flit-Strike',  desc: (r, R) => `Shots and blade hits within ${R ? R.stat('flitStrikeWindow', 1) : 1} s after a flit deal +${20 * r}%` },
-                { id: 'afterimage',   name: 'Afterimage',   desc: r => `Your flit ghost draws gangers' eyes for ${(0.5 * r).toFixed(1)} s` },
-                { id: 'double_step',  name: 'Double Step',  desc: r => `+${20 * r} max attunement${r >= 3 ? '; a second flit within 0.6 s costs half' : ''}` },
-                { id: 'long_echo',    name: 'Long Echo',    unlockLevel: 30, desc: r => `Flit-Strike lasts ${(1 + 0.25 * r).toFixed(2)} s; its damage bonus stays the same` },
-            ] },
-            { id: 'frame', name: 'Frame', color: '#c4566e', blurb: 'What Dr. Yin builds into you.', nodes: [
-                { id: 'reinforced',   name: 'Reinforced',   desc: r => `+${10 * r} max health` },
-                { id: 'plating',      name: 'Plating',      desc: r => `−${6 * r}% damage taken` },
-                { id: 'stim_potency', name: 'Stim Potency', desc: r => `Stims heal +${15 * r}` },
-                { id: 'idle_mend',    name: 'Idle Mend',    desc: r => `Regen starts ${2 * r} s sooner, +${r} HP/s` },
-                { id: 'last_stand',   name: 'Last Stand',   desc: r => `Survive a lethal hit at 1 HP (every ${[0, 120, 90, 60][r]} s)` },
-                { id: 'grounded',     name: 'Grounded',     unlockLevel: 30, desc: r => `−${15 * r}% knockback from damage; gangers who step in your spills slip for ${(0.4 + 0.2 * r).toFixed(1)} s` },
-            ] },
-            { id: 'arms', name: 'Arms', color: '#e8c27a', blurb: 'Steadier hands, heavier hits.', nodes: [
-                { id: 'steady',       name: 'Steady',       desc: r => `−${12 * r}% spread, −${15 * r}% drink spilt` },
-                { id: 'quick_hands',  name: 'Quick Hands',  desc: r => `−${8 * r}% time between shots` },
-                { id: 'hollow_points',name: 'Hollow Points',desc: r => `+${8 * r}% gun damage` },
-                { id: 'heavy_hands',  name: 'Heavy Hands',  desc: r => `+${25 * r}% punch damage and knockback` },
-                { id: 'quick_draw',   name: 'Quick-Draw',   desc: r => `First shot within 0.8 s of drawing: +${25 * r}%` },
-                { id: 'low_signature',name: 'Low Signature',unlockLevel: 30, desc: r => `Gunshots carry ${10 * r}% less far to enemies` },
-            ] },
-        ];
+        const RESONANCE_TREES = GAME_DB.progression.trees;
+        for (const tree of RESONANCE_TREES) for (const node of tree.nodes) {
+            const text = RESONANCE_NODE_TEXT[node.id];
+            if (!text) throw new Error(`RESONANCE_TREES: node '${node.id}' has no text in RESONANCE_NODE_TEXT`);
+            node.desc = (r, R) => text(r, R, node.per_rank);
+        }
+        /** A node by id, from any tree (undefined if there's none). */
+        function resonanceNode(id) {
+            for (const tree of RESONANCE_TREES) for (const node of tree.nodes) if (node.id === id) return node;
+        }
 
         class ResonanceSystem {
             constructor() { this.reset(); }
@@ -63,27 +63,33 @@
 
             rank(id) { return this.ranks[id] || 0; }
 
+            /** A node's per-rank value (progression.json), e.g. value('flit_strike', 'damage'). */
+            value(id, key) { return resonanceNode(id).per_rank[key]; }
+
+            /** How long after a flit Flit-Strike's bonus holds, in seconds. */
+            flitStrikeWindow() { return this.stat('flitStrikeWindow', this.value('flit_strike', 'window')); }
+
             /** A stat with installed ranks applied. */
             stat(key, base) {
-                const r = id => this.rank(id);
+                const r = id => this.rank(id), v = (id, k) => this.value(id, k);
                 switch (key) {
-                    case 'flitDistance':   return base * (1 + 0.10 * r('reach'));
-                    case 'flitCost':       return base * (1 - 0.10 * r('quick_return'));
-                    case 'flitStrikeWindow': return base + 0.25 * r('long_echo');
-                    case 'maxAttunement':  return base + 20 * r('double_step');
-                    case 'maxHealth':      return base + 10 * r('reinforced');
-                    case 'damageTaken':    return base * (1 - 0.06 * r('plating'));
-                    case 'knockbackTaken': return base * (1 - 0.15 * r('grounded'));
-                    case 'stimHeal':       return base + 15 * r('stim_potency');
-                    case 'regenDelay':     return Math.max(60, base - 120 * r('idle_mend'));   // frames
-                    case 'regenAmount':    return base + r('idle_mend');                        // HP per second
-                    case 'spread':         return base * (1 - 0.12 * r('steady'));
-                    case 'spill':          return base * (1 - 0.15 * r('steady'));             // engine/spills.js
-                    case 'slipSecs':       return r('grounded') ? base + 0.2 * r('grounded') : 0;
-                    case 'fireCooldown':   return base * (1 - 0.08 * r('quick_hands'));
-                    case 'gunDamage':      return base * (1 + 0.08 * r('hollow_points'));
-                    case 'gunNoise':       return base * (1 - 0.10 * r('low_signature'));
-                    case 'punchDamage':    return base * (1 + 0.25 * r('heavy_hands'));
+                    case 'flitDistance':   return base * (1 + v('reach', 'distance') * r('reach'));
+                    case 'flitCost':       return base * (1 - v('quick_return', 'cost') * r('quick_return'));
+                    case 'flitStrikeWindow': return base + v('long_echo', 'window') * r('long_echo');
+                    case 'maxAttunement':  return base + v('double_step', 'attunement') * r('double_step');
+                    case 'maxHealth':      return base + v('reinforced', 'health') * r('reinforced');
+                    case 'damageTaken':    return base * (1 - v('plating', 'damage_taken') * r('plating'));
+                    case 'knockbackTaken': return base * (1 - v('grounded', 'knockback') * r('grounded'));
+                    case 'stimHeal':       return base + v('stim_potency', 'heal') * r('stim_potency');
+                    case 'regenDelay':     return Math.max(v('idle_mend', 'min_delay_frames'), base - v('idle_mend', 'delay_frames') * r('idle_mend'));   // frames
+                    case 'regenAmount':    return base + v('idle_mend', 'hp_per_sec') * r('idle_mend');                        // HP per second
+                    case 'spread':         return base * (1 - v('steady', 'spread') * r('steady'));
+                    case 'spill':          return base * (1 - v('steady', 'spill') * r('steady'));             // engine/spills.js
+                    case 'slipSecs':       return r('grounded') ? base + v('grounded', 'slip_secs') * r('grounded') : 0;
+                    case 'fireCooldown':   return base * (1 - v('quick_hands', 'cooldown') * r('quick_hands'));
+                    case 'gunDamage':      return base * (1 + v('hollow_points', 'damage') * r('hollow_points'));
+                    case 'gunNoise':       return base * (1 - v('low_signature', 'noise') * r('low_signature'));
+                    case 'punchDamage':    return base * (1 + v('heavy_hands', 'damage') * r('heavy_hands'));
                     default: return base;
                 }
             }
@@ -168,7 +174,7 @@
             tryLastStand(now) {
                 const r = this.rank('last_stand');
                 if (!r || now < this.lastStandReadyAt) return false;
-                this.lastStandReadyAt = now + [0, 120, 90, 60][r];
+                this.lastStandReadyAt = now + this.value('last_stand', 'cooldown_secs')[r];
                 return true;
             }
 

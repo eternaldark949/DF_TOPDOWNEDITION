@@ -41,7 +41,7 @@
                 if (now - (this._punchAt ?? -99) > KNUCKLES.COMBO_RESET) this._punchCombo = 0;
                 this._punchAt = now;
                 this._punchCombo = (this._punchCombo || 0) + 1;
-                const flit = _gameTimeSec - this.flitState.lastFlitAt <= this.resonance.stat('flitStrikeWindow', 1);
+                const flit = _gameTimeSec - this.flitState.lastFlitAt <= this.resonance.flitStrikeWindow();
                 const hay = flit || this._punchCombo % (st.haymakerEvery || KNUCKLES.EVERY) === 0;
                 if (hay) this._punchCombo = 0;
                 const ang = pl.angle;
@@ -56,7 +56,7 @@
                 if (near.length) this.meleeStepIn(ang, this._meleeGap(near));
 
                 let dmg = this.resonance.stat('punchDamage', st.damage || 16) * this.playerDamageMult();
-                if (flit) dmg *= 1 + 0.2 * this.resonance.rank('flit_strike');
+                if (flit) dmg *= 1 + this.resonance.value('flit_strike', 'damage') * this.resonance.rank('flit_strike');
                 if (hay) dmg *= st.haymakerMult || KNUCKLES.HAY_MULT;
                 const crit = this.rollCrit(st);
                 const px = pl.x + Math.cos(ang) * 20, py = pl.y + Math.sin(ang) * 20;

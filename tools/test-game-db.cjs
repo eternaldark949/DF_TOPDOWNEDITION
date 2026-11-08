@@ -78,4 +78,34 @@ test('Shops: car prices name real cars, colours are hex, and the game reads them
  assert.deepEqual(e.errors,[]);
 });
 
+test('Progression: trees, kill awards and abilities are whole, and the game builds its tuning screen from them',()=>{
+ const pg=load('progression.json'), R=pg.resonance;
+ assert.ok(R.CAP>0&&R.level_cost.base>0&&R.level_cost.per_level>=0);
+ assert.equal(pg.trees.length,3);
+ const ids=pg.trees.flatMap(t=>t.nodes.map(n=>n.id));
+ assert.equal(new Set(ids).size,ids.length,'a node id is used twice');
+ for(const t of pg.trees){
+  assert.equal(t.nodes.length,6,`tree ${t.id}: six nodes`);
+  for(const n of t.nodes){
+   assert.ok(n.per_rank&&Object.keys(n.per_rank).length,`node ${n.id}: per_rank`);
+   assert.ok(!n.unlockLevel||n.unlockLevel<=R.CAP,`node ${n.id}: unlockLevel past the cap`);
+   for(const [k,x] of Object.entries(n.per_rank)) assert.ok(Array.isArray(x)?x.every(Number.isFinite):Number.isFinite(x),`node ${n.id}.${k}`);
+  }
+ }
+ assert.equal(pg.trees.find(t=>t.id==='frame').nodes.find(n=>n.id==='last_stand').per_rank.cooldown_secs.length,4,'last_stand: a cooldown per rank, from 0');
+ for(const [id,a] of Object.entries(pg.abilities)) assert.ok(a.name&&a.stats&&a.stats.damage>0&&a.stats.fireRate>0,`ability ${id}`);
+ const e=runtime(join(ROOT,'DFAB V8.html'),{affine:true});
+ const got=JSON.parse(e.run(`JSON.stringify((()=>{const R=new ResonanceSystem();R.ranks={reach:3,long_echo:2};
+  return {classes:Object.keys(RESONANCE.BASE).map(k=>typeof globalThis[k]==='function'||eval('typeof '+k)==='function'),
+   same:RESONANCE===GAME_DB.progression.resonance&&RESONANCE_TREES===GAME_DB.progression.trees&&ABILITY_REGISTRY===GAME_DB.progression.abilities&&TALK_PERKS===GAME_DB.progression.talk_perks,
+   texts:RESONANCE_TREES.flatMap(t=>t.nodes.map(n=>n.desc(3,R))), next:RESONANCE.nextLevel(2), reach:R.stat('flitDistance',100), window:R.flitStrikeWindow()};})())`));
+ assert.ok(got.classes.every(Boolean),'RESONANCE.BASE names an enemy class that does not exist');
+ assert.equal(got.same,true);
+ assert.ok(got.texts.every(t=>typeof t==='string'&&t.length>0&&!/undefined|NaN/.test(t)),'a node text is broken');
+ assert.equal(got.next,R.level_cost.base+R.level_cost.per_level*2);
+ assert.equal(got.reach,100*(1+0.1*3));
+ assert.equal(got.window,1+0.25*2);
+ assert.deepEqual(e.errors,[]);
+});
+
 console.log(`test-game-db: ${tests.length} passed`);

@@ -331,8 +331,8 @@
                 const shotSpeed  = stats.projectileSpeed || 25;
                 // Arms: Hollow Points; Flit: Flit-Strike (shots just after a flit); Arms: Quick-Draw (first shot after drawing)
                 let shotDamage = this.resonance.stat('gunDamage', stats.damage || 35);
-                if (_gameTimeSec - this.flitState.lastFlitAt <= this.resonance.stat('flitStrikeWindow', 1)) shotDamage *= 1 + 0.2 * this.resonance.rank('flit_strike');
-                if (this._drawnAt !== undefined && _gameTimeSec - this._drawnAt <= 0.8 && !this._drawShotUsed) { shotDamage *= 1 + 0.25 * this.resonance.rank('quick_draw'); this._drawShotUsed = true; }
+                if (_gameTimeSec - this.flitState.lastFlitAt <= this.resonance.flitStrikeWindow()) shotDamage *= 1 + this.resonance.value('flit_strike', 'damage') * this.resonance.rank('flit_strike');
+                if (this._drawnAt !== undefined && _gameTimeSec - this._drawnAt <= this.resonance.value('quick_draw', 'window') && !this._drawShotUsed) { shotDamage *= 1 + this.resonance.value('quick_draw', 'damage') * this.resonance.rank('quick_draw'); this._drawShotUsed = true; }
                 shotDamage *= this.gunDamageMult();                      // the Bloodthirsty Muzzle, the Mirrored Glass (engine/status-effects.js)
                 const shotCrit = this.rollCrit(stats);                   // a critical hit (engine/combat-fx.js)
                 // A Golden Child orb burns with the shot: its every boost (Hollow Points, Flit-Strike, Quick-Draw, the

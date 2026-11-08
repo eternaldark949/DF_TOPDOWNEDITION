@@ -29,53 +29,7 @@
         //  Same stat pattern as ITEM_REGISTRY weapons but for innate/learned abilities.
         //  Any humanoid can use these via ActorEntity.castAbility().
         // ============================================================================
-        const ABILITY_REGISTRY = {
-            'fireball': {
-                name: 'Fireball',
-                desc: 'Red-hot projectile cast from the palm.',
-                stats: {
-                    fireRate: 70,           // Cooldown in frames between casts
-                    damage: 50,             // one-shots a ganger (40 HP) without trivialising the gauntlet's gunners
-                    projectileColor: '#ff3300',
-                    projectileSpeed: 18,
-                    spread: 0.15,
-                    flashRadius: 60,
-                    flashColor: '#ff6600',
-                    projectileLife: 50,
-                    range: 400
-                }
-            },
-            'shadow_bolt': {
-                name: 'Shadow Bolt',
-                desc: 'A fast-moving bolt of dark energy.',
-                stats: {
-                    fireRate: 50,
-                    damage: 20,
-                    projectileColor: '#8a2be2',
-                    projectileSpeed: 24,
-                    spread: 0.1,
-                    flashRadius: 40,
-                    flashColor: '#9966ff',
-                    projectileLife: 60,
-                    range: 500
-                }
-            },
-            'ember_burst': {
-                name: 'Ember Burst',
-                desc: 'A rapid volley of small fire projectiles.',
-                stats: {
-                    fireRate: 25,
-                    damage: 12,
-                    projectileColor: '#ff6600',
-                    projectileSpeed: 22,
-                    spread: 0.25,
-                    flashRadius: 35,
-                    flashColor: '#ffaa00',
-                    projectileLife: 40,
-                    range: 350
-                }
-            }
-        };
+        const ABILITY_REGISTRY = GAME_DB.progression.abilities;   // directory/game-db/progression.json
         
         // ============================================================================
         //  CENTRALIZED COMBAT FUNCTIONS
