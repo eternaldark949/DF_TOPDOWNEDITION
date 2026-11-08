@@ -197,131 +197,22 @@
                 // Drag from emote button, four overlays appear over heal/nv/flit/holster slots.
                 // Drag finger to a slot → release fires that emote.
                 const gameUi = document.getElementById('game-ui');
-                const emoteEntries = Object.entries(this.emoteOverlays);
 
-                const emoteStart = (clientX, clientY, touchId) => {
-                    if (this.emoteJoystick.active) return;
-                    this.emoteJoystick.active = true;
-                    this.emoteJoystick.touchId = touchId;
-                    this.emoteJoystick.highlighted = null;
-                    this.emoteBtn.classList.add('dragging');
-                    // Single class toggle drives the cat's-paw crossfade —
-                    // utility buttons fade out, emote overlays fade in.
-                    gameUi.classList.add('emote-active');
-                    // Cache rects AFTER class toggle — getBoundingClientRect forces
-                    // synchronous layout so values are valid even mid-fade.
-                    // Using rect math (not elementFromPoint) because the overlays carry
-                    // pointer-events: none to keep the drag from being stolen.
-                    this.emoteJoystick.rects = emoteEntries.map(([key, el]) => ({
-                        key,
-                        rect: el.getBoundingClientRect()
-                    }));
-                    // Cache emote button center for knob-lean translation.
-                    const btnRect = this.emoteBtn.getBoundingClientRect();
-                    this.emoteJoystick.centerX = btnRect.left + btnRect.width / 2;
-                    this.emoteJoystick.centerY = btnRect.top + btnRect.height / 2;
-                };
-                const emoteMove = (clientX, clientY) => {
-                    if (!this.emoteJoystick.active) return;
-                    let nextHighlight = null;
-                    for (const { key, rect } of this.emoteJoystick.rects) {
-                        if (clientX >= rect.left && clientX <= rect.right &&
-                            clientY >= rect.top  && clientY <= rect.bottom) {
-                            nextHighlight = key;
-                            break;
-                        }
-                    }
-                    if (nextHighlight !== this.emoteJoystick.highlighted) {
-                        if (this.emoteJoystick.highlighted) {
-                            this.emoteOverlays[this.emoteJoystick.highlighted].classList.remove('highlighted');
-                        }
-                        if (nextHighlight) {
-                            this.emoteOverlays[nextHighlight].classList.add('highlighted');
-                        }
-                        this.emoteJoystick.highlighted = nextHighlight;
-                    }
-                    // Knob-lean — translate the inner knob toward the finger,
-                    // clamped to MAX_LEAN so it stays inside the ring.
-                    // Using CSS custom properties means the knob's base centering
-                    // transform (translate(-50%, -50%)) stays intact; --lx/--ly
-                    // just add the offset.
-                    const dx = clientX - this.emoteJoystick.centerX;
-                    const dy = clientY - this.emoteJoystick.centerY;
-                    const dist = Math.hypot(dx, dy);
-                    const MAX_LEAN = 18;
-                    if (dist > 0) {
-                        const clamped = Math.min(dist, MAX_LEAN);
-                        const tx = (dx / dist) * clamped;
-                        const ty = (dy / dist) * clamped;
-                        this.emoteKnob.style.setProperty('--lx', tx + 'px');
-                        this.emoteKnob.style.setProperty('--ly', ty + 'px');
-                    } else {
-                        this.emoteKnob.style.setProperty('--lx', '0px');
-                        this.emoteKnob.style.setProperty('--ly', '0px');
-                    }
-                };
-                const emoteEnd = () => {
-                    if (!this.emoteJoystick.active) return;
-                    const fired = this.emoteJoystick.highlighted;
-                    // Clear highlight class but leave the crossfade to CSS — class
-                    // toggle on game-ui handles the fade-out for both groups.
-                    if (fired) {
-                        this.emoteOverlays[fired].classList.remove('highlighted');
-                    }
-                    gameUi.classList.remove('emote-active');
-                    this.emoteBtn.classList.remove('dragging');
-                    // Snap-back — clearing the inline custom props lets the CSS
-                    // `transition: transform 0.18s` ease the knob home.
-                    this.emoteKnob.style.setProperty('--lx', '0px');
-                    this.emoteKnob.style.setProperty('--ly', '0px');
-                    this.emoteJoystick.active = false;
-                    this.emoteJoystick.touchId = null;
-                    this.emoteJoystick.highlighted = null;
-                    if (fired) this.firePlayerEmote(fired);
-                };
-
-                // Touch
-                this.emoteBtn.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    const t = e.changedTouches[0];
-                    emoteStart(t.clientX, t.clientY, t.identifier);
-                }, { passive: false });
-                this.emoteBtn.addEventListener('touchmove', (e) => {
-                    e.preventDefault();
-                    for (let i = 0; i < e.changedTouches.length; i++) {
-                        const t = e.changedTouches[i];
-                        if (t.identifier === this.emoteJoystick.touchId) {
-                            emoteMove(t.clientX, t.clientY);
-                            break;
-                        }
-                    }
-                }, { passive: false });
-                const touchEndEmote = (e) => {
-                    e.preventDefault();
-                    for (let i = 0; i < e.changedTouches.length; i++) {
-                        if (e.changedTouches[i].identifier === this.emoteJoystick.touchId) {
-                            emoteEnd();
-                            break;
-                        }
-                    }
-                };
-                this.emoteBtn.addEventListener('touchend', touchEndEmote);
-                this.emoteBtn.addEventListener('touchcancel', touchEndEmote);
-
-                // Mouse (for desktop playtesting)
-                this.emoteBtn.addEventListener('mousedown', (e) => {
-                    e.preventDefault();
-                    emoteStart(e.clientX, e.clientY, 'mouse');
-                });
-                window.addEventListener('mousemove', (e) => {
-                    if (this.emoteJoystick.active && this.emoteJoystick.touchId === 'mouse') {
-                        emoteMove(e.clientX, e.clientY);
-                    }
-                });
-                window.addEventListener('mouseup', (e) => {
-                    if (this.emoteJoystick.active && this.emoteJoystick.touchId === 'mouse') {
-                        emoteEnd();
-                    }
+                // The stick (basement/controls-system.js touchStick): the knob leans up to 18 px; the slot under the finger lights
+                const E = this.emoteJoystick;
+                controls.touch.stick('emote', { zone: this.emoteBtn, knob: this.emoteKnob, travel: 18, slots: this.emoteOverlays, mouse: true,
+                    onStart: (S) => {
+                        Object.assign(E, { active: true, touchId: S.id, highlighted: null });
+                        this.emoteBtn.classList.add('dragging');
+                        gameUi.classList.add('emote-active');   // one class: the utility buttons fade out, the emote overlays in
+                    },
+                    onMove: (S) => { E.highlighted = S.slot; },
+                    onEnd: (S) => {
+                        gameUi.classList.remove('emote-active');
+                        this.emoteBtn.classList.remove('dragging');   // the knob eases home (CSS transition)
+                        Object.assign(E, { active: false, touchId: null, highlighted: null });
+                        if (S.slot) this.firePlayerEmote(S.slot);
+                    },
                 });
 
                 // Dialogue buttons: what each NPC's Accept and Decline do lives in story/npc-dialogue.js

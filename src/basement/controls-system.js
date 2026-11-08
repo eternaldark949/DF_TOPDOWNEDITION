@@ -100,7 +100,9 @@
             /** On-screen buttons as inputs: a finger (or the mouse) down on one presses it, lifting it, sliding
              *  off it or losing it releases it, so a HUD button can tap, hold or double tap like a key. While
              *  pressed the button wears the `held` class. (The sticks and gestures keep their own code.) */
-            constructor(system) { super(system, 'touch'); this.elements = {}; }
+            constructor(system) { super(system, 'touch'); this.elements = {}; this.sticks = {}; }
+            /** A touch stick (STICK PACKET, below): controls.touch.sticks[name]; its value is [x, y], -1..1. */
+            stick(name, packet) { return this.sticks[name] = new touchStick(this.system, name, packet); }
             /** BUTTON PACKETS: [[element or id, input], ...]  e.g. [['btn-heal', 'touchHeal']] */
             buttons(list) { for (const [el, input] of list) this.button(el, input); }
             button(el, input) {
@@ -109,6 +111,7 @@
                 this.elements[input] = el;
                 const down = e => {
                     e.preventDefault();
+                    if (e.button > 0) return;                     // a mouse's right or middle button
                     try { e.pointerId !== undefined && el.setPointerCapture(e.pointerId); } catch (_) { /* not capturable */ }
                     el.classList.add('held');
                     this.system.press(this, input, this.system.ev('touch', input, e));
@@ -120,6 +123,106 @@
             }
             /** Let go of one button (its finger is still down, but it no longer counts). */
             drop(input) { if (this.input_active.has(input)) { this.spent.add(input); if (this.armed[input]) this.armed[input] = new Set(); } this.elements[input]?.classList.remove('held'); }
+        }
+
+        /* A touch stick: one finger on a zone drives a knob. It does the parts every stick shares (which
+           finger is its own, where its centre is, the knob's travel, the ring, the slots) and hands each
+           sample to the game, which decides what the stick means (walk, aim, pick an emote).
+           STICK PACKET: {
+             zone       the element (or id) a finger lands on
+             knob       the element that moves, or null: it is set the CSS variables --lx / --ly (px from the
+                        centre; the shared .df-stick-knob style turns them into its transform)
+             base       an element shown under the thumb while held (anchor 'touch'; base_radius: half its size), or null
+             anchor     'touch': the centre is where the thumb lands (kept `edge` px in from the screen's
+                        sides) and drags count from the landing point; 'centre': the zone's centre
+             travel     px the knob may go (a number, or a function: it can change with a setting)
+             scale      () => the zone's zoom (drags are divided by it: the stick's own pixels)
+             ring       [in, out]: past `in` it is out, back inside `out` it is in again (hysteresis)
+             input      a touch input pressed while the stick is past the ring (e.g. 'touchFireRing')
+             slots      { key: element }: the slot under the finger is `highlighted`; onEnd gets it
+             mouse      true: a mouse can drag it too (desktop testing)
+             free       () => may a new finger take it? (default: not already held; a stick sharing its
+                        state with another device asks that state)
+             onStart(s, e), onMove(s, e) (false: leave the knob where it is), onEnd(s, e)
+           }
+           SAMPLE s: { id, x0, y0 (centre), dx, dy (from the centre or landing), far, angle,
+                       kx, ky (the knob, clamped to travel), out (past the ring), slot } */
+        class touchStick {
+            constructor(system, name, packet) {
+                Object.assign(this, { anchor: 'centre', base_radius: 0, travel: 40, scale: () => 1, edge: 0, ring: null, input: null, slots: null, mouse: false, free: () => !this.s.active, onStart() {}, onMove() {}, onEnd() {} }, packet);
+                this.system = system; this.name = name;
+                const el = x => typeof x === 'string' ? document.getElementById(x) : x;
+                this.zone = el(this.zone); this.knob = el(this.knob); this.base = el(this.base);
+                this.s = { id: null, active: false, x0: 0, y0: 0, lx: 0, ly: 0, dx: 0, dy: 0, far: 0, angle: 0, kx: 0, ky: 0, out: false, slot: null, rects: null };
+                this.value = [0, 0];
+                if (!this.zone) return;
+                const z = this.zone, own = (e, fn) => { for (let i = 0; i < e.changedTouches.length; i++) if (e.changedTouches[i].identifier === this.s.id) return fn(e.changedTouches[i]), true; return false; };
+                z.addEventListener('touchstart', e => { e.preventDefault(); if (this.free()) this.start(e.changedTouches[0], e); }, { passive: false });
+                z.addEventListener('touchmove', e => { e.preventDefault(); if (this.s.active) own(e, t => this.move(t, e)); }, { passive: false });
+                const end = e => { e.preventDefault(); if (this.s.active) own(e, () => this.end(e)); };
+                z.addEventListener('touchend', end); z.addEventListener('touchcancel', end);
+                if (this.mouse) {
+                    const m = e => ({ identifier: 'mouse', clientX: e.clientX, clientY: e.clientY });
+                    z.addEventListener('mousedown', e => { e.preventDefault(); if (this.free()) this.start(m(e), e); });
+                    window.addEventListener('mousemove', e => { if (this.s.active && this.s.id === 'mouse') this.move(m(e), e); });
+                    window.addEventListener('mouseup', e => { if (this.s.active && this.s.id === 'mouse') this.end(e); });
+                }
+            }
+            get maxTravel() { return typeof this.travel === 'function' ? this.travel() : this.travel; }
+            start(t, e) {
+                const s = this.s;
+                if (this.anchor === 'touch') {
+                    const W = window.innerWidth, H = window.innerHeight, ey = Math.min(this.edge, H * 0.24);   // a short screen: less margin top and bottom
+                    s.x0 = Math.max(this.edge, Math.min(W - this.edge, t.clientX)); s.y0 = Math.max(ey, Math.min(H - ey, t.clientY));
+                    s.lx = t.clientX; s.ly = t.clientY;
+                    if (this.base) Object.assign(this.base.style, { display: 'block', left: (s.x0 - this.base_radius) + 'px', top: (s.y0 - this.base_radius) + 'px' });
+                } else {
+                    const r = this.zone.getBoundingClientRect();
+                    s.x0 = s.lx = r.left + r.width / 2; s.y0 = s.ly = r.top + r.height / 2;
+                }
+                Object.assign(s, { id: t.identifier, active: true, dx: 0, dy: 0, far: 0, angle: 0, kx: 0, ky: 0, out: false, slot: null, landX: t.clientX, landY: t.clientY });
+                this.setKnob(0, 0);
+                this.onStart(s, e);
+                if (this.slots) s.rects = Object.entries(this.slots).map(([key, el]) => [key, el.getBoundingClientRect()]);   // after onStart: it may show them
+            }
+            move(t, e) {
+                const s = this.s, k = this.scale() || 1, T = this.maxTravel;
+                s.dx = (t.clientX - s.lx) / k; s.dy = (t.clientY - s.ly) / k; s.far = Math.hypot(s.dx, s.dy); s.angle = Math.atan2(s.dy, s.dx);
+                const d = Math.min(s.far, T); s.kx = Math.cos(s.angle) * d; s.ky = Math.sin(s.angle) * d;
+                this.value = [s.kx / T, s.ky / T];
+                if (this.ring) this.setOut(s.far >= this.ring[0] || (s.out && s.far > this.ring[1]));
+                if (s.rects) {
+                    const hit = s.rects.find(([, r]) => t.clientX >= r.left && t.clientX <= r.right && t.clientY >= r.top && t.clientY <= r.bottom);
+                    const key = hit ? hit[0] : null;
+                    if (key !== s.slot) { s.slot && this.slots[s.slot].classList.remove('highlighted'); key && this.slots[key].classList.add('highlighted'); s.slot = key; }
+                }
+                if (this.onMove(s, e) !== false) this.setKnob(s.kx, s.ky);
+            }
+            setOut(out) {
+                const s = this.s; if (out === s.out) return; s.out = out;
+                if (!this.input) return;
+                const T = this.system.touch, ev = this.system.ev('touch', this.input);
+                out ? this.system.press(T, this.input, ev) : this.system.release(T, this.input, ev);
+            }
+            end(e) {
+                const s = this.s;
+                this.onEnd(s, e);
+                this.release();
+            }
+            /** Let go: back to rest, nothing more is sent (a lost finger, a menu opening). */
+            release() {
+                const s = this.s;
+                this.setOut(false);
+                if (s.slot) this.slots[s.slot].classList.remove('highlighted');
+                Object.assign(s, { id: null, active: false, dx: 0, dy: 0, far: 0, kx: 0, ky: 0, slot: null, rects: null });
+                this.value = [0, 0];
+                this.setKnob(0, 0);
+                if (this.base && this.anchor === 'touch') this.base.style.display = 'none';
+            }
+            setKnob(x, y) {
+                if (!this.knob) return;
+                this.knob.style.setProperty('--lx', x + 'px'); this.knob.style.setProperty('--ly', y + 'px');
+            }
         }
 
         class gamepadInstance extends inputInstance {
@@ -214,6 +317,7 @@
             }
             /** Let go of everything held: nothing fires or reads as held until it is pressed again. */
             clear() {
+                for (const k in this.touch.sticks) this.touch.sticks[k].release();
                 for (const i of this.touch.input_active) this.touch.elements[i]?.classList.remove('held');
                 for (const inst of [this.keyboard, this.mouse, this.touch, this.gamepad]) { for (const i of inst.input_active) inst.spent.add(i); inst.armed = {}; }
                 this.pending.length = 0;

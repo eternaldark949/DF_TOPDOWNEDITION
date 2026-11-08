@@ -75,26 +75,10 @@ engineMixin({
         }
     },
     initQuickDrawControl() {
-        const btn = this.holsterBtn;
-        let pointer = null, held = false, timer = null;
-        this._cancelQuickDrawHold = () => { clearTimeout(timer); timer = null; pointer = null; held = false; };
-        btn.title = 'Tap to holster/draw. Hold for quick draw.';
-        btn.addEventListener('pointerdown', e => {
-            e.preventDefault(); e.stopPropagation();
-            if (pointer !== null || (e.button !== undefined && e.button !== 0) || !this.running || this.paused || hudInputBlocked() || this.isDriving) return;
-            pointer = e.pointerId; held = false;
-            try { btn.setPointerCapture(pointer); } catch (_) {}
-            timer = setTimeout(() => { held = true; this.armQuickDraw(); }, 450);
-        });
-        btn.addEventListener('pointerup', e => {
-            if (e.pointerId !== pointer) return;
-            e.preventDefault(); const tap = !held; this._cancelQuickDrawHold();
-            if (!tap || this.paused || !this.running || hudInputBlocked()) return;
-            if (this._quickDraw) { this.cancelQuickDraw(); this.setWeaponHolstered(false); }
-            else this.setWeaponHolstered(!this.weaponHolstered);
-        });
-        for (const event of ['pointercancel', 'lostpointercapture']) btn.addEventListener(event, this._cancelQuickDrawHold);
-        btn.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+        // The holster button is the touch input 'touchHolster' (directory/game-controls.js): tap holsters or
+        // draws, held 0.45 s it arms the quick draw
+        this.holsterBtn.title = 'Tap to holster/draw. Hold for quick draw.';
+        this._cancelQuickDrawHold = () => controls.touch.drop('touchHolster');
         window.addEventListener('blur', () => clearGameplayInputs(this));
     }
 });

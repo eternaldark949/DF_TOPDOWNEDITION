@@ -28,7 +28,8 @@
             interact: ['e', 'gamepadA', 'touchInteract'],
             doors: ['f', 'gamepadY', 'touchDoors'],
             flit: ['gamepadB', 'touchFlit'],
-            holster: ['gamepadX'],
+            holster: ['gamepadX', ['touchHolster', TAP]],
+            quick_draw: [['touchHolster', HELD, 0.45]],
             sneak: ['c', 'gamepadLBumper', 'touchSneak'],
             booster: ['h', ['gamepadRBumper', TAP], ['touchHeal', TAP]],
             booster_ally: ['j', ['gamepadRBumper', HELD, 0.3], ['touchHeal', HELD, 0.3]],
@@ -80,6 +81,7 @@
             ['doors', LIVE, g => (dfShown(g.transitionBtn) || !g.isDriving && g.activeMap.transitions && g._transitionGrid.query(g.player.x, g.player.y)) && g.triggerTransition()],
             ['flit', (g, ev) => PLAY(g, ev) && !g.isDriving, (g, ev) => ev.device === 'gamepad' ? g.triggerFlit(undefined, 'pad') && controls.gamepad.rumble(90, 0.5) : g.triggerFlit()],
             ['holster', (g, ev) => PLAY(g, ev) && !g.isDriving, g => g._quickDraw ? (g.cancelQuickDraw(), g.setWeaponHolstered(false)) : g.setWeaponHolstered(!g.weaponHolstered)],
+            ['quick_draw', (g, ev) => PLAY(g, ev) && !g.isDriving, g => g.armQuickDraw()],
             ['sneak', (g, ev) => PLAY(g, ev) && !ev.ctrl && !g.isDriving, g => g.toggleSneak()],   // engine/sneak.js
             ['booster', PLAY, g => g.useBooster()],
             ['booster_ally', PLAY, g => g.useBoosterOnAlly()],
@@ -104,7 +106,7 @@
         const dfTouchButtons = [
             ['btn-interact', 'touchInteract'], ['btn-transition', 'touchDoors'], ['btn-heal', 'touchHeal'], ['btn-flit', 'touchFlit'],
             ['btn-autodrive', 'touchAutoDrive'], ['btn-handbrake', 'touchHandbrake'], ['btn-zib-skip', 'touchZibSkip'], ['btn-sneak', 'touchSneak'],
-            ['btn-nv', 'touchNightVision'], ['btn-pause', 'touchPause'], ['btn-grab', 'touchGrab'], ['btn-rot-l', 'touchTurnLeft'], ['btn-rot-r', 'touchTurnRight'],
+            ['btn-nv', 'touchNightVision'], ['btn-pause', 'touchPause'], ['btn-grab', 'touchGrab'], ['btn-rot-l', 'touchTurnLeft'], ['btn-rot-r', 'touchTurnRight'], ['btn-holster', 'touchHolster'],
         ];
 
         const controls = new controlsSystem({ keymap: dfKeyMap, actions: dfActions, context: () => typeof game !== 'undefined' ? game : null });

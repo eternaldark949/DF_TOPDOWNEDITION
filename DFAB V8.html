@@ -2105,42 +2105,20 @@
         
         /* --- ACTION BUTTONS & INPUTS --- */
         
+        /* Touch sticks (basement/controls-system.js touchStick): one look for every stick.
+           .df-stick: the base disc, almost black with a hint of crimson; size it with width/height.
+           .df-stick-knob: the champagne knob, moved by --lx / --ly (px from the centre); .emoji: a face instead */
+        .df-stick { position: absolute; border-radius: 50%; border: none; background: rgba(20, 0, 10, 0.4); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5); backdrop-filter: blur(2px); user-select: none; }
+        .df-stick-knob {
+            position: absolute; top: 50%; left: 50%; width: 36px; height: 36px; border-radius: 50%; pointer-events: none;
+            --lx: 0px; --ly: 0px; transform: translate(calc(-50% + var(--lx)), calc(-50% + var(--ly)));
+            background: radial-gradient(circle at 35% 35%, #fffbf2 0%, #e8dcc0 40%, #c4a980 100%);   /* champagne luxe */
+            box-shadow: inset 2px 2px 3px rgba(255, 255, 255, 1.0), inset -2px -2px 4px rgba(100, 80, 60, 0.4), 0 5px 10px rgba(0, 0, 0, 0.5);   /* bevel */
+        }
+        .df-stick-knob.emoji { width: auto; height: auto; border-radius: 0; background: none; box-shadow: none; font-size: max(6px, 2.2rem - var(--font-trim)); line-height: 1; }
+
         /* 1. Fire Button (Right Joystick Container) */
-        #btn-fire { 
-            position: absolute; 
-            bottom: 140px; 
-            right: 60px; 
-            width: 80px; 
-            height: 80px; 
-            border-radius: 50%; 
-            /* Darker, almost black background with hint of crimson */
-            background: rgba(20, 0, 10, 0.4); 
-            border: none; 
-            color: #ff0055; 
-            font-size: max(6px, 1.5rem - var(--font-trim)); 
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            z-index: 25; 
-            pointer-events: auto; 
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(2px);
-        }
-        
-        #fire-joystick-knob {
-            position: absolute; 
-            top: 50%; 
-            left: 50%; 
-            width: 36px; 
-            height: 36px; 
-            border-radius: 50%; 
-            transform: translate(-50%, -50%); 
-            pointer-events: none;
-            /* Champagne Luxe Gradient */
-            background: radial-gradient(circle at 35% 35%, #fffbf2 0%, #e8dcc0 40%, #c4a980 100%);
-            /* Bevel Effect */
-            box-shadow: inset 2px 2px 3px rgba(255, 255, 255, 1.0), inset -2px -2px 4px rgba(100, 80, 60, 0.4), 0 5px 10px rgba(0, 0, 0, 0.5);
-        }
+        #btn-fire { bottom: 140px; right: 60px; width: 80px; height: 80px; color: #ff0055; font-size: max(6px, 1.5rem - var(--font-trim)); display: flex; justify-content: center; align-items: center; z-index: 25; pointer-events: auto; }
 
         /* 2. Utility Buttons (Heal, NV, Flit, Auto) */
         /* Updated: Tighter spacing ("Cat's Paw") & Darker Background */
@@ -2244,39 +2222,10 @@
 
         /* Emote Joystick (replaces fire button when holstered)
            Pattern matches #btn-fire: stationary outer ring + inner knob that moves. */
-        #btn-emote {
-            position: absolute;
-            bottom: 140px;
-            right: 60px;
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            background: rgba(20, 0, 10, 0.4);
-            border: none;
-            display: none; /* shown when weaponHolstered */
-            z-index: 25;
-            pointer-events: auto;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(2px);
-            user-select: none;
-        }
+        #btn-emote { bottom: 140px; right: 60px; width: 80px; height: 80px; display: none; /* shown when weaponHolstered */ z-index: 25; pointer-events: auto; }
         #btn-emote.dragging { background: rgba(255, 170, 68, 0.25); }
 
-        #emote-joystick-knob {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            /* Default centered transform — JS adds an extra translate during drag.
-               --lx/--ly are CSS custom properties so JS can set them once and the
-               transform recomposes; on release we clear them and the knob eases home. */
-            --lx: 0px;
-            --ly: 0px;
-            transform: translate(calc(-50% + var(--lx)), calc(-50% + var(--ly)));
-            pointer-events: none;
-            font-size: max(6px, 2.2rem - var(--font-trim));
-            line-height: 1;
-            transition: transform 0.18s ease;
-        }
+        #emote-joystick-knob { transition: transform 0.18s ease; }   /* let go: the face eases home */
         #btn-emote.dragging #emote-joystick-knob {
             transition: none; /* live drag — no easing while finger moves */
         }
@@ -2346,30 +2295,9 @@
 
         /* 4. Movement Joystick Visuals */
         #joystick-zone { 
-            position: absolute; 
-            width: 128px;   /* the knob's full-speed reach (WALK, initJoystick) sits just inside; BASE there is half of this */
-            height: 128px; 
-            background: rgba(20, 0, 10, 0.4); /* Almost black */
-            border: none;
-            border-radius: 50%; 
+            width: 128px; height: 128px;   /* the knob's full-speed reach (WALK, initJoystick) sits just inside; BASE there is half of this */
             pointer-events: none; /* Must be none so touches pass through to input-zone */
-            display: none; 
-            z-index: 26; 
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(2px);
-        }
-        
-        #joystick-knob { 
-            position: absolute; 
-            top: 50%; 
-            left: 50%; 
-            width: 36px; 
-            height: 36px; 
-            border-radius: 50%; 
-            transform: translate(-50%, -50%); 
-            /* Champagne Luxe Style */
-            background: radial-gradient(circle at 35% 35%, #fffbf2 0%, #e8dcc0 40%, #c4a980 100%);
-            box-shadow: inset 2px 2px 3px rgba(255, 255, 255, 1.0), inset -2px -2px 4px rgba(100, 80, 60, 0.4), 0 5px 10px rgba(0, 0, 0, 0.5);
+            display: none; z-index: 26;
         }
 
 
@@ -5009,12 +4937,12 @@
                 <div id="grab-rotate"><div class="grab-rot" id="btn-rot-l" title="Turn left (Shift+R)">⟲</div><div class="grab-rot" id="btn-rot-r" title="Turn right (R)">⟳</div></div>
             </div>
             
-            <div id="btn-fire">
+            <div id="btn-fire" class="df-stick">
                 <div id="fire-ring"></div>
                 <div id="fire-band"></div>
-                <div id="fire-joystick-knob"></div>
+                <div id="fire-joystick-knob" class="df-stick-knob"></div>
             </div>
-            <div id="btn-emote"><div id="emote-joystick-knob">😊</div></div>
+            <div id="btn-emote" class="df-stick"><div id="emote-joystick-knob" class="df-stick-knob emoji">😊</div></div>
             <div id="emote-smile" class="emote-overlay">😊</div>
             <div id="emote-zany"  class="emote-overlay">🤪</div>
             <div id="emote-cry"   class="emote-overlay">😭</div>
@@ -5030,9 +4958,9 @@
 
             <div id="input-zone-left"></div> 
             <div id="input-zone-look"></div>
-            <div id="joystick-zone">
+            <div id="joystick-zone" class="df-stick">
                 <div id="joystick-ring"></div>
-                <div id="joystick-knob"></div>
+                <div id="joystick-knob" class="df-stick-knob"></div>
             </div>
             
             <div id="phone-overlay">
@@ -5868,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '8c7cc09761d8';
+        const DFAB_BUILD = 'a65cb9c18993';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="26">
         // ===== LV0 BASEMENT =====
@@ -6564,7 +6492,7 @@
             }
         }
     </script>
-    <script type="text/dfab" data-src="basement/controls-system.js" data-cost="208">
+    <script type="text/dfab" data-src="basement/controls-system.js" data-cost="288">
         // ===== LV0 BASEMENT =====
         // The controls system: every key, mouse button and gamepad button goes through one place. It knows
         // nothing about any game: the game hands it a keymap (action -> the inputs bound to it) and an
@@ -6667,7 +6595,9 @@
             /** On-screen buttons as inputs: a finger (or the mouse) down on one presses it, lifting it, sliding
              *  off it or losing it releases it, so a HUD button can tap, hold or double tap like a key. While
              *  pressed the button wears the `held` class. (The sticks and gestures keep their own code.) */
-            constructor(system) { super(system, 'touch'); this.elements = {}; }
+            constructor(system) { super(system, 'touch'); this.elements = {}; this.sticks = {}; }
+            /** A touch stick (STICK PACKET, below): controls.touch.sticks[name]; its value is [x, y], -1..1. */
+            stick(name, packet) { return this.sticks[name] = new touchStick(this.system, name, packet); }
             /** BUTTON PACKETS: [[element or id, input], ...]  e.g. [['btn-heal', 'touchHeal']] */
             buttons(list) { for (const [el, input] of list) this.button(el, input); }
             button(el, input) {
@@ -6676,6 +6606,7 @@
                 this.elements[input] = el;
                 const down = e => {
                     e.preventDefault();
+                    if (e.button > 0) return;                     // a mouse's right or middle button
                     try { e.pointerId !== undefined && el.setPointerCapture(e.pointerId); } catch (_) { /* not capturable */ }
                     el.classList.add('held');
                     this.system.press(this, input, this.system.ev('touch', input, e));
@@ -6687,6 +6618,106 @@
             }
             /** Let go of one button (its finger is still down, but it no longer counts). */
             drop(input) { if (this.input_active.has(input)) { this.spent.add(input); if (this.armed[input]) this.armed[input] = new Set(); } this.elements[input]?.classList.remove('held'); }
+        }
+
+        /* A touch stick: one finger on a zone drives a knob. It does the parts every stick shares (which
+           finger is its own, where its centre is, the knob's travel, the ring, the slots) and hands each
+           sample to the game, which decides what the stick means (walk, aim, pick an emote).
+           STICK PACKET: {
+             zone       the element (or id) a finger lands on
+             knob       the element that moves, or null: it is set the CSS variables --lx / --ly (px from the
+                        centre; the shared .df-stick-knob style turns them into its transform)
+             base       an element shown under the thumb while held (anchor 'touch'; base_radius: half its size), or null
+             anchor     'touch': the centre is where the thumb lands (kept `edge` px in from the screen's
+                        sides) and drags count from the landing point; 'centre': the zone's centre
+             travel     px the knob may go (a number, or a function: it can change with a setting)
+             scale      () => the zone's zoom (drags are divided by it: the stick's own pixels)
+             ring       [in, out]: past `in` it is out, back inside `out` it is in again (hysteresis)
+             input      a touch input pressed while the stick is past the ring (e.g. 'touchFireRing')
+             slots      { key: element }: the slot under the finger is `highlighted`; onEnd gets it
+             mouse      true: a mouse can drag it too (desktop testing)
+             free       () => may a new finger take it? (default: not already held; a stick sharing its
+                        state with another device asks that state)
+             onStart(s, e), onMove(s, e) (false: leave the knob where it is), onEnd(s, e)
+           }
+           SAMPLE s: { id, x0, y0 (centre), dx, dy (from the centre or landing), far, angle,
+                       kx, ky (the knob, clamped to travel), out (past the ring), slot } */
+        class touchStick {
+            constructor(system, name, packet) {
+                Object.assign(this, { anchor: 'centre', base_radius: 0, travel: 40, scale: () => 1, edge: 0, ring: null, input: null, slots: null, mouse: false, free: () => !this.s.active, onStart() {}, onMove() {}, onEnd() {} }, packet);
+                this.system = system; this.name = name;
+                const el = x => typeof x === 'string' ? document.getElementById(x) : x;
+                this.zone = el(this.zone); this.knob = el(this.knob); this.base = el(this.base);
+                this.s = { id: null, active: false, x0: 0, y0: 0, lx: 0, ly: 0, dx: 0, dy: 0, far: 0, angle: 0, kx: 0, ky: 0, out: false, slot: null, rects: null };
+                this.value = [0, 0];
+                if (!this.zone) return;
+                const z = this.zone, own = (e, fn) => { for (let i = 0; i < e.changedTouches.length; i++) if (e.changedTouches[i].identifier === this.s.id) return fn(e.changedTouches[i]), true; return false; };
+                z.addEventListener('touchstart', e => { e.preventDefault(); if (this.free()) this.start(e.changedTouches[0], e); }, { passive: false });
+                z.addEventListener('touchmove', e => { e.preventDefault(); if (this.s.active) own(e, t => this.move(t, e)); }, { passive: false });
+                const end = e => { e.preventDefault(); if (this.s.active) own(e, () => this.end(e)); };
+                z.addEventListener('touchend', end); z.addEventListener('touchcancel', end);
+                if (this.mouse) {
+                    const m = e => ({ identifier: 'mouse', clientX: e.clientX, clientY: e.clientY });
+                    z.addEventListener('mousedown', e => { e.preventDefault(); if (this.free()) this.start(m(e), e); });
+                    window.addEventListener('mousemove', e => { if (this.s.active && this.s.id === 'mouse') this.move(m(e), e); });
+                    window.addEventListener('mouseup', e => { if (this.s.active && this.s.id === 'mouse') this.end(e); });
+                }
+            }
+            get maxTravel() { return typeof this.travel === 'function' ? this.travel() : this.travel; }
+            start(t, e) {
+                const s = this.s;
+                if (this.anchor === 'touch') {
+                    const W = window.innerWidth, H = window.innerHeight, ey = Math.min(this.edge, H * 0.24);   // a short screen: less margin top and bottom
+                    s.x0 = Math.max(this.edge, Math.min(W - this.edge, t.clientX)); s.y0 = Math.max(ey, Math.min(H - ey, t.clientY));
+                    s.lx = t.clientX; s.ly = t.clientY;
+                    if (this.base) Object.assign(this.base.style, { display: 'block', left: (s.x0 - this.base_radius) + 'px', top: (s.y0 - this.base_radius) + 'px' });
+                } else {
+                    const r = this.zone.getBoundingClientRect();
+                    s.x0 = s.lx = r.left + r.width / 2; s.y0 = s.ly = r.top + r.height / 2;
+                }
+                Object.assign(s, { id: t.identifier, active: true, dx: 0, dy: 0, far: 0, angle: 0, kx: 0, ky: 0, out: false, slot: null, landX: t.clientX, landY: t.clientY });
+                this.setKnob(0, 0);
+                this.onStart(s, e);
+                if (this.slots) s.rects = Object.entries(this.slots).map(([key, el]) => [key, el.getBoundingClientRect()]);   // after onStart: it may show them
+            }
+            move(t, e) {
+                const s = this.s, k = this.scale() || 1, T = this.maxTravel;
+                s.dx = (t.clientX - s.lx) / k; s.dy = (t.clientY - s.ly) / k; s.far = Math.hypot(s.dx, s.dy); s.angle = Math.atan2(s.dy, s.dx);
+                const d = Math.min(s.far, T); s.kx = Math.cos(s.angle) * d; s.ky = Math.sin(s.angle) * d;
+                this.value = [s.kx / T, s.ky / T];
+                if (this.ring) this.setOut(s.far >= this.ring[0] || (s.out && s.far > this.ring[1]));
+                if (s.rects) {
+                    const hit = s.rects.find(([, r]) => t.clientX >= r.left && t.clientX <= r.right && t.clientY >= r.top && t.clientY <= r.bottom);
+                    const key = hit ? hit[0] : null;
+                    if (key !== s.slot) { s.slot && this.slots[s.slot].classList.remove('highlighted'); key && this.slots[key].classList.add('highlighted'); s.slot = key; }
+                }
+                if (this.onMove(s, e) !== false) this.setKnob(s.kx, s.ky);
+            }
+            setOut(out) {
+                const s = this.s; if (out === s.out) return; s.out = out;
+                if (!this.input) return;
+                const T = this.system.touch, ev = this.system.ev('touch', this.input);
+                out ? this.system.press(T, this.input, ev) : this.system.release(T, this.input, ev);
+            }
+            end(e) {
+                const s = this.s;
+                this.onEnd(s, e);
+                this.release();
+            }
+            /** Let go: back to rest, nothing more is sent (a lost finger, a menu opening). */
+            release() {
+                const s = this.s;
+                this.setOut(false);
+                if (s.slot) this.slots[s.slot].classList.remove('highlighted');
+                Object.assign(s, { id: null, active: false, dx: 0, dy: 0, far: 0, kx: 0, ky: 0, slot: null, rects: null });
+                this.value = [0, 0];
+                this.setKnob(0, 0);
+                if (this.base && this.anchor === 'touch') this.base.style.display = 'none';
+            }
+            setKnob(x, y) {
+                if (!this.knob) return;
+                this.knob.style.setProperty('--lx', x + 'px'); this.knob.style.setProperty('--ly', y + 'px');
+            }
         }
 
         class gamepadInstance extends inputInstance {
@@ -6781,6 +6812,7 @@
             }
             /** Let go of everything held: nothing fires or reads as held until it is pressed again. */
             clear() {
+                for (const k in this.touch.sticks) this.touch.sticks[k].release();
                 for (const i of this.touch.input_active) this.touch.elements[i]?.classList.remove('held');
                 for (const inst of [this.keyboard, this.mouse, this.touch, this.gamepad]) { for (const i of inst.input_active) inst.spent.add(i); inst.armed = {}; }
                 this.pending.length = 0;
@@ -13839,7 +13871,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
 
     </script>
-    <script type="text/dfab" data-src="directory/game-controls.js" data-cost="93">
+    <script type="text/dfab" data-src="directory/game-controls.js" data-cost="95">
         // ===== LV2 DIRECTORY =====
         // The game's controls: which keys and buttons do what (dfKeyMap), and the actions they fire
         // (dfActions), handed to the Basement's controls system (basement/controls-system.js).
@@ -13870,7 +13902,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             interact: ['e', 'gamepadA', 'touchInteract'],
             doors: ['f', 'gamepadY', 'touchDoors'],
             flit: ['gamepadB', 'touchFlit'],
-            holster: ['gamepadX'],
+            holster: ['gamepadX', ['touchHolster', TAP]],
+            quick_draw: [['touchHolster', HELD, 0.45]],
             sneak: ['c', 'gamepadLBumper', 'touchSneak'],
             booster: ['h', ['gamepadRBumper', TAP], ['touchHeal', TAP]],
             booster_ally: ['j', ['gamepadRBumper', HELD, 0.3], ['touchHeal', HELD, 0.3]],
@@ -13922,6 +13955,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             ['doors', LIVE, g => (dfShown(g.transitionBtn) || !g.isDriving && g.activeMap.transitions && g._transitionGrid.query(g.player.x, g.player.y)) && g.triggerTransition()],
             ['flit', (g, ev) => PLAY(g, ev) && !g.isDriving, (g, ev) => ev.device === 'gamepad' ? g.triggerFlit(undefined, 'pad') && controls.gamepad.rumble(90, 0.5) : g.triggerFlit()],
             ['holster', (g, ev) => PLAY(g, ev) && !g.isDriving, g => g._quickDraw ? (g.cancelQuickDraw(), g.setWeaponHolstered(false)) : g.setWeaponHolstered(!g.weaponHolstered)],
+            ['quick_draw', (g, ev) => PLAY(g, ev) && !g.isDriving, g => g.armQuickDraw()],
             ['sneak', (g, ev) => PLAY(g, ev) && !ev.ctrl && !g.isDriving, g => g.toggleSneak()],   // engine/sneak.js
             ['booster', PLAY, g => g.useBooster()],
             ['booster_ally', PLAY, g => g.useBoosterOnAlly()],
@@ -13946,7 +13980,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         const dfTouchButtons = [
             ['btn-interact', 'touchInteract'], ['btn-transition', 'touchDoors'], ['btn-heal', 'touchHeal'], ['btn-flit', 'touchFlit'],
             ['btn-autodrive', 'touchAutoDrive'], ['btn-handbrake', 'touchHandbrake'], ['btn-zib-skip', 'touchZibSkip'], ['btn-sneak', 'touchSneak'],
-            ['btn-nv', 'touchNightVision'], ['btn-pause', 'touchPause'], ['btn-grab', 'touchGrab'], ['btn-rot-l', 'touchTurnLeft'], ['btn-rot-r', 'touchTurnRight'],
+            ['btn-nv', 'touchNightVision'], ['btn-pause', 'touchPause'], ['btn-grab', 'touchGrab'], ['btn-rot-l', 'touchTurnLeft'], ['btn-rot-r', 'touchTurnRight'], ['btn-holster', 'touchHolster'],
         ];
 
         const controls = new controlsSystem({ keymap: dfKeyMap, actions: dfActions, context: () => typeof game !== 'undefined' ? game : null });
@@ -73938,7 +73972,7 @@ Object.assign(TrafficVehicle.prototype, {
         }
 
     </script>
-    <script type="text/dfab" data-src="engine/events.js" data-cost="227">
+    <script type="text/dfab" data-src="engine/events.js" data-cost="169">
         // GameEngine — Input and UI event wiring (keyboard, touch, buttons).
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -74138,131 +74172,22 @@ Object.assign(TrafficVehicle.prototype, {
                 // Drag from emote button, four overlays appear over heal/nv/flit/holster slots.
                 // Drag finger to a slot → release fires that emote.
                 const gameUi = document.getElementById('game-ui');
-                const emoteEntries = Object.entries(this.emoteOverlays);
 
-                const emoteStart = (clientX, clientY, touchId) => {
-                    if (this.emoteJoystick.active) return;
-                    this.emoteJoystick.active = true;
-                    this.emoteJoystick.touchId = touchId;
-                    this.emoteJoystick.highlighted = null;
-                    this.emoteBtn.classList.add('dragging');
-                    // Single class toggle drives the cat's-paw crossfade —
-                    // utility buttons fade out, emote overlays fade in.
-                    gameUi.classList.add('emote-active');
-                    // Cache rects AFTER class toggle — getBoundingClientRect forces
-                    // synchronous layout so values are valid even mid-fade.
-                    // Using rect math (not elementFromPoint) because the overlays carry
-                    // pointer-events: none to keep the drag from being stolen.
-                    this.emoteJoystick.rects = emoteEntries.map(([key, el]) => ({
-                        key,
-                        rect: el.getBoundingClientRect()
-                    }));
-                    // Cache emote button center for knob-lean translation.
-                    const btnRect = this.emoteBtn.getBoundingClientRect();
-                    this.emoteJoystick.centerX = btnRect.left + btnRect.width / 2;
-                    this.emoteJoystick.centerY = btnRect.top + btnRect.height / 2;
-                };
-                const emoteMove = (clientX, clientY) => {
-                    if (!this.emoteJoystick.active) return;
-                    let nextHighlight = null;
-                    for (const { key, rect } of this.emoteJoystick.rects) {
-                        if (clientX >= rect.left && clientX <= rect.right &&
-                            clientY >= rect.top  && clientY <= rect.bottom) {
-                            nextHighlight = key;
-                            break;
-                        }
-                    }
-                    if (nextHighlight !== this.emoteJoystick.highlighted) {
-                        if (this.emoteJoystick.highlighted) {
-                            this.emoteOverlays[this.emoteJoystick.highlighted].classList.remove('highlighted');
-                        }
-                        if (nextHighlight) {
-                            this.emoteOverlays[nextHighlight].classList.add('highlighted');
-                        }
-                        this.emoteJoystick.highlighted = nextHighlight;
-                    }
-                    // Knob-lean — translate the inner knob toward the finger,
-                    // clamped to MAX_LEAN so it stays inside the ring.
-                    // Using CSS custom properties means the knob's base centering
-                    // transform (translate(-50%, -50%)) stays intact; --lx/--ly
-                    // just add the offset.
-                    const dx = clientX - this.emoteJoystick.centerX;
-                    const dy = clientY - this.emoteJoystick.centerY;
-                    const dist = Math.hypot(dx, dy);
-                    const MAX_LEAN = 18;
-                    if (dist > 0) {
-                        const clamped = Math.min(dist, MAX_LEAN);
-                        const tx = (dx / dist) * clamped;
-                        const ty = (dy / dist) * clamped;
-                        this.emoteKnob.style.setProperty('--lx', tx + 'px');
-                        this.emoteKnob.style.setProperty('--ly', ty + 'px');
-                    } else {
-                        this.emoteKnob.style.setProperty('--lx', '0px');
-                        this.emoteKnob.style.setProperty('--ly', '0px');
-                    }
-                };
-                const emoteEnd = () => {
-                    if (!this.emoteJoystick.active) return;
-                    const fired = this.emoteJoystick.highlighted;
-                    // Clear highlight class but leave the crossfade to CSS — class
-                    // toggle on game-ui handles the fade-out for both groups.
-                    if (fired) {
-                        this.emoteOverlays[fired].classList.remove('highlighted');
-                    }
-                    gameUi.classList.remove('emote-active');
-                    this.emoteBtn.classList.remove('dragging');
-                    // Snap-back — clearing the inline custom props lets the CSS
-                    // `transition: transform 0.18s` ease the knob home.
-                    this.emoteKnob.style.setProperty('--lx', '0px');
-                    this.emoteKnob.style.setProperty('--ly', '0px');
-                    this.emoteJoystick.active = false;
-                    this.emoteJoystick.touchId = null;
-                    this.emoteJoystick.highlighted = null;
-                    if (fired) this.firePlayerEmote(fired);
-                };
-
-                // Touch
-                this.emoteBtn.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    const t = e.changedTouches[0];
-                    emoteStart(t.clientX, t.clientY, t.identifier);
-                }, { passive: false });
-                this.emoteBtn.addEventListener('touchmove', (e) => {
-                    e.preventDefault();
-                    for (let i = 0; i < e.changedTouches.length; i++) {
-                        const t = e.changedTouches[i];
-                        if (t.identifier === this.emoteJoystick.touchId) {
-                            emoteMove(t.clientX, t.clientY);
-                            break;
-                        }
-                    }
-                }, { passive: false });
-                const touchEndEmote = (e) => {
-                    e.preventDefault();
-                    for (let i = 0; i < e.changedTouches.length; i++) {
-                        if (e.changedTouches[i].identifier === this.emoteJoystick.touchId) {
-                            emoteEnd();
-                            break;
-                        }
-                    }
-                };
-                this.emoteBtn.addEventListener('touchend', touchEndEmote);
-                this.emoteBtn.addEventListener('touchcancel', touchEndEmote);
-
-                // Mouse (for desktop playtesting)
-                this.emoteBtn.addEventListener('mousedown', (e) => {
-                    e.preventDefault();
-                    emoteStart(e.clientX, e.clientY, 'mouse');
-                });
-                window.addEventListener('mousemove', (e) => {
-                    if (this.emoteJoystick.active && this.emoteJoystick.touchId === 'mouse') {
-                        emoteMove(e.clientX, e.clientY);
-                    }
-                });
-                window.addEventListener('mouseup', (e) => {
-                    if (this.emoteJoystick.active && this.emoteJoystick.touchId === 'mouse') {
-                        emoteEnd();
-                    }
+                // The stick (basement/controls-system.js touchStick): the knob leans up to 18 px; the slot under the finger lights
+                const E = this.emoteJoystick;
+                controls.touch.stick('emote', { zone: this.emoteBtn, knob: this.emoteKnob, travel: 18, slots: this.emoteOverlays, mouse: true,
+                    onStart: (S) => {
+                        Object.assign(E, { active: true, touchId: S.id, highlighted: null });
+                        this.emoteBtn.classList.add('dragging');
+                        gameUi.classList.add('emote-active');   // one class: the utility buttons fade out, the emote overlays in
+                    },
+                    onMove: (S) => { E.highlighted = S.slot; },
+                    onEnd: (S) => {
+                        gameUi.classList.remove('emote-active');
+                        this.emoteBtn.classList.remove('dragging');   // the knob eases home (CSS transition)
+                        Object.assign(E, { active: false, touchId: null, highlighted: null });
+                        if (S.slot) this.firePlayerEmote(S.slot);
+                    },
                 });
 
                 // Dialogue buttons: what each NPC's Accept and Decline do lives in story/npc-dialogue.js
@@ -75247,7 +75172,7 @@ Object.assign(TrafficVehicle.prototype, {
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/quick-draw.js" data-cost="56">
+    <script type="text/dfab" data-src="engine/quick-draw.js" data-cost="46">
 // Quick draw is a transient combat mode. Shots still use fireWeapon and its normal bonuses.
 engineMixin({
     setWeaponHolstered(on) {
@@ -75325,26 +75250,10 @@ engineMixin({
         }
     },
     initQuickDrawControl() {
-        const btn = this.holsterBtn;
-        let pointer = null, held = false, timer = null;
-        this._cancelQuickDrawHold = () => { clearTimeout(timer); timer = null; pointer = null; held = false; };
-        btn.title = 'Tap to holster/draw. Hold for quick draw.';
-        btn.addEventListener('pointerdown', e => {
-            e.preventDefault(); e.stopPropagation();
-            if (pointer !== null || (e.button !== undefined && e.button !== 0) || !this.running || this.paused || hudInputBlocked() || this.isDriving) return;
-            pointer = e.pointerId; held = false;
-            try { btn.setPointerCapture(pointer); } catch (_) {}
-            timer = setTimeout(() => { held = true; this.armQuickDraw(); }, 450);
-        });
-        btn.addEventListener('pointerup', e => {
-            if (e.pointerId !== pointer) return;
-            e.preventDefault(); const tap = !held; this._cancelQuickDrawHold();
-            if (!tap || this.paused || !this.running || hudInputBlocked()) return;
-            if (this._quickDraw) { this.cancelQuickDraw(); this.setWeaponHolstered(false); }
-            else this.setWeaponHolstered(!this.weaponHolstered);
-        });
-        for (const event of ['pointercancel', 'lostpointercapture']) btn.addEventListener(event, this._cancelQuickDrawHold);
-        btn.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+        // The holster button is the touch input 'touchHolster' (directory/game-controls.js): tap holsters or
+        // draws, held 0.45 s it arms the quick draw
+        this.holsterBtn.title = 'Tap to holster/draw. Hold for quick draw.';
+        this._cancelQuickDrawHold = () => controls.touch.drop('touchHolster');
         window.addEventListener('blur', () => clearGameplayInputs(this));
     }
 });
@@ -94748,7 +94657,7 @@ engineMixin({
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/player-draw-input.js" data-cost="361">
+    <script type="text/dfab" data-src="engine/player-draw-input.js" data-cost="331">
         // GameEngine — Drawing the player, emotes, pausable timers, sidebar portrait, joysticks.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -95081,49 +94990,31 @@ engineMixin({
                     const next = (ringHead + ringCount++) % ringTimes.length;
                     ringTimes[next] = now; ringRadii[next] = radius;
                 };
-                inputZone.addEventListener('touchstart', (e) => {
-                    e.preventDefault(); if (J.active) return;
-                    const touch = e.changedTouches[0];
-                    // Keep the whole ring on screen: shift the stick's centre in from the edges
-                    const ox = Math.max(EDGE, Math.min(window.innerWidth - EDGE, touch.clientX)), EY = Math.min(EDGE, window.innerHeight * 0.24), oy = Math.max(EY, Math.min(window.innerHeight - EY, touch.clientY));   // a short (landscape) screen: less margin top and bottom
-                    J.id = touch.identifier; J.active = true; J.originX = ox; J.originY = oy; J.dx = 0; J.dy = 0; J.armed = true;
-                    J.landX = touch.clientX; J.landY = touch.clientY;      // drags count from where the thumb landed
-                    J.trail = [{ x: 0, y: 0, t: performance.now() }];
-                    J.ringArmed = true; ringCount = 0;
-                    if (GameSettings.flitRing) seedRing(0, ringTime(e));
-                    visualZone.style.display = 'block'; visualZone.style.left = (ox - BASE) + 'px'; visualZone.style.top = (oy - BASE) + 'px';
-                    knob.style.transform = `translate(-50%, -50%)`;
-                    if (this.flitRingEl) this.flitRingEl.classList.toggle('off', !GameSettings.flitRing || !canFlit());
-                }, { passive: false });
-                inputZone.addEventListener('touchmove', (e) => {
-                    e.preventDefault(); if (!J.active) return;
-                    for (let i = 0; i < e.changedTouches.length; i++) {
-                        const touch = e.changedTouches[i];
-                        if (touch.identifier !== J.id) continue;
-                        const deltaX = touch.clientX - J.landX, deltaY = touch.clientY - J.landY, far = Math.hypot(deltaX, deltaY);
-                        const distance = Math.min(far, WALK), angle = Math.atan2(deltaY, deltaX);
-                        const moveX = Math.cos(angle) * distance, moveY = Math.sin(angle) * distance;
-                        knob.style.transform = `translate(calc(-50% + ${moveX}px), calc(-50% + ${moveY}px))`;
-                        if (GameSettings.preciseStick) {
-                            const push = shapePush(far);
-                            J.dx = Math.cos(angle) * push; J.dy = Math.sin(angle) * push;
-                        } else { J.dx = moveX / WALK; J.dy = moveY / WALK; }
+                // The stick itself (basement/controls-system.js touchStick): the base appears under the thumb
+                controls.touch.stick('move', { zone: inputZone, knob, base: visualZone, base_radius: BASE, anchor: 'touch', edge: EDGE, travel: WALK, free: () => !J.active,
+                    onStart: (S, e) => {
+                        Object.assign(J, { id: S.id, active: true, originX: S.x0, originY: S.y0, dx: 0, dy: 0, armed: true, landX: S.landX, landY: S.landY, trail: [{ x: 0, y: 0, t: performance.now() }], ringArmed: true });
+                        ringCount = 0;
+                        if (GameSettings.flitRing) seedRing(0, ringTime(e));
+                        if (this.flitRingEl) this.flitRingEl.classList.toggle('off', !GameSettings.flitRing || !canFlit());
+                    },
+                    onMove: (S, e) => {
+                        if (GameSettings.preciseStick) { const push = shapePush(S.far); J.dx = Math.cos(S.angle) * push; J.dy = Math.sin(S.angle) * push; }
+                        else { J.dx = S.kx / WALK; J.dy = S.ky / WALK; }
                         // A held-touch ring flick needs fresh, substantial outward speed.
                         // Keep the standalone flick's existing shared latch/re-arm behavior.
-                        if (far <= RING_OUT) J.armed = true;
-                        sampleRing(e, deltaX, deltaY, far);
+                        if (S.far <= RING_OUT) J.armed = true;
+                        sampleRing(e, S.dx, S.dy, S.far);
                         // A flick: from near the centre to well out, fast
                         if (GameSettings.flitFlick && J.armed) {
-                            const now = performance.now(); J.trail.push({ x: deltaX, y: deltaY, t: now });
+                            const now = performance.now(); J.trail.push({ x: S.dx, y: S.dy, t: now });
                             while (J.trail.length > 2 && now - J.trail[0].t > 150) J.trail.shift();
                             const t0 = J.trail[0];
-                            if (Math.hypot(t0.x, t0.y) < 14 && far > 30 && now - t0.t < 150 && canFlit()) { J.armed = false; if (!this.triggerFlit(angle, 'flick')) J.armed = true; }
+                            if (Math.hypot(t0.x, t0.y) < 14 && S.far > 30 && now - t0.t < 150 && canFlit()) { J.armed = false; if (!this.triggerFlit(S.angle, 'flick')) J.armed = true; }
                         }
-                        break;
-                    }
-                }, { passive: false });
-                const endHandler = (e) => { e.preventDefault(); for (let i = 0; i < e.changedTouches.length; i++) { if (e.changedTouches[i].identifier === J.id) { J.active = false; J.dx = 0; J.dy = 0; J.armed = true; J.ringArmed = true; ringCount = 0; visualZone.style.display = 'none'; break; } } };
-                inputZone.addEventListener('touchend', endHandler); inputZone.addEventListener('touchcancel', endHandler);
+                    },
+                    onEnd: () => { Object.assign(J, { active: false, dx: 0, dy: 0, armed: true, ringArmed: true }); ringCount = 0; },
+                });
                 // Two-Finger Flit: while the fire stick is held, a tap on the right half (not on a button)
                 document.addEventListener('touchstart', (e) => {
                     if (!GameSettings.flitTwoFinger || !this.fireJoystick.active || !this.running || this.paused) return;
@@ -95149,7 +95040,7 @@ engineMixin({
                 const F = this.fireJoystick, MEMORY = 0.6, DRAG = 8, DEAD = 6, FIRE_IN = 62, FIRE_OUT = 45;   // fire past 62 px, stop inside 45
                 const aimMode = () => !!this._quickDraw || GameSettings.aimBeforeFire !== false;
                 const sniperRelease = () => !!this._quickDraw || (aimMode() && GameSettings.sniperRelease !== false && this.weaponMode === 'sniper');
-                const setKnob = (x, y) => { knob.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`; };
+                const setKnob = (x, y) => controls.touch.sticks.fire.setKnob(x, y);
                 const buzz = () => { try { if (navigator.vibrate) navigator.vibrate(10); } catch (e) { /* no haptics */ } };
                 const showRing = () => { for (const el of [ring, band]) { if (!el) continue; el.classList.toggle('off', !aimMode()); el.classList.toggle('hot', !!F.firing); el.classList.toggle('armed', !!F.armed); } };
                 // Past the ring → fire (or arm, for a sniper on release); back inside → stop
@@ -95160,58 +95051,41 @@ engineMixin({
                     else { if (out && !F.firing) buzz(); F.firing = out; F.armed = false; }
                     showRing();
                 };
-                fireZone.addEventListener('touchstart', (e) => {
-                    e.preventDefault(); if (F.active) return;
-                    const touch = e.changedTouches[0], rect = fireZone.getBoundingClientRect();
-                    F.id = touch.identifier; F.active = true; F.originX = rect.left + rect.width / 2; F.originY = rect.top + rect.height / 2;
-                    F.dx = 0; F.dy = 0; F.landX = touch.clientX; F.landY = touch.clientY; F.remembered = false;
-                    F.aimed = !aimMode(); F.firing = !aimMode(); F.armed = false;
-                    if (gameUI) gameUI.classList.add('aiming');
-                    // Aim memory: back within 0.6 s → the old aim (and fire again only if she was firing)
-                    const m = this._aimMemory;
-                    if (!this._quickDraw && m && performance.now() / 1000 - m.at <= MEMORY) {
-                        F.dx = Math.cos(m.angle); F.dy = Math.sin(m.angle); F.remembered = true; F.aimed = true;
-                        if (aimMode()) { F.firing = !!m.firing && !sniperRelease(); F.armed = !!m.firing && sniperRelease(); }
-                        const r = aimMode() && (F.firing || F.armed) ? FIRE_IN + 5 : 30;
-                        setKnob(F.dx * r, F.dy * r);
-                    } else knob.style.transform = `translate(-50%, -50%)`;
-                    showRing();
-                }, { passive: false });
-                fireZone.addEventListener('touchmove', (e) => {
-                    e.preventDefault(); if (!F.active) return;
-                    for (let i = 0; i < e.changedTouches.length; i++) {
-                        const touch = e.changedTouches[i];
-                        if (touch.identifier !== F.id) continue;
-                        if (F.remembered && Math.hypot(touch.clientX - F.landX, touch.clientY - F.landY) < DRAG) break;   // still on the remembered aim
+                // The stick (basement/controls-system.js touchStick): fixed on the paw, in the paw's own (zoomed) pixels
+                controls.touch.stick('fire', { zone: fireZone, knob, anchor: 'centre', travel: () => aimMode() ? 74 : 35, scale: () => this.hudScale || 1, free: () => !F.active,
+                    onStart: (S) => {
+                        Object.assign(F, { id: S.id, active: true, originX: S.x0, originY: S.y0, dx: 0, dy: 0, landX: S.landX, landY: S.landY, remembered: false, aimed: !aimMode(), firing: !aimMode(), armed: false });
+                        if (gameUI) gameUI.classList.add('aiming');
+                        // Aim memory: back within 0.6 s → the old aim (and fire again only if she was firing)
+                        const m = this._aimMemory;
+                        if (!this._quickDraw && m && performance.now() / 1000 - m.at <= MEMORY) {
+                            F.dx = Math.cos(m.angle); F.dy = Math.sin(m.angle); F.remembered = true; F.aimed = true;
+                            if (aimMode()) { F.firing = !!m.firing && !sniperRelease(); F.armed = !!m.firing && sniperRelease(); }
+                            const r = aimMode() && (F.firing || F.armed) ? FIRE_IN + 5 : 30;
+                            setKnob(F.dx * r, F.dy * r);
+                        }
+                        showRing();
+                    },
+                    onMove: (S, e) => {
+                        const t = [...e.changedTouches].find(t => t.identifier === S.id) || {};
+                        if (F.remembered && Math.hypot(t.clientX - F.landX, t.clientY - F.landY) < DRAG) return false;   // still on the remembered aim
                         F.remembered = false;
-                        // In the stick's own pixels: the paw is zoomed by --hud (hudScale), so its ring is too
-                        const k = this.hudScale || 1, deltaX = (touch.clientX - F.originX) / k, deltaY = (touch.clientY - F.originY) / k, far = Math.hypot(deltaX, deltaY);
-                        const MAX = aimMode() ? 74 : 35, distance = Math.min(far, MAX), angle = Math.atan2(deltaY, deltaX);
-                        setKnob(Math.cos(angle) * distance, Math.sin(angle) * distance);
                         if (aimMode()) {
-                            if (far > DEAD) { F.aimed = true; F.dx = Math.cos(angle); F.dy = Math.sin(angle); }   // direction only: she aims wherever the thumb points
-                            setFiring(far);
-                        } else { F.dx = Math.cos(angle) * distance / MAX; F.dy = Math.sin(angle) * distance / MAX; }
-                        break;
-                    }
-                }, { passive: false });
-                const endHandler = (e) => {
-                    e.preventDefault();
-                    for (let i = 0; i < e.changedTouches.length; i++) {
-                        if (e.changedTouches[i].identifier !== F.id) continue;
+                            if (S.far > DEAD) { F.aimed = true; F.dx = Math.cos(S.angle); F.dy = Math.sin(S.angle); }   // direction only: she aims wherever the thumb points
+                            setFiring(S.far);
+                        } else { const T = 35; F.dx = S.kx / T; F.dy = S.ky / T; }
+                    },
+                    onEnd: (S, e) => {
                         if (e.type !== 'touchcancel' && F.armed && F.aimed) {
                             if (this._quickDraw) this.requestQuickDraw(Math.atan2(F.dy, F.dx));
                             else this._releaseShot = Math.atan2(F.dy, F.dx);
                         }   // sniper: lifting the thumb takes the shot (update.js)
                         if (F.aimed && Math.hypot(F.dx, F.dy) > 0.2) this._aimMemory = { angle: Math.atan2(F.dy, F.dx), at: performance.now() / 1000, firing: F.firing || F.armed };   // real time, not game time
-                        F.active = false; F.dx = 0; F.dy = 0; F.remembered = false; F.aimed = false; F.firing = false; F.armed = false;
-                        knob.style.transform = `translate(-50%, -50%)`;
+                        Object.assign(F, { active: false, dx: 0, dy: 0, remembered: false, aimed: false, firing: false, armed: false });
                         if (gameUI) gameUI.classList.remove('aiming');
                         showRing();
-                        break;
-                    }
-                };
-                fireZone.addEventListener('touchend', endHandler); fireZone.addEventListener('touchcancel', endHandler);
+                    },
+                });
             },
 
             /* Drag-to-look: the empty screen above the cat's paw (#input-zone-look). Drag there and the
