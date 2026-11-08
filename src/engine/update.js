@@ -68,7 +68,8 @@
                 this.updateSneak();
                 this.updatePuddles();                                  // raindrop rings and splashes (engine/reflections.js)
                 this.effects.update('flame');
-                this.updateBreachFx();                                 // a wall blown in (engine/breach-fx.js)
+                this.effects.update('breach');                         // a wall blown in
+                this.effects.update('slash'); this.effects.update('knuckle'); this.effects.update('spill'); this.effects.update('number');
                 this.effects.update('barrel');
             
                 this.updateTime();

@@ -69,8 +69,7 @@
             earnResonance(amount, label, x, y) {
                 if (!this.resonance || !(amount > 0)) return;
                 this.resonance.earn(amount);
-                const texts = this.floatingTexts || (this.floatingTexts = []);
-                texts.push({ target: null, x: x ?? this.player.x, y: y ?? this.player.y - 30, value: 0, text: `+${Math.round(amount)} ◈${label ? ' ' + label : ''}`,
+                this.effects.spawn('number', { target: null, x: x ?? this.player.x, y: y ?? this.player.y - 30, value: 0, text: `+${Math.round(amount)} ◈${label ? ' ' + label : ''}`,
                              color: '#c9a6ff', t0: _gameTimeSec, pop: _gameTimeSec, drift: 0, big: true });
                 this._resPulse = _gameTimeSec;
                 if (this.updateUI) this.updateUI();
@@ -85,18 +84,18 @@
             onActorHit(actor, amount, kbX = 0, kbY = 0, opts = null) {
                 if (!(amount > 0) || !actor) return;
                 const now = _gameTimeSec, type = opts && opts.type;
-                const texts = this.floatingTexts || (this.floatingTexts = []);
+                const texts = this.effects.of('number');
                 if (type === 'burn') {                                   // a Golden Child orb: small amber numbers, gathered, no flinch
                     const recent = texts.find(t => t.target === actor && t.burn && now - t.t0 < 0.6);
                     if (recent) { recent.value += amount; recent.t0 = now; }
-                    else { texts.push({ target: actor, x: actor.x, y: actor.y - 8, value: amount, color: '#ffb347', t0: now, pop: now, drift: (Math.random() - 0.5) * 1.6, bleed: true, burn: true }); if (texts.length > 40) texts.shift(); }
+                    else { this.effects.spawn('number', { target: actor, x: actor.x, y: actor.y - 8, value: amount, color: '#ffb347', t0: now, pop: now, drift: (Math.random() - 0.5) * 1.6, bleed: true, burn: true }, 40); }
                     actor._hpShowT = now;
                     return;
                 }
                 if (type === 'bleed') {
                     const recent = texts.find(t => t.target === actor && t.bleed && !t.burn && now - t.t0 < 0.6);
                     if (recent) { recent.value += amount; recent.t0 = now; }
-                    else { texts.push({ target: actor, x: actor.x, y: actor.y - 8, value: amount, color: '#ff3a5c', t0: now, pop: now, drift: (Math.random() - 0.5) * 1.6, bleed: true }); if (texts.length > 40) texts.shift(); }
+                    else { this.effects.spawn('number', { target: actor, x: actor.x, y: actor.y - 8, value: amount, color: '#ff3a5c', t0: now, pop: now, drift: (Math.random() - 0.5) * 1.6, bleed: true }, 40); }
                     actor._hpShowT = now;
                     const B = bloodOf(actor);
                     if (B && this.decals) this.decals.addDecal('blood', actor.x + (Math.random() - 0.5) * 8, actor.y + (Math.random() - 0.5) * 8, { size: 1.6 + Math.random() * 1.4, color: B.decal, dir: Math.random() * 6.28, glow: B.glow });
@@ -109,16 +108,14 @@
                 // Damage number — hits on the same target within 0.15 s add up into one (a crit stands alone)
                 const recent = !crit && texts.find(t => t.target === actor && !t.bleed && !t.crit && now - t.t0 < 0.15);
                 if (crit) {
-                    texts.push({ target: actor, x: actor.x, y: actor.y - 16, value: amount, color: '#ffd23a', t0: now, pop: now, drift: (Math.random() - 0.5) * 0.6, crit: true });
-                    if (texts.length > 40) texts.shift();
+                    this.effects.spawn('number', { target: actor, x: actor.x, y: actor.y - 16, value: amount, color: '#ffd23a', t0: now, pop: now, drift: (Math.random() - 0.5) * 0.6, crit: true }, 40);
                     if (this.weather) this.weather.spawnSparks(actor.x, actor.y, 10);
                     this.triggerShake(3);
                     if (typeof audioSys !== 'undefined' && audioSys.sfx) audioSys.sfx('crit');
                 } else if (recent) { recent.value += amount; recent.t0 = now; recent.pop = now; }
                 else {
                     const color = actor === this.player ? '#ff5a6a' : (actor.role === 'teammate' ? '#ffb347' : '#ffffff');
-                    texts.push({ target: actor, x: actor.x, y: actor.y - 16, value: amount, color, t0: now, pop: now, drift: Math.random() - 0.5 });
-                    if (texts.length > 40) texts.shift();
+                    this.effects.spawn('number', { target: actor, x: actor.x, y: actor.y - 16, value: amount, color, t0: now, pop: now, drift: Math.random() - 0.5 }, 40);
                 }
 
                 actor._hpShowT = now;                                        // show their health bar for a while
@@ -157,25 +154,6 @@
                     } else drawHPBar(ctx, e.x - 14, e.y - 30, 28, 3.5, Math.max(0, e.hp / e.maxHp));
                 }
                 ctx.globalAlpha = 1;
-                // Numbers: rise, drift, fade over 0.85 s; a merged hit pops a little bigger
-                const texts = this.floatingTexts;
-                if (!texts || !texts.length) return;
-                ctx.save();
-                ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
-                lifeKit.sweep(texts, (t) => {
-                    const age = now - t.t0;
-                    const life = t.big ? 1.6 : t.crit ? 1.1 : 0.85;
-                    if (age > life || age < -1) return true;
-                    if (t.target && !t.target.dead) { t.x = t.target.x; t.y = t.target.y - 16; }
-                    const x = t.x + t.drift * age * 14, y = t.y - age * 30;
-                    if (!inView(x, y)) return;
-                    const pop = Math.max(0, 1 - (now - t.pop) / 0.12);
-                    ctx.globalAlpha = 1 - Math.pow(age / life, 2);
-                    ctx.font = `bold ${Math.round((t.big ? 10 : t.bleed ? 8 : t.crit ? 15 : 11) + pop * (t.bleed ? 1 : t.crit ? 9 : 4) + Math.min(5, t.value / 20))}px Orbitron, sans-serif`;
-                    const s = t.text || String(Math.round(t.value)) + (t.crit ? '!' : '');
-                    ctx.lineWidth = t.crit ? 4 : 3; ctx.strokeStyle = t.crit ? 'rgba(90, 10, 0, 0.85)' : 'rgba(0,0,0,0.75)'; ctx.strokeText(s, x, y);
-                    ctx.fillStyle = t.color; ctx.fillText(s, x, y);
-                });
-                ctx.restore();
+                this.effects.draw('number', ctx, cull);                   // the floating numbers (directory/effects-system.js)
             },
         });

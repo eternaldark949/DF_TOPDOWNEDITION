@@ -10,12 +10,12 @@
         // collider, a haymaker's target takes SLAM more of the hit. A punch inside the Flit-Strike
         // window is always a haymaker, Flit-Strike's bonus on top. Jabs step her in like a blade does.
         // Each punch leaves gold afterimages of the fist along its path; a haymaker adds a ring burst,
-        // sparks and a clink (drawKnuckleFx, after the slashes).
+        // sparks and a clink (the effects system's 'knuckle', after the slashes).
         //
         // Vampiric Fists (an attachment, SCHEMATICS vampiric_fists, 350 scrap): any punch of hers that lands —
         // bare fists, the knuckles, fist weapons to come — heals her VAMPIRIC.LIFESTEAL of its damage, a haymaker
         // HAY_LIFESTEAL and a bleed (onPunchLanded, from CollisionSystem.resolveProjectile). Crimson motes run
-        // from the wound to her (drawKnuckleFx); the knuckle bar's studs turn garnet.
+        // from the wound to her (the effects system's 'knuckle'); the knuckle bar's studs turn garnet.
 
         const KNUCKLES = {
             ID: 'golden_retribution', EVERY: 3, HAY_MULT: 2.5, JAB_KNOCK: 1, HAY_KNOCK: 3,
@@ -66,9 +66,7 @@
                 p.knock = hay ? KNUCKLES.HAY_KNOCK : KNUCKLES.JAB_KNOCK; p.knockDmg = st.damage || 16;
                 this.projectiles.push(p);
                 // The fist's afterimages: gold copies along its path, fading
-                const fx = this.knuckleFx || (this.knuckleFx = []);
-                fx.push({ k: 'trail', x: pl.x, y: pl.y, a: ang, side: pl.punchSide, t0: now, hay });
-                if (fx.length > 24) fx.splice(0, fx.length - 24);
+                this.effects.spawn('knuckle', { k: 'trail', x: pl.x, y: pl.y, a: ang, side: pl.punchSide, t0: now, hay }, 24);
                 this.emitNoise(pl.x, pl.y, CONFIG.NOISE.punch, 'punch');
                 this.triggerShake(hay ? 4 : 2);
                 return p;
@@ -85,8 +83,7 @@
                     if (e.telegraphThreshold !== undefined) e.cooldown = Math.max(e.cooldown || 0, e.telegraphThreshold + 1);
                 }
                 e._slam = { until: now + KNUCKLES.SLAM_SECS, dmg: Math.round(p.damage * KNUCKLES.SLAM), by: p.owner };
-                const fx = this.knuckleFx || (this.knuckleFx = []);
-                fx.push({ k: 'ring', x: e.x, y: e.y, t0: now });
+                this.effects.spawn('knuckle', { k: 'ring', x: e.x, y: e.y, t0: now });
                 if (this.weather) this.weather.spawnSparks(e.x, e.y, 14);
                 if (typeof ambience !== 'undefined' && ambience.clink) ambience.clink();
             },
@@ -100,10 +97,8 @@
                 const V = ITEM_REGISTRY[VAMPIRIC.ID].stats, pl = this.player;
                 const healed = pl.heal ? pl.heal(Math.max(1, Math.round(p.damage * (p.haymaker ? V.haymakerLifesteal : V.lifesteal)))) : 0;
                 if (p.haymaker && !e.dead) this.applyStatus(e, 'bleed', { dps: V.bleedDps * this.playerDamageMult(), secs: V.bleedSecs, by: pl });
-                const fx = this.knuckleFx || (this.knuckleFx = []), now = _gameTimeSec;
-                const n = p.haymaker ? VAMPIRIC.HAY_MOTES : VAMPIRIC.MOTES;
-                for (let i = 0; i < n; i++) fx.push({ k: 'drain', x: e.x, y: e.y, t0: now + i * 0.025, ph: Math.random() * 6.28, sp: 10 + Math.random() * 12 });
-                if (fx.length > 48) fx.splice(0, fx.length - 48);
+                const now = _gameTimeSec, n = p.haymaker ? VAMPIRIC.HAY_MOTES : VAMPIRIC.MOTES;
+                for (let i = 0; i < n; i++) this.effects.spawn('knuckle', { k: 'drain', x: e.x, y: e.y, t0: now + i * 0.025, ph: Math.random() * 6.28, sp: 10 + Math.random() * 12 }, 48);
                 return healed;
             },
 
@@ -130,68 +125,13 @@
                     e.lastHitBy = S.by; e.lastHitMelee = true;
                     e.takeDamage(S.dmg, 0, 0, { punch: true, slam: true });
                     e.knockbackVx = 0; e.knockbackVy = 0;
-                    const fx = this.knuckleFx || (this.knuckleFx = []);
-                    fx.push({ k: 'ring', x: e.x, y: e.y, t0: now, slam: true });
+                    this.effects.spawn('knuckle', { k: 'ring', x: e.x, y: e.y, t0: now, slam: true });
                     if (this.weather) this.weather.spawnSparks(e.x, e.y, 10);
                     this.triggerShake(5);
                     if (typeof ambience !== 'undefined' && ambience.clink) ambience.clink();
-                    (this.floatingTexts || (this.floatingTexts = [])).push({ target: null, x: e.x, y: e.y - 26, value: 0, text: 'SLAM!', color: '#ffd76a', t0: now, pop: now, drift: 0 });
+                    this.effects.spawn('number', { target: null, x: e.x, y: e.y - 26, value: 0, text: 'SLAM!', color: '#ffd76a', t0: now, pop: now, drift: 0 });
                 }
             },
-
-            /** The gold afterimages of each punch and a haymaker's ring (world space, after the slashes) */
-            drawKnuckleFx(ctx) {
-                const L = this.knuckleFx; if (!L || !L.length) return;
-                const now = _gameTimeSec, TAU = Math.PI * 2, R = CONFIG.PUNCH.REACH;
-                lifeKit.sweep(L, f => {
-                    const age = now - f.t0;
-                    if (f.k === 'drain') {                                         // Vampiric Fists: a crimson mote, wound to her
-                        if (age < 0) return;
-                        if (age > VAMPIRIC.LIFE || !this.player) { return true; }
-                        const u = age / VAMPIRIC.LIFE, e2 = u * u * (3 - 2 * u), pl = this.player;
-                        const dx = pl.x - f.x, dy = pl.y - f.y, d = Math.hypot(dx, dy) || 1;
-                        const bow = Math.sin(u * Math.PI) * f.sp * Math.sin(f.ph);           // each one curves its own way
-                        const x = f.x + dx * e2 - dy / d * bow, y = f.y + dy * e2 + dx / d * bow;
-                        const a = (u < 0.15 ? u / 0.15 : 1) * (1 - Math.max(0, u - 0.8) / 0.2), r = 2.2 - u * 0.8;
-                        ctx.save();
-                        const g = ctx.createRadialGradient(x, y, 0, x, y, r * 3);
-                        g.addColorStop(0, `rgba(255, 120, 140, ${a * 0.9})`); g.addColorStop(0.4, `rgba(200, 16, 46, ${a * 0.6})`); g.addColorStop(1, 'rgba(120, 0, 20, 0)');
-                        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 3, 0, TAU); ctx.fill();
-                        ctx.fillStyle = `rgba(255, 210, 220, ${a})`; ctx.beginPath(); ctx.arc(x, y, r * 0.5, 0, TAU); ctx.fill();
-                        ctx.restore();
-                    } else if (f.k === 'trail') {
-                        const life = f.hay ? 0.32 : 0.22;
-                        if (age > life) { return true; }
-                        const c = Math.cos(f.a), s = Math.sin(f.a), side = f.side === 'right' ? 1 : -1;
-                        const ox = -s * 5 * side, oy = c * 5 * side;                   // the punching hand's side
-                        const n = f.hay ? 4 : 3;
-                        ctx.save();
-                        for (let j = 0; j < n; j++) {
-                            const u = (j + 1) / n, d = 12 + R * u * 1.1, a = (1 - age / life) * (0.18 + 0.42 * u);
-                            // a haymaker's copies ride the hook's arc (CONFIG.HAYMAKER), a jab's the straight line
-                            const ph = (92 - 100 * u) * Math.PI / 180, H = 19 + 7 * u, lx = Math.cos(ph) * H, ly = Math.sin(ph) * H * side;
-                            const x = f.hay ? f.x + c * lx - s * ly : f.x + c * d + ox, y = f.hay ? f.y + s * lx + c * ly : f.y + s * d + oy, rr = (f.hay ? 5.4 : 4.4) * (0.7 + 0.3 * u);
-                            const g = ctx.createRadialGradient(x, y, 0, x, y, rr * 2.2);
-                            g.addColorStop(0, `rgba(255, 238, 170, ${a})`); g.addColorStop(0.45, `rgba(255, 196, 72, ${a * 0.7})`); g.addColorStop(1, 'rgba(255, 170, 40, 0)');
-                            ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, rr * 2.2, 0, TAU); ctx.fill();
-                            ctx.fillStyle = `rgba(255, 226, 140, ${a * 1.2})`; ctx.beginPath(); ctx.arc(x, y, rr * 0.7, 0, TAU); ctx.fill();
-                        }
-                        ctx.restore();
-                    } else {
-                        const life = 0.36;
-                        if (age > life) { return true; }
-                        const u = age / life, rr = (f.slam ? 14 : 10) + u * (f.slam ? 30 : 24);
-                        ctx.save();
-                        ctx.globalAlpha = (1 - u) * 0.9;
-                        ctx.strokeStyle = '#ffd76a'; ctx.lineWidth = 3 * (1 - u) + 0.6;
-                        ctx.shadowColor = '#ffb732'; ctx.shadowBlur = 10;
-                        ctx.beginPath(); ctx.arc(f.x, f.y, rr, 0, TAU); ctx.stroke();
-                        ctx.lineWidth = 1; ctx.strokeStyle = '#fff4cf';
-                        ctx.beginPath(); ctx.arc(f.x, f.y, rr * 0.7, 0, TAU); ctx.stroke();
-                        ctx.restore();
-                    }
-                });
-            }
         });
 
         /** Gilded brass knuckles across a fist, seen from above: `a` is the forearm's way (toward the knuckles) */

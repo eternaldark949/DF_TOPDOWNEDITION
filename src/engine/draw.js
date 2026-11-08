@@ -536,7 +536,7 @@
                 this._drawForecourts(cullBounds, 'top');
                 if (RL.at('decals')) {
                     this.decals.draw(this.ctx, cullBounds.world);
-                    this.drawSpills(this.ctx, cullBounds.world);              // spilt drinks (engine/spills.js)
+                    this.effects.draw('spill', this.ctx, cullBounds.world);   // spilt drinks (engine/spills.js)
                     this.drawPoolRipples(this.ctx, cullBounds.world);         // rings on the parks' pools (engine/pools.js)
                     this.effects.draw('casing', this.ctx, cullBounds.world);  // spent brass (directory/effects-system.js)
                 }
@@ -891,8 +891,8 @@
                 if (RL.at('combat')) {
                     this.effects.draw('muzzle', this.ctx);                   // the flash's star at each muzzle
                     this.effects.draw('barrel', this.ctx, cullBounds.world);  // barrel smoke, embers, golden wisps (directory/effects-system.js)
-                    this.drawSlashes(this.ctx);                              // a blade's gold arc (engine/status-effects.js)
-                    this.drawKnuckleFx(this.ctx);                            // Golden Retribution's gold afterimages and rings (engine/knuckles.js)
+                    this.effects.draw('slash', this.ctx);                    // a blade's gold arc
+                    this.effects.draw('knuckle', this.ctx);                  // Golden Retribution's gold afterimages and rings, Vampiric motes
                     this.drawMirrorShield(this.ctx);                         // the Mirrored Glass turning a shot
                 }
 
@@ -1169,7 +1169,7 @@
                 
                 if (RenderStats.timed) this._entLap('Entities: Effects');
                 if (RL.at('particles')) this.weather.draw(this.ctx, cullBounds.view, viewZoom);
-                if (RL.at('combat')) this.drawBreachUnder(this.ctx, cullBounds.view);   // scorch, debris, smoke (engine/breach-fx.js)
+                if (RL.at('combat')) this.effects.draw('breach', this.ctx, cullBounds.view, 'under');   // scorch, debris, smoke (directory/effects-system.js)
                 if (RenderStats.timed) this._entLap('Entities: Weather');
                 
                 // Graveyard humanoid ghosts
@@ -1209,7 +1209,7 @@
                     this.drawGunnerHeat(this.ctx, cullBounds.entities);
                     this.drawBossHazards(this.ctx, cullBounds.view);   // the duel's dimming, sigils, fire, hooks (engine/boss-hazards.js)
                     this.effects.draw('flame', this.ctx, cullBounds.view);
-                    this.drawBreachGlow(this.ctx, cullBounds.view);
+                    this.effects.draw('breach', this.ctx, cullBounds.view, 'glow');
                     for (const p of this.projectiles) if (p.isFireball) p.draw(this.ctx);
                 }
                 // The veil at the edge of an outdoor map (world/map-edge.js), above the darkness

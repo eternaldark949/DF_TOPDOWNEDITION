@@ -10,7 +10,7 @@ function test(name,fn){const e=runtime(join(__dirname,'..','DFAB V8.html'),{affi
 const setup=`game._doLoadMap('ollo_test');game.running=true;game.paused=false;game.player.visible=true;
  game.activeMap={id:'crit_test',width:3000,height:3000,walls:[],buildings:[],buildingColliders:[]};
  game.player._game=game;game.player.x=1000;game.player.y=1000;game.player.angle=0;game.isDriving=false;
- game.weaponHolstered=false;game.projectiles=[];game.enemies=[];game.floatingTexts=[];_gameTimeSec=10;
+ game.weaponHolstered=false;game.projectiles=[];game.enemies=[];game.effects.of('number').length=0;_gameTimeSec=10;
  const wield=id=>{game.currentWeapon=createItemFromRegistry(id,game);game.weaponMode=ITEM_REGISTRY[id].weaponMode;game.shootCooldown=0;};
  const ganger=(x,y)=>{const g=new Ganger(x,y,{hp:500});g.state='IDLE';game.enemies.push(g);return g;};
  const rnd=Math.random;const withRandom=(v,f)=>{Math.random=()=>v;try{return f();}finally{Math.random=rnd;}};
@@ -36,7 +36,7 @@ test('A cut at 90 px (she steps in up to 16) lands with Blood Pact but not with 
 
 test('A blade crit doubles the cut and shows a gold number with a bang',e=>{
  const r=value(e,setup+`const g=ganger(1030,1000);wield('blood_pact');withRandom(.01,swing);
-  const t=game.floatingTexts.find(t=>t.target===g&&!t.bleed);return {crit:t.crit,value:t.value,color:t.color};`);
+  const t=game.effects.of('number').find(t=>t.target===g&&!t.bleed);return {crit:t.crit,value:t.value,color:t.color};`);
  assert.deepEqual(r,{crit:true,value:90,color:'#ffd23a'});
 });
 
@@ -60,7 +60,7 @@ test('Quick cuts all land: i-frames and bleed ticks no longer swallow the next c
  const r=value(e,setup+`const out={};
   for(const id of ['maiden_kukri','blood_pact']){game.enemies=[];const g=ganger(1030,1000);g.hp=g.maxHp=5000;wield(id);
    let cuts=0;for(let i=0;i<5;i++){game.shootCooldown=0;cuts+=withRandom(.99,swing);while(game.shootCooldown-->0)tick();}
-   out[id]={cuts,texts:game.floatingTexts.filter(t=>t.target===g&&!t.bleed).length,frames:g.invincibleTimer};}
+   out[id]={cuts,texts:game.effects.of('number').filter(t=>t.target===g&&!t.bleed).length,frames:g.invincibleTimer};}
   return out;`);
  assert.deepEqual(r.maiden_kukri,{cuts:5,texts:5,frames:0});assert.deepEqual(r.blood_pact,{cuts:5,texts:5,frames:0});
 });
@@ -72,7 +72,7 @@ test('Crit chance: 10% by default, 20% with Blood Pact; others\' hits and bleeds
    fist:withRandom(.05,()=>game.rollCrit(null))};`);
  assert.deepEqual(r,{gunLow:2,gunHigh:1,pactLow:2,pactHigh:1,fist:2});
  const b=value(e,setup+`const g=ganger(1030,1000);game.applyStatus(g,'bleed',{dps:8,secs:3,by:game.player});
-  _gameTimeSec+=1.01;game.updateStatuses();return game.floatingTexts.filter(t=>t.crit).length;`);
+  _gameTimeSec+=1.01;game.updateStatuses();return game.effects.of('number').filter(t=>t.crit).length;`);
  assert.equal(b,0);
 });
 
@@ -80,7 +80,7 @@ test('A shot that crits carries double damage, lands as a crit, and bypasses not
  const r=value(e,setup+`game.player._muzzleLocal={x:20,y:3};game.player._muzzleReady=true;
   wield('pistol_fpx');withRandom(.01,()=>game.fireWeapon());const crit=game.projectiles.at(-1);
   wield('pistol_fpx');withRandom(.99,()=>game.fireWeapon());const plain=game.projectiles.at(-1);
-  const g=ganger(1300,1000);g.onProjectileHit(crit,game);const t=game.floatingTexts.find(t=>t.target===g);
+  const g=ganger(1300,1000);g.onProjectileHit(crit,game);const t=game.effects.of('number').find(t=>t.target===g);
   return {crit:crit.crit,plain:plain.crit,ratio:crit.damage/plain.damage,text:!!(t&&t.crit),hp:g.hp,dmg:crit.damage};`);
  assert.equal(r.crit,true);assert.equal(r.plain,false);assert.equal(r.text,true);assert.equal(r.hp,500-r.dmg);
  assert.ok(Math.abs(r.ratio-2)<0.1,String(r.ratio));
@@ -88,8 +88,8 @@ test('A shot that crits carries double damage, lands as a crit, and bypasses not
 
 test('The katana\'s slower swing stretches the pose and the trail follows its long red edge',e=>{
  const r=value(e,setup+`wield('blood_pact');game.enemies=[];withRandom(.99,()=>{game.meleeSlash();});
-  const s=game.slashes.at(-1);const atKukriEnd=sampleMeleeSwing(.3,1,{},s.secs),kukriEnd=sampleMeleeSwing(.3,1);
-  const pts=[];const ctx=game.ctx,line=ctx.lineTo;ctx.lineTo=(x,y)=>pts.push([x,y]);_gameTimeSec+=s.secs*.72;game.drawSlashes(ctx);ctx.lineTo=line;
+  const s=game.effects.of('slash').at(-1);const atKukriEnd=sampleMeleeSwing(.3,1,{},s.secs),kukriEnd=sampleMeleeSwing(.3,1);
+  const pts=[];const ctx=game.ctx,line=ctx.lineTo;ctx.lineTo=(x,y)=>pts.push([x,y]);_gameTimeSec+=s.secs*.72;game.effects.draw('slash',ctx);ctx.lineTo=line;
   const far=Math.max(...pts.map(([x,y])=>Math.hypot(x,y)));
   return {secs:s.secs,mid:!!atKukriEnd,kukriEnd,far,edge:s.edge,cols:s.cols[1][1]};`);
  assert.equal(r.secs,.32);assert.equal(r.mid,true);assert.equal(r.kukriEnd,null);

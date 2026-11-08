@@ -67,7 +67,7 @@
                 const ox = (x ?? this.player.x), oy = (y ?? this.player.y);
                 const r = 4 + Math.sqrt(lost) * 34;                                // 2.5% ≈ 9 px, 7% ≈ 13 px
                 const px = ox + dx * (10 + r * 0.6), py = oy + dy * (10 + r * 0.6);
-                const spills = this.spills || (this.spills = []);
+                const spills = this.effects.of('spill');
                 const merge = spills.find(s => s.color === D.liquid && now - s.born < SPILL.LIFE - SPILL.FADE && Math.hypot(s.x - px, s.y - py) < s.r * SPILL.MERGE);
                 const drops = [];
                 const n = 2 + Math.floor(Math.random() * 3);
@@ -79,24 +79,23 @@
                     merge.r = Math.min(30, Math.hypot(merge.r, r * 0.8)); merge.born = now; merge.drops.push(...drops.slice(0, 2));
                     merge.ox = ox; merge.oy = oy; merge.splash = now;
                 } else {
-                    if (spills.length >= SPILL.MAX) spills.shift();
-                    spills.push({ x: px, y: py, r, color: D.liquid, color2: D.liquid2 || null, glow: !!D.glow, born: now, splash: now, ox, oy,
-                                  seed: Math.random() * 1000, a: Math.atan2(dy, dx), drops, map: this.activeMap ? this.activeMap.id : null });
+                    this.effects.spawn('spill', { x: px, y: py, r, color: D.liquid, color2: D.liquid2 || null, glow: !!D.glow, born: now, splash: now, ox, oy,
+                                  seed: Math.random() * 1000, a: Math.atan2(dy, dx), drops, map: this.activeMap ? this.activeMap.id : null }, SPILL.MAX);
                 }
                 return lost;
             },
 
             /** How wet (x, y) is with spilt drink: true inside a puddle that hasn't dried (footsteps splash) */
             _inSpill(x, y) {
-                if (!this.spills || !this.spills.length) return false;
+                const S = this.effects.of('spill'); if (!S.length) return false;
                 const now = _gameTimeSec;
-                for (const s of this.spills) if (now - s.born < SPILL.LIFE - SPILL.FADE * 0.5 && Math.hypot(x - s.x, y - s.y) < s.r * 0.9) return true;
+                for (const s of S) if (now - s.born < SPILL.LIFE - SPILL.FADE * 0.5 && Math.hypot(x - s.x, y - s.y) < s.r * 0.9) return true;
                 return false;
             },
 
             /** Once a sim tick: with Grounded, a ganger who steps in a spill loses their footing (Ganger.update skips while _staggerUntil) */
             updateSpillSlips() {
-                if (!this.spills || !this.spills.length || !this.resonance || !this.enemies) return;
+                if (!this.effects.of('spill').length || !this.resonance || !this.enemies) return;
                 const secs = this.resonance.stat('slipSecs', SPILL.SLIP_SECS); if (!secs) return;
                 const now = _gameTimeSec;
                 for (const e of this.enemies) {
@@ -106,7 +105,7 @@
                     e._staggerUntil = now + secs;
                     const m = Math.hypot(e.x - px, e.y - py);                   // they skid on the way they were going
                     if (m > 0.05) { e.knockbackVx += (e.x - px) / m * SPILL.SLIP_SKID; e.knockbackVy += (e.y - py) / m * SPILL.SLIP_SKID; }
-                    (this.floatingTexts || (this.floatingTexts = [])).push({ target: null, x: e.x, y: e.y - 24, value: 0, text: 'SLIP!', color: '#f2d57e', t0: now, pop: now, drift: 0 });
+                    this.effects.spawn('number', { target: null, x: e.x, y: e.y - 24, value: 0, text: 'SLIP!', color: '#f2d57e', t0: now, pop: now, drift: 0 });
                 }
             },
 
@@ -120,51 +119,4 @@
                 audioSys.sfx('ui');
                 return true;
             },
-
-            /** The puddles, on the floor under everyone (after the decals) */
-            drawSpills(ctx, cb) {
-                const S = this.spills; if (!S || !S.length) return;
-                const now = _gameTimeSec, TAU = Math.PI * 2, mapId = this.activeMap ? this.activeMap.id : null;
-                lifeKit.sweep(S, s => {
-                    const age = now - s.born;
-                    if (age > SPILL.LIFE || s.map !== mapId) { return true; }
-                    if (cb && (s.x + 40 < cb.left || s.x - 40 > cb.right || s.y + 40 < cb.top || s.y - 40 > cb.bottom)) return;
-                    const dry = age > SPILL.LIFE - SPILL.FADE ? 1 - (age - (SPILL.LIFE - SPILL.FADE)) / SPILL.FADE : 1;
-                    const fly = Math.min(1, (now - s.splash) / 0.2);                // the splash: the drink flies out, then lands
-                    const grow = Math.min(1, (now - s.splash) / 0.3), ease = 1 - (1 - grow) * (1 - grow);
-                    const r = s.r * (0.35 + 0.65 * ease) * (0.75 + 0.25 * dry);  // and shrinks a little as it dries
-                    const rgb = hexToRgb(s.color);
-                    ctx.save();
-                    ctx.globalAlpha = 0.6 * dry;
-                    // The pool: thrown out along the way it flew, a few lobes from its seed so no two are the same shape
-                    ctx.fillStyle = `rgb(${rgb})`;
-                    if (s.glow) { ctx.shadowColor = s.color; ctx.shadowBlur = 8; }
-                    ctx.beginPath();
-                    ctx.ellipse(s.x, s.y, r, r * 0.62, s.a || 0, 0, TAU);
-                    for (let k = 0; k < 4; k++) {
-                        const a = (s.a || 0) + (k - 1.5) * 1.1 + Math.sin(s.seed + k) * 0.4, d = r * (0.5 + ((s.seed * (k + 3)) % 1) * 0.25);
-                        const lr = r * (0.22 + ((s.seed * (k + 7)) % 1) * 0.18), cx = s.x + Math.cos(a) * d, cy = s.y + Math.sin(a) * d * 0.7;
-                        ctx.moveTo(cx + lr, cy); ctx.arc(cx, cy, lr, 0, TAU);
-                    }
-                    ctx.fill();
-                    ctx.shadowBlur = 0;
-                    ctx.globalAlpha = 0.3 * dry; ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 0.8;   // the edge, darker where it's thin
-                    ctx.beginPath(); ctx.ellipse(s.x, s.y, r, r * 0.62, s.a || 0, 0, TAU); ctx.stroke();
-                    ctx.shadowBlur = 0;
-                    if (s.color2) {                                              // a layered cocktail keeps its second colour in the middle
-                        ctx.globalAlpha = 0.5 * dry; ctx.fillStyle = s.color2;
-                        ctx.beginPath(); ctx.arc(s.x, s.y, r * 0.4, 0, TAU); ctx.fill();
-                    }
-                    // Sheen: the room's light caught on the wet surface
-                    ctx.globalAlpha = 0.35 * dry; ctx.fillStyle = '#ffffff';
-                    ctx.beginPath(); ctx.ellipse(s.x - r * 0.3, s.y - r * 0.2, r * 0.26, r * 0.09, -0.6, 0, TAU); ctx.fill();
-                    // The drops thrown ahead (in flight for the first moment)
-                    ctx.globalAlpha = 0.8 * dry; ctx.fillStyle = `rgb(${rgb})`;
-                    for (const d of s.drops) {
-                        const dx = s.ox + (d.x - s.ox) * fly, dy = s.oy + (d.y - s.oy) * fly;
-                        ctx.beginPath(); ctx.arc(dx, dy, d.r * (fly < 1 ? 0.8 : 1), 0, TAU); ctx.fill();
-                    }
-                    ctx.restore();
-                });
-            }
         });
