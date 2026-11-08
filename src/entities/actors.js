@@ -203,19 +203,12 @@
                 this.vx = this.moveDir.x * this.curSpeed;
                 this.vy = this.moveDir.y * this.curSpeed;
         
-                // 4. APPLY KNOCKBACK (Additive)
-                this.vx += this.knockbackVx;
-                this.vy += this.knockbackVy;
+                // 4. KNOCKBACK on top (the body step: added, then damped; basement/collision-kit.js carry)
+                collisionWorld.carry(this, 'velocity');
         
                 // 5. APPLY TO POSITION
                 this.x += this.vx;
                 this.y += this.vy;
-        
-                // 6. DECAY KNOCKBACK
-                this.knockbackVx *= this.knockbackFriction;
-                this.knockbackVy *= this.knockbackFriction;
-                if (Math.abs(this.knockbackVx) < 0.1) this.knockbackVx = 0;
-                if (Math.abs(this.knockbackVy) < 0.1) this.knockbackVy = 0;
             }
         
             // Standard helper to set direction for AI/Input
@@ -418,15 +411,7 @@
                 // Movement is applied in GameEngine.update() BEFORE CollisionSystem runs
                 // CollisionSystem will then resolve any wall/prop penetrations
                 
-                // Apply knockback (if any, from damage)
-                this.x += this.knockbackVx;
-                this.y += this.knockbackVy;
-                
-                // Decay knockback
-                this.knockbackVx *= this.knockbackFriction;
-                this.knockbackVy *= this.knockbackFriction;
-                if (Math.abs(this.knockbackVx) < 0.1) this.knockbackVx = 0;
-                if (Math.abs(this.knockbackVy) < 0.1) this.knockbackVy = 0;
+                collisionWorld.carry(this);   // knockback (from damage, shoves, slips): the body step (basement/collision-kit.js)
             }
             
             /**

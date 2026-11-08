@@ -59,8 +59,12 @@
             //   mask           the groups it collides with (default: all)
             //   ray_mask       which queries see it (a query passes its own bit; default: all): a raycast or overlap finds a
             //                  body when the query's mask includes its group and its ray_mask includes the query's bit
-            //   mass, linear_damping, angular_damping (per tick, 0..1), lock { x, y, rot } (locked axes), ccd (swept: fast
+            //   mass, linear_damping, angular_damping (the share of its speed, or spin, lost each tick, 0..1; default: what
+            //                  the old fields keep: 1 − knockbackFriction / friction / angularFriction), lock { x, y, rot }
+            //                  (locked axes: rot by default for all but 'rigid', and for fixedRotation), ccd (swept: fast
             //                  movers can't pass through thin things)
+            //   collisionWorld moves bodies (carry: what impulses gave a character; integrate: a rigid body's whole step)
+            //   and pushes them (impulse): see basement/collision-kit.js THE BODY STEP
             static BODY_TYPES = ['no_collision', 'static', 'dynamic', 'rigid', 'character'];
             /** The body: what's set (`b`) wins; the rest follows the entity as it is now (its layer, shape, mass, flags). */
             static makeBody(e, b = {}) {
@@ -72,12 +76,15 @@
                     ghost: () => !!e.isTrigger || e.collisionLayer === L.TRIGGER,
                     shape: () => e.collisionShape === GameEntity.SHAPE.CIRCLE ? 'circle' : e.collisionShape === GameEntity.SHAPE.OBB ? 'box' : 'aabb',
                     group: () => e.collisionLayer, mask: () => 0xFFFF, ray_mask: () => 0xFFFF,
-                    mass: () => e.mass, linear_damping: () => 0, angular_damping: () => 0,
-                    lock: () => { const r = (set.physics_type ?? derived.physics_type()) !== 'rigid'; return { x: false, y: false, rot: r }; },
+                    mass: () => e.mass,
+                    linear_damping: () => 1 - (e.knockbackFriction ?? e.friction ?? 1),          // (what the old fields keep a tick)
+                    angular_damping: () => 1 - (e.angularFriction ?? 1),
+                    lock: () => { const r = (set.physics_type ?? derived.physics_type()) !== 'rigid' || !!e.fixedRotation; return { x: false, y: false, rot: r }; },
                     ccd: () => e.collisionLayer === L.PROJECTILE,
                 };
                 const body = {};
                 for (const k in derived) Object.defineProperty(body, k, { enumerable: true, get: () => set[k] ?? derived[k](), set: (v) => { set[k] = v; } });
+                Object.defineProperty(body, 'given', { value: set });   // what was set by hand (the rest follows the entity)
                 return body;
             }
 

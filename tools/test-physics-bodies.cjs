@@ -68,6 +68,16 @@ const r = JSON.parse(JSON.stringify(e.run(`(() => {
   const P0 = game.player; Object.assign(P0, { x: X + 50, y: Y + 400 - 25 }); game.isDriving = false;
   const y0 = P0.y; CollisionSystem.streetFeet([P0], grid, game); out.feetGhost = [P0.y === y0, told.slice()];
   c2.body.ghost = false; CollisionSystem.streetFeet([P0], grid, game); out.feetPushed = P0.y < y0;
+
+  // the body step: carry (knockback), damping set by hand, locked axes, impulse, integrate
+  const k = actor(X, Y + 800); k.knockbackVx = 10; k.knockbackVy = 10; k.knockbackFriction = 0.85;
+  k.body.lock = { x: true, y: false, rot: true }; collisionWorld.carry(k); out.carryLock = [k.x === X, k.y === Y + 810, k.knockbackVx];
+  k.body.lock = undefined; k.body.linear_damping = 0.5; k.knockbackVx = 8; k.knockbackVy = 0; collisionWorld.carry(k); out.carryDamp = k.knockbackVx;
+  const box = new PropEntity({ x: X, y: Y + 900, width: 40, height: 40, mass: 10 });
+  collisionWorld.impulse(box, 20, 0); out.imp = [box.vx, box.angularVel];
+  collisionWorld.impulse(box, 0, 20, box.getCenter().x + 20, box.getCenter().y); out.impSpin = box.angularVel > 0;
+  box.body.lock = { x: false, y: false, rot: true }; box.angularVel = 0; collisionWorld.impulse(box, 0, 20, box.getCenter().x + 20, box.getCenter().y); out.impLocked = box.angularVel;
+  box.body.lock = { x: false, y: true, rot: false }; const by = box.y; box.vx = 2; box.vy = 3; collisionWorld.integrate(box); out.intLock = [box.y === by, box.vy, box.vx > 0];
   return out;
 })()`)));
 assert.deepEqual([...e.errors], []);
@@ -90,4 +100,9 @@ assert.deepEqual(r.street.hits, [[true, true]], 'two cars meet once; a mask with
 assert.deepEqual(r.street.told, ['begin:+']);
 assert.equal(r.feetGhost[0], true, 'a ghost car: told, she is not pushed'); assert.equal(r.feetGhost[1].length, 1);
 assert.ok(r.feetPushed, 'a solid car pushes her out');
+assert.deepEqual(r.carryLock, [true, true, 0], 'a locked axis carries nothing');
+assert.equal(r.carryDamp, 4, 'linear_damping 0.5 halves it');
+assert.deepEqual(r.imp, [2, 0], 'impulse / mass, no turn without a point');
+assert.ok(r.impSpin, 'off-centre: it turns'); assert.equal(r.impLocked, 0, 'a locked turn stays still');
+assert.deepEqual(r.intLock, [true, 0, true], 'integrate keeps a locked axis');
 console.log('ok physics bodies:', JSON.stringify(r));

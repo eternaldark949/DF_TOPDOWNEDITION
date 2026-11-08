@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '16b3ca18bc2e';
+        const DFAB_BUILD = '1761e3b83992';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -7070,7 +7070,7 @@
             }
         }
     </script>
-    <script type="text/dfab" data-src="basement/entity-base.js" data-cost="184">
+    <script type="text/dfab" data-src="basement/entity-base.js" data-cost="192">
         // ===== LV0 BASEMENT =====
         // =====================================================================
         //  GAME ENTITY (Base Class)
@@ -7132,8 +7132,12 @@
             //   mask           the groups it collides with (default: all)
             //   ray_mask       which queries see it (a query passes its own bit; default: all): a raycast or overlap finds a
             //                  body when the query's mask includes its group and its ray_mask includes the query's bit
-            //   mass, linear_damping, angular_damping (per tick, 0..1), lock { x, y, rot } (locked axes), ccd (swept: fast
+            //   mass, linear_damping, angular_damping (the share of its speed, or spin, lost each tick, 0..1; default: what
+            //                  the old fields keep: 1 − knockbackFriction / friction / angularFriction), lock { x, y, rot }
+            //                  (locked axes: rot by default for all but 'rigid', and for fixedRotation), ccd (swept: fast
             //                  movers can't pass through thin things)
+            //   collisionWorld moves bodies (carry: what impulses gave a character; integrate: a rigid body's whole step)
+            //   and pushes them (impulse): see basement/collision-kit.js THE BODY STEP
             static BODY_TYPES = ['no_collision', 'static', 'dynamic', 'rigid', 'character'];
             /** The body: what's set (`b`) wins; the rest follows the entity as it is now (its layer, shape, mass, flags). */
             static makeBody(e, b = {}) {
@@ -7145,12 +7149,15 @@
                     ghost: () => !!e.isTrigger || e.collisionLayer === L.TRIGGER,
                     shape: () => e.collisionShape === GameEntity.SHAPE.CIRCLE ? 'circle' : e.collisionShape === GameEntity.SHAPE.OBB ? 'box' : 'aabb',
                     group: () => e.collisionLayer, mask: () => 0xFFFF, ray_mask: () => 0xFFFF,
-                    mass: () => e.mass, linear_damping: () => 0, angular_damping: () => 0,
-                    lock: () => { const r = (set.physics_type ?? derived.physics_type()) !== 'rigid'; return { x: false, y: false, rot: r }; },
+                    mass: () => e.mass,
+                    linear_damping: () => 1 - (e.knockbackFriction ?? e.friction ?? 1),          // (what the old fields keep a tick)
+                    angular_damping: () => 1 - (e.angularFriction ?? 1),
+                    lock: () => { const r = (set.physics_type ?? derived.physics_type()) !== 'rigid' || !!e.fixedRotation; return { x: false, y: false, rot: r }; },
                     ccd: () => e.collisionLayer === L.PROJECTILE,
                 };
                 const body = {};
                 for (const k in derived) Object.defineProperty(body, k, { enumerable: true, get: () => set[k] ?? derived[k](), set: (v) => { set[k] = v; } });
+                Object.defineProperty(body, 'given', { value: set });   // what was set by hand (the rest follows the entity)
                 return body;
             }
 
@@ -8327,7 +8334,7 @@
 
 
     </script>
-    <script type="text/dfab" data-src="basement/collision-kit.js" data-cost="518">
+    <script type="text/dfab" data-src="basement/collision-kit.js" data-cost="569">
         // ===== LV0 BASEMENT =====
         // The collision kit: the parts of a collision step that know nothing about any game. The shape tests are the
         // shape kit's (basement/shape-kit.js), the broad phase the spatial grid's (basement/spatial-grid.js).
@@ -8985,6 +8992,84 @@
             static _footVsCar(p, v, c, game) { p.x += c.nx * c.depth; p.y += c.ny * c.depth; }
 
             // =====================
+            //  THE BODY STEP: every body moves by what it was given, loses what its damping takes, and keeps its locked
+            //  axes, the same way for everyone (Blender: linear / angular velocity, damping, locks)
+            // =====================
+
+            /** What a body keeps of its speed (or 'angular': spin) a tick: 1 − its damping when set by hand, else the old field. */
+            static _keep(e, kind = 'linear') {
+                const B = e.body, given = B && B.given, k = kind === 'angular' ? 'angular_damping' : 'linear_damping';
+                if (given && given[k] !== undefined) return 1 - given[k];
+                return kind === 'angular' ? e.angularFriction : (e.knockbackFriction ?? e.friction);
+            }
+            static _locks(e) { return e.body ? e.body.lock : null; }
+            /**
+             * A character's carried velocity (knockback: what hits, shoves and slips gave it, beside its own walking):
+             * moves it (into 'position', or 'velocity' for things that move by their own vx / vy), then damping takes
+             * its share, and under 0.1 it stops. A locked axis carries nothing.
+             */
+            static carry(e, into = 'position') {
+                if (!(e.knockbackVx || e.knockbackVy)) return;
+                const lk = this._locks(e);
+                if (lk) { if (lk.x) e.knockbackVx = 0; if (lk.y) e.knockbackVy = 0; }
+                if (into === 'velocity') { e.vx += e.knockbackVx; e.vy += e.knockbackVy; }
+                else { e.x += e.knockbackVx; e.y += e.knockbackVy; }
+                const k = this._keep(e);
+                e.knockbackVx *= k; e.knockbackVy *= k;
+                if (Math.abs(e.knockbackVx) < 0.1) e.knockbackVx = 0;
+                if (Math.abs(e.knockbackVy) < 0.1) e.knockbackVy = 0;
+            }
+            /**
+             * A rigid body's whole step (props): a broken number restores its last good pose; a locked turn doesn't
+             * spin; the speed cap (about its own thickness a tick, so walls can't be skipped) and the spin cap; move,
+             * turn, damping; under 0.1 (spin 0.001) it stops, and still for long enough it sleeps (`_still`).
+             */
+            static integrate(e) {
+                if (!Number.isFinite(e.x + e.y + e.vx + e.vy + e.angle + e.angularVel)) {
+                    const g = e._good || { x: 0, y: 0, angle: 0 };
+                    e.x = g.x; e.y = g.y; e.angle = g.angle; e.vx = e.vy = e.angularVel = 0;
+                }
+                const lk = this._locks(e);
+                if (lk && lk.rot) e.angularVel = 0;
+                if (lk && lk.x) e.vx = 0;
+                if (lk && lk.y) e.vy = 0;
+                const keep = this._keep(e), keepW = this._keep(e, 'angular');
+                if (e.vx === 0 && e.vy === 0 && e.angularVel === 0 && Number.isFinite(keep) && Number.isFinite(keepW)) {
+                    // At rest: keep even signed-zero arithmetic and the zero normalization
+                    e.x += e.vx; e.y += e.vy; e.angle += e.angularVel;
+                    e.vx = e.vy = e.angularVel = 0;
+                    e._still = (e._still || 0) + 1;
+                    if (!e._good) e._good = {};
+                    e._good.x = e.x; e._good.y = e.y; e._good.angle = e.angle;
+                    return;
+                }
+                const sp = Math.hypot(e.vx, e.vy), cap = Math.max(4, Math.min(14, Math.min(e.width, e.height) * 0.9));
+                if (sp > cap) { e.vx *= cap / sp; e.vy *= cap / sp; }
+                if (Math.abs(e.angularVel) > 0.35) e.angularVel = Math.sign(e.angularVel) * 0.35;
+                e.x += e.vx; e.y += e.vy;
+                e.angle += e.angularVel;
+                e.vx *= keep; e.vy *= keep;
+                e.angularVel *= keepW;
+                if (Math.abs(e.vx) < 0.1) e.vx = 0;
+                if (Math.abs(e.vy) < 0.1) e.vy = 0;
+                if (Math.abs(e.angularVel) < 0.001) e.angularVel = 0;
+                e._still = (e.vx || e.vy || e.angularVel) ? 0 : (e._still || 0) + 1;   // asleep after a still half-second; a contact wakes it
+                if (!e._good) e._good = {};
+                e._good.x = e.x; e._good.y = e.y; e._good.angle = e.angle;
+            }
+            /**
+             * Push a body: impulse (jx, jy), at point (px, py) for a turn too (a rigid body). Its speed changes by
+             * impulse / mass (a character's carried velocity, a prop's vx / vy); static and immovable bodies don't move.
+             */
+            static impulse(e, jx, jy, px = null, py = null) {
+                const im = this._invMass(e);
+                if (!im) return;
+                this._addVel(e, jx * im, jy * im);
+                const I = px === null ? 0 : this._invInertia(e);
+                if (I) { const c = this._centre(e); e.angularVel = (e.angularVel || 0) + ((px - c.x) * jy - (py - c.y) * jx) * I; }
+            }
+
+            // =====================
             //  CONTACT SOLVER (rigid bodies in the plane)
             // =====================
 
@@ -8996,7 +9081,7 @@
             }
             /** Inverse moment of inertia about the centre: a box spins (I = m(w²+h²)/12); circles, cars and fixed decor don't. */
             static _invInertia(e) {
-                if (!e || e.angularVel === undefined || e.fixedRotation || this._invMass(e) === 0) return 0;
+                if (!e || e.angularVel === undefined || e.fixedRotation || (e.body && e.body.lock.rot) || this._invMass(e) === 0) return 0;
                 const w = e.width || 20, h = e.height || 20;
                 return 12 / ((e.mass || 1) * (w * w + h * h));
             }
@@ -9008,6 +9093,8 @@
                 return { x: e.vx || 0, y: e.vy || 0 };
             }
             static _addVel(e, dx, dy) {
+                const lk = this._locks(e);
+                if (lk) { if (lk.x) dx = 0; if (lk.y) dy = 0; }
                 if (e.collisionLayer === GameEntity.LAYER.ACTOR && e.knockbackVx !== undefined) { e.knockbackVx += dx; e.knockbackVy += dy; }
                 else { e.vx = (e.vx || 0) + dx; e.vy = (e.vy || 0) + dy; }
             }
@@ -20444,7 +20531,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
     </script>
-    <script type="text/dfab" data-src="entities/props-decor.js" data-cost="2516">
+    <script type="text/dfab" data-src="entities/props-decor.js" data-cost="2490">
         // One soft, centred ground blob shared by props, pickups and Velvet. It is stamped
         // before artwork transforms and never baked into a rotating furniture sprite.
         function drawGroundContactShadow(ctx, x, y, rx, ry, angle = 0) {
@@ -23163,49 +23250,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              * Wall and prop-prop collisions are handled by CollisionSystem.
              */
             update() {
-                // A broken number never spreads: restore the last good state
-                if (!Number.isFinite(this.x + this.y + this.vx + this.vy + this.angle + this.angularVel)) {
-                    const g = this._good || { x: 0, y: 0, angle: 0 };
-                    this.x = g.x; this.y = g.y; this.angle = g.angle; this.vx = this.vy = this.angularVel = 0;
-                }
-                if (this.fixedRotation) this.angularVel = 0;
-                // Settled furniture still wakes on any assigned velocity/rotation or
-                // edited pose. Keep all externally visible sleeping bookkeeping.
-                if (this.vx === 0 && this.vy === 0 && this.angularVel === 0 && Number.isFinite(this.friction) && Number.isFinite(this.angularFriction)) {
-                    // Retain even signed-zero arithmetic and the original zero normalization.
-                    this.x += this.vx; this.y += this.vy; this.angle += this.angularVel;
-                    this.vx = this.vy = this.angularVel = 0;
-                    this._still = (this._still || 0) + 1;
-                    if (!this._good) this._good = {};
-                    this._good.x = this.x; this._good.y = this.y; this._good.angle = this.angle;
-                    this.w = this.width; this.h = this.height;
-                    return;
-                }
-                // Speed cap: no faster than about half its own thickness a tick (walls can't be skipped)
-                const sp = Math.hypot(this.vx, this.vy), cap = Math.max(4, Math.min(14, Math.min(this.width, this.height) * 0.9));
-                if (sp > cap) { this.vx *= cap / sp; this.vy *= cap / sp; }
-                if (Math.abs(this.angularVel) > 0.35) this.angularVel = Math.sign(this.angularVel) * 0.35;
-
-                // Apply velocity
-                this.x += this.vx;
-                this.y += this.vy;
-
-                // Apply rotation
-                this.angle += this.angularVel;
-
-                // Apply friction
-                this.vx *= this.friction;
-                this.vy *= this.friction;
-                this.angularVel *= this.angularFriction;
-
-                // Stop if very slow (prevents micro-drift)
-                if (Math.abs(this.vx) < 0.1) this.vx = 0;
-                if (Math.abs(this.vy) < 0.1) this.vy = 0;
-                if (Math.abs(this.angularVel) < 0.001) this.angularVel = 0;
-                // Asleep after a still half-second (CollisionSystem skips sleeper pairs); a contact wakes it
-                this._still = (this.vx || this.vy || this.angularVel) ? 0 : (this._still || 0) + 1;
-                if (!this._good) this._good = {};
-                this._good.x = this.x; this._good.y = this.y; this._good.angle = this.angle;
+                collisionWorld.integrate(this);   // velocity, spin, damping, locks, caps, sleep: the body step (basement/collision-kit.js)
 
                 // Keep w/h in sync for legacy compatibility
                 this.w = this.width;
@@ -25938,7 +25983,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
     </script>
-    <script type="text/dfab" data-src="entities/actors.js" data-cost="608">
+    <script type="text/dfab" data-src="entities/actors.js" data-cost="602">
         /**
          * =====================================================================
          *  ACTOR ENTITY (Base Class for NPCs & Enemies)
@@ -26144,19 +26189,12 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this.vx = this.moveDir.x * this.curSpeed;
                 this.vy = this.moveDir.y * this.curSpeed;
         
-                // 4. APPLY KNOCKBACK (Additive)
-                this.vx += this.knockbackVx;
-                this.vy += this.knockbackVy;
+                // 4. KNOCKBACK on top (the body step: added, then damped; basement/collision-kit.js carry)
+                collisionWorld.carry(this, 'velocity');
         
                 // 5. APPLY TO POSITION
                 this.x += this.vx;
                 this.y += this.vy;
-        
-                // 6. DECAY KNOCKBACK
-                this.knockbackVx *= this.knockbackFriction;
-                this.knockbackVy *= this.knockbackFriction;
-                if (Math.abs(this.knockbackVx) < 0.1) this.knockbackVx = 0;
-                if (Math.abs(this.knockbackVy) < 0.1) this.knockbackVy = 0;
             }
         
             // Standard helper to set direction for AI/Input
@@ -26359,15 +26397,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Movement is applied in GameEngine.update() BEFORE CollisionSystem runs
                 // CollisionSystem will then resolve any wall/prop penetrations
                 
-                // Apply knockback (if any, from damage)
-                this.x += this.knockbackVx;
-                this.y += this.knockbackVy;
-                
-                // Decay knockback
-                this.knockbackVx *= this.knockbackFriction;
-                this.knockbackVy *= this.knockbackFriction;
-                if (Math.abs(this.knockbackVx) < 0.1) this.knockbackVx = 0;
-                if (Math.abs(this.knockbackVy) < 0.1) this.knockbackVy = 0;
+                collisionWorld.carry(this);   // knockback (from damage, shoves, slips): the body step (basement/collision-kit.js)
             }
             
             /**
@@ -28472,7 +28502,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
     </script>
-    <script type="text/dfab" data-src="entities/npc.js" data-cost="563">
+    <script type="text/dfab" data-src="entities/npc.js" data-cost="555">
         /**
          * =====================================================================
          *  NPC CLASS (Extends ActorEntity)
@@ -28622,14 +28652,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.dead) return;
                 
                 // Apply knockback from ActorEntity (damage pushback)
-                if (this.knockbackVx || this.knockbackVy) {
-                    this.x += this.knockbackVx;
-                    this.y += this.knockbackVy;
-                    this.knockbackVx *= this.knockbackFriction;
-                    this.knockbackVy *= this.knockbackFriction;
-                    if (Math.abs(this.knockbackVx) < 0.1) this.knockbackVx = 0;
-                    if (Math.abs(this.knockbackVy) < 0.1) this.knockbackVy = 0;
-                }
+                collisionWorld.carry(this);   // knockback: the body step (basement/collision-kit.js)
                 
                 // Decrement invincibility
                 if (this.invincibleTimer > 0) {
@@ -28708,14 +28731,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.combatTargetTimer > 0) this.combatTargetTimer--;
                 
                 // Apply knockback physics
-                if (this.knockbackVx || this.knockbackVy) {
-                    this.x += this.knockbackVx;
-                    this.y += this.knockbackVy;
-                    this.knockbackVx *= this.knockbackFriction;
-                    this.knockbackVy *= this.knockbackFriction;
-                    if (Math.abs(this.knockbackVx) < 0.1) this.knockbackVx = 0;
-                    if (Math.abs(this.knockbackVy) < 0.1) this.knockbackVy = 0;
-                }
+                collisionWorld.carry(this);   // knockback: the body step (basement/collision-kit.js)
                 if (this.invincibleTimer > 0) this.invincibleTimer--;
                 if (this.stimCooldown > 0) this.stimCooldown--;
                 
@@ -29540,7 +29556,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         };
 
     </script>
-    <script type="text/dfab" data-src="entities/pedestrians.js" data-cost="676">
+    <script type="text/dfab" data-src="entities/pedestrians.js" data-cost="672">
         /**
          * =====================================================================
          *  PEDESTRIAN CLASS (Roaming City Civilian)
@@ -29864,14 +29880,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.quipCooldown > 0) this.quipCooldown--;
                 
                 // Apply knockback physics from ActorEntity
-                if (this.knockbackVx || this.knockbackVy) {
-                    this.x += this.knockbackVx;
-                    this.y += this.knockbackVy;
-                    this.knockbackVx *= this.knockbackFriction;
-                    this.knockbackVy *= this.knockbackFriction;
-                    if (Math.abs(this.knockbackVx) < 0.1) this.knockbackVx = 0;
-                    if (Math.abs(this.knockbackVy) < 0.1) this.knockbackVy = 0;
-                }
+                collisionWorld.carry(this);   // knockback: the body step (basement/collision-kit.js)
                 
                 if (this.invincibleTimer > 0) this.invincibleTimer--;
                 
@@ -31677,7 +31686,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
     </script>
-    <script type="text/dfab" data-src="entities/enemies.js" data-cost="1657">
+    <script type="text/dfab" data-src="entities/enemies.js" data-cost="1651">
         /**
          * =====================================================================
          *  VELVET CAT — Dreampunk Feline Companion
@@ -32646,14 +32655,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 
                 // Apply knockback physics
-                if (this.knockbackVx || this.knockbackVy) {
-                    this.x += this.knockbackVx;
-                    this.y += this.knockbackVy;
-                    this.knockbackVx *= this.knockbackFriction;
-                    this.knockbackVy *= this.knockbackFriction;
-                    if (Math.abs(this.knockbackVx) < 0.1) this.knockbackVx = 0;
-                    if (Math.abs(this.knockbackVy) < 0.1) this.knockbackVy = 0;
-                }
+                collisionWorld.carry(this);   // knockback: the body step (basement/collision-kit.js)
 
                 // A warden: what it knows of her, its own move; out of sight, its burst goes on into her cover
                 const S = this.persona ? this._wardenSense(playerX, playerY) : null;
@@ -33278,12 +33280,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.invincibleTimer > 0) this.invincibleTimer--;
                 
                 // Physics Knockback
-                if (this.knockbackVx || this.knockbackVy) {
-                    this.x += this.knockbackVx;
-                    this.y += this.knockbackVy;
-                    this.knockbackVx *= this.knockbackFriction;
-                    this.knockbackVy *= this.knockbackFriction;
-                }
+                collisionWorld.carry(this);   // knockback: the body step (basement/collision-kit.js)
                 if (this._staggerUntil && _gameTimeSec < this._staggerUntil) return null;   // slipped in a spill (engine/spills.js): no step, no shot
                 
                 const her = this.awareness.observe(player, 'her'), distToPlayer = her[AWARE.DIST];
@@ -34762,7 +34759,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
     </script>
-    <script type="text/dfab" data-src="entities/drones.js" data-cost="311">
+    <script type="text/dfab" data-src="entities/drones.js" data-cost="308">
         /* =====================================================================
            DRONES — the hunter-killers that come for the Dark Maker (the Double
            Nights ambush, story/story-db.js), after ETERNAL's concept sheet
@@ -34825,12 +34822,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const g = typeof game !== 'undefined' ? game : null, now = _gameTimeSec, age = now - this._stateT;
                 this.hoverOffset += 0.08;
                 if (this.invincibleTimer > 0) this.invincibleTimer--;
-                if (this.knockbackVx || this.knockbackVy) {
-                    this.vx += this.knockbackVx; this.vy += this.knockbackVy;
-                    this.knockbackVx *= this.knockbackFriction; this.knockbackVy *= this.knockbackFriction;
-                    if (Math.abs(this.knockbackVx) < 0.1) this.knockbackVx = 0;
-                    if (Math.abs(this.knockbackVy) < 0.1) this.knockbackVy = 0;
-                }
+                collisionWorld.carry(this, 'velocity');   // knockback into its own vx / vy: the body step
                 const dx = playerX - this.x, dy = playerY - this.y, dist = Math.hypot(dx, dy), toHer = Math.atan2(dy, dx);
                 const turn = (to, k) => { this.angle += normalizeAngle(to - this.angle) * k; };
                 let shot = null;
@@ -35206,7 +35198,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
     </script>
-    <script type="text/dfab" data-src="entities/marionettes.js" data-cost="185">
+    <script type="text/dfab" data-src="entities/marionettes.js" data-cost="182">
         /* =====================================================================
            MARIONETTES — the Dark Maker's puppets (Darklands; DRAFT)
            ---------------------------------------------------------------------
@@ -35263,12 +35255,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (this.dead) return null;
                 const M = MARIONETTE, g = typeof game !== 'undefined' ? game : null, now = _gameTimeSec, age = now - this._stateT;
                 if (this.invincibleTimer > 0) this.invincibleTimer--;
-                if (this.knockbackVx || this.knockbackVy) {
-                    this.vx += this.knockbackVx; this.vy += this.knockbackVy;
-                    this.knockbackVx *= this.knockbackFriction; this.knockbackVy *= this.knockbackFriction;
-                    if (Math.abs(this.knockbackVx) < 0.1) this.knockbackVx = 0;
-                    if (Math.abs(this.knockbackVy) < 0.1) this.knockbackVy = 0;
-                }
+                collisionWorld.carry(this, 'velocity');   // knockback into its own vx / vy: the body step
                 const dx = playerX - this.x, dy = playerY - this.y, dist = Math.hypot(dx, dy), toHer = Math.atan2(dy, dx);
                 const turn = (to, k) => { this.angle += normalizeAngle(to - this.angle) * k; };
                 this._yank *= 0.9;

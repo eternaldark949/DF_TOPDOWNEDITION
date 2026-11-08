@@ -147,14 +147,7 @@
                 if (this.dead) return;
                 
                 // Apply knockback from ActorEntity (damage pushback)
-                if (this.knockbackVx || this.knockbackVy) {
-                    this.x += this.knockbackVx;
-                    this.y += this.knockbackVy;
-                    this.knockbackVx *= this.knockbackFriction;
-                    this.knockbackVy *= this.knockbackFriction;
-                    if (Math.abs(this.knockbackVx) < 0.1) this.knockbackVx = 0;
-                    if (Math.abs(this.knockbackVy) < 0.1) this.knockbackVy = 0;
-                }
+                collisionWorld.carry(this);   // knockback: the body step (basement/collision-kit.js)
                 
                 // Decrement invincibility
                 if (this.invincibleTimer > 0) {
@@ -233,14 +226,7 @@
                 if (this.combatTargetTimer > 0) this.combatTargetTimer--;
                 
                 // Apply knockback physics
-                if (this.knockbackVx || this.knockbackVy) {
-                    this.x += this.knockbackVx;
-                    this.y += this.knockbackVy;
-                    this.knockbackVx *= this.knockbackFriction;
-                    this.knockbackVy *= this.knockbackFriction;
-                    if (Math.abs(this.knockbackVx) < 0.1) this.knockbackVx = 0;
-                    if (Math.abs(this.knockbackVy) < 0.1) this.knockbackVy = 0;
-                }
+                collisionWorld.carry(this);   // knockback: the body step (basement/collision-kit.js)
                 if (this.invincibleTimer > 0) this.invincibleTimer--;
                 if (this.stimCooldown > 0) this.stimCooldown--;
                 

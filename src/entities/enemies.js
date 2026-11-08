@@ -966,14 +966,7 @@
                 }
                 
                 // Apply knockback physics
-                if (this.knockbackVx || this.knockbackVy) {
-                    this.x += this.knockbackVx;
-                    this.y += this.knockbackVy;
-                    this.knockbackVx *= this.knockbackFriction;
-                    this.knockbackVy *= this.knockbackFriction;
-                    if (Math.abs(this.knockbackVx) < 0.1) this.knockbackVx = 0;
-                    if (Math.abs(this.knockbackVy) < 0.1) this.knockbackVy = 0;
-                }
+                collisionWorld.carry(this);   // knockback: the body step (basement/collision-kit.js)
 
                 // A warden: what it knows of her, its own move; out of sight, its burst goes on into her cover
                 const S = this.persona ? this._wardenSense(playerX, playerY) : null;
@@ -1598,12 +1591,7 @@
                 if (this.invincibleTimer > 0) this.invincibleTimer--;
                 
                 // Physics Knockback
-                if (this.knockbackVx || this.knockbackVy) {
-                    this.x += this.knockbackVx;
-                    this.y += this.knockbackVy;
-                    this.knockbackVx *= this.knockbackFriction;
-                    this.knockbackVy *= this.knockbackFriction;
-                }
+                collisionWorld.carry(this);   // knockback: the body step (basement/collision-kit.js)
                 if (this._staggerUntil && _gameTimeSec < this._staggerUntil) return null;   // slipped in a spill (engine/spills.js): no step, no shot
                 
                 const her = this.awareness.observe(player, 'her'), distToPlayer = her[AWARE.DIST];

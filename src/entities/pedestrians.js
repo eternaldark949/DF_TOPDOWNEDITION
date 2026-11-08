@@ -321,14 +321,7 @@
                 if (this.quipCooldown > 0) this.quipCooldown--;
                 
                 // Apply knockback physics from ActorEntity
-                if (this.knockbackVx || this.knockbackVy) {
-                    this.x += this.knockbackVx;
-                    this.y += this.knockbackVy;
-                    this.knockbackVx *= this.knockbackFriction;
-                    this.knockbackVy *= this.knockbackFriction;
-                    if (Math.abs(this.knockbackVx) < 0.1) this.knockbackVx = 0;
-                    if (Math.abs(this.knockbackVy) < 0.1) this.knockbackVy = 0;
-                }
+                collisionWorld.carry(this);   // knockback: the body step (basement/collision-kit.js)
                 
                 if (this.invincibleTimer > 0) this.invincibleTimer--;
                 

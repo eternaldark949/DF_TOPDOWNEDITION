@@ -655,6 +655,84 @@
             static _footVsCar(p, v, c, game) { p.x += c.nx * c.depth; p.y += c.ny * c.depth; }
 
             // =====================
+            //  THE BODY STEP: every body moves by what it was given, loses what its damping takes, and keeps its locked
+            //  axes, the same way for everyone (Blender: linear / angular velocity, damping, locks)
+            // =====================
+
+            /** What a body keeps of its speed (or 'angular': spin) a tick: 1 − its damping when set by hand, else the old field. */
+            static _keep(e, kind = 'linear') {
+                const B = e.body, given = B && B.given, k = kind === 'angular' ? 'angular_damping' : 'linear_damping';
+                if (given && given[k] !== undefined) return 1 - given[k];
+                return kind === 'angular' ? e.angularFriction : (e.knockbackFriction ?? e.friction);
+            }
+            static _locks(e) { return e.body ? e.body.lock : null; }
+            /**
+             * A character's carried velocity (knockback: what hits, shoves and slips gave it, beside its own walking):
+             * moves it (into 'position', or 'velocity' for things that move by their own vx / vy), then damping takes
+             * its share, and under 0.1 it stops. A locked axis carries nothing.
+             */
+            static carry(e, into = 'position') {
+                if (!(e.knockbackVx || e.knockbackVy)) return;
+                const lk = this._locks(e);
+                if (lk) { if (lk.x) e.knockbackVx = 0; if (lk.y) e.knockbackVy = 0; }
+                if (into === 'velocity') { e.vx += e.knockbackVx; e.vy += e.knockbackVy; }
+                else { e.x += e.knockbackVx; e.y += e.knockbackVy; }
+                const k = this._keep(e);
+                e.knockbackVx *= k; e.knockbackVy *= k;
+                if (Math.abs(e.knockbackVx) < 0.1) e.knockbackVx = 0;
+                if (Math.abs(e.knockbackVy) < 0.1) e.knockbackVy = 0;
+            }
+            /**
+             * A rigid body's whole step (props): a broken number restores its last good pose; a locked turn doesn't
+             * spin; the speed cap (about its own thickness a tick, so walls can't be skipped) and the spin cap; move,
+             * turn, damping; under 0.1 (spin 0.001) it stops, and still for long enough it sleeps (`_still`).
+             */
+            static integrate(e) {
+                if (!Number.isFinite(e.x + e.y + e.vx + e.vy + e.angle + e.angularVel)) {
+                    const g = e._good || { x: 0, y: 0, angle: 0 };
+                    e.x = g.x; e.y = g.y; e.angle = g.angle; e.vx = e.vy = e.angularVel = 0;
+                }
+                const lk = this._locks(e);
+                if (lk && lk.rot) e.angularVel = 0;
+                if (lk && lk.x) e.vx = 0;
+                if (lk && lk.y) e.vy = 0;
+                const keep = this._keep(e), keepW = this._keep(e, 'angular');
+                if (e.vx === 0 && e.vy === 0 && e.angularVel === 0 && Number.isFinite(keep) && Number.isFinite(keepW)) {
+                    // At rest: keep even signed-zero arithmetic and the zero normalization
+                    e.x += e.vx; e.y += e.vy; e.angle += e.angularVel;
+                    e.vx = e.vy = e.angularVel = 0;
+                    e._still = (e._still || 0) + 1;
+                    if (!e._good) e._good = {};
+                    e._good.x = e.x; e._good.y = e.y; e._good.angle = e.angle;
+                    return;
+                }
+                const sp = Math.hypot(e.vx, e.vy), cap = Math.max(4, Math.min(14, Math.min(e.width, e.height) * 0.9));
+                if (sp > cap) { e.vx *= cap / sp; e.vy *= cap / sp; }
+                if (Math.abs(e.angularVel) > 0.35) e.angularVel = Math.sign(e.angularVel) * 0.35;
+                e.x += e.vx; e.y += e.vy;
+                e.angle += e.angularVel;
+                e.vx *= keep; e.vy *= keep;
+                e.angularVel *= keepW;
+                if (Math.abs(e.vx) < 0.1) e.vx = 0;
+                if (Math.abs(e.vy) < 0.1) e.vy = 0;
+                if (Math.abs(e.angularVel) < 0.001) e.angularVel = 0;
+                e._still = (e.vx || e.vy || e.angularVel) ? 0 : (e._still || 0) + 1;   // asleep after a still half-second; a contact wakes it
+                if (!e._good) e._good = {};
+                e._good.x = e.x; e._good.y = e.y; e._good.angle = e.angle;
+            }
+            /**
+             * Push a body: impulse (jx, jy), at point (px, py) for a turn too (a rigid body). Its speed changes by
+             * impulse / mass (a character's carried velocity, a prop's vx / vy); static and immovable bodies don't move.
+             */
+            static impulse(e, jx, jy, px = null, py = null) {
+                const im = this._invMass(e);
+                if (!im) return;
+                this._addVel(e, jx * im, jy * im);
+                const I = px === null ? 0 : this._invInertia(e);
+                if (I) { const c = this._centre(e); e.angularVel = (e.angularVel || 0) + ((px - c.x) * jy - (py - c.y) * jx) * I; }
+            }
+
+            // =====================
             //  CONTACT SOLVER (rigid bodies in the plane)
             // =====================
 
@@ -666,7 +744,7 @@
             }
             /** Inverse moment of inertia about the centre: a box spins (I = m(w²+h²)/12); circles, cars and fixed decor don't. */
             static _invInertia(e) {
-                if (!e || e.angularVel === undefined || e.fixedRotation || this._invMass(e) === 0) return 0;
+                if (!e || e.angularVel === undefined || e.fixedRotation || (e.body && e.body.lock.rot) || this._invMass(e) === 0) return 0;
                 const w = e.width || 20, h = e.height || 20;
                 return 12 / ((e.mass || 1) * (w * w + h * h));
             }
@@ -678,6 +756,8 @@
                 return { x: e.vx || 0, y: e.vy || 0 };
             }
             static _addVel(e, dx, dy) {
+                const lk = this._locks(e);
+                if (lk) { if (lk.x) dx = 0; if (lk.y) dy = 0; }
                 if (e.collisionLayer === GameEntity.LAYER.ACTOR && e.knockbackVx !== undefined) { e.knockbackVx += dx; e.knockbackVy += dy; }
                 else { e.vx = (e.vx || 0) + dx; e.vy = (e.vy || 0) + dy; }
             }

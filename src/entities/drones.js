@@ -60,12 +60,7 @@
                 const g = typeof game !== 'undefined' ? game : null, now = _gameTimeSec, age = now - this._stateT;
                 this.hoverOffset += 0.08;
                 if (this.invincibleTimer > 0) this.invincibleTimer--;
-                if (this.knockbackVx || this.knockbackVy) {
-                    this.vx += this.knockbackVx; this.vy += this.knockbackVy;
-                    this.knockbackVx *= this.knockbackFriction; this.knockbackVy *= this.knockbackFriction;
-                    if (Math.abs(this.knockbackVx) < 0.1) this.knockbackVx = 0;
-                    if (Math.abs(this.knockbackVy) < 0.1) this.knockbackVy = 0;
-                }
+                collisionWorld.carry(this, 'velocity');   // knockback into its own vx / vy: the body step
                 const dx = playerX - this.x, dy = playerY - this.y, dist = Math.hypot(dx, dy), toHer = Math.atan2(dy, dx);
                 const turn = (to, k) => { this.angle += normalizeAngle(to - this.angle) * k; };
                 let shot = null;
