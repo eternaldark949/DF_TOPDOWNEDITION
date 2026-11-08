@@ -22,94 +22,7 @@
            Items are stored as data; createItemFromRegistry() builds live objects.
            Save stores IDs only; load reconstructs from this registry.
            ===================================================================== */
-        const ITEM_REGISTRY = {
-            'pistol_fpx': {
-                name: 'FP-X', type: 'weapon', icon: '🔫',
-                desc: 'The Freelancer experimental pistol. Packs quite a punch.',
-                weaponMode: 'normal',
-                stats: { fireRate: 22, recoil: 10, damage: 35, projectileColor: '#00f3ff', projectileSpeed: 25, flashRadius: 50 }
-            },
-            'sniper_sara': {
-                name: 'YourGirlSara', type: 'weapon', icon: '🔭',
-                desc: 'Mayhem incarnate. Damn, Sara.',
-                weaponMode: 'sniper',
-                stats: { fireRate: 70, recoil: 20, damage: 100, projectileColor: '#FFD700', projectileSpeed: 80, flashRadius: 80, penetrating: true }
-            },
-            'rifle_rb98': {
-                name: 'RB-98', type: 'weapon', icon: '🧬',
-                desc: 'High-velocity rifle blaster. SMG-class fire rate.',
-                weaponMode: 'normal',
-                stats: { fireRate: 6, recoil: 4, damage: 12, projectileColor: '#00ffcc', projectileSpeed: 28, flashRadius: 40 }
-            },
-            'pistol_anavia': {
-                name: 'Anavia', type: 'weapon', icon: '💠',
-                desc: 'A specialized energy blaster that fires ethereal periwinkle bolts.',
-                weaponMode: 'normal',
-                stats: { fireRate: 4, recoil: 3, damage: 8, projectileColor: '#CCCCFF', projectileSpeed: 24, flashRadius: 45 }
-            },
-            'sniper_sr86': {
-                name: 'SR-86', type: 'weapon', icon: '🎯',
-                desc: 'Semi-automatic crimson death.',
-                weaponMode: 'sniper',
-                stats: { fireRate: 50, recoil: 15, damage: 65, projectileColor: '#DC143C', projectileSpeed: 40, flashRadius: 60, penetrating: true }
-            },
-            'maiden_kukri': {
-                name: "Maiden's Kukri", type: 'weapon', icon: '🗡',
-                desc: 'A curved golden knife, light as a promise. Cuts that keep bleeding.',
-                weaponMode: 'melee',
-                // a slash in an arc before her: damage, then bleeding (engine/status-effects.js); quiet, not silent
-                stats: { fireRate: 16, damage: 28, reach: 38, arc: 1.5, bleedDps: 6, bleedSecs: 3, noise: 60, damageType: 'melee' }
-            },
-            'blood_pact': {
-                name: 'Blood Pact', type: 'weapon', icon: '⚔',
-                desc: 'A long blood-red katana. Twice the Kukri\'s reach, half its pace; its cuts bleed and crit more often.',
-                weaponMode: 'melee',
-                // the Kukri's twice-reach, half-rate cousin: a slower swing (swingSecs), harder cuts, a wider arc
-                stats: { fireRate: 32, damage: 45, reach: 76, arc: 2.1, swingSecs: 0.32, bleedDps: 8, bleedSecs: 3, critChance: 0.2, noise: 65, damageType: 'melee' }
-            },
-            'golden_retribution': {
-                name: 'Golden Retribution', type: 'weapon', icon: '✊',
-                desc: 'Gilded brass knuckles. Quick jabs, and every third punch a haymaker that staggers and slams.',
-                weaponMode: 'fists',
-                // jabs on the bare-fist hitbox, every haymakerEvery-th a haymaker (engine/knuckles.js)
-                stats: { fireRate: 15, damage: 16, haymakerEvery: 3, haymakerMult: 2.5, damageType: 'melee' }
-            },
-            'laser_sight': {
-                name: 'Laser Sight', type: 'attachment', icon: '⊕',
-                desc: 'Faint red targeting beam when equipped.',
-                stats: { effect: 'laser_sight' }
-            },
-            'mirror_blade': {
-                name: 'Mirror Blade', type: 'attachment', icon: '◈',
-                desc: 'A mirror-polished edge. Bullets your blade meets mid-cut fly back at whoever fired them.',
-                // engine/status-effects.js deflectShots: the Kukri's and Blood Pact's cut turns enemy shots
-                stats: { effect: 'mirror_blade' }
-            },
-            'crimson_edge': {
-                name: 'Crimson Edge', type: 'attachment', icon: '❖',
-                desc: 'A blood-red whetted edge. Blades cut 50% harder, and wounds bleed up to five deep.',
-                // engine/status-effects.js meleeSlash / applyStatus: blade damage × bladeDamageMult, bleed up to bleedMax stacks
-                stats: { effect: 'crimson_edge', bladeDamageMult: 1.5, bleedMax: 5 }
-            },
-            'vampiric_fists': {
-                name: 'Vampiric Fists', type: 'attachment', icon: '❦',
-                desc: 'Blood-garnet studs for the knuckles. Every punch you land heals you; a haymaker drinks deeper and leaves them bleeding.',
-                // engine/knuckles.js onPunchLanded: any punch of hers (bare fists, Golden Retribution, fist weapons to come)
-                stats: { effect: 'vampiric_fists', lifesteal: 0.15, haymakerLifesteal: 0.3, bleedDps: 5, bleedSecs: 3 }
-            },
-            'blood_muzzle': {
-                name: 'Bloodthirsty Muzzle', type: 'attachment', icon: '♆',
-                desc: 'A crimson muzzle brake that drinks the shot. Bullets deal 75% more damage.',
-                // engine/combat-effects.js fireWeapon: the shot's damage × gunDamageMult
-                stats: { effect: 'blood_muzzle', gunDamageMult: 1.75 }
-            },
-            'golden_child': {
-                name: 'Golden Child', type: 'weapon', icon: '✦',
-                desc: 'Fires golden orbs that stick to targets and burn away.',
-                weaponMode: 'normal',
-                stats: { fireRate: 38, recoil: 6, damage: 18, projectileColor: '#FFD700', projectileSpeed: 18, flashRadius: 45, sticky: true, dotDamage: 8, dotTicks: 12, dotInterval: 10, maxOrbs: 4 }
-            },
-        };
+        const ITEM_REGISTRY = GAME_DB.items.gear;   // directory/game-db/items.json
         
         // ============================================================================
         //  ABILITY REGISTRY — Data-driven abilities (magic, fireballs, etc.)
@@ -228,7 +141,7 @@
         }
         
         // Default loadout for new games
-        const DEFAULT_LOADOUT = ['pistol_fpx', 'sniper_sara', 'rifle_rb98', 'pistol_anavia', 'sniper_sr86', 'maiden_kukri', 'blood_pact'];
+        const DEFAULT_LOADOUT = GAME_DB.items.default_loadout;   // directory/game-db/items.json
         
         // Factory: create a live InventoryItem from registry ID
         function createItemFromRegistry(id, game) {
@@ -255,38 +168,7 @@
         // Views of existing ownership. These records never enter physical InventorySystem.items,
         // capacity calculations, save payloads, map entities or cosmetic acquisition methods.
         const INVENTORY_SPECIAL_COSMETICS = new Set(['outfit_academy', 'acc_umbrella']);
-        const APARTMENT_FURNITURE_REGISTRY = Object.freeze([
-            { id: 'apt_sofa', name: 'Sofa', quantity: 1, icon: '▰', description: 'Wine-red two-seat sofa with cushions and a knit throw.' },
-            { id: 'apt_coffee', name: 'Coffee Table', quantity: 1, icon: '▭', description: 'Rounded walnut coffee table with books and flowers.' },
-            { id: 'apt_chair', name: 'Armchair', quantity: 2, icon: '▣', description: 'Blush upholstered lounge and bedroom armchairs.' },
-            { id: 'apt_side', name: 'Side Table', quantity: 3, icon: '▥', description: 'Walnut side tables with integrated lamps; two indoors and one on the veranda.' },
-            { id: 'apt_bookshelf', name: 'Bookshelf', quantity: 1, icon: '▤', description: 'Walnut shelf stocked with books and ornaments.' },
-            { id: 'apt_console', name: 'Console', quantity: 1, icon: '♫', description: 'Walnut media console with a turntable and stereo speakers.' },
-            { id: 'apt_fireplace', name: 'Fireplace', quantity: 1, icon: '♨', description: 'Linear glass fireplace set into a stone surround.' },
-            { id: 'apt_floor_lamp', name: 'Floor Lamp', quantity: 3, icon: '◉', description: 'Cream floor lamps with brass trim.' },
-            { id: 'apt_plant', name: 'Plant', quantity: 6, icon: '♣', description: 'Potted foliage throughout the living room, bedroom and bathroom.' },
-            { id: 'apt_bar_cart', name: 'Bar Cart', quantity: 1, icon: '◍', description: 'Brass and smoked-glass bar cart with bottles, a decanter and an ice bucket. Tops up her glass.' },
-            { id: 'apt_craft', name: 'Crafting Table', quantity: 1, icon: '⚒', description: 'Walnut and steel workbench with tools, a vise and a schematic tablet.' },
-            { id: 'apt_fridge', name: 'Refrigerator', quantity: 1, icon: '▣', description: 'Metal-finished refrigerator with brass trim.' },
-            { id: 'apt_sink', name: 'Kitchen Sink', quantity: 1, icon: '◡', description: 'Kitchen sink set into cream quartz with a brass tap.' },
-            { id: 'apt_counter', name: 'Kitchen Counter', quantity: 3, icon: '▬', description: 'Cream quartz countertop sections with walnut front edges.' },
-            { id: 'apt_gas_range', name: 'Gas Range', quantity: 1, icon: '♨', description: 'Five-burner black steel gas range with brass knobs.' },
-            { id: 'apt_induction', name: 'Induction Cooktop', quantity: 1, icon: '⊚', description: 'Four-zone black glass induction cooktop.' },
-            { id: 'apt_island', name: 'Kitchen Island', quantity: 1, icon: '▰', description: 'Quartz bar island with waterfall ends and integrated pendant shades.' },
-            { id: 'apt_stool', name: 'Stool', quantity: 4, icon: '●', description: 'Wine-red stools with brass frames along the kitchen island.' },
-            { id: 'apt_bed', name: 'Bed', quantity: 1, icon: '▰', description: 'Queen bed with a blush headboard, wine-red duvet and knit throw.' },
-            { id: 'apt_nightstand', name: 'Nightstand', quantity: 2, icon: '▥', description: 'Walnut bedside cabinets with brass pulls and integrated lamps.' },
-            { id: 'apt_wardrobe', name: 'Wardrobe', quantity: 1, icon: '▥', description: 'Tall walnut wardrobe with brass handles.' },
-            { id: 'apt_vanity', name: 'Dressing Vanity', quantity: 1, icon: '◯', description: 'Walnut dressing table with a brass-framed round mirror and a stool.' },
-            { id: 'apt_tub', name: 'Bathtub', quantity: 1, icon: '◡', description: 'Freestanding oval bathtub with brass fittings.' },
-            { id: 'apt_bath_vanity', name: 'Bathroom Vanity', quantity: 1, icon: '▭', description: 'Double marble vanity with brass taps and a mirror.' },
-            { id: 'apt_shower', name: 'Shower', quantity: 1, icon: '▣', description: 'Walk-in tiled shower with glass screening and a brass rain head.' },
-            { id: 'apt_towels', name: 'Towel Rack', quantity: 1, icon: '║', description: 'Walnut towel stand with blush and cream towels.' },
-            { id: 'apt_lounger', name: 'Lounger', quantity: 2, icon: '▰', description: 'Walnut-framed veranda loungers with cream cushions.' },
-            { id: 'apt_bistro', name: 'Bistro Set', quantity: 1, icon: '◉', description: 'Veranda bistro table and its two chairs, treated as one set.' },
-            { id: 'apt_telescope', name: 'Telescope', quantity: 1, icon: '⌕', description: 'Brass telescope on a tripod overlooking the city.' },
-            { id: 'apt_planter', name: 'Planter', quantity: 3, icon: '♣', description: 'Rectangular planted troughs along the veranda railing.' }
-        ].map(entry => Object.freeze(entry)));
+        const APARTMENT_FURNITURE_REGISTRY = Object.freeze(GAME_DB.items.furniture.map(entry => Object.freeze(entry)));   // directory/game-db/items.json
 
         function getOwnedInventoryEntries(game) {
             const result = [], cosmetics = game?.cosmetics;
@@ -839,17 +721,7 @@
            Cybernetic augments purchasable at Dr. Yin's Clinic.
            Augments are equipped from the pause menu Augments screen.
            ===================================================================== */
-        const AUGMENT_CATALOG = [
-            { id: 'auto_aim', name: 'NEURAL LOCK', desc: 'Soft target-lock on nearest hostile. Projectiles steer toward enemies in your line of fire.', price: 350, slot: 'optic', icon: '◎' },
-            { id: 'speed_boost', name: 'ADRENAL SURGE', desc: 'Vehicle top speed increased by 20%. Acceleration boosted by 15%.', price: 300, slot: 'spine', icon: '⚡' },
-            { id: 'armor_plate', name: 'SUBDERMAL MESH', desc: 'Reduces all incoming damage by 20%.', price: 400, slot: 'torso', icon: '🛡' },
-            { id: 'radar_ext', name: 'ECHO PULSE', desc: 'Enables tactical radar overlay. Detects hostiles and allies within 600px. Sweep-scan display.', price: 250, slot: 'cranial', icon: '◉' },
-            { id: 'fast_reload', name: 'REFLEX SYNC', desc: 'Weapon cooldown reduced by 25%. Faster fire rate across all weapons.', price: 275, slot: 'arms', icon: '↻' },
-            { id: 'flit_ext', name: 'PHASE WIRE', desc: 'FLIT cost reduced by 30%. Extended dash range.', price: 500, slot: 'legs', icon: '⟐' },
-            { id: 'health_regen', name: 'NANITE WEAVE', desc: 'Slowly regenerates 1 HP every 5 seconds when out of combat.', price: 600, slot: 'torso', icon: '✦' },
-            { id: 'scrap_magnet', name: 'SALVAGE NET', desc: 'Scrap pickup radius doubled. +10% bonus scrap from all sources.', price: 200, slot: 'arms', icon: '⊕' },
-            { id: 'vital_link', name: 'VITAL LINK', desc: 'Stim capacity +2. Proximity healing aura for allies boosted by 75%.', price: 450, slot: 'spine', icon: '❤' },
-        ];
+        const AUGMENT_CATALOG = GAME_DB.items.augments;   // directory/game-db/items.json
 
         class AugmentSystem {
             constructor() {

@@ -5,88 +5,17 @@
         //  Styles: 'letter' (warm parchment), 'briefing' (cold professional),
         //          'ancient' (dark mystical parchment), 'digital' (tech hologram)
         // ============================================================================
-        const NOTE_REGISTRY = {
-            'dark_maker_letter': {
-                id: 'dark_maker_letter',
-                title: 'A Letter from the Dark Maker',
-                author: 'Dark Maker',
-                style: 'letter',
-                icon: '🌙',
-                headerDetail: 'Double Nights — Crimson Crescent Seal',
-                body: `Dear Freelancers,
-
-I know that you will find this. Trust, I make no mistake of your skill. I also know you survived my gift. I'm not surprised. Experts deserve expert challenges.
-
-I've always admired your dedication, resolve, your prowess. I'm sure you can understand why I enjoy making this difficult for you. But I won't bore you. Things will step up here on out.
-
-Now for the most important question. Where the hell am I? Eh?
-
-Well, I left Friday the 19th after a very enjoyable stay. 10 out of 10, would recommend. I'm looking for a change of scenery now, I tire of cities for the moment.
-
-You'll figure out where I am. You always do.`,
-                signature: '~ Dark Maker',
-            },
-            'larissa_briefing_darklands': {
-                id: 'larissa_briefing_darklands',
-                title: 'Mission Briefing — Darklands',
-                author: 'Larissa',
-                style: 'briefing',
-                icon: '📋',
-                headerDetail: 'BLACK GUILD — CLASSIFIED',
-                body: `OPERATION: RETURN TO DARKLANDS
-CLASSIFICATION: PRIORITY ALPHA
-HANDLER: LARISSA
-
-The target known as the Dark Maker has been located via the Pool of Visions. He has fled to the dimension designated DARKLANDS.
-
-You will be accompanied by Commander Luck, Black Guild Elite. Insertion point: the gated township. Local intel suggests a curse is active in the area — the spirits of Jon and Ella Malledost.
-
-Exercise extreme caution. The Empereal Lord is watching.`,
-                signature: '— L.',
-            },
-        };
+        const NOTE_REGISTRY = GAME_DB.items.notes;   // directory/game-db/items.json
 
         // ============================================================================
         //  CONSUMABLES CONFIG — Data-driven vending machine items & buff definitions
-        //  Add new items here. The engine reads modifiers automatically.
+        //  Add new items in directory/game-db/items.json. The engine reads modifiers automatically.
         //  Modifier stats: 'speed', 'flitDistance', 'flitCooldown', 'detectionRange'
         //  Modifier types: 'multiply' (base * value), 'add' (base + value)
         // ============================================================================
-        const CONSUMABLES = {
-            bubbleTea: {
-                name: 'Bubble Tea',
-                cost: 30,
-                duration: 120,              // in-game minutes (2 hours)
-                modifiers: [
-                    { stat: 'speed',        type: 'multiply', value: 1.2 },
-                    { stat: 'flitDistance',  type: 'multiply', value: 2.0 }
-                ],
-                uiLabel: 'NEON RUSH ACTIVE',
-                uiColor: '#00f3ff',
-                purchaseMsg: 'PURCHASED: BUBBLE TEA — SPEED INCREASED',
-                expireMsg: 'NEON RUSH EXPIRED'
-            },
-            jeanSoda: {
-                name: 'Ms. Jean Soda',
-                cost: 20,
-                duration: 90,               // 1.5 in-game hours
-                modifiers: [
-                    { stat: 'detectionRange', type: 'multiply', value: 0.6 }
-                ],
-                uiLabel: null,              // No buff bar text
-                uiColor: null,
-                purchaseMsg: 'PURCHASED: MS. JEAN — ENEMIES LESS PERCEPTIVE',
-                expireMsg: "MS. JEAN'S CHARM FADED"
-            },
-            stellarLemonade: {
-                name: 'Stellar Lemonade',
-                cost: 75,
-                duration: 480,              // 8 in-game hours (~8 real min)
-                modifiers: [
-                    { stat: 'speed',        type: 'multiply', value: 1.75 },
-                    { stat: 'flitCooldown', type: 'multiply', value: 1/3 }
-                ],
-                shield: { maxShield: 100 },
+        /* The code the consumables name in their `hooks` field (directory/game-db/items.json has their data). */
+        const CONSUMABLE_HOOKS = {
+            stellar_lemonade: {
                 unlockCheck: (game) => game.missions && game.missions.completedBounties >= 5,
                 onActivate: (game, buff, config) => {
                     buff.shield = buff.maxShield;
@@ -102,13 +31,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         buff.savedMaxHp = 0;
                     }
                     game.player.syncHealth(game.playerHealth, game.maxPlayerHealth);
-                },
-                uiLabel: 'STELLAR RUSH ACTIVE',
-                uiColor: '#FFD700',
-                purchaseMsg: 'PURCHASED: STELLAR LEMONADE — SPEED BLAZING, SHIELD UP, HP HALVED',
-                expireMsg: 'STELLAR RUSH EXPIRED — HP RESTORED'
+                }
             }
         };
+        const CONSUMABLES = attachDataHooks(GAME_DB.items.consumables, CONSUMABLE_HOOKS);   // directory/game-db/items.json
 
         // ============================================================================
         //  COSMETICS REGISTRY — Data-driven appearance items (W.I.G.s / S.K.I.N.s / V.O.C.A.L.s)
@@ -116,22 +42,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         //  Purchased at Neural Systems, equipped via NEU.ME app.
         // ============================================================================
         /** Drinks for the Crystal Glass. `glass` picks the glass shape (seen from above). */
-        const GLASS_DRINKS = {
-            champagne:  { name: 'Champagne',     glass: 'flute',   rim: 3.2, liquid: '#f2d57e', bubbles: true },
-            rose:       { name: 'Rosé',          glass: 'wine',    rim: 4.2, liquid: '#f19ab0' },
-            red_wine:   { name: 'Bellafore',     glass: 'wine',    rim: 4.4, liquid: '#6a0c20' },   // Bella's finest, the classic red
-            white_wine: { name: 'White Wine',    glass: 'wine',    rim: 4.4, liquid: '#eadf98' },
-            martini:    { name: 'Martini',       glass: 'martini', rim: 5.0, liquid: '#e3efe9', garnish: 'olive' },
-            whiskey:    { name: 'Whiskey',       glass: 'tumbler', rim: 4.0, liquid: '#b5641a', ice: true },
-            neon:       { name: 'Neon Cocktail', glass: 'coupe',   rim: 4.6, liquid: '#17dcff', liquid2: '#ff2bd6', glow: true, garnish: 'citrus' },
-            cream_soda: { name: 'Ms. Jean Cream Soda', glass: 'soda', rim: 3.8, liquid: '#f4b0c4', bubbles: true, foam: true, straw: '#d4447c' },
-            stellar_lemonade: { name: 'Stellar Lemonade', glass: 'tumbler', rim: 4.0, liquid: '#f3dc6a', ice: true, garnish: 'citrus' },   // JJ's
-            // The Cozy Cafe's mugs (its guests, directory/cafe-life.js; `cafe`: not one of the Crystal Glass's pours)
-            latte:      { name: 'Honey Latte',   glass: 'mug', rim: 4.4, liquid: '#a9784e', cup: '#efe4d0', art: true, cafe: true },
-            tea:        { name: 'Chai',          glass: 'mug', rim: 4.2, liquid: '#b07a3c', cup: '#6d8a64', cafe: true },
-            cocoa:      { name: 'Cocoa',         glass: 'mug', rim: 4.4, liquid: '#5a3424', cup: '#c0903a', foam: true, cafe: true },
-            espresso:   { name: 'Espresso',      glass: 'mug', rim: 3.2, liquid: '#3a2214', cup: '#f3ead8', crema: true, cafe: true }
-        };
+        const GLASS_DRINKS = GAME_DB.items.drinks;   // directory/game-db/items.json
 
         /** The parts of an outfit the Clothing Dyer can colour: ['top.color', 'top.trim', …], in wearing order */
         const DYE_KEYS = ['color', 'trim', 'inner', 'accent', 'stripe'];
