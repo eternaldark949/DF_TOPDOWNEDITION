@@ -8,14 +8,9 @@
         // cosmetics.dyes (core/registries.js dyedOutfit lays them over the outfit), saved, per outfit.
 
         const DYER = {
-            FEE: 20,
+            FEE: GAME_DB.shops.dyer.fee,                                 // directory/game-db/shops.json, with the palette
             STATION: { x: 1176, y: 214, width: 58, height: 30 },       // apt_949: the bedroom wall between the nightstand and the wardrobe
-            PALETTE: [
-                ['#0c0c0e', 'Onyx'], ['#3a3a44', 'Slate'], ['#c9ccd8', 'Silver'], ['#f6f3ee', 'Pearl'], ['#efe6dc', 'Cream'], ['#e8c27a', 'Gold'],
-                ['#cc7722', 'Amber'], ['#8b4a2b', 'Rust'], ['#4a2e22', 'Cocoa'], ['#6a0c20', 'Bordeaux'], ['#dc143c', 'Crimson'], ['#ff6f61', 'Coral'],
-                ['#f19ab0', 'Rose'], ['#f3d6e4', 'Blush'], ['#e000c8', 'Magenta'], ['#8a2be2', 'Violet'], ['#b9a8e6', 'Lavender'], ['#ccccff', 'Periwinkle'],
-                ['#1a1440', 'Midnight'], ['#2a5cff', 'Cobalt'], ['#17dcff', 'Neon Cyan'], ['#00b39b', 'Teal'], ['#9be8c0', 'Mint'], ['#2f5a3e', 'Emerald']
-            ]
+            PALETTE: GAME_DB.shops.dyer.palette
         };
         const DYE_PIECES = { top: 'Top', bottom: 'Bottom', shoes: 'Shoes' };
         const DYE_PARTS = { color: '', trim: 'trim', inner: 'lining', accent: 'accent', stripe: 'stripe' };

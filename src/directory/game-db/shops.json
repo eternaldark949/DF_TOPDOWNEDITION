@@ -1,0 +1,179 @@
+{
+  "_about": {
+    "chapter": "Shops and prices: what the shops charge and offer that is not already on an item. Item, augment, consumable and schematic prices stay on their entries in items.json; cosmetic prices stay on the cosmetics until the looks chapter moves.",
+    "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.shops and checked by tools/test-game-db.cjs. Credits are personics (PP); the dyer charges scrap. Colours are CSS hex.",
+    "tables": {
+      "auto_shop": "Torque Auto (engine/shops-menus.js). car_prices: PP per brand and model (a model with no price is not for sale; brands and models are VEHICLE_BRANDS in traffic/garage-zib.js). sell_rate: the share of the price paid back when a car is sold. custom_prices: PP per change of paint, underglow or headlights. paint_colors: offered on top of the brand's own colours; glow_colors (null is no underglow) and headlight_colors: the swatches offered.",
+      "dyer": "The Clothing Dyer (engine/dyer.js). fee: scrap per piece dyed. palette: [hex, name] swatches, in the order shown."
+    }
+  },
+  "auto_shop": {
+    "car_prices": {
+      "LADY": {
+        "suv": 15000,
+        "suv2": 18000
+      },
+      "Zenxera": {
+        "sedan": 3000,
+        "suv": 4500,
+        "sports": 6000,
+        "truck": 3500
+      },
+      "Gelfash": {
+        "sedan": 1200,
+        "suv": 1800,
+        "sports": 2500,
+        "truck": 1500
+      }
+    },
+    "sell_rate": 0.4,
+    "custom_prices": {
+      "paint": 75,
+      "underglow": 150,
+      "headlights": 100
+    },
+    "paint_colors": [
+      "#1a1a1a",
+      "#0a0a0a",
+      "#ffffff",
+      "#333333",
+      "#8b0000",
+      "#003366",
+      "#2d5a27",
+      "#4a0e4e",
+      "#d4af37",
+      "#ff4500",
+      "#ff69b4",
+      "#E6E6FA",
+      "#CCCCFF"
+    ],
+    "glow_colors": [
+      null,
+      "#ffffff",
+      "#ff8800",
+      "#00f3ff",
+      "#ff00aa",
+      "#00ff88",
+      "#d4af37",
+      "#ff2244",
+      "#a469ff",
+      "#ff4500",
+      "#ff69b4",
+      "#E6E6FA",
+      "#CCCCFF"
+    ],
+    "headlight_colors": [
+      "#ffffaa",
+      "#ffffff",
+      "#ccddff",
+      "#ff8800",
+      "#00f3ff",
+      "#ff69b4",
+      "#d4af37",
+      "#ff2244",
+      "#E6E6FA",
+      "#CCCCFF"
+    ]
+  },
+  "dyer": {
+    "fee": 20,
+    "palette": [
+      [
+        "#0c0c0e",
+        "Onyx"
+      ],
+      [
+        "#3a3a44",
+        "Slate"
+      ],
+      [
+        "#c9ccd8",
+        "Silver"
+      ],
+      [
+        "#f6f3ee",
+        "Pearl"
+      ],
+      [
+        "#efe6dc",
+        "Cream"
+      ],
+      [
+        "#e8c27a",
+        "Gold"
+      ],
+      [
+        "#cc7722",
+        "Amber"
+      ],
+      [
+        "#8b4a2b",
+        "Rust"
+      ],
+      [
+        "#4a2e22",
+        "Cocoa"
+      ],
+      [
+        "#6a0c20",
+        "Bordeaux"
+      ],
+      [
+        "#dc143c",
+        "Crimson"
+      ],
+      [
+        "#ff6f61",
+        "Coral"
+      ],
+      [
+        "#f19ab0",
+        "Rose"
+      ],
+      [
+        "#f3d6e4",
+        "Blush"
+      ],
+      [
+        "#e000c8",
+        "Magenta"
+      ],
+      [
+        "#8a2be2",
+        "Violet"
+      ],
+      [
+        "#b9a8e6",
+        "Lavender"
+      ],
+      [
+        "#ccccff",
+        "Periwinkle"
+      ],
+      [
+        "#1a1440",
+        "Midnight"
+      ],
+      [
+        "#2a5cff",
+        "Cobalt"
+      ],
+      [
+        "#17dcff",
+        "Neon Cyan"
+      ],
+      [
+        "#00b39b",
+        "Teal"
+      ],
+      [
+        "#9be8c0",
+        "Mint"
+      ],
+      [
+        "#2f5a3e",
+        "Emerald"
+      ]
+    ]
+  }
+}

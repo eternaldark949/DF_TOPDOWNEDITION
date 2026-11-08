@@ -65,6 +65,7 @@ const SCRIPTS = [
     'core/config.js',
     'directory/game-db/game-db.js',   // LV2 Directory: GAME_DB, the game's data; its chapters (JSON) follow
     'directory/game-db/items.json',   // GAME_DB.items: gear, augments, furniture, consumables, drinks, notes, schematics
+    'directory/game-db/shops.json',   // GAME_DB.shops: the auto shop's prices and colours, the dyer's fee and palette
     '@assets',              // generated from the assets/ folder
     'core/assets.js',
     'core/registries.js',

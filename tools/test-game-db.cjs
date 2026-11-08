@@ -61,4 +61,21 @@ test('The running game reads the JSON under the old names, hooks attached',()=>{
  assert.deepEqual(e.errors,[]);
 });
 
+test('Shops: car prices name real cars, colours are hex, and the game reads them',()=>{
+ const sh=load('shops.json'), A=sh.auto_shop, hex=c=>/^#[0-9a-f]{6}$/i.test(c);
+ assert.ok(A.sell_rate>0&&A.sell_rate<1,'auto_shop.sell_rate is a share of the price');
+ for(const k of ['paint','underglow','headlights']) assert.ok(A.custom_prices[k]>0,`custom_prices.${k}`);
+ for(const c of [...A.paint_colors,...A.headlight_colors,...A.glow_colors.filter(c=>c!==null)]) assert.ok(hex(c),`auto_shop colour ${c}`);
+ assert.ok(sh.dyer.fee>0);
+ for(const p of sh.dyer.palette) assert.ok(Array.isArray(p)&&p.length===2&&hex(p[0])&&typeof p[1]==='string',`dyer palette ${p}`);
+ const e=runtime(join(ROOT,'DFAB V8.html'),{affine:true});
+ const got=JSON.parse(e.run(`JSON.stringify({brands:Object.fromEntries(Object.entries(VEHICLE_BRANDS).map(([b,v])=>[b,Object.keys(v.models)])),
+  car:CAR_PRICES===GAME_DB.shops.auto_shop.car_prices, custom:CUSTOM_PRICES===GAME_DB.shops.auto_shop.custom_prices&&Object.isFrozen(CUSTOM_PRICES),
+  fee:DYER.FEE, palette:DYER.PALETTE===GAME_DB.shops.dyer.palette})`));
+ for(const [b,models] of Object.entries(A.car_prices)) for(const m of Object.keys(models))
+  assert.ok(got.brands[b]&&got.brands[b].includes(m),`car_prices.${b}.${m}: no such car in VEHICLE_BRANDS`);
+ assert.deepEqual([got.car,got.custom,got.fee,got.palette],[true,true,sh.dyer.fee,true]);
+ assert.deepEqual(e.errors,[]);
+});
+
 console.log(`test-game-db: ${tests.length} passed`);

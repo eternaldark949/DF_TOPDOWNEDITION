@@ -105,18 +105,10 @@
         });
 
         /** Purchase prices per brand tier + model */
-        const CAR_PRICES = {
-            LADY:    { suv: 15000, suv2: 18000 },
-            Zenxera: { sedan: 3000, suv: 4500, sports: 6000, truck: 3500 },
-            Gelfash: { sedan: 1200, suv: 1800, sports: 2500, truck: 1500 }
-        };
+        const CAR_PRICES = GAME_DB.shops.auto_shop.car_prices;   // directory/game-db/shops.json
 
         /** Cosmetic service pricing */
-        const CUSTOM_PRICES = Object.freeze({
-            paint: 75,
-            underglow: 150,
-            headlights: 100
-        });
+        const CUSTOM_PRICES = Object.freeze(GAME_DB.shops.auto_shop.custom_prices);   // directory/game-db/shops.json
 
         class PlayerGarage {
             constructor() {
