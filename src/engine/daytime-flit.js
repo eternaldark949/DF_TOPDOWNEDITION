@@ -35,7 +35,8 @@
                 cost = this.player.buffSystem.getStat('flitCooldown', cost);
                 if (this.resonance) {
                     cost = this.resonance.stat('flitCost', cost);
-                    if (this.resonance.rank('double_step') >= 3 && _gameTimeSec - this.flitState.lastFlitAt <= 0.6) cost *= 0.5;
+                    const R = this.resonance, half = R.value('double_step', 'half_cost_window');
+                    if (R.rank('double_step') >= R.value('double_step', 'half_cost_rank') && _gameTimeSec - this.flitState.lastFlitAt <= half) cost *= R.value('double_step', 'half_cost');
                 }
                 return Math.floor(cost);
             },
@@ -208,7 +209,7 @@
                 this.flitState.lastFlitAt = _gameTimeSec;
                 // Flit: Afterimage — gangers keep seeing you where you left
                 const ai = this.resonance ? this.resonance.rank('afterimage') : 0;
-                this._afterimage = ai ? { x: startX, y: startY, until: _gameTimeSec + 0.5 * ai } : null;
+                this._afterimage = ai ? { x: startX, y: startY, until: _gameTimeSec + this.resonance.value('afterimage', 'secs') * ai } : null;
 
                 if (traveled > 1) this.spillDrink(SPILL.FLIT_COST, (startX - targetX) / traveled, (startY - targetY) / traveled, startX, startY);   // the drink stays behind a moment (engine/spills.js)
                 this.player.x = targetX; this.player.y = targetY; resetHumanoidAnim(this.player); showMessage("FLIT!"); this.triggerShake(4);

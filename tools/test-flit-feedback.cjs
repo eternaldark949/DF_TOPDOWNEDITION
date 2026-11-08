@@ -12,7 +12,7 @@ game.roomSystem={active:false,doors:[]};
  game.activeMap={width:1000,height:1000,walls:[],buildings:[],buildingColliders:[]};
  Object.assign(game.player,{x:100,y:100,angle:0,radius:12});
  game.player.buffSystem={getStat:(name,base)=>base};game.augments={isEquipped:()=>false};
- game.resonance={stat:(name,base)=>base,rank:()=>0};_gameTimeSec=10;
+ game.resonance=Object.assign(new ResonanceSystem(),{stat:(name,base)=>base,rank:()=>0});_gameTimeSec=10;
  game.flitState={active:true,duration:7,maxDuration:15,attunement:120,maxAttunement:120,dashCost:40,rechargeRate:2,lastFlitAt:9.8};
  game._afterimage={x:30,y:30,until:11};game.flitVFX=[];game._drawnAt=9.8;game._drawShotUsed=true;
  const feedback=[];audioSys.sfx=s=>feedback.push(s);navigator.vibrate=p=>{feedback.push(p);return true;};

@@ -97,7 +97,7 @@ function flitFixture(env, walls) {
     game.activeMap={width:1000,height:1000,walls:${JSON.stringify(walls)},buildings:[],buildingColliders:[]};
     Object.assign(game.player,{x:100,y:100,angle:0,radius:12});
     game.player.buffSystem={getStat:(name,base)=>base}; game.augments={isEquipped:()=>false};
-    game.resonance={stat:(name,base)=>base,rank:()=>0};
+    game.resonance=Object.assign(new ResonanceSystem(),{stat:(name,base)=>base,rank:()=>0});
     game.flitState={active:false,duration:0,maxDuration:15,attunement:120,maxAttunement:120,dashCost:40,rechargeRate:2,lastFlitAt:-99};
     game._afterimage={x:1,y:2,until:3}; game.flitVFX=[];
     globalThis.__effects=[]; globalThis.__randomCalls=0;

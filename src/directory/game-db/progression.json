@@ -1,0 +1,274 @@
+{
+  "_about": {
+    "chapter": "Progression: Resonance (949's levels), the three tuning trees, castable abilities, and the perks closeness unlocks.",
+    "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.progression and checked by tools/test-game-db.cjs. Node ids, tree ids and ability ids are in save files: never rename one. A \"note\" is for people only.",
+    "tables": {
+      "resonance": "Level rules (read as RESONANCE, core/resonance.js). CAP: top level. level_cost: Resonance from level L to the next = base + per_level x L. DEATH_LOSS: share of unsettled Resonance lost on death. RESPEC_COST and POST_CAP_XP_PER_PP: in PP. BASE: Resonance per kill by enemy class; USUAL_HP: the HP that base assumes (tougher pays up to 3x). FLIT_KILL, PUNCH, UNTOUCHED, POISE: style multipliers; CHAIN_STEP per chained kill up to CHAIN_MAX; FLIT_WINDOW, CHAIN_WINDOW, UNTOUCHED_SECS in seconds; TEAMMATE_SHARE: share for a crew kill; POISE_LEVEL: drink level for POISE.",
+      "trees": "The three trees of six nodes (read as RESONANCE_TREES). Each node has up to 3 ranks; a node opens once the one above it has a rank; unlockLevel gates it by level. per_rank: the node's numbers, multiplied by its rank (shares are 0.10 = 10%, times in seconds unless the name says frames). The text the tuning screen shows is built from these in core/resonance.js (RESONANCE_NODE_TEXT). last_stand.cooldown_secs is indexed by rank; double_step halves a flit's cost (half_cost) within half_cost_window s of the last one from rank half_cost_rank; grounded.slip_secs is added to SPILL.SLIP_SECS (engine/spills.js).",
+      "abilities": "Castable abilities (read as ABILITY_REGISTRY, ui/inventory-augments.js). stats.fireRate: frames between casts; projectileSpeed px per frame; projectileLife frames; range px; spread radians.",
+      "talk_perks": "What closeness with a person unlocks, by name and closeness tier (read as TALK_PERKS, story/talks.js)."
+    }
+  },
+  "resonance": {
+    "CAP": 50,
+    "level_cost": {
+      "base": 120,
+      "per_level": 70
+    },
+    "DEATH_LOSS": 0.5,
+    "RESPEC_COST": 200,
+    "POST_CAP_XP_PER_PP": 100,
+    "BASE": {
+      "Ganger": 20,
+      "Drone": 30,
+      "GatlingGunner": 80
+    },
+    "USUAL_HP": {
+      "Ganger": 40,
+      "Drone": 60,
+      "GatlingGunner": 200
+    },
+    "FLIT_KILL": 1.5,
+    "PUNCH": 1.4,
+    "CHAIN_STEP": 0.25,
+    "CHAIN_MAX": 2,
+    "UNTOUCHED": 1.3,
+    "FLIT_WINDOW": 1,
+    "CHAIN_WINDOW": 2.5,
+    "UNTOUCHED_SECS": 20,
+    "TEAMMATE_SHARE": 0.3,
+    "POISE": 1.25,
+    "POISE_LEVEL": 0.75
+  },
+  "trees": [
+    {
+      "id": "flit",
+      "name": "Flit",
+      "color": "#b89cff",
+      "blurb": "Tune the jump between dimensions.",
+      "nodes": [
+        {
+          "id": "reach",
+          "name": "Reach",
+          "per_rank": {
+            "distance": 0.1
+          }
+        },
+        {
+          "id": "quick_return",
+          "name": "Quick Return",
+          "per_rank": {
+            "cost": 0.1
+          }
+        },
+        {
+          "id": "flit_strike",
+          "name": "Flit-Strike",
+          "per_rank": {
+            "window": 1,
+            "damage": 0.2
+          }
+        },
+        {
+          "id": "afterimage",
+          "name": "Afterimage",
+          "per_rank": {
+            "secs": 0.5
+          }
+        },
+        {
+          "id": "double_step",
+          "name": "Double Step",
+          "per_rank": {
+            "attunement": 20,
+            "half_cost_rank": 3,
+            "half_cost_window": 0.6,
+            "half_cost": 0.5
+          }
+        },
+        {
+          "id": "long_echo",
+          "name": "Long Echo",
+          "unlockLevel": 30,
+          "per_rank": {
+            "window": 0.25
+          }
+        }
+      ]
+    },
+    {
+      "id": "frame",
+      "name": "Frame",
+      "color": "#c4566e",
+      "blurb": "What Dr. Yin builds into you.",
+      "nodes": [
+        {
+          "id": "reinforced",
+          "name": "Reinforced",
+          "per_rank": {
+            "health": 10
+          }
+        },
+        {
+          "id": "plating",
+          "name": "Plating",
+          "per_rank": {
+            "damage_taken": 0.06
+          }
+        },
+        {
+          "id": "stim_potency",
+          "name": "Stim Potency",
+          "per_rank": {
+            "heal": 15
+          }
+        },
+        {
+          "id": "idle_mend",
+          "name": "Idle Mend",
+          "per_rank": {
+            "delay_frames": 120,
+            "min_delay_frames": 60,
+            "hp_per_sec": 1
+          }
+        },
+        {
+          "id": "last_stand",
+          "name": "Last Stand",
+          "per_rank": {
+            "cooldown_secs": [
+              0,
+              120,
+              90,
+              60
+            ]
+          }
+        },
+        {
+          "id": "grounded",
+          "name": "Grounded",
+          "unlockLevel": 30,
+          "per_rank": {
+            "knockback": 0.15,
+            "slip_secs": 0.2
+          }
+        }
+      ]
+    },
+    {
+      "id": "arms",
+      "name": "Arms",
+      "color": "#e8c27a",
+      "blurb": "Steadier hands, heavier hits.",
+      "nodes": [
+        {
+          "id": "steady",
+          "name": "Steady",
+          "per_rank": {
+            "spread": 0.12,
+            "spill": 0.15
+          }
+        },
+        {
+          "id": "quick_hands",
+          "name": "Quick Hands",
+          "per_rank": {
+            "cooldown": 0.08
+          }
+        },
+        {
+          "id": "hollow_points",
+          "name": "Hollow Points",
+          "per_rank": {
+            "damage": 0.08
+          }
+        },
+        {
+          "id": "heavy_hands",
+          "name": "Heavy Hands",
+          "per_rank": {
+            "damage": 0.25
+          }
+        },
+        {
+          "id": "quick_draw",
+          "name": "Quick-Draw",
+          "per_rank": {
+            "damage": 0.25,
+            "window": 0.8
+          }
+        },
+        {
+          "id": "low_signature",
+          "name": "Low Signature",
+          "unlockLevel": 30,
+          "per_rank": {
+            "noise": 0.1
+          }
+        }
+      ]
+    }
+  ],
+  "abilities": {
+    "fireball": {
+      "name": "Fireball",
+      "desc": "Red-hot projectile cast from the palm.",
+      "stats": {
+        "fireRate": 70,
+        "damage": 50,
+        "projectileColor": "#ff3300",
+        "projectileSpeed": 18,
+        "spread": 0.15,
+        "flashRadius": 60,
+        "flashColor": "#ff6600",
+        "projectileLife": 50,
+        "range": 400
+      },
+      "note": "damage 50 one-shots a ganger (40 HP) without trivialising the gauntlet's gunners."
+    },
+    "shadow_bolt": {
+      "name": "Shadow Bolt",
+      "desc": "A fast-moving bolt of dark energy.",
+      "stats": {
+        "fireRate": 50,
+        "damage": 20,
+        "projectileColor": "#8a2be2",
+        "projectileSpeed": 24,
+        "spread": 0.1,
+        "flashRadius": 40,
+        "flashColor": "#9966ff",
+        "projectileLife": 60,
+        "range": 500
+      }
+    },
+    "ember_burst": {
+      "name": "Ember Burst",
+      "desc": "A rapid volley of small fire projectiles.",
+      "stats": {
+        "fireRate": 25,
+        "damage": 12,
+        "projectileColor": "#ff6600",
+        "projectileSpeed": 22,
+        "spread": 0.25,
+        "flashRadius": 35,
+        "flashColor": "#ffaa00",
+        "projectileLife": 40,
+        "range": 350
+      }
+    }
+  },
+  "talk_perks": {
+    "Anavia": {
+      "1": "HER SALVAGE JOBS PAY 20% MORE"
+    },
+    "Barista Ren": {
+      "1": "AMBER DELIVERIES PAY 10% MORE"
+    },
+    "Bartender": {
+      "1": "BOUNTIES PAY 10% MORE"
+    },
+    "Dr. Yin": {
+      "1": "A FREE STIM WHEN YOU STOP BY (ONCE A DAY)"
+    }
+  }
+}

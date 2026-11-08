@@ -238,8 +238,8 @@
                 const edge = this.inventory && this.inventory.hasAttachment('crimson_edge') ? ITEM_REGISTRY.crimson_edge.stats : null;
                 let bladeDamage = (st.damage || 25) * this.playerDamageMult() * (edge ? edge.bladeDamageMult : 1);
                 // A Flit-cut: a swing inside the Flit-Strike window always crits (and Flit-Strike adds its share)
-                const flitCut = !!(this.resonance && this.flitState && _gameTimeSec - this.flitState.lastFlitAt <= this.resonance.stat('flitStrikeWindow', 1));
-                if (flitCut) bladeDamage *= 1 + 0.2 * this.resonance.rank('flit_strike');
+                const flitCut = !!(this.resonance && this.flitState && _gameTimeSec - this.flitState.lastFlitAt <= this.resonance.flitStrikeWindow());
+                if (flitCut) bladeDamage *= 1 + this.resonance.value('flit_strike', 'damage') * this.resonance.rank('flit_strike');
                 const swing = this._swing = { t0: this._slashT, secs: this._slashSecs, style: this._slashStyle, side, weapon: W, st,
                     damage: bladeDamage, flitCut, bleedMax: edge ? edge.bleedMax : STATUS.BLEED_MAX,
                     edge: M.edge || DEFAULT_SLASH_TRAIL.edge, k: 0, struck: new Set(), hits: 0 };

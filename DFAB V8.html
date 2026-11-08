@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '211d8254b0d9';
+        const DFAB_BUILD = 'fcac15545c67';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -10529,6 +10529,9 @@
     <script type="text/dfab" data-src="directory/game-db/shops.json" data-cost="23">
         GAME_DB.shops = {"_about":{"chapter":"Shops and prices: what the shops charge and offer that is not already on an item. Item, augment, consumable and schematic prices stay on their entries in items.json; cosmetic prices stay on the cosmetics until the looks chapter moves.","how_to_edit":"Plain JSON, inlined by tools/build.mjs as GAME_DB.shops and checked by tools/test-game-db.cjs. Credits are personics (PP); the dyer charges scrap. Colours are CSS hex.","tables":{"auto_shop":"Torque Auto (engine/shops-menus.js). car_prices: PP per brand and model (a model with no price is not for sale; brands and models are VEHICLE_BRANDS in traffic/garage-zib.js). sell_rate: the share of the price paid back when a car is sold. custom_prices: PP per change of paint, underglow or headlights. paint_colors: offered on top of the brand's own colours; glow_colors (null is no underglow) and headlight_colors: the swatches offered.","dyer":"The Clothing Dyer (engine/dyer.js). fee: scrap per piece dyed. palette: [hex, name] swatches, in the order shown."}},"auto_shop":{"car_prices":{"LADY":{"suv":15000,"suv2":18000},"Zenxera":{"sedan":3000,"suv":4500,"sports":6000,"truck":3500},"Gelfash":{"sedan":1200,"suv":1800,"sports":2500,"truck":1500}},"sell_rate":0.4,"custom_prices":{"paint":75,"underglow":150,"headlights":100},"paint_colors":["#1a1a1a","#0a0a0a","#ffffff","#333333","#8b0000","#003366","#2d5a27","#4a0e4e","#d4af37","#ff4500","#ff69b4","#E6E6FA","#CCCCFF"],"glow_colors":[null,"#ffffff","#ff8800","#00f3ff","#ff00aa","#00ff88","#d4af37","#ff2244","#a469ff","#ff4500","#ff69b4","#E6E6FA","#CCCCFF"],"headlight_colors":["#ffffaa","#ffffff","#ccddff","#ff8800","#00f3ff","#ff69b4","#d4af37","#ff2244","#E6E6FA","#CCCCFF"]},"dyer":{"fee":20,"palette":[["#0c0c0e","Onyx"],["#3a3a44","Slate"],["#c9ccd8","Silver"],["#f6f3ee","Pearl"],["#efe6dc","Cream"],["#e8c27a","Gold"],["#cc7722","Amber"],["#8b4a2b","Rust"],["#4a2e22","Cocoa"],["#6a0c20","Bordeaux"],["#dc143c","Crimson"],["#ff6f61","Coral"],["#f19ab0","Rose"],["#f3d6e4","Blush"],["#e000c8","Magenta"],["#8a2be2","Violet"],["#b9a8e6","Lavender"],["#ccccff","Periwinkle"],["#1a1440","Midnight"],["#2a5cff","Cobalt"],["#17dcff","Neon Cyan"],["#00b39b","Teal"],["#9be8c0","Mint"],["#2f5a3e","Emerald"]]}};
     </script>
+    <script type="text/dfab" data-src="directory/game-db/progression.json" data-cost="51">
+        GAME_DB.progression = {"_about":{"chapter":"Progression: Resonance (949's levels), the three tuning trees, castable abilities, and the perks closeness unlocks.","how_to_edit":"Plain JSON, inlined by tools/build.mjs as GAME_DB.progression and checked by tools/test-game-db.cjs. Node ids, tree ids and ability ids are in save files: never rename one. A \"note\" is for people only.","tables":{"resonance":"Level rules (read as RESONANCE, core/resonance.js). CAP: top level. level_cost: Resonance from level L to the next = base + per_level x L. DEATH_LOSS: share of unsettled Resonance lost on death. RESPEC_COST and POST_CAP_XP_PER_PP: in PP. BASE: Resonance per kill by enemy class; USUAL_HP: the HP that base assumes (tougher pays up to 3x). FLIT_KILL, PUNCH, UNTOUCHED, POISE: style multipliers; CHAIN_STEP per chained kill up to CHAIN_MAX; FLIT_WINDOW, CHAIN_WINDOW, UNTOUCHED_SECS in seconds; TEAMMATE_SHARE: share for a crew kill; POISE_LEVEL: drink level for POISE.","trees":"The three trees of six nodes (read as RESONANCE_TREES). Each node has up to 3 ranks; a node opens once the one above it has a rank; unlockLevel gates it by level. per_rank: the node's numbers, multiplied by its rank (shares are 0.10 = 10%, times in seconds unless the name says frames). The text the tuning screen shows is built from these in core/resonance.js (RESONANCE_NODE_TEXT). last_stand.cooldown_secs is indexed by rank; double_step halves a flit's cost (half_cost) within half_cost_window s of the last one from rank half_cost_rank; grounded.slip_secs is added to SPILL.SLIP_SECS (engine/spills.js).","abilities":"Castable abilities (read as ABILITY_REGISTRY, ui/inventory-augments.js). stats.fireRate: frames between casts; projectileSpeed px per frame; projectileLife frames; range px; spread radians.","talk_perks":"What closeness with a person unlocks, by name and closeness tier (read as TALK_PERKS, story/talks.js)."}},"resonance":{"CAP":50,"level_cost":{"base":120,"per_level":70},"DEATH_LOSS":0.5,"RESPEC_COST":200,"POST_CAP_XP_PER_PP":100,"BASE":{"Ganger":20,"Drone":30,"GatlingGunner":80},"USUAL_HP":{"Ganger":40,"Drone":60,"GatlingGunner":200},"FLIT_KILL":1.5,"PUNCH":1.4,"CHAIN_STEP":0.25,"CHAIN_MAX":2,"UNTOUCHED":1.3,"FLIT_WINDOW":1,"CHAIN_WINDOW":2.5,"UNTOUCHED_SECS":20,"TEAMMATE_SHARE":0.3,"POISE":1.25,"POISE_LEVEL":0.75},"trees":[{"id":"flit","name":"Flit","color":"#b89cff","blurb":"Tune the jump between dimensions.","nodes":[{"id":"reach","name":"Reach","per_rank":{"distance":0.1}},{"id":"quick_return","name":"Quick Return","per_rank":{"cost":0.1}},{"id":"flit_strike","name":"Flit-Strike","per_rank":{"window":1,"damage":0.2}},{"id":"afterimage","name":"Afterimage","per_rank":{"secs":0.5}},{"id":"double_step","name":"Double Step","per_rank":{"attunement":20,"half_cost_rank":3,"half_cost_window":0.6,"half_cost":0.5}},{"id":"long_echo","name":"Long Echo","unlockLevel":30,"per_rank":{"window":0.25}}]},{"id":"frame","name":"Frame","color":"#c4566e","blurb":"What Dr. Yin builds into you.","nodes":[{"id":"reinforced","name":"Reinforced","per_rank":{"health":10}},{"id":"plating","name":"Plating","per_rank":{"damage_taken":0.06}},{"id":"stim_potency","name":"Stim Potency","per_rank":{"heal":15}},{"id":"idle_mend","name":"Idle Mend","per_rank":{"delay_frames":120,"min_delay_frames":60,"hp_per_sec":1}},{"id":"last_stand","name":"Last Stand","per_rank":{"cooldown_secs":[0,120,90,60]}},{"id":"grounded","name":"Grounded","unlockLevel":30,"per_rank":{"knockback":0.15,"slip_secs":0.2}}]},{"id":"arms","name":"Arms","color":"#e8c27a","blurb":"Steadier hands, heavier hits.","nodes":[{"id":"steady","name":"Steady","per_rank":{"spread":0.12,"spill":0.15}},{"id":"quick_hands","name":"Quick Hands","per_rank":{"cooldown":0.08}},{"id":"hollow_points","name":"Hollow Points","per_rank":{"damage":0.08}},{"id":"heavy_hands","name":"Heavy Hands","per_rank":{"damage":0.25}},{"id":"quick_draw","name":"Quick-Draw","per_rank":{"damage":0.25,"window":0.8}},{"id":"low_signature","name":"Low Signature","unlockLevel":30,"per_rank":{"noise":0.1}}]}],"abilities":{"fireball":{"name":"Fireball","desc":"Red-hot projectile cast from the palm.","stats":{"fireRate":70,"damage":50,"projectileColor":"#ff3300","projectileSpeed":18,"spread":0.15,"flashRadius":60,"flashColor":"#ff6600","projectileLife":50,"range":400},"note":"damage 50 one-shots a ganger (40 HP) without trivialising the gauntlet's gunners."},"shadow_bolt":{"name":"Shadow Bolt","desc":"A fast-moving bolt of dark energy.","stats":{"fireRate":50,"damage":20,"projectileColor":"#8a2be2","projectileSpeed":24,"spread":0.1,"flashRadius":40,"flashColor":"#9966ff","projectileLife":60,"range":500}},"ember_burst":{"name":"Ember Burst","desc":"A rapid volley of small fire projectiles.","stats":{"fireRate":25,"damage":12,"projectileColor":"#ff6600","projectileSpeed":22,"spread":0.25,"flashRadius":35,"flashColor":"#ffaa00","projectileLife":40,"range":350}}},"talk_perks":{"Anavia":{"1":"HER SALVAGE JOBS PAY 20% MORE"},"Barista Ren":{"1":"AMBER DELIVERIES PAY 10% MORE"},"Bartender":{"1":"BOUNTIES PAY 10% MORE"},"Dr. Yin":{"1":"A FREE STIM WHEN YOU STOP BY (ONCE A DAY)"}}};
+    </script>
     <script type="text/dfab" data-src="assets#0" data-cost="1">
         const ASSETS = { images: {}, audio: {} };
     </script>
@@ -11188,7 +11191,7 @@
             if (D) materialKit.linkAll([D.top, D.bottom, D.shoes, D.train].filter(Boolean));
         }
     </script>
-    <script type="text/dfab" data-src="core/resonance.js" data-cost="120">
+    <script type="text/dfab" data-src="core/resonance.js" data-cost="125">
         /* =====================================================================
            RESONANCE — 949's progression
            ---------------------------------------------------------------------
@@ -11203,46 +11206,46 @@
            `stat(key, base)` gives any stat with the installed
            ranks applied — the game asks it wherever a number could be tuned.
            ===================================================================== */
-        const RESONANCE = {
-            CAP: 50,
-            nextLevel: level => 120 + 70 * level,                 // Resonance from `level` to the next
-            DEATH_LOSS: 0.5,
-            RESPEC_COST: 200,
-            POST_CAP_XP_PER_PP: 100,                            // Dr. Yin exchanges settled surplus; fractions carry forward
-            // Kill awards: base by toughness, then style multipliers (they stack)
-            BASE: { Ganger: 20, Drone: 30, GatlingGunner: 80 },
-            USUAL_HP: { Ganger: 40, Drone: 60, GatlingGunner: 200 },
-            FLIT_KILL: 1.5, PUNCH: 1.4, CHAIN_STEP: 0.25, CHAIN_MAX: 2, UNTOUCHED: 1.3,
-            FLIT_WINDOW: 1.0, CHAIN_WINDOW: 2.5, UNTOUCHED_SECS: 20, TEAMMATE_SHARE: 0.3,
-            POISE: 1.25, POISE_LEVEL: 0.75,                     // a kill with her glass still three-quarters full (engine/spills.js)
+        // The numbers live in directory/game-db/progression.json (GAME_DB.progression): the level rules, the trees
+        // and every node's per-rank values. This file keeps the code: the level curve, each node's text and stat().
+        const RESONANCE = Object.assign(GAME_DB.progression.resonance, {
+            /** Resonance from `level` to the next */
+            nextLevel: level => RESONANCE.level_cost.base + RESONANCE.level_cost.per_level * level,
+        });
+
+        /** A node's text on the tuning screen, at rank r (R: her ResonanceSystem, when there is one), built from its per_rank values */
+        const _resPct = v => Math.round(v * 100);
+        const RESONANCE_NODE_TEXT = {
+            reach:         (r, R, v) => `+${_resPct(v.distance) * r}% flit distance`,
+            quick_return:  (r, R, v) => `−${_resPct(v.cost) * r}% attunement per flit`,
+            flit_strike:   (r, R, v) => `Shots and blade hits within ${R ? R.flitStrikeWindow() : v.window} s after a flit deal +${_resPct(v.damage) * r}%`,
+            afterimage:    (r, R, v) => `Your flit ghost draws gangers' eyes for ${(v.secs * r).toFixed(1)} s`,
+            double_step:   (r, R, v) => `+${v.attunement * r} max attunement${r >= v.half_cost_rank ? `; a second flit within ${v.half_cost_window} s costs half` : ''}`,
+            long_echo:     (r, R, v) => `Flit-Strike lasts ${(resonanceNode('flit_strike').per_rank.window + v.window * r).toFixed(2)} s; its damage bonus stays the same`,
+            reinforced:    (r, R, v) => `+${v.health * r} max health`,
+            plating:       (r, R, v) => `−${_resPct(v.damage_taken) * r}% damage taken`,
+            stim_potency:  (r, R, v) => `Stims heal +${v.heal * r}`,
+            idle_mend:     (r, R, v) => `Regen starts ${v.delay_frames / 60 * r} s sooner, +${v.hp_per_sec * r} HP/s`,
+            last_stand:    (r, R, v) => `Survive a lethal hit at 1 HP (every ${v.cooldown_secs[r]} s)`,
+            grounded:      (r, R, v) => `−${_resPct(v.knockback) * r}% knockback from damage; gangers who step in your spills slip for ${(SPILL.SLIP_SECS + v.slip_secs * r).toFixed(1)} s`,
+            steady:        (r, R, v) => `−${_resPct(v.spread) * r}% spread, −${_resPct(v.spill) * r}% drink spilt`,
+            quick_hands:   (r, R, v) => `−${_resPct(v.cooldown) * r}% time between shots`,
+            hollow_points: (r, R, v) => `+${_resPct(v.damage) * r}% gun damage`,
+            heavy_hands:   (r, R, v) => `+${_resPct(v.damage) * r}% punch damage and knockback`,
+            quick_draw:    (r, R, v) => `First shot within ${v.window} s of drawing: +${_resPct(v.damage) * r}%`,
+            low_signature: (r, R, v) => `Gunshots carry ${_resPct(v.noise) * r}% less far to enemies`,
         };
 
-        const RESONANCE_TREES = [
-            { id: 'flit', name: 'Flit', color: '#b89cff', blurb: 'Tune the jump between dimensions.', nodes: [
-                { id: 'reach',        name: 'Reach',        desc: r => `+${10 * r}% flit distance` },
-                { id: 'quick_return', name: 'Quick Return', desc: r => `−${10 * r}% attunement per flit` },
-                { id: 'flit_strike',  name: 'Flit-Strike',  desc: (r, R) => `Shots and blade hits within ${R ? R.stat('flitStrikeWindow', 1) : 1} s after a flit deal +${20 * r}%` },
-                { id: 'afterimage',   name: 'Afterimage',   desc: r => `Your flit ghost draws gangers' eyes for ${(0.5 * r).toFixed(1)} s` },
-                { id: 'double_step',  name: 'Double Step',  desc: r => `+${20 * r} max attunement${r >= 3 ? '; a second flit within 0.6 s costs half' : ''}` },
-                { id: 'long_echo',    name: 'Long Echo',    unlockLevel: 30, desc: r => `Flit-Strike lasts ${(1 + 0.25 * r).toFixed(2)} s; its damage bonus stays the same` },
-            ] },
-            { id: 'frame', name: 'Frame', color: '#c4566e', blurb: 'What Dr. Yin builds into you.', nodes: [
-                { id: 'reinforced',   name: 'Reinforced',   desc: r => `+${10 * r} max health` },
-                { id: 'plating',      name: 'Plating',      desc: r => `−${6 * r}% damage taken` },
-                { id: 'stim_potency', name: 'Stim Potency', desc: r => `Stims heal +${15 * r}` },
-                { id: 'idle_mend',    name: 'Idle Mend',    desc: r => `Regen starts ${2 * r} s sooner, +${r} HP/s` },
-                { id: 'last_stand',   name: 'Last Stand',   desc: r => `Survive a lethal hit at 1 HP (every ${[0, 120, 90, 60][r]} s)` },
-                { id: 'grounded',     name: 'Grounded',     unlockLevel: 30, desc: r => `−${15 * r}% knockback from damage; gangers who step in your spills slip for ${(0.4 + 0.2 * r).toFixed(1)} s` },
-            ] },
-            { id: 'arms', name: 'Arms', color: '#e8c27a', blurb: 'Steadier hands, heavier hits.', nodes: [
-                { id: 'steady',       name: 'Steady',       desc: r => `−${12 * r}% spread, −${15 * r}% drink spilt` },
-                { id: 'quick_hands',  name: 'Quick Hands',  desc: r => `−${8 * r}% time between shots` },
-                { id: 'hollow_points',name: 'Hollow Points',desc: r => `+${8 * r}% gun damage` },
-                { id: 'heavy_hands',  name: 'Heavy Hands',  desc: r => `+${25 * r}% punch damage and knockback` },
-                { id: 'quick_draw',   name: 'Quick-Draw',   desc: r => `First shot within 0.8 s of drawing: +${25 * r}%` },
-                { id: 'low_signature',name: 'Low Signature',unlockLevel: 30, desc: r => `Gunshots carry ${10 * r}% less far to enemies` },
-            ] },
-        ];
+        const RESONANCE_TREES = GAME_DB.progression.trees;
+        for (const tree of RESONANCE_TREES) for (const node of tree.nodes) {
+            const text = RESONANCE_NODE_TEXT[node.id];
+            if (!text) throw new Error(`RESONANCE_TREES: node '${node.id}' has no text in RESONANCE_NODE_TEXT`);
+            node.desc = (r, R) => text(r, R, node.per_rank);
+        }
+        /** A node by id, from any tree (undefined if there's none). */
+        function resonanceNode(id) {
+            for (const tree of RESONANCE_TREES) for (const node of tree.nodes) if (node.id === id) return node;
+        }
 
         class ResonanceSystem {
             constructor() { this.reset(); }
@@ -11254,27 +11257,33 @@
 
             rank(id) { return this.ranks[id] || 0; }
 
+            /** A node's per-rank value (progression.json), e.g. value('flit_strike', 'damage'). */
+            value(id, key) { return resonanceNode(id).per_rank[key]; }
+
+            /** How long after a flit Flit-Strike's bonus holds, in seconds. */
+            flitStrikeWindow() { return this.stat('flitStrikeWindow', this.value('flit_strike', 'window')); }
+
             /** A stat with installed ranks applied. */
             stat(key, base) {
-                const r = id => this.rank(id);
+                const r = id => this.rank(id), v = (id, k) => this.value(id, k);
                 switch (key) {
-                    case 'flitDistance':   return base * (1 + 0.10 * r('reach'));
-                    case 'flitCost':       return base * (1 - 0.10 * r('quick_return'));
-                    case 'flitStrikeWindow': return base + 0.25 * r('long_echo');
-                    case 'maxAttunement':  return base + 20 * r('double_step');
-                    case 'maxHealth':      return base + 10 * r('reinforced');
-                    case 'damageTaken':    return base * (1 - 0.06 * r('plating'));
-                    case 'knockbackTaken': return base * (1 - 0.15 * r('grounded'));
-                    case 'stimHeal':       return base + 15 * r('stim_potency');
-                    case 'regenDelay':     return Math.max(60, base - 120 * r('idle_mend'));   // frames
-                    case 'regenAmount':    return base + r('idle_mend');                        // HP per second
-                    case 'spread':         return base * (1 - 0.12 * r('steady'));
-                    case 'spill':          return base * (1 - 0.15 * r('steady'));             // engine/spills.js
-                    case 'slipSecs':       return r('grounded') ? base + 0.2 * r('grounded') : 0;
-                    case 'fireCooldown':   return base * (1 - 0.08 * r('quick_hands'));
-                    case 'gunDamage':      return base * (1 + 0.08 * r('hollow_points'));
-                    case 'gunNoise':       return base * (1 - 0.10 * r('low_signature'));
-                    case 'punchDamage':    return base * (1 + 0.25 * r('heavy_hands'));
+                    case 'flitDistance':   return base * (1 + v('reach', 'distance') * r('reach'));
+                    case 'flitCost':       return base * (1 - v('quick_return', 'cost') * r('quick_return'));
+                    case 'flitStrikeWindow': return base + v('long_echo', 'window') * r('long_echo');
+                    case 'maxAttunement':  return base + v('double_step', 'attunement') * r('double_step');
+                    case 'maxHealth':      return base + v('reinforced', 'health') * r('reinforced');
+                    case 'damageTaken':    return base * (1 - v('plating', 'damage_taken') * r('plating'));
+                    case 'knockbackTaken': return base * (1 - v('grounded', 'knockback') * r('grounded'));
+                    case 'stimHeal':       return base + v('stim_potency', 'heal') * r('stim_potency');
+                    case 'regenDelay':     return Math.max(v('idle_mend', 'min_delay_frames'), base - v('idle_mend', 'delay_frames') * r('idle_mend'));   // frames
+                    case 'regenAmount':    return base + v('idle_mend', 'hp_per_sec') * r('idle_mend');                        // HP per second
+                    case 'spread':         return base * (1 - v('steady', 'spread') * r('steady'));
+                    case 'spill':          return base * (1 - v('steady', 'spill') * r('steady'));             // engine/spills.js
+                    case 'slipSecs':       return r('grounded') ? base + v('grounded', 'slip_secs') * r('grounded') : 0;
+                    case 'fireCooldown':   return base * (1 - v('quick_hands', 'cooldown') * r('quick_hands'));
+                    case 'gunDamage':      return base * (1 + v('hollow_points', 'damage') * r('hollow_points'));
+                    case 'gunNoise':       return base * (1 - v('low_signature', 'noise') * r('low_signature'));
+                    case 'punchDamage':    return base * (1 + v('heavy_hands', 'damage') * r('heavy_hands'));
                     default: return base;
                 }
             }
@@ -11359,7 +11368,7 @@
             tryLastStand(now) {
                 const r = this.rank('last_stand');
                 if (!r || now < this.lastStandReadyAt) return false;
-                this.lastStandReadyAt = now + [0, 120, 90, 60][r];
+                this.lastStandReadyAt = now + this.value('last_stand', 'cooldown_secs')[r];
                 return true;
             }
 
@@ -70321,7 +70330,7 @@ Object.assign(TrafficVehicle.prototype, {
         }
 
     </script>
-    <script type="text/dfab" data-src="ui/inventory-augments.js" data-cost="437">
+    <script type="text/dfab" data-src="ui/inventory-augments.js" data-cost="420">
         /* =====================================================================
            INVENTORY SYSTEM
            ---------------------------------------------------------------------
@@ -70353,53 +70362,7 @@ Object.assign(TrafficVehicle.prototype, {
         //  Same stat pattern as ITEM_REGISTRY weapons but for innate/learned abilities.
         //  Any humanoid can use these via ActorEntity.castAbility().
         // ============================================================================
-        const ABILITY_REGISTRY = {
-            'fireball': {
-                name: 'Fireball',
-                desc: 'Red-hot projectile cast from the palm.',
-                stats: {
-                    fireRate: 70,           // Cooldown in frames between casts
-                    damage: 50,             // one-shots a ganger (40 HP) without trivialising the gauntlet's gunners
-                    projectileColor: '#ff3300',
-                    projectileSpeed: 18,
-                    spread: 0.15,
-                    flashRadius: 60,
-                    flashColor: '#ff6600',
-                    projectileLife: 50,
-                    range: 400
-                }
-            },
-            'shadow_bolt': {
-                name: 'Shadow Bolt',
-                desc: 'A fast-moving bolt of dark energy.',
-                stats: {
-                    fireRate: 50,
-                    damage: 20,
-                    projectileColor: '#8a2be2',
-                    projectileSpeed: 24,
-                    spread: 0.1,
-                    flashRadius: 40,
-                    flashColor: '#9966ff',
-                    projectileLife: 60,
-                    range: 500
-                }
-            },
-            'ember_burst': {
-                name: 'Ember Burst',
-                desc: 'A rapid volley of small fire projectiles.',
-                stats: {
-                    fireRate: 25,
-                    damage: 12,
-                    projectileColor: '#ff6600',
-                    projectileSpeed: 22,
-                    spread: 0.25,
-                    flashRadius: 35,
-                    flashColor: '#ffaa00',
-                    projectileLife: 40,
-                    range: 350
-                }
-            }
-        };
+        const ABILITY_REGISTRY = GAME_DB.progression.abilities;   // directory/game-db/progression.json
         
         // ============================================================================
         //  CENTRALIZED COMBAT FUNCTIONS
@@ -75285,7 +75248,7 @@ Object.assign(TrafficVehicle.prototype, {
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/combat-effects.js" data-cost="342">
+    <script type="text/dfab" data-src="engine/combat-effects.js" data-cost="343">
         // GameEngine — Screen shake, time slow, death, resize, firing, boosters, player damage.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         const _muzzleStars = new Map();
@@ -75619,8 +75582,8 @@ Object.assign(TrafficVehicle.prototype, {
                 const shotSpeed  = stats.projectileSpeed || 25;
                 // Arms: Hollow Points; Flit: Flit-Strike (shots just after a flit); Arms: Quick-Draw (first shot after drawing)
                 let shotDamage = this.resonance.stat('gunDamage', stats.damage || 35);
-                if (_gameTimeSec - this.flitState.lastFlitAt <= this.resonance.stat('flitStrikeWindow', 1)) shotDamage *= 1 + 0.2 * this.resonance.rank('flit_strike');
-                if (this._drawnAt !== undefined && _gameTimeSec - this._drawnAt <= 0.8 && !this._drawShotUsed) { shotDamage *= 1 + 0.25 * this.resonance.rank('quick_draw'); this._drawShotUsed = true; }
+                if (_gameTimeSec - this.flitState.lastFlitAt <= this.resonance.flitStrikeWindow()) shotDamage *= 1 + this.resonance.value('flit_strike', 'damage') * this.resonance.rank('flit_strike');
+                if (this._drawnAt !== undefined && _gameTimeSec - this._drawnAt <= this.resonance.value('quick_draw', 'window') && !this._drawShotUsed) { shotDamage *= 1 + this.resonance.value('quick_draw', 'damage') * this.resonance.rank('quick_draw'); this._drawShotUsed = true; }
                 shotDamage *= this.gunDamageMult();                      // the Bloodthirsty Muzzle, the Mirrored Glass (engine/status-effects.js)
                 const shotCrit = this.rollCrit(stats);                   // a critical hit (engine/combat-fx.js)
                 // A Golden Child orb burns with the shot: its every boost (Hollow Points, Flit-Strike, Quick-Draw, the
@@ -79438,8 +79401,8 @@ engineMixin({
                 const edge = this.inventory && this.inventory.hasAttachment('crimson_edge') ? ITEM_REGISTRY.crimson_edge.stats : null;
                 let bladeDamage = (st.damage || 25) * this.playerDamageMult() * (edge ? edge.bladeDamageMult : 1);
                 // A Flit-cut: a swing inside the Flit-Strike window always crits (and Flit-Strike adds its share)
-                const flitCut = !!(this.resonance && this.flitState && _gameTimeSec - this.flitState.lastFlitAt <= this.resonance.stat('flitStrikeWindow', 1));
-                if (flitCut) bladeDamage *= 1 + 0.2 * this.resonance.rank('flit_strike');
+                const flitCut = !!(this.resonance && this.flitState && _gameTimeSec - this.flitState.lastFlitAt <= this.resonance.flitStrikeWindow());
+                if (flitCut) bladeDamage *= 1 + this.resonance.value('flit_strike', 'damage') * this.resonance.rank('flit_strike');
                 const swing = this._swing = { t0: this._slashT, secs: this._slashSecs, style: this._slashStyle, side, weapon: W, st,
                     damage: bladeDamage, flitCut, bleedMax: edge ? edge.bleedMax : STATUS.BLEED_MAX,
                     edge: M.edge || DEFAULT_SLASH_TRAIL.edge, k: 0, struck: new Set(), hits: 0 };
@@ -80229,7 +80192,7 @@ engineMixin({
                 if (now - (this._punchAt ?? -99) > KNUCKLES.COMBO_RESET) this._punchCombo = 0;
                 this._punchAt = now;
                 this._punchCombo = (this._punchCombo || 0) + 1;
-                const flit = _gameTimeSec - this.flitState.lastFlitAt <= this.resonance.stat('flitStrikeWindow', 1);
+                const flit = _gameTimeSec - this.flitState.lastFlitAt <= this.resonance.flitStrikeWindow();
                 const hay = flit || this._punchCombo % (st.haymakerEvery || KNUCKLES.EVERY) === 0;
                 if (hay) this._punchCombo = 0;
                 const ang = pl.angle;
@@ -80244,7 +80207,7 @@ engineMixin({
                 if (near.length) this.meleeStepIn(ang, this._meleeGap(near));
 
                 let dmg = this.resonance.stat('punchDamage', st.damage || 16) * this.playerDamageMult();
-                if (flit) dmg *= 1 + 0.2 * this.resonance.rank('flit_strike');
+                if (flit) dmg *= 1 + this.resonance.value('flit_strike', 'damage') * this.resonance.rank('flit_strike');
                 if (hay) dmg *= st.haymakerMult || KNUCKLES.HAY_MULT;
                 const crit = this.rollCrit(st);
                 const px = pl.x + Math.cos(ang) * 20, py = pl.y + Math.sin(ang) * 20;
@@ -81835,7 +81798,7 @@ engineMixin({
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/daytime-flit.js" data-cost="340">
+    <script type="text/dfab" data-src="engine/daytime-flit.js" data-cost="342">
         // GameEngine — Daytime exposure, flit teleport effects, graveyard ghosts.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -81873,7 +81836,8 @@ engineMixin({
                 cost = this.player.buffSystem.getStat('flitCooldown', cost);
                 if (this.resonance) {
                     cost = this.resonance.stat('flitCost', cost);
-                    if (this.resonance.rank('double_step') >= 3 && _gameTimeSec - this.flitState.lastFlitAt <= 0.6) cost *= 0.5;
+                    const R = this.resonance, half = R.value('double_step', 'half_cost_window');
+                    if (R.rank('double_step') >= R.value('double_step', 'half_cost_rank') && _gameTimeSec - this.flitState.lastFlitAt <= half) cost *= R.value('double_step', 'half_cost');
                 }
                 return Math.floor(cost);
             },
@@ -82046,7 +82010,7 @@ engineMixin({
                 this.flitState.lastFlitAt = _gameTimeSec;
                 // Flit: Afterimage — gangers keep seeing you where you left
                 const ai = this.resonance ? this.resonance.rank('afterimage') : 0;
-                this._afterimage = ai ? { x: startX, y: startY, until: _gameTimeSec + 0.5 * ai } : null;
+                this._afterimage = ai ? { x: startX, y: startY, until: _gameTimeSec + this.resonance.value('afterimage', 'secs') * ai } : null;
 
                 if (traveled > 1) this.spillDrink(SPILL.FLIT_COST, (startX - targetX) / traveled, (startY - targetY) / traveled, startX, startY);   // the drink stays behind a moment (engine/spills.js)
                 this.player.x = targetX; this.player.y = targetY; resetHumanoidAnim(this.player); showMessage("FLIT!"); this.triggerShake(4);
@@ -99499,7 +99463,7 @@ engineMixin({
         }
         game_timers.every(1, () => CrewNights.tick(), 'crew_nights').keep = true;   // in game time: it waits while paused
     </script>
-    <script type="text/dfab" data-src="story/talks.js" data-cost="479">
+    <script type="text/dfab" data-src="story/talks.js" data-cost="477">
         /* =====================================================================
            TALKS — sitting down with someone and actually talking.
 
@@ -99912,12 +99876,7 @@ engineMixin({
         };
 
         /** What closeness gets you, crossed in a talk (or anywhere rapport moves) */
-        const TALK_PERKS = {
-            Anavia:        { 1: 'HER SALVAGE JOBS PAY 20% MORE' },
-            'Barista Ren': { 1: 'AMBER DELIVERIES PAY 10% MORE' },
-            Bartender:     { 1: 'BOUNTIES PAY 10% MORE' },
-            'Dr. Yin':     { 1: 'A FREE STIM WHEN YOU STOP BY (ONCE A DAY)' }
-        };
+        const TALK_PERKS = GAME_DB.progression.talk_perks;   // directory/game-db/progression.json
 
         const Talks = {
             _run: null,

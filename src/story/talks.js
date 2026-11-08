@@ -410,12 +410,7 @@
         };
 
         /** What closeness gets you, crossed in a talk (or anywhere rapport moves) */
-        const TALK_PERKS = {
-            Anavia:        { 1: 'HER SALVAGE JOBS PAY 20% MORE' },
-            'Barista Ren': { 1: 'AMBER DELIVERIES PAY 10% MORE' },
-            Bartender:     { 1: 'BOUNTIES PAY 10% MORE' },
-            'Dr. Yin':     { 1: 'A FREE STIM WHEN YOU STOP BY (ONCE A DAY)' }
-        };
+        const TALK_PERKS = GAME_DB.progression.talk_perks;   // directory/game-db/progression.json
 
         const Talks = {
             _run: null,
