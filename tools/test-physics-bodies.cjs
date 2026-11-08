@@ -54,6 +54,20 @@ const r = JSON.parse(JSON.stringify(e.run(`(() => {
   out.rayCrate = CollisionSystem.raycast(X - 100, Y, X + 100, Y, { mask: NEW }).map(h => h.e === crate);
   p.body.ray_mask = 0; out.rayHidden = CollisionSystem.raycast(X - 100, Y, X + 100, Y, { mask: L.ACTOR }).length;
   out.overlap = CollisionSystem.overlap(X, Y, 5).map(o => o === crate ? 'crate' : o === p ? 'p' : 'other');
+
+  // the street (everywhere on the map, the traffic step's grid): two cars meet with masks and onCollide like anything else
+  const grid = { all: [], getNearby(q, buf) { buf.length = 0; for (const c of this.all) buf.push(c); return buf; } };
+  const car = (x, cfg = {}) => Object.assign(new GameEntity({ x, y: Y + 400, width: 60, height: 30, hasCollision: true, collisionShape: GameEntity.SHAPE.OBB, collisionLayer: L.VEHICLE, ...cfg }), { length: 60, width: 30, angle: 0, getOBB() { return { x: this.x, y: this.y, length: 60, width: 30, angle: 0, mass: 1000 }; } });
+  const c1 = car(X), c2 = car(X + 50); grid.all = [c1, c2]; const hits = [], told = [];
+  c2.onCollide = (o, c, phase) => told.push(phase + ':' + (c && c.nx > 0 ? '+' : c ? '-' : ''));
+  CollisionSystem.streetCars(grid.all, grid, [], (v1, v2, pk) => hits.push([v1 === c1, v2 === c2]));
+  c1.body.mask = 0xFFFF & ~L.VEHICLE; CollisionSystem.streetCars(grid.all, grid, [], () => hits.push('masked'));
+  out.street = { hits, told: told.slice() };
+  // on foot: her against a car through streetFeet; a ghost car is told, she isn't pushed
+  c1.body.mask = 0xFFFF; c1.active = c2.active = false; grid.all = [c2]; c2.body.ghost = true; told.length = 0;
+  const P0 = game.player; Object.assign(P0, { x: X + 50, y: Y + 400 - 25 }); game.isDriving = false;
+  const y0 = P0.y; CollisionSystem.streetFeet([P0], grid, game); out.feetGhost = [P0.y === y0, told.slice()];
+  c2.body.ghost = false; CollisionSystem.streetFeet([P0], grid, game); out.feetPushed = P0.y < y0;
   return out;
 })()`)));
 assert.deepEqual([...e.errors], []);
@@ -72,4 +86,8 @@ assert.equal(r.ray.length, 1); assert.equal(r.ray[0][0], 'p');
 assert.deepEqual(r.rayCrate, [true]);
 assert.equal(r.rayHidden, 0, 'ray_mask hides it from that ray');
 assert.deepEqual(r.overlap, ['crate']);
+assert.deepEqual(r.street.hits, [[true, true]], 'two cars meet once; a mask without VEHICLE: they pass');
+assert.deepEqual(r.street.told, ['begin:+']);
+assert.equal(r.feetGhost[0], true, 'a ghost car: told, she is not pushed'); assert.equal(r.feetGhost[1].length, 1);
+assert.ok(r.feetPushed, 'a solid car pushes her out');
 console.log('ok physics bodies:', JSON.stringify(r));

@@ -294,10 +294,49 @@
                 }
                 return false;
             }
-            /** Stella and her crew meet cars in engine/update.js resolveTrafficCollisions (they shove back, and get hurt there) */
+            /** Stella and her crew meet cars on the street step (streetFeet, from engine/update.js resolveTrafficCollisions): everywhere, not only on screen */
             static _ownCarRules(p, game) {
                 if (!game) return false;
                 return p === game.player || (game.teammates && game.teammates.includes(p)) || (game.isDriving && p === game.player);
             }
             static get push_mass() { return CONFIG.PHYSICS.PUSH_MASS; }
+
+            /** Who meets traffic on foot, and how: her (15 px, never from inside a car), the crew she has (their radius + 1;
+             *  a car fading in or out isn't solid yet). Each one's car-hit grace counts down here. */
+            static _footRules(p, game) {
+                if (p === game.player) return this._herFoot || (this._herFoot = { R: 15, inside: false });
+                if (!p || p.inCar || p.dead || !(p.recruited || p.hired)) return null;
+                if (p._carHitCd > 0) p._carHitCd--;
+                return { R: (p.radius || 14) + 1, inside: true, skip: v => (v === game.car && game.isDriving && p.inCar) || (v.fade !== undefined && v.fade < 0.5) };
+            }
+            /** A car touching her or the crew: she shoves it back by mass (and with her strength); they're shoved aside.
+             *  One over speed 4 hits (10), then 40 ticks' grace. */
+            static _footVsCar(p, v, c, game) {
+                const wx = c.nx, wy = c.ny, o = c.depth;
+                if (p === game.player) {
+                    const pMass = p.mass || 15, vMass = v.mass || 1000, totalMass = pMass + vMass;
+                    const playerRatio = vMass / totalMass, carRatio = pMass / totalMass;   // how much each one moves
+                    p.x += wx * o * playerRatio; p.y += wy * o * playerRatio;
+                    v.x -= wx * o * carRatio; v.y -= wy * o * carRatio;
+                    const pushDot = p.velX * wx + p.velY * wy;                           // walking into it: a shove (super strength)
+                    if (pushDot < 0 && carRatio > 0.5) {
+                        const pushForce = -pushDot * 2.0;
+                        v.x -= wx * pushForce * carRatio * 2; v.y -= wy * pushForce * carRatio * 2;
+                    }
+                    if (Math.abs(v.speed) > 4.0 && !(game._carHitCd > 0)) {
+                        game._carHitCd = 40;
+                        game.damagePlayer(10);
+                        game.triggerShake(10);
+                        audioSys.sfx('explode');
+                        game.weather.spawnExplosion(p.x, p.y, '#ff0000');
+                    }
+                    return;
+                }
+                p.x += wx * o; p.y += wy * o;                                            // the car doesn't give
+                if (Math.abs(v.speed) > 4 && !(p._carHitCd > 0) && !p.downed) {
+                    p._carHitCd = 40;
+                    if (p.takeDamage) p.takeDamage(10, wx * 6, wy * 6);
+                    game.triggerShake(4);
+                }
+            }
         }

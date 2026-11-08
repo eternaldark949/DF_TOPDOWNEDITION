@@ -12,7 +12,23 @@
         // collisionKit.circleVsMovingBox(body, box) -> CONTACT | null
         //   touching now, or crossed this tick (a fast box passing a small body between two ticks: the sweep, in the
         //   box's frame, of the body's path against the box's rounded outline), so nothing slips through a car
+        // collisionKit.circleVsCarBody(x, y, R, car, pad, inside) -> { nx, ny, depth } | null
+        //   a circle (on foot) against a car's box grown by `pad`, the normal out of the car; `inside`: a centre inside
+        //   the box goes out the nearest side (false: no contact)
         const collisionKit = {
+            circleVsCarBody(x, y, R, v, pad = 2, inside = true) {
+                const c = Math.cos(-v.angle), s = Math.sin(-v.angle), dx = x - v.x, dy = y - v.y;
+                const lx = dx * c - dy * s, ly = dx * s + dy * c, hl = v.length / 2 + pad, hw = v.width / 2 + pad;
+                const ex = lx - Math.max(-hl, Math.min(hl, lx)), ey = ly - Math.max(-hw, Math.min(hw, ly)), d2 = ex * ex + ey * ey;
+                if (d2 >= R * R) return null;
+                let d = Math.sqrt(d2), o = R - d, nx = ex / (d || 1), ny = ey / (d || 1);
+                if (d2 <= 0) {
+                    if (!inside) return null;
+                    const sx = hl - Math.abs(lx), sy = hw - Math.abs(ly);
+                    if (sx < sy) { nx = Math.sign(lx) || 1; ny = 0; o = sx + R; } else { nx = 0; ny = Math.sign(ly) || 1; o = sy + R; }
+                }
+                return { nx: nx * Math.cos(v.angle) - ny * Math.sin(v.angle), ny: nx * Math.sin(v.angle) + ny * Math.cos(v.angle), depth: o };
+            },
             circleVsMovingBox(c, b) {
                 const r = c.radius || 0, hl = (b.length || 0) / 2, hw = (b.width || 0) / 2, a = b.angle || 0;
                 const cos = Math.cos(-a), sin = Math.sin(-a), cb = Math.cos(a), sb = Math.sin(a);
@@ -596,6 +612,47 @@
                 }
                 return out;
             }
+
+            // =====================
+            //  THE STREET: cars all over the map (not just on screen), on the traffic step's own grid; the same
+            //  _meets / _report as every other pass, so masks, ghosts and onCollide hold for cars too
+            // =====================
+
+            /** Every pair of `cars` once (the earlier in the list meets the later) that touch: hit(v1, v2, packet)
+             *  (default `_resolveVehicleCollision`). grid.getNearby(car, buf) gives a car's neighbours. */
+            static streetCars(cars, grid, buf = [], hit = null) {
+                for (let i = 0; i < cars.length; i++) cars[i]._colIdx = i;
+                for (let n1 = 0; n1 < cars.length; n1++) {
+                    const v1 = cars[n1];
+                    for (const v2 of grid.getNearby(v1, buf)) {
+                        if (v1 === v2 || v2._colIdx === undefined || cars[v2._colIdx] !== v2 || v2._colIdx < n1) continue;   // met already (or not in the list)
+                        if (!this._meets(v1, v2)) continue;
+                        this.stats.totalChecks++;
+                        const packet = this._satCollision(v1, v2);
+                        if (!packet || !this._report(v1, v2, packet)) continue;
+                        if (hit) hit(v1, v2, packet); else this._resolveVehicleCollision(v1, v2, packet);
+                    }
+                }
+            }
+            /** Everyone in `people` on foot against the cars near them: `_footRules(p, game)` -> { R, inside, skip(car) }
+             *  or null (not now), then `_footVsCar(p, car, contact, game)` for each one touching (the normal out of the car). */
+            static streetFeet(people, grid, game) {
+                const q = this._footQuery || (this._footQuery = { x: 0, y: 0, length: 30, width: 30 }), buf = this._footNear || (this._footNear = []);
+                for (const p of people) {
+                    const f = this._footRules(p, game);
+                    if (!f) continue;
+                    q.x = p.x; q.y = p.y;
+                    for (const v of grid.getNearby(q, buf)) {
+                        if ((f.skip && f.skip(v)) || !this._meets(p, v)) continue;
+                        this.stats.totalChecks++;
+                        const c = collisionKit.circleVsCarBody(p.x, p.y, f.R, v, 2, f.inside);
+                        if (!c || !this._report(p, v, c)) continue;
+                        this._footVsCar(p, v, c, game);
+                    }
+                }
+            }
+            static _footRules(p, game) { return { R: p.radius || 12, inside: true }; }
+            static _footVsCar(p, v, c, game) { p.x += c.nx * c.depth; p.y += c.ny * c.depth; }
 
             // =====================
             //  CONTACT SOLVER (rigid bodies in the plane)

@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '47ae326f16d4';
+        const DFAB_BUILD = '16b3ca18bc2e';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -8327,7 +8327,7 @@
 
 
     </script>
-    <script type="text/dfab" data-src="basement/collision-kit.js" data-cost="478">
+    <script type="text/dfab" data-src="basement/collision-kit.js" data-cost="518">
         // ===== LV0 BASEMENT =====
         // The collision kit: the parts of a collision step that know nothing about any game. The shape tests are the
         // shape kit's (basement/shape-kit.js), the broad phase the spatial grid's (basement/spatial-grid.js).
@@ -8342,7 +8342,23 @@
         // collisionKit.circleVsMovingBox(body, box) -> CONTACT | null
         //   touching now, or crossed this tick (a fast box passing a small body between two ticks: the sweep, in the
         //   box's frame, of the body's path against the box's rounded outline), so nothing slips through a car
+        // collisionKit.circleVsCarBody(x, y, R, car, pad, inside) -> { nx, ny, depth } | null
+        //   a circle (on foot) against a car's box grown by `pad`, the normal out of the car; `inside`: a centre inside
+        //   the box goes out the nearest side (false: no contact)
         const collisionKit = {
+            circleVsCarBody(x, y, R, v, pad = 2, inside = true) {
+                const c = Math.cos(-v.angle), s = Math.sin(-v.angle), dx = x - v.x, dy = y - v.y;
+                const lx = dx * c - dy * s, ly = dx * s + dy * c, hl = v.length / 2 + pad, hw = v.width / 2 + pad;
+                const ex = lx - Math.max(-hl, Math.min(hl, lx)), ey = ly - Math.max(-hw, Math.min(hw, ly)), d2 = ex * ex + ey * ey;
+                if (d2 >= R * R) return null;
+                let d = Math.sqrt(d2), o = R - d, nx = ex / (d || 1), ny = ey / (d || 1);
+                if (d2 <= 0) {
+                    if (!inside) return null;
+                    const sx = hl - Math.abs(lx), sy = hw - Math.abs(ly);
+                    if (sx < sy) { nx = Math.sign(lx) || 1; ny = 0; o = sx + R; } else { nx = 0; ny = Math.sign(ly) || 1; o = sy + R; }
+                }
+                return { nx: nx * Math.cos(v.angle) - ny * Math.sin(v.angle), ny: nx * Math.sin(v.angle) + ny * Math.cos(v.angle), depth: o };
+            },
             circleVsMovingBox(c, b) {
                 const r = c.radius || 0, hl = (b.length || 0) / 2, hw = (b.width || 0) / 2, a = b.angle || 0;
                 const cos = Math.cos(-a), sin = Math.sin(-a), cb = Math.cos(a), sb = Math.sin(a);
@@ -8926,6 +8942,47 @@
                 }
                 return out;
             }
+
+            // =====================
+            //  THE STREET: cars all over the map (not just on screen), on the traffic step's own grid; the same
+            //  _meets / _report as every other pass, so masks, ghosts and onCollide hold for cars too
+            // =====================
+
+            /** Every pair of `cars` once (the earlier in the list meets the later) that touch: hit(v1, v2, packet)
+             *  (default `_resolveVehicleCollision`). grid.getNearby(car, buf) gives a car's neighbours. */
+            static streetCars(cars, grid, buf = [], hit = null) {
+                for (let i = 0; i < cars.length; i++) cars[i]._colIdx = i;
+                for (let n1 = 0; n1 < cars.length; n1++) {
+                    const v1 = cars[n1];
+                    for (const v2 of grid.getNearby(v1, buf)) {
+                        if (v1 === v2 || v2._colIdx === undefined || cars[v2._colIdx] !== v2 || v2._colIdx < n1) continue;   // met already (or not in the list)
+                        if (!this._meets(v1, v2)) continue;
+                        this.stats.totalChecks++;
+                        const packet = this._satCollision(v1, v2);
+                        if (!packet || !this._report(v1, v2, packet)) continue;
+                        if (hit) hit(v1, v2, packet); else this._resolveVehicleCollision(v1, v2, packet);
+                    }
+                }
+            }
+            /** Everyone in `people` on foot against the cars near them: `_footRules(p, game)` -> { R, inside, skip(car) }
+             *  or null (not now), then `_footVsCar(p, car, contact, game)` for each one touching (the normal out of the car). */
+            static streetFeet(people, grid, game) {
+                const q = this._footQuery || (this._footQuery = { x: 0, y: 0, length: 30, width: 30 }), buf = this._footNear || (this._footNear = []);
+                for (const p of people) {
+                    const f = this._footRules(p, game);
+                    if (!f) continue;
+                    q.x = p.x; q.y = p.y;
+                    for (const v of grid.getNearby(q, buf)) {
+                        if ((f.skip && f.skip(v)) || !this._meets(p, v)) continue;
+                        this.stats.totalChecks++;
+                        const c = collisionKit.circleVsCarBody(p.x, p.y, f.R, v, 2, f.inside);
+                        if (!c || !this._report(p, v, c)) continue;
+                        this._footVsCar(p, v, c, game);
+                    }
+                }
+            }
+            static _footRules(p, game) { return { R: p.radius || 12, inside: true }; }
+            static _footVsCar(p, v, c, game) { p.x += c.nx * c.depth; p.y += c.ny * c.depth; }
 
             // =====================
             //  CONTACT SOLVER (rigid bodies in the plane)
@@ -20043,7 +20100,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
     </script>
-    <script type="text/dfab" data-src="directory/collision-system.js" data-cost="198">
+    <script type="text/dfab" data-src="directory/collision-system.js" data-cost="224">
         // ===== LV2 DIRECTORY =====
         // The game's collision system: collisionWorld (basement/collision-kit.js: the step, the layers, the grid, the
         // solver, people vs cars) with this game's rules on top: projectile hits, doors swinging, companions giving
@@ -20340,12 +20397,51 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 return false;
             }
-            /** Stella and her crew meet cars in engine/update.js resolveTrafficCollisions (they shove back, and get hurt there) */
+            /** Stella and her crew meet cars on the street step (streetFeet, from engine/update.js resolveTrafficCollisions): everywhere, not only on screen */
             static _ownCarRules(p, game) {
                 if (!game) return false;
                 return p === game.player || (game.teammates && game.teammates.includes(p)) || (game.isDriving && p === game.player);
             }
             static get push_mass() { return CONFIG.PHYSICS.PUSH_MASS; }
+
+            /** Who meets traffic on foot, and how: her (15 px, never from inside a car), the crew she has (their radius + 1;
+             *  a car fading in or out isn't solid yet). Each one's car-hit grace counts down here. */
+            static _footRules(p, game) {
+                if (p === game.player) return this._herFoot || (this._herFoot = { R: 15, inside: false });
+                if (!p || p.inCar || p.dead || !(p.recruited || p.hired)) return null;
+                if (p._carHitCd > 0) p._carHitCd--;
+                return { R: (p.radius || 14) + 1, inside: true, skip: v => (v === game.car && game.isDriving && p.inCar) || (v.fade !== undefined && v.fade < 0.5) };
+            }
+            /** A car touching her or the crew: she shoves it back by mass (and with her strength); they're shoved aside.
+             *  One over speed 4 hits (10), then 40 ticks' grace. */
+            static _footVsCar(p, v, c, game) {
+                const wx = c.nx, wy = c.ny, o = c.depth;
+                if (p === game.player) {
+                    const pMass = p.mass || 15, vMass = v.mass || 1000, totalMass = pMass + vMass;
+                    const playerRatio = vMass / totalMass, carRatio = pMass / totalMass;   // how much each one moves
+                    p.x += wx * o * playerRatio; p.y += wy * o * playerRatio;
+                    v.x -= wx * o * carRatio; v.y -= wy * o * carRatio;
+                    const pushDot = p.velX * wx + p.velY * wy;                           // walking into it: a shove (super strength)
+                    if (pushDot < 0 && carRatio > 0.5) {
+                        const pushForce = -pushDot * 2.0;
+                        v.x -= wx * pushForce * carRatio * 2; v.y -= wy * pushForce * carRatio * 2;
+                    }
+                    if (Math.abs(v.speed) > 4.0 && !(game._carHitCd > 0)) {
+                        game._carHitCd = 40;
+                        game.damagePlayer(10);
+                        game.triggerShake(10);
+                        audioSys.sfx('explode');
+                        game.weather.spawnExplosion(p.x, p.y, '#ff0000');
+                    }
+                    return;
+                }
+                p.x += wx * o; p.y += wy * o;                                            // the car doesn't give
+                if (Math.abs(v.speed) > 4 && !(p._carHitCd > 0) && !p.downed) {
+                    p._carHitCd = 40;
+                    if (p.takeDamage) p.takeDamage(10, wx * 6, wy * 6);
+                    game.triggerShake(4);
+                }
+            }
         }
     </script>
     <script type="text/dfab" data-src="entities/props-decor.js" data-cost="2516">
@@ -56625,7 +56721,7 @@ Object.assign(TrafficVehicle.prototype, {
             },
         });
     </script>
-    <script type="text/dfab" data-src="traffic/traffic-manager.js" data-cost="268">
+    <script type="text/dfab" data-src="traffic/traffic-manager.js" data-cost="259">
         /* --- OPTIMIZATION: SPATIAL GRID ---
            Cells are keyed by number (no strings) and their arrays are kept and emptied, not rebuilt;
            getNearby drops repeats with a per-query stamp instead of a Set (same order as before). */
@@ -56989,46 +57085,27 @@ Object.assign(TrafficVehicle.prototype, {
                 if (parked) for (const c of parked) if (!allVehicles.includes(c)) allVehicles.push(c);   // her cars standing about
                 this.grid.clear();
                 for (const v of allVehicles) this.grid.add(v);
-                // Each pair once, at the turn of whichever comes first in the list (as the old pair-key Set did:
-                // neighbours are mutual, so the first to meet the other is the earlier one)
-                for (let i = 0; i < allVehicles.length; i++) allVehicles[i]._colIdx = i;
-            
-                // 2. BROAD PHASE: SPATIAL GRID
-                for (let n1 = 0; n1 < allVehicles.length; n1++) {
-                    const v1 = allVehicles[n1];
-                    const neighbors = this.grid.getNearby(v1, this._collisionNeighbours || (this._collisionNeighbours = []));
-                    
-                    for (let v2 of neighbors) {
-                        if (v1 === v2) continue; 
-                        if (v2._colIdx === undefined || allVehicles[v2._colIdx] !== v2 || v2._colIdx < n1) continue;   // met already (or not in the list)
-                        
-                        // 3. NARROW PHASE: SAT RESOLUTION
-                        const collided = PhysicsSystem.resolveOBBCollision(v1, v2);
-                        
-                        // 4. GAME FEEL (VISUALS/AUDIO): scaled by how hard they met, not a coin flip
-                        const imp = collided ? (v1._lastImpact || 0) : 0;
-                        if (imp > 1.2) {
-                            const midX = (v1.x + v2.x) / 2;
-                            const midY = (v1.y + v2.y) / 2;
-                            
-                            // Sparks (Temporary)
-                            weather.spawnSparks(midX, midY, Math.min(12, Math.round(2 + imp * 2)));
-                            
-                            // Debris (Persistent)
-                            if (decalSystem && imp > 2) {
-                                decalSystem.addDebris(midX, midY, '#aaddff', 4); // Glass
-                                decalSystem.addDebris(midX, midY, v1.color, 3);  // Paint
-                            }
-                            
-                            // Sound (the driven car's own hits crunch in TrafficVehicle.onImpact)
-                            const pd = Math.hypot(player.x - midX, player.y - midY);
-                            if (v1.controlMode !== 'PLAYER' && v2.controlMode !== 'PLAYER' && pd < 500 && !(this._crunchCd > 0)) {
-                                this._crunchCd = 10;
-                                audioSys.sfx('crunch', { gain: Math.min(1, imp / 5) * (1 - pd / 600) });
-                            }
+                // 2. EVERY PAIR THAT TOUCHES (collisionWorld.streetCars: each pair once, masks, ghosts, onCollide), then the
+                // knock (car-contact.js) and the feel: scaled by how hard they met, not a coin flip
+                CollisionSystem.streetCars(allVehicles, this.grid, this._collisionNeighbours || (this._collisionNeighbours = []), (v1, v2, packet) => {
+                    PhysicsSystem.carContact(v1, v2, packet.nx, packet.ny, packet.depth);
+                    const imp = v1._lastImpact || 0;
+                    if (imp > 1.2) {
+                        const midX = (v1.x + v2.x) / 2;
+                        const midY = (v1.y + v2.y) / 2;
+                        weather.spawnSparks(midX, midY, Math.min(12, Math.round(2 + imp * 2)));   // sparks (temporary)
+                        if (decalSystem && imp > 2) {                                              // debris (persistent): glass, paint
+                            decalSystem.addDebris(midX, midY, '#aaddff', 4);
+                            decalSystem.addDebris(midX, midY, v1.color, 3);
+                        }
+                        // Sound (the driven car's own hits crunch in TrafficVehicle.onImpact)
+                        const pd = Math.hypot(player.x - midX, player.y - midY);
+                        if (v1.controlMode !== 'PLAYER' && v2.controlMode !== 'PLAYER' && pd < 500 && !(this._crunchCd > 0)) {
+                            this._crunchCd = 10;
+                            audioSys.sfx('crunch', { gain: Math.min(1, imp / 5) * (1 - pd / 600) });
                         }
                     }
-                }
+                });
             }
         
         
@@ -88136,7 +88213,7 @@ engineMixin({
             },
         });
     </script>
-    <script type="text/dfab" data-src="engine/update.js" data-cost="825">
+    <script type="text/dfab" data-src="engine/update.js" data-cost="757">
         // GameEngine — The per-tick simulation (update) and traffic collision helpers.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         /** Props you can use, and what the action pill says for them: type → [verb, name, name from the prop's own label].
@@ -89289,113 +89366,13 @@ engineMixin({
 
             
             resolveTrafficCollisions() {
-                // 1. WALKING COLLISION (Player vs Traffic)
+                // 1. HER AND HER CREW ON FOOT vs TRAFFIC (CollisionSystem._footRules / _footVsCar, through collisionWorld.streetFeet)
                 if (this._carHitCd > 0) this._carHitCd--;
-                if (!this.isDriving) {
-                    // Create dummy for Grid Query
-                    const playerDummy = this._trafficPlayerQuery || (this._trafficPlayerQuery = { x: 0, y: 0, length: 30, width: 30 });
-                    playerDummy.x = this.player.x; playerDummy.y = this.player.y;
-                    const nearby = this.traffic.grid.getNearby(playerDummy, this._trafficPlayerNear || (this._trafficPlayerNear = []));
-                    
-                    for (let v of nearby) {
-                        // Translate player to vehicle local space
-                        const dx = this.player.x - v.x;
-                        const dy = this.player.y - v.y;
-                        const cos = Math.cos(-v.angle);
-                        const sin = Math.sin(-v.angle);
-                        const localX = dx * cos - dy * sin;
-                        const localY = dx * sin + dy * cos;
-                        
-                        const hLen = (v.length / 2) + 2; 
-                        const hWid = (v.width / 2) + 2;
-                        const closestX = Math.max(-hLen, Math.min(hLen, localX));
-                        const closestY = Math.max(-hWid, Math.min(hWid, localY));
-                        const distX = localX - closestX;
-                        const distY = localY - closestY;
-                        const distSq = distX * distX + distY * distY;
-                        const radius = 15; 
-            
-                        if (distSq < radius * radius && distSq > 0) {
-                            const dist = Math.sqrt(distSq);
-                            const overlap = radius - dist;
-                            const nX = distX / dist;
-                            const nY = distY / dist;
-                            
-                            // Rotate normal back to world space
-                            const worldNx = nX * Math.cos(v.angle) - nY * Math.sin(v.angle);
-                            const worldNy = nX * Math.sin(v.angle) + nY * Math.cos(v.angle);
-            
-                            // --- NEW PHYSICS LOGIC ---
-                            const pMass = this.player.mass || 15; // Your 15000 goes here
-                            const vMass = v.mass || 1000;
-                            const totalMass = pMass + vMass;
-                            
-                            // Calculate push ratios
-                            const playerRatio = vMass / totalMass; // How much player moves
-                            const carRatio = pMass / totalMass;    // How much car moves
-            
-                            // 1. Position Separation (Push both based on mass)
-                            this.player.x += worldNx * overlap * playerRatio;
-                            this.player.y += worldNy * overlap * playerRatio;
-                            
-                            v.x -= worldNx * overlap * carRatio;
-                            v.y -= worldNy * overlap * carRatio;
-            
-                            // 2. Momentum Transfer (Super strength effect)
-                            // If player is moving into the car, transfer velocity
-                            const pushDot = this.player.velX * worldNx + this.player.velY * worldNy;
-                            if (pushDot < 0) {
-                                const pushForce = -pushDot * 2.0; // Strength multiplier
-                                // Apply velocity to car (if it has vx/vy properties)
-                                // Since cars use 'speed' and 'angle', we approximate:
-                                if (carRatio > 0.5) { // Only if player is heavy enough to matter
-                                     // Hacky impulse for legacy cars: nudge position directly for "slide"
-                                     v.x -= worldNx * pushForce * carRatio * 2;
-                                     v.y -= worldNy * pushForce * carRatio * 2;
-                                }
-                            }
-                            // -------------------------
-            
-                            // Hit by a car going over 4: once, then a moment's grace (as her crew), not every tick it touches
-                            if (Math.abs(v.speed) > 4.0 && !(this._carHitCd > 0)) {
-                                this._carHitCd = 40;
-                                this.damagePlayer(10);
-                                this.triggerShake(10);
-                                audioSys.sfx('explode'); 
-                                this.weather.spawnExplosion(this.player.x, this.player.y, '#ff0000');
-                            }
-                        }
-                    }
-                } 
-                
-                // 1b. THE CREW ON FOOT vs TRAFFIC: pushed clear of a car's body; a fast one hits them
-                for (const tm of this.teammates) {
-                    if (!tm || tm.inCar || tm.dead || !(tm.recruited || tm.hired)) continue;
-                    if (tm._carHitCd > 0) tm._carHitCd--;
-                    const crewQuery = this._trafficCrewQuery || (this._trafficCrewQuery = { x: 0, y: 0, length: 30, width: 30 });
-                    crewQuery.x = tm.x; crewQuery.y = tm.y;
-                    const nearby = this.traffic.grid.getNearby(crewQuery, this._trafficCrewNear || (this._trafficCrewNear = []));
-                    for (const v of nearby) {
-                        if (v === this.car && this.isDriving && tm.inCar) continue;
-                        if (v.fade !== undefined && v.fade < 0.5) continue;                 // a car fading in or out isn't solid yet
-                        const c = Math.cos(-v.angle), s = Math.sin(-v.angle), dx = tm.x - v.x, dy = tm.y - v.y;
-                        const lx = dx * c - dy * s, ly = dx * s + dy * c, hl = v.length / 2 + 2, hw = v.width / 2 + 2;
-                        const ex = lx - Math.max(-hl, Math.min(hl, lx)), ey = ly - Math.max(-hw, Math.min(hw, ly)), d2 = ex * ex + ey * ey, R = (tm.radius || 14) + 1;
-                        if (d2 >= R * R) continue;
-                        let d = Math.sqrt(d2), o = R - d, nx = ex / (d || 1), ny = ey / (d || 1);
-                        if (d2 <= 0) {                                                      // centre inside the body: out the nearest side
-                            const sx = hl - Math.abs(lx), sy = hw - Math.abs(ly);
-                            if (sx < sy) { nx = Math.sign(lx) || 1; ny = 0; o = sx + R; } else { nx = 0; ny = Math.sign(ly) || 1; o = sy + R; }
-                        }
-                        const wx = nx * Math.cos(v.angle) - ny * Math.sin(v.angle), wy = nx * Math.sin(v.angle) + ny * Math.cos(v.angle);
-                        tm.x += wx * o; tm.y += wy * o;                                    // the car doesn't give; they're shoved aside
-                        if (Math.abs(v.speed) > 4 && !(tm._carHitCd > 0) && !tm.downed) {
-                            tm._carHitCd = 40;
-                            if (tm.takeDamage) tm.takeDamage(10, wx * 6, wy * 6);
-                            this.triggerShake(4);
-                        }
-                    }
-                }
+                const feet = this._trafficFeet || (this._trafficFeet = []);
+                feet.length = 0;
+                if (!this.isDriving) feet.push(this.player);
+                for (const tm of this.teammates) feet.push(tm);
+                CollisionSystem.streetFeet(feet, this.traffic.grid, this);
 
                 // 2. VEHICLE vs VEHICLE Collisions
                 this.traffic.resolveCollisions(this.car, this.player, this.weather, audioSys, this.parkedCars(this._parkedCars || (this._parkedCars = [])), this.decals);
