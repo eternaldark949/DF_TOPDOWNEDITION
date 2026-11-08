@@ -15,7 +15,7 @@
             g._cancelQuickDrawHold?.();
             g.interruptQuickDrawShot?.();
             g.mouseDown = false;
-            if (g.keys) for (const k in g.keys) g.keys[k] = false;
+            if (typeof controls !== 'undefined') controls.clear();
             if (g.joystick) Object.assign(g.joystick, { active: false, dx: 0, dy: 0, id: null, armed: true, ringArmed: true, trail: [] });
             if (g.fireJoystick) Object.assign(g.fireJoystick, { active: false, dx: 0, dy: 0, id: null, firing: false, armed: false, aimed: false, remembered: false });
             g._releaseShot = null; g._releaseWait = 0; g._aimMemory = null;

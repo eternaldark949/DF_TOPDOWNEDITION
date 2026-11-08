@@ -48,6 +48,7 @@ const SCRIPTS = [
     'basement/life-kit.js',        // LV0 Basement: lifeKit (lists of short-lived things)
     'basement/sound-kit.js',       // LV0 Basement: soundKit (Web Audio building blocks)
     'basement/sound-system.js',    // LV0 Basement: soundSystem (context, channels, volume dial, reverb, sounds by packet)
+    'basement/controls-system.js', // LV0 Basement: controlsSystem (keyboard, mouse and gamepad instances, keymap, action table)
     'basement/entity-base.js',     // LV0 Basement: GameEntity (the base of everything that moves or collides)
     'basement/shape-kit.js',       // LV0 Basement: shapeKit (collision geometry)
     'basement/spatial-grid.js',    // LV0 Basement: SpatialHashGrid and the render / transition grids
@@ -70,6 +71,7 @@ const SCRIPTS = [
     'story/story-db.js',
     'story/captions.js',
     'directory/game-sound.js',
+    'directory/game-controls.js',    // LV2 Directory: dfKeyMap and dfActions (which keys and buttons do what)
     'world/weather.js',
     'world/weather-response.js',
     'world/particles-decals.js',

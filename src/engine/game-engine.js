@@ -58,7 +58,6 @@
                 this._hubCacheSkipSigns = false; // Flag to skip sign re-harvest on cache restore
                 this._transitionGrid = new TransitionGrid(100); // Spatial grid for O(1) transition zone lookup
                 this.roomSystem = new RoomSystem(); // Indoor V2 room system
-                this.keys = {};
                 this.joystick = { active: false, dx: 0, dy: 0, originX: 0, originY: 0, id: null };
                 this.fireJoystick = { active: false, dx: 0, dy: 0, originX: 0, originY: 0, id: null, aimed: false, firing: false, armed: false };
                 this._releaseShot = null; this._releaseWait = 0;   // sniper fire-on-release (initFireJoystick)

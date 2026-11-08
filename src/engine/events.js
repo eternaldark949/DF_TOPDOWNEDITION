@@ -119,36 +119,7 @@
                 window.addEventListener('resize', () => { this.resize(); });
                 document.addEventListener('visibilitychange', () => { if (document.hidden) this.onPageHidden(); });
                 window.addEventListener('pagehide', () => this.onPageHidden());
-                window.addEventListener('keydown', (e) => {
-                    if (!this.running || this.paused || hudInputBlocked() || e.target instanceof Element && e.target.closest('input, textarea, select, [contenteditable="true"]')) return;
-                    this.keys[e.key] = true; 
-                    if (e.key === 'h' || e.key === 'H') this.useBooster();
-                    // Furniture (engine/furniture.js): G grabs / confirms / lets go, R turns, directions pick a side
-                    if (this.furniture && this.running && !this.paused) {
-                        if (e.key === 'g' || e.key === 'G') this.furniture.press();
-                        if ((e.key === 'r' || e.key === 'R') && this.furniture.holding) this.furniture.rotate(e.shiftKey ? -1 : 1);
-                        if (this.furniture.state === 'choose') {
-                            const D = { ArrowUp: [0, -1], w: [0, -1], W: [0, -1], ArrowDown: [0, 1], s: [0, 1], S: [0, 1], ArrowLeft: [-1, 0], a: [-1, 0], A: [-1, 0], ArrowRight: [1, 0], d: [1, 0], D: [1, 0] }[e.key];
-                            if (D) { this.furniture.chooseDir(D[0], D[1]); e.preventDefault(); }
-                        }
-                    }
-                    if (e.key === 'j' || e.key === 'J') this.useBoosterOnAlly();
-                    if ((e.key === 'c' || e.key === 'C') && this.running && !this.paused && !e.ctrlKey && !e.metaKey) this.toggleSneak();   // engine/sneak.js
-                    
-                    // AUTO-DRIVE TOGGLE (only while driving)
-                    if ((e.key === 'q' || e.key === 'Q') && !e.repeat && this.isDriving && this.running && !this.paused) {
-                        this.toggleAutoDrive();
-                    }
-                    
-                    if (e.key === ' ') {
-                        e.preventDefault();
-                        // Behind the wheel Space is the handbrake (update.js); the mouse still fires
-                        if (!this.isDriving && this.shootCooldown <= 0 && this.player.visible && !this.paused) {
-                            this.fireWeapon();
-                        }
-                    }
-                });
-                window.addEventListener('keyup', (e) => this.keys[e.key] = false);
+                // Keys and controller buttons: directory/game-controls.js (the controls system)
                 
                 // DESKTOP MOUSE CONTROLS for aiming and shooting
                 this.mouseX = 0;

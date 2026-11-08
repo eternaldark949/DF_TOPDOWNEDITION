@@ -410,11 +410,7 @@
             
                 // --- 4. INPUT HANDLING ---
                 this.profiler.start('Input:Process');
-                let inputX = 0; let inputY = 0;
-                if (this.keys['w'] || this.keys['ArrowUp']) inputY = -1; 
-                if (this.keys['s'] || this.keys['ArrowDown']) inputY = 1; 
-                if (this.keys['a'] || this.keys['ArrowLeft']) inputX = -1; 
-                if (this.keys['d'] || this.keys['ArrowRight']) inputX = 1;
+                let [inputX, inputY] = controls.direction('move');
                 if (this.joystick.active) { inputX = this.joystick.dx; inputY = this.joystick.dy; }
                 // The apartment's hand (engine/furniture.js): the pill; choosing a side holds her still
                 if (this.furniture) { this.furniture.update(this); if (this.furniture.state === 'choose') { inputX = 0; inputY = 0; } }
@@ -930,12 +926,12 @@
                         }
                         this.car.update(this.player, this.car, this.traffic.vehicles, this.weather, this.traffic.network.intersections, this.activeMap.walls, this.carColliders(), this.decals, this.traffic.folk);
                         if (!(this.zibSystem && this.zibSystem.isPassenger) &&
-                            (inputX !== 0 || inputY !== 0 || this.keys[' '] || this.handbrakeHeld)) {
+                            (inputX !== 0 || inputY !== 0 || controls.active('handbrake') || this.handbrakeHeld)) {
                             this.car.disableAutoDrive(); this.car.clearNavWaypoints(); this.autodriveBtn.classList.remove('engaged'); showMessage("AUTO-DRIVE DISENGAGED");
                         }
                     } else {
                         this.car.driverInput(inputX, inputY, this.joystick.active);
-                        this.car.handbrake = !!(this.keys[' '] || this.handbrakeHeld);
+                        this.car.handbrake = !!(controls.active('handbrake') || this.handbrakeHeld);
                         this.car.updateManualDriving(this.activeMap.walls, this.carColliders(), this.weather, this.decals);   // (pools stop her car: engine/pools.js)
                     }
                     // Player sits at seat 0, not car center

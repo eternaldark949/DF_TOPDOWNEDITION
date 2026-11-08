@@ -976,13 +976,7 @@
                 this.timer--;
                 
                 // Player driving input
-                let inputX = 0, inputY = 0;
-                if (game.keys) {
-                    if (game.keys['w'] || game.keys['ArrowUp']) inputY = -1;
-                    if (game.keys['s'] || game.keys['ArrowDown']) inputY = 1;
-                    if (game.keys['a'] || game.keys['ArrowLeft']) inputX = -1;
-                    if (game.keys['d'] || game.keys['ArrowRight']) inputX = 1;
-                }
+                let [inputX, inputY] = controls.direction('move');
                 if (game.joystick && game.joystick.active) {
                     inputX = game.joystick.dx;
                     inputY = game.joystick.dy;

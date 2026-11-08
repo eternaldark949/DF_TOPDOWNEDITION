@@ -177,11 +177,7 @@
 
                 // Flit direction: use movement keys (WASD) or joystick if active, otherwise fall back to facing angle
                 let flitAngle = this.player.angle;
-                let moveX = 0, moveY = 0;
-                if (this.keys['w'] || this.keys['ArrowUp']) moveY = -1;
-                if (this.keys['s'] || this.keys['ArrowDown']) moveY = 1;
-                if (this.keys['a'] || this.keys['ArrowLeft']) moveX = -1;
-                if (this.keys['d'] || this.keys['ArrowRight']) moveX = 1;
+                let [moveX, moveY] = controls.direction('move');
                 if (this.joystick && this.joystick.active) {
                     moveX = this.joystick.dx;
                     moveY = this.joystick.dy;

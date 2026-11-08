@@ -39,7 +39,7 @@ test('An about-face from rest turns toward input instead of getting stuck in rev
  const r=value(e,`
  const m=new BumperCarMinigame();m.active=true;m.timer=1000;m._updateHUD=()=>{};
  const a=m.playerCar=new BumperCar({x:450,y:450,angle:0});m.cars=[a];
- game.activeMap={walls:[]};game.keys={a:true};game.joystick={active:false};
+ game.activeMap={walls:[]};controls.keyboard.setInputs(['a']);game.joystick={active:false};
  for(let i=0;i<100;i++)m.update(game);
  return {error:Math.abs(Math.atan2(Math.sin(Math.PI-a.angle),Math.cos(Math.PI-a.angle))),x:a.x};`);
  assert.ok(r.error<.05,JSON.stringify(r));assert.ok(r.x<400,JSON.stringify(r));
@@ -50,7 +50,7 @@ test('Chase assist is bounded, gives up on steering away, and never accelerates 
  const a=m.playerCar=new BumperCar({x:200,y:200}),b=new BumperCar({x:400,y:230});m.cars=[a,b];
  const assisted=m._chaseHeading(0),picked=m._chaseTarget===b;
  const away=m._chaseHeading(Math.PI),released=m._chaseTarget===null;
- game.activeMap={walls:[]};game.keys={};game.joystick={active:false};
+ game.activeMap={walls:[]};controls.keyboard.setInputs([]);game.joystick={active:false};
  const start=[a.x,a.y];m.update(game);
  return {assisted,picked,away,released,idle:a.x===start[0]&&a.y===start[1]};`);
  assert.ok(r.assisted>0&&r.assisted<=.25);assert.equal(r.picked,true);assert.equal(r.away,Math.PI);assert.equal(r.released,true);assert.equal(r.idle,true);
@@ -59,7 +59,7 @@ test('A full seven-car round scores, ends and restores player control and exits'
  const r=value(e,`
  game._doLoadMap('biggs_arena');game.currency=1000;
  const exits=game.activeMap.transitions,m=game.bumperMinigame;m.start(game);m._updateHUD=()=>{};
- const cars=m.cars.slice(),player=m.playerCar;game.joystick={active:true,dx:0,dy:0};game.keys={};
+ const cars=m.cars.slice(),player=m.playerCar;game.joystick={active:true,dx:0,dy:0};controls.keyboard.setInputs([]);
  for(let i=0;i<3600;i++){
   if(i%12===0){
    const target=cars.filter(c=>c!==player).sort((a,b)=>Math.hypot(a.x-player.x,a.y-player.y)-Math.hypot(b.x-player.x,b.y-player.y))[0];
