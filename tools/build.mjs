@@ -53,8 +53,8 @@ const SCRIPTS = [
     'basement/recorder-kit.js',    // LV0 Basement: gRecorder (inputs recorded per tick, played back through the controls)
     'basement/entity-base.js',     // LV0 Basement: GameEntity (the base of everything that moves or collides)
     'basement/shape-kit.js',       // LV0 Basement: shapeKit (collision geometry)
-    'basement/collision-kit.js',   // LV0 Basement: collisionKit (the collision step's game-free parts: people vs moving boxes)
     'basement/spatial-grid.js',    // LV0 Basement: SpatialHashGrid and the render / transition grids
+    'basement/collision-kit.js',   // LV0 Basement: collisionKit and collisionWorld (the collision step, game-free: layers, grid, passes, solver)
     'basement/ui-kit.js',          // LV0 Basement: uiKit (making, showing and hiding DOM panels)
     'basement/material-kit.js',    // LV0 Basement: materialKit (linked materials and finish rules)
     'basement/virtual-child.js',   // LV0 Basement: virtualChild (things that ride on a parent without being its child)
