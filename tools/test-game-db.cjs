@@ -171,4 +171,42 @@ test('Enemies: kinds, bosses and gauntlet maps hang together, and enemies spawn 
  assert.deepEqual(e.errors,[]);
 });
 
+test('Vehicles: every car is whole, the Zib and BlackMark are real cars, each tuning field is explained, and the game reads them',()=>{
+ const v=load('vehicles.json'), hex=c=>/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(c), F=v._about.fields;
+ const car=(b,m)=>v.brands[b]&&v.brands[b].models[m];
+ for(const [b,B] of Object.entries(v.brands)){
+  for(const k of ['maxSpeed','acceleration','handling','friction','mass','seats','brake']) assert.ok(B.baseStats[k]>0,`${b}.baseStats.${k}`);
+  assert.deepEqual(Object.keys(B.drive).sort(),Object.keys(F.drive_feel).sort(),`${b}.drive: fields differ from _about.fields.drive_feel`);
+  for(const c of [...B.colors,B.headlightColor,...(B.glowColor===null?[]:[B.glowColor])]) assert.ok(hex(c),`${b} colour ${c}`);
+  for(const [m,M] of Object.entries(B.models)){
+   assert.ok(typeof M.name==='string'&&M.length>0&&M.width>0&&M.speedMod>0,`${b}.${m}: name, length, width, speedMod`);
+   assert.ok(M.driven.top>0&&M.driven.accel>0,`${b}.${m}.driven`);
+   assert.equal(M.spec.length,v.spec_labels.length,`${b}.${m}.spec: one rating per spec label`);
+   assert.ok(M.spec.every(n=>n>=0&&n<=100),`${b}.${m}.spec: ratings are out of 100`);
+  }
+ }
+ assert.ok(car(v.blackmark_defaults.brand,v.blackmark_defaults.model),'blackmark_defaults: no such car');
+ assert.ok(car(v.zib.brand,v.zib.model),'zib: no such car');
+ assert.ok(v.zib.fareBase>0&&v.zib.farePerUnit>0&&v.zib.maxActive>0&&v.zib.spawnChance>0&&v.zib.spawnChance<1,'zib: fare and spawning');
+ unique(v.zib_destinations,'zib_destinations');
+ for(const d of v.zib_destinations) assert.ok(d.label&&d.landmark,`zib destination ${d.id}: label and landmark`);
+ for(const t of ['calm','normal','pushy']) assert.ok(v.traffic_tempers[t],`traffic_tempers.${t}: traffic-people.js reads it`);
+ for(const [t,T] of Object.entries(v.traffic_tempers)) assert.deepEqual(Object.keys(T).sort(),Object.keys(F.traffic_tempers).sort(),`traffic_tempers.${t}: fields differ from _about.fields`);
+ for(const k of ['traffic_ai','drive']) assert.deepEqual(Object.keys(v[k]).sort(),Object.keys(F[k]).sort(),`${k}: every field is explained in _about.fields, and only those`);
+ const e=runtime(join(ROOT,'DFAB V8.html'),{affine:true});
+ const got=JSON.parse(e.run(`JSON.stringify({same:VEHICLE_BRANDS===GAME_DB.vehicles.brands&&CAR_SPEC_LABELS===GAME_DB.vehicles.spec_labels&&ZIB_DESTINATIONS===GAME_DB.vehicles.zib_destinations
+   &&TRAFFIC_TEMPERS===GAME_DB.vehicles.traffic_tempers&&CONFIG.VEHICLE_AI===GAME_DB.vehicles.traffic_ai&&CONFIG.VEHICLE_DRIVE===GAME_DB.vehicles.drive
+   &&BLACKMARK_DEFAULTS===GAME_DB.vehicles.blackmark_defaults&&ZIB_CONFIG===GAME_DB.vehicles.zib,
+  frozen:Object.isFrozen(BLACKMARK_DEFAULTS)&&Object.isFrozen(ZIB_CONFIG),
+  fare:ZibSystem.prototype.calculateFare(0,0,3000,4000),
+  car:(c=>[c.brand,c.model,c.length,c.width])(new TrafficVehicle(null,'Zenxera','sports','AI')),
+  spec:carSpec('LADY','suv')})`));
+ assert.equal(got.same,true,'an old name no longer reads the chapter');
+ assert.equal(got.frozen,true);
+ assert.equal(got.fare,Math.round(v.zib.fareBase+5000*v.zib.farePerUnit));
+ assert.deepEqual(got.car,['Zenxera','sports',v.brands.Zenxera.models.sports.length,v.brands.Zenxera.models.sports.width]);
+ assert.deepEqual(got.spec,v.spec_labels.map((label,i)=>({label,v:v.brands.LADY.models.suv.spec[i]})));
+ assert.deepEqual(e.errors,[]);
+});
+
 console.log(`test-game-db: ${tests.length} passed`);
