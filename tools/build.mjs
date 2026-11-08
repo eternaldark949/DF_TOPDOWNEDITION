@@ -8,6 +8,8 @@
  * Files in assets/images and assets/audio are embedded as data URIs in the
  * ASSETS table (see src/core/assets.js for getImage / drawAsset / playSound).
  * Files in assets/fonts become @font-face rules, named after the file.
+ * A .json file in SCRIPTS is a GAME_DB chapter (src/directory/game-db/): it goes in as
+ * `GAME_DB.<file name> = <its JSON>;`, so the data stays plain JSON that editors and tools can read.
  *
  * No dependencies. The game is plain classic <script> code sharing one global
  * scope, so the ORDER below matters: a file can only use, at load time, what
@@ -61,6 +63,8 @@ const SCRIPTS = [
     'basement/virtual-child.js',   // LV0 Basement: virtualChild (things that ride on a parent without being its child)
     'basement/awareness-kit.js',   // LV0 Basement: awarenessMatrix (what a character knows of what's around them)
     'core/config.js',
+    'directory/game-db/game-db.js',   // LV2 Directory: GAME_DB, the game's data; its chapters (JSON) follow
+    'directory/game-db/items.json',   // GAME_DB.items: gear, augments, furniture, consumables, drinks, notes, schematics
     '@assets',              // generated from the assets/ folder
     'core/assets.js',
     'core/registries.js',
@@ -310,6 +314,15 @@ function fontFaces() {
 
 const read = (p) => readFileSync(join(ROOT, 'src', p), 'utf8');
 
+/** A GAME_DB chapter: directory/game-db/items.json becomes `GAME_DB.items = {...};` (parsed first, so bad JSON fails the build). */
+function chapterScript(p) {
+    const chapter = p.split('/').pop().slice(0, -'.json'.length);
+    if (!/^[a-z][a-z0-9_]*$/.test(chapter)) throw new Error(`src/${p}: a chapter's file name must be snake_case`);
+    let data;
+    try { data = JSON.parse(read(p)); } catch (e) { throw new Error(`src/${p} is not valid JSON: ${e.message}`); }
+    return `        GAME_DB.${chapter} = ${JSON.stringify(data)};\n`;
+}
+
 /*
  * Each script file goes into the page as an inert <script type="text/dfab"> block. The boot loader
  * (src/app/boot-loader.js, the one plain script) runs them in this order, one task apiece, so the
@@ -321,6 +334,7 @@ function scriptBlocks() {
     const blocks = [];
     for (const p of SCRIPTS) {
         if (p === '@assets') assetPieces().forEach((code, i) => blocks.push([`assets#${i}`, code]));
+        else if (p.endsWith('.json')) blocks.push([p, chapterScript(p)]);
         else blocks.push([p, read(p)]);
     }
     for (const [name, code] of blocks) {
