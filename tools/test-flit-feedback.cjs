@@ -8,7 +8,7 @@ const value=(e,s)=>structuredClone(e.run(`(()=>{${s}})()`));
 function test(name,fn){const e=runtime(join(__dirname,'..','DFAB V8.html'),{affine:true,capture:true});fn(e);assert.deepEqual(e.errors,[]);tests.push(name);}
 const setup=`
  game._doLoadMap('ollo_test');game.isDriving=false;game.paused=false;game.hud={has:()=>true};controls.keyboard.setInputs([]);game.joystick={active:false};
- game.useNewCollisionSystem=false;game.roomSystem={active:false,doors:[]};
+game.roomSystem={active:false,doors:[]};
  game.activeMap={width:1000,height:1000,walls:[],buildings:[],buildingColliders:[]};
  Object.assign(game.player,{x:100,y:100,angle:0,radius:12});
  game.player.buffSystem={getStat:(name,base)=>base};game.augments={isEquipped:()=>false};

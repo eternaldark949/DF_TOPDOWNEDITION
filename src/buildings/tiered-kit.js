@@ -53,15 +53,6 @@
            were the world's until the humanoid stood next to the doors.
            ===================================================================== */
         const TierKit = {
-            /** Convex hull (monotone chain) of [x, y] points. */
-            hull(pts) {
-                pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-                const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
-                const lo = [], up = [];
-                for (const p of pts) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
-                for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
-                return lo.slice(0, -1).concat(up.slice(0, -1));
-            },
             rect(x, y, w, h) { return [[x, y], [x, y + h], [x + w, y + h], [x + w, y]]; },
             /**
              * Where a light strip has any light: a summed-area table over cells LIT_CU world px along the wall by LIT_CZ
@@ -523,7 +514,7 @@
                 const pts = [];
                 for (const [x, y] of t.poly) pts.push(this._tkP(x, y, t.z0), this._tkP(x, y, t.z1));
                 if (t.rise) { let cx = 0, cy = 0; for (const [x, y] of t.poly) { cx += x / t.poly.length; cy += y / t.poly.length; } pts.push(this._tkP(cx, cy, t.z1 + t.rise)); }
-                return TierKit.hull(pts);
+                return shapeKit.hull(pts);
             }
 
             /** What hides the glow of buildings behind it: each tier, footprint to leaned roof. */
@@ -536,7 +527,7 @@
             _sunShadowHulls(dx, dy) {
                 const c = this._tkSun;
                 if (c && c.dx === dx && c.dy === dy && c.x === this.x && c.y === this.y) return c.hulls;
-                const hulls = this._tkGeo().tiers.filter(t => t.z0 < 1 || t.castShadow).map(t => TierKit.hull(t.poly.map(p => p.slice()).concat(t.poly.map(([x, y]) => [x + dx * t.z1 * TierKit.Z_SCALE, y + dy * t.z1 * TierKit.Z_SCALE]))));
+                const hulls = this._tkGeo().tiers.filter(t => t.z0 < 1 || t.castShadow).map(t => shapeKit.hull(t.poly.map(p => p.slice()).concat(t.poly.map(([x, y]) => [x + dx * t.z1 * TierKit.Z_SCALE, y + dy * t.z1 * TierKit.Z_SCALE]))));
                 this._tkSun = { dx, dy, x: this.x, y: this.y, hulls };
                 return hulls;
             }

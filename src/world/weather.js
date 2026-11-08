@@ -904,16 +904,13 @@
                     const cullTop = camera.y - (this.height / zoom) / 2 - cullMargin;
                     const cullBottom = camera.y + (this.height / zoom) / 2 + cullMargin;
                     
-                    for (let i = this.drops.length - 1; i >= 0; i--) {
-                        const d = this.drops[i];
+                    lifeKit.cull(this.drops, d => {
                         d.height -= d.fallSpeed;
                         
                         // Cull drops far from camera (player moved away)
                         if (d.groundX < cullLeft || d.groundX > cullRight ||
                             d.groundY < cullTop || d.groundY > cullBottom) {
-                            this.drops[i] = this.drops[this.drops.length - 1];
-                            this.drops.pop();
-                            continue;
+                            return true;
                         }
                         
                         if (d.height <= 0) {
@@ -927,27 +924,23 @@
                                     br: d.brightness
                                 });
                             }
-                            this.drops[i] = this.drops[this.drops.length - 1];
-                            this.drops.pop();
+                            return true;
                         }
-                    }
+                    });
                     
                     // Update splashes — cull off-screen ones too
-                    for (let i = this.splashes.length - 1; i >= 0; i--) {
-                        this.splashes[i].t += 16.67;
-                        const s = this.splashes[i];
+                    lifeKit.cull(this.splashes, s => {
+                        s.t += 16.67;
                         if (s.t > s.lifespan ||
                             s.x < cullLeft || s.x > cullRight ||
                             s.y < cullTop || s.y > cullBottom) {
-                            this.splashes[i] = this.splashes[this.splashes.length - 1];
-                            this.splashes.pop();
+                            return true;
                         }
-                    }
+                    });
                 }
                 
                 // Update all particles
-                for(let i=this.particles.length-1; i>=0; i--) {
-                    let p = this.particles[i]; 
+                lifeKit.cull(this.particles, p => {
                     
                     // Ghosts drift slowly in their facing direction
                     if (p.type === 'ghost') {
@@ -968,10 +961,9 @@
                     // Remove dead particles - release to pool and use O(1) swap removal
                     if(p.life <= 0) {
                         this._particlePool.release(p);
-                        this.particles[i] = this.particles[this.particles.length - 1];
-                        this.particles.pop();
+                        return true;
                     }
-                }
+                });
                 
                 // Lightning flash decay (fast fade out)
                 if (this.lightningFlash > 0) {

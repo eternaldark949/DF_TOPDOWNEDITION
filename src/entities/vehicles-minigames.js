@@ -358,18 +358,11 @@
                     for (const w of walls) {
                         const hw = this.length / 2;
                         const hh = this.vehicleWidth / 2;
-                        if (this.x + hw > w.x && this.x - hw < w.x + w.w &&
-                            this.y + hh > w.y && this.y - hh < w.y + w.h) {
-                            // Find smallest overlap axis
-                            const overlapL = (this.x + hw) - w.x;
-                            const overlapR = (w.x + w.w) - (this.x - hw);
-                            const overlapT = (this.y + hh) - w.y;
-                            const overlapB = (w.y + w.h) - (this.y - hh);
-                            const minOverlap = Math.min(overlapL, overlapR, overlapT, overlapB);
-                            
-                            if (minOverlap === overlapL) { this.x = w.x - hw; this.vx = -Math.abs(this.vx) * 0.6; }
-                            else if (minOverlap === overlapR) { this.x = w.x + w.w + hw; this.vx = Math.abs(this.vx) * 0.6; }
-                            else if (minOverlap === overlapT) { this.y = w.y - hh; this.vy = -Math.abs(this.vy) * 0.6; }
+                        const out = shapeKit.boxOutOfRect(this.x, this.y, hw, hh, w);   // the shortest way out, or null
+                        if (out) {
+                            if (out.side === 'left') { this.x = w.x - hw; this.vx = -Math.abs(this.vx) * 0.6; }
+                            else if (out.side === 'right') { this.x = w.x + w.w + hw; this.vx = Math.abs(this.vx) * 0.6; }
+                            else if (out.side === 'top') { this.y = w.y - hh; this.vy = -Math.abs(this.vy) * 0.6; }
                             else { this.y = w.y + w.h + hh; this.vy = Math.abs(this.vy) * 0.6; }
                             
                             this.speed *= 0.6;
@@ -414,10 +407,9 @@
                     if (contact && this._bumperTick >= contact.nextTick) contact.armed = true;
                     if (otherContact && other._bumperTick >= otherContact.nextTick) otherContact.armed = true;
                 }
-                if (dist < minDist && dist > 0) {
-                    const nx = dx / dist;
-                    const ny = dy / dist;
-                    const overlap = minDist - dist;
+                const c = dist > 0 ? shapeKit.circleVsCircle({ x: other.x, y: other.y, radius: r2 }, { x: this.x, y: this.y, radius: r1 }) : null;   // the normal points from her to it
+                if (c) {
+                    const nx = c.nx, ny = c.ny, overlap = c.depth;
                     
                     // Separate
                     this.x -= nx * overlap * 0.5;
@@ -818,7 +810,7 @@
                 // Hide HUD elements during minigame
                 ['ui-currency', 'ui-scrap', 'ui-health', 'ui-flit-bar-container', 'ui-equipment', 'btn-phone', 'btn-heal'].forEach(id => {
                     const el = document.getElementById(id);
-                    if (el) el.style.display = 'none';
+                    if (el) uiKit.hide(el);
                 });
                 
                 // Spawn positions (spread around arena center)
@@ -1048,10 +1040,10 @@
                 // Restore HUD elements
                 ['ui-currency', 'ui-scrap', 'ui-health', 'ui-flit-bar-container', 'ui-equipment', 'btn-phone'].forEach(id => {
                     const el = document.getElementById(id);
-                    if (el) el.style.display = '';
+                    if (el) uiKit.show(el, '');
                 });
                 const healBtn = document.getElementById('btn-heal');
-                if (healBtn) healBtn.style.display = 'flex';
+                if (healBtn) uiKit.show(healBtn, 'flex');
                 
                 // Exit car
                 game.isDriving = false;
@@ -1122,7 +1114,7 @@
                 game.pauseSystem.acquire('bumper_results');
                 
                 // ─── BUILD RESULTS POPUP ───
-                const overlay = document.createElement('div');
+                const overlay = uiKit.make(['div']);
                 overlay.id = 'bumper-results-overlay';
                 overlay.style.cssText = `
                     position: fixed; inset: 0; z-index: 200;
@@ -1131,7 +1123,7 @@
                     animation: bumperFadeIn 0.4s ease;
                 `;
                 
-                const popup = document.createElement('div');
+                const popup = uiKit.make(['div']);
                 popup.style.cssText = `
                     background: linear-gradient(180deg, #120818, #0a0510);
                     border: 1px solid rgba(255,255,255,0.08);
@@ -1213,7 +1205,7 @@
                 
                 // Inject animations
                 if (!document.getElementById('bumper-results-style')) {
-                    const style = document.createElement('style');
+                    const style = uiKit.make(['style']);
                     style.id = 'bumper-results-style';
                     style.textContent = `
                         @keyframes bumperFadeIn { from { opacity:0; } to { opacity:1; } }
@@ -1250,7 +1242,7 @@
             
             _createHUD() {
                 // Timer bar (top center)
-                this.hudTimer = document.createElement('div');
+                this.hudTimer = uiKit.make(['div']);
                 this.hudTimer.id = 'bumper-timer';
                 this.hudTimer.style.cssText = `
                     position: fixed; top: 8px; left: 50%; transform: translateX(-50%);
@@ -1263,7 +1255,7 @@
                 document.body.appendChild(this.hudTimer);
                 
                 // Scoreboard container (right side)
-                this.hudBoard = document.createElement('div');
+                this.hudBoard = uiKit.make(['div']);
                 this.hudBoard.id = 'bumper-board';
                 this.hudBoard.style.cssText = `
                     position: fixed; top: 45px; right: 8px; width: 140px;
@@ -1273,7 +1265,7 @@
                 document.body.appendChild(this.hudBoard);
                 
                 // Header
-                const header = document.createElement('div');
+                const header = uiKit.make(['div']);
                 header.style.cssText = `
                     color: #888; letter-spacing: 2px; text-align: center;
                     margin-bottom: 4px; font-size: max(6px, 0.45rem - var(--font-trim));
@@ -1282,7 +1274,7 @@
                 this.hudBoard.appendChild(header);
                 
                 // Bar container (relative, for absolute-positioned bars)
-                this.hudBarContainer = document.createElement('div');
+                this.hudBarContainer = uiKit.make(['div']);
                 this.hudBarContainer.style.cssText = `
                     position: relative;
                     height: ${this.cars.length * 24}px;
@@ -1295,7 +1287,7 @@
                 const barGap = 4;
                 
                 this.cars.forEach((car, i) => {
-                    const bar = document.createElement('div');
+                    const bar = uiKit.make(['div']);
                     const isPlayer = car === this.playerCar;
                     
                     bar.style.cssText = `
@@ -1315,7 +1307,7 @@
                         box-sizing: border-box;
                     `;
                     
-                    const nameEl = document.createElement('span');
+                    const nameEl = uiKit.make(['span']);
                     nameEl.style.cssText = `
                         color: ${isPlayer ? '#d4af37' : '#aaa'};
                         letter-spacing: 1px; font-size: max(6px, 0.5rem - var(--font-trim));
@@ -1324,7 +1316,7 @@
                     `;
                     nameEl.textContent = isPlayer ? '★ YOU' : (car.driverName || car.labelChar);
                     
-                    const scoreEl = document.createElement('span');
+                    const scoreEl = uiKit.make(['span']);
                     scoreEl.style.cssText = `
                         color: ${isPlayer ? '#ffd700' : '#ddd'};
                         font-size: max(6px, 0.6rem - var(--font-trim)); font-weight: bold;

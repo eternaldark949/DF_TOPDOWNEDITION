@@ -21,7 +21,7 @@
                 const shot = this.getPlayerShotGeometry();
                 const beamLength = 300;
                 const ex = shot.x + Math.cos(shot.angle) * beamLength, ey = shot.y + Math.sin(shot.angle) * beamLength;
-                const hitD = raycastNearest(shot.x, shot.y, ex, ey, [...(this.activeMap.walls || []), ...getColliders(this.activeMap)], beamLength);
+                const hitD = collisionWorld.rayNearest(shot.x, shot.y, ex, ey, [...(this.activeMap.walls || []), ...getColliders(this.activeMap)], beamLength);
                 this._laserGeom = { x0: shot.x, y0: shot.y, x1: shot.x + Math.cos(shot.angle) * hitD, y1: shot.y + Math.sin(shot.angle) * hitD, angle: shot.angle };
                 return this._laserGeom;
             },
@@ -599,7 +599,7 @@
             
             // Raycast check for Light Occlusion (Shadows)
             checkLineOfSight(x1, y1, x2, y2) {
-                return !isLineBlocked(x1, y1, x2, y2, this.activeMap.walls, getColliders(this.activeMap));
+                return !collisionWorld.lineBlocked(x1, y1, x2, y2, this.activeMap.walls, getColliders(this.activeMap));
             },
             
             calculatePlayerVisibility() {
@@ -737,18 +737,18 @@
                 
                 // Threshold: If visibility is below 30%, you are considered Hidden
                 if (this.player.visibility < 0.30) {
-                    stealthUI.style.display = 'block';
+                    uiKit.show(stealthUI);
                     stealthUI.textContent = `HIDDEN (${hiddenPercent}%)`;
                     this.player.isHidden = true;
                 } else {
-                    stealthUI.style.display = 'none';
+                    uiKit.hide(stealthUI);
                     this.player.isHidden = false;
                 }
 
                 // Clean up the OLD buff UI if it was showing hidden status previously
                 const buffUI = document.getElementById('ui-buffs');
                 if (buffUI.textContent.includes('HIDDEN')) {
-                    buffUI.style.display = 'none';
+                    uiKit.hide(buffUI);
                 }
             },
 

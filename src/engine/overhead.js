@@ -32,13 +32,7 @@
             leanHull(x, y, w, h, cx, cy, k) {
                 const pts = [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
                 for (let i = 0; i < 4; i++) pts.push([cx + (pts[i][0] - cx) * k, cy + (pts[i][1] - cy) * k]);
-                pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-                const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
-                const lo = [], hi = [];
-                for (const p of pts) { while (lo.length > 1 && cross(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
-                for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (hi.length > 1 && cross(hi[hi.length - 2], hi[hi.length - 1], p) <= 0) hi.pop(); hi.push(p); }
-                lo.pop(); hi.pop();
-                return lo.concat(hi);
+                return shapeKit.hull(pts);
             },
 
             /** Squared distance from (cx, cy) to a footprint (0 inside it). */

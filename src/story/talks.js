@@ -440,7 +440,7 @@
                 const after = this.tier(g, name);
                 if (after > before && BONDING_TIERS[after].message) {
                     const perk = TALK_PERKS[name] && TALK_PERKS[name][after];
-                    g.addPausableTimeout(() => showMessage(`${name.toUpperCase()}: ${BONDING_TIERS[after].message}${perk ? ' · ' + perk : ''}`), 2600);
+                    game_timers.after(2.6, () => showMessage(`${name.toUpperCase()}: ${BONDING_TIERS[after].message}${perk ? ' · ' + perk : ''}`), 'world');
                 }
                 return n;
             },
@@ -448,16 +448,16 @@
             /** The TALK button on the dialogue box */
             button(g, npc) {
                 let b = g._talkDialogueBtn;
-                if (!this.can(g, npc.name)) { if (b) b.style.display = 'none'; return; }
+                if (!this.can(g, npc.name)) { if (b) uiKit.hide(b); return; }
                 if (!b) {
-                    b = g._talkDialogueBtn = document.createElement('button');
+                    b = g._talkDialogueBtn = uiKit.make(['button']);
                     b.className = 'dialogue-btn talk-btn';
                     g.btnDecline.parentElement.insertBefore(b, g.btnDecline);
-                    b.addEventListener('click', () => { const n = g.activeInteraction; b.style.display = 'none'; g.endDialogue(); if (n) this.open(g, n); });
+                    b.addEventListener('click', () => { const n = g.activeInteraction; uiKit.hide(b); g.endDialogue(); if (n) this.open(g, n); });
                 }
                 b.textContent = 'Talk';
                 b.classList.toggle('fresh', this.fresh(g, npc.name));                   // something new to talk about
-                b.style.display = '';
+                uiKit.show(b, '');
             },
 
             open(g, npc) {
@@ -479,8 +479,8 @@
                 const notes = [];
                 if (R.gain > 0) notes.push(`♡ ${R.name.toUpperCase()} +${R.gain}`);
                 notes.push(...R.notes);
-                notes.forEach((n, i) => g.addPausableTimeout(() => { showMessage(n); audioSys.sfx('ui'); }, 500 + i * 2200));
-                for (const [text, delay] of R.texts || []) g.addPausableTimeout(() => phoneSystem.sendText(R.name, text, true, 1800), delay);
+                notes.forEach((n, i) => game_timers.after((500 + i * 2200) / 1000, () => { showMessage(n); audioSys.sfx('ui'); }, 'world'));
+                for (const [text, delay] of R.texts || []) game_timers.after(delay / 1000, () => phoneSystem.sendText(R.name, text, true, 1800), 'world');
             },
             _gain(g, n) { const R = this._run; if (!R || !n) return; this.bond(g, R.name, n); R.gain += n; },
 

@@ -573,8 +573,7 @@
                 el.dataset.source = entry.source;
                 el.dataset.category = entry.category;
 
-                const icon = document.createElement('div');
-                icon.className = 'pill-icon';
+                const icon = uiKit.make(['div', 'pill-icon']);
                 // Existing carried icons are registry-authored SVG/markup; owned
                 // registry labels and descriptions are inserted as plain text.
                 if (entry.source === 'carried') icon.innerHTML = entry.icon || '';
@@ -582,30 +581,19 @@
                 if (entry.color) icon.style.borderColor = entry.color;
                 el.appendChild(icon);
 
-                const body = document.createElement('div');
-                body.className = 'inventory-entry-body';
-                const head = document.createElement('div');
-                head.className = 'inventory-entry-head';
-                const name = document.createElement('span');
-                name.className = 'pill-name'; name.textContent = entry.name;
-                head.appendChild(name);
-                const tag = document.createElement('span');
-                tag.className = entry.isEquipped ? 'pill-equipped-tag' : 'inventory-registry-tag';
-                tag.textContent = entry.isEquipped ? 'EQUIPPED' : (entry.registryLabel || '');
+                const body = uiKit.make(['div', 'inventory-entry-body']);
+                const head = uiKit.make(['div', 'inventory-entry-head']);
+                const name = uiKit.make(['span', 'pill-name', entry.name], head);
+                const tag = uiKit.make(['span', entry.isEquipped ? 'pill-equipped-tag' : 'inventory-registry-tag', entry.isEquipped ? 'EQUIPPED' : (entry.registryLabel || '')]);
                 if (tag.textContent) head.appendChild(tag);
                 body.appendChild(head);
-                const desc = document.createElement('div');
-                desc.className = 'pill-desc'; desc.textContent = entry.description || '';
-                body.appendChild(desc);
+                const desc = uiKit.make(['div', 'pill-desc', entry.description || ''], body);
                 if (entry.detail) {
-                    const detail = document.createElement('div');
-                    detail.className = 'inventory-entry-detail'; detail.textContent = entry.detail;
-                    body.appendChild(detail);
+                    const detail = uiKit.make(['div', 'inventory-entry-detail', entry.detail], body);
                 }
                 el.appendChild(body);
 
-                const qty = document.createElement('div');
-                qty.className = 'pill-qty';
+                const qty = uiKit.make(['div', 'pill-qty']);
                 const qtyLabel = uiKit.make(['span', 'pill-qty-label', 'QTY']);
                 const qtyValue = uiKit.make(['span', 'pill-qty-value', String(entry.quantity ?? entry.item?.quantity ?? 1)]);
                 qty.append(qtyLabel, qtyValue);
@@ -650,20 +638,17 @@
                to the left (the pill's contents dim and a gold glow gathers behind the node); a drag
                moves the pill up or down its section, and the new order is kept (entryOrder, saved). */
             _attachControlNode(el, entry, actions) {
-                const control = document.createElement('button');
+                const control = uiKit.make(['button']);
                 control.type = 'button'; control.className = 'control-node';
                 control.setAttribute('aria-label', `Actions for ${entry.name}; drag to reorder`);
                 control.setAttribute('aria-expanded', 'false');
                 el.appendChild(control);
-                const menu = document.createElement('div');
-                menu.className = 'node-menu';
+                const menu = uiKit.make(['div', 'node-menu']);
                 menu.style.setProperty('--n', actions.length);
-                const caption = document.createElement('span');
-                caption.className = 'node-caption';
-                menu.appendChild(caption);
+                const caption = uiKit.make(['span', 'node-caption'], menu);
                 const showCaption = text => { caption.textContent = text; };
                 const buttons = actions.map((action, i) => {
-                    const button = document.createElement('button');
+                    const button = uiKit.make(['button']);
                     button.type = 'button'; button.className = `node-btn node-btn-${action.kind}`;
                     button.style.setProperty('--i', i);
                     button.setAttribute('aria-label', action.label); button.title = action.label; button.tabIndex = -1;
@@ -824,10 +809,7 @@
                 if (filter && filter !== 'all' && !equippedOnly) entries = entries.filter(entry => entry.category === filter);   // Equipped lists everything worn and held
                 const labels = { items: 'Items', collectibles: 'Collectibles', weapons: 'Weapons', pets: 'Pets', mounts: 'Mounts' };
                 if (!entries.length) {
-                    const empty = document.createElement('div');
-                    empty.className = 'inventory-empty';
-                    empty.textContent = equippedOnly ? 'NOTHING EQUIPPED IN THIS CATEGORY' : `NO OWNED ${(labels[filter] || 'ITEMS').toUpperCase()}`;
-                    this.uiList.appendChild(empty);
+                    const empty = uiKit.make(['div', 'inventory-empty', equippedOnly ? 'NOTHING EQUIPPED IN THIS CATEGORY' : `NO OWNED ${(labels[filter] || 'ITEMS').toUpperCase()}`], this.uiList);
                     return;
                 }
                 // With filtering off, each category still has its own heading.

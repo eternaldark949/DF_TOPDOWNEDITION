@@ -55,30 +55,16 @@
 
             // --- geometry -------------------------------------------------------------
             _c(p) { return { x: p.x + p.width / 2, y: p.y + p.height / 2 }; }
-            _corners(cx, cy, w, h, a) {
-                const c = Math.cos(a), s = Math.sin(a), hw = w / 2, hh = h / 2;
-                return [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(([x, y]) => [cx + x * c - y * s, cy + x * s + y * c]);
-            }
-            _sat(A, B) {
-                for (const P of [A, B]) for (let i = 0; i < 4; i++) {
-                    const [x1, y1] = P[i], [x2, y2] = P[(i + 1) % 4], nx = y1 - y2, ny = x2 - x1;
-                    let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
-                    for (const [x, y] of A) { const d = x * nx + y * ny; a0 = Math.min(a0, d); a1 = Math.max(a1, d); }
-                    for (const [x, y] of B) { const d = x * nx + y * ny; b0 = Math.min(b0, d); b1 = Math.max(b1, d); }
-                    if (a1 <= b0 || b1 <= a0) return false;
-                }
-                return true;
-            }
             /** Would the piece, centred at (cx, cy) and turned to a, run into a wall, another piece or the map's edge? */
             _blocked(p, cx, cy, a) {
-                const g = this.game, M = g.activeMap, A = this._corners(cx, cy, p.width - 2, p.height - 2, a);
+                const g = this.game, M = g.activeMap, A = shapeKit.quadCorners(cx, cy, p.width - 2, p.height - 2, a);
                 for (const [x, y] of A) if (x < 0 || y < 0 || x > M.width || y > M.height) return true;
-                for (const w of M.walls || []) if (this._sat(A, [[w.x, w.y], [w.x + w.w, w.y], [w.x + w.w, w.y + w.h], [w.x, w.y + w.h]])) return true;
+                for (const w of M.walls || []) if (shapeKit.quadsOverlap(A, shapeKit.rectQuad(w))) return true;
                 for (const o of g.props || []) {
                     if (o === p || o.hasCollision === false || o.noNav) continue;
                     const c = this._c(o);
                     if (Math.abs(c.x - cx) > (o.width + o.height + p.width + p.height) / 1.4) continue;
-                    if (this._sat(A, this._corners(c.x, c.y, o.width, o.height, o.angle || 0))) return true;
+                    if (shapeKit.quadsOverlap(A, shapeKit.quadCorners(c.x, c.y, o.width, o.height, o.angle || 0))) return true;
                 }
                 return false;
             }
@@ -177,7 +163,7 @@
                 const btn = this._btn || (this._btn = document.getElementById('btn-grab'));
                 const rot = this._rot || (this._rot = document.getElementById('grab-rotate'));
                 const here = game.activeMap && game.activeMap.id === FURNITURE_GRAB.MAP && !game.isDriving && !game.paused;
-                if (!here) { if (this.state !== 'idle') this.release(); if (btn) btn.style.display = 'none'; if (rot) rot.style.display = 'none'; this.cand = null; return; }
+                if (!here) { if (this.state !== 'idle') this.release(); if (btn) uiKit.hide(btn); if (rot) uiKit.hide(rot); this.cand = null; return; }
                 const pl = game.player;
                 if (this.state === 'walk' && !Walker.isWalking(pl)) { if (this.state === 'walk') this.release(true); }   // she walked off (real input took over)
                 if (this.state === 'idle') {
@@ -188,10 +174,10 @@
                 if (this.state === 'hold') this._prev = { x: pl.x, y: pl.y };
                 if (btn) {
                     const name = this.target ? FURNITURE_GRAB.NAMES[this.target.decorType] : this.cand ? FURNITURE_GRAB.NAMES[this.cand.decorType] : '';
-                    btn.style.display = this.state !== 'idle' || this.cand ? 'flex' : 'none';
+                    uiKit.toggle(btn, this.state !== 'idle' || this.cand, 'flex');
                     if (btn.style.display === 'flex') setActionPill(btn, this.state === 'idle' ? 'Grab' : this.state === 'choose' ? 'Hold' : this.state === 'walk' ? 'Grab' : 'Let go', name, 'G');
                 }
-                if (rot) rot.style.display = this.state === 'hold' ? 'flex' : 'none';
+                if (rot) uiKit.toggle(rot, this.state === 'hold', 'flex');
             }
 
             /** After the collision pass: the held piece follows her, or (if it'd hit something) neither moves. */

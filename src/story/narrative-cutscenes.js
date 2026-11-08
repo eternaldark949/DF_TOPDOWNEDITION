@@ -52,9 +52,9 @@
             showTitle(duration) {
                 if (this.overlay) {
                     this.overlay.style.opacity = '1';
-                    this.game.addPausableTimeout(() => {
+                    game_timers.after(duration / 1000, () => {
                         this.overlay.style.opacity = '0';
-                    }, duration);
+                    }, 'world');
                 }
             }
         

@@ -102,7 +102,7 @@
                 const g = typeof game !== 'undefined' ? game : null; if (!g) return false;
                 const nav = NavGrid.for(g.activeMap);
                 if (nav && !nav.walkable(tx, ty)) return false;
-                if (isLineBlocked(this.x, this.y, tx, ty, walls, buildings)) return false;
+                if (collisionWorld.lineBlocked(this.x, this.y, tx, ty, walls, buildings)) return false;
                 if (g.roomSystem && g.roomSystem.active && g.roomSystem.doorBlocks(this.x, this.y, tx, ty)) return false;
                 const L = g.hunterDashes || (g.hunterDashes = []);
                 L.push({ x0: this.x, y0: this.y, x1: tx, y1: ty, t0: _gameTimeSec, a: this.angle, look: this.look, boss: !!this.bossName, seed: Math.random() * 100 });
@@ -164,7 +164,7 @@
                 if (this._staggerUntil && _gameTimeSec < this._staggerUntil) return null;   // staggered: no whip
                 const dx = player.x - this.x, dy = player.y - this.y, d = Math.hypot(dx, dy);
                 this.whipCD--;
-                if ((this.state === 'ALERT' || this.state === 'SUPPRESSING') && this.whipCD <= 0 && d > 55 && d < 120 && !isLineBlocked(this.x, this.y, player.x, player.y, walls, buildings)) {
+                if ((this.state === 'ALERT' || this.state === 'SUPPRESSING') && this.whipCD <= 0 && d > 55 && d < 120 && !collisionWorld.lineBlocked(this.x, this.y, player.x, player.y, walls, buildings)) {
                     this.whipCD = 75; this._whipT = _gameTimeSec; this._whipTo = { x: player.x, y: player.y };
                     const a = Math.atan2(dy, dx);
                     const whip = new ProjectileEntity({ x: player.x - Math.cos(a) * 4, y: player.y - Math.sin(a) * 4, angle: a, radius: 20, speed: 0.5, life: 3,
@@ -205,7 +205,7 @@
                 if (T.whip2 && now >= T.whip2) {
                     T.whip2 = 0;
                     const dx = player.x - this.x, dy = player.y - this.y, d = Math.hypot(dx, dy);
-                    if (d < 130 && !isLineBlocked(this.x, this.y, player.x, player.y, walls, buildings)) {
+                    if (d < 130 && !collisionWorld.lineBlocked(this.x, this.y, player.x, player.y, walls, buildings)) {
                         const a = Math.atan2(dy, dx); this._whipT = T.whip = now; this._whipTo = { x: player.x, y: player.y };
                         add(new ProjectileEntity({ x: player.x - Math.cos(a) * 4, y: player.y - Math.sin(a) * 4, angle: a, radius: 20, speed: 0.5, life: 3,
                                                    damage: this.whipDmg, isEnemy: true, owner: this, color: 'rgba(0,0,0,0)', melee: true }));
@@ -216,7 +216,7 @@
                 if (g.isDriving || !player.visible) return res;
                 const dx = player.x - this.x, dy = player.y - this.y, d = Math.hypot(dx, dy);
                 const engaged = this.state === 'ALERT' || this.state === 'SUPPRESSING';
-                const clear = !isLineBlocked(this.x, this.y, player.x, player.y, walls, buildings);
+                const clear = !collisionWorld.lineBlocked(this.x, this.y, player.x, player.y, walls, buildings);
                 // A tell running: when it's due, the move happens
                 const tl = this._tell;
                 if (tl && now >= tl.at) {
@@ -328,7 +328,7 @@
                 const g = game, nav = NavGrid.for(g.activeMap), fa = player.angle || 0;
                 for (const off of [Math.PI, Math.PI * 0.7, -Math.PI * 0.7, Math.PI / 2, -Math.PI / 2]) {
                     const x = player.x + Math.cos(fa + off) * DUEL.STEP_BEHIND, y = player.y + Math.sin(fa + off) * DUEL.STEP_BEHIND;
-                    if ((!nav || nav.walkable(x, y)) && !isLineBlocked(player.x, player.y, x, y, g.activeMap.walls, getColliders(g.activeMap))) return { x, y };
+                    if ((!nav || nav.walkable(x, y)) && !collisionWorld.lineBlocked(player.x, player.y, x, y, g.activeMap.walls, getColliders(g.activeMap))) return { x, y };
                 }
                 return null;
             }
@@ -369,7 +369,7 @@
                 const pa = this.angle + Math.PI / 2, spots = [{ x: this.x, y: this.y }];
                 for (const s of [-1, 1]) {
                     const x = this.x + Math.cos(pa) * D.MIRROR_SPREAD * s, y = this.y + Math.sin(pa) * D.MIRROR_SPREAD * s;
-                    if ((!nav || nav.walkable(x, y)) && !isLineBlocked(this.x, this.y, x, y, walls, buildings)) spots.push({ x, y });
+                    if ((!nav || nav.walkable(x, y)) && !collisionWorld.lineBlocked(this.x, this.y, x, y, walls, buildings)) spots.push({ x, y });
                 }
                 if (spots.length < 2) return;
                 for (let i = spots.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [spots[i], spots[j]] = [spots[j], spots[i]]; }

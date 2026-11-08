@@ -131,8 +131,7 @@
             }
             _byDepth() { return this.buildings.slice().sort((a, b) => (a.y + a.h) - (b.y + b.h)); }   // far rows first
             _canvas(res) {
-                const cv = document.createElement('canvas'), k = this.scale * res;
-                cv.width = Math.ceil(this.iw * res); cv.height = Math.ceil(this.ih * res);
+                const k = this.scale * res, cv = canvasKit.createLayer([Math.ceil(this.iw * res), Math.ceil(this.ih * res)]).canvas;
                 const c = cv.getContext('2d'); c.setTransform(k, 0, 0, k, 0, 0);
                 return [cv, c];
             }

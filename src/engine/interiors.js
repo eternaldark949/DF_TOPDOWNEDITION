@@ -43,7 +43,7 @@
             },
 
             _paintAptFloor() {
-                const cv = document.createElement('canvas'); cv.width = 1400; cv.height = 900;
+                const cv = canvasKit.createLayer([1400, 900]).canvas;
                 this._drawAptFloorArt(cv.getContext('2d'));
                 return cv;
             },
@@ -1231,7 +1231,7 @@
             },
 
             _paintCafeFloor() {
-                const W = 1200, H = 1000, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+                const W = 1200, H = 1000, cv = canvasKit.createLayer([W, H]).canvas;
                 const c = cv.getContext('2d'), r = seededRandom(5150);
                 c.fillStyle = '#1c120a'; c.fillRect(0, 0, W, H);
                 // Honey chevron parquet over the whole café floor, each plank its own shade, a little worn

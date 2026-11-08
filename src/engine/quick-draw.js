@@ -11,8 +11,8 @@ engineMixin({
         this.holsterBtn.innerHTML = quick ? 'QUICK<br>DRAW' : on ? 'DRAW' : 'HOLSTER';
         this.holsterBtn.title = quick ? 'Quick draw: aim past the ring and release. Tap to leave.' : 'Tap to holster/draw. Hold for quick draw.';
         this.holsterBtn.setAttribute('aria-pressed', String(quick));
-        this.fireBtn.style.display = !on || quick ? 'flex' : 'none';
-        this.emoteBtn.style.display = on && !quick ? 'flex' : 'none';
+        uiKit.toggle(this.fireBtn, !on || quick, 'flex');
+        uiKit.toggle(this.emoteBtn, on && !quick, 'flex');
     },
     armQuickDraw() {
         if (!this.running || this.paused || hudInputBlocked() || this.isDriving || this.player.dead

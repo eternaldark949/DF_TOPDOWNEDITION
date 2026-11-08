@@ -274,7 +274,7 @@
                 let el = this._card;
                 if (!this.active && !this.results) { if (el) { el.remove(); this._card = null; } return; }
                 if (!el) {
-                    el = this._card = document.createElement('div'); el.id = 'bench-card';
+                    el = this._card = uiKit.make(['div']); el.id = 'bench-card';
                     el.addEventListener('click', (e) => {
                         const act = e.target.closest('[data-bench]')?.dataset.bench;
                         if (act === 'cancel') this.cancel();

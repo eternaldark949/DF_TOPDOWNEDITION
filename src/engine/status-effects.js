@@ -47,7 +47,7 @@
             const d1 = cross(cx, cy, dx, dy, ax, ay), d2 = cross(cx, cy, dx, dy, bx, by);
             const d3 = cross(ax, ay, bx, by, cx, cy), d4 = cross(ax, ay, bx, by, dx, dy);
             if (((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0)) && d1 && d2 && d3 && d4) return 0;   // they cross
-            const D = CollisionSystem.distToSegmentSquared;
+            const D = shapeKit.segmentDistanceSq;
             return Math.min(D(ax, ay, cx, cy, dx, dy), D(bx, by, cx, cy, dx, dy), D(cx, cy, ax, ay, bx, by), D(dx, dy, ax, ay, bx, by));
         }
 
@@ -177,12 +177,12 @@
                 const rects = [...(map.walls || []), ...getColliders(map)];
                 const left = Math.min(sx, sx + ux * distance) - r, right = Math.max(sx, sx + ux * distance) + r;
                 const top = Math.min(sy, sy + uy * distance) - r, bottom = Math.max(sy, sy + uy * distance) + r;
-                const solids = this.useNewCollisionSystem ? GameEntity.registry.collidable.filter(e => {
+                const solids = GameEntity.registry.collidable.filter(e => {
                     if (e === pl || !e.active || e.dead || e.isTrigger || e.markedForDestroy
                         || !(e.collisionLayer & (GameEntity.LAYER.STATIC | GameEntity.LAYER.DYNAMIC | GameEntity.LAYER.VEHICLE | GameEntity.LAYER.ACTOR))) return false;
                     const b = e.getBoundingBox();
                     return b.x <= right && b.x + b.w >= left && b.y <= bottom && b.y + b.h >= top;
-                }) : [];
+                });
                 const leaves = [];
                 if (this.roomSystem && this.roomSystem.active) for (const d of this.roomSystem.doors || []) {
                     if (d.type !== 'arch') for (const s of d.leaves()) leaves.push({ s, r: r + (d.halfThick || 0) });
@@ -190,7 +190,7 @@
                 const probe = Object.create(pl);
                 // Something she already touches only blocks a step that takes her deeper into it (backed
                 // against a wall or brushing a passer-by, she can still step away from it toward the target)
-                const rectD2 = (b, x, y) => { const dx = x - Math.max(b.x, Math.min(b.x + b.w, x)), dy = y - Math.max(b.y, Math.min(b.y + b.h, y)); return dx * dx + dy * dy; };
+                const rectD2 = (b, x, y) => { const [dx, dy] = shapeKit.rectGap(x, y, b); return dx * dx + dy * dy; };
                 const ec = e => { const b = e.getBoundingBox(); return [b.x + b.w / 2, b.y + b.h / 2]; };
                 const clear = (x, y) => {
                     if (x < r || y < r || x > map.width - r || y > map.height - r) return false;
@@ -199,12 +199,12 @@
                         if (d2 < r * r && d2 <= rectD2(b, sx, sy)) return false;
                     }
                     for (const leaf of leaves) {
-                        const [ax, ay, bx, by] = leaf.s, d2 = CollisionSystem.distToSegmentSquared(x, y, ax, ay, bx, by);
-                        if (d2 < leaf.r * leaf.r && d2 <= CollisionSystem.distToSegmentSquared(sx, sy, ax, ay, bx, by)) return false;
+                        const [ax, ay, bx, by] = leaf.s, d2 = shapeKit.segmentDistanceSq(x, y, ax, ay, bx, by);
+                        if (d2 < leaf.r * leaf.r && d2 <= shapeKit.segmentDistanceSq(sx, sy, ax, ay, bx, by)) return false;
                     }
                     probe.x = x; probe.y = y;
                     for (const e of solids) {
-                        if (!CollisionSystem._checkCollision(probe, e)) continue;
+                        if (!shapeKit.overlaps(probe, e)) continue;
                         const [cx, cy] = ec(e);
                         if ((x - cx) ** 2 + (y - cy) ** 2 <= (sx - cx) ** 2 + (sy - cy) ** 2) return false;
                     }
@@ -246,7 +246,7 @@
                 // Step in only when the blade will meet someone: a slash at nothing stays where she is
                 // (held, it used to creep her ~30 px/s into zones and lamplight)
                 const walls = this.activeMap.walls, cols = getColliders(this.activeMap);
-                const near = this.enemies.filter(e => e && !e.dead && this._bladeMeets(swing, e, BLADE.STEP_PAD) && !isLineBlocked(pl.x, pl.y, e.x, e.y, walls, cols));
+                const near = this.enemies.filter(e => e && !e.dead && this._bladeMeets(swing, e, BLADE.STEP_PAD) && !collisionWorld.lineBlocked(pl.x, pl.y, e.x, e.y, walls, cols));
                 if (near.length) this.meleeStepIn(ang, this._meleeGap(near));
                 // the arc and its sparkle, in the blade's colour (gold for the Kukri); a hit adds more where it lands
                 const trail = M.trail || DEFAULT_SLASH_TRAIL;
@@ -315,7 +315,7 @@
                 for (; S.k <= BLADE.CUT_STEPS && S.k <= p * BLADE.CUT_STEPS + 1e-9; S.k++) {
                     for (const e of this.enemies) {
                         if (!e || e.dead || S.struck.has(e) || !this._bladeAt(S, S.k, e)) continue;
-                        if (isLineBlocked(pl.x, pl.y, e.x, e.y, walls, cols)) continue;       // no cutting through walls
+                        if (collisionWorld.lineBlocked(pl.x, pl.y, e.x, e.y, walls, cols)) continue;       // no cutting through walls
                         S.struck.add(e);
                         this._bladeCut(S, e);
                     }
@@ -455,7 +455,7 @@
                         const reach = (r + BLADE.HALF_WIDTH + MIRROR.BLADE_PAD) ** 2;
                         if (blade.some(b => _segSegDist2(x0, y0, x1, y1, b[0], b[1], b[2], b[3]) <= reach)) { this.reflectShot(p, 'blade'); continue; }
                     }
-                    if (G && !G.spent && CollisionSystem.distToSegmentSquared(pl.x, pl.y, x0, y0, x1, y1) < (pl.radius + 5) ** 2) {
+                    if (G && !G.spent && shapeKit.segmentDistanceSq(pl.x, pl.y, x0, y0, x1, y1) < (pl.radius + 5) ** 2) {
                         G.charge -= p.damage; G.hitTick = _simTick;
                         if (G.charge <= 0) { G.charge = 0; G.spent = true; showMessage('MIRRORED GLASS — RECHARGING'); }
                         this.reflectShot(p, 'glass');
@@ -505,13 +505,13 @@
                 const L = this.slashes; if (!L || !L.length) return;
                 const now = _gameTimeSec;
                 ctx.save(); ctx.globalCompositeOperation = 'lighter';
-                for (let i = L.length - 1; i >= 0; i--) {
-                    const s = L[i], age = now - s.t0;
+                lifeKit.sweep(L, s => {
+                    const age = now - s.t0;
                     // Times scaled from the Kukri's swing (q stretches them for a slower blade), phases by style
                     const secs = s.secs || MELEE_SWING.duration, q = secs / MELEE_SWING.duration, life = .3 * q;
                     const ph = swingPhases(s.style), windT = ph.windup * secs, cutT = ph.cutEnd * secs;
-                    if (age > life) { L.splice(i, 1); continue; }
-                    if (age < windT) continue;
+                    if (age > life) { return true; }
+                    if (age < windT) return;
                     // Keep the newest cut attached to the moving wielder, then let its last
                     // position fade. Recovery does not paint a second, backward slash.
                     if (s.t0 === this._slashT && age <= MELEE_SWING.duration * q && this.weaponMode === 'melee' && !this.weaponHolstered) {
@@ -538,7 +538,7 @@
                         ctx.strokeStyle = `rgba(${col}, ${al * k})`; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.stroke();
                     }
                     ctx.restore();
-                }
+                });
                 ctx.restore();
             }
         });

@@ -28,7 +28,7 @@
             for (const el of Object.values(g.emoteOverlays || {})) el?.classList.remove('highlighted');
             if (g.emoteKnob) { g.emoteKnob.style.setProperty('--lx', '0px'); g.emoteKnob.style.setProperty('--ly', '0px'); }
             document.getElementById('game-ui')?.classList.remove('aiming', 'emote-active');
-            const zone = document.getElementById('joystick-zone'); if (zone) zone.style.display = 'none';
+            const zone = document.getElementById('joystick-zone'); if (zone) uiKit.hide(zone);
             const moveKnob = document.getElementById('joystick-knob'); if (moveKnob) moveKnob.style.transform = 'translate(-50%, -50%)';
             const knob = document.getElementById('fire-joystick-knob'); if (knob) knob.style.transform = 'translate(-50%, -50%)';
             for (const id of ['fire-ring', 'fire-band']) document.getElementById(id)?.classList.remove('hot', 'armed');
@@ -500,7 +500,7 @@
                    (WALL_SLIDE_FRICTION) so a glancing hit scrapes along a wall
                    instead of stopping the car dead and throwing it backwards. */
                 WALL_SLIDE_FRICTION: 0.88,      // Tangential velocity retained when sliding (parked cars)
-                WALL_MU: 0.2,                   // Friction along a wall at the point of contact (PhysicsSystem.impulseAt)
+                WALL_MU: 0.2,                   // Friction along a wall at the point of contact (shapeKit.impulseAt)
                 WALL_PUSHOUT: 1.5               // Separation nudge, in units of post-hit velocity
             },
 
@@ -561,7 +561,7 @@
                 STICK_YAW_DAMP: 5,
                 STICK_LIGHT_LOCK: 0.35,         // Precise Stick: wheel lock at the lightest push…
                 STICK_FULL_LOCK_PUSH: 0.6,      // …growing to full lock by this shaped push (about two-thirds out)
-                // Rigid body (PhysicsSystem.impulseAt, the TYRES in applyDrivePhysics)
+                // Rigid body (shapeKit.impulseAt, the TYRES in applyDrivePhysics)
                 SPIN_INERTIA: 1,                // × a plain box's inertia (m(L²+W²)/12): higher, a hit turns the car less
                 YAW_SPIN_MAX: 0.3,              // rad/tick, the fastest any car spins
                 AXLE_FROM_CENTRE: 0.33,         // Each axle sits this × length ahead of / behind the centre

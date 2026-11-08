@@ -42,7 +42,7 @@
                 else if (same && tick - c.tick < 3 && Math.hypot(c.x - cx, c.y - cy) < 30 && Math.abs(c.a - a) < 0.08) { poly = c.poly; dx = cx - c.x; dy = cy - c.y; }
                 else {
                     const ax = cx - Math.cos(a) * back, ay = cy - Math.sin(a) * back;
-                    poly = computeVisibilityPoly(ax, ay, beamLength + back, getOccluders(this.activeMap),
+                    poly = collisionWorld.visibilityPoly(ax, ay, beamLength + back, getOccluders(this.activeMap),
                         { aMin: a - half, aMax: a + half, arcStep: 0.1, minDist: back });
                     poly.ax = ax; poly.ay = ay;
                     owner._beamCache = { x: cx, y: cy, a, L: beamLength, map: this.activeMap, poly, tick };
@@ -59,7 +59,7 @@
                 let cv = cache.get(key);
                 if (cv) return cv;
                 const S = 0.5, rgb = /^#[0-9a-f]{6}$/i.test(color) ? hexToRgb(color) : '255, 255, 220';
-                cv = document.createElement('canvas'); cv.width = Math.ceil(L * S); cv.height = Math.ceil(2 * W * S);
+                cv = canvasKit.createLayer([Math.ceil(L * S), Math.ceil(2 * W * S)]).canvas;
                 const c = cv.getContext('2d');
                 c.scale(S, S); c.translate(0, W);
                 const along = c.createLinearGradient(0, 0, L, 0);
@@ -93,7 +93,7 @@
                 let cached = owner._fireLightClip;
                 if (!cached || cached.map !== map || cached.occluders !== occluders || cached.revision !== revision ||
                     cached.x !== x || cached.y !== y || cached.r !== r) {
-                    const poly = computeVisibilityPoly(x, y, r, occluders, { aMin: 0, aMax: Math.PI * 2, arcStep: 0.18 });
+                    const poly = collisionWorld.visibilityPoly(x, y, r, occluders, { aMin: 0, aMax: Math.PI * 2, arcStep: 0.18 });
                     const path = new Path2D();
                     if (poly.length) {
                         path.moveTo(poly[0].x, poly[0].y);
@@ -790,11 +790,10 @@
                     // Soft edges, the same in every browser and no ctx.filter (Safari before 18 has none): a separable
                     // box blur on the half-resolution light layer — three whole-pixel shifts across, then three down,
                     // each a third, added up. Six plain copies of a small canvas.
-                    const pair = this._softCanvas || (this._softCanvas = [document.createElement('canvas'), document.createElement('canvas')]);
+                    const pair = this._softCanvas || (this._softCanvas = []);
                     let src = this.lightCanvas;
                     for (let pass = 0; pass < 2; pass++) {
-                        const cv = pair[pass];
-                        canvasKit.fitLayer(cv, lw, lh);
+                        const cv = canvasKit.scratch(pair, pass, lw, lh);
                         const sx = cv.getContext('2d');
                         sx.globalCompositeOperation = 'copy'; sx.globalAlpha = 1 / 3;
                         sx.drawImage(src, 0, 0);
@@ -865,12 +864,11 @@
                 // The blur is a downscale chain (no ctx.filter: slow on many phones, unsupported in Safari):
                 // halving twice averages the light out; stretched back up with smoothing it reads as a soft
                 // bleed of about 12 and 24 px on screen, at a sixth and a twelfth of the resolution
-                const blurred = this._bloomBlur || (this._bloomBlur = [document.createElement('canvas'), document.createElement('canvas')]);
+                const blurred = this._bloomBlur || (this._bloomBlur = []);
                 const sizes = [[Math.max(1, bw >> 1), Math.max(1, bh >> 1)], [Math.max(1, bw >> 2), Math.max(1, bh >> 2)]];
                 let src = this.bloomCanvas;
-                blurred.forEach((cv, i) => {
-                    const [w, h] = sizes[i];
-                    canvasKit.fitLayer(cv, w, h);
+                sizes.forEach(([w, h], i) => {
+                    const cv = canvasKit.scratch(blurred, i, w, h);
                     const c = cv.getContext('2d'); c.imageSmoothingEnabled = true;
                     c.clearRect(0, 0, w, h); c.drawImage(src, 0, 0, w, h);
                     src = cv;

@@ -80,14 +80,7 @@
                 // Keep only each building's latest hulls; weak keys release them with the building.
                 // Replay their points into the common path so overlapping shadows still fill once.
                 const buildingShadows = this._sunBuildingShadows || (this._sunBuildingShadows = new WeakMap());
-                const hull = (pts) => {                                                        // convex hull (monotone chain)
-                    pts.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
-                    const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
-                    const lo = [], up = [];
-                    for (const p of pts) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
-                    for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
-                    return lo.slice(0, -1).concat(up.slice(0, -1));
-                };
+                const hull = shapeKit.hull;
                 const buildingCandidates = this._queryRenderBuildings({ left: cull.left - 300, right: cull.right + 300, top: cull.top - 300, bottom: cull.bottom + 300 },
                     this._sunBuildingCandidates || (this._sunBuildingCandidates = []));
                 for (const entry of buildingCandidates) {

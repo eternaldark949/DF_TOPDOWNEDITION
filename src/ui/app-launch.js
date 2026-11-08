@@ -115,12 +115,10 @@
                 const glyph = icon.querySelector('.phone-app-icon-circle'), name = icon.querySelector('.phone-app-name');
                 const sp = uiKit.make(['div', 'app-splash']);
                 sp.style.setProperty('--acc', acc);
-                const tile = document.createElement('div');
-                tile.className = 'as-tile';
+                const tile = uiKit.make(['div', 'as-tile']);
                 if (glyph) glyph.childNodes.forEach(n => { if (!(n.classList && n.classList.contains('app-badge'))) tile.appendChild(n.cloneNode(true)); });
                 const label = uiKit.make(['div', 'as-name', name ? name.textContent : '']);
-                const line = document.createElement('div');
-                line.className = 'as-line';
+                const line = uiKit.make(['div', 'as-line']);
                 sp.append(tile, label, line);
                 // it sits over the app's screen, so it grows out of the icon with it
                 const hb = host.getBoundingClientRect(), k = hb.width / host.offsetWidth || 1;

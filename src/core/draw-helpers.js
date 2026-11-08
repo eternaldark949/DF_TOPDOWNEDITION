@@ -66,39 +66,9 @@
         /** '#rrggbb' + alpha → 'rgba(r, g, b, a)'. */
         function hexToRgba(hex, a) { return `rgba(${hexToRgb(hex)}, ${a})`; }
 
-        /** Check if a line segment is blocked by any rect in the obstacle arrays. */
-        function isLineBlocked(x1, y1, x2, y2, walls, buildings) {
-            const bounds = { left: Math.min(x1, x2), right: Math.max(x1, x2), top: Math.min(y1, y2), bottom: Math.max(y1, y2) };
-            const wc = _physicsSpatial.query(walls, bounds);
-            if (wc) { for (let i = 0; i < wc.length; i++) { const w = wc[i]; if (segCrossesRect(x1, y1, x2, y2, w.x, w.y, w.w, w.h)) return true; } }
-            const bc = _physicsSpatial.query(buildings, bounds);
-            if (bc) { for (let i = 0; i < bc.length; i++) { const b = bc[i]; if (segCrossesRect(x1, y1, x2, y2, b.x, b.y, b.w, b.h)) return true; } }
-            return false;
-        }
-        
-        /** Raycast: find nearest hit distance along a line through obstacle rects. Returns maxDist if no hit. */
-        function raycastNearest(x1, y1, x2, y2, obstacles, maxDist) {
-            let nearest = maxDist;
-            const candidates = _physicsSpatial.query(obstacles, { left: Math.min(x1, x2), right: Math.max(x1, x2), top: Math.min(y1, y2), bottom: Math.max(y1, y2) });
-            for (let i = 0; i < candidates.length; i++) { const o = candidates[i]; nearest = segRectNearest(x1, y1, x2, y2, o.x, o.y, o.w, o.h, nearest, -Infinity); }
-            return nearest;
-        }
-        
         /** Get building colliders from a map object (with fallbacks). */
         function getColliders(map) { return map.buildingColliders || map.buildings || []; }
         
-        /** Does the segment (x1, y1)-(x2, y2) touch the rect [L, R] x [T, B]? (slab clip) */
-        function segmentHitsRect(x1, y1, x2, y2, L, T, R, B) {
-            let t0 = 0, t1 = 1;
-            const dx = x2 - x1, dy = y2 - y1;
-            for (const [p, q] of [[-dx, x1 - L], [dx, R - x1], [-dy, y1 - T], [dy, B - y1]]) {
-                if (p === 0) { if (q < 0) return false; continue; }
-                const r = q / p;
-                if (p < 0) { if (r > t1) return false; if (r > t0) t0 = r; }
-                else { if (r < t0) return false; if (r < t1) t1 = r; }
-            }
-            return true;
-        }
 
         /** Everything that blocks sight and light on a map: walls plus building footprints (cached per map). */
         function getOccluders(map) {
@@ -113,51 +83,6 @@
             return list;
         }
 
-        /**
-         * Visibility polygon from (ox, oy) out to `range`, blocked by rect obstacles ({x,y,w,h}).
-         * Returns points sorted by angle ({angle, x, y}); fan them from the origin to fill.
-         *   opts.extraPoints  more corner points to aim rays at (the lamp bake adds the map corners)
-         *   opts.aMin/aMax    only this angle window (radians, aMin → aMax counter-clockwise), with
-         *                     its edges and an arc of rays every opts.arcStep (default 0.12) so the far
-         *                     edge stays round — used by vision cones and headlight beams
-         *   opts.minDist      ignore walls nearer than this (a beam cast from behind the bumper)
-         * Rays go to every nearby obstacle corner (±0.0001 rad) and stop at the first wall they hit.
-         */
-        const _visRel = [], _visAng = [];                                     // scratch, reused by every call
-        function computeVisibilityPoly(ox, oy, range, obstacles, opts = {}) {
-            const relevant = _visRel; relevant.length = 0;
-            for (let i = 0; i < obstacles.length; i++) { const o = obstacles[i]; if (Math.hypot(o.x + o.w / 2 - ox, o.y + o.h / 2 - oy) < range + Math.max(o.w, o.h)) relevant.push(o); }
-            const minDist = opts.minDist || 0;                                // ignore hits nearer than this
-            const windowed = opts.aMin !== undefined;
-            const TAU = Math.PI * 2, span = windowed ? (((opts.aMax - opts.aMin) % TAU + TAU) % TAU || TAU) : 0;
-            const rel = a => ((a - opts.aMin) % TAU + TAU) % TAU;
-            const angles = _visAng; angles.length = 0;
-            // Rays at every corner (and just either side of it), in the order the corners were always listed
-            const aim = (px, py) => {
-                const angle = Math.atan2(py - oy, px - ox);
-                for (let k = -1; k <= 1; k++) {
-                    const off = k === 0 ? 0 : k * 0.0001;
-                    if (windowed && rel(angle + off) > span) continue;
-                    angles.push(angle + off);
-                }
-            };
-            for (let i = 0; i < relevant.length; i++) { const o = relevant[i]; aim(o.x, o.y); aim(o.x + o.w, o.y); aim(o.x + o.w, o.y + o.h); aim(o.x, o.y + o.h); }
-            if (opts.extraPoints) for (const p of opts.extraPoints) aim(p.x, p.y);
-            if (windowed) {
-                const step = opts.arcStep || 0.12, n = Math.max(1, Math.ceil(span / step));
-                for (let i = 0; i <= n; i++) angles.push(opts.aMin + span * i / n);
-            }
-            const out = new Array(angles.length);
-            for (let j = 0; j < angles.length; j++) {
-                const a = angles[j], dx = Math.cos(a), dy = Math.sin(a), ex = ox + dx * range, ey = oy + dy * range;
-                let closest = range;
-                for (let i = 0; i < relevant.length; i++) { const o = relevant[i]; closest = segRectNearest(ox, oy, ex, ey, o.x, o.y, o.w, o.h, closest, minDist); }
-                out[j] = { angle: a, x: ox + dx * closest, y: oy + dy * closest };
-            }
-            if (windowed) out.sort((p, q) => rel(p.angle) - rel(q.angle));
-            else out.sort((p, q) => p.angle - q.angle);
-            return out;
-        }
 
         /** Draw an HP bar at the given position. */
         function drawHPBar(ctx, x, y, w, h, percent) {
@@ -282,7 +207,7 @@
             let cv = _lensStars.get(key);
             if (cv) return cv;
             const R = 64, rgb = _lensRGB(color);
-            cv = document.createElement('canvas'); cv.width = cv.height = Math.ceil(R * 2 * S);
+            cv = canvasKit.createLayer([Math.ceil(R * 2 * S), Math.ceil(R * 2 * S)]).canvas;
             const c = cv.getContext('2d'); c.setTransform(S, 0, 0, S, R * S, R * S);
             c.globalCompositeOperation = 'lighter';
             for (let i = 0; i < 8; i++) {
@@ -307,7 +232,7 @@
             let cv = _lensFogs.get(color);
             if (cv) return cv;
             const rgb = _lensRGB(color), A = LENS_GLARE.FOG_A;
-            cv = document.createElement('canvas'); cv.width = cv.height = 64;
+            cv = canvasKit.createLayer([64, 64]).canvas;
             const c = cv.getContext('2d'), g = c.createRadialGradient(32, 32, 0, 32, 32, 32);
             g.addColorStop(0, `rgba(${rgb},${A})`); g.addColorStop(0.1, `rgba(${rgb},${A * 0.7})`); g.addColorStop(0.28, `rgba(${rgb},${A * 0.3})`);
             g.addColorStop(0.55, `rgba(${rgb},${A * 0.09})`); g.addColorStop(1, `rgba(${rgb},0)`);
@@ -358,7 +283,7 @@
             let cv = _bulbSprites.get(key);
             if (cv) return cv;
             const R = (hrgb ? hr : cr) + 1, n = Math.ceil(R * 2 * S);   // (a pixel's pad for the edge's antialiasing)
-            cv = document.createElement('canvas'); cv.width = cv.height = n; cv.r = n / S / 2;
+            cv = canvasKit.createLayer([n, n]).canvas; cv.r = n / S / 2;
             const c = cv.getContext('2d'); c.scale(S, S); c.globalCompositeOperation = 'lighter';
             c.fillStyle = `rgba(${rgb},${ca})`; c.beginPath(); c.arc(cv.r, cv.r, cr, 0, Math.PI * 2); c.fill();
             if (hrgb) {

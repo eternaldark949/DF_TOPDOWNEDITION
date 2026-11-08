@@ -27,7 +27,7 @@
 
             _canvas(slot, side) {
                 let cv = this._cv[slot];
-                if (!cv) { cv = this._cv[slot] = document.createElement('canvas'); cv.width = cv.height = 0; }
+                if (!cv) cv = this._cv[slot] = canvasKit.createLayer([0, 0]).canvas;
                 if (cv.width < side || cv.height < side) {           // grows only, in 64 px steps
                     const s = Math.ceil(side / 64) * 64;
                     cv.width = Math.max(cv.width, s); cv.height = Math.max(cv.height, s);

@@ -49,10 +49,10 @@
                     A.unlocked = true;
                     A.pingAt = (g.worldMinutes || 0) + 10;
                     this.sendText('Barista Ren', REN_APP[0], true, 2200);
-                    g.addPausableTimeout(() => {
+                    game_timers.after(2.6, () => {
                         this.sendText('Barista Ren', REN_APP[1], true, 2400);
-                        g.addPausableTimeout(() => { showMessage('NEW APP · AMBER DELIVERY'); this._amberIcon(); }, 2600);
-                    }, 2600);
+                        game_timers.after(2.6, () => { showMessage('NEW APP · AMBER DELIVERY'); this._amberIcon(); }, 'world');
+                    }, 'world');
                     return;
                 }
                 const onHub = g.activeMap && g.activeMap.id === 'sdc';
@@ -66,7 +66,7 @@
             /** The icon on the home screen, once Ren's put her on the app; its dot while an order's waiting */
             _amberIcon() {
                 const A = this._amber(), icon = document.getElementById('app-amber');
-                if (icon) icon.style.display = A && A.unlocked ? '' : 'none';
+                if (icon) uiKit.toggle(icon, A && A.unlocked, '');
                 const dot = document.getElementById('badge-amber');
                 if (dot) dot.classList.toggle('active', !!(A && A.unlocked && A.fresh));
             },
@@ -80,8 +80,8 @@
                 const A = this._amber();
                 if (!A || !A.unlocked) return;
                 this.currentApp = 'amber';
-                this.homeScreen.style.display = 'none';
-                document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
+                uiKit.hide(this.homeScreen);
+                document.querySelectorAll('.phone-app-screen').forEach(s => uiKit.hide(s));
                 uiKit.show('screen-amber', 'flex');
                 A.fresh = false; this._amberIcon();
                 this._amberOrders(false);

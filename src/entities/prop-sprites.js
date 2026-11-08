@@ -170,7 +170,7 @@
 
             /** One sprite: the prop unturned, world mapped onto the canvas round its box; `t` sets the clock for a loop frame */
             _canvas(p, s, run, t) {
-                const S = PROP_SPRITE.S, cv = document.createElement('canvas'); cv.width = s.W; cv.height = s.H;
+                const S = PROP_SPRITE.S, cv = canvasKit.createLayer([s.W, s.H]).canvas;
                 const c = cv.getContext('2d');
                 c.setTransform(S, 0, 0, S, (s.pad - p.x) * S, (s.pad - p.y) * S);
                 const angle = p.angle, clock = _frameTime;
@@ -288,7 +288,7 @@
                     for (let xx = 0; xx < W; xx++) if (d[row + xx * 4 + 3]) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (yy < y0) y0 = yy; y1 = yy; }
                 }
                 if (x1 < 0) return null;
-                const tw = x1 - x0 + 1, th = y1 - y0 + 1, t = document.createElement('canvas'); t.width = tw; t.height = th;
+                const tw = x1 - x0 + 1, th = y1 - y0 + 1, t = canvasKit.createLayer([tw, th]).canvas;
                 t.getContext('2d').drawImage(cv, x0, y0, tw, th, 0, 0, tw, th);
                 return { cv: t, x: x + x0 / S, y: y + y0 / S, w: tw / S, h: th / S };
             },

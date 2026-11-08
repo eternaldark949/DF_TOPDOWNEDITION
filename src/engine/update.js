@@ -40,9 +40,6 @@
                 this._syncProfiler();
                 CollisionSystem.beginProjectileStep(this);
                 
-                // Pausable systems — must tick before any logic that might
-                // schedule new timers or read playerEmote state.
-                this._tickPausableTimers();
                 if (this.scenes && this.scenes.running) this.scenes._lockInput();   // a scene has the stage: no walking or firing
                 this.tickPlayerEmote();
                 
@@ -337,9 +334,7 @@
                     }
 
                     // Update graveyard ghosts
-                    for (let i = this.graveyardGhosts.length - 1; i >= 0; i--) {
-                        const g = this.graveyardGhosts[i];
-
+                    lifeKit.sweep(this.graveyardGhosts, g => {
                         if (g.phase === 'in') {
                             g.life += g.fadeSpeed * 2;
                             if (g.life >= 0.7) { g.life = 0.7; g.phase = 'wander'; }
@@ -363,11 +358,10 @@
                         } else if (g.phase === 'out') {
                             g.life -= g.fadeSpeed;
                             if (g.life <= 0) {
-                                this.graveyardGhosts.splice(i, 1);
-                                continue;
+                                return true;
                             }
                         }
-                    }
+                    });
                 } else {
                     // Clear ghosts when leaving the area
                     if (this.graveyardGhosts.length > 0) this.graveyardGhosts = [];
@@ -685,9 +679,9 @@
                         for (const e of this.enemies) {
                             if (e.isTelegraphing && !e.dead) {
                                 this.questState.larissa_telegraph_hint = true;
-                                this.addPausableTimeout(() => {
+                                game_timers.after(0.3, () => {
                                     this.story.triggerComms("LARISSA", "Watch the line, 949. That's your window.", 4500);
-                                }, 300);
+                                }, 'world');
                                 break;
                             }
                         }
@@ -697,9 +691,9 @@
                         for (const e of this.enemies) {
                             if (e instanceof Ganger && e.state === 'ALERT' && !e.dead) {
                                 this.questState.larissa_stealth_hint = true;
-                                this.addPausableTimeout(() => {
+                                game_timers.after(4.8, () => {
                                     this.story.triggerComms("LARISSA", "They can't see in the dark. Use it.", 4500);
-                                }, 4800); // Delayed so it doesn't overlap telegraph hint
+                                }, 'world'); // Delayed so it doesn't overlap telegraph hint
                                 break;
                             }
                         }
@@ -957,10 +951,7 @@
                     this.player.applyMovement(inputX, inputY);
                     this.updateSpills();                     // a hard turn slops her drink (engine/spills.js)
                     
-                    // Clamp player within map bounds
-                    const boundsMargin = 15;
-                    this.player.x = Math.max(boundsMargin, Math.min(this.activeMap.width - boundsMargin, this.player.x));
-                    this.player.y = Math.max(boundsMargin, Math.min(this.activeMap.height - boundsMargin, this.player.y));
+                    collisionWorld.keepInside(this.player, this.activeMap.width, this.activeMap.height, 15);   // within the map
                     
                     // Wall/Building/Prop collisions now handled by CollisionSystem
                     // (runs after this in the update loop)
@@ -981,11 +972,7 @@
                 this.player.update();
                 
                 // Clamp player within map bounds after knockback
-                if (!this.isDriving) {
-                    const postKnockbackMargin = 15;
-                    this.player.x = Math.max(postKnockbackMargin, Math.min(this.activeMap.width - postKnockbackMargin, this.player.x));
-                    this.player.y = Math.max(postKnockbackMargin, Math.min(this.activeMap.height - postKnockbackMargin, this.player.y));
-                }
+                if (!this.isDriving) collisionWorld.keepInside(this.player, this.activeMap.width, this.activeMap.height, 15);
                 this.profiler.stop('Physics:Player');
 
                 // --- ENTITY BOUNDARY CLAMPING ---
@@ -994,13 +981,7 @@
                     const mapW = this.activeMap.width;
                     const mapH = this.activeMap.height;
                     const em = 15; // entity margin
-                    const clampEntity = (e) => {
-                        if (!e || e.x === undefined) return;
-                        if (e.x < em) e.x = em;
-                        else if (e.x > mapW - em) e.x = mapW - em;
-                        if (e.y < em) e.y = em;
-                        else if (e.y > mapH - em) e.y = mapH - em;
-                    };
+                    const clampEntity = (e) => { if (e && e.x !== undefined) collisionWorld.keepInside(e, mapW, mapH, em); };
                     for (const npc of this.npcs) clampEntity(npc);
                     for (const tm of this.teammates) { if (tm.recruited) clampEntity(tm); }
                     for (const enemy of this.enemies) clampEntity(enemy);
@@ -1020,10 +1001,7 @@
                 CollisionSystem.resolveProjectiles(this);
                 this.updateStickyOrbs();
 
-                // Unified Entity System collision pass (spatial grid optimization)
-                if (this.useNewCollisionSystem) {
-                    CollisionSystem.update(this.camera, this.canvas, this);
-                }
+                CollisionSystem.update(this.camera, this.canvas, this);   // the collision step (basement/collision-kit.js)
                 if (this.furniture) this.furniture.afterCollision(this);   // a held piece follows her (or holds her back)
                 this.updateCarLightTrails();
                 this.profiler.stop('Physics:Collisions');
@@ -1033,9 +1011,9 @@
                 let inTransition = false;
                 if (this.activeMap.transitions && !this.isDriving) { 
                     const t = this._transitionGrid.query(this.player.x, this.player.y); 
-                    if (t) { inTransition = true; const [v, n] = transitionAction(t.label); setActionPill(this.transitionBtn, v, n, 'F'); this.transitionBtn.style.display = 'flex'; } 
+                    if (t) { inTransition = true; const [v, n] = transitionAction(t.label); setActionPill(this.transitionBtn, v, n, 'F'); uiKit.show(this.transitionBtn, 'flex'); } 
                 }
-                if (!inTransition) this.transitionBtn.style.display = 'none';
+                if (!inTransition) uiKit.hide(this.transitionBtn);
             
                 let nearInteractable = null;
                 
@@ -1080,14 +1058,14 @@
                 // Update Button State
                 const execT = this._execTarget = this.executionTarget();             // an unaware back, in reach (engine/executions.js)
                 if (this.isDriving) { 
-                    this.setInteract('Exit', 'Vehicle'); this.interactBtn.style.display = 'flex'; this.activeInteraction = null; 
+                    this.setInteract('Exit', 'Vehicle'); uiKit.show(this.interactBtn, 'flex'); this.activeInteraction = null; 
                 } 
                 else if (execT) {
-                    this.setInteract('Execute', this.weaponMode === 'melee' ? 'Blade' : 'Quietly'); this.interactBtn.style.display = 'flex';
+                    this.setInteract('Execute', this.weaponMode === 'melee' ? 'Blade' : 'Quietly'); uiKit.show(this.interactBtn, 'flex');
                     this.activeInteraction = { type: 'execute', target: execT };
                 }
                 else if (nearInteractable) { 
-                    this.interactBtn.style.display = 'flex'; this.activeInteraction = nearInteractable; 
+                    uiKit.show(this.interactBtn, 'flex'); this.activeInteraction = nearInteractable; 
                     if (nearInteractable instanceof PropEntity) {
                         const [verb, name, useLabel] = PROP_ACTIONS[nearInteractable.interactionType];
                         this.setInteract(verb, (useLabel && nearInteractable.label) || name);
@@ -1106,16 +1084,16 @@
                 else if (nearMine) {
                     const kind = this.carKind(nearMine);
                     this.setInteract('Drive', kind === 'own' ? 'Your car' : kind === 'sanctioned' ? 'Delivery van' : 'Car');
-                    this.interactBtn.style.display = 'flex'; this.activeInteraction = { type: 'drive', target: nearMine };
+                    uiKit.show(this.interactBtn, 'flex'); this.activeInteraction = { type: 'drive', target: nearMine };
                 }
                 else if (nearTraffic && nearTraffic.isZib) {
-                    this.setInteract('Hail', 'Zib cab'); this.interactBtn.style.display = 'flex'; this.activeInteraction = { type: 'hail_zib', target: nearTraffic };
+                    this.setInteract('Hail', 'Zib cab'); uiKit.show(this.interactBtn, 'flex'); this.activeInteraction = { type: 'hail_zib', target: nearTraffic };
                 }
                 else if (nearTraffic) {
-                    this.setInteract('Hijack', 'Vehicle'); this.interactBtn.style.display = 'flex'; this.activeInteraction = { type: 'hijack', target: nearTraffic };
+                    this.setInteract('Hijack', 'Vehicle'); uiKit.show(this.interactBtn, 'flex'); this.activeInteraction = { type: 'hijack', target: nearTraffic };
                 }
                 else { 
-                    this.interactBtn.style.display = 'none'; this.activeInteraction = null; 
+                    uiKit.hide(this.interactBtn); this.activeInteraction = null; 
                 }
             
                 // Camera Zoom Logic (skip during cutscene — cutscene manager owns zoom)
@@ -1160,31 +1138,6 @@
 
                 // 2. VEHICLE vs VEHICLE Collisions
                 this.traffic.resolveCollisions(this.car, this.player, this.weather, audioSys, this.parkedCars(this._parkedCars || (this._parkedCars = [])), this.decals);
-            },
-
-            
-            getOBBCorners(c) {
-                const cos = Math.cos(c.angle); const sin = Math.sin(c.angle);
-                const hw = c.length / 2; const hh = c.width / 2; // Note: Length is X-axis in local space usually
-                return [
-                    { x: c.x + (hw * cos - hh * sin), y: c.y + (hw * sin + hh * cos) },
-                    { x: c.x + (hw * cos + hh * sin), y: c.y + (hw * sin - hh * cos) },
-                    { x: c.x + (-hw * cos + hh * sin), y: c.y + (-hw * sin - hh * cos) },
-                    { x: c.x + (-hw * cos - hh * sin), y: c.y + (-hw * sin + hh * cos) }
-                ];
-            },
-            
-            isPointInRotatedRect(x, y, rect) {
-                // Translate point to rect local space
-                const dx = x - rect.x;
-                const dy = y - rect.y;
-                const cos = Math.cos(-rect.angle);
-                const sin = Math.sin(-rect.angle);
-                const localX = dx * cos - dy * sin;
-                const localY = dx * sin + dy * cos;
-                
-                // Check AABB in local space
-                return (Math.abs(localX) < rect.length/2 && Math.abs(localY) < rect.width/2);
             },
 
         });

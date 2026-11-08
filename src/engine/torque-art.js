@@ -48,7 +48,7 @@ const TorqueArt = {
     /** The wrap bay's car all in pink vinyl (the bay lays it up to its edge) */
     _fullWrap(car) {
         if (car._fullWrap) return car._fullWrap;
-        const sp = carSprite(car), cv = document.createElement('canvas'); cv.width = sp.cv.width; cv.height = sp.cv.height;
+        const sp = carSprite(car), cv = canvasKit.createLayer([sp.cv.width, sp.cv.height]).canvas;
         const c = cv.getContext('2d');
         c.drawImage(sp.cv, 0, 0);
         c.globalCompositeOperation = 'source-atop';
@@ -59,7 +59,7 @@ const TorqueArt = {
     /** The wrap bay's car: Victoria's pink vinyl laid over its back half, the edge left raw */
     _wrapped(car) {
         if (car._wrap) return car._wrap;
-        const sp = carSprite(car), cv = document.createElement('canvas'); cv.width = sp.cv.width; cv.height = sp.cv.height;
+        const sp = carSprite(car), cv = canvasKit.createLayer([sp.cv.width, sp.cv.height]).canvas;
         const c = cv.getContext('2d'), S = CAR_ART.SCALE, edge = cv.width * 0.52;
         c.drawImage(sp.cv, 0, 0);
         c.globalCompositeOperation = 'source-atop';
@@ -263,7 +263,7 @@ function drawTorqueDecorProp(c, p) {
 engineMixin({
     drawTorqueInterior(c) { if (!this._torqueFloor) this._torqueFloor = this._paintTorqueFloor(); c.drawImage(this._torqueFloor, 0, 0); },
     _paintTorqueFloor() {
-        const W = 1400, H = 1000, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+        const W = 1400, H = 1000, cv = canvasKit.createLayer([W, H]).canvas;
         const c = cv.getContext('2d'), r = seededRandom(5930), B = TorqueArt.box, T = TQ;
         c.fillStyle = '#0e0d11'; c.fillRect(0, 0, W, H);
         // The bay: graphite epoxy with a fleck in it, saw cuts every 100, a sheen where the lights sit

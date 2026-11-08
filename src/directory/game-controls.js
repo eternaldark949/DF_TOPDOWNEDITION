@@ -90,7 +90,7 @@
             ['furniture_turn', (g, ev) => PLAY(g, ev) && !!g.furniture?.holding, (g, ev) => g.furniture.rotate(ev.shift ? -1 : 1)],
             ['furniture_turn_back', (g, ev) => PLAY(g, ev) && !!g.furniture?.holding, g => g.furniture.rotate(-1)],
             ['auto_drive', (g, ev) => PLAY(g, ev) && g.isDriving, g => g.toggleAutoDrive()],
-            ['zib_skip', (g, ev) => (ev.device === 'touch' || LIVE(g, ev)) && !!g.zibSystem?.isPassenger, g => { g.zibSystem.teleportToDestination(g); if (g.zibSkipBtn) g.zibSkipBtn.style.display = 'none'; }],
+            ['zib_skip', (g, ev) => (ev.device === 'touch' || LIVE(g, ev)) && !!g.zibSystem?.isPassenger, g => { g.zibSystem.teleportToDestination(g); if (g.zibSkipBtn) uiKit.hide(g.zibSkipBtn); }],
             ['map', UI, g => Screens.mapOpen() ? Screens.close() : g?.running && !g.paused && Screens.open('map')],   // the map holds a pause token
             ['phone', UI, g => phoneSystem.overlay.style.display === 'flex' ? phoneSystem.close() : !g?.paused && phoneSystem.open()],
             ['night_vision', PLAY, g => g.toggleNightVision()],

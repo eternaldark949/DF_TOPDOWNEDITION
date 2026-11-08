@@ -26,11 +26,9 @@
             say(game, speaker, text, ms = 3000) {
                 const bar = document.getElementById('comms-bar');
                 if (!bar) return;
-                const chip = document.createElement('div');
-                chip.className = 'comm-chip';
+                const chip = uiKit.make(['div', 'comm-chip']);
                 chip.style.setProperty('--who', (typeof SPEAKER_COLORS !== 'undefined' && SPEAKER_COLORS[this._name(speaker)]) || '#e8c27a');
-                const face = document.createElement('div');
-                face.className = 'comm-face';
+                const face = uiKit.make(['div', 'comm-face']);
                 const url = this._face(game, speaker);
                 if (url) { const img = new Image(); img.alt = ''; img.src = url; face.appendChild(img); }
                 else {
@@ -43,13 +41,9 @@
                         FaceCache.queue(n, FaceCache.SMALL, cb);
                     }
                 }
-                const body = document.createElement('div');
-                body.className = 'comm-body';
-                const name = document.createElement('div');
-                name.className = 'comm-name';
-                name.textContent = speaker;
-                const sig = document.createElement('span');
-                sig.className = 'comm-sig'; sig.innerHTML = '<i></i><i></i><i></i>';
+                const body = uiKit.make(['div', 'comm-body']);
+                const name = uiKit.make(['div', 'comm-name', speaker]);
+                const sig = uiKit.make(['span', 'comm-sig']); sig.innerHTML = '<i></i><i></i><i></i>';
                 name.appendChild(sig);
                 const line = uiKit.make(['div', 'comm-text', text]);
                 body.append(name, line);
@@ -61,7 +55,7 @@
                 for (const c of live.slice(0, Math.max(0, live.length - keep))) this._drop(c);
                 this._age(bar);
                 const gone = () => this._drop(chip);
-                if (game && game.addPausableTimeout) game.addPausableTimeout(gone, ms); else setTimeout(gone, ms);
+                if (typeof game !== 'undefined' && game) game_timers.after(ms / 1000, gone, 'world'); else setTimeout(gone, ms);
             },
             _drop(chip) {
                 if (chip.classList.contains('out')) return;

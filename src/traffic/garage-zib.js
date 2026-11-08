@@ -434,9 +434,9 @@
                 if (game.velvetCat && game.questState.hasVelvetCat) game.velvetCat.inCar = true;
                 Object.assign(game.player, zib.getSeatWorldPos(0));
 
-                game.autodriveBtn.style.display = 'none';
-                if (game.zibSkipBtn) game.zibSkipBtn.style.display = 'flex';
-                if (game.holsterBtn) game.holsterBtn.style.display = 'none';
+                uiKit.hide(game.autodriveBtn);
+                if (game.zibSkipBtn) uiKit.show(game.zibSkipBtn, 'flex');
+                if (game.holsterBtn) uiKit.hide(game.holsterBtn);
                 showMessage(`ZIB HAILED — ${fare} PERSONICS — EN ROUTE. Press SKIP to teleport.`);
             }
 
@@ -604,11 +604,11 @@
                 game.player.visible = true;
                 game.car = game.ownedCar;
                 game.autodriveBtn.classList.remove('engaged');
-                game.autodriveBtn.style.display = 'none';
+                uiKit.hide(game.autodriveBtn);
                 controls.touch.drop('touchHandbrake');
-                if (game.handbrakeBtn) { game.handbrakeBtn.style.display = 'none'; game.handbrakeBtn.classList.remove('held'); }
-                if (game.zibSkipBtn) game.zibSkipBtn.style.display = 'none';
-                if (game.holsterBtn) game.holsterBtn.style.display = 'flex';
+                if (game.handbrakeBtn) { uiKit.hide(game.handbrakeBtn); game.handbrakeBtn.classList.remove('held'); }
+                if (game.zibSkipBtn) uiKit.hide(game.zibSkipBtn);
+                if (game.holsterBtn) uiKit.show(game.holsterBtn, 'flex');
 
                 game.navDestination = null;
                 if (game.ui) {

@@ -43,7 +43,7 @@
             ringCall(name, opts = {}) {
                 this.endCall();
                 const c = this.call = { name, subtitle: opts.subtitle || '', answered: false, t0: 0, el: null };
-                const el = c.el = document.createElement('div');
+                const el = c.el = uiKit.make(['div']);
                 el.id = 'call-card';
                 el.innerHTML = '<div class="cc-ring"><i></i><i></i><canvas width="120" height="120"></canvas></div>'
                     + '<div class="cc-who"><b></b><span></span></div><button class="cc-answer">Answer</button><div class="cc-time"></div>';
@@ -91,7 +91,7 @@
                 if (this.call && !this.call.answered) { this.answerCall(); return; }   // the phone's ringing: the button answers it
                 this.fit();
                 this.isOpen = true;
-                this.overlay.style.display = 'flex';
+                uiKit.show(this.overlay, 'flex');
                 this.showHome();
                 this.updateTime();
                 // NOTE: opening the phone no longer clears the badge. Unread state
@@ -107,7 +107,7 @@
                 this._closePhotoManager?.();
                 this.isOpen = false;
                 this.currentApp = 'closed';
-                this.overlay.style.display = 'none';
+                uiKit.hide(this.overlay);
                 game.pauseSystem.release('phone');
                 audioSys.sfx('ui');
                 this.broadcast('PHONE_CLOSED', {}); // Report Event
@@ -117,8 +117,8 @@
                 this._closePhotoManager?.();
                 this.currentApp = 'home';
                 this.currentContact = null;
-                document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
-                this.homeScreen.style.display = 'block';
+                document.querySelectorAll('.phone-app-screen').forEach(s => uiKit.hide(s));
+                uiKit.show(this.homeScreen);
                 this.updateTime();
             },
             
@@ -349,7 +349,7 @@
 
                 if (badge) {
                     badge.textContent = total > 99 ? '99+' : String(total);
-                    badge.style.display = total > 0 ? 'flex' : 'none';
+                    uiKit.toggle(badge, total > 0, 'flex');
                 }
                 if (btn) btn.classList.toggle('notify', total > 0);
                 if (appDot) appDot.classList.toggle('active', total > 0);
@@ -465,7 +465,7 @@
             showMaps() {
                 this.currentApp = 'maps';
                 this.broadcast('APP_OPENED', { app: 'maps' }); // Report Event
-                this.homeScreen.style.display = 'none';
+                uiKit.hide(this.homeScreen);
                 uiKit.show('screen-maps', 'flex');
                 this.mapView.zoom = 1.2; this.mapView.offsetX = 0; this.mapView.offsetY = 0;
                 this.drawMap(true); 
@@ -506,12 +506,12 @@
                 ctx.fillText(`${this.mapView.zoom.toFixed(1)}×`, 28 * D, canvas.height - 14 * D);
             },
             
-            showHelp() { this.currentApp = 'help'; this.homeScreen.style.display = 'none'; document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none'); uiKit.show('screen-help', 'flex'); },
+            showHelp() { this.currentApp = 'help'; uiKit.hide(this.homeScreen); document.querySelectorAll('.phone-app-screen').forEach(s => uiKit.hide(s)); uiKit.show('screen-help', 'flex'); },
 
             showSkyMe() {
                 this.currentApp = 'skyme';
-                this.homeScreen.style.display = 'none';
-                document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
+                uiKit.hide(this.homeScreen);
+                document.querySelectorAll('.phone-app-screen').forEach(s => uiKit.hide(s));
                 uiKit.show('screen-skyme', 'flex');
                 this._renderSkyMe();
             },
@@ -691,8 +691,8 @@
 
             showLog() {
                 this.currentApp = 'log';
-                this.homeScreen.style.display = 'none';
-                document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
+                uiKit.hide(this.homeScreen);
+                document.querySelectorAll('.phone-app-screen').forEach(s => uiKit.hide(s));
                 uiKit.show('screen-log', 'flex');
                 this._renderLog();
             },
@@ -903,8 +903,8 @@
 
             showCarMe() {
                 this.currentApp = 'carme';
-                this.homeScreen.style.display = 'none';
-                document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
+                uiKit.hide(this.homeScreen);
+                document.querySelectorAll('.phone-app-screen').forEach(s => uiKit.hide(s));
                 uiKit.show('screen-carme', 'flex');
 
                 const container = document.getElementById('carme-content'), G = game.garage;
@@ -1010,7 +1010,7 @@
         
         // --- NEU.ME APP LOGIC ---
         document.getElementById('app-neume').addEventListener('click', () => {
-            phoneSystem.homeScreen.style.display = 'none';
+            uiKit.hide(phoneSystem.homeScreen);
             uiKit.show('screen-neume', 'flex');
             updateNeumeUI();
         });

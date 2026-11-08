@@ -51,7 +51,7 @@
                     if (!e || e.dead) return false;
                     const dx = e.x - pl.x, dy = e.y - pl.y, d = Math.hypot(dx, dy);
                     return d - (pl.radius || 12) - (e.radius || 14) <= KNUCKLES.STEP_REACH && Math.abs(normalizeAngle(Math.atan2(dy, dx) - ang)) < 0.6
-                        && !isLineBlocked(pl.x, pl.y, e.x, e.y, walls, cols);
+                        && !collisionWorld.lineBlocked(pl.x, pl.y, e.x, e.y, walls, cols);
                 });
                 if (near.length) this.meleeStepIn(ang, this._meleeGap(near));
 
@@ -121,7 +121,7 @@
                     for (const list of [this.activeMap.walls || [], getColliders(this.activeMap)]) {
                         const near = _physicsSpatial.query(list, box) || [];
                         for (let i = 0; !hit && i < near.length; i++) {
-                            const b = near[i], dx = Math.max(b.x, Math.min(b.x + b.w, e.x)) - e.x, dy = Math.max(b.y, Math.min(b.y + b.h, e.y)) - e.y;
+                            const b = near[i], [gx, gy] = shapeKit.rectGap(e.x, e.y, b), dx = -gx, dy = -gy;   // toward the wall
                             hit = dx * dx + dy * dy <= r * r && dx * kx + dy * ky >= 0;   // touching it, and driven toward it
                         }
                     }
@@ -143,11 +143,11 @@
             drawKnuckleFx(ctx) {
                 const L = this.knuckleFx; if (!L || !L.length) return;
                 const now = _gameTimeSec, TAU = Math.PI * 2, R = CONFIG.PUNCH.REACH;
-                for (let i = L.length - 1; i >= 0; i--) {
-                    const f = L[i], age = now - f.t0;
+                lifeKit.sweep(L, f => {
+                    const age = now - f.t0;
                     if (f.k === 'drain') {                                         // Vampiric Fists: a crimson mote, wound to her
-                        if (age < 0) continue;
-                        if (age > VAMPIRIC.LIFE || !this.player) { L.splice(i, 1); continue; }
+                        if (age < 0) return;
+                        if (age > VAMPIRIC.LIFE || !this.player) { return true; }
                         const u = age / VAMPIRIC.LIFE, e2 = u * u * (3 - 2 * u), pl = this.player;
                         const dx = pl.x - f.x, dy = pl.y - f.y, d = Math.hypot(dx, dy) || 1;
                         const bow = Math.sin(u * Math.PI) * f.sp * Math.sin(f.ph);           // each one curves its own way
@@ -161,7 +161,7 @@
                         ctx.restore();
                     } else if (f.k === 'trail') {
                         const life = f.hay ? 0.32 : 0.22;
-                        if (age > life) { L.splice(i, 1); continue; }
+                        if (age > life) { return true; }
                         const c = Math.cos(f.a), s = Math.sin(f.a), side = f.side === 'right' ? 1 : -1;
                         const ox = -s * 5 * side, oy = c * 5 * side;                   // the punching hand's side
                         const n = f.hay ? 4 : 3;
@@ -179,7 +179,7 @@
                         ctx.restore();
                     } else {
                         const life = 0.36;
-                        if (age > life) { L.splice(i, 1); continue; }
+                        if (age > life) { return true; }
                         const u = age / life, rr = (f.slam ? 14 : 10) + u * (f.slam ? 30 : 24);
                         ctx.save();
                         ctx.globalAlpha = (1 - u) * 0.9;
@@ -190,7 +190,7 @@
                         ctx.beginPath(); ctx.arc(f.x, f.y, rr * 0.7, 0, TAU); ctx.stroke();
                         ctx.restore();
                     }
-                }
+                });
             }
         });
 

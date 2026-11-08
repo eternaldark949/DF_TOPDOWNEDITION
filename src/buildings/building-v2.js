@@ -849,7 +849,7 @@
                 this.sections.forEach((s, si) => {
                     const fp = this._footprint(s, si), pts = fp.map(p => p.slice());
                     for (const [x, y] of fp) pts.push([cam.x + (x - cam.x) * k, cam.y + (y - cam.y) * k]);
-                    out.push(TierKit.hull(pts));
+                    out.push(shapeKit.hull(pts));
                 });
                 return out;
             },

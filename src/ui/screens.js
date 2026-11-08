@@ -46,8 +46,8 @@
                     this._menu().classList.remove('map-on');
                     if (main) main.style.visibility = '';
                     const ids = new Set(Object.values(this.SUBS).map(s => s[0]));
-                    ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
-                    document.getElementById(sub[0]).style.display = sub[0] === 'inventory-list-container' ? '' : 'block';
+                    ids.forEach(id => { const el = document.getElementById(id); if (el) uiKit.hide(el); });
+                    uiKit.show(sub[0], sub[0] === 'inventory-list-container' ? '' : 'block');
                     document.getElementById('screen-title-text').textContent = sub[1];
                     this.current = name;    // set before render: the inventory list reads it for EQUIPPED
                     this._menu().classList.toggle('no-filter', !this.FILTERED[name]);
@@ -88,12 +88,12 @@
                 const m = this._menu();
                 if (!m || show === this.menuOpen()) return;
                 if (show) {
-                    m.style.display = 'flex';
+                    uiKit.show(m, 'flex');
                     document.body.classList.add('screen-menu-open');      // the HUD steps out from behind it (styles/dossier.css)
                     game.pauseSystem.acquire('inventory_menu');
                     game.renderSidebarPortrait();
                 } else {
-                    m.style.display = 'none';
+                    uiKit.hide(m);
                     document.body.classList.remove('screen-menu-open');
                     game.pauseSystem.release('inventory_menu');
                     document.querySelectorAll('#inventory-list .ui-pill.expanded').forEach(p => p.classList.remove('expanded'));

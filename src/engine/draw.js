@@ -109,7 +109,7 @@
                     const x2 = cam.x + (x - cam.x) / k, y2 = cam.y + (y - cam.y) / k;
                     for (const sec of b.sections) {
                         const L = b.x + sec.x, T = b.y + sec.y;
-                        if (segmentHitsRect(x, y, x2, y2, L, T, L + sec.w, T + sec.h)) return true;
+                        if (shapeKit.segmentHitsRect(x, y, x2, y2, L, T, L + sec.w, T + sec.h)) return true;
                     }
                 }
                 if (foliageOn && this.activeMap.foliage) {

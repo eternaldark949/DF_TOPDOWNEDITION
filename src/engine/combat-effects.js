@@ -5,7 +5,7 @@
         function muzzleStarSprite(color) {
             let cv = _muzzleStars.get(color);
             if (cv) return cv;
-            cv = document.createElement('canvas'); cv.width = 96; cv.height = 48;
+            cv = canvasKit.createLayer([96, 48]).canvas;
             const c = cv.getContext('2d'), rgb = /^#[0-9a-f]{6}$/i.test(color) ? hexToRgb(color) : '255, 204, 136';
             const spike = (x0, y0, x1, y1, w) => {                          // a tapered spike from (x0,y0) to (x1,y1)
                 const a = Math.atan2(y1 - y0, x1 - x0), nx = -Math.sin(a) * w, ny = Math.cos(a) * w;
@@ -49,15 +49,15 @@
             updateCasings() {
                 const L = this.casings;
                 if (!L || !L.length) return;
-                for (let i = L.length - 1; i >= 0; i--) {
-                    const k = L[i]; k.t++;
+                lifeKit.sweep(L, k => {
+                    k.t++;
                     if (k.t < 26) { k.x += k.vx; k.y += k.vy; k.vx *= 0.86; k.vy *= 0.86; k.a += k.spin; k.spin *= 0.9; }
                     else if (k.t === 26) {                                               // landed: two finer flecks, and the lamp it lies under
                         k.sub = [(Math.random() - 0.5) * 5, (Math.random() - 0.5) * 5, (Math.random() - 0.5) * 5, (Math.random() - 0.5) * 5];
                         this._casingLamp(k);
                     }
-                    if (k.t > 1500) L.splice(i, 1);
-                }
+                    if (k.t > 1500) return true;
+                });
             },
             /** Once, as a casing lands: the nearest lamp whose pool it lies in lends it its colour (k.lc) and strength (k.lk). */
             _casingLamp(k) {
@@ -152,9 +152,9 @@
                 if (!shot.isFireball || !shot.active || shot.markedForDestroy) return;
                 // Flames stop at the wall the fireball meets this step (it's destroyed in the collision pass after)
                 const map = this.activeMap;
-                if (map && isLineBlocked(x0, y0, x1, y1, map.walls, getColliders(map))) {
+                if (map && collisionWorld.lineBlocked(x0, y0, x1, y1, map.walls, getColliders(map))) {
                     let lo = 0, hi = 1;
-                    for (let k = 0; k < 6; k++) { const m = (lo + hi) / 2; if (isLineBlocked(x0, y0, x0 + (x1 - x0) * m, y0 + (y1 - y0) * m, map.walls, getColliders(map))) hi = m; else lo = m; }
+                    for (let k = 0; k < 6; k++) { const m = (lo + hi) / 2; if (collisionWorld.lineBlocked(x0, y0, x0 + (x1 - x0) * m, y0 + (y1 - y0) * m, map.walls, getColliders(map))) hi = m; else lo = m; }
                     x1 = x0 + (x1 - x0) * lo; y1 = y0 + (y1 - y0) * lo;
                 }
                 const dx = x1 - x0, dy = y1 - y0, distance = Math.hypot(dx, dy);
@@ -733,9 +733,9 @@
                     const anyTelegraphing = this.enemies.some(e => e.isTelegraphing && !e.dead);
                     if (anyTelegraphing) {
                         this.questState.larissa_flit_hint = true;
-                        this.addPausableTimeout(() => {
+                        game_timers.after(1.2, () => {
                             this.story.triggerComms("LARISSA", "You saw it coming. The flit is faster than they are.", 5000);
-                        }, 1200);
+                        }, 'world');
                     }
                 }
             },

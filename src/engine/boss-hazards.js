@@ -65,7 +65,7 @@
                 for (let i = 0; i < n; i++) {
                     const nx = p.x + dx / n, ny = p.y + dy / n;
                     if (nav && !nav.walkable(nx, ny)) break;
-                    if (isLineBlocked(p.x, p.y, nx, ny, map.walls, [])) break;
+                    if (collisionWorld.lineBlocked(p.x, p.y, nx, ny, map.walls, [])) break;
                     p.x = nx; p.y = ny;
                 }
             },
@@ -76,7 +76,7 @@
                 for (const h of this._hazards) {
                     if (h.kind !== 'smoke') continue;
                     const r = h.r * this._smokeK(h);
-                    if (r > 20 && CollisionSystem.distToSegmentSquared(h.x, h.y, x0, y0, x1, y1) < (r * 0.7) ** 2) return true;
+                    if (r > 20 && shapeKit.segmentDistanceSq(h.x, h.y, x0, y0, x1, y1) < (r * 0.7) ** 2) return true;
                 }
                 return false;
             },
@@ -139,7 +139,7 @@
                         case 'hook': {
                             if (h.state === 'out') {
                                 const nx = h.x + Math.cos(h.a) * HAZARD.HOOK_SPEED, ny = h.y + Math.sin(h.a) * HAZARD.HOOK_SPEED;
-                                const wall = isLineBlocked(h.x, h.y, nx, ny, this.activeMap.walls, []);
+                                const wall = collisionWorld.lineBlocked(h.x, h.y, nx, ny, this.activeMap.walls, []);
                                 h.x = nx; h.y = ny;
                                 if (p && Math.hypot(p.x - h.x, p.y - h.y) < 20 && !this.playerDodging()) {
                                     h.state = 'caught'; h.caughtAt = now;
@@ -347,7 +347,7 @@
                 if (first) {
                     qs.goldenRetributionUnlocked = true;                 // the workbench's schematic (story/missions.js SCHEMATICS)
                     if (g) g.spoil('Golden Retribution schematic');
-                    this.addPausableTimeout(() => showMessage('SCHEMATIC UNLOCKED — GOLDEN RETRIBUTION'), 2200);
+                    game_timers.after(2.2, () => showMessage('SCHEMATIC UNLOCKED — GOLDEN RETRIBUTION'), 'world');
                 }
             },
 
@@ -358,7 +358,7 @@
                 const qs = this.questState || (this.questState = {}), first = !qs.triumvirateDefeats;
                 qs.triumvirateDefeats = (qs.triumvirateDefeats || 0) + 1;
                 if (first && !this.inventory.items.some(i => i.id === 'blood_pact') && this.dropBossWeapon('blood_pact', last.x, last.y + 8)) {
-                    this.addPausableTimeout(() => showMessage('COMPLINE LEAVES THE BLOOD PACT'), 1600);
+                    game_timers.after(1.6, () => showMessage('COMPLINE LEAVES THE BLOOD PACT'), 'world');
                     if (this.hordeGauntlet) this.hordeGauntlet.spoil('Blood Pact');
                 }
             },

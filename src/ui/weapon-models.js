@@ -307,8 +307,7 @@
             let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
             for (const p of parts) { const b = _gunPartBox(p); bx0 = Math.min(bx0, b[0]); by0 = Math.min(by0, b[1]); bx1 = Math.max(bx1, b[2]); by1 = Math.max(by1, b[3]); }
             bx0 -= 2.5; by0 -= 2.5; bx1 += 2.5; by1 += 2.5;                                   // room for the emitters' halos
-            const cv = document.createElement('canvas'), K = WEAPON_BAKE;
-            cv.width = Math.ceil((bx1 - bx0) * K); cv.height = Math.ceil((by1 - by0) * K);
+            const K = WEAPON_BAKE, cv = canvasKit.createLayer([Math.ceil((bx1 - bx0) * K), Math.ceil((by1 - by0) * K)]).canvas;
             const c = cv.getContext('2d');
             c.scale(K, K); c.translate(-bx0, -by0); c.lineJoin = 'round';
             for (const p of parts) _paintGunPart(c, p);

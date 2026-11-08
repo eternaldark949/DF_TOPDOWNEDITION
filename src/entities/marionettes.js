@@ -102,7 +102,7 @@
                 }
                 this.vx *= 0.86; this.vy *= 0.86;
                 const nx = this.x + this.vx, ny = this.y + this.vy, r = this.radius;
-                const hits = (x, y) => walls.some(w => x + r > w.x && x - r < w.x + w.w && y + r > w.y && y - r < w.y + w.h);
+                const hits = (x, y) => collisionWorld.squareBlocked(x, y, r, walls);
                 if (!hits(nx, this.y)) this.x = nx; else this.vx *= -0.3;
                 if (!hits(this.x, ny)) this.y = ny; else this.vy *= -0.3;
                 return null;

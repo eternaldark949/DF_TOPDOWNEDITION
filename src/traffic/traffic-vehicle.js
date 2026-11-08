@@ -768,7 +768,7 @@
                     angleDiff = normalizeAngle(angleDiff);
                     angleDiff = Math.abs(angleDiff);
                     
-                    const isBlocked = isLineBlocked(this.x, this.y, closestX, closestY, walls);
+                    const isBlocked = collisionWorld.lineBlocked(this.x, this.y, closestX, closestY, walls);
                     if (!isBlocked && dist < nearestDist && angleDiff < Math.PI / 2) {
                         nearestDist = dist;
                         nearestLane = lane;
@@ -1189,11 +1189,11 @@
                     if (!c) break;
                     collided = true;
                     // Where the car meets the wall (a corner, usually): the push lands there, so it turns the car too
-                    const [px, py] = PhysicsSystem.contactPoint(this, c.obb, c.nx, c.ny);
+                    const [px, py] = shapeKit.boxContactPoint(this, c.obb, c.nx, c.ny);
                     this.x += c.nx * (c.depth + 0.01);
                     this.y += c.ny * (c.depth + 0.01);
                     const B = PhysicsSystem.body(this, true);
-                    if (PhysicsSystem.impulseAt(B, PhysicsSystem.body(c.obb, false), px + c.nx * c.depth, py + c.ny * c.depth,
+                    if (shapeKit.impulseAt(B, PhysicsSystem.body(c.obb, false), px + c.nx * c.depth, py + c.ny * c.depth,
                                                 c.nx, c.ny, -VA.WALL_BOUNCE_FACTOR, VA.WALL_MU)) PhysicsSystem._store(this, B);
                 }
                 if (collided) {
@@ -1292,7 +1292,7 @@
                     if (!candidates) continue;
                     for (let w of candidates) {
                         if (nextX + r < w.x || nextX - r > w.x + w.w || nextY + r < w.y || nextY - r > w.y + w.h) continue;
-                        if (CollisionSystem._satCollision(futureOBB, CollisionSystem._aabbToOBB(w))) return true;
+                        if (shapeKit.sat(futureOBB, shapeKit.rectToObb(w))) return true;
                     }
                 }
                 return false;
@@ -1310,8 +1310,8 @@
                     if (!candidates) continue;
                     for (let w of candidates) {
                         if (this.x + r < w.x || this.x - r > w.x + w.w || this.y + r < w.y || this.y - r > w.y + w.h) continue;
-                        const wo = CollisionSystem._aabbToOBB(w);
-                        const c = CollisionSystem._satCollision(obb, wo);
+                        const wo = shapeKit.rectToObb(w);
+                        const c = shapeKit.sat(obb, wo);
                         if (c && (!best || c.depth > best.depth)) { best = c; c.obb = wo; }
                     }
                 }

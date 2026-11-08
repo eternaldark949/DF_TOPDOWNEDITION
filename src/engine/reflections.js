@@ -53,7 +53,7 @@
         let _wetGlitterTile = null;
         function _wetGlitter() {
             if (_wetGlitterTile) return _wetGlitterTile;
-            const N = 160, cv = document.createElement('canvas'); cv.width = cv.height = N;
+            const N = 160, cv = canvasKit.createLayer([N, N]).canvas;
             const c = cv.getContext('2d');
             let seed = 9491;
             const rnd = () => ((seed = seed * 16807 % 2147483647) - 1) / 2147483646;
@@ -105,7 +105,7 @@
             let rec = _puddleArts.get(p);
             if (!rec) _puddleArts.set(p, rec = {});
             let b = rec[slot];
-            if (!b) b = rec[slot] = { cv: document.createElement('canvas'), half: 0, q: 0, g: -1, al: [0, 0, 0], used: 0 };
+            if (!b) b = rec[slot] = { cv: canvasKit.createLayer().canvas, half: 0, q: 0, g: -1, al: [0, 0, 0], used: 0 };
             b.used = _frameTime;
             const T = PUDDLE_BAKE_TOL, al = b.al;
             if (b.q === q && Math.abs(b.g - g) <= T && Math.abs(al[0] - a1) <= T && Math.abs(al[1] - a2) <= T && Math.abs(al[2] - a3) <= T) return b;
@@ -324,9 +324,7 @@
                 // Ultra's own detail layer (people, cars, trees) is the one drawn at full size
                 const W = this.canvas.width, H = this.canvas.height, s = q === 'medium' ? 0.25 : 0.5;
                 const rw = Math.max(1, Math.round(W * s)), rh = Math.max(1, Math.round(H * s));
-                let R = this._reflCv, M = this._reflMask;
-                if (!R) { R = this._reflCv = document.createElement('canvas'); M = this._reflMask = document.createElement('canvas'); }
-                if (R.width !== rw || R.height !== rh) { R.width = M.width = rw; R.height = M.height = rh; }
+                const R = canvasKit.scratch(this, '_reflCv', rw, rh), M = canvasKit.scratch(this, '_reflMask', rw, rh);
                 const rc = R.getContext('2d'), mc = M.getContext('2d');
                 const v = this.view, z = v.zoom;
                 const toView = (c, k = s) => { c.setTransform(k, 0, 0, k, 0, 0); c.translate(W / 2, H / 2); c.scale(z, z); c.translate(-v.x + (v.shakeX || 0), -v.y + (v.shakeY || 0)); };
@@ -505,8 +503,8 @@
                 // with source-over and never punches a bright hole in the darkness layer.
                 let D = null, Dr = null, Drs = null;
                 if (q === 'ultra') {
-                    D = this._reflDetailCv || (this._reflDetailCv = document.createElement('canvas'));
-                    if (D.width !== W || D.height !== H) { D.width = W; D.height = H; D._dirty = null; }
+                    D = this._reflDetailCv;
+                    if (!D || D.width !== W || D.height !== H) { D = canvasKit.scratch(this, '_reflDetailCv', W, H); D._dirty = null; }
                     const dc = D.getContext('2d'), old = D._dirty;
                     dc.setTransform(1, 0, 0, 1, 0, 0);
                     if (old) for (const o of old) dc.clearRect(o.x0, o.y0, o.x1 - o.x0, o.y1 - o.y0);   // (all last frame drew was in these)
@@ -686,7 +684,7 @@
                 if (!a) {
                     const free = this._ultraArtFree;
                     this._ultraArtSeq = ((this._ultraArtSeq || 0) + 1) % 3;
-                    a = { cv: (free && free.pop()) || document.createElement('canvas'), at: 0, fresh: true, hasArt: true, used: 0, seq: this._ultraArtSeq };
+                    a = { cv: (free && free.pop()) || canvasKit.createLayer().canvas, at: 0, fresh: true, hasArt: true, used: 0, seq: this._ultraArtSeq };
                     all.set(e, a);
                 }
                 a.used = this._renderDrawId;

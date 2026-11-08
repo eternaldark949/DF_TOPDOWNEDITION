@@ -74,7 +74,7 @@
             /** A soft lane sprite: bright along its middle, feathered at the sides, fading at the far end. */
             _scopeLaneSprite() {
                 if (this._scopeLane) return this._scopeLane;
-                const W = 256, H = 32, cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+                const W = 256, H = 32, cv = canvasKit.createLayer([W, H]).canvas;
                 const c = cv.getContext('2d'), img = c.createImageData(W, H);
                 for (let y = 0; y < H; y++) {
                     const across = 1 - Math.pow(Math.abs(y - (H - 1) / 2) / (H / 2), 2);           // soft sides
@@ -98,7 +98,7 @@
                 const shot = this.getPlayerShotGeometry();
                 const a = shot.angle + (Math.sin(t * 1.7) * 0.7 + Math.sin(t * 3.1) * 0.3) * SCOPE.SWAY * (1 - steady);
                 const ex = shot.x, ey = shot.y;
-                const far = raycastNearest(ex, ey, ex + Math.cos(a) * SCOPE.RANGE, ey + Math.sin(a) * SCOPE.RANGE,
+                const far = collisionWorld.rayNearest(ex, ey, ex + Math.cos(a) * SCOPE.RANGE, ey + Math.sin(a) * SCOPE.RANGE,
                     [...(this.activeMap.walls || []), ...getColliders(this.activeMap)], SCOPE.RANGE);
                 // The veil on its own half-resolution layer (it's all soft), with the lane cut out of it
                 const R = 0.5, W = Math.ceil(this.canvas.width * R), H = Math.ceil(this.canvas.height * R);

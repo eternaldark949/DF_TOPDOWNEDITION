@@ -51,7 +51,7 @@ Object.assign(TrafficVehicle.prototype, {
         const seat = this.getSeatWorldPos(index), c = Math.cos(this.angle), s = Math.sin(this.angle);
         const x = this.x + pose.muzzleX * c - pose.muzzleY * s, y = this.y + pose.muzzleX * s + pose.muzzleY * c;
         const map = typeof game !== 'undefined' && game.activeMap;
-        if (map && isLineBlocked(seat.x, seat.y, x, y, map.walls || [], getColliders(map)))
+        if (map && collisionWorld.lineBlocked(seat.x, seat.y, x, y, map.walls || [], getColliders(map)))
             return { x: seat.x, y: seat.y, angle: pose.angle };
         return { x, y, angle: pose.angle };
     },
@@ -69,7 +69,7 @@ Object.assign(TrafficVehicle.prototype, {
         const key = windows.key;
         if (sprite.occupants?.key === key) return sprite.occupants;
         const {SCALE:S,PAD:P} = CAR_ART, g = carGeo(this);
-        const make = () => {const cv=document.createElement('canvas');cv.width=sprite.cv.width;cv.height=sprite.cv.height;return cv;};
+        const make = () => canvasKit.createLayer([sprite.cv.width,sprite.cv.height]).canvas;
         const lower=make(),upper=make(),lc=lower.getContext('2d'),uc=upper.getContext('2d');
         for (const ctx of [lc,uc]) {ctx.drawImage(sprite.cv,0,0);ctx.setTransform(S,0,0,S,(g.L/2+P)*S,(g.W/2+P)*S);}
         // Partition the existing artwork: the cabin floor below, the roof and its glass (whole, as when parked) above.

@@ -72,23 +72,6 @@
             static _staticMembers = [];
             static _layers = { projectile: [], vehicle: [], actor: [], dynamic: [], trigger: [] };
 
-            // --- SHAPE MATHS: basement/shape-kit.js, under the names the game already calls ---
-            static distToSegmentSquared = shapeKit.segmentDistanceSq;
-            static _sweepCircle = shapeKit.sweepCircle;
-            static _sweepRect = shapeKit.sweepRect;
-            static _sweepRoundedBox = shapeKit.sweepRoundedBox;
-            static _inOBB = shapeKit.insideObb;
-            static _contactPoint = shapeKit.obbContactPoint;
-            static _checkCollision = shapeKit.overlaps;
-            static _satCollision = shapeKit.sat;
-            static _circleVsCircle = shapeKit.circleVsCircle;
-            static _circleVsAABB = shapeKit.circleVsRect;
-            static _circleVsOBB = shapeKit.circleVsObb;
-            static _getOBBCorners = shapeKit.obbCorners;
-            static _getOBBAxes = shapeKit.obbAxes;
-            static _projectShape = shapeKit.projectOnAxis;
-            static _entityToOBB = shapeKit.entityToObb;
-            static _aabbToOBB = shapeKit.rectToObb;
 
             static _prepareStaticGrid(items) {
                 const rows = this._staticRows;
@@ -255,7 +238,7 @@
                 if (target.collisionShape === GameEntity.SHAPE.CIRCLE) {
                     const moving = actor && p.lastX !== undefined && target._projectileStartTick === _simTick;
                     const sx = moving ? target._projectileStartX : target.x, sy = moving ? target._projectileStartY : target.y;
-                    return this._sweepCircle(ax - sx, ay - sy, p.x - target.x, p.y - target.y, 0, 0, r + target.radius);
+                    return shapeKit.sweepCircle(ax - sx, ay - sy, p.x - target.x, p.y - target.y, 0, 0, r + target.radius);
                 }
                 let cx, cy, hw, hh, angle = 0;
                 if (target.collisionShape === GameEntity.SHAPE.OBB || target.length !== undefined) {
@@ -267,7 +250,7 @@
                 }
                 if (![cx, cy, hw, hh].every(Number.isFinite)) return null;
                 const c = Math.cos(angle), s = Math.sin(angle);
-                return this._sweepRoundedBox((ax - cx) * c + (ay - cy) * s, (ay - cy) * c - (ax - cx) * s,
+                return shapeKit.sweepRoundedBox((ax - cx) * c + (ay - cy) * s, (ay - cy) * c - (ax - cx) * s,
                     (p.x - cx) * c + (p.y - cy) * s, (p.y - cy) * c - (p.x - cx) * s, hw, hh, r);
             }
 
@@ -291,10 +274,10 @@
                         if (!wall.active || !this._meets(vehicle, wall)) continue;
                         
                         this.stats.totalChecks++;
-                        const wallOBB = this._aabbToOBB(wall);
+                        const wallOBB = shapeKit.rectToObb(wall);
                         wallOBB.mass = Infinity;
                         
-                        const packet = this._satCollision(vehicle.getOBB(), wallOBB);
+                        const packet = shapeKit.sat(vehicle.getOBB(), wallOBB);
                         if (packet && this._report(vehicle, wall, packet)) {
                             this._resolveVehicleCollision(vehicle, { getOBB: () => wallOBB, isStatic: true }, packet);
                             this.stats.collisionsResolved++;
@@ -310,9 +293,9 @@
                         if (prop.collisionLayer !== GameEntity.LAYER.DYNAMIC || !prop.active || !this._meets(vehicle, prop)) continue;
                         this.stats.totalChecks++;
                         const vo = vehicle.getOBB(), po = prop.getOBB();
-                        const packet = this._satCollision(vo, po);
+                        const packet = shapeKit.sat(vo, po);
                         if (!packet || !this._report(vehicle, prop, packet)) continue;
-                        const cp = this._contactPoint(vo, po, packet.nx, packet.ny);
+                        const cp = shapeKit.obbContactPoint(vo, po, packet.nx, packet.ny);
                         this._solveContact(vehicle, prop, packet, cp, 0.25, 0.4);
                         prop._still = 0;
                         this.stats.collisionsResolved++;
@@ -346,7 +329,7 @@
                         if (!this._meets(actorA, actorB)) continue;
                         
                         this.stats.totalChecks++;
-                        const packet = this._circleVsCircle(actorA, actorB);
+                        const packet = shapeKit.circleVsCircle(actorA, actorB);
                         if (packet && this._report(actorA, actorB, packet)) {
                             // Same-alliance actors get soft push (don't block each other)
                             if (actorA.alliance && actorA.alliance === actorB.alliance) {
@@ -371,7 +354,7 @@
                         if (!wall.active || !this._meets(actor, wall)) continue;
                         
                         this.stats.totalChecks++;
-                        const packet = this._circleVsAABB(actor, wall, mapBounds);
+                        const packet = shapeKit.circleVsRect(actor, wall, mapBounds);
                         if (packet && this._report(actor, wall, packet)) {
                             this._resolveCircleVsStatic(actor, packet);
                             this.stats.collisionsResolved++;
@@ -391,7 +374,7 @@
                         if (!prop.active || !this._meets(actor, prop)) continue;
                         
                         this.stats.totalChecks++;
-                        const packet = this._circleVsOBB(actor, prop);
+                        const packet = shapeKit.circleVsObb(actor, prop);
                         if (packet && this._report(actor, prop, packet)) {
                             prop._still = 0;
                             this._resolveCircleVsDynamic(actor, prop, packet);
@@ -450,9 +433,9 @@
                             if (!this._meets(propA, propB)) continue;
                             this.stats.totalChecks++;
                             const oa = propA.getOBB(), ob = propB.getOBB();
-                            const packet = this._satCollision(oa, ob);
+                            const packet = shapeKit.sat(oa, ob);
                             if (packet && this._report(propA, propB, packet)) {
-                                const cp = this._contactPoint(oa, ob, packet.nx, packet.ny);
+                                const cp = shapeKit.obbContactPoint(oa, ob, packet.nx, packet.ny);
                                 this._solveContact(propA, propB, packet, cp, Math.min(propA.restitution || 0.3, propB.restitution || 0.3), 0.35);
                                 if (packet.depth > 0.5) { propA._still = 0; propB._still = 0; }
                                 this.stats.collisionsResolved++;
@@ -467,11 +450,11 @@
                             if (wall.collisionLayer !== GameEntity.LAYER.STATIC) continue;
                             if (!wall.active || !this._meets(prop, wall)) continue;
                             this.stats.totalChecks++;
-                            const wallOBB = this._aabbToOBB(wall);
+                            const wallOBB = shapeKit.rectToObb(wall);
                             const po = prop.getOBB();
-                            const packet = this._satCollision(po, wallOBB);
+                            const packet = shapeKit.sat(po, wallOBB);
                             if (packet && this._report(prop, wall, packet)) {
-                                const cp = this._contactPoint(po, wallOBB, packet.nx, packet.ny);
+                                const cp = shapeKit.obbContactPoint(po, wallOBB, packet.nx, packet.ny);
                                 this._solveContact(prop, null, packet, cp, prop.restitution || 0.3, 0.45);
                                 this.stats.collisionsResolved++;
                             }
@@ -558,12 +541,12 @@
             /** The contact between two bodies by their shapes: { nx, ny (from b toward a), depth } or null. */
             static _shapeContact(a, b) {
                 const circle = e => (e.body ? e.body.shape : '') === 'circle';
-                const box = e => e.getOBB ? e.getOBB() : (e.body && e.body.shape === 'aabb' ? this._aabbToOBB(e) : shapeKit.entityToObb(e));
+                const box = e => e.getOBB ? e.getOBB() : (e.body && e.body.shape === 'aabb' ? shapeKit.rectToObb(e) : shapeKit.entityToObb(e));
                 let c;
-                if (circle(a) && circle(b)) c = this._circleVsCircle(a, b);
-                else if (circle(a)) c = this._circleVsOBB(a, { getOBB: () => box(b) });
-                else if (circle(b)) { c = this._circleVsOBB(b, { getOBB: () => box(a) }); if (c) c = { ...c, nx: -c.nx, ny: -c.ny }; }
-                else c = this._satCollision(box(a), box(b));
+                if (circle(a) && circle(b)) c = shapeKit.circleVsCircle(a, b);
+                else if (circle(a)) c = shapeKit.circleVsObb(a, { getOBB: () => box(b) });
+                else if (circle(b)) { c = shapeKit.circleVsObb(b, { getOBB: () => box(a) }); if (c) c = { ...c, nx: -c.nx, ny: -c.ny }; }
+                else c = shapeKit.sat(box(a), box(b));
                 if (!c) return null;
                 const ca = this._centre(a), cb = this._centre(b);
                 if (c.nx * (ca.x - cb.x) + c.ny * (ca.y - cb.y) < 0) c = { ...c, nx: -c.nx, ny: -c.ny };   // from b toward a
@@ -594,11 +577,11 @@
                 for (const e of this.spatialGrid.getNearby(q)) {
                     if (!this._findable(e, opts)) continue;
                     let t;
-                    if (e.body.shape === 'circle') t = this._sweepCircle(x0, y0, x1, y1, e.x, e.y, e.radius || 0);
+                    if (e.body.shape === 'circle') t = shapeKit.sweepCircle(x0, y0, x1, y1, e.x, e.y, e.radius || 0);
                     else {
-                        const o = e.getOBB ? e.getOBB() : e.body.shape === 'aabb' ? this._aabbToOBB(e) : shapeKit.entityToObb(e), a = o.angle || 0, c = Math.cos(-a), s = Math.sin(-a);
+                        const o = e.getOBB ? e.getOBB() : e.body.shape === 'aabb' ? shapeKit.rectToObb(e) : shapeKit.entityToObb(e), a = o.angle || 0, c = Math.cos(-a), s = Math.sin(-a);
                         const lx = (x, y) => (x - o.x) * c - (y - o.y) * s, ly = (x, y) => (x - o.x) * s + (y - o.y) * c;
-                        t = this._sweepRoundedBox(lx(x0, y0), ly(x0, y0), lx(x1, y1), ly(x1, y1), o.length / 2, o.width / 2, 0);
+                        t = shapeKit.sweepRoundedBox(lx(x0, y0), ly(x0, y0), lx(x1, y1), ly(x1, y1), o.length / 2, o.width / 2, 0);
                     }
                     if (t !== null && t !== undefined) hits.push({ e, t, x: x0 + (x1 - x0) * t, y: y0 + (y1 - y0) * t });
                 }
@@ -608,9 +591,123 @@
                 const probe = { x, y, radius: r }, out = [];
                 for (const e of this.spatialGrid.getInRadius(x, y, r)) {
                     if (!this._findable(e, opts)) continue;
-                    if (e.body.shape === 'circle' ? Math.hypot(e.x - x, e.y - y) < r + (e.radius || 0) : this._circleVsOBB(probe, e)) out.push(e);
+                    if (e.body.shape === 'circle' ? Math.hypot(e.x - x, e.y - y) < r + (e.radius || 0) : shapeKit.circleVsObb(probe, e)) out.push(e);
                 }
                 return out;
+            }
+
+            // =====================
+            //  JOINTS: a hinged leaf (a door) — h { hx, hy (the hinge), baseAngle, angle, angVel, length, thickness }
+            // =====================
+
+            /** One tick: circle bodies push the leaf (and it pushes them back out, less near its middle), the push turns
+             *  it, a spring closes it, damping slows it, and it stops `limit` either side of shut (bouncing a little). */
+            static stepHinge(h, actors, limit) {
+                const L = h.length, half = h.thickness / 2, MAX = limit;
+                const a = h.baseAngle + h.angle, ux = Math.cos(a), uy = Math.sin(a);
+                for (const act of actors) {
+                    const r = act.radius || 12;
+                    const px = act.x - h.hx, py = act.y - h.hy;
+                    if (px * px + py * py > (L + r + 4) * (L + r + 4)) continue;
+                    const s = Math.max(0, Math.min(L, px * ux + py * uy));           // closest point along the leaf
+                    const dx = px - ux * s, dy = py - uy * s, dist = Math.hypot(dx, dy);
+                    const depth = r + half - dist;
+                    if (depth <= 0) continue;
+                    let nx, ny;
+                    if (dist > 1e-4) { nx = dx / dist; ny = dy / dist; }
+                    else { nx = -uy; ny = ux; }
+                    const jammed = Math.abs(h.angle) >= MAX - 0.01 && Math.sign(ux * -ny - uy * -nx) === Math.sign(h.angle);
+                    const give = jammed || s < 4 ? 1 : 0.7;                         // near the hinge or at the stop it can't yield
+                    act.x += nx * depth * give; act.y += ny * depth * give;
+                    // Torque from the actor pushing along -n; a push near the hinge still swings the
+                    // door (people push a door's middle), so no one gets stuck at the jamb
+                    const torque = Math.max(s, L * 0.5) * (ux * -ny - uy * -nx) * depth;
+                    h.angVel += torque * 0.9 / (L * L / 3);
+                }
+                h.angVel += -0.018 * h.angle;                                 // closing spring
+                h.angVel *= 0.88;
+                h.angle += h.angVel;
+                if (h.angle > MAX) { h.angle = MAX; h.angVel *= -0.3; }
+                if (h.angle < -MAX) { h.angle = -MAX; h.angVel *= -0.3; }
+                if (Math.abs(h.angle) < 0.002 && Math.abs(h.angVel) < 0.0005) { h.angle = 0; h.angVel = 0; }
+            }
+
+            // =====================
+            //  MAP QUERIES: lines, rays, sight and room to stand, against plain rects ({ x, y, w, h }: a map's walls and
+            //  footprints), the whole map (not just on screen), through the rect grid (_physicsSpatial)
+            // =====================
+
+            /** Is the segment blocked by any rect in these lists? */
+            static lineBlocked(x1, y1, x2, y2, ...lists) {
+                const bounds = { left: Math.min(x1, x2), right: Math.max(x1, x2), top: Math.min(y1, y2), bottom: Math.max(y1, y2) };
+                for (const list of lists) {
+                    const c = _physicsSpatial.query(list, bounds);
+                    if (c) for (let i = 0; i < c.length; i++) { const w = c[i]; if (shapeKit.segCrossesRect(x1, y1, x2, y2, w.x, w.y, w.w, w.h)) return true; }
+                }
+                return false;
+            }
+            /** How far along the segment the first rect is (maxDist when none) */
+            static rayNearest(x1, y1, x2, y2, rects, maxDist) {
+                let nearest = maxDist;
+                const candidates = _physicsSpatial.query(rects, { left: Math.min(x1, x2), right: Math.max(x1, x2), top: Math.min(y1, y2), bottom: Math.max(y1, y2) });
+                for (let i = 0; i < candidates.length; i++) { const o = candidates[i]; nearest = shapeKit.segRectNearest(x1, y1, x2, y2, o.x, o.y, o.w, o.h, nearest, -Infinity); }
+                return nearest;
+            }
+            /**
+             * What can be seen from (ox, oy) out to `range` past rects: a visibility polygon, points sorted by angle
+             * ({ angle, x, y }); fan them from the origin to fill. opts.extraPoints: more corners to aim at;
+             * opts.aMin / aMax: only that angle window (counter-clockwise), with an arc of rays every opts.arcStep
+             * (default 0.12) so the far edge stays round (vision cones, headlight beams); opts.minDist: ignore rects
+             * nearer than this. Rays go to every nearby corner (and ±0.0001 rad) and stop at the first rect.
+             */
+            static _visRel = []; static _visAng = [];
+            static visibilityPoly(ox, oy, range, obstacles, opts = {}) {
+                const relevant = this._visRel; relevant.length = 0;
+                for (let i = 0; i < obstacles.length; i++) { const o = obstacles[i]; if (Math.hypot(o.x + o.w / 2 - ox, o.y + o.h / 2 - oy) < range + Math.max(o.w, o.h)) relevant.push(o); }
+                const minDist = opts.minDist || 0;
+                const windowed = opts.aMin !== undefined;
+                const TAU = Math.PI * 2, span = windowed ? (((opts.aMax - opts.aMin) % TAU + TAU) % TAU || TAU) : 0;
+                const rel = a => ((a - opts.aMin) % TAU + TAU) % TAU;
+                const angles = this._visAng; angles.length = 0;
+                const aim = (px, py) => {
+                    const angle = Math.atan2(py - oy, px - ox);
+                    for (let k = -1; k <= 1; k++) {
+                        const off = k === 0 ? 0 : k * 0.0001;
+                        if (windowed && rel(angle + off) > span) continue;
+                        angles.push(angle + off);
+                    }
+                };
+                for (let i = 0; i < relevant.length; i++) { const o = relevant[i]; aim(o.x, o.y); aim(o.x + o.w, o.y); aim(o.x + o.w, o.y + o.h); aim(o.x, o.y + o.h); }
+                if (opts.extraPoints) for (const p of opts.extraPoints) aim(p.x, p.y);
+                if (windowed) {
+                    const step = opts.arcStep || 0.12, n = Math.max(1, Math.ceil(span / step));
+                    for (let i = 0; i <= n; i++) angles.push(opts.aMin + span * i / n);
+                }
+                const out = new Array(angles.length);
+                for (let j = 0; j < angles.length; j++) {
+                    const a = angles[j], dx = Math.cos(a), dy = Math.sin(a), ex = ox + dx * range, ey = oy + dy * range;
+                    let closest = range;
+                    for (let i = 0; i < relevant.length; i++) { const o = relevant[i]; closest = shapeKit.segRectNearest(ox, oy, ex, ey, o.x, o.y, o.w, o.h, closest, minDist); }
+                    out[j] = { angle: a, x: ox + dx * closest, y: oy + dy * closest };
+                }
+                if (windowed) out.sort((p, q) => rel(p.angle) - rel(q.angle));
+                else out.sort((p, q) => p.angle - q.angle);
+                return out;
+            }
+            /** Is (x, y) strictly inside any rect in these lists? */
+            static pointBlocked(x, y, ...lists) {
+                for (const list of lists) if (list) for (const r of list) if (shapeKit.pointInsideRect(x, y, r)) return true;
+                return false;
+            }
+            /** Does a square body of half-size h at (x, y) overlap any rect in these lists? (a mover's next step) */
+            static squareBlocked(x, y, h, ...lists) {
+                for (const list of lists) if (list) for (const r of list) if (shapeKit.squareHitsRect(x, y, h, r)) return true;
+                return false;
+            }
+            /** Keep a body inside the map (w × h), `margin` from its edges */
+            static keepInside(e, w, h, margin) {
+                e.x = Math.max(margin, Math.min(w - margin, e.x));
+                e.y = Math.max(margin, Math.min(h - margin, e.y));
             }
 
             // =====================
@@ -628,7 +725,7 @@
                         if (v1 === v2 || v2._colIdx === undefined || cars[v2._colIdx] !== v2 || v2._colIdx < n1) continue;   // met already (or not in the list)
                         if (!this._meets(v1, v2)) continue;
                         this.stats.totalChecks++;
-                        const packet = this._satCollision(v1, v2);
+                        const packet = shapeKit.sat(v1, v2);
                         if (!packet || !this._report(v1, v2, packet)) continue;
                         if (hit) hit(v1, v2, packet); else this._resolveVehicleCollision(v1, v2, packet);
                     }

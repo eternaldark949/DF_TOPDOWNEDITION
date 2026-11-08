@@ -359,32 +359,12 @@
         //  Companion eyeline tactics
         // ---------------------------------------------------------------------
 
-        /** Does segment (x1,y1)→(x2,y2) touch prop p? Props are rotated boxes positioned
-         *  by their top-left corner (see PropEntity.getOBB). Liang–Barsky in the prop's frame. */
-        function segmentHitsProp(x1, y1, x2, y2, p) {
-            const hw = p.width / 2, hh = p.height / 2;
-            const cx = p.x + hw, cy = p.y + hh;
-            const a = -(p.angle || 0), c = Math.cos(a), s = Math.sin(a);
-            const ax = (x1 - cx) * c - (y1 - cy) * s, ay = (x1 - cx) * s + (y1 - cy) * c;
-            const bx = (x2 - cx) * c - (y2 - cy) * s, by = (x2 - cx) * s + (y2 - cy) * c;
-            const dx = bx - ax, dy = by - ay;
-            let t0 = 0, t1 = 1;
-            const edges = [[-dx, ax + hw], [dx, hw - ax], [-dy, ay + hh], [dy, hh - ay]];
-            for (let i = 0; i < 4; i++) {
-                const pp = edges[i][0], qq = edges[i][1];
-                if (pp === 0) { if (qq < 0) return false; continue; }
-                const r = qq / pp;
-                if (pp < 0) { if (r > t1) return false; if (r > t0) t0 = r; }
-                else        { if (r < t0) return false; if (r < t1) t1 = r; }
-            }
-            return true;
-        }
 
         /** Clear shot for a projectile? Walls and buildings (same test the enemies use),
          *  plus props, which stop bullets too (they get knocked around when hit).
          *  Lamps are light sources with no collision, so they never block. */
         function hasShotLine(x1, y1, x2, y2, map) {
-            if (isLineBlocked(x1, y1, x2, y2, map.walls, getColliders(map))) return false;
+            if (collisionWorld.lineBlocked(x1, y1, x2, y2, map.walls, getColliders(map))) return false;
             if (typeof game !== 'undefined' && game.activeMap === map && game.roomSystem.doorBlocks(x1, y1, x2, y2)) return false;   // a shut door
             const props = (typeof game !== 'undefined' && game.activeMap === map) ? game.props : null;
             if (props && props.length) {
@@ -395,7 +375,7 @@
                     const r = 0.71 * Math.max(p.width, p.height) + 1;             // bounding circle
                     const cx = p.x + p.width / 2, cy = p.y + p.height / 2;
                     if (cx < minX - r || cx > maxX + r || cy < minY - r || cy > maxY + r) continue;
-                    if (segmentHitsProp(x1, y1, x2, y2, p)) return false;
+                    if (shapeKit.segmentHitsTurnedRect(x1, y1, x2, y2, p)) return false;
                 }
             }
             return true;

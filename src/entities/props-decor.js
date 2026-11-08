@@ -1286,7 +1286,7 @@
         const _gyTiles = {};
         function _gyTile(name, w, h, paint) {
             if (_gyTiles[name]) return _gyTiles[name];
-            const S = 2, cv = document.createElement('canvas'); cv.width = w * S; cv.height = h * S;
+            const S = 2, cv = canvasKit.createLayer([w * S, h * S]).canvas;
             const c = cv.getContext('2d'); c.scale(S, S); paint(c, w, h);
             const pat = c.createPattern(cv, 'repeat'); pat.setTransform(new DOMMatrix().scale(1 / S));
             return (_gyTiles[name] = pat);
@@ -1503,7 +1503,7 @@
             if (_gyLean()) { _gyPillar3D(ctx, p); return; }
             const P = GY_WALL.PILLAR, pad = GY_PILLAR_PAD;
             if (!_gyPillarSprite) {
-                const S = 3, cv = document.createElement('canvas'); cv.width = cv.height = (P + pad * 2) * S;
+                const S = 3, cv = canvasKit.createLayer([(P + pad * 2) * S, (P + pad * 2) * S]).canvas;
                 const c = cv.getContext('2d'); c.scale(S, S); c.translate(pad, pad);
                 const capH = 20;
                 c.fillStyle = 'rgba(6, 4, 10, 0.45)'; c.beginPath(); c.roundRect(5, 6, P + 2, P + 1, 3); c.fill();   // its shadow

@@ -31,7 +31,7 @@
             openDrYinMenu() {
                 this.pauseSystem.acquire('tuning');
                 const ov = document.getElementById('tuning-overlay');
-                ov.style.display = 'block';
+                uiKit.show(ov);
                 const body = document.getElementById('tuning-body');
                 const R = this.resonance;
                 body.innerHTML = `

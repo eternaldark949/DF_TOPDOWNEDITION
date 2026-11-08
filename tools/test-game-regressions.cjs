@@ -93,7 +93,7 @@ test('Legacy save/load and cap PP settlement preserve XP without duplicate payou
 function flitFixture(env, walls) {
   env.run(`
     game.isDriving=false; game.paused=false; game.hud={has:()=>true}; controls.keyboard.setInputs([]); game.joystick={active:false};
-    game.useNewCollisionSystem=false; game._staticBillboardEntities=[]; game.roomSystem={active:false,doors:[]};
+    game._staticBillboardEntities=[]; game.roomSystem={active:false,doors:[]};
     game.activeMap={width:1000,height:1000,walls:${JSON.stringify(walls)},buildings:[],buildingColliders:[]};
     Object.assign(game.player,{x:100,y:100,angle:0,radius:12});
     game.player.buffSystem={getStat:(name,base)=>base}; game.augments={isEquipped:()=>false};
