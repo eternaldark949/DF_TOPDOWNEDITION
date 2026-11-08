@@ -56,6 +56,7 @@ const SCRIPTS = [
     'basement/spatial-grid.js',    // LV0 Basement: SpatialHashGrid and the render / transition grids
     'basement/collision-kit.js',   // LV0 Basement: collisionKit and collisionWorld (the collision step, game-free: layers, grid, passes, solver)
     'basement/ui-kit.js',          // LV0 Basement: uiKit (making, showing and hiding DOM panels)
+    'basement/draw-list.js',       // LV0 Basement: drawList and canvasRenderer (what to draw, apart from how)
     'basement/material-kit.js',    // LV0 Basement: materialKit (linked materials and finish rules)
     'basement/virtual-child.js',   // LV0 Basement: virtualChild (things that ride on a parent without being its child)
     'basement/awareness-kit.js',   // LV0 Basement: awarenessMatrix (what a character knows of what's around them)
@@ -183,6 +184,7 @@ const SCRIPTS = [
     'lobby/level-pause.js',       // LV1 Lobby: levelPause (the pause registry)
     'lobby/level-stages.js',      // LV1 Lobby: levelStages (which stage the engine is on: menu, loading, world)
     'engine/pause-system.js',
+    'directory/effects-system.js',   // LV2 Directory: effectsSystem and EFFECTS (the world's short-lived effects)
     'engine/game-engine.js',
     'engine/events.js',
     'engine/combat-effects.js',

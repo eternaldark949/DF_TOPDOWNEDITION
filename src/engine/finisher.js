@@ -144,7 +144,7 @@
                 this.triggerTimeSlow(subtle ? 0.5 : FINISHER.SLOW, (this.finisher.tBody + this.finisher.tStella) / 1000, true,
                                      { inMs: FINISHER.RAMP_IN, outMs: FINISHER.RAMP_OUT });
                 this._finShot = this.shotsFired || 0;
-                if (this.muzzleFlashes && this.muzzleFlashes.length) this.muzzleFlashes[this.muzzleFlashes.length - 1].life += 6;   // the last star lingers
+                { const M = this.effects.of('muzzle'); if (M.length) M[M.length - 1].life += 6; }   // the last star lingers
             },
 
             /** Once per rendered frame (real ms, loop.js): the beats, the camera, the twirl */
@@ -185,18 +185,15 @@
 
             /** The kill's glitter rises from the body and settles as lamp-catching flecks */
             finisherBurst(F) {
-                const L = this.casings || (this.casings = []);
                 const n = F.subtle ? 14 : 26;
                 for (let i = 0; i < n; i++) {
                     const a = Math.random() * Math.PI * 2, v = 1.2 + Math.random() * 2.6;
-                    L.push({ x: F.x, y: F.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, a, spin: (Math.random() - 0.5) * 0.9, t: 0,
+                    this.effects.spawn('casing', { x: F.x, y: F.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, a, spin: (Math.random() - 0.5) * 0.9, t: 0,
                              big: false, col: F.col, ph: Math.random() * 6.28, rate: 0.006 + Math.random() * 0.006 });
                 }
-                while (L.length > 60) L.shift();
-                const fx = this.shotFx || (this.shotFx = []);
                 for (let i = 0; i < 10; i++) {
                     const a = Math.random() * Math.PI * 2, v = 0.4 + Math.random() * 0.9;
-                    fx.push({ k: 'dust', x: F.x, y: F.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 0.3, t: -i, life: 70, col: F.col, ph: Math.random() * 6.28 });
+                    this.effects.spawn('barrel', { k: 'dust', x: F.x, y: F.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 0.3, t: -i, life: 70, col: F.col, ph: Math.random() * 6.28 });
                 }
                 while (fx.length > 160) fx.shift();
             },

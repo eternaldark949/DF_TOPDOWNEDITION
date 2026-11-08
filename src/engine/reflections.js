@@ -481,7 +481,7 @@
                     }
                     rc.globalCompositeOperation = 'lighter';
                 }
-                for (const fl of this.muzzleFlashes || []) glow(fl.x, fl.y + 16, fl.color && /^#[0-9a-f]{6}$/i.test(fl.color) ? fl.color : '#fff1d0', 40, 60, 0.8);
+                for (const fl of this.effects.of('muzzle')) glow(fl.x, fl.y + 16, fl.color && /^#[0-9a-f]{6}$/i.test(fl.color) ? fl.color : '#fff1d0', 40, 60, 0.8);
                 for (const pj of this.projectiles || []) if (pj.active !== false) glow(pj.x, pj.y + 12, /^#[0-9a-f]{6}$/i.test(pj.color || '') ? pj.color : '#ffffff', 12, 26, 0.6);
                 // Whoever stands between a light and its reflection blocks it: their mirrored shape
                 rc.globalCompositeOperation = 'destination-out';
