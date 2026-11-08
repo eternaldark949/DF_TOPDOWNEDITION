@@ -285,4 +285,38 @@ test('Story: steps are named once, point at real maps and checks, crew nights at
  assert.deepEqual(e.errors,[]);
 });
 
+test('Dialogue: every line has a speaker and words, the crew is the same six everywhere, and the game reads it',()=>{
+ const d=load('dialogue.json'), crew=Object.keys(load('story.json').crew.ids).sort(), C=d.crew;
+ const castIds=new Set(Object.values(load('story.json').crew.ids).concat(['949']));
+ const line=(l,where)=>{ assert.ok(Array.isArray(l)&&l.length===2&&typeof l[0]==='string'&&typeof l[1]==='string'&&l[1].length>0,`${where}: a line is [speaker, text]`);
+  assert.ok(castIds.has(l[0]),`${where}: '${l[0]}' is no cast id`); };
+ for(const k of ['openers','closers','toast_taste','yes','no','stood_up','ask_back','intel','stim','solo','moments'])
+  assert.deepEqual(Object.keys(C[k]).sort(),crew,`crew.${k}: not one entry for each of the crew`);
+ for(const who of Object.keys(C.solo_ask)) assert.ok(crew.includes(who),`crew.solo_ask: '${who}' is not one of the crew`);   // (who has none never asks again)
+ for(const k of Object.keys(C.job_talk)) assert.deepEqual(Object.keys(C.job_talk[k]).sort(),crew,`crew.job_talk.${k}: not one line for each of the crew`);
+ for(const [who,t] of Object.entries(C.toast_taste)) assert.ok(C.toasts[t]!==undefined,`crew.toast_taste.${who}: no toast ${t}`);
+ for(const [who,s] of Object.entries(C.solo)){
+  for(const part of ['open','ask','close']) s[part].forEach((l,i)=>line(l,`crew.solo.${who}.${part}[${i}]`));
+  assert.equal(s.replies.length,s.opts.length,`crew.solo.${who}: one reply for each option`);
+  assert.ok(s.liked>=0&&s.liked<s.opts.length,`crew.solo.${who}.liked is no option`);
+  s.replies.forEach((r,i)=>r.forEach((l,j)=>line(l,`crew.solo.${who}.replies[${i}][${j}]`)));
+ }
+ for(const [who,tiers] of Object.entries(C.moments)) tiers.forEach((pool,t)=>pool.forEach((m,i)=>{
+  const at=`crew.moments.${who}[${t}][${i}]`; m.lines.forEach((l,j)=>line(l,`${at}.lines[${j}]`));
+  assert.equal(m.after.length,m.opts.length,`${at}: one after for each option`); assert.ok(m.good>=0&&m.good<m.opts.length,`${at}.good is no option`);
+  m.after.forEach((a,i2)=>a.forEach((l,j)=>line(l,`${at}.after[${i2}][${j}]`)));
+ }));
+ const T=d.bonding.tiers; assert.equal(T[0].min,0); for(let i=1;i<T.length;i++) assert.ok(T[i].min>T[i-1].min,'bonding.tiers: min goes up');
+ for(const [who,tiers] of Object.entries(d.bonding.dialogues)) for(const [t,pool] of Object.entries(tiers)){
+  assert.ok(T[t],`bonding.dialogues.${who}: no tier ${t}`);
+  pool.forEach((ex,i)=>ex.forEach((l,j)=>assert.ok(l.speaker&&l.text,`bonding.dialogues.${who}[${t}][${i}][${j}]: speaker and text`)));
+ }
+ const e=runtime(join(ROOT,'DFAB V8.html'),{affine:true});
+ const got=JSON.parse(e.run(`JSON.stringify({same:BONDING_DIALOGUES===GAME_DB.dialogue.bonding.dialogues&&BONDING_TIERS===GAME_DB.dialogue.bonding.tiers&&PROLOGUE_EPIGRAPH===GAME_DB.dialogue.prologue_epigraph
+  &&[CREW_OPENERS,CREW_BOOTH,CREW_TOASTS,CREW_TOAST_TASTE,CREW_TOAST_LINES,CREW_JOB_TALK,CREW_CLOSERS,CREW_SOLO,CREW_MOMENTS,CREW_GROUP_INVITE,CREW_YES,CREW_NO,CREW_STOOD_UP,CREW_ASK_BACK,CREW_INTEL,CREW_STIM,CREW_SOLO_ASK]
+     .every((t,i)=>t===Object.values(GAME_DB.dialogue.crew)[i])})`));
+ assert.equal(got.same,true,'an old name no longer reads the chapter');
+ assert.deepEqual(e.errors,[]);
+});
+
 console.log(`test-game-db: ${tests.length} passed`);

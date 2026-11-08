@@ -1,0 +1,731 @@
+{
+  "_about": {
+    "chapter": "Dialogue and text: the apartment's bonding talks and the bond tiers, everything the crew says on a night out and in their texts, and the prologue's poem.",
+    "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.dialogue and checked by tools/test-game-db.cjs. A line is [speaker, text] or { speaker, text, mood }; the speaker is a cast id (949, 747, victoria…) in crew.solo and crew.moments, a name (Victoria, 949) in bonding. {mark}, {gun} and {job} are filled in by the code. Crew members are keyed by name ('747', Victoria, Sabrina, Yenna, Max, Josh). _about.notes keeps the explanations that were comments in the code, keyed by path.",
+    "tables": {
+      "bonding": "The apartment's talks (story/dialogue-bonding.js): dialogues (BONDING_DIALOGUES) holds per person, per tier (0 Acquaintance to 3 Inner Circle), a pool of exchanges, one picked each time; tiers (BONDING_TIERS) is each tier's name, the relationship it starts at (min, out of 100), the banner shown on reaching it (message) and the colour of its ring on the contacts app.",
+      "crew": "The crew's nights out (story/crew-nights.js). A group night: openers (each one's first line), booth (lines at the table), toasts and toast_taste (which toast each one likes) with toast_lines, job_talk (what each says about her last job: bounty, delivery, salvage or none), closers. A solo night: solo (per person: open, ask, opts, the option they like best (liked), replies to each, close), moments (per person, per tier: lines, opts, the good one, and after). Texts: group_invite, yes, no, stood_up, ask_back, intel, stim, solo_ask.",
+      "prologue_epigraph": "The prologue's poem (PROLOGUE_EPIGRAPH, story/scenes/prologue.js), one line each; an empty string is a stanza break."
+    },
+    "notes": {
+      "bonding.dialogues.Victoria[0][0]": "Acquaintance (0-24)",
+      "bonding.dialogues.Victoria[1][0]": "Companion (25-49)",
+      "bonding.dialogues.Victoria[2][0]": "Trusted (50-74)",
+      "bonding.dialogues.Victoria[3][0]": "Inner Circle (75-100)",
+      "bonding.tiers[0]": "`ring` drives the contacts-app avatar border. Kept here so tier colour has one definition — anything else showing tier state reads it from the same place rather than hardcoding a parallel palette."
+    }
+  },
+  "bonding": {
+    "dialogues": {
+      "Victoria": {
+        "0": [
+          [
+            {"speaker":"Victoria","text":"You just gonna stand there or did you actually want something?"},
+            {"speaker":"949","text":"Just checking in."},
+            {
+              "speaker": "Victoria",
+              "text": "Checking in. Cute. Well, I'm still here. Still armed. Still better than whoever's out there trying to kill us."
+            },
+            {"speaker":"949","text":"Good to know."},
+            {"speaker":"Victoria","text":"...Yeah. It is.","mood":"smile"}
+          ],
+          [
+            {
+              "speaker": "Victoria",
+              "text": "This apartment's alright. Small though. You ever think about getting a place with more room to store ammunition?"
+            },
+            {"speaker":"949","text":"Not really a priority."},
+            {
+              "speaker": "Victoria",
+              "text": "It should be. I've got crates stacked in the corner over there. Organization is half the battle, Freelancer."
+            }
+          ]
+        ],
+        "1": [
+          [
+            {"speaker":"Victoria","text":"You know, I had a corner office once. Real glass. Real view. The kind of place people kill for."},
+            {"speaker":"949","text":"What happened?"},
+            {
+              "speaker": "Victoria",
+              "text": "I found out what they were actually doing with the weapons I was testing. So I took the prototype and walked out."
+            },
+            {"speaker":"949","text":"Just like that?"},
+            {"speaker":"Victoria","text":"Just like that. The glass was bulletproof, by the way. I checked on my way out.","mood":"smirk"}
+          ],
+          [
+            {"speaker":"Victoria","text":"Most people I've worked with are dead or corporate. Same thing, really."},
+            {"speaker":"949","text":"Which am I?"},
+            {"speaker":"Victoria","text":"Neither. That's why I'm still here."}
+          ]
+        ],
+        "2": [
+          [
+            {
+              "speaker": "Victoria",
+              "text": "I don't say this often and I'll deny it if you repeat it. But this crew? This is the closest thing to family I've had in years."
+            },
+            {"speaker":"949","text":"You don't have to deny it."},
+            {
+              "speaker": "Victoria",
+              "text": "...Fine. But if Max makes one more joke about my hair, I'm putting him through the wall. Lovingly.",
+              "mood": "annoyed"
+            }
+          ]
+        ],
+        "3": [
+          [
+            {
+              "speaker": "Victoria",
+              "text": "Freelancer. Whatever happens out there — whatever comes through those dimensions — I've got you. No hesitation. No questions."
+            },
+            {"speaker":"949","text":"I know."},
+            {"speaker":"Victoria","text":"Good. Now let's go break something.","mood":"grin"}
+          ]
+        ]
+      },
+      "Yenna": {
+        "0": [
+          [
+            {
+              "speaker": "Yenna",
+              "text": "The wind pattern shifts three degrees between 2 AM and 4 AM from that balcony. Affects trajectory past 600 meters."
+            },
+            {"speaker":"949","text":"You've been measuring wind from the apartment?"},
+            {"speaker":"Yenna","text":"Observing. There's a difference."}
+          ],
+          [
+            {"speaker":"Yenna","text":"You move well. Not military-trained, but there's something else. Instinct, maybe."},
+            {"speaker":"949","text":"I don't know where it comes from."},
+            {"speaker":"Yenna","text":"That's what makes it dangerous. And useful."}
+          ]
+        ],
+        "1": [
+          [
+            {
+              "speaker": "Yenna",
+              "text": "I served three tours in the Rim Conflicts. Saw things that don't make tactical sense. Things that shouldn't exist."
+            },
+            {"speaker":"949","text":"Dimensional anomalies?"},
+            {
+              "speaker": "Yenna",
+              "text": "That's the polite term. We called them rips. My unit walked into one. I walked out alone.",
+              "mood": "sad"
+            },
+            {"speaker":"949","text":"Yenna..."},
+            {"speaker":"Yenna","text":"I don't need sympathy. I need purpose. This crew gives me that."}
+          ]
+        ],
+        "2": [
+          [
+            {
+              "speaker": "Yenna",
+              "text": "I've been watching the team dynamics. Victoria leads with force. Sabrina deflects with humor. Max combusts. Josh calculates."
+            },
+            {"speaker":"949","text":"And me?"},
+            {"speaker":"Yenna","text":"You hold it together. That's the hardest job. And you don't even notice you're doing it."}
+          ]
+        ],
+        "3": [
+          [
+            {"speaker":"Yenna","text":"I don't form attachments easily. But I want you to know — my scope covers you first. Always."},
+            {"speaker":"949","text":"That means a lot, Yenna."},
+            {"speaker":"Yenna","text":"It's not sentiment. It's strategy. You're the one worth keeping alive."}
+          ]
+        ]
+      },
+      "Sabrina": {
+        "0": [
+          [
+            {
+              "speaker": "Sabrina",
+              "text": "Oh look, the Freelancer wants to chat. Should I put on tea? Light some candles? Summon a minor demon for ambiance?"
+            },
+            {"speaker":"949","text":"Just tea is fine."},
+            {"speaker":"Sabrina","text":"Boring. But sure.","mood":"smirk"}
+          ],
+          [
+            {
+              "speaker": "Sabrina",
+              "text": "You know what I like about this apartment? The walls don't bleed. Low bar, but I've lived in worse."
+            },
+            {"speaker":"949","text":"Where was that?"},
+            {"speaker":"Sabrina","text":"Nice try. We're not there yet."}
+          ]
+        ],
+        "1": [
+          [
+            {
+              "speaker": "Sabrina",
+              "text": "The dark energy thing isn't learned. I was born with it. Mom called it a gift. Dad called it a curse. They were both right."
+            },
+            {"speaker":"949","text":"How do you control it?"},
+            {"speaker":"Sabrina","text":"Control is a strong word. I aim it. Big difference."},
+            {"speaker":"949","text":"That's terrifying.","mood":"surprised"},
+            {"speaker":"Sabrina","text":"I know, right? Kind of awesome though.","mood":"grin"}
+          ]
+        ],
+        "2": [
+          [
+            {"speaker":"Sabrina","text":"I use sarcasm like armor. You've probably noticed."},
+            {"speaker":"949","text":"Little bit."},
+            {"speaker":"Sabrina","text":"It's easier than admitting that I actually care what happens to these idiots. And to you."},
+            {"speaker":"949","text":"The armor's down right now."},
+            {"speaker":"Sabrina","text":"Don't get used to it. But... yeah. It is.","mood":"sultry"}
+          ]
+        ],
+        "3": [
+          [
+            {"speaker":"Sabrina","text":"You're the first person who didn't flinch when they saw what I can do. Not once."},
+            {"speaker":"949","text":"Why would I?"},
+            {"speaker":"Sabrina","text":"Because it scares me sometimes. And I'm the one doing it. So thanks for that. Seriously."}
+          ]
+        ]
+      },
+      "Max": {
+        "0": [
+          [
+            {"speaker":"Max","text":"Yo! Finally some company. I was about to start talking to the walls. Again."},
+            {"speaker":"949","text":"Again?"},
+            {"speaker":"Max","text":"They don't talk back. It's actually kind of peaceful. Don't judge me."}
+          ],
+          [
+            {"speaker":"Max","text":"Hey, check this out — *bzzt*"},
+            {"speaker":"949","text":"Did you just shock the toaster?","mood":"surprised"},
+            {"speaker":"Max","text":"It was being slow. I helped. That's what I do. I help."}
+          ]
+        ],
+        "1": [
+          [
+            {
+              "speaker": "Max",
+              "text": "The sparks aren't just some cool party trick. My nervous system is overclocked. Always has been. Too much electricity, not enough... ground."
+            },
+            {"speaker":"949","text":"Is that why you're always moving?"},
+            {"speaker":"Max","text":"If I stop, I feel like I'll explode. Not metaphorically. I mean actually explode.","mood":"worried"},
+            {"speaker":"949","text":"That sounds exhausting."},
+            {"speaker":"Max","text":"It is. But it also means I'll never let you down in a fight. Can't slow down even if I wanted to."}
+          ]
+        ],
+        "2": [
+          [
+            {"speaker":"Max","text":"People think I'm crazy. And like, fair. But there's a reason I burn hot."},
+            {"speaker":"949","text":"What's the reason?"},
+            {
+              "speaker": "Max",
+              "text": "Because the people I care about are worth burning for. This team. You. I'd fry every circuit in my body if it meant keeping you safe."
+            },
+            {"speaker":"949","text":"Max..."},
+            {"speaker":"Max","text":"Don't make it weird. I'm still gonna shock your toaster."}
+          ]
+        ],
+        "3": [
+          [
+            {"speaker":"Max","text":"You ever notice I don't spark around you anymore? My hands are steady."},
+            {"speaker":"949","text":"I hadn't noticed."},
+            {
+              "speaker": "Max",
+              "text": "First time that's happened. Ever. You're like a ground wire for me, Freelancer. Don't know what I'd do without this crew."
+            }
+          ]
+        ]
+      },
+      "Josh": {
+        "0": [
+          [
+            {"speaker":"Josh","text":"The apartment's network security is inadequate. I've already patched three vulnerabilities."},
+            {"speaker":"949","text":"Thanks, Josh."},
+            {"speaker":"Josh","text":"Acknowledgment noted."}
+          ],
+          [
+            {"speaker":"Josh","text":"You've approached me voluntarily. This is the first time. I'm logging it."},
+            {"speaker":"949","text":"You don't have to log everything."},
+            {"speaker":"Josh","text":"Incorrect. Patterns in social interaction predict mission outcomes with 73% accuracy."}
+          ]
+        ],
+        "1": [
+          [
+            {
+              "speaker": "Josh",
+              "text": "I started hacking at age eleven. Not because I wanted to break things. Because I wanted to understand how they worked."
+            },
+            {"speaker":"949","text":"And now?"},
+            {"speaker":"Josh","text":"Now I understand how most things work. People are the exception. You are a significant exception."},
+            {"speaker":"949","text":"Is that good or bad?"},
+            {"speaker":"Josh","text":"Undetermined. But I find the uncertainty... acceptable."}
+          ]
+        ],
+        "2": [
+          [
+            {
+              "speaker": "Josh",
+              "text": "I ran probability models on crew survival rates. With you leading, they're 340% higher than baseline."
+            },
+            {"speaker":"949","text":"That's just math, Josh."},
+            {
+              "speaker": "Josh",
+              "text": "No. I factored out tactical variables. The remaining variable is morale. You make people want to survive. That's not math. That's... something else."
+            }
+          ]
+        ],
+        "3": [
+          [
+            {
+              "speaker": "Josh",
+              "text": "Emotional attachment detected. Subject: you. And the team. Severity: significant. Recommended action: none. I don't want it to stop."
+            },
+            {"speaker":"949","text":"Josh, that might be the most human thing you've ever said.","mood":"smile"},
+            {"speaker":"Josh","text":"...Don't tell Max.","mood":"smile"}
+          ]
+        ]
+      }
+    },
+    "tiers": [
+      {"name":"Acquaintance","min":0,"message":null,"ring":"rgba(150,150,160,0.45)"},
+      {"name":"Companion","min":25,"message":"BOND DEEPENED — COMPANION","ring":"rgba(196,86,110,0.75)"},
+      {"name":"Trusted","min":50,"message":"BOND DEEPENED — TRUSTED ALLY","ring":"rgba(255,60,120,0.9)"},
+      {"name":"Inner Circle","min":75,"message":"BOND DEEPENED — INNER CIRCLE","ring":"#ff0055"}
+    ]
+  },
+  "crew": {
+    "openers": {
+      "747": ["There she is. Sit, Nine. Tonight we're off the clock."],
+      "Victoria": ["Nine! Finally. I ordered for you. Don't ask what it is."],
+      "Sabrina": ["Look who remembered she has friends."],
+      "Max": ["You're late. Sit down before someone takes your seat."],
+      "Josh": ["You arrived four minutes after the median. Acceptable."],
+      "Yenna": ["Booth with a clear view of both exits. You're welcome."]
+    },
+    "booth": {
+      "747": "Good to see everyone in one piece for once.",
+      "Victoria": "The DJ keeps looking at me. I'm going to let him suffer.",
+      "Sabrina": "The drinks here are terrible. I've had four.",
+      "Max": "Music's too loud. Drinks are too small. This is bullshit.",
+      "Josh": "Fun fact: this booth has the best acoustics in the building. For eavesdropping.",
+      "Yenna": "Bartender's been watering the gin. I can tell from here."
+    },
+    "toasts": ["To the crew.","To getting paid.","To surviving Mirabel."],
+    "toast_taste": {"747":0,"Yenna":0,"Victoria":1,"Josh":1,"Max":2,"Sabrina":2},
+    "toast_lines": [
+      {"747":"To the crew.","Yenna":"To the crew. Every one of you."},
+      {"Victoria":"Now THAT I'll drink to.","Josh":"Technically we get paid either way. But yes."},
+      {"Max":"Ha! Finally, someone says it.","Sabrina":"We'll need more glasses."}
+    ],
+    "job_talk": {
+      "bounty": {
+        "747": "Good work on {job}, Nine.",
+        "Yenna": "That last mark had a decent rifle. Had.",
+        "Josh": "{job}. Closed. I put a little star next to it.",
+        "Max": "{job} won't be bothering anyone.",
+        "Victoria": "Can we talk about how dramatic that last bounty was?",
+        "Sabrina": "You've been busy. {job}, was it?"
+      },
+      "delivery": {
+        "747": "Honest work. Nothing wrong with that.",
+        "Victoria": "I hear we're couriers now. Do I get a cute hat?",
+        "Josh": "Amber rated you five stars. I checked. Twice.",
+        "Max": "Boxes. We fought gods and now we carry boxes.",
+        "Sabrina": "How's the delivery life? Tips any good?",
+        "Yenna": "Delivery routes are good recon. Smart."
+      },
+      "salvage": {
+        "747": "Careful with Anavia, Nine. Her gifts have strings.",
+        "Max": "Anavia's scrap jobs pay. I'll give her that.",
+        "Josh": "That salvage haul was worth more than this bar.",
+        "Victoria": "You came back covered in rust. Iconic.",
+        "Yenna": "Salvage guards are getting smarter. Watch it.",
+        "Sabrina": "Treasure hunting for Anavia. How romantic."
+      },
+      "none": {
+        "747": "Enjoy the quiet while it lasts.",
+        "Victoria": "Quiet week. I hate quiet weeks.",
+        "Max": "Nothing's blown up in days. I'm suspicious.",
+        "Josh": "Statistically, something terrible is about to happen.",
+        "Sabrina": "No jobs, no drama. Boring.",
+        "Yenna": "Quiet means someone's planning something."
+      }
+    },
+    "closers": {
+      "747": "Same time next week. Nobody dies before then.",
+      "Victoria": "Okay, I'm drunk. Somebody walk me to a car.",
+      "Sabrina": "Last round. Then I'm going home. Alone. Probably.",
+      "Max": "Fine. That wasn't terrible. Don't tell anyone I said that.",
+      "Josh": "I'll put it on the group card. You're welcome.",
+      "Yenna": "I'll take the back door. Old habits."
+    },
+    "solo": {
+      "747": {
+        "open": [["747","Nine. I got you the usual. Black, too strong."],["747","Sit. No contracts tonight. Just coffee."]],
+        "ask": [["747","Settle something for me. What's the point of all this, after the jobs?"]],
+        "opts": ["Keeping all of you alive.","Getting rich and disappearing.","Finding the Dark Maker."],
+        "liked": 0,
+        "replies": [
+          [["747","…Yeah. Me too. Funny how that turns into the whole point."]],
+          [["747","Hm. Take me with you when you disappear. I'll carry the bags."]],
+          [["747","Don't let him become the only thing you are, Nine."]]
+        ],
+        "close": [["747","Same time next week? Coffee's on me."]]
+      },
+      "Victoria": {
+        "open": [
+          ["victoria","Okay, look at this. LOOK at it. Torque got the new wraps in."],
+          ["victoria","I need a second opinion. A good one. Not Max's."]
+        ],
+        "ask": [["victoria","Which one? Be honest. Be very honest."]],
+        "opts": ["The chrome rose gold.","Matte black, obviously.","The holographic one."],
+        "liked": 2,
+        "replies": [
+          [["victoria","Classy. Bit safe. I love you anyway."]],
+          [["victoria","Matte black is what Max would pick. I'm hurt."]],
+          [
+            ["victoria","YES. Finally, someone with taste. I'm putting it on your car."],
+            ["949","You are not."],
+            ["victoria","I am absolutely going to."]
+          ]
+        ],
+        "close": [["victoria","This was fun. You're fun. Don't tell the others, they'll get jealous."]]
+      },
+      "Sabrina": {
+        "open": [
+          ["sabrina","You came. I was starting to think I'd have to drink alone. Again."],
+          ["sabrina","Sit. The bartender knows my order. He'll guess yours."]
+        ],
+        "ask": [["sabrina","Tell me something nobody else in the crew knows about you."]],
+        "opts": ["I hate the sound of rain.","I talk to my reflection.","Nice try."],
+        "liked": 2,
+        "replies": [
+          [["sabrina","Rain. In this city. You poor thing."]],
+          [["sabrina","Everyone does. You're just honest about it."]],
+          [["sabrina","Ha. Good. Keep your secrets, Nine. It suits you."]]
+        ],
+        "close": [["sabrina","Next round's yours. Next time."]]
+      },
+      "Yenna": {
+        "open": [["yenna","Cans are set up on the rail. Fifty paces."],["yenna","Loser buys dinner. I've never bought dinner."]],
+        "ask": [["yenna","Your shot. Take your time."]],
+        "opts": ["Take it slow. Breathe.","Quick draw. Don't think.","Shoot the can she's aiming at."],
+        "liked": 0,
+        "replies": [
+          [["yenna","…Clean. You actually listened when I taught you."]],
+          [["yenna","Missed by a mile. But it looked cool."]],
+          [["yenna","Did you just— okay. That's funny. I hate that it's funny."]]
+        ],
+        "close": [["yenna","Same spot next time. I'll bring a harder target."]]
+      },
+      "Josh": {
+        "open": [
+          ["josh","Prisma has a sale on V.O.C.A.L.s. I've been here for two hours."],
+          ["josh","I need you to stop me from buying a voice that sounds like a cello."]
+        ],
+        "ask": [["josh","Be honest. Which one?"]],
+        "opts": ["The cello. Obviously.","Keep your own voice.","The one that sounds like Max."],
+        "liked": 1,
+        "replies": [
+          [["josh","You're enabling me. I appreciate it. I'm not buying it."]],
+          [["josh","…That's the nicest thing anyone's said to me this month."]],
+          [["josh","This is bullshit. See? It works. Terrifying."]]
+        ],
+        "close": [["josh","Thanks for coming. I logged it as a team-building exercise."]]
+      },
+      "Max": {
+        "open": [["max","Don't laugh."],["max","I need an opinion on a jacket. One opinion. Yours."]],
+        "ask": [["max","Leather or the long coat?"]],
+        "opts": ["The leather. You look dangerous.","The long coat. Very detective.","Honestly? Neither."],
+        "liked": 0,
+        "replies": [
+          [["max","Dangerous. Yeah. Okay. Yeah."]],
+          [["max","I look like Josh in this. Never mind."]],
+          [["max","Of course. Of course you say that."],["max","…Thanks for being straight with me."]]
+        ],
+        "close": [["max","This was… fine. Good. It was good. Don't make it weird."]]
+      }
+    },
+    "moments": {
+      "747": [
+        [
+          {
+            "lines": [
+              ["747","You ever think about the first job? The one in the rain?"],
+              ["747","You froze for half a second. I almost didn't see it."]
+            ],
+            "opts": ["I didn't freeze.","You saw. Thanks for not saying anything."],
+            "good": 1,
+            "after": [[["747","Sure you didn't."]],[["747","That's what partners are for, Nine."]]]
+          },
+          {
+            "lines": [["747","Mirabel asked me how you're holding up."],["747","I told her you're fine. Are you?"]],
+            "opts": ["I'm fine.","Not really. But I will be."],
+            "good": 1,
+            "after": [[["747","Okay. The offer stands, whenever."]],[["747","That's a better answer. I've got you."]]]
+          }
+        ],
+        [
+          {
+            "lines": [["747","If something happens to me out there, I want you to lead them."],["747","They listen to you more than you think."]],
+            "opts": ["Nothing's going to happen to you.","I will. I promise."],
+            "good": 1,
+            "after": [[["747","You don't get to promise that. But thanks."]],[["747","Good. Then I can sleep tonight."]]]
+          }
+        ],
+        [
+          {
+            "lines": [["747","I don't say this enough."],["747","I'd follow you anywhere, Nine. Into anything."]],
+            "opts": ["Same. Always.","Don't get sentimental on me."],
+            "good": 0,
+            "after": [[["747","Always."]],[["747","Too late. It's out there now."]]]
+          }
+        ]
+      ],
+      "Victoria": [
+        [
+          {
+            "lines": [["victoria","Can I tell you something embarrassing?"],["victoria","I practise my one-liners in the mirror. Before jobs."]],
+            "opts": ["I can tell. They're good.","That's so embarrassing."],
+            "good": 0,
+            "after": [[["victoria","Right?! Finally someone appreciates the craft."]],[["victoria","Wow. Okay. I'm telling everyone you snore."]]]
+          },
+          {
+            "lines": [["victoria","Max says I talk too much on comms."]],
+            "opts": ["Max says that about breathing.","You do, a little."],
+            "good": 0,
+            "after": [[["victoria","HA. He does. I'm keeping that one."]],[["victoria","Traitor. A cute traitor, but a traitor."]]]
+          }
+        ],
+        [
+          {
+            "lines": [["victoria","Real talk for one second."],["victoria","I'm scared all the time out there. I just make it look fabulous."]],
+            "opts": ["Me too. Every job.","You hide it well."],
+            "good": 0,
+            "after": [[["victoria","…Okay. Okay, that helps more than you know."]],[["victoria","Thanks. I think. That's the whole trick."]]]
+          }
+        ],
+        [
+          {
+            "lines": [["victoria","You're my favourite. Out of everyone. Don't tell 747."]],
+            "opts": ["You're mine too.","I'm telling 747."],
+            "good": 0,
+            "after": [
+              [["victoria","I KNEW it. Okay, I'm crying. Ignore me."]],
+              [["victoria","You wouldn't dare. …You would. I love that about you."]]
+            ]
+          }
+        ]
+      ],
+      "Yenna": [
+        [
+          {
+            "lines": [["yenna","You check corners the way I taught you. I noticed."]],
+            "opts": ["Best teacher in the crew.","I figured it out myself."],
+            "good": 0,
+            "after": [[["yenna","Don't let the others hear that. They'll sulk."]],[["yenna","Sure you did."]]]
+          },
+          {
+            "lines": [["yenna","I keep a list. Every shot I didn't take."],["yenna","It's a short list. It still bothers me."]],
+            "opts": ["Those are the ones that count.","You should burn it."],
+            "good": 0,
+            "after": [[["yenna","Yeah. You get it."]],[["yenna","Maybe. Not yet."]]]
+          }
+        ],
+        [
+          {
+            "lines": [["yenna","I trust you on my blind side. I don't say that to people."]],
+            "opts": ["I'll always cover it.","Watch your own side."],
+            "good": 0,
+            "after": [[["yenna","I know. That's why I said it."]],[["yenna","…Fair. Still trust you."]]]
+          }
+        ],
+        [
+          {
+            "lines": [
+              ["yenna","When this is all over, I'm buying a place with a view of nothing. No rooftops. No angles."],
+              ["yenna","There's a room in it for you."]
+            ],
+            "opts": ["I'll bring the coffee.","You'd be bored in a week."],
+            "good": 0,
+            "after": [[["yenna","Good. Black. Too strong."]],[["yenna","Probably. Come anyway."]]]
+          }
+        ]
+      ],
+      "Sabrina": [
+        [
+          {
+            "lines": [["sabrina","Everyone thinks I'm mean. I'm just accurate."]],
+            "opts": ["Accurate and mean.","You're kinder than you let on."],
+            "good": 0,
+            "after": [[["sabrina","Exactly. See, you get me."]],[["sabrina","Shh. You'll ruin my reputation."]]]
+          },
+          {
+            "lines": [["sabrina","Victoria tried to braid my hair on the last job. Mid-firefight."]],
+            "opts": ["Did you let her?","That's Victoria."],
+            "good": 0,
+            "after": [[["sabrina","…She did a good job. I hate it."]],[["sabrina","That's Victoria."]]]
+          }
+        ],
+        [
+          {
+            "lines": [["sabrina","I used to work alone. Liked it."],["sabrina","Then you lot happened."]],
+            "opts": ["Sorry about that.","You're stuck with us now."],
+            "good": 1,
+            "after": [[["sabrina","Don't be. That's the point."]],[["sabrina","Yeah. Turns out I don't mind."]]]
+          }
+        ],
+        [
+          {
+            "lines": [["sabrina","If you ever leave the crew, I'm coming with you. I'm not asking."]],
+            "opts": ["I'd never go without you.","Bossy."],
+            "good": 0,
+            "after": [[["sabrina","Good answer. Correct answer."]],[["sabrina","You like it."]]]
+          }
+        ]
+      ],
+      "Max": [
+        [
+          {
+            "lines": [["max","Everyone thinks I hate everything."],["max","I hate MOST things."]],
+            "opts": ["What don't you hate?","That tracks."],
+            "good": 0,
+            "after": [[["max","Engines. Rain on a tin roof. This crew, mostly."]],[["max","Yeah. It does."]]]
+          },
+          {
+            "lines": [["max","Josh fixed my rifle sight while I was asleep. Didn't say a word."],["max","I don't know what to do with that."]],
+            "opts": ["Say thank you.","Fix something of his."],
+            "good": 1,
+            "after": [[["max","Out loud? Ugh. Fine."]],[["max","…Yeah. Yeah, that's better. I like that."]]]
+          }
+        ],
+        [
+          {
+            "lines": [["max","I lose my temper. On jobs. You know that."],["max","You never hold it against me."]],
+            "opts": ["You always come back.","I hold it a little."],
+            "good": 0,
+            "after": [[["max","I always will. For you lot."]],[["max","Fair. I'll work on it. Probably."]]]
+          }
+        ],
+        [
+          {
+            "lines": [["max","I had a sister. She'd have liked you."],["max","That's all. I just wanted you to know."]],
+            "opts": ["Tell me about her sometime.","I'm sorry, Max."],
+            "good": 0,
+            "after": [[["max","…Yeah. Sometime. Thanks, Nine."]],[["max","Don't be. Just… stick around."]]]
+          }
+        ]
+      ],
+      "Josh": [
+        [
+          {
+            "lines": [["josh","I keep a file on everyone in the crew. For safety."],["josh","Yours is the thinnest. That bothers me."]],
+            "opts": ["Good. Keep it thin.","Ask me anything."],
+            "good": 1,
+            "after": [[["josh","Noted. Suspicious, but noted."]],[["josh","Favourite colour? …I'll start small."]]]
+          },
+          {
+            "lines": [["josh","Statistically, we should be dead four times over."]],
+            "opts": ["We're just that good.","Stop counting."],
+            "good": 0,
+            "after": [[["josh","That's not how statistics work. But I'll allow it."]],[["josh","I can't. It's how I relax."]]]
+          }
+        ],
+        [
+          {
+            "lines": [["josh","Everyone says \"you're welcome\" is my thing."],["josh","It's because nobody ever said thank you first."]],
+            "opts": ["Thank you, Josh. For everything.","It's a good thing."],
+            "good": 0,
+            "after": [[["josh","…You're welcome. That one felt different."]],[["josh","It's grown on me."]]]
+          }
+        ],
+        [
+          {
+            "lines": [["josh","I rewrote my file on you. It's one line now."],["josh","\"Would die for her.\" Then I deleted it. Too dramatic."]],
+            "opts": ["Put it back.","Same, Josh."],
+            "good": 1,
+            "after": [[["josh","Fine. Saved. Backed up twice."]],[["josh","…Logged. Permanently."]]]
+          }
+        ]
+      ]
+    },
+    "group_invite": [
+      {"who":"Victoria","text":"Drinks. Moon City. First round's on Josh."},
+      {"who":"Sabrina","text":"Booth at Moon City tonight. Don't make me drink with Max alone."},
+      {"who":"Josh","text":"Calendar invite: Moon City, tonight. Attendance is mandatory. Kind of."}
+    ],
+    "yes": {
+      "747": "See you there, Nine.",
+      "Victoria": "YAY. Wear something cute.",
+      "Sabrina": "Don't be late.",
+      "Max": "Fine. Good.",
+      "Josh": "Logged.",
+      "Yenna": "Copy that."
+    },
+    "no": {"747":"Another time.","Victoria":"Booo. Fine.","Sabrina":"Your loss.","Max":"Whatever.","Josh":"Noted. Sadly.","Yenna":"Understood."},
+    "stood_up": {
+      "747": "We waited, Nine. Next time.",
+      "Victoria": "We waited ALL night. Rude.",
+      "Sabrina": "Stood up. Bold.",
+      "Max": "Thanks for nothing.",
+      "Josh": "Your seat was empty. I noticed.",
+      "Yenna": "You didn't show. Everything okay?"
+    },
+    "ask_back": {
+      "747": "Always. Coffee?",
+      "Victoria": "Obviously. Torque. Now.",
+      "Sabrina": "Mm. My bar, then.",
+      "Max": "…Sure. I need help with something anyway.",
+      "Josh": "Yes. I mean, I'm free. Yes.",
+      "Yenna": "Park. Bring your aim."
+    },
+    "intel": {
+      "747": "Heads up. {mark}'s carrying a {gun}. Stay behind cover.",
+      "Victoria": "{mark} has a {gun}. Rude. Be careful.",
+      "Yenna": "{mark}: {gun}. Watch their sightlines.",
+      "Sabrina": "Your mark's packing a {gun}. Try not to get shot.",
+      "Max": "{mark} has a {gun}. Don't do anything stupid.",
+      "Josh": "Pulled {mark}'s file. They carry a {gun}. You're welcome."
+    },
+    "stim": {
+      "747": "Left a stim in your bag. Don't argue.",
+      "Victoria": "You looked rough. There's a stim in your pocket. You're welcome, darling.",
+      "Yenna": "Stim in your kit. Use it.",
+      "Sabrina": "Slipped you a stim. Don't make it a habit.",
+      "Max": "Stim. Your bag. Don't make me patch you up.",
+      "Josh": "Restocked one stim. Logged as a gift."
+    },
+    "solo_ask": {
+      "Victoria": [
+        "Torque's open late. Come judge my paint choices.",
+        "I need you at the garage. It's urgent. It's about rims.",
+        "Bored. Garage. You. Now."
+      ],
+      "Sabrina": [
+        "Bar's quiet tonight. Come be quiet with me.",
+        "I'm at Moon City. Drinking alone is a choice and I'm un-choosing it.",
+        "Booth at the back. Bring your bad jokes."
+      ],
+      "Yenna": ["Range is clear. Fifty paces. Loser buys.","Park, after dark. The cans miss you.","Need a spotter. Not for work."],
+      "Josh": [
+        "Neural Systems got a new shipment. I require supervision.",
+        "I've booked thirty minutes for us. That came out wrong. Come to Neural Systems.",
+        "Prisma restocked. Please stop me."
+      ],
+      "Max": [
+        "Enni Cole. I need a second opinion. Again. Shut up.",
+        "Found a jacket. Need your eyes. Don't tell Victoria.",
+        "Come to Enni Cole. Don't make it weird."
+      ]
+    }
+  },
+  "prologue_epigraph": [
+    "You, 747,",
+    "You with so much courage,",
+    "You come alone? Who do you think you are?",
+    "",
+    "You’re an old collection of screws and wire,",
+    "Complete with low grade ditanium plating,",
+    "Nothing but a façade of a person,",
+    "",
+    "Where’s your crew? Your parade of bickering kids?",
+    "They will suffer 747.",
+    "And what will you do?",
+    "",
+    "Your group of so-called Freelancers… ha…",
+    "You’re nothing but a pawn… a pawn in a game, ages old."
+  ]
+}

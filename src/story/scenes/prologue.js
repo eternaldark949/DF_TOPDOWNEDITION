@@ -11,22 +11,7 @@
            Timing is in ticks (60 a second). s.say waits for a tap; { auto: true }
            lets a line go by itself after its reading time.
            ===================================================================== */
-        const PROLOGUE_EPIGRAPH = [
-            'You, 747,',
-            'You with so much courage,',
-            'You come alone? Who do you think you are?',
-            '',
-            'You’re an old collection of screws and wire,',
-            'Complete with low grade ditanium plating,',
-            'Nothing but a façade of a person,',
-            '',
-            'Where’s your crew? Your parade of bickering kids?',
-            'They will suffer 747.',
-            'And what will you do?',
-            '',
-            'Your group of so-called Freelancers… ha…',
-            'You’re nothing but a pawn… a pawn in a game, ages old.'
-        ];
+        const PROLOGUE_EPIGRAPH = GAME_DB.dialogue.prologue_epigraph;   // directory/game-db/dialogue.json
 
         defineScene('prologue', {
             startMap: { id: 'keepers_hill', at: { x: 900, y: 2450 } },
