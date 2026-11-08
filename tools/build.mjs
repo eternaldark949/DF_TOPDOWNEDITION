@@ -73,6 +73,7 @@ const SCRIPTS = [
     'directory/game-db/places.json',    // GAME_DB.places: the maps, their rooms and doors, the city's landmark blocks, the fireplaces
     'directory/game-db/story.json',     // GAME_DB.story: the story's parts and steps (code in STORY_STEP_HOOKS), mission kinds, crew nights, the van's drop
     'directory/game-db/dialogue.json',  // GAME_DB.dialogue: the bonding talks and tiers, the crew's lines and texts, the prologue's poem
+    'directory/game-db/cast.json',      // GAME_DB.cast: speaker colours, the scene cast, the crew's spots at home, every named look, the wardrobe, finishes and materials
     'core/config.js',                   // reads GAME_DB.vehicles and .places, so it comes after the chapters
     '@assets',              // generated from the assets/ folder
     'core/assets.js',

@@ -30,7 +30,7 @@ test('Every chapter is valid JSON, listed in the build, and says what each of it
 test('Items: the loadout, schematics and consumable hooks point at things that exist',()=>{
  const it=load('items.json');
  const registries=fs.readFileSync(join(ROOT,'src','core','registries.js'),'utf8');
- const cosmetic=id=>registries.includes(`'${id}':`);
+ const cosmetics=load('cast.json').cosmetics, cosmetic=id=>!!cosmetics[id];
  for(const id of it.default_loadout) assert.ok(it.gear[id],`default_loadout: no gear '${id}'`);
  unique(it.augments,'augments');unique(it.furniture,'furniture');unique(it.schematics,'schematics');
  for(const s of it.schematics){
@@ -339,6 +339,47 @@ test('Dialogue: every line has a speaker and words, the crew is the same six eve
   &&[CREW_OPENERS,CREW_BOOTH,CREW_TOASTS,CREW_TOAST_TASTE,CREW_TOAST_LINES,CREW_JOB_TALK,CREW_CLOSERS,CREW_SOLO,CREW_MOMENTS,CREW_GROUP_INVITE,CREW_YES,CREW_NO,CREW_STOOD_UP,CREW_ASK_BACK,CREW_INTEL,CREW_STIM,CREW_SOLO_ASK]
      .every((t,i)=>t===Object.values(GAME_DB.dialogue.crew)[i])})`));
  assert.equal(got.same,true,'an old name no longer reads the chapter');
+ assert.deepEqual(e.errors,[]);
+});
+
+test('Cast and looks: every speaker and look exists, colours are hex, palette names are real, and the game reads them',()=>{
+ const d=load('cast.json'), hex=/^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+ for(const [who,c] of Object.entries(d.speaker_colors)) assert.ok(hex.test(c),`speaker_colors.${who}: '${c}' is no colour`);
+ for(const [id,C] of Object.entries(d.scene_cast)){
+  assert.ok(d.speaker_colors[C.color_of||C.name],`scene_cast.${id}: no speaker colour for '${C.color_of||C.name}'`);
+  assert.ok(d.appearances[C.look],`scene_cast.${id}: no look '${C.look}'`);
+  assert.ok(C.side==='left'||C.side==='right',`scene_cast.${id}: side is left or right`);
+ }
+ const poses=fs.readFileSync(join(ROOT,'src','ui','poses.js'),'utf8');
+ for(const [who,p] of Object.entries(d.apartment_idle)){
+  assert.ok(d.appearances[who],`apartment_idle.${who}: no such character`);
+  assert.ok(Number.isFinite(p.x)&&Number.isFinite(p.y)&&poses.includes(p.pose),`apartment_idle.${who}: x, y and a real pose`);
+ }
+ const refs=[];
+ const walk=(v,at)=>{ if(!v||typeof v!=='object') return; if(Object.keys(v).join()==='palette'){refs.push(v.palette);assert.ok(d.palette[v.palette]!==undefined,`${at}: no palette '${v.palette}'`);return;}
+  for(const [k,x] of Object.entries(v)) walk(x,`${at}.${k}`); };
+ walk(d.appearances,'appearances'); assert.ok(refs.length>0);
+ for(const [who,L] of Object.entries(d.appearances)) if(L.body&&L.body.kind==='android') assert.ok(d.android_finishes[L.body.finish],`appearances.${who}: no finish '${L.body.finish}'`);
+ const cats=['wig','skin','vocal','outfit','accessory','hat','jewelry','legwear'];
+ for(const [id,c] of Object.entries(d.cosmetics)){
+  assert.equal(c.id,id,`cosmetics.${id}: its id field differs from its key`);
+  assert.ok(cats.includes(c.category)&&c.name&&Number.isFinite(c.price)&&c.data,`cosmetics.${id}: category, name, price and data`);
+  if(c.pairsWith) assert.ok(d.cosmetics[c.pairsWith],`cosmetics.${id}: pairsWith '${c.pairsWith}' is no cosmetic`);
+  for(const piece of ['top','bottom','shoes','train']){ const P=c.data[piece];
+   if(P&&P.material) assert.ok(d.materials[P.material],`cosmetics.${id}.data.${piece}: no material '${P.material}'`);
+   if(P&&P.finish) assert.ok(d.finishes[P.finish],`cosmetics.${id}.data.${piece}: no finish '${P.finish}'`); }
+ }
+ for(const [m,[color,,finish]] of Object.entries(d.materials)){ assert.ok(hex.test(color),`materials.${m}: colour`); if(finish) assert.ok(d.finishes[finish],`materials.${m}: no finish '${finish}'`); }
+ assert.deepEqual(Object.keys(d._about.fields.finishes).sort(),Object.keys(d.finishes.none).sort(),'_about.fields.finishes explains every rule');
+ const e=runtime(join(ROOT,'DFAB V8.html'),{affine:true});
+ const got=JSON.parse(e.run(`JSON.stringify({same:SPEAKER_COLORS===GAME_DB.cast.speaker_colors&&SCENE_CAST===GAME_DB.cast.scene_cast&&APT_IDLE_POSITIONS===GAME_DB.cast.apartment_idle
+   &&PALETTE===GAME_DB.cast.palette&&ANDROID_FINISHES===GAME_DB.cast.android_finishes&&APPEARANCES===GAME_DB.cast.appearances&&COSMETICS_REGISTRY===GAME_DB.cast.cosmetics,
+  left:JSON.stringify(APPEARANCES).includes('"palette"')||JSON.stringify(SCENE_CAST).includes('color_of'),
+  skin:APPEARANCES['949'].skinColor, ren:SCENE_CAST.ren.color, velvet:materialKit.finishOf({finish:'velvet'}).nap, sequin:materialKit.material('silver_sequin')})`));
+ assert.equal(got.same,true,'an old name no longer reads the chapter');
+ assert.equal(got.left,false,'palette names and color_of were not all resolved');
+ assert.equal(got.skin,d.palette.stellaSkin); assert.equal(got.ren,d.speaker_colors['Barista Ren']); assert.equal(got.velvet,true);
+ assert.deepEqual(got.sequin,{color:'#c9ccd8',fabric:'sequin',finish:'gloss'});
  assert.deepEqual(e.errors,[]);
 });
 
