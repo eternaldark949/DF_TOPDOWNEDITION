@@ -31,6 +31,9 @@ jobs:
         if: github.event_name != 'pull_request'
         run: node tools/build.mjs
 
+      - name: Check the game data (src/directory/game-db)
+        run: node tools/test-game-db.cjs
+
       - name: Check gameplay and rendering regressions
         run: node tools/test-game-regressions.cjs
 

@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '508170eba680';
+        const DFAB_BUILD = '4f8c6231be41';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -10411,6 +10411,30 @@
             return B.CAM_HEIGHT * Math.max(0.7, Math.min(3.2, B.REF_ZOOM / z));
         }
     </script>
+    <script type="text/dfab" data-src="directory/game-db/game-db.js" data-cost="13">
+        // ===== LV2 DIRECTORY: GAME DB =====
+        /* The game's data, one chapter per JSON file in directory/game-db/. tools/build.mjs inlines each
+           chapter as GAME_DB.<chapter> (items.json → GAME_DB.items), right after this file, so everything
+           loaded later can read it. The JSON is the source: edit it by hand or in a data editor, and
+           tools/test-game-db.cjs checks it. Each chapter's _about says what its tables hold and in what units.
+           Chapters hold data only. Where an entry needs code, it names it in a `hooks` field and the system that
+           owns the table adds the functions with attachDataHooks (see CONSUMABLE_HOOKS, core/registries.js). */
+        const GAME_DB = {};
+
+        /** Give each entry of `table` that names `hooks: '<name>'` the functions in hooks[name]; returns the table. */
+        function attachDataHooks(table, hooks) {
+            for (const [id, entry] of Object.entries(table)) {
+                if (!entry || !entry.hooks) continue;
+                const fns = hooks[entry.hooks];
+                if (!fns) throw new Error(`GAME_DB: ${id} names hooks '${entry.hooks}', which nothing provides`);
+                Object.assign(entry, fns);
+            }
+            return table;
+        }
+    </script>
+    <script type="text/dfab" data-src="directory/game-db/items.json" data-cost="182">
+        GAME_DB.items = {"_about":{"chapter":"Items and gear: everything she can carry, drink, read, craft or own.","how_to_edit":"Plain JSON. tools/build.mjs inlines this file as GAME_DB.items when it builds the game, and tools/test-game-db.cjs checks it. Entry field names stay camelCase because the game code reads them by those names. A \"note\" field is for people and is never read by the game.","ids":"Keys and id fields are saved in players' save files. Never rename one; add a new entry instead.","tables":{"gear":"Weapons and attachments (was ITEM_REGISTRY, ui/inventory-augments.js). type: weapon | attachment. weaponMode: normal | sniper | melee | fists. stats.fireRate is frames between shots; projectileSpeed px per frame; reach px; arc radians; bleedSecs / swingSecs seconds.","default_loadout":"Gear ids a new game starts with (was DEFAULT_LOADOUT).","augments":"Dr. Yin's clinic augments (was AUGMENT_CATALOG). price in credits; slot: optic | spine | torso | cranial | arms | legs.","furniture":"The apartment's furniture as the inventory lists it (was APARTMENT_FURNITURE_REGISTRY).","consumables":"Vending machine drinks and their buffs (was CONSUMABLES, core/registries.js). cost in credits; duration in in-game minutes; modifiers[].stat: speed | flitDistance | flitCooldown | detectionRange; modifiers[].type: multiply | add. hooks names code in core/registries.js (CONSUMABLE_HOOKS) that adds unlockCheck, onActivate and onExpire.","drinks":"Drinks for the Crystal Glass and the cafe mugs (was GLASS_DRINKS). glass: flute | wine | martini | tumbler | coupe | soda | mug; rim px; colours are CSS.","notes":"Readable letters and briefings (was NOTE_REGISTRY). style: letter | briefing | ancient | digital.","schematics":"What the crafting table makes (was SCHEMATICS, story/missions.js). id is a gear id, or with cosmetic: true a cosmetics id. scrapCost in scrap. unlock and furniture name questState flags; requires is a cosmetic that must be owned first."}},"gear":{"pistol_fpx":{"name":"FP-X","type":"weapon","icon":"🔫","desc":"The Freelancer experimental pistol. Packs quite a punch.","weaponMode":"normal","stats":{"fireRate":22,"recoil":10,"damage":35,"projectileColor":"#00f3ff","projectileSpeed":25,"flashRadius":50}},"sniper_sara":{"name":"YourGirlSara","type":"weapon","icon":"🔭","desc":"Mayhem incarnate. Damn, Sara.","weaponMode":"sniper","stats":{"fireRate":70,"recoil":20,"damage":100,"projectileColor":"#FFD700","projectileSpeed":80,"flashRadius":80,"penetrating":true}},"rifle_rb98":{"name":"RB-98","type":"weapon","icon":"🧬","desc":"High-velocity rifle blaster. SMG-class fire rate.","weaponMode":"normal","stats":{"fireRate":6,"recoil":4,"damage":12,"projectileColor":"#00ffcc","projectileSpeed":28,"flashRadius":40}},"pistol_anavia":{"name":"Anavia","type":"weapon","icon":"💠","desc":"A specialized energy blaster that fires ethereal periwinkle bolts.","weaponMode":"normal","stats":{"fireRate":4,"recoil":3,"damage":8,"projectileColor":"#CCCCFF","projectileSpeed":24,"flashRadius":45}},"sniper_sr86":{"name":"SR-86","type":"weapon","icon":"🎯","desc":"Semi-automatic crimson death.","weaponMode":"sniper","stats":{"fireRate":50,"recoil":15,"damage":65,"projectileColor":"#DC143C","projectileSpeed":40,"flashRadius":60,"penetrating":true}},"maiden_kukri":{"name":"Maiden's Kukri","type":"weapon","icon":"🗡","desc":"A curved golden knife, light as a promise. Cuts that keep bleeding.","note":"A slash in an arc before her: damage, then bleeding (engine/status-effects.js). Quiet, not silent.","weaponMode":"melee","stats":{"fireRate":16,"damage":28,"reach":38,"arc":1.5,"bleedDps":6,"bleedSecs":3,"noise":60,"damageType":"melee"}},"blood_pact":{"name":"Blood Pact","type":"weapon","icon":"⚔","desc":"A long blood-red katana. Twice the Kukri's reach, half its pace; its cuts bleed and crit more often.","note":"The Kukri's twice-reach, half-rate cousin: a slower swing (swingSecs), harder cuts, a wider arc.","weaponMode":"melee","stats":{"fireRate":32,"damage":45,"reach":76,"arc":2.1,"swingSecs":0.32,"bleedDps":8,"bleedSecs":3,"critChance":0.2,"noise":65,"damageType":"melee"}},"golden_retribution":{"name":"Golden Retribution","type":"weapon","icon":"✊","desc":"Gilded brass knuckles. Quick jabs, and every third punch a haymaker that staggers and slams.","note":"Jabs on the bare-fist hitbox; every haymakerEvery-th punch is a haymaker (engine/knuckles.js).","weaponMode":"fists","stats":{"fireRate":15,"damage":16,"haymakerEvery":3,"haymakerMult":2.5,"damageType":"melee"}},"laser_sight":{"name":"Laser Sight","type":"attachment","icon":"⊕","desc":"Faint red targeting beam when equipped.","stats":{"effect":"laser_sight"}},"mirror_blade":{"name":"Mirror Blade","type":"attachment","icon":"◈","desc":"A mirror-polished edge. Bullets your blade meets mid-cut fly back at whoever fired them.","note":"engine/status-effects.js deflectShots: the Kukri's and Blood Pact's cut turns enemy shots.","stats":{"effect":"mirror_blade"}},"crimson_edge":{"name":"Crimson Edge","type":"attachment","icon":"❖","desc":"A blood-red whetted edge. Blades cut 50% harder, and wounds bleed up to five deep.","note":"engine/status-effects.js meleeSlash / applyStatus: blade damage x bladeDamageMult, bleed up to bleedMax stacks.","stats":{"effect":"crimson_edge","bladeDamageMult":1.5,"bleedMax":5}},"vampiric_fists":{"name":"Vampiric Fists","type":"attachment","icon":"❦","desc":"Blood-garnet studs for the knuckles. Every punch you land heals you; a haymaker drinks deeper and leaves them bleeding.","note":"engine/knuckles.js onPunchLanded: any punch of hers (bare fists, Golden Retribution, fist weapons to come).","stats":{"effect":"vampiric_fists","lifesteal":0.15,"haymakerLifesteal":0.3,"bleedDps":5,"bleedSecs":3}},"blood_muzzle":{"name":"Bloodthirsty Muzzle","type":"attachment","icon":"♆","desc":"A crimson muzzle brake that drinks the shot. Bullets deal 75% more damage.","note":"engine/combat-effects.js fireWeapon: the shot's damage x gunDamageMult.","stats":{"effect":"blood_muzzle","gunDamageMult":1.75}},"golden_child":{"name":"Golden Child","type":"weapon","icon":"✦","desc":"Fires golden orbs that stick to targets and burn away.","weaponMode":"normal","stats":{"fireRate":38,"recoil":6,"damage":18,"projectileColor":"#FFD700","projectileSpeed":18,"flashRadius":45,"sticky":true,"dotDamage":8,"dotTicks":12,"dotInterval":10,"maxOrbs":4}}},"default_loadout":["pistol_fpx","sniper_sara","rifle_rb98","pistol_anavia","sniper_sr86","maiden_kukri","blood_pact"],"augments":[{"id":"auto_aim","name":"NEURAL LOCK","desc":"Soft target-lock on nearest hostile. Projectiles steer toward enemies in your line of fire.","price":350,"slot":"optic","icon":"◎"},{"id":"speed_boost","name":"ADRENAL SURGE","desc":"Vehicle top speed increased by 20%. Acceleration boosted by 15%.","price":300,"slot":"spine","icon":"⚡"},{"id":"armor_plate","name":"SUBDERMAL MESH","desc":"Reduces all incoming damage by 20%.","price":400,"slot":"torso","icon":"🛡"},{"id":"radar_ext","name":"ECHO PULSE","desc":"Enables tactical radar overlay. Detects hostiles and allies within 600px. Sweep-scan display.","price":250,"slot":"cranial","icon":"◉"},{"id":"fast_reload","name":"REFLEX SYNC","desc":"Weapon cooldown reduced by 25%. Faster fire rate across all weapons.","price":275,"slot":"arms","icon":"↻"},{"id":"flit_ext","name":"PHASE WIRE","desc":"FLIT cost reduced by 30%. Extended dash range.","price":500,"slot":"legs","icon":"⟐"},{"id":"health_regen","name":"NANITE WEAVE","desc":"Slowly regenerates 1 HP every 5 seconds when out of combat.","price":600,"slot":"torso","icon":"✦"},{"id":"scrap_magnet","name":"SALVAGE NET","desc":"Scrap pickup radius doubled. +10% bonus scrap from all sources.","price":200,"slot":"arms","icon":"⊕"},{"id":"vital_link","name":"VITAL LINK","desc":"Stim capacity +2. Proximity healing aura for allies boosted by 75%.","price":450,"slot":"spine","icon":"❤"}],"furniture":[{"id":"apt_sofa","name":"Sofa","quantity":1,"icon":"▰","description":"Wine-red two-seat sofa with cushions and a knit throw."},{"id":"apt_coffee","name":"Coffee Table","quantity":1,"icon":"▭","description":"Rounded walnut coffee table with books and flowers."},{"id":"apt_chair","name":"Armchair","quantity":2,"icon":"▣","description":"Blush upholstered lounge and bedroom armchairs."},{"id":"apt_side","name":"Side Table","quantity":3,"icon":"▥","description":"Walnut side tables with integrated lamps; two indoors and one on the veranda."},{"id":"apt_bookshelf","name":"Bookshelf","quantity":1,"icon":"▤","description":"Walnut shelf stocked with books and ornaments."},{"id":"apt_console","name":"Console","quantity":1,"icon":"♫","description":"Walnut media console with a turntable and stereo speakers."},{"id":"apt_fireplace","name":"Fireplace","quantity":1,"icon":"♨","description":"Linear glass fireplace set into a stone surround."},{"id":"apt_floor_lamp","name":"Floor Lamp","quantity":3,"icon":"◉","description":"Cream floor lamps with brass trim."},{"id":"apt_plant","name":"Plant","quantity":6,"icon":"♣","description":"Potted foliage throughout the living room, bedroom and bathroom."},{"id":"apt_bar_cart","name":"Bar Cart","quantity":1,"icon":"◍","description":"Brass and smoked-glass bar cart with bottles, a decanter and an ice bucket. Tops up her glass."},{"id":"apt_craft","name":"Crafting Table","quantity":1,"icon":"⚒","description":"Walnut and steel workbench with tools, a vise and a schematic tablet."},{"id":"apt_fridge","name":"Refrigerator","quantity":1,"icon":"▣","description":"Metal-finished refrigerator with brass trim."},{"id":"apt_sink","name":"Kitchen Sink","quantity":1,"icon":"◡","description":"Kitchen sink set into cream quartz with a brass tap."},{"id":"apt_counter","name":"Kitchen Counter","quantity":3,"icon":"▬","description":"Cream quartz countertop sections with walnut front edges."},{"id":"apt_gas_range","name":"Gas Range","quantity":1,"icon":"♨","description":"Five-burner black steel gas range with brass knobs."},{"id":"apt_induction","name":"Induction Cooktop","quantity":1,"icon":"⊚","description":"Four-zone black glass induction cooktop."},{"id":"apt_island","name":"Kitchen Island","quantity":1,"icon":"▰","description":"Quartz bar island with waterfall ends and integrated pendant shades."},{"id":"apt_stool","name":"Stool","quantity":4,"icon":"●","description":"Wine-red stools with brass frames along the kitchen island."},{"id":"apt_bed","name":"Bed","quantity":1,"icon":"▰","description":"Queen bed with a blush headboard, wine-red duvet and knit throw."},{"id":"apt_nightstand","name":"Nightstand","quantity":2,"icon":"▥","description":"Walnut bedside cabinets with brass pulls and integrated lamps."},{"id":"apt_wardrobe","name":"Wardrobe","quantity":1,"icon":"▥","description":"Tall walnut wardrobe with brass handles."},{"id":"apt_vanity","name":"Dressing Vanity","quantity":1,"icon":"◯","description":"Walnut dressing table with a brass-framed round mirror and a stool."},{"id":"apt_tub","name":"Bathtub","quantity":1,"icon":"◡","description":"Freestanding oval bathtub with brass fittings."},{"id":"apt_bath_vanity","name":"Bathroom Vanity","quantity":1,"icon":"▭","description":"Double marble vanity with brass taps and a mirror."},{"id":"apt_shower","name":"Shower","quantity":1,"icon":"▣","description":"Walk-in tiled shower with glass screening and a brass rain head."},{"id":"apt_towels","name":"Towel Rack","quantity":1,"icon":"║","description":"Walnut towel stand with blush and cream towels."},{"id":"apt_lounger","name":"Lounger","quantity":2,"icon":"▰","description":"Walnut-framed veranda loungers with cream cushions."},{"id":"apt_bistro","name":"Bistro Set","quantity":1,"icon":"◉","description":"Veranda bistro table and its two chairs, treated as one set."},{"id":"apt_telescope","name":"Telescope","quantity":1,"icon":"⌕","description":"Brass telescope on a tripod overlooking the city."},{"id":"apt_planter","name":"Planter","quantity":3,"icon":"♣","description":"Rectangular planted troughs along the veranda railing."}],"consumables":{"bubbleTea":{"name":"Bubble Tea","cost":30,"duration":120,"modifiers":[{"stat":"speed","type":"multiply","value":1.2},{"stat":"flitDistance","type":"multiply","value":2}],"uiLabel":"NEON RUSH ACTIVE","uiColor":"#00f3ff","purchaseMsg":"PURCHASED: BUBBLE TEA — SPEED INCREASED","expireMsg":"NEON RUSH EXPIRED"},"jeanSoda":{"name":"Ms. Jean Soda","cost":20,"duration":90,"modifiers":[{"stat":"detectionRange","type":"multiply","value":0.6}],"uiLabel":null,"uiColor":null,"purchaseMsg":"PURCHASED: MS. JEAN — ENEMIES LESS PERCEPTIVE","expireMsg":"MS. JEAN'S CHARM FADED"},"stellarLemonade":{"name":"Stellar Lemonade","cost":75,"duration":480,"modifiers":[{"stat":"speed","type":"multiply","value":1.75},{"stat":"flitCooldown","type":"multiply","value":0.3333333333333333}],"shield":{"maxShield":100},"uiLabel":"STELLAR RUSH ACTIVE","uiColor":"#FFD700","purchaseMsg":"PURCHASED: STELLAR LEMONADE — SPEED BLAZING, SHIELD UP, HP HALVED","expireMsg":"STELLAR RUSH EXPIRED — HP RESTORED","hooks":"stellar_lemonade"}},"drinks":{"champagne":{"name":"Champagne","glass":"flute","rim":3.2,"liquid":"#f2d57e","bubbles":true},"rose":{"name":"Rosé","glass":"wine","rim":4.2,"liquid":"#f19ab0"},"red_wine":{"name":"Bellafore","glass":"wine","rim":4.4,"liquid":"#6a0c20","note":"Bella's finest, the classic red."},"white_wine":{"name":"White Wine","glass":"wine","rim":4.4,"liquid":"#eadf98"},"martini":{"name":"Martini","glass":"martini","rim":5,"liquid":"#e3efe9","garnish":"olive"},"whiskey":{"name":"Whiskey","glass":"tumbler","rim":4,"liquid":"#b5641a","ice":true},"neon":{"name":"Neon Cocktail","glass":"coupe","rim":4.6,"liquid":"#17dcff","liquid2":"#ff2bd6","glow":true,"garnish":"citrus"},"cream_soda":{"name":"Ms. Jean Cream Soda","glass":"soda","rim":3.8,"liquid":"#f4b0c4","bubbles":true,"foam":true,"straw":"#d4447c"},"stellar_lemonade":{"name":"Stellar Lemonade","glass":"tumbler","rim":4,"liquid":"#f3dc6a","ice":true,"garnish":"citrus","note":"JJ's."},"latte":{"name":"Honey Latte","glass":"mug","rim":4.4,"liquid":"#a9784e","cup":"#efe4d0","art":true,"cafe":true,"note":"The Cozy Cafe's mugs (directory/cafe-life.js); cafe: not one of the Crystal Glass's pours."},"tea":{"name":"Chai","glass":"mug","rim":4.2,"liquid":"#b07a3c","cup":"#6d8a64","cafe":true,"note":"The Cozy Cafe's mugs (directory/cafe-life.js); cafe: not one of the Crystal Glass's pours."},"cocoa":{"name":"Cocoa","glass":"mug","rim":4.4,"liquid":"#5a3424","cup":"#c0903a","foam":true,"cafe":true,"note":"The Cozy Cafe's mugs (directory/cafe-life.js); cafe: not one of the Crystal Glass's pours."},"espresso":{"name":"Espresso","glass":"mug","rim":3.2,"liquid":"#3a2214","cup":"#f3ead8","crema":true,"cafe":true,"note":"The Cozy Cafe's mugs (directory/cafe-life.js); cafe: not one of the Crystal Glass's pours."}},"notes":{"dark_maker_letter":{"id":"dark_maker_letter","title":"A Letter from the Dark Maker","author":"Dark Maker","style":"letter","icon":"🌙","headerDetail":"Double Nights — Crimson Crescent Seal","body":"Dear Freelancers,\n\nI know that you will find this. Trust, I make no mistake of your skill. I also know you survived my gift. I'm not surprised. Experts deserve expert challenges.\n\nI've always admired your dedication, resolve, your prowess. I'm sure you can understand why I enjoy making this difficult for you. But I won't bore you. Things will step up here on out.\n\nNow for the most important question. Where the hell am I? Eh?\n\nWell, I left Friday the 19th after a very enjoyable stay. 10 out of 10, would recommend. I'm looking for a change of scenery now, I tire of cities for the moment.\n\nYou'll figure out where I am. You always do.","signature":"~ Dark Maker"},"larissa_briefing_darklands":{"id":"larissa_briefing_darklands","title":"Mission Briefing — Darklands","author":"Larissa","style":"briefing","icon":"📋","headerDetail":"BLACK GUILD — CLASSIFIED","body":"OPERATION: RETURN TO DARKLANDS\nCLASSIFICATION: PRIORITY ALPHA\nHANDLER: LARISSA\n\nThe target known as the Dark Maker has been located via the Pool of Visions. He has fled to the dimension designated DARKLANDS.\n\nYou will be accompanied by Commander Luck, Black Guild Elite. Insertion point: the gated township. Local intel suggests a curse is active in the area — the spirits of Jon and Ella Malledost.\n\nExercise extreme caution. The Empereal Lord is watching.","signature":"— L."}},"schematics":[{"id":"laser_sight","name":"LASER SIGHT","icon":"⊕","desc":"Projects a faint red targeting beam. Helps visualize aim direction.","scrapCost":150},{"id":"golden_child","name":"GOLDEN CHILD","icon":"✦","desc":"Golden orbs that stick to enemies and burn away. Attrition warfare.","scrapCost":500},{"id":"mirror_blade","name":"MIRROR BLADE","icon":"◈","desc":"Polish the edge to a mirror. Bullets your blade meets mid-cut fly back at the shooter.","scrapCost":200},{"id":"blood_muzzle","name":"BLOODTHIRSTY MUZZLE","icon":"♆","desc":"A crimson muzzle brake. Every bullet hits 75% harder.","scrapCost":275},{"id":"crimson_edge","name":"CRIMSON EDGE","icon":"❖","desc":"Whet the blade blood-red. Cuts land 50% harder and wounds bleed up to five deep.","scrapCost":300},{"id":"golden_retribution","unlock":"goldenRetributionUnlocked","unlockHint":"Defeat Lilitu alone in the palace","name":"GOLDEN RETRIBUTION","icon":"✊","desc":"Gild a pair of brass knuckles. Fast jabs that can crit; every third punch is a haymaker that staggers, and drives them into walls.","scrapCost":400},{"id":"vampiric_fists","name":"VAMPIRIC FISTS","icon":"❦","desc":"Set blood-garnets in the knuckles. Every punch you land heals 15% of its damage; a haymaker heals 30% and opens a bleed. Bare fists or brass.","scrapCost":350},{"id":"acc_mirror_glass","cosmetic":true,"requires":"acc_glass","name":"MIRRORED GLASS","icon":"◎","desc":"Silver the Crystal Glass. All damage +35%, and it turns up to 90 damage of shots back before it recharges (3 s).","scrapCost":650},{"id":"clothing_dyer","furniture":"hasClothingDyer","name":"CLOTHING DYER","icon":"✿","desc":"Vats, a steamer and a rack of swatches for the bedroom. Recolour any outfit you own, piece by piece.","scrapCost":1000}]};
+    </script>
     <script type="text/dfab" data-src="assets#0" data-cost="1">
         const ASSETS = { images: {}, audio: {} };
     </script>
@@ -10486,7 +10510,7 @@
         for (const name of Object.keys(ASSETS.images)) getImage(name);
 
     </script>
-    <script type="text/dfab" data-src="core/registries.js" data-cost="565">
+    <script type="text/dfab" data-src="core/registries.js" data-cost="515">
         // ============================================================================
         //  NOTE REGISTRY — Readable documents, letters, briefings, lore.
         //  Each entry defines content + visual style. Found notes are tracked
@@ -10494,88 +10518,17 @@
         //  Styles: 'letter' (warm parchment), 'briefing' (cold professional),
         //          'ancient' (dark mystical parchment), 'digital' (tech hologram)
         // ============================================================================
-        const NOTE_REGISTRY = {
-            'dark_maker_letter': {
-                id: 'dark_maker_letter',
-                title: 'A Letter from the Dark Maker',
-                author: 'Dark Maker',
-                style: 'letter',
-                icon: '🌙',
-                headerDetail: 'Double Nights — Crimson Crescent Seal',
-                body: `Dear Freelancers,
-
-I know that you will find this. Trust, I make no mistake of your skill. I also know you survived my gift. I'm not surprised. Experts deserve expert challenges.
-
-I've always admired your dedication, resolve, your prowess. I'm sure you can understand why I enjoy making this difficult for you. But I won't bore you. Things will step up here on out.
-
-Now for the most important question. Where the hell am I? Eh?
-
-Well, I left Friday the 19th after a very enjoyable stay. 10 out of 10, would recommend. I'm looking for a change of scenery now, I tire of cities for the moment.
-
-You'll figure out where I am. You always do.`,
-                signature: '~ Dark Maker',
-            },
-            'larissa_briefing_darklands': {
-                id: 'larissa_briefing_darklands',
-                title: 'Mission Briefing — Darklands',
-                author: 'Larissa',
-                style: 'briefing',
-                icon: '📋',
-                headerDetail: 'BLACK GUILD — CLASSIFIED',
-                body: `OPERATION: RETURN TO DARKLANDS
-CLASSIFICATION: PRIORITY ALPHA
-HANDLER: LARISSA
-
-The target known as the Dark Maker has been located via the Pool of Visions. He has fled to the dimension designated DARKLANDS.
-
-You will be accompanied by Commander Luck, Black Guild Elite. Insertion point: the gated township. Local intel suggests a curse is active in the area — the spirits of Jon and Ella Malledost.
-
-Exercise extreme caution. The Empereal Lord is watching.`,
-                signature: '— L.',
-            },
-        };
+        const NOTE_REGISTRY = GAME_DB.items.notes;   // directory/game-db/items.json
 
         // ============================================================================
         //  CONSUMABLES CONFIG — Data-driven vending machine items & buff definitions
-        //  Add new items here. The engine reads modifiers automatically.
+        //  Add new items in directory/game-db/items.json. The engine reads modifiers automatically.
         //  Modifier stats: 'speed', 'flitDistance', 'flitCooldown', 'detectionRange'
         //  Modifier types: 'multiply' (base * value), 'add' (base + value)
         // ============================================================================
-        const CONSUMABLES = {
-            bubbleTea: {
-                name: 'Bubble Tea',
-                cost: 30,
-                duration: 120,              // in-game minutes (2 hours)
-                modifiers: [
-                    { stat: 'speed',        type: 'multiply', value: 1.2 },
-                    { stat: 'flitDistance',  type: 'multiply', value: 2.0 }
-                ],
-                uiLabel: 'NEON RUSH ACTIVE',
-                uiColor: '#00f3ff',
-                purchaseMsg: 'PURCHASED: BUBBLE TEA — SPEED INCREASED',
-                expireMsg: 'NEON RUSH EXPIRED'
-            },
-            jeanSoda: {
-                name: 'Ms. Jean Soda',
-                cost: 20,
-                duration: 90,               // 1.5 in-game hours
-                modifiers: [
-                    { stat: 'detectionRange', type: 'multiply', value: 0.6 }
-                ],
-                uiLabel: null,              // No buff bar text
-                uiColor: null,
-                purchaseMsg: 'PURCHASED: MS. JEAN — ENEMIES LESS PERCEPTIVE',
-                expireMsg: "MS. JEAN'S CHARM FADED"
-            },
-            stellarLemonade: {
-                name: 'Stellar Lemonade',
-                cost: 75,
-                duration: 480,              // 8 in-game hours (~8 real min)
-                modifiers: [
-                    { stat: 'speed',        type: 'multiply', value: 1.75 },
-                    { stat: 'flitCooldown', type: 'multiply', value: 1/3 }
-                ],
-                shield: { maxShield: 100 },
+        /* The code the consumables name in their `hooks` field (directory/game-db/items.json has their data). */
+        const CONSUMABLE_HOOKS = {
+            stellar_lemonade: {
                 unlockCheck: (game) => game.missions && game.missions.completedBounties >= 5,
                 onActivate: (game, buff, config) => {
                     buff.shield = buff.maxShield;
@@ -10591,13 +10544,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         buff.savedMaxHp = 0;
                     }
                     game.player.syncHealth(game.playerHealth, game.maxPlayerHealth);
-                },
-                uiLabel: 'STELLAR RUSH ACTIVE',
-                uiColor: '#FFD700',
-                purchaseMsg: 'PURCHASED: STELLAR LEMONADE — SPEED BLAZING, SHIELD UP, HP HALVED',
-                expireMsg: 'STELLAR RUSH EXPIRED — HP RESTORED'
+                }
             }
         };
+        const CONSUMABLES = attachDataHooks(GAME_DB.items.consumables, CONSUMABLE_HOOKS);   // directory/game-db/items.json
 
         // ============================================================================
         //  COSMETICS REGISTRY — Data-driven appearance items (W.I.G.s / S.K.I.N.s / V.O.C.A.L.s)
@@ -10605,22 +10555,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         //  Purchased at Neural Systems, equipped via NEU.ME app.
         // ============================================================================
         /** Drinks for the Crystal Glass. `glass` picks the glass shape (seen from above). */
-        const GLASS_DRINKS = {
-            champagne:  { name: 'Champagne',     glass: 'flute',   rim: 3.2, liquid: '#f2d57e', bubbles: true },
-            rose:       { name: 'Rosé',          glass: 'wine',    rim: 4.2, liquid: '#f19ab0' },
-            red_wine:   { name: 'Bellafore',     glass: 'wine',    rim: 4.4, liquid: '#6a0c20' },   // Bella's finest, the classic red
-            white_wine: { name: 'White Wine',    glass: 'wine',    rim: 4.4, liquid: '#eadf98' },
-            martini:    { name: 'Martini',       glass: 'martini', rim: 5.0, liquid: '#e3efe9', garnish: 'olive' },
-            whiskey:    { name: 'Whiskey',       glass: 'tumbler', rim: 4.0, liquid: '#b5641a', ice: true },
-            neon:       { name: 'Neon Cocktail', glass: 'coupe',   rim: 4.6, liquid: '#17dcff', liquid2: '#ff2bd6', glow: true, garnish: 'citrus' },
-            cream_soda: { name: 'Ms. Jean Cream Soda', glass: 'soda', rim: 3.8, liquid: '#f4b0c4', bubbles: true, foam: true, straw: '#d4447c' },
-            stellar_lemonade: { name: 'Stellar Lemonade', glass: 'tumbler', rim: 4.0, liquid: '#f3dc6a', ice: true, garnish: 'citrus' },   // JJ's
-            // The Cozy Cafe's mugs (its guests, directory/cafe-life.js; `cafe`: not one of the Crystal Glass's pours)
-            latte:      { name: 'Honey Latte',   glass: 'mug', rim: 4.4, liquid: '#a9784e', cup: '#efe4d0', art: true, cafe: true },
-            tea:        { name: 'Chai',          glass: 'mug', rim: 4.2, liquid: '#b07a3c', cup: '#6d8a64', cafe: true },
-            cocoa:      { name: 'Cocoa',         glass: 'mug', rim: 4.4, liquid: '#5a3424', cup: '#c0903a', foam: true, cafe: true },
-            espresso:   { name: 'Espresso',      glass: 'mug', rim: 3.2, liquid: '#3a2214', cup: '#f3ead8', crema: true, cafe: true }
-        };
+        const GLASS_DRINKS = GAME_DB.items.drinks;   // directory/game-db/items.json
 
         /** The parts of an outfit the Clothing Dyer can colour: ['top.color', 'top.trim', …], in wearing order */
         const DYE_KEYS = ['color', 'trim', 'inner', 'accent', 'stripe'];
@@ -70300,7 +70235,7 @@ Object.assign(TrafficVehicle.prototype, {
         }
 
     </script>
-    <script type="text/dfab" data-src="ui/inventory-augments.js" data-cost="553">
+    <script type="text/dfab" data-src="ui/inventory-augments.js" data-cost="437">
         /* =====================================================================
            INVENTORY SYSTEM
            ---------------------------------------------------------------------
@@ -70325,94 +70260,7 @@ Object.assign(TrafficVehicle.prototype, {
            Items are stored as data; createItemFromRegistry() builds live objects.
            Save stores IDs only; load reconstructs from this registry.
            ===================================================================== */
-        const ITEM_REGISTRY = {
-            'pistol_fpx': {
-                name: 'FP-X', type: 'weapon', icon: '🔫',
-                desc: 'The Freelancer experimental pistol. Packs quite a punch.',
-                weaponMode: 'normal',
-                stats: { fireRate: 22, recoil: 10, damage: 35, projectileColor: '#00f3ff', projectileSpeed: 25, flashRadius: 50 }
-            },
-            'sniper_sara': {
-                name: 'YourGirlSara', type: 'weapon', icon: '🔭',
-                desc: 'Mayhem incarnate. Damn, Sara.',
-                weaponMode: 'sniper',
-                stats: { fireRate: 70, recoil: 20, damage: 100, projectileColor: '#FFD700', projectileSpeed: 80, flashRadius: 80, penetrating: true }
-            },
-            'rifle_rb98': {
-                name: 'RB-98', type: 'weapon', icon: '🧬',
-                desc: 'High-velocity rifle blaster. SMG-class fire rate.',
-                weaponMode: 'normal',
-                stats: { fireRate: 6, recoil: 4, damage: 12, projectileColor: '#00ffcc', projectileSpeed: 28, flashRadius: 40 }
-            },
-            'pistol_anavia': {
-                name: 'Anavia', type: 'weapon', icon: '💠',
-                desc: 'A specialized energy blaster that fires ethereal periwinkle bolts.',
-                weaponMode: 'normal',
-                stats: { fireRate: 4, recoil: 3, damage: 8, projectileColor: '#CCCCFF', projectileSpeed: 24, flashRadius: 45 }
-            },
-            'sniper_sr86': {
-                name: 'SR-86', type: 'weapon', icon: '🎯',
-                desc: 'Semi-automatic crimson death.',
-                weaponMode: 'sniper',
-                stats: { fireRate: 50, recoil: 15, damage: 65, projectileColor: '#DC143C', projectileSpeed: 40, flashRadius: 60, penetrating: true }
-            },
-            'maiden_kukri': {
-                name: "Maiden's Kukri", type: 'weapon', icon: '🗡',
-                desc: 'A curved golden knife, light as a promise. Cuts that keep bleeding.',
-                weaponMode: 'melee',
-                // a slash in an arc before her: damage, then bleeding (engine/status-effects.js); quiet, not silent
-                stats: { fireRate: 16, damage: 28, reach: 38, arc: 1.5, bleedDps: 6, bleedSecs: 3, noise: 60, damageType: 'melee' }
-            },
-            'blood_pact': {
-                name: 'Blood Pact', type: 'weapon', icon: '⚔',
-                desc: 'A long blood-red katana. Twice the Kukri\'s reach, half its pace; its cuts bleed and crit more often.',
-                weaponMode: 'melee',
-                // the Kukri's twice-reach, half-rate cousin: a slower swing (swingSecs), harder cuts, a wider arc
-                stats: { fireRate: 32, damage: 45, reach: 76, arc: 2.1, swingSecs: 0.32, bleedDps: 8, bleedSecs: 3, critChance: 0.2, noise: 65, damageType: 'melee' }
-            },
-            'golden_retribution': {
-                name: 'Golden Retribution', type: 'weapon', icon: '✊',
-                desc: 'Gilded brass knuckles. Quick jabs, and every third punch a haymaker that staggers and slams.',
-                weaponMode: 'fists',
-                // jabs on the bare-fist hitbox, every haymakerEvery-th a haymaker (engine/knuckles.js)
-                stats: { fireRate: 15, damage: 16, haymakerEvery: 3, haymakerMult: 2.5, damageType: 'melee' }
-            },
-            'laser_sight': {
-                name: 'Laser Sight', type: 'attachment', icon: '⊕',
-                desc: 'Faint red targeting beam when equipped.',
-                stats: { effect: 'laser_sight' }
-            },
-            'mirror_blade': {
-                name: 'Mirror Blade', type: 'attachment', icon: '◈',
-                desc: 'A mirror-polished edge. Bullets your blade meets mid-cut fly back at whoever fired them.',
-                // engine/status-effects.js deflectShots: the Kukri's and Blood Pact's cut turns enemy shots
-                stats: { effect: 'mirror_blade' }
-            },
-            'crimson_edge': {
-                name: 'Crimson Edge', type: 'attachment', icon: '❖',
-                desc: 'A blood-red whetted edge. Blades cut 50% harder, and wounds bleed up to five deep.',
-                // engine/status-effects.js meleeSlash / applyStatus: blade damage × bladeDamageMult, bleed up to bleedMax stacks
-                stats: { effect: 'crimson_edge', bladeDamageMult: 1.5, bleedMax: 5 }
-            },
-            'vampiric_fists': {
-                name: 'Vampiric Fists', type: 'attachment', icon: '❦',
-                desc: 'Blood-garnet studs for the knuckles. Every punch you land heals you; a haymaker drinks deeper and leaves them bleeding.',
-                // engine/knuckles.js onPunchLanded: any punch of hers (bare fists, Golden Retribution, fist weapons to come)
-                stats: { effect: 'vampiric_fists', lifesteal: 0.15, haymakerLifesteal: 0.3, bleedDps: 5, bleedSecs: 3 }
-            },
-            'blood_muzzle': {
-                name: 'Bloodthirsty Muzzle', type: 'attachment', icon: '♆',
-                desc: 'A crimson muzzle brake that drinks the shot. Bullets deal 75% more damage.',
-                // engine/combat-effects.js fireWeapon: the shot's damage × gunDamageMult
-                stats: { effect: 'blood_muzzle', gunDamageMult: 1.75 }
-            },
-            'golden_child': {
-                name: 'Golden Child', type: 'weapon', icon: '✦',
-                desc: 'Fires golden orbs that stick to targets and burn away.',
-                weaponMode: 'normal',
-                stats: { fireRate: 38, recoil: 6, damage: 18, projectileColor: '#FFD700', projectileSpeed: 18, flashRadius: 45, sticky: true, dotDamage: 8, dotTicks: 12, dotInterval: 10, maxOrbs: 4 }
-            },
-        };
+        const ITEM_REGISTRY = GAME_DB.items.gear;   // directory/game-db/items.json
         
         // ============================================================================
         //  ABILITY REGISTRY — Data-driven abilities (magic, fireballs, etc.)
@@ -70531,7 +70379,7 @@ Object.assign(TrafficVehicle.prototype, {
         }
         
         // Default loadout for new games
-        const DEFAULT_LOADOUT = ['pistol_fpx', 'sniper_sara', 'rifle_rb98', 'pistol_anavia', 'sniper_sr86', 'maiden_kukri', 'blood_pact'];
+        const DEFAULT_LOADOUT = GAME_DB.items.default_loadout;   // directory/game-db/items.json
         
         // Factory: create a live InventoryItem from registry ID
         function createItemFromRegistry(id, game) {
@@ -70558,38 +70406,7 @@ Object.assign(TrafficVehicle.prototype, {
         // Views of existing ownership. These records never enter physical InventorySystem.items,
         // capacity calculations, save payloads, map entities or cosmetic acquisition methods.
         const INVENTORY_SPECIAL_COSMETICS = new Set(['outfit_academy', 'acc_umbrella']);
-        const APARTMENT_FURNITURE_REGISTRY = Object.freeze([
-            { id: 'apt_sofa', name: 'Sofa', quantity: 1, icon: '▰', description: 'Wine-red two-seat sofa with cushions and a knit throw.' },
-            { id: 'apt_coffee', name: 'Coffee Table', quantity: 1, icon: '▭', description: 'Rounded walnut coffee table with books and flowers.' },
-            { id: 'apt_chair', name: 'Armchair', quantity: 2, icon: '▣', description: 'Blush upholstered lounge and bedroom armchairs.' },
-            { id: 'apt_side', name: 'Side Table', quantity: 3, icon: '▥', description: 'Walnut side tables with integrated lamps; two indoors and one on the veranda.' },
-            { id: 'apt_bookshelf', name: 'Bookshelf', quantity: 1, icon: '▤', description: 'Walnut shelf stocked with books and ornaments.' },
-            { id: 'apt_console', name: 'Console', quantity: 1, icon: '♫', description: 'Walnut media console with a turntable and stereo speakers.' },
-            { id: 'apt_fireplace', name: 'Fireplace', quantity: 1, icon: '♨', description: 'Linear glass fireplace set into a stone surround.' },
-            { id: 'apt_floor_lamp', name: 'Floor Lamp', quantity: 3, icon: '◉', description: 'Cream floor lamps with brass trim.' },
-            { id: 'apt_plant', name: 'Plant', quantity: 6, icon: '♣', description: 'Potted foliage throughout the living room, bedroom and bathroom.' },
-            { id: 'apt_bar_cart', name: 'Bar Cart', quantity: 1, icon: '◍', description: 'Brass and smoked-glass bar cart with bottles, a decanter and an ice bucket. Tops up her glass.' },
-            { id: 'apt_craft', name: 'Crafting Table', quantity: 1, icon: '⚒', description: 'Walnut and steel workbench with tools, a vise and a schematic tablet.' },
-            { id: 'apt_fridge', name: 'Refrigerator', quantity: 1, icon: '▣', description: 'Metal-finished refrigerator with brass trim.' },
-            { id: 'apt_sink', name: 'Kitchen Sink', quantity: 1, icon: '◡', description: 'Kitchen sink set into cream quartz with a brass tap.' },
-            { id: 'apt_counter', name: 'Kitchen Counter', quantity: 3, icon: '▬', description: 'Cream quartz countertop sections with walnut front edges.' },
-            { id: 'apt_gas_range', name: 'Gas Range', quantity: 1, icon: '♨', description: 'Five-burner black steel gas range with brass knobs.' },
-            { id: 'apt_induction', name: 'Induction Cooktop', quantity: 1, icon: '⊚', description: 'Four-zone black glass induction cooktop.' },
-            { id: 'apt_island', name: 'Kitchen Island', quantity: 1, icon: '▰', description: 'Quartz bar island with waterfall ends and integrated pendant shades.' },
-            { id: 'apt_stool', name: 'Stool', quantity: 4, icon: '●', description: 'Wine-red stools with brass frames along the kitchen island.' },
-            { id: 'apt_bed', name: 'Bed', quantity: 1, icon: '▰', description: 'Queen bed with a blush headboard, wine-red duvet and knit throw.' },
-            { id: 'apt_nightstand', name: 'Nightstand', quantity: 2, icon: '▥', description: 'Walnut bedside cabinets with brass pulls and integrated lamps.' },
-            { id: 'apt_wardrobe', name: 'Wardrobe', quantity: 1, icon: '▥', description: 'Tall walnut wardrobe with brass handles.' },
-            { id: 'apt_vanity', name: 'Dressing Vanity', quantity: 1, icon: '◯', description: 'Walnut dressing table with a brass-framed round mirror and a stool.' },
-            { id: 'apt_tub', name: 'Bathtub', quantity: 1, icon: '◡', description: 'Freestanding oval bathtub with brass fittings.' },
-            { id: 'apt_bath_vanity', name: 'Bathroom Vanity', quantity: 1, icon: '▭', description: 'Double marble vanity with brass taps and a mirror.' },
-            { id: 'apt_shower', name: 'Shower', quantity: 1, icon: '▣', description: 'Walk-in tiled shower with glass screening and a brass rain head.' },
-            { id: 'apt_towels', name: 'Towel Rack', quantity: 1, icon: '║', description: 'Walnut towel stand with blush and cream towels.' },
-            { id: 'apt_lounger', name: 'Lounger', quantity: 2, icon: '▰', description: 'Walnut-framed veranda loungers with cream cushions.' },
-            { id: 'apt_bistro', name: 'Bistro Set', quantity: 1, icon: '◉', description: 'Veranda bistro table and its two chairs, treated as one set.' },
-            { id: 'apt_telescope', name: 'Telescope', quantity: 1, icon: '⌕', description: 'Brass telescope on a tripod overlooking the city.' },
-            { id: 'apt_planter', name: 'Planter', quantity: 3, icon: '♣', description: 'Rectangular planted troughs along the veranda railing.' }
-        ].map(entry => Object.freeze(entry)));
+        const APARTMENT_FURNITURE_REGISTRY = Object.freeze(GAME_DB.items.furniture.map(entry => Object.freeze(entry)));   // directory/game-db/items.json
 
         function getOwnedInventoryEntries(game) {
             const result = [], cosmetics = game?.cosmetics;
@@ -71142,17 +70959,7 @@ Object.assign(TrafficVehicle.prototype, {
            Cybernetic augments purchasable at Dr. Yin's Clinic.
            Augments are equipped from the pause menu Augments screen.
            ===================================================================== */
-        const AUGMENT_CATALOG = [
-            { id: 'auto_aim', name: 'NEURAL LOCK', desc: 'Soft target-lock on nearest hostile. Projectiles steer toward enemies in your line of fire.', price: 350, slot: 'optic', icon: '◎' },
-            { id: 'speed_boost', name: 'ADRENAL SURGE', desc: 'Vehicle top speed increased by 20%. Acceleration boosted by 15%.', price: 300, slot: 'spine', icon: '⚡' },
-            { id: 'armor_plate', name: 'SUBDERMAL MESH', desc: 'Reduces all incoming damage by 20%.', price: 400, slot: 'torso', icon: '🛡' },
-            { id: 'radar_ext', name: 'ECHO PULSE', desc: 'Enables tactical radar overlay. Detects hostiles and allies within 600px. Sweep-scan display.', price: 250, slot: 'cranial', icon: '◉' },
-            { id: 'fast_reload', name: 'REFLEX SYNC', desc: 'Weapon cooldown reduced by 25%. Faster fire rate across all weapons.', price: 275, slot: 'arms', icon: '↻' },
-            { id: 'flit_ext', name: 'PHASE WIRE', desc: 'FLIT cost reduced by 30%. Extended dash range.', price: 500, slot: 'legs', icon: '⟐' },
-            { id: 'health_regen', name: 'NANITE WEAVE', desc: 'Slowly regenerates 1 HP every 5 seconds when out of combat.', price: 600, slot: 'torso', icon: '✦' },
-            { id: 'scrap_magnet', name: 'SALVAGE NET', desc: 'Scrap pickup radius doubled. +10% bonus scrap from all sources.', price: 200, slot: 'arms', icon: '⊕' },
-            { id: 'vital_link', name: 'VITAL LINK', desc: 'Stim capacity +2. Proximity healing aura for allies boosted by 75%.', price: 450, slot: 'spine', icon: '❤' },
-        ];
+        const AUGMENT_CATALOG = GAME_DB.items.augments;   // directory/game-db/items.json
 
         class AugmentSystem {
             constructor() {
@@ -71365,7 +71172,7 @@ Object.assign(TrafficVehicle.prototype, {
         }
 
     </script>
-    <script type="text/dfab" data-src="story/missions.js" data-cost="344">
+    <script type="text/dfab" data-src="story/missions.js" data-cost="313">
         /* =====================================================================
            MISSION SYSTEM
            ---------------------------------------------------------------------
@@ -71927,76 +71734,7 @@ Object.assign(TrafficVehicle.prototype, {
         /* =====================================================================
            CRAFTING SCHEMATICS
            ===================================================================== */
-        const SCHEMATICS = [
-            {
-                id: 'laser_sight',        // Must match ITEM_REGISTRY key
-                name: 'LASER SIGHT',
-                icon: '⊕',
-                desc: 'Projects a faint red targeting beam. Helps visualize aim direction.',
-                scrapCost: 150,
-            },
-            {
-                id: 'golden_child',
-                name: 'GOLDEN CHILD',
-                icon: '✦',
-                desc: 'Golden orbs that stick to enemies and burn away. Attrition warfare.',
-                scrapCost: 500,
-            },
-            {
-                id: 'mirror_blade',
-                name: 'MIRROR BLADE',
-                icon: '◈',
-                desc: 'Polish the edge to a mirror. Bullets your blade meets mid-cut fly back at the shooter.',
-                scrapCost: 200,
-            },
-            {
-                id: 'blood_muzzle',
-                name: 'BLOODTHIRSTY MUZZLE',
-                icon: '♆',
-                desc: 'A crimson muzzle brake. Every bullet hits 75% harder.',
-                scrapCost: 275,
-            },
-            {
-                id: 'crimson_edge',
-                name: 'CRIMSON EDGE',
-                icon: '❖',
-                desc: 'Whet the blade blood-red. Cuts land 50% harder and wounds bleed up to five deep.',
-                scrapCost: 300,
-            },
-            {
-                id: 'golden_retribution',
-                unlock: 'goldenRetributionUnlocked',   // a questState flag: set by Lilitu's first solo defeat (the gauntlet)
-                unlockHint: 'Defeat Lilitu alone in the palace',
-                name: 'GOLDEN RETRIBUTION',
-                icon: '✊',
-                desc: 'Gild a pair of brass knuckles. Fast jabs that can crit; every third punch is a haymaker that staggers, and drives them into walls.',
-                scrapCost: 400,
-            },
-            {
-                id: 'vampiric_fists',
-                name: 'VAMPIRIC FISTS',
-                icon: '❦',
-                desc: 'Set blood-garnets in the knuckles. Every punch you land heals 15% of its damage; a haymaker heals 30% and opens a bleed. Bare fists or brass.',
-                scrapCost: 350,
-            },
-            {
-                id: 'acc_mirror_glass',
-                cosmetic: true,           // a COSMETICS_REGISTRY accessory, not an item: it's worn, and takes no attachment slot
-                requires: 'acc_glass',    // silvered from the Crystal Glass
-                name: 'MIRRORED GLASS',
-                icon: '◎',
-                desc: 'Silver the Crystal Glass. All damage +35%, and it turns up to 90 damage of shots back before it recharges (3 s).',
-                scrapCost: 650,
-            },
-            {
-                id: 'clothing_dyer',
-                furniture: 'hasClothingDyer',   // not carried or worn: it stands in the apartment once made (questState flag; engine/dyer.js)
-                name: 'CLOTHING DYER',
-                icon: '✿',
-                desc: 'Vats, a steamer and a rack of swatches for the bedroom. Recolour any outfit you own, piece by piece.',
-                scrapCost: 1000,
-            },
-        ];
+        const SCHEMATICS = GAME_DB.items.schematics;   // directory/game-db/items.json
 
     </script>
     <script type="text/dfab" data-src="story/dialogue-bonding.js" data-cost="295">
