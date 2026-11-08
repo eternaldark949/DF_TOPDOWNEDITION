@@ -5868,7 +5868,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'e0aadbfbd88d';
+        const DFAB_BUILD = '8c7cc09761d8';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="26">
         // ===== LV0 BASEMENT =====
@@ -6564,7 +6564,7 @@
             }
         }
     </script>
-    <script type="text/dfab" data-src="basement/controls-system.js" data-cost="185">
+    <script type="text/dfab" data-src="basement/controls-system.js" data-cost="208">
         // ===== LV0 BASEMENT =====
         // The controls system: every key, mouse button and gamepad button goes through one place. It knows
         // nothing about any game: the game hands it a keymap (action -> the inputs bound to it) and an
@@ -6572,14 +6572,15 @@
         // (The terms are from the g7 engine: base game script 2.0's controlsSystem and V1's controlSystem.)
         //
         //   keyboardInstance ┐
-        //   mouseInstance    ├── press / release ── keymap ── action table ── run(game, ev)
+        //   mouseInstance    │
+        //   touchInstance    ├── press / release ── keymap ── action table ── run(game, ev)
         //   gamepadInstance  ┘        (polled each frame)            └── queue (readQueue: buffered inputs)
         //
         // Each instance keeps input_active (held now), input_just_activated and input_just_released (this
         // frame), and ghost_image (what was held last frame: generateGhostImage, at the end of a frame).
         //
         // INPUT NAMES:   keys by e.key, letters in lower case ('w', 'space', 'Escape', 'ArrowUp', 'Enter');
-        //                'mouseLeft' | 'mouseMiddle' | 'mouseRight';
+        //                'mouseLeft' | 'mouseMiddle' | 'mouseRight';  'touch…' (on-screen buttons, named by the game);
         //                'gamepadA' 'gamepadB' 'gamepadX' 'gamepadY' 'gamepadLBumper' 'gamepadRBumper'
         //                'gamepadLTrigger' 'gamepadRTrigger' 'gamepadBack' 'gamepadStart' 'gamepadLStickButton'
         //                'gamepadRStickButton' 'gamepadDUp' 'gamepadDDown' 'gamepadDLeft' 'gamepadDRight'
@@ -6662,6 +6663,32 @@
             }
         }
 
+        class touchInstance extends inputInstance {
+            /** On-screen buttons as inputs: a finger (or the mouse) down on one presses it, lifting it, sliding
+             *  off it or losing it releases it, so a HUD button can tap, hold or double tap like a key. While
+             *  pressed the button wears the `held` class. (The sticks and gestures keep their own code.) */
+            constructor(system) { super(system, 'touch'); this.elements = {}; }
+            /** BUTTON PACKETS: [[element or id, input], ...]  e.g. [['btn-heal', 'touchHeal']] */
+            buttons(list) { for (const [el, input] of list) this.button(el, input); }
+            button(el, input) {
+                el = typeof el === 'string' ? document.getElementById(el) : el;
+                if (!el || this.elements[input] === el) return;
+                this.elements[input] = el;
+                const down = e => {
+                    e.preventDefault();
+                    try { e.pointerId !== undefined && el.setPointerCapture(e.pointerId); } catch (_) { /* not capturable */ }
+                    el.classList.add('held');
+                    this.system.press(this, input, this.system.ev('touch', input, e));
+                };
+                const up = e => { el.classList.remove('held'); if (this.input_active.has(input)) this.system.release(this, input, this.system.ev('touch', input, e)); };
+                el.addEventListener('pointerdown', down);
+                for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) el.addEventListener(t, up);
+                el.addEventListener('touchstart', e => e.preventDefault(), { passive: false });   // no scroll, no copied mouse events
+            }
+            /** Let go of one button (its finger is still down, but it no longer counts). */
+            drop(input) { if (this.input_active.has(input)) { this.spent.add(input); if (this.armed[input]) this.armed[input] = new Set(); } this.elements[input]?.classList.remove('held'); }
+        }
+
         class gamepadInstance extends inputInstance {
             /** Standard mapping: button index -> name. */
             static BUTTONS = ['gamepadA', 'gamepadB', 'gamepadX', 'gamepadY', 'gamepadLBumper', 'gamepadRBumper', 'gamepadLTrigger', 'gamepadRTrigger',
@@ -6719,6 +6746,7 @@
                 this.setKeymap(keymap);
                 this.keyboard = new keyboardInstance(this);
                 this.mouse = new mouseInstance(this);
+                this.touch = new touchInstance(this);
                 this.gamepad = new gamepadInstance(this);
                 this.frame = this.frame.bind(this);
                 if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(this.frame);
@@ -6735,7 +6763,7 @@
             }
             bind(action, ...bindings) { this.setKeymap({ ...this.keymap, [action]: bindings }); }
             bound(action, input) { return !!this.inputs[action]?.includes(input); }
-            instanceOf(input) { return input.startsWith('gamepad') ? this.gamepad : input.startsWith('mouse') ? this.mouse : this.keyboard; }
+            instanceOf(input) { return input.startsWith('gamepad') ? this.gamepad : input.startsWith('mouse') ? this.mouse : input.startsWith('touch') ? this.touch : this.keyboard; }
 
             // ── Asking ──────────────────────────────────────────────────────────
             active(action) { return !!this.inputs[action]?.some(i => this.instanceOf(i).isActive(i)); }
@@ -6753,7 +6781,8 @@
             }
             /** Let go of everything held: nothing fires or reads as held until it is pressed again. */
             clear() {
-                for (const inst of [this.keyboard, this.mouse, this.gamepad]) { for (const i of inst.input_active) inst.spent.add(i); inst.armed = {}; }
+                for (const i of this.touch.input_active) this.touch.elements[i]?.classList.remove('held');
+                for (const inst of [this.keyboard, this.mouse, this.touch, this.gamepad]) { for (const i of inst.input_active) inst.spent.add(i); inst.armed = {}; }
                 this.pending.length = 0;
             }
 
@@ -6802,7 +6831,7 @@
             // ── The frame ───────────────────────────────────────────────────────
             update(now = controlsSystem.now()) {
                 this.gamepad.updateGamepads();
-                for (const inst of [this.keyboard, this.mouse, this.gamepad]) for (const input in inst.armed) {
+                for (const inst of [this.keyboard, this.mouse, this.touch, this.gamepad]) for (const input in inst.armed) {
                     const armed = inst.armed[input], since = inst.input_time[input];
                     for (const [a, t, hold] of this.bindings[input] || []) {
                         if (t !== HELD || !armed.has(a) || armed['held_' + a] || now - since < (hold ?? this.hold_wait_time)) continue;
@@ -6813,7 +6842,7 @@
                 this.pending = this.pending.filter(([, a, ev]) => now - ev.time <= this.tap_wait_time || (this.fire(a, TAP, ev), false));
                 this.queue = this.queue.filter(q => now - q[2] <= this.queue_wait_time);
                 for (const fn of this.hooks) fn(this, now);
-                this.keyboard.generateGhostImage(); this.mouse.generateGhostImage(); this.gamepad.generateGhostImage();
+                for (const inst of [this.keyboard, this.mouse, this.touch, this.gamepad]) inst.generateGhostImage();
             }
             frame() { requestAnimationFrame(this.frame); this.update(); }
         }
@@ -8219,7 +8248,7 @@
             }
         }
     </script>
-    <script type="text/dfab" data-src="core/config.js" data-cost="417">
+    <script type="text/dfab" data-src="core/config.js" data-cost="416">
 
         // Console chatter (the ~100 [SAVE] / STORY / roads logs) is quiet unless you turn it on:
         // run  localStorage.dfab_debug = '1'  in the console and reload. Warnings and errors always show.
@@ -8241,10 +8270,9 @@
             if (g.joystick) Object.assign(g.joystick, { active: false, dx: 0, dy: 0, id: null, armed: true, ringArmed: true, trail: [] });
             if (g.fireJoystick) Object.assign(g.fireJoystick, { active: false, dx: 0, dy: 0, id: null, firing: false, armed: false, aimed: false, remembered: false });
             g._releaseShot = null; g._releaseWait = 0; g._aimMemory = null;
-            clearTimeout(g._healHoldTimer); g._healHoldTimer = null; g._healHeld = false; g._healPressed = false;
             g._cancelGrabHold?.();
             g._cancelLookDrag?.();
-            g.handbrakeHeld = false; if (g.car) g.car.handbrake = false;
+            if (g.car) g.car.handbrake = false;
             document.getElementById('btn-handbrake')?.classList.remove('held');
             if (g.emoteJoystick) Object.assign(g.emoteJoystick, { active: false, touchId: null, highlighted: null });
             g.emoteBtn?.classList.remove('dragging');
@@ -13811,12 +13839,13 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
 
     </script>
-    <script type="text/dfab" data-src="directory/game-controls.js" data-cost="79">
+    <script type="text/dfab" data-src="directory/game-controls.js" data-cost="93">
         // ===== LV2 DIRECTORY =====
         // The game's controls: which keys and buttons do what (dfKeyMap), and the actions they fire
         // (dfActions), handed to the Basement's controls system (basement/controls-system.js).
-        // Touch (the HUD buttons and sticks), the mouse aim and the controller's menu highlight stay
-        // where they are: engine/events.js, the joysticks, ui/gamepad.js.
+        // The HUD's buttons are touch inputs (dfTouchButtons). The touch sticks and gestures, the mouse
+        // aim and the controller's menu highlight keep their own code: the joysticks, engine/events.js,
+        // ui/gamepad.js.
         //
         // Who may fire what:
         //   PLAY  the game is running and unpaused, the HUD takes input, no text field has the key
@@ -13837,21 +13866,23 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         const dfKeyMap = {
             move_up: ['w', 'ArrowUp'], move_down: ['s', 'ArrowDown'], move_left: ['a', 'ArrowLeft'], move_right: ['d', 'ArrowRight'],
             fire: [['space', REPEAT]],                          // the controller fires with RT on the aim stick (ui/gamepad.js)
-            handbrake: ['space', 'gamepadLTrigger'],
-            interact: ['e', 'gamepadA'],
-            doors: ['f', 'gamepadY'],
-            flit: ['gamepadB'],
+            handbrake: ['space', 'gamepadLTrigger', 'touchHandbrake'],
+            interact: ['e', 'gamepadA', 'touchInteract'],
+            doors: ['f', 'gamepadY', 'touchDoors'],
+            flit: ['gamepadB', 'touchFlit'],
             holster: ['gamepadX'],
-            sneak: ['c', 'gamepadLBumper'],
-            booster: ['h', ['gamepadRBumper', TAP]],
-            booster_ally: ['j', ['gamepadRBumper', HELD, 0.3]],
-            furniture: ['g'],
-            furniture_turn: [['r', REPEAT]],
-            auto_drive: ['q', 'gamepadLStickButton'],
-            zib_skip: ['t'],
+            sneak: ['c', 'gamepadLBumper', 'touchSneak'],
+            booster: ['h', ['gamepadRBumper', TAP], ['touchHeal', TAP]],
+            booster_ally: ['j', ['gamepadRBumper', HELD, 0.3], ['touchHeal', HELD, 0.3]],
+            furniture: ['g', ['touchGrab', TAP]],
+            furniture_reset: [['touchGrab', HELD, 0.9]],
+            furniture_turn: [['r', REPEAT], 'touchTurnRight'], furniture_turn_back: ['touchTurnLeft'],
+            auto_drive: ['q', 'gamepadLStickButton', 'touchAutoDrive'],
+            zib_skip: ['t', 'touchZibSkip'],
             map: ['m', 'gamepadBack'],
             phone: ['p', 'gamepadDUp'],
-            night_vision: ['gamepadDDown'],
+            night_vision: ['gamepadDDown', 'touchNightVision'],
+            pause: ['touchPause'],
             screen_back: ['b'],
             back: ['Escape', 'gamepadStart'],
             menu_up: [['ArrowUp', REPEAT]], menu_down: [['ArrowDown', REPEAT]], menu_left: [['ArrowLeft', REPEAT]], menu_right: [['ArrowRight', REPEAT]],
@@ -13889,23 +13920,33 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             ['fire', PLAY, (g, ev) => { ev.preventDefault(); if (!g.isDriving && g.shootCooldown <= 0 && g.player.visible) g.fireWeapon(); }],   // driving, Space is the handbrake
             ['interact', LIVE, g => g.interact()],
             ['doors', LIVE, g => (dfShown(g.transitionBtn) || !g.isDriving && g.activeMap.transitions && g._transitionGrid.query(g.player.x, g.player.y)) && g.triggerTransition()],
-            ['flit', (g, ev) => PLAY(g, ev) && !g.isDriving, g => g.triggerFlit(undefined, 'pad') && controls.gamepad.rumble(90, 0.5)],
+            ['flit', (g, ev) => PLAY(g, ev) && !g.isDriving, (g, ev) => ev.device === 'gamepad' ? g.triggerFlit(undefined, 'pad') && controls.gamepad.rumble(90, 0.5) : g.triggerFlit()],
             ['holster', (g, ev) => PLAY(g, ev) && !g.isDriving, g => g._quickDraw ? (g.cancelQuickDraw(), g.setWeaponHolstered(false)) : g.setWeaponHolstered(!g.weaponHolstered)],
             ['sneak', (g, ev) => PLAY(g, ev) && !ev.ctrl && !g.isDriving, g => g.toggleSneak()],   // engine/sneak.js
             ['booster', PLAY, g => g.useBooster()],
             ['booster_ally', PLAY, g => g.useBoosterOnAlly()],
             ['furniture', (g, ev) => PLAY(g, ev) && !!g.furniture, g => g.furniture.press()],                 // engine/furniture.js: grab / confirm / let go
+            ['furniture_reset', (g, ev) => PLAY(g, ev) && g.furniture?.state === 'idle', g => g.furniture.resetLayout()],   // hold the hand a moment
             ['furniture_turn', (g, ev) => PLAY(g, ev) && !!g.furniture?.holding, (g, ev) => g.furniture.rotate(ev.shift ? -1 : 1)],
+            ['furniture_turn_back', (g, ev) => PLAY(g, ev) && !!g.furniture?.holding, g => g.furniture.rotate(-1)],
             ['auto_drive', (g, ev) => PLAY(g, ev) && g.isDriving, g => g.toggleAutoDrive()],
-            ['zib_skip', (g, ev) => LIVE(g, ev) && !!g.zibSystem?.isPassenger, g => { g.zibSystem.teleportToDestination(g); if (g.zibSkipBtn) g.zibSkipBtn.style.display = 'none'; }],
+            ['zib_skip', (g, ev) => (ev.device === 'touch' || LIVE(g, ev)) && !!g.zibSystem?.isPassenger, g => { g.zibSystem.teleportToDestination(g); if (g.zibSkipBtn) g.zibSkipBtn.style.display = 'none'; }],
             ['map', UI, g => Screens.mapOpen() ? Screens.close() : g?.running && !g.paused && Screens.open('map')],   // the map holds a pause token
             ['phone', UI, g => phoneSystem.overlay.style.display === 'flex' ? phoneSystem.close() : !g?.paused && phoneSystem.open()],
-            ['night_vision', PLAY, () => document.getElementById('btn-nv')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))],
+            ['night_vision', PLAY, g => g.toggleNightVision()],
+            ['pause', null, () => pauseMenu.isOpen ? pauseMenu.close() : pauseMenu.open()],   // the ⏸ button
             ['screen_back', UI, () => (Screens.mapOpen() || Screens.menuOpen()) && Screens.close()],
             ['back', dfPad, g => dfBack(g)],                   // Escape works in a text field too
             ['menu_up', MENU, dfMenuKey(() => pauseMenu.navigateUp())], ['menu_down', MENU, dfMenuKey(() => pauseMenu.navigateDown())],
             ['menu_left', MENU, dfMenuKey(() => pauseMenu.navigateLeft())], ['menu_right', MENU, dfMenuKey(() => pauseMenu.navigateRight())],
             ['menu_select', MENU, dfMenuKey(() => pauseMenu.selectCurrent())],
+        ];
+
+        /** The HUD's buttons as touch inputs (engine/events.js hands them over once the HUD exists). */
+        const dfTouchButtons = [
+            ['btn-interact', 'touchInteract'], ['btn-transition', 'touchDoors'], ['btn-heal', 'touchHeal'], ['btn-flit', 'touchFlit'],
+            ['btn-autodrive', 'touchAutoDrive'], ['btn-handbrake', 'touchHandbrake'], ['btn-zib-skip', 'touchZibSkip'], ['btn-sneak', 'touchSneak'],
+            ['btn-nv', 'touchNightVision'], ['btn-pause', 'touchPause'], ['btn-grab', 'touchGrab'], ['btn-rot-l', 'touchTurnLeft'], ['btn-rot-r', 'touchTurnRight'],
         ];
 
         const controls = new controlsSystem({ keymap: dfKeyMap, actions: dfActions, context: () => typeof game !== 'undefined' ? game : null });
@@ -51142,7 +51183,7 @@ function createNeuralSystemsTiered(x, y, config = {}) {
                 game.car = game.ownedCar;
                 game.autodriveBtn.classList.remove('engaged');
                 game.autodriveBtn.style.display = 'none';
-                game.handbrakeHeld = false;
+                controls.touch.drop('touchHandbrake');
                 if (game.handbrakeBtn) { game.handbrakeBtn.style.display = 'none'; game.handbrakeBtn.classList.remove('held'); }
                 if (game.zibSkipBtn) game.zibSkipBtn.style.display = 'none';
                 if (game.holsterBtn) game.holsterBtn.style.display = 'flex';
@@ -73897,7 +73938,7 @@ Object.assign(TrafficVehicle.prototype, {
         }
 
     </script>
-    <script type="text/dfab" data-src="engine/events.js" data-cost="304">
+    <script type="text/dfab" data-src="engine/events.js" data-cost="227">
         // GameEngine — Input and UI event wiring (keyboard, touch, buttons).
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -74015,6 +74056,13 @@ Object.assign(TrafficVehicle.prototype, {
                 if (pm && !pm.isOpen && !this.paused && !(this.scenes && this.scenes.running)) pm.open(true);
             },
 
+            /** Night vision on or off (the 👁️ button, D-pad ↓). */
+            toggleNightVision() {
+                this.nightVision = !this.nightVision;
+                document.getElementById('btn-nv')?.classList.toggle('active', this.nightVision);
+                audioSys.sfx('ui'); showMessage(this.nightVision ? "NIGHT VISION: ON" : "NIGHT VISION: OFF");
+            },
+
             initEvents() {
                 window.addEventListener('resize', () => { this.resize(); });
                 document.addEventListener('visibilitychange', () => { if (document.hidden) this.onPageHidden(); });
@@ -74057,26 +74105,9 @@ Object.assign(TrafficVehicle.prototype, {
                     this.mouseDown = false;
                 });
                 
-                const toggleAction = (e) => { e.preventDefault(); this.interact(); };
-
-                this.interactBtn.addEventListener('click', toggleAction); this.interactBtn.addEventListener('touchstart', toggleAction);
-                // The hand (engine/furniture.js): tap to grab / confirm / let go; hold it a moment to reset the layout
-                const grabBtn = document.getElementById('btn-grab');
-                if (grabBtn) {
-                    let held = null, long = false;
-                    this._cancelGrabHold = () => { clearTimeout(held); held = null; long = false; };
-                    grabBtn.addEventListener('pointerdown', (e) => {
-                        e.preventDefault(); e.stopPropagation(); long = false;
-                        held = setTimeout(() => { long = true; if (this.furniture.state === 'idle') this.furniture.resetLayout(); }, 900);
-                    });
-                    const up = (e) => { if (held === null) return; clearTimeout(held); held = null; e.preventDefault(); if (!long) this.furniture.press(); };
-                    grabBtn.addEventListener('pointerup', up);
-                    grabBtn.addEventListener('pointercancel', () => { clearTimeout(held); held = null; });
-                    for (const [id, dir] of [['btn-rot-l', -1], ['btn-rot-r', 1]]) {
-                        const b = document.getElementById(id);
-                        if (b) b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); this.furniture.rotate(dir); });
-                    }
-                }
+                // The HUD's buttons are inputs of the controls system (directory/game-controls.js: dfTouchButtons)
+                controls.touch.buttons(dfTouchButtons);
+                this._cancelGrabHold = () => controls.touch.drop('touchGrab');
                 // Choosing a side: a tap on a handle (world space) picks it, before anything else hears the tap
                 this.canvas.addEventListener('pointerdown', (e) => {
                     if (!this.running || this.paused || hudInputBlocked() || !this.furniture || this.furniture.state !== 'choose') return;
@@ -74099,126 +74130,8 @@ Object.assign(TrafficVehicle.prototype, {
                 });
 
                 
-                // In initEvents()
-                const toggleNV = (e) => {
-                    e.preventDefault();
-                    this.nightVision = !this.nightVision;
-                    
-                    // Visual Feedback logic...
-                    const btn = document.getElementById('btn-nv');
-                    if(this.nightVision) {
-                        btn.classList.add('active');
-                        audioSys.sfx('ui');
-                        showMessage("NIGHT VISION: ON");
-                    } else {
-                        btn.classList.remove('active');
-                        audioSys.sfx('ui');
-                        showMessage("NIGHT VISION: OFF");
-                    }
-                };
-                
-                const btnNv = document.getElementById('btn-nv');
-                btnNv.addEventListener('mousedown', toggleNV); // For mouse users
-                btnNv.addEventListener('touchstart', toggleNV); // For touch users (INSTANT RESPONSE)
-
-
-                
-                    // --- PAUSE BUTTON LOGIC ---
-                    const btnPause = document.getElementById('btn-pause');
-                    const pauseMenuEl = document.getElementById('pause-menu');
-                    
-                    const togglePause = (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                    
-                        // Option 1: Use existing PauseMenu class if available (Best practice)
-                        if (typeof pauseMenu !== 'undefined') {
-                            if (pauseMenu.isOpen) pauseMenu.close();
-                            else pauseMenu.open();
-                            return;
-                        }
-                    
-                        // Option 2: Fallback manual toggle (If PauseMenu class is missing)
-                        if (game.paused) {
-                            // Resume
-                            pauseMenuEl.classList.remove('active');
-                            pauseMenuEl.style.display = 'none';
-                            game.pauseSystem.release('pause_menu');
-                        } else {
-                            // Pause
-                            pauseMenuEl.style.display = 'flex';
-                            // Small delay to allow display:flex to apply before adding class for transition
-                            requestAnimationFrame(() => {
-                                pauseMenuEl.classList.add('active');
-                            });
-                            game.pauseSystem.acquire('pause_menu');
-                        }
-                        
-                        // Play sound
-                        if (typeof audioSys !== 'undefined') audioSys.sfx('ui');
-                    };
-                    
-                    // Add listeners for both touch and mouse
-                    btnPause.addEventListener('mousedown', togglePause);
-                    btnPause.addEventListener('touchstart', togglePause);
-
-                
-                this.transitionBtn.addEventListener('click', (e) => { e.preventDefault(); this.triggerTransition(); });
-                this.transitionBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.triggerTransition(); });
-                // Fire button is now a joystick - handlers in initFireJoystick()
-                this.shootCooldown = 0; // Cooldown for automatic fire
-                // --- HEAL BUTTON: Tap = self, Hold (300ms+) = nearest damaged ally ---
-                this._healHoldTimer = null;
-                this._healHeld = false;
-                
-                const healStart = (e) => {
-                    e.preventDefault();
-                    if (!this.running || this.paused || hudInputBlocked() || this._healPressed) return;
-                    this._healPressed = true;
-                    this._healHeld = false;
-                    this._healHoldTimer = setTimeout(() => {
-                        this._healHeld = true;
-                        this.useBoosterOnAlly();
-                    }, 300);
-                };
-                const healEnd = (e) => {
-                    e.preventDefault();
-                    if (!this._healPressed) return;
-                    this._healPressed = false;
-                    if (this._healHoldTimer) {
-                        clearTimeout(this._healHoldTimer);
-                        this._healHoldTimer = null;
-                    }
-                    if (!this._healHeld) {
-                        // Quick tap — self heal
-                        this.useBooster();
-                    }
-                    this._healHeld = false;
-                };
-                this.healBtn.addEventListener('mousedown', healStart);
-                this.healBtn.addEventListener('touchstart', healStart);
-                this.healBtn.addEventListener('mouseup', healEnd);
-                this.healBtn.addEventListener('touchend', healEnd);
-                this.healBtn.addEventListener('mouseleave', healEnd);
-                this.flitBtn.addEventListener('mousedown', (e) => { e.preventDefault(); this.triggerFlit(); });
-                this.flitBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.triggerFlit(); });
-                this.autodriveBtn.addEventListener('mousedown', (e) => { e.preventDefault(); this.toggleAutoDrive(); });
-                this.autodriveBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.toggleAutoDrive(); });
-                // Handbrake: held for as long as a finger (or the mouse) is on it
-                const hbBtn = document.getElementById('btn-handbrake');
-                if (hbBtn) {
-                    const hbSet = (on) => { this.handbrakeHeld = on; hbBtn.classList.toggle('held', on); };
-                    hbBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); try { hbBtn.setPointerCapture(e.pointerId); } catch (_) {} hbSet(true); });
-                    for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) hbBtn.addEventListener(ev, () => hbSet(false));
-                    hbBtn.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
-                    this.handbrakeBtn = hbBtn;
-                }
-
-                this.zibSkipBtn.addEventListener('mousedown', (e) => { e.preventDefault(); if (this.zibSystem) this.zibSystem.teleportToDestination(this); this.zibSkipBtn.style.display = 'none'; });
-                this.zibSkipBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if (this.zibSystem) this.zibSystem.teleportToDestination(this); this.zibSkipBtn.style.display = 'none'; });
-
-                const sneakBtn = document.getElementById('btn-sneak');
-                if (sneakBtn) { const tog = (e) => { e.preventDefault(); e.stopPropagation(); this.toggleSneak(); }; sneakBtn.addEventListener('mousedown', tog); sneakBtn.addEventListener('touchstart', tog, { passive: false }); }
+                this.shootCooldown = 0; // Cooldown for automatic fire (the fire button is a joystick: initFireJoystick())
+                this.handbrakeBtn = document.getElementById('btn-handbrake');
                 this.initQuickDrawControl();
 
                 // ── Emote Joystick ──
@@ -87066,7 +86979,7 @@ engineMixin({
                 this.autodriveBtn.style.display = 'none';
                 this.autodriveBtn.classList.remove('engaged');
                 if (this.handbrakeBtn) { this.handbrakeBtn.style.display = 'none'; this.handbrakeBtn.classList.remove('held'); }
-                this.handbrakeHeld = false;
+                controls.touch.drop('touchHandbrake');
                 this.holsterBtn.style.display = 'flex'; { const sb = document.getElementById('btn-sneak'); if (sb) sb.style.display = 'flex'; }
                 this.fireBtn.style.display = this.weaponHolstered ? 'none' : 'flex';
                 this.emoteBtn.style.display = this.weaponHolstered ? 'flex' : 'none';
@@ -88532,12 +88445,12 @@ engineMixin({
                         }
                         this.car.update(this.player, this.car, this.traffic.vehicles, this.weather, this.traffic.network.intersections, this.activeMap.walls, this.carColliders(), this.decals, this.traffic.folk);
                         if (!(this.zibSystem && this.zibSystem.isPassenger) &&
-                            (inputX !== 0 || inputY !== 0 || controls.active('handbrake') || this.handbrakeHeld)) {
+                            (inputX !== 0 || inputY !== 0 || controls.active('handbrake'))) {
                             this.car.disableAutoDrive(); this.car.clearNavWaypoints(); this.autodriveBtn.classList.remove('engaged'); showMessage("AUTO-DRIVE DISENGAGED");
                         }
                     } else {
                         this.car.driverInput(inputX, inputY, this.joystick.active);
-                        this.car.handbrake = !!(controls.active('handbrake') || this.handbrakeHeld);
+                        this.car.handbrake = !!(controls.active('handbrake'));
                         this.car.updateManualDriving(this.activeMap.walls, this.carColliders(), this.weather, this.decals);   // (pools stop her car: engine/pools.js)
                     }
                     // Player sits at seat 0, not car center
@@ -102071,7 +101984,6 @@ engineMixin({
                     document.getElementById('game-ui')?.classList.remove('aiming');
                 }
                 state.ownsMove = state.ownsAim = false;
-                g.handbrakeHeld = false;
             }
 
             /** Play: the sticks feed the same state the touch sticks do. The buttons are actions (directory/game-controls.js). */
@@ -102109,7 +102021,7 @@ engineMixin({
                 }
                 // LT is the handbrake (the 'handbrake' action, read by engine/update.js): light its button
                 const hb = !!(g.isDriving && pressed('gamepadLTrigger'));
-                if (hb !== !!state.hb) { state.hb = hb; document.getElementById('btn-handbrake')?.classList.toggle('held', hb || g.handbrakeHeld); }
+                if (hb !== !!state.hb) { state.hb = hb; document.getElementById('btn-handbrake')?.classList.toggle('held', hb || controls.touch.isActive('touchHandbrake')); }
             }
 
             // ── Menus: a highlight that moves between the visible clickable things ──

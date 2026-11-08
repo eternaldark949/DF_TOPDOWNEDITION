@@ -605,7 +605,7 @@
                 game.car = game.ownedCar;
                 game.autodriveBtn.classList.remove('engaged');
                 game.autodriveBtn.style.display = 'none';
-                game.handbrakeHeld = false;
+                controls.touch.drop('touchHandbrake');
                 if (game.handbrakeBtn) { game.handbrakeBtn.style.display = 'none'; game.handbrakeBtn.classList.remove('held'); }
                 if (game.zibSkipBtn) game.zibSkipBtn.style.display = 'none';
                 if (game.holsterBtn) game.holsterBtn.style.display = 'flex';

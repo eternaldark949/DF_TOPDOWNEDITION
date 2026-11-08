@@ -926,12 +926,12 @@
                         }
                         this.car.update(this.player, this.car, this.traffic.vehicles, this.weather, this.traffic.network.intersections, this.activeMap.walls, this.carColliders(), this.decals, this.traffic.folk);
                         if (!(this.zibSystem && this.zibSystem.isPassenger) &&
-                            (inputX !== 0 || inputY !== 0 || controls.active('handbrake') || this.handbrakeHeld)) {
+                            (inputX !== 0 || inputY !== 0 || controls.active('handbrake'))) {
                             this.car.disableAutoDrive(); this.car.clearNavWaypoints(); this.autodriveBtn.classList.remove('engaged'); showMessage("AUTO-DRIVE DISENGAGED");
                         }
                     } else {
                         this.car.driverInput(inputX, inputY, this.joystick.active);
-                        this.car.handbrake = !!(controls.active('handbrake') || this.handbrakeHeld);
+                        this.car.handbrake = !!(controls.active('handbrake'));
                         this.car.updateManualDriving(this.activeMap.walls, this.carColliders(), this.weather, this.decals);   // (pools stop her car: engine/pools.js)
                     }
                     // Player sits at seat 0, not car center

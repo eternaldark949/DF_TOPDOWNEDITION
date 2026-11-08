@@ -19,10 +19,9 @@
             if (g.joystick) Object.assign(g.joystick, { active: false, dx: 0, dy: 0, id: null, armed: true, ringArmed: true, trail: [] });
             if (g.fireJoystick) Object.assign(g.fireJoystick, { active: false, dx: 0, dy: 0, id: null, firing: false, armed: false, aimed: false, remembered: false });
             g._releaseShot = null; g._releaseWait = 0; g._aimMemory = null;
-            clearTimeout(g._healHoldTimer); g._healHoldTimer = null; g._healHeld = false; g._healPressed = false;
             g._cancelGrabHold?.();
             g._cancelLookDrag?.();
-            g.handbrakeHeld = false; if (g.car) g.car.handbrake = false;
+            if (g.car) g.car.handbrake = false;
             document.getElementById('btn-handbrake')?.classList.remove('held');
             if (g.emoteJoystick) Object.assign(g.emoteJoystick, { active: false, touchId: null, highlighted: null });
             g.emoteBtn?.classList.remove('dragging');

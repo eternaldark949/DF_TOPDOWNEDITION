@@ -246,7 +246,7 @@ function setupDrive(env, {taxi=false,lane='R0.S0.L2',destination='clinic',endpoi
     game._doLoadMap('sdc'); game.story.update=()=>{}; game.running=true; game.paused=false;
     game.traffic.vehicles=[]; game.traffic.spawnTimer=1e9; GameSettings.getMaxTraffic=()=>0;
     game.zibSystem.passengerRide=null; game.zibSystem.activeZibs=[]; game.zibSystem.trySpawn=()=>{};
-    controls.keyboard.setInputs([]); game.joystick.active=false; game.joystick.dx=game.joystick.dy=0; game.handbrakeHeld=false;
+    controls.keyboard.setInputs([]); game.joystick.active=false; game.joystick.dx=game.joystick.dy=0; controls.touch.setInputs([]);
     const selected=game.traffic.network.allLanes.find(l=>l.id===${JSON.stringify(lane)});
     const offset=${endpoint} ? selected.length-12 : Math.min(200,selected.length*.3);
     game.car=game.ownedCar; game.car.disableAutoDrive(); game.car.clearNavWaypoints();
@@ -400,7 +400,7 @@ test('Autodrive keyboard repeat, player takeover and passenger input guards', en
   env.run('controls.keyboard.setInputs(["ArrowLeft"]);game.update();');
   equal(env.probe.game.car.controlMode, 'PLAYER');
   setupDrive(env, {taxi:true});
-  env.run('game.toggleAutoDrive();controls.keyboard.setInputs(["ArrowLeft"]);game.handbrakeHeld=true;game.update();');
+  env.run('game.toggleAutoDrive();controls.keyboard.setInputs(["ArrowLeft"]);controls.touch.setInputs(["touchHandbrake"]);game.update();');
   equal(env.probe.game.car.controlMode, 'AI'); equal(env.probe.game.zibSystem.isPassenger, true);
 }, {events:true,timers:true});
 

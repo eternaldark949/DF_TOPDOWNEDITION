@@ -49,7 +49,6 @@
                     document.getElementById('game-ui')?.classList.remove('aiming');
                 }
                 state.ownsMove = state.ownsAim = false;
-                g.handbrakeHeld = false;
             }
 
             /** Play: the sticks feed the same state the touch sticks do. The buttons are actions (directory/game-controls.js). */
@@ -87,7 +86,7 @@
                 }
                 // LT is the handbrake (the 'handbrake' action, read by engine/update.js): light its button
                 const hb = !!(g.isDriving && pressed('gamepadLTrigger'));
-                if (hb !== !!state.hb) { state.hb = hb; document.getElementById('btn-handbrake')?.classList.toggle('held', hb || g.handbrakeHeld); }
+                if (hb !== !!state.hb) { state.hb = hb; document.getElementById('btn-handbrake')?.classList.toggle('held', hb || controls.touch.isActive('touchHandbrake')); }
             }
 
             // ── Menus: a highlight that moves between the visible clickable things ──

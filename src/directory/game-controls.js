@@ -1,8 +1,9 @@
         // ===== LV2 DIRECTORY =====
         // The game's controls: which keys and buttons do what (dfKeyMap), and the actions they fire
         // (dfActions), handed to the Basement's controls system (basement/controls-system.js).
-        // Touch (the HUD buttons and sticks), the mouse aim and the controller's menu highlight stay
-        // where they are: engine/events.js, the joysticks, ui/gamepad.js.
+        // The HUD's buttons are touch inputs (dfTouchButtons). The touch sticks and gestures, the mouse
+        // aim and the controller's menu highlight keep their own code: the joysticks, engine/events.js,
+        // ui/gamepad.js.
         //
         // Who may fire what:
         //   PLAY  the game is running and unpaused, the HUD takes input, no text field has the key
@@ -23,21 +24,23 @@
         const dfKeyMap = {
             move_up: ['w', 'ArrowUp'], move_down: ['s', 'ArrowDown'], move_left: ['a', 'ArrowLeft'], move_right: ['d', 'ArrowRight'],
             fire: [['space', REPEAT]],                          // the controller fires with RT on the aim stick (ui/gamepad.js)
-            handbrake: ['space', 'gamepadLTrigger'],
-            interact: ['e', 'gamepadA'],
-            doors: ['f', 'gamepadY'],
-            flit: ['gamepadB'],
+            handbrake: ['space', 'gamepadLTrigger', 'touchHandbrake'],
+            interact: ['e', 'gamepadA', 'touchInteract'],
+            doors: ['f', 'gamepadY', 'touchDoors'],
+            flit: ['gamepadB', 'touchFlit'],
             holster: ['gamepadX'],
-            sneak: ['c', 'gamepadLBumper'],
-            booster: ['h', ['gamepadRBumper', TAP]],
-            booster_ally: ['j', ['gamepadRBumper', HELD, 0.3]],
-            furniture: ['g'],
-            furniture_turn: [['r', REPEAT]],
-            auto_drive: ['q', 'gamepadLStickButton'],
-            zib_skip: ['t'],
+            sneak: ['c', 'gamepadLBumper', 'touchSneak'],
+            booster: ['h', ['gamepadRBumper', TAP], ['touchHeal', TAP]],
+            booster_ally: ['j', ['gamepadRBumper', HELD, 0.3], ['touchHeal', HELD, 0.3]],
+            furniture: ['g', ['touchGrab', TAP]],
+            furniture_reset: [['touchGrab', HELD, 0.9]],
+            furniture_turn: [['r', REPEAT], 'touchTurnRight'], furniture_turn_back: ['touchTurnLeft'],
+            auto_drive: ['q', 'gamepadLStickButton', 'touchAutoDrive'],
+            zib_skip: ['t', 'touchZibSkip'],
             map: ['m', 'gamepadBack'],
             phone: ['p', 'gamepadDUp'],
-            night_vision: ['gamepadDDown'],
+            night_vision: ['gamepadDDown', 'touchNightVision'],
+            pause: ['touchPause'],
             screen_back: ['b'],
             back: ['Escape', 'gamepadStart'],
             menu_up: [['ArrowUp', REPEAT]], menu_down: [['ArrowDown', REPEAT]], menu_left: [['ArrowLeft', REPEAT]], menu_right: [['ArrowRight', REPEAT]],
@@ -75,23 +78,33 @@
             ['fire', PLAY, (g, ev) => { ev.preventDefault(); if (!g.isDriving && g.shootCooldown <= 0 && g.player.visible) g.fireWeapon(); }],   // driving, Space is the handbrake
             ['interact', LIVE, g => g.interact()],
             ['doors', LIVE, g => (dfShown(g.transitionBtn) || !g.isDriving && g.activeMap.transitions && g._transitionGrid.query(g.player.x, g.player.y)) && g.triggerTransition()],
-            ['flit', (g, ev) => PLAY(g, ev) && !g.isDriving, g => g.triggerFlit(undefined, 'pad') && controls.gamepad.rumble(90, 0.5)],
+            ['flit', (g, ev) => PLAY(g, ev) && !g.isDriving, (g, ev) => ev.device === 'gamepad' ? g.triggerFlit(undefined, 'pad') && controls.gamepad.rumble(90, 0.5) : g.triggerFlit()],
             ['holster', (g, ev) => PLAY(g, ev) && !g.isDriving, g => g._quickDraw ? (g.cancelQuickDraw(), g.setWeaponHolstered(false)) : g.setWeaponHolstered(!g.weaponHolstered)],
             ['sneak', (g, ev) => PLAY(g, ev) && !ev.ctrl && !g.isDriving, g => g.toggleSneak()],   // engine/sneak.js
             ['booster', PLAY, g => g.useBooster()],
             ['booster_ally', PLAY, g => g.useBoosterOnAlly()],
             ['furniture', (g, ev) => PLAY(g, ev) && !!g.furniture, g => g.furniture.press()],                 // engine/furniture.js: grab / confirm / let go
+            ['furniture_reset', (g, ev) => PLAY(g, ev) && g.furniture?.state === 'idle', g => g.furniture.resetLayout()],   // hold the hand a moment
             ['furniture_turn', (g, ev) => PLAY(g, ev) && !!g.furniture?.holding, (g, ev) => g.furniture.rotate(ev.shift ? -1 : 1)],
+            ['furniture_turn_back', (g, ev) => PLAY(g, ev) && !!g.furniture?.holding, g => g.furniture.rotate(-1)],
             ['auto_drive', (g, ev) => PLAY(g, ev) && g.isDriving, g => g.toggleAutoDrive()],
-            ['zib_skip', (g, ev) => LIVE(g, ev) && !!g.zibSystem?.isPassenger, g => { g.zibSystem.teleportToDestination(g); if (g.zibSkipBtn) g.zibSkipBtn.style.display = 'none'; }],
+            ['zib_skip', (g, ev) => (ev.device === 'touch' || LIVE(g, ev)) && !!g.zibSystem?.isPassenger, g => { g.zibSystem.teleportToDestination(g); if (g.zibSkipBtn) g.zibSkipBtn.style.display = 'none'; }],
             ['map', UI, g => Screens.mapOpen() ? Screens.close() : g?.running && !g.paused && Screens.open('map')],   // the map holds a pause token
             ['phone', UI, g => phoneSystem.overlay.style.display === 'flex' ? phoneSystem.close() : !g?.paused && phoneSystem.open()],
-            ['night_vision', PLAY, () => document.getElementById('btn-nv')?.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }))],
+            ['night_vision', PLAY, g => g.toggleNightVision()],
+            ['pause', null, () => pauseMenu.isOpen ? pauseMenu.close() : pauseMenu.open()],   // the ⏸ button
             ['screen_back', UI, () => (Screens.mapOpen() || Screens.menuOpen()) && Screens.close()],
             ['back', dfPad, g => dfBack(g)],                   // Escape works in a text field too
             ['menu_up', MENU, dfMenuKey(() => pauseMenu.navigateUp())], ['menu_down', MENU, dfMenuKey(() => pauseMenu.navigateDown())],
             ['menu_left', MENU, dfMenuKey(() => pauseMenu.navigateLeft())], ['menu_right', MENU, dfMenuKey(() => pauseMenu.navigateRight())],
             ['menu_select', MENU, dfMenuKey(() => pauseMenu.selectCurrent())],
+        ];
+
+        /** The HUD's buttons as touch inputs (engine/events.js hands them over once the HUD exists). */
+        const dfTouchButtons = [
+            ['btn-interact', 'touchInteract'], ['btn-transition', 'touchDoors'], ['btn-heal', 'touchHeal'], ['btn-flit', 'touchFlit'],
+            ['btn-autodrive', 'touchAutoDrive'], ['btn-handbrake', 'touchHandbrake'], ['btn-zib-skip', 'touchZibSkip'], ['btn-sneak', 'touchSneak'],
+            ['btn-nv', 'touchNightVision'], ['btn-pause', 'touchPause'], ['btn-grab', 'touchGrab'], ['btn-rot-l', 'touchTurnLeft'], ['btn-rot-r', 'touchTurnRight'],
         ];
 
         const controls = new controlsSystem({ keymap: dfKeyMap, actions: dfActions, context: () => typeof game !== 'undefined' ? game : null });

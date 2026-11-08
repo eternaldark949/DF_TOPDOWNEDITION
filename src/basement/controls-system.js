@@ -5,14 +5,15 @@
         // (The terms are from the g7 engine: base game script 2.0's controlsSystem and V1's controlSystem.)
         //
         //   keyboardInstance ┐
-        //   mouseInstance    ├── press / release ── keymap ── action table ── run(game, ev)
+        //   mouseInstance    │
+        //   touchInstance    ├── press / release ── keymap ── action table ── run(game, ev)
         //   gamepadInstance  ┘        (polled each frame)            └── queue (readQueue: buffered inputs)
         //
         // Each instance keeps input_active (held now), input_just_activated and input_just_released (this
         // frame), and ghost_image (what was held last frame: generateGhostImage, at the end of a frame).
         //
         // INPUT NAMES:   keys by e.key, letters in lower case ('w', 'space', 'Escape', 'ArrowUp', 'Enter');
-        //                'mouseLeft' | 'mouseMiddle' | 'mouseRight';
+        //                'mouseLeft' | 'mouseMiddle' | 'mouseRight';  'touch…' (on-screen buttons, named by the game);
         //                'gamepadA' 'gamepadB' 'gamepadX' 'gamepadY' 'gamepadLBumper' 'gamepadRBumper'
         //                'gamepadLTrigger' 'gamepadRTrigger' 'gamepadBack' 'gamepadStart' 'gamepadLStickButton'
         //                'gamepadRStickButton' 'gamepadDUp' 'gamepadDDown' 'gamepadDLeft' 'gamepadDRight'
@@ -95,6 +96,32 @@
             }
         }
 
+        class touchInstance extends inputInstance {
+            /** On-screen buttons as inputs: a finger (or the mouse) down on one presses it, lifting it, sliding
+             *  off it or losing it releases it, so a HUD button can tap, hold or double tap like a key. While
+             *  pressed the button wears the `held` class. (The sticks and gestures keep their own code.) */
+            constructor(system) { super(system, 'touch'); this.elements = {}; }
+            /** BUTTON PACKETS: [[element or id, input], ...]  e.g. [['btn-heal', 'touchHeal']] */
+            buttons(list) { for (const [el, input] of list) this.button(el, input); }
+            button(el, input) {
+                el = typeof el === 'string' ? document.getElementById(el) : el;
+                if (!el || this.elements[input] === el) return;
+                this.elements[input] = el;
+                const down = e => {
+                    e.preventDefault();
+                    try { e.pointerId !== undefined && el.setPointerCapture(e.pointerId); } catch (_) { /* not capturable */ }
+                    el.classList.add('held');
+                    this.system.press(this, input, this.system.ev('touch', input, e));
+                };
+                const up = e => { el.classList.remove('held'); if (this.input_active.has(input)) this.system.release(this, input, this.system.ev('touch', input, e)); };
+                el.addEventListener('pointerdown', down);
+                for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) el.addEventListener(t, up);
+                el.addEventListener('touchstart', e => e.preventDefault(), { passive: false });   // no scroll, no copied mouse events
+            }
+            /** Let go of one button (its finger is still down, but it no longer counts). */
+            drop(input) { if (this.input_active.has(input)) { this.spent.add(input); if (this.armed[input]) this.armed[input] = new Set(); } this.elements[input]?.classList.remove('held'); }
+        }
+
         class gamepadInstance extends inputInstance {
             /** Standard mapping: button index -> name. */
             static BUTTONS = ['gamepadA', 'gamepadB', 'gamepadX', 'gamepadY', 'gamepadLBumper', 'gamepadRBumper', 'gamepadLTrigger', 'gamepadRTrigger',
@@ -152,6 +179,7 @@
                 this.setKeymap(keymap);
                 this.keyboard = new keyboardInstance(this);
                 this.mouse = new mouseInstance(this);
+                this.touch = new touchInstance(this);
                 this.gamepad = new gamepadInstance(this);
                 this.frame = this.frame.bind(this);
                 if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(this.frame);
@@ -168,7 +196,7 @@
             }
             bind(action, ...bindings) { this.setKeymap({ ...this.keymap, [action]: bindings }); }
             bound(action, input) { return !!this.inputs[action]?.includes(input); }
-            instanceOf(input) { return input.startsWith('gamepad') ? this.gamepad : input.startsWith('mouse') ? this.mouse : this.keyboard; }
+            instanceOf(input) { return input.startsWith('gamepad') ? this.gamepad : input.startsWith('mouse') ? this.mouse : input.startsWith('touch') ? this.touch : this.keyboard; }
 
             // ── Asking ──────────────────────────────────────────────────────────
             active(action) { return !!this.inputs[action]?.some(i => this.instanceOf(i).isActive(i)); }
@@ -186,7 +214,8 @@
             }
             /** Let go of everything held: nothing fires or reads as held until it is pressed again. */
             clear() {
-                for (const inst of [this.keyboard, this.mouse, this.gamepad]) { for (const i of inst.input_active) inst.spent.add(i); inst.armed = {}; }
+                for (const i of this.touch.input_active) this.touch.elements[i]?.classList.remove('held');
+                for (const inst of [this.keyboard, this.mouse, this.touch, this.gamepad]) { for (const i of inst.input_active) inst.spent.add(i); inst.armed = {}; }
                 this.pending.length = 0;
             }
 
@@ -235,7 +264,7 @@
             // ── The frame ───────────────────────────────────────────────────────
             update(now = controlsSystem.now()) {
                 this.gamepad.updateGamepads();
-                for (const inst of [this.keyboard, this.mouse, this.gamepad]) for (const input in inst.armed) {
+                for (const inst of [this.keyboard, this.mouse, this.touch, this.gamepad]) for (const input in inst.armed) {
                     const armed = inst.armed[input], since = inst.input_time[input];
                     for (const [a, t, hold] of this.bindings[input] || []) {
                         if (t !== HELD || !armed.has(a) || armed['held_' + a] || now - since < (hold ?? this.hold_wait_time)) continue;
@@ -246,7 +275,7 @@
                 this.pending = this.pending.filter(([, a, ev]) => now - ev.time <= this.tap_wait_time || (this.fire(a, TAP, ev), false));
                 this.queue = this.queue.filter(q => now - q[2] <= this.queue_wait_time);
                 for (const fn of this.hooks) fn(this, now);
-                this.keyboard.generateGhostImage(); this.mouse.generateGhostImage(); this.gamepad.generateGhostImage();
+                for (const inst of [this.keyboard, this.mouse, this.touch, this.gamepad]) inst.generateGhostImage();
             }
             frame() { requestAnimationFrame(this.frame); this.update(); }
         }

@@ -115,6 +115,13 @@
                 if (pm && !pm.isOpen && !this.paused && !(this.scenes && this.scenes.running)) pm.open(true);
             },
 
+            /** Night vision on or off (the 👁️ button, D-pad ↓). */
+            toggleNightVision() {
+                this.nightVision = !this.nightVision;
+                document.getElementById('btn-nv')?.classList.toggle('active', this.nightVision);
+                audioSys.sfx('ui'); showMessage(this.nightVision ? "NIGHT VISION: ON" : "NIGHT VISION: OFF");
+            },
+
             initEvents() {
                 window.addEventListener('resize', () => { this.resize(); });
                 document.addEventListener('visibilitychange', () => { if (document.hidden) this.onPageHidden(); });
@@ -157,26 +164,9 @@
                     this.mouseDown = false;
                 });
                 
-                const toggleAction = (e) => { e.preventDefault(); this.interact(); };
-
-                this.interactBtn.addEventListener('click', toggleAction); this.interactBtn.addEventListener('touchstart', toggleAction);
-                // The hand (engine/furniture.js): tap to grab / confirm / let go; hold it a moment to reset the layout
-                const grabBtn = document.getElementById('btn-grab');
-                if (grabBtn) {
-                    let held = null, long = false;
-                    this._cancelGrabHold = () => { clearTimeout(held); held = null; long = false; };
-                    grabBtn.addEventListener('pointerdown', (e) => {
-                        e.preventDefault(); e.stopPropagation(); long = false;
-                        held = setTimeout(() => { long = true; if (this.furniture.state === 'idle') this.furniture.resetLayout(); }, 900);
-                    });
-                    const up = (e) => { if (held === null) return; clearTimeout(held); held = null; e.preventDefault(); if (!long) this.furniture.press(); };
-                    grabBtn.addEventListener('pointerup', up);
-                    grabBtn.addEventListener('pointercancel', () => { clearTimeout(held); held = null; });
-                    for (const [id, dir] of [['btn-rot-l', -1], ['btn-rot-r', 1]]) {
-                        const b = document.getElementById(id);
-                        if (b) b.addEventListener('pointerdown', (e) => { e.preventDefault(); e.stopPropagation(); this.furniture.rotate(dir); });
-                    }
-                }
+                // The HUD's buttons are inputs of the controls system (directory/game-controls.js: dfTouchButtons)
+                controls.touch.buttons(dfTouchButtons);
+                this._cancelGrabHold = () => controls.touch.drop('touchGrab');
                 // Choosing a side: a tap on a handle (world space) picks it, before anything else hears the tap
                 this.canvas.addEventListener('pointerdown', (e) => {
                     if (!this.running || this.paused || hudInputBlocked() || !this.furniture || this.furniture.state !== 'choose') return;
@@ -199,126 +189,8 @@
                 });
 
                 
-                // In initEvents()
-                const toggleNV = (e) => {
-                    e.preventDefault();
-                    this.nightVision = !this.nightVision;
-                    
-                    // Visual Feedback logic...
-                    const btn = document.getElementById('btn-nv');
-                    if(this.nightVision) {
-                        btn.classList.add('active');
-                        audioSys.sfx('ui');
-                        showMessage("NIGHT VISION: ON");
-                    } else {
-                        btn.classList.remove('active');
-                        audioSys.sfx('ui');
-                        showMessage("NIGHT VISION: OFF");
-                    }
-                };
-                
-                const btnNv = document.getElementById('btn-nv');
-                btnNv.addEventListener('mousedown', toggleNV); // For mouse users
-                btnNv.addEventListener('touchstart', toggleNV); // For touch users (INSTANT RESPONSE)
-
-
-                
-                    // --- PAUSE BUTTON LOGIC ---
-                    const btnPause = document.getElementById('btn-pause');
-                    const pauseMenuEl = document.getElementById('pause-menu');
-                    
-                    const togglePause = (e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                    
-                        // Option 1: Use existing PauseMenu class if available (Best practice)
-                        if (typeof pauseMenu !== 'undefined') {
-                            if (pauseMenu.isOpen) pauseMenu.close();
-                            else pauseMenu.open();
-                            return;
-                        }
-                    
-                        // Option 2: Fallback manual toggle (If PauseMenu class is missing)
-                        if (game.paused) {
-                            // Resume
-                            pauseMenuEl.classList.remove('active');
-                            pauseMenuEl.style.display = 'none';
-                            game.pauseSystem.release('pause_menu');
-                        } else {
-                            // Pause
-                            pauseMenuEl.style.display = 'flex';
-                            // Small delay to allow display:flex to apply before adding class for transition
-                            requestAnimationFrame(() => {
-                                pauseMenuEl.classList.add('active');
-                            });
-                            game.pauseSystem.acquire('pause_menu');
-                        }
-                        
-                        // Play sound
-                        if (typeof audioSys !== 'undefined') audioSys.sfx('ui');
-                    };
-                    
-                    // Add listeners for both touch and mouse
-                    btnPause.addEventListener('mousedown', togglePause);
-                    btnPause.addEventListener('touchstart', togglePause);
-
-                
-                this.transitionBtn.addEventListener('click', (e) => { e.preventDefault(); this.triggerTransition(); });
-                this.transitionBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.triggerTransition(); });
-                // Fire button is now a joystick - handlers in initFireJoystick()
-                this.shootCooldown = 0; // Cooldown for automatic fire
-                // --- HEAL BUTTON: Tap = self, Hold (300ms+) = nearest damaged ally ---
-                this._healHoldTimer = null;
-                this._healHeld = false;
-                
-                const healStart = (e) => {
-                    e.preventDefault();
-                    if (!this.running || this.paused || hudInputBlocked() || this._healPressed) return;
-                    this._healPressed = true;
-                    this._healHeld = false;
-                    this._healHoldTimer = setTimeout(() => {
-                        this._healHeld = true;
-                        this.useBoosterOnAlly();
-                    }, 300);
-                };
-                const healEnd = (e) => {
-                    e.preventDefault();
-                    if (!this._healPressed) return;
-                    this._healPressed = false;
-                    if (this._healHoldTimer) {
-                        clearTimeout(this._healHoldTimer);
-                        this._healHoldTimer = null;
-                    }
-                    if (!this._healHeld) {
-                        // Quick tap — self heal
-                        this.useBooster();
-                    }
-                    this._healHeld = false;
-                };
-                this.healBtn.addEventListener('mousedown', healStart);
-                this.healBtn.addEventListener('touchstart', healStart);
-                this.healBtn.addEventListener('mouseup', healEnd);
-                this.healBtn.addEventListener('touchend', healEnd);
-                this.healBtn.addEventListener('mouseleave', healEnd);
-                this.flitBtn.addEventListener('mousedown', (e) => { e.preventDefault(); this.triggerFlit(); });
-                this.flitBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.triggerFlit(); });
-                this.autodriveBtn.addEventListener('mousedown', (e) => { e.preventDefault(); this.toggleAutoDrive(); });
-                this.autodriveBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.toggleAutoDrive(); });
-                // Handbrake: held for as long as a finger (or the mouse) is on it
-                const hbBtn = document.getElementById('btn-handbrake');
-                if (hbBtn) {
-                    const hbSet = (on) => { this.handbrakeHeld = on; hbBtn.classList.toggle('held', on); };
-                    hbBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); try { hbBtn.setPointerCapture(e.pointerId); } catch (_) {} hbSet(true); });
-                    for (const ev of ['pointerup', 'pointercancel', 'lostpointercapture']) hbBtn.addEventListener(ev, () => hbSet(false));
-                    hbBtn.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false });
-                    this.handbrakeBtn = hbBtn;
-                }
-
-                this.zibSkipBtn.addEventListener('mousedown', (e) => { e.preventDefault(); if (this.zibSystem) this.zibSystem.teleportToDestination(this); this.zibSkipBtn.style.display = 'none'; });
-                this.zibSkipBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if (this.zibSystem) this.zibSystem.teleportToDestination(this); this.zibSkipBtn.style.display = 'none'; });
-
-                const sneakBtn = document.getElementById('btn-sneak');
-                if (sneakBtn) { const tog = (e) => { e.preventDefault(); e.stopPropagation(); this.toggleSneak(); }; sneakBtn.addEventListener('mousedown', tog); sneakBtn.addEventListener('touchstart', tog, { passive: false }); }
+                this.shootCooldown = 0; // Cooldown for automatic fire (the fire button is a joystick: initFireJoystick())
+                this.handbrakeBtn = document.getElementById('btn-handbrake');
                 this.initQuickDrawControl();
 
                 // ── Emote Joystick ──
