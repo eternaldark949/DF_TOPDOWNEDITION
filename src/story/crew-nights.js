@@ -39,215 +39,36 @@
         const CREW_HOME_VENUE = GAME_DB.story.crew.home_venue;   // directory/game-db/story.json
 
         /* ── A group night ── */
-        const CREW_OPENERS = {
-            Victoria: ['Nine! Finally. I ordered for you. Don\'t ask what it is.'],
-            Sabrina: ['Look who remembered she has friends.'],
-            Max: ['You\'re late. Sit down before someone takes your seat.'],
-            Josh: ['You arrived four minutes after the median. Acceptable.'],
-            Yenna: ['Booth with a clear view of both exits. You\'re welcome.'],
-            '747': ['There she is. Sit, Nine. Tonight we\'re off the clock.'],
-        };
-        const CREW_BOOTH = {
-            Victoria: 'The DJ keeps looking at me. I\'m going to let him suffer.', Sabrina: 'The drinks here are terrible. I\'ve had four.',
-            Max: 'Music\'s too loud. Drinks are too small. This is bullshit.', Josh: 'Fun fact: this booth has the best acoustics in the building. For eavesdropping.',
-            Yenna: 'Bartender\'s been watering the gin. I can tell from here.', '747': 'Good to see everyone in one piece for once.',
-        };
-        const CREW_TOASTS = ['To the crew.', 'To getting paid.', 'To surviving Mirabel.'];
+        const CREW_OPENERS = GAME_DB.dialogue.crew.openers;   // directory/game-db/dialogue.json
+        const CREW_BOOTH = GAME_DB.dialogue.crew.booth;   // directory/game-db/dialogue.json
+        const CREW_TOASTS = GAME_DB.dialogue.crew.toasts;   // directory/game-db/dialogue.json
         /** Which toast each of them likes (and a word for it) */
-        const CREW_TOAST_TASTE = { '747': 0, Yenna: 0, Victoria: 1, Josh: 1, Max: 2, Sabrina: 2 };
-        const CREW_TOAST_LINES = [
-            { '747': 'To the crew.', Yenna: 'To the crew. Every one of you.' },
-            { Victoria: 'Now THAT I\'ll drink to.', Josh: 'Technically we get paid either way. But yes.' },
-            { Max: 'Ha! Finally, someone says it.', Sabrina: 'We\'ll need more glasses.' },
-        ];
-        const CREW_JOB_TALK = {
-            bounty: { Yenna: 'That last mark had a decent rifle. Had.', Josh: '{job}. Closed. I put a little star next to it.', Max: '{job} won\'t be bothering anyone.',
-                      Victoria: 'Can we talk about how dramatic that last bounty was?', Sabrina: 'You\'ve been busy. {job}, was it?', '747': 'Good work on {job}, Nine.' },
-            delivery: { Victoria: 'I hear we\'re couriers now. Do I get a cute hat?', Josh: 'Amber rated you five stars. I checked. Twice.', Max: 'Boxes. We fought gods and now we carry boxes.',
-                        Sabrina: 'How\'s the delivery life? Tips any good?', Yenna: 'Delivery routes are good recon. Smart.', '747': 'Honest work. Nothing wrong with that.' },
-            salvage: { Max: 'Anavia\'s scrap jobs pay. I\'ll give her that.', Josh: 'That salvage haul was worth more than this bar.', Victoria: 'You came back covered in rust. Iconic.',
-                       Yenna: 'Salvage guards are getting smarter. Watch it.', Sabrina: 'Treasure hunting for Anavia. How romantic.', '747': 'Careful with Anavia, Nine. Her gifts have strings.' },
-            none: { Victoria: 'Quiet week. I hate quiet weeks.', Max: 'Nothing\'s blown up in days. I\'m suspicious.', Josh: 'Statistically, something terrible is about to happen.',
-                    Sabrina: 'No jobs, no drama. Boring.', Yenna: 'Quiet means someone\'s planning something.', '747': 'Enjoy the quiet while it lasts.' },
-        };
-        const CREW_CLOSERS = {
-            '747': 'Same time next week. Nobody dies before then.', Victoria: 'Okay, I\'m drunk. Somebody walk me to a car.', Sabrina: 'Last round. Then I\'m going home. Alone. Probably.',
-            Max: 'Fine. That wasn\'t terrible. Don\'t tell anyone I said that.', Josh: 'I\'ll put it on the group card. You\'re welcome.', Yenna: 'I\'ll take the back door. Old habits.',
-        };
+        const CREW_TOAST_TASTE = GAME_DB.dialogue.crew.toast_taste;   // directory/game-db/dialogue.json
+        const CREW_TOAST_LINES = GAME_DB.dialogue.crew.toast_lines;   // directory/game-db/dialogue.json
+        const CREW_JOB_TALK = GAME_DB.dialogue.crew.job_talk;   // directory/game-db/dialogue.json
+        const CREW_CLOSERS = GAME_DB.dialogue.crew.closers;   // directory/game-db/dialogue.json
 
         /* ── A night with one of them ── */
-        const CREW_SOLO = {
-            '747': {
-                open: [['747', 'Nine. I got you the usual. Black, too strong.'], ['747', 'Sit. No contracts tonight. Just coffee.']],
-                ask: [['747', 'Settle something for me. What\'s the point of all this, after the jobs?']],
-                opts: ['Keeping all of you alive.', 'Getting rich and disappearing.', 'Finding the Dark Maker.'], liked: 0,
-                replies: [[['747', '…Yeah. Me too. Funny how that turns into the whole point.']],
-                          [['747', 'Hm. Take me with you when you disappear. I\'ll carry the bags.']],
-                          [['747', 'Don\'t let him become the only thing you are, Nine.']]],
-                close: [['747', 'Same time next week? Coffee\'s on me.']],
-            },
-            Victoria: {
-                open: [['victoria', 'Okay, look at this. LOOK at it. Torque got the new wraps in.'], ['victoria', 'I need a second opinion. A good one. Not Max\'s.']],
-                ask: [['victoria', 'Which one? Be honest. Be very honest.']],
-                opts: ['The chrome rose gold.', 'Matte black, obviously.', 'The holographic one.'], liked: 2,
-                replies: [[['victoria', 'Classy. Bit safe. I love you anyway.']],
-                          [['victoria', 'Matte black is what Max would pick. I\'m hurt.']],
-                          [['victoria', 'YES. Finally, someone with taste. I\'m putting it on your car.'], ['949', 'You are not.'], ['victoria', 'I am absolutely going to.']]],
-                close: [['victoria', 'This was fun. You\'re fun. Don\'t tell the others, they\'ll get jealous.']],
-            },
-            Sabrina: {
-                open: [['sabrina', 'You came. I was starting to think I\'d have to drink alone. Again.'], ['sabrina', 'Sit. The bartender knows my order. He\'ll guess yours.']],
-                ask: [['sabrina', 'Tell me something nobody else in the crew knows about you.']],
-                opts: ['I hate the sound of rain.', 'I talk to my reflection.', 'Nice try.'], liked: 2,
-                replies: [[['sabrina', 'Rain. In this city. You poor thing.']],
-                          [['sabrina', 'Everyone does. You\'re just honest about it.']],
-                          [['sabrina', 'Ha. Good. Keep your secrets, Nine. It suits you.']]],
-                close: [['sabrina', 'Next round\'s yours. Next time.']],
-            },
-            Yenna: {
-                open: [['yenna', 'Cans are set up on the rail. Fifty paces.'], ['yenna', 'Loser buys dinner. I\'ve never bought dinner.']],
-                ask: [['yenna', 'Your shot. Take your time.']],
-                opts: ['Take it slow. Breathe.', 'Quick draw. Don\'t think.', 'Shoot the can she\'s aiming at.'], liked: 0,
-                replies: [[['yenna', '…Clean. You actually listened when I taught you.']],
-                          [['yenna', 'Missed by a mile. But it looked cool.']],
-                          [['yenna', 'Did you just— okay. That\'s funny. I hate that it\'s funny.']]],
-                close: [['yenna', 'Same spot next time. I\'ll bring a harder target.']],
-            },
-            Josh: {
-                open: [['josh', 'Prisma has a sale on V.O.C.A.L.s. I\'ve been here for two hours.'], ['josh', 'I need you to stop me from buying a voice that sounds like a cello.']],
-                ask: [['josh', 'Be honest. Which one?']],
-                opts: ['The cello. Obviously.', 'Keep your own voice.', 'The one that sounds like Max.'], liked: 1,
-                replies: [[['josh', 'You\'re enabling me. I appreciate it. I\'m not buying it.']],
-                          [['josh', '…That\'s the nicest thing anyone\'s said to me this month.']],
-                          [['josh', 'This is bullshit. See? It works. Terrifying.']]],
-                close: [['josh', 'Thanks for coming. I logged it as a team-building exercise.']],
-            },
-            Max: {
-                open: [['max', 'Don\'t laugh.'], ['max', 'I need an opinion on a jacket. One opinion. Yours.']],
-                ask: [['max', 'Leather or the long coat?']],
-                opts: ['The leather. You look dangerous.', 'The long coat. Very detective.', 'Honestly? Neither.'], liked: 0,
-                replies: [[['max', 'Dangerous. Yeah. Okay. Yeah.']],
-                          [['max', 'I look like Josh in this. Never mind.']],
-                          [['max', 'Of course. Of course you say that.'], ['max', '…Thanks for being straight with me.']]],
-                close: [['max', 'This was… fine. Good. It was good. Don\'t make it weird.']],
-            },
-        };
+        const CREW_SOLO = GAME_DB.dialogue.crew.solo;   // directory/game-db/dialogue.json
 
         /**
          * The moments: a few lines, a question for her, and what each reply gets. `good` is the reply that lands.
          * Bands by how close they are: 0 acquaintance/companion, 1 trusted, 2 inner circle.
          */
-        const CREW_MOMENTS = {
-            '747': [
-                [{ lines: [['747', 'You ever think about the first job? The one in the rain?'], ['747', 'You froze for half a second. I almost didn\'t see it.']],
-                   opts: ['I didn\'t freeze.', 'You saw. Thanks for not saying anything.'], good: 1,
-                   after: [[['747', 'Sure you didn\'t.']], [['747', 'That\'s what partners are for, Nine.']]] },
-                 { lines: [['747', 'Mirabel asked me how you\'re holding up.'], ['747', 'I told her you\'re fine. Are you?']],
-                   opts: ['I\'m fine.', 'Not really. But I will be.'], good: 1,
-                   after: [[['747', 'Okay. The offer stands, whenever.']], [['747', 'That\'s a better answer. I\'ve got you.']]] }],
-                [{ lines: [['747', 'If something happens to me out there, I want you to lead them.'], ['747', 'They listen to you more than you think.']],
-                   opts: ['Nothing\'s going to happen to you.', 'I will. I promise.'], good: 1,
-                   after: [[['747', 'You don\'t get to promise that. But thanks.']], [['747', 'Good. Then I can sleep tonight.']]] }],
-                [{ lines: [['747', 'I don\'t say this enough.'], ['747', 'I\'d follow you anywhere, Nine. Into anything.']],
-                   opts: ['Same. Always.', 'Don\'t get sentimental on me.'], good: 0,
-                   after: [[['747', 'Always.']], [['747', 'Too late. It\'s out there now.']]] }],
-            ],
-            Victoria: [
-                [{ lines: [['victoria', 'Can I tell you something embarrassing?'], ['victoria', 'I practise my one-liners in the mirror. Before jobs.']],
-                   opts: ['I can tell. They\'re good.', 'That\'s so embarrassing.'], good: 0,
-                   after: [[['victoria', 'Right?! Finally someone appreciates the craft.']], [['victoria', 'Wow. Okay. I\'m telling everyone you snore.']]] },
-                 { lines: [['victoria', 'Max says I talk too much on comms.']],
-                   opts: ['Max says that about breathing.', 'You do, a little.'], good: 0,
-                   after: [[['victoria', 'HA. He does. I\'m keeping that one.']], [['victoria', 'Traitor. A cute traitor, but a traitor.']]] }],
-                [{ lines: [['victoria', 'Real talk for one second.'], ['victoria', 'I\'m scared all the time out there. I just make it look fabulous.']],
-                   opts: ['Me too. Every job.', 'You hide it well.'], good: 0,
-                   after: [[['victoria', '…Okay. Okay, that helps more than you know.']], [['victoria', 'Thanks. I think. That\'s the whole trick.']]] }],
-                [{ lines: [['victoria', 'You\'re my favourite. Out of everyone. Don\'t tell 747.']],
-                   opts: ['You\'re mine too.', 'I\'m telling 747.'], good: 0,
-                   after: [[['victoria', 'I KNEW it. Okay, I\'m crying. Ignore me.']], [['victoria', 'You wouldn\'t dare. …You would. I love that about you.']]] }],
-            ],
-            Yenna: [
-                [{ lines: [['yenna', 'You check corners the way I taught you. I noticed.']],
-                   opts: ['Best teacher in the crew.', 'I figured it out myself.'], good: 0,
-                   after: [[['yenna', 'Don\'t let the others hear that. They\'ll sulk.']], [['yenna', 'Sure you did.']]] },
-                 { lines: [['yenna', 'I keep a list. Every shot I didn\'t take.'], ['yenna', 'It\'s a short list. It still bothers me.']],
-                   opts: ['Those are the ones that count.', 'You should burn it.'], good: 0,
-                   after: [[['yenna', 'Yeah. You get it.']], [['yenna', 'Maybe. Not yet.']]] }],
-                [{ lines: [['yenna', 'I trust you on my blind side. I don\'t say that to people.']],
-                   opts: ['I\'ll always cover it.', 'Watch your own side.'], good: 0,
-                   after: [[['yenna', 'I know. That\'s why I said it.']], [['yenna', '…Fair. Still trust you.']]] }],
-                [{ lines: [['yenna', 'When this is all over, I\'m buying a place with a view of nothing. No rooftops. No angles.'], ['yenna', 'There\'s a room in it for you.']],
-                   opts: ['I\'ll bring the coffee.', 'You\'d be bored in a week.'], good: 0,
-                   after: [[['yenna', 'Good. Black. Too strong.']], [['yenna', 'Probably. Come anyway.']]] }],
-            ],
-            Sabrina: [
-                [{ lines: [['sabrina', 'Everyone thinks I\'m mean. I\'m just accurate.']],
-                   opts: ['Accurate and mean.', 'You\'re kinder than you let on.'], good: 0,
-                   after: [[['sabrina', 'Exactly. See, you get me.']], [['sabrina', 'Shh. You\'ll ruin my reputation.']]] },
-                 { lines: [['sabrina', 'Victoria tried to braid my hair on the last job. Mid-firefight.']],
-                   opts: ['Did you let her?', 'That\'s Victoria.'], good: 0,
-                   after: [[['sabrina', '…She did a good job. I hate it.']], [['sabrina', 'That\'s Victoria.']]] }],
-                [{ lines: [['sabrina', 'I used to work alone. Liked it.'], ['sabrina', 'Then you lot happened.']],
-                   opts: ['Sorry about that.', 'You\'re stuck with us now.'], good: 1,
-                   after: [[['sabrina', 'Don\'t be. That\'s the point.']], [['sabrina', 'Yeah. Turns out I don\'t mind.']]] }],
-                [{ lines: [['sabrina', 'If you ever leave the crew, I\'m coming with you. I\'m not asking.']],
-                   opts: ['I\'d never go without you.', 'Bossy.'], good: 0,
-                   after: [[['sabrina', 'Good answer. Correct answer.']], [['sabrina', 'You like it.']]] }],
-            ],
-            Max: [
-                [{ lines: [['max', 'Everyone thinks I hate everything.'], ['max', 'I hate MOST things.']],
-                   opts: ['What don\'t you hate?', 'That tracks.'], good: 0,
-                   after: [[['max', 'Engines. Rain on a tin roof. This crew, mostly.']], [['max', 'Yeah. It does.']]] },
-                 { lines: [['max', 'Josh fixed my rifle sight while I was asleep. Didn\'t say a word.'], ['max', 'I don\'t know what to do with that.']],
-                   opts: ['Say thank you.', 'Fix something of his.'], good: 1,
-                   after: [[['max', 'Out loud? Ugh. Fine.']], [['max', '…Yeah. Yeah, that\'s better. I like that.']]] }],
-                [{ lines: [['max', 'I lose my temper. On jobs. You know that.'], ['max', 'You never hold it against me.']],
-                   opts: ['You always come back.', 'I hold it a little.'], good: 0,
-                   after: [[['max', 'I always will. For you lot.']], [['max', 'Fair. I\'ll work on it. Probably.']]] }],
-                [{ lines: [['max', 'I had a sister. She\'d have liked you.'], ['max', 'That\'s all. I just wanted you to know.']],
-                   opts: ['Tell me about her sometime.', 'I\'m sorry, Max.'], good: 0,
-                   after: [[['max', '…Yeah. Sometime. Thanks, Nine.']], [['max', 'Don\'t be. Just… stick around.']]] }],
-            ],
-            Josh: [
-                [{ lines: [['josh', 'I keep a file on everyone in the crew. For safety.'], ['josh', 'Yours is the thinnest. That bothers me.']],
-                   opts: ['Good. Keep it thin.', 'Ask me anything.'], good: 1,
-                   after: [[['josh', 'Noted. Suspicious, but noted.']], [['josh', 'Favourite colour? …I\'ll start small.']]] },
-                 { lines: [['josh', 'Statistically, we should be dead four times over.']],
-                   opts: ['We\'re just that good.', 'Stop counting.'], good: 0,
-                   after: [[['josh', 'That\'s not how statistics work. But I\'ll allow it.']], [['josh', 'I can\'t. It\'s how I relax.']]] }],
-                [{ lines: [['josh', 'Everyone says "you\'re welcome" is my thing.'], ['josh', 'It\'s because nobody ever said thank you first.']],
-                   opts: ['Thank you, Josh. For everything.', 'It\'s a good thing.'], good: 0,
-                   after: [[['josh', '…You\'re welcome. That one felt different.']], [['josh', 'It\'s grown on me.']]] }],
-                [{ lines: [['josh', 'I rewrote my file on you. It\'s one line now.'], ['josh', '"Would die for her." Then I deleted it. Too dramatic.']],
-                   opts: ['Put it back.', 'Same, Josh.'], good: 1,
-                   after: [[['josh', 'Fine. Saved. Backed up twice.']], [['josh', '…Logged. Permanently.']]] }],
-            ],
-        };
+        const CREW_MOMENTS = GAME_DB.dialogue.crew.moments;   // directory/game-db/dialogue.json
 
         /* ── Invites and RSVPs ── */
-        const CREW_GROUP_INVITE = [
-            { who: 'Victoria', text: 'Drinks. Moon City. First round\'s on Josh.' },
-            { who: 'Sabrina', text: 'Booth at Moon City tonight. Don\'t make me drink with Max alone.' },
-            { who: 'Josh', text: 'Calendar invite: Moon City, tonight. Attendance is mandatory. Kind of.' },
-        ];
-        const CREW_YES = { '747': 'See you there, Nine.', Victoria: 'YAY. Wear something cute.', Sabrina: 'Don\'t be late.', Max: 'Fine. Good.', Josh: 'Logged.', Yenna: 'Copy that.' };
-        const CREW_NO = { '747': 'Another time.', Victoria: 'Booo. Fine.', Sabrina: 'Your loss.', Max: 'Whatever.', Josh: 'Noted. Sadly.', Yenna: 'Understood.' };
-        const CREW_STOOD_UP = { '747': 'We waited, Nine. Next time.', Victoria: 'We waited ALL night. Rude.', Sabrina: 'Stood up. Bold.', Max: 'Thanks for nothing.', Josh: 'Your seat was empty. I noticed.', Yenna: 'You didn\'t show. Everything okay?' };
-        const CREW_ASK_BACK = { '747': 'Always. Coffee?', Victoria: 'Obviously. Torque. Now.', Sabrina: 'Mm. My bar, then.', Max: '…Sure. I need help with something anyway.', Josh: 'Yes. I mean, I\'m free. Yes.', Yenna: 'Park. Bring your aim.' };
+        const CREW_GROUP_INVITE = GAME_DB.dialogue.crew.group_invite;   // directory/game-db/dialogue.json
+        const CREW_YES = GAME_DB.dialogue.crew.yes;   // directory/game-db/dialogue.json
+        const CREW_NO = GAME_DB.dialogue.crew.no;   // directory/game-db/dialogue.json
+        const CREW_STOOD_UP = GAME_DB.dialogue.crew.stood_up;   // directory/game-db/dialogue.json
+        const CREW_ASK_BACK = GAME_DB.dialogue.crew.ask_back;   // directory/game-db/dialogue.json
         /** The perks of being close */
-        const CREW_INTEL = { '747': 'Heads up. {mark}\'s carrying a {gun}. Stay behind cover.', Victoria: '{mark} has a {gun}. Rude. Be careful.', Yenna: '{mark}: {gun}. Watch their sightlines.',
-                             Sabrina: 'Your mark\'s packing a {gun}. Try not to get shot.', Max: '{mark} has a {gun}. Don\'t do anything stupid.', Josh: 'Pulled {mark}\'s file. They carry a {gun}. You\'re welcome.' };
-        const CREW_STIM = { '747': 'Left a stim in your bag. Don\'t argue.', Victoria: 'You looked rough. There\'s a stim in your pocket. You\'re welcome, darling.', Yenna: 'Stim in your kit. Use it.',
-                            Sabrina: 'Slipped you a stim. Don\'t make it a habit.', Max: 'Stim. Your bag. Don\'t make me patch you up.', Josh: 'Restocked one stim. Logged as a gift.' };
+        const CREW_INTEL = GAME_DB.dialogue.crew.intel;   // directory/game-db/dialogue.json
+        const CREW_STIM = GAME_DB.dialogue.crew.stim;   // directory/game-db/dialogue.json
 
         /** Asking her out again, after the first time (the feed's pins are the first) */
-        const CREW_SOLO_ASK = {
-            Victoria: ['Torque\'s open late. Come judge my paint choices.', 'I need you at the garage. It\'s urgent. It\'s about rims.', 'Bored. Garage. You. Now.'],
-            Sabrina: ['Bar\'s quiet tonight. Come be quiet with me.', 'I\'m at Moon City. Drinking alone is a choice and I\'m un-choosing it.', 'Booth at the back. Bring your bad jokes.'],
-            Yenna: ['Range is clear. Fifty paces. Loser buys.', 'Park, after dark. The cans miss you.', 'Need a spotter. Not for work.'],
-            Josh: ['Neural Systems got a new shipment. I require supervision.', 'I\'ve booked thirty minutes for us. That came out wrong. Come to Neural Systems.', 'Prisma restocked. Please stop me.'],
-            Max: ['Enni Cole. I need a second opinion. Again. Shut up.', 'Found a jacket. Need your eyes. Don\'t tell Victoria.', 'Come to Enni Cole. Don\'t make it weird.']
-        };
+        const CREW_SOLO_ASK = GAME_DB.dialogue.crew.solo_ask;   // directory/game-db/dialogue.json
 
         const CrewNights = {
             _run: null,          // the night playing right now
