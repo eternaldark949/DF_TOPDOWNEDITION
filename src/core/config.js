@@ -484,96 +484,11 @@
                 OFFHAND_TURN: 0.6       // how much of the torso's twist the other arm turns with
             },
 
-            VEHICLE_AI: {
-                TURN_SPEED_SHARP: 0.3,          // maxSpeed multiplier for 90°+ turns
-                TURN_SPEED_MEDIUM: 0.5,         // maxSpeed multiplier for 45-90° turns
-                TURN_SPEED_GENTLE: 0.7,         // maxSpeed multiplier for 22.5-45° turns
-                INTERSECTION_APPROACH_SLOWDOWN: 100, // Start slowing this many px before stop
-                WALL_BOUNCE_FACTOR: -0.5,       // Velocity multiplier on wall collision
-                SPAWN_CLEAR_MIN: 500,           // Min distance from player to spawn traffic
-                SPAWN_CLEAR_MAX: 1200,          // Max distance from player to spawn traffic
-                SPAWN_SEPARATION: 150,          // Min distance between spawned vehicles
-
-                /* --- WALL RESPONSE ---
-                   Collisions are resolved per-axis. The blocked axis reflects
-                   (WALL_BOUNCE_FACTOR); the free axis keeps most of its speed
-                   (WALL_SLIDE_FRICTION) so a glancing hit scrapes along a wall
-                   instead of stopping the car dead and throwing it backwards. */
-                WALL_SLIDE_FRICTION: 0.88,      // Tangential velocity retained when sliding (parked cars)
-                WALL_MU: 0.2,                   // Friction along a wall at the point of contact (shapeKit.impulseAt)
-                WALL_PUSHOUT: 1.5               // Separation nudge, in units of post-hit velocity
-            },
-
-            /* =================================================================
-               PLAYER DRIVING
-               -----------------------------------------------------------------
-               Per-vehicle stats (maxSpeed, acceleration, handling) live on the
-               vehicle itself and come from VEHICLE_BRANDS. These are the shared
-               curve shapes that apply to every car.
-               ================================================================= */
-            VEHICLE_DRIVE: {
-                // Drag is DERIVED from each car's maxSpeed + acceleration rather
-                // than hardcoded, so a vehicle actually tops out at its stat
-                // value: steady state v = a·d/(1-d)  =>  d = v/(a+v).
-                REVERSE_TOP_FRACTION: 0.55,     // Reverse tops out at this × forward maxSpeed
-
-                /* --- STEERING CURVE ---
-                   Turn rate used to be constant at any speed, so a nearly
-                   stationary car pirouetted at 189°/s with a 22px radius. Now it
-                   ramps in from a standstill and eases off at speed. */
-                STEER_RAMP_SPEED: 3.0,          // Speed at which full steering authority is reached
-                STEER_MIN_SPEED: 0.2,           // Below this the wheel does nothing
-                STEER_HIGH_FLOOR: 0.55,         // Steering retained at very high speed
-                STEER_FALLOFF: 0.12,            // How quickly authority decays past the ramp speed
-                REVERSE_STEER_FACTOR: 0.6,      // Reduced sensitivity in reverse for stability
-
-                // Lateral grip: fraction of sideways velocity kept per step.
-                GRIP_BASE: 0.92,
-                GRIP_RAIN_PENALTY: 0.06,        // Subtracted at full rain intensity
-                GRIP_SLIDE_THRESHOLD: 2.5,      // Lateral speed at which grip starts breaking away
-                GRIP_SLIDE_PENALTY: 0.95,       // Grip multiplier once sliding
-                HANDLING_RAIN_PENALTY: 0.1,     // Steering authority lost at full rain intensity
-
-                /* --- WEIGHT (T2) ---
-                   The wheel, the pedals and the body all lag a little behind the
-                   driver: the wheel slews to the stick and self-centres when it's
-                   let go, the car's rotation (yawRate) builds and settles, and
-                   braking throws the load forward so the rear lets go. Per-brand
-                   numbers live in VEHICLE_BRANDS[brand].drive. */
-                DEFAULT_FEEL: { steerRate: 0.11, turnIn: 0.24, gripF: 1, gripR: 1, latAcc: 0.5, weight: 1 },
-                CENTER_RATE: 0.2,               // Wheel self-centring per tick (fraction of what's left)…
-                CENTER_RATE_SPEED: 0.018,       // …plus this per px/tick of speed (caster), up to…
-                CENTER_RATE_MAX: 0.42,
-                AI_STEER_RATE: 0.3,             // Traffic's drawn wheels (their steering itself is direct)
-                PEDAL_IN: 0.17,                 // Throttle travel per tick (about 0.2 s to the floor)
-                PEDAL_BRAKE_IN: 0.4,            // The brake bites over a few ticks
-                PEDAL_OUT: 0.3,                 // Lifting off
-                LOAD_FWD_GRIP: 0.3,             // Front grip gained per unit of forward load…
-                LOAD_REAR_GRIP: 0.55,           // …and rear grip lost
-                LOAD_RATE: 0.14,                // How fast the load shifts (÷ brand weight)
-                HANDBRAKE_REAR_GRIP: 0.3,       // Rear grip while the handbrake's up
-                HANDBRAKE_DECEL: 0.07,          // px/tick² scrubbed by locked rear wheels
-                POWER_OVERSTEER: 0.2,           // Rear grip lost to full throttle at full lock (0: steering alone never kicks the tail out)
-                HANDBRAKE_YAW_DAMP: 0.96,       // Rotation kept per tick while the handbrake's up (lower: less swing)
-                REVERSE_BELOW: 0.5,             // Pull-back only reverses under this speed
-                CAM_LOOK_AHEAD: { PER_SPEED: 13, TAU_MS: 700 },   // camera leads by velocity × this (engine/draw.js)
-                CAM_ZOOM: { SPAN: 0.25, FLOOR: 0.75 },              // zoom = 1 − speed ratio × SPAN, never below FLOOR (×0.9 landscape)
-                STICK_YAW_DAMP: 5,
-                STICK_LIGHT_LOCK: 0.35,         // Precise Stick: wheel lock at the lightest push…
-                STICK_FULL_LOCK_PUSH: 0.6,      // …growing to full lock by this shaped push (about two-thirds out)
-                // Rigid body (shapeKit.impulseAt, the TYRES in applyDrivePhysics)
-                SPIN_INERTIA: 1,                // × a plain box's inertia (m(L²+W²)/12): higher, a hit turns the car less
-                YAW_SPIN_MAX: 0.3,              // rad/tick, the fastest any car spins
-                AXLE_FROM_CENTRE: 0.33,         // Each axle sits this × length ahead of / behind the centre
-                TYRE_STIFF: 0.22,               // How much of an axle's sideways slide its tyres take out per tick (front × the brand's turnIn)
-                WHEEL_LOCK: 1.1,                // Most the front wheels turn (rad)
-                KNOCK_MIN_HIT: 1.5,             // Traffic on traffic: closing speed (px/tick) below this doesn't spin them
-                KNOCK_SPIN_DECAY: 0.88,         // Traffic: spin kept per tick after a knock (its tyres scrub it)
-                PARKED_SCRUB: 0.85,             // A shunted parked car: speed and spin kept per tick on locked wheels…
-                PARKED_HOLD: 0.6,               // …after this much speed (px/tick) is taken off first: a brush doesn't move it
-                PARKED_HOLD_SPIN: 0.01,         // …and this much spin (rad/tick)
-                COAST_DRAG: 0.3                 // Extra off-throttle drag per unit of (1 - friction)
-            }
+            // Traffic's driving and collisions, and the driving feel every car shares: GAME_DB.vehicles
+            // (directory/game-db/vehicles.json; each field is explained in its _about.fields). A car's own
+            // numbers (maxSpeed, acceleration, handling, its drive feel) are in VEHICLE_BRANDS, the same chapter.
+            VEHICLE_AI: GAME_DB.vehicles.traffic_ai,
+            VEHICLE_DRIVE: GAME_DB.vehicles.drive
         });
 
 

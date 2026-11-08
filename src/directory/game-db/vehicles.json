@@ -1,0 +1,560 @@
+{
+  "_about": {
+    "chapter": "Vehicles and traffic: the car brands and models, BlackMark's factory look, the Zib cabs and where they go, how traffic treats people in the road, and the driving feel every car shares.",
+    "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.vehicles and checked by tools/test-game-db.cjs. Speeds are px a tick (60 ticks a second), accelerations px a tick², times in ticks unless a name says ms, distances px, angles radians. Keys in camelCase or UPPER_SNAKE are read by the code under those names. Brand and model keys are in save files: never rename one. _about.fields explains each field of the tuning tables.",
+    "tables": {
+      "brands": "The three car brands (VEHICLE_BRANDS, traffic/garage-zib.js), each with its tier, baseStats (traffic's top speed, pull, grip and brake; seats; mass), drive (how it handles with the player at the wheel, see _about.fields.drive_feel), colors (traffic paint, the first is the showroom's), glowColor (null: no underglow), headlightColor, visualStyle, and its models. A model has a name, length and width in px, speedMod (× the brand's top speed in traffic), driven { top, accel } (how it goes when she drives it), optional seats and noHearseCap, and spec (its blueprint ratings out of 100, in the order of spec_labels). The brands differ in character, not in being worth driving: no car falls under about 80% of the best top speed or 60% of the best pull. LADY: the fastest, a heavy grand tourer with the best brakes. Zenxera: the quickest off the line (the Bolt), sharpest turn-in, lively tail. Gelfash: friendly and forgiving.",
+      "spec_labels": "The names of a model's five spec ratings (CAR_SPEC_LABELS). Lady's own sheet for the BlackMark V1 (100, 80, 80, 90, 100) set the scale; the rest are rated against it.",
+      "blackmark_defaults": "The BlackMark V1's factory look (BLACKMARK_DEFAULTS), restored by Reset to default. It is Stella's car and can't be sold.",
+      "zib": "The Zib cabs (ZIB_CONFIG): which car, its paint, underglow and headlights; the fare (fareBase + distance × farePerUnit, never under fareBase; hijacking is free); at most maxActive on the road, each tick a spawnChance of one more.",
+      "zib_destinations": "Where a Zib can take her (ZIB_DESTINATIONS): id, the label on the phone, and the landmark it drives to.",
+      "traffic_tempers": "How traffic treats people in the road (TRAFFIC_TEMPERS, traffic/traffic-people.js): calm (and anyone driving for her), normal, and pushy (the gangers' cars). See _about.fields.traffic_tempers.",
+      "traffic_ai": "Traffic's driving and collisions (CONFIG.VEHICLE_AI): slowing for turns, where cars spawn, and how they bounce off walls. See _about.fields.traffic_ai.",
+      "drive": "The driving feel every car shares (CONFIG.VEHICLE_DRIVE): steering curve, grip, the weight of the wheel, pedals and body, the handbrake, the camera, and the rigid body. A car's own numbers are in brands. See _about.fields.drive."
+    },
+    "fields": {
+      "drive_feel": {
+        "steerRate": "How fast the wheel turns to the stick",
+        "turnIn": "How hard the front tyres bite into a turn",
+        "gripF": "Front grip",
+        "gripR": "Rear grip (lower: the tail steps out)",
+        "latAcc": "Sideways acceleration it can hold",
+        "weight": "How slowly the load shifts under braking and throttle"
+      },
+      "traffic_tempers": {
+        "gap": "Stop this far short of someone crossing",
+        "pull": "Room to pull out round someone standing",
+        "swing": "× the sideways shift it needs, in room to pull out (how sharply it pulls round)",
+        "pause": "Ticks stopped before going round",
+        "honk": "Ticks before the horn",
+        "rehonk": "Sound it again every this many ticks (0: once)",
+        "pass": "× the speed it goes by people at",
+        "kerb": "Ticks before squeezing by on the far side",
+        "backUp": "Ticks stuck before backing up to try again",
+        "take": "× the gap it wants to pull into a moving lane, or to turn left across (traffic-signals.js)",
+        "amber": "The share of its full brake it'll use to stop for an amber light"
+      },
+      "traffic_ai": {
+        "TURN_SPEED_SHARP": "maxSpeed × this for turns of 90° or more",
+        "TURN_SPEED_MEDIUM": "… for 45 to 90°",
+        "TURN_SPEED_GENTLE": "… for 22.5 to 45°",
+        "INTERSECTION_APPROACH_SLOWDOWN": "Start slowing this far before a stop",
+        "WALL_BOUNCE_FACTOR": "Velocity × this on the axis that hit a wall",
+        "SPAWN_CLEAR_MIN": "Spawn traffic at least this far from her",
+        "SPAWN_CLEAR_MAX": "…and at most this far",
+        "SPAWN_SEPARATION": "Least distance between spawned cars",
+        "WALL_SLIDE_FRICTION": "Speed kept along a wall (a glancing hit scrapes along it instead of stopping dead)",
+        "WALL_MU": "Friction along a wall at the point of contact (shapeKit.impulseAt)",
+        "WALL_PUSHOUT": "Separation nudge, in units of the speed after the hit"
+      },
+      "drive": {
+        "REVERSE_TOP_FRACTION": "Reverse tops out at this × forward maxSpeed (drag comes from each car's maxSpeed and acceleration, so it tops out at its stat)",
+        "STEER_RAMP_SPEED": "Speed at which the wheel has full authority",
+        "STEER_MIN_SPEED": "Below this the wheel does nothing",
+        "STEER_HIGH_FLOOR": "Steering kept at very high speed",
+        "STEER_FALLOFF": "How quickly steering eases off past the ramp speed",
+        "REVERSE_STEER_FACTOR": "Steering × this in reverse",
+        "GRIP_BASE": "Share of sideways speed kept per tick",
+        "GRIP_RAIN_PENALTY": "Taken off grip in full rain",
+        "GRIP_SLIDE_THRESHOLD": "Sideways speed at which grip starts to break away",
+        "GRIP_SLIDE_PENALTY": "Grip × this once sliding",
+        "HANDLING_RAIN_PENALTY": "Steering lost in full rain",
+        "DEFAULT_FEEL": "A car's drive feel when its brand gives none (fields as in drive_feel)",
+        "CENTER_RATE": "The wheel self-centres this share of what's left each tick…",
+        "CENTER_RATE_SPEED": "…plus this per px/tick of speed (caster), up to…",
+        "CENTER_RATE_MAX": "…this",
+        "AI_STEER_RATE": "Traffic's drawn wheels (their steering itself is direct)",
+        "PEDAL_IN": "Throttle travel per tick (about 0.2 s to the floor)",
+        "PEDAL_BRAKE_IN": "Brake travel per tick",
+        "PEDAL_OUT": "Pedal travel per tick when lifting off",
+        "LOAD_FWD_GRIP": "Front grip gained per unit of forward load…",
+        "LOAD_REAR_GRIP": "…and rear grip lost",
+        "LOAD_RATE": "How fast the load shifts (÷ the brand's weight)",
+        "HANDBRAKE_REAR_GRIP": "Rear grip with the handbrake up",
+        "HANDBRAKE_DECEL": "Speed scrubbed per tick by locked rear wheels",
+        "POWER_OVERSTEER": "Rear grip lost to full throttle at full lock (0: steering alone never kicks the tail out)",
+        "HANDBRAKE_YAW_DAMP": "Rotation kept per tick with the handbrake up (lower: less swing)",
+        "REVERSE_BELOW": "Pulling back only reverses under this speed",
+        "CAM_LOOK_AHEAD": "The camera leads by velocity × PER_SPEED, easing over TAU_MS (engine/draw.js)",
+        "CAM_ZOOM": "Zoom = 1 − speed share × SPAN, never below FLOOR (× 0.9 in landscape)",
+        "STICK_YAW_DAMP": "Precise Stick: how hard rotation is damped",
+        "STICK_LIGHT_LOCK": "Precise Stick: wheel lock at the lightest push…",
+        "STICK_FULL_LOCK_PUSH": "…growing to full lock by this shaped push (about two-thirds out)",
+        "SPIN_INERTIA": "× a plain box's inertia (m(L²+W²)/12): higher, a hit turns the car less",
+        "YAW_SPIN_MAX": "The fastest any car spins (rad a tick)",
+        "AXLE_FROM_CENTRE": "Each axle sits this × length ahead of or behind the centre",
+        "TYRE_STIFF": "Share of an axle's sideways slide its tyres take out per tick (front × the brand's turnIn)",
+        "WHEEL_LOCK": "Most the front wheels turn (rad)",
+        "KNOCK_MIN_HIT": "Traffic on traffic: closing speed below this doesn't spin them",
+        "KNOCK_SPIN_DECAY": "Traffic: spin kept per tick after a knock",
+        "PARKED_SCRUB": "A shunted parked car: speed and spin kept per tick on locked wheels…",
+        "PARKED_HOLD": "…after this much speed is taken off first (a brush doesn't move it)",
+        "PARKED_HOLD_SPIN": "…and this much spin (rad a tick)",
+        "COAST_DRAG": "Extra off-throttle drag per unit of (1 − friction)"
+      }
+    }
+  },
+  "brands": {
+    "LADY": {
+      "tier": "ultra-luxury",
+      "baseStats": {
+        "maxSpeed": 12.5,
+        "acceleration": 0.35,
+        "handling": 0.08,
+        "friction": 0.98,
+        "mass": 2500,
+        "lightRange": 100,
+        "seats": 6,
+        "brake": 0.42
+      },
+      "drive": {
+        "steerRate": 0.085,
+        "turnIn": 0.3,
+        "gripF": 1,
+        "gripR": 0.86,
+        "latAcc": 0.6,
+        "weight": 1.35
+      },
+      "colors": [
+        "#050505",
+        "#1a0b1a",
+        "#0b1a1a",
+        "#1a1a0b",
+        "#2b0000"
+      ],
+      "glowColor": "#ffffff",
+      "headlightColor": "#ffffff",
+      "visualStyle": "blackmark",
+      "models": {
+        "suv": {
+          "name": "BlackMark V1",
+          "length": 95,
+          "width": 44,
+          "speedMod": 1,
+          "driven": {
+            "top": 12.5,
+            "accel": 0.26
+          },
+          "spec": [
+            100,
+            80,
+            80,
+            90,
+            100
+          ]
+        },
+        "suv2": {
+          "name": "BlackMark V3",
+          "length": 98,
+          "width": 42,
+          "speedMod": 1.05,
+          "driven": {
+            "top": 13,
+            "accel": 0.28
+          },
+          "noHearseCap": true,
+          "seats": 6,
+          "spec": [
+            100,
+            86,
+            88,
+            78,
+            95
+          ]
+        }
+      }
+    },
+    "Zenxera": {
+      "tier": "mid-luxury",
+      "baseStats": {
+        "maxSpeed": 9.5,
+        "acceleration": 0.12,
+        "handling": 0.055,
+        "friction": 0.96,
+        "mass": 1200,
+        "seats": 4,
+        "brake": 0.3
+      },
+      "drive": {
+        "steerRate": 0.15,
+        "turnIn": 0.45,
+        "gripF": 1.1,
+        "gripR": 0.9,
+        "latAcc": 0.55,
+        "weight": 0.85
+      },
+      "colors": [
+        "#E6E6FA",
+        "#CCCCFF",
+        "#C0C0C0",
+        "#cd7f32",
+        "#9370DB"
+      ],
+      "glowColor": "#00f3ff",
+      "headlightColor": "#ccddff",
+      "visualStyle": "angular",
+      "models": {
+        "sedan": {
+          "name": "Stratos",
+          "length": 72,
+          "width": 40,
+          "speedMod": 1,
+          "driven": {
+            "top": 11.5,
+            "accel": 0.28
+          },
+          "seats": 4,
+          "spec": [
+            76,
+            82,
+            46,
+            52,
+            72
+          ]
+        },
+        "suv": {
+          "name": "Apex",
+          "length": 78,
+          "width": 46,
+          "speedMod": 0.9,
+          "driven": {
+            "top": 11,
+            "accel": 0.25
+          },
+          "seats": 6,
+          "spec": [
+            68,
+            76,
+            40,
+            66,
+            72
+          ]
+        },
+        "sports": {
+          "name": "Bolt",
+          "length": 63,
+          "width": 36,
+          "speedMod": 1.25,
+          "driven": {
+            "top": 12.3,
+            "accel": 0.32
+          },
+          "seats": 2,
+          "spec": [
+            95,
+            90,
+            58,
+            36,
+            72
+          ]
+        },
+        "truck": {
+          "name": "Freighter",
+          "length": 92,
+          "width": 50,
+          "speedMod": 0.75,
+          "driven": {
+            "top": 10.6,
+            "accel": 0.21
+          },
+          "seats": 2,
+          "spec": [
+            57,
+            62,
+            30,
+            82,
+            72
+          ]
+        }
+      }
+    },
+    "Gelfash": {
+      "tier": "economy",
+      "baseStats": {
+        "maxSpeed": 8.5,
+        "acceleration": 0.1,
+        "handling": 0.05,
+        "friction": 0.96,
+        "mass": 1000,
+        "seats": 4,
+        "brake": 0.26
+      },
+      "drive": {
+        "steerRate": 0.14,
+        "turnIn": 0.42,
+        "gripF": 1,
+        "gripR": 1.15,
+        "latAcc": 0.5,
+        "weight": 1
+      },
+      "colors": [
+        "#fff",
+        "#aaa",
+        "#555",
+        "#a469ff",
+        "#00f3ff"
+      ],
+      "glowColor": null,
+      "headlightColor": "#ffffaa",
+      "visualStyle": "boxy",
+      "models": {
+        "sedan": {
+          "name": "Commuter",
+          "length": 70,
+          "width": 40,
+          "speedMod": 1,
+          "driven": {
+            "top": 10.8,
+            "accel": 0.21
+          },
+          "seats": 4,
+          "spec": [
+            68,
+            64,
+            40,
+            46,
+            50
+          ]
+        },
+        "suv": {
+          "name": "Ranger",
+          "length": 75,
+          "width": 44,
+          "speedMod": 0.9,
+          "driven": {
+            "top": 10.5,
+            "accel": 0.2
+          },
+          "seats": 5,
+          "spec": [
+            61,
+            60,
+            35,
+            56,
+            52
+          ]
+        },
+        "sports": {
+          "name": "Sprint",
+          "length": 62,
+          "width": 36,
+          "speedMod": 1.15,
+          "driven": {
+            "top": 11.3,
+            "accel": 0.23
+          },
+          "seats": 2,
+          "spec": [
+            78,
+            70,
+            46,
+            34,
+            50
+          ]
+        },
+        "truck": {
+          "name": "Workhorse",
+          "length": 90,
+          "width": 50,
+          "speedMod": 0.7,
+          "driven": {
+            "top": 10.4,
+            "accel": 0.19
+          },
+          "seats": 2,
+          "spec": [
+            48,
+            56,
+            26,
+            72,
+            50
+          ]
+        }
+      }
+    }
+  },
+  "spec_labels": [
+    "Top speed",
+    "Traction rating",
+    "Acceleration",
+    "Toughness / armor",
+    "Lighting element"
+  ],
+  "blackmark_defaults": {
+    "brand": "LADY",
+    "model": "suv",
+    "paintColor": "#1a1a1a",
+    "underglowColor": "#ffffff",
+    "headlightColor": "#ffffff"
+  },
+  "zib": {
+    "brand": "LADY",
+    "model": "suv2",
+    "paintColor": "#1a0a2e",
+    "underglowColor": "#8a2be2",
+    "headlightColor": "#9966ff",
+    "fareBase": 25,
+    "farePerUnit": 0.025,
+    "maxActive": 3,
+    "spawnChance": 0.008
+  },
+  "zib_destinations": [
+    {
+      "id": "silver_queen",
+      "label": "Silver Queen Apartments",
+      "landmark": "parking_spot"
+    },
+    {
+      "id": "moon_city",
+      "label": "Moon City Nightclub",
+      "landmark": "club_entrance"
+    },
+    {
+      "id": "double_nights",
+      "label": "Double Nights Hotel",
+      "landmark": "hotel_entrance"
+    },
+    {
+      "id": "cozy_cafe",
+      "label": "Cozy Cafe",
+      "landmark": "cozy_cafe"
+    },
+    {
+      "id": "dr_yins",
+      "label": "Dr. Yin's Clinic",
+      "landmark": "clinic"
+    },
+    {
+      "id": "torque_auto",
+      "label": "Torque Auto",
+      "landmark": "torque_auto"
+    },
+    {
+      "id": "neural_sys",
+      "label": "Neural Systems",
+      "landmark": "neural_systems"
+    },
+    {
+      "id": "enni_cole",
+      "label": "Enni Cole",
+      "landmark": "enni_cole"
+    },
+    {
+      "id": "biggs_park",
+      "label": "Biggs Amusement Park",
+      "landmark": "biggs_park"
+    }
+  ],
+  "traffic_tempers": {
+    "calm": {
+      "gap": 32,
+      "pull": 72,
+      "swing": 1.85,
+      "pause": 45,
+      "honk": 300,
+      "rehonk": 0,
+      "pass": 0.85,
+      "kerb": 600,
+      "backUp": 480,
+      "take": 1.25,
+      "amber": 1
+    },
+    "normal": {
+      "gap": 22,
+      "pull": 66,
+      "swing": 1.7,
+      "pause": 22,
+      "honk": 150,
+      "rehonk": 0,
+      "pass": 1,
+      "kerb": 420,
+      "backUp": 330,
+      "take": 1,
+      "amber": 0.75
+    },
+    "pushy": {
+      "gap": 12,
+      "pull": 56,
+      "swing": 1.45,
+      "pause": 6,
+      "honk": 40,
+      "rehonk": 100,
+      "pass": 1.3,
+      "kerb": 200,
+      "backUp": 220,
+      "take": 0.7,
+      "amber": 0.45
+    }
+  },
+  "traffic_ai": {
+    "TURN_SPEED_SHARP": 0.3,
+    "TURN_SPEED_MEDIUM": 0.5,
+    "TURN_SPEED_GENTLE": 0.7,
+    "INTERSECTION_APPROACH_SLOWDOWN": 100,
+    "WALL_BOUNCE_FACTOR": -0.5,
+    "SPAWN_CLEAR_MIN": 500,
+    "SPAWN_CLEAR_MAX": 1200,
+    "SPAWN_SEPARATION": 150,
+    "WALL_SLIDE_FRICTION": 0.88,
+    "WALL_MU": 0.2,
+    "WALL_PUSHOUT": 1.5
+  },
+  "drive": {
+    "REVERSE_TOP_FRACTION": 0.55,
+    "STEER_RAMP_SPEED": 3,
+    "STEER_MIN_SPEED": 0.2,
+    "STEER_HIGH_FLOOR": 0.55,
+    "STEER_FALLOFF": 0.12,
+    "REVERSE_STEER_FACTOR": 0.6,
+    "GRIP_BASE": 0.92,
+    "GRIP_RAIN_PENALTY": 0.06,
+    "GRIP_SLIDE_THRESHOLD": 2.5,
+    "GRIP_SLIDE_PENALTY": 0.95,
+    "HANDLING_RAIN_PENALTY": 0.1,
+    "DEFAULT_FEEL": {
+      "steerRate": 0.11,
+      "turnIn": 0.24,
+      "gripF": 1,
+      "gripR": 1,
+      "latAcc": 0.5,
+      "weight": 1
+    },
+    "CENTER_RATE": 0.2,
+    "CENTER_RATE_SPEED": 0.018,
+    "CENTER_RATE_MAX": 0.42,
+    "AI_STEER_RATE": 0.3,
+    "PEDAL_IN": 0.17,
+    "PEDAL_BRAKE_IN": 0.4,
+    "PEDAL_OUT": 0.3,
+    "LOAD_FWD_GRIP": 0.3,
+    "LOAD_REAR_GRIP": 0.55,
+    "LOAD_RATE": 0.14,
+    "HANDBRAKE_REAR_GRIP": 0.3,
+    "HANDBRAKE_DECEL": 0.07,
+    "POWER_OVERSTEER": 0.2,
+    "HANDBRAKE_YAW_DAMP": 0.96,
+    "REVERSE_BELOW": 0.5,
+    "CAM_LOOK_AHEAD": {
+      "PER_SPEED": 13,
+      "TAU_MS": 700
+    },
+    "CAM_ZOOM": {
+      "SPAN": 0.25,
+      "FLOOR": 0.75
+    },
+    "STICK_YAW_DAMP": 5,
+    "STICK_LIGHT_LOCK": 0.35,
+    "STICK_FULL_LOCK_PUSH": 0.6,
+    "SPIN_INERTIA": 1,
+    "YAW_SPIN_MAX": 0.3,
+    "AXLE_FROM_CENTRE": 0.33,
+    "TYRE_STIFF": 0.22,
+    "WHEEL_LOCK": 1.1,
+    "KNOCK_MIN_HIT": 1.5,
+    "KNOCK_SPIN_DECAY": 0.88,
+    "PARKED_SCRUB": 0.85,
+    "PARKED_HOLD": 0.6,
+    "PARKED_HOLD_SPIN": 0.01,
+    "COAST_DRAG": 0.3
+  }
+}

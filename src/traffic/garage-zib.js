@@ -1,59 +1,10 @@
-        /* --- VEHICLE BRANDS DATA STRUCTURE --- */
-        /* --- UPDATED VEHICLE DATA --- */
-        const VEHICLE_BRANDS = {
-            LADY: {
-                tier: 'ultra-luxury',
-                baseStats: { 
-                    maxSpeed: 12.5, acceleration: 0.35, handling: 0.08, friction: 0.98, 
-                    mass: 2500, lightRange: 100, seats: 6, // SUV = 6 seats
-                    brake: 0.42     // px/tick² at full brake (traffic/traffic-vehicle.js applyDrivePhysics)
-                },
-                /* A model's `driven` { top, accel } is how it goes with the player at the wheel (traffic keeps baseStats ×
-                   speedMod). The brands differ in character, not in being worth driving: no car falls under ~80% of the
-                   best top speed or ~60% of the best pull. LADY: the fastest, heavy grand tourer with the best brakes.
-                   Zenxera: the quickest off the line (the Bolt), sharpest turn-in, lively tail. Gelfash: friendly and forgiving. */
-                // Handling character (applyDrivePhysics): heavy and floaty, lazy wheel, long catchable slide
-                drive: { steerRate: 0.085, turnIn: 0.3, gripF: 1.0, gripR: 0.86, latAcc: 0.60, weight: 1.35 },
-                colors: ['#050505', '#1a0b1a', '#0b1a1a', '#1a1a0b', '#2b0000'],
-                glowColor: '#ffffff', headlightColor: '#ffffff', visualStyle: 'blackmark',
-                models: { 
-                    suv: { name: 'BlackMark V1', length: 95, width: 44, speedMod: 1.0, driven: { top: 12.5, accel: 0.26 }, spec: [100, 80, 80, 90, 100] },
-                    suv2: { name: 'BlackMark V3', length: 98, width: 42, speedMod: 1.05, driven: { top: 13.0, accel: 0.28 }, noHearseCap: true, seats: 6, spec: [100, 86, 88, 78, 95] }
-                }
-            },
-            Zenxera: {
-                tier: 'mid-luxury',
-                baseStats: { maxSpeed: 9.5, acceleration: 0.12, handling: 0.055, friction: 0.96, mass: 1200, seats: 4, brake: 0.30 },
-                drive: { steerRate: 0.15, turnIn: 0.45, gripF: 1.1, gripR: 0.9, latAcc: 0.55, weight: 0.85 },   // sharp, lively rear
-                // NEW PALETTE: Lavender, Periwinkle, Silver, Bronze
-                colors: ['#E6E6FA', '#CCCCFF', '#C0C0C0', '#cd7f32', '#9370DB'],
-                glowColor: '#00f3ff', headlightColor: '#ccddff', // Cool blue-white
-                visualStyle: 'angular',
-                models: {
-                    sedan:  { name: 'Stratos',   length: 72, width: 40, speedMod: 1.0, driven: { top: 11.5, accel: 0.28 }, seats: 4, spec: [76, 82, 46, 52, 72] },
-                    suv:    { name: 'Apex',      length: 78, width: 46, speedMod: 0.9, driven: { top: 11.0, accel: 0.25 }, seats: 6, spec: [68, 76, 40, 66, 72] },
-                    sports: { name: 'Bolt',      length: 63, width: 36, speedMod: 1.25, driven: { top: 12.3, accel: 0.32 }, seats: 2, spec: [95, 90, 58, 36, 72] },
-                    truck:  { name: 'Freighter', length: 92, width: 50, speedMod: 0.75, driven: { top: 10.6, accel: 0.21 }, seats: 2, spec: [57, 62, 30, 82, 72] }
-                }
-            },
-            Gelfash: {
-                tier: 'economy',
-                baseStats: { maxSpeed: 8.5, acceleration: 0.1, handling: 0.05, friction: 0.96, mass: 1000, seats: 4, brake: 0.26 },
-                drive: { steerRate: 0.14, turnIn: 0.42, gripF: 1.0, gripR: 1.15, latAcc: 0.5, weight: 1.0 },     // friendly: quick hands, planted rear, never bites
-                colors: ['#fff', '#aaa', '#555', '#a469ff', '#00f3ff'],
-                glowColor: null, headlightColor: '#ffffaa', visualStyle: 'boxy',
-                models: {
-                    sedan:  { name: 'Commuter',  length: 70, width: 40, speedMod: 1.0, driven: { top: 10.8, accel: 0.21 }, seats: 4, spec: [68, 64, 40, 46, 50] },
-                    suv:    { name: 'Ranger',    length: 75, width: 44, speedMod: 0.9, driven: { top: 10.5, accel: 0.20 }, seats: 5, spec: [61, 60, 35, 56, 52] },
-                    sports: { name: 'Sprint',    length: 62, width: 36, speedMod: 1.15, driven: { top: 11.3, accel: 0.23 }, seats: 2, spec: [78, 70, 46, 34, 50] },
-                    truck:  { name: 'Workhorse', length: 90, width: 50, speedMod: 0.7, driven: { top: 10.4, accel: 0.19 }, seats: 2, spec: [48, 56, 26, 72, 50] }
-                }
-            }
-        };
-        
+        /** The car brands and their models: tier, traffic stats, driving feel, colours, and each model's size,
+            speed and spec ratings (what each field means: the chapter's _about). */
+        const VEHICLE_BRANDS = GAME_DB.vehicles.brands;   // directory/game-db/vehicles.json
+
         /** The blueprint ratings, out of 100, in the order of a model's `spec`: Lady's own spec sheet for the
             BlackMark V1 set the scale (100 / 80 / 80 / 90 / 100); the rest are rated against it. */
-        const CAR_SPEC_LABELS = ['Top speed', 'Traction rating', 'Acceleration', 'Toughness / armor', 'Lighting element'];
+        const CAR_SPEC_LABELS = GAME_DB.vehicles.spec_labels;   // directory/game-db/vehicles.json
 
         /** A model's ratings as [{label, v}], or null for an unknown car */
         function carSpec(brand, model) {
@@ -97,12 +48,7 @@
         // ============================================================================
 
         /** BlackMark factory defaults — used for reset to default */
-        const BLACKMARK_DEFAULTS = Object.freeze({
-            brand: 'LADY', model: 'suv',
-            paintColor: '#1a1a1a',
-            underglowColor: '#ffffff',
-            headlightColor: '#ffffff'
-        });
+        const BLACKMARK_DEFAULTS = Object.freeze(GAME_DB.vehicles.blackmark_defaults);   // directory/game-db/vehicles.json
 
         /** Purchase prices per brand tier + model */
         const CAR_PRICES = GAME_DB.shops.auto_shop.car_prices;   // directory/game-db/shops.json
@@ -298,29 +244,9 @@
         //  Fare: base fee + distance-based rate. Hijacking is free.
         // ============================================================================
 
-        const ZIB_CONFIG = Object.freeze({
-            brand: 'LADY',
-            model: 'suv2',
-            paintColor: '#1a0a2e',
-            underglowColor: '#8a2be2',
-            headlightColor: '#9966ff',
-            fareBase: 25,
-            farePerUnit: 0.025,
-            maxActive: 3,
-            spawnChance: 0.008
-        });
+        const ZIB_CONFIG = Object.freeze(GAME_DB.vehicles.zib);   // directory/game-db/vehicles.json
 
-        const ZIB_DESTINATIONS = [
-            { id: 'silver_queen', label: 'Silver Queen Apartments', landmark: 'parking_spot' },
-            { id: 'moon_city', label: 'Moon City Nightclub', landmark: 'club_entrance' },
-            { id: 'double_nights', label: 'Double Nights Hotel', landmark: 'hotel_entrance' },
-            { id: 'cozy_cafe', label: 'Cozy Cafe', landmark: 'cozy_cafe' },
-            { id: 'dr_yins', label: "Dr. Yin's Clinic", landmark: 'clinic' },
-            { id: 'torque_auto', label: 'Torque Auto', landmark: 'torque_auto' },
-            { id: 'neural_sys', label: 'Neural Systems', landmark: 'neural_systems' },
-            { id: 'enni_cole', label: 'Enni Cole', landmark: 'enni_cole' },
-            { id: 'biggs_park', label: 'Biggs Amusement Park', landmark: 'biggs_park' }
-        ];
+        const ZIB_DESTINATIONS = GAME_DB.vehicles.zib_destinations;   // directory/game-db/vehicles.json
 
         class ZibSystem {
             constructor() {

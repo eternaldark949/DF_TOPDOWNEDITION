@@ -16,17 +16,8 @@
         //  it waits, how fast it passes and how soon it sounds the horn: calm, normal, or pushy (the gangers' cars).
         //  A parked car in the lane (traffic-vehicle.js) backs up the same way when it's too close to pull out.
 
-        const TRAFFIC_TEMPERS = {
-            // gap: stop this far short of someone crossing   pull: of someone standing (room to pull out round them)
-            // swing: × the sideways shift it needs, in room to pull out (how sharply it pulls round)
-            // pause: ticks stopped before going round        honk, rehonk: the horn (and again every rehonk ticks)
-            // pass: × the speed it goes by people at         kerb: ticks before squeezing by on the far side
-            // backUp: ticks stuck before backing up to try again   take: × the gap it wants to pull into a moving lane
-            //   (or to turn left across: traffic-signals.js)   amber: the share of its full brake it'll use to stop for one
-            calm:   { gap: 32, pull: 72, swing: 1.85, pause: 45, honk: 300, rehonk: 0,   pass: 0.85, kerb: 600, backUp: 480, take: 1.25, amber: 1 },
-            normal: { gap: 22, pull: 66, swing: 1.7,  pause: 22, honk: 150, rehonk: 0,   pass: 1,    kerb: 420, backUp: 330, take: 1,    amber: 0.75 },
-            pushy:  { gap: 12, pull: 56, swing: 1.45, pause: 6,  honk: 40,  rehonk: 100, pass: 1.3,  kerb: 200, backUp: 220, take: 0.7,  amber: 0.45 },
-        };
+        // What each temper's numbers mean: _about.fields.traffic_tempers in the chapter.
+        const TRAFFIC_TEMPERS = GAME_DB.vehicles.traffic_tempers;   // directory/game-db/vehicles.json
 
         Object.assign(TrafficVehicle.prototype, {
             /** How this car treats people in the road: anyone driving for her is calm, whatever the car */
