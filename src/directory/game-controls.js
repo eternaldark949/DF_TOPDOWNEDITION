@@ -113,6 +113,8 @@
 
         /** The game's recorder (basement/recorder-kit.js): the sticks and the mouse aim ride along with the held inputs;
          *  her, her car and her crew are the recorded things. game_recorder.startRecording() … stopRecording() → a recording. */
+        /** An object's own numbers, strings and flags (its plain state, without what it points to). */
+        const dfPlain = o => Object.fromEntries(Object.entries(o).filter(([, v]) => v === null || ['number', 'string', 'boolean'].includes(typeof v)));
         const game_recorder = new gRecorder(controls, {
             sources: {
                 joystick: [() => { const J = game.joystick; return [+J.active, J.dx, J.dy]; }, ([a, dx, dy]) => Object.assign(game.joystick, { active: !!a, id: a ? 'replay' : null, dx, dy })],
@@ -123,4 +125,16 @@
             objects: () => [['player', game.player.x, game.player.y, game.player.angle], ...(game.isDriving && game.car ? [['car', game.car.x, game.car.y, game.car.angle]] : []),
                 ...(game.teammates || []).map((t, i) => ['crew' + i, t.x, t.y, t.angle])],
             centre: () => [game.player.x, game.player.y],
+            // Where a run starts: the clocks, the id counters (a car's id staggers its thinking), the time of day, the camera,
+            // her own plain state (where she is, her pace, sneaking), the sky and its forecast; setting it also empties the street, so the crowd and
+            // the traffic come from the recording's dice
+            world: [
+                () => [_simTick, game.simStep | 0, _gameTimeSec, GameEntity._nextId, TrafficVehicle._phaseCounter | 0, game.worldMinutes, game._clockTicks | 0, { ...game.camera }, game.view ? { ...game.view } : null, dfPlain(game.player), !!game.sneaking, JSON.parse(JSON.stringify(game.weather.serialize())), dfPlain(game.weather)],
+                ([tick, step, time, id, phase, minutes, clock, camera, view, her, sneaking, sky, weather]) => {
+                    frame_clock.setTick(tick); game.simStep = step; frame_clock.setGameTime(time); GameEntity._nextId = id; TrafficVehicle._phaseCounter = phase;
+                    game.worldMinutes = minutes; game._clockTicks = clock; Object.assign(game.camera, camera); if (view) game.view = { ...view };
+                    Object.assign(game.player, her); if (!!game.sneaking !== sneaking) game.setSneak(sneaking); game.weather.deserialize(sky); Object.assign(game.weather, weather);
+                    game.traffic.clearStreet(); game.pedestrians.clearStreet();
+                },
+            ],
         });

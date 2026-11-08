@@ -97,47 +97,47 @@
                 // Spawn off the upwind edge(s) of the view, carried in on the wind (any direction)
                 const screenW = this.game.canvas.width / cam.zoom;
                 const screenH = this.game.canvas.height / cam.zoom;
-                const ux = ws > 0.05 ? w.x / ws : (Math.random() - 0.5), uy = ws > 0.05 ? w.y / ws : (Math.random() - 0.5);
-                if (Math.random() * (Math.abs(ux) + Math.abs(uy)) < Math.abs(ux)) {
+                const ux = ws > 0.05 ? w.x / ws : (fxRandom() - 0.5), uy = ws > 0.05 ? w.y / ws : (fxRandom() - 0.5);
+                if (fxRandom() * (Math.abs(ux) + Math.abs(uy)) < Math.abs(ux)) {
                     leaf.x = cam.x - Math.sign(ux || 1) * (screenW / 2 + 50);           // the left or right edge the wind comes from
-                    leaf.y = cam.y - screenH / 2 + Math.random() * screenH;
+                    leaf.y = cam.y - screenH / 2 + fxRandom() * screenH;
                 } else {
                     leaf.y = cam.y - Math.sign(uy || 1) * (screenH / 2 + 50);           // the top or bottom edge
-                    leaf.x = cam.x - screenW / 2 + Math.random() * screenW;
+                    leaf.x = cam.x - screenW / 2 + fxRandom() * screenW;
                 }
                 
                 // Already moving with the wind, give or take
-                const k = (0.6 + Math.random() * 0.6) * 0.6 * this.windInfluence;
-                leaf.vx = w.x * k + (Math.random() - 0.5) * 0.4;
-                leaf.vy = w.y * k + (Math.random() - 0.5) * 0.4;
+                const k = (0.6 + fxRandom() * 0.6) * 0.6 * this.windInfluence;
+                leaf.vx = w.x * k + (fxRandom() - 0.5) * 0.4;
+                leaf.vy = w.y * k + (fxRandom() - 0.5) * 0.4;
                 
                 // Rotation
-                leaf.rotation = Math.random() * Math.PI * 2;
-                leaf.rotationSpeed = (Math.random() - 0.5) * 0.15;
+                leaf.rotation = fxRandom() * Math.PI * 2;
+                leaf.rotationSpeed = (fxRandom() - 0.5) * 0.15;
                 
                 // Tumbling (3D rotation illusion)
-                leaf.tumble = Math.random() * Math.PI * 2;
-                leaf.tumbleSpeed = 0.02 + Math.random() * 0.04;
+                leaf.tumble = fxRandom() * Math.PI * 2;
+                leaf.tumbleSpeed = 0.02 + fxRandom() * 0.04;
                 
                 // Flutter (side-to-side oscillation)
-                leaf.flutter = Math.random() * Math.PI * 2;
-                leaf.flutterSpeed = 0.05 + Math.random() * 0.05;
+                leaf.flutter = fxRandom() * Math.PI * 2;
+                leaf.flutterSpeed = 0.05 + fxRandom() * 0.05;
                 
                 // Appearance
-                leaf.size = 4 + Math.random() * 5;
-                leaf.shape = this.shapes[Math.floor(Math.random() * this.shapes.length)];
+                leaf.size = 4 + fxRandom() * 5;
+                leaf.shape = this.shapes[Math.floor(fxRandom() * this.shapes.length)];
                 leaf.life = 1.0;
                 
                 // Determine if glowing
-                leaf.isGlowing = Math.random() < this.glowingChance;
+                leaf.isGlowing = fxRandom() < this.glowingChance;
                 
                 if (leaf.isGlowing) {
-                    const glowData = this.glowingColors[Math.floor(Math.random() * this.glowingColors.length)];
+                    const glowData = this.glowingColors[Math.floor(fxRandom() * this.glowingColors.length)];
                     leaf.color = glowData.color;
                     leaf.glowColor = glowData.glow;
-                    leaf.pulsePhase = Math.random() * Math.PI * 2;
+                    leaf.pulsePhase = fxRandom() * Math.PI * 2;
                 } else {
-                    leaf.color = this.colors[Math.floor(Math.random() * this.colors.length)];
+                    leaf.color = this.colors[Math.floor(fxRandom() * this.colors.length)];
                     leaf.glowColor = null;
                 }
                 
@@ -162,7 +162,7 @@
                 
                 // Spawn new leaves (more when windy; still air brings few)
                 const spawnChance = this.spawnRate * (0.15 + wind);
-                if (Math.random() < spawnChance) {
+                if (fxRandom() < spawnChance) {
                     this.spawnLeaf();
                 }
                 
@@ -393,14 +393,14 @@
                         
                         for (let i = 0; i < count; i++) {
                             if (this.decals.length >= this.maxDecals) this.decals.shift();
-                            const dist = Math.random() * spread;
-                            const angle = Math.random() * Math.PI * 2;
+                            const dist = fxRandom() * spread;
+                            const angle = fxRandom() * Math.PI * 2;
                             this.decals.push({
                                 type: 'debris', 
                                 x: x + Math.cos(angle) * dist,
                                 y: y + Math.sin(angle) * dist,
-                                size: 1 + Math.random() * 3,
-                                alpha: 0.6 + Math.random() * 0.4,
+                                size: 1 + fxRandom() * 3,
+                                alpha: 0.6 + fxRandom() * 0.4,
                                 color: rgb,
                                 spawnTime: now
                             });
@@ -413,29 +413,29 @@
                         this.decals.push({
                             type: 'blood', x, y,
                             radius: size,
-                            alpha: 0.4 + Math.random() * 0.4,
+                            alpha: 0.4 + fxRandom() * 0.4,
                             color,
                             spawnTime: now
                         });
                         // A hit sprays along its direction: a few droplets trailing away
                         if (opts.dir !== undefined) {
-                            const n = 2 + Math.floor(Math.random() * 3);
+                            const n = 2 + Math.floor(fxRandom() * 3);
                             for (let k = 1; k <= n; k++) {
                                 if (this.decals.length >= this.maxDecals) this.decals.shift();
-                                const d = size * (1.2 + k * 1.1) + Math.random() * 3, a = opts.dir + (Math.random() - 0.5) * 0.6;
+                                const d = size * (1.2 + k * 1.1) + fxRandom() * 3, a = opts.dir + (fxRandom() - 0.5) * 0.6;
                                 this.decals.push({ type: 'blood', x: x + Math.cos(a) * d, y: y + Math.sin(a) * d,
-                                                   radius: Math.max(0.6, size * (0.55 - k * 0.1)), alpha: 0.35 + Math.random() * 0.35, color, spawnTime: now });
+                                                   radius: Math.max(0.6, size * (0.55 - k * 0.1)), alpha: 0.35 + fxRandom() * 0.35, color, spawnTime: now });
                             }
                         }
                         // Secondary splatter
-                        if (Math.random() < CONFIG.DECALS.BLOOD_SPLATTER_CHANCE) {
+                        if (fxRandom() < CONFIG.DECALS.BLOOD_SPLATTER_CHANCE) {
                             if (this.decals.length >= this.maxDecals) this.decals.shift();
                             this.decals.push({
                                 type: 'blood',
-                                x: x + (Math.random() - 0.5) * 12,
-                                y: y + (Math.random() - 0.5) * 12,
+                                x: x + (fxRandom() - 0.5) * 12,
+                                y: y + (fxRandom() - 0.5) * 12,
                                 radius: size * 0.6,
-                                alpha: 0.3 + Math.random() * 0.3,
+                                alpha: 0.3 + fxRandom() * 0.3,
                                 color,
                                 spawnTime: now
                             });

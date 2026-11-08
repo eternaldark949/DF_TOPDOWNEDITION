@@ -56,7 +56,7 @@
                 if (++U.vizT >= 6) {
                     U.vizT = 0;
                     if (!U.bars || !U.bars.length) U.bars = document.querySelectorAll('#audio-viz .viz-bar');
-                    U.bars.forEach(bar => bar.style.height = `${20 + Math.random() * 80}%`);
+                    U.bars.forEach(bar => bar.style.height = `${20 + fxRandom() * 80}%`);
                 }
             },
             

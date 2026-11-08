@@ -21,6 +21,11 @@
          *  keep _frameTime for real-time effects like light flicker and UI. */
         let _gameTimeSec = 0;
 
+        /** Dice for looks only (rain, sparks, splashes): the browser's own, kept before anything can reseed Math.random.
+         *  Math.random is the WORLD's dice (a replay reseeds it: basement/recorder-kit.js); something drawn a different
+         *  number of times each run must not take numbers from it, or two runs of the same inputs drift apart. */
+        const fxRandom = Math.random;
+
         class frameClock {
             // --- WRITERS ---
             /** A new frame is being drawn: stamp real time. */
@@ -30,6 +35,8 @@
             }
             /** One simulation step has begun. */
             advanceTick () { _simTick++; if (typeof game_timers !== 'undefined') game_timers.tick(); }   // the game's timers (basement/timer-kit.js) move with it
+            /** Back to an earlier tick count (a replay starting where its recording did: basement/recorder-kit.js). */
+            setTick (n) { _simTick = n; }
             /** Where this drawn frame sits in game time, in seconds. */
             setGameTime (seconds) { _gameTimeSec = seconds; }
 

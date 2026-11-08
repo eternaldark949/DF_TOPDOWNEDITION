@@ -98,6 +98,12 @@
                 for (const ix of this.network.intersections) if (ix.signal && ix.signal.inView(view)) ix.signal.drawGlow(ctx, dark, crosswalks, t);
             }
 
+            /** Nobody on the road: the cars gone, the spawn clock and the lanes-near list as at a fresh start (a replay). */
+            clearStreet() {   // the cars gone and the junctions as they were built (queues, lights: a replay's start)
+                for (const v of this.vehicles) if (!v.markedForDestroy) v.destroy(); this.vehicles = []; this.spawnTimer = 0; this._near = null; this.grid.clear();
+                for (const ix of this.network.intersections || []) { ix.clearAndRecollect(); ix.currentVehicle = ix.occupiedBy = null; ix.clearanceTimer = 0; ix.signal = undefined; }
+                this.sensing.active = false; this.sensing.source = null; this.sensing.cars.clear(true); this.sensing.people.clear(true);
+            }
             reset() { 
                 // Properly destroy all vehicle entities before clearing
                 for (let v of this.vehicles) {

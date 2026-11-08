@@ -5796,9 +5796,9 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '63625ceadd79';
+        const DFAB_BUILD = '6e2bdc9d28f9';
     </script>
-    <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="27">
+    <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
         // The frame clock: the engine's four time values, and the only code meant to move them.
         //
@@ -5822,6 +5822,11 @@
          *  keep _frameTime for real-time effects like light flicker and UI. */
         let _gameTimeSec = 0;
 
+        /** Dice for looks only (rain, sparks, splashes): the browser's own, kept before anything can reseed Math.random.
+         *  Math.random is the WORLD's dice (a replay reseeds it: basement/recorder-kit.js); something drawn a different
+         *  number of times each run must not take numbers from it, or two runs of the same inputs drift apart. */
+        const fxRandom = Math.random;
+
         class frameClock {
             // --- WRITERS ---
             /** A new frame is being drawn: stamp real time. */
@@ -5831,6 +5836,8 @@
             }
             /** One simulation step has begun. */
             advanceTick () { _simTick++; if (typeof game_timers !== 'undefined') game_timers.tick(); }   // the game's timers (basement/timer-kit.js) move with it
+            /** Back to an earlier tick count (a replay starting where its recording did: basement/recorder-kit.js). */
+            setTick (n) { _simTick = n; }
             /** Where this drawn frame sits in game time, in seconds. */
             setGameTime (seconds) { _gameTimeSec = seconds; }
 
@@ -6952,7 +6959,7 @@
             frame() { requestAnimationFrame(this.frame); this.update(); }
         }
     </script>
-    <script type="text/dfab" data-src="basement/recorder-kit.js" data-cost="79">
+    <script type="text/dfab" data-src="basement/recorder-kit.js" data-cost="84">
         // ===== LV0 BASEMENT =====
         // The recorder: what the player did, tick by tick, so it can be played back through the controls
         // system as if they were doing it again (a replay test, a demo, a bug to watch happen twice). It also
@@ -6965,8 +6972,10 @@
         //             (a touch stick's dx/dy, the mouse's aim): get() -> a packet, set(packet)
         //   objects   () -> [[id, x, y, angle], ...]   things that may be recorded
         //   centre    () -> [x, y]                     the middle of the recorded circle
+        //   world     [get, set]   the world's start: what a run reads besides the dice (its clocks, id counters, the
+        //             camera, a street to empty): got before the setup, set again before the playback's setup
         //
-        // RECORDING: { frames: [FRAME...], actions: [ACTION...], step, seed }   plain data (JSON)
+        // RECORDING: { frames: [FRAME...], actions: [ACTION...], step, seed, world }   plain data (JSON)
         //   seed     the dice: while recording or playing, Math.random is reseeded from it at the start of every
         //            tick and before every action, so whatever the drawing used in between (it draws a different
         //            number of frames each time) can't change what the world does: a playback is the same run
@@ -6984,8 +6993,8 @@
         //   recording, playing, frame (the frame index now)
         //   createFrame() / prepareFrameData() / recordFrame(): one tick's frame, its objects, kept
         class gRecorder {
-            constructor(controls, { sources = {}, objects = () => [], centre = () => [0, 0], recording_radius = 600 } = {}) {
-                Object.assign(this, { controls, sources, objects, centre, recording_radius, recording: false, playing: false, frame: 0, data: null, timer: null, on_end: null });
+            constructor(controls, { sources = {}, objects = () => [], centre = () => [0, 0], recording_radius = 600, world = null } = {}) {
+                Object.assign(this, { controls, sources, objects, centre, recording_radius, world, recording: false, playing: false, frame: 0, data: null, timer: null, on_end: null });
                 controls.on_fire.push((action, type, ev) => { if (this.recording && ev.device !== 'replay') this.data.actions.push([this.frame - 1, action, type, ev.device, ev.input, !!ev.shift]); });
                 controls.before_fire.push(() => { if (this.recording || this.playing) this.reseed(this.frame - 1, 1 + this._fired++); });
                 game_timers.before.push(() => { if (this.recording || this.playing) { this.reseed(this.frame, 0); this._fired = 0; } });
@@ -7007,7 +7016,8 @@
              *  starts from whatever world is there, and only her own part is sure to repeat. */
             startRecording(setup = null) {
                 this.stopPlayback();
-                this.data = { frames: [], actions: [], step: game_timers.step, seed: (this.real_random() * 4294967296) >>> 0 };
+                this.data = { frames: [], actions: [], step: game_timers.step, seed: (this.real_random() * 4294967296) >>> 0, world: this.world ? this.world[0]() : null };
+                if (this.world) this.world[1](this.data.world);   // the same way the playback will start: the street emptied, the clocks set
                 this._setup(setup);
                 this.recording = true; this.frame = 0;
                 this.recordFrame();
@@ -7031,6 +7041,7 @@
             startPlayback(recording, on_end = null, setup = null) {
                 this.stopRecording(); this.stopPlayback();
                 Object.assign(this, { data: recording, frame: 0, on_end });
+                if (this.world && recording.world) this.world[1](recording.world);
                 this._setup(setup);
                 this.playing = true;
                 this.controls.clear(); this.controls.muted = true;
@@ -14051,7 +14062,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
 
     </script>
-    <script type="text/dfab" data-src="directory/game-controls.js" data-cost="108">
+    <script type="text/dfab" data-src="directory/game-controls.js" data-cost="125">
         // ===== LV2 DIRECTORY =====
         // The game's controls: which keys and buttons do what (dfKeyMap), and the actions they fire
         // (dfActions), handed to the Basement's controls system (basement/controls-system.js).
@@ -14167,6 +14178,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
 
         /** The game's recorder (basement/recorder-kit.js): the sticks and the mouse aim ride along with the held inputs;
          *  her, her car and her crew are the recorded things. game_recorder.startRecording() … stopRecording() → a recording. */
+        /** An object's own numbers, strings and flags (its plain state, without what it points to). */
+        const dfPlain = o => Object.fromEntries(Object.entries(o).filter(([, v]) => v === null || ['number', 'string', 'boolean'].includes(typeof v)));
         const game_recorder = new gRecorder(controls, {
             sources: {
                 joystick: [() => { const J = game.joystick; return [+J.active, J.dx, J.dy]; }, ([a, dx, dy]) => Object.assign(game.joystick, { active: !!a, id: a ? 'replay' : null, dx, dy })],
@@ -14177,9 +14190,21 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             objects: () => [['player', game.player.x, game.player.y, game.player.angle], ...(game.isDriving && game.car ? [['car', game.car.x, game.car.y, game.car.angle]] : []),
                 ...(game.teammates || []).map((t, i) => ['crew' + i, t.x, t.y, t.angle])],
             centre: () => [game.player.x, game.player.y],
+            // Where a run starts: the clocks, the id counters (a car's id staggers its thinking), the time of day, the camera,
+            // her own plain state (where she is, her pace, sneaking), the sky and its forecast; setting it also empties the street, so the crowd and
+            // the traffic come from the recording's dice
+            world: [
+                () => [_simTick, game.simStep | 0, _gameTimeSec, GameEntity._nextId, TrafficVehicle._phaseCounter | 0, game.worldMinutes, game._clockTicks | 0, { ...game.camera }, game.view ? { ...game.view } : null, dfPlain(game.player), !!game.sneaking, JSON.parse(JSON.stringify(game.weather.serialize())), dfPlain(game.weather)],
+                ([tick, step, time, id, phase, minutes, clock, camera, view, her, sneaking, sky, weather]) => {
+                    frame_clock.setTick(tick); game.simStep = step; frame_clock.setGameTime(time); GameEntity._nextId = id; TrafficVehicle._phaseCounter = phase;
+                    game.worldMinutes = minutes; game._clockTicks = clock; Object.assign(game.camera, camera); if (view) game.view = { ...view };
+                    Object.assign(game.player, her); if (!!game.sneaking !== sneaking) game.setSneak(sneaking); game.weather.deserialize(sky); Object.assign(game.weather, weather);
+                    game.traffic.clearStreet(); game.pedestrians.clearStreet();
+                },
+            ],
         });
     </script>
-    <script type="text/dfab" data-src="world/weather.js" data-cost="767">
+    <script type="text/dfab" data-src="world/weather.js" data-cost="766">
         /* =====================================================================
            WEATHER CONDITIONS — the vocabulary the scheduler picks from
            ---------------------------------------------------------------------
@@ -14884,14 +14909,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 for(let i=0; i<count; i++) {
                     const p = this._particlePool.acquire();
                     p.type = 'spray';
-                    p.x = x + (Math.random()-0.5)*5;
-                    p.y = y + (Math.random()-0.5)*5;
-                    p.vx = -Math.cos(angle)*(Math.random()*3) + (Math.random()-0.5);
-                    p.vy = -Math.sin(angle)*(Math.random()*3) + (Math.random()-0.5);
+                    p.x = x + (fxRandom()-0.5)*5;
+                    p.y = y + (fxRandom()-0.5)*5;
+                    p.vx = -Math.cos(angle)*(fxRandom()*3) + (fxRandom()-0.5);
+                    p.vy = -Math.sin(angle)*(fxRandom()*3) + (fxRandom()-0.5);
                     p.life = 1.0;
-                    p.decay = (0.08 + Math.random()*0.05) / lifeMult;
+                    p.decay = (0.08 + fxRandom()*0.05) / lifeMult;
                     p.color = color;
-                    p.size = 2 + Math.random() * 3;
+                    p.size = 2 + fxRandom() * 3;
                     this.particles.push(p);
                 }
             }
@@ -14899,17 +14924,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // Explosion: Radial burst of particles (combat/destruction)
             spawnExplosion(x, y, color = 'rgba(0, 243, 255, 1)', count = 15, speed = 6) {
                 for(let i=0; i<count; i++) {
-                    const ang = Math.random() * Math.PI * 2;
-                    const spd = Math.random() * speed;
+                    const ang = fxRandom() * Math.PI * 2;
+                    const spd = fxRandom() * speed;
                     const p = this._particlePool.acquire();
                     p.type = 'explosion';
                     p.x = x; p.y = y;
                     p.vx = Math.cos(ang) * spd;
                     p.vy = Math.sin(ang) * spd;
                     p.life = 1.0;
-                    p.decay = 0.05 + Math.random() * 0.05;
+                    p.decay = 0.05 + fxRandom() * 0.05;
                     p.color = color;
-                    p.size = 3 + Math.random() * 3;
+                    p.size = 3 + fxRandom() * 3;
                     this.particles.push(p);
                 }
             }
@@ -14929,17 +14954,17 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             // Sparks: Bright particles from impacts (metal collisions)
             spawnSparks(x, y, amount = 15) {
                 for(let i=0; i<amount; i++) {
-                    const ang = Math.random() * Math.PI * 2;
-                    const speed = 3 + Math.random() * 5;
+                    const ang = fxRandom() * Math.PI * 2;
+                    const speed = 3 + fxRandom() * 5;
                     const p = this._particlePool.acquire();
                     p.type = 'spark';
                     p.x = x; p.y = y;
                     p.vx = Math.cos(ang) * speed;
                     p.vy = Math.sin(ang) * speed;
                     p.life = 1.0;
-                    p.decay = 0.1 + Math.random() * 0.1;
+                    p.decay = 0.1 + fxRandom() * 0.1;
                     p.color = '#fff5aa';
-                    p.size = 1 + Math.random();
+                    p.size = 1 + fxRandom();
                     this.particles.push(p);
                 }
             }
@@ -14947,16 +14972,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             /** A spray of droplets (blood, coolant…) fanning out along `dir`. color: 'rgba(r, g, b, 1)'. */
             spawnSpray(x, y, dir, color, amount = 8) {
                 for (let i = 0; i < amount; i++) {
-                    const ang = dir + (Math.random() - 0.5) * 1.1;
-                    const spd = 1.5 + Math.random() * 4.5;
+                    const ang = dir + (fxRandom() - 0.5) * 1.1;
+                    const spd = 1.5 + fxRandom() * 4.5;
                     const p = this._particlePool.acquire();
                     p.type = 'explosion';                                    // damped, drawn as a fading dot
                     p.x = x; p.y = y;
                     p.vx = Math.cos(ang) * spd; p.vy = Math.sin(ang) * spd;
                     p.life = 1.0;
-                    p.decay = 0.06 + Math.random() * 0.05;
+                    p.decay = 0.06 + fxRandom() * 0.05;
                     p.color = color;
-                    p.size = 1 + Math.random() * 1.8;
+                    p.size = 1 + fxRandom() * 1.8;
                     this.particles.push(p);
                 }
             }
@@ -15048,11 +15073,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                     const baseRate = Math.max(1, Math.floor(rainCfg.dropRate * areaScale * wScale));
                     
                     // Spawn new drops in world space within visible area
-                    const toSpawn = baseRate + Math.floor(Math.random() * baseRate * 0.4);
+                    const toSpawn = baseRate + Math.floor(fxRandom() * baseRate * 0.4);
                     for (let i = 0; i < toSpawn && this.drops.length < maxDrops; i++) {
-                        const gx = viewLeft + Math.random() * viewW;
-                        const gy = viewTop + Math.random() * viewH;
-                        const h0 = 0.6 + Math.random() * 0.4;
+                        const gx = viewLeft + fxRandom() * viewW;
+                        const gy = viewTop + fxRandom() * viewH;
+                        const h0 = 0.6 + fxRandom() * 0.4;
                         
                         // Convert ground target to screen space for direction calc
                         const sx = (gx - camera.x) * zoom + hw;
@@ -15073,8 +15098,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         this.drops.push({
                             groundX: gx, groundY: gy,  // WORLD space
                             height: h0,
-                            fallSpeed: RC.RAIN_FALL_SPEED_MIN + Math.random() * (RC.RAIN_FALL_SPEED_MAX - RC.RAIN_FALL_SPEED_MIN),
-                            brightness: 0.35 + Math.random() * 0.65,
+                            fallSpeed: RC.RAIN_FALL_SPEED_MIN + fxRandom() * (RC.RAIN_FALL_SPEED_MAX - RC.RAIN_FALL_SPEED_MIN),
+                            brightness: 0.35 + fxRandom() * 0.65,
                             dirX: dirX, dirY: dirY
                         });
                     }
@@ -15103,9 +15128,9 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                             if (this.splashes.length < rainCfg.maxSplashes * areaScale * wScale) {
                                 this.splashes.push({
                                     x: d.groundX, y: d.groundY,  // WORLD space
-                                    t: 0, lifespan: 300 + Math.random() * 250,
-                                    maxR: CONFIG.WEATHER.SPLASH_RADIUS_MIN + Math.random() * (CONFIG.WEATHER.SPLASH_RADIUS_MAX - CONFIG.WEATHER.SPLASH_RADIUS_MIN),
-                                    rings: Math.random() > (1 - CONFIG.WEATHER.SPLASH_RINGS_CHANCE) ? 2 : 1,
+                                    t: 0, lifespan: 300 + fxRandom() * 250,
+                                    maxR: CONFIG.WEATHER.SPLASH_RADIUS_MIN + fxRandom() * (CONFIG.WEATHER.SPLASH_RADIUS_MAX - CONFIG.WEATHER.SPLASH_RADIUS_MIN),
+                                    rings: fxRandom() > (1 - CONFIG.WEATHER.SPLASH_RINGS_CHANCE) ? 2 : 1,
                                     br: d.brightness
                                 });
                             }
@@ -15274,16 +15299,16 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 const want = Math.min(4000, Math.floor(this._cineDensity * vw * vh));
                 let have = 0; for (const d of this.drops) if (d.groundX > L && d.groundX < L + vw && d.groundY > T && d.groundY < T + vh) have++;
                 for (let k = 0, tries = 0; have < want && tries < want * 4 && this.drops.length < 6000; tries++) {
-                    const gx = L + Math.random() * vw, gy = T + Math.random() * vh;
+                    const gx = L + fxRandom() * vw, gy = T + fxRandom() * vh;
                     if (inC(gx, gy)) continue;                                      // that ground already has its rain
-                    const h0 = 0.05 + Math.random() * 0.95;
+                    const h0 = 0.05 + fxRandom() * 0.95;
                     const sx = (gx - view.x) * zoom + hw, sy = (gy - view.y) * zoom + hh, dx = sx - hw, dy = sy - hh;
                     const par = h0 * h0 * RC.RAIN_PARALLAX;
                     const stx = sx + dx * par - this.windVec.x * RC.RAIN_WIND_DRIFT * h0, sty = sy + dy * par - this.windVec.y * RC.RAIN_WIND_DRIFT * h0;
                     const tx = sx - stx - this.windVec.x * RC.RAIN_WIND_DIR_STR, ty = sy - sty - this.windVec.y * RC.RAIN_WIND_DIR_STR, dist = Math.hypot(tx, ty);
                     this.drops.push({ groundX: gx, groundY: gy, height: h0,
-                        fallSpeed: RC.RAIN_FALL_SPEED_MIN + Math.random() * (RC.RAIN_FALL_SPEED_MAX - RC.RAIN_FALL_SPEED_MIN),
-                        brightness: 0.35 + Math.random() * 0.65, dirX: dist > 0.1 ? tx / dist : 0, dirY: dist > 0.1 ? ty / dist : 1 });
+                        fallSpeed: RC.RAIN_FALL_SPEED_MIN + fxRandom() * (RC.RAIN_FALL_SPEED_MAX - RC.RAIN_FALL_SPEED_MIN),
+                        brightness: 0.35 + fxRandom() * 0.65, dirX: dist > 0.1 ? tx / dist : 0, dirY: dist > 0.1 ? ty / dist : 1 });
                     have++; k++;
                 }
             }
@@ -15624,7 +15649,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             ctx.restore();
         }
     </script>
-    <script type="text/dfab" data-src="world/particles-decals.js" data-cost="240">
+    <script type="text/dfab" data-src="world/particles-decals.js" data-cost="239">
         // PuddleSystem removed — disabled for performance (this.puddles = null at init).
         // All references are guarded with `if (this.puddles)` so no code changes needed.
         // Can be restored from version control if puddle visuals are revisited.
@@ -15724,47 +15749,47 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // Spawn off the upwind edge(s) of the view, carried in on the wind (any direction)
                 const screenW = this.game.canvas.width / cam.zoom;
                 const screenH = this.game.canvas.height / cam.zoom;
-                const ux = ws > 0.05 ? w.x / ws : (Math.random() - 0.5), uy = ws > 0.05 ? w.y / ws : (Math.random() - 0.5);
-                if (Math.random() * (Math.abs(ux) + Math.abs(uy)) < Math.abs(ux)) {
+                const ux = ws > 0.05 ? w.x / ws : (fxRandom() - 0.5), uy = ws > 0.05 ? w.y / ws : (fxRandom() - 0.5);
+                if (fxRandom() * (Math.abs(ux) + Math.abs(uy)) < Math.abs(ux)) {
                     leaf.x = cam.x - Math.sign(ux || 1) * (screenW / 2 + 50);           // the left or right edge the wind comes from
-                    leaf.y = cam.y - screenH / 2 + Math.random() * screenH;
+                    leaf.y = cam.y - screenH / 2 + fxRandom() * screenH;
                 } else {
                     leaf.y = cam.y - Math.sign(uy || 1) * (screenH / 2 + 50);           // the top or bottom edge
-                    leaf.x = cam.x - screenW / 2 + Math.random() * screenW;
+                    leaf.x = cam.x - screenW / 2 + fxRandom() * screenW;
                 }
                 
                 // Already moving with the wind, give or take
-                const k = (0.6 + Math.random() * 0.6) * 0.6 * this.windInfluence;
-                leaf.vx = w.x * k + (Math.random() - 0.5) * 0.4;
-                leaf.vy = w.y * k + (Math.random() - 0.5) * 0.4;
+                const k = (0.6 + fxRandom() * 0.6) * 0.6 * this.windInfluence;
+                leaf.vx = w.x * k + (fxRandom() - 0.5) * 0.4;
+                leaf.vy = w.y * k + (fxRandom() - 0.5) * 0.4;
                 
                 // Rotation
-                leaf.rotation = Math.random() * Math.PI * 2;
-                leaf.rotationSpeed = (Math.random() - 0.5) * 0.15;
+                leaf.rotation = fxRandom() * Math.PI * 2;
+                leaf.rotationSpeed = (fxRandom() - 0.5) * 0.15;
                 
                 // Tumbling (3D rotation illusion)
-                leaf.tumble = Math.random() * Math.PI * 2;
-                leaf.tumbleSpeed = 0.02 + Math.random() * 0.04;
+                leaf.tumble = fxRandom() * Math.PI * 2;
+                leaf.tumbleSpeed = 0.02 + fxRandom() * 0.04;
                 
                 // Flutter (side-to-side oscillation)
-                leaf.flutter = Math.random() * Math.PI * 2;
-                leaf.flutterSpeed = 0.05 + Math.random() * 0.05;
+                leaf.flutter = fxRandom() * Math.PI * 2;
+                leaf.flutterSpeed = 0.05 + fxRandom() * 0.05;
                 
                 // Appearance
-                leaf.size = 4 + Math.random() * 5;
-                leaf.shape = this.shapes[Math.floor(Math.random() * this.shapes.length)];
+                leaf.size = 4 + fxRandom() * 5;
+                leaf.shape = this.shapes[Math.floor(fxRandom() * this.shapes.length)];
                 leaf.life = 1.0;
                 
                 // Determine if glowing
-                leaf.isGlowing = Math.random() < this.glowingChance;
+                leaf.isGlowing = fxRandom() < this.glowingChance;
                 
                 if (leaf.isGlowing) {
-                    const glowData = this.glowingColors[Math.floor(Math.random() * this.glowingColors.length)];
+                    const glowData = this.glowingColors[Math.floor(fxRandom() * this.glowingColors.length)];
                     leaf.color = glowData.color;
                     leaf.glowColor = glowData.glow;
-                    leaf.pulsePhase = Math.random() * Math.PI * 2;
+                    leaf.pulsePhase = fxRandom() * Math.PI * 2;
                 } else {
-                    leaf.color = this.colors[Math.floor(Math.random() * this.colors.length)];
+                    leaf.color = this.colors[Math.floor(fxRandom() * this.colors.length)];
                     leaf.glowColor = null;
                 }
                 
@@ -15789,7 +15814,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 
                 // Spawn new leaves (more when windy; still air brings few)
                 const spawnChance = this.spawnRate * (0.15 + wind);
-                if (Math.random() < spawnChance) {
+                if (fxRandom() < spawnChance) {
                     this.spawnLeaf();
                 }
                 
@@ -16020,14 +16045,14 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         
                         for (let i = 0; i < count; i++) {
                             if (this.decals.length >= this.maxDecals) this.decals.shift();
-                            const dist = Math.random() * spread;
-                            const angle = Math.random() * Math.PI * 2;
+                            const dist = fxRandom() * spread;
+                            const angle = fxRandom() * Math.PI * 2;
                             this.decals.push({
                                 type: 'debris', 
                                 x: x + Math.cos(angle) * dist,
                                 y: y + Math.sin(angle) * dist,
-                                size: 1 + Math.random() * 3,
-                                alpha: 0.6 + Math.random() * 0.4,
+                                size: 1 + fxRandom() * 3,
+                                alpha: 0.6 + fxRandom() * 0.4,
                                 color: rgb,
                                 spawnTime: now
                             });
@@ -16040,29 +16065,29 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                         this.decals.push({
                             type: 'blood', x, y,
                             radius: size,
-                            alpha: 0.4 + Math.random() * 0.4,
+                            alpha: 0.4 + fxRandom() * 0.4,
                             color,
                             spawnTime: now
                         });
                         // A hit sprays along its direction: a few droplets trailing away
                         if (opts.dir !== undefined) {
-                            const n = 2 + Math.floor(Math.random() * 3);
+                            const n = 2 + Math.floor(fxRandom() * 3);
                             for (let k = 1; k <= n; k++) {
                                 if (this.decals.length >= this.maxDecals) this.decals.shift();
-                                const d = size * (1.2 + k * 1.1) + Math.random() * 3, a = opts.dir + (Math.random() - 0.5) * 0.6;
+                                const d = size * (1.2 + k * 1.1) + fxRandom() * 3, a = opts.dir + (fxRandom() - 0.5) * 0.6;
                                 this.decals.push({ type: 'blood', x: x + Math.cos(a) * d, y: y + Math.sin(a) * d,
-                                                   radius: Math.max(0.6, size * (0.55 - k * 0.1)), alpha: 0.35 + Math.random() * 0.35, color, spawnTime: now });
+                                                   radius: Math.max(0.6, size * (0.55 - k * 0.1)), alpha: 0.35 + fxRandom() * 0.35, color, spawnTime: now });
                             }
                         }
                         // Secondary splatter
-                        if (Math.random() < CONFIG.DECALS.BLOOD_SPLATTER_CHANCE) {
+                        if (fxRandom() < CONFIG.DECALS.BLOOD_SPLATTER_CHANCE) {
                             if (this.decals.length >= this.maxDecals) this.decals.shift();
                             this.decals.push({
                                 type: 'blood',
-                                x: x + (Math.random() - 0.5) * 12,
-                                y: y + (Math.random() - 0.5) * 12,
+                                x: x + (fxRandom() - 0.5) * 12,
+                                y: y + (fxRandom() - 0.5) * 12,
                                 radius: size * 0.6,
-                                alpha: 0.3 + Math.random() * 0.3,
+                                alpha: 0.3 + fxRandom() * 0.3,
                                 color,
                                 spawnTime: now
                             });
@@ -27937,7 +27962,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         }
 
     </script>
-    <script type="text/dfab" data-src="entities/npc.js" data-cost="559">
+    <script type="text/dfab" data-src="entities/npc.js" data-cost="560">
         /**
          * =====================================================================
          *  NPC CLASS (Extends ActorEntity)
@@ -28715,18 +28740,19 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         // any one citizen from spamming, and the trigger chances are tuned so
         // the chorus feels alive but never overwhelming on a crowded street.
         // Categories are checked in priority order: danger > seesWeapon > roaming.
-        /* Lines currently in the air, text -> expiry timestamp (ms).
+        /* Lines currently in the air, text -> the sim tick it expires on (game time, so a replay hears the same
+           lines: real time would make who speaks depend on the frame rate).
            Time-based rather than a reference count on purpose: quip lifetime only
            ticks inside NPC.draw(), so a pedestrian who wanders off-screen mid-line
            never clears their own bubble. A refcount would leak that line forever;
            an expiry stamp always releases itself. */
         const _activeQuipLines = new Map();
-        const QUIP_LINE_GRACE_MS = 1500;   // quiet beat before a line may repeat
+        const QUIP_LINE_GRACE_TICKS = 90;   // quiet beat before a line may repeat (1.5 s)
 
         function _quipLineBusy(text) {
             const exp = _activeQuipLines.get(text);
             if (exp === undefined) return false;
-            if (_frameTime >= exp) { _activeQuipLines.delete(text); return false; }
+            if (_simTick >= exp) { _activeQuipLines.delete(text); return false; }
             return true;
         }
 
@@ -28996,7 +29022,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         };
 
     </script>
-    <script type="text/dfab" data-src="entities/pedestrians.js" data-cost="650">
+    <script type="text/dfab" data-src="entities/pedestrians.js" data-cost="653">
         /**
          * =====================================================================
          *  PEDESTRIAN CLASS (Roaming City Civilian)
@@ -29257,7 +29283,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // pedestrian goes quiet for a beat before they can speak again.
                 this.quipCooldown = this.quipDuration + 480 + Math.floor(Math.random() * 240);
                 // Reserve the line for its readable lifetime plus a grace beat.
-                _activeQuipLines.set(text, _frameTime + this.quipDuration * (1000 / 60) + QUIP_LINE_GRACE_MS);
+                _activeQuipLines.set(text, _simTick + this.quipDuration + QUIP_LINE_GRACE_TICKS);
             }
 
             /**
@@ -30031,6 +30057,8 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             /**
              * Reset all pedestrians (called on map change)
              */
+            /** Nobody on the pavements: as at a fresh start, the network kept (a replay). */
+            clearStreet() { for (const p of this.pedestrians) if (!p.markedForDestroy) p.destroy(); this.pedestrians = []; this.spawnTimer = 0; this._near = null; this.crossingQueues.clear(); _activeQuipLines.clear(); }
             reset() {
                 for (let p of this.pedestrians) {
                     if (!p.markedForDestroy) p.destroy();
@@ -56127,7 +56155,7 @@ Object.assign(TrafficVehicle.prototype, {
             },
         });
     </script>
-    <script type="text/dfab" data-src="traffic/traffic-manager.js" data-cost="260">
+    <script type="text/dfab" data-src="traffic/traffic-manager.js" data-cost="268">
         /* --- OPTIMIZATION: SPATIAL GRID ---
            Cells are keyed by number (no strings) and their arrays are kept and emptied, not rebuilt;
            getNearby drops repeats with a per-query stamp instead of a Set (same order as before). */
@@ -56228,6 +56256,12 @@ Object.assign(TrafficVehicle.prototype, {
                 for (const ix of this.network.intersections) if (ix.signal && ix.signal.inView(view)) ix.signal.drawGlow(ctx, dark, crosswalks, t);
             }
 
+            /** Nobody on the road: the cars gone, the spawn clock and the lanes-near list as at a fresh start (a replay). */
+            clearStreet() {   // the cars gone and the junctions as they were built (queues, lights: a replay's start)
+                for (const v of this.vehicles) if (!v.markedForDestroy) v.destroy(); this.vehicles = []; this.spawnTimer = 0; this._near = null; this.grid.clear();
+                for (const ix of this.network.intersections || []) { ix.clearAndRecollect(); ix.currentVehicle = ix.occupiedBy = null; ix.clearanceTimer = 0; ix.signal = undefined; }
+                this.sensing.active = false; this.sensing.source = null; this.sensing.cars.clear(true); this.sensing.people.clear(true);
+            }
             reset() { 
                 // Properly destroy all vehicle entities before clearing
                 for (let v of this.vehicles) {
@@ -77965,9 +77999,9 @@ engineMixin({
                 const wet = this._wetHere(), surf = this._surfaces();
                 if (!this.reflectQuality() || !this.view) return;
                 // the fountains and pools stir by themselves
-                if (surf) for (const [x, y, r] of surf.water) if (Math.random() < 0.12 && R.length < 70) {
-                    const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * r * 0.8;
-                    R.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d, t: 0, life: 40, r: 7 + Math.random() * 6 });
+                if (surf) for (const [x, y, r] of surf.water) if (fxRandom() < 0.12 && R.length < 70) {
+                    const a = fxRandom() * Math.PI * 2, d = Math.sqrt(fxRandom()) * r * 0.8;
+                    R.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d, t: 0, life: 40, r: 7 + fxRandom() * 6 });
                 }
                 if (wet < 0.05) return;
                 const v = this.view, z = v.zoom, hw = this.canvas.width / 2 / z + 40, hh = this.canvas.height / 2 / z + 40;
@@ -77989,12 +78023,12 @@ engineMixin({
                 if (!vis.length) return;
                 const W = this.weather, rain = W && W.isRaining ? W.intensity : 0;
                 // raindrops
-                let drops = rain * 2.2 + (Math.random() < (rain * 2.2) % 1 ? 1 : 0);
+                let drops = rain * 2.2 + (fxRandom() < (rain * 2.2) % 1 ? 1 : 0);
                 while (drops-- >= 1 && R.length < 70) {
-                    const [p, k] = vis[(Math.random() * vis.length) | 0], L = p.lobes[(Math.random() * p.lobes.length) | 0];
-                    const g = 0.65 + 0.35 * k, a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * 0.8;
+                    const [p, k] = vis[(fxRandom() * vis.length) | 0], L = p.lobes[(fxRandom() * p.lobes.length) | 0];
+                    const g = 0.65 + 0.35 * k, a = fxRandom() * Math.PI * 2, rr = Math.sqrt(fxRandom()) * 0.8;
                     const lx = L.dx + Math.cos(a) * L.rx * g * rr, ly = L.dy + Math.sin(a) * L.ry * g * rr, c = Math.cos(p.ang), sn = Math.sin(p.ang);
-                    R.push({ x: p.x + lx * c - ly * sn, y: p.y + lx * sn + ly * c, t: 0, life: 26 + (Math.random() * 12 | 0), r: 5 + Math.random() * 4 });
+                    R.push({ x: p.x + lx * c - ly * sn, y: p.y + lx * sn + ly * c, t: 0, life: 26 + (fxRandom() * 12 | 0), r: 5 + fxRandom() * 4 });
                 }
                 // splashes: footsteps every so often, tyres often
                 const inside = (p, k, x, y) => {
@@ -82090,7 +82124,7 @@ engineMixin({
                 if (++U.vizT >= 6) {
                     U.vizT = 0;
                     if (!U.bars || !U.bars.length) U.bars = document.querySelectorAll('#audio-viz .viz-bar');
-                    U.bars.forEach(bar => bar.style.height = `${20 + Math.random() * 80}%`);
+                    U.bars.forEach(bar => bar.style.height = `${20 + fxRandom() * 80}%`);
                 }
             },
             

@@ -775,18 +775,19 @@
         // any one citizen from spamming, and the trigger chances are tuned so
         // the chorus feels alive but never overwhelming on a crowded street.
         // Categories are checked in priority order: danger > seesWeapon > roaming.
-        /* Lines currently in the air, text -> expiry timestamp (ms).
+        /* Lines currently in the air, text -> the sim tick it expires on (game time, so a replay hears the same
+           lines: real time would make who speaks depend on the frame rate).
            Time-based rather than a reference count on purpose: quip lifetime only
            ticks inside NPC.draw(), so a pedestrian who wanders off-screen mid-line
            never clears their own bubble. A refcount would leak that line forever;
            an expiry stamp always releases itself. */
         const _activeQuipLines = new Map();
-        const QUIP_LINE_GRACE_MS = 1500;   // quiet beat before a line may repeat
+        const QUIP_LINE_GRACE_TICKS = 90;   // quiet beat before a line may repeat (1.5 s)
 
         function _quipLineBusy(text) {
             const exp = _activeQuipLines.get(text);
             if (exp === undefined) return false;
-            if (_frameTime >= exp) { _activeQuipLines.delete(text); return false; }
+            if (_simTick >= exp) { _activeQuipLines.delete(text); return false; }
             return true;
         }
 

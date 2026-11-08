@@ -258,7 +258,7 @@
                 // pedestrian goes quiet for a beat before they can speak again.
                 this.quipCooldown = this.quipDuration + 480 + Math.floor(Math.random() * 240);
                 // Reserve the line for its readable lifetime plus a grace beat.
-                _activeQuipLines.set(text, _frameTime + this.quipDuration * (1000 / 60) + QUIP_LINE_GRACE_MS);
+                _activeQuipLines.set(text, _simTick + this.quipDuration + QUIP_LINE_GRACE_TICKS);
             }
 
             /**
@@ -1032,6 +1032,8 @@
             /**
              * Reset all pedestrians (called on map change)
              */
+            /** Nobody on the pavements: as at a fresh start, the network kept (a replay). */
+            clearStreet() { for (const p of this.pedestrians) if (!p.markedForDestroy) p.destroy(); this.pedestrians = []; this.spawnTimer = 0; this._near = null; this.crossingQueues.clear(); _activeQuipLines.clear(); }
             reset() {
                 for (let p of this.pedestrians) {
                     if (!p.markedForDestroy) p.destroy();

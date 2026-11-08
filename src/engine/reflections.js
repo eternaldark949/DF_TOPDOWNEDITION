@@ -1140,9 +1140,9 @@
                 const wet = this._wetHere(), surf = this._surfaces();
                 if (!this.reflectQuality() || !this.view) return;
                 // the fountains and pools stir by themselves
-                if (surf) for (const [x, y, r] of surf.water) if (Math.random() < 0.12 && R.length < 70) {
-                    const a = Math.random() * Math.PI * 2, d = Math.sqrt(Math.random()) * r * 0.8;
-                    R.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d, t: 0, life: 40, r: 7 + Math.random() * 6 });
+                if (surf) for (const [x, y, r] of surf.water) if (fxRandom() < 0.12 && R.length < 70) {
+                    const a = fxRandom() * Math.PI * 2, d = Math.sqrt(fxRandom()) * r * 0.8;
+                    R.push({ x: x + Math.cos(a) * d, y: y + Math.sin(a) * d, t: 0, life: 40, r: 7 + fxRandom() * 6 });
                 }
                 if (wet < 0.05) return;
                 const v = this.view, z = v.zoom, hw = this.canvas.width / 2 / z + 40, hh = this.canvas.height / 2 / z + 40;
@@ -1164,12 +1164,12 @@
                 if (!vis.length) return;
                 const W = this.weather, rain = W && W.isRaining ? W.intensity : 0;
                 // raindrops
-                let drops = rain * 2.2 + (Math.random() < (rain * 2.2) % 1 ? 1 : 0);
+                let drops = rain * 2.2 + (fxRandom() < (rain * 2.2) % 1 ? 1 : 0);
                 while (drops-- >= 1 && R.length < 70) {
-                    const [p, k] = vis[(Math.random() * vis.length) | 0], L = p.lobes[(Math.random() * p.lobes.length) | 0];
-                    const g = 0.65 + 0.35 * k, a = Math.random() * Math.PI * 2, rr = Math.sqrt(Math.random()) * 0.8;
+                    const [p, k] = vis[(fxRandom() * vis.length) | 0], L = p.lobes[(fxRandom() * p.lobes.length) | 0];
+                    const g = 0.65 + 0.35 * k, a = fxRandom() * Math.PI * 2, rr = Math.sqrt(fxRandom()) * 0.8;
                     const lx = L.dx + Math.cos(a) * L.rx * g * rr, ly = L.dy + Math.sin(a) * L.ry * g * rr, c = Math.cos(p.ang), sn = Math.sin(p.ang);
-                    R.push({ x: p.x + lx * c - ly * sn, y: p.y + lx * sn + ly * c, t: 0, life: 26 + (Math.random() * 12 | 0), r: 5 + Math.random() * 4 });
+                    R.push({ x: p.x + lx * c - ly * sn, y: p.y + lx * sn + ly * c, t: 0, life: 26 + (fxRandom() * 12 | 0), r: 5 + fxRandom() * 4 });
                 }
                 // splashes: footsteps every so often, tyres often
                 const inside = (p, k, x, y) => {

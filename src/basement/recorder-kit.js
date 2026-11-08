@@ -10,8 +10,10 @@
         //             (a touch stick's dx/dy, the mouse's aim): get() -> a packet, set(packet)
         //   objects   () -> [[id, x, y, angle], ...]   things that may be recorded
         //   centre    () -> [x, y]                     the middle of the recorded circle
+        //   world     [get, set]   the world's start: what a run reads besides the dice (its clocks, id counters, the
+        //             camera, a street to empty): got before the setup, set again before the playback's setup
         //
-        // RECORDING: { frames: [FRAME...], actions: [ACTION...], step, seed }   plain data (JSON)
+        // RECORDING: { frames: [FRAME...], actions: [ACTION...], step, seed, world }   plain data (JSON)
         //   seed     the dice: while recording or playing, Math.random is reseeded from it at the start of every
         //            tick and before every action, so whatever the drawing used in between (it draws a different
         //            number of frames each time) can't change what the world does: a playback is the same run
@@ -29,8 +31,8 @@
         //   recording, playing, frame (the frame index now)
         //   createFrame() / prepareFrameData() / recordFrame(): one tick's frame, its objects, kept
         class gRecorder {
-            constructor(controls, { sources = {}, objects = () => [], centre = () => [0, 0], recording_radius = 600 } = {}) {
-                Object.assign(this, { controls, sources, objects, centre, recording_radius, recording: false, playing: false, frame: 0, data: null, timer: null, on_end: null });
+            constructor(controls, { sources = {}, objects = () => [], centre = () => [0, 0], recording_radius = 600, world = null } = {}) {
+                Object.assign(this, { controls, sources, objects, centre, recording_radius, world, recording: false, playing: false, frame: 0, data: null, timer: null, on_end: null });
                 controls.on_fire.push((action, type, ev) => { if (this.recording && ev.device !== 'replay') this.data.actions.push([this.frame - 1, action, type, ev.device, ev.input, !!ev.shift]); });
                 controls.before_fire.push(() => { if (this.recording || this.playing) this.reseed(this.frame - 1, 1 + this._fired++); });
                 game_timers.before.push(() => { if (this.recording || this.playing) { this.reseed(this.frame, 0); this._fired = 0; } });
@@ -52,7 +54,8 @@
              *  starts from whatever world is there, and only her own part is sure to repeat. */
             startRecording(setup = null) {
                 this.stopPlayback();
-                this.data = { frames: [], actions: [], step: game_timers.step, seed: (this.real_random() * 4294967296) >>> 0 };
+                this.data = { frames: [], actions: [], step: game_timers.step, seed: (this.real_random() * 4294967296) >>> 0, world: this.world ? this.world[0]() : null };
+                if (this.world) this.world[1](this.data.world);   // the same way the playback will start: the street emptied, the clocks set
                 this._setup(setup);
                 this.recording = true; this.frame = 0;
                 this.recordFrame();
@@ -76,6 +79,7 @@
             startPlayback(recording, on_end = null, setup = null) {
                 this.stopRecording(); this.stopPlayback();
                 Object.assign(this, { data: recording, frame: 0, on_end });
+                if (this.world && recording.world) this.world[1](recording.world);
                 this._setup(setup);
                 this.playing = true;
                 this.controls.clear(); this.controls.muted = true;
