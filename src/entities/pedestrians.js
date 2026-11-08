@@ -453,6 +453,11 @@
              *
              * No HP damage. The world refuses to enact what it shows.
              */
+            /** A car (CollisionSystem's people-vs-cars pass has put them just outside it): fast enough, they go down */
+            hitByCar(car, contact, speed) {
+                if (speed > 1.5 && this.state !== 'sprawled' && this.state !== 'recovering') this._handleVehicleImpact(car);
+            }
+
             _handleVehicleImpact(car) {
                 if (this.invincibleTimer > 0) return; // brief grace after a bump
                 

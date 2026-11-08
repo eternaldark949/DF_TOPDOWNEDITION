@@ -208,6 +208,10 @@
                 }
                 // Actors that move by position (the player) have no vx/vy: their contact velocity is this tick's step
                 for (const e of onScreen) {
+                    if (e.collisionLayer === GameEntity.LAYER.VEHICLE) {   // where each car was last tick (people vs cars sweeps its path)
+                        e._kpx = e._kpt === _simTick - 1 ? e._kx : e.x; e._kpy = e._kpt === _simTick - 1 ? e._ky : e.y;
+                        e._kx = e.x; e._ky = e.y; e._kpt = _simTick;
+                    }
                     if (e.collisionLayer !== GameEntity.LAYER.ACTOR) continue;
                     e._cvx = e._cpx === undefined ? 0 : e.x - e._cpx; e._cvy = e._cpy === undefined ? 0 : e.y - e._cpy;
                     e._cpx = e.x; e._cpy = e.y;
@@ -235,6 +239,7 @@
                 this._processProjectiles(onScreen, game, L.projectile);
                 this._processVehicles(onScreen, game, L.vehicle);
                 this._processActors(onScreen, game, L.actor);
+                this._processPeopleVsCars(game, L.vehicle);
                 this._processDynamics(onScreen, game, L.dynamic);
                 
                 // 5. Cleanup destroyed entities
@@ -584,6 +589,34 @@
                 }
             }
             
+            /**
+             * People vs cars: every moving car against everyone on foot near it, every tick, against the car's real box
+             * and along its path this tick (basement/collision-kit.js), so nobody stands inside a car and a fast one
+             * can't pass through a small body. They're put just outside it; what else happens is theirs: `hitByCar(car,
+             * contact, speed)` (a passer-by sprawls, a ganger is hurt, the cat leaps clear). Stella and her crew are
+             * engine/update.js resolveTrafficCollisions (they shove back, and get hurt there). A parked car pushes no one.
+             */
+            static _processPeopleVsCars(game, cars) {
+                const crew = game && game.teammates ? game.teammates : [], her = game && game.player;
+                for (const car of cars) {
+                    if (!car.active || car.dead || (car.fade !== undefined && car.fade < 0.5)) continue;
+                    const moved = car.x !== car._kpx || car.y !== car._kpy;
+                    if (!moved && !(Math.abs(car.speed || 0) > 0.05)) continue;
+                    const o = car.getOBB ? car.getOBB() : car, box = { x: o.x, y: o.y, angle: o.angle || 0, length: o.length, width: o.width, px: car._kpx, py: car._kpy };
+                    const near = this.spatialGrid.getNearby(car);
+                    for (const p of near) {
+                        if (p.collisionLayer !== GameEntity.LAYER.ACTOR || !p.active || p.dead || p.inCar || p === her || crew.includes(p)) continue;
+                        if (game && game.isDriving && p === game.player) continue;
+                        this.stats.totalChecks++;
+                        const c = collisionKit.circleVsMovingBox({ x: p.x, y: p.y, radius: p.radius || 10, px: p.x - (p._cvx || 0), py: p.y - (p._cvy || 0) }, box);
+                        if (!c) continue;
+                        p.x = c.x; p.y = c.y;
+                        if (p.hitByCar) p.hitByCar(car, c, Math.abs(car.speed || 0));
+                        this.stats.collisionsResolved++;
+                    }
+                }
+            }
+
             static _processDynamics(onScreen, game, candidates = null) {
                 const dynamics = candidates ? this._activeLayer(candidates) : onScreen.filter(e =>
                     e.collisionLayer === GameEntity.LAYER.DYNAMIC && e.active

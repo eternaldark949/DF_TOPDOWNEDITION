@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'e2a59c4dbee3';
+        const DFAB_BUILD = '965d1758250b';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -7879,6 +7879,50 @@
                 const obbB = b.getOBB ? b.getOBB() : shapeKit.entityToObb(b);
                 return shapeKit.sat(obbA, obbB) !== null;
             }
+        };
+    </script>
+    <script type="text/dfab" data-src="basement/collision-kit.js" data-cost="35">
+        // ===== LV0 BASEMENT =====
+        // The collision kit: the parts of a collision step that know nothing about any game. The shape tests are the
+        // shape kit's (basement/shape-kit.js), the broad phase the spatial grid's (basement/spatial-grid.js).
+        //
+        // BODY      a circle: { x, y, radius }, and where it was last tick (px, py; default: where it is)
+        // BOX       a moving box: { x, y, angle, length (along angle), width }, and where it was last tick (px, py)
+        // CONTACT   { nx, ny, depth, x, y, swept }   the way out (unit normal, world), how far in, where the body goes
+        //           (just outside the box), and whether it was found only along the tick's path (the box went through it)
+        //
+        // collisionKit.circleVsMovingBox(body, box) -> CONTACT | null
+        //   touching now, or crossed this tick (a fast box passing a small body between two ticks: the sweep, in the
+        //   box's frame, of the body's path against the box's rounded outline), so nothing slips through a car
+        const collisionKit = {
+            circleVsMovingBox(c, b) {
+                const r = c.radius || 0, hl = (b.length || 0) / 2, hw = (b.width || 0) / 2, a = b.angle || 0;
+                const cos = Math.cos(-a), sin = Math.sin(-a), cb = Math.cos(a), sb = Math.sin(a);
+                const local = (x, y, ox, oy) => { const dx = x - ox, dy = y - oy; return [dx * cos - dy * sin, dx * sin + dy * cos]; };
+                const world = (lx, ly) => [b.x + lx * cb - ly * sb, b.y + lx * sb + ly * cb];
+                const [lx, ly] = local(c.x, c.y, b.x, b.y);
+                // touching now: out along the nearest way (the closest point, or the nearest side when the centre is inside)
+                const ex = lx - Math.max(-hl, Math.min(hl, lx)), ey = ly - Math.max(-hw, Math.min(hw, ly)), d2 = ex * ex + ey * ey;
+                if (d2 < r * r) {
+                    let nlx, nly, tx, ty;
+                    if (d2 > 0) { const d = Math.sqrt(d2); nlx = ex / d; nly = ey / d; tx = lx + nlx * (r - d); ty = ly + nly * (r - d); }
+                    else if (hl - Math.abs(lx) < hw - Math.abs(ly)) { nlx = Math.sign(lx) || 1; nly = 0; tx = nlx * (hl + r); ty = ly; }
+                    else { nlx = 0; nly = Math.sign(ly) || 1; tx = lx; ty = nly * (hw + r); }
+                    const [x, y] = world(tx, ty);
+                    return { nx: nlx * cb - nly * sb, ny: nlx * sb + nly * cb, depth: Math.hypot(tx - lx, ty - ly), x, y, swept: false };
+                }
+                // crossed this tick: the body's path in the box's frame (from where each of them was)
+                const [ax, ay] = local(c.px ?? c.x, c.py ?? c.y, b.px ?? b.x, b.py ?? b.y);
+                if (ax === lx && ay === ly) return null;
+                const t = shapeKit.sweepRoundedBox(ax, ay, lx, ly, hl, hw, r);
+                if (t === null) return null;
+                // thrown clear to the side it was met from (where it stood, across the box's path)
+                const side = Math.abs(ay) - hw >= Math.abs(ax) - hl;
+                const nlx = side ? 0 : (Math.sign(ax) || 1), nly = side ? (Math.sign(ay) || 1) : 0;
+                const tx = side ? Math.max(-hl, Math.min(hl, lx)) : nlx * (hl + r), ty = side ? nly * (hw + r) : Math.max(-hw, Math.min(hw, ly));
+                const [x, y] = world(tx, ty);
+                return { nx: nlx * cb - nly * sb, ny: nlx * sb + nly * cb, depth: Math.hypot(tx - lx, ty - ly), x, y, swept: true };
+            },
         };
     </script>
     <script type="text/dfab" data-src="basement/spatial-grid.js" data-cost="216">
@@ -19232,7 +19276,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
     </script>
-    <script type="text/dfab" data-src="directory/collision-system.js" data-cost="485">
+    <script type="text/dfab" data-src="directory/collision-system.js" data-cost="510">
         // ===== LV2 DIRECTORY =====
         // The game's collision system: who collides with whom each step (projectiles, vehicles, actors,
         // pushable props) and how this game resolves it (knockback, companions yielding, prop pushes).
@@ -19443,6 +19487,10 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 // Actors that move by position (the player) have no vx/vy: their contact velocity is this tick's step
                 for (const e of onScreen) {
+                    if (e.collisionLayer === GameEntity.LAYER.VEHICLE) {   // where each car was last tick (people vs cars sweeps its path)
+                        e._kpx = e._kpt === _simTick - 1 ? e._kx : e.x; e._kpy = e._kpt === _simTick - 1 ? e._ky : e.y;
+                        e._kx = e.x; e._ky = e.y; e._kpt = _simTick;
+                    }
                     if (e.collisionLayer !== GameEntity.LAYER.ACTOR) continue;
                     e._cvx = e._cpx === undefined ? 0 : e.x - e._cpx; e._cvy = e._cpy === undefined ? 0 : e.y - e._cpy;
                     e._cpx = e.x; e._cpy = e.y;
@@ -19470,6 +19518,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 this._processProjectiles(onScreen, game, L.projectile);
                 this._processVehicles(onScreen, game, L.vehicle);
                 this._processActors(onScreen, game, L.actor);
+                this._processPeopleVsCars(game, L.vehicle);
                 this._processDynamics(onScreen, game, L.dynamic);
                 
                 // 5. Cleanup destroyed entities
@@ -19819,6 +19868,34 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
             }
             
+            /**
+             * People vs cars: every moving car against everyone on foot near it, every tick, against the car's real box
+             * and along its path this tick (basement/collision-kit.js), so nobody stands inside a car and a fast one
+             * can't pass through a small body. They're put just outside it; what else happens is theirs: `hitByCar(car,
+             * contact, speed)` (a passer-by sprawls, a ganger is hurt, the cat leaps clear). Stella and her crew are
+             * engine/update.js resolveTrafficCollisions (they shove back, and get hurt there). A parked car pushes no one.
+             */
+            static _processPeopleVsCars(game, cars) {
+                const crew = game && game.teammates ? game.teammates : [], her = game && game.player;
+                for (const car of cars) {
+                    if (!car.active || car.dead || (car.fade !== undefined && car.fade < 0.5)) continue;
+                    const moved = car.x !== car._kpx || car.y !== car._kpy;
+                    if (!moved && !(Math.abs(car.speed || 0) > 0.05)) continue;
+                    const o = car.getOBB ? car.getOBB() : car, box = { x: o.x, y: o.y, angle: o.angle || 0, length: o.length, width: o.width, px: car._kpx, py: car._kpy };
+                    const near = this.spatialGrid.getNearby(car);
+                    for (const p of near) {
+                        if (p.collisionLayer !== GameEntity.LAYER.ACTOR || !p.active || p.dead || p.inCar || p === her || crew.includes(p)) continue;
+                        if (game && game.isDriving && p === game.player) continue;
+                        this.stats.totalChecks++;
+                        const c = collisionKit.circleVsMovingBox({ x: p.x, y: p.y, radius: p.radius || 10, px: p.x - (p._cvx || 0), py: p.y - (p._cvy || 0) }, box);
+                        if (!c) continue;
+                        p.x = c.x; p.y = c.y;
+                        if (p.hitByCar) p.hitByCar(car, c, Math.abs(car.speed || 0));
+                        this.stats.collisionsResolved++;
+                    }
+                }
+            }
+
             static _processDynamics(onScreen, game, candidates = null) {
                 const dynamics = candidates ? this._activeLayer(candidates) : onScreen.filter(e =>
                     e.collisionLayer === GameEntity.LAYER.DYNAMIC && e.active
@@ -29141,7 +29218,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
         };
 
     </script>
-    <script type="text/dfab" data-src="entities/pedestrians.js" data-cost="673">
+    <script type="text/dfab" data-src="entities/pedestrians.js" data-cost="676">
         /**
          * =====================================================================
          *  PEDESTRIAN CLASS (Roaming City Civilian)
@@ -29597,6 +29674,11 @@ Exercise extreme caution. The Empereal Lord is watching.`,
              *
              * No HP damage. The world refuses to enact what it shows.
              */
+            /** A car (CollisionSystem's people-vs-cars pass has put them just outside it): fast enough, they go down */
+            hitByCar(car, contact, speed) {
+                if (speed > 1.5 && this.state !== 'sprawled' && this.state !== 'recovering') this._handleVehicleImpact(car);
+            }
+
             _handleVehicleImpact(car) {
                 if (this.invincibleTimer > 0) return; // brief grace after a bump
                 
@@ -31273,7 +31355,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
             }
         }
     </script>
-    <script type="text/dfab" data-src="entities/enemies.js" data-cost="1648">
+    <script type="text/dfab" data-src="entities/enemies.js" data-cost="1657">
         /**
          * =====================================================================
          *  VELVET CAT — Dreampunk Feline Companion
@@ -31484,10 +31566,24 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 return this.state === 'idle' ? this.idleBehavior : null;
             }
 
+            /** A car (CollisionSystem's people-vs-cars pass has put her just outside it): she leaps clear of it */
+            hitByCar(car, contact, speed) {
+                if (speed < 0.5) return;
+                const f = Math.min(9, 3 + speed * 0.6);
+                this._leap = { vx: contact.nx * f, vy: contact.ny * f, t: 10 };
+                this.state = 'following'; this.idleBehavior = null; this.idleTimer = 0;
+            }
+
             update(player, dt = 1, map = null, adopted = true) {
                 if (!this.visible || this.inCar) return;
                 dt = Number.isFinite(dt) ? Math.max(0, Math.min(3, dt)) : 1;
                 if (!dt) return;
+                if (this._leap && this._leap.t > 0) {   // mid-leap (hitByCar): carried clear, then back to herself
+                    const L = this._leap, nav = map ? NavGrid.for(map) : null, nx = this.x + L.vx * dt, ny = this.y + L.vy * dt;
+                    if (!nav || nav.walkable(nx, ny)) { this.x = nx; this.y = ny; }
+                    L.vx *= 0.8; L.vy *= 0.8; L.t -= dt; this.angle = Math.atan2(L.vy, L.vx); this.walkPhase += 0.6 * dt;
+                    return;
+                }
                 const nav = map ? NavGrid.for(map) : null;
                 const dist = Math.hypot(player.x - this.x, player.y - this.y);
                 const prevAngle = this.angle;
@@ -33167,16 +33263,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 if (trafficCars) {
                     for (let car of trafficCars) {
                         const dist = Math.hypot(this.x - car.x, this.y - car.y);
-                        if (dist < 40) { 
-                            if (Math.abs(car.speed) > 2.0) {
-                                const damage = Math.abs(car.speed) * 10;
-                                const pushAngle = Math.atan2(this.y - car.y, this.x - car.x);
-                                const force = Math.abs(car.speed) * 3;
-                                this.takeDamage(damage, Math.cos(pushAngle) * force, Math.sin(pushAngle) * force);
-                                showMessage("GANGER HIT BY VEHICLE!");
-                                hitObstacle = false; 
-                            } else { hitObstacle = true; }
-                        }
+                        if (dist < 40 && Math.abs(car.speed) <= 2.0) hitObstacle = true;   // a fast one hits him (hitByCar)
                     }
                 }
                 if (hitObstacle) {
@@ -33185,6 +33272,15 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
             }
             
+            /** A car (CollisionSystem's people-vs-cars pass has put him just outside it): a fast one hurts, once a hit */
+            hitByCar(car, contact, speed) {
+                if (speed <= 2.0 || _simTick - (this._carHitAt ?? -1e9) < 20) return;
+                this._carHitAt = _simTick;
+                const force = speed * 3;
+                this.takeDamage(speed * 10, contact.nx * force, contact.ny * force);
+                showMessage("GANGER HIT BY VEHICLE!");
+            }
+
             /**
              * A sound (engine/noise.js): unless already fighting her, turn toward roughly where it
              * came from (`err` px off) and go to look. `strength` 0…1 — louder or closer is

@@ -208,10 +208,24 @@
                 return this.state === 'idle' ? this.idleBehavior : null;
             }
 
+            /** A car (CollisionSystem's people-vs-cars pass has put her just outside it): she leaps clear of it */
+            hitByCar(car, contact, speed) {
+                if (speed < 0.5) return;
+                const f = Math.min(9, 3 + speed * 0.6);
+                this._leap = { vx: contact.nx * f, vy: contact.ny * f, t: 10 };
+                this.state = 'following'; this.idleBehavior = null; this.idleTimer = 0;
+            }
+
             update(player, dt = 1, map = null, adopted = true) {
                 if (!this.visible || this.inCar) return;
                 dt = Number.isFinite(dt) ? Math.max(0, Math.min(3, dt)) : 1;
                 if (!dt) return;
+                if (this._leap && this._leap.t > 0) {   // mid-leap (hitByCar): carried clear, then back to herself
+                    const L = this._leap, nav = map ? NavGrid.for(map) : null, nx = this.x + L.vx * dt, ny = this.y + L.vy * dt;
+                    if (!nav || nav.walkable(nx, ny)) { this.x = nx; this.y = ny; }
+                    L.vx *= 0.8; L.vy *= 0.8; L.t -= dt; this.angle = Math.atan2(L.vy, L.vx); this.walkPhase += 0.6 * dt;
+                    return;
+                }
                 const nav = map ? NavGrid.for(map) : null;
                 const dist = Math.hypot(player.x - this.x, player.y - this.y);
                 const prevAngle = this.angle;
@@ -1891,16 +1905,7 @@
                 if (trafficCars) {
                     for (let car of trafficCars) {
                         const dist = Math.hypot(this.x - car.x, this.y - car.y);
-                        if (dist < 40) { 
-                            if (Math.abs(car.speed) > 2.0) {
-                                const damage = Math.abs(car.speed) * 10;
-                                const pushAngle = Math.atan2(this.y - car.y, this.x - car.x);
-                                const force = Math.abs(car.speed) * 3;
-                                this.takeDamage(damage, Math.cos(pushAngle) * force, Math.sin(pushAngle) * force);
-                                showMessage("GANGER HIT BY VEHICLE!");
-                                hitObstacle = false; 
-                            } else { hitObstacle = true; }
-                        }
+                        if (dist < 40 && Math.abs(car.speed) <= 2.0) hitObstacle = true;   // a fast one hits him (hitByCar)
                     }
                 }
                 if (hitObstacle) {
@@ -1909,6 +1914,15 @@
                 }
             }
             
+            /** A car (CollisionSystem's people-vs-cars pass has put him just outside it): a fast one hurts, once a hit */
+            hitByCar(car, contact, speed) {
+                if (speed <= 2.0 || _simTick - (this._carHitAt ?? -1e9) < 20) return;
+                this._carHitAt = _simTick;
+                const force = speed * 3;
+                this.takeDamage(speed * 10, contact.nx * force, contact.ny * force);
+                showMessage("GANGER HIT BY VEHICLE!");
+            }
+
             /**
              * A sound (engine/noise.js): unless already fighting her, turn toward roughly where it
              * came from (`err` px off) and go to look. `strength` 0…1 — louder or closer is
