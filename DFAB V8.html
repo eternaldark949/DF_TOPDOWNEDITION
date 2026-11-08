@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '6da1010a31c6';
+        const DFAB_BUILD = '63625ceadd79';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="27">
         // ===== LV0 BASEMENT =====
@@ -5842,7 +5842,7 @@
         }
         const frame_clock = new frameClock();
     </script>
-    <script type="text/dfab" data-src="basement/timer-kit.js" data-cost="44">
+    <script type="text/dfab" data-src="basement/timer-kit.js" data-cost="45">
         // ===== LV0 BASEMENT =====
         // The game's timers: anything that should happen "in N seconds" of GAME time. They run on the frame
         // clock's sim ticks (frame_clock.advanceTick moves them), so they stop while the game is paused, follow
@@ -5893,7 +5893,7 @@
         }
 
         class timerSystem {
-            constructor() { this.timers = new Set(); this.step = 1 / 60; }
+            constructor() { this.timers = new Set(); this.step = 1 / 60; this.before = []; }   // before: run at the start of every tick, ahead of the timers
             add(t) { this.timers.add(t); }
             remove(t) { this.timers.delete(t); }
             after(seconds, fn, tag = null) { return new gTimer([seconds], { on_end: fn, tag }).startTimer(); }
@@ -5901,7 +5901,7 @@
             /** Stop every timer with this tag (or, with none, every timer but the standing ones, `keep`: a new game). */
             cancel(tag = undefined) { for (const t of [...this.timers]) if (tag === undefined ? !t.keep : t.tag === tag) { t.running = false; this.timers.delete(t); } }
             /** One sim tick (frame_clock.advanceTick). */
-            tick() { for (const t of [...this.timers]) { try { t.updateState(this.step); } catch (e) { console.error(e); } } }
+            tick() { for (const fn of this.before) fn(); for (const t of [...this.timers]) { try { t.updateState(this.step); } catch (e) { console.error(e); } } }
         }
         const game_timers = new timerSystem();
     </script>
@@ -6555,7 +6555,7 @@
             }
         }
     </script>
-    <script type="text/dfab" data-src="basement/controls-system.js" data-cost="296">
+    <script type="text/dfab" data-src="basement/controls-system.js" data-cost="298">
         // ===== LV0 BASEMENT =====
         // The controls system: every key, mouse button and gamepad button goes through one place. It knows
         // nothing about any game: the game hands it a keymap (action -> the inputs bound to it) and an
@@ -6837,6 +6837,7 @@
                 this.pending = [];          // taps waiting to see if a second press comes: [input, action, ev]
                 this.hooks = [];            // run each frame after the pad is read: fn(system, now)
                 this.on_fire = [];          // told of every fired action: fn(action, type, ev)
+                this.before_fire = [];      // told just before an action runs (a recorder reseeding the dice)
                 this.muted = false;         // true: devices are not heard (a playback), except the inputs in unmuted
                 this.unmuted = ['Escape'];
                 for (const [name, when, run] of actions) this.actions[name] = [when, run];
@@ -6895,6 +6896,7 @@
             fire(action, type, ev) {
                 if (!this.can(action, ev)) return false;
                 ev.type = type;
+                for (const fn of this.before_fire) fn(action, type, ev);
                 this.queue.push([action, type, ev.time]);
                 this.actions[action][1]?.(this.context(), ev);
                 for (const fn of this.on_fire) fn(action, type, ev);   // a recorder listening (basement/recorder-kit.js)
@@ -6950,7 +6952,7 @@
             frame() { requestAnimationFrame(this.frame); this.update(); }
         }
     </script>
-    <script type="text/dfab" data-src="basement/recorder-kit.js" data-cost="56">
+    <script type="text/dfab" data-src="basement/recorder-kit.js" data-cost="79">
         // ===== LV0 BASEMENT =====
         // The recorder: what the player did, tick by tick, so it can be played back through the controls
         // system as if they were doing it again (a replay test, a demo, a bug to watch happen twice). It also
@@ -6964,7 +6966,10 @@
         //   objects   () -> [[id, x, y, angle], ...]   things that may be recorded
         //   centre    () -> [x, y]                     the middle of the recorded circle
         //
-        // RECORDING: { frames: [FRAME...], actions: [ACTION...], step }   plain data (JSON)
+        // RECORDING: { frames: [FRAME...], actions: [ACTION...], step, seed }   plain data (JSON)
+        //   seed     the dice: while recording or playing, Math.random is reseeded from it at the start of every
+        //            tick and before every action, so whatever the drawing used in between (it draws a different
+        //            number of frames each time) can't change what the world does: a playback is the same run
         //   FRAME    [held, sources, objects]
         //            held     { keyboard: [...], touch: [...], gamepad: [...] }   the inputs held that tick
         //            sources  { name: packet }
@@ -6972,27 +6977,43 @@
         //   ACTION   [frame, action, type, device, input, shift]   an action fired after that frame
         //
         // gRecorder(controls, { sources, objects, centre, recording_radius })
-        //   startRecording(), stopRecording() -> RECORDING
-        //   startPlayback(recording, on_end), stopPlayback()   while playing, the devices are muted (Escape still works)
+        //   startRecording(setup), stopRecording() -> RECORDING
+        //   startPlayback(recording, on_end, setup), stopPlayback()   while playing, the devices are muted (Escape still works)
+        //   setup     optional: what puts the world where it starts (a map load), run on the recording's dice; give the
+        //             same one to the playback and it starts from the same world (pedestrians and all)
         //   recording, playing, frame (the frame index now)
         //   createFrame() / prepareFrameData() / recordFrame(): one tick's frame, its objects, kept
         class gRecorder {
             constructor(controls, { sources = {}, objects = () => [], centre = () => [0, 0], recording_radius = 600 } = {}) {
                 Object.assign(this, { controls, sources, objects, centre, recording_radius, recording: false, playing: false, frame: 0, data: null, timer: null, on_end: null });
                 controls.on_fire.push((action, type, ev) => { if (this.recording && ev.device !== 'replay') this.data.actions.push([this.frame - 1, action, type, ev.device, ev.input, !!ev.shift]); });
+                controls.before_fire.push(() => { if (this.recording || this.playing) this.reseed(this.frame - 1, 1 + this._fired++); });
+                game_timers.before.push(() => { if (this.recording || this.playing) { this.reseed(this.frame, 0); this._fired = 0; } });
+                this.real_random = Math.random; this._fired = 0;
             }
+            /** The dice for (frame, n): the same numbers every time this run reaches that point. */
+            reseed(frame, n) {
+                let a = (this.data.seed ^ Math.imul(frame + 1, 0x9E3779B1) ^ Math.imul(n + 1, 0x85EBCA6B)) >>> 0;
+                Math.random = () => { a = (a + 0x6D2B79F5) >>> 0; let t = Math.imul(a ^ (a >>> 15), a | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };   // mulberry32
+            }
+            _dice(on) { if (!on) Math.random = this.real_random; }
+            _setup(setup) { if (!setup) return; this.reseed(-1, 0); try { setup(); } finally { this._dice(false); } }
             /** Each sim tick (game_timers: the recorder runs in game time, so a pause is not recorded). */
             _everyTick(fn) { this.timer?.stopTimer(); this.timer = game_timers.every(game_timers.step, fn, 'recorder'); this.timer.keep = true; }
 
             // ── Recording ──────────────────────────────────────────────────────
-            startRecording() {
+            /** setup(): what puts the world where it starts (a map load); it runs on the recording's own dice, so a
+             *  playback that runs it again starts from the same world, pedestrians and all. Without one, a playback
+             *  starts from whatever world is there, and only her own part is sure to repeat. */
+            startRecording(setup = null) {
                 this.stopPlayback();
-                this.data = { frames: [], actions: [], step: game_timers.step };
+                this.data = { frames: [], actions: [], step: game_timers.step, seed: (this.real_random() * 4294967296) >>> 0 };
+                this._setup(setup);
                 this.recording = true; this.frame = 0;
                 this.recordFrame();
                 this._everyTick(() => this.recordFrame());
             }
-            stopRecording() { this.recording = false; this.timer?.stopTimer(); return this.data; }
+            stopRecording() { if (this.recording) this._dice(false); this.recording = false; this.timer?.stopTimer(); return this.data; }
             createFrame() {
                 const C = this.controls, held = {};
                 for (const d of ['keyboard', 'touch', 'gamepad']) held[d] = C[d].getActiveInputs();
@@ -7007,9 +7028,11 @@
             recordFrame() { this.data.frames.push(this.createFrame()); this.frame++; }
 
             // ── Playback ───────────────────────────────────────────────────────
-            startPlayback(recording, on_end = null) {
+            startPlayback(recording, on_end = null, setup = null) {
                 this.stopRecording(); this.stopPlayback();
-                Object.assign(this, { data: recording, playing: true, frame: 0, on_end });
+                Object.assign(this, { data: recording, frame: 0, on_end });
+                this._setup(setup);
+                this.playing = true;
                 this.controls.clear(); this.controls.muted = true;
                 this.playFrame();
                 this._everyTick(() => this.playFrame());
@@ -7020,6 +7043,7 @@
                 for (const [f, action, type, device, input, shift] of d.actions) if (f === this.frame - 1)
                     C.fire(action, type, { device: 'replay', from: device, input, type, shift, time: controlsSystem.now(), repeat: false, typing: false, ctrl: false, preventDefault() {}, stop() {} });
                 if (this.frame >= d.frames.length) return this.stopPlayback(true);
+                this.reseed(this.frame, 0);   // the tick's own dice again, after those actions (they ran between ticks when recorded)
                 const [held, src] = d.frames[this.frame];
                 for (const dv of ['keyboard', 'touch', 'gamepad']) C[dv].setInputs(held[dv] || []);
                 for (const k in src) this.sources[k]?.[1](src[k]);
@@ -7027,7 +7051,7 @@
             }
             stopPlayback(ended = false) {
                 if (!this.playing) return;
-                this.playing = false; this.timer?.stopTimer();
+                this.playing = false; this.timer?.stopTimer(); this._dice(false);
                 const C = this.controls;
                 for (const dv of ['keyboard', 'touch', 'gamepad']) C[dv].setInputs([]);
                 C.muted = false;

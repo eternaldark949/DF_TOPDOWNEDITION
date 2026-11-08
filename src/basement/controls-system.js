@@ -279,6 +279,7 @@
                 this.pending = [];          // taps waiting to see if a second press comes: [input, action, ev]
                 this.hooks = [];            // run each frame after the pad is read: fn(system, now)
                 this.on_fire = [];          // told of every fired action: fn(action, type, ev)
+                this.before_fire = [];      // told just before an action runs (a recorder reseeding the dice)
                 this.muted = false;         // true: devices are not heard (a playback), except the inputs in unmuted
                 this.unmuted = ['Escape'];
                 for (const [name, when, run] of actions) this.actions[name] = [when, run];
@@ -337,6 +338,7 @@
             fire(action, type, ev) {
                 if (!this.can(action, ev)) return false;
                 ev.type = type;
+                for (const fn of this.before_fire) fn(action, type, ev);
                 this.queue.push([action, type, ev.time]);
                 this.actions[action][1]?.(this.context(), ev);
                 for (const fn of this.on_fire) fn(action, type, ev);   // a recorder listening (basement/recorder-kit.js)

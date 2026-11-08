@@ -48,7 +48,7 @@
         }
 
         class timerSystem {
-            constructor() { this.timers = new Set(); this.step = 1 / 60; }
+            constructor() { this.timers = new Set(); this.step = 1 / 60; this.before = []; }   // before: run at the start of every tick, ahead of the timers
             add(t) { this.timers.add(t); }
             remove(t) { this.timers.delete(t); }
             after(seconds, fn, tag = null) { return new gTimer([seconds], { on_end: fn, tag }).startTimer(); }
@@ -56,6 +56,6 @@
             /** Stop every timer with this tag (or, with none, every timer but the standing ones, `keep`: a new game). */
             cancel(tag = undefined) { for (const t of [...this.timers]) if (tag === undefined ? !t.keep : t.tag === tag) { t.running = false; this.timers.delete(t); } }
             /** One sim tick (frame_clock.advanceTick). */
-            tick() { for (const t of [...this.timers]) { try { t.updateState(this.step); } catch (e) { console.error(e); } } }
+            tick() { for (const fn of this.before) fn(); for (const t of [...this.timers]) { try { t.updateState(this.step); } catch (e) { console.error(e); } } }
         }
         const game_timers = new timerSystem();
