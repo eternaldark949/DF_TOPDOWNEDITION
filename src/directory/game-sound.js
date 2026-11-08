@@ -22,10 +22,10 @@
            - engine(s) : The driven car's electric hum (ENGINE_HUM per brand)
            ===================================================================== */
         /** The Audio Buffer setting → the context's latencyHint (read once, at launch) */
-        const AUDIO_BUFFERS = { low: 'interactive', balanced: 'balanced', smooth: 'playback' };
+        const AUDIO_BUFFERS = GAME_DB.audio.buffers;   // directory/game-db/audio.json
         /** sfx(): the recipes there are, how long each one rings (s) and how many may ring at once (default 6) */
-        const SFX_DUR = { shoot: 0.16, explode: 0.31, thunder: 2.8, knock: 0.14, bump: 0.32, crunch: 0.3, ui: 0.06, flit: 0.21, crit: 0.14 };
-        const SFX_CAP = { shoot: 4, explode: 3, thunder: 2, ui: 3, crunch: 3, crit: 3 };
+        const SFX_DUR = GAME_DB.audio.sfx_length;
+        const SFX_CAP = GAME_DB.audio.sfx_voices;
 
         class AudioSystem {
             constructor() {
@@ -202,11 +202,7 @@
             }
         }
         /** Each brand's motor (AudioSystem.engine): root pitch in Hz and how the voices sit. */
-        const ENGINE_HUM = {
-            LADY:    { root: 44, body: 1.15, shimmer: 0.8, whine: 0.8, level: 0.11 },   // darkest, most body
-            Zenxera: { root: 55, body: 1.0,  shimmer: 1.2, whine: 1.0, level: 0.1 },    // brighter, more shimmer
-            Gelfash: { root: 62, body: 0.85, shimmer: 0.9, whine: 0.5, level: 0.09 }    // thinner, little whine
-        };
+        const ENGINE_HUM = GAME_DB.audio.engine_hum;   // directory/game-db/audio.json
 
         // Global audio system instance
         const audioSys = new AudioSystem();
@@ -585,44 +581,19 @@
            keeps it to one part of the map, fading in over `fade` px as you come up to it. */
         /** The game's rooms as reverb (ROOM PACKET [decay s, predelay ms, damp Hz, wet], basement/sound-system.js).
          *  The sound system makes each tail on the spot and fades between them as she goes. */
-        const REVERB = {
-            street:   [1.0, 24, 4200, 0.10],   // out in the city: a short slap off the buildings
-            open:     [0.6, 12, 3500, 0.05],   // a hillside: almost nothing comes back
-            room:     [0.5,  6, 6000, 0.14],   // a furnished room
-            bathroom: [1.1,  4, 9000, 0.26],   // tile and marble: bright and close
-            hall:     [2.0, 22, 5200, 0.22],   // a lobby, a club's floor
-            stone:    [3.2, 32, 4000, 0.30],   // a church, a palace: long and dark
-            cabin:    [0.25, 2, 2800, 0.10],   // the van: boxed in
-            void:     [5.5, 60, 2600, 0.38],   // the ethereal plane
-            valley:   [1.2, 40, 3500, 0.10, 0.45, 0.4, 0.32]   // open ground under cliffs: echoes coming back off the far side
-        };
+        const REVERB = GAME_DB.audio.reverb;   // directory/game-db/audio.json
         /** Each map's room (indoor maps default to `room`, outdoor ones to `street`) and rooms that differ inside them. */
-        const MAP_REVERB = {
-            hotel_lobby: 'hall', moon_city_nightclub: 'hall', enni_cole_interior: 'hall', biggs_arena: 'hall', auto_shop: 'hall',
-            church_boss: 'stone', demoness_palace: 'stone', house_of_death: 'stone',
-            van_interior: 'cabin', keepers_hill: 'open', ethereal_plane: 'void'
-        };
-        const ROOM_REVERB = { bathroom: 'bathroom' };
+        const MAP_REVERB = GAME_DB.audio.map_reverb;
+        const ROOM_REVERB = GAME_DB.audio.room_reverb;
 
-        const MAP_MUSIC = {
-            apt_949: { track: 'silver queen tst', room: 'main_room', volume: 0.5 },   // the Silver Queen suite
-            // Swig (the club's cut): a 24-bar loop at 140 BPM, the kick on the first sample; the club's lights dance to it
-            moon_city_nightclub: { track: 'moon city nightclub - swig', room: 'hall', volume: 0.55, bpm: 140, beat0: 0 },
-            // The Visitor: the Keeper's fireside — the same track on the hill and in the parlor, so it plays on across the cut
-            keepers_hill: { track: 'the visitor', volume: 0.5 },
-            keepers_parlor: { track: 'the visitor', volume: 0.5 },
-            // The Sanctum: the Triumvirate
-            church_boss: { track: 'triumvirate boss fight', volume: 0.55 },
-            // The van, on the way to the job (the intro): over the rain on the roof and the road
-            van_interior: { track: 'van 2', volume: 0.45 },
-            // Grave Stories: the southern graveyard in Southern Dimensions City (its walls, engine/map-loading.js 11d)
-            sdc: [
-                { track: 'grave stories (1)', volume: 0.5, area: HUB_GRAVEYARD, fade: 600 },
-                // Moon City's bass through its walls: heard as you come up to the club, low-passed to the thump; its lights keep time
-                { track: 'moon city nightclub - swig', building: 'moon_city', volume: 0.32, fade: 420, lowpass: 260, bpm: 140, beat0: 0 }
-            ],
-        };
-        const CLUB_BPM = 140;
+        /** Places a MAP_MUSIC area can name (an area track's `area`, in the data, is one of these). */
+        const MUSIC_AREAS = { hub_graveyard: HUB_GRAVEYARD };
+        const MAP_MUSIC = GAME_DB.audio.map_music;   // directory/game-db/audio.json
+        for (const e of Object.values(MAP_MUSIC)) for (const spec of [].concat(e)) if (typeof spec.area === 'string') {
+            if (!MUSIC_AREAS[spec.area]) throw new Error(`MAP_MUSIC: no area '${spec.area}' (MUSIC_AREAS)`);
+            spec.area = MUSIC_AREAS[spec.area];
+        }
+        const CLUB_BPM = GAME_DB.audio.club_bpm;
         const CLUB_PAL = ['176, 120, 255', '220, 190, 255', '255, 90, 150', '232, 194, 122'];   // the club's lights: violet, lavender, rose, gold
 
         /** The current map's beat count, if its track has a tempo (MAP_MUSIC bpm): from the music while

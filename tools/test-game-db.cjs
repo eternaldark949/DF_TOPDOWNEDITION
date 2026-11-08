@@ -108,4 +108,35 @@ test('Progression: trees, kill awards and abilities are whole, and the game buil
  assert.deepEqual(e.errors,[]);
 });
 
+test('Audio: every track is a file, every map, room, brand and floor exists, and the game reads them',()=>{
+ const au=load('audio.json');
+ const files=new Set(fs.readdirSync(join(ROOT,'assets','audio')).map(f=>f.replace(/\.[^.]+$/,'')));
+ const specs=Object.entries(au.map_music).flatMap(([map,e])=>[].concat(e).map(s=>[map,s]));
+ for(const [map,s] of specs){
+  assert.ok(files.has(s.track),`map_music.${map}: no assets/audio file '${s.track}'`);
+  assert.ok(s.volume>0&&s.volume<=1,`map_music.${map}: volume`);
+ }
+ for(const [map,room] of Object.entries(au.map_reverb)) assert.ok(au.reverb[room],`map_reverb.${map}: no reverb '${room}'`);
+ for(const [kind,room] of Object.entries(au.room_reverb)) assert.ok(au.reverb[room],`room_reverb.${kind}: no reverb '${room}'`);
+ for(const [name,p] of Object.entries(au.reverb)) assert.ok((p.length===4||p.length===7)&&p.every(Number.isFinite),`reverb.${name}: a ROOM PACKET is 4 or 7 numbers`);
+ for(const k of Object.keys(au.sfx_voices)) assert.ok(k in au.sfx_length,`sfx_voices.${k}: no such sound in sfx_length`);
+ const MATS=new Set(['marble','wood','carpet','stone','concrete','asphalt','grass','metal','water']);
+ for(const [map,f] of Object.entries(au.floors)){
+  assert.ok(MATS.has(f.def),`floors.${map}.def`);
+  for(const r of f.rects||[]) assert.ok(r.length===5&&r.slice(0,4).every(Number.isFinite)&&MATS.has(r[4]),`floors.${map}: rect ${r}`);
+ }
+ const e=runtime(join(ROOT,'DFAB V8.html'),{affine:true});
+ const got=JSON.parse(e.run(`JSON.stringify({maps:Object.keys(MAP_DATA),brands:Object.keys(VEHICLE_BRANDS),
+  same:MAP_MUSIC===GAME_DB.audio.map_music&&REVERB===GAME_DB.audio.reverb&&FLOOR_MATERIALS===GAME_DB.audio.floors&&SFX_CAP===GAME_DB.audio.sfx_voices&&ENGINE_HUM===GAME_DB.audio.engine_hum,
+  areas:Object.values(MAP_MUSIC).flatMap(e=>[].concat(e)).filter(s=>s.area).map(s=>typeof s.area==='object'&&Number.isFinite(s.area.w)),
+  graveyard:MAP_MUSIC.sdc[0].area===HUB_GRAVEYARD})`));
+ const maps=new Set(got.maps);
+ for(const t of ['map_music','map_reverb','floors']) for(const map of Object.keys(au[t])) assert.ok(maps.has(map),`${t}.${map}: no such map in MAP_DATA`);
+ for(const b of Object.keys(au.engine_hum)) assert.ok(got.brands.includes(b),`engine_hum.${b}: no such brand`);
+ assert.equal(got.same,true);
+ assert.ok(got.areas.length>0&&got.areas.every(Boolean),'a music area did not resolve to a place');
+ assert.equal(got.graveyard,true);
+ assert.deepEqual(e.errors,[]);
+});
+
 console.log(`test-game-db: ${tests.length} passed`);
