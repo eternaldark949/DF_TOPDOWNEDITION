@@ -198,7 +198,7 @@
                     html += `<div class="df-btn-row">`;
                     if (!isActive) html += `<button class="df-btn small auto-activate-btn" data-index="${i}">Set active</button>`;
                     html += `<button class="df-btn small ghost auto-reset-btn" data-index="${i}">Reset look</button>`;
-                    if (!car.isDefault) html += `<button class="df-btn small danger auto-sell-btn" data-index="${i}">Sell · ${Math.floor((CAR_PRICES[car.brand]?.[car.model] || 0) * 0.4).toLocaleString()} PP</button>`;
+                    if (!car.isDefault) html += `<button class="df-btn small danger auto-sell-btn" data-index="${i}">Sell · ${Math.floor((CAR_PRICES[car.brand]?.[car.model] || 0) * GAME_DB.shops.auto_shop.sell_rate).toLocaleString()} PP</button>`;
                     html += `</div></div>`;
                 }
                 container.innerHTML = html;
@@ -211,7 +211,7 @@
                 container.querySelectorAll('.auto-sell-btn').forEach(btn => btn.addEventListener('click', () => this._confirmTap(btn, 'Sell?', () => {
                     const idx = parseInt(btn.dataset.index), car = this.garage.get(idx);
                     if (!car || car.isDefault) return;
-                    const sellPrice = Math.floor((CAR_PRICES[car.brand]?.[car.model] || 0) * 0.4);
+                    const sellPrice = Math.floor((CAR_PRICES[car.brand]?.[car.model] || 0) * GAME_DB.shops.auto_shop.sell_rate);
                     this.garage.removeCar(idx);
                     this.currency += sellPrice;
                     // If we sold the active car, rebuild ownedCar to the new active
@@ -235,10 +235,10 @@
                     this._customizePending = { paintColor: car.paintColor, underglowColor: car.underglowColor, headlightColor: car.headlightColor };
                 }
                 const pending = this._customizePending, orig = this._customizeOriginal;
-                const universalColors = ['#1a1a1a', '#0a0a0a', '#ffffff', '#333333', '#8b0000', '#003366', '#2d5a27', '#4a0e4e', '#d4af37', '#ff4500', '#ff69b4', '#E6E6FA', '#CCCCFF'];
+                const universalColors = GAME_DB.shops.auto_shop.paint_colors;   // directory/game-db/shops.json
                 const allPaintColors = [...new Set([...(brandData?.colors || []), ...universalColors])];
-                const glowOptions = [null, '#ffffff', '#ff8800', '#00f3ff', '#ff00aa', '#00ff88', '#d4af37', '#ff2244', '#a469ff', '#ff4500', '#ff69b4', '#E6E6FA', '#CCCCFF'];
-                const headlightOptions = ['#ffffaa', '#ffffff', '#ccddff', '#ff8800', '#00f3ff', '#ff69b4', '#d4af37', '#ff2244', '#E6E6FA', '#CCCCFF'];
+                const glowOptions = GAME_DB.shops.auto_shop.glow_colors;
+                const headlightOptions = GAME_DB.shops.auto_shop.headlight_colors;
                 let totalCost = 0, changeCount = 0;
                 if (pending.paintColor !== orig.paintColor) { totalCost += CUSTOM_PRICES.paint; changeCount++; }
                 if (pending.underglowColor !== orig.underglowColor) { totalCost += CUSTOM_PRICES.underglow; changeCount++; }
