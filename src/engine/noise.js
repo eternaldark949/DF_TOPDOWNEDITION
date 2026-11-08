@@ -18,7 +18,7 @@
                     const d = Math.hypot(e.x - x, e.y - y);
                     if (d > reach) continue;
                     let r = reach;
-                    if (isLineBlocked(x, y, e.x, e.y, walls, cols)) r *= N.WALL;
+                    if (collisionWorld.lineBlocked(x, y, e.x, e.y, walls, cols)) r *= N.WALL;
                     if (rs && rs.active && rs.doorBlocks(x, y, e.x, e.y)) r *= N.DOOR;
                     if (d > r) continue;
                     const k = d / r;                                          // 0 close … 1 at the edge of hearing
@@ -112,10 +112,9 @@
                 const W = this.canvas.width, H = this.canvas.height;
                 const v = this.view || { x: this.camera.x, y: this.camera.y, zoom: this.camera.zoom, shakeX: 0, shakeY: 0 };
                 const z = v.zoom;
-                let cv = this._mirageCv;
-                if (!cv) { cv = this._mirageCv = document.createElement('canvas'); this._mirageCtx = cv.getContext('2d'); }
                 const sw = Math.max(1, W >> 2), sh = Math.max(1, H >> 2);
-                canvasKit.fitLayer(cv, sw, sh);
+                const cv = canvasKit.scratch(this, '_mirageCv', sw, sh);
+                this._mirageCtx = cv.getContext('2d');
                 let copied = false;
                 const N = 72, TAU = Math.PI * 2;
                 ctx.save();

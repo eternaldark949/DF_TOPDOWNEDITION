@@ -160,7 +160,7 @@
             if (spr) return spr;
             const K = FLORA_KINDS[type] || FLORA_KINDS.tree, rnd = seededRandom(variant * 977 + Math.round(sz * 100) + type.length * 31);
             const palm = type === 'palm', bush = type === 'bush';
-            const R = (palm ? 24 : bush ? 13 : 21) * sz, W = Math.ceil(R * 2.6 + 6), cv = document.createElement('canvas'); cv.width = cv.height = W;
+            const R = (palm ? 24 : bush ? 13 : 21) * sz, W = Math.ceil(R * 2.6 + 6), cv = canvasKit.createLayer([W, W]).canvas;
             const c = cv.getContext('2d'), o = W / 2;
             if (palm) {
                 const n = 8 + (variant % 2);

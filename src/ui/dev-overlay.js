@@ -34,20 +34,20 @@
                 const mode = game.showProfiler ? (GameSettings.profilerMode && GameSettings.profilerMode !== 'off' ? GameSettings.profilerMode : 'compact') : 'off';
                 if (mode !== 'off') this._ensureProf();
                 if (this._prof) {
-                    this._prof.style.display = mode === 'off' ? 'none' : '';
+                    uiKit.toggle(this._prof, mode !== 'off', '');
                     this._prof.classList.toggle('full', mode === 'full');
                     this._report = null;
                 }
                 this._countCalls(this._wantCalls(game));
                 if (game.debugMode) this._ensureDbg();
-                if (this._dbg) this._dbg.style.display = game.debugMode ? '' : 'none';
+                if (this._dbg) uiKit.toggle(this._dbg, game.debugMode, '');
                 document.body.classList.toggle('dev-debug', !!game.debugMode);
                 document.body.classList.toggle('dev-prof-full', mode === 'full');   // (in portrait it shares the column with the dock)
             },
 
             _ensureProf() {
                 if (this._prof) return;
-                const el = document.createElement('div'); el.id = 'dev-prof';
+                const el = uiKit.make(['div']); el.id = 'dev-prof';
                 el.innerHTML = '<div class="dp-head"><b class="dp-fps">--</b><span>fps</span><b class="dp-ms">--</b><span>ms</span><canvas class="dp-spark" width="96" height="22"></canvas></div><div class="dp-rows"></div>';
                 el.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -68,13 +68,13 @@
             /** One column for the dev panels (Baseline's layers over the Debug chips), so both can be open */
             dock() {
                 let d = document.getElementById('dev-dock');
-                if (!d) { d = document.createElement('div'); d.id = 'dev-dock'; document.body.appendChild(d); }
+                if (!d) { d = uiKit.make(['div']); d.id = 'dev-dock'; document.body.appendChild(d); }
                 return d;
             },
 
             _ensureDbg() {
                 if (this._dbg) return;
-                const el = document.createElement('div'); el.id = 'dev-layers';
+                const el = uiKit.make(['div']); el.id = 'dev-layers';
                 const on = this.layers();
                 el.innerHTML = '<div class="dl-head"><span>Debug</span><button class="dl-fold" title="Fold">▾</button></div><div class="dl-chips">'
                     + DEBUG_LAYERS.map(([k, name, c]) => `<button class="dl-chip${on.has(k) ? ' on' : ''}" data-layer="${k}" style="--c:${c}">${name}</button>`).join('')

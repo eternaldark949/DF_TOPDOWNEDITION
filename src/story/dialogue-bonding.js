@@ -330,13 +330,13 @@
 
                 const g = this.game;
                 g.pauseSystem.acquire('dialogue');
-                g.dialogueBox.style.display = 'block';
+                uiKit.show(g.dialogueBox);
                 g.dialogueBox.classList.remove('peeking');
                 uiKit.hide('dialogue-caption');
 
                 g.btnAccept.textContent = options.continueText || 'Continue ▶';
-                g.btnAccept.style.display = '';
-                g.btnDecline.style.display = 'none';
+                uiKit.show(g.btnAccept, '');
+                uiKit.hide(g.btnDecline);
 
                 this._renderLine();
             }
@@ -379,15 +379,15 @@
                 const prevBtn = document.getElementById('btn-dialogue-prev');
                 const nextBtn = document.getElementById('btn-dialogue-next');
                 if (prevBtn) {
-                    prevBtn.style.display = (visibleIndex > 0) ? '' : 'none';
+                    uiKit.toggle(prevBtn, visibleIndex > 0, '');
                     prevBtn.disabled = (visibleIndex <= 0);
                 }
                 if (nextBtn) {
-                    nextBtn.style.display = peeking ? '' : 'none';
+                    uiKit.toggle(nextBtn, peeking, '');
                 }
 
                 // Continue button: hidden while peeking, visible normally
-                g.btnAccept.style.display = peeking ? 'none' : '';
+                uiKit.toggle(g.btnAccept, !peeking, '');
                 if (!peeking) {
                     g.btnAccept.textContent = isLast
                         ? (options.finalButtonText || 'Done')
@@ -523,9 +523,9 @@
                 audioSys.sfx('ui');
 
                 if (newTier > oldTier && BONDING_TIERS[newTier].message) {
-                    game.addPausableTimeout(() => {
+                    game_timers.after(1.5, () => {
                         showMessage(`${teammate.name.toUpperCase()}: ${BONDING_TIERS[newTier].message}`);
-                    }, 1500);
+                    }, 'world');
                 }
             }
 

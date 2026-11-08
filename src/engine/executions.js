@@ -41,7 +41,7 @@
                     // she's at its back (within ±70° of straight behind)
                     const toHer = Math.atan2(pl.y - e.y, pl.x - e.x);
                     if (Math.abs(normalizeAngle(toHer - e.angle)) < Math.PI - 1.22) continue;
-                    if (isLineBlocked(pl.x, pl.y, e.x, e.y, walls, cols)) continue;
+                    if (collisionWorld.lineBlocked(pl.x, pl.y, e.x, e.y, walls, cols)) continue;
                     best = e; bd = d;
                 }
                 return best;
@@ -90,8 +90,8 @@
                             if (bar) {
                                 bar.classList.remove('execution-heal'); void bar.offsetWidth;
                                 bar.classList.add('execution-heal');
-                                this.cancelPausableTimeout(this._executionHealPulse);
-                                this._executionHealPulse = this.addPausableTimeout(() => bar.classList.remove('execution-heal'), 600);
+                                this._executionHealPulse?.stopTimer();
+                                this._executionHealPulse = game_timers.after(0.6, () => bar.classList.remove('execution-heal'), 'world');
                             }
                         }
                     }

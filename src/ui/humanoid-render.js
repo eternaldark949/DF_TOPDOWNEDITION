@@ -366,8 +366,7 @@
             let cv = _hairFinishSprites.get(key);
             if (cv) return cv;
             const [, rx, ry, lie] = HAIR_CROWNS[type], K = HAIR_FINISH_K, pad = 1;
-            cv = document.createElement('canvas');
-            cv.width = Math.ceil((rx + pad) * 2 * K); cv.height = Math.ceil((ry + pad) * 2 * K);
+            cv = canvasKit.createLayer([Math.ceil((rx + pad) * 2 * K), Math.ceil((ry + pad) * 2 * K)]).canvas;
             const c = cv.getContext('2d');
             c.translate(cv.width / 2, cv.height / 2); c.scale(K, K);
             c.beginPath(); c.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2); c.clip();
@@ -428,8 +427,7 @@
             let cv = _hairTiles.get(key);
             if (cv) return cv;
             const K = HAIR_FINISH_K, U = 6;
-            cv = document.createElement('canvas');
-            cv.width = cv.height = U * K;
+            cv = canvasKit.createLayer([U * K, U * K]).canvas;
             const c = cv.getContext('2d'), luma = _hairLuma(color);
             const dark = _hairShade(color, 0.5), mid = lightenHex(color, luma < 0.25 ? 45 : 28);
             c.scale(K, K); c.lineCap = 'round'; c.lineWidth = 0.4;
@@ -1718,7 +1716,7 @@
             const S = LampShadows;
             let k = S.keeps.get(entity);
             if (!k) {
-                const kc = document.createElement('canvas'); kc.width = kc.height = LAMP_KEEP;
+                const kc = canvasKit.createLayer([LAMP_KEEP, LAMP_KEEP]).canvas;
                 k = { cv: kc, m: null, x: 0, y: 0, seq: -1 };
                 S.keeps.set(entity, k);
             }

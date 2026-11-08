@@ -91,7 +91,7 @@
             const key = 'i' + motif + r;
             let s = _pavingSprites.get(key);
             if (s) return s;
-            const P = 6, cv = document.createElement('canvas'); cv.width = cv.height = Math.ceil(r * 2 + P * 2);
+            const P = 6, cv = canvasKit.createLayer([Math.ceil(r * 2 + P * 2), Math.ceil(r * 2 + P * 2)]).canvas;
             const c = cv.getContext('2d'), M = PAVING_MOTIFS[motif], W = PAVING.W;
             c.translate(r + P, r + P);
             const g = c.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
@@ -123,7 +123,7 @@
             const key = 'g' + motif + r;
             let s = _pavingSprites.get(key);
             if (s) return s;
-            const P = 14, cv = document.createElement('canvas'); cv.width = cv.height = Math.ceil(r * 2 + P * 2);
+            const P = 14, cv = canvasKit.createLayer([Math.ceil(r * 2 + P * 2), Math.ceil(r * 2 + P * 2)]).canvas;
             const c = cv.getContext('2d'), M = PAVING_MOTIFS[motif];
             c.translate(r + P, r + P); c.lineCap = 'round'; c.lineJoin = 'round';
             for (const [w, col] of [[9, 'rgba(150,90,255,.10)'], [5, 'rgba(170,110,255,.22)'], [2.2, 'rgba(200,160,255,.6)'], [0.9, 'rgba(240,225,255,.9)']])

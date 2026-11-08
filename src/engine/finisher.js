@@ -39,8 +39,7 @@
 
             /** A settled body, drawn once into its own small canvas (centred, unrotated: drawCorpses turns and stretches it) */
             _snapCorpse(e, bx, by, facing, sx, sy) {
-                const R = FINISHER.SNAP_R, Q = FINISHER.SNAP_Q, cv = document.createElement('canvas');
-                cv.width = cv.height = R * 2 * Q;
+                const R = FINISHER.SNAP_R, Q = FINISHER.SNAP_Q, cv = canvasKit.createLayer([R * 2 * Q, R * 2 * Q]).canvas;
                 const g = cv.getContext('2d'); if (!g) return null;
                 // Drawn exactly as on the street: this canvas stands in for the world (so its light, sun
                 // shadow, hair and cloth read their world position), turned and stretched the same way

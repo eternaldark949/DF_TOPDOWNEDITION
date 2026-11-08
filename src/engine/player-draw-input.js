@@ -177,38 +177,10 @@
                 
                 if (nearest) {
                     const delay = 400 + Math.random() * 200; // 400–600ms beat
-                    this.addPausableTimeout(() => {
+                    game_timers.after(delay / 1000, () => {
                         if (nearest.dead) return;
                         nearest.reactToEmote(key);
-                    }, delay);
-                }
-            },
-
-            /**
-             * Schedule a callback to fire after `ms` of in-game time (counted in sim ticks). Unlike
-             * setTimeout, these timers freeze when the game is paused — they advance only when
-             * update() runs — and a new game or a load clears them, so no stale story beat fires.
-             * Returns a token that can be passed to cancelPausableTimeout.
-             */
-            addPausableTimeout(callback, ms) {
-                const timer = { msRemaining: ms, cb: callback };
-                this.pausableTimers.push(timer);
-                return timer;
-            },
-            cancelPausableTimeout(timer) {
-                const idx = this.pausableTimers.indexOf(timer);
-                if (idx !== -1) this.pausableTimers.splice(idx, 1);
-            },
-            _tickPausableTimers() {
-                // Game time, not wall time: one sim tick per call (update() runs only while unpaused)
-                const dt = CONFIG.LOOP.STEP_MS;
-                for (let i = this.pausableTimers.length - 1; i >= 0; i--) {
-                    const t = this.pausableTimers[i];
-                    t.msRemaining -= dt;
-                    if (t.msRemaining <= 0) {
-                        this.pausableTimers.splice(i, 1);
-                        try { t.cb(); } catch (e) { console.error('[pausableTimer]', e); }
-                    }
+                    }, 'world');
                 }
             },
 

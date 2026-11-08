@@ -53,7 +53,7 @@ function drawNeuralDecorProp(c,p){
 const NEURAL_TREES=[[215,262],[785,262],[432,478],[568,478]];
 function neuralCanopy(){
     if(neuralCanopy.cv)return neuralCanopy.cv;
-    const R=60,cv=document.createElement('canvas');cv.width=cv.height=R*2;const c=cv.getContext('2d'),r=seededRandom(4242);
+    const R=60,cv=canvasKit.createLayer([R*2,R*2]).canvas;const c=cv.getContext('2d'),r=seededRandom(4242);
     // A soft violet mass, then leaves clustered in seven lobes: dark beneath, orchid above, glowing at the tips.
     const m=c.createRadialGradient(R,R,6,R,R,52);m.addColorStop(0,'rgba(60,20,110,.95)');m.addColorStop(.75,'rgba(48,16,96,.85)');m.addColorStop(1,'rgba(40,10,80,0)');
     c.fillStyle=m;c.beginPath();c.arc(R,R,52,0,Math.PI*2);c.fill();

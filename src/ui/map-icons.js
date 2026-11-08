@@ -462,9 +462,8 @@
             /** The soft gold bloom over a finished cache (device px, identity transform): light pools where streets crowd. */
             bloom(cv) {
                 const w = Math.max(1, cv.width >> 2), h = Math.max(1, cv.height >> 2);
-                const t = this._bloomCv || (this._bloomCv = document.createElement('canvas'));
-                t.width = w; t.height = h;
-                const tc = t.getContext('2d'); tc.imageSmoothingEnabled = true; tc.drawImage(cv, 0, 0, w, h);
+                const t = canvasKit.scratch(this, '_bloomCv', w, h);
+                const tc = t.getContext('2d'); tc.clearRect(0, 0, w, h); tc.imageSmoothingEnabled = true; tc.drawImage(cv, 0, 0, w, h);
                 const c = cv.getContext('2d');
                 c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.4; c.imageSmoothingEnabled = true;
                 c.drawImage(t, 0, 0, cv.width, cv.height);

@@ -262,9 +262,9 @@
                 this.broadcast('APP_OPENED', { app: 'contacts' });
                 const scr = document.getElementById('screen-contacts');
                 const reopening = scr.style.display !== 'flex' || !this.isOpen;   // not just back from a thread
-                this.homeScreen.style.display = 'none';
-                document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
-                scr.style.display = 'flex';
+                uiKit.hide(this.homeScreen);
+                document.querySelectorAll('.phone-app-screen').forEach(s => uiKit.hide(s));
+                uiKit.show(scr, 'flex');
                 scr.classList.remove('has-thread');
                 this._buildContactDefs();
                 this.renderContacts();
@@ -343,21 +343,17 @@
 
             _row(c) {
                 const n = this.unread[c.name] || 0;
-                const item = document.createElement('div');
-                item.className = 'msg-item' + (n ? ' unread' : '') + (this._activeContact && this._activeContact.name === c.name ? ' on' : '');
+                const item = uiKit.make(['div', 'msg-item' + (n ? ' unread' : '') + (this._activeContact && this._activeContact.name === c.name ? ' on' : '')]);
                 item.appendChild(c.group ? this._groupFace() : this._face(c.name));
-                const who = document.createElement('div');
-                who.className = 'msg-who';
-                const b = document.createElement('b'); b.textContent = c.name;
-                const i = document.createElement('i');
+                const who = uiKit.make(['div', 'msg-who']);
+                const b = uiKit.make(['b', null, c.name]);
+                const i = uiKit.make(['i']);
                 const last = this._lastRec(c.name) || (c.messages ? { text: c.messages[c.messages.length - 1], from: 'them' } : null);
                 i.textContent = this.typingState[c.name] ? 'typing…' : this._preview(last);
                 if (this.typingState[c.name]) i.classList.add('typing');
                 who.append(b, i);
-                const meta = document.createElement('div');
-                meta.className = 'msg-meta';
-                const t = document.createElement('small'); t.textContent = this._railTime(this._recency(c.name));
-                meta.appendChild(t);
+                const meta = uiKit.make(['div', 'msg-meta']);
+                const t = uiKit.make(['small', null, this._railTime(this._recency(c.name))], meta);
                 if (n) uiKit.make(['span', 'msg-count', n > 99 ? '99+' : n], meta);
                 item.append(who, meta);
                 item.addEventListener('click', () => this.showContactDetail(c));
@@ -382,10 +378,10 @@
                 this._activeContact = contact;
                 this.broadcast('CONTACT_VIEWED', { name: contact.name });
 
-                this.homeScreen.style.display = 'none';
-                document.querySelectorAll('.phone-app-screen').forEach(s => s.style.display = 'none');
+                uiKit.hide(this.homeScreen);
+                document.querySelectorAll('.phone-app-screen').forEach(s => uiKit.hide(s));
                 const scr = document.getElementById('screen-contacts');
-                scr.style.display = 'flex';
+                uiKit.show(scr, 'flex');
                 scr.classList.add('has-thread');
                 if (!this._contactDefs) this._buildContactDefs();
 
@@ -505,23 +501,20 @@
             /** One line in the thread: its bubble or card, the face and name in the group, the reaction */
             _message(contact, rec, cont) {
                 const mine = rec.from === 'me';
-                const row = document.createElement('div');
-                row.className = 'mb-row ' + (mine ? 'me' : 'them') + (cont ? ' cont' : '');
+                const row = uiKit.make(['div', 'mb-row ' + (mine ? 'me' : 'them') + (cont ? ' cont' : '')]);
                 if (contact.group && !mine) {
-                    const av = cont ? document.createElement('div') : this._face(rec.who || '?', 'mav mb-av');
+                    const av = cont ? uiKit.make(['div']) : this._face(rec.who || '?', 'mav mb-av');
                     if (cont) av.className = 'mb-av blank';
                     row.appendChild(av);
                 }
-                const col = document.createElement('div');
-                col.className = 'mb-col';
+                const col = uiKit.make(['div', 'mb-col']);
                 if (contact.group && !mine && !cont && rec.who) {
                     const w = uiKit.make(['div', 'mb-who']);
                     w.style.color = this._color(rec.who);
                     w.textContent = rec.who;
                     col.appendChild(w);
                 }
-                const wrap = document.createElement('div');
-                wrap.className = 'mb-wrap';
+                const wrap = uiKit.make(['div', 'mb-wrap']);
                 const kind = rec.kind;
                 if (rec.text && kind !== 'voice') uiKit.make(['div', 'mb', rec.text], wrap);
                 if (kind === 'pin') wrap.appendChild(this._pinCard(rec));
@@ -573,9 +566,7 @@
                 bar && bar.classList.add('armed');
                 if (hint) hint.textContent = contact.group ? 'Message the crew…' : `Reply to ${contact.name}…`;
                 opts.forEach(opt => {
-                    const chip = document.createElement('button');
-                    chip.className = 'reply-chip';
-                    chip.textContent = opt.text;
+                    const chip = uiKit.make(['button', 'reply-chip', opt.text]);
                     chip.addEventListener('click', () => this.sendReply(contact, opt));
                     box.appendChild(chip);
                 });
@@ -671,8 +662,7 @@
                 this._closePicker();
                 const p = uiKit.make(['div', 'mb-picker']);
                 for (const e of MSG_REACTIONS) {
-                    const b = document.createElement('button');
-                    b.textContent = e;
+                    const b = uiKit.make(['button', null, e]);
                     if (rec.react === e) b.classList.add('on');
                     b.addEventListener('click', ev => { ev.stopPropagation(); this.react(contact, rec, e); });
                     p.appendChild(b);
@@ -731,26 +721,21 @@
             },
             _pinCard(rec) {
                 const d = rec.data || {}, P = this._place(d.place) || { label: 'Somewhere', kind: '' };
-                const card = document.createElement('div');
-                card.className = 'mb-card mb-pin';
-                const map = document.createElement('div');
-                map.className = 'mb-map';
+                const card = uiKit.make(['div', 'mb-card mb-pin']);
+                const map = uiKit.make(['div', 'mb-map']);
                 const url = this._pinMap(d.place);
                 if (url) map.style.backgroundImage = `url(${url})`;
                 else map.classList.add('sketch');
-                const pin = document.createElement('i');
+                const pin = uiKit.make(['i']);
                 map.appendChild(pin);
-                const cap = document.createElement('div');
-                cap.className = 'mb-cap';
-                const t = document.createElement('div');
-                const b = document.createElement('b'); b.textContent = P.label;
-                const s = document.createElement('small');
+                const cap = uiKit.make(['div', 'mb-cap']);
+                const t = uiKit.make(['div']);
+                const b = uiKit.make(['b', null, P.label]);
+                const s = uiKit.make(['small']);
                 const set = game && game.navDestination && P.tx != null && Math.hypot(game.navDestination.x - P.tx, game.navDestination.y - P.ty) < 4;
                 s.textContent = set ? 'Waypoint set' : this._pinKey(this.feed.pendingPin) === this._pinKey(d.place) ? 'Waypoint saved for the city' : P.kind;
                 t.append(b, s);
-                const btn = document.createElement('button');
-                btn.className = 'mb-btn';
-                btn.textContent = set ? '✓ Set' : 'Set waypoint';
+                const btn = uiKit.make(['button', 'mb-btn', set ? '✓ Set' : 'Set waypoint']);
                 btn.addEventListener('click', e => {
                     e.stopPropagation();
                     if (this.setWaypoint(d.place)) { audioSys.sfx('ui'); this._activeContact && this.renderThread(this._activeContact); }
@@ -821,37 +806,29 @@
             },
             _briefCard(rec) {
                 const d = rec.data || {}, m = d.mission || {};
-                const card = document.createElement('div');
-                card.className = 'mb-card mb-brief';
-                const k = document.createElement('div'); k.className = 'k';
-                k.textContent = `Job · ${m.type === 'bounty' ? 'Bounty' : m.type === 'delivery' ? 'Delivery' : 'Salvage'}`;
-                const b = document.createElement('b'); b.textContent = this._jobTitle(m);
-                const p = document.createElement('p'); p.textContent = m.description || '';
+                const card = uiKit.make(['div', 'mb-card mb-brief']);
+                const k = uiKit.make(['div', 'k', `Job · ${m.type === 'bounty' ? 'Bounty' : m.type === 'delivery' ? 'Delivery' : 'Salvage'}`]);
+                const b = uiKit.make(['b', null, this._jobTitle(m)]);
+                const p = uiKit.make(['p', null, m.description || '']);
                 if (m.type === 'delivery' && m.handed) p.textContent += ' · Courier brings the box to you';
                 if (m.type === 'delivery' && m.km) p.textContent += ` · ${(m.km / 1000).toFixed(1)} km`;
-                const row = document.createElement('div'); row.className = 'row';
-                const pay = document.createElement('span'); pay.textContent = `${m.reward || 0} PP · ${m.scrapReward || 0} scrap`;
-                row.appendChild(pay);
+                const row = uiKit.make(['div', 'row']);
+                const pay = uiKit.make(['span', null, `${m.reward || 0} PP · ${m.scrapReward || 0} scrap`], row);
                 if (d.state === 'open') {
-                    const btn = document.createElement('button');
-                    btn.className = 'mb-btn';
-                    btn.textContent = 'Accept';
+                    const btn = uiKit.make(['button', 'mb-btn', 'Accept']);
                     btn.addEventListener('click', e => { e.stopPropagation(); this.acceptBrief(rec); });
                     row.appendChild(btn);
                 } else {
-                    const st = document.createElement('em');
-                    st.textContent = d.state === 'accepted' ? '✓ On the tracker' : 'Taken by someone else';
-                    row.appendChild(st);
+                    const st = uiKit.make(['em', null, d.state === 'accepted' ? '✓ On the tracker' : 'Taken by someone else'], row);
                     card.classList.add(d.state);
                 }
                 card.append(k, b, p, row);
                 // Where it is: the same map crop a pin gets, with its own pin
                 const spot = this._jobSpot(m), url = spot && this._pinMap(spot);
                 if (url) {
-                    const map = document.createElement('div');
-                    map.className = 'mb-map mb-brief-map';
+                    const map = uiKit.make(['div', 'mb-map mb-brief-map']);
                     map.style.backgroundImage = `url(${url})`;
-                    map.appendChild(document.createElement('i'));
+                    map.appendChild(uiKit.make(['i']));
                     card.insertBefore(map, row);
                 }
                 return card;
@@ -893,22 +870,18 @@
                 const d = rec.data || {}, secs = d.secs || this._voiceSecs(d.lines || [rec.text]);
                 const v = uiKit.make(['div', 'mb-voice' + (d.heard ? '' : ' fresh')]);
                 v.dataset.vid = rec.id;
-                const play = document.createElement('button');
-                play.className = 'mb-play';
-                play.textContent = '▶';
+                const play = uiKit.make(['button', 'mb-play', '▶']);
                 play.addEventListener('click', e => { e.stopPropagation(); this.playVoice(contact, rec); });
-                const wave = document.createElement('div');
-                wave.className = 'mb-wave';
+                const wave = uiKit.make(['div', 'mb-wave']);
                 let h = 7;
                 for (const ch of String(rec.id || rec.text)) h = (h * 31 + ch.charCodeAt(0)) % 9973;
                 for (let i = 0; i < 26; i++) {
                     h = (h * 1103 + 12345) % 9973;
-                    const bar = document.createElement('i');
+                    const bar = uiKit.make(['i']);
                     bar.style.height = `${22 + (h % 70) * (0.6 + 0.4 * Math.sin(i / 3))}%`;
                     wave.appendChild(bar);
                 }
-                const t = document.createElement('small');
-                t.textContent = `0:${String(secs).padStart(2, '0')}`;
+                const t = uiKit.make(['small', null, `0:${String(secs).padStart(2, '0')}`]);
                 v.append(play, wave, t);
                 return v;
             },
@@ -968,13 +941,12 @@
             },
             /** The earpiece chip (ui/comms.js's look), held in the thread under the note */
             _subChip(speaker) {
-                const chip = document.createElement('div');
-                chip.className = 'comm-chip mb-sub';
+                const chip = uiKit.make(['div', 'comm-chip mb-sub']);
                 chip.style.setProperty('--who', this._color(speaker));
                 const face = this._face(speaker, 'comm-face');
-                const body = document.createElement('div'); body.className = 'comm-body';
-                const name = document.createElement('div'); name.className = 'comm-name'; name.textContent = speaker;
-                const sig = document.createElement('span'); sig.className = 'comm-sig'; sig.innerHTML = '<i></i><i></i><i></i>';
+                const body = uiKit.make(['div', 'comm-body']);
+                const name = uiKit.make(['div', 'comm-name', speaker]);
+                const sig = uiKit.make(['span', 'comm-sig']); sig.innerHTML = '<i></i><i></i><i></i>';
                 name.appendChild(sig);
                 const line = uiKit.make(['div', 'comm-text']);
                 body.append(name, line);
@@ -988,8 +960,7 @@
             /* ───────────────────────── snapshots ───────────────────────── */
             _snapCard(contact, rec) {
                 const d = rec.data || {};
-                const card = document.createElement('div');
-                card.className = 'mb-card mb-snap';
+                const card = uiKit.make(['div', 'mb-card mb-snap']);
                 if(rec.from==='me'&&!d.img){card.classList.add('mb-photo-unavailable');card.textContent='📷 Image no longer available';return card;}
                 const img = new Image();
                 img.alt = '';
@@ -1001,8 +972,8 @@
                 }
                 card.appendChild(img);
                 const P = d.place && MSG_PLACES[d.place];
-                if (P) { const tag = document.createElement('span'); tag.textContent = `📍 ${P.label}`; card.appendChild(tag); }
-                if(rec.from==='me'){const expiry=document.createElement('div');expiry.className='mb-photo-expiry';expiry.textContent=`Disappearing photo · Expires in ${this._photoTime(rec)}`;card.append(expiry,this._photoActions(rec));}
+                if (P) { const tag = uiKit.make(['span', null, `📍 ${P.label}`], card); }
+                if(rec.from==='me'){const expiry=uiKit.make(['div']);expiry.className='mb-photo-expiry';expiry.textContent=`Disappearing photo · Expires in ${this._photoTime(rec)}`;card.append(expiry,this._photoActions(rec));}
                 return card;
             },
             /**
@@ -1016,8 +987,7 @@
                 const d = rec.data || {}, P = MSG_PLACES[d.place] || MSG_PLACES.double_nights;
                 let url = null;
                 try {
-                    const W = 480, H = 300, c = document.createElement('canvas');
-                    c.width = W; c.height = H;
+                    const W = 480, H = 300, c = canvasKit.createLayer([W, H]).canvas;
                     const ctx = c.getContext('2d');
                     let seed = 0; for (const ch of key) seed = (seed * 31 + ch.charCodeAt(0)) % 99991;
                     const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -1035,8 +1005,7 @@
                     // Them, a little off-centre, as a phone held at arm's length frames a face
                     const cfg = typeof game !== 'undefined' && game && game.resolvePortraitConfig ? game.resolvePortraitConfig(who) : null;
                     if (cfg && !cfg.isFallback) {
-                        const S = 300, f = document.createElement('canvas');
-                        f.width = f.height = S;
+                        const S = 300, f = canvasKit.createLayer([S, S]).canvas;
                         drawCharacterPortrait(f.getContext('2d'), S, S, { ...cfg, backdrop: false, expression: d.mood || 'smile' });
                         ctx.save();
                         ctx.translate(W * 0.62, H * 0.56); ctx.rotate(-0.04);
@@ -1115,8 +1084,7 @@
                 try {
                     const src = document.getElementById('game-canvas');
                     if (src && src.width) {
-                        const w = 320, h = Math.round(w * src.height / src.width), c = document.createElement('canvas');
-                        c.width = w; c.height = h;
+                        const w = 320, h = Math.round(w * src.height / src.width), c = canvasKit.createLayer([w, h]).canvas;
                         c.getContext('2d').drawImage(src, 0, 0, w, h);
                         img = c.toDataURL('image/jpeg', 0.7);
                     }
@@ -1182,14 +1150,14 @@
             _downloadSnapshot(rec) {
                 this._expireSnapshots();
                 if(rec?.from!=='me'||rec.kind!=='snap'||!rec.data?.img){this._refreshPhotoStorage();return false;}
-                const a=document.createElement('a');a.href=rec.data.img;
+                const a=uiKit.make(['a']);a.href=rec.data.img;
                 a.download=`df-photo-${String(rec.id||rec.timestamp).replace(/[^a-z0-9_-]/gi,'_')}.jpg`;
                 document.body.appendChild(a);a.click();a.remove();return true;
             },
             _photoActions(rec) {
-                const row=document.createElement('div');row.className='mb-photo-actions';
+                const row=uiKit.make(['div']);row.className='mb-photo-actions';
                 for(const [label,action] of [['Download',()=>this._downloadSnapshot(rec)],['Delete image',()=>this._deleteSnapshot(rec)]]){
-                    const b=document.createElement('button');b.type='button';b.textContent=label;
+                    const b=uiKit.make(['button']);b.type='button';b.textContent=label;
                     b.addEventListener('click',event=>{event.stopPropagation();action();});row.appendChild(b);
                 }
                 return row;
@@ -1197,17 +1165,17 @@
             _closePhotoManager() {this._photoManagerEl?.remove();this._photoManagerEl=null;},
             _showPhotoManager() {
                 this._closePhotoManager();
-                const panel=document.createElement('div');panel.className='msg-photo-manager';
+                const panel=uiKit.make(['div']);panel.className='msg-photo-manager';
                 panel.setAttribute('role','dialog');panel.setAttribute('aria-label','Sent photos');
-                const head=document.createElement('div');head.className='msg-photo-manager-head';
-                const title=document.createElement('b');const photos=this._activeSnapshots();title.textContent=`Sent photos ${photos.length}/${MSG_PHOTOS.LIMIT}`;
-                const close=document.createElement('button');close.type='button';close.textContent='Done';close.addEventListener('click',()=>this._closePhotoManager());head.append(title,close);panel.appendChild(head);
-                const help=document.createElement('p');help.textContent=(photos.length>=MSG_PHOTOS.LIMIT?'Sent photo limit reached. Wait for photos to expire or delete images you no longer need. ':'')+'Photos disappear after 24 in-game hours. Download any you want to keep. Deleting an image keeps the conversation.';panel.appendChild(help);
-                if(!photos.length){const empty=document.createElement('p');empty.textContent='No sent images stored.';panel.appendChild(empty);}
+                const head=uiKit.make(['div']);head.className='msg-photo-manager-head';
+                const title=uiKit.make(['b']);const photos=this._activeSnapshots();title.textContent=`Sent photos ${photos.length}/${MSG_PHOTOS.LIMIT}`;
+                const close=uiKit.make(['button']);close.type='button';close.textContent='Done';close.addEventListener('click',()=>this._closePhotoManager());head.append(title,close);panel.appendChild(head);
+                const help=uiKit.make(['p']);help.textContent=(photos.length>=MSG_PHOTOS.LIMIT?'Sent photo limit reached. Wait for photos to expire or delete images you no longer need. ':'')+'Photos disappear after 24 in-game hours. Download any you want to keep. Deleting an image keeps the conversation.';panel.appendChild(help);
+                if(!photos.length){const empty=uiKit.make(['p']);empty.textContent='No sent images stored.';panel.appendChild(empty);}
                 for(const {name,rec}of photos){
-                    const row=document.createElement('div');row.className='msg-photo-storage-row';
+                    const row=uiKit.make(['div']);row.className='msg-photo-storage-row';
                     const img=new Image();img.src=rec.data.img;img.alt=`Photo sent to ${name}`;
-                    const info=document.createElement('div'),who=document.createElement('b'),expiry=document.createElement('small');
+                    const info=uiKit.make(['div']),who=uiKit.make(['b']),expiry=uiKit.make(['small']);
                     who.textContent=name;expiry.textContent=`Expires in ${this._photoTime(rec)}`;
                     info.append(who,expiry,this._photoActions(rec));row.append(img,info);panel.appendChild(row);
                 }

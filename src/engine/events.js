@@ -92,7 +92,7 @@
                     const open = e => !nav || (nav.walkable(...W(e, Math.sign(ply || 1) * ew)) && nav.walkable(...W(e, side * ew)));
                     if (!open(ex) && open(-ex)) ex = -ex;
                     via.push(W(ex, Math.sign(ply || 1) * ew), W(ex, side * ew));
-                } else if (segmentHitsRect(plx, ply, hl * 0.2, side * (hw + 20), -(hl + 17), -(hw + 17), hl + 17, hw + 17)) {
+                } else if (shapeKit.segmentHitsRect(plx, ply, hl * 0.2, side * (hw + 20), -(hl + 17), -(hw + 17), hl + 17, hw + 17)) {
                     // Behind it or in front (either side): the straight line to the door cuts the corner, so round the
                     // corner on the door's side of the end she's at first, then along the side to the door
                     via.push(W(Math.sign(plx || -1) * (hl + 30), side * ew));
@@ -225,7 +225,7 @@
                     const npc = this.activeInteraction;
                     if (npc instanceof NPC) {
                         const D = npcDialogueFor(npc);
-                        if (this._extraDialogueBtn) this._extraDialogueBtn.style.display = 'none';
+                        if (this._extraDialogueBtn) uiKit.hide(this._extraDialogueBtn);
                         if (D.endFirst) { this.endDialogue(); if (D.accept) D.accept(this, npc); return; }   // it opens a menu of its own
                         if (D.accept) D.accept(this, npc);
                     }
@@ -241,7 +241,7 @@
                 this.btnDecline.addEventListener('click', () => { 
                     const npc = this.activeInteraction;
                     const D = npc instanceof NPC ? npcDialogueFor(npc) : null;
-                    if (this._extraDialogueBtn) this._extraDialogueBtn.style.display = 'none';
+                    if (this._extraDialogueBtn) uiKit.hide(this._extraDialogueBtn);
                     this.endDialogue();
                     if (D && D.decline) D.decline(this, npc);
                 });

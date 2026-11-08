@@ -4,7 +4,7 @@
             drawBiggsInterior(ctx) {
                 const ready=!document.fonts || (document.fonts.check('24px Orbitron') && document.fonts.check('30px "Great Vibes"'));
                 if(!this._biggsFloor){
-                    const cv=document.createElement('canvas');cv.width=cv.height=900;
+                    const cv=canvasKit.createLayer([900,900]).canvas;
                     this._paintBiggsFloor(cv.getContext('2d'));
                     if(ready)this._biggsFloor=cv;
                     else {ctx.drawImage(cv,0,0);return;}

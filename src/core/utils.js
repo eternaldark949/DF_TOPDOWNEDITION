@@ -103,7 +103,7 @@
             // A long barrel poked through a wall (standing right against it): fire from the
             // body instead, so the round hits the wall rather than starting on the far side
             const map = (typeof game !== 'undefined' && game.activeMap) ? game.activeMap : null;
-            if (map && (m.x !== ent.x || m.y !== ent.y) && isLineBlocked(ent.x, ent.y, m.x, m.y, map.walls || [], getColliders(map))) {
+            if (map && (m.x !== ent.x || m.y !== ent.y) && collisionWorld.lineBlocked(ent.x, ent.y, m.x, m.y, map.walls || [], getColliders(map))) {
                 m = { x: ent.x, y: ent.y };
             }
             let angle = dirAngle;

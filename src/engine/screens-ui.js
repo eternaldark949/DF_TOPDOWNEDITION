@@ -45,7 +45,7 @@
                 // --- 5. GOLDEN SHIELD BAR (any buff with shield) ---
                 if (U.shield && U.shieldFill) {
                     const shieldBuff = this.player.buffSystem.getShieldBuff();
-                    set('shieldOn', !!shieldBuff, v => { U.shield.style.display = v ? 'block' : 'none'; });
+                    set('shieldOn', !!shieldBuff, v => { uiKit.toggle(U.shield, v); });
                     if (shieldBuff) set('shieldW', ((shieldBuff.shield / shieldBuff.maxShield) * 100).toFixed(1), v => { U.shieldFill.style.width = `${v}%`; });
                 }
                 
@@ -137,7 +137,7 @@
                     } else {
                         // Cooldown — show a brief remark instead
                         this.pauseSystem.acquire('dialogue');
-                        this.dialogueBox.style.display = 'block';
+                        uiKit.show(this.dialogueBox);
                         this.npcNameEl.textContent = entity.name;
                         this.npcNameEl.style.color = SPEAKER_COLORS[entity.name] || '#ff0055';
                         this.renderDialoguePortrait(entity.name);
@@ -150,15 +150,15 @@
                             'Josh': "Social interaction quota met for this cycle."
                         };
                         this.npcTextEl.textContent = cooldownLines[entity.name] || "We've already caught up.";
-                        this.btnAccept.style.display = 'none';
+                        uiKit.hide(this.btnAccept);
                         this.btnDecline.textContent = 'OK';
-                        this.btnDecline.style.display = '';
+                        uiKit.show(this.btnDecline, '');
                         return;
                     }
                 }
 
                 this.pauseSystem.acquire('dialogue'); 
-                this.dialogueBox.style.display = 'block'; 
+                uiKit.show(this.dialogueBox); 
                 this.npcNameEl.textContent = entity.name;
                 
                 // Render portrait and apply speaker color
@@ -177,20 +177,20 @@
                 const D = npcDialogueFor(entity);
                 this.npcTextEl.textContent = D.text(this, entity);
                 const B = D.buttons ? D.buttons(this, entity) : {};
-                if (B.accept === null) this.btnAccept.style.display = 'none';
+                if (B.accept === null) uiKit.hide(this.btnAccept);
                 else if (B.accept) this.btnAccept.textContent = B.accept;
                 if (B.decline) this.btnDecline.textContent = B.decline;
                 if (B.extra) {
                     // A third button that just leaves (Grum's menu)
                     if (!this._extraDialogueBtn) {
-                        this._extraDialogueBtn = document.createElement('button');
+                        this._extraDialogueBtn = uiKit.make(['button']);
                         this._extraDialogueBtn.className = 'dialogue-btn';
                         this._extraDialogueBtn.style.opacity = '0.6';
                         this.btnDecline.parentElement.appendChild(this._extraDialogueBtn);
-                        this._extraDialogueBtn.addEventListener('click', () => { this._extraDialogueBtn.style.display = 'none'; this.endDialogue(); });
+                        this._extraDialogueBtn.addEventListener('click', () => { uiKit.hide(this._extraDialogueBtn); this.endDialogue(); });
                     }
                     this._extraDialogueBtn.textContent = B.extra;
-                    this._extraDialogueBtn.style.display = '';
+                    uiKit.show(this._extraDialogueBtn, '');
                 }
                 if (typeof Talks !== 'undefined') Talks.button(this, entity);   // story/talks.js: sit down and talk
                 if (D.noLock) return;
@@ -385,9 +385,7 @@
                     return hit;
                 }
 
-                const canvas = document.createElement('canvas');
-                canvas.width = size;
-                canvas.height = size;
+                const canvas = canvasKit.createLayer([size, size]).canvas;
                 this.paintPortraitTo(canvas, speakerName, bg);
 
                 const entry = { canvas, config, url: null };
@@ -475,21 +473,21 @@
             
             endDialogue() {
                 this.pauseSystem.release('dialogue'); 
-                this.dialogueBox.style.display = 'none'; 
+                uiKit.hide(this.dialogueBox); 
                 
                 // 1. RESTORE RANDOM CAPTIONS
                 uiKit.show('dialogue-caption');
                 
                 // 2. RESTORE DIALOGUE BUTTON DEFAULTS
                 this.btnAccept.textContent = 'Accept';
-                this.btnAccept.style.display = '';
+                uiKit.show(this.btnAccept, '');
                 this.btnDecline.textContent = 'Decline';
-                this.btnDecline.style.display = '';
+                uiKit.show(this.btnDecline, '');
                 this.npcNameEl.style.color = '';
                 
                 // 2b. Hide the third button (Grum's menu)
-                if (this._extraDialogueBtn) this._extraDialogueBtn.style.display = 'none';
-                if (this._talkDialogueBtn) this._talkDialogueBtn.style.display = 'none';
+                if (this._extraDialogueBtn) uiKit.hide(this._extraDialogueBtn);
+                if (this._talkDialogueBtn) uiKit.hide(this._talkDialogueBtn);
                 
                 // 3. RESET POINTER EVENTS (Re-enable Buttons)
                 document.getElementById('game-ui').style.pointerEvents = 'none'; 
@@ -1244,7 +1242,7 @@
                 
                 // Toggle close: same card tapped while open
                 if (slot.dataset.activeNote === noteId && slot.style.display !== 'none') {
-                    slot.style.display = 'none';
+                    uiKit.hide(slot);
                     slot.innerHTML = '';
                     delete slot.dataset.activeNote;
                     allCards.forEach(c => c.classList.remove('selected'));
@@ -1291,7 +1289,7 @@
                 inner += `</div></div>`;
                 
                 slot.innerHTML = inner;
-                slot.style.display = 'block';
+                uiKit.show(slot);
                 slot.dataset.activeNote = noteId;
                 
                 // Active-card highlight
@@ -1357,12 +1355,12 @@
                 sig.innerHTML = note.signature ? `<span style="font-size:max(6px, 0.85rem - var(--font-trim));">${note.signature}</span>` : '';
 
                 // Show
-                overlay.style.display = 'block';
+                uiKit.show(overlay);
                 doc.scrollTop = 0;
 
                 // Close on click/tap
                 const closeHandler = () => {
-                    overlay.style.display = 'none';
+                    uiKit.hide(overlay);
                     this.pauseSystem.release('note_overlay');
                     overlay.removeEventListener('click', closeHandler);
                     audioSys.sfx('ui');

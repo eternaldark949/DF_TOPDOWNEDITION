@@ -56,7 +56,7 @@
                     if (b.isV2 && typeof b.getCollisionShapes === 'function') for (const r of b.getCollisionShapes()) addRect(r);
                     else addRect(b);
                 }
-                if (this.useNewCollisionSystem) for (const e of this._staticBillboardEntities || []) {
+                for (const e of this._staticBillboardEntities || []) {
                     if (e.active && e.hasCollision && !e.markedForDestroy) addRect(e.getBoundingBox());
                 }
                 const rooms = this.roomSystem;
@@ -69,13 +69,12 @@
                 }
                 const clear = (x, y) => {
                     for (const r of rects) {
-                        const dx = x - Math.max(r.x, Math.min(r.x + r.w, x)), dy = y - Math.max(r.y, Math.min(r.y + r.h, y));
+                        const [dx, dy] = shapeKit.rectGap(x, y, r);
                         if (Math.hypot(dx, dy) < radius) return false;
                     }
                     for (const leaf of leaves) {
-                        const [ax, ay, bx, by] = leaf.s, dx = bx - ax, dy = by - ay, n = dx * dx + dy * dy;
-                        const t = n ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / n)) : 0;
-                        if (Math.hypot(x - ax - dx * t, y - ay - dy * t) < leaf.r) return false;
+                        const [ax, ay, bx, by] = leaf.s;
+                        if (shapeKit.segmentDistanceSq(x, y, ax, ay, bx, by) < leaf.r * leaf.r) return false;
                     }
                     return true;
                 };
@@ -297,9 +296,7 @@
                3. Arrival glow — radial bloom at destination, ~0.5s
                ========================================================= */
             updateFlitVFX() {
-                for (let i = this.flitVFX.length - 1; i >= 0; i--) {
-                    const vfx = this.flitVFX[i];
-
+                lifeKit.sweep(this.flitVFX, vfx => {
                     // Decay ghost afterimage
                     if (vfx.ghostAlpha > 0) {
                         vfx.ghostAlpha -= vfx.ghostDecay;
@@ -341,9 +338,9 @@
 
                     // Remove fully dead effects
                     if (vfx.ghostAlpha <= 0 && vfx.trailLife <= 0 && vfx.arrivalGlow <= 0) {
-                        this.flitVFX.splice(i, 1);
+                        return true;
                     }
-                }
+                });
             },
 
             /** One bounded cue, shared by every input method and independent of the joystick ring. */

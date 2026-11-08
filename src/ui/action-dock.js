@@ -44,7 +44,7 @@
             el._ap.medal.innerHTML = ACTION_ICONS[icon];
             el._ap.verb.textContent = verb;
             el._ap.name.textContent = name || '';
-            el._ap.name.style.display = name ? '' : 'none';
+            uiKit.toggle(el._ap.name, name, '');
             el._ap.key.textContent = key;
             // Re-run the arrival flourish for a new action
             el.classList.remove('ap-arrive'); void el.offsetWidth; el.classList.add('ap-arrive');

@@ -82,7 +82,7 @@
             _bossTitle(show) {
                 let el = document.getElementById('boss-title');
                 if (!el) {
-                    el = document.createElement('div'); el.id = 'boss-title';
+                    el = uiKit.make(['div']); el.id = 'boss-title';
                     el.innerHTML = '<div class="bt-main"></div><div class="bt-names"></div>';
                     document.body.appendChild(el);
                 }

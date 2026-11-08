@@ -11,64 +11,10 @@
         
 
         
-        /* --- ALLOCATION-FREE LINE-RECT TESTS (sight lines, rays, vision cones: thousands a frame) ---
-           The same arithmetic as getLineRectIntersections, edge by edge, so every answer matches it;
-           nothing is allocated, and a segment whose box misses the rect's is rejected first. */
 
-        /** Where segment 1→2 crosses edge e1→e2, as uA along the segment (0..1), or -1 when it doesn't */
-        function _segEdgeT(x1, y1, x2, y2, ex1, ey1, ex2, ey2) {
-            const denom = (ey2 - ey1) * (x2 - x1) - (ex2 - ex1) * (y2 - y1);
-            if (denom === 0) return -1;
-            const uA = ((ex2 - ex1) * (y1 - ey1) - (ey2 - ey1) * (x1 - ex1)) / denom;
-            const uB = ((x2 - x1) * (y1 - ey1) - (y2 - y1) * (x1 - ex1)) / denom;
-            return (uA >= 0 && uA <= 1 && uB >= 0 && uB <= 1) ? uA : -1;
-        }
 
-        /** True when the segment crosses any edge of the rect (getLineRectIntersections(...).length > 0) */
-        function segCrossesRect(x1, y1, x2, y2, rx, ry, rw, rh) {
-            if ((x1 > x2 ? x1 : x2) < rx || (x1 < x2 ? x1 : x2) > rx + rw || (y1 > y2 ? y1 : y2) < ry || (y1 < y2 ? y1 : y2) > ry + rh) return false;
-            return _segEdgeT(x1, y1, x2, y2, rx, ry, rx + rw, ry) >= 0 || _segEdgeT(x1, y1, x2, y2, rx, ry + rh, rx + rw, ry + rh) >= 0
-                || _segEdgeT(x1, y1, x2, y2, rx, ry, rx, ry + rh) >= 0 || _segEdgeT(x1, y1, x2, y2, rx + rw, ry, rx + rw, ry + rh) >= 0;
-        }
 
-        /** The nearest crossing's distance from (x1, y1) that's at least minD, if under `best`; else `best`.
-            (Distances are worked out exactly as from getLineRectIntersections' points.) */
-        function segRectNearest(x1, y1, x2, y2, rx, ry, rw, rh, best, minD) {
-            if ((x1 > x2 ? x1 : x2) < rx || (x1 < x2 ? x1 : x2) > rx + rw || (y1 > y2 ? y1 : y2) < ry || (y1 < y2 ? y1 : y2) > ry + rh) return best;
-            for (let e = 0; e < 4; e++) {
-                const t = e === 0 ? _segEdgeT(x1, y1, x2, y2, rx, ry, rx + rw, ry)
-                        : e === 1 ? _segEdgeT(x1, y1, x2, y2, rx, ry + rh, rx + rw, ry + rh)
-                        : e === 2 ? _segEdgeT(x1, y1, x2, y2, rx, ry, rx, ry + rh)
-                        : _segEdgeT(x1, y1, x2, y2, rx + rw, ry, rx + rw, ry + rh);
-                if (t < 0) continue;
-                const d = Math.hypot(x1 + t * (x2 - x1) - x1, y1 + t * (y2 - y1) - y1);
-                if (d < best && d >= minD) best = d;
-            }
-            return best;
-        }
 
-        /* --- HELPER: LINE-RECT INTERSECTION --- */
-        function getLineRectIntersections(x1, y1, x2, y2, rx, ry, rw, rh) {
-            const points = [];
-            const lines = [
-                { x1: rx, y1: ry, x2: rx + rw, y2: ry },
-                { x1: rx, y1: ry + rh, x2: rx + rw, y2: ry + rh },
-                { x1: rx, y1: ry, x2: rx, y2: ry + rh },
-                { x1: rx + rw, y1: ry, x2: rx + rw, y2: ry + rh }
-            ];
-        
-            lines.forEach(line => {
-                const denom = (line.y2 - line.y1) * (x2 - x1) - (line.x2 - line.x1) * (y2 - y1);
-                if (denom !== 0) {
-                    const uA = ((line.x2 - line.x1) * (y1 - line.y1) - (line.y2 - line.y1) * (x1 - line.x1)) / denom;
-                    const uB = ((x2 - x1) * (y1 - line.y1) - (y2 - y1) * (x1 - line.x1)) / denom;
-                    if (uA >= 0 && uA <= 1 && uB >= 0 && uB <= 1) {
-                        points.push({ x: x1 + uA * (x2 - x1), y: y1 + uA * (y2 - y1) });
-                    }
-                }
-            });
-            return points;
-        }
 
         /* --- CONVEX POLYGON HELPERS (angled roads: their junctions, pavements and crossings) ---
            Polygons are arrays of {x, y}, convex, either winding. */
@@ -101,15 +47,6 @@
                 for (let i = 0; i < poly.length; i++) { const a = poly[i], b = poly[(i + 1) % poly.length]; A += a.x * b.y - b.x * a.y; }
                 return A / 2;
             },
-            hull(points) {
-                const P = points.slice().sort((a, b) => a.x - b.x || a.y - b.y);
-                if (P.length < 3) return P;
-                const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
-                const lo = [], hi = [];
-                for (const p of P) { while (lo.length >= 2 && cross(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
-                for (let i = P.length - 1; i >= 0; i--) { const p = P[i]; while (hi.length >= 2 && cross(hi[hi.length - 2], hi[hi.length - 1], p) <= 0) hi.pop(); hi.push(p); }
-                return lo.slice(0, -1).concat(hi.slice(0, -1));
-            },
             box(poly) {
                 let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
                 for (const p of poly) { if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y; }
@@ -132,7 +69,7 @@
             segHits(x1, y1, x2, y2, poly) {
                 const pts = [];
                 for (let i = 0; i < poly.length; i++) {
-                    const a = poly[i], b = poly[(i + 1) % poly.length], t = _segEdgeT(x1, y1, x2, y2, a.x, a.y, b.x, b.y);
+                    const a = poly[i], b = poly[(i + 1) % poly.length], t = shapeKit.segEdgeT(x1, y1, x2, y2, a.x, a.y, b.x, b.y);
                     if (t >= 0) pts.push({ x: x1 + t * (x2 - x1), y: y1 + t * (y2 - y1) });
                 }
                 return pts;
@@ -1420,7 +1357,7 @@
                     const hT = r.thickness / 2;
                     pts.push(r.paramToWorld(a0, -hT), r.paramToWorld(a0, hT), r.paramToWorld(a1, -hT), r.paramToWorld(a1, hT));
                 }
-                const poly = Poly.hull(pts);
+                const poly = shapeKit.hull(pts, true);
                 return { ...Poly.box(poly), poly };
             }
             
@@ -1622,7 +1559,7 @@
                     
                     for (let intersection of this.intersections) {
                         // (a junction's shape sits 5 px past the lane's end: the line is run on 10 px to meet it)
-                        const hits = intersection.poly ? Poly.segHits(lane.start.x - lane.ux * 10, lane.start.y - lane.uy * 10, lane.end.x + lane.ux * 10, lane.end.y + lane.uy * 10, intersection.poly) : getLineRectIntersections(
+                        const hits = intersection.poly ? Poly.segHits(lane.start.x - lane.ux * 10, lane.start.y - lane.uy * 10, lane.end.x + lane.ux * 10, lane.end.y + lane.uy * 10, intersection.poly) : shapeKit.segRectPoints(
                             lane.start.x, lane.start.y, lane.end.x, lane.end.y,
                             intersection.x, intersection.y, intersection.width, intersection.height
                         );

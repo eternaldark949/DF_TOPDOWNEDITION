@@ -24,7 +24,7 @@
             _build() {
                 if (this.root) return;
                 const el = (tag, id, cls, parent) => { const e = document.createElement(tag); if (id) e.id = id; if (cls) e.className = cls; (parent || this.root).appendChild(e); return e; };
-                this.root = document.createElement('div'); this.root.id = 'cine'; document.body.appendChild(this.root);
+                this.root = uiKit.make(['div']); this.root.id = 'cine'; document.body.appendChild(this.root);
                 this.memEl = el('div', 'cine-memory');            // the flashback's vignette and grain (memory())
                 this.blackEl = el('div', 'cine-black');
                 this.tapEl = el('div', 'cine-tap');
@@ -119,8 +119,8 @@
                 this.sub.classList.toggle('narr', who === null);
                 const side = opts.side || C.side || 'right', other = side === 'left' ? 'right' : 'left';
                 this.nameEl.innerHTML = '';
-                const n = document.createElement('span'); n.textContent = C.name; n.style.color = C.color; this.nameEl.appendChild(n);
-                if (opts.offscreen) { const v = document.createElement('em'); v.textContent = 'VOICE'; this.nameEl.appendChild(v); }
+                const n = uiKit.make(['span', null, C.name]); n.style.color = C.color; this.nameEl.appendChild(n);
+                if (opts.offscreen) { const v = uiKit.make(['em', null, 'VOICE'], this.nameEl); }
                 this.sub.style.setProperty('--who', C.color);
                 this.sub.classList.add('show'); this.scrim.classList.add('show'); this.sub.classList.remove('done');
                 this.tapEl.classList.add('on');
@@ -201,7 +201,7 @@
                 this.cardEl.className = opts.style ? 'show ' + opts.style : 'show';
                 const els = lines.map(t => uiKit.make(['div', t === '' ? 'gap' : 'ln', t], this.cardEl));
                 if (opts.sign) els.push(uiKit.make(['div', 'sign', opts.sign], this.cardEl));
-                const hint = document.createElement('div'); hint.className = 'hint'; hint.textContent = 'tap to continue'; this.cardEl.appendChild(hint);
+                const hint = uiKit.make(['div', 'hint', 'tap to continue'], this.cardEl);
                 const S = this.cardS = { els, i: 0, t: 0, every: opts.every || 70, hold: opts.hold || 0, held: 0, out: 0, done: false, hint };
                 this.tapped = false;
                 return { done: () => S.done, leaving: () => S.done || S.out > 0 };   // leaving: the tap is in, it's fading out

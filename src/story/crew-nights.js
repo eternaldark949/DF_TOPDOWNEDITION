@@ -290,7 +290,7 @@
                 const before = g.bonding ? g.bonding.getTier(t.relationship || 0) : 0;
                 t.relationship = Math.max(0, Math.min(100, (t.relationship || 0) + n));
                 const after = g.bonding ? g.bonding.getTier(t.relationship) : 0;
-                if (after > before && BONDING_TIERS[after].message) g.addPausableTimeout(() => showMessage(`${name.toUpperCase()}: ${BONDING_TIERS[after].message}`), 2600);
+                if (after > before && BONDING_TIERS[after].message) game_timers.after(2.6, () => showMessage(`${name.toUpperCase()}: ${BONDING_TIERS[after].message}`), 'world');
                 return n;
             },
 
@@ -351,23 +351,22 @@
             card(rec) {
                 const d = rec.data || {}, S = this.state(), plan = S.plan && S.plan.id === d.plan ? S.plan : null, V = CREW_VENUES[d.venue] || CREW_VENUES.moon_city;
                 const st = plan ? plan.state : d.state === 'open' || d.state === 'yes' ? 'lapsed' : d.state;
-                const card = document.createElement('div');
-                card.className = 'mb-card mb-plan ' + st;
-                const k = document.createElement('div'); k.className = 'k'; k.textContent = plan && plan.solo ? 'Plans · Just you two' : 'Plans · Crew night';
-                const b = document.createElement('b'); b.textContent = V.what;
-                const p = document.createElement('p');
+                const card = uiKit.make(['div', 'mb-card mb-plan ' + st]);
+                const k = uiKit.make(['div', 'k', plan && plan.solo ? 'Plans · Just you two' : 'Plans · Crew night']);
+                const b = uiKit.make(['b', null, V.what]);
+                const p = uiKit.make(['p']);
                 if (plan) p.textContent = `${phoneSystem._clock(plan.from)} – ${phoneSystem._clock(plan.to)}`;
-                const faces = document.createElement('div'); faces.className = 'mb-plan-faces';
+                const faces = uiKit.make(['div', 'mb-plan-faces']);
                 for (const n of (plan ? plan.who : [])) faces.appendChild(phoneSystem._face(n, 'mav mb-plan-av', 48));
                 const url = phoneSystem._pinMap(V.park ? { x: V.park.x, y: V.park.y } : d.venue);
-                const map = document.createElement('div'); map.className = 'mb-map mb-brief-map';
+                const map = uiKit.make(['div', 'mb-map mb-brief-map']);
                 if (url) map.style.backgroundImage = `url(${url})`; else map.classList.add('sketch');
-                map.appendChild(document.createElement('i'));
-                const row = document.createElement('div'); row.className = 'row';
+                map.appendChild(uiKit.make(['i']));
+                const row = uiKit.make(['div', 'row']);
                 const btn = (label, fn, cls = '') => { const x = uiKit.make(['button', 'mb-btn ' + cls, label]); x.addEventListener('click', e => { e.stopPropagation(); fn(); }); row.appendChild(x); };
                 if (st === 'open') { btn('I\'m in', () => this.rsvp(true)); btn('Can\'t tonight', () => this.rsvp(false), 'ghost'); }
                 else {
-                    const em = document.createElement('em');
+                    const em = uiKit.make(['em']);
                     em.textContent = { yes: '✓ You\'re going', no: 'You passed', done: '♡ A good night', missed: 'You didn\'t make it', lapsed: 'That night\'s gone' }[st] || '';
                     row.appendChild(em);
                     if (st === 'yes') btn('Set waypoint', () => { if (this._waypoint(plan)) audioSys.sfx('ui'); }, 'ghost');
@@ -435,10 +434,10 @@
                 if (at && g.activeMap.id === V.map) { g.player.x = at.x; g.player.y = at.y; }
                 g.player.visible = true;
                 g.camera.x = g.player.x; g.camera.y = g.player.y;
-                if (parts.length) g.addPausableTimeout(() => { showMessage(`♡ ${parts.join(' · ')}`); audioSys.sfx('ui'); }, 600);
+                if (parts.length) game_timers.after(0.6, () => { showMessage(`♡ ${parts.join(' · ')}`); audioSys.sfx('ui'); }, 'world');
                 // The thread remembers it
-                g.addPausableTimeout(() => phoneSystem.sendText(plan.chat, plan.solo ? CREW_SOLO[plan.host].close[0][1] : 'Best night in a while. Same time next week?', true, 2000,
-                    plan.solo ? null : { who: this._pick(plan.who) }), 4000);
+                game_timers.after(4, () => phoneSystem.sendText(plan.chat, plan.solo ? CREW_SOLO[plan.host].close[0][1] : 'Best night in a while. Same time next week?', true, 2000,
+                    plan.solo ? null : { who: this._pick(plan.who) }), 'world');
             },
 
             /** The moment she gets with one of them, by how close they are (unseen ones first) */

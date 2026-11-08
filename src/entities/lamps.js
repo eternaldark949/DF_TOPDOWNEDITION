@@ -194,7 +194,7 @@
             const key = `${color}|${radius}|${shape}|${S}`;
             let cv = _lampBulbEmissionSprites.get(key);
             if (cv) return cv;
-            cv = document.createElement('canvas'); cv.width = cv.height = 48 * S;
+            cv = canvasKit.createLayer([48 * S, 48 * S]).canvas;
             const c = cv.getContext('2d'); c.setTransform(S, 0, 0, S, 24 * S, 24 * S);
             const rgb = [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16)).join(',');
             const haloRadius = shape === 'globe' ? 18 : 24;
@@ -249,7 +249,7 @@
             const key = color + '|' + radius + '|' + frame + '|' + S;
             let cv = _lampGlitterSprites.get(key);
             if (cv) return cv;
-            cv = document.createElement('canvas'); cv.width = cv.height = 48 * S;
+            cv = canvasKit.createLayer([48 * S, 48 * S]).canvas;
             const c = cv.getContext('2d'); c.setTransform(S, 0, 0, S, 24 * S, 24 * S);
             let seed = 7919 * (frame + 1) + radius * 131;
             const rnd = () => ((seed = seed * 16807 % 2147483647) - 1) / 2147483646;
@@ -282,7 +282,7 @@
             let cv = _lampSprites.get(key);
             if (!cv) {
                 const [bx, by, bw, bh] = LAMP_STYLES[style].box;
-                cv = document.createElement('canvas'); cv.width = Math.ceil(bw * S); cv.height = Math.ceil(bh * S);
+                cv = canvasKit.createLayer([Math.ceil(bw * S), Math.ceil(bh * S)]).canvas;
                 const c = cv.getContext('2d'); c.setTransform(S, 0, 0, S, -bx * S, -by * S);
                 LAMP_STYLES[style].paint(c, lit, color);
                 _lampSprites.set(key, cv);
@@ -500,7 +500,7 @@
             let cv = _lampFixtureSprites.get(key);
             if (!cv) {
                 const [bx, by, bw, bh] = LAMP_FIXTURES[name].box;
-                cv = document.createElement('canvas'); cv.width = Math.ceil(bw * S); cv.height = Math.ceil(bh * S);
+                cv = canvasKit.createLayer([Math.ceil(bw * S), Math.ceil(bh * S)]).canvas;
                 const c = cv.getContext('2d'); c.setTransform(S, 0, 0, S, -bx * S, -by * S);
                 LAMP_FIXTURES[name].paint(c, lit, color);
                 _lampFixtureSprites.set(key, cv);

@@ -73,7 +73,7 @@
                                         condition: "LOC_HOTEL_SUITE",
                                         onStart: (game) => {
                                             game.hud.reveal('action');
-                                            game.addPausableTimeout(() => game.story.triggerComms("747", "I'll hold the lobby and watch the feeds. Comms open.", 4500), 1200);
+                                            game_timers.after(1.2, () => game.story.triggerComms("747", "I'll hold the lobby and watch the feeds. Comms open.", 4500), 'world');
                                         }
                                     },
                                     // The penthouse: she draws her FP-X (the fire stick), and walks in deeper
@@ -86,10 +86,10 @@
                                         onStart: (game) => {
                                             if (game.inventory && game.inventory.items.some(i => i.id === 'pistol_fpx')) { game.inventory.equipItem('pistol_fpx'); game.weaponHolstered = false; }
                                             game.hud.reveal('holster');
-                                            game.addPausableTimeout(() => {
+                                            game_timers.after(0.6, () => {
                                                 game.hud.reveal('fire', { title: 'Your FP-X', text: 'Hold to aim. Push past the gold line to fire.', timeout: 14000, until: g => g.fireJoystick.active || g.mouseDown });
-                                            }, 600);
-                                            game.addPausableTimeout(() => game.story.triggerComms("747", "Well, welcome to the Penthouse. Watch your corners, Nine.", 4000), 2500);
+                                            }, 'world');
+                                            game_timers.after(2.5, () => game.story.triggerComms("747", "Well, welcome to the Penthouse. Watch your corners, Nine.", 4000), 'world');
                                         }
                                     },
                                     // The red light, the wall blows in, the drones
@@ -103,8 +103,8 @@
                                             const S = game.story, H = game.hud;
                                             game.questState.suiteAmbushTriggered = false;          // set when the wall goes (AMBUSH_CLEARED waits on it)
                                             S.triggerComms("949", "Threat, bedroom.", 2200);
-                                            game.addPausableTimeout(() => S.triggerComms("Yenna", "Copacetic, en route!", 1800), 1300);
-                                            game.addPausableTimeout(() => {
+                                            game_timers.after(1.3, () => S.triggerComms("Yenna", "Copacetic, en route!", 1800), 'world');
+                                            game_timers.after(3.2, () => {
                                                 if (game.activeMap.id !== 'hotel_suite') { game.story.goTo('SEARCH_SUITE'); return; }   // she left before it blew
                                                 game.questState.suiteAmbushTriggered = true;
                                                 showMessage("BREACH DETECTED!");
@@ -120,10 +120,10 @@
                                                 game.enemies.push(new Drone(900, 1100, 'lancer'));
                                                 game.enemies.push(new Drone(1000, 1150, 'seer'));
                                                 game.enemies.push(new Drone(1100, 1100, 'grappler'));
-                                            }, 3200);
-                                            game.addPausableTimeout(() => S.triggerComms("Max", "Fuck!", 1500), 3700);
-                                            game.addPausableTimeout(() => S.triggerComms("Victoria", "It's them.", 2200), 5400);
-                                            game.addPausableTimeout(() => S.triggerComms("Max", "And here we go…", 2200), 7800);
+                                            }, 'world');
+                                            game_timers.after(3.7, () => S.triggerComms("Max", "Fuck!", 1500), 'world');
+                                            game_timers.after(5.4, () => S.triggerComms("Victoria", "It's them.", 2200), 'world');
+                                            game_timers.after(7.8, () => S.triggerComms("Max", "And here we go…", 2200), 'world');
                                             // A stim after the first hit; the flit once they start telegraphing (or she's hit)
                                             S.watch(g => {
                                                 if (g.coach.cur) return false;
@@ -152,14 +152,14 @@
                                             const S = game.story, H = game.hud;
                                             game.questState.ambushCleared = true;
                                             H.reveal('heal'); H.reveal('flit');
-                                            game.addPausableTimeout(() => S.triggerComms("Max", "This… is bullshit.", 2400), 1500);
-                                            game.addPausableTimeout(() => S.triggerComms("Sabrina", "Better than bullshit. It's raw building material.", 3200), 4200);
+                                            game_timers.after(1.5, () => S.triggerComms("Max", "This… is bullshit.", 2400), 'world');
+                                            game_timers.after(4.2, () => S.triggerComms("Sabrina", "Better than bullshit. It's raw building material.", 3200), 'world');
                                             S.watch(g => {
                                                 const note = (g.props || []).find(p => p.noteId === 'dark_maker_letter' || (p.interactionType === 'read_note' && /dark/i.test(p.noteId || p.label || '')));
                                                 if (!note || g.activeMap.id !== 'hotel_suite') return false;
                                                 if (Math.hypot(g.player.x - (note.x + (note.w || 0) / 2), g.player.y - (note.y + (note.h || 0) / 2)) > 150) return false;
                                                 S.triggerComms("Yenna", "What's that?", 2400);
-                                                g.addPausableTimeout(() => S.triggerComms("949", "Yenna, you really are a sniper.", 2600), 2600);
+                                                game_timers.after(2.6, () => S.triggerComms("949", "Yenna, you really are a sniper.", 2600), 'world');
                                                 return true;
                                             });
                                         }
@@ -173,9 +173,9 @@
                                         condition: "PLAYER_IN_OWNED_CAR",
                                         onStart: (game) => {
                                             const S = game.story;
-                                            game.addPausableTimeout(() => { game.triggerShake(6); S.triggerComms("Josh", "RAAAGH—", 1600); }, 1200);
-                                            game.addPausableTimeout(() => S.triggerComms("949", "Josh.", 2000), 3200);
-                                            game.addPausableTimeout(() => S.triggerComms("747", "News crews'll be on us any minute. The BlackMark's out front, Nine.", 4200), 6000);
+                                            game_timers.after(1.2, () => { game.triggerShake(6); S.triggerComms("Josh", "RAAAGH—", 1600); }, 'world');
+                                            game_timers.after(3.2, () => S.triggerComms("949", "Josh.", 2000), 'world');
+                                            game_timers.after(6, () => S.triggerComms("747", "News crews'll be on us any minute. The BlackMark's out front, Nine.", 4200), 'world');
                                             S.watch(g => g.activeMap.id === 'sdc' && (S.placeCarAtHotel(), true));   // once she's back on the street
                                             S.watch(g => {
                                                 if (!g.isDriving || g.coach.cur) return false;
@@ -214,12 +214,12 @@
                                         onStart: (game) => {
                                             if (game.hud) game.hud.revealAll();
                                             game.ui.showMissionBanner("CHAPTER 1 COMPLETE — THE AWAKENING", "gold", "COMPLETED");
-                                            game.addPausableTimeout(() => {
+                                            game_timers.after(3, () => {
                                                 game.story.triggerComms("747", "He slipped through. But we rattled him. Rest up, Nine. This isn't over.", 6000);
-                                            }, 3000);
-                                            game.addPausableTimeout(() => {
+                                            }, 'world');
+                                            game_timers.after(16, () => {
                                                 game.story.triggerComms("LARISSA", "949. I received news of what went down. I say it's time for a meeting.", 6000);
-                                            }, 16000);
+                                            }, 'world');
                                         }
                                     }
                                 },
@@ -259,12 +259,12 @@
                                                     showMessage("THE TRIUMVIRATE DESTROYED! REWARD: 1000 PERSONICS, 50 SCRAP");
                                                     game.triggerShake(30);
                                                     for (let i = 0; i < 20; i++) {
-                                                        game.addPausableTimeout(() => {
+                                                        game_timers.after((i * 100) / 1000, () => {
                                                             const rx = 400 + Math.random() * 400;
                                                             const ry = 300 + Math.random() * 600;
                                                             game.weather.spawnExplosion(rx, ry, '#ff3300');
                                                             game.weather.spawnSparks(rx, ry, 30);
-                                                        }, i * 100);
+                                                        }, 'world');
                                                     }
                                                     game.ui.showMissionBanner("THE SANCTUM — CLEARED", "gold", "COMPLETED");
                                                 }

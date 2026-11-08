@@ -6,12 +6,6 @@
          * Delegates to CollisionSystem's unified SAT solver.
          */
         class PhysicsSystem {
-            // --- SHAPE MATHS: basement/shape-kit.js, under the names the game already calls ---
-            static corners = shapeKit.boxCorners;
-            static _inside = shapeKit.insideBox;
-            static contactPoint = shapeKit.boxContactPoint;
-            static impulseAt = shapeKit.impulseAt;
-            static checkPointAABB = shapeKit.pointInRect;
 
             /**
              * Resolve OBB collision between two vehicles.
@@ -19,7 +13,7 @@
              */
             static resolveOBBCollision(c1, c2) {
                 // Use CollisionSystem's SAT solver
-                const packet = CollisionSystem._satCollision(c1, c2);
+                const packet = shapeKit.sat(c1, c2);
                 if (!packet) return false;
                 PhysicsSystem.carContact(c1, c2, packet.nx, packet.ny, packet.depth);
                 return true;
@@ -62,13 +56,13 @@
                 const m1 = c1.isStatic ? Infinity : (c1.mass || 1000), m2 = c2.isStatic ? Infinity : (c2.mass || 1000);
                 const w1 = isFinite(m1) ? (isFinite(m2) ? m2 / (m1 + m2) : 1) : 0;
                 const w2 = isFinite(m2) ? (isFinite(m1) ? m1 / (m1 + m2) : 1) : 0;
-                const [px, py] = PhysicsSystem.contactPoint(c1, c2, nx, ny);
+                const [px, py] = shapeKit.boxContactPoint(c1, c2, nx, ny);
                 c1.x += nx * depth * w1; c1.y += ny * depth * w1;
                 c2.x -= nx * depth * w2; c2.y -= ny * depth * w2;
                 c1._lastImpact = c2._lastImpact = 0;
                 const B1 = PhysicsSystem.body(c1, w1 > 0), B2 = PhysicsSystem.body(c2, w2 > 0);
                 const v1x = B1.vx, v1y = B1.vy, v2x = B2.vx, v2y = B2.vy;
-                const hit = PhysicsSystem.impulseAt(B1, B2, px + nx * depth * w1, py + ny * depth * w1, nx, ny, 0.2, 0.3);
+                const hit = shapeKit.impulseAt(B1, B2, px + nx * depth * w1, py + ny * depth * w1, nx, ny, 0.2, 0.3);
                 if (!hit) return;                                      // already separating
                 // A nudge between two traffic cars (queues, merges) is driven out of; a real knock spins them
                 const soft = hit < CONFIG.VEHICLE_DRIVE.KNOCK_MIN_HIT && c1.controlMode !== 'PLAYER' && c2.controlMode !== 'PLAYER';

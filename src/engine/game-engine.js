@@ -23,9 +23,7 @@
                 this.profiler = new Profiler(); // Initialize the performance tracker
                 this.profiler.setEnabled(false);
                 
-                // Unified Entity System feature flag
-                this.useNewCollisionSystem = true;
-                
+
                 this.canvas = document.getElementById('game-canvas');
                 this.ctx = this.canvas.getContext('2d');
                 
@@ -130,11 +128,6 @@
                 this.emoteJoystick = { active: false, touchId: null, highlighted: null };
                 this.playerEmote = { text: null, age: 0, duration: 120 }; // ~2s bubble above player
 
-                // Pausable timer system — frame-tick driven so timers naturally
-                // freeze with the game. Use addPausableTimeout/cancelPausableTimeout
-                // anywhere that setTimeout would inappropriately run during pause.
-                this.pausableTimers = [];
-                this._lastPausableTimerTick = undefined;
                 this.uiLocation = document.getElementById('ui-location');
                 this.uiTime = document.getElementById('ui-time');
                 this.uiCurrency = document.getElementById('ui-currency');

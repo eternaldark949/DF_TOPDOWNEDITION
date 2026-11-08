@@ -1372,14 +1372,12 @@ engineMixin({
                 
                 GameEntity.clearType('projectile'); 
 
-                if (this.useNewCollisionSystem) {
-                    if (this.activeMap.walls) { this._staticWallEntities = createStaticEntitiesFromWalls(this.activeMap.walls); }
-                    if (this.activeMap.buildings) { this._staticBuildingEntities = createStaticEntitiesFromBuildings(this.activeMap.buildings); }
-                }
+                if (this.activeMap.walls) { this._staticWallEntities = createStaticEntitiesFromWalls(this.activeMap.walls); }
+                if (this.activeMap.buildings) { this._staticBuildingEntities = createStaticEntitiesFromBuildings(this.activeMap.buildings); }
                 // Hub billboards are parked for now; keep their authored data for a later return.
                 this.activeMap.billboards = this.activeMap.id === 'sdc' ? []
                     : BILLBOARDS.filter(b => b.map === this.activeMap.id).map(cfg => new Billboard(cfg));
-                if (this.useNewCollisionSystem) this._staticBillboardEntities = this.activeMap.billboards.flatMap(b => b.colliders());
+                this._staticBillboardEntities = this.activeMap.billboards.flatMap(b => b.colliders());
                 
                 CollisionSystem.processQueue();
                 GameEntity.queueEnabled = false;
@@ -1430,12 +1428,12 @@ engineMixin({
                 if (this.activeMap.id === 'sdc' && this.missions && this.missions.activeMission) {
                     const m = this.missions.activeMission;
                     if (m.status === 'active') {
-                        this.addPausableTimeout(() => {
+                        game_timers.after(0.8, () => {
                             if (this.ui && this.ui.showMissionBanner) {
                                 const text = this.missions.getObjectiveText();
                                 if (text) this.ui.showMissionBanner(text, 'gold', 'IN PROGRESS');
                             }
-                        }, 800);
+                        }, 'world');
                     }
                 }
                 
@@ -1727,7 +1725,7 @@ engineMixin({
                 }
                 for (let lamp of this.lamps) {
                     // Visibility polygon (core/draw-helpers.js), bounded by the map's corners
-                    const intersections = computeVisibilityPoly(lamp.x, lamp.y, lamp.radius, allObstacles, {
+                    const intersections = collisionWorld.visibilityPoly(lamp.x, lamp.y, lamp.radius, allObstacles, {
                         extraPoints: [{x: 0, y: 0}, {x: this.activeMap.width, y: 0},
                                       {x: this.activeMap.width, y: this.activeMap.height}, {x: 0, y: this.activeMap.height}] });
             

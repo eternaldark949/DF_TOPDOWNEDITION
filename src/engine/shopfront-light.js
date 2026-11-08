@@ -74,8 +74,7 @@
         /** The door's extra: one pane's shaft, warm, the door's extra brightness */
         function shopDoorSprite() {
             return shopLightSprite._door || (shopLightSprite._door = (() => {
-                const L = SHOP_LIGHT, D = L.DEPTH, W = L.PANE + D, ox = W / 2, cv = document.createElement('canvas');
-                cv.width = Math.ceil(W * L.K); cv.height = Math.ceil(D * L.K);
+                const L = SHOP_LIGHT, D = L.DEPTH, W = L.PANE + D, ox = W / 2, cv = canvasKit.createLayer([Math.ceil(W * L.K), Math.ceil(D * L.K)]).canvas;
                 const c = cv.getContext('2d'); c.scale(L.K, L.K); c.globalCompositeOperation = 'lighter';
                 _shopShaft(c, ox, -L.PANE / 2, L.PANE / 2, L.WARM, L.ALPHA * (L.DOOR - 1));
                 return { cv, ox, W };

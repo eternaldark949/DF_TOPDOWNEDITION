@@ -853,7 +853,7 @@
             drawScanlines(ctx, w, h) {
                 // A whisper of scanlines (cached tile), so the gold reads as a display, not as noise
                 if (!this._scanPat || this._scanDpr !== this.dpr) {
-                    const t = document.createElement('canvas'), D = this.dpr; t.width = 4; t.height = Math.max(2, Math.round(3 * D));
+                    const D = this.dpr, t = canvasKit.createLayer([4, Math.max(2, Math.round(3 * D))]).canvas;
                     const c = t.getContext('2d'); c.fillStyle = 'rgba(6, 2, 14, 0.16)'; c.fillRect(0, 0, 4, Math.max(1, Math.round(D)));
                     this._scanPat = ctx.createPattern(t, 'repeat'); this._scanDpr = D;
                 }
@@ -868,7 +868,7 @@
 
             _showMap(show) {
                 const mapUI = document.getElementById('map-interface');
-                mapUI.style.display = show ? 'block' : 'none';
+                uiKit.toggle(mapUI, show);
                 if (show) this.game.pauseSystem.acquire('map_ui');
                 else this.game.pauseSystem.release('map_ui');
                 

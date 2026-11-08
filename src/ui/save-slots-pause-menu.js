@@ -150,16 +150,14 @@
                 try {
                     const src = document.getElementById('game-canvas');
                     if (src && src.width) {
-                        const w = 360, h = Math.round(w * src.height / src.width), c = document.createElement('canvas');
-                        c.width = w; c.height = h;
+                        const w = 360, h = Math.round(w * src.height / src.width), c = canvasKit.createLayer([w, h]).canvas;
                         c.getContext('2d').drawImage(src, 0, 0, w, h);
                         out.shot = c.toDataURL('image/jpeg', 0.72);
                     }
                 } catch (e) { /* no picture: the card shows the place's name on a plain ground */ }
                 try {
                     if (game.resolvePortraitConfig && !game.resolvePortraitConfig('949').isFallback) {
-                        const c = document.createElement('canvas');
-                        c.width = c.height = 120;
+                        const c = canvasKit.createLayer([120, 120]).canvas;
                         game.paintPortraitTo(c, '949', '#1d0e30');
                         out.face = c.toDataURL('image/jpeg', 0.85);
                     }
@@ -470,7 +468,7 @@
             _downloadJSON(data, filename) {
                 const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
+                const a = uiKit.make(['a']);
                 a.href = url;
                 a.download = filename;
                 document.body.appendChild(a);
@@ -699,10 +697,10 @@
                     const obj = game.missions.getObjectiveText();
                     if (obj) {
                         sideText.innerHTML = obj;
-                        if (cancelDiv) cancelDiv.style.display = 'block';
+                        if (cancelDiv) uiKit.show(cancelDiv);
                     } else {
                         sideText.innerHTML = '<span class="pause-obj-none">—</span>';
-                        if (cancelDiv) cancelDiv.style.display = 'none';
+                        if (cancelDiv) uiKit.hide(cancelDiv);
                     }
                 }
                 
@@ -714,7 +712,7 @@
                         if (game.missions && game.missions.activeMission) {
                             game.missions.abandonMission();
                             const st = document.getElementById('pause-obj-side-text'); if (st) st.innerHTML = '<span class="pause-obj-none">Mission abandoned</span>';
-                            if (cancelDiv) cancelDiv.style.display = 'none';
+                            if (cancelDiv) uiKit.hide(cancelDiv);
                         }
                     };
                 }
@@ -739,7 +737,7 @@
                 this.isOpen = false;
                 this.inSettings = false;
                 this.settingsPanel.classList.remove('active');
-                this.navMain.style.display = '';
+                uiKit.show(this.navMain, '');
                 this.navMain.inert = false;
                 // Just release our token — the registry handles whether the world
                 // remains paused. If dialogue, a shop, or another menu is also open,
@@ -956,7 +954,7 @@
                 if (GameSettings.capturePrompt === false) return;
                 let pill = document.getElementById('capture-pill');
                 if (!pill) {
-                    pill = document.createElement('button'); pill.id = 'capture-pill';
+                    pill = uiKit.make(['button']); pill.id = 'capture-pill';
                     pill.innerHTML = '<svg class="aperture-icon" aria-hidden="true"><use href="#icon-aperture"/></svg>Capture?';
                     document.body.appendChild(pill);
                     pill.addEventListener('click', (e) => {
@@ -998,8 +996,7 @@
 
             /** The held frame as a PNG, colour grade and all: downloaded, or the share sheet where files can be shared (phones). */
             saveCinePicture() {
-                const src = game.canvas, out = document.createElement('canvas');
-                out.width = src.width; out.height = src.height;
+                const src = game.canvas, out = canvasKit.createLayer([src.width, src.height]).canvas;
                 const ctx = out.getContext('2d');
                 const f = src.style.filter;
                 if (f && f !== 'none' && 'filter' in ctx) ctx.filter = f;
@@ -1023,7 +1020,7 @@
                     if (touch && file && navigator.canShare?.({ files: [file] })) {
                         try { await navigator.share({ files: [file], title: 'Dimensions: Freelancer' }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
                     }
-                    const a = document.createElement('a');
+                    const a = uiKit.make(['a']);
                     a.href = URL.createObjectURL(blob); a.download = name;
                     document.body.appendChild(a); a.click(); a.remove();
                     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
@@ -1095,7 +1092,7 @@
                 this.quickIndex = -1;
                 this.quickItems.forEach(item => item.classList.remove('active'));
                 this.inSettings = true;
-                this.navMain.style.display = 'none';
+                uiKit.hide(this.navMain);
                 this.navMain.inert = true;
                 this.settingsPanel.classList.add('active');
                 this._syncSettingsUI();
@@ -1107,7 +1104,7 @@
             closeSettings() {
                 this.inSettings = false;
                 this.settingsPanel.classList.remove('active');
-                this.navMain.style.display = '';
+                uiKit.show(this.navMain, '');
                 this.navMain.inert = false;
                 this._syncCutsceneMenu();
                 this.setActiveIndex(this.activeIndex);

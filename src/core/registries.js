@@ -521,7 +521,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 // HUD label
                 if (config.uiLabel) {
                     const el = document.getElementById('ui-buffs');
-                    el.style.display = 'block';
+                    uiKit.show(el);
                     el.textContent = config.uiLabel;
                     if (config.uiColor) el.style.color = config.uiColor;
                 }
@@ -597,7 +597,7 @@ Exercise extreme caution. The Empereal Lord is watching.`,
                 }
                 if (!anyLabel) {
                     const el = document.getElementById('ui-buffs');
-                    el.style.display = 'none';
+                    uiKit.hide(el);
                     el.style.color = '';
                 }
 

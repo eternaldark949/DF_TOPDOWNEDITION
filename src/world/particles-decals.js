@@ -167,8 +167,7 @@
                 }
                 
                 // Update existing leaves
-                for (let i = this.leaves.length - 1; i >= 0; i--) {
-                    const leaf = this.leaves[i];
+                lifeKit.cull(this.leaves, leaf => {
                     
                     // Carried by the wind: ease toward its velocity (top-down, so no "falling" south)
                     leaf.vx += (tx - leaf.vx) * 0.02;
@@ -197,10 +196,9 @@
                         Math.abs(dy) > screenH / 2 + margin) {
                         // Recycle leaf - use O(1) swap removal
                         this._recycleLeaf(leaf);
-                        this.leaves[i] = this.leaves[this.leaves.length - 1];
-                        this.leaves.pop();
+                        return true;
                     }
-                }
+                });
             }
             
             /**
@@ -472,20 +470,17 @@
                 }
                 
                 // Iterate and draw/cleanup in one pass
-                for (let i = this.decals.length - 1; i >= 0; i--) {
-                    const d = this.decals[i];
+                lifeKit.cull(this.decals, d => {
                     const age = now - d.spawnTime;
                     
                     // Remove expired decals
                     if (age > maxAge) {
-                        this.decals[i] = this.decals[this.decals.length - 1];
-                        this.decals.pop();
-                        continue;
+                        return true;
                     }
                     
                     // Viewport culling
                     if (hasBounds) {
-                        if (d.x < left || d.x > right || d.y < top || d.y > bottom) continue;
+                        if (d.x < left || d.x > right || d.y < top || d.y > bottom) return;
                     }
                     
                     // Calculate fade
@@ -494,7 +489,7 @@
                     if (ageFraction > fadeStart) {
                         alpha *= 1.0 - ((ageFraction - fadeStart) / (1.0 - fadeStart));
                     }
-                    if (alpha < 0.01) continue;
+                    if (alpha < 0.01) return;
                     
                     // Draw based on type
                     if (d.type === 'skid' || d.type === 'blood') {
@@ -506,7 +501,7 @@
                         ctx.fillStyle = `rgba(${d.color}, ${alpha})`;
                         ctx.fillRect(d.x, d.y, d.size, d.size);
                     }
-                }
+                });
             }
             
             _hexToRgb(hex) {

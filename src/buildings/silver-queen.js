@@ -420,7 +420,7 @@
             /** The court painted once (2 px a world unit): fan-laid granite setts, a plum and gold border, three bays
                 along the wing (hers, 949, in the middle), parterres of violets in clipped box, the fountain's basin. */
             _sqPaintCourt(C) {
-                const D = C.drive, H = C.h + D.h, S2 = 2, cv = document.createElement('canvas'); cv.width = Math.ceil(C.w * S2); cv.height = Math.ceil(H * S2);
+                const D = C.drive, H = C.h + D.h, S2 = 2, cv = canvasKit.createLayer([Math.ceil(C.w * S2), Math.ceil(H * S2)]).canvas;
                 const c = cv.getContext('2d'), T = SQ_THEME, r = seededRandom('sq-court'); c.scale(S2, S2);
                 const fx = C.fx - C.x, fy = C.fy - C.y, R = C.fr, dx = D.x - C.x;
                 c.save(); c.beginPath(); c.rect(0, 0, C.w, C.h); c.rect(dx, C.h - 1, D.w, D.h + 1); c.clip();

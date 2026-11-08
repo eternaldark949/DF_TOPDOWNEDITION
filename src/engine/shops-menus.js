@@ -13,7 +13,7 @@
             openVendingMenu() {
                 this.pauseSystem.acquire('vending');
                 const menu = document.getElementById('vending-menu');
-                menu.style.display = 'block';
+                uiKit.show(menu);
                 
                 // Update balance display
                 document.getElementById('vend-balance').textContent = `BALANCE: ${this.currency} PERSONICS`;
@@ -23,7 +23,7 @@
                 if (stellarEl) {
                     const stellarConfig = CONSUMABLES.stellarLemonade;
                     const unlocked = stellarConfig.unlockCheck ? stellarConfig.unlockCheck(this) : true;
-                    stellarEl.style.display = unlocked ? 'flex' : 'none';
+                    uiKit.toggle(stellarEl, unlocked, 'flex');
                 }
                 
                 // Wire up item clicks (re-bind each open to capture current state)
@@ -279,7 +279,7 @@
                     const carEl = container.querySelector('.df-car'); if (!carEl) return;
                     carEl.style.background = pending.paintColor;
                     let glow = carEl.querySelector('.glow');
-                    if (!glow && pending.underglowColor) { glow = document.createElement('i'); glow.className = 'glow'; carEl.prepend(glow); }
+                    if (!glow && pending.underglowColor) { glow = uiKit.make(['i']); glow.className = 'glow'; carEl.prepend(glow); }
                     if (glow && pending.underglowColor) { glow.style.background = pending.underglowColor; glow.style.boxShadow = `0 0 10px ${pending.underglowColor},0 3px 14px ${pending.underglowColor}`; }
                     carEl.querySelectorAll('.lamp').forEach(l => { l.style.background = pending.headlightColor; l.style.boxShadow = `0 0 9px ${pending.headlightColor}`; });
                 };
@@ -376,7 +376,7 @@
             openGauntletMenu() {
                 this.pauseSystem.acquire('gauntlet_menu');
                 const menu = document.getElementById('gauntlet-menu');
-                menu.style.display = 'block';
+                uiKit.show(menu);
                 const hg = this.hordeGauntlet, container = document.getElementById('gauntlet-maps');
                 let html = '';
                 for (const g of GAUNTLET_MAPS) {
@@ -412,7 +412,7 @@
             openSleepMenu() {
                 this.pauseSystem.acquire('sleep_menu');
                 const menu = document.getElementById('sleep-menu');
-                menu.style.display = 'block';
+                uiKit.show(menu);
                 
                 // Setup Slider Logic
                 const slider = document.getElementById('sleep-slider');
@@ -431,7 +431,7 @@
                 // Confirm Button
                 const confirmBtn = document.getElementById('btn-sleep-confirm');
                 confirmBtn.onclick = () => {
-                    menu.style.display = 'none';
+                    uiKit.hide(menu);
                     this.pauseSystem.release('sleep_menu');
                     this.sleep(parseInt(slider.value));
                 };
@@ -439,7 +439,7 @@
                 // Cancel Button
                 const cancelBtn = document.getElementById('btn-sleep-cancel');
                 cancelBtn.onclick = () => {
-                    menu.style.display = 'none';
+                    uiKit.hide(menu);
                     this.pauseSystem.release('sleep_menu');
                 };
             },

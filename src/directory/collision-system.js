@@ -165,7 +165,7 @@
                         for (const [ax, ay, bx, by] of door.leaves()) {
                             const cx = (ax + bx) / 2, cy = (ay + by) / 2, a = Math.atan2(by - ay, bx - ax), c = Math.cos(a), s = Math.sin(a);
                             const x0 = (p.lastX ?? p.x) - cx, y0 = (p.lastY ?? p.y) - cy, x1 = p.x - cx, y1 = p.y - cy;
-                            const at = this._sweepRoundedBox(x0 * c + y0 * s, y0 * c - x0 * s, x1 * c + y1 * s, y1 * c - x1 * s,
+                            const at = shapeKit.sweepRoundedBox(x0 * c + y0 * s, y0 * c - x0 * s, x1 * c + y1 * s, y1 * c - x1 * s,
                                 Math.hypot(bx - ax, by - ay) / 2, 0, r + (door.halfThick || 0));
                             if (at !== null && (t === null || at < t)) t = at;
                         }

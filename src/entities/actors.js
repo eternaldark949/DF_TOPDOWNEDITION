@@ -478,7 +478,7 @@
                     // Half the unsettled Resonance scatters on the way back to Dr. Yin
                     if (this._game.resonance) {
                         const lost = this._game.resonance.onDeath();
-                        if (lost > 0) this._game.addPausableTimeout(() => showMessage(`${lost} UNSETTLED RESONANCE SCATTERED IN THE RETURN`), 1800);
+                        if (lost > 0) game_timers.after(1.8, () => showMessage(`${lost} UNSETTLED RESONANCE SCATTERED IN THE RETURN`), 'world');
                     }
                     
                     // Clear all active buffs (restores maxHP if Stellar Lemonade was active, etc.)
@@ -636,8 +636,7 @@
             if (_fieryFireballSprites) return _fieryFireballSprites;
             const K = 4, frames = 16, cols = 4, TAU = Math.PI * 2;
             const atlas = (w, h) => {
-                const cv = document.createElement('canvas');
-                cv.width = w * cols * K; cv.height = h * Math.ceil(frames / cols) * K;
+                const cv = canvasKit.createLayer([w * cols * K, h * Math.ceil(frames / cols) * K]).canvas;
                 return { cv, c: cv.getContext('2d'), w, h };
             };
             const core = atlas(40, 40), tail = atlas(64, 36);

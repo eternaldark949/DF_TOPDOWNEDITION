@@ -26,7 +26,7 @@
         /** The void: one seeded 512 px tile of nebula and stars, wrapped so it repeats seamlessly. */
         function _edgeVoidTile() {
             if (_edgeTile) return _edgeTile;
-            const S = MAP_EDGE.TILE, cv = document.createElement('canvas'); cv.width = cv.height = S;
+            const S = MAP_EDGE.TILE, cv = canvasKit.createLayer([S, S]).canvas;
             const c = cv.getContext('2d'), rng = seededRandom('the veil'), TAU = Math.PI * 2;
             c.fillStyle = '#080320'; c.fillRect(0, 0, S, S);
             const cols = ['92, 40, 170', '168, 44, 150', '48, 60, 180', '124, 84, 224'];

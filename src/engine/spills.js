@@ -125,10 +125,10 @@
             drawSpills(ctx, cb) {
                 const S = this.spills; if (!S || !S.length) return;
                 const now = _gameTimeSec, TAU = Math.PI * 2, mapId = this.activeMap ? this.activeMap.id : null;
-                for (let i = S.length - 1; i >= 0; i--) {
-                    const s = S[i], age = now - s.born;
-                    if (age > SPILL.LIFE || s.map !== mapId) { S.splice(i, 1); continue; }
-                    if (cb && (s.x + 40 < cb.left || s.x - 40 > cb.right || s.y + 40 < cb.top || s.y - 40 > cb.bottom)) continue;
+                lifeKit.sweep(S, s => {
+                    const age = now - s.born;
+                    if (age > SPILL.LIFE || s.map !== mapId) { return true; }
+                    if (cb && (s.x + 40 < cb.left || s.x - 40 > cb.right || s.y + 40 < cb.top || s.y - 40 > cb.bottom)) return;
                     const dry = age > SPILL.LIFE - SPILL.FADE ? 1 - (age - (SPILL.LIFE - SPILL.FADE)) / SPILL.FADE : 1;
                     const fly = Math.min(1, (now - s.splash) / 0.2);                // the splash: the drink flies out, then lands
                     const grow = Math.min(1, (now - s.splash) / 0.3), ease = 1 - (1 - grow) * (1 - grow);
@@ -165,6 +165,6 @@
                         ctx.beginPath(); ctx.arc(dx, dy, d.r * (fly < 1 ? 0.8 : 1), 0, TAU); ctx.fill();
                     }
                     ctx.restore();
-                }
+                });
             }
         });

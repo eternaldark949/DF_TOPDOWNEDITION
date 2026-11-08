@@ -70,13 +70,13 @@
 
             /** The driving buttons go, the on-foot ones come back */
             _onFootButtons() {
-                this.autodriveBtn.style.display = 'none';
+                uiKit.hide(this.autodriveBtn);
                 this.autodriveBtn.classList.remove('engaged');
-                if (this.handbrakeBtn) { this.handbrakeBtn.style.display = 'none'; this.handbrakeBtn.classList.remove('held'); }
+                if (this.handbrakeBtn) { uiKit.hide(this.handbrakeBtn); this.handbrakeBtn.classList.remove('held'); }
                 controls.touch.drop('touchHandbrake');
-                this.holsterBtn.style.display = 'flex'; { const sb = document.getElementById('btn-sneak'); if (sb) sb.style.display = 'flex'; }
-                this.fireBtn.style.display = this.weaponHolstered ? 'none' : 'flex';
-                this.emoteBtn.style.display = this.weaponHolstered ? 'flex' : 'none';
+                uiKit.show(this.holsterBtn, 'flex'); { const sb = document.getElementById('btn-sneak'); if (sb) uiKit.show(sb, 'flex'); }
+                uiKit.toggle(this.fireBtn, !this.weaponHolstered, 'flex');
+                uiKit.toggle(this.emoteBtn, this.weaponHolstered, 'flex');
             },
 
             /** Get into one of hers: the owned car, Amber's van, or her linked car (`hijackVehicle` takes a stranger's) */
@@ -150,18 +150,7 @@
                     const rightX = this.car.x - (Math.sin(this.car.angle) * exitDist);
                     const rightY = this.car.y + (Math.cos(this.car.angle) * exitDist);
 
-                    const isBlocked = (x, y) => {
-                        for(let w of this.activeMap.walls) {
-                            if(x > w.x && x < w.x + w.w && y > w.y && y < w.y + w.h) return true;
-                        }
-                        const colliders = getColliders(this.activeMap);
-                        if (colliders) {
-                            for(let b of colliders) {
-                                if(x > b.x && x < b.x + b.w && y > b.y && y < b.y + b.h) return true;
-                            }
-                        }
-                        return false;
-                    };
+                    const isBlocked = (x, y) => collisionWorld.pointBlocked(x, y, this.activeMap.walls, getColliders(this.activeMap));
 
                     const leftBlocked = isBlocked(leftX, leftY);
                     const rightBlocked = isBlocked(rightX, rightY);
@@ -227,11 +216,11 @@
                     const idx = this.traffic.vehicles.indexOf(c);
                     if (idx > -1) this.traffic.vehicles.splice(idx, 1);
 
-                    this.autodriveBtn.style.display = 'flex';
-                    if (this.handbrakeBtn) this.handbrakeBtn.style.display = 'flex';
-                    this.holsterBtn.style.display = 'none'; { const sb = document.getElementById('btn-sneak'); if (sb) sb.style.display = 'none'; }
-                    this.fireBtn.style.display = 'flex';
-                    this.emoteBtn.style.display = 'none';
+                    uiKit.show(this.autodriveBtn, 'flex');
+                    if (this.handbrakeBtn) uiKit.show(this.handbrakeBtn, 'flex');
+                    uiKit.hide(this.holsterBtn); { const sb = document.getElementById('btn-sneak'); if (sb) uiKit.hide(sb); }
+                    uiKit.show(this.fireBtn, 'flex');
+                    uiKit.hide(this.emoteBtn);
                     this.setInteract('Exit', 'Vehicle');
 
                     // --- SEATING LOGIC (seat assignment system) ---

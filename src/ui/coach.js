@@ -24,7 +24,7 @@
 
             _build() {
                 if (this.root) return;
-                const r = this.root = document.createElement('div');
+                const r = this.root = uiKit.make(['div']);
                 r.id = 'coach';
                 r.innerHTML = '<div class="co-hole"></div>'
                     + '<div class="co-block"></div><div class="co-block"></div><div class="co-block"></div><div class="co-block"></div>'

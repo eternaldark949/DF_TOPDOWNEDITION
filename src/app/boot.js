@@ -50,7 +50,7 @@
             const name = p && p.key !== 'none' ? p.name : 'Custom';
             const data = { game: 'DFAB', kind: 'colour-grade', version: 1, name, exportDate: new Date().toISOString(), values: { ..._gameGrade } };
             const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const a = document.createElement('a');
+            const a = uiKit.make(['a']);
             a.href = URL.createObjectURL(blob);
             a.download = `dfab_grade_${name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}.json`;
             document.body.appendChild(a); a.click(); a.remove();
@@ -88,17 +88,17 @@
             const c = document.getElementById('game-canvas'); if (!c) return;
             const g = _gameGrade;
             let ov = document.getElementById('grade-overlay');
-            if (!ov) { ov = document.createElement('div'); ov.id = 'grade-overlay'; ov.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;mix-blend-mode:soft-light;'; c.parentElement.appendChild(ov); }
+            if (!ov) { ov = uiKit.make(['div']); ov.id = 'grade-overlay'; ov.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;mix-blend-mode:soft-light;'; c.parentElement.appendChild(ov); }
             const w = gradeWash(g);
-            if (w) { ov.style.background = w.rgb; ov.style.opacity = w.alpha; ov.style.display = 'block'; }
-            else ov.style.display = 'none';
+            if (w) { ov.style.background = w.rgb; ov.style.opacity = w.alpha; uiKit.show(ov); }
+            else uiKit.hide(ov);
             // The vignette on a layer of its own over the canvas: an inset shadow on the canvas itself is painted under its
             // pixels, so it never showed in play (only saved photos, which bake it in, had it)
             let vg = document.getElementById('grade-vignette');
-            if (!vg) { vg = document.createElement('div'); vg.id = 'grade-vignette'; vg.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;'; c.parentElement.appendChild(vg); }
+            if (!vg) { vg = uiKit.make(['div']); vg.id = 'grade-vignette'; vg.style.cssText = 'position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1;'; c.parentElement.appendChild(vg); }
             c.style.boxShadow = 'none';
             vg.style.boxShadow = g.vignette > 0 ? 'inset 0 0 ' + (g.vignette * 2) + 'px ' + g.vignette + 'px rgba(0,0,0,' + (g.vignette / 100) + ')' : 'none';
-            vg.style.display = g.vignette > 0 ? 'block' : 'none';
+            uiKit.toggle(vg, g.vignette > 0);
         }
         /** Bake the wash and vignette into a photo (out: a canvas already holding the filtered frame) */
         function gradePhotoPass(out, cssW) {
@@ -133,7 +133,7 @@
             }
             if (S && !S.childElementCount) {
                 for (const [k, label, lo, hi, track] of GAME_GRADE_SLIDERS) {
-                    const row = document.createElement('label'); row.className = 'cg-row';
+                    const row = uiKit.make(['label', 'cg-row']);
                     row.innerHTML = `<span class="cg-label">${label}</span><input type="range" class="cg-slider" data-k="${k}" min="${lo}" max="${hi}" step="1"${track ? ` style="--cg-track:${track}"` : ''}><span class="cg-val" data-v="${k}"></span>`;
                     S.appendChild(row);
                 }

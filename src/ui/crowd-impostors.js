@@ -207,8 +207,7 @@
             _bakeSteps(n) {
                 const J = this.job; if (!J) return null;
                 const walk = J.stride > 0, F = walk ? CROWD_HQ.FRAMES : 1, W = walk ? CROWD_HQ.WARM : 0, R = CROWD_HQ.R, Q = CROWD_HQ.Q, cell = J.cell;
-                let sc = this._scratch;
-                if (!sc || sc.width !== cell) { sc = this._scratch = document.createElement('canvas'); sc.width = sc.height = cell; }
+                const sc = canvasKit.scratch(this, '_scratch', cell, cell);
                 const g = sc.getContext('2d'), B = J.B, G = B._gait;
                 const wm = _worldMatrix, wc = _worldCanvas, lite = _crowdLite, gt = _gameTimeSec, rot = _bodyRot;
                 _crowdLite = false;

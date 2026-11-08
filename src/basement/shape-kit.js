@@ -63,6 +63,114 @@
             /**
              * Point-in-AABB test (for UI/triggers).
              */
+            // --- SEGMENTS vs RECTS (sight lines, rays, vision cones, shots: thousands a frame, nothing allocated) ---
+            /** Where segment 1→2 crosses edge e1→e2, as uA along the segment (0..1), or -1 when it doesn't */
+            segEdgeT (x1, y1, x2, y2, ex1, ey1, ex2, ey2) {
+                const denom = (ey2 - ey1) * (x2 - x1) - (ex2 - ex1) * (y2 - y1);
+                if (denom === 0) return -1;
+                const uA = ((ex2 - ex1) * (y1 - ey1) - (ey2 - ey1) * (x1 - ex1)) / denom;
+                const uB = ((x2 - x1) * (y1 - ey1) - (y2 - y1) * (x1 - ex1)) / denom;
+                return (uA >= 0 && uA <= 1 && uB >= 0 && uB <= 1) ? uA : -1;
+            },
+            /** True when the segment crosses any edge of the rect (rx, ry, rw, rh) */
+            segCrossesRect (x1, y1, x2, y2, rx, ry, rw, rh) {
+                if ((x1 > x2 ? x1 : x2) < rx || (x1 < x2 ? x1 : x2) > rx + rw || (y1 > y2 ? y1 : y2) < ry || (y1 < y2 ? y1 : y2) > ry + rh) return false;
+                const T = shapeKit.segEdgeT;
+                return T(x1, y1, x2, y2, rx, ry, rx + rw, ry) >= 0 || T(x1, y1, x2, y2, rx, ry + rh, rx + rw, ry + rh) >= 0
+                    || T(x1, y1, x2, y2, rx, ry, rx, ry + rh) >= 0 || T(x1, y1, x2, y2, rx + rw, ry, rx + rw, ry + rh) >= 0;
+            },
+            /** Every point where the segment crosses the rect's edges (top, bottom, left, right), as { x, y } */
+            segRectPoints (x1, y1, x2, y2, rx, ry, rw, rh) {
+                const pts = [], T = shapeKit.segEdgeT;
+                for (const [ex1, ey1, ex2, ey2] of [[rx, ry, rx + rw, ry], [rx, ry + rh, rx + rw, ry + rh], [rx, ry, rx, ry + rh], [rx + rw, ry, rx + rw, ry + rh]]) {
+                    const t = T(x1, y1, x2, y2, ex1, ey1, ex2, ey2);
+                    if (t >= 0) pts.push({ x: x1 + t * (x2 - x1), y: y1 + t * (y2 - y1) });
+                }
+                return pts;
+            },
+            /** The nearest crossing's distance from (x1, y1) that's at least minD, if under `best`; else `best` */
+            segRectNearest (x1, y1, x2, y2, rx, ry, rw, rh, best, minD) {
+                if ((x1 > x2 ? x1 : x2) < rx || (x1 < x2 ? x1 : x2) > rx + rw || (y1 > y2 ? y1 : y2) < ry || (y1 < y2 ? y1 : y2) > ry + rh) return best;
+                const T = shapeKit.segEdgeT;
+                for (let e = 0; e < 4; e++) {
+                    const t = e === 0 ? T(x1, y1, x2, y2, rx, ry, rx + rw, ry)
+                            : e === 1 ? T(x1, y1, x2, y2, rx, ry + rh, rx + rw, ry + rh)
+                            : e === 2 ? T(x1, y1, x2, y2, rx, ry, rx, ry + rh)
+                            : T(x1, y1, x2, y2, rx + rw, ry, rx + rw, ry + rh);
+                    if (t < 0) continue;
+                    const d = Math.hypot(x1 + t * (x2 - x1) - x1, y1 + t * (y2 - y1) - y1);
+                    if (d < best && d >= minD) best = d;
+                }
+                return best;
+            },
+            /** Does the segment touch the rect [L, R] × [T, B], inside included? (slab clip) */
+            segmentHitsRect (x1, y1, x2, y2, L, T, R, B) {
+                let t0 = 0, t1 = 1;
+                const dx = x2 - x1, dy = y2 - y1;
+                for (const [p, q] of [[-dx, x1 - L], [dx, R - x1], [-dy, y1 - T], [dy, B - y1]]) {
+                    if (p === 0) { if (q < 0) return false; continue; }
+                    const r = q / p;
+                    if (p < 0) { if (r > t1) return false; if (r > t0) t0 = r; }
+                    else { if (r < t0) return false; if (r < t1) t1 = r; }
+                }
+                return true;
+            },
+            /** The same for a turned rect { x, y, width, height, angle } (x, y its corner; it turns about its centre) */
+            segmentHitsTurnedRect (x1, y1, x2, y2, p) {
+                const hw = p.width / 2, hh = p.height / 2;
+                const cx = p.x + hw, cy = p.y + hh;
+                const a = -(p.angle || 0), c = Math.cos(a), s = Math.sin(a);
+                const ax = (x1 - cx) * c - (y1 - cy) * s, ay = (x1 - cx) * s + (y1 - cy) * c;
+                const bx = (x2 - cx) * c - (y2 - cy) * s, by = (x2 - cx) * s + (y2 - cy) * c;
+                return shapeKit.segmentHitsRect(ax, ay, bx, by, -hw, -hh, hw, hh);
+            },
+
+            // --- POINTS, SQUARES AND QUADS vs RECTS ---
+            /** [dx, dy] from the rect's nearest point to (x, y) (0, 0 inside it) */
+            rectGap (x, y, r) { return [x - Math.max(r.x, Math.min(r.x + r.w, x)), y - Math.max(r.y, Math.min(r.y + r.h, y))]; },
+            /** (x, y) strictly inside the rect (its edge doesn't count) */
+            pointInsideRect (x, y, r) { return x > r.x && x < r.x + r.w && y > r.y && y < r.y + r.h; },
+            /** A square of half-size h at (x, y) overlapping the rect (touching doesn't count): the cheap body test */
+            squareHitsRect (x, y, h, r) { return x + h > r.x && x - h < r.x + r.w && y + h > r.y && y - h < r.y + r.h; },
+            /** The same with two half-sizes (an axis-aligned box centred at x, y): which way out is shortest, or null.
+             *  -> { side: 'left' | 'right' | 'top' | 'bottom', overlap } */
+            boxOutOfRect (x, y, hw, hh, r) {
+                if (!(x + hw > r.x && x - hw < r.x + r.w && y + hh > r.y && y - hh < r.y + r.h)) return null;
+                const L = (x + hw) - r.x, R = (r.x + r.w) - (x - hw), T = (y + hh) - r.y, B = (r.y + r.h) - (y - hh);
+                const m = Math.min(L, R, T, B);
+                return { side: m === L ? 'left' : m === R ? 'right' : m === T ? 'top' : 'bottom', overlap: m };
+            },
+            /** The convex hull of points (monotone chain), from the lowest x round. Sorts pts in place. Points are
+             *  [x, y] pairs, or { x, y } with xy = true. Fewer than three come back as they are, sorted. */
+            hull (pts, xy) {
+                const X = xy ? p => p.x : p => p[0], Y = xy ? p => p.y : p => p[1];
+                pts.sort((a, b) => X(a) - X(b) || Y(a) - Y(b));
+                if (pts.length < 3) return pts;
+                const cr = (o, a, b) => (X(a) - X(o)) * (Y(b) - Y(o)) - (Y(a) - Y(o)) * (X(b) - X(o));
+                const lo = [], up = [];
+                for (const p of pts) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+                for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
+                return lo.slice(0, -1).concat(up.slice(0, -1));
+            },
+            /** A turned rect's four corners as [x, y] pairs (centred at cx, cy) */
+            quadCorners (cx, cy, w, h, a) {
+                const c = Math.cos(a), s = Math.sin(a), hw = w / 2, hh = h / 2;
+                return [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(([x, y]) => [cx + x * c - y * s, cy + x * s + y * c]);
+            },
+            /** Two quads (four [x, y] corners each) overlap, touching doesn't count (separating axes) */
+            quadsOverlap (A, B) {
+                for (const P of [A, B]) for (let i = 0; i < 4; i++) {
+                    const [x1, y1] = P[i], [x2, y2] = P[(i + 1) % 4], nx = y1 - y2, ny = x2 - x1;
+                    let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
+                    for (const [x, y] of A) { const d = x * nx + y * ny; a0 = Math.min(a0, d); a1 = Math.max(a1, d); }
+                    for (const [x, y] of B) { const d = x * nx + y * ny; b0 = Math.min(b0, d); b1 = Math.max(b1, d); }
+                    if (a1 <= b0 || b1 <= a0) return false;
+                }
+                return true;
+            },
+            /** A rect's four corners as a quad */
+            rectQuad (r) { return [[r.x, r.y], [r.x + r.w, r.y], [r.x + r.w, r.y + r.h], [r.x, r.y + r.h]]; },
+
             pointInRect (px, py, rect) {
                 return (px >= rect.x && px <= rect.x + rect.w && 
                         py >= rect.y && py <= rect.y + rect.h);

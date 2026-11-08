@@ -74,7 +74,7 @@
                 this.active = want;
                 this.layers();
                 if (want) this._ensure();
-                if (this._el) this._el.style.display = want ? '' : 'none';
+                if (this._el) uiKit.toggle(this._el, want, '');
                 document.body.classList.toggle('dev-render', want);
                 if (typeof DevOverlay !== 'undefined') DevOverlay.sync(game);   // the counter runs while the panel is open
                 if (want) this.mark = RenderStats.calls;
@@ -100,7 +100,7 @@
 
             _ensure() {
                 if (this._el) return;
-                const el = document.createElement('div'); el.id = 'dev-render';
+                const el = uiKit.make(['div']); el.id = 'dev-render';
                 const groups = [];
                 for (const [k, name, g] of RENDER_LAYERS) {
                     let grp = groups.find(x => x.g === g);

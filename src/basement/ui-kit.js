@@ -4,7 +4,7 @@
         //
         // EL PACKET: [tag, className, text]   a new element; leave out what you don't set
         //   tag               'div', 'span', 'button' ...
-        //   className         its class (set even when empty, as an assignment would)
+        //   className         its class (set even when empty, as an assignment would; null leaves it unset)
         //   text              its textContent
         //
         // A REF is an element or an element's id. show / hide also take a list of refs. A ref that
@@ -25,7 +25,7 @@
             /** A new element from a packet, appended to `parent` when one is given. */
             make (el_packet, parent) {
                 const e = document.createElement(el_packet[0]);
-                if (el_packet.length > 1) e.className = el_packet[1];
+                if (el_packet.length > 1 && el_packet[1] !== null) e.className = el_packet[1];
                 if (el_packet.length > 2) e.textContent = el_packet[2];
                 if (parent) parent.appendChild(e);
                 return e;

@@ -70,11 +70,11 @@
                 endFirst: true, accept: g => { if (g.hordeGauntlet) g.openGauntletMenu(); },
                 decline(g) {                                                           // BOSS REPLAY: back to the Sanctum
                     g.loadMap('church_boss');
-                    g.addPausableTimeout(() => {
+                    game_timers.after(0.5, () => {
                         if (!g.enemies.some(e => e.persona && !e.dead)) g.spawnTriumvirate({ short: true });
                         showMessage("THE TRIUMVIRATE AWAKENS... (REPLAY)");
                         g.triggerShake(20);
-                    }, 500);
+                    }, 'world');
                 }
             },
             'LUVSH4D3': {

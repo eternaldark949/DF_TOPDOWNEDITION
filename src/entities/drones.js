@@ -50,7 +50,7 @@
             _setState(s) { this.state = s; this._stateT = _gameTimeSec; }
 
             /** Clear line, walls only (props are low: it hovers over them) */
-            _los(px, py, walls) { return !isLineBlocked(this.x, this.y, px, py, walls, []); }
+            _los(px, py, walls) { return !collisionWorld.lineBlocked(this.x, this.y, px, py, walls, []); }
 
             /** Where its eye is (world) */
             eyePos() { return { x: this.x + Math.cos(this.angle) * DRONE.EYE_FWD, y: this.y + Math.sin(this.angle) * DRONE.EYE_FWD }; }
@@ -99,7 +99,7 @@
                     case 'dive': {
                         const L = DRONE.LANCE, ux = Math.cos(this._diveA), uy = Math.sin(this._diveA);
                         const nx = this.x + ux * L.SPEED, ny = this.y + uy * L.SPEED;
-                        const blocked = isLineBlocked(this.x, this.y, nx, ny, walls, []);
+                        const blocked = collisionWorld.lineBlocked(this.x, this.y, nx, ny, walls, []);
                         if (!blocked) { this.x = nx; this.y = ny; this._dived += L.SPEED; }
                         if (!this._impaled && g && Math.hypot(playerX - this.x, playerY - this.y) < this.radius + 16) {
                             this._impaled = true;
@@ -116,7 +116,7 @@
                         const T = this._tether, G = DRONE.GRAPPLE;
                         if (T.state === 'out') {
                             const nx = T.x + Math.cos(T.a) * G.SPEED, ny = T.y + Math.sin(T.a) * G.SPEED;
-                            const wall = isLineBlocked(T.x, T.y, nx, ny, walls, []);
+                            const wall = collisionWorld.lineBlocked(T.x, T.y, nx, ny, walls, []);
                             T.x = nx; T.y = ny;
                             if (g && Math.hypot(playerX - T.x, playerY - T.y) < 18 && !g.playerDodging()) {
                                 T.state = 'held'; T.until = now + G.SECS; T.next = now + G.TICK;
@@ -180,7 +180,7 @@
                 this.vx *= 0.9; this.vy *= 0.9;
                 this.x += this.vx; this.y += this.vy;
                 for (const w of walls) {
-                    if (this.x + this.radius > w.x && this.x - this.radius < w.x + w.w && this.y + this.radius > w.y && this.y - this.radius < w.y + w.h) {
+                    if (shapeKit.squareHitsRect(this.x, this.y, this.radius, w)) {
                         this.vx *= -1; this.vy *= -1; this.x += this.vx * 2; this.y += this.vy * 2;
                     }
                 }
@@ -215,7 +215,7 @@
                     this._moveAt = now + DRONE.BEAM.EVERY;
                     const e = this.eyePos(), B = DRONE.BEAM;
                     this._beam = { x0: e.x, y0: e.y, x1: e.x + Math.cos(M.a) * B.RANGE, y1: e.y + Math.sin(M.a) * B.RANGE, t0: now };
-                    const d2 = CollisionSystem.distToSegmentSquared(px, py, this._beam.x0, this._beam.y0, this._beam.x1, this._beam.y1);
+                    const d2 = shapeKit.segmentDistanceSq(px, py, this._beam.x0, this._beam.y0, this._beam.x1, this._beam.y1);
                     if (d2 < B.WIDTH * B.WIDTH && g.hurtPlayer(B.HIT)) { g.burnPlayer(4, 1.5); g.triggerShake(6); }
                     this._setState('beam');
                 }

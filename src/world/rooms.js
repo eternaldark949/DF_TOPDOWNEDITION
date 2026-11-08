@@ -417,34 +417,8 @@
                 if (this.type !== 'hinged') return;
                 // A leaf folds right back to the wall beside its hinge (not a 90° stop), so no one
                 // is ever pinned behind a door flung wide
-                const L = this.length, half = this.thickness / 2, MAX = Math.PI - 0.25;
-                const a = this.baseAngle + this.angle, ux = Math.cos(a), uy = Math.sin(a);
-                for (const act of actors) {
-                    const r = act.radius || 12;
-                    const px = act.x - this.hx, py = act.y - this.hy;
-                    if (px * px + py * py > (L + r + 4) * (L + r + 4)) continue;
-                    const s = Math.max(0, Math.min(L, px * ux + py * uy));           // closest point along the leaf
-                    const dx = px - ux * s, dy = py - uy * s, dist = Math.hypot(dx, dy);
-                    const depth = r + half - dist;
-                    if (depth <= 0) continue;
-                    let nx, ny;
-                    if (dist > 1e-4) { nx = dx / dist; ny = dy / dist; }
-                    else { nx = -uy; ny = ux; }
-                    const jammed = Math.abs(this.angle) >= MAX - 0.01 && Math.sign(ux * -ny - uy * -nx) === Math.sign(this.angle);
-                    const give = jammed || s < 4 ? 1 : 0.7;                         // near the hinge or at the stop it can't yield
-                    act.x += nx * depth * give; act.y += ny * depth * give;
-                    // Torque from the actor pushing along -n; a push near the hinge still swings the
-                    // door (people push a door's middle), so no one gets stuck at the jamb
-                    const torque = Math.max(s, L * 0.5) * (ux * -ny - uy * -nx) * depth;
-                    this.angVel += torque * 0.9 / (L * L / 3);
-                }
                 const prev = this.angle;
-                this.angVel += -0.018 * this.angle;                                 // closing spring
-                this.angVel *= 0.88;
-                this.angle += this.angVel;
-                if (this.angle > MAX) { this.angle = MAX; this.angVel *= -0.3; }
-                if (this.angle < -MAX) { this.angle = -MAX; this.angVel *= -0.3; }
-                if (Math.abs(this.angle) < 0.002 && Math.abs(this.angVel) < 0.0005) { this.angle = 0; this.angVel = 0; }
+                collisionWorld.stepHinge(this, actors, Math.PI - 0.25);   // the leaf on its hinge: pushed, pushing back, sprung shut
                 // Sounds: a creak as it's pushed open, a latch click when it swings home
                 if (typeof ambience !== 'undefined') {
                     const t = _frameTime / 1000;
@@ -637,9 +611,9 @@
                 return den ? Math.max(0, Math.min(1, ((cx - ax) * sy - (cy - ay) * sx) / den)) : 0;
             }
             const R2 = R * R;                                    // grazing: the circle touches the leaf at an end of the step
-            if (CollisionSystem.distToSegmentSquared(ax, ay, cx, cy, dx, dy) < R2) return 0;
-            if (CollisionSystem.distToSegmentSquared(bx, by, cx, cy, dx, dy) < R2) return 1;
-            if (CollisionSystem.distToSegmentSquared(cx, cy, ax, ay, bx, by) < R2 || CollisionSystem.distToSegmentSquared(dx, dy, ax, ay, bx, by) < R2) return 0.5;
+            if (shapeKit.segmentDistanceSq(ax, ay, cx, cy, dx, dy) < R2) return 0;
+            if (shapeKit.segmentDistanceSq(bx, by, cx, cy, dx, dy) < R2) return 1;
+            if (shapeKit.segmentDistanceSq(cx, cy, ax, ay, bx, by) < R2 || shapeKit.segmentDistanceSq(dx, dy, ax, ay, bx, by) < R2) return 0.5;
             return null;
         }
 
@@ -1019,9 +993,9 @@
                 if (!this._veil) {                                      // world-aligned, one texel per FEATHER px
                     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
                     for (const id in this.rooms) { const r = this.rooms[id]; x0 = Math.min(x0, r.x); y0 = Math.min(y0, r.y); x1 = Math.max(x1, r.x + r.w); y1 = Math.max(y1, r.y + r.h); }
-                    const pad = L.FEATHER * 2, cv = document.createElement('canvas');
+                    const pad = L.FEATHER * 2;
                     x0 -= pad; y0 -= pad; x1 += pad; y1 += pad;
-                    cv.width = Math.ceil((x1 - x0) / L.FEATHER); cv.height = Math.ceil((y1 - y0) / L.FEATHER);
+                    const cv = canvasKit.createLayer([Math.ceil((x1 - x0) / L.FEATHER), Math.ceil((y1 - y0) / L.FEATHER)]).canvas;
                     this._veil = { cv, c: cv.getContext('2d'), x0, y0, w: cv.width * L.FEATHER, h: cv.height * L.FEATHER };
                 }
                 const V = this._veil, c = V.c, s = 1 / L.FEATHER;

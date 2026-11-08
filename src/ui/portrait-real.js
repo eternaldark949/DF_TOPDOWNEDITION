@@ -56,7 +56,7 @@
                 return c;
             }
             function canvasFor() {
-                const c = document.createElement('canvas'); c.width = W; c.height = H;
+                const c = canvasKit.createLayer([W, H]).canvas;
                 c.getContext('2d').setTransform(S, 0, 0, S, OX, OY);
                 return c;
             }
@@ -1560,7 +1560,7 @@
             }
 
             const cache = new Map();
-            let frame = null;
+            const keep = {};                       // the frame buffer (canvasKit.scratch)
             const stable = v => v === null || typeof v !== 'object' ? JSON.stringify(v)
                 : Array.isArray(v) ? '[' + v.map(stable).join(',') + ']'
                 : '{' + Object.keys(v).filter(k => k !== 'material').sort().map(k => JSON.stringify(k) + ':' + stable(v[k])).join(',') + '}';   // (a linked material is already in its colour, fabric and finish)
@@ -1578,8 +1578,7 @@
                     if (cache.size > 40) cache.delete(cache.keys().next().value);
                 }
                 setSpace(w, h);
-                if (!frame) frame = document.createElement('canvas');
-                canvasKit.fitLayer(frame, w, h);
+                const frame = canvasKit.scratch(keep, 'frame', w, h);
                 const c = frame.getContext('2d');
                 c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; c.filter = 'none';
                 c.clearRect(0, 0, w, h);

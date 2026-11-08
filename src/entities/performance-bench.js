@@ -182,7 +182,7 @@
                         const file = new File([blob], name, { type: blob.type });
                         if (navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: 'Performance report' }); return; }
                     }
-                    const url = URL.createObjectURL(blob), a = document.createElement('a');
+                    const url = URL.createObjectURL(blob), a = uiKit.make(['a']);
                     a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
                     setTimeout(() => URL.revokeObjectURL(url), 30000);
                 } catch (e) { if (e.name !== 'AbortError') showMessage('REPORT EXPORT FAILED — TRY THE OTHER FORMAT'); }
@@ -192,7 +192,7 @@
                 let el = this._card;
                 if (!this.active && !this.results) { if (el) el.remove(); this._card = null; return; }
                 if (!el) {
-                    el = this._card = document.createElement('div'); el.id = 'performance-bench-card';
+                    el = this._card = uiKit.make(['div']); el.id = 'performance-bench-card';
                     for (const type of ['pointerdown','mousedown','touchstart','touchmove']) {
                         el.addEventListener(type, e => e.stopPropagation(), { passive: true });
                     }

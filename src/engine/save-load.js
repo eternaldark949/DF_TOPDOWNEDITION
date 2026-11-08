@@ -463,7 +463,7 @@ engineMixin({
                 const slotKey = key || ((typeof saveSlotManager !== 'undefined') ? saveSlotManager.getActiveKey() : 'dfab_save_slot_0');
                 let json = localStorage.getItem(slotKey);
                 // (A pre-slots save was moved into slot 1 once, by saveSlotManager._migrateV1Save; an empty slot stays empty.)
-                if (json && this.pausableTimers) this.pausableTimers.length = 0;   // the loaded world starts with nothing pending
+                if (json) game_timers.cancel('world');   // the loaded world starts with nothing pending (basement/timer-kit.js)
                 if (json && this.scenes) this.scenes.abort();                       // nor with a scene from before it
                 if (!json) {
                     showMessage("NO SAVE FILE FOUND.");

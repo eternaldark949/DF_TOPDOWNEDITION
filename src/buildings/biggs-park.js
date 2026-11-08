@@ -42,8 +42,7 @@
                 const key = [L, W, car.bodyColor, car.bumperColor, car.labelChar].join('|');
                 let s = car._biggsPaint;
                 if (!s || s.key !== key) {
-                    const cv = document.createElement('canvas'), pad = 8, d = 2;
-                    cv.width = Math.ceil((L + pad * 2) * d); cv.height = Math.ceil((W + pad * 2) * d);
+                    const pad = 8, d = 2, cv = canvasKit.createLayer([Math.ceil((L + pad * 2) * d), Math.ceil((W + pad * 2) * d)]).canvas;
                     const p = cv.getContext('2d'); p.setTransform(d, 0, 0, d, (L / 2 + pad) * d, (W / 2 + pad) * d);
                     const B = BiggsArt.box;
                     B(p, -L/2-2, -W/2+1, L+7, W+7, 'rgba(0,0,0,.35)', null, 11);

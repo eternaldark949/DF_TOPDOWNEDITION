@@ -1575,7 +1575,7 @@
             _sightClear(tx, ty, walls, buildings) {
                 if (typeof game !== 'undefined' && game.roomSystem.doorBlocks(this.x, this.y, tx, ty)) return false;   // not through a shut door
                 if (this._restrictedZoneId && typeof game !== 'undefined') return hasShotLine(this.x,this.y,tx,ty,game.activeMap);
-                return !isLineBlocked(this.x, this.y, tx, ty, walls, buildings);
+                return !collisionWorld.lineBlocked(this.x, this.y, tx, ty, walls, buildings);
             }
 
             // ... [update method from previous turn] ...
@@ -1872,10 +1872,7 @@
             // ... [collision/damage methods unchanged] ...
             checkCollisions(walls, buildings, trafficCars) {
                 let hitObstacle = false;
-                const checkBounds = (rect) => {
-                    return (this.x > rect.x - this.radius && this.x < rect.x + rect.w + this.radius && this.y > rect.y - this.radius && this.y < rect.y + rect.h + this.radius);
-                };
-                const staticBlocked = () => walls.some(checkBounds) || (buildings ? buildings.some(checkBounds) : false);
+                const staticBlocked = () => collisionWorld.squareBlocked(this.x, this.y, this.radius, walls, buildings);
                 let hitStatic = staticBlocked();
                 if (hitStatic && (this.velX || this.velY)) {
                     // Slide along the wall: keep whichever axis of the move is still clear
@@ -1996,7 +1993,7 @@
                 const r = this._coneRange || this.visionRange, c = this._coneCache;
                 if (c && Math.abs(c.x - this.x) < 2 && Math.abs(c.y - this.y) < 2 && Math.abs(c.a - this.angle) < 0.02 && Math.abs(c.r - r) < 2) return c.poly;
                 const map = typeof game !== 'undefined' && game.activeMap;
-                const poly = computeVisibilityPoly(this.x, this.y, r, getOccluders(map), { aMin: this.angle - this.visionFov / 2, aMax: this.angle + this.visionFov / 2, arcStep: 0.08 });
+                const poly = collisionWorld.visibilityPoly(this.x, this.y, r, getOccluders(map), { aMin: this.angle - this.visionFov / 2, aMax: this.angle + this.visionFov / 2, arcStep: 0.08 });
                 this._coneCache = { x: this.x, y: this.y, a: this.angle, r, poly };
                 return poly;
             }
