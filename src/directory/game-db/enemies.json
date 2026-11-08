@@ -1,0 +1,542 @@
+{
+  "_about": {
+    "chapter": "Enemies and encounters: what each enemy kind starts with, the drones, the Triumvirate and Lilitu, their hazards, and the Horde Gauntlet.",
+    "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.enemies and checked by tools/test-game-db.cjs. Times are seconds unless a name says frames (60 a second); distances px; damage HP. Keys in UPPER_SNAKE are read by the code under those names. Gauntlet ids and kind ids are in save files: never rename one.",
+    "tables": {
+      "kinds": "Each enemy class's starting numbers, read by its constructor (entities/enemies.js, entities/hunters.js, entities/drones.js); a spawn can still pass its own hp, speed or vision range. ganger.gun is the gun a ganger with no weapon carries (and the fallback for any stat a weapon leaves out). hunter.weapon is an ITEM or weapon-model id. demoness.decoy is a Blood Mirror decoy's claw and whip. gatling_gunner burst_count shots burst_delay frames apart, then reload frames.",
+      "drone": "The drones (DRONE, entities/drones.js): HP, armour and how much the open eye takes; how they descend, hover and land; the bolt; and each kind's move (LANCE, GRAPPLE, BEAM) and keep-away distance (KEEP).",
+      "drone_kinds": "The drone kinds, one picked at random when a spawn names none (DRONE_KINDS).",
+      "duel": "Lilitu's duel (DUEL, entities/hunters.js): phase thresholds P2 and P3 as shares of her health; SIGIL_EVERY and SIGILS per phase; her bolt fan, Shadow Step, Wing Gale, Blood Mirror and Infernal Rite.",
+      "wardens": "The Triumvirate's three wardens (WARDENS): name and colours (eye is an r, g, b string).",
+      "warden": "How the wardens fight (WARDEN): HP each; RELOAD and STAGGER in frames; EXTEND shots; COVER_FIRE and FLANK_AFTER in seconds; each one's move: Vesper's censer, Matins' hymn, Compline's hook.",
+      "triumvirate": "Where the wardens kneel in the Sanctum (TRIUMVIRATE, engine/boss-intro.js): [x, y, squad index, warden id].",
+      "hazards": "The bosses' hazards (HAZARD, engine/boss-hazards.js): sigils, burning, the censer's fire and smoke, the hymn, the hook, the rite.",
+      "gauntlet_maps": "The Horde Gauntlet's maps (GAUNTLET_MAPS): mapId is a map in world/maps.js; spawns and gunnerSpawns are [x, y]; locked ones show as Sealed. hooks names the wave rule in entities/enemies.js (GAUNTLET_WAVE_HOOKS); a map without one uses the standard waves.",
+      "gauntlet": "The gauntlet's rules: spawn_min_dist px from her; scale (GAUNTLET_SCALE): from wave FROM, HP x HP_GROWTH and damage + DMG_STEP a wave; elites from ELITE_FROM, about one in ELITE_EVERY; SCRAP x wave a cleared wave, BONUS_SCRAP every BONUS_EVERY-th; the Demoness' HP with her hunters and alone. lead_err px: how far off a wave's first guess of where she is; stall_secs and stall_err: a vaguer lead when no one has found her.",
+      "elites": "The elite marks (ELITES): label and colour (r, g, b); ward (ELITE_WARD): the warded elite's front arc in radians either side and the share of its health it turns away."
+    }
+  },
+  "kinds": {
+    "ganger": {
+      "radius": 15,
+      "hp": 40,
+      "mass": 10,
+      "friction": 0.9,
+      "speed": 2.5,
+      "invincible_frames": 20,
+      "vision_range": 320,
+      "telegraph_frames": 9,
+      "gun": {
+        "fireRate": 45,
+        "damage": 10,
+        "color": "#ff0055",
+        "speed": 24,
+        "spread": 0.15,
+        "penetrating": false,
+        "sticky": false
+      }
+    },
+    "hunter": {
+      "hp": 70,
+      "speed": 2.8,
+      "vision_range": 520,
+      "weapon": "pistol_ganger",
+      "dashes": 1,
+      "dash_cd": 230,
+      "claw": 14,
+      "claw_reach": 44,
+      "hunt_speed": 2.4
+    },
+    "demoness": {
+      "hp": 900,
+      "speed": 3,
+      "vision_range": 640,
+      "dashes": 2,
+      "dash_cd": 150,
+      "claw": 22,
+      "claw_reach": 50,
+      "hunt_speed": 2.9,
+      "whip_cd": 60,
+      "whip_dmg": 18,
+      "telegraph_frames": 30,
+      "decoy": {
+        "claw": 6,
+        "whip_dmg": 5
+      }
+    },
+    "gatling_gunner": {
+      "radius": 20,
+      "hp": 200,
+      "mass": 25,
+      "friction": 0.85,
+      "speed": 2,
+      "invincible_frames": 10,
+      "burst_count": 10,
+      "burst_delay": 6,
+      "reload": 210,
+      "telegraph_frames": 12
+    },
+    "drone": {
+      "radius": 20,
+      "mass": 30,
+      "speed": 3,
+      "invincible_frames": 15
+    }
+  },
+  "drone": {
+    "HP": 110,
+    "ARMOR": 0.3,
+    "OPEN": 0.7,
+    "BLADE": 0.6,
+    "EYE_MULT": 1.8,
+    "EYE_R": 10,
+    "EYE_FWD": 15,
+    "DESCENT": 0.9,
+    "RISE": 0.6,
+    "LOST": 5,
+    "LAND_HIT": 10,
+    "LAND_R": 48,
+    "HOVER_PX": 7,
+    "BOLT_EVERY": 2.2,
+    "BOLT_TELL": 0.25,
+    "LANCE": {
+      "EVERY": 4.5,
+      "RANGE": 330,
+      "TELL": 0.65,
+      "LOCK": 0.15,
+      "SPEED": 15,
+      "DIST": 400,
+      "HIT": 18,
+      "BURN_DPS": 6,
+      "BURN_SECS": 2.5,
+      "RECOVER": 1
+    },
+    "GRAPPLE": {
+      "EVERY": 6.5,
+      "RANGE": 320,
+      "TELL": 0.5,
+      "SPEED": 15,
+      "HIT": 6,
+      "PULL": 2.8,
+      "SECS": 2.4,
+      "TICK": 0.5,
+      "TICK_DMG": 4,
+      "HOLD": 64
+    },
+    "BEAM": {
+      "EVERY": 5.5,
+      "RANGE": 640,
+      "CHARGE": 1.2,
+      "LOCK": 0.2,
+      "FIRE": 0.3,
+      "HIT": 22,
+      "WIDTH": 15
+    },
+    "KEEP": {
+      "lancer": 230,
+      "grappler": 210,
+      "seer": 330
+    }
+  },
+  "drone_kinds": [
+    "lancer",
+    "grappler",
+    "seer"
+  ],
+  "duel": {
+    "P2": 0.66,
+    "P3": 0.33,
+    "SIGIL_EVERY": [
+      0,
+      4.5,
+      3.8,
+      3.2
+    ],
+    "SIGILS": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "SIGIL_SPREAD": 95,
+    "BOLT_EVERY": 2.8,
+    "BOLT_TELL": 0.35,
+    "BOLT_FAN": 3,
+    "BOLT_SPREAD": 0.17,
+    "BOLT_DMG": 12,
+    "BOLT_SPEED": 13,
+    "STEP_EVERY": 7,
+    "STEP_TELL": 0.4,
+    "STEP_BEHIND": 46,
+    "GALE_EVERY": 8,
+    "GALE_TELL": 0.5,
+    "GALE_REACH": 170,
+    "GALE_SPREAD": 0.75,
+    "GALE_PUSH": 140,
+    "GALE_HIT": 12,
+    "GUARD_BREAK": 1.2,
+    "MIRROR_EVERY": 16,
+    "MIRROR_SECS": 9,
+    "MIRROR_SPREAD": 80,
+    "RITE_EVERY": 20,
+    "RITE_R0": 430,
+    "RITE_R1": 140,
+    "DASH_CD_P3": 95,
+    "WHIP2_DELAY": 0.16
+  },
+  "wardens": {
+    "vesper": {
+      "name": "Vesper, the Censer",
+      "accent": "#c42a3c",
+      "trim": "#e8c27a",
+      "mantle": "#5a0c1c",
+      "eye": "255, 60, 40"
+    },
+    "matins": {
+      "name": "Matins, the Choir",
+      "accent": "#e8c27a",
+      "trim": "#fff1c2",
+      "mantle": "#1a1216",
+      "eye": "255, 190, 80"
+    },
+    "compline": {
+      "name": "Compline, the Penitent",
+      "accent": "#8a5cff",
+      "trim": "#e6ddd0",
+      "mantle": "#24163a",
+      "eye": "200, 120, 255"
+    }
+  },
+  "warden": {
+    "HP": 1500,
+    "RELOAD": 120,
+    "STAGGER": 40,
+    "EXTEND": 4,
+    "COVER_FIRE": 0.5,
+    "FLANK_AFTER": 2,
+    "CENSER_EVERY": 7,
+    "CENSER_WIND": 0.5,
+    "CENSER_RANGE": 640,
+    "HYMN_EVERY": 6,
+    "HYMN_CHARGE": 0.6,
+    "HOOK_EVERY": 8,
+    "HOOK_TELL": 0.7,
+    "HOOK_RANGE": 420
+  },
+  "triumvirate": [
+    [
+      360,
+      330,
+      0,
+      "vesper"
+    ],
+    [
+      600,
+      290,
+      1,
+      "matins"
+    ],
+    [
+      840,
+      330,
+      2,
+      "compline"
+    ]
+  ],
+  "hazards": {
+    "SIGIL_ARM": 1,
+    "SIGIL_R": 58,
+    "SIGIL_HIT": 16,
+    "FIRE_SECS": 1.6,
+    "BURN_TICK": 0.5,
+    "CENSER_FLIGHT": 0.9,
+    "CENSER_FIRE_R": 62,
+    "CENSER_FIRE_SECS": 4,
+    "CENSER_SMOKE_R": 96,
+    "CENSER_SMOKE_SECS": 6,
+    "CENSER_HIT": 12,
+    "HYMN_SECS": 1.1,
+    "HYMN_RANGE": 760,
+    "HYMN_HIT": 10,
+    "REVEAL_SECS": 2.5,
+    "HOOK_SPEED": 17,
+    "HOOK_RANGE": 430,
+    "HOOK_HIT": 8,
+    "HOOK_PULL": 8,
+    "HOOK_STOP": 80,
+    "HOOK_PULL_SECS": 0.6,
+    "RITE_SECS": 8,
+    "RITE_WARN": 1,
+    "RITE_DPS": 14
+  },
+  "gauntlet_maps": [
+    {
+      "id": "house_of_death",
+      "label": "The House of Death",
+      "mapId": "house_of_death",
+      "blurb": "A gothic villa of glass and black marble. Doors swing under fire, rooms sink into shadow — hold the house, wave after wave.",
+      "spawns": [
+        [
+          120,
+          380
+        ],
+        [
+          440,
+          390
+        ],
+        [
+          280,
+          110
+        ],
+        [
+          900,
+          300
+        ],
+        [
+          610,
+          100
+        ],
+        [
+          1195,
+          380
+        ],
+        [
+          1300,
+          300
+        ],
+        [
+          1450,
+          250
+        ],
+        [
+          1620,
+          200
+        ],
+        [
+          80,
+          800
+        ],
+        [
+          480,
+          850
+        ],
+        [
+          300,
+          520
+        ],
+        [
+          650,
+          500
+        ],
+        [
+          1150,
+          950
+        ],
+        [
+          760,
+          960
+        ],
+        [
+          1150,
+          700
+        ],
+        [
+          1350,
+          600
+        ],
+        [
+          1700,
+          700
+        ],
+        [
+          1400,
+          880
+        ],
+        [
+          1650,
+          580
+        ],
+        [
+          100,
+          1100
+        ],
+        [
+          450,
+          1350
+        ],
+        [
+          300,
+          1120
+        ],
+        [
+          650,
+          1300
+        ],
+        [
+          1150,
+          1100
+        ],
+        [
+          1300,
+          1090
+        ],
+        [
+          1710,
+          1250
+        ],
+        [
+          1560,
+          1090
+        ],
+        [
+          1300,
+          1320
+        ],
+        [
+          1560,
+          1330
+        ]
+      ],
+      "gunnerSpawns": [
+        [
+          760,
+          700
+        ],
+        [
+          1380,
+          560
+        ],
+        [
+          280,
+          820
+        ],
+        [
+          700,
+          380
+        ]
+      ]
+    },
+    {
+      "id": "demoness_palace",
+      "label": "The Demoness Palace",
+      "mapId": "demoness_palace",
+      "blurb": "Obsidian and gold, lit by embers. Her hunters see in the dark and cross a room in a blink, and every fifth wave she hunts you herself.",
+      "spawns": [
+        [
+          150,
+          180
+        ],
+        [
+          760,
+          180
+        ],
+        [
+          1000,
+          150
+        ],
+        [
+          1300,
+          150
+        ],
+        [
+          1600,
+          310
+        ],
+        [
+          140,
+          520
+        ],
+        [
+          460,
+          900
+        ],
+        [
+          1350,
+          520
+        ],
+        [
+          1650,
+          900
+        ],
+        [
+          690,
+          490
+        ],
+        [
+          1110,
+          960
+        ],
+        [
+          420,
+          1300
+        ],
+        [
+          120,
+          1250
+        ],
+        [
+          1300,
+          1300
+        ],
+        [
+          1700,
+          1300
+        ]
+      ],
+      "gunnerSpawns": [],
+      "hooks": "demoness_palace"
+    },
+    {
+      "id": "sealed_2",
+      "label": "Sealed",
+      "locked": true,
+      "blurb": "Coming soon."
+    },
+    {
+      "id": "sealed_3",
+      "label": "Sealed",
+      "locked": true,
+      "blurb": "Coming soon."
+    }
+  ],
+  "gauntlet": {
+    "spawn_min_dist": 350,
+    "scale": {
+      "FROM": 15,
+      "HP_GROWTH": 1.04,
+      "DMG_STEP": 0.02,
+      "ELITE_FROM": 12,
+      "ELITE_EVERY": 6,
+      "SCRAP": 5,
+      "BONUS_EVERY": 5,
+      "BONUS_SCRAP": 100,
+      "DEMONESS_HP": 1000,
+      "DEMONESS_HP_W": 80,
+      "SOLO_HP": 3000,
+      "SOLO_HP_W": 100
+    },
+    "lead_err": 300,
+    "stall_secs": 20,
+    "stall_err": 220
+  },
+  "elites": {
+    "marks": {
+      "armored": {
+        "label": "ARMORED",
+        "col": "180, 196, 214"
+      },
+      "swift": {
+        "label": "SWIFT",
+        "col": "110, 230, 255"
+      },
+      "warded": {
+        "label": "WARDED",
+        "col": "255, 214, 110"
+      }
+    },
+    "ward": {
+      "ARC": 1.05,
+      "HP": 0.6
+    }
+  }
+}

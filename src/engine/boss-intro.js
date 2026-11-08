@@ -7,7 +7,7 @@
         // telegraphs. Replays (or once seen) get the short version: no pan, eyes and rising in place.
         // A tap or a key skips to the pan back. Runs on frames (updateBossIntro, from update.js).
         /** The Sanctum's three wardens: where they kneel on the dais (x, y, id, persona). */
-        const TRIUMVIRATE = [[360, 330, 0, 'vesper'], [600, 290, 1, 'matins'], [840, 330, 2, 'compline']];
+        const TRIUMVIRATE = GAME_DB.enemies.triumvirate;   // directory/game-db/enemies.json
 
         engineMixin({
             /** Spawn the Triumvirate dormant and play their awakening (the story's first visit, or Grum's replay). */

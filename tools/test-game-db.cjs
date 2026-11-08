@@ -139,4 +139,36 @@ test('Audio: every track is a file, every map, room, brand and floor exists, and
  assert.deepEqual(e.errors,[]);
 });
 
+test('Enemies: kinds, bosses and gauntlet maps hang together, and enemies spawn with the data\'s numbers',()=>{
+ const en=load('enemies.json'), K=en.kinds;
+ for(const [id,k] of Object.entries(K)) for(const [f,v] of Object.entries(k)) if(typeof v==='number') assert.ok(Number.isFinite(v)&&v>=0,`kinds.${id}.${f}`);
+ assert.deepEqual(en.triumvirate.map(t=>t[3]).sort(),Object.keys(en.wardens).sort(),'triumvirate: one place per warden');
+ for(const t of en.triumvirate) assert.ok(Number.isFinite(t[0])&&Number.isFinite(t[1])&&Number.isInteger(t[2]),`triumvirate ${t}`);
+ for(const id of en.drone_kinds) assert.ok(en.drone.KEEP[id],`drone kind ${id}: no KEEP distance`);
+ const ids=en.gauntlet_maps.map(g=>g.id); assert.equal(new Set(ids).size,ids.length,'a gauntlet id is used twice');
+ for(const g of en.gauntlet_maps.filter(g=>!g.locked)){
+  assert.ok(g.spawns.length>0&&g.spawns.every(p=>p.length===2&&p.every(Number.isFinite)),`gauntlet ${g.id}: spawns`);
+  assert.ok(g.gunnerSpawns.every(p=>p.length===2&&p.every(Number.isFinite)),`gauntlet ${g.id}: gunnerSpawns`);
+ }
+ const e=runtime(join(ROOT,'DFAB V8.html'),{affine:true});
+ const got=JSON.parse(e.run(`JSON.stringify({maps:Object.keys(MAP_DATA),weapons:Object.keys(typeof WEAPON_MODELS!=='undefined'?WEAPON_MODELS:{}),
+  hooks:GAUNTLET_MAPS.filter(g=>g.hooks).map(g=>typeof g.waves),
+  ganger:(g=>[g.hp,g.speed,g.visionRange,g.radius])(new Ganger(0,0)), hunter:(h=>[h.hp,h.clawDmg,h.huntSpeed])(new Hunter(0,0)),
+  demoness:(d=>[d.hp,d.whipDmg])(new Demoness(0,0)), gunner:(g=>[g.hp,g.reloadTime])(new GatlingGunner(0,0,0)), warden:new GatlingGunner(0,0,0,{persona:'matins'}).hp,
+  drone:(d=>[d.hp,d.radius])(new Drone(0,0,'seer')),
+  same:DRONE===GAME_DB.enemies.drone&&DUEL===GAME_DB.enemies.duel&&HAZARD===GAME_DB.enemies.hazards&&GAUNTLET_SCALE===GAME_DB.enemies.gauntlet.scale})`));
+ const maps=new Set(got.maps);
+ for(const g of en.gauntlet_maps.filter(g=>!g.locked)) assert.ok(maps.has(g.mapId),`gauntlet ${g.id}: no map '${g.mapId}'`);
+ if(got.weapons.length) assert.ok(got.weapons.includes(K.hunter.weapon),`kinds.hunter.weapon '${K.hunter.weapon}' has no weapon model`);
+ assert.ok(got.hooks.length>0&&got.hooks.every(t=>t==='function'),'a gauntlet map names wave hooks that did not attach');
+ assert.deepEqual(got.ganger,[K.ganger.hp,K.ganger.speed,K.ganger.vision_range,K.ganger.radius]);
+ assert.deepEqual(got.hunter,[K.hunter.hp,K.hunter.claw,K.hunter.hunt_speed]);
+ assert.deepEqual(got.demoness,[K.demoness.hp,K.demoness.whip_dmg]);
+ assert.deepEqual(got.gunner,[K.gatling_gunner.hp,K.gatling_gunner.reload]);
+ assert.equal(got.warden,en.warden.HP);
+ assert.deepEqual(got.drone,[en.drone.HP,K.drone.radius]);
+ assert.equal(got.same,true);
+ assert.deepEqual(e.errors,[]);
+});
+
 console.log(`test-game-db: ${tests.length} passed`);

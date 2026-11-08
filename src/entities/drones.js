@@ -19,21 +19,14 @@
                        straight through walls and cover
            The lancer and the grappler also spit violet bolts between moves.
            ===================================================================== */
-        const DRONE = {
-            HP: 110, ARMOR: 0.3, OPEN: 0.7, BLADE: 0.6, EYE_MULT: 1.8, EYE_R: 10, EYE_FWD: 15,
-            DESCENT: 0.9, RISE: 0.6, LOST: 5, LAND_HIT: 10, LAND_R: 48, HOVER_PX: 7,
-            BOLT_EVERY: 2.2, BOLT_TELL: 0.25,
-            LANCE: { EVERY: 4.5, RANGE: 330, TELL: 0.65, LOCK: 0.15, SPEED: 15, DIST: 400, HIT: 18, BURN_DPS: 6, BURN_SECS: 2.5, RECOVER: 1.0 },
-            GRAPPLE: { EVERY: 6.5, RANGE: 320, TELL: 0.5, SPEED: 15, HIT: 6, PULL: 2.8, SECS: 2.4, TICK: 0.5, TICK_DMG: 4, HOLD: 64 },
-            BEAM: { EVERY: 5.5, RANGE: 640, CHARGE: 1.2, LOCK: 0.2, FIRE: 0.3, HIT: 22, WIDTH: 15 },
-            KEEP: { lancer: 230, grappler: 210, seer: 330 }
-        };
-        const DRONE_KINDS = ['lancer', 'grappler', 'seer'];
+        const DRONE = GAME_DB.enemies.drone;   // directory/game-db/enemies.json
+        const DRONE_KINDS = GAME_DB.enemies.drone_kinds;
 
         class Drone extends ActorEntity {
             constructor(x, y, kind) {
-                super({ x, y, radius: 20, type: 'drone', alliance: 'hostile', hp: DRONE.HP, mass: 30, friction: 0.9, speed: 3,
-                        hasCollision: true, invincibleDuration: 15 });
+                const K = GAME_DB.enemies.kinds.drone;
+                super({ x, y, radius: K.radius, type: 'drone', alliance: 'hostile', hp: DRONE.HP, mass: K.mass, friction: 0.9, speed: K.speed,
+                        hasCollision: true, invincibleDuration: K.invincible_frames });
                 this.kind = DRONE_KINDS.includes(kind) ? kind : DRONE_KINDS[Math.floor(Math.random() * DRONE_KINDS.length)];
                 this.angle = Math.PI / 2;
                 this.hoverOffset = Math.random() * Math.PI * 2;

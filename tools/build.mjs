@@ -68,6 +68,7 @@ const SCRIPTS = [
     'directory/game-db/shops.json',   // GAME_DB.shops: the auto shop's prices and colours, the dyer's fee and palette
     'directory/game-db/progression.json',   // GAME_DB.progression: Resonance, the three trees, abilities, talk perks
     'directory/game-db/audio.json',   // GAME_DB.audio: music per map, reverb rooms, sound lengths and caps, motors, footstep floors
+    'directory/game-db/enemies.json',   // GAME_DB.enemies: enemy kinds, drones, the bosses and their hazards, the Horde Gauntlet
     '@assets',              // generated from the assets/ folder
     'core/assets.js',
     'core/registries.js',
