@@ -141,6 +141,14 @@
                 }
                 return true;
             }
+            /** Is a side face of a post or trunk, projected to flat points [a_i, a_j, b_j, b_i] (two neighbours on its
+             *  bottom ring, then the same two on its top ring, rings wound by increasing angle), turned to the camera?
+             *  Its projected winding says so. On a convex solid the faces turned away are always hidden. */
+            static front(pts) {
+                let a = 0;
+                for (let i = 0, n = pts.length; i < n; i += 2) { const j = (i + 2) % n; a += pts[i] * pts[j + 1] - pts[j] * pts[i + 1]; }
+                return a > 0;
+            }
             /** Do two shapes overlap? Two convex polygons: by separating axes, sharing an edge doesn't count (they
              *  must cross by more than a quarter pixel). Anything else: by box. */
             static _overlap(a, b) {
@@ -238,7 +246,7 @@
                         }
                         ctx.moveTo(p[0], p[1]);
                         for (let i = 2; i < p.length; i += 2) ctx.lineTo(p[i], p[i + 1]);
-                        if (it.closed) ctx.closePath();
+                        if (it.closed && stroke) ctx.closePath();     // a fill closes every subpath itself
                     }
                     if (stroke) ctx.stroke(); else ctx.fill();
                 });
