@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '413fb5a4006e';
+        const DFAB_BUILD = '773c479588b8';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9903,7 +9903,7 @@
             ids (packets) { return packets.map(p => p.id); }
         };
     </script>
-    <script type="text/dfab" data-src="basement/render-system.js" data-cost="166">
+    <script type="text/dfab" data-src="basement/render-system.js" data-cost="181">
         // ===== LV0 BASEMENT =====
         // The render system: a queue of shapes that sorts itself by depth and draws in as few canvas calls as it
         // can. Canvas 2D pays per call, so shapes that share a style (fill colour, or stroke colour and width;
@@ -9928,7 +9928,8 @@
         // drawn over it, or under it, changes, and shapes in one path never cross (no winding holes, no doubled
         // alpha). Overlap is exact for small convex polygons (a separating-axis test: faces that only share an
         // edge don't count, so a faceted post's faces can batch; the shared edge is then drawn once, without the
-        // faint seam two fills leave) and by bounding box, a pixel to spare, for everything else.
+        // faint seam two fills leave; a butt-capped segment counts as its stroke's rectangle, so a chain of them
+        // touching end to end batches) and by bounding box, a pixel to spare, for everything else.
         // A shape's clip keeps only the polygons that reach its box (the rest can't change a pixel of it), so a face no
         // roof leans over is unclipped and batches with the rest. `batch: false, trim: false` draws every shape on
         // its own with its whole clip, in the same order: the reference the pixel check compares against.
@@ -9955,7 +9956,7 @@
                 it.op = (state && state.op) || 'source-over';
                 it.cap = (state && state.cap) || 'butt';
                 it.clip = it.clipAll = (state && state.clip && state.clip.length) ? state.clip : null;
-                it.pts.length = 0; it.paint = null; it.img = null; it.width = 0; it.color = null; it.closed = false; it.convex = false;
+                it.pts.length = 0; it.paint = null; it.img = null; it.width = 0; it.color = null; it.closed = false; it.convex = false; it.hull = null;
                 return it;
             }
             /** Keep only the clip polygons that reach the shape (a polygon clear of its box can't change a pixel of it),
@@ -9997,6 +9998,14 @@
                 const it = this._item(z, 'stroke', state); it.color = color; it.width = width; it.closed = closed;
                 for (let i = 0; i < pts.length; i++) it.pts.push(pts[i]);
                 this._box(it, width / 2 + 1);
+                if (pts.length === 4 && it.cap === 'butt') {                     // one butt-capped segment: its stroke is a rectangle (convex, for the overlap test)
+                    const dx = pts[2] - pts[0], dy = pts[3] - pts[1], m = Math.hypot(dx, dy);
+                    if (m > 1e-6) {
+                        const nx = -dy / m * width / 2, ny = dx / m * width / 2, h = it.hull || [];
+                        h.length = 0; h.push(pts[0] + nx, pts[1] + ny, pts[2] + nx, pts[3] + ny, pts[2] - nx, pts[3] - ny, pts[0] - nx, pts[1] - ny);
+                        it.hull = h; it.convex = true;
+                    }
+                }
                 it.key = 's|' + color + '|' + width + '|' + it.cap + '|' + it.alpha + '|' + it.op + '|' + this._clipKey(it);
                 return it;
             }
@@ -10038,12 +10047,21 @@
                 }
                 return true;
             }
+            /** Is a side face of a post or trunk, projected to flat points [a_i, a_j, b_j, b_i] (two neighbours on its
+             *  bottom ring, then the same two on its top ring, rings wound by increasing angle), turned to the camera?
+             *  Its projected winding says so. On a convex solid the faces turned away are always hidden. */
+            static front(pts) {
+                let a = 0;
+                for (let i = 0, n = pts.length; i < n; i += 2) { const j = (i + 2) % n; a += pts[i] * pts[j + 1] - pts[j] * pts[i + 1]; }
+                return a > 0;
+            }
             /** Do two shapes overlap? Two convex polygons: by separating axes, sharing an edge doesn't count (they
              *  must cross by more than a quarter pixel). Anything else: by box. */
             static _overlap(a, b) {
                 if (!renderQueue._hit(a, b)) return false;
                 if (!a.convex || !b.convex) return true;
-                return !renderQueue._separated(a.pts, b.pts) && !renderQueue._separated(b.pts, a.pts);
+                const p = a.hull || a.pts, q = b.hull || b.pts;
+                return !renderQueue._separated(p, q) && !renderQueue._separated(q, p);
             }
             static _separated(p, q) {
                 const EPS = 0.25;
@@ -10134,7 +10152,7 @@
                         }
                         ctx.moveTo(p[0], p[1]);
                         for (let i = 2; i < p.length; i += 2) ctx.lineTo(p[i], p[i + 1]);
-                        if (it.closed) ctx.closePath();
+                        if (it.closed && stroke) ctx.closePath();     // a fill closes every subpath itself
                     }
                     if (stroke) ctx.stroke(); else ctx.fill();
                 });
@@ -24512,7 +24530,7 @@
         }
 
     </script>
-    <script type="text/dfab" data-src="entities/lamps.js" data-cost="547">
+    <script type="text/dfab" data-src="entities/lamps.js" data-cost="548">
         /**
          * Lamp Entity - No collision, just decoration.
          */
@@ -24599,10 +24617,6 @@
 
         function drawProjectedLamp(ctx, lamp, lit) {
             const style = LAMP_TYPE_STYLE[lamp.lampType], spec = LAMP_STYLES[style], H = lampProjection(lamp).z;
-            const poly = (points, color) => {
-                const projected=points.map(p=>lampPoint(lamp,...p));
-                FoliageLampDepth.poly(ctx,points.reduce((sum,p)=>sum+p[2],0)/points.length,color,projected.flat());
-            };
             const stroke = (a,b,width,color) => {
                 const p=lampPoint(lamp,...a),q=lampPoint(lamp,...b);
                 FoliageLampDepth.line(ctx,(a[2]+b[2])/2,width,color,[p[0],p[1],q[0],q[1]],'round');
@@ -24611,21 +24625,23 @@
                 const a = Math.PI / 6 + i * Math.PI * 2 / n;
                 return [x + Math.cos(a) * r, y + Math.sin(a) * r, z];
             });
-            // Faceted surfaces connect rings at different heights: foot, fluted shaft, collars and caps.
-            const sleeve = (a, b, colors) => {
-                const faces = a.map((p,i) => {
-                    const j = (i + 1) % a.length, q = lampPoint(lamp,(p[0]+a[j][0])/2,(p[1]+a[j][1])/2,0);
-                    return { i, j, d: (q[0]-game.camera.x)**2 + (q[1]-game.camera.y)**2 };
-                }).sort((u,v) => v.d-u.d);
-                for (const {i,j} of faces) poly([a[i], a[j], b[j], b[i]], colors[i % colors.length]);
-                poly(b, colors[0]);
+            // Faceted surfaces connect rings at different heights: foot, fluted shaft, collars and caps. Only the
+            // faces turned to the camera are drawn: on a convex post the far ones are always hidden behind them and
+            // the cap (renderQueue.front). cap false leaves out a cap the next ring up sits on, which hides it.
+            const sleeve = (a, b, colors, cap = true) => {
+                const A = a.map(p => lampPoint(lamp, ...p)), B = b.map(p => lampPoint(lamp, ...p)), z = (a[0][2] + b[0][2]) / 2;
+                for (let i = 0; i < a.length; i++) {
+                    const j = (i + 1) % a.length, quad = [...A[i], ...A[j], ...B[j], ...B[i]];
+                    if (renderQueue.front(quad)) FoliageLampDepth.poly(ctx, z, colors[i % colors.length], quad);
+                }
+                if (cap) FoliageLampDepth.poly(ctx, b[0][2], colors[0], B.flat());
             };
             const iron = ['#32293f','#211a2b','#100c17','#18121f'];
             if (style !== 'pillar_lantern') {
-                sleeve(ring(0,0,0,7), ring(0,0,9,5), iron);
+                sleeve(ring(0,0,0,7), ring(0,0,9,5), iron, false);
                 sleeve(ring(0,0,9,5), ring(0,0,15,3), [LAMP_BRASS,'#70532d']);
                 // Short bands let a canopy cover the lower shaft while its upper section stays in front.
-                for(let z=15;z<H+12;z+=8){const end=Math.min(H+12,z+8),r=t=>2.8-(t-15)/(H-3)*1.1;sleeve(ring(0,0,z,r(z)),ring(0,0,end,r(end)),iron);}
+                for(let z=15;z<H+12;z+=8){const end=Math.min(H+12,z+8),r=t=>2.8-(t-15)/(H-3)*1.1;sleeve(ring(0,0,z,r(z)),ring(0,0,end,r(end)),iron,end>=H+12);}
                 for (const z of [20, H * .65, H + 8])
                     sleeve(ring(0,0,z,3), ring(0,0,z+3,3), [LAMP_BRASS,'#70532d']);
                 // Swept arms are curves through height, rather than a flat drawing of the old stem.
@@ -24646,8 +24662,8 @@
             for (const b of spec.bulbs) {
                 const r = style === 'antique_twin' ? 7 : 6.5;
                 const lower = ring(b.x,b.y,H-10,r*.65,6), upper = ring(b.x,b.y,H+7,r,6);
-                sleeve(ring(b.x,b.y,H-13,r*.35,6), lower, iron);
-                sleeve(lower,upper,lit ? [_lampTint(lamp.color,.25),lamp.color,_lampTint(lamp.color,.1)] : ['#39303f','#241d2d']);
+                sleeve(ring(b.x,b.y,H-13,r*.35,6), lower, iron, false);
+                sleeve(lower,upper,lit ? [_lampTint(lamp.color,.25),lamp.color,_lampTint(lamp.color,.1)] : ['#39303f','#241d2d'], false);
                 // Iron ribs bound each individual glass pane in three dimensions.
                 for (let i=0;i<6;i++) stroke(lower[i],upper[i],1.4,LAMP_IRON);
                 sleeve(upper,ring(b.x,b.y,H+13,r*.35,6),iron);
@@ -27250,7 +27266,7 @@
         };
         if (typeof window !== 'undefined') window.PerformanceBench = PerformanceBench;
     </script>
-    <script type="text/dfab" data-src="entities/street-objects.js" data-cost="350">
+    <script type="text/dfab" data-src="entities/street-objects.js" data-cost="351">
         /* --- ENTITIES --- */
         // =====================================================================
         //  PROJECTILE CLASS - REMOVED (Now uses ProjectileEntity)
@@ -27549,10 +27565,12 @@
             const stroke=(a,b,width,color) => FD.line(ctx,(a.z+b.z)/2,width,color,[a.x,a.y,b.x,b.y],'butt',clip);
             // A tapered trunk built as a ring of bark faces, with its root flare on the ground.
             const ring=(z,r) => Array.from({length:6},(_,i)=>point(Math.cos(i*Math.PI/3)*r,Math.sin(i*Math.PI/3)*r,z));
+            // Only the bark faces turned to the camera: the far side of the trunk is always behind them.
+            const bark=[f.trunkColor,'#604329','#392718','#241a12','#49311e','#755235'];
             const stem=(z0,r0,z1,r1) => {
-                const a=ring(z0,r0),b=ring(z1,r1),colors=[f.trunkColor,'#604329','#392718','#241a12','#49311e','#755235'];
-                const order=a.map((p,i)=>({i,d:(p.x-game.camera.x)**2+(p.y-game.camera.y)**2})).sort((a,b)=>b.d-a.d);
-                for(const {i} of order){const j=(i+1)%6;polygon([a[i],a[j],b[j],b[i]],colors[i]);}
+                const a=ring(z0,r0),b=ring(z1,r1),z=(z0+z1)/2;
+                for(let i=0;i<6;i++){const j=(i+1)%6,quad=[a[i].x,a[i].y,a[j].x,a[j].y,b[j].x,b[j].y,b[i].x,b[i].y];
+                    if(renderQueue.front(quad))FD.poly(ctx,z,bark[i],quad,clip);}
             };
             stem(0,5*s,14*s,3*s);
             for(let z=14*s;z<H;z+=8){const end=Math.min(H,z+8),r=t=>3*s-(t-14*s)/(H-14*s)*1.4*s;stem(z,r(z),end,r(end));}
@@ -37368,8 +37386,9 @@
             /** How far a face turns from the light (the moon or sun, from the west and a little south): 0 lit .. 1 turned away. */
             _tkTurn(f) { const lx = -0.78, ly = 0.62; return Math.max(0, Math.min(1, 0.5 - 0.5 * (f.nx * lx + f.ny * ly))); }
 
-            /** The ledges round a tier at height z along its visible faces: mitred slabs, each face's front shaded by its turn. */
-            _tkLedges(ctx, t, faces, g) {
+            /** The ledges round a tier at height z along its visible faces: mitred slabs, each face's front shaded by its turn.
+             *  Queued in order on q (a renderQueue: basement/render-system.js), which draws a tier's ledges in a few batches. */
+            _tkLedges(q, t, faces, g, z) {
                 const cam = game.camera, p = (x, y, k) => [cam.x + (x - cam.x) * k, cam.y + (y - cam.y) * k], n = t.poly.length;
                 const kT = this._tkK(g.z), kB = this._tkK(Math.max(t.z0, g.z - g.th)), [r, gg, b] = g.band;
                 const fine = !TierKit.LOD || _zoomLOD < 2;                               // (zoomed right out: the lip and the shadow line under it, a px wide, go)
@@ -37388,11 +37407,11 @@
                     }
                     const { oa, ob, wa, wb } = L;
                     const A = p(oa[0], oa[1], kB), B = p(ob[0], ob[1], kB), Bt = p(ob[0], ob[1], kT), At = p(oa[0], oa[1], kT), a1 = p(wa[0], wa[1], kT), b1 = p(wb[0], wb[1], kT);
-                    ctx.fillStyle = L.front;
-                    ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.lineTo(Bt[0], Bt[1]); ctx.lineTo(At[0], At[1]); ctx.closePath(); ctx.fill();
-                    ctx.fillStyle = g.top; ctx.beginPath(); ctx.moveTo(a1[0], a1[1]); ctx.lineTo(b1[0], b1[1]); ctx.lineTo(Bt[0], Bt[1]); ctx.lineTo(At[0], At[1]); ctx.closePath(); ctx.fill();
-                    if (fine && g.lip) { ctx.strokeStyle = g.lip; ctx.globalAlpha = 1 - 0.6 * this._tkTurn(f); ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(At[0], At[1]); ctx.lineTo(Bt[0], Bt[1]); ctx.stroke(); ctx.globalAlpha = 1; }
-                    if (fine) { ctx.strokeStyle = 'rgba(6, 12, 14, 0.45)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke(); }
+                    // each ledge's slabs first (they only meet at their mitres), then its lines over them
+                    q.poly(z, L.front, [A[0], A[1], B[0], B[1], Bt[0], Bt[1], At[0], At[1]]);
+                    q.poly(z, g.top, [a1[0], a1[1], b1[0], b1[1], Bt[0], Bt[1], At[0], At[1]]);
+                    if (fine && g.lip) q.line(z + 0.5, 0.8, g.lip, [At[0], At[1], Bt[0], Bt[1]], (L.lipState || (L.lipState = { alpha: 1 - 0.6 * this._tkTurn(f) })));
+                    if (fine) q.line(z + 0.5, 1, 'rgba(6, 12, 14, 0.45)', [A[0], A[1], B[0], B[1]]);
                 }
             }
 
@@ -37475,7 +37494,10 @@
                             this._tkQuad(ctx, f, f.z0, f.z0 + 8); this._tkFade(ctx, contact, this._tkP(f.x1, f.y1, f.z0), this._tkP(f.x1, f.y1, f.z0 + 8));
                         }
                     }
-                    for (const g of t.ledgesByZ || (t.ledgesByZ = (t.ledges || []).slice().sort((a, b) => a.z - b.z))) this._tkLedges(ctx, t, faces, g);
+                    const q = TierKit.ledgeQueue || (TierKit.ledgeQueue = new renderQueue()); q.begin();
+                    let z = 0;
+                    for (const g of t.ledgesByZ || (t.ledgesByZ = (t.ledges || []).slice().sort((a, b) => a.z - b.z))) this._tkLedges(q, t, faces, g, z++);
+                    q.flush(ctx);
                     if (t.roof) LandmarkKit.drawSprite(ctx, this._tkRoof(t, false), this._tkK(t.z1));
                     if (t.top) t.top(ctx, false, t, this);
                 }

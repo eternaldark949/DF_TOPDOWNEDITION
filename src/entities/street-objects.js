@@ -296,10 +296,12 @@
             const stroke=(a,b,width,color) => FD.line(ctx,(a.z+b.z)/2,width,color,[a.x,a.y,b.x,b.y],'butt',clip);
             // A tapered trunk built as a ring of bark faces, with its root flare on the ground.
             const ring=(z,r) => Array.from({length:6},(_,i)=>point(Math.cos(i*Math.PI/3)*r,Math.sin(i*Math.PI/3)*r,z));
+            // Only the bark faces turned to the camera: the far side of the trunk is always behind them.
+            const bark=[f.trunkColor,'#604329','#392718','#241a12','#49311e','#755235'];
             const stem=(z0,r0,z1,r1) => {
-                const a=ring(z0,r0),b=ring(z1,r1),colors=[f.trunkColor,'#604329','#392718','#241a12','#49311e','#755235'];
-                const order=a.map((p,i)=>({i,d:(p.x-game.camera.x)**2+(p.y-game.camera.y)**2})).sort((a,b)=>b.d-a.d);
-                for(const {i} of order){const j=(i+1)%6;polygon([a[i],a[j],b[j],b[i]],colors[i]);}
+                const a=ring(z0,r0),b=ring(z1,r1),z=(z0+z1)/2;
+                for(let i=0;i<6;i++){const j=(i+1)%6,quad=[a[i].x,a[i].y,a[j].x,a[j].y,b[j].x,b[j].y,b[i].x,b[i].y];
+                    if(renderQueue.front(quad))FD.poly(ctx,z,bark[i],quad,clip);}
             };
             stem(0,5*s,14*s,3*s);
             for(let z=14*s;z<H;z+=8){const end=Math.min(H,z+8),r=t=>3*s-(t-14*s)/(H-14*s)*1.4*s;stem(z,r(z),end,r(end));}
