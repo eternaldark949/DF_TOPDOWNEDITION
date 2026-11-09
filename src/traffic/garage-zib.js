@@ -248,6 +248,22 @@
 
         const ZIB_DESTINATIONS = GAME_DB.vehicles.zib_destinations;   // directory/game-db/vehicles.json
 
+        /** Where a Zib can take her, in the phone's order: every city building you can go to (worldQuery.getBuildings),
+         *  the ones ZIB_DESTINATIONS lists first, in its order and under its labels (hide: true leaves one off), then
+         *  any others under their own names, so a new landmarked building shows up on its own.
+         *  → [{ id, label, landmark, x, y }] (x, y: the building's door). */
+        function zibDestinations(game) {
+            const buildings = worldQuery.getBuildings(game, { test: b => !!b.landmark });
+            const listed = new Map(ZIB_DESTINATIONS.map((d, i) => [d.landmark, { ...d, order: i }]));
+            const out = [];
+            for (const b of buildings) {
+                const d = listed.get(b.landmark);
+                if (d && d.hide) continue;
+                out.push({ id: b.id, label: d ? d.label : b.name, landmark: b.landmark, x: b.door.x, y: b.door.y, order: d ? d.order : Infinity });
+            }
+            return out.sort((a, b) => a.order - b.order).map(({ order, ...d }) => d);
+        }
+
         class ZibSystem {
             constructor() {
                 this.activeZibs = [];

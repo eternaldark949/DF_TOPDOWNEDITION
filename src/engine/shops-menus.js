@@ -318,9 +318,8 @@
                 const DIST = { near: ['mint', 'Nearby'], mid: ['gold', 'Moderate'], far: ['crimson', 'Far'] };
                 const pin = typeof ACTION_ICONS !== 'undefined' && ACTION_ICONS.car ? `<span style="width:24px;height:24px;color:var(--df-gold);display:inline-flex">${ACTION_ICONS.car}</span>` : '🚕';
                 let html = `<div class="df-section"><span><span class="glint">◆</span>Select destination</span></div>`, n = 0;
-                for (const dest of ZIB_DESTINATIONS) {
-                    const lm = this.landmarkRegistry[dest.landmark];
-                    if (!lm) continue;                                              // not on this map
+                for (const dest of zibDestinations(this)) {                       // traffic/garage-zib.js: the city's buildings
+                    const lm = dest;
                     const fare = this.zibSystem.calculateFare(zib.x, zib.y, lm.x, lm.y), afford = this.currency >= fare;
                     const dist = Math.hypot(lm.x - zib.x, lm.y - zib.y), [dc, dl] = DIST[dist < 500 ? 'near' : dist < 2000 ? 'mid' : 'far'];
                     html += `<div class="df-card clickable zib-dest-btn${afford ? '' : ' unaffordable dim'}" data-landmark="${dest.landmark}" data-x="${lm.x}" data-y="${lm.y}" data-fare="${fare}"><div class="df-head">`;

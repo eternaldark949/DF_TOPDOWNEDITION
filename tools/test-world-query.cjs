@@ -57,4 +57,22 @@ test('The city: buildings you can go to, with their door, the Zib\'s curb and th
  assert.ok(r.lm>=r.reg&&r.raw>r.hub.length);
 });
 
+test('Zib\'s phone lists the city\'s buildings: the listed ones first under their labels, hidden ones off, new ones under their own names',()=>{
+ const r=run(`game._doLoadMap('sdc');
+  const now=zibDestinations(game).map(d=>[d.label,d.landmark,d.x,d.y]);
+  const listed=ZIB_DESTINATIONS.filter(d=>game.landmarkRegistry[d.landmark]).map(d=>[d.label,d.landmark,game.landmarkRegistry[d.landmark].x,game.landmarkRegistry[d.landmark].y]);
+  const saved=ZIB_DESTINATIONS.splice(0);
+  ZIB_DESTINATIONS.push({...saved[1]},{...saved[0],hide:true});
+  const edited=zibDestinations(game).map(d=>d.label);
+  ZIB_DESTINATIONS.splice(0,ZIB_DESTINATIONS.length,...saved);
+  const names=Object.fromEntries(worldQuery.getBuildings(game).map(b=>[b.landmark,b.name]));
+  game.openZibMenu({x:600,y:1200}); const html=document.getElementById('zib-destinations').innerHTML; game.closeZibMenu();
+  return {now,listed,edited,names,first:saved[0],second:saved[1],cards:(html.match(/zib-dest-btn/g)||[]).length};`);
+ assert.deepEqual(r.now,r.listed,'the phone lists what it did before');
+ assert.equal(r.edited[0],r.second.label,'a listed one comes first, under its label');
+ assert.ok(!r.edited.some(l=>l===r.first.label||l===r.names[r.first.landmark]),'a hidden one is left off');
+ assert.equal(r.edited.length,r.now.length-1); assert.ok(r.edited.includes(r.names[r.now[2][1]]),'an unlisted building shows under its own name');
+ assert.equal(r.cards,r.now.length,'the menu shows a card for each');
+});
+
 console.log(`test-world-query: ${tests.length} passed`);
