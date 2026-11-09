@@ -738,14 +738,9 @@
                 
                 const margin = 20;
                 const isInWall = (x, y) => {
-                    for (let w of game.activeMap.walls) {
-                        if (x > w.x && x < w.x + w.w && y > w.y && y < w.y + w.h) return true;
-                    }
-                    const colliders = getColliders(game.activeMap);
-                    if (colliders) {
-                        for (let b of colliders) {
-                            if (x > b.x && x < b.x + b.w && y > b.y && y < b.y + b.h) return true;
-                        }
+                    const at = { left: x, right: x, top: y, bottom: y };
+                    for (const list of [game.activeMap.walls || [], getColliders(game.activeMap)]) {
+                        for (const w of _physicsSpatial.query(list, at) || []) if (x > w.x && x < w.x + w.w && y > w.y && y < w.y + w.h) return true;
                     }
                     return false;
                 };

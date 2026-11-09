@@ -224,7 +224,7 @@ engineMixin({
                     M._occluderCache = null;
                 }
                 if (NavGrid._cache && NavGrid._cache.map === M) NavGrid._cache.grid._epoch = -1;
-                CollisionSystem._staticRows.length = 0;
+                CollisionSystem.invalidateStatics();
             },
 
             /** Take a wall out of the live map (the suite's breach): its collision body, the render grid,

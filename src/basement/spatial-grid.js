@@ -242,15 +242,15 @@
         }
 
         // Static rectangle searches share an ordered, map-owned broadphase. Arbitrary
-        // caller arrays keep their original linear path. Registered arrays validate
-        // slots/geometry once per simulation tick, never once per car or sight ray.
-        // Known same-tick edits explicitly invalidate; replacement/length changes
-        // rebuild immediately. Entries keep duplicate slots and original hit order.
+        // caller arrays keep their original linear path. Walls and buildings don't move
+        // during play: a registered array is catalogued once and rebuilt only when it is
+        // reported changed (invalidate, through GameEngine.invalidatePhysicsSpatial) or
+        // grows or shrinks. Entries keep duplicate slots and original hit order.
         const _physicsSpatial = {
             records: new WeakMap(),
             track(items) {
                 if (!items || this.records.has(items)) return;
-                this.records.set(items, { grid: new OrderedRenderGrid(400), slots: [], geometry: [], epoch: -1, dirty: true, linear: false, entries: [], items: [], cellQueries: new Map(), cachedSlots: 0 });
+                this.records.set(items, { grid: new OrderedRenderGrid(400), length: -1, dirty: true, linear: false, entries: [], items: [], cellQueries: new Map(), cachedSlots: 0 });
             },
             invalidate(items) {
                 if (!items) { this.clear(); return; }
@@ -259,33 +259,17 @@
             },
             clear() { this.records = new WeakMap(); },
             refresh(items, c) {
-                let changed = c.dirty || c.slots.length !== items.length;
-                if (!changed && c.epoch !== _simTick) {
-                    for (let i = 0; i < items.length; i++) {
-                        const o = items[i], at = i * 4;
-                        if (c.slots[i] !== o || !o || !Object.is(c.geometry[at], o.x) || !Object.is(c.geometry[at + 1], o.y) || !Object.is(c.geometry[at + 2], o.w) || !Object.is(c.geometry[at + 3], o.h)) { changed = true; break; }
-                    }
-                }
-                if (changed) {
-                    c.cellQueries.clear(); c.cachedSlots = 0;
-                    c.slots.length = items.length; c.geometry.length = items.length * 4;
-                    c.linear = false;
-                    for (let i = 0; i < items.length; i++) {
-                        const o = items[i], at = i * 4;
-                        if (!(i in items)) c.linear = true;
-                        c.slots[i] = o;
-                        c.geometry[at] = o && o.x; c.geometry[at + 1] = o && o.y; c.geometry[at + 2] = o && o.w; c.geometry[at + 3] = o && o.h;
-                    }
-                    c.grid.build(items, o => o && ({ left: o.x, right: o.x + o.w, top: o.y, bottom: o.y + o.h }));
-                    c.dirty = false;
-                }
-                c.epoch = _simTick;
+                c.cellQueries.clear(); c.cachedSlots = 0;
+                c.linear = false;
+                for (let i = 0; i < items.length; i++) if (!(i in items)) { c.linear = true; break; }
+                c.grid.build(items, o => o && ({ left: o.x, right: o.x + o.w, top: o.y, bottom: o.y + o.h }));
+                c.length = items.length; c.dirty = false;
             },
             query(items, bounds) {
                 if (!items) return items;
                 const c = this.records.get(items);
                 if (!c) return items;
-                if (c.dirty || c.slots.length !== items.length || c.epoch !== _simTick) this.refresh(items, c);
+                if (c.dirty || c.length !== items.length) this.refresh(items, c);
                 if (c.linear) return items;
                 // Grid candidates depend on cell range, not the precise query rectangle.
                 // Cars and sight rays repeatedly visit the same static cells. Cache their

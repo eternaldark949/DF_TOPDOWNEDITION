@@ -120,7 +120,7 @@
              *  car, Amber's van, that last one: GameEngine.parkedCars) — out of traffic, but solid and rolling;
              *  `teammates`, `walkers`: her crew, and the street's pedestrians (with her, the `folk` cars look out for) */
             update(player, map, playerCar, weather, parked, decalSystem, teammates, walkers) { 
-                const folk = this.folk;
+                const folk = this.folk, TF = CONFIG.TRAFFIC_FLOW;
                 folk.length = 0;
                 if (map.type === 'indoor') return;
                 
@@ -129,7 +129,7 @@
                 const track = (p) => {
                     if (p._tpt !== _simTick) {
                         let vx = p._tpt === _simTick - 1 ? p.x - p._tpx : 0, vy = p._tpt === _simTick - 1 ? p.y - p._tpy : 0;
-                        if (vx * vx + vy * vy > 144) vx = vy = 0;
+                        if (vx * vx + vy * vy > TF.FOLK_JUMP * TF.FOLK_JUMP) vx = vy = 0;
                         p._tvx = (p._tvx || 0) * 0.4 + vx * 0.6; p._tvy = (p._tvy || 0) * 0.4 + vy * 0.6;
                         p._tpx = p.x; p._tpy = p.y; p._tpt = _simTick;
                     }
@@ -194,7 +194,7 @@
                 // order and update moved cars immediately for the sequential simulation.
                 const sensing = this.sensing;
                 sensing.source = sensed; sensing.cars.build(sensed); sensing.people.build(folk);
-                let folkRad = 12;                                   // the widest body on foot (traffic-people.js sizes its search by it)
+                let folkRad = TF.FOLK_MIN_RADIUS;                                   // the widest body on foot (traffic-people.js sizes its search by it)
                 for (const p of folk) if (p && p.radius > folkRad) folkRad = p.radius;
                 sensing.folkRad = folkRad;
                 // Traffic occupies the first slots in both source forms. Descending
@@ -222,21 +222,21 @@
                                 const distToEnd = lane.length - distAlongLane;
                             
                                 // Despawn if within 2 car lengths of dead-end (mirrors spawn offset)
-                                if (distToEnd < 140) {
+                                if (distToEnd < TF.DEAD_END_DESPAWN) {
                                     nearDeadEnd = true;
                                 }
                             }
                         }
 
                         // Gridlock relief: a car frozen for 15 s somewhere the player can't see quietly goes away
-                        if (v.controlMode === 'AI' && Math.abs(v.speed || 0) < 0.2) v._frozen = (v._frozen || 0) + 1; else v._frozen = 0;
-                        const frozenOut = v._frozen > 900 && v.driverType !== 'player' && v.driverType !== 'zib' && !v.isOwnedCar &&
-                            !v.isDeliveryVehicle && distToPlayer > 900;
+                        if (v.controlMode === 'AI' && Math.abs(v.speed || 0) < TF.FROZEN_SPEED) v._frozen = (v._frozen || 0) + 1; else v._frozen = 0;
+                        const frozenOut = v._frozen > TF.FROZEN_TICKS && v.driverType !== 'player' && v.driverType !== 'zib' && !v.isOwnedCar &&
+                            !v.isDeliveryVehicle && distToPlayer > TF.FROZEN_MIN_DIST;
                         // Leaving: fade out over ~0.5 s (still rolling on into the lane's end), then go
                         if (!v.fading && (v.dead || distToPlayer > CONFIG.CULLING.VEHICLE_DESPAWN || nearDeadEnd || frozenOut)) v.fading = true;
-                        if (v.fading) v.fade = Math.min(v.fade ?? 1, 1) - 1 / 30;
-                        else if ((v.fade ?? 1) < 1) v.fade = Math.min(1, v.fade + 1 / 36);       // arriving: fade in over ~0.6 s
-                        if (v.fading && (v.fade <= 0 || distToPlayer > CONFIG.CULLING.VEHICLE_DESPAWN + 600)) {
+                        if (v.fading) v.fade = Math.min(v.fade ?? 1, 1) - 1 / TF.FADE_OUT_TICKS;
+                        else if ((v.fade ?? 1) < 1) v.fade = Math.min(1, v.fade + 1 / TF.FADE_IN_TICKS);       // arriving: fade in over ~0.6 s
+                        if (v.fading && (v.fade <= 0 || distToPlayer > CONFIG.CULLING.VEHICLE_DESPAWN + TF.DESPAWN_HARD_EXTRA)) {
                             if (v.currentIntersection) v.currentIntersection.releaseEntry(v);
                             // Properly destroy entity to unregister from collision system
                             if (!v.markedForDestroy) v.destroy();
@@ -257,16 +257,16 @@
                 }
         
                 // Over the cap (the setting was turned down): the farthest cars out of view fade away
-                if (_simTick % 60 === 0) this.trimToCap(player, playerCar);
+                if (_simTick % TF.TRIM_EVERY === 0) this.trimToCap(player, playerCar);
                 // 2. SPAWN LOGIC
                 if (this.vehicles.length < GameSettings.getMaxTraffic() && this.spawnTimer <= 0) { 
-                    this.spawnTimer = 5;  // Was 20 — 4× faster spawn rate so crowd density actually fills
+                    this.spawnTimer = TF.SPAWN_EVERY;
                     const pool = this.network.allLanes.length ? this._lanesNear(player.x, player.y) : [];
                     if (pool.length > 0) {
                         // Spawn out of sight where possible: the camera's view plus a margin
                         const gv = typeof game !== 'undefined' ? game.view : null, cv = typeof game !== 'undefined' ? game.canvas : null;
-                        const hw = gv && cv ? cv.width / 2 / gv.zoom + 120 : 0, hh = gv && cv ? cv.height / 2 / gv.zoom + 120 : 0;
-                        for(let k=0; k<14; k++) { 
+                        const hw = gv && cv ? cv.width / 2 / gv.zoom + TF.SPAWN_VIEW_MARGIN : 0, hh = gv && cv ? cv.height / 2 / gv.zoom + TF.SPAWN_VIEW_MARGIN : 0;
+                        for (let k = 0; k < TF.SPAWN_TRIES; k++) {
                             const spawnLane = pool[Math.floor(Math.random() * pool.length)];
                             // Choose the car first, so the check is made where it will actually appear
                             const brand = TrafficVehicle._selectRandomBrand(), model = TrafficVehicle._selectRandomModel(brand);
@@ -279,7 +279,7 @@
                             const spawnY = spawnLane.start.y + spawnLane.uy * spawnOffset;
                             const distToP = Math.hypot(player.x - spawnX, player.y - spawnY);
                             if (distToP < CONFIG.VEHICLE_AI.SPAWN_CLEAR_MIN || distToP > CONFIG.VEHICLE_AI.SPAWN_CLEAR_MAX) clear = false; 
-                            if (clear && gv && k < 12 && Math.abs(spawnX - gv.x) < hw && Math.abs(spawnY - gv.y) < hh) clear = false;   // (the last tries take what they can; the fade hides it)
+                            if (clear && gv && k < TF.SPAWN_TRIES_HIDDEN && Math.abs(spawnX - gv.x) < hw && Math.abs(spawnY - gv.y) < hh) clear = false;   // (the last tries take what they can; the fade hides it)
                             if (clear) {
                                 // Nobody within the separation, and nobody coming up the lane who couldn't stop for it
                                 const cars = this.vehicles.concat(playerCar && playerCar.visible ? [playerCar] : []);
@@ -287,9 +287,9 @@
                                     const dx = v.x - spawnX, dy = v.y - spawnY;
                                     if (Math.hypot(dx, dy) < CONFIG.VEHICLE_AI.SPAWN_SEPARATION) { clear = false; break; }
                                     const along = dx * spawnLane.ux + dy * spawnLane.uy, lat = Math.abs(-dx * spawnLane.uy + dy * spawnLane.ux);
-                                    if (lat > 34) continue;
+                                    if (lat > TF.SPAWN_LANE_HALF_WIDTH) continue;
                                     const sp = Math.abs(v.speed || 0), stop = sp * sp / (2 * (v.brake || 0.3));
-                                    if (along < len + 40 && along > -(stop + len + v.length / 2 + 40)) { clear = false; break; }
+                                    if (along < len + TF.SPAWN_LANE_MARGIN && along > -(stop + len + v.length / 2 + TF.SPAWN_LANE_MARGIN)) { clear = false; break; }
                                 }
                             }
                             if (clear) {
@@ -310,9 +310,10 @@
              */
             _lanesNear(x, y) {
                 const c = this._near, all = this.network.allLanes;
-                if (c && c.all === all && Math.abs(c.x - x) < 300 && Math.abs(c.y - y) < 300) return c.list;
+                const TF = CONFIG.TRAFFIC_FLOW;
+                if (c && c.all === all && Math.abs(c.x - x) < TF.LANES_NEAR_RELIST && Math.abs(c.y - y) < TF.LANES_NEAR_RELIST) return c.list;
                 // any lane that passes through the ring round her (with slack for her moves since)
-                const lo = CONFIG.VEHICLE_AI.SPAWN_CLEAR_MIN - 450, hi = CONFIG.VEHICLE_AI.SPAWN_CLEAR_MAX + 450;
+                const lo = CONFIG.VEHICLE_AI.SPAWN_CLEAR_MIN - TF.LANES_NEAR_SLACK, hi = CONFIG.VEHICLE_AI.SPAWN_CLEAR_MAX + TF.LANES_NEAR_SLACK;
                 const list = all.filter(l => {
                     const t = Math.max(0, Math.min(l.length, (x - l.start.x) * l.ux + (y - l.start.y) * l.uy));
                     const near = Math.hypot(l.start.x + l.ux * t - x, l.start.y + l.uy * t - y);
@@ -328,16 +329,17 @@
              * else (on a straight road) a random spot along it in range, clear of both its ends' junctions; null if none.
              */
             _spawnAlong(lane, player, len) {
-                const lo = CONFIG.VEHICLE_AI.SPAWN_CLEAR_MIN, hi = CONFIG.VEHICLE_AI.SPAWN_CLEAR_MAX;
-                const d0 = Math.hypot(lane.start.x + lane.ux * len * 2 - player.x, lane.start.y + lane.uy * len * 2 - player.y);
-                if (d0 >= lo && d0 <= hi) return len * 2;
+                const lo = CONFIG.VEHICLE_AI.SPAWN_CLEAR_MIN, hi = CONFIG.VEHICLE_AI.SPAWN_CLEAR_MAX, TF = CONFIG.TRAFFIC_FLOW;
+                const inLen = len * TF.SPAWN_ALONG_LENGTHS;
+                const d0 = Math.hypot(lane.start.x + lane.ux * inLen - player.x, lane.start.y + lane.uy * inLen - player.y);
+                if (d0 >= lo && d0 <= hi) return inLen;
                 if (lane.road && lane.road.isCurved) return null;   // (a lane round a bend is its chord: a car started partway would be off the road)
                 const t0 = (player.x - lane.start.x) * lane.ux + (player.y - lane.start.y) * lane.uy;
                 const lat = Math.abs((player.x - lane.start.x) * -lane.uy + (player.y - lane.start.y) * lane.ux);
                 const d = lo + Math.random() * (hi - lo);
                 if (lat >= d) return null;
                 const along = t0 + (Math.random() < 0.5 ? -1 : 1) * Math.sqrt(d * d - lat * lat);
-                return along >= len * 2 && along <= lane.length - len * 4 ? along : null;
+                return along >= inLen && along <= lane.length - len * TF.SPAWN_END_LENGTHS ? along : null;
             }
             
             /** Down to GameSettings' cap: the farthest cars out of view fade out (hers are never in the list; one rolling stays) */
@@ -354,6 +356,7 @@
 
             // Optimized Collision Resolution with DEBRIS
             resolveCollisions(playerCar, player, weather, audioSys, parked, decalSystem) {
+                const TF = CONFIG.TRAFFIC_FLOW;
                 if (this._crunchCd > 0) this._crunchCd--;
                 // 1. GATHER ALL PHYSICAL VEHICLES (and re-grid them where they are now, after moving)
                 const allVehicles = this.vehicles.filter(v => !v.dead && !(v.fading && v.fade < 0.5));   // (a car fading out is a ghost)
@@ -362,23 +365,23 @@
                 this.grid.clear();
                 for (const v of allVehicles) this.grid.add(v);
                 // 2. EVERY PAIR THAT TOUCHES (collisionWorld.streetCars: each pair once, masks, ghosts, onCollide), then the
-                // knock (car-contact.js) and the feel: scaled by how hard they met, not a coin flip
+                // knock (vehicleKit.carContact, basement/vehicle-kit.js) and the feel: scaled by how hard they met, not a coin flip
                 CollisionSystem.streetCars(allVehicles, this.grid, this._collisionNeighbours || (this._collisionNeighbours = []), (v1, v2, packet) => {
-                    PhysicsSystem.carContact(v1, v2, packet.nx, packet.ny, packet.depth);
+                    vehicleKit.carContact(v1, v2, packet.nx, packet.ny, packet.depth, CONFIG.VEHICLE_DRIVE);
                     const imp = v1._lastImpact || 0;
-                    if (imp > 1.2) {
+                    if (imp > TF.SPARK_MIN_HIT) {
                         const midX = (v1.x + v2.x) / 2;
                         const midY = (v1.y + v2.y) / 2;
-                        weather.spawnSparks(midX, midY, Math.min(12, Math.round(2 + imp * 2)));   // sparks (temporary)
-                        if (decalSystem && imp > 2) {                                              // debris (persistent): glass, paint
+                        weather.spawnSparks(midX, midY, Math.min(TF.SPARKS_MAX, Math.round(2 + imp * 2)));   // sparks (temporary)
+                        if (decalSystem && imp > TF.DEBRIS_MIN_HIT) {                                              // debris (persistent): glass, paint
                             decalSystem.addDebris(midX, midY, '#aaddff', 4);
                             decalSystem.addDebris(midX, midY, v1.color, 3);
                         }
                         // Sound (the driven car's own hits crunch in TrafficVehicle.onImpact)
                         const pd = Math.hypot(player.x - midX, player.y - midY);
-                        if (v1.controlMode !== 'PLAYER' && v2.controlMode !== 'PLAYER' && pd < 500 && !(this._crunchCd > 0)) {
-                            this._crunchCd = 10;
-                            audioSys.sfx('crunch', { gain: Math.min(1, imp / 5) * (1 - pd / 600) });
+                        if (v1.controlMode !== 'PLAYER' && v2.controlMode !== 'PLAYER' && pd < TF.CRUNCH_HEAR && !(this._crunchCd > 0)) {
+                            this._crunchCd = TF.CRUNCH_COOLDOWN;
+                            audioSys.sfx('crunch', { gain: Math.min(1, imp / 5) * (1 - pd / TF.CRUNCH_FADE) });
                         }
                     }
                 });

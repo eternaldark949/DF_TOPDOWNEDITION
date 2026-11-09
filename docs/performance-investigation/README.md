@@ -112,3 +112,17 @@ The same comparison's initial city samples were mixed: median night time was 9.7
 The longer final comparison covers **all three changes** against the pre-investigation build: five paired intervals, each with 240 warmup and 240 measured frames, per city scene. Night measured 5,481.9 vs 5,486.5 ms (flat); daylight 7,226.1 vs 7,061.7 ms (2.28% lower). The scenes ended with 100 street pedestrians and 71 vehicles, averaging 15.67 drawn bodies over their history. Every paired animation/physics/traffic state hash and final image matched exactly. Variation remains large enough that these results do **not** establish a dependable whole-city frame-rate improvement. The isolated savings are useful, but they must not be presented as an equivalent total-game gain. Remaining native Canvas painting and submission work warrants further local investigation. The engine is headless Chromium in this container, without phone CPU/GPU emulation.
 
 Final validation: 123 automated cases passed, including 91 broad game regressions with 1,363 assertions. The six character sheets, warmed full-city images, mixed-particle images, animation/physics/traffic state hashes, text/JSON exports, and profiler-hook restoration checks passed. The build freshness check and `git diff --check` passed.
+
+## Static geometry catalogued once (November 9)
+
+Walls and buildings don't move during play, so nothing re-checks them tick to tick any more. The rule is: catalogue once, rebuild only when a change is reported.
+
+- `_physicsSpatial` (basement/spatial-grid.js) used to compare every wall and building's x, y, w, h each tick (678 shapes on the city map). It now rebuilds only on `invalidate` or when a list grows or shrinks.
+- `NavGrid._refresh` (world/navigation.js) re-reads walls and buildings only when their lists change or the map reports a change; pushable props are still checked each tick.
+- `collisionWorld.update` (basement/collision-kit.js) used to screen-test all 922 collidables each tick, 710 of them fixed, and rebuild the fixed grid as the camera panned. Fixed bodies are now sorted out and gridded map-wide once, again only when the registry changes (`GameEntity.registry.revision`) or `invalidateStatics()`.
+- The remaining linear wall scans (Gatling Gunner, drones, ganger spawn check, phone rescue, bumper cars) go through `_physicsSpatial`.
+- Reporting path for anything that edits walls or buildings during play: `GameEngine.invalidatePhysicsSpatial()` (removeWall and invalidateRenderSpatial already call it).
+
+Car physics moved to the Basement as `vehicleKit` (basement/vehicle-kit.js): driving, wall push-out, settling, and car-to-car contact (formerly directory/car-contact.js). Traffic-manager and traffic-light numbers moved to `vehicles.json` (`traffic_flow`, `traffic_signals`).
+
+Headless city-map timing (Node, desktop, 30 cars, 2,000 measured ticks after 1,500 warm-up, three alternating runs): world tick 4,832 µs before vs 4,177 µs after (about 14% lower); traffic manager 2,358 vs 1,893 µs (about 20% lower). Not a phone measurement.

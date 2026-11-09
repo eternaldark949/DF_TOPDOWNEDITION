@@ -29,7 +29,7 @@ test('Static cell cache preserves slots, duplicates and hit order, including neg
  assert.equal(r.equal,true);assert.ok(r.cached<=256);assert.ok(r.slots<=16384);
 });
 
-test('Static cell hits skip grid work and invalidate on geometry edits, slot changes and explicit same-tick invalidation',()=>{
+test('Static cell hits skip grid work; unreported moves are not re-checked each tick, reported edits and size changes rebuild',()=>{
  const env=runtime(file);
  const r=value(env,`
    const a={id:'a',x:10,y:10,w:20,h:20},b={id:'b',x:900,y:900,w:20,h:20},items=[a,b,a];
@@ -40,14 +40,16 @@ test('Static cell hits skip grid work and invalidate on geometry edits, slot cha
    for(let i=0;i<100;i++)_physicsSpatial.query(items,{left:1,top:1,right:80,bottom:80});
    const warmQueries=builds;
    b.x=30;b.y=30;_simTick++;
+   const unreported=_physicsSpatial.query(items,B).map(o=>o.id);
+   _physicsSpatial.invalidate(items);
    const moved=_physicsSpatial.query(items,B).map(o=>o.id);
    items[1]={id:'c',x:20,y:20,w:10,h:10};_physicsSpatial.invalidate(items);
    const replaced=_physicsSpatial.query(items,B).map(o=>o.id);
    items.push({id:'d',x:30,y:30,w:5,h:5});
    const grown=_physicsSpatial.query(items,B).map(o=>o.id);
-   return{first,warmQueries,moved,replaced,grown};
+   return{first,warmQueries,unreported,moved,replaced,grown};
  `);
- assert.deepEqual(r,{first:['a','a'],warmQueries:1,moved:['a','b','a'],replaced:['a','c','a'],grown:['a','c','a','d']});
+ assert.deepEqual(r,{first:['a','a'],warmQueries:1,unreported:['a','a'],moved:['a','b','a'],replaced:['a','c','a'],grown:['a','c','a','d']});
 });
 
 test('Nonfinite ranges, sparse arrays and unknown geometry retain their fallback behavior',()=>{

@@ -21,26 +21,7 @@
         //  out once, from their shapes). People on foot cross the road that's red, only while its red has time left.
         //  Junctions without lights (other shapes, or with them switched off) keep Intersection's turn-taking queue.
 
-        const SIGNAL = {
-            ON: true,             // lights at every crossing of two roads (off: the old one-at-a-time queue)
-            SEE: 480,             // how far out a car on its way in shows on the gauge (px to the box)
-            MIN_GREEN: 90,        // ticks a green runs at least, once someone waits on the other road
-            MAX_GREEN: 300,       // ...and at most, plus GREEN_PER for each unit of its own demand, up to MAX_BUSY
-            GREEN_PER: 30, MAX_BUSY: 540,
-            STARVED: 600,         // ticks a car may wait on red before its road's turn comes straight after MIN_GREEN
-            AMBER: 45,
-            CLEAR_MIN: 14, CLEAR_MAX: 240,
-            WALK: 150,            // ticks from the start of a green that walkers may start across the red road, whatever's waiting
-            CLEAR_WALK: 120,      // ticks the all-red waits for walkers still crossing (after that, the cars wait for them)
-            STOP_BACK: 80,        // the stop line, px short of the box (behind the crosswalk: traffic-vehicle.js)
-            CROSS: 46,            // two turn paths closer than this anywhere cross (centre to centre), plus each one's
-            DRIFT: { straight: 6, turn: 34 },   // drift: how far cars stray off it mid-way (none at its ends)
-            YIELD: 95,            // ticks of oncoming arrival a left turn won't cut across (× temper `take`)
-            ARROW: true,          // a turn arrow ahead of a green for cars waiting to turn (off: turns only on the green)
-            ARROW_MIN: 40, ARROW_MAX: 240,  // ticks it runs, at least and at most (ends early once the turners are through)
-            TURN_AT: 200,         // a car waiting to turn this close (centre, px to the box) asks for the arrow
-            TURN_STALL: 240,      // ticks a left turn may stand at the front of its lane on a green before it gets one
-        };
+        const SIGNAL = GAME_DB.vehicles.traffic_signals;   // the timings: vehicles.json, _about.fields.traffic_signals
 
         class JunctionSignal {
             /** Lights for `ix` if it's a crossing of two roads with traffic in on both; else null (the queue). */

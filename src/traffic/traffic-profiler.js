@@ -36,8 +36,8 @@
             const V = TrafficVehicle.prototype;
             bind(V, 'updateAIDriving', 'Driving decisions');
             bind(V, 'aiDriveStep', 'Physics integration');
-            bind(V, '_wallContact', 'Wall contacts');
-            bind(V, 'checkEnvironmentCollision', 'Environment checks');
+            bind(vehicleKit, 'wallContact', 'Wall contacts');
+            bind(vehicleKit, 'fits', 'Environment checks');
             bind(_physicsSpatial, 'query', 'Static broadphase');
             bind(_physicsSpatial, 'refresh', 'Static geometry validation');
             bind(V, '_readFolk', 'People sensing');
