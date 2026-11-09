@@ -62,6 +62,7 @@ const SCRIPTS = [
     'basement/material-kit.js',    // LV0 Basement: materialKit (linked materials and finish rules)
     'basement/virtual-child.js',   // LV0 Basement: virtualChild (things that ride on a parent without being its child)
     'basement/angle-kit.js',       // LV0 Basement: angleKit (degrees in the data, radians in the code)
+    'basement/query-kit.js',       // LV0 Basement: queryKit (find, filter and sort location packets)
     'basement/awareness-kit.js',   // LV0 Basement: awarenessMatrix (what a character knows of what's around them)
     'directory/game-db/game-db.js',   // LV2 Directory: GAME_DB, the game's data; its chapters (JSON) follow
     'directory/game-db/items.json',   // GAME_DB.items: gear, augments, furniture, consumables, drinks, notes, schematics
@@ -113,6 +114,7 @@ const SCRIPTS = [
     'directory/lobby-life.js',
     'directory/club-life.js',
     'directory/cafe-life.js',
+    'directory/world-query.js',    // LV2 Directory: worldQuery (rooms, seats, NPCs, loot, doors, landmarks, buildings as packets)
     'engine/furniture.js',
     'entities/enemies.js',
     'entities/hunters.js',

@@ -20,6 +20,7 @@
         //   EXIT_REACH       how near an exit counts as there (someone may be standing in the door)
         //   ARRIVE_ONCE      once at a stop, stay put there (true), or walk back if pushed off it (false)
         //   DRINKS           what a `drink` step fetches
+        //   SEATS            { pool: [{ at: [x, y], from: [x, y], face }] }: its seats, for worldQuery.getSeats
         // AND WHAT IT WRITES: _setUp(game) (spots, staff), _target(game), _spawnGuest(mid_visit),
         //   _expand(w, step), _staffThink(w, game); optionally _leave, _abandonStep, _finishStep,
         //   _afterUpdate and draw.

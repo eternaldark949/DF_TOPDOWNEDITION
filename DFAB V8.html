@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '31caadf8bf66';
+        const DFAB_BUILD = '4aa4d4c57f94';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9821,6 +9821,86 @@
                 if (obj && typeof obj.deg === 'number') { obj.a = angleKit.toRad(obj.deg); delete obj.deg; }
                 return obj;
             }
+        };
+    </script>
+    <script type="text/dfab" data-src="basement/query-kit.js" data-cost="40">
+        // ===== LV0 BASEMENT =====
+        // The query kit: asking a list of LOCATION PACKETS what's where. It knows nothing about any game;
+        // the game makes the packets (directory/world-query.js) and the kit filters, sorts and finds in them.
+        //
+        // LOCATION PACKET: { id, kind, name, x, y, ...extras }
+        //   id        unique within its kind ('chair.3', 'Barista Ren', 'cozy_cafe')
+        //   kind      what it is: 'room', 'seat', 'npc', 'loot', 'landmark', 'door', 'building' ...
+        //   name      what a person would call it (defaults to the id)
+        //   x, y      where it is, in world pixels (a room's or building's middle)
+        //   extras    whatever the kind adds: map, room, a (a heading, radians), bounds { x, y, w, h }, entity ...
+        //
+        // FILTER: every key given must match
+        //   kind      'seat' or ['npc', 'loot']
+        //   any other plain key (map, room, pool, role, type ...): the packet's value equals it (or is in its array)
+        //   near      [x, y, r]: within r of (x, y)
+        //   inside    { x, y, w, h }: inside that box
+        //   test      p => boolean, anything else
+        //
+        //   queryKit.find(packets, { kind: 'seat', room: 'cafe', taken: false })
+        //   queryKit.nearest(packets, x, y, { kind: 'npc' })
+        //   queryKit.names(queryKit.find(packets, { kind: 'room' }))   // ['Café', 'Kitchen', ...]
+        const queryKit = {
+            /** A location packet. extras are copied onto it; name defaults to the id. */
+            packet (kind, id, x, y, extras) {
+                const p = { id, kind, name: id, x, y };
+                if (extras) Object.assign(p, extras);
+                if (p.name === undefined || p.name === null) p.name = id;
+                return p;
+            },
+
+            /** Does packet p pass the filter? (no filter: yes) */
+            matches (p, filter) {
+                if (!filter) return true;
+                for (const k in filter) {
+                    const want = filter[k];
+                    if (want === undefined) continue;
+                    if (k === 'near') { const dx = p.x - want[0], dy = p.y - want[1]; if (dx * dx + dy * dy > want[2] * want[2]) return false; continue; }
+                    if (k === 'inside') { if (p.x < want.x || p.x > want.x + want.w || p.y < want.y || p.y > want.y + want.h) return false; continue; }
+                    if (k === 'test') { if (!want(p)) return false; continue; }
+                    if (Array.isArray(want) ? !want.includes(p[k]) : p[k] !== want) return false;
+                }
+                return true;
+            },
+
+            /** The packets that pass the filter, in their order. */
+            find (packets, filter) {
+                return filter ? packets.filter(p => queryKit.matches(p, filter)) : packets.slice();
+            },
+
+            /** The first packet that passes, or null. */
+            first (packets, filter) {
+                for (const p of packets) if (queryKit.matches(p, filter)) return p;
+                return null;
+            },
+
+            /** The nearest packet to (x, y) that passes the filter, or null. */
+            nearest (packets, x, y, filter) {
+                let best = null, bd = Infinity;
+                for (const p of packets) {
+                    if (!queryKit.matches(p, filter)) continue;
+                    const d = (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y);
+                    if (d < bd) { bd = d; best = p; }
+                }
+                return best;
+            },
+
+            /** A copy, nearest to (x, y) first. */
+            byDistance (packets, x, y) {
+                const d = p => (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y);
+                return packets.slice().sort((a, b) => d(a) - d(b));
+            },
+
+            /** Their names, in order. */
+            names (packets) { return packets.map(p => p.name); },
+
+            /** Their ids, in order. */
+            ids (packets) { return packets.map(p => p.id); }
         };
     </script>
     <script type="text/dfab" data-src="basement/awareness-kit.js" data-cost="92">
@@ -29779,7 +29859,7 @@
         }
 
     </script>
-    <script type="text/dfab" data-src="directory/venue-crowd.js" data-cost="135">
+    <script type="text/dfab" data-src="directory/venue-crowd.js" data-cost="136">
         // ===== LV2 DIRECTORY =====
         // VENUE CROWD: the walker loop that every venue's ambient crowd runs on. The Double Nights lobby
         // (lobby-life.js), Moon City (club-life.js) and the Cozy Cafe (cafe-life.js) are this class with
@@ -29802,6 +29882,7 @@
         //   EXIT_REACH       how near an exit counts as there (someone may be standing in the door)
         //   ARRIVE_ONCE      once at a stop, stay put there (true), or walk back if pushed off it (false)
         //   DRINKS           what a `drink` step fetches
+        //   SEATS            { pool: [{ at: [x, y], from: [x, y], face }] }: its seats, for worldQuery.getSeats
         // AND WHAT IT WRITES: _setUp(game) (spots, staff), _target(game), _spawnGuest(mid_visit),
         //   _expand(w, step), _staffThink(w, game); optionally _leave, _abandonStep, _finishStep,
         //   _afterUpdate and draw.
@@ -30146,7 +30227,7 @@
             }
         }
     </script>
-    <script type="text/dfab" data-src="directory/club-life.js" data-cost="124">
+    <script type="text/dfab" data-src="directory/club-life.js" data-cost="125">
         // ===== LV2 DIRECTORY =====
         // ============================================================================
         //  CLUB LIFE — Moon City's crowd (moon_city_nightclub only)
@@ -30188,6 +30269,7 @@
         const CLUB_DRINKS = ['neon', 'neon', 'martini', 'champagne', 'rose', 'cream_soda', 'whiskey', 'red_wine', 'stellar_lemonade'];
 
         class ClubLife extends VenueCrowd {
+            SEATS = CLUB_SEATS;      // read by worldQuery.getSeats (directory/world-query.js)
             DRINKS = CLUB_DRINKS;
             constructor() { super('moon_city_nightclub'); }
 
@@ -30311,7 +30393,7 @@
             }
         }
     </script>
-    <script type="text/dfab" data-src="directory/cafe-life.js" data-cost="101">
+    <script type="text/dfab" data-src="directory/cafe-life.js" data-cost="102">
         // ===== LV2 DIRECTORY =====
         // ============================================================================
         //  CAFE LIFE — the Cozy Cafe's guests (cozy_cafe_interior only)
@@ -30349,6 +30431,7 @@
         };
 
         class CafeLife extends VenueCrowd {
+            SEATS = CAFE_SEATS;      // read by worldQuery.getSeats (directory/world-query.js)
             PREFILL = 0.75;
             DRINKS = CAFE_DRINKS;
             constructor() { super('cozy_cafe_interior'); }
@@ -30446,6 +30529,135 @@
                 } else w.steps.push({ go: this._snap([120 + r() * 220, 200 + r() * 20]), face: [200, 260], wait: 240 + r() * 360 | 0, pose: 'polish' });
             }
         }
+    </script>
+    <script type="text/dfab" data-src="directory/world-query.js" data-cost="91">
+        // ===== LV2 DIRECTORY =====
+        // WORLD QUERY: what's where in this game, as location packets (basement/query-kit.js). Each getter
+        // takes the game and an optional filter, and returns packets: { id, kind, name, x, y, map, room, ... }.
+        // Entity-backed packets (npc, loot) carry the live `entity`; the rest are plain data.
+        //
+        //   worldQuery.getRooms(game)                      the map's rooms (any map: getRooms(game, { map: 'apt_949' }))
+        //   worldQuery.roomAt(game, x, y)                  the id of the room at (x, y) on this map, or null
+        //   worldQuery.getSeats(game, { taken: false })    the venue's seats: pool, a (facing), from (where you step up)
+        //   worldQuery.getNPCs(game, { room: 'kitchen' })  the characters on this map
+        //   worldQuery.getLoot(game)                       pickups on the ground
+        //   worldQuery.getDoors(game)                      this map's exits: target map, label
+        //   worldQuery.getLandmarks(game)                  named points: building, drop (the curb a Zib stops at)
+        //   worldQuery.getBuildings(game)                  the city's buildings you can go to, from any map
+        //   worldQuery.hubBuildings(game)                  every city building (raw), from any map
+        //   worldQuery.nearest(list, x, y, filter)         queryKit.nearest, for convenience
+        // The filter is queryKit's: { kind, near: [x, y, r], inside: {x, y, w, h}, test: p => …, or any field }.
+        const worldQuery = {
+            _mapId (game) { return game && game.activeMap ? game.activeMap.id : null; },
+            _filter (filter) { if (!filter) return null; const f = { ...filter }; delete f.map; return f; },
+
+            /** The room id at (x, y) on the current map, or null (no rooms here, or between them). */
+            roomAt (game, x, y) {
+                const rs = game && game.roomSystem;
+                const r = rs && rs.active ? rs.getRoomAt(x, y) : null;
+                return r ? r.id : null;
+            },
+
+            /** Rooms: the current map's (live: lightsOff, vis), or another map's from GAME_DB.places.rooms (filter.map). */
+            getRooms (game, filter) {
+                const here = worldQuery._mapId(game), map = (filter && filter.map) || here, out = [];
+                const rs = game && game.roomSystem;
+                if (map === here && rs && rs.active) {
+                    for (const r of Object.values(rs.rooms))
+                        out.push(queryKit.packet('room', r.id, r.x + r.w / 2, r.y + r.h / 2,
+                            { name: r.label, map, room: r.id, type: r.type, bounds: { x: r.x, y: r.y, w: r.w, h: r.h }, rects: r.rects, lightsOff: r.lightsOff }));
+                } else {
+                    const def = ROOM_DEFS[map];
+                    for (const [id, d] of Object.entries((def && def.rooms) || {})) {
+                        const rects = d.rects || [{ x: d.x, y: d.y, w: d.w, h: d.h }];
+                        const x0 = Math.min(...rects.map(q => q.x)), y0 = Math.min(...rects.map(q => q.y));
+                        const x1 = Math.max(...rects.map(q => q.x + q.w)), y1 = Math.max(...rects.map(q => q.y + q.h));
+                        out.push(queryKit.packet('room', id, (x0 + x1) / 2, (y0 + y1) / 2,
+                            { name: d.label || id, map, room: id, type: d.type || 'indoor', bounds: { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }, rects }));
+                    }
+                }
+                return queryKit.find(out, worldQuery._filter(filter));
+            },
+
+            /** Seats in the current venue (the venue crowds' SEATS: cafe, club): pool, index, a (which way
+             *  you face), from (where you step up to it), taken (someone in the crowd has it). */
+            getSeats (game, filter) {
+                const map = worldQuery._mapId(game), out = [];
+                for (const crowd of [game && game.cafeLife, game && game.clubLife, game && game.lobbyLife]) {
+                    if (!crowd || crowd.mapId !== map || !crowd.SEATS) continue;
+                    for (const [pool, list] of Object.entries(crowd.SEATS)) list.forEach((s, i) => {
+                        const set = crowd.taken && crowd.taken.get(pool);
+                        out.push(queryKit.packet('seat', pool + '.' + i, s.at[0], s.at[1],
+                            { map, room: worldQuery.roomAt(game, s.at[0], s.at[1]), pool, index: i, a: s.face,
+                              from: { x: s.from[0], y: s.from[1] }, taken: !!(set && set.has(i)) }));
+                    });
+                }
+                return queryKit.find(out, worldQuery._filter(filter));
+            },
+
+            /** The characters on the current map: name, role, a (facing), room, and the live entity. */
+            getNPCs (game, filter) {
+                const map = worldQuery._mapId(game);
+                const out = ((game && game.npcs) || []).filter(n => n && !n.dead && n.active !== false).map(n =>
+                    queryKit.packet('npc', n.name || n.role || String(n.id), n.x, n.y,
+                        { name: n.name || n.role || 'someone', role: n.role || null, a: n.angle, map, room: worldQuery.roomAt(game, n.x, n.y), entity: n }));
+                return queryKit.find(out, worldQuery._filter(filter));
+            },
+
+            /** Pickups on the ground: type (pp, scrap, stim, dark_element …), room, and the live entity. */
+            getLoot (game, filter) {
+                const map = worldQuery._mapId(game);
+                const out = ((game && game.loot) || []).map((l, i) =>
+                    queryKit.packet('loot', l.type + '.' + i, l.x, l.y, { name: l.type, type: l.type, map, room: worldQuery.roomAt(game, l.x, l.y), entity: l }));
+                return queryKit.find(out, worldQuery._filter(filter));
+            },
+
+            /** The current map's exits (its transitions): target map, label, bounds. */
+            getDoors (game, filter) {
+                const map = worldQuery._mapId(game);
+                const out = ((game && game.activeMap && game.activeMap.transitions) || []).map(t =>
+                    queryKit.packet('door', `${map}_to_${t.target}`, t.x + t.w / 2, t.y + t.h / 2,
+                        { name: t.label || t.target, map, target: t.target, room: worldQuery.roomAt(game, t.x + t.w / 2, t.y + t.h / 2), bounds: { x: t.x, y: t.y, w: t.w, h: t.h } }));
+                return queryKit.find(out, worldQuery._filter(filter));
+            },
+
+            /** The current map's named points (the landmark registry): building (its template id), drop (the curb a Zib stops at). */
+            getLandmarks (game, filter) {
+                const map = worldQuery._mapId(game), drops = (game && game.dropOffRegistry) || {};
+                const out = Object.entries((game && game.landmarkRegistry) || {}).map(([id, l]) =>
+                    queryKit.packet('landmark', id, l.x, l.y, { name: l.buildingLabel || id, map, building: l.templateId || null, drop: drops[id] || null }));
+                return queryKit.find(out, worldQuery._filter(filter));
+            },
+
+            /** Every city building, raw (the hub's, cached once it has loaded), from any map. */
+            hubBuildings (game) {
+                if (!game) return [];
+                if (game._hubBuildingsCache) return game._hubBuildingsCache;
+                return (game.activeMap && game.activeMap.id === 'sdc' && game.activeMap.buildings) || [];
+            },
+
+            /** The city's buildings you can go to (those with a landmark at their door), from any map:
+             *  type, bounds, door (the landmark's point), landmark (its id), drop (the Zib's curb), enter (the map inside, if any). */
+            getBuildings (game, filter) {
+                // The city's landmarks: live on the hub, else as cached when it was built
+                const onHub = worldQuery._mapId(game) === 'sdc', cache = (game && game._hubCache) || {};
+                const all = (onHub ? game.landmarkRegistry : cache.landmarks) || {}, drops = (onHub ? game.dropOffRegistry : cache.dropOffs) || {};
+                const lms = {};
+                for (const [id, l] of Object.entries(all)) if (l.templateId) lms[l.templateId] = { id, ...l };
+                const out = [];
+                for (const b of worldQuery.hubBuildings(game)) {
+                    const lm = lms[b.id];
+                    if (!lm && !b.attachedTransition) continue;
+                    out.push(queryKit.packet('building', b.id, b.x + b.w / 2, b.y + b.h / 2,
+                        { name: b.label || b.id, map: 'sdc', type: b.type || null, bounds: { x: b.x, y: b.y, w: b.w, h: b.h },
+                          door: lm ? { x: lm.x, y: lm.y } : null, landmark: lm ? lm.id : null, drop: lm ? drops[lm.id] || null : null,
+                          enter: b.attachedTransition ? b.attachedTransition.target || null : null }));
+                }
+                return queryKit.find(out, worldQuery._filter(filter));
+            },
+
+            nearest (list, x, y, filter) { return queryKit.nearest(list, x, y, filter); }
+        };
     </script>
     <script type="text/dfab" data-src="engine/furniture.js" data-cost="146">
         // ============================================================================
@@ -69901,7 +70113,7 @@ Object.assign(TrafficVehicle.prototype, {
         }
 
     </script>
-    <script type="text/dfab" data-src="story/missions.js" data-cost="313">
+    <script type="text/dfab" data-src="story/missions.js" data-cost="311">
         /* =====================================================================
            MISSION SYSTEM
            ---------------------------------------------------------------------
@@ -69931,8 +70143,7 @@ Object.assign(TrafficVehicle.prototype, {
 
             /** The city's buildings, from wherever she is (the hub's, cached, while she's inside) */
             _hubBuildings(game) {
-                if (game._hubBuildingsCache) return game._hubBuildingsCache;
-                return (game.activeMap && game.activeMap.id === 'sdc' && game.activeMap.buildings) || [];
+                return worldQuery.hubBuildings(game);
             }
 
             /**
@@ -95709,7 +95920,7 @@ engineMixin({
             else AppLaunch.init();
         }
     </script>
-    <script type="text/dfab" data-src="ui/messages.js" data-cost="866">
+    <script type="text/dfab" data-src="ui/messages.js" data-cost="865">
         /* =====================================================================
            MESSAGES — the phone's Messages app ("Velvet Thread")
            ---------------------------------------------------------------------
@@ -96426,7 +96637,7 @@ engineMixin({
                 const P = MSG_PLACES[id];
                 if (!P) return null;
                 // The live building wins over the table (a map edit moves the pin with it)
-                const bs = (typeof game !== 'undefined' && game) && (game._hubBuildingsCache || (game.activeMap && game.activeMap.id === 'sdc' && game.activeMap.buildings));
+                const bs = (typeof game !== 'undefined' && game) && worldQuery.hubBuildings(game);
                 const b = bs && bs.find(x => x.id === id);
                 const x = b ? b.x : P.x, y = b ? b.y : P.y, w = b ? (b.w || 100) : P.w, h = b ? (b.h || 100) : P.h;
                 return { ...P, id, tx: x + w / 2, ty: y + h + 30 };

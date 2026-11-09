@@ -39,6 +39,7 @@
         const CLUB_DRINKS = ['neon', 'neon', 'martini', 'champagne', 'rose', 'cream_soda', 'whiskey', 'red_wine', 'stellar_lemonade'];
 
         class ClubLife extends VenueCrowd {
+            SEATS = CLUB_SEATS;      // read by worldQuery.getSeats (directory/world-query.js)
             DRINKS = CLUB_DRINKS;
             constructor() { super('moon_city_nightclub'); }
 
