@@ -11,9 +11,9 @@ const {join}=require('node:path');
 const {runtime}=require('./test-game-runtime.cjs');
 const tests=[];
 // Canvas calls a frame, averaged over a second of play with the clocks running. Measured: city at night 14.5-15.9k,
-// the park by day 20.8-22.5k (it was 46-87k a frame before tree clips were trimmed), café 1.7-2.1k, club 6.7-9.9k
+// the park by day 19.9-21.1k (it was 46-87k a frame before tree clips were trimmed and ledges batched), café 1.7-2.1k, club 6.7-9.9k
 // (the city's and club's crowds come and go, so they wander); the budgets sit about 10% over the top.
-const CALL_BUDGET={ city_night: 17500, city_park: 25000, cozy_cafe: 2400, moon_city: 10900 };
+const CALL_BUDGET={ city_night: 17500, city_park: 23500, cozy_cafe: 2400, moon_city: 10900 };
 function test(name,fn){fn();tests.push(name);}
 const fresh=()=>{const e=runtime(join(__dirname,'..','DFAB V8.html'),{affine:true,capture:true});e.setTrace(false);return e;};
 const ops=(e,src)=>{e.setTrace(true);e.run('{'+src+'}');const t=e.trace.slice();e.setTrace(false);const c={};for(const r of t)c[r[1]]=(c[r[1]]||0)+1;return {c,t};};
@@ -64,18 +64,21 @@ const SCENES={
 // bakes, frame time for the bake budget each frame
 const FRAME='game.update();frame_clock.setGameTime(_simTick/60);_frameTime=1000+_simTick*1000/60;game.draw();';
 const WARM=240, MEASURE=60;
-test('The trees and street lamps are batched, the crowd stands from its bakes, and every scene draws within its canvas-call budget',()=>{
+test('The trees, street lamps and buildings\' ledges are batched, the crowd stands from its bakes, and every scene draws within its canvas-call budget',()=>{
  const e=fresh(); const got={};
  e.scope.__calls=()=>e.counters.canvasCalls;
  e.run(`game.story.update=()=>{}; game.showProfiler=false; GameSettings.profilerMode='off';
   globalThis.__crowd={live:0,baked:0,calls:0}; const B=CrowdBakes.draw.bind(CrowdBakes); CrowdBakes.draw=(ctx,w,c)=>{const r=B(ctx,w,c); __crowd[r?'baked':'live']++; return r;};
+  globalThis.__ledges={shapes:0,batches:0}; const LQ=TierKit.ledgeQueue||(TierKit.ledgeQueue=new renderQueue()); const LF=LQ.flush; LQ.flush=function(ctx){LF.call(this,ctx); __ledges.shapes+=this.stats.shapes; __ledges.batches+=this.stats.batches;};
   const D=drawCrowdHumanoid; drawCrowdHumanoid=function(ctx,w,c){const c0=__calls(); try{return D(ctx,w,c);}finally{__crowd.calls+=__calls()-c0;}};`);
  for(const [name,setup] of Object.entries(SCENES)){
   e.run(setup+'game.running=true;game.paused=false;'); for(let i=0;i<WARM;i++) e.run(FRAME);
-  e.run('__crowd.live=__crowd.baked=__crowd.calls=0;');
+  e.run('__crowd.live=__crowd.baked=__crowd.calls=0; __ledges.shapes=__ledges.batches=0;');
   const c0=e.counters.canvasCalls; for(let i=0;i<MEASURE;i++) e.run(FRAME); got[name]=Math.round((e.counters.canvasCalls-c0)/MEASURE);
   if(name==='city_night'){const s=JSON.parse(e.run('JSON.stringify(FoliageLampDepth.queue.stats)'));
    assert.ok(s.shapes>500,'the city has trees and lamps in view'); assert.ok(s.batches<s.shapes*0.4,`trees and lamps: ${s.batches} draws for ${s.shapes} shapes`);}
+  if(name==='city_park'){const s=JSON.parse(e.run('JSON.stringify(__ledges)'));        // the hotel's and other tiered buildings' ledges
+   assert.ok(s.shapes>300,'tiered buildings in view'); assert.ok(s.batches<s.shapes*0.45,`ledges: ${s.batches} draws for ${s.shapes} shapes`);}
   if(name==='cozy_cafe'){const c=JSON.parse(e.run('JSON.stringify(__crowd)'));    // the café's crowd is seated or standing: pose frames
    assert.ok(c.baked>=c.live*9,`café crowd: ${c.baked} bodies from bakes, ${c.live} live`); assert.ok(c.calls/MEASURE<600,`café crowd: ${Math.round(c.calls/MEASURE)} canvas calls a frame`);}
  }

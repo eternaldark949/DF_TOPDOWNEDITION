@@ -338,8 +338,9 @@
             /** How far a face turns from the light (the moon or sun, from the west and a little south): 0 lit .. 1 turned away. */
             _tkTurn(f) { const lx = -0.78, ly = 0.62; return Math.max(0, Math.min(1, 0.5 - 0.5 * (f.nx * lx + f.ny * ly))); }
 
-            /** The ledges round a tier at height z along its visible faces: mitred slabs, each face's front shaded by its turn. */
-            _tkLedges(ctx, t, faces, g) {
+            /** The ledges round a tier at height z along its visible faces: mitred slabs, each face's front shaded by its turn.
+             *  Queued in order on q (a renderQueue: basement/render-system.js), which draws a tier's ledges in a few batches. */
+            _tkLedges(q, t, faces, g, z) {
                 const cam = game.camera, p = (x, y, k) => [cam.x + (x - cam.x) * k, cam.y + (y - cam.y) * k], n = t.poly.length;
                 const kT = this._tkK(g.z), kB = this._tkK(Math.max(t.z0, g.z - g.th)), [r, gg, b] = g.band;
                 const fine = !TierKit.LOD || _zoomLOD < 2;                               // (zoomed right out: the lip and the shadow line under it, a px wide, go)
@@ -358,11 +359,11 @@
                     }
                     const { oa, ob, wa, wb } = L;
                     const A = p(oa[0], oa[1], kB), B = p(ob[0], ob[1], kB), Bt = p(ob[0], ob[1], kT), At = p(oa[0], oa[1], kT), a1 = p(wa[0], wa[1], kT), b1 = p(wb[0], wb[1], kT);
-                    ctx.fillStyle = L.front;
-                    ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.lineTo(Bt[0], Bt[1]); ctx.lineTo(At[0], At[1]); ctx.closePath(); ctx.fill();
-                    ctx.fillStyle = g.top; ctx.beginPath(); ctx.moveTo(a1[0], a1[1]); ctx.lineTo(b1[0], b1[1]); ctx.lineTo(Bt[0], Bt[1]); ctx.lineTo(At[0], At[1]); ctx.closePath(); ctx.fill();
-                    if (fine && g.lip) { ctx.strokeStyle = g.lip; ctx.globalAlpha = 1 - 0.6 * this._tkTurn(f); ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(At[0], At[1]); ctx.lineTo(Bt[0], Bt[1]); ctx.stroke(); ctx.globalAlpha = 1; }
-                    if (fine) { ctx.strokeStyle = 'rgba(6, 12, 14, 0.45)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke(); }
+                    // each ledge's slabs first (they only meet at their mitres), then its lines over them
+                    q.poly(z, L.front, [A[0], A[1], B[0], B[1], Bt[0], Bt[1], At[0], At[1]]);
+                    q.poly(z, g.top, [a1[0], a1[1], b1[0], b1[1], Bt[0], Bt[1], At[0], At[1]]);
+                    if (fine && g.lip) q.line(z + 0.5, 0.8, g.lip, [At[0], At[1], Bt[0], Bt[1]], (L.lipState || (L.lipState = { alpha: 1 - 0.6 * this._tkTurn(f) })));
+                    if (fine) q.line(z + 0.5, 1, 'rgba(6, 12, 14, 0.45)', [A[0], A[1], B[0], B[1]]);
                 }
             }
 
@@ -445,7 +446,10 @@
                             this._tkQuad(ctx, f, f.z0, f.z0 + 8); this._tkFade(ctx, contact, this._tkP(f.x1, f.y1, f.z0), this._tkP(f.x1, f.y1, f.z0 + 8));
                         }
                     }
-                    for (const g of t.ledgesByZ || (t.ledgesByZ = (t.ledges || []).slice().sort((a, b) => a.z - b.z))) this._tkLedges(ctx, t, faces, g);
+                    const q = TierKit.ledgeQueue || (TierKit.ledgeQueue = new renderQueue()); q.begin();
+                    let z = 0;
+                    for (const g of t.ledgesByZ || (t.ledgesByZ = (t.ledges || []).slice().sort((a, b) => a.z - b.z))) this._tkLedges(q, t, faces, g, z++);
+                    q.flush(ctx);
                     if (t.roof) LandmarkKit.drawSprite(ctx, this._tkRoof(t, false), this._tkK(t.z1));
                     if (t.top) t.top(ctx, false, t, this);
                 }
