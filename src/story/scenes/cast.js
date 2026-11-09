@@ -1,22 +1,7 @@
         /* =====================================================================
-           THE CAST — who can speak in a scene: the name on their subtitle, their
-           colour (from SPEAKER_COLORS, story/dialogue-bonding.js), whose face their cameo wears (core/appearances.js), and which
+           THE CAST (directory/game-db/cast.json, scene_cast) — who can speak in a scene: the name on their subtitle, their
+           colour (from SPEAKER_COLORS by their name, or color_of), whose face their cameo wears (core/appearances.js), and which
            side of the screen they stand on (949 on the left, others on the right).
            ===================================================================== */
-        const SCENE_CAST = {
-            '949':     { name: '949', look: '949', color: SPEAKER_COLORS['949'], side: 'left' },
-            '747':     { name: '747', look: '747', color: SPEAKER_COLORS['747'], side: 'right' },
-            keeper:    { name: 'The Keeper', look: 'Keeper', color: SPEAKER_COLORS['The Keeper'], side: 'right' },
-            traveler:  { name: 'The Traveller', look: 'Traveler', color: SPEAKER_COLORS['The Traveller'], side: 'left' },
-            larissa:   { name: 'Larissa', look: 'Larissa', color: SPEAKER_COLORS['Larissa'], side: 'right' },
-            mirabel:   { name: 'Mirabel', look: 'Mirabel', color: SPEAKER_COLORS['Mirabel'], side: 'right' },
-            yenna:     { name: 'Yenna', look: 'Yenna', color: SPEAKER_COLORS['Yenna'], side: 'right' },
-            sabrina:   { name: 'Sabrina', look: 'Sabrina', color: SPEAKER_COLORS['Sabrina'], side: 'right' },
-            max:       { name: 'Max', look: 'Max', color: SPEAKER_COLORS['Max'], side: 'right' },
-            josh:      { name: 'Josh', look: 'Josh', color: SPEAKER_COLORS['Josh'], side: 'right' },
-            victoria:  { name: 'Victoria', look: 'Victoria', color: SPEAKER_COLORS['Victoria'], side: 'right' },
-            anavia:    { name: 'Anavia', look: 'Anavia', color: SPEAKER_COLORS['Anavia'], side: 'right' },
-            ren:       { name: 'Ren', look: 'Barista Ren', color: SPEAKER_COLORS['Barista Ren'], side: 'right' },
-            bartender: { name: 'Bartender', look: 'Bartender', color: SPEAKER_COLORS['Bartender'], side: 'right' },
-            yin:       { name: 'Dr. Yin', look: 'Dr. Yin', color: SPEAKER_COLORS['Dr. Yin'], side: 'right' }
-        };
+        const SCENE_CAST = GAME_DB.cast.scene_cast;   // directory/game-db/cast.json
+        for (const C of Object.values(SCENE_CAST)) { C.color = SPEAKER_COLORS[C.color_of || C.name]; delete C.color_of; }
