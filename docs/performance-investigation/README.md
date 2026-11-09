@@ -126,3 +126,14 @@ Walls and buildings don't move during play, so nothing re-checks them tick to ti
 Car physics moved to the Basement as `vehicleKit` (basement/vehicle-kit.js): driving, wall push-out, settling, and car-to-car contact (formerly directory/car-contact.js). Traffic-manager and traffic-light numbers moved to `vehicles.json` (`traffic_flow`, `traffic_signals`).
 
 Headless city-map timing (Node, desktop, 30 cars, 2,000 measured ticks after 1,500 warm-up, three alternating runs): world tick 4,832 µs before vs 4,177 µs after (about 14% lower); traffic manager 2,358 vs 1,893 µs (about 20% lower). Not a phone measurement.
+
+## Lane runners (November 9)
+
+Most AI cars no longer run the full driver every tick. A car on its way rides its rail (traffic/lane-runner.js, basement/lane-rail-kit.js): position and heading are read off the lane or the sampled turn curve, and speed follows the same rules and pedals as before. The car ahead is found from the rails' order plus the sensing grid, with no tunnel probe, tyre model or wall checks. Anything unusual hands the car back to the full driver, such as a crash, a shove, someone on foot in the road, a parked car, or being stuck. It rejoins once it is lined up on its lane again.
+
+- About 90% of AI cars are runners at any moment on the city map.
+- The slide through turns and the tyre marks were tuned against the old traffic. Old left turns average a 1.28 px/tick slide and right turns 0.45; runners give 1.17 and 0.51. Skid marks come to 800 to 1,170 per 1,000 ticks against 630 to 1,170, over four seeds.
+- Car overlaps: none in either version. Junction throughput: 813 turns over four 4,000-tick runs against 842, within run-to-run spread.
+- The fixed-body grid in collision-kit is now rebuilt only when the fixed bodies themselves change, not on every car or person spawn.
+
+Headless city-map timing (same method as above, three alternating runs each): traffic manager about 1,460 µs per tick against 1,910 with the groundwork alone and 2,440 before it; collision pass 225 against 335 and 375; world tick about 3,640 against 4,260 and 5,020. Not a phone measurement.

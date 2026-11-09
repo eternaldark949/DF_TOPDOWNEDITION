@@ -488,7 +488,8 @@
             // (directory/game-db/vehicles.json; each field is explained in its _about.fields). A car's own
             // numbers (maxSpeed, acceleration, handling, its drive feel) are in VEHICLE_BRANDS, the same chapter.
             VEHICLE_AI: GAME_DB.vehicles.traffic_ai,
-            TRAFFIC_FLOW: GAME_DB.vehicles.traffic_flow,   // spawning, despawning, fades, the cap, crash effects (traffic-manager.js)
+            TRAFFIC_FLOW: GAME_DB.vehicles.traffic_flow,
+            TRAFFIC_RUNNER: GAME_DB.vehicles.traffic_runner,   // lane runners: traffic on rails (traffic/lane-runner.js)   // spawning, despawning, fades, the cap, crash effects (traffic-manager.js)
             VEHICLE_DRIVE: GAME_DB.vehicles.drive
         });
 

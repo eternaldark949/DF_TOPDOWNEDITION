@@ -141,6 +141,11 @@
                 
                 // --- DRIVER STATE ---
                 this.hasDriver = (controlMode === 'AI'); 
+
+                // --- LANE RUNNER STATE (traffic/lane-runner.js), set up front so every car keeps one shape ---
+                this.runner = false; this._rs = 0; this._calm = 0; this._slide = 0; this._joinLat = 0; this._joinYaw = 0;
+                this._rx = NaN; this._ry = NaN; this._ra = NaN; this._runnerStop = undefined; this._runnerWait = 0;
+                this._runnerTrouble = null; this._runnerWhy = null; this._runnerHold = 0; this._railAt = null; this._leadOut = null; this._seen = null;
             }
             
             // Static helper methods for brand/model selection (called before super)

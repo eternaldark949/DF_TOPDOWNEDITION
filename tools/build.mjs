@@ -58,6 +58,7 @@ const SCRIPTS = [
     'basement/spatial-grid.js',    // LV0 Basement: SpatialHashGrid and the render / transition grids
     'basement/collision-kit.js',   // LV0 Basement: collisionKit and collisionWorld (the collision step, game-free: layers, grid, passes, solver)
     'basement/vehicle-kit.js',     // LV0 Basement: vehicleKit (driving, out of walls, car-to-car contact: game-free)
+    'basement/lane-rail-kit.js',   // LV0 Basement: railKit (things that run along a line: sampled curves, pedals, following)
     'basement/ui-kit.js',          // LV0 Basement: uiKit (making, showing and hiding DOM panels)
     'basement/draw-list.js',       // LV0 Basement: drawList and canvasRenderer (what to draw, apart from how)
     'basement/material-kit.js',    // LV0 Basement: materialKit (linked materials and finish rules)
@@ -157,6 +158,7 @@ const SCRIPTS = [
     'traffic/vehicle-occupants.js',
     'traffic/traffic-people.js',
     'traffic/traffic-signals.js',
+    'traffic/lane-runner.js',
     'traffic/traffic-manager.js',
     'traffic/traffic-profiler.js',
     'world/parks.js',
