@@ -5,7 +5,9 @@
 // buildings' ledges, TierKit.ledgeQueue) is drawn twice into a canvas of its own, unbatched and batched, and the pixels
 // compared. Batching only changes where two faces share an edge (it's drawn
 // once, without the faint seam two fills leave): pmean is the average difference per painted pixel (0..255),
-// opaqueBig the opaque pixels that changed by more than a quarter. It fails if those grow.
+// opaqueBig the opaque pixels that changed by more than a quarter. It fails if those grow. (Since the far sides of
+// posts and trunks are skipped, nothing fills behind the seams between their faces: unbatched they show a faint
+// line of what's beneath, batched they don't, so pmean runs up to about 2 on the lamps.)
 const { chromium } = require('playwright'); const path = require('path');
 const shots=[['sdc',4890,2300,1320],['sdc',2000,1100,1320],['sdc',2000,1100,840],['sdc',522,1100,780]];
 (async () => {
@@ -45,7 +47,7 @@ const shots=[['sdc',4890,2300,1320],['sdc',2000,1100,1320],['sdc',2000,1100,840]
     });
     const { samples, ...shown } = r;
     console.log(map, x, y, JSON.stringify(shown));
-    for (const [name, q] of Object.entries(r.queues)) if (q.opaqueBig > 0 || +q.pmean > 2) { console.error(name + ': batching changed the picture'); process.exitCode = 1; }
+    for (const [name, q] of Object.entries(r.queues)) if (q.opaqueBig > 0 || +q.pmean > 3) { console.error(name + ': batching changed the picture'); process.exitCode = 1; }
   }
   console.log(errs.slice(0,4)); await browser.close();
 })();
