@@ -22,7 +22,8 @@
         // drawn over it, or under it, changes, and shapes in one path never cross (no winding holes, no doubled
         // alpha). Overlap is exact for small convex polygons (a separating-axis test: faces that only share an
         // edge don't count, so a faceted post's faces can batch; the shared edge is then drawn once, without the
-        // faint seam two fills leave) and by bounding box, a pixel to spare, for everything else.
+        // faint seam two fills leave; a butt-capped segment counts as its stroke's rectangle, so a chain of them
+        // touching end to end batches) and by bounding box, a pixel to spare, for everything else.
         // A shape's clip keeps only the polygons that reach its box (the rest can't change a pixel of it), so a face no
         // roof leans over is unclipped and batches with the rest. `batch: false, trim: false` draws every shape on
         // its own with its whole clip, in the same order: the reference the pixel check compares against.
@@ -49,7 +50,7 @@
                 it.op = (state && state.op) || 'source-over';
                 it.cap = (state && state.cap) || 'butt';
                 it.clip = it.clipAll = (state && state.clip && state.clip.length) ? state.clip : null;
-                it.pts.length = 0; it.paint = null; it.img = null; it.width = 0; it.color = null; it.closed = false; it.convex = false;
+                it.pts.length = 0; it.paint = null; it.img = null; it.width = 0; it.color = null; it.closed = false; it.convex = false; it.hull = null;
                 return it;
             }
             /** Keep only the clip polygons that reach the shape (a polygon clear of its box can't change a pixel of it),
@@ -91,6 +92,14 @@
                 const it = this._item(z, 'stroke', state); it.color = color; it.width = width; it.closed = closed;
                 for (let i = 0; i < pts.length; i++) it.pts.push(pts[i]);
                 this._box(it, width / 2 + 1);
+                if (pts.length === 4 && it.cap === 'butt') {                     // one butt-capped segment: its stroke is a rectangle (convex, for the overlap test)
+                    const dx = pts[2] - pts[0], dy = pts[3] - pts[1], m = Math.hypot(dx, dy);
+                    if (m > 1e-6) {
+                        const nx = -dy / m * width / 2, ny = dx / m * width / 2, h = it.hull || [];
+                        h.length = 0; h.push(pts[0] + nx, pts[1] + ny, pts[2] + nx, pts[3] + ny, pts[2] - nx, pts[3] - ny, pts[0] - nx, pts[1] - ny);
+                        it.hull = h; it.convex = true;
+                    }
+                }
                 it.key = 's|' + color + '|' + width + '|' + it.cap + '|' + it.alpha + '|' + it.op + '|' + this._clipKey(it);
                 return it;
             }
@@ -137,7 +146,8 @@
             static _overlap(a, b) {
                 if (!renderQueue._hit(a, b)) return false;
                 if (!a.convex || !b.convex) return true;
-                return !renderQueue._separated(a.pts, b.pts) && !renderQueue._separated(b.pts, a.pts);
+                const p = a.hull || a.pts, q = b.hull || b.pts;
+                return !renderQueue._separated(p, q) && !renderQueue._separated(q, p);
             }
             static _separated(p, q) {
                 const EPS = 0.25;
