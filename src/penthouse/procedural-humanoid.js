@@ -21,6 +21,28 @@
         // The shapes come from ui/bodies.js, the clothes from ui/wardrobe.js, the hair and heads from
         // ui/humanoid-render.js. drawProceduralHumanoid (ui/humanoid-render.js) is still the way in:
         // it picks the silhouette, timing and scale, then hands the body to this class.
+        /** The pose (ui/poses.js) a standing person strikes this frame, and how far it has faded in: { pose, w },
+         *  or null (none). It fades in after a moment standing, out the moment they walk (some poses hold while
+         *  walking: pushing furniture). Ticks the person's pose clock (entity._pose), once a frame however often
+         *  it's asked. config._pose ({ pose, w }, or null) strikes that pose instead (a crowd bake's frame: ui/crowd-impostors.js). */
+        function humanoidPose(entity, config, gaitSpeed, gender) {
+            if (config.pose === 'none') return null;
+            if (config._pose !== undefined) return config._pose;
+            const ps = entity._pose || (entity._pose = { still: 0, t: 0, name: null, w: 0, last: _gameTimeSec, seed: Math.random() * 97 });
+            const dt = Math.max(0, Math.min(0.1, _gameTimeSec - ps.last));
+            ps.last = _gameTimeSec;
+            const moving = gaitSpeed > 0.15;
+            ps.still = moving ? 0 : ps.still + dt;
+            const name = POSES[config.pose] ? config.pose : 'idle';
+            if (name !== ps.name) { ps.name = name; ps.t = 0; }
+            ps.t += dt;
+            const target = config.poseWhileMoving || (!moving && ps.still > 0.4) ? 1 : 0;
+            ps.w += (target - ps.w) * Math.min(1, dt * (target ? 3 : 10));
+            if (config.poseInstant) ps.w = target;                             // a fall can't wait for the pose to fade in
+            if (!(ps.w > 0.001)) return null;
+            return { pose: POSES[name](ps.t, { still: ps.still, seed: ps.seed, gender, beat: name === 'dance' ? mapBeatN() : null }), w: ps.w };
+        }
+
         class proceduralHumanoid {
             static _people = new WeakMap();
             /** The humanoid for a person (made the first time they're drawn). */
@@ -282,25 +304,9 @@
 
             /** The pose (ui/poses.js): what the body does while standing still. It fades in after a moment standing, out the moment they walk. */
             strikePose () {
-                const entity = this.entity, config = this.config, isDriving = this.driving, gender = this.gender, gaitSpeed = this.gait_speed;
                 // --- 3b. POSE (ui/poses.js): what the body does while standing still ---
-                // Fades in after a moment standing, out the moment the character walks.
-                let pose = null, poseW = 0;
-                if (!isDriving && config.pose !== 'none') {
-                    const ps = entity._pose || (entity._pose = { still: 0, t: 0, name: null, w: 0, last: _gameTimeSec, seed: Math.random() * 97 });
-                    const dt = Math.max(0, Math.min(0.1, _gameTimeSec - ps.last));
-                    ps.last = _gameTimeSec;
-                    const moving = gaitSpeed > 0.15;
-                    ps.still = moving ? 0 : ps.still + dt;
-                    const name = POSES[config.pose] ? config.pose : 'idle';
-                    if (name !== ps.name) { ps.name = name; ps.t = 0; }
-                    ps.t += dt;
-                    const target = config.poseWhileMoving || (!moving && ps.still > 0.4) ? 1 : 0;   // (some poses hold while walking: pushing furniture)
-                    ps.w += (target - ps.w) * Math.min(1, dt * (target ? 3 : 10));
-                    if (config.poseInstant) ps.w = target;                     // a fall can't wait for the pose to fade in
-                    if (ps.w > 0.001) { pose = POSES[name](ps.t, { still: ps.still, seed: ps.seed, gender, beat: name === 'dance' ? mapBeatN() : null }); poseW = ps.w; }
-                }
-                this.pose = pose; this.pose_w = poseW;
+                const P = this.driving ? null : humanoidPose(this.entity, this.config, this.gait_speed, this.gender);
+                this.pose = P ? P.pose : null; this.pose_w = P ? P.w : 0;
             }
 
             /** Where the hands and elbows want to be for the stance, a held drink, umbrella or parcel, and the pose. */
