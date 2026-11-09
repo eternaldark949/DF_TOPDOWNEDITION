@@ -1025,10 +1025,11 @@ test('Ultra reflections: art repaints on a cadence, crowd bakes are shared and p
     CrowdImpostors.clear(); CrowdImpostors._bakedFrame = -1;
     const cfg = { ...ped.look, stance: 'idle', noShadow: true }, ctx = document.createElement('canvas').getContext('2d');
     syncHumanoidGait(ped); ped._gait.speed = 1;
-    _frameTime += 16; CrowdImpostors.draw(ctx, ped, cfg);
-    const baked = CrowdImpostors.cache.get(ped);
+    _frameTime += 16; CrowdImpostors.draw(ctx, ped, cfg);             // a new pace: drawn live until it holds (STEADY_S)
+    _gameTimeSec += 1; _frameTime += 16; CrowdImpostors._bakedFrame = -1; CrowdImpostors.draw(ctx, ped, cfg);
+    const baked = CrowdImpostors.cache.get(ped)[0];
     ped._gait.speed = 2.5; _frameTime += 16; CrowdImpostors._bakedFrame = -1;
-    out.reused = CrowdImpostors.draw(ctx, ped, cfg, ped, true) && CrowdImpostors.cache.get(ped) === baked;
+    out.reused = CrowdImpostors.draw(ctx, ped, cfg, ped, true) && CrowdImpostors.cache.get(ped).length === 1 && CrowdImpostors.cache.get(ped)[0] === baked;
     game._ultraWet = null; _frameTime += 16; game.draw();
     out.puddleCanvases = [..._puddleArts.values()].flatMap(rec => Object.values(rec).map(x => x.cv._probeID));
     return out;`);
