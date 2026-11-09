@@ -63,6 +63,7 @@ const SCRIPTS = [
     'basement/virtual-child.js',   // LV0 Basement: virtualChild (things that ride on a parent without being its child)
     'basement/angle-kit.js',       // LV0 Basement: angleKit (degrees in the data, radians in the code)
     'basement/query-kit.js',       // LV0 Basement: queryKit (find, filter and sort location packets)
+    'basement/render-system.js',   // LV0 Basement: renderQueue (shapes sorted by depth, same-style ones drawn in one call)
     'basement/awareness-kit.js',   // LV0 Basement: awarenessMatrix (what a character knows of what's around them)
     'directory/game-db/game-db.js',   // LV2 Directory: GAME_DB, the game's data; its chapters (JSON) follow
     'directory/game-db/items.json',   // GAME_DB.items: gear, augments, furniture, consumables, drinks, notes, schematics

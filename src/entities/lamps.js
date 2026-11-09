@@ -86,13 +86,11 @@
             const style = LAMP_TYPE_STYLE[lamp.lampType], spec = LAMP_STYLES[style], H = lampProjection(lamp).z;
             const poly = (points, color) => {
                 const projected=points.map(p=>lampPoint(lamp,...p));
-                FoliageLampDepth.add(ctx,points.reduce((sum,p)=>sum+p[2],0)/points.length,()=>{
-                    ctx.fillStyle=color;ctx.beginPath();projected.forEach((p,i)=>ctx[i?'lineTo':'moveTo'](...p));ctx.closePath();ctx.fill();
-                });
+                FoliageLampDepth.poly(ctx,points.reduce((sum,p)=>sum+p[2],0)/points.length,color,projected.flat());
             };
             const stroke = (a,b,width,color) => {
                 const p=lampPoint(lamp,...a),q=lampPoint(lamp,...b);
-                FoliageLampDepth.add(ctx,(a[2]+b[2])/2,()=>{ctx.strokeStyle=color;ctx.lineWidth=width;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(...p);ctx.lineTo(...q);ctx.stroke();});
+                FoliageLampDepth.line(ctx,(a[2]+b[2])/2,width,color,[p[0],p[1],q[0],q[1]],'round');
             };
             const ring = (x, y, z, r, n = 8) => Array.from({length:n}, (_,i) => {
                 const a = Math.PI / 6 + i * Math.PI * 2 / n;
@@ -118,10 +116,7 @@
                 // Swept arms are curves through height, rather than a flat drawing of the old stem.
                 const arm = (points, width, color) => {
                     const projected=points.map(p=>lampPoint(lamp,...p));
-                    FoliageLampDepth.add(ctx,points.reduce((sum,p)=>sum+p[2],0)/points.length,()=>{
-                        ctx.strokeStyle=color;ctx.lineWidth=width;ctx.lineCap='round';ctx.beginPath();
-                        projected.forEach((p,i)=>ctx[i?'lineTo':'moveTo'](...p));ctx.stroke();
-                    });
+                    FoliageLampDepth.line(ctx,points.reduce((sum,p)=>sum+p[2],0)/points.length,width,color,projected.flat(),'round');
                 };
                 if (style === 'antique_twin') {
                     for (const side of [-1,1]) {

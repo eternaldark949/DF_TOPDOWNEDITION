@@ -37,6 +37,9 @@ jobs:
       - name: Check the world queries (rooms, seats, NPCs, buildings)
         run: node tools/test-world-query.cjs
 
+      - name: Check the render system and the frame's canvas-call budget
+        run: node tools/test-render-system.cjs
+
       - name: Check gameplay and rendering regressions
         run: node tools/test-game-regressions.cjs
 
