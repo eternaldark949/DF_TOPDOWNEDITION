@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'e85720cbc804';
+        const DFAB_BUILD = '16cb1cf5786c';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -76128,7 +76128,7 @@ engineMixin({
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/finisher.js" data-cost="142">
+    <script type="text/dfab" data-src="engine/finisher.js" data-cost="141">
         // GameEngine — Deaths and the finisher. Methods are added to GameEngine.prototype
         // (see engineMixin in game-engine.js).
         //
@@ -76326,7 +76326,6 @@ engineMixin({
                     const a = Math.random() * Math.PI * 2, v = 0.4 + Math.random() * 0.9;
                     this.effects.spawn('barrel', { k: 'dust', x: F.x, y: F.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 0.3, t: -i, life: 70, col: F.col, ph: Math.random() * 6.28 });
                 }
-                while (fx.length > 160) fx.shift();
             },
 
             /** Her twirl: the gun's spin about her trigger finger (radians), for the player's weapon draw */
@@ -94826,7 +94825,7 @@ engineMixin({
             
         });
     </script>
-    <script type="text/dfab" data-src="engine/loop.js" data-cost="50">
+    <script type="text/dfab" data-src="engine/loop.js" data-cost="53">
         // GameEngine — the game's side of the main loop: what it plugs into the Lobby's jacks (the clock is the Lobby's: lobby/level-lobby.js).
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -94884,7 +94883,13 @@ engineMixin({
             },
 
             /** One frame of the main loop: the Lobby's clock (lobby/level-lobby.js). */
-            loop() { this.level_lobby.runEngine(); },
+            loop() {
+                try { this.level_lobby.runEngine(); }
+                catch (err) {                                   // a frame that throws is reported, and the next one still comes
+                    console.error(err);
+                    this.level_lobby.scheduleNextFrame();
+                }
+            },
 
             // The loop's clock lives in the Lobby; these keep the old names working for the code
             // (lighting, reflections, scope) and tests that read or reset them.

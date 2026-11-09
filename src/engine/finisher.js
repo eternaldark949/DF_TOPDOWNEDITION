@@ -195,7 +195,6 @@
                     const a = Math.random() * Math.PI * 2, v = 0.4 + Math.random() * 0.9;
                     this.effects.spawn('barrel', { k: 'dust', x: F.x, y: F.y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 0.3, t: -i, life: 70, col: F.col, ph: Math.random() * 6.28 });
                 }
-                while (fx.length > 160) fx.shift();
             },
 
             /** Her twirl: the gun's spin about her trigger finger (radians), for the player's weapon draw */

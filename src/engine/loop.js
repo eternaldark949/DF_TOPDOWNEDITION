@@ -55,7 +55,13 @@
             },
 
             /** One frame of the main loop: the Lobby's clock (lobby/level-lobby.js). */
-            loop() { this.level_lobby.runEngine(); },
+            loop() {
+                try { this.level_lobby.runEngine(); }
+                catch (err) {                                   // a frame that throws is reported, and the next one still comes
+                    console.error(err);
+                    this.level_lobby.scheduleNextFrame();
+                }
+            },
 
             // The loop's clock lives in the Lobby; these keep the old names working for the code
             // (lighting, reflections, scope) and tests that read or reset them.
