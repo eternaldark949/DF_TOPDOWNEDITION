@@ -12,6 +12,7 @@
       "traffic_ai": "Traffic's driving and collisions (CONFIG.VEHICLE_AI): slowing for turns, where cars spawn, and how they bounce off walls. See _about.fields.traffic_ai.",
       "traffic_flow": "How the street fills and empties (CONFIG.TRAFFIC_FLOW, traffic/traffic-manager.js): spawning out of sight, despawning at dead ends, far away or stuck out of view, fading in and out, the cap trim, and the sparks, debris and crunch of car-to-car hits. See _about.fields.traffic_flow.",
       "traffic_signals": "Junction lights, gauged by demand (SIGNAL, traffic/traffic-signals.js): how long greens, ambers, all-reds, turn arrows and walk phases run, how far out cars are seen, and when turn paths count as crossing. See _about.fields.traffic_signals.",
+      "traffic_runner": "Lane runners (CONFIG.TRAFFIC_RUNNER, traffic/lane-runner.js): ordinary traffic runs along its lane or turn instead of driving its tyres, and hands itself to the full driver whenever something touches it or is in its way. See _about.fields.traffic_runner.",
       "drive": "The driving feel every car shares (CONFIG.VEHICLE_DRIVE): steering curve, grip, the weight of the wheel, pedals and body, the handbrake, the camera, and the rigid body. A car's own numbers are in brands. See _about.fields.drive."
     },
     "fields": {
@@ -99,6 +100,21 @@
         "ARROW_MAX": "...and at most (it ends early once the turners are through)",
         "TURN_AT": "A car waiting to turn this close (centre, px to the box) asks for the arrow",
         "TURN_STALL": "Ticks a left turn may stand at the front of its lane on a green before it gets an arrow"
+      },
+      "traffic_runner": {
+        "ON": "Ordinary traffic runs on rails (false: every car drives with the full driver, as before)",
+        "CURVE_SAMPLES": "Points a junction turn's curve is sampled into, once",
+        "LOOK_BASE": "px a runner looks ahead past its own length and stopping distance",
+        "LOOK_PER_SPEED": "...plus this many px per px/tick of speed",
+        "SLIDE_PER_ACC": "The slide through a turn: sideways speed (px/tick) per unit of sideways pull (v² × bend)",
+        "SLIDE_MAX": "The most a runner slides (px/tick)",
+        "SLIDE_EASE": "How quickly the slide builds and fades (share a tick)",
+        "SLIP_MAX": "The most the nose turns in for it (sine of the angle)",
+        "JOIN_LAT": "A car back from the full driver joins the rails within this many px of its lane's line",
+        "JOIN_ANGLE": "...and lined up with it within this many radians",
+        "CALM_TICKS": "...after this many ticks of both, with nothing in its way",
+        "STUCK_TICKS": "Ticks stopped behind a car that isn't moving before the full driver takes over (to go round)",
+        "FOLK_MARGIN": "px of room past a person's radius and the car's half width that counts as in the way"
       },
       "drive": {
         "REVERSE_TOP_FRACTION": "Reverse tops out at this × forward maxSpeed (drag comes from each car's maxSpeed and acceleration, so it tops out at its stat)",
@@ -605,6 +621,21 @@
     "ARROW_MAX": 240,
     "TURN_AT": 200,
     "TURN_STALL": 240
+  },
+  "traffic_runner": {
+    "ON": true,
+    "CURVE_SAMPLES": 24,
+    "LOOK_BASE": 60,
+    "LOOK_PER_SPEED": 8,
+    "SLIDE_PER_ACC": 14,
+    "SLIDE_MAX": 2.6,
+    "SLIDE_EASE": 0.2,
+    "SLIP_MAX": 0.7,
+    "JOIN_LAT": 4,
+    "JOIN_ANGLE": 0.08,
+    "CALM_TICKS": 30,
+    "STUCK_TICKS": 100,
+    "FOLK_MARGIN": 10
   },
   "drive": {
     "REVERSE_TOP_FRACTION": 0.55,

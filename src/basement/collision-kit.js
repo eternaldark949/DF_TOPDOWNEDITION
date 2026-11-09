@@ -71,6 +71,7 @@
             static _staticMembers = [];   // the fixed bodies (walls, buildings, posts), map-wide, gridded once
             static _movers = [];          // every other collidable, in registry order
             static _staticsRev = -1;
+            static _staticsValid = false;   // the grid holds exactly _staticMembers (cleared by invalidateStatics)
             static _layers = { projectile: [], vehicle: [], actor: [], dynamic: [], trigger: [] };
 
 
@@ -81,19 +82,31 @@
                 const reg = GameEntity.registry, all = reg.collidable;
                 if (this._staticsRev === reg.revision && this._staticsSource === all && this._staticGrid.cellSize === this.spatialGrid.cellSize) return;
                 this._staticsRev = reg.revision; this._staticsSource = all;
+                // A car or a person coming or going changes the registry, not the walls: the grid is built again only
+                // when the fixed bodies themselves (or their order) differ, or the geometry was reported changed
                 const fixed = this._staticMembers, movers = this._movers;
-                fixed.length = movers.length = 0;
-                this._staticGrid = new SpatialHashGrid(this.spatialGrid.cellSize);
+                const grid = this._staticGrid, keep = this._staticsValid && grid.cellSize === this.spatialGrid.cellSize;
+                let same = keep, n = 0;
+                movers.length = 0;
                 for (let i = 0; i < all.length; i++) {
                     const e = all[i];
                     e._regOrder = i;
-                    if (this._isFixed(e)) { e._collisionOrder = i; fixed.push(e); this._staticGrid.insert(e); }
-                    else movers.push(e);
+                    if (this._isFixed(e)) {
+                        e._collisionOrder = i;
+                        if (same && fixed[n] !== e) same = false;
+                        if (!same) fixed[n] = e;
+                        n++;
+                    } else movers.push(e);
                 }
+                if (same && n === fixed.length) return;
+                fixed.length = n;
+                this._staticGrid = new SpatialHashGrid(this.spatialGrid.cellSize);
+                for (let i = 0; i < n; i++) this._staticGrid.insert(fixed[i]);
                 this.spatialGrid._staticCells = this._staticGrid.cells;
+                this._staticsValid = true;
             }
             /** The map's static geometry changed (a wall removed, an editor): sort and grid the statics again next step */
-            static invalidateStatics() { this._staticsRev = -1; }
+            static invalidateStatics() { this._staticsRev = -1; this._staticsValid = false; }
 
             static _activeLayer(items) {
                 let n = 0;
@@ -109,7 +122,7 @@
                 this.spatialGrid.clear();
                 this.spatialGrid._staticCells = null;
                 this._staticGrid = new SpatialHashGrid(this.spatialGrid.cellSize);
-                this._staticMembers.length = 0; this._movers.length = 0; this._staticsRev = -1;
+                this._staticMembers.length = 0; this._movers.length = 0; this._staticsRev = -1; this._staticsValid = false;
                 const L = this._layers;
                 L.projectile.length = L.vehicle.length = L.actor.length = L.dynamic.length = L.trigger.length = 0;
                 this._touching.clear();

@@ -36,6 +36,7 @@
             const V = TrafficVehicle.prototype;
             bind(V, 'updateAIDriving', 'Driving decisions');
             bind(V, 'aiDriveStep', 'Physics integration');
+            bind(V, 'runnerStep', 'Lane runners');
             bind(vehicleKit, 'wallContact', 'Wall contacts');
             bind(vehicleKit, 'fits', 'Environment checks');
             bind(_physicsSpatial, 'query', 'Static broadphase');

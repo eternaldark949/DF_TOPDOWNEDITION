@@ -201,6 +201,24 @@
                 // removal leaves every not-yet-visited index unchanged, so the loop's
                 // index is also the grid record index; no per-tick identity map needed.
                 sensing.active = true;
+                // Lane runners (traffic/lane-runner.js): each rail's runners in order along it (so a runner finds the
+                // one ahead on its way without looking round), and her car when it isn't in the sensing grid
+                const R = this._runnerTick || (this._runnerTick = { rails: new Map(), extra: [], folk: null, sensing: null, all: null });
+                for (const list of R.rails.values()) list.length = 0;
+                if (R.rails.size > 512) R.rails.clear();
+                for (const v of sensed) {
+                    if (v.dead) continue;
+                    if (v.runner) {
+                        const key = v.currentTurnPath || v.currentLane;
+                        let list = R.rails.get(key);
+                        if (!list) R.rails.set(key, list = []);
+                        list.push(v);
+                    }
+                }
+                for (const list of R.rails.values()) if (list.length > 1) list.sort((a, b) => a._rs - b._rs);
+                R.extra.length = 0;
+                if (playerCar && playerCar.visible && !sensed.includes(playerCar)) R.extra.push(playerCar);
+                R.folk = folk; R.sensing = sensing; R.all = sensed;
                 try {
                     // 1. VEHICLE UPDATES & CLEANUP
                     for (let i = this.vehicles.length - 1; i >= 0; i--) {
@@ -243,8 +261,11 @@
                             if (sensed === this.vehicles) sensing.cars.remove(i);
                             this.vehicles.splice(i, 1);
                         } else if (!v.dead) {
-                            // Pass decalSystem to update
-                            v.update(player, playerCar, sensed, weather, this.network.intersections, map.walls, getColliders(map), decalSystem, folk);
+                            // On rails (lane-runner.js), or the full driver; a body back on its lane goes on rails again
+                            if (!(v.runner && v.runnerStep(R, weather, decalSystem))) {
+                                v.update(player, playerCar, sensed, weather, this.network.intersections, map.walls, getColliders(map), decalSystem, folk);
+                                if (!v.runner && v._runnerOn) v._runnerOn(R);
+                            }
                             sensing.cars.update(i);
                         }
                     }
@@ -366,7 +387,7 @@
                 for (const v of allVehicles) this.grid.add(v);
                 // 2. EVERY PAIR THAT TOUCHES (collisionWorld.streetCars: each pair once, masks, ghosts, onCollide), then the
                 // knock (vehicleKit.carContact, basement/vehicle-kit.js) and the feel: scaled by how hard they met, not a coin flip
-                CollisionSystem.streetCars(allVehicles, this.grid, this._collisionNeighbours || (this._collisionNeighbours = []), (v1, v2, packet) => {
+                CollisionSystem.streetCars(allVehicles, this.grid, this._collisionNeighbours || (this._collisionNeighbours = []), (v1, v2, packet) => {   // (two runners never meet: their rails keep them apart)
                     vehicleKit.carContact(v1, v2, packet.nx, packet.ny, packet.depth, CONFIG.VEHICLE_DRIVE);
                     const imp = v1._lastImpact || 0;
                     if (imp > TF.SPARK_MIN_HIT) {
