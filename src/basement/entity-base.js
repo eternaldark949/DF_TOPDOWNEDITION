@@ -25,7 +25,8 @@
                 all: [],              // Every entity
                 collidable: [],       // Entities with hasCollision: true
                 byLayer: {},          // Grouped by collision layer name
-                byType: {}            // Grouped by entity type (for targeted updates)
+                byType: {},           // Grouped by entity type (for targeted updates)
+                revision: 0           // Bumped whenever a body joins or leaves `collidable`
             };
             
             // === COLLISION LAYERS (Bitmask) ===
@@ -184,6 +185,7 @@
                 if (GameEntity.registry.collidable.includes(this)) return;
                 
                 GameEntity.registry.collidable.push(this);
+                GameEntity.registry.revision++;   // the collision step re-sorts fixed from moving only when this moves
                 
                 const layerName = this._getLayerName();
                 if (!GameEntity.registry.byLayer[layerName]) {
@@ -208,7 +210,7 @@
             
             _unregisterCollision() {
                 let idx = GameEntity.registry.collidable.indexOf(this);
-                if (idx > -1) GameEntity.registry.collidable.splice(idx, 1);
+                if (idx > -1) { GameEntity.registry.collidable.splice(idx, 1); GameEntity.registry.revision++; }
                 
                 const layerName = this._getLayerName();
                 if (GameEntity.registry.byLayer[layerName]) {
@@ -391,6 +393,7 @@
             static clearAll() {
                 GameEntity.registry.all = [];
                 GameEntity.registry.collidable = [];
+                GameEntity.registry.revision++;
                 GameEntity.registry.byLayer = {};
                 GameEntity.registry.byType = {};
             }

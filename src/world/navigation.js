@@ -32,7 +32,7 @@
                 this._changes = []; this._dirty = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity };   // where recent revisions changed (pathTouched)
                 this._heapIdx = []; this._heapF = [];
                 this._geometry = new Map(); this._buckets = new Map();
-                this._tracked = new Map(); this._present = new Set(); this._records = [];
+                this._tracked = new Map(); this._present = new Set(); this._records = []; this._movable = [];
                 this._sources = [null, null, null, null]; this._sourceSlots = [[], [], [], []];
                 this._bucketSize = 128; this._queryStamp = 0; this._epoch = -1;
                 for (let i = 0; i < n; i++) {
@@ -57,25 +57,29 @@
                 if (sources[1] !== cols) { sources[1] = cols; membership = true; }
                 if (sources[2] !== nav) { sources[2] = nav; membership = true; }
                 if (sources[3] !== live) { sources[3] = live; membership = true; }
+                // Walls and buildings (sources 0, 1) don't move during play: they're re-read only when their arrays
+                // change size or the map reports a change (GameEngine.invalidatePhysicsSpatial sets _epoch = -1).
+                // Props and the furniture paths route round (2, 3) can be pushed: those are checked each tick.
                 for (let s = 0; s < 4; s++) {
                     const items = sources[s], prior = slots[s];
                     if (prior.length !== items.length) membership = true;
-                    if (newTick || membership) for (let i = 0; i < items.length; i++) if (prior[i] !== items[i]) {
+                    if (s >= 2 || membership) for (let i = 0; i < items.length; i++) if (prior[i] !== items[i]) {
                         membership = true; prior[i] = items[i];
                     }
                     prior.length = items.length;
                 }
-                if (!newTick && !membership) return;                               // geometry is checked once per simulation tick
+                if (!newTick && !membership) return;                               // movable geometry is checked once per simulation tick
                 this._epoch = _simTick;
                 let changed = false;
                 if (membership) {
-                    const present = this._present; present.clear(); this._records.length = 0;
+                    const present = this._present; present.clear(); this._records.length = 0; this._movable.length = 0;
                     for (let s = 0; s < 4; s++) for (const p of sources[s]) {
                         if (!p || present.has(p)) continue;
                         present.add(p);
                         let entry = this._tracked.get(p);
                         if (!entry) this._tracked.set(p, entry = { p, geometry: null });
                         this._records.push(entry);
+                        if (s >= 2) this._movable.push(entry);
                     }
                     for (const [p, entry] of this._tracked) if (!present.has(p)) {
                         if (entry.geometry) { this._note(entry.geometry); this._removeGeometry(entry.geometry); this._geometry.delete(p); changed = true; }
@@ -83,7 +87,7 @@
                     }
                     present.clear();
                 }
-                const records = this._records;
+                const records = membership ? this._records : this._movable;
                 for (let index = 0; index < records.length; index++) {
                     const entry = records[index], p = entry.p;
                     let o = entry.geometry;

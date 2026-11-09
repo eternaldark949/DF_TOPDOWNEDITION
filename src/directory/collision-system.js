@@ -1,7 +1,7 @@
         // ===== LV2 DIRECTORY =====
         // The game's collision system: collisionWorld (basement/collision-kit.js: the step, the layers, the grid, the
         // solver, people vs cars) with this game's rules on top: projectile hits, doors swinging, companions giving
-        // way to her, who meets cars in engine/update.js, car physics (directory/car-contact.js).
+        // way to her, who meets cars in engine/update.js, car physics (basement/vehicle-kit.js).
         // The shape tests are the Basement's shape kit (basement/shape-kit.js); entities are
         // basement/entity-base.js, the broad-phase grid basement/spatial-grid.js.
         /* =====================================================================
@@ -255,7 +255,7 @@
                 const body = (v) => v.isStatic ? Object.assign(v.getOBB(), { isStatic: true }) : v;
                 const b1 = body(v1), b2 = body(v2);
                 if (b1.mass === undefined && v1.getOBB) b1.mass = v1.getOBB().mass;
-                PhysicsSystem.carContact(b1, b2, packet.nx, packet.ny, packet.depth);
+                vehicleKit.carContact(b1, b2, packet.nx, packet.ny, packet.depth, CONFIG.VEHICLE_DRIVE);
             }
             
 

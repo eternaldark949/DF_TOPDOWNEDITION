@@ -355,7 +355,8 @@
                 
                 // Wall collision (simple AABB push-out with bounce)
                 if (walls) {
-                    for (const w of walls) {
+                    const reach = Math.hypot(this.length, this.vehicleWidth) / 2;
+                    for (const w of _physicsSpatial.query(walls, { left: this.x - reach, right: this.x + reach, top: this.y - reach, bottom: this.y + reach }) || []) {
                         const hw = this.length / 2;
                         const hh = this.vehicleWidth / 2;
                         const out = shapeKit.boxOutOfRect(this.x, this.y, hw, hh, w);   // the shortest way out, or null

@@ -68,29 +68,32 @@
             static spatialGrid = new SpatialHashGrid(200);
             static enabled = true;
             static _staticGrid = new SpatialHashGrid(200);
-            static _staticRows = [];
-            static _staticMembers = [];
+            static _staticMembers = [];   // the fixed bodies (walls, buildings, posts), map-wide, gridded once
+            static _movers = [];          // every other collidable, in registry order
+            static _staticsRev = -1;
             static _layers = { projectile: [], vehicle: [], actor: [], dynamic: [], trigger: [] };
 
 
-            static _prepareStaticGrid(items) {
-                const rows = this._staticRows;
-                if (this._staticGrid.cellSize !== this.spatialGrid.cellSize) { this._staticGrid = new SpatialHashGrid(this.spatialGrid.cellSize); rows.length = 0; }
-                let changed = rows.length !== items.length;
-                if (!changed) for (let i = 0; i < items.length; i++) {
-                    const e = items[i], r = rows[i];
-                    if (r.e !== e || !Object.is(r.x, e.x) || !Object.is(r.y, e.y) || !Object.is(r.w, e.width) || !Object.is(r.h, e.height) || !Object.is(r.r, e.radius) || !Object.is(r.a, e.angle) || r.shape !== e.collisionShape) { changed = true; break; }
-                }
-                if (changed) {
-                    this._staticGrid.clear(); rows.length = items.length;
-                    for (let i = 0; i < items.length; i++) {
-                        const e = items[i], r = rows[i] || (rows[i] = {});
-                        r.e = e; r.x = e.x; r.y = e.y; r.w = e.width; r.h = e.height; r.r = e.radius; r.a = e.angle; r.shape = e.collisionShape;
-                        this._staticGrid.insert(e);
-                    }
+            /** Walls, buildings and posts never move during play: they are sorted out of the collidables and put in
+             *  their own grid ONCE, for the whole map, and again only when a body joins or leaves the registry
+             *  (GameEntity.registry.revision) or the map's static geometry is reported changed (invalidateStatics). */
+            static _prepareStatics() {
+                const reg = GameEntity.registry, all = reg.collidable;
+                if (this._staticsRev === reg.revision && this._staticsSource === all && this._staticGrid.cellSize === this.spatialGrid.cellSize) return;
+                this._staticsRev = reg.revision; this._staticsSource = all;
+                const fixed = this._staticMembers, movers = this._movers;
+                fixed.length = movers.length = 0;
+                this._staticGrid = new SpatialHashGrid(this.spatialGrid.cellSize);
+                for (let i = 0; i < all.length; i++) {
+                    const e = all[i];
+                    e._regOrder = i;
+                    if (this._isFixed(e)) { e._collisionOrder = i; fixed.push(e); this._staticGrid.insert(e); }
+                    else movers.push(e);
                 }
                 this.spatialGrid._staticCells = this._staticGrid.cells;
             }
+            /** The map's static geometry changed (a wall removed, an editor): sort and grid the statics again next step */
+            static invalidateStatics() { this._staticsRev = -1; }
 
             static _activeLayer(items) {
                 let n = 0;
@@ -106,7 +109,7 @@
                 this.spatialGrid.clear();
                 this.spatialGrid._staticCells = null;
                 this._staticGrid = new SpatialHashGrid(this.spatialGrid.cellSize);
-                this._staticRows.length = 0; this._staticMembers.length = 0;
+                this._staticMembers.length = 0; this._movers.length = 0; this._staticsRev = -1;
                 const L = this._layers;
                 L.projectile.length = L.vehicle.length = L.actor.length = L.dynamic.length = L.trigger.length = 0;
                 this._touching.clear();
@@ -147,18 +150,15 @@
                 // 1. Clear and rebuild spatial grid
                 this.spatialGrid.clear();
                 
-                // 2. Get on-screen collidables
-                const margin = 300;
-                const onScreen = GameEntity.getOnScreen(camera, canvas, margin);
-                // A prop still moving off screen keeps colliding (else it drifts through walls out of sight)
-                const dyn = GameEntity.getByLayer('DYNAMIC');
-                if (dyn.length) {
-                    let seen = null;
-                    for (const p of dyn) {
-                        if (!p.active || !(p.vx || p.vy || p.angularVel)) continue;
-                        if (!seen) seen = new Set(onScreen);
-                        if (!seen.has(p)) { onScreen.push(p); seen.add(p); }
-                    }
+                // 2. The fixed bodies are gridded once (_prepareStatics); only what can move is sorted each step:
+                // what's on screen, and a prop still moving off screen (else it drifts through walls out of sight)
+                this._prepareStatics();
+                const margin = 300, movers = this._movers, onScreen = this._onScreen || (this._onScreen = []);
+                onScreen.length = 0;
+                for (let i = 0; i < movers.length; i++) {
+                    const e = movers[i];
+                    if (!e.active) continue;
+                    if (e.isOnScreen(camera, canvas, margin) || (e.collisionLayer === GameEntity.LAYER.DYNAMIC && (e.vx || e.vy || e.angularVel))) onScreen.push(e);
                 }
                 // Actors that move by position (the player) have no vx/vy: their contact velocity is this tick's step
                 for (const e of onScreen) {
@@ -171,15 +171,13 @@
                     e._cpx = e.x; e._cpy = e.y;
                 }
                 
-                // 3. Refresh moving cells; unchanged standard static bodies keep their
-                // cell coverage. Bucket layers once, in the same onScreen order.
-                const L = this._layers, fixed = this._staticMembers;
-                L.projectile.length = L.vehicle.length = L.actor.length = L.dynamic.length = L.trigger.length = fixed.length = 0;
+                // 3. Grid the movers and bucket them by layer, in registry order (cells merge with the static grid by it)
+                const L = this._layers;
+                L.projectile.length = L.vehicle.length = L.actor.length = L.dynamic.length = L.trigger.length = 0;
                 for (let i = 0; i < onScreen.length; i++) {
                     const entity = onScreen[i];
-                    entity._collisionOrder = i;
-                    if (this._isFixed(entity)) fixed.push(entity);
-                    else this.spatialGrid.insert(entity);
+                    entity._collisionOrder = entity._regOrder;
+                    this.spatialGrid.insert(entity);
                     switch (entity.collisionLayer) {
                         case GameEntity.LAYER.PROJECTILE: L.projectile.push(entity); break;
                         case GameEntity.LAYER.VEHICLE: L.vehicle.push(entity); break;
@@ -188,7 +186,6 @@
                         case GameEntity.LAYER.TRIGGER: L.trigger.push(entity); break;
                     }
                 }
-                this._prepareStaticGrid(fixed);
                 
                 // 4. Process collisions by layer
                 this._processProjectiles(onScreen, game, L.projectile);
@@ -519,7 +516,8 @@
                 const L = GameEntity.LAYER, Lb = this._layers;
                 if (group === L.VEHICLE) return Lb.vehicle; if (group === L.ACTOR) return Lb.actor; if (group === L.DYNAMIC) return Lb.dynamic;
                 if (group === L.TRIGGER) return Lb.trigger; if (group === L.PROJECTILE) return Lb.projectile;
-                return onScreen.filter(e => e.active && (e.body ? e.body.group : e.collisionLayer) === group);
+                const of = e => e.active && (e.body ? e.body.group : e.collisionLayer) === group;
+                return onScreen.filter(of).concat(this._staticMembers.filter(of));   // (the fixed bodies are map-wide, not sorted per step)
             }
             static _processPairs(onScreen, game) {
                 for (const [ga, gb, opts] of this.PAIRS) {

@@ -57,6 +57,7 @@ const SCRIPTS = [
     'basement/shape-kit.js',       // LV0 Basement: shapeKit (collision geometry)
     'basement/spatial-grid.js',    // LV0 Basement: SpatialHashGrid and the render / transition grids
     'basement/collision-kit.js',   // LV0 Basement: collisionKit and collisionWorld (the collision step, game-free: layers, grid, passes, solver)
+    'basement/vehicle-kit.js',     // LV0 Basement: vehicleKit (driving, out of walls, car-to-car contact: game-free)
     'basement/ui-kit.js',          // LV0 Basement: uiKit (making, showing and hiding DOM panels)
     'basement/draw-list.js',       // LV0 Basement: drawList and canvasRenderer (what to draw, apart from how)
     'basement/material-kit.js',    // LV0 Basement: materialKit (linked materials and finish rules)
@@ -99,7 +100,6 @@ const SCRIPTS = [
     'world/rooms.js',
     'world/maps.js',
     'world/map-entities.js',
-    'directory/car-contact.js',
     'directory/collision-system.js',
     'entities/props-decor.js',
     'entities/prop-sprites.js',

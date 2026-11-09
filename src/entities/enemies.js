@@ -1059,7 +1059,8 @@
                 this.y += moveY;
                 
                 // WALL COLLISION & ANTI-CLIPPING
-                for(let w of walls) {
+                const r0 = this.radius;
+                for (const w of _physicsSpatial.query(walls, { left: this.x - r0, right: this.x + r0, top: this.y - r0, bottom: this.y + r0 }) || []) {
                     if (this.x > w.x - this.radius && this.x < w.x + w.w + this.radius && 
                         this.y > w.y - this.radius && this.y < w.y + w.h + this.radius) {
                         

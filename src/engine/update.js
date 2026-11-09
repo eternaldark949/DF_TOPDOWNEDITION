@@ -268,17 +268,13 @@
                     const ey = Math.random() * this.activeMap.height;
                     let hitObstacle = false;
                     
-                    // Safety check to ensure they don't spawn in walls
-                    for(let w of this.activeMap.walls) { 
-                        if (ex > w.x - 20 && ex < w.x + w.w + 20 && ey > w.y - 20 && ey < w.y + w.h + 20) { hitObstacle = true; break; }
-                    }
-                    if (!hitObstacle) {
-                        const spawnColliders = getColliders(this.activeMap);
-                        if (spawnColliders) {
-                            for(let b of spawnColliders) { 
-                                if (ex > b.x - 20 && ex < b.x + b.w + 20 && ey > b.y - 20 && ey < b.y + b.h + 20) { hitObstacle = true; break; }
-                            }
+                    // Safety check to ensure they don't spawn in walls (the static broadphase: only the rects near the spot)
+                    const spot = { left: ex - 20, right: ex + 20, top: ey - 20, bottom: ey + 20 };
+                    for (const list of [this.activeMap.walls || [], getColliders(this.activeMap)]) {
+                        for (const w of _physicsSpatial.query(list, spot) || []) {
+                            if (ex > w.x - 20 && ex < w.x + w.w + 20 && ey > w.y - 20 && ey < w.y + w.h + 20) { hitObstacle = true; break; }
                         }
+                        if (hitObstacle) break;
                     }
                     const d = Math.hypot(this.player.x - ex, this.player.y - ey);
                     // Exclude restricted zone bounds

@@ -5,6 +5,7 @@
                 // ╔══════════════════════════════════════════════════════════════════╗
         // ║                     TRAFFIC SYSTEM                                ║
         // ╚══════════════════════════════════════════════════════════════════╝
+        const EMPTY_SOLIDS = [];
         class TrafficVehicle extends VehicleEntity {
             constructor(lane, brand = null, model = null, controlMode = 'AI', along = null) {
                 // --- RESOLVE BRAND/MODEL BEFORE SUPER ---
@@ -21,7 +22,7 @@
                 // Calculate starting position - offset by 2 car lengths to avoid wall spawns
                 let startX = 0, startY = 0, startAngle = 0;
                 if (lane) {
-                    const spawnOffset = along ?? vehicleLength * 2; // 2 car lengths into the lane, unless told where (TrafficManager)
+                    const spawnOffset = along ?? vehicleLength * CONFIG.TRAFFIC_FLOW.SPAWN_ALONG_LENGTHS; // into the lane, unless told where (TrafficManager)
                     startX = lane.start.x + Math.cos(lane.angle) * spawnOffset;
                     startY = lane.start.y + Math.sin(lane.angle) * spawnOffset;
                     startAngle = lane.angle;
@@ -917,297 +918,31 @@
              *
              * @returns {boolean} whether the vehicle hit environment geometry
              */
-            applyDrivePhysics({ weather, walls, buildings, decalSystem,
-                                steerCurve = false, gripFloor = 0 }) {
-                const VD = CONFIG.VEHICLE_DRIVE;
-                const VA = CONFIG.VEHICLE_AI;
-                this._wallProbeTick = _simTick;   // walls are handled here: CollisionSystem skips this car's wall pass
-                if (typeof this.vx === 'undefined') { this.vx = 0; this.vy = 0; }
+            /** The car's tyre model is the driven car's (yawRate, two axles); traffic steers directly (spin from a knock) */
+            get tyreModel() { return this.controlMode === 'PLAYER'; }
+            /** It drives (vehicleKit): it turns when struck off-centre */
+            get drives() { return true; }
 
-                /* --- PER-VEHICLE PERFORMANCE ---
-                   Acceleration and drag used to be hardcoded (0.5 / 0.96), so
-                   every car in the game shared one top speed of 12.5 and one
-                   acceleration curve — the entire brand/model stat block was
-                   invisible from behind the wheel. Now the car's own numbers
-                   drive it, and drag is SOLVED so it tops out where its spec
-                   says it should:
-
-                       steady state  v = a·d/(1-d)   =>   d = v/(a+v)          */
-                const player = steerCurve;                    // the full weighted model is the driver's
-                const ownTop = player && this.drivenTop > 0 ? this.drivenTop : this.maxSpeed;
-                const ownAccel = player && this.drivenAccel > 0 ? this.drivenAccel : this.acceleration;
-                const topSpeed = (typeof ownTop === 'number' && ownTop > 0) ? ownTop : 12.5;
-                const acceleration = (typeof ownAccel === 'number' && ownAccel > 0) ? ownAccel : 0.5;
-                const drag = topSpeed / (acceleration + topSpeed);
-                const revTop = topSpeed * VD.REVERSE_TOP_FRACTION;
-                const reverseDrag = revTop / (acceleration + revTop);
-
-                const F = this.drive || VD.DEFAULT_FEEL;
-                const rain = (weather && weather.isRaining)
-                    ? Math.min(1, weather.getRainScale ? weather.getRainScale() : 1) : 0;
-                const absSpeed = Math.abs(this.speed);
-                const clampU = (x, m) => x < -m ? -m : x > m ? m : x;
-
-                // --- GRIP (traffic: the original single-number model) ---
-                let grip = VD.GRIP_BASE;
-                if (rain) grip = VD.GRIP_BASE - VD.GRIP_RAIN_PENALTY * rain;
-                if (this.surfaceFriction) grip *= this.surfaceFriction;
-                if (gripFloor > 0) grip = Math.max(grip, gripFloor);
-
-                /* --- THE WHEEL ---
-                   manualTurn is what the driver asks for; `steer` is where the front
-                   wheels actually point. They wind on at the brand's pace and, when the
-                   stick is let go, the caster pulls them home — quicker the faster the
-                   car rolls, easing in rather than stopping dead. Traffic's wheels only
-                   *look* like that (the drawn tyres follow `steer`): its path follower
-                   steers the car directly, since a lagging wheel under it doubled
-                   car-to-car contacts in the traffic sim. */
-                const req = clampU(this.manualTurn || 0, 1);
-                let st = this.steer || 0;
-                if (!player) {
-                    st += clampU(req - st, VD.AI_STEER_RATE);
-                } else if (Math.abs(req) > 0.02 && (Math.sign(req) !== Math.sign(st) || Math.abs(req) > Math.abs(st))) {
-                    const across = st !== 0 && Math.sign(req) !== Math.sign(st);
-                    const rate = F.steerRate * (across ? 1.6 : 1);     // crossing centre, the caster helps
-                    st += clampU(req - st, rate);
-                } else {
-                    const k = Math.min(VD.CENTER_RATE_MAX, VD.CENTER_RATE + VD.CENTER_RATE_SPEED * absSpeed);
-                    const d = (req - st) * k;
-                    st += Math.abs(d) < 0.006 ? req - st : d;
-                }
-                this.steer = st;
-                if (player) this._steerSignal(req, absSpeed);
-
-                // --- STEERING → ROTATION ---
-                let yawTarget = 0;
-                if (absSpeed > VD.STEER_MIN_SPEED) {
-                    // Latch steering direction — only flip when speed clearly
-                    // crosses the dead zone. Prevents direction jitter that
-                    // causes wiggle at low reverse speeds.
-                    if (this.speed > 1.0) this._steerDir = 1;
-                    else if (this.speed < -1.0) this._steerDir = -1;
-                    const direction = this._steerDir || 1;
-                    const handlingMod = 1.0 - VD.HANDLING_RAIN_PENALTY * rain;
-
-                    let authority = 1.0;
-                    if (steerCurve) {
-                        /* Turn rate was constant at any speed, so a barely-moving
-                           car pirouetted at 189°/s with a 22px radius. Now it
-                           ramps in from a standstill — you have to be rolling
-                           before the wheel bites — and tapers at speed so the top
-                           end is stable rather than twitchy, bottoming out at
-                           STEER_HIGH_FLOOR instead of going to zero. */
-                        const ramp = Math.min(1, absSpeed / VD.STEER_RAMP_SPEED);
-                        const over = Math.max(0, absSpeed - VD.STEER_RAMP_SPEED);
-                        authority = ramp * (VD.STEER_HIGH_FLOOR +
-                            (1 - VD.STEER_HIGH_FLOOR) / (1 + over * VD.STEER_FALLOFF));
-                    }
-                    const reverseSteerFactor = direction < 0 ? VD.REVERSE_STEER_FACTOR : 1.0;
-                    yawTarget = (player ? st : req) * this.handling * handlingMod * direction * reverseSteerFactor * authority;
-                }
-                /* Traffic turns where its path follower says, plus any spin a knock gave it
-                   (PhysicsSystem.carContact), which its tyres scrub away; while it's spinning
-                   the driver has lost it and barely steers. The driven car's rotation is
-                   worked out from its tyres below (TYRES), so it's turned there. */
-                let yaw = this.yawRate || 0;
-                if (!player) {
-                    const spin = this.spin || 0;
-                    yaw = yawTarget * (1 - 0.85 * Math.min(1, Math.abs(spin) / 0.03)) + spin;
-                    this.spin = Math.abs(spin) < 0.0005 ? 0 : spin * VD.KNOCK_SPIN_DECAY;
-                    this.yawRate = yaw;
-                    this.angle += yaw;
-                }
-
-                /* --- PEDALS ---
-                   Gas against the direction of travel is the brake (this.brake, px/tick²),
-                   taken off the car's motion and never past a stop; only once (nearly)
-                   stopped does it reverse. The driver's throttle travels in over a few
-                   ticks and the brake bites progressively; the handbrake is instant. */
-                const fwdX0 = Math.cos(this.angle), fwdY0 = Math.sin(this.angle);
-                const fwd0 = this.vx * fwdX0 + this.vy * fwdY0;
-                const revBelow = player ? VD.REVERSE_BELOW : 0.25;
-                let gas = this.manualGas || 0;
-                if (player) {
-                    const p = this.pedal || 0;
-                    const braking = gas * fwd0 < 0 && Math.abs(fwd0) > revBelow;
-                    const rate = (p !== 0 && Math.sign(gas) !== Math.sign(p)) ? VD.PEDAL_OUT + VD.PEDAL_BRAKE_IN
-                        : Math.abs(gas) < Math.abs(p) ? VD.PEDAL_OUT
-                        : braking ? VD.PEDAL_BRAKE_IN : VD.PEDAL_IN;
-                    gas = this.pedal = p + clampU(gas - p, rate);
-                }
-                let decel = 0;
-                if (Math.abs(gas) > (player && this._fineGas ? 0.02 : 0.1)) {
-                    if (fwd0 * gas < 0 && Math.abs(fwd0) > revBelow) {
-                        const sp = Math.hypot(this.vx, this.vy);
-                        decel = Math.min(sp, Math.abs(gas) * (this.brake || 0.3));
-                        if (sp > 0) { this.vx -= this.vx / sp * decel; this.vy -= this.vy / sp * decel; }
-                    } else {
-                        this.vx += fwdX0 * gas * acceleration;
-                        this.vy += fwdY0 * gas * acceleration;
-                    }
-                }
-                const hb = player && this.handbrake && absSpeed > 0.05;
-                if (hb) {
-                    const sp = Math.hypot(this.vx, this.vy), dec = Math.min(sp, VD.HANDBRAKE_DECEL);
-                    if (sp > 0) { this.vx -= this.vx / sp * dec; this.vy -= this.vy / sp * dec; }
-                    decel += dec;
-                }
-
-                /* --- WEIGHT ---
-                   Braking pitches the load forward (the front bites, the rear goes
-                   light); throttle sits it back. It shifts at the brand's pace, so a
-                   heavy car settles slowly. */
-                const loadTarget = decel > 0 ? Math.min(1, decel / ((this.brake || 0.3) + 0.05))
-                    : gas > 0.1 ? -0.4 * gas * Math.min(1, acceleration / 0.2) : 0;
-                this.load = (this.load || 0) + (loadTarget - (this.load || 0)) * VD.LOAD_RATE / F.weight;
-
-                // --- DRIFT DECOMPOSITION ---
-                const fwdX = Math.cos(this.angle);
-                const fwdY = Math.sin(this.angle);
-                const rightX = -fwdY;
-                const rightY = fwdX;
-                let fwdVelocity = this.vx * fwdX + this.vy * fwdY;
-                let slideVelocity = this.vx * rightX + this.vy * rightY;
-
-                this.applySkids(decalSystem);
-
-                // --- RAIN SPRAY ---
-                if (rain && Math.abs(fwdVelocity) > 2.0) {
-                    // Spray frequency tracks rain strength — wet roads throw more water.
-                    const sprayChance = 0.7 * rain;
-                    if (Math.random() < sprayChance) {
-                        const sprayColor = 'rgba(200, 200, 255, 0.4)';
-                        const spraySpeed = Math.abs(fwdVelocity) * 0.5;
-                        const blX = this.x - this.length/2 * fwdX + this.width/2 * rightX;
-                        const blY = this.y - this.length/2 * fwdY + this.width/2 * rightY;
-                        weather.addSpray(blX, blY, this.angle + Math.PI, spraySpeed, sprayColor, 1.0, 1.0);
-                        const brX = this.x - this.length/2 * fwdX - this.width/2 * rightX;
-                        const brY = this.y - this.length/2 * fwdY - this.width/2 * rightY;
-                        weather.addSpray(brX, brY, this.angle + Math.PI, spraySpeed, sprayColor, 1.0, 1.0);
-                    }
-                }
-
-                // --- DRIFT SMOKE (+ traffic's grip breakaway) ---
-                const smoking = Math.abs(slideVelocity) > VD.GRIP_SLIDE_THRESHOLD || (hb && Math.abs(fwdVelocity) > 3);
-                if (smoking) {
-                    if (!player) grip *= VD.GRIP_SLIDE_PENALTY;
-                    if (weather && Math.random() > 0.2) {
-                        const smokeColor = 'rgba(30, 30, 30, 0.6)';
-                        const slipSpeed = Math.max(Math.abs(slideVelocity), hb ? Math.abs(fwdVelocity) * 0.4 : 0);
-                        const volume = 20.0;
-                        const life = 10.0;
-                        const blX = this.x - this.length/2 * fwdX + this.width/2 * rightX;
-                        const blY = this.y - this.length/2 * fwdY + this.width/2 * rightY;
-                        weather.addSpray(blX, blY, this.angle + Math.PI, slipSpeed, smokeColor, volume, life);
-                        const brX = this.x - this.length/2 * fwdX - this.width/2 * rightX;
-                        const brY = this.y - this.length/2 * fwdY - this.width/2 * rightY;
-                        weather.addSpray(brX, brY, this.angle + Math.PI, slipSpeed, smokeColor, volume, life);
-                    }
-                }
-
-                // --- TYRES ---
-                if (!player) {
-                    slideVelocity *= grip;
-                } else {
-                    /* Two axles, each a tyre pushing sideways against how fast that end of
-                       the car slides across its wheels: firmly, up to a limit, then it lets
-                       go. The front wheels point where the steering asks (the angle that
-                       would carry yawTarget round), so the front pulls the nose in. The car
-                       is one body: both pushes move it sideways, and because they act ahead
-                       of and behind the centre they also turn it (rotation inertia
-                       SPIN_INERTIA). So the car's rotation is worked out, not set: it
-                       builds as the front bites, the tail steps out when the rear lets go
-                       (braking weight forward, the handbrake), the nose pushes wide when the
-                       front does, and any spin a crash gave it carries on until the tyres
-                       scrub it off. */
-                    const wetGrip = (1 - 0.35 * rain) * (this.surfaceFriction || 1);
-                    const L = this.load;
-                    let gF = F.gripF * (1 + VD.LOAD_FWD_GRIP * L) * wetGrip;
-                    let gR = F.gripR * (1 - VD.LOAD_REAR_GRIP * L) * wetGrip;
-                    if (hb) gR *= VD.HANDBRAKE_REAR_GRIP;
-                    // Power over the rear: throttle held through a turn at speed spends the rear tyres' grip, so the tail can step out
-                    if (VD.POWER_OVERSTEER && gas > 0.5 && absSpeed > 4) gR *= 1 - VD.POWER_OVERSTEER * gas * Math.min(1, Math.abs(st));
-                    const a = this.length * VD.AXLE_FROM_CENTRE, wb = 2 * a;
-                    const iu = (this.length * this.length + this.width * this.width) / 12 * VD.SPIN_INERTIA;   // inertia per unit mass
-                    let w = this.yawRate || 0;
-                    const delta = Math.abs(fwdVelocity) > 0.3 ? clampU(yawTarget * wb / fwdVelocity, VD.WHEEL_LOCK) : 0;
-                    const sF = slideVelocity + w * a - fwdVelocity * delta, sR = slideVelocity - w * a;
-                    const kF = VD.TYRE_STIFF * (F.turnIn / VD.DEFAULT_FEEL.turnIn), kR = VD.TYRE_STIFF;
-                    const pF = -Math.sign(sF) * Math.min(Math.abs(sF) * kF * gF, F.latAcc * gF);
-                    const pR = -Math.sign(sR) * Math.min(Math.abs(sR) * kR * gR, F.latAcc * gR);
-                    slideVelocity += (pF + pR) / 2;
-                    w += a * (pF - pR) / 2 / iu;
-                    if (hb) w *= VD.HANDBRAKE_YAW_DAMP;               // the locked rear drags the swing out of it
-                    w = clampU(w, VD.YAW_SPIN_MAX);
-                    yaw = this.yawRate = w;
-                    this.tyreSlip = Math.max(0, Math.abs(slideVelocity) - F.latAcc * 1.6) + (hb ? Math.abs(fwdVelocity) * 0.25 : 0)
-                        + (decel > (this.brake || 0.3) * 0.8 && Math.abs(fwdVelocity) > 4 ? 0.8 : 0);
-                }
-
-                // --- BODY (visual): lean out of the turn, dip under the brakes ---
-                const latA = clampU(yaw * fwdVelocity / 0.6, 1);
-                this.bodyRoll = (this.bodyRoll || 0) + (latA - (this.bodyRoll || 0)) * 0.16 / F.weight;
-
-                // --- RECOMPOSE + DRAG ---
-                this.vx = fwdVelocity * fwdX + slideVelocity * rightX;
-                this.vy = fwdVelocity * fwdY + slideVelocity * rightY;
-                let dragNow = (fwdVelocity > 0 ? drag : reverseDrag);
-                if (player && Math.abs(gas) < 0.1) dragNow *= 1 - (1 - (this.friction || 0.97)) * VD.COAST_DRAG;
-                this.vx *= dragNow;
-                this.vy *= dragNow;
-                // --- INTEGRATE + COLLIDE ---
-                const nextX = this.x + this.vx;
-                const nextY = this.y + this.vy;
-                if (player) this.angle += this.yawRate;
-
-                /* Report the POST-drag forward component.
-                   This used to be recorded before drag was applied, which
-                   overstated speed by exactly one acceleration step. That was
-                   invisible while top speed was a hardcoded 12.5, but now drag is
-                   solved from each car's maxSpeed, so the stale value made every
-                   vehicle read (maxSpeed + acceleration) instead of its spec. */
-                this.speed = this.vx * fwdX + this.vy * fwdY;
-
-                /* Wall response: move, then push out of whatever it ends up in.
-                   The old axis-by-axis retry only asked "does it fit?", so once the car
-                   was inside a wall (rotation is never checked: steering while touching
-                   a wall turns a corner into it) every retry failed, the "head-on"
-                   branch flipped the velocity back toward the wall, and the car stayed
-                   stuck however the driver steered. Now each touching wall gives its
-                   contact normal and depth (SAT): the car is moved out along it, the
-                   speed going into the wall bounces back (WALL_BOUNCE_FACTOR) and the
-                   speed along it scrapes (WALL_SLIDE_FRICTION). Speed already leaving
-                   the wall is left alone, so the driver can always pull away. */
-                const w_ = walls || [], b_ = buildings || [];
-                if (player && this._crunchCd > 0) this._crunchCd--;
-                const vx0 = this.vx, vy0 = this.vy;
-                this.x = nextX;
-                this.y = nextY;
-                let collided = false;
-                for (let pass = 0; pass < 4; pass++) {
-                    const c = this._wallContact(w_, b_);
-                    if (!c) break;
-                    collided = true;
-                    // Where the car meets the wall (a corner, usually): the push lands there, so it turns the car too
-                    const [px, py] = shapeKit.boxContactPoint(this, c.obb, c.nx, c.ny);
-                    this.x += c.nx * (c.depth + 0.01);
-                    this.y += c.ny * (c.depth + 0.01);
-                    const B = PhysicsSystem.body(this, true);
-                    if (shapeKit.impulseAt(B, PhysicsSystem.body(c.obb, false), px + c.nx * c.depth, py + c.ny * c.depth,
-                                                c.nx, c.ny, -VA.WALL_BOUNCE_FACTOR, VA.WALL_MU)) PhysicsSystem._store(this, B);
-                }
-                if (collided) {
-                    // Re-derive forward speed from the corrected velocity so the
-                    // HUD, engine audio and skid logic agree with what the car is
-                    // actually doing after the impact.
-                    this.speed = this.vx * fwdX + this.vy * fwdY;
-                    if (player) this.onImpact(Math.hypot(this.vx - vx0, this.vy - vy0));
-                }
-                return collided;
+            /** One tick of driving: the Basement's vehicle kit (basement/vehicle-kit.js), with this game's numbers
+             *  (CONFIG.VEHICLE_DRIVE, vehicles.json) and its effects: the turn signal, tyre marks, rain spray and smoke */
+            applyDrivePhysics({ weather, walls, buildings, decalSystem, steerCurve = false, gripFloor = 0 }) {
+                const fx = this._driveFx || (this._driveFx = {
+                    steer: (car, req, absSpeed) => car._steerSignal(req, absSpeed),
+                    skids: (car) => car.applySkids(car._fxDecals),
+                    spray: null
+                });
+                this._fxDecals = decalSystem;
+                fx.spray = weather && weather.addSpray ? weather._sprayFx || (weather._sprayFx = weather.addSpray.bind(weather)) : null;
+                const env = this._driveEnv || (this._driveEnv = { solids: [null, null], fx });
+                env.solids[0] = walls || EMPTY_SOLIDS; env.solids[1] = buildings || EMPTY_SOLIDS;
+                env.rain = weather && weather.isRaining ? Math.min(1, weather.getRainScale ? weather.getRainScale() : 1) : 0;
+                env.steerCurve = steerCurve; env.gripFloor = gripFloor;
+                env.wallBounce = CONFIG.VEHICLE_AI.WALL_BOUNCE_FACTOR; env.wallMu = CONFIG.VEHICLE_AI.WALL_MU;
+                return vehicleKit.drive(this, CONFIG.VEHICLE_DRIVE, env);
             }
 
             /**
-             * A knock the driver feels (PhysicsSystem.carContact, walls in applyDrivePhysics):
+             * A knock the driver feels (vehicleKit.carContact, walls in vehicleKit.drive):
              * strength is the speed change it caused (px/tick), kick a twist to the car's
              * rotation. Hard enough, it crunches and shakes the camera.
              */
@@ -1283,65 +1018,16 @@
                 this.manualGas = 0; this.manualTurn = 0;
             }
         
+            /** Would the car overlap a wall or building at (nextX, nextY) facing angle? (vehicleKit.fits) */
             checkEnvironmentCollision(nextX, nextY, angle, walls, buildings) {
-                const futureOBB = { x: nextX, y: nextY, angle: angle, length: this.length, width: this.width };
-                const r = Math.hypot(this.length, this.width) / 2;   // reaches the corners at any angle
-                const bounds = { left: nextX - r, right: nextX + r, top: nextY - r, bottom: nextY + r };
-                for (const list of [walls, buildings]) {
-                    const candidates = _physicsSpatial.query(list, bounds);
-                    if (!candidates) continue;
-                    for (let w of candidates) {
-                        if (nextX + r < w.x || nextX - r > w.x + w.w || nextY + r < w.y || nextY - r > w.y + w.h) continue;
-                        if (shapeKit.sat(futureOBB, shapeKit.rectToObb(w))) return true;
-                    }
-                }
-                return false;
-            }
-
-            /** The deepest wall or building the car overlaps where it stands: { nx, ny, depth },
-             *  the normal pointing out of the wall (SAT), or null when it's clear */
-            _wallContact(walls, buildings) {
-                const obb = { x: this.x, y: this.y, angle: this.angle, length: this.length, width: this.width };
-                const r = Math.hypot(this.length, this.width) / 2;
-                const bounds = { left: this.x - r, right: this.x + r, top: this.y - r, bottom: this.y + r };
-                let best = null;
-                for (const list of [walls, buildings]) {
-                    const candidates = _physicsSpatial.query(list, bounds);
-                    if (!candidates) continue;
-                    for (let w of candidates) {
-                        if (this.x + r < w.x || this.x - r > w.x + w.w || this.y + r < w.y || this.y - r > w.y + w.h) continue;
-                        const wo = shapeKit.rectToObb(w);
-                        const c = shapeKit.sat(obb, wo);
-                        if (c && (!best || c.depth > best.depth)) { best = c; c.obb = wo; }
-                    }
-                }
-                return best;
-            }
-        
-            /** A parked car that's been hit: it slides and turns on locked wheels until it stops (out of any wall) */
-            _settle(walls, buildings) {
-                // Locked wheels grip before they slide: each tick takes a fixed bite off the speed and spin
-                // (so a brush barely moves it) and then a share of what's left
-                const VD = CONFIG.VEHICLE_DRIVE, k = VD.PARKED_SCRUB;
-                const sp = Math.hypot(this.vx || 0, this.vy || 0), keep = sp > VD.PARKED_HOLD ? (sp - VD.PARKED_HOLD) / sp * k : 0;
-                this.vx = (this.vx || 0) * keep; this.vy = (this.vy || 0) * keep;
-                const sn = this.spin || 0;
-                this.spin = Math.abs(sn) > VD.PARKED_HOLD_SPIN ? (sn - Math.sign(sn) * VD.PARKED_HOLD_SPIN) * k : 0;
-                this.x += this.vx; this.y += this.vy; this.angle += this.spin;
-                for (let pass = 0; pass < 3; pass++) {
-                    const c = this._wallContact(walls || [], buildings || []);
-                    if (!c) break;
-                    this.x += c.nx * (c.depth + 0.01); this.y += c.ny * (c.depth + 0.01);
-                    const vn = this.vx * c.nx + this.vy * c.ny;
-                    if (vn < 0) { this.vx -= vn * c.nx; this.vy -= vn * c.ny; }
-                }
+                return !vehicleKit.fits(this, nextX, nextY, angle, [walls || EMPTY_SOLIDS, buildings || EMPTY_SOLIDS]);
             }
 
             // --- MAIN UPDATE (AI & Logic) ---
             update(player, playerCar, allVehicles, weather, intersections = [], walls = [], buildings = [], decalSystem, folk = []) {
                 // --- CONTROL MODE BRANCHING ---
                 if (this.controlMode === 'PARKED') {
-                    if (this.vx || this.vy || this.spin) this._settle(walls, buildings);
+                    if (this.vx || this.vy || this.spin) vehicleKit.settle(this, [walls || EMPTY_SOLIDS, buildings || EMPTY_SOLIDS], CONFIG.VEHICLE_DRIVE);
                     this.speed = 0;
                     return;
                 }

@@ -172,7 +172,8 @@
                 // Drift, and bounce off walls
                 this.vx *= 0.9; this.vy *= 0.9;
                 this.x += this.vx; this.y += this.vy;
-                for (const w of walls) {
+                const r0 = this.radius;
+                for (const w of _physicsSpatial.query(walls, { left: this.x - r0, right: this.x + r0, top: this.y - r0, bottom: this.y + r0 }) || []) {
                     if (shapeKit.squareHitsRect(this.x, this.y, this.radius, w)) {
                         this.vx *= -1; this.vy *= -1; this.x += this.vx * 2; this.y += this.vy * 2;
                     }
