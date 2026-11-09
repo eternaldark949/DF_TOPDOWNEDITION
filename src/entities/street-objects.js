@@ -215,21 +215,28 @@
 
         // At a shared projected pixel, greater world height is closer to the overhead camera.
         // Queue only on the main world pass; standalone art and reflections still paint immediately.
+        // The trees' and street lamps' faces go into one render queue (basement/render-system.js), sorted by
+        // height and drawn in batches of the same colour: one fill for many faces.
         const FoliageLampDepth = {
-            ctx: null, parts: [],
-            begin(ctx) { this.ctx=ctx; this.parts.length=0; this.matrix=ctx.getTransform(); },
-            add(ctx,z,paint) {
-                if (ctx!==this.ctx) { paint(); return; }
-                this.parts.push({z,paint,alpha:ctx.globalAlpha,op:ctx.globalCompositeOperation});
-            },
+            ctx: null, queue: new renderQueue(), _now: new renderQueue({ sort: false }),
+            begin(ctx) { this.ctx=ctx; this.queue.begin(); this.matrix=ctx.getTransform(); },
+            /** The queue for this context: the frame's (drawn at flush), or a one-shot drawn now. */
+            _q(ctx) { if (ctx===this.ctx) return this.queue; this._now.begin(); return this._now; },
+            _done(ctx, q) { if (q===this._now) q.flush(ctx); },
+            _state(ctx, cap, clip) { return { alpha: ctx.globalAlpha, op: ctx.globalCompositeOperation, cap, clip }; },
+            /** A filled face through flat points [x0, y0, ...] at height z (clip: polygons it stays out of). */
+            poly(ctx,z,color,pts,clip) { const q=this._q(ctx); q.poly(z,color,pts,this._state(ctx,'butt',clip)); this._done(ctx,q); },
+            /** A line through flat points at height z. */
+            line(ctx,z,width,color,pts,cap,clip) { const q=this._q(ctx); q.line(z,width,color,pts,this._state(ctx,cap||'butt',clip)); this._done(ctx,q); },
+            ellipse(ctx,z,x,y,rx,ry,rot,color,width,clip) { const q=this._q(ctx); q.ellipse(z,x,y,rx,ry,rot,color,width,this._state(ctx,'butt',clip)); this._done(ctx,q); },
+            image(ctx,z,img,x,y,w,h,clip) { const q=this._q(ctx); q.image(z,img,x,y,w,h,this._state(ctx,'butt',clip)); this._done(ctx,q); },
+            /** Anything else, painted in its place. */
+            add(ctx,z,paint) { if (ctx!==this.ctx) { paint(); return; } this.queue.custom(z,paint,this._state(ctx)); },
             flush(ctx) {
-                const parts=this.parts;this.ctx=null;
-                parts.sort((a,b)=>a.z-b.z);
+                this.ctx=null;
                 ctx.save();
-                try {
-                    const m=this.matrix;ctx.setTransform(m.a,m.b,m.c,m.d,m.e,m.f);
-                    for (const p of parts) {ctx.globalAlpha=p.alpha;ctx.globalCompositeOperation=p.op;p.paint();}
-                } finally {ctx.restore();parts.length=0;}
+                try { const m=this.matrix;ctx.setTransform(m.a,m.b,m.c,m.d,m.e,m.f); this.queue.flush(ctx); }
+                finally { ctx.restore(); this.queue.begin(); }
             }
         };
 
@@ -274,17 +281,11 @@
                     }
                 }
             }
-            const paintAt = (z,paint) => FoliageLampDepth.add(ctx,z,()=>{
-                if (!covers.length) {paint();return;}
-                ctx.save();
-                try {
-                    for(const poly of covers){ctx.beginPath();ctx.rect(-1e7,-1e7,2e7,2e7);poly.forEach((p,i)=>ctx[i?'lineTo':'moveTo'](p[0],p[1]));ctx.closePath();ctx.clip('evenodd');}
-                    paint();
-                } finally {ctx.restore();}
-            });
+            const clip=covers.length?covers:null, FD=FoliageLampDepth;
             const point=(x,y,z) => ({...foliagePoint(f,x+sway*z/H,y,z),z});
-            const polygon=(pts,color) => paintAt(pts.reduce((sum,p)=>sum+p.z,0)/pts.length,()=>{ctx.fillStyle=color;ctx.beginPath();pts.forEach((p,i)=>ctx[i?'lineTo':'moveTo'](p.x,p.y));ctx.closePath();ctx.fill();});
-            const stroke=(a,b,width,color) => paintAt((a.z+b.z)/2,()=>{ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();});
+            const flat=pts => { const out=[]; for (const p of pts) out.push(p.x,p.y); return out; };
+            const polygon=(pts,color) => FD.poly(ctx,pts.reduce((sum,p)=>sum+p.z,0)/pts.length,color,flat(pts),clip);
+            const stroke=(a,b,width,color) => FD.line(ctx,(a.z+b.z)/2,width,color,[a.x,a.y,b.x,b.y],'butt',clip);
             // A tapered trunk built as a ring of bark faces, with its root flare on the ground.
             const ring=(z,r) => Array.from({length:6},(_,i)=>point(Math.cos(i*Math.PI/3)*r,Math.sin(i*Math.PI/3)*r,z));
             const stem=(z0,r0,z1,r1) => {
@@ -295,7 +296,7 @@
             stem(0,5*s,14*s,3*s);
             for(let z=14*s;z<H;z+=8){const end=Math.min(H,z+8),r=t=>3*s-(t-14*s)/(H-14*s)*1.4*s;stem(z,r(z),end,r(end));}
             if(palm){
-                for(let z=20*s;z<H;z+=13*s){const p=point(0,0,z);paintAt(z,()=>{ctx.strokeStyle='#957653';ctx.lineWidth=1;ctx.beginPath();ctx.ellipse(p.x,p.y,2.4*s*p.k,1.5*s*p.k,0,0,Math.PI*2);ctx.stroke();});}
+                for(let z=20*s;z<H;z+=13*s){const p=point(0,0,z);FD.ellipse(ctx,z,p.x,p.y,2.4*s*p.k,1.5*s*p.k,0,'#957653',1,clip);}
                 // Individual curved fronds rise at the crown and droop toward their tips.
                 for(let i=0;i<8;i++){
                     const a=i*Math.PI/4+f.phaseOffset*.2,pts=[];
@@ -311,7 +312,7 @@
                 boughs.push({x:0,y:0,z:H+9*s,size:s*.72});
                 for(const b of boughs){const p=point(0,0,H*.62),q=point(b.x,b.y,b.z);stroke(p,q,2.5*s,f.trunkColor);}
                 boughs.sort((a,b)=>a.z-b.z);
-                for(let i=0;i<boughs.length;i++){const b=boughs[i],p=point(b.x,b.y,b.z),spr=floraSprite(f.type,b.size,(f._variant+i)%4),w=spr.w*p.k;paintAt(b.z,()=>ctx.drawImage(spr.cv,p.x-w/2,p.y-w/2,w,w));}
+                for(let i=0;i<boughs.length;i++){const b=boughs[i],p=point(b.x,b.y,b.z),spr=floraSprite(f.type,b.size,(f._variant+i)%4),w=spr.w*p.k;FD.image(ctx,b.z,spr.cv,p.x-w/2,p.y-w/2,w,w,clip);}
             }
         }
 
