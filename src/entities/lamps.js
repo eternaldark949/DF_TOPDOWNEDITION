@@ -82,6 +82,14 @@
             return [cam.x + (wx - cam.x) * k, cam.y + (wy - cam.y) * k];
         }
 
+        /** Is a tree's or palm's canopy close enough to cross this lamp's post on screen? (Lamps and trees stand
+         *  still, so it's asked once per lamp.) */
+        function lampNearCanopy(lamp) {
+            if (lamp._nearCanopy !== undefined) return lamp._nearCanopy;
+            const F = (game.activeMap && game.activeMap.foliage) || [];
+            return lamp._nearCanopy = F.some(f => f.type !== 'bush' && Math.hypot(f.x - lamp.x, f.y - lamp.y) < 60 * f.size + 60);
+        }
+
         function drawProjectedLamp(ctx, lamp, lit) {
             const style = LAMP_TYPE_STYLE[lamp.lampType], spec = LAMP_STYLES[style], H = lampProjection(lamp).z;
             const stroke = (a,b,width,color) => {
@@ -107,8 +115,11 @@
             if (style !== 'pillar_lantern') {
                 sleeve(ring(0,0,0,7), ring(0,0,9,5), iron, false);
                 sleeve(ring(0,0,9,5), ring(0,0,15,3), [LAMP_BRASS,'#70532d']);
-                // Short bands let a canopy cover the lower shaft while its upper section stays in front.
-                for(let z=15;z<H+12;z+=8){const end=Math.min(H+12,z+8),r=t=>2.8-(t-15)/(H-3)*1.1;sleeve(ring(0,0,z,r(z)),ring(0,0,end,r(end)),iron,end>=H+12);}
+                // Short bands let a canopy cover the lower shaft while its upper section stays in front. With no
+                // canopy near, the shaft is one straight taper between the collars (they hide what's inside them).
+                const r=t=>2.8-(t-15)/(H-3)*1.1, shaft=(z0,z1,cap)=>sleeve(ring(0,0,z0,r(z0)),ring(0,0,z1,r(z1)),iron,cap);
+                if (lampNearCanopy(lamp)) for(let z=15;z<H+12;z+=8){const end=Math.min(H+12,z+8);shaft(z,end,end>=H+12);}
+                else { shaft(15,20,false); shaft(23,H*.65,false); shaft(H*.65+3,H+8,false); shaft(H+11,H+12,true); }
                 for (const z of [20, H * .65, H + 8])
                     sleeve(ring(0,0,z,3), ring(0,0,z+3,3), [LAMP_BRASS,'#70532d']);
                 // Swept arms are curves through height, rather than a flat drawing of the old stem.
