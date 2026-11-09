@@ -6,19 +6,24 @@
         //   medium — live, but flat-shaded, with hair and cloth at rest (no physics), no lamp rim
         //   low    — baked: each crowd member's look is drawn once into a strip of frames (an idle
         //            frame and an 8-step walk cycle) and replayed: the contact shadow is drawn live,
-        //            then one drawImage. Bakes are lazy (one look a frame), kept for up to
-        //            CROWD_BAKE.MAX members (least recently seen go first); anyone not baked yet,
-        //            or in a pose that keeps moving (dancing), is drawn as on medium.
+        //            then one drawImage. Bakes are lazy (one look a frame); each member keeps up to
+        //            CROWD_BAKE.PER_OWNER of them (a pace that wobbles between two strides finds both
+        //            already baked), CROWD_BAKE.MAX in all (least recently seen go first). A walking stride is
+        //            baked once they've held it STEADY_S (easing in or out of a stroll they're drawn live). Someone
+        //            standing is drawn from the idle frame of any bake of their look (it is the same
+        //            frame whatever the stride), and a look first baked standing is only that frame.
+        //            Anyone not baked yet, or in a pose that keeps moving (dancing), is drawn as on medium.
         // drawCrowdHumanoid(ctx, entity, config) is the one entry point; the caller has already
         // translated and rotated ctx to the body, as for drawProceduralHumanoid.
 
-        const CROWD_BAKE = { FRAMES: 8, R: 40, Q: 1.25, MAX: 64, PER_FRAME: 1 };
+        const CROWD_BAKE = { FRAMES: 8, R: 40, Q: 1.25, MAX: 64, PER_OWNER: 3, PER_FRAME: 1, STEADY_S: 0.4 };
 
         /** Medium detail for the body being drawn (read by humanShade, hairGeometry, clothGeometry) */
         let _crowdLite = false;
 
         const CrowdImpostors = {
-            cache: new Map(),          // entity → { sig, cv, used }
+            cache: new Map(),          // entity → [{ sig, parts, stride, cv, cell, used }, ...] (newest first)
+            count: 0,                  // bakes kept, all owners
             _bakedFrame: -1, _bakes: 0,
 
             /** What a bake depends on: the look as drawn, the pose, the stride, rain on them */
@@ -42,12 +47,41 @@
                 const p = sig.split('|');
                 return !!b.parts && p.length === 6 && p.every((v, i) => i === 4 || v === b.parts[i]);
             },
+            /** The bake to draw from for `sig`, from this owner's list: [bake, idle only], or null.
+                The idle frame doesn't depend on the stride, so anyone standing can use any bake of their look. */
+            _find(list, sig, anyStride) {
+                if (!list) return null;
+                for (const b of list) if (b.sig === sig) return [b, b.stride === 0];
+                const standing = sig.split('|')[4] === '0';
+                if (standing) { for (const b of list) if (this._sameButStride(b, sig)) return [b, true]; }
+                else if (anyStride) { for (const b of list) if (b.stride > 0 && this._sameButStride(b, sig)) return [b, false]; }
+                return null;
+            },
+            /** Keep a new bake (newest first); over PER_OWNER or MAX, drop the least recently seen (never one seen this frame) */
+            _store(owner, b) {
+                let list = this.cache.get(owner);
+                if (!list) this.cache.set(owner, list = []);
+                list.unshift(b); this.count++;
+                if (list.length > CROWD_BAKE.PER_OWNER) {
+                    let oi = -1, oT = Infinity;
+                    for (let i = 1; i < list.length; i++) if (list[i].used < oT) { oT = list[i].used; oi = i; }
+                    list.splice(oi, 1); this.count--;
+                }
+                while (this.count > CROWD_BAKE.MAX) {
+                    let oldK = null, oldI = -1, oldT = Infinity;
+                    for (const [k, l] of this.cache) for (let i = 0; i < l.length; i++) if (l[i].used < oldT) { oldT = l[i].used; oldK = k; oldI = i; }
+                    if (oldK === null || oldT >= _frameTime) break;
+                    const l = this.cache.get(oldK); l.splice(oldI, 1); this.count--;
+                    if (!l.length) this.cache.delete(oldK);
+                }
+            },
 
-            /** Bake the strip: frame 0 standing, 1..FRAMES the walk cycle, in the body's own frame (facing +x) */
+            /** Bake the strip: frame 0 standing, 1..FRAMES the walk cycle, in the body's own frame (facing +x).
+                A standing look (stride 0) is only frame 0: its walk frames would never be drawn. */
             _bake(e, c, sig) {
-                const F = CROWD_BAKE.FRAMES, R = CROWD_BAKE.R, Q = CROWD_BAKE.Q, cell = Math.ceil(R * 2 * Q);
+                const R = CROWD_BAKE.R, Q = CROWD_BAKE.Q, cell = Math.ceil(R * 2 * Q);
+                const parts = sig.split('|'), sp = +parts[4] || 0, F = sp > 0 ? CROWD_BAKE.FRAMES : 0;
                 const { canvas: cv, ctx: g } = canvasKit.createLayer([cell * (F + 1), cell]); if (!g) return null;
-                const parts = sig.split('|'), sp = +parts[4] || 0;
                 // a stand-in body: same look and place, its gait pinned (no ticks pass, so syncHumanoidGait keeps it)
                 const B = { x: e.x, y: e.y, angle: 0, look: e.look, walkPhase: 0 };
                 syncHumanoidGait(B);
@@ -75,25 +109,32 @@
             draw(ctx, e, c, owner = e, anyStride = false) {
                 if (c.pose === 'dance' || c.pose === 'die') return false;          // poses that keep moving: live
                 syncHumanoidGait(e);                                                // the walk (and its footsteps) as the live draw would
-                let b = this.cache.get(owner);
-                const sig = this._sig(e, c, b);
-                if (!b || b.sig !== sig && !(anyStride && b.stride > 0 && this._sameButStride(b, sig))) {
+                const list = this.cache.get(owner);
+                const sig = this._sig(e, c, list && list[0]);
+                let hit = this._find(list, sig, anyStride);
+                if (!hit) {
+                    // easing in or out of a stroll, the pace passes through a stride a moment at a time: they're drawn
+                    // live meanwhile, as anyone not baked yet is, rather than a strip baked for each pace on the way
+                    const sp = sig.split('|')[4];
+                    if (owner._lowSp !== sp) { owner._lowSp = sp; owner._lowSpT = _gameTimeSec; }
+                    if (sp !== '0' && _gameTimeSec - owner._lowSpT < CROWD_BAKE.STEADY_S) return false;
                     if (this._bakedFrame !== _frameTime) { this._bakedFrame = _frameTime; this._bakes = 0; }
                     if (this._bakes >= CROWD_BAKE.PER_FRAME) return false;          // one look a frame; live until then
-                    if (!this.cache.has(owner) && this.cache.size >= CROWD_BAKE.MAX) {                   // full: make room from whoever was seen longest ago —
-                        let oldK = null, oldT = Infinity;                              // never someone on screen this frame (no thrash)
-                        for (const [k, v] of this.cache) if (v.used < oldT) { oldT = v.used; oldK = k; }
-                        if (oldK === null || oldT >= _frameTime) return false;
-                        this.cache.delete(oldK);
+                    if (this.count >= CROWD_BAKE.MAX) {                               // full: there must be room from whoever was seen longest ago —
+                        let oldT = Infinity;                                           // never someone on screen this frame (no thrash)
+                        for (const l of this.cache.values()) for (const v of l) if (v.used < oldT) oldT = v.used;
+                        if (oldT >= _frameTime) return false;
                     }
                     this._bakes++;
-                    b = this._bake(e, c, sig);
-                    if (!b) return false;
-                    this.cache.set(owner, b);
+                    const nb = this._bake(e, c, sig);
+                    if (!nb) return false;
+                    this._store(owner, nb);
+                    hit = [nb, nb.stride === 0];
                 }
+                const b = hit[0];
                 b.used = _frameTime;
                 const g = e._gait, F = CROWD_BAKE.FRAMES, R = CROWD_BAKE.R;
-                const walking = g && g.speed > CONFIG.GAIT.STOP_SPEED && b.stride > 0;
+                const walking = !hit[1] && g && g.speed > CONFIG.GAIT.STOP_SPEED && b.stride > 0;
                 const ph = ((e.walkPhase || 0) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
                 const f = walking ? 1 + (Math.round(ph / (Math.PI * 2) * F) % F) : 0;
                 // Contact and sun casts stay live, outside the rotating body sprite.
@@ -103,7 +144,7 @@
                 return true;
             },
 
-            clear() { this.cache.clear(); if (typeof CrowdBakes !== 'undefined') CrowdBakes.clear(); }
+            clear() { this.cache.clear(); this.count = 0; if (typeof CrowdBakes !== 'undefined') CrowdBakes.clear(); }
         };
 
         // ═══ HIGH: shaded walk bakes, hair and cloth swinging ═══

@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '44d519db4aa5';
+        const DFAB_BUILD = '375480ac7f71';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -10309,7 +10309,7 @@
             ids (packets) { return packets.map(p => p.id); }
         };
     </script>
-    <script type="text/dfab" data-src="basement/render-system.js" data-cost="174">
+    <script type="text/dfab" data-src="basement/render-system.js" data-cost="181">
         // ===== LV0 BASEMENT =====
         // The render system: a queue of shapes that sorts itself by depth and draws in as few canvas calls as it
         // can. Canvas 2D pays per call, so shapes that share a style (fill colour, or stroke colour and width;
@@ -10453,6 +10453,14 @@
                 }
                 return true;
             }
+            /** Is a side face of a post or trunk, projected to flat points [a_i, a_j, b_j, b_i] (two neighbours on its
+             *  bottom ring, then the same two on its top ring, rings wound by increasing angle), turned to the camera?
+             *  Its projected winding says so. On a convex solid the faces turned away are always hidden. */
+            static front(pts) {
+                let a = 0;
+                for (let i = 0, n = pts.length; i < n; i += 2) { const j = (i + 2) % n; a += pts[i] * pts[j + 1] - pts[j] * pts[i + 1]; }
+                return a > 0;
+            }
             /** Do two shapes overlap? Two convex polygons: by separating axes, sharing an edge doesn't count (they
              *  must cross by more than a quarter pixel). Anything else: by box. */
             static _overlap(a, b) {
@@ -10550,7 +10558,7 @@
                         }
                         ctx.moveTo(p[0], p[1]);
                         for (let i = 2; i < p.length; i += 2) ctx.lineTo(p[i], p[i + 1]);
-                        if (it.closed) ctx.closePath();
+                        if (it.closed && stroke) ctx.closePath();     // a fill closes every subpath itself
                     }
                     if (stroke) ctx.stroke(); else ctx.fill();
                 });
@@ -24838,7 +24846,7 @@
         }
 
     </script>
-    <script type="text/dfab" data-src="entities/lamps.js" data-cost="547">
+    <script type="text/dfab" data-src="entities/lamps.js" data-cost="548">
         /**
          * Lamp Entity - No collision, just decoration.
          */
@@ -24925,10 +24933,6 @@
 
         function drawProjectedLamp(ctx, lamp, lit) {
             const style = LAMP_TYPE_STYLE[lamp.lampType], spec = LAMP_STYLES[style], H = lampProjection(lamp).z;
-            const poly = (points, color) => {
-                const projected=points.map(p=>lampPoint(lamp,...p));
-                FoliageLampDepth.poly(ctx,points.reduce((sum,p)=>sum+p[2],0)/points.length,color,projected.flat());
-            };
             const stroke = (a,b,width,color) => {
                 const p=lampPoint(lamp,...a),q=lampPoint(lamp,...b);
                 FoliageLampDepth.line(ctx,(a[2]+b[2])/2,width,color,[p[0],p[1],q[0],q[1]],'round');
@@ -24937,21 +24941,23 @@
                 const a = Math.PI / 6 + i * Math.PI * 2 / n;
                 return [x + Math.cos(a) * r, y + Math.sin(a) * r, z];
             });
-            // Faceted surfaces connect rings at different heights: foot, fluted shaft, collars and caps.
-            const sleeve = (a, b, colors) => {
-                const faces = a.map((p,i) => {
-                    const j = (i + 1) % a.length, q = lampPoint(lamp,(p[0]+a[j][0])/2,(p[1]+a[j][1])/2,0);
-                    return { i, j, d: (q[0]-game.camera.x)**2 + (q[1]-game.camera.y)**2 };
-                }).sort((u,v) => v.d-u.d);
-                for (const {i,j} of faces) poly([a[i], a[j], b[j], b[i]], colors[i % colors.length]);
-                poly(b, colors[0]);
+            // Faceted surfaces connect rings at different heights: foot, fluted shaft, collars and caps. Only the
+            // faces turned to the camera are drawn: on a convex post the far ones are always hidden behind them and
+            // the cap (renderQueue.front). cap false leaves out a cap the next ring up sits on, which hides it.
+            const sleeve = (a, b, colors, cap = true) => {
+                const A = a.map(p => lampPoint(lamp, ...p)), B = b.map(p => lampPoint(lamp, ...p)), z = (a[0][2] + b[0][2]) / 2;
+                for (let i = 0; i < a.length; i++) {
+                    const j = (i + 1) % a.length, quad = [...A[i], ...A[j], ...B[j], ...B[i]];
+                    if (renderQueue.front(quad)) FoliageLampDepth.poly(ctx, z, colors[i % colors.length], quad);
+                }
+                if (cap) FoliageLampDepth.poly(ctx, b[0][2], colors[0], B.flat());
             };
             const iron = ['#32293f','#211a2b','#100c17','#18121f'];
             if (style !== 'pillar_lantern') {
-                sleeve(ring(0,0,0,7), ring(0,0,9,5), iron);
+                sleeve(ring(0,0,0,7), ring(0,0,9,5), iron, false);
                 sleeve(ring(0,0,9,5), ring(0,0,15,3), [LAMP_BRASS,'#70532d']);
                 // Short bands let a canopy cover the lower shaft while its upper section stays in front.
-                for(let z=15;z<H+12;z+=8){const end=Math.min(H+12,z+8),r=t=>2.8-(t-15)/(H-3)*1.1;sleeve(ring(0,0,z,r(z)),ring(0,0,end,r(end)),iron);}
+                for(let z=15;z<H+12;z+=8){const end=Math.min(H+12,z+8),r=t=>2.8-(t-15)/(H-3)*1.1;sleeve(ring(0,0,z,r(z)),ring(0,0,end,r(end)),iron,end>=H+12);}
                 for (const z of [20, H * .65, H + 8])
                     sleeve(ring(0,0,z,3), ring(0,0,z+3,3), [LAMP_BRASS,'#70532d']);
                 // Swept arms are curves through height, rather than a flat drawing of the old stem.
@@ -24972,8 +24978,8 @@
             for (const b of spec.bulbs) {
                 const r = style === 'antique_twin' ? 7 : 6.5;
                 const lower = ring(b.x,b.y,H-10,r*.65,6), upper = ring(b.x,b.y,H+7,r,6);
-                sleeve(ring(b.x,b.y,H-13,r*.35,6), lower, iron);
-                sleeve(lower,upper,lit ? [_lampTint(lamp.color,.25),lamp.color,_lampTint(lamp.color,.1)] : ['#39303f','#241d2d']);
+                sleeve(ring(b.x,b.y,H-13,r*.35,6), lower, iron, false);
+                sleeve(lower,upper,lit ? [_lampTint(lamp.color,.25),lamp.color,_lampTint(lamp.color,.1)] : ['#39303f','#241d2d'], false);
                 // Iron ribs bound each individual glass pane in three dimensions.
                 for (let i=0;i<6;i++) stroke(lower[i],upper[i],1.4,LAMP_IRON);
                 sleeve(upper,ring(b.x,b.y,H+13,r*.35,6),iron);
@@ -27576,7 +27582,7 @@
         };
         if (typeof window !== 'undefined') window.PerformanceBench = PerformanceBench;
     </script>
-    <script type="text/dfab" data-src="entities/street-objects.js" data-cost="350">
+    <script type="text/dfab" data-src="entities/street-objects.js" data-cost="351">
         /* --- ENTITIES --- */
         // =====================================================================
         //  PROJECTILE CLASS - REMOVED (Now uses ProjectileEntity)
@@ -27875,10 +27881,12 @@
             const stroke=(a,b,width,color) => FD.line(ctx,(a.z+b.z)/2,width,color,[a.x,a.y,b.x,b.y],'butt',clip);
             // A tapered trunk built as a ring of bark faces, with its root flare on the ground.
             const ring=(z,r) => Array.from({length:6},(_,i)=>point(Math.cos(i*Math.PI/3)*r,Math.sin(i*Math.PI/3)*r,z));
+            // Only the bark faces turned to the camera: the far side of the trunk is always behind them.
+            const bark=[f.trunkColor,'#604329','#392718','#241a12','#49311e','#755235'];
             const stem=(z0,r0,z1,r1) => {
-                const a=ring(z0,r0),b=ring(z1,r1),colors=[f.trunkColor,'#604329','#392718','#241a12','#49311e','#755235'];
-                const order=a.map((p,i)=>({i,d:(p.x-game.camera.x)**2+(p.y-game.camera.y)**2})).sort((a,b)=>b.d-a.d);
-                for(const {i} of order){const j=(i+1)%6;polygon([a[i],a[j],b[j],b[i]],colors[i]);}
+                const a=ring(z0,r0),b=ring(z1,r1),z=(z0+z1)/2;
+                for(let i=0;i<6;i++){const j=(i+1)%6,quad=[a[i].x,a[i].y,a[j].x,a[j].y,b[j].x,b[j].y,b[i].x,b[i].y];
+                    if(renderQueue.front(quad))FD.poly(ctx,z,bark[i],quad,clip);}
             };
             stem(0,5*s,14*s,3*s);
             for(let z=14*s;z<H;z+=8){const end=Math.min(H,z+8),r=t=>3*s-(t-14*s)/(H-14*s)*1.4*s;stem(z,r(z),end,r(end));}
@@ -67171,7 +67179,7 @@ Object.assign(TrafficVehicle.prototype, {
             },
         };
     </script>
-    <script type="text/dfab" data-src="ui/crowd-impostors.js" data-cost="270">
+    <script type="text/dfab" data-src="ui/crowd-impostors.js" data-cost="301">
         // ═══ CROWD QUALITY — how the crowd is drawn (Settings → Graphics → Crowd Quality) ═══
         // The crowd: pedestrians, the lobby's and club's guests and staff, and a map's standing
         // NPCs. Never Stella, the crew, enemies or the fallen (they're always drawn live).
@@ -67180,19 +67188,24 @@ Object.assign(TrafficVehicle.prototype, {
         //   medium — live, but flat-shaded, with hair and cloth at rest (no physics), no lamp rim
         //   low    — baked: each crowd member's look is drawn once into a strip of frames (an idle
         //            frame and an 8-step walk cycle) and replayed: the contact shadow is drawn live,
-        //            then one drawImage. Bakes are lazy (one look a frame), kept for up to
-        //            CROWD_BAKE.MAX members (least recently seen go first); anyone not baked yet,
-        //            or in a pose that keeps moving (dancing), is drawn as on medium.
+        //            then one drawImage. Bakes are lazy (one look a frame); each member keeps up to
+        //            CROWD_BAKE.PER_OWNER of them (a pace that wobbles between two strides finds both
+        //            already baked), CROWD_BAKE.MAX in all (least recently seen go first). A walking stride is
+        //            baked once they've held it STEADY_S (easing in or out of a stroll they're drawn live). Someone
+        //            standing is drawn from the idle frame of any bake of their look (it is the same
+        //            frame whatever the stride), and a look first baked standing is only that frame.
+        //            Anyone not baked yet, or in a pose that keeps moving (dancing), is drawn as on medium.
         // drawCrowdHumanoid(ctx, entity, config) is the one entry point; the caller has already
         // translated and rotated ctx to the body, as for drawProceduralHumanoid.
 
-        const CROWD_BAKE = { FRAMES: 8, R: 40, Q: 1.25, MAX: 64, PER_FRAME: 1 };
+        const CROWD_BAKE = { FRAMES: 8, R: 40, Q: 1.25, MAX: 64, PER_OWNER: 3, PER_FRAME: 1, STEADY_S: 0.4 };
 
         /** Medium detail for the body being drawn (read by humanShade, hairGeometry, clothGeometry) */
         let _crowdLite = false;
 
         const CrowdImpostors = {
-            cache: new Map(),          // entity → { sig, cv, used }
+            cache: new Map(),          // entity → [{ sig, parts, stride, cv, cell, used }, ...] (newest first)
+            count: 0,                  // bakes kept, all owners
             _bakedFrame: -1, _bakes: 0,
 
             /** What a bake depends on: the look as drawn, the pose, the stride, rain on them */
@@ -67216,12 +67229,41 @@ Object.assign(TrafficVehicle.prototype, {
                 const p = sig.split('|');
                 return !!b.parts && p.length === 6 && p.every((v, i) => i === 4 || v === b.parts[i]);
             },
+            /** The bake to draw from for `sig`, from this owner's list: [bake, idle only], or null.
+                The idle frame doesn't depend on the stride, so anyone standing can use any bake of their look. */
+            _find(list, sig, anyStride) {
+                if (!list) return null;
+                for (const b of list) if (b.sig === sig) return [b, b.stride === 0];
+                const standing = sig.split('|')[4] === '0';
+                if (standing) { for (const b of list) if (this._sameButStride(b, sig)) return [b, true]; }
+                else if (anyStride) { for (const b of list) if (b.stride > 0 && this._sameButStride(b, sig)) return [b, false]; }
+                return null;
+            },
+            /** Keep a new bake (newest first); over PER_OWNER or MAX, drop the least recently seen (never one seen this frame) */
+            _store(owner, b) {
+                let list = this.cache.get(owner);
+                if (!list) this.cache.set(owner, list = []);
+                list.unshift(b); this.count++;
+                if (list.length > CROWD_BAKE.PER_OWNER) {
+                    let oi = -1, oT = Infinity;
+                    for (let i = 1; i < list.length; i++) if (list[i].used < oT) { oT = list[i].used; oi = i; }
+                    list.splice(oi, 1); this.count--;
+                }
+                while (this.count > CROWD_BAKE.MAX) {
+                    let oldK = null, oldI = -1, oldT = Infinity;
+                    for (const [k, l] of this.cache) for (let i = 0; i < l.length; i++) if (l[i].used < oldT) { oldT = l[i].used; oldK = k; oldI = i; }
+                    if (oldK === null || oldT >= _frameTime) break;
+                    const l = this.cache.get(oldK); l.splice(oldI, 1); this.count--;
+                    if (!l.length) this.cache.delete(oldK);
+                }
+            },
 
-            /** Bake the strip: frame 0 standing, 1..FRAMES the walk cycle, in the body's own frame (facing +x) */
+            /** Bake the strip: frame 0 standing, 1..FRAMES the walk cycle, in the body's own frame (facing +x).
+                A standing look (stride 0) is only frame 0: its walk frames would never be drawn. */
             _bake(e, c, sig) {
-                const F = CROWD_BAKE.FRAMES, R = CROWD_BAKE.R, Q = CROWD_BAKE.Q, cell = Math.ceil(R * 2 * Q);
+                const R = CROWD_BAKE.R, Q = CROWD_BAKE.Q, cell = Math.ceil(R * 2 * Q);
+                const parts = sig.split('|'), sp = +parts[4] || 0, F = sp > 0 ? CROWD_BAKE.FRAMES : 0;
                 const { canvas: cv, ctx: g } = canvasKit.createLayer([cell * (F + 1), cell]); if (!g) return null;
-                const parts = sig.split('|'), sp = +parts[4] || 0;
                 // a stand-in body: same look and place, its gait pinned (no ticks pass, so syncHumanoidGait keeps it)
                 const B = { x: e.x, y: e.y, angle: 0, look: e.look, walkPhase: 0 };
                 syncHumanoidGait(B);
@@ -67249,25 +67291,32 @@ Object.assign(TrafficVehicle.prototype, {
             draw(ctx, e, c, owner = e, anyStride = false) {
                 if (c.pose === 'dance' || c.pose === 'die') return false;          // poses that keep moving: live
                 syncHumanoidGait(e);                                                // the walk (and its footsteps) as the live draw would
-                let b = this.cache.get(owner);
-                const sig = this._sig(e, c, b);
-                if (!b || b.sig !== sig && !(anyStride && b.stride > 0 && this._sameButStride(b, sig))) {
+                const list = this.cache.get(owner);
+                const sig = this._sig(e, c, list && list[0]);
+                let hit = this._find(list, sig, anyStride);
+                if (!hit) {
+                    // easing in or out of a stroll, the pace passes through a stride a moment at a time: they're drawn
+                    // live meanwhile, as anyone not baked yet is, rather than a strip baked for each pace on the way
+                    const sp = sig.split('|')[4];
+                    if (owner._lowSp !== sp) { owner._lowSp = sp; owner._lowSpT = _gameTimeSec; }
+                    if (sp !== '0' && _gameTimeSec - owner._lowSpT < CROWD_BAKE.STEADY_S) return false;
                     if (this._bakedFrame !== _frameTime) { this._bakedFrame = _frameTime; this._bakes = 0; }
                     if (this._bakes >= CROWD_BAKE.PER_FRAME) return false;          // one look a frame; live until then
-                    if (!this.cache.has(owner) && this.cache.size >= CROWD_BAKE.MAX) {                   // full: make room from whoever was seen longest ago —
-                        let oldK = null, oldT = Infinity;                              // never someone on screen this frame (no thrash)
-                        for (const [k, v] of this.cache) if (v.used < oldT) { oldT = v.used; oldK = k; }
-                        if (oldK === null || oldT >= _frameTime) return false;
-                        this.cache.delete(oldK);
+                    if (this.count >= CROWD_BAKE.MAX) {                               // full: there must be room from whoever was seen longest ago —
+                        let oldT = Infinity;                                           // never someone on screen this frame (no thrash)
+                        for (const l of this.cache.values()) for (const v of l) if (v.used < oldT) oldT = v.used;
+                        if (oldT >= _frameTime) return false;
                     }
                     this._bakes++;
-                    b = this._bake(e, c, sig);
-                    if (!b) return false;
-                    this.cache.set(owner, b);
+                    const nb = this._bake(e, c, sig);
+                    if (!nb) return false;
+                    this._store(owner, nb);
+                    hit = [nb, nb.stride === 0];
                 }
+                const b = hit[0];
                 b.used = _frameTime;
                 const g = e._gait, F = CROWD_BAKE.FRAMES, R = CROWD_BAKE.R;
-                const walking = g && g.speed > CONFIG.GAIT.STOP_SPEED && b.stride > 0;
+                const walking = !hit[1] && g && g.speed > CONFIG.GAIT.STOP_SPEED && b.stride > 0;
                 const ph = ((e.walkPhase || 0) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
                 const f = walking ? 1 + (Math.round(ph / (Math.PI * 2) * F) % F) : 0;
                 // Contact and sun casts stay live, outside the rotating body sprite.
@@ -67277,7 +67326,7 @@ Object.assign(TrafficVehicle.prototype, {
                 return true;
             },
 
-            clear() { this.cache.clear(); if (typeof CrowdBakes !== 'undefined') CrowdBakes.clear(); }
+            clear() { this.cache.clear(); this.count = 0; if (typeof CrowdBakes !== 'undefined') CrowdBakes.clear(); }
         };
 
         // ═══ HIGH: shaded walk bakes, hair and cloth swinging ═══
@@ -79649,7 +79698,7 @@ engineMixin({
                 if (gb) for (const cv of gb.cache.values()) { ground += px(cv); groundN++; }
                 if (typeof MAP_BAKES !== 'undefined') { const seen = new Set(); for (const id in MAP_BAKES) for (const k of MAP_BAKES[id]) if (!seen.has(k)) { seen.add(k); floors += px(game[k]); } }
                 if (typeof _carSprites !== 'undefined') for (const sp of _carSprites.values()) cars += px(sp.cv);
-                if (typeof CrowdImpostors !== 'undefined') for (const b of CrowdImpostors.cache.values()) crowd += px(b.cv); if (typeof CrowdBakes !== 'undefined') for (const l of CrowdBakes.bakes.values()) for (const b of l) crowd += px(b.cv);
+                if (typeof CrowdImpostors !== 'undefined') for (const l of CrowdImpostors.cache.values()) for (const b of l) crowd += px(b.cv); if (typeof CrowdBakes !== 'undefined') for (const l of CrowdBakes.bakes.values()) for (const b of l) crowd += px(b.cv);
                 const props = typeof PropSprites !== 'undefined' ? PropSprites.bytes / 4 : 0;
                 this._mem = { ground: ground * MB, groundN, floors: floors * MB, cars: cars * MB, crowd: crowd * MB, props: props * MB, total: (ground + floors + cars + crowd + props) * MB };
                 this._memAt = now;

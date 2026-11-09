@@ -84,10 +84,6 @@
 
         function drawProjectedLamp(ctx, lamp, lit) {
             const style = LAMP_TYPE_STYLE[lamp.lampType], spec = LAMP_STYLES[style], H = lampProjection(lamp).z;
-            const poly = (points, color) => {
-                const projected=points.map(p=>lampPoint(lamp,...p));
-                FoliageLampDepth.poly(ctx,points.reduce((sum,p)=>sum+p[2],0)/points.length,color,projected.flat());
-            };
             const stroke = (a,b,width,color) => {
                 const p=lampPoint(lamp,...a),q=lampPoint(lamp,...b);
                 FoliageLampDepth.line(ctx,(a[2]+b[2])/2,width,color,[p[0],p[1],q[0],q[1]],'round');
@@ -96,21 +92,23 @@
                 const a = Math.PI / 6 + i * Math.PI * 2 / n;
                 return [x + Math.cos(a) * r, y + Math.sin(a) * r, z];
             });
-            // Faceted surfaces connect rings at different heights: foot, fluted shaft, collars and caps.
-            const sleeve = (a, b, colors) => {
-                const faces = a.map((p,i) => {
-                    const j = (i + 1) % a.length, q = lampPoint(lamp,(p[0]+a[j][0])/2,(p[1]+a[j][1])/2,0);
-                    return { i, j, d: (q[0]-game.camera.x)**2 + (q[1]-game.camera.y)**2 };
-                }).sort((u,v) => v.d-u.d);
-                for (const {i,j} of faces) poly([a[i], a[j], b[j], b[i]], colors[i % colors.length]);
-                poly(b, colors[0]);
+            // Faceted surfaces connect rings at different heights: foot, fluted shaft, collars and caps. Only the
+            // faces turned to the camera are drawn: on a convex post the far ones are always hidden behind them and
+            // the cap (renderQueue.front). cap false leaves out a cap the next ring up sits on, which hides it.
+            const sleeve = (a, b, colors, cap = true) => {
+                const A = a.map(p => lampPoint(lamp, ...p)), B = b.map(p => lampPoint(lamp, ...p)), z = (a[0][2] + b[0][2]) / 2;
+                for (let i = 0; i < a.length; i++) {
+                    const j = (i + 1) % a.length, quad = [...A[i], ...A[j], ...B[j], ...B[i]];
+                    if (renderQueue.front(quad)) FoliageLampDepth.poly(ctx, z, colors[i % colors.length], quad);
+                }
+                if (cap) FoliageLampDepth.poly(ctx, b[0][2], colors[0], B.flat());
             };
             const iron = ['#32293f','#211a2b','#100c17','#18121f'];
             if (style !== 'pillar_lantern') {
-                sleeve(ring(0,0,0,7), ring(0,0,9,5), iron);
+                sleeve(ring(0,0,0,7), ring(0,0,9,5), iron, false);
                 sleeve(ring(0,0,9,5), ring(0,0,15,3), [LAMP_BRASS,'#70532d']);
                 // Short bands let a canopy cover the lower shaft while its upper section stays in front.
-                for(let z=15;z<H+12;z+=8){const end=Math.min(H+12,z+8),r=t=>2.8-(t-15)/(H-3)*1.1;sleeve(ring(0,0,z,r(z)),ring(0,0,end,r(end)),iron);}
+                for(let z=15;z<H+12;z+=8){const end=Math.min(H+12,z+8),r=t=>2.8-(t-15)/(H-3)*1.1;sleeve(ring(0,0,z,r(z)),ring(0,0,end,r(end)),iron,end>=H+12);}
                 for (const z of [20, H * .65, H + 8])
                     sleeve(ring(0,0,z,3), ring(0,0,z+3,3), [LAMP_BRASS,'#70532d']);
                 // Swept arms are curves through height, rather than a flat drawing of the old stem.
@@ -131,8 +129,8 @@
             for (const b of spec.bulbs) {
                 const r = style === 'antique_twin' ? 7 : 6.5;
                 const lower = ring(b.x,b.y,H-10,r*.65,6), upper = ring(b.x,b.y,H+7,r,6);
-                sleeve(ring(b.x,b.y,H-13,r*.35,6), lower, iron);
-                sleeve(lower,upper,lit ? [_lampTint(lamp.color,.25),lamp.color,_lampTint(lamp.color,.1)] : ['#39303f','#241d2d']);
+                sleeve(ring(b.x,b.y,H-13,r*.35,6), lower, iron, false);
+                sleeve(lower,upper,lit ? [_lampTint(lamp.color,.25),lamp.color,_lampTint(lamp.color,.1)] : ['#39303f','#241d2d'], false);
                 // Iron ribs bound each individual glass pane in three dimensions.
                 for (let i=0;i<6;i++) stroke(lower[i],upper[i],1.4,LAMP_IRON);
                 sleeve(upper,ring(b.x,b.y,H+13,r*.35,6),iron);
