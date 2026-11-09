@@ -2206,6 +2206,29 @@ test('Thigh-high finishes buy, replace footwear and persist alongside thigh band
   equal(result.legacy, {type:'thigh_heels',color:'#141016'}, 'existing saves keep their original black boots');
 });
 
+test('A finisher runs to its end: the glitter bursts, the camera comes home and time comes back', env => {
+  // The burst once threw (an effects list that had moved), and a throw there stopped the game loop mid-zoom
+  env.run(`game.story.update=()=>{}; game._doLoadMap('sdc'); game.player.x=4890; game.player.y=2300; game.running=true; game.paused=false;`);
+  const r = value(env, `
+    const F = () => { game.update(); frame_clock.setGameTime(_simTick / 60); game.draw(); };
+    for (let i = 0; i < 5; i++) F();
+    game.startFinisher({ x: game.player.x + 120, y: game.player.y }, 'punch');
+    let slow = 1, zoom = 1, burst = false;
+    for (let i = 0; i < 300; i++) {
+      const s = game.updateTimeSlow(16.7); slow = Math.min(slow, s);
+      if (game.finisher || game.finCam) game.updateFinisher(16.7);
+      if (game.finCam) zoom = Math.max(zoom, game.finCam.z);
+      if (game.finisher && game.finisher.burst) burst = true;
+      F();
+    }
+    return { slow, zoom, burst, fin: !!game.finisher, cam: game.finCam, scale: game.updateTimeSlow(16.7), casings: game.effects.of('casing').length };
+  `);
+  ok(r.slow <= 0.3, 'time slows for the kill');
+  ok(r.zoom > 1.5, 'the camera closes in');
+  ok(r.burst, 'the glitter bursts');
+  equal([r.fin, r.cam, r.scale], [false, null, 1], 'over: the camera home and time back');
+}, {affine:true});
+
 results.push(...require('./test-projectile-collisions.cjs').run());
 const failures = results.filter(r => r.status === 'failed');
 console.log(JSON.stringify({file:gameFile,passed:results.length-failures.length,failed:failures.length,assertions,results},null,2));

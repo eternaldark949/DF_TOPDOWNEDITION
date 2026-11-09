@@ -264,6 +264,16 @@
                 return inside;
             });
         }
+        /** A building's roof silhouettes for the trees this frame (the same polygons for every tree, so the render
+         *  queue can batch the faces they clip: basement/render-system.js) */
+        const _treeOcc = { frame: -1, cx: NaN, cy: NaN, map: new Map() };
+        function treeOccluders(b) {
+            const T = _treeOcc, cam = game.camera;
+            if (T.frame !== _frameTime || T.cx !== cam.x || T.cy !== cam.y) { T.frame = _frameTime; T.cx = cam.x; T.cy = cam.y; T.map.clear(); }
+            let polys = T.map.get(b);
+            if (!polys) T.map.set(b, polys = b._glowOccluders(cam));
+            return polys;
+        }
         function drawProjectedTree(ctx, f, sway) {
             const s=f.size, H=foliageHeight(f), palm=f.type==='palm';
             const covers=[];
@@ -276,9 +286,7 @@
                     if (!b._glowOccluders || roofHeight < H+12*s) continue;
                     const box=b._glowBox && b._glowBox(game.camera), p=foliagePoint(f,sway,0,H+12*s),r=50*s*p.k;
                     if (box && (box[0]>Math.max(f.x,p.x)+r || box[2]<Math.min(f.x,p.x)-r || box[1]>Math.max(f.y,p.y)+r || box[3]<Math.min(f.y,p.y)-r)) continue;
-                    for (const poly of b._glowOccluders(game.camera)) {
-                        covers.push(poly);
-                    }
+                    for (const poly of treeOccluders(b)) covers.push(poly);
                 }
             }
             const clip=covers.length?covers:null, FD=FoliageLampDepth;

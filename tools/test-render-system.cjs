@@ -10,9 +10,10 @@ const assert=require('node:assert/strict');
 const {join}=require('node:path');
 const {runtime}=require('./test-game-runtime.cjs');
 const tests=[];
-// Canvas calls a frame, averaged over a second of play with the clocks running. Measured 14.5-15.9k, 1.8-2.1k,
-// 7.6-9.3k (the city's and club's crowds come and go, so they wander); the budgets sit about 10% over the top.
-const CALL_BUDGET={ city_night: 17500, cozy_cafe: 2400, moon_city: 10300 };
+// Canvas calls a frame, averaged over a second of play with the clocks running. Measured: city at night 14.5-15.9k,
+// the park by day 20.8-22.5k (it was 46-87k a frame before tree clips were trimmed), café 1.7-2.1k, club 6.7-9.9k
+// (the city's and club's crowds come and go, so they wander); the budgets sit about 10% over the top.
+const CALL_BUDGET={ city_night: 17500, city_park: 25000, cozy_cafe: 2400, moon_city: 10900 };
 function test(name,fn){fn();tests.push(name);}
 const fresh=()=>{const e=runtime(join(__dirname,'..','DFAB V8.html'),{affine:true,capture:true});e.setTrace(false);return e;};
 const ops=(e,src)=>{e.setTrace(true);e.run('{'+src+'}');const t=e.trace.slice();e.setTrace(false);const c={};for(const r of t)c[r[1]]=(c[r[1]]||0)+1;return {c,t};};
@@ -55,6 +56,7 @@ test('Same-colour shapes that miss each other are one fill; what lies between th
 
 const SCENES={
  city_night:`game._doLoadMap('sdc'); game.worldMinutes=22*60; game.player.x=4890; game.player.y=2300;`,
+ city_park:`game._doLoadMap('sdc'); game.worldMinutes=14*60; game.player.x=2000; game.player.y=1100;`,   // trees under leaning roofs: clips trimmed to the faces they reach
  cozy_cafe:`game._doLoadMap('cozy_cafe_interior'); game.worldMinutes=10*60; game.cafeLife.reset(game); game.player.x=600; game.player.y=800;`,
  moon_city:`game._doLoadMap('moon_city_nightclub'); game.worldMinutes=23*60; game.player.x=800; game.player.y=700;`
 };

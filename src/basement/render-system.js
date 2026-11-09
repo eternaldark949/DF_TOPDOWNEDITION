@@ -23,11 +23,14 @@
         // alpha). Overlap is exact for small convex polygons (a separating-axis test: faces that only share an
         // edge don't count, so a faceted post's faces can batch; the shared edge is then drawn once, without the
         // faint seam two fills leave) and by bounding box, a pixel to spare, for everything else.
-        // `batch: false` draws every shape on its own, in the same order: the reference the test compares against.
+        // A shape's clip keeps only the polygons that reach its box (the rest can't change a pixel of it), so a face no
+        // roof leans over is unclipped and batches with the rest. `batch: false, trim: false` draws every shape on
+        // its own with its whole clip, in the same order: the reference the pixel check compares against.
         class renderQueue {
             constructor(opts = {}) {
                 this.sort = opts.sort !== false;      // sort by z (stable)
                 this.batch = opts.batch !== false;    // merge same-style shapes
+                this.trim = opts.trim !== false;      // drop clip polygons that miss the shape (false: every shape takes its whole clip, the reference)
                 this.lookback = opts.lookback || 64;  // how many batches back a shape may look for its own
                 this.items = []; this.n = 0;
                 this.stats = { shapes: 0, batches: 0 };
@@ -45,15 +48,28 @@
                 it.alpha = state && state.alpha !== undefined ? state.alpha : 1;
                 it.op = (state && state.op) || 'source-over';
                 it.cap = (state && state.cap) || 'butt';
-                it.clip = (state && state.clip && state.clip.length) ? state.clip : null;
+                it.clip = it.clipAll = (state && state.clip && state.clip.length) ? state.clip : null;
                 it.pts.length = 0; it.paint = null; it.img = null; it.width = 0; it.color = null; it.closed = false; it.convex = false;
                 return it;
             }
-            _clipId(clip) {
-                if (!clip) return 0;
-                let id = this._clipIds.get(clip);
-                if (!id) this._clipIds.set(clip, id = ++this._clipN);
-                return id;
+            /** Keep only the clip polygons that reach the shape (a polygon clear of its box can't change a pixel of it),
+             *  and name what's left: '' (no clip), or the kept polygons' ids. Shapes clipped by the same polygons batch. */
+            _clipKey(it) {
+                const clip = it.clip; if (!clip) return '';
+                let kept = null, key = '';
+                for (let i = 0; i < clip.length; i++) {
+                    const poly = clip[i]; let c = this._clipIds.get(poly);
+                    if (!c) {
+                        let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+                        for (const q of poly) { if (q[0] < x0) x0 = q[0]; if (q[0] > x1) x1 = q[0]; if (q[1] < y0) y0 = q[1]; if (q[1] > y1) y1 = q[1]; }
+                        this._clipIds.set(poly, c = { id: ++this._clipN, x0, y0, x1, y1 });
+                    }
+                    if (c.x0 >= it.x1 || c.x1 <= it.x0 || c.y0 >= it.y1 || c.y1 <= it.y0) { if (!kept) kept = clip.slice(0, i); continue; }
+                    if (kept) kept.push(poly);
+                    key += (key ? ',' : '') + c.id;
+                }
+                if (kept) it.clip = kept.length ? kept : null;
+                return key;
             }
             _box(it, pad) {
                 const p = it.pts; let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
@@ -67,7 +83,7 @@
                 for (let i = 0; i < pts.length; i++) it.pts.push(pts[i]);
                 it.closed = true; this._box(it, 1);
                 it.convex = renderQueue._isConvex(it.pts);
-                it.key = 'f|' + color + '|' + it.alpha + '|' + it.op + '|' + this._clipId(it.clip);
+                it.key = 'f|' + color + '|' + it.alpha + '|' + it.op + '|' + this._clipKey(it);
                 return it;
             }
             /** A stroked line through flat points (closed: back to the first). */
@@ -75,7 +91,7 @@
                 const it = this._item(z, 'stroke', state); it.color = color; it.width = width; it.closed = closed;
                 for (let i = 0; i < pts.length; i++) it.pts.push(pts[i]);
                 this._box(it, width / 2 + 1);
-                it.key = 's|' + color + '|' + width + '|' + it.cap + '|' + it.alpha + '|' + it.op + '|' + this._clipId(it.clip);
+                it.key = 's|' + color + '|' + width + '|' + it.cap + '|' + it.alpha + '|' + it.op + '|' + this._clipKey(it);
                 return it;
             }
             /** An ellipse: stroked at `width`, or filled when width is 0. */
@@ -84,14 +100,14 @@
                 it.pts.push(x, y, rx, ry, rot);
                 const r = Math.max(rx, ry) + (width ? width / 2 : 0) + 1;
                 it.x0 = x - r; it.y0 = y - r; it.x1 = x + r; it.y1 = y + r;
-                it.key = (width ? 's|' + color + '|' + width + '|' + it.cap : 'f|' + color) + '|' + it.alpha + '|' + it.op + '|' + this._clipId(it.clip);
+                it.key = (width ? 's|' + color + '|' + width + '|' + it.cap : 'f|' + color) + '|' + it.alpha + '|' + it.op + '|' + this._clipKey(it);
                 return it;
             }
             /** A sprite (an image or canvas) into a rect. Drawn on its own, but shapes may batch past it if they miss it. */
             image(z, img, x, y, w, h, state) {
                 const it = this._item(z, 'image', state); it.img = img; it.pts.push(x, y, w, h);
                 it.x0 = Math.min(x, x + w) - 1; it.y0 = Math.min(y, y + h) - 1; it.x1 = Math.max(x, x + w) + 1; it.y1 = Math.max(y, y + h) + 1;
-                it.key = null;
+                it.key = null; this._clipKey(it);
                 return it;
             }
             /** Anything else: paint() is called in its place, with the state set. Nothing batches past it. */
@@ -198,9 +214,9 @@
                 const f = items[0];
                 ctx.globalAlpha = f.alpha; ctx.globalCompositeOperation = f.op;
                 if (f.kind === 'custom') { f.paint(); return; }
-                if (f.kind === 'image') { const p = f.pts; this._clip(ctx, f.clip, () => ctx.drawImage(f.img, p[0], p[1], p[2], p[3])); return; }
+                if (f.kind === 'image') { const p = f.pts; this._clip(ctx, this.trim ? f.clip : f.clipAll, () => ctx.drawImage(f.img, p[0], p[1], p[2], p[3])); return; }
                 const stroke = f.kind === 'stroke' || f.kind === 'oring';
-                this._clip(ctx, f.clip, () => {
+                this._clip(ctx, this.trim ? f.clip : f.clipAll, () => {
                     if (stroke) { ctx.strokeStyle = f.color; ctx.lineWidth = f.width; ctx.lineCap = f.cap; } else ctx.fillStyle = f.color;
                     ctx.beginPath();
                     for (const it of items) {
