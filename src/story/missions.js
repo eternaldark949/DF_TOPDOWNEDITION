@@ -27,8 +27,7 @@
 
             /** The city's buildings, from wherever she is (the hub's, cached, while she's inside) */
             _hubBuildings(game) {
-                if (game._hubBuildingsCache) return game._hubBuildingsCache;
-                return (game.activeMap && game.activeMap.id === 'sdc' && game.activeMap.buildings) || [];
+                return worldQuery.hubBuildings(game);
             }
 
             /**

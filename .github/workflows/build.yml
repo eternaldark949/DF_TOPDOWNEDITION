@@ -34,6 +34,9 @@ jobs:
       - name: Check the game data (src/directory/game-db)
         run: node tools/test-game-db.cjs
 
+      - name: Check the world queries (rooms, seats, NPCs, buildings)
+        run: node tools/test-world-query.cjs
+
       - name: Check gameplay and rendering regressions
         run: node tools/test-game-regressions.cjs
 

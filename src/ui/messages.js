@@ -714,7 +714,7 @@
                 const P = MSG_PLACES[id];
                 if (!P) return null;
                 // The live building wins over the table (a map edit moves the pin with it)
-                const bs = (typeof game !== 'undefined' && game) && (game._hubBuildingsCache || (game.activeMap && game.activeMap.id === 'sdc' && game.activeMap.buildings));
+                const bs = (typeof game !== 'undefined' && game) && worldQuery.hubBuildings(game);
                 const b = bs && bs.find(x => x.id === id);
                 const x = b ? b.x : P.x, y = b ? b.y : P.y, w = b ? (b.w || 100) : P.w, h = b ? (b.h || 100) : P.h;
                 return { ...P, id, tx: x + w / 2, ty: y + h + 30 };

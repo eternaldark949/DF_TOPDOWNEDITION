@@ -35,6 +35,7 @@
         };
 
         class CafeLife extends VenueCrowd {
+            SEATS = CAFE_SEATS;      // read by worldQuery.getSeats (directory/world-query.js)
             PREFILL = 0.75;
             DRINKS = CAFE_DRINKS;
             constructor() { super('cozy_cafe_interior'); }
