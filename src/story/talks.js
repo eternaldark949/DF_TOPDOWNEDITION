@@ -30,7 +30,7 @@ const TALK_HOOKS = {
              : t === 2 ? [['@', 'I was hoping it would be you.', 'smile']]
              : t === 1 ? [['@', 'There she is.', 'sultry']]
              : [['@', 'Back again. Careful, 949. I\'ll start expecting you.', 'sultry']],
-            'Anavia.gun.needs': g => g.inventory && g.inventory.items.some(i => i.id === 'pistol_anavia'),
+            'Anavia.gun.needs': g => g.inventory && g.items.listItems().some(i => i.id === 'pistol_anavia'),
             'Anavia.scrap.needs': g => g.missions.completedBounties >= 5,
             'Anavia.mother.needs': (g, T) => T.seen.includes('gun'),
             'Anavia.mother.beat1': (T) => ['@', T.mem.gun === 'offered' ? 'You offered me the pistol back, that first time. Nobody has ever done that.' : 'You never asked about my mother. I noticed. It was kind.'],

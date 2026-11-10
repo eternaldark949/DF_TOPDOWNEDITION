@@ -275,7 +275,7 @@
              * Handles cost check, currency deduction, state init, lifecycle hooks, and UI.
              * @returns {boolean} true if purchased successfully
              */
-            activate(buffId, worldMinutes, game) {
+            activate(buffId, worldMinutes, game, {charge=true}={}) {
                 const config = CONSUMABLES[buffId];
                 if (!config) return false;
 
@@ -286,12 +286,12 @@
                 }
 
                 // Cost check
-                if (game.currency < config.cost) {
+                if (charge && game.currency < config.cost) {
                     showMessage(`INSUFFICIENT FUNDS (${config.cost} PERSONICS REQUIRED).`);
                     return false;
                 }
 
-                game.currency -= config.cost;
+                if(charge)game.currency -= config.cost;
 
                 // Build buff runtime state
                 const buff = { active: true, endTime: worldMinutes + config.duration };

@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '076f0f7af64a';
+        const DFAB_BUILD = 'e879919d2423';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="6190">
+    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="6669">
 const DFNative = (()=>{
 'use strict';
 // src/basement/physics/core/values.mjs
@@ -20671,7 +20671,7 @@ const methods=['initialize','resize','render','registerResource','releaseResourc
 /** Backend selection and frame orchestration. Visibility uses the existing native world index. */
 class renderSystem {
     #world;#camera;#frame=new renderFrame();#renderers=new Map();#resources=new Map();#backend=null;#backendId=null;#surface=null;
-    #collecting=false;#busy=false;#disposed=false;#generation=0;#last=null;#surfaceListeners=new Set();#requirements=[];
+    #collecting=false;#busy=false;#disposed=false;#generation=0;#last=null;#surfaceListeners=new Set();#frameListeners=new Set();#requirements=[];
     constructor({physics_system,camera}={}){if(!physics_system?.queryEntitiesInBounds||!camera?.getView)throw new TypeError('renderSystem requires native world and camera');this.#world=physics_system;this.#camera=camera;}
     get renderer_id(){return this.#backendId;}
     get disposed(){return this.#disposed;}
@@ -20682,6 +20682,7 @@ class renderSystem {
     getCapabilities(){this.#live();return Object.freeze(this.#backend?[...this.#backend.capabilities]:[]);}
     getSurfaceBounds(){this.#live();return this.#backend?.getSurfaceBounds()??Object.freeze({left:0,top:0,width:this.#camera.viewport.width,height:this.#camera.viewport.height});}
     onSurfaceChanged(handler){this.#boundary();if(typeof handler!=='function')throw new TypeError('Surface handler must be a function');this.#surfaceListeners.add(handler);return ()=>this.#surfaceListeners.delete(handler);}
+    onFrameRendered(handler){this.#boundary();if(typeof handler!=='function')throw new TypeError('Frame handler must be a function');this.#frameListeners.add(handler);return ()=>this.#frameListeners.delete(handler);}
     async setRenderer(renderer_id,{surface}={}){
         this.#boundary();const Constructor=this.#renderers.get(renderer_id);if(!Constructor)throw new Error('Unknown renderer');
         if(this.#backend&&surface===this.#surface){if(renderer_id===this.#backendId)return;throw new Error('A different backend requires a fresh surface; context types cannot share a canvas');}
@@ -20726,13 +20727,15 @@ class renderSystem {
                 }
             }
             const result=this.#backend?.render(frame);if(result&&typeof result.then==='function'){Promise.resolve(result).catch(()=>{});throw new TypeError('Renderer.render must be synchronous');}
-            this.#last=frame;return frame.packet_count;
+            this.#last=frame;
+            if(this.#backend&&this.#frameListeners.size){const event=Object.freeze({targets:Object.freeze([...new Set(frame.passes.map(pass=>pass.target_id).filter(id=>id!==null))])});for(const handler of this.#frameListeners)handler(event);}
+            return frame.packet_count;
         }finally{this.#collecting=false;}
     }
     abortFrame(){this.#frame.abort();this.#collecting=false;}
     getFrameSnapshot(){this.#live();return this.#frame.snapshot();}
     getStatistics(){return {...this.#frame.getStatistics(),resources:this.#resources.size,renderer_id:this.#backendId};}
-    dispose(){if(this.#disposed)return;this.#disposed=true;this.#generation++;this.abortFrame();try{this.#backend?.dispose();}finally{this.#backend=null;this.#surface=null;this.#resources.clear();this.#renderers.clear();this.#surfaceListeners.clear();this.#last=null;}}
+    dispose(){if(this.#disposed)return;this.#disposed=true;this.#generation++;this.abortFrame();try{this.#backend?.dispose();}finally{this.#backend=null;this.#surface=null;this.#resources.clear();this.#renderers.clear();this.#surfaceListeners.clear();this.#frameListeners.clear();this.#last=null;}}
 }
 
 return Object.freeze({get renderSystem(){return renderSystem;}});
@@ -21554,28 +21557,236 @@ const m67 = Object.freeze({default:{
     "aim":{"gamepad":"right","touch":"aim","dead_zone":0.15}
   }
 }});
+const m70 = Object.freeze({default:{"capacity":10,"max_attachments":2,"owner_id":"player"}});
+// src/gameplay/items/item-system.mjs
+const m69 = (()=>{
+const itemRules = m70.default;
+const {identifier,jsonCopy,validateModifiers} = m41;
+
+const modes=['normal','sniper','melee','fists'];
+const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
+const integer=(value,name,min=0)=>{if(!Number.isSafeInteger(value)||value<min)throw new TypeError(`${name} must be a safe integer >= ${min}`);return value;};
+
+/** One authoritative inventory record. UI, equipped views and saves read this model. */
+class itemSystem {
+    #data; #catalog; #rules; #views=new Map(); #listeners=new Map(); #notify; #parents=new Map();
+    constructor({data={},catalog,rules=itemRules,on_event}={}) {
+        this.#rules=jsonCopy(rules);integer(rules.capacity,'capacity');integer(rules.max_attachments,'max_attachments');identifier(rules.owner_id);
+        if(!catalog||typeof catalog!=='object'||Array.isArray(catalog))throw new TypeError('An item catalog is required');
+        this.#catalog=freeze(jsonCopy(catalog));
+        for(const [id,def] of Object.entries(this.#catalog)){
+            identifier(id);if(!['weapon','attachment','consumable','collectible','intel'].includes(def.type))throw new TypeError(`Unknown item type: ${id}`);
+            if(def.type==='weapon'&&!modes.includes(def.weaponMode??'normal'))throw new TypeError(`Unknown weapon mode: ${id}`);
+            if(def.max_stack!==undefined)integer(def.max_stack,'max_stack',1);
+            if(def.stackable&&['weapon','attachment'].includes(def.type))throw new TypeError('Weapons and attachments require unique instances');
+        }
+        this.#notify=on_event;this.#data=data;
+        if(!Object.keys(data).length)Object.assign(data,this.#empty());
+        this.#validate(data);this.#indexParents();
+    }
+    #indexParents(){this.#parents.clear();for(const record of Object.values(this.#data.records))for(const child of record.attachments)this.#parents.set(child,record.instance_id);}
+    #empty(){return {format_version:1,owner_id:this.#rules.owner_id,next_instance_id:1,capacity:this.#rules.capacity,max_attachments:this.#rules.max_attachments,records:{},order:[],equipment:{weapon:null,attachments:[]}};}
+    #definition(id){identifier(id);const def=this.#catalog[id];if(!def)throw new Error(`Unknown item definition: ${id}`);return def;}
+    getDefinition(id){return this.#definition(id);}
+    #record(id){identifier(id);const record=this.#data.records[id];if(!record)throw new Error(`Unknown owned item instance: ${id}`);return record;}
+    #validateRecord(record){
+        if(!record||Object.keys(record).some(key=>!['instance_id','definition_id','quantity','state','upgrades','attachments'].includes(key)))throw new TypeError('Invalid item record fields');
+        identifier(record?.instance_id);const def=this.#definition(record.definition_id);integer(record.quantity,'quantity',1);
+        if(record.quantity>(def.stackable?(def.max_stack??999):1))throw new TypeError('Invalid item stack size');
+        if(!record.state||typeof record.state!=='object'||Array.isArray(record.state)||!record.upgrades||typeof record.upgrades!=='object'||Array.isArray(record.upgrades)||!Array.isArray(record.attachments))throw new TypeError('Invalid item state');
+        if(record.state.fire_mode!==undefined&&(!modes.includes(record.state.fire_mode)||def.type!=='weapon'))throw new TypeError('Invalid item fire mode');
+        for(const [id,rank] of Object.entries(record.upgrades)){identifier(id);integer(rank,'upgrade rank',1);const upgrade=def.upgrades?.[id];if(!upgrade||rank>(upgrade.max_rank??1))throw new TypeError(`Unknown or invalid upgrade: ${id}`);validateModifiers(upgrade.modifiers??{});}
+        if(def.type!=='weapon'&&record.attachments.length)throw new TypeError('Only weapons can mount attachments');
+        this.#stats(record,def);return def;
+    }
+    #stats(record,definition){
+        const stats=jsonCopy(definition.stats??{});
+        const modifiers={};
+        for(const [key,rank] of Object.entries(record.upgrades))for(const [stat,modifier] of Object.entries(definition.upgrades[key].modifiers??{})){
+            const total=modifiers[stat]??={add:0,multiply:1};total.add+=(modifier.add??0)*rank;total.multiply*=(modifier.multiply??1)**rank;
+        }
+        for(const [stat,modifier] of Object.entries(modifiers)){const base=stats[stat]??0;if(!Number.isFinite(base))throw new TypeError('Upgrades require numeric stats');stats[stat]=Math.max(0,(base+modifier.add)*modifier.multiply);if(!Number.isFinite(stats[stat]))throw new TypeError('Modified stats must be finite');}
+        return stats;
+    }
+    #compatible(weapon,attachment){const allowed=attachment.compatible_modes;return !allowed||allowed.includes(weapon.weaponMode??'normal');}
+    #validate(data){
+        jsonCopy(data);if(data.format_version!==1||!data.records||typeof data.records!=='object'||Array.isArray(data.records)||!Array.isArray(data.order)||!data.equipment||!Array.isArray(data.equipment.attachments))throw new TypeError('Unsupported inventory snapshot');
+        identifier(data.owner_id);if(data.owner_id!==this.#rules.owner_id)throw new TypeError('Inventory owner scope mismatch');integer(data.next_instance_id,'next_instance_id',1);integer(data.capacity,'capacity');integer(data.max_attachments,'max_attachments');
+        if(data.order.length>10000)throw new RangeError('Inventory exceeds 10000 instance budget');
+        if(new Set(data.order).size!==data.order.length||data.order.length!==Object.keys(data.records).length)throw new TypeError('Inventory order must list every instance exactly once');
+        let slots=0;const attached=new Set(),prefix=`${data.owner_id}:item:`;
+        for(const id of data.order){const record=data.records[id];if(record?.instance_id!==id)throw new TypeError('Inventory instance identity mismatch');const def=this.#validateRecord(record);if(def.type!=='attachment')slots++;
+            if(id.startsWith(prefix)){const serial=Number(id.slice(prefix.length));if(!Number.isSafeInteger(serial)||serial<1||serial>=data.next_instance_id)throw new TypeError('Invalid inventory instance counter');}
+            if(record.attachments.length>data.max_attachments)throw new TypeError('Too many mounted attachments');
+            for(const child of record.attachments){identifier(child);const item=data.records[child],childDef=item&&this.#definition(item.definition_id);if(!childDef||childDef.type!=='attachment'||attached.has(child)||!this.#compatible(def,childDef))throw new TypeError('Invalid or duplicate mounted attachment');attached.add(child);}
+        }
+        if(slots>data.capacity)throw new TypeError('Inventory capacity exceeded');
+        const equipped=data.equipment;
+        if(equipped.weapon!==null){const item=data.records[equipped.weapon];if(!item||this.#definition(item.definition_id).type!=='weapon')throw new TypeError('Equipped weapon must reference an owned weapon instance');}
+        if(new Set(equipped.attachments).size!==equipped.attachments.length)throw new TypeError('Duplicate equipped attachment');
+        for(const id of equipped.attachments){const item=data.records[id];if(!item||this.#definition(item.definition_id).type!=='attachment'||attached.has(id))throw new TypeError('Equipped attachment must have one owner');}
+        if(equipped.attachments.length+(equipped.weapon?data.records[equipped.weapon].attachments.length:0)>data.max_attachments)throw new TypeError('Attachment slot limit exceeded');
+        return data;
+    }
+    get capacity(){return this.#data.capacity;}
+    get max_attachments(){return this.#data.max_attachments;}
+    get equipped_weapon_id(){return this.#data.equipment.weapon;}
+    get equipped_attachment_ids(){return Object.freeze([...this.#data.equipment.attachments]);}
+    hasInstance(id){return typeof id==='string'&&Object.hasOwn(this.#data.records,id);}
+    hasItem(definition_id){return this.#data.order.some(id=>this.#data.records[id].definition_id===definition_id);}
+    findItem(definition_id){const id=this.#data.order.find(id=>this.#data.records[id].definition_id===definition_id);return id?this.getItem(id):null;}
+    getItem(id){
+        const record=this.#record(id),prior=this.#views.get(id);if(prior?.record===record)return prior.value;
+        const definition=this.#definition(record.definition_id),stats=this.#stats(record,definition);
+        const value=freeze({...jsonCopy(record),id:record.definition_id,name:definition.name??record.definition_id,type:definition.type,icon:definition.icon??'',description:definition.desc??'',effect:definition.stats?.effect??definition.effect??null,weaponMode:record.state.fire_mode??definition.weaponMode??null,stats});
+        this.#views.set(id,{record,value});return value;
+    }
+    listItems(){return Object.freeze(this.#data.order.map(id=>this.getItem(id)));}
+    getEquippedWeapon(){return this.equipped_weapon_id?this.getItem(this.equipped_weapon_id):null;}
+    getEquippedAttachments(){const mounted=this.equipped_weapon_id?this.#record(this.equipped_weapon_id).attachments:[];return Object.freeze([...this.#data.equipment.attachments,...mounted].map(id=>this.getItem(id)));}
+    getWeaponMode(){return this.getEquippedWeapon()?.weaponMode??'none';}
+    hasAttachment(effect){return this.getEquippedAttachments().some(item=>item.effect===effect);}
+    getParentWeapon(id){const parent=this.#parents.get(id);return parent?this.getItem(parent):null;}
+    isEquipped(id){return this.equipped_weapon_id===id||this.#data.equipment.attachments.includes(id)||this.#parents.has(id);}
+    #changed(event,detail={}){for(const listener of [...(this.#listeners.get(event)??[])])listener(Object.freeze({event,...jsonCopy(detail)}));this.#notify?.(event,detail);}
+    on(event,listener){identifier(event);if(typeof listener!=='function')throw new TypeError('Listener must be a function');const list=this.#listeners.get(event)??new Set();list.add(listener);this.#listeners.set(event,list);return ()=>list.delete(listener);}
+    detach(){this.#listeners.clear();}
+    #allocate(){const serial=this.#data.next_instance_id;integer(serial+1,'next_instance_id',1);this.#data.next_instance_id++;return `${this.#data.owner_id}:item:${serial}`;}
+    createItem(definition_id,{quantity=1,state={},upgrades={}}={}){
+        const record={instance_id:`${this.#data.owner_id}:item:${this.#data.next_instance_id}`,definition_id,quantity,state:jsonCopy(state),upgrades:jsonCopy(upgrades),attachments:[]};this.#validateRecord(record);record.instance_id=this.#allocate();return freeze(record);
+    }
+    receiveItem(packet){
+        const record=jsonCopy(packet);const def=this.#validateRecord(record);if(this.hasInstance(record.instance_id))throw new Error('Item instance is already owned');
+        if(record.attachments.length)throw new TypeError('Transfer mounted items as an inventory snapshot or detach them first');
+        if(!this.#canFit(def))return null;
+        const prefix=`${this.#data.owner_id}:item:`;if(record.instance_id.startsWith(prefix)){const serial=Number(record.instance_id.slice(prefix.length));integer(serial,'instance serial',1);integer(serial+1,'next_instance_id',1);this.#data.next_instance_id=Math.max(this.#data.next_instance_id,serial+1);}
+        this.#data.records[record.instance_id]=record;this.#data.order.push(record.instance_id);this.#changed('items:acquired',{instance_id:record.instance_id,definition_id:record.definition_id});return this.getItem(record.instance_id);
+    }
+    #canFit(def,count=1){return this.#data.order.length+count<=10000&&(def.type==='attachment'||this.#data.order.filter(id=>this.#definition(this.#record(id).definition_id).type!=='attachment').length<this.capacity);}
+    grantItem(definition_id,options={}){
+        const def=this.#definition(definition_id),quantity=options.quantity??1;integer(quantity,'quantity',1);
+        if(def.stackable){const item=this.listItems().find(item=>item.definition_id===definition_id&&item.quantity+quantity<=(def.max_stack??999)&&JSON.stringify(item.state)===JSON.stringify(options.state??{})&&JSON.stringify(item.upgrades)===JSON.stringify(options.upgrades??{}));if(item){this.#data.records[item.instance_id]={...this.#record(item.instance_id),quantity:item.quantity+quantity};this.#changed('items:acquired',{instance_id:item.instance_id,definition_id});return this.getItem(item.instance_id);}}
+        if(!this.#canFit(def))return null;
+        return this.receiveItem(this.createItem(definition_id,options));
+    }
+    removeItem(id){
+        const item=this.#record(id);if(item.attachments.length)throw new Error('Detach mounted attachments before removing their weapon');
+        if(this.#parents.has(id))throw new Error('Detach an attachment before removing it');
+        const packet=freeze(jsonCopy(item));if(this.isEquipped(id))this.unequipItem(id);
+        delete this.#data.records[id];this.#data.order=this.#data.order.filter(key=>key!==id);this.#views.delete(id);this.#changed('items:removed',{instance_id:id,definition_id:item.definition_id});return packet;
+    }
+    extractItem(id){
+        const root=this.#record(id);if(this.#parents.has(id))throw new Error('Detach an attachment before transferring it separately');
+        const ids=[id,...root.attachments],bundle=freeze(jsonCopy({format_version:1,root_instance_id:id,records:ids.map(key=>this.#record(key))}));
+        if(this.isEquipped(id))this.unequipItem(id);
+        for(const key of ids){delete this.#data.records[key];this.#views.delete(key);this.#parents.delete(key);}this.#data.order=this.#data.order.filter(key=>!ids.includes(key));
+        this.#changed('items:removed',{instance_id:id,definition_id:root.definition_id});return bundle;
+    }
+    receiveBundle(bundle){
+        const copy=jsonCopy(bundle);if(copy.format_version!==1||!Array.isArray(copy.records)||!copy.records.length)throw new TypeError('Invalid item bundle');
+        identifier(copy.root_instance_id);const root=copy.records.find(record=>record.instance_id===copy.root_instance_id);if(!root)throw new TypeError('Missing bundle root');
+        const expected=new Set([root.instance_id,...root.attachments]);if(expected.size!==copy.records.length||copy.records.some(record=>!expected.has(record.instance_id)))throw new TypeError('Bundle must contain exactly the root and its attachments');
+        for(const record of copy.records){this.#validateRecord(record);if(this.hasInstance(record.instance_id))throw new Error('Transferred item is already owned');}
+        if(!this.#canFit(this.#definition(root.definition_id),copy.records.length))return null;
+        const state=this.snapshot(),prefix=`${state.owner_id}:item:`;
+        for(const record of copy.records){state.records[record.instance_id]=record;state.order.push(record.instance_id);if(record.instance_id.startsWith(prefix)){const serial=Number(record.instance_id.slice(prefix.length));integer(serial,'instance serial',1);state.next_instance_id=Math.max(state.next_instance_id,integer(serial+1,'next_instance_id',1));}}
+        this.#validate(state);for(const key of Object.keys(this.#data))delete this.#data[key];Object.assign(this.#data,state);this.#views.clear();this.#indexParents();
+        this.#changed('items:acquired',{instance_id:root.instance_id,definition_id:root.definition_id});return this.getItem(root.instance_id);
+    }
+    consumeItem(id,quantity=1){const item=this.#record(id),def=this.#definition(item.definition_id);integer(quantity,'quantity',1);if(def.type!=='consumable'||quantity>item.quantity)return false;
+        if(quantity===item.quantity)this.removeItem(id);else this.#data.records[id]={...item,quantity:item.quantity-quantity};this.#changed('items:consumed',{instance_id:id,definition_id:item.definition_id,quantity,effect:def.effect??null});return true;}
+    equipItem(id){
+        const item=this.#record(id),def=this.#definition(item.definition_id),equipment=this.#data.equipment;
+        if(def.type==='weapon'){if(equipment.attachments.length+item.attachments.length>this.max_attachments)return false;equipment.weapon=id;}
+        else if(def.type==='attachment'){
+            if(this.#parents.has(id))return false;
+            if(equipment.attachments.includes(id))return true;
+            if(this.getEquippedAttachments().length>=this.max_attachments)return false;
+            equipment.attachments.push(id);
+        }else return false;
+        this.#changed('items:equipped',{instance_id:id,definition_id:item.definition_id,slot:def.type});return true;
+    }
+    unequipItem(id){if(!this.hasInstance(id)||!this.isEquipped(id))return false;const slot=this.equipped_weapon_id===id?'weapon':'attachment';const parent=this.#parents.get(id);if(parent)this.detachFromWeapon(parent,id);if(slot==='weapon')this.#data.equipment.weapon=null;else this.#data.equipment.attachments=this.#data.equipment.attachments.filter(key=>key!==id);this.#changed('items:unequipped',{instance_id:id,slot});return true;}
+    unequipSlot(slot){if(slot==='weapon'){if(this.equipped_weapon_id)this.unequipItem(this.equipped_weapon_id);}else if(slot==='attachment'){for(const item of this.getEquippedAttachments())this.unequipItem(item.instance_id);}else throw new TypeError('Unknown equipment slot');}
+    setItemState(id,patch){if(!patch||typeof patch!=='object'||Array.isArray(patch))throw new TypeError('Item state patch must be a record');const record=this.#record(id),state={...record.state,...jsonCopy(patch)},next={...record,state};this.#validateRecord(next);this.#data.records[id]=next;this.#changed('items:changed',{instance_id:id});return this.getItem(id);}
+    setFireMode(mode){if(!modes.includes(mode))throw new TypeError('Invalid weapon mode');if(!this.equipped_weapon_id)return false;this.setItemState(this.equipped_weapon_id,{fire_mode:mode});return true;}
+    setUpgrade(id,upgrade_id,rank){const record=this.#record(id),upgrades={...record.upgrades};identifier(upgrade_id);integer(rank,'rank');if(rank)upgrades[upgrade_id]=rank;else delete upgrades[upgrade_id];const next={...record,upgrades};this.#validateRecord(next);this.#data.records[id]=next;this.#changed('items:changed',{instance_id:id});}
+    attachToWeapon(weapon_id,attachment_id){
+        const weapon=this.#record(weapon_id),attachment=this.#record(attachment_id),def=this.#definition(weapon.definition_id),other=this.#definition(attachment.definition_id);
+        if(def.type!=='weapon'||other.type!=='attachment'||!this.#compatible(def,other))return false;
+        if(this.isEquipped(attachment_id)||this.#parents.has(attachment_id)||weapon.attachments.length>=this.max_attachments||this.equipped_weapon_id===weapon_id&&this.getEquippedAttachments().length>=this.max_attachments)return false;
+        this.#data.records[weapon_id]={...weapon,attachments:[...weapon.attachments,attachment_id]};this.#parents.set(attachment_id,weapon_id);this.#changed('items:changed',{instance_id:weapon_id});return true;
+    }
+    detachFromWeapon(weapon_id,attachment_id){const weapon=this.#record(weapon_id);if(!weapon.attachments.includes(attachment_id))return false;this.#data.records[weapon_id]={...weapon,attachments:weapon.attachments.filter(id=>id!==attachment_id)};this.#parents.delete(attachment_id);this.#changed('items:changed',{instance_id:weapon_id});return true;}
+    snapshot(){return jsonCopy(this.#data);}
+    load(snapshot){const copy=jsonCopy(snapshot);this.#validate(copy);for(const key of Object.keys(this.#data))delete this.#data[key];Object.assign(this.#data,copy);this.#views.clear();this.#indexParents();this.#changed('items:loaded');}
+    clear(){const data=this.#empty();data.next_instance_id=this.#data.next_instance_id;this.load(data);}
+    reset(ids=[]){const data=this.#empty(),draft=new itemSystem({data,catalog:this.#catalog,rules:this.#rules});for(const id of ids)if(!draft.grantItem(id))throw new Error('Default loadout exceeds inventory capacity');this.load(draft.snapshot());}
+    importLegacy({items=[],equippedWeaponId=null,equippedId=null,equippedAttachments,equippedAttachmentId=null}={}){
+        if(!Array.isArray(items)||items.some(id=>typeof id!=='string'))throw new TypeError('Legacy items must be catalog IDs');
+        const data=this.#empty();data.capacity=Math.max(data.capacity,items.filter(id=>this.#definition(id).type!=='attachment').length);
+        const draft=new itemSystem({data,catalog:this.#catalog,rules:this.#rules});for(const id of items)if(!draft.grantItem(id))throw new Error('Legacy inventory exceeds capacity');
+        const weapon=draft.findItem(equippedWeaponId??equippedId);if(weapon?.type==='weapon')draft.equipItem(weapon.instance_id);
+        for(const id of [...new Set(equippedAttachments??(equippedAttachmentId?[equippedAttachmentId]:[]))]){const item=draft.findItem(id);if(item?.type==='attachment')draft.equipItem(item.instance_id);}
+        this.load(draft.snapshot());
+    }
+}
+
+return Object.freeze({get itemSystem(){return itemSystem;}});
+})();
+// src/directory/game-items.mjs
+const m71 = (()=>{
+const definitions = m34.default;
+
+/** Concrete item definitions stay in the Directory; gameplay receives plain catalog data. */
+function createItemCatalog(items=definitions) {
+    const catalog=structuredClone(items.gear);
+    for(const [id,item] of Object.entries(items.consumables??{})){
+        // The classic loader adds these callbacks to its table. Catalogs carry
+        // declarative effects; callbacks remain in the explicit gameplay policy.
+        const {unlockCheck,onActivate,onExpire,...data}=item;
+        catalog[`consumable:${id}`]={...structuredClone(data),type:'consumable',stackable:true,max_stack:99,desc:item.description??item.desc??'',effect:{kind:'buff',buff_id:id}};
+    }
+    for(const [id,item] of Object.entries(items.notes??{}))catalog[`note:${id}`]={...structuredClone(item),type:'intel',name:item.title??id,desc:item.description??'',effect:{kind:'note',note_id:id}};
+    return catalog;
+}
+
+return Object.freeze({get createItemCatalog(){return createItemCatalog;}});
+})();
 // src/gameplay/game-session.mjs
 const m68 = (()=>{
+const {itemSystem} = m69;
+const {createItemCatalog} = m71;
+const itemRules = m70.default;
 const {identifier,jsonCopy,nonnegative} = m41;
 
-const recordNames = ['inventory', 'equipment', 'quests', 'roster', 'progression'];
+const recordNames = ['quests', 'roster', 'progression'];
 
 /** Persistent game records and a reference to the official player, never a body or health mirror. */
 class gameSession {
-    #state; #context = null; #listeners = new Map(); #playerPacket;
-    constructor({ player, state } = {}) {
+    #state; #context = null; #listeners = new Map(); #playerPacket; #items;
+    constructor({ player, state, item_catalog=createItemCatalog() } = {}) {
         this.#playerPacket = jsonCopy(player ?? {template:'df:player_949', entity_type:'df_player'});
-        this.#state = this.#validate(state ?? {format_version:1, player_entity_id:null, currency:0, inventory:{}, equipment:{}, quests:{}, roster:{}, progression:{}});
+        this.#state=this.#validate(state??{format_version:2,player_entity_id:null,currency:0,inventory:{},quests:{},roster:{},progression:{}},item_catalog);
+        this.#items=new itemSystem({data:this.#state.inventory,catalog:item_catalog,rules:itemRules,on_event:(event,detail)=>{this.emit(event,detail);this.emit('session:changed',{collection:'inventory',item_event:event});}});
     }
-    #validate(state) {
+    #validate(state,catalog) {
         const copy = jsonCopy(state);
-        if (copy.format_version !== 1 || Object.keys(copy).some(key => !['format_version','player_entity_id','currency',...recordNames].includes(key))) throw new TypeError('Unsupported session snapshot');
+        if (copy.format_version===1){
+            const draft=new itemSystem({catalog,rules:itemRules});
+            for(const [id,count] of Object.entries(copy.inventory??{})){if(!Number.isSafeInteger(count)||count<0)throw new TypeError('Invalid legacy inventory count');for(let i=0;i<count;i++)if(!draft.grantItem(id))throw new TypeError('Legacy inventory exceeds capacity');}
+            const weapon=draft.findItem(copy.equipment?.weapon);if(weapon?.type==='weapon')draft.equipItem(weapon.instance_id);
+            copy.inventory=draft.snapshot();delete copy.equipment;copy.format_version=2;
+        }
+        if (copy.format_version !== 2 || Object.keys(copy).some(key => !['format_version','player_entity_id','currency','inventory',...recordNames].includes(key))) throw new TypeError('Unsupported session snapshot');
         if (copy.player_entity_id !== null && (!Number.isSafeInteger(copy.player_entity_id) || copy.player_entity_id < 1)) throw new TypeError('Invalid player entity ID');
         nonnegative(copy.currency, 'currency');
         for (const name of recordNames) if (!copy[name] || Array.isArray(copy[name]) || typeof copy[name] !== 'object') throw new TypeError(`Invalid session record: ${name}`);
-        for (const count of Object.values(copy.inventory)) if (!Number.isSafeInteger(count) || count < 0) throw new TypeError('Inventory counts must be nonnegative safe integers');
+        if(!copy.inventory||typeof copy.inventory!=='object'||Array.isArray(copy.inventory))throw new TypeError('Invalid inventory record');
+        new itemSystem({data:copy.inventory,catalog,rules:itemRules});
         return copy;
     }
+    get items(){return this.#items;}
     get player_entity_id() { return this.#state.player_entity_id; }
     get player() { return this.#context?.api.elements.fetchEntity(this.player_entity_id) ?? null; }
     get currency() { return this.#state.currency; }
@@ -21597,17 +21808,10 @@ class gameSession {
     getRecord(collection, key) { this.#collection(collection); identifier(key); const value=this.#state[collection][key]; return value === undefined ? undefined : jsonCopy(value); }
     setRecord(collection, key, value) {
         this.#collection(collection); identifier(key);
-        if (collection === 'inventory') throw new TypeError('Use addItem to change inventory counts');
         const copy = jsonCopy(value); this.#state[collection][key] = copy;
         this.emit('session:changed', {collection, key}); return this;
     }
     #collection(name) { if (!recordNames.includes(name)) throw new TypeError(`Unknown session collection: ${name}`); }
-    addItem(item_id, count = 1) {
-        identifier(item_id);
-        const total=(this.#state.inventory[item_id] ?? 0)+count;
-        if (!Number.isSafeInteger(count) || !Number.isSafeInteger(total) || total < 0) throw new TypeError('Inventory change must leave a nonnegative safe integer count');
-        this.#state.inventory[item_id]=total; this.emit('session:changed',{collection:'inventory',key:item_id}); return total;
-    }
     changeCurrency(amount) {
         if (!Number.isFinite(amount)) throw new TypeError('Currency change must be finite');
         const total=nonnegative(this.currency+amount,'currency'); this.#state.currency=total;
@@ -21627,7 +21831,7 @@ class gameSession {
 return Object.freeze({get gameSession(){return gameSession;}});
 })();
 // src/gameplay/player-state-system.mjs
-const m69 = (()=>{
+const m72 = (()=>{
 const {nonnegative,jsonCopy} = m41;
 
 /** Game rules only. The native entity/body remains the sole owner of physical state. */
@@ -21683,7 +21887,7 @@ class PlayerStateSystem {
 return Object.freeze({get PlayerStateSystem(){return PlayerStateSystem;}});
 })();
 // src/gameplay/player-control-system.mjs
-const m70 = (()=>{
+const m73 = (()=>{
 /** Turns input terminology into native motor requests and gameplay intents. No physical math. */
 class PlayerControlSystem {
     #session; #state; #blocked = new Set(); #placement; #context = null;
@@ -21730,18 +21934,19 @@ const {ApartmentCompanion} = m43;
 const {registerStreetEntityTypes} = m60;
 const controlProfile = m67.default;
 const {gameSession} = m68;
-const {PlayerStateSystem} = m69;
-const {PlayerControlSystem} = m70;
+const {PlayerStateSystem} = m72;
+const {PlayerControlSystem} = m73;
+const {createItemCatalog} = m71;
 const playerRules = m27.default;
 const {canvasRenderer} = m52;
 
 /** Explicit game composition. Importing this file never starts a second runtime. */
 function createGameRuntime({ game_db, surface, session_state, player, ...options } = {}) {
-    const session=new gameSession({state:session_state,player});
+    const session=new gameSession({state:session_state,player,item_catalog:createItemCatalog(game_db?.items)});
     const player_state=new PlayerStateSystem({session,rules:playerRules});
     const player_controls=new PlayerControlSystem({session,player_state,placement_bounds:context=>context.engine.active_level?.player_placement_bounds});
-    if(options.services && ['session','player_state','player_controls'].some(key=>Object.hasOwn(options.services,key)))throw new TypeError('Directory owns player services');
-    const engine = new gameEngine({ ...options, services:{...options.services,session,player_state,player_controls}, controls:{...controlProfile,...(surface?.addEventListener?{mouse_target:surface}:{}),...options.controls}, asset_library: createApartmentAssetLibrary({ game_db }) });
+    if(options.services && ['session','items','player_state','player_controls'].some(key=>Object.hasOwn(options.services,key)))throw new TypeError('Directory owns player services');
+    const engine = new gameEngine({ ...options, services:{...options.services,session,items:session.items,player_state,player_controls}, controls:{...controlProfile,...(surface?.addEventListener?{mouse_target:surface}:{}),...options.controls}, asset_library: createApartmentAssetLibrary({ game_db }) });
     engine.api.render.registerRenderer('canvas',canvasRenderer);
     engine.registerSystem('surface-input',{
         attach(context){context.defer(context.api.render.onSurfaceChanged(({surface})=>context.api.controls.setMouseTarget(options.controls?.mouse_target??surface)));}
@@ -21750,6 +21955,7 @@ function createGameRuntime({ game_db, surface, session_state, player, ...options
     registerStreetEntityTypes(engine.api.physics);
     try {
         engine.registerSystem('session',session);
+        engine.registerSystem('items',session.items);
         engine.registerSystem('player-state',player_state);
         engine.registerSystem('player-controls',player_controls);
         return engine;
@@ -21757,6 +21963,314 @@ function createGameRuntime({ game_db, surface, session_state, player, ...options
 }
 
 return Object.freeze({get createGameRuntime(){return createGameRuntime;}});
+})();
+// src/directory/weapon-appearance.mjs
+const m74 = (()=>{
+/* =====================================================================
+   WEAPON MODELS — every gun as data: parts in the gun's own frame (+x down
+   the barrel, the grip hand near 0,0, +y to the holder's right), each in a
+   material. A model is painted once into a sprite (bakeWeapon) and stamped
+   by drawWeapon (ui/humanoid-render.js); only its lights are drawn live.
+   Ethereal, elegant sci-fi seen from straight above, in the shapes of
+   ETERNAL's catalog sketches, shaded as angular metallic glass: hard bevel
+   facets, slanted glass glints, faceted gem knobs, glass sleeves over the
+   lines of light. The shading runs along the gun, so it holds whichever
+   way the holder turns and never needs relighting.
+     muzzle   barrel tip (shots and the laser leave from here: weaponMuzzleLocal)
+     rail     where the laser module sits (its front end)
+     brass    the glitter colour of the spent casings each shot throws (null: an energy gun)
+     fx       its signature (engine/combat-effects.js): trail 'crackle' | 'static' | 'wisp' behind the shot,
+              or barrel 'smoke' (after N quick shots with `after`) | 'embers' off the muzzle; col / core / dust / hot
+     glow     live lights [x, y, r, colour], breathing slowly in a wave down the gun
+     run      a spark that glides down a light line [x0, x1, y, colour]
+   ===================================================================== */
+const GUN_MATERIALS = {             // base, edge (the dark facet: a deep shade of its own hue, never black), hi (the bright bevel)
+    abyss:      ['#1a1436', '#0e0926', '#5c4fa0'],      // obsidian glass, violet in its depths
+    midnight:   ['#172a86', '#0c1858', '#6f8cff'],
+    lavender:   ['#a891ec', '#4a3790', '#f0e8ff'],
+    periwinkle: ['#8392f7', '#2e3796', '#e2e6ff'],
+    pearl:      ['#ece8fb', '#8f86b8', '#ffffff'],
+    crimson:    ['#c0143e', '#6a0828', '#ff7a98'],
+    teal:       ['#12b8a4', '#066a5e', '#9cfff2'],
+    bronze:     ['#a0602e', '#5a2a10', '#f6b477'],       // rose bronze
+    molten:     ['#ff6418', '#a03008', '#ffd09a'],
+    gold:       ['#d2a038', '#7a5414', '#fff0b0'],
+    champagne:  ['#eddcb2', '#8e7446', '#fffaea'],
+    silver:     ['#c4ccd9', '#626d86', '#f4f7ff'],      // polished silver
+    diamond:    ['#e1f5ff', '#7ca8c5', '#ffffff'],      // icy crystal-white grip
+    pink:       ['#e81c84', '#8a0a4a', '#ffa0d0'],
+    violet:     ['#4a24a0', '#24105e', '#b596ff']
+};
+
+// Shapes (from the sketches): a rounded knob at the rear where the hand sits, a band that bulges out
+// both sides (the side view's big ring), a long rounded slide or barrel, square collars with slots of
+// light, a side knob and emblem, a nub at the muzzle.
+// _r slab x0→x1 centred on cy, w wide · _cap the same, fully rounded · _c a knob (a faceted gem) ·
+// _e/_ce lights (baked with a halo) · _g a glass sleeve over a light · _hole a bore · _slots three slots.
+const _r = (x0, x1, cy, w, m, r = 0.3) => ({ rr: [x0, cy - w / 2, x1 - x0, w, r], m });
+const _cap = (x0, x1, cy, w, m) => _r(x0, x1, cy, w, m, w / 2);
+const _c = (x, y, r, m) => ({ dot: [x, y, r], m });
+const _e = (x0, x1, cy, w, c) => ({ rr: [x0, cy - w / 2, x1 - x0, w, 0.2], c, emit: true });
+const _ce = (x, y, r, c) => ({ dot: [x, y, r], c, emit: true });
+const _g = (x0, x1, cy, w) => ({ rr: [x0, cy - w / 2, x1 - x0, w, w / 2], glass: true });
+const _hole = (x, y, r) => ({ dot: [x, y, r], c: '#020104' });
+const _slots = (x0, x1, cy, c) => [-1.3, 0, 1.3].map(o => _e(x0, x1, cy + o, 0.42, c));
+
+const WEAPON_MODELS = {
+    pistol_fpx: {                                                                       // obsidian glass with deep-blue light (catalog sketch)
+        stance: 'pistol', muzzle: [13.4, 1], rail: [10.5, 4.3], brass: '#6f8cff',
+        parts: [
+            _c(-2, 1, 2.4, 'abyss'), _c(-2.2, 1, 1.05, 'midnight'),                     // the rear knob
+            _r(1, 12.2, 1, 4.4, 'abyss', 1.2),                                         // the slide
+            _e(3.4, 9.6, 1, 0.45, '#4a78ff'), _g(3, 10, 1, 1.5),                        // a light down its spine, under glass
+            _r(10.3, 11.9, 1, 1, 'midnight', 0.2), _e(10.6, 11.6, 1, 0.45, '#8fb0ff'),  // the sight notch
+            _cap(11.6, 13.4, 1, 2.6, 'midnight'),                                       // the muzzle nub
+            _cap(-1.4, 2.2, 1, 6.8, 'midnight'),                                        // the ring band, bulging both sides
+            _cap(-0.6, 1.4, 1, 5.2, 'abyss'),
+            _ce(0.4, -1.8, 0.75, '#4a78ff'), _ce(0.4, 3.8, 0.75, '#4a78ff')             // the ring's light at each side
+        ],
+        glow: [[0.4, -1.8, 2.6, '#4a78ff'], [0.4, 3.8, 2.6, '#4a78ff'], [6.5, 1, 2.6, '#4a78ff'], [11.1, 1, 2.2, '#8fb0ff']],
+        run: [3.4, 9.6, 1, '#9fbaff']
+    },
+    pistol_anavia: {                                                                    // periwinkle and lavender, a light for a core
+        stance: 'pistol', muzzle: [13.4, 1], rail: [10, 4.5], brass: null, fx: { trail: 'crackle', col: '#a9b4ff', core: '#f1ecff' },
+        parts: [
+            _c(-1.8, 1, 2.3, 'lavender'), _c(-2, 1, 1, 'periwinkle'),
+            _r(0.6, 11.4, 1, 4.8, 'lavender', 2),
+            _e(4, 10.2, 1, 0.9, '#9aa6ff'), _g(3.6, 10.6, 1, 2),                        // the core, under glass
+            _c(12.2, 1, 2, 'periwinkle'), _ce(12.5, 1, 0.9, '#c4cbff'),                 // the front orb
+            _cap(0.6, 3.4, 1, 7, 'periwinkle'),
+            _ce(2, -2, 0.7, '#9fb0ff'), _ce(2, 4, 0.7, '#9fb0ff')
+        ],
+        glow: [[2, -2, 2.2, '#9fb0ff'], [2, 4, 2.2, '#9fb0ff'], [7, 1, 2.8, '#a58ee6'], [12.5, 1, 3.2, '#8c9cff']],
+        run: [4, 10.2, 1, '#e4e0ff']
+    },
+    pistol_ganger: {                                                                    // the hot pink pistol: the FP-X's shape
+        stance: 'pistol', muzzle: [12.9, 1], rail: [10, 4.2], brass: '#ff6ab8',
+        parts: [
+            _c(-2, 1, 2.3, 'pink'),
+            _r(1, 11.6, 1, 4.2, 'pink', 1.2),
+            _cap(11.2, 12.9, 1, 2.4, 'abyss'),
+            _cap(-1.4, 2, 1, 6.4, 'abyss'),
+            _e(0.3, 1, 1, 5.4, '#ff9ad2')
+        ],
+        glow: [[0.65, 1, 2.6, '#ff6ab8']]
+    },
+    rifle_rb98: {                                                                       // pearl and teal
+        stance: 'rifle', muzzle: [29.3, 1.5], rail: [21, 4.3], brass: '#6ff5e2', fx: { barrel: 'smoke', after: 4, col: '#cfeee9' },
+        parts: [
+            _cap(-10, -4.6, 1.5, 4.6, 'pearl'),                                         // the rear pad
+            _r(-5.6, 13.2, 1.5, 5.8, 'pearl', 2.2),                                    // the body
+            _e(-3.4, 11.4, 1.5, 0.5, '#3dffe0'), _g(-3.8, 11.8, 1.5, 1.7),
+            _r(13, 19, 1.5, 5, 'teal', 0.6), ..._slots(13.8, 18.2, 1.5, '#3dffe0'),      // the vent collar
+            _cap(19, 27.4, 1.5, 2.2, 'abyss'),
+            _cap(26.4, 29.3, 1.5, 3.2, 'pearl'),                                        // the muzzle cap
+            _cap(3.2, 6.4, 1.5, 7.4, 'teal'),                                           // the ring band
+            _ce(4.8, -1.9, 0.7, '#3dffe0'), _ce(4.8, 4.9, 0.7, '#3dffe0')
+        ],
+        glow: [[-1, 1.5, 2.2, '#3dffe0'], [4.8, -1.9, 2.4, '#3dffe0'], [4.8, 4.9, 2.4, '#3dffe0'], [16, 1.5, 3.2, '#3dffe0']],
+        run: [-3.4, 11.4, 1.5, '#c8fff6']
+    },
+    sniper_sara: {                                                                      // YourGirlSara: molten orange, rose bronze and obsidian
+        stance: 'sniper', muzzle: [55.2, 0.5], rail: [40, 2.9], brass: '#ff9a3c', fx: { barrel: 'embers', col: '#ff9a3c', hot: '#ffe0a0' },
+        parts: [
+            _cap(-12, -2, 0.5, 5.4, 'abyss'),                                          // the rounded rear hump
+            _e(-10, -4, 0.5, 0.7, '#ff6a1a'),
+            _r(-2.6, 14.2, 0.5, 5.6, 'bronze', 1.2),                                   // the receiver
+            _c(6, 3.8, 1.3, 'bronze'),                                                  // the side knob
+            _r(14.6, 18.6, 0.5, 4.8, 'bronze', 0.4), ..._slots(15.2, 18, 0.5, '#ff7a24'),
+            _r(19.2, 23.2, 0.5, 4.8, 'bronze', 0.4), ..._slots(19.8, 22.6, 0.5, '#ff7a24'),
+            _cap(23.2, 51.4, 0.5, 2.8, 'silver'),
+            _e(24.5, 50, 0.5, 0.5, '#ff5a12'), _g(24, 50.6, 0.5, 1.6),                  // the barrel's heat line, under glass
+            _r(51, 55.2, 0.5, 4, 'bronze', 0.8),                                        // the brake
+            _r(52.1, 52.7, 0.5, 4, 'champagne'), _r(53.5, 54.1, 0.5, 4, 'champagne'),
+            _cap(0.4, 13.6, 0.5, 3, 'abyss'),                                           // the scope, on top
+            _r(3.4, 4.6, 0.5, 3.6, 'bronze'), _r(9.4, 10.6, 0.5, 3.6, 'bronze'),
+            _ce(13, 0.5, 0.95, '#ffb060')
+        ],
+        glow: [[-7, 0.5, 2.4, '#ff6a1a'], [13, 0.5, 3.2, '#ff7a24'], [16.6, 0.5, 3, '#ff6a1a'], [21.2, 0.5, 3, '#ff6a1a'], [38, 0.5, 3, '#ff5a12']],
+        run: [24.5, 50, 0.5, '#ffd09a']
+    },
+    sniper_sr86: {                                                                      // SR-86: obsidian, crimson and pearl (catalog sketch): one width, stock to muzzle
+        stance: 'sniper', muzzle: [55.2, 0.5], rail: [40, 3.9], brass: '#ff4d68', fx: { barrel: 'smoke', col: '#d9d2de' },
+        parts: [
+            _r(-12, -2, 0.5, 5, 'abyss', [2.5, 0.4, 0.4, 2.5]),                         // the thumb-hump rear, rounded at the back
+            _r(-9.6, -4, 0.5, 1, 'crimson'),
+            _r(-2, 14.2, 0.5, 5, 'pearl', 0.5),                                         // the receiver
+            _c(6, 3.6, 1.3, 'pearl'),                                                   // the side knob
+            _e(4.4, 7.6, 0.5, 0.6, '#ff2448'), _e(5.7, 6.3, 0.5, 2.6, '#ff2448'),        // the cross emblem
+            _r(14.6, 18.6, 0.5, 5, 'abyss', 0.4), ..._slots(15.2, 18, 0.5, '#ff2448'),   // the two slotted collars
+            _r(19.2, 23.2, 0.5, 5, 'abyss', 0.4), ..._slots(19.8, 22.6, 0.5, '#ff2448'),
+            _r(23.2, 55.2, 0.5, 5, 'abyss', [0.4, 1.2, 1.2, 0.4]),                      // the long smooth barrel, the same width to the muzzle
+            _e(25, 50, -0.7, 0.35, '#ff2448'), _e(25, 50, 1.7, 0.35, '#ff2448'),         // two hairlines of red down it, under glass
+            _g(24.6, 50.4, 0.5, 3.6),
+            _hole(51.6, 0.5, 0.9),                                                      // its bore hole
+            _r(53.6, 55.2, 0.5, 5, 'crimson', [0.4, 1.2, 1.2, 0.4])                     // the crimson muzzle band
+        ],
+        glow: [[6, 0.5, 3.2, '#ff2448'], [16.6, 0.5, 3, '#ff2448'], [21.2, 0.5, 3, '#ff2448'], [54.4, 0.5, 2.4, '#ff2448']],
+        run: [25, 50, 1.7, '#ff9aae']
+    },
+    golden_child: {                                                                     // gold and champagne, a light in its heart
+        stance: 'pistol', muzzle: [20, 1], rail: [13, 5.8], brass: null, fx: { trail: 'wisp', col: '#f3e4c6', dust: '#ffd76a' },
+        parts: [
+            _cap(-3.6, 14, 1, 8.4, 'gold'),
+            _e(-1.6, 12, 1, 0.5, '#ffe7a0'), _g(-2, 12.4, 1, 2),
+            _cap(3.8, 7.4, 1, 9.6, 'champagne'),                                        // the ring band
+            _ce(5.6, 1, 1.7, '#fff1c4'),                                                // the core
+            _c(16.6, 1, 3.3, 'champagne'), _ce(17.6, 1, 1.35, '#ffd76a')                // the front orb and its bore
+        ],
+        glow: [[5.6, 1, 4.2, '#ffd76a'], [17.6, 1, 3.6, '#ffe7a0']],
+        run: [-1.6, 12, 1, '#fffaea']
+    },
+    maiden_kukri: {                                                                     // the Maiden's Kukri: a curved golden blade, a dark grip, a ring pommel
+        stance: 'knife', muzzle: [19, 1.6], rail: [8, 0], brass: null, melee: true,
+        parts: [
+            _c(-5.2, 0, 1.9, 'gold'), _hole(-5.2, 0, 0.85),                             // the ring pommel
+            _r(-4, 3, 0, 2.6, 'diamond', 1.1),                                          // the icy diamond grip
+            _r(-2.6, -2, 0, 2.8, 'gold', 0.3), _r(0.4, 1, 0, 2.8, 'gold', 0.3),         // gold bands on it
+            _r(3, 4.2, 0, 4.6, 'gold', 0.5),                                            // the guard
+            { poly: [[4, -1.3], [8.5, -1.7], [12.5, -1.3], [16, -0.2], [18.6, 1.4], [19.4, 2.6], [17.2, 2.6], [13.6, 2.1], [9.4, 1.6], [4, 1.1]], m: 'gold' },   // the forward-curved blade
+            { poly: [[5, 0.4], [9.5, 0.9], [13.8, 1.4], [17.4, 2.2], [13.6, 1.8], [9.4, 1.3], [5, 0.9]], m: 'champagne' },   // its bright edge
+            { poly: [[5, -0.05], [9.5, 0.08], [13.5, 0.62], [16.7, 1.52], [18.35, 2.2], [16.55, 1.8], [13.4, 0.9], [9.4, 0.32], [5, 0.17]], m: 'silver' }, // a slender silver inlay along the blade
+            _ce(3.6, 0, 0.6, '#ffe7a0')                                                 // a gem in the guard
+        ],
+        glow: [[3.6, 0, 1.6, '#ffd76a'], [18, 2, 1.4, '#fff1c4']],
+        run: [5, 18, 1.4, '#fffaea']                                                    // the glint along the edge
+    },
+    blood_pact: {                                                                       // Blood Pact: a long blood-red katana, a black wrapped grip, a crimson tsuba
+        stance: 'knife', muzzle: [50, -1.6], rail: [8, 0], brass: null, melee: true, swing: 'wide',   // a two-handed sweep (engine/status-effects.js)
+        edge: [50.5, -1.9],                                                             // the tip, where the slash trail runs (engine/status-effects.js)
+        trail: { dust: '#ff3a5c', cols: [[9, '200, 20, 50', .26], [3.4, '255, 70, 100', .6], [1.3, '255, 210, 220', .9]] },
+        parts: [
+            _cap(-10.4, -8.4, 0, 2.7, 'crimson'),                                       // the pommel cap
+            _r(-9, 1.8, 0, 2.4, 'abyss', 0.8),                                          // the long two-hand grip
+            ...[-7.4, -5.2, -3, -0.8].map(x => _r(x, x + 0.9, 0, 2.5, 'crimson', 0.4)), // the crimson wrap across it
+            _r(1.8, 3, 0, 5.6, 'abyss', 0.6),                                           // the tsuba
+            _ce(2.4, 0, 0.7, '#ff2448'),                                                // a blood gem in it
+            _r(3, 4.6, 0, 2.3, 'gold', 0.3),                                            // the collar
+            { poly: [[3.5, -1], [10, -0.99], [17, -1.04], [24, -1.14], [31, -1.31], [38, -1.54], [44, -1.79], [47, -1.93], [50.5, -1.9],
+                     [47.6, -0.5], [44, -0.25], [38, 0.07], [31, 0.37], [24, 0.62], [17, 0.81], [10, 0.94], [3.5, 1]], m: 'crimson' },  // the gently curved blade
+            { poly: [[4.6, 0.45], [17, 0.3], [31, -0.1], [44, -0.65], [49.6, -1.6], [47.4, -0.62], [44, -0.32], [31, 0.3], [17, 0.74], [4.6, 0.9]], c: '#ff5a78', emit: true },   // its glowing edge
+            { poly: [[6, -0.48], [20, -0.5], [36, -0.85], [36, -0.62], [20, -0.28], [6, -0.26]], c: '#3a0412' }   // the blood groove
+        ],
+        glow: [[2.4, 0, 1.8, '#ff2448'], [30, -0.2, 1.6, '#ff5a78'], [49, -1.6, 1.6, '#ffb0c0']],
+        run: [5, 48, 1.5, '#ffd0da']                                                    // the glint along the edge
+    },
+    empg: {                                                                             // the EMP blaster (catalog): a bulbous body, twin orbs at the front
+        stance: 'pistol', muzzle: [14.6, 1], rail: [9, 5.4], brass: null, fx: { trail: 'static', col: '#b48cff', core: '#efe4ff' },
+        parts: [
+            _c(-2, 1, 2.4, 'abyss'),
+            _cap(-1.2, 12.4, 1, 7.4, 'violet'),
+            _ce(1, 1, 0.75, '#c9a6ff'),                                                 // the port
+            _e(3.6, 10, 1, 0.5, '#b48cff'), _g(3.2, 10.4, 1, 2.2),
+            _c(12.6, -1.5, 1.6, 'pearl'), _ce(13, -1.5, 0.7, '#dcc6ff'),                 // the twin orbs
+            _c(12.6, 3.5, 1.6, 'pearl'), _ce(13, 3.5, 0.7, '#dcc6ff')
+        ],
+        glow: [[1, 1, 2, '#c9a6ff'], [13, -1.5, 2.8, '#b48cff'], [13, 3.5, 2.8, '#b48cff']],
+        run: [3.6, 10, 1, '#efe4ff']
+    }
+};
+const LASER_MODULE = [                                                                  // under-barrel laser: body, then emitter at its front
+    { rr: [-5.5, -0.9, 5.5, 1.9, 0.3], m: 'abyss' }, { rr: [-0.9, -0.5, 0.9, 1.1, 0.2], c: '#ff2a3a', emit: true }
+];
+
+// Consumers share immutable authored data, never mutable copies of an owned weapon.
+const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
+freeze(GUN_MATERIALS);freeze(WEAPON_MODELS);freeze(LASER_MODULE);
+
+/** The model for a weapon id: its own, else the closest by name, else the FP-X — never nothing. */
+function weaponModel(id) {
+    id = id || '';
+    return WEAPON_MODELS[id] || (id.includes('sniper') ? WEAPON_MODELS.sniper_sara : id.includes('rifle') ? WEAPON_MODELS.rifle_rb98
+        : id.includes('kukri') ? WEAPON_MODELS.maiden_kukri : id.includes('pact') || id.includes('katana') ? WEAPON_MODELS.blood_pact : id.includes('golden') ? WEAPON_MODELS.golden_child : id.includes('emp') ? WEAPON_MODELS.empg : id.includes('anavia') ? WEAPON_MODELS.pistol_anavia : WEAPON_MODELS.pistol_fpx);
+}
+
+
+return Object.freeze({get GUN_MATERIALS(){return GUN_MATERIALS;},get WEAPON_MODELS(){return WEAPON_MODELS;},get LASER_MODULE(){return LASER_MODULE;},get weaponModel(){return weaponModel;}});
+})();
+// src/presentation/weapon-appearance.mjs
+const m75 = (()=>{
+const {GUN_MATERIALS,WEAPON_MODELS,LASER_MODULE,weaponModel} = m74;
+
+const polygon=points=>({type:'path',commands:[...points.map(([x,y],i)=>[i?'line':'move',x,y]),['close']]});
+function shape(part){
+    if(part.poly)return polygon(part.poly);
+    if(part.dot){const [x,y,r]=part.dot;return {type:'path',commands:[['ellipse',x,y,r,r,0,0,Math.PI*2,0],['close']]};}
+    const [x,y,w,h,radius]=part.rr??part.ring,raw=Array.isArray(radius)?radius:[radius??0,radius??0,radius??0,radius??0];
+    const factor=Math.min(1,w/(raw[0]+raw[1]||1),h/(raw[1]+raw[2]||1),w/(raw[2]+raw[3]||1),h/(raw[3]+raw[0]||1));
+    const [tl,tr,br,bl]=raw.map(r=>r*factor),commands=[['move',x+tl,y],['line',x+w-tr,y]];
+    const arc=(cx,cy,r,start,end)=>{if(r)commands.push(['ellipse',cx,cy,r,r,0,start,end,0]);};
+    arc(x+w-tr,y+tr,tr,-Math.PI/2,0);commands.push(['line',x+w,y+h-br]);arc(x+w-br,y+h-br,br,0,Math.PI/2);
+    commands.push(['line',x+bl,y+h]);arc(x+bl,y+h-bl,bl,Math.PI/2,Math.PI);commands.push(['line',x,y+tl]);arc(x+tl,y+tl,tl,Math.PI,Math.PI*1.5);commands.push(['close']);
+    return {type:'path',commands};
+}
+function box(part){
+    const r=part.rr??part.ring;if(r)return [r[0],r[1],r[0]+r[2],r[1]+r[3]];
+    if(part.dot){const [x,y,r]=part.dot;return [x-r,y-r,x+r,y+r];}
+    const xs=part.poly.map(p=>p[0]),ys=part.poly.map(p=>p[1]);return [Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)];
+}
+function mix(a,b,t){const A=parseInt(a.slice(1),16),B=parseInt(b.slice(1),16),channel=s=>Math.round(((A>>s)&255)*(1-t)+((B>>s)&255)*t);return `rgb(${channel(16)}, ${channel(8)}, ${channel(0)})`;}
+const gradient=(from,to,stops)=>({type:'linear',from,to,stops});
+function paint(parts,offset){
+    const packets=[],submit=(geometry,material,clips=[])=>packets.push({type:'shape',space:'screen',position:offset,geometry,material,clips});
+    const glints=([x0,y0,x1,y1],alpha,clip)=>{
+        const h=y1-y0,L=x1-x0,sk=h*.7;
+        for(const [f,w,k]of [[.3,Math.min(1.6,L*.08),1],[.3,.35,.8],[.72,.5,.6]]){
+            const x=x0+L*f+(k===.8?Math.min(1.6,L*.08)+.5:0);
+            submit(polygon([[x+sk,y0],[x+sk+w,y0],[x+w,y1],[x,y1]]),{fill:`rgba(255,255,255,${alpha*k})`},[{geometry:clip}]);
+        }
+    };
+    for(const part of parts){
+        const geometry=shape(part),bounds=box(part),[x0,y0,x1,y1]=bounds;
+        if(part.glass){
+            submit(geometry,{fill:'rgba(226,218,255,.16)'});
+            submit({type:'path',commands:[['move',x0,y0+.2],['line',x1,y0+.2]]},{stroke:'rgba(255,255,255,.55)',stroke_width:.22},[{geometry}]);glints(bounds,.3,geometry);continue;
+        }
+        if(!part.m){if(part.emit)for(let n=0;n<2;n++)submit(geometry,{fill:part.c,shadow:{color:part.c,blur:2.2}});submit(geometry,{fill:part.c});continue;}
+        const M=GUN_MATERIALS[part.m],E=mix(M[1],M[0],.4);
+        if(part.dot){
+            const [x,y,r]=part.dot;submit(geometry,{fill:gradient([x-r,y-r],[x+r,y+r],[[0,M[2]],[.46,mix(M[2],M[0],.55)],[.46,M[0]],[.8,mix(M[0],M[1],.5)],[1,E]])});
+            submit(polygon([[x-r*.55,y-r*.2],[x-r*.2,y-r*.55],[x-r*.05,y-r*.4],[x-r*.4,y-r*.05]]),{fill:'rgba(255,255,255,.7)'});continue;
+        }
+        submit(geometry,{fill:gradient([0,y0],[0,y1],[[0,E],[.08,E],[.08,M[2]],[.26,mix(M[2],M[0],.5)],[.26,M[0]],[.6,M[0]],[.6,mix(M[0],M[1],.45)],[.9,mix(M[0],M[1],.6)],[.9,E],[1,E]])});
+        if(x1-x0>3&&y1-y0>1.6)glints(bounds,.2,geometry);
+    }
+    return packets;
+}
+
+/** Renderer-neutral cached art. Gameplay supplies identity and pose, never a Canvas. */
+class weaponAppearance {
+    #render=null;#entries=new Map();#unsubscribe=null;#frameUnsubscribe=null;#prefix;#preparing=false;
+    constructor({resource_prefix='weapon-art'}={}){if(typeof resource_prefix!=='string'||!resource_prefix.trim())throw new TypeError('A resource prefix is required');this.#prefix=resource_prefix;}
+    async prepare(render){
+        if(this.#render||this.#preparing)throw new Error('Weapon appearance is already prepared or preparing');this.#preparing=true;
+        const installed=[];
+        try{
+            for(const [id,model]of Object.entries(WEAPON_MODELS))for(const laser of [false,true]){
+                const parts=[...model.parts];if(laser&&model.rail)for(const p of LASER_MODULE){const q=structuredClone(p);if(q.rr){q.rr[0]+=model.rail[0];q.rr[1]+=model.rail[1];}parts.push(q);}
+                const bounds=parts.map(box),x=Math.min(...bounds.map(b=>b[0]))-2.5,y=Math.min(...bounds.map(b=>b[1]))-2.5;
+                const size=[Math.max(...bounds.map(b=>b[2]))+2.5-x,Math.max(...bounds.map(b=>b[3]))+2.5-y],resource_id=`${this.#prefix}:${id}:${laser?1:0}`;
+                if(render.listResources().includes(resource_id))throw new Error(`Weapon resource already exists: ${resource_id}`);
+                await render.registerResource(resource_id,{type:'target',width:Math.ceil(size[0]*4),height:Math.ceil(size[1]*4)});installed.push(resource_id);
+                this.#entries.set(resource_id,{resource_id,size,origin:[-x/size[0],-y/size[1]],packets:paint(parts,[-x,-y]),dirty:true});
+            }
+            this.#unsubscribe=render.onSurfaceChanged(()=>{for(const entry of this.#entries.values())entry.dirty=true;});this.#frameUnsubscribe=render.onFrameRendered(({targets})=>{for(const id of targets){const entry=this.#entries.get(id);if(entry)entry.dirty=false;}});this.#render=render;
+        }catch(error){if(!render.disposed)for(const id of installed)render.releaseResource(id);this.#entries.clear();throw error;}finally{this.#preparing=false;}
+        return this;
+    }
+    draw(frame,definition_id,{laser=false,...pose}={}){
+        if(!this.#render)throw new Error('Prepare weapon resources before drawing');
+        const model=weaponModel(definition_id),id=Object.keys(WEAPON_MODELS).find(key=>WEAPON_MODELS[key]===model),entry=this.#entries.get(`${this.#prefix}:${id}:${laser?1:0}`);
+        // Cache passes are replayed until a completed frame is observed. An aborted
+        // producer frame must not leave the cache marked ready with an empty target.
+        if(entry.dirty){frame.beginPass({target_id:entry.resource_id,viewport:{width:entry.size[0],height:entry.size[1]}});for(const packet of entry.packets)frame.submit(packet);frame.endPass();}
+        frame.submit({...pose,type:'sprite',resource_id:entry.resource_id,size:entry.size,origin:entry.origin});
+    }
+    invalidate(){for(const entry of this.#entries.values())entry.dirty=true;}
+    dispose(){if(this.#preparing)throw new Error('Wait for appearance preparation before disposal');this.#unsubscribe?.();this.#unsubscribe=null;this.#frameUnsubscribe?.();this.#frameUnsubscribe=null;if(this.#render&&!this.#render.disposed)for(const id of this.#entries.keys())this.#render.releaseResource(id);this.#render=null;this.#entries.clear();}
+}
+
+return Object.freeze({get weaponAppearance(){return weaponAppearance;}});
 })();
 // src/directory/native-entry.mjs
 const m0 = (()=>{
@@ -21779,7 +22293,13 @@ const m0 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get assetLibrary(){return m1.assetLibrary;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get createGameAssetLibrary(){return m26.createGameAssetLibrary;},get ApartmentLevel(){return m35.ApartmentLevel;},get APARTMENT_RULES(){return m36.APARTMENT_RULES;},get gameEngine(){return m44.gameEngine;},get gameLevel(){return m46.gameLevel;},get levelLobby(){return m45.levelLobby;},get createGameRuntime(){return m59.createGameRuntime;},get controlSystem(){return m47.controlSystem;},get controlsSystem(){return m47.controlsSystem;},get inputInstance(){return m47.inputInstance;},get keyboardInstance(){return m47.keyboardInstance;},get mouseInstance(){return m47.mouseInstance;},get touchInstance(){return m47.touchInstance;},get touchStick(){return m47.touchStick;},get gamepadInstance(){return m47.gamepadInstance;},get TAP(){return m47.TAP;},get DOUBLETAP(){return m47.DOUBLETAP;},get HELD(){return m47.HELD;},get PRESS(){return m47.PRESS;},get REPEAT(){return m47.REPEAT;},get RELEASE(){return m47.RELEASE;},get renderSystem(){return m52.renderSystem;},get renderFrame(){return m52.renderFrame;},get canvasRenderer(){return m52.canvasRenderer;},get cameraSystem(){return m52.cameraSystem;},get gameSession(){return m68.gameSession;},get PlayerStateSystem(){return m69.PlayerStateSystem;},get PlayerControlSystem(){return m70.PlayerControlSystem;},get Player(){return m39.Player;},get playerVitals(){return m40.playerVitals;}});
+
+
+
+
+
+
+return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get assetLibrary(){return m1.assetLibrary;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get createGameAssetLibrary(){return m26.createGameAssetLibrary;},get ApartmentLevel(){return m35.ApartmentLevel;},get APARTMENT_RULES(){return m36.APARTMENT_RULES;},get gameEngine(){return m44.gameEngine;},get gameLevel(){return m46.gameLevel;},get levelLobby(){return m45.levelLobby;},get createGameRuntime(){return m59.createGameRuntime;},get controlSystem(){return m47.controlSystem;},get controlsSystem(){return m47.controlsSystem;},get inputInstance(){return m47.inputInstance;},get keyboardInstance(){return m47.keyboardInstance;},get mouseInstance(){return m47.mouseInstance;},get touchInstance(){return m47.touchInstance;},get touchStick(){return m47.touchStick;},get gamepadInstance(){return m47.gamepadInstance;},get TAP(){return m47.TAP;},get DOUBLETAP(){return m47.DOUBLETAP;},get HELD(){return m47.HELD;},get PRESS(){return m47.PRESS;},get REPEAT(){return m47.REPEAT;},get RELEASE(){return m47.RELEASE;},get renderSystem(){return m52.renderSystem;},get renderFrame(){return m52.renderFrame;},get canvasRenderer(){return m52.canvasRenderer;},get cameraSystem(){return m52.cameraSystem;},get gameSession(){return m68.gameSession;},get PlayerStateSystem(){return m72.PlayerStateSystem;},get PlayerControlSystem(){return m73.PlayerControlSystem;},get Player(){return m39.Player;},get playerVitals(){return m40.playerVitals;},get itemSystem(){return m69.itemSystem;},get createItemCatalog(){return m71.createItemCatalog;},get GUN_MATERIALS(){return m74.GUN_MATERIALS;},get WEAPON_MODELS(){return m74.WEAPON_MODELS;},get LASER_MODULE(){return m74.LASER_MODULE;},get weaponModel(){return m74.weaponModel;},get weaponAppearance(){return m75.weaponAppearance;}});
 })();
 return m0;
 })();
@@ -23452,7 +23972,7 @@ const { controlSystem, controlsSystem, inputInstance, keyboardInstance, mouseIns
         for (const name of Object.keys(ASSETS.images)) getImage(name);
 
     </script>
-    <script type="text/dfab" data-src="core/registries.js" data-cost="227">
+    <script type="text/dfab" data-src="core/registries.js" data-cost="228">
         // ============================================================================
         //  NOTE REGISTRY — Readable documents, letters, briefings, lore.
         //  Each entry defines content + visual style. Found notes are tracked
@@ -23730,7 +24250,7 @@ const { controlSystem, controlsSystem, inputInstance, keyboardInstance, mouseIns
              * Handles cost check, currency deduction, state init, lifecycle hooks, and UI.
              * @returns {boolean} true if purchased successfully
              */
-            activate(buffId, worldMinutes, game) {
+            activate(buffId, worldMinutes, game, {charge=true}={}) {
                 const config = CONSUMABLES[buffId];
                 if (!config) return false;
 
@@ -23741,12 +24261,12 @@ const { controlSystem, controlsSystem, inputInstance, keyboardInstance, mouseIns
                 }
 
                 // Cost check
-                if (game.currency < config.cost) {
+                if (charge && game.currency < config.cost) {
                     showMessage(`INSUFFICIENT FUNDS (${config.cost} PERSONICS REQUIRED).`);
                     return false;
                 }
 
-                game.currency -= config.cost;
+                if(charge)game.currency -= config.cost;
 
                 // Build buff runtime state
                 const buff = { active: true, endTime: worldMinutes + config.duration };
@@ -26560,7 +27080,7 @@ const { controlSystem, controlsSystem, inputInstance, keyboardInstance, mouseIns
             },
             SEARCH_SUITE: {
                 onStart: (game) => {
-                    if (game.inventory && game.inventory.items.some(i => i.id === 'pistol_fpx')) { game.inventory.equipItem('pistol_fpx'); game.weaponHolstered = false; }
+                    if (game.inventory && game.items.listItems().some(i => i.id === 'pistol_fpx')) { game.inventory.equipItem(game.items.findItem('pistol_fpx').instance_id); game.weaponHolstered = false; }
                     game.hud.reveal('holster');
                     game_timers.after(0.6, () => {
                         game.hud.reveal('fire', { title: 'Your FP-X', text: 'Hold to aim. Push past the gold line to fire.', timeout: 14000, until: g => g.fireJoystick.active || g.mouseDown });
@@ -69854,7 +70374,7 @@ Object.assign(TrafficVehicle.prototype, {
                 this.animationFrameId = null;
         
                 // (the map's Back is the menu's: it closes every screen, the map among them)
-                // close-menu button is handled by InventorySystem.toggleMenu()
+                // close-menu button is handled by InventoryView.toggleMenu()
                 
                 window.addEventListener('resize', () => {
                     this.resizeMap();
@@ -70842,7 +71362,7 @@ Object.assign(TrafficVehicle.prototype, {
             ownedMaps() {
                 const g = this.game, ids = new Set(g.visitedMaps || []);
                 if (g.activeMap) ids.add(g.activeMap.id);
-                for (const it of (g.inventory && g.inventory.items) || []) if (it && it.mapId && MAP_DATA[it.mapId]) ids.add(it.mapId);
+                for (const it of (g.inventory && g.items.listItems()) || []) if (it && it.state.mapId && MAP_DATA[it.state.mapId]) ids.add(it.state.mapId);
                 ids.delete('van_interior');                                 // a ride, not a place
                 const order = Object.keys(MAP_DATA);
                 return [...ids].filter(id => MAP_DATA[id]).sort((a, b) => order.indexOf(a) - order.indexOf(b))
@@ -73956,221 +74476,9 @@ Object.assign(TrafficVehicle.prototype, {
             }
         };
     </script>
-    <script type="text/dfab" data-src="ui/weapon-models.js" data-cost="256">
-        /* =====================================================================
-           WEAPON MODELS — every gun as data: parts in the gun's own frame (+x down
-           the barrel, the grip hand near 0,0, +y to the holder's right), each in a
-           material. A model is painted once into a sprite (bakeWeapon) and stamped
-           by drawWeapon (ui/humanoid-render.js); only its lights are drawn live.
-           Ethereal, elegant sci-fi seen from straight above, in the shapes of
-           ETERNAL's catalog sketches, shaded as angular metallic glass: hard bevel
-           facets, slanted glass glints, faceted gem knobs, glass sleeves over the
-           lines of light. The shading runs along the gun, so it holds whichever
-           way the holder turns and never needs relighting.
-             muzzle   barrel tip (shots and the laser leave from here: weaponMuzzleLocal)
-             rail     where the laser module sits (its front end)
-             brass    the glitter colour of the spent casings each shot throws (null: an energy gun)
-             fx       its signature (engine/combat-effects.js): trail 'crackle' | 'static' | 'wisp' behind the shot,
-                      or barrel 'smoke' (after N quick shots with `after`) | 'embers' off the muzzle; col / core / dust / hot
-             glow     live lights [x, y, r, colour], breathing slowly in a wave down the gun
-             run      a spark that glides down a light line [x0, x1, y, colour]
-           ===================================================================== */
-        const GUN_MATERIALS = {             // base, edge (the dark facet: a deep shade of its own hue, never black), hi (the bright bevel)
-            abyss:      ['#1a1436', '#0e0926', '#5c4fa0'],      // obsidian glass, violet in its depths
-            midnight:   ['#172a86', '#0c1858', '#6f8cff'],
-            lavender:   ['#a891ec', '#4a3790', '#f0e8ff'],
-            periwinkle: ['#8392f7', '#2e3796', '#e2e6ff'],
-            pearl:      ['#ece8fb', '#8f86b8', '#ffffff'],
-            crimson:    ['#c0143e', '#6a0828', '#ff7a98'],
-            teal:       ['#12b8a4', '#066a5e', '#9cfff2'],
-            bronze:     ['#a0602e', '#5a2a10', '#f6b477'],       // rose bronze
-            molten:     ['#ff6418', '#a03008', '#ffd09a'],
-            gold:       ['#d2a038', '#7a5414', '#fff0b0'],
-            champagne:  ['#eddcb2', '#8e7446', '#fffaea'],
-            silver:     ['#c4ccd9', '#626d86', '#f4f7ff'],      // polished silver
-            diamond:    ['#e1f5ff', '#7ca8c5', '#ffffff'],      // icy crystal-white grip
-            pink:       ['#e81c84', '#8a0a4a', '#ffa0d0'],
-            violet:     ['#4a24a0', '#24105e', '#b596ff']
-        };
-
-        // Shapes (from the sketches): a rounded knob at the rear where the hand sits, a band that bulges out
-        // both sides (the side view's big ring), a long rounded slide or barrel, square collars with slots of
-        // light, a side knob and emblem, a nub at the muzzle.
-        // _r slab x0→x1 centred on cy, w wide · _cap the same, fully rounded · _c a knob (a faceted gem) ·
-        // _e/_ce lights (baked with a halo) · _g a glass sleeve over a light · _hole a bore · _slots three slots.
-        const _r = (x0, x1, cy, w, m, r = 0.3) => ({ rr: [x0, cy - w / 2, x1 - x0, w, r], m });
-        const _cap = (x0, x1, cy, w, m) => _r(x0, x1, cy, w, m, w / 2);
-        const _c = (x, y, r, m) => ({ dot: [x, y, r], m });
-        const _e = (x0, x1, cy, w, c) => ({ rr: [x0, cy - w / 2, x1 - x0, w, 0.2], c, emit: true });
-        const _ce = (x, y, r, c) => ({ dot: [x, y, r], c, emit: true });
-        const _g = (x0, x1, cy, w) => ({ rr: [x0, cy - w / 2, x1 - x0, w, w / 2], glass: true });
-        const _hole = (x, y, r) => ({ dot: [x, y, r], c: '#020104' });
-        const _slots = (x0, x1, cy, c) => [-1.3, 0, 1.3].map(o => _e(x0, x1, cy + o, 0.42, c));
-
-        const WEAPON_MODELS = {
-            pistol_fpx: {                                                                       // obsidian glass with deep-blue light (catalog sketch)
-                stance: 'pistol', muzzle: [13.4, 1], rail: [10.5, 4.3], brass: '#6f8cff',
-                parts: [
-                    _c(-2, 1, 2.4, 'abyss'), _c(-2.2, 1, 1.05, 'midnight'),                     // the rear knob
-                    _r(1, 12.2, 1, 4.4, 'abyss', 1.2),                                         // the slide
-                    _e(3.4, 9.6, 1, 0.45, '#4a78ff'), _g(3, 10, 1, 1.5),                        // a light down its spine, under glass
-                    _r(10.3, 11.9, 1, 1, 'midnight', 0.2), _e(10.6, 11.6, 1, 0.45, '#8fb0ff'),  // the sight notch
-                    _cap(11.6, 13.4, 1, 2.6, 'midnight'),                                       // the muzzle nub
-                    _cap(-1.4, 2.2, 1, 6.8, 'midnight'),                                        // the ring band, bulging both sides
-                    _cap(-0.6, 1.4, 1, 5.2, 'abyss'),
-                    _ce(0.4, -1.8, 0.75, '#4a78ff'), _ce(0.4, 3.8, 0.75, '#4a78ff')             // the ring's light at each side
-                ],
-                glow: [[0.4, -1.8, 2.6, '#4a78ff'], [0.4, 3.8, 2.6, '#4a78ff'], [6.5, 1, 2.6, '#4a78ff'], [11.1, 1, 2.2, '#8fb0ff']],
-                run: [3.4, 9.6, 1, '#9fbaff']
-            },
-            pistol_anavia: {                                                                    // periwinkle and lavender, a light for a core
-                stance: 'pistol', muzzle: [13.4, 1], rail: [10, 4.5], brass: null, fx: { trail: 'crackle', col: '#a9b4ff', core: '#f1ecff' }, 
-                parts: [
-                    _c(-1.8, 1, 2.3, 'lavender'), _c(-2, 1, 1, 'periwinkle'),
-                    _r(0.6, 11.4, 1, 4.8, 'lavender', 2),
-                    _e(4, 10.2, 1, 0.9, '#9aa6ff'), _g(3.6, 10.6, 1, 2),                        // the core, under glass
-                    _c(12.2, 1, 2, 'periwinkle'), _ce(12.5, 1, 0.9, '#c4cbff'),                 // the front orb
-                    _cap(0.6, 3.4, 1, 7, 'periwinkle'),
-                    _ce(2, -2, 0.7, '#9fb0ff'), _ce(2, 4, 0.7, '#9fb0ff')
-                ],
-                glow: [[2, -2, 2.2, '#9fb0ff'], [2, 4, 2.2, '#9fb0ff'], [7, 1, 2.8, '#a58ee6'], [12.5, 1, 3.2, '#8c9cff']],
-                run: [4, 10.2, 1, '#e4e0ff']
-            },
-            pistol_ganger: {                                                                    // the hot pink pistol: the FP-X's shape
-                stance: 'pistol', muzzle: [12.9, 1], rail: [10, 4.2], brass: '#ff6ab8',
-                parts: [
-                    _c(-2, 1, 2.3, 'pink'),
-                    _r(1, 11.6, 1, 4.2, 'pink', 1.2),
-                    _cap(11.2, 12.9, 1, 2.4, 'abyss'),
-                    _cap(-1.4, 2, 1, 6.4, 'abyss'),
-                    _e(0.3, 1, 1, 5.4, '#ff9ad2')
-                ],
-                glow: [[0.65, 1, 2.6, '#ff6ab8']]
-            },
-            rifle_rb98: {                                                                       // pearl and teal
-                stance: 'rifle', muzzle: [29.3, 1.5], rail: [21, 4.3], brass: '#6ff5e2', fx: { barrel: 'smoke', after: 4, col: '#cfeee9' }, 
-                parts: [
-                    _cap(-10, -4.6, 1.5, 4.6, 'pearl'),                                         // the rear pad
-                    _r(-5.6, 13.2, 1.5, 5.8, 'pearl', 2.2),                                    // the body
-                    _e(-3.4, 11.4, 1.5, 0.5, '#3dffe0'), _g(-3.8, 11.8, 1.5, 1.7),
-                    _r(13, 19, 1.5, 5, 'teal', 0.6), ..._slots(13.8, 18.2, 1.5, '#3dffe0'),      // the vent collar
-                    _cap(19, 27.4, 1.5, 2.2, 'abyss'),
-                    _cap(26.4, 29.3, 1.5, 3.2, 'pearl'),                                        // the muzzle cap
-                    _cap(3.2, 6.4, 1.5, 7.4, 'teal'),                                           // the ring band
-                    _ce(4.8, -1.9, 0.7, '#3dffe0'), _ce(4.8, 4.9, 0.7, '#3dffe0')
-                ],
-                glow: [[-1, 1.5, 2.2, '#3dffe0'], [4.8, -1.9, 2.4, '#3dffe0'], [4.8, 4.9, 2.4, '#3dffe0'], [16, 1.5, 3.2, '#3dffe0']],
-                run: [-3.4, 11.4, 1.5, '#c8fff6']
-            },
-            sniper_sara: {                                                                      // YourGirlSara: molten orange, rose bronze and obsidian
-                stance: 'sniper', muzzle: [55.2, 0.5], rail: [40, 2.9], brass: '#ff9a3c', fx: { barrel: 'embers', col: '#ff9a3c', hot: '#ffe0a0' }, 
-                parts: [
-                    _cap(-12, -2, 0.5, 5.4, 'abyss'),                                          // the rounded rear hump
-                    _e(-10, -4, 0.5, 0.7, '#ff6a1a'),
-                    _r(-2.6, 14.2, 0.5, 5.6, 'bronze', 1.2),                                   // the receiver
-                    _c(6, 3.8, 1.3, 'bronze'),                                                  // the side knob
-                    _r(14.6, 18.6, 0.5, 4.8, 'bronze', 0.4), ..._slots(15.2, 18, 0.5, '#ff7a24'),
-                    _r(19.2, 23.2, 0.5, 4.8, 'bronze', 0.4), ..._slots(19.8, 22.6, 0.5, '#ff7a24'),
-                    _cap(23.2, 51.4, 0.5, 2.8, 'silver'),
-                    _e(24.5, 50, 0.5, 0.5, '#ff5a12'), _g(24, 50.6, 0.5, 1.6),                  // the barrel's heat line, under glass
-                    _r(51, 55.2, 0.5, 4, 'bronze', 0.8),                                        // the brake
-                    _r(52.1, 52.7, 0.5, 4, 'champagne'), _r(53.5, 54.1, 0.5, 4, 'champagne'),
-                    _cap(0.4, 13.6, 0.5, 3, 'abyss'),                                           // the scope, on top
-                    _r(3.4, 4.6, 0.5, 3.6, 'bronze'), _r(9.4, 10.6, 0.5, 3.6, 'bronze'),
-                    _ce(13, 0.5, 0.95, '#ffb060')
-                ],
-                glow: [[-7, 0.5, 2.4, '#ff6a1a'], [13, 0.5, 3.2, '#ff7a24'], [16.6, 0.5, 3, '#ff6a1a'], [21.2, 0.5, 3, '#ff6a1a'], [38, 0.5, 3, '#ff5a12']],
-                run: [24.5, 50, 0.5, '#ffd09a']
-            },
-            sniper_sr86: {                                                                      // SR-86: obsidian, crimson and pearl (catalog sketch): one width, stock to muzzle
-                stance: 'sniper', muzzle: [55.2, 0.5], rail: [40, 3.9], brass: '#ff4d68', fx: { barrel: 'smoke', col: '#d9d2de' }, 
-                parts: [
-                    _r(-12, -2, 0.5, 5, 'abyss', [2.5, 0.4, 0.4, 2.5]),                         // the thumb-hump rear, rounded at the back
-                    _r(-9.6, -4, 0.5, 1, 'crimson'),
-                    _r(-2, 14.2, 0.5, 5, 'pearl', 0.5),                                         // the receiver
-                    _c(6, 3.6, 1.3, 'pearl'),                                                   // the side knob
-                    _e(4.4, 7.6, 0.5, 0.6, '#ff2448'), _e(5.7, 6.3, 0.5, 2.6, '#ff2448'),        // the cross emblem
-                    _r(14.6, 18.6, 0.5, 5, 'abyss', 0.4), ..._slots(15.2, 18, 0.5, '#ff2448'),   // the two slotted collars
-                    _r(19.2, 23.2, 0.5, 5, 'abyss', 0.4), ..._slots(19.8, 22.6, 0.5, '#ff2448'),
-                    _r(23.2, 55.2, 0.5, 5, 'abyss', [0.4, 1.2, 1.2, 0.4]),                      // the long smooth barrel, the same width to the muzzle
-                    _e(25, 50, -0.7, 0.35, '#ff2448'), _e(25, 50, 1.7, 0.35, '#ff2448'),         // two hairlines of red down it, under glass
-                    _g(24.6, 50.4, 0.5, 3.6),
-                    _hole(51.6, 0.5, 0.9),                                                      // its bore hole
-                    _r(53.6, 55.2, 0.5, 5, 'crimson', [0.4, 1.2, 1.2, 0.4])                     // the crimson muzzle band
-                ],
-                glow: [[6, 0.5, 3.2, '#ff2448'], [16.6, 0.5, 3, '#ff2448'], [21.2, 0.5, 3, '#ff2448'], [54.4, 0.5, 2.4, '#ff2448']],
-                run: [25, 50, 1.7, '#ff9aae']
-            },
-            golden_child: {                                                                     // gold and champagne, a light in its heart
-                stance: 'pistol', muzzle: [20, 1], rail: [13, 5.8], brass: null, fx: { trail: 'wisp', col: '#f3e4c6', dust: '#ffd76a' }, 
-                parts: [
-                    _cap(-3.6, 14, 1, 8.4, 'gold'),
-                    _e(-1.6, 12, 1, 0.5, '#ffe7a0'), _g(-2, 12.4, 1, 2),
-                    _cap(3.8, 7.4, 1, 9.6, 'champagne'),                                        // the ring band
-                    _ce(5.6, 1, 1.7, '#fff1c4'),                                                // the core
-                    _c(16.6, 1, 3.3, 'champagne'), _ce(17.6, 1, 1.35, '#ffd76a')                // the front orb and its bore
-                ],
-                glow: [[5.6, 1, 4.2, '#ffd76a'], [17.6, 1, 3.6, '#ffe7a0']],
-                run: [-1.6, 12, 1, '#fffaea']
-            },
-            maiden_kukri: {                                                                     // the Maiden's Kukri: a curved golden blade, a dark grip, a ring pommel
-                stance: 'knife', muzzle: [19, 1.6], rail: [8, 0], brass: null, melee: true,
-                parts: [
-                    _c(-5.2, 0, 1.9, 'gold'), _hole(-5.2, 0, 0.85),                             // the ring pommel
-                    _r(-4, 3, 0, 2.6, 'diamond', 1.1),                                          // the icy diamond grip
-                    _r(-2.6, -2, 0, 2.8, 'gold', 0.3), _r(0.4, 1, 0, 2.8, 'gold', 0.3),         // gold bands on it
-                    _r(3, 4.2, 0, 4.6, 'gold', 0.5),                                            // the guard
-                    { poly: [[4, -1.3], [8.5, -1.7], [12.5, -1.3], [16, -0.2], [18.6, 1.4], [19.4, 2.6], [17.2, 2.6], [13.6, 2.1], [9.4, 1.6], [4, 1.1]], m: 'gold' },   // the forward-curved blade
-                    { poly: [[5, 0.4], [9.5, 0.9], [13.8, 1.4], [17.4, 2.2], [13.6, 1.8], [9.4, 1.3], [5, 0.9]], m: 'champagne' },   // its bright edge
-                    { poly: [[5, -0.05], [9.5, 0.08], [13.5, 0.62], [16.7, 1.52], [18.35, 2.2], [16.55, 1.8], [13.4, 0.9], [9.4, 0.32], [5, 0.17]], m: 'silver' }, // a slender silver inlay along the blade
-                    _ce(3.6, 0, 0.6, '#ffe7a0')                                                 // a gem in the guard
-                ],
-                glow: [[3.6, 0, 1.6, '#ffd76a'], [18, 2, 1.4, '#fff1c4']],
-                run: [5, 18, 1.4, '#fffaea']                                                    // the glint along the edge
-            },
-            blood_pact: {                                                                       // Blood Pact: a long blood-red katana, a black wrapped grip, a crimson tsuba
-                stance: 'knife', muzzle: [50, -1.6], rail: [8, 0], brass: null, melee: true, swing: 'wide',   // a two-handed sweep (engine/status-effects.js)
-                edge: [50.5, -1.9],                                                             // the tip, where the slash trail runs (engine/status-effects.js)
-                trail: { dust: '#ff3a5c', cols: [[9, '200, 20, 50', .26], [3.4, '255, 70, 100', .6], [1.3, '255, 210, 220', .9]] },
-                parts: [
-                    _cap(-10.4, -8.4, 0, 2.7, 'crimson'),                                       // the pommel cap
-                    _r(-9, 1.8, 0, 2.4, 'abyss', 0.8),                                          // the long two-hand grip
-                    ...[-7.4, -5.2, -3, -0.8].map(x => _r(x, x + 0.9, 0, 2.5, 'crimson', 0.4)), // the crimson wrap across it
-                    _r(1.8, 3, 0, 5.6, 'abyss', 0.6),                                           // the tsuba
-                    _ce(2.4, 0, 0.7, '#ff2448'),                                                // a blood gem in it
-                    _r(3, 4.6, 0, 2.3, 'gold', 0.3),                                            // the collar
-                    { poly: [[3.5, -1], [10, -0.99], [17, -1.04], [24, -1.14], [31, -1.31], [38, -1.54], [44, -1.79], [47, -1.93], [50.5, -1.9],
-                             [47.6, -0.5], [44, -0.25], [38, 0.07], [31, 0.37], [24, 0.62], [17, 0.81], [10, 0.94], [3.5, 1]], m: 'crimson' },  // the gently curved blade
-                    { poly: [[4.6, 0.45], [17, 0.3], [31, -0.1], [44, -0.65], [49.6, -1.6], [47.4, -0.62], [44, -0.32], [31, 0.3], [17, 0.74], [4.6, 0.9]], c: '#ff5a78', emit: true },   // its glowing edge
-                    { poly: [[6, -0.48], [20, -0.5], [36, -0.85], [36, -0.62], [20, -0.28], [6, -0.26]], c: '#3a0412' }   // the blood groove
-                ],
-                glow: [[2.4, 0, 1.8, '#ff2448'], [30, -0.2, 1.6, '#ff5a78'], [49, -1.6, 1.6, '#ffb0c0']],
-                run: [5, 48, 1.5, '#ffd0da']                                                    // the glint along the edge
-            },
-            empg: {                                                                             // the EMP blaster (catalog): a bulbous body, twin orbs at the front
-                stance: 'pistol', muzzle: [14.6, 1], rail: [9, 5.4], brass: null, fx: { trail: 'static', col: '#b48cff', core: '#efe4ff' }, 
-                parts: [
-                    _c(-2, 1, 2.4, 'abyss'),
-                    _cap(-1.2, 12.4, 1, 7.4, 'violet'),
-                    _ce(1, 1, 0.75, '#c9a6ff'),                                                 // the port
-                    _e(3.6, 10, 1, 0.5, '#b48cff'), _g(3.2, 10.4, 1, 2.2),
-                    _c(12.6, -1.5, 1.6, 'pearl'), _ce(13, -1.5, 0.7, '#dcc6ff'),                 // the twin orbs
-                    _c(12.6, 3.5, 1.6, 'pearl'), _ce(13, 3.5, 0.7, '#dcc6ff')
-                ],
-                glow: [[1, 1, 2, '#c9a6ff'], [13, -1.5, 2.8, '#b48cff'], [13, 3.5, 2.8, '#b48cff']],
-                run: [3.6, 10, 1, '#efe4ff']
-            }
-        };
-        const LASER_MODULE = [                                                                  // under-barrel laser: body, then emitter at its front
-            { rr: [-5.5, -0.9, 5.5, 1.9, 0.3], m: 'abyss' }, { rr: [-0.9, -0.5, 0.9, 1.1, 0.2], c: '#ff2a3a', emit: true }
-        ];
-
-        /** The model for a weapon id: its own, else the closest by name, else the FP-X — never nothing. */
-        function weaponModel(id) {
-            id = id || '';
-            return WEAPON_MODELS[id] || (id.includes('sniper') ? WEAPON_MODELS.sniper_sara : id.includes('rifle') ? WEAPON_MODELS.rifle_rb98
-                : id.includes('kukri') ? WEAPON_MODELS.maiden_kukri : id.includes('pact') || id.includes('katana') ? WEAPON_MODELS.blood_pact : id.includes('golden') ? WEAPON_MODELS.golden_child : id.includes('emp') ? WEAPON_MODELS.empg : id.includes('anavia') ? WEAPON_MODELS.pistol_anavia : WEAPON_MODELS.pistol_fpx);
-        }
+    <script type="text/dfab" data-src="ui/weapon-models.js" data-cost="71">
+        // Appearance definitions are authored once in Directory. Canvas remains the classic backend.
+        const {GUN_MATERIALS,WEAPON_MODELS,LASER_MODULE,weaponModel}=DFNative;
 
         const _weaponSprites = new Map();
         const WEAPON_BAKE = 4;                                                                  // sprite px per model px
@@ -77106,7 +77414,7 @@ Object.assign(TrafficVehicle.prototype, {
                         // the retract). Sniper models sit 2px lower in the hand, matching NPCs.
                         if (game.weaponMode === 'normal' || game.weaponMode === 'sniper') {
                             const wy = wyBase + (weaponId.includes('sniper') ? 2 : 0);
-                            const laser = !!(game.inventory && game.inventory.hasAttachment('laser_sight'));
+                            const laser = !!(game.inventory && game.items.hasAttachment('laser_sight'));
                             // the finisher's twirl (engine/finisher.js): the gun spins round her trigger finger
                             const tw = game.twirlAngle ? game.twirlAngle() : 0;
                             drawWeapon(ctx, weaponId, wx, wy, tw, scale, laser && !tw);
@@ -81931,30 +82239,17 @@ Object.assign(TrafficVehicle.prototype, {
         }
 
     </script>
-    <script type="text/dfab" data-src="ui/inventory-augments.js" data-cost="421">
+    <script type="text/dfab" data-src="ui/inventory-augments.js" data-cost="366">
         /* =====================================================================
            INVENTORY SYSTEM
            ---------------------------------------------------------------------
            Manages complex items beyond simple counters.
            Connects to the #freelancer-menu UI.
            ===================================================================== */
-        class InventoryItem {
-            constructor(id, name, type, icon, description, action = null, stats = {}) {
-                this.id = id;
-                this.name = name;
-                this.type = type; // 'weapon', 'consumable', 'intel', 'attachment'
-                this.icon = icon;
-                this.description = description;
-                this.action = action; // Function to execute on use
-                this.stats = stats;
-                if (stats.effect) this.effect = stats.effect;
-            }
-        }
-        
         /* =====================================================================
            ITEM REGISTRY — Single source of truth for all item definitions.
-           Items are stored as data; createItemFromRegistry() builds live objects.
-           Save stores IDs only; load reconstructs from this registry.
+           Items are definitions; itemSystem owns uniquely identified instances.
+           Saves preserve instance records and equipment references.
            ===================================================================== */
         const ITEM_REGISTRY = GAME_DB.items.gear;   // directory/game-db/items.json
         
@@ -82031,29 +82326,7 @@ Object.assign(TrafficVehicle.prototype, {
         // Default loadout for new games
         const DEFAULT_LOADOUT = GAME_DB.items.default_loadout;   // directory/game-db/items.json
         
-        // Factory: create a live InventoryItem from registry ID
-        function createItemFromRegistry(id, game) {
-            const def = ITEM_REGISTRY[id];
-            if (!def) { console.warn(`[ITEM_REGISTRY] Unknown item: ${id}`); return null; }
-            
-            let action = null;
-            if (def.type === 'weapon') {
-                const mode = def.weaponMode || 'normal';
-                action = (item) => {
-                    if (game) {
-                        game.cancelQuickDraw();
-                        game.currentWeapon = item;
-                        game.weaponMode = mode;
-                        game._drawnAt = _gameTimeSec; game._drawShotUsed = false;   // Arms: Quick-Draw
-                    }
-                };
-            }
-            
-            const item = new InventoryItem(id, def.name, def.type, def.icon, def.desc, action, def.stats);
-            return item;
-        }
-        
-        // Views of existing ownership. These records never enter physical InventorySystem.items,
+        // Views of existing ownership. These records never enter the carried item model,
         // capacity calculations, save payloads, map entities or cosmetic acquisition methods.
         const INVENTORY_SPECIAL_COSMETICS = new Set(['outfit_academy', 'acc_umbrella']);
         const APARTMENT_FURNITURE_REGISTRY = Object.freeze(GAME_DB.items.furniture.map(entry => Object.freeze(entry)));   // directory/game-db/items.json
@@ -82120,18 +82393,12 @@ Object.assign(TrafficVehicle.prototype, {
             return result;
         }
 
-        class InventorySystem {
+        class InventoryView {
             constructor(game) {
                 this.game = game;
-                this.items = [];
-                this.capacity = 10;
                 this.uiList = document.getElementById('inventory-list');
                 this.menu = document.getElementById('freelancer-menu');
                 
-                // --- DUAL EQUIP SLOTS ---
-                this.equippedWeaponId = null;     // Active weapon
-                this.equippedAttachments = [];    // Active attachments (laser sight, muzzle…), up to maxAttachments
-                this.maxAttachments = 2;
                 this.entryOrder = [];             // pill order the player dragged, as 'source:id' keys (saved)
                 
                 // --- ITEM TYPE CONFIG ---
@@ -82150,128 +82417,32 @@ Object.assign(TrafficVehicle.prototype, {
                 const backBtn = document.getElementById('close-menu');
                 if (backBtn) backBtn.onclick = () => this.toggleMenu();
         
-                // Default Loadout (from ITEM_REGISTRY)
-                this.loadDefaultLoadout();
-                
-                // Auto-equip the first weapon found
-            }
-            
-            // Load default new-game items from ITEM_REGISTRY
-            loadDefaultLoadout() {
-                // (quietly: no OBTAINED toasts while the main menu is up, where this runs at boot and on New Game)
-                for (const id of DEFAULT_LOADOUT) {
-                    const item = createItemFromRegistry(id, this.game);
-                    if (item) this.items.push(item);
-                }
-            }
-            
-            // Rebuild inventory from an array of item IDs (used by save/load)
-            loadItemsFromIds(ids) {
-                this.items = [];
-                this.equippedWeaponId = null;
-                this.equippedAttachmentId = null;
-                for (const id of ids) {
-                    const item = createItemFromRegistry(id, this.game);
-                    if (item) this.items.push(item);
-                    else console.warn(`[LOAD] Unknown item ID in save: ${id}`);
-                }
-            }
-        
-            equipItem(id) {
-                const item = this.items.find(i => i.id === id);
-                if (!item) return;
-                const config = this.typeConfig[item.type];
-                if (!config || !config.slot) return; // Not equippable
-                
-                if (config.slot === 'weapon') {
-                    this.equippedWeaponId = id;
-                    if (item.action) item.action(item);
-                } else if (config.slot === 'attachment') {
-                    if (this.equippedAttachments.includes(id)) return;
-                    if (this.equippedAttachments.length >= this.maxAttachments) {
-                        showMessage(`MAX ${this.maxAttachments} ATTACHMENTS EQUIPPED. UNEQUIP ONE FIRST.`);
-                        return;
-                    }
-                    this.equippedAttachments.push(id);
-                    showMessage(`${item.name.toUpperCase()} EQUIPPED`);
-                }
-                this.render();
-            }
-        
-            unequipSlot(slot, id = null) {
-                if (slot === 'weapon') {
-                    this.equippedWeaponId = null;
-                    this.game.weaponMode = 'none';
-                    showMessage("WEAPON HOLSTERED");
-                } else if (slot === 'attachment') {
-                    // One attachment by id, or all of them
-                    this.equippedAttachments = id ? this.equippedAttachments.filter(a => a !== id) : [];
-                    showMessage("ATTACHMENT REMOVED");
-                }
-                this.render();
-            }
-            
-            // Legacy compat — unequips whatever was passed or defaults to weapon
-            unequip(itemId) {
-                if (itemId) {
-                    const item = this.items.find(i => i.id === itemId);
-                    if (item) {
-                        const config = this.typeConfig[item.type];
-                        if (config?.slot) { this.unequipSlot(config.slot, itemId); return; }
-                    }
-                }
-                this.unequipSlot('weapon');
-            }
-            
-            isItemEquipped(id) {
-                return this.equippedWeaponId === id || this.equippedAttachments.includes(id);
             }
 
-            /** The first equipped attachment (older saves and callers knew only one); setting it equips just that one */
-            get equippedAttachmentId() { return this.equippedAttachments[0] || null; }
-            set equippedAttachmentId(id) { this.equippedAttachments = id ? [id] : []; }
-
-            getEquippedAttachment() {
-                return this.equippedAttachmentId ? this.items.find(i => i.id === this.equippedAttachmentId) : null;
+            equipItem(instance_id) {
+                const item=this.game.items.getItem(instance_id);
+                if(!this.game.items.equipItem(instance_id)){showMessage('ATTACHMENT SLOTS FULL OR INCOMPATIBLE');return false;}
+                showMessage(`${item.name.toUpperCase()} EQUIPPED`);this.render();return true;
             }
-
-            /** The equipped attachments, as items */
-            getEquippedAttachments() {
-                return this.equippedAttachments.map(id => this.items.find(i => i.id === id)).filter(Boolean);
+            unequipSlot(slot,instance_id=null) {
+                if(instance_id)this.game.items.unequipItem(instance_id);else this.game.items.unequipSlot(slot);
+                showMessage(slot==='weapon'?'WEAPON HOLSTERED':'ATTACHMENT REMOVED');this.render();
             }
-
-            /** Is an attachment with this effect equipped? ('laser_sight', 'mirror_blade', 'blood_muzzle') */
-            hasAttachment(effect) {
-                return this.equippedAttachments.some(id => this.items.find(i => i.id === id)?.effect === effect);
+            receiveItem(packet) {
+                const item=packet.root_instance_id?this.game.items.receiveBundle(packet):this.game.items.receiveItem(packet);
+                if(!item){showMessage('INVENTORY FULL');return false;}
+                showMessage(`OBTAINED: ${item.name.toUpperCase()}`);this.render();return true;
             }
-        
-            addItem(item) {
-                // Attachments ride in their own case: craft as many as you like (two are worn at a time);
-                // the capacity counts everything else
-                if (item.type !== 'attachment' && this.items.filter(i => i.type !== 'attachment').length >= this.capacity) {
-                    showMessage("INVENTORY FULL");
-                    return false;
+            useItem(instance_id) {
+                const item=this.game.items.getItem(instance_id),effect=item.effect;
+                if(effect?.kind==='buff'){
+                    if(!this.game.player.buffSystem.activate(effect.buff_id,this.game.worldMinutes,this.game,{charge:false}))return false;
+                    this.game.items.consumeItem(instance_id);this.render();return true;
                 }
-                this.items.push(item);
-                // If we have nothing equipped and picked up a weapon, maybe auto-equip?
-                // For now, we'll just notify.
-                showMessage(`OBTAINED: ${item.name.toUpperCase()}`);
-                return true;
+                if(effect?.kind==='note'){this.game.openNote(effect.note_id);return true;}
+                return false;
             }
-        
-            removeItem(id) {
-                // If dropping equipped item, unequip first
-                if (this.isItemEquipped(id)) {
-                    this.unequip(id);
-                }
-                
-                const idx = this.items.findIndex(i => i.id === id);
-                if (idx > -1) {
-                    this.items.splice(idx, 1);
-                    this.render();
-                }
-            }
-        
+
             // Open the menu on the inventory, or close it (Screens keeps every sub-screen in step)
             toggleMenu() {
                 if (Screens.menuOpen()) Screens.close();
@@ -82286,12 +82457,12 @@ Object.assign(TrafficVehicle.prototype, {
                     collectible: 'collectibles', intel: 'collectibles',
                     pet: 'pets', mount: 'mounts', vehicle: 'mounts'
                 }[type] || 'items');
-                const carried = this.items.map(item => ({
-                    id: item.id, source: 'carried', sourceId: item.id,
+                const carried = this.game.items.listItems().map(item => ({
+                    id:item.instance_id,source:'carried',sourceId:item.definition_id,
                     category: categoryOf(item.type), type: item.type,
                     name: item.name, description: item.description, icon: item.icon,
-                    detail: item.type === 'attachment' ? 'Weapon attachment' : '',
-                    isEquipped: this.isItemEquipped(item.id), item
+                    detail:item.type==='attachment'?(this.game.items.getParentWeapon(item.instance_id)?'Mounted on '+this.game.items.getParentWeapon(item.instance_id).name:'Weapon attachment'):'',
+                    isEquipped:this.game.items.isEquipped(item.instance_id),item
                 }));
                 return carried.concat(getOwnedInventoryEntries(this.game));
             }
@@ -82313,13 +82484,15 @@ Object.assign(TrafficVehicle.prototype, {
 
             _dropCarriedItem(item) {
                 // Registry entries never reach the existing physical drop path.
-                if (!this.items.includes(item)) return;
+                if(!this.game.running||!this.game.loot||!this.game.items.hasInstance(item.instance_id))return;
+                const parent=this.game.items.getParentWeapon(item.instance_id);if(parent)this.game.items.detachFromWeapon(parent.instance_id,item.instance_id);
+                const packet=this.game.items.extractItem(item.instance_id);
                 if (this.game.loot) {
                     const throwAngle = Math.random() * Math.PI * 2;
                     this.game.loot.push({
                         x: this.game.playerPosition[0] + Math.cos(throwAngle) * 50,
                         y: this.game.playerPosition[1] + Math.sin(throwAngle) * 50,
-                        type: 'weapon_drop', item,
+                        type:'weapon_drop',item:packet,
                         angle: Math.random() * 6.28, dropTime: Date.now(),
                         draw: function(ctx) {
                             ctx.save();
@@ -82328,12 +82501,12 @@ Object.assign(TrafficVehicle.prototype, {
                             ctx.save(); ctx.translate(0, 10); ctx.scale(1, 0.36); ctx.globalAlpha = 0.75;
                             drawGlow(ctx, 0, 0, 22, '#a469ff', 0.3);
                             ctx.restore();
-                            drawWeapon(ctx, this.item.id, 0, bob, this.angle, 0.8);
+                            drawWeapon(ctx, this.item.root_instance_id?this.item.records[0].definition_id:this.item.definition_id, 0, bob, this.angle, 0.8);
                             ctx.restore();
                         }
                     });
                 }
-                this.removeItem(item.id);
+                this.render();
                 showMessage(`DROPPED: ${item.name}`);
             }
 
@@ -82373,20 +82546,17 @@ Object.assign(TrafficVehicle.prototype, {
                 const actions = [];
                 if (entry.source === 'carried') {
                     const config = this.typeConfig[entry.type] || {};
-                    if (config.slot || config.consumable || entry.item.action) {
+                    if (config.slot || config.consumable || entry.item.effect?.kind==='note') {
                         const kind = config.slot ? 'equip' : config.consumable ? 'consume' : 'inspect';
                         const label = config.slot ? (entry.isEquipped ? config.unequipLabel : config.equipLabel)
                             : config.consumable ? 'CONSUME' : (config.equipLabel || 'USE');
                         actions.push({ kind, label, run: () => {
                             // Read current state at the time of the action.
-                            if (!this.items.includes(entry.item)) return;
+                            if(!this.game.items.hasInstance(entry.item.instance_id))return;
                             if (config.slot) {
-                                if (this.isItemEquipped(entry.id)) this.unequipSlot(config.slot, entry.id);
+                                if (this.game.items.isEquipped(entry.id)) this.unequipSlot(config.slot, entry.id);
                                 else this.equipItem(entry.id);
-                            } else if (config.consumable) {
-                                if (entry.item.action) entry.item.action(entry.item);
-                                this.removeItem(entry.id);
-                            } else if (entry.item.action) entry.item.action(entry.item);
+                            } else this.useItem(entry.item.instance_id);
                         }});
                     }
                     actions.push({ kind: 'drop', label: 'DROP', run: () => this._dropCarriedItem(entry.item) });
@@ -85895,8 +86065,10 @@ const levelLobby = DFNative.levelLobby;
             }
         };
     </script>
-    <script type="text/dfab" data-src="engine/game-engine.js" data-cost="175">
+    <script type="text/dfab" data-src="engine/game-engine.js" data-cost="179">
         class GameEngine {
+            get currentWeapon(){return this.items?.getEquippedWeapon()??null;}
+            get weaponMode(){return this.items?.getWeaponMode()??'none';}
             constructor() {
                 
                 // Pause registry — every subsystem that needs the world paused
@@ -85911,7 +86083,11 @@ const levelLobby = DFNative.levelLobby;
                 
                 this.ui = new UISystem(this);
                 this.musicWidget = new MusicWidgetSystem(this);
-                this.inventory = new InventorySystem(this);
+                this.items=new DFNative.itemSystem({catalog:DFNative.createItemCatalog(GAME_DB.items)});
+                this.items.reset(DEFAULT_LOADOUT);
+                this.items.on('items:equipped',event=>{if(event.slot==='weapon'){this.cancelQuickDraw();this._drawnAt=_gameTimeSec;this._drawShotUsed=false;}});
+                this.items.on('items:unequipped',event=>{if(event.slot==='weapon')this.cancelQuickDraw();});
+                this.inventory = new InventoryView(this);
                 
                 this.cutscene = new CutsceneManager(this);
                 this.story = new StoryManager(this);
@@ -85991,9 +86167,7 @@ const levelLobby = DFNative.levelLobby;
                 };
                 
                 this.currency = 100; this.scrap = 0; this.boosterCount = 4; this.maxBoosters = 4; this.debugMode = false; this.showProfiler = false;
-                this.weaponMode = 'none';  // 'normal' or 'sniper' - sniper shots penetrate everything
                 this.shootCooldown = 0;    // Tracks timing between shots
-                this.currentWeapon = null; // Stores the currently active weapon object
 
                 this.interactBtn = document.getElementById('btn-interact');
                 this.transitionBtn = document.getElementById('btn-transition');
@@ -87139,7 +87313,7 @@ const levelLobby = DFNative.levelLobby;
             },
         });
     </script>
-    <script type="text/dfab" data-src="engine/quick-draw.js" data-cost="47">
+    <script type="text/dfab" data-src="engine/quick-draw.js" data-cost="48">
 // Quick draw is a transient combat mode. Shots still use fireWeapon and its normal bonuses.
 engineMixin({
     setWeaponHolstered(on) {
@@ -87161,7 +87335,7 @@ engineMixin({
             || !this.player.visible || !this.currentWeapon || !['normal', 'sniper'].includes(this.weaponMode)
             || this.furniture?.busy() || this.cutscene?.active) return false;
         clearGameplayInputs(this);
-        this._quickDraw = { weapon: this.currentWeapon, phase: 'ready', ticks: 0 };
+        this._quickDraw = { weapon_instance_id:this.currentWeapon.instance_id, phase: 'ready', ticks: 0 };
         this.setWeaponHolstered(true);
         showMessage('QUICK DRAW — AIM PAST THE RING AND RELEASE');
         return true;
@@ -87169,7 +87343,7 @@ engineMixin({
     interruptQuickDrawShot() {
         const q = this._quickDraw;
         if (!q) return;
-        if (q.weapon !== this.currentWeapon || this.isDriving || this.player.dead) { this.cancelQuickDraw(); return; }
+        if (q.weapon_instance_id !== this.currentWeapon?.instance_id || this.isDriving || this.player.dead) { this.cancelQuickDraw(); return; }
         q.phase = 'ready'; q.ticks = 0; q.aimPoint = null; q.angle = null;
         this._quickDrawFiring = false;
         this.setWeaponHolstered(true);
@@ -87183,7 +87357,7 @@ engineMixin({
         const q = this._quickDraw;
         if (!q || q.phase !== 'ready' || !Number.isFinite(angle) || !this.running || this.paused
             || hudInputBlocked() || this.isDriving || this.player.dead || !this.player.visible
-            || this.currentWeapon !== q.weapon || this.furniture?.busy() || this.cutscene?.active) return false;
+            || this.currentWeapon?.instance_id !== q.weapon_instance_id || this.furniture?.busy() || this.cutscene?.active) return false;
         // A release during recovery is discarded, never queued to fire later.
         if (this.shootCooldown > 0) { showMessage('QUICK DRAW — RECOVERING'); return false; }
         q.phase = 'draw'; q.ticks = 7; q.angle = angle;
@@ -87195,7 +87369,7 @@ engineMixin({
     updateQuickDraw() {
         const q = this._quickDraw;
         if (!q) return;
-        if (this.currentWeapon !== q.weapon || !['normal', 'sniper'].includes(this.weaponMode)
+        if (this.currentWeapon?.instance_id !== q.weapon_instance_id || !['normal', 'sniper'].includes(this.weaponMode)
             || this.isDriving || this.player.dead || !this.player.visible || this.cutscene?.active || this.furniture?.busy()) {
             this.cancelQuickDraw(); return;
         }
@@ -87965,7 +88139,7 @@ engineMixin({
                 this._triFallTick = _simTick;
                 const qs = this.questState || (this.questState = {}), first = !qs.triumvirateDefeats;
                 qs.triumvirateDefeats = (qs.triumvirateDefeats || 0) + 1;
-                if (first && !this.inventory.items.some(i => i.id === 'blood_pact') && this.dropBossWeapon('blood_pact', last.x, last.y + 8)) {
+                if (first && !this.items.listItems().some(i => i.id === 'blood_pact') && this.dropBossWeapon('blood_pact', last.x, last.y + 8)) {
                     game_timers.after(1.6, () => showMessage('COMPLINE LEAVES THE BLOOD PACT'), 'world');
                     if (this.hordeGauntlet) this.hordeGauntlet.spoil('Blood Pact');
                 }
@@ -87973,9 +88147,9 @@ engineMixin({
 
             /** A boss's weapon on the floor where it fell, glowing gold (picked up like any weapon drop) */
             dropBossWeapon(id, x, y) {
-                const item = createItemFromRegistry(id, this); if (!item) return null;
+                const item = this.items.createItem(id); if (!item) return null;
                 const drop = { x, y, type: 'weapon_drop', item, angle: 0.6, dropTime: 0,
-                    draw(ctx) { ctx.save(); ctx.translate(this.x, this.y); ctx.save(); ctx.translate(0, 10); ctx.scale(1, 0.36); ctx.globalAlpha = 0.75; drawGlow(ctx, 0, 0, 22, '#ffd76a', 0.3); ctx.restore(); drawWeapon(ctx, this.item.id, 0, Math.sin(_frameTime / 500) * 3, this.angle, 0.9); ctx.restore(); } };
+                    draw(ctx) { ctx.save(); ctx.translate(this.x, this.y); ctx.save(); ctx.translate(0, 10); ctx.scale(1, 0.36); ctx.globalAlpha = 0.75; drawGlow(ctx, 0, 0, 22, '#ffd76a', 0.3); ctx.restore(); drawWeapon(ctx, this.item.definition_id, 0, Math.sin(_frameTime / 500) * 3, this.angle, 0.9); ctx.restore(); } };
                 this.loot.push(drop);
                 return drop;
             }
@@ -90615,7 +90789,7 @@ engineMixin({
                 const M = weaponModel(W && W.id);
                 this._slashStyle = M.swing || 'knife';
                 const ang = pl.angle, reach = st.reach || 36, arc = st.arc || 1.4;
-                const edge = this.inventory && this.inventory.hasAttachment('crimson_edge') ? ITEM_REGISTRY.crimson_edge.stats : null;
+                const edge = this.inventory && this.items.hasAttachment('crimson_edge') ? ITEM_REGISTRY.crimson_edge.stats : null;
                 let bladeDamage = (st.damage || 25) * this.playerDamageMult() * (edge ? edge.bladeDamageMult : 1);
                 // A Flit-cut: a swing inside the Flit-Strike window always crits (and Flit-Strike adds its share)
                 const flitCut = !!(this.resonance && this.player && _gameTimeSec - this.player.vitals.last_flit_at <= this.resonance.flitStrikeWindow());
@@ -90777,7 +90951,7 @@ engineMixin({
             playerDamageMult() { return this.mirrorGlassOn() ? MIRROR.GLASS_DAMAGE : 1; },
             /** …and on her bullets (the Bloodthirsty Muzzle on top) */
             gunDamageMult() {
-                const muzzle = this.inventory && this.inventory.hasAttachment('blood_muzzle') ? ITEM_REGISTRY.blood_muzzle.stats.gunDamageMult : 1;
+                const muzzle = this.inventory && this.items.hasAttachment('blood_muzzle') ? ITEM_REGISTRY.blood_muzzle.stats.gunDamageMult : 1;
                 return muzzle * this.playerDamageMult();
             },
 
@@ -90812,7 +90986,7 @@ engineMixin({
                 }
                 const S = this._swing;
                 let blade = null;
-                if (S && this.inventory && this.inventory.hasAttachment('mirror_blade')) {
+                if (S && this.inventory && this.items.hasAttachment('mirror_blade')) {
                     // The blade this tick: from a tick ago to now, in a few steps, during the cut only
                     const ph = swingPhases(S.style), age = _gameTimeSec - S.t0, from = Math.max(ph.windup * S.secs, age - step), to = Math.min(ph.cutEnd * S.secs, age);
                     if (to >= from) {
@@ -91460,7 +91634,7 @@ engineMixin({
             },
 
             /** Vampiric Fists worn? */
-            vampiricFists() { return !!(this.inventory && this.inventory.hasAttachment(VAMPIRIC.ID)); },
+            vampiricFists() { return !!(this.inventory && this.items.hasAttachment(VAMPIRIC.ID)); },
 
             /** One of her punches landed (CollisionSystem.resolveProjectile): with Vampiric Fists, she drinks */
             onPunchLanded(e, p) {
@@ -94597,9 +94771,9 @@ engineMixin({
                     return `<div class="df-row"><span class="k">${label}</span><span class="v${modified ? (better ? ' up' : ' down') : ''}">${v}</span></div>`;
                 };
 
-                const weapId = this.inventory?.equippedWeaponId;
+                const weapId = this.items?.getEquippedWeapon()?.definition_id;
                 const weapName = weapId && typeof ITEM_REGISTRY !== 'undefined' && ITEM_REGISTRY[weapId] ? ITEM_REGISTRY[weapId].name : 'Unarmed';
-                const attIds = this.inventory?.equippedAttachments || [];
+                const attIds = this.items?.getEquippedAttachments().map(item=>item.definition_id) || [];
                 const attName = attIds.map(id => typeof ITEM_REGISTRY !== 'undefined' && ITEM_REGISTRY[id] ? ITEM_REGISTRY[id].name : null).filter(Boolean).join(', ') || 'None';
 
                 html += `<div class="df-rows" style="margin-top:8px;">`;
@@ -95008,7 +95182,7 @@ engineMixin({
                 const KINDS = [['attachment', 'Attachments', 'Attachment', '#cab0fa'], ['weapon', 'Weapons', 'Weapon', '#e8a688'], ['accessory', 'Accessories', 'Accessory', '#ffc248'], ['home', 'For the Apartment', 'Furniture', '#f19ab0']];
                 const made = SCHEMATICS.filter(s => this.schematicOwned(s)).length;
                 const pct = SCHEMATICS.length ? Math.round(made / SCHEMATICS.length * 100) : 0;
-                const worn = this.inventory ? this.inventory.equippedAttachments.length : 0, maxWorn = this.inventory ? this.inventory.maxAttachments : 2;
+                const worn = this.inventory ? this.items.getEquippedAttachments().length : 0, maxWorn = this.inventory ? this.items.max_attachments : 2;
                 let html = `<div class="sk-head cr-head"><div class="sk-dial cr-dial" style="--v:${pct}"><div class="sk-dial-in"><div class="sk-level">${this.scrap}</div><div class="sk-pct">Scrap</div></div></div>`;
                 html += `<div class="sk-meta"><div class="sk-next">${made} of ${SCHEMATICS.length} schematics crafted</div>`;
                 html += `<div class="sk-caps"><span class="sk-cap lav">Attachments ${worn} / ${maxWorn} worn</span></div>`;
@@ -95069,7 +95243,7 @@ engineMixin({
             /** A schematic is made: an item carried, or (cosmetic) a piece owned to wear */
             schematicOwned(sch) {
                 if (sch.furniture) return !!(this.questState && this.questState[sch.furniture]);
-                return sch.cosmetic ? !!(this.cosmetics && this.cosmetics.isOwned(sch.id)) : this.inventory.items.some(i => i.id === sch.id);
+                return sch.cosmetic ? !!(this.cosmetics && this.cosmetics.isOwned(sch.id)) : this.items.listItems().some(i => i.id === sch.id);
             },
 
             /** What a schematic still needs first (its `requires`, by name), or null */
@@ -95090,8 +95264,8 @@ engineMixin({
                     if (!this.cosmetics || !COSMETICS_REGISTRY[sch.id]) return false;
                     this.cosmetics.owned.push(sch.id);
                 } else {
-                    const craftedItem = createItemFromRegistry(sch.id, this);
-                    if (!craftedItem || !this.inventory.addItem(craftedItem)) return false;   // (inventory full: the scrap stays)
+                    const craftedItem=this.items.grantItem(sch.id);
+                    if(!craftedItem){showMessage('INVENTORY FULL');return false;}   // (inventory full: the scrap stays)
                 }
                 this.scrap -= sch.scrapCost;
                 this.updateUI();
@@ -95102,7 +95276,7 @@ engineMixin({
 
         });
     </script>
-    <script type="text/dfab" data-src="engine/save-load.js" data-cost="528">
+    <script type="text/dfab" data-src="engine/save-load.js" data-cost="505">
         // GameEngine — Save schema, migrations, saveGame / loadGame.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
                 const AUTOSAVE_KEY = 'dfab_save_slot_auto';   // written when the app goes to the background (onPageHidden)
@@ -95166,15 +95340,8 @@ engineMixin({
                     teammates: [],    // Populated dynamically
                     
                     // --- INVENTORY & EQUIPMENT ---
-                    inventory: {
-                        items: this.inventory?.items?.map(i => i.id) ?? [],
-                        equippedWeaponId: this.inventory?.equippedWeaponId ?? null,
-                        equippedAttachmentId: this.inventory?.equippedAttachmentId ?? null,   // (the first, for older builds)
-                        equippedAttachments: this.inventory?.equippedAttachments?.slice() ?? [],
-                        order: this.inventory?.entryOrder ?? [],
-                        weaponMode: this.weaponMode ?? 'normal'
-                    },
-                    
+                    inventory:{model:this.items.snapshot(),order:this.inventory?.entryOrder??[]},
+
                     // --- PHONE DATA ---
                     phone: {
                         messageHistory: (typeof phoneSystem !== 'undefined') ? phoneSystem.messageHistory : {},
@@ -95597,7 +95764,15 @@ engineMixin({
                     
                     console.log(`[LOAD] Loading save (v${fromVersion} → v${save.version}), merged with defaults`);
         
-                    // Validate vitals before changing live player/session records.
+                    // Validate inventory and vitals before changing live player/session records.
+                    const loadedItems=new DFNative.itemSystem({catalog:DFNative.createItemCatalog(GAME_DB.items)});
+                    if(save.inventory?.model!==undefined&&save.inventory.model!==null)loadedItems.load(save.inventory.model);
+                    else {
+                        const legacy=save.inventory??{};
+                        loadedItems.importLegacy({...legacy,items:legacy.items?.length?legacy.items:DEFAULT_LOADOUT});
+                        if(GameSettings.kukriFromArmory!==false)for(const id of ['maiden_kukri','blood_pact'])if(!loadedItems.hasItem(id))loadedItems.grantItem(id);
+                    }
+
                     const loadedVitals=new DFNative.playerVitals();
                     if(playerData.vitals)loadedVitals.load(playerData.vitals);
                     else {
@@ -95758,45 +95933,13 @@ engineMixin({
                     }
         
                     }
-                    // 8. Restore Inventory & Equipped Weapon
-                    const invData = save.inventory || rawSave.inventory || defaults.inventory;
-                    if (invData && this.inventory) {
-                        this.inventory.entryOrder = Array.isArray(invData.order) ? invData.order.filter(key => typeof key === 'string') : [];
-                        // Restore weapon mode
-                        this.weaponMode = invData.weaponMode ?? 'normal';
-                        
-                        // Rebuild inventory from saved item IDs (if save has items)
-                        if (invData.items && invData.items.length > 0) {
-                            this.inventory.loadItemsFromIds(invData.items);
-                            // The Maiden's Kukri waits in the armory for now (GameSettings.kukriFromArmory); later only the Demoness gives it
-                            if (GameSettings.kukriFromArmory !== false && !invData.items.includes('maiden_kukri')) { const k = createItemFromRegistry('maiden_kukri', this); if (k) this.inventory.items.push(k); }
-                            // Blood Pact waits beside it (older saves get it too)
-                            if (GameSettings.kukriFromArmory !== false && !invData.items.includes('blood_pact')) { const k = createItemFromRegistry('blood_pact', this); if (k) this.inventory.items.push(k); }
-                            console.log(`[LOAD] Rebuilt inventory: ${invData.items.length} items (${invData.items.join(', ')})`);
-                        }
-                        // If save had empty items array, keep the default loadout from constructor
-                        
-                        // Restore equipped weapon (with legacy equippedId fallback)
-                        const wId = invData.equippedWeaponId || invData.equippedId || null;
-                        if (wId) {
-                            const equippedItem = this.inventory.items.find(i => i.id === wId);
-                            if (equippedItem) {
-                                this.inventory.equippedWeaponId = wId;
-                                this.currentWeapon = equippedItem;
-                                if (equippedItem.action) equippedItem.action(equippedItem);
-                                console.log(`[LOAD] Equipped weapon: ${equippedItem.name}`);
-                            }
-                        }
-                        
-                        // Restore equipped attachments (up to two; older saves name one)
-                        const attachIds = Array.isArray(invData.equippedAttachments) ? invData.equippedAttachments
-                            : invData.equippedAttachmentId ? [invData.equippedAttachmentId] : [];
-                        this.inventory.equippedAttachments = [...new Set(attachIds)]
-                            .filter(id => this.inventory.items.some(i => i.id === id && i.type === 'attachment'))
-                            .slice(0, this.inventory.maxAttachments);
-                        
-                        // Render once after cosmetics and all ownership data restore below.
-                    }
+                    // 8. Restore the validated authoritative item model and UI ordering.
+                    this.items.load(loadedItems.snapshot());this.cancelQuickDraw();
+                    this._drawnAt=_gameTimeSec;this._drawShotUsed=false;
+                    this.inventory.entryOrder=Array.isArray(save.inventory?.order)?save.inventory.order.filter(key=>typeof key==='string'):[];
+                    if(!save.inventory?.model)this.inventory.entryOrder=this.inventory.entryOrder.map(key=>{
+                        if(!key.startsWith('carried:'))return key;const item=this.items.findItem(key.slice(8));return item?'carried:'+item.instance_id:key;
+                    });
 
                     // 9. Restore Phone Data (Message History)
                     const phoneData = save.phone || rawSave.phone || defaults.phone;
@@ -97742,7 +97885,7 @@ engineMixin({
                 if (this._laserKey === key) return this._laserGeom;
                 this._laserKey = key;
                 this._laserGeom = null;
-                if (!this.inventory.hasAttachment('laser_sight') || !this.player.visible) return null;
+                if (!this.items.hasAttachment('laser_sight') || !this.player.visible) return null;
                 if (!(this.weaponMode === 'normal' || this.weaponMode === 'sniper') || (this.weaponHolstered && !this._quickDraw && !this.isDriving)) return null;
                 if (!this.isDriving && (!this.player._muzzleLocal || !this.player._muzzleReady)) return null;
                 const shot = this.getPlayerShotGeometry();
@@ -99811,10 +99954,10 @@ engineMixin({
                             const qs = this.questState || (this.questState = {}), first = !qs.demonessDefeated;
                             qs.demonessDefeated = (qs.demonessDefeated || 0) + 1;
                             this.loot.push(new Loot(enemy.x + 14, enemy.y, 'dark_element'));
-                            if (first && !this.inventory.items.some(i => i.id === 'maiden_kukri')) {
-                                const k = createItemFromRegistry('maiden_kukri', this);
+                            if (first && !this.items.listItems().some(i => i.id === 'maiden_kukri')) {
+                                const k = this.items.createItem('maiden_kukri');
                                 this.loot.push({ x: enemy.x - 12, y: enemy.y + 6, type: 'weapon_drop', item: k, angle: 0.6, dropTime: 0,
-                                                 draw(ctx) { ctx.save(); ctx.translate(this.x, this.y); ctx.save(); ctx.translate(0, 10); ctx.scale(1, 0.36); ctx.globalAlpha = 0.75; drawGlow(ctx, 0, 0, 22, '#ffd76a', 0.3); ctx.restore(); drawWeapon(ctx, this.item.id, 0, Math.sin(_frameTime / 500) * 3, this.angle, 0.9); ctx.restore(); } });
+                                                 draw(ctx) { ctx.save(); ctx.translate(this.x, this.y); ctx.save(); ctx.translate(0, 10); ctx.scale(1, 0.36); ctx.globalAlpha = 0.75; drawGlow(ctx, 0, 0, 22, '#ffd76a', 0.3); ctx.restore(); drawWeapon(ctx, this.item.definition_id, 0, Math.sin(_frameTime / 500) * 3, this.angle, 0.9); ctx.restore(); } });
                                 showMessage("THE DEMONESS FALLS — SHE LEAVES THE MAIDEN'S KUKRI");
                             } else showMessage('THE DEMONESS FALLS');
                             if (enemy.solo) this.lilituDuelWon(enemy);            // her duel: a second Dark Element, the schematic (engine/boss-hazards.js)
@@ -100019,7 +100162,7 @@ engineMixin({
                             const timeSinceDrop = Date.now() - (l.dropTime || 0);
 
                             if (timeSinceDrop > 1500) {
-                                const added = this.inventory.addItem(l.item);
+                                const added = this.inventory.receiveItem(l.item);
                                 if (added) {
                                     audioSys.sfx('ui');
                                     this.loot.splice(i, 1);
@@ -106720,7 +106863,7 @@ engineMixin({
         });
 
     </script>
-    <script type="text/dfab" data-src="directory/new-game-state.js" data-cost="115">
+    <script type="text/dfab" data-src="directory/new-game-state.js" data-cost="113">
         // ===== LV2 DIRECTORY =====
         // GameEngine: this game's new-game defaults (resetGameState): player, quest flags, inventory, crew,
         // story, missions, phone, the last run's world. Called on exit to the main menu and before a new game.
@@ -106776,11 +106919,9 @@ engineMixin({
                 this.player.vitals.reset();
                 this.boosterCount = 4;
                 this.maxBoosters = 4;
-                this.weaponMode = 'none';
                 this.setWeaponHolstered(false); this.holsterAnim = 1;
                 this._drawnAt = undefined; this._drawShotUsed = false;
                 this.shootCooldown = 0;
-                this.currentWeapon = null;
                 this.nightVision = false;
                 this.nvIntensity = 0;
                 
@@ -106801,13 +106942,9 @@ engineMixin({
                 };
                 
                 // --- INVENTORY (rebuild from defaults) ---
-                if (this.inventory) {
-                    this.inventory.items = [];
-                    this.inventory.equippedWeaponId = null;
-                    this.inventory.equippedAttachmentId = null;
-                    this.inventory.loadDefaultLoadout();
-                }
-                
+                this.items.reset(DEFAULT_LOADOUT);
+                if(this.inventory)this.inventory.entryOrder=[];
+
                 // --- AUGMENTS ---
                 if (this.augments) {
                     this.augments.owned = [];
@@ -110675,7 +110812,7 @@ const TALK_HOOKS = {
              : t === 2 ? [['@', 'I was hoping it would be you.', 'smile']]
              : t === 1 ? [['@', 'There she is.', 'sultry']]
              : [['@', 'Back again. Careful, 949. I\'ll start expecting you.', 'sultry']],
-            'Anavia.gun.needs': g => g.inventory && g.inventory.items.some(i => i.id === 'pistol_anavia'),
+            'Anavia.gun.needs': g => g.inventory && g.items.listItems().some(i => i.id === 'pistol_anavia'),
             'Anavia.scrap.needs': g => g.missions.completedBounties >= 5,
             'Anavia.mother.needs': (g, T) => T.seen.includes('gun'),
             'Anavia.mother.beat1': (T) => ['@', T.mem.gun === 'offered' ? 'You offered me the pistol back, that first time. Nobody has ever done that.' : 'You never asked about my mother. I noticed. It was kind.'],
@@ -112542,7 +112679,7 @@ const TALK_HOOKS = {
 
                 } else if (key === 'devWeaponMode') {
                     // Sniper mode: penetrating rounds
-                    game.weaponMode = game.weaponMode === 'sniper' ? 'normal' : 'sniper';
+                    if(!game.items.setFireMode(game.weaponMode==='sniper'?'normal':'sniper')){showMessage('EQUIP A WEAPON FIRST');return;}
                     showMessage(game.weaponMode === 'sniper' ? 'SNIPER MODE: PENETRATING ROUNDS ACTIVE' : 'NORMAL MODE: STANDARD ROUNDS ACTIVE');
                     this._updateValueEl(el.id, game.weaponMode);
 

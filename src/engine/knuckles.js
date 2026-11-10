@@ -89,7 +89,7 @@
             },
 
             /** Vampiric Fists worn? */
-            vampiricFists() { return !!(this.inventory && this.inventory.hasAttachment(VAMPIRIC.ID)); },
+            vampiricFists() { return !!(this.inventory && this.items.hasAttachment(VAMPIRIC.ID)); },
 
             /** One of her punches landed (CollisionSystem.resolveProjectile): with Vampiric Fists, she drinks */
             onPunchLanded(e, p) {

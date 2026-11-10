@@ -19,7 +19,7 @@ engineMixin({
             || !this.player.visible || !this.currentWeapon || !['normal', 'sniper'].includes(this.weaponMode)
             || this.furniture?.busy() || this.cutscene?.active) return false;
         clearGameplayInputs(this);
-        this._quickDraw = { weapon: this.currentWeapon, phase: 'ready', ticks: 0 };
+        this._quickDraw = { weapon_instance_id:this.currentWeapon.instance_id, phase: 'ready', ticks: 0 };
         this.setWeaponHolstered(true);
         showMessage('QUICK DRAW — AIM PAST THE RING AND RELEASE');
         return true;
@@ -27,7 +27,7 @@ engineMixin({
     interruptQuickDrawShot() {
         const q = this._quickDraw;
         if (!q) return;
-        if (q.weapon !== this.currentWeapon || this.isDriving || this.player.dead) { this.cancelQuickDraw(); return; }
+        if (q.weapon_instance_id !== this.currentWeapon?.instance_id || this.isDriving || this.player.dead) { this.cancelQuickDraw(); return; }
         q.phase = 'ready'; q.ticks = 0; q.aimPoint = null; q.angle = null;
         this._quickDrawFiring = false;
         this.setWeaponHolstered(true);
@@ -41,7 +41,7 @@ engineMixin({
         const q = this._quickDraw;
         if (!q || q.phase !== 'ready' || !Number.isFinite(angle) || !this.running || this.paused
             || hudInputBlocked() || this.isDriving || this.player.dead || !this.player.visible
-            || this.currentWeapon !== q.weapon || this.furniture?.busy() || this.cutscene?.active) return false;
+            || this.currentWeapon?.instance_id !== q.weapon_instance_id || this.furniture?.busy() || this.cutscene?.active) return false;
         // A release during recovery is discarded, never queued to fire later.
         if (this.shootCooldown > 0) { showMessage('QUICK DRAW — RECOVERING'); return false; }
         q.phase = 'draw'; q.ticks = 7; q.angle = angle;
@@ -53,7 +53,7 @@ engineMixin({
     updateQuickDraw() {
         const q = this._quickDraw;
         if (!q) return;
-        if (this.currentWeapon !== q.weapon || !['normal', 'sniper'].includes(this.weaponMode)
+        if (this.currentWeapon?.instance_id !== q.weapon_instance_id || !['normal', 'sniper'].includes(this.weaponMode)
             || this.isDriving || this.player.dead || !this.player.visible || this.cutscene?.active || this.furniture?.busy()) {
             this.cancelQuickDraw(); return;
         }

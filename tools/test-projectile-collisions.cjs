@@ -30,7 +30,7 @@ function run(){
   const rows=[];
   for(const [id,w]of Object.entries(ITEM_REGISTRY).filter(([,w])=>w.type==='weapon'&&w.weaponMode!=='melee'&&w.weaponMode!=='fists'))
    for(const offset of [0,110,150,190,210])for(const fraction of [.25,.5,.9]){
-    clear();game.weaponHolstered=false;game.currentWeapon=createItemFromRegistry(id,game);game.weaponMode=w.weaponMode;
+    clear();game.weaponHolstered=false;game.items.equipItem((game.items.findItem(id)??game.items.grantItem(id)).instance_id);game.items.setFireMode(w.weaponMode);
     game.shootCooldown=0;game._drawnAt=undefined;game.fireWeapon();game.weaponHolstered=true;
     const p=game.projectiles.at(-1);p.x=1000+offset;p.y=1000;const g=enemy(p.x+w.stats.projectileSpeed*fraction);
     tick();rows.push({id,offset,fraction,lost:5000-g.hp,expected:w.stats.damage});
@@ -41,12 +41,12 @@ function run(){
   return {first,after:g.hp,hits:p.hitTargets.size,active:p.active};`,r=>assert.deepEqual(r,{first:4900,after:4900,hits:1,active:true}));
  test('A long sniper barrel cannot spawn its shot beyond a point-blank enemy',`
   const g=enemy(1035);game.player._muzzleLocal={x:75,y:0};game.weaponHolstered=false;
-  game.currentWeapon=createItemFromRegistry('sniper_sara',game);game.weaponMode='sniper';game.fireWeapon();
+  game.items.equipItem((game.items.findItem('sniper_sara')??game.items.grantItem('sniper_sara')).instance_id);game.items.setFireMode('sniper');game.fireWeapon();
   const x=game.projectiles[0].x;tick();return {x,hp:g.hp};`,r=>assert.deepEqual(r,{x:1000,hp:4900}));
  test('A long sniper barrel cannot spawn beyond a solid prop',`
   new GameEntity({x:1040,y:1000,width:4,height:60,hasCollision:true,collisionShape:GameEntity.SHAPE.OBB,collisionLayer:GameEntity.LAYER.DYNAMIC});
   const g=enemy(1130);game.player._muzzleLocal={x:75,y:0};game.weaponHolstered=false;
-  game.currentWeapon=createItemFromRegistry('sniper_sara',game);game.weaponMode='sniper';game.fireWeapon();
+  game.items.equipItem((game.items.findItem('sniper_sara')??game.items.grantItem('sniper_sara')).instance_id);game.items.setFireMode('sniper');game.fireWeapon();
   const x=game.projectiles[0].x;tick();return {x,hp:g.hp};`,r=>assert.deepEqual(r,{x:1000,hp:5000}));
  test('Sniper hits remain reliable over long ranges, diagonals, and reversed directions',`
   const rows=[];

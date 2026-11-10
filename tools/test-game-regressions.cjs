@@ -520,7 +520,7 @@ test('Nav grid: once per tick, local invalidation, failed searches back off, ste
 test('Melee steps in only on a target in reach', env => {
   const r = value(env, `
     game._doLoadMap('hotel_lobby'); game.story.update=()=>{}; game.running=true; game.paused=false;
-    game.enemies.length=0; game.currentWeapon=createItemFromRegistry('maiden_kukri', game); game.isDriving=false;
+    game.enemies.length=0; game.items.equipItem((game.items.findItem('maiden_kukri')??game.items.grantItem('maiden_kukri')).instance_id); game.isDriving=false;
     const pl=game.player; pl.angle=0; const x0=pl.x;
     game.meleeSlash(); const idle=pl.x-x0;
     const g=new Ganger(pl.x+40, pl.y, {hp:400}); game.enemies.push(g);
@@ -535,7 +535,7 @@ test('Pause → Equip opens the Weapons tab and lists the equipped gun; furnitur
   const r = value(env, `
     game._doLoadMap('hotel_lobby'); game.running=true; game.paused=false;
     const furnitureBefore=game.inventory.getEntries().filter(e=>e.source==='furniture').length;
-    const gun=game.inventory.items.find(i=>i.type==='weapon'); game.inventory.equipItem(gun.id);
+    const gun=game.items.listItems().find(i=>i.type==='weapon'); game.inventory.equipItem(gun.instance_id);
     invSidebar.filterEnabled=true; invSidebar.activeFilter='items';
     pauseMenuController.open(); pauseMenuController.executeQuick('equip');
     game.inventory.render();

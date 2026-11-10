@@ -61,15 +61,8 @@ engineMixin({
                     teammates: [],    // Populated dynamically
                     
                     // --- INVENTORY & EQUIPMENT ---
-                    inventory: {
-                        items: this.inventory?.items?.map(i => i.id) ?? [],
-                        equippedWeaponId: this.inventory?.equippedWeaponId ?? null,
-                        equippedAttachmentId: this.inventory?.equippedAttachmentId ?? null,   // (the first, for older builds)
-                        equippedAttachments: this.inventory?.equippedAttachments?.slice() ?? [],
-                        order: this.inventory?.entryOrder ?? [],
-                        weaponMode: this.weaponMode ?? 'normal'
-                    },
-                    
+                    inventory:{model:this.items.snapshot(),order:this.inventory?.entryOrder??[]},
+
                     // --- PHONE DATA ---
                     phone: {
                         messageHistory: (typeof phoneSystem !== 'undefined') ? phoneSystem.messageHistory : {},
@@ -492,7 +485,15 @@ engineMixin({
                     
                     console.log(`[LOAD] Loading save (v${fromVersion} → v${save.version}), merged with defaults`);
         
-                    // Validate vitals before changing live player/session records.
+                    // Validate inventory and vitals before changing live player/session records.
+                    const loadedItems=new DFNative.itemSystem({catalog:DFNative.createItemCatalog(GAME_DB.items)});
+                    if(save.inventory?.model!==undefined&&save.inventory.model!==null)loadedItems.load(save.inventory.model);
+                    else {
+                        const legacy=save.inventory??{};
+                        loadedItems.importLegacy({...legacy,items:legacy.items?.length?legacy.items:DEFAULT_LOADOUT});
+                        if(GameSettings.kukriFromArmory!==false)for(const id of ['maiden_kukri','blood_pact'])if(!loadedItems.hasItem(id))loadedItems.grantItem(id);
+                    }
+
                     const loadedVitals=new DFNative.playerVitals();
                     if(playerData.vitals)loadedVitals.load(playerData.vitals);
                     else {
@@ -653,45 +654,13 @@ engineMixin({
                     }
         
                     }
-                    // 8. Restore Inventory & Equipped Weapon
-                    const invData = save.inventory || rawSave.inventory || defaults.inventory;
-                    if (invData && this.inventory) {
-                        this.inventory.entryOrder = Array.isArray(invData.order) ? invData.order.filter(key => typeof key === 'string') : [];
-                        // Restore weapon mode
-                        this.weaponMode = invData.weaponMode ?? 'normal';
-                        
-                        // Rebuild inventory from saved item IDs (if save has items)
-                        if (invData.items && invData.items.length > 0) {
-                            this.inventory.loadItemsFromIds(invData.items);
-                            // The Maiden's Kukri waits in the armory for now (GameSettings.kukriFromArmory); later only the Demoness gives it
-                            if (GameSettings.kukriFromArmory !== false && !invData.items.includes('maiden_kukri')) { const k = createItemFromRegistry('maiden_kukri', this); if (k) this.inventory.items.push(k); }
-                            // Blood Pact waits beside it (older saves get it too)
-                            if (GameSettings.kukriFromArmory !== false && !invData.items.includes('blood_pact')) { const k = createItemFromRegistry('blood_pact', this); if (k) this.inventory.items.push(k); }
-                            console.log(`[LOAD] Rebuilt inventory: ${invData.items.length} items (${invData.items.join(', ')})`);
-                        }
-                        // If save had empty items array, keep the default loadout from constructor
-                        
-                        // Restore equipped weapon (with legacy equippedId fallback)
-                        const wId = invData.equippedWeaponId || invData.equippedId || null;
-                        if (wId) {
-                            const equippedItem = this.inventory.items.find(i => i.id === wId);
-                            if (equippedItem) {
-                                this.inventory.equippedWeaponId = wId;
-                                this.currentWeapon = equippedItem;
-                                if (equippedItem.action) equippedItem.action(equippedItem);
-                                console.log(`[LOAD] Equipped weapon: ${equippedItem.name}`);
-                            }
-                        }
-                        
-                        // Restore equipped attachments (up to two; older saves name one)
-                        const attachIds = Array.isArray(invData.equippedAttachments) ? invData.equippedAttachments
-                            : invData.equippedAttachmentId ? [invData.equippedAttachmentId] : [];
-                        this.inventory.equippedAttachments = [...new Set(attachIds)]
-                            .filter(id => this.inventory.items.some(i => i.id === id && i.type === 'attachment'))
-                            .slice(0, this.inventory.maxAttachments);
-                        
-                        // Render once after cosmetics and all ownership data restore below.
-                    }
+                    // 8. Restore the validated authoritative item model and UI ordering.
+                    this.items.load(loadedItems.snapshot());this.cancelQuickDraw();
+                    this._drawnAt=_gameTimeSec;this._drawShotUsed=false;
+                    this.inventory.entryOrder=Array.isArray(save.inventory?.order)?save.inventory.order.filter(key=>typeof key==='string'):[];
+                    if(!save.inventory?.model)this.inventory.entryOrder=this.inventory.entryOrder.map(key=>{
+                        if(!key.startsWith('carried:'))return key;const item=this.items.findItem(key.slice(8));return item?'carried:'+item.instance_id:key;
+                    });
 
                     // 9. Restore Phone Data (Message History)
                     const phoneData = save.phone || rawSave.phone || defaults.phone;

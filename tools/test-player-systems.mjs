@@ -25,9 +25,9 @@ test('Directory installs exactly one official persistent player and shared servi
 });
 test('session records have explicit validated mutations and snapshots cannot mutate live records',()=>{
  const s=new gameSession();let changed=0;const unsubscribe=s.on('session:changed',()=>changed++);
- assert.equal(s.changeCurrency(20),20);assert.equal(s.addItem('stims',2),2);s.setRecord('quests','search',{stage:2});
+ assert.equal(s.changeCurrency(20),20);assert.equal(s.items.grantItem('consumable:bubbleTea',{quantity:2}).quantity,2);s.setRecord('quests','search',{stage:2});
  const snapshot=s.snapshot();snapshot.quests.search.stage=99;assert.equal(s.getRecord('quests','search').stage,2);
- assert.throws(()=>s.changeCurrency(-21));assert.throws(()=>s.addItem('stims',-3));assert.throws(()=>s.addItem('__proto__',1));assert.throws(()=>s.setRecord('roster','friend',{hp:Infinity}));assert.throws(()=>s.setRecord('inventory','stims',9));
+ assert.throws(()=>s.changeCurrency(-21));assert.throws(()=>s.items.grantItem('consumable:bubbleTea',{quantity:-3}));assert.throws(()=>s.items.grantItem('__proto__'));assert.throws(()=>s.setRecord('roster','friend',{hp:Infinity}));assert.throws(()=>s.setRecord('inventory','stims',9));
  assert.equal(changed,3);unsubscribe();s.changeCurrency(1);assert.equal(changed,3);
  assert.deepEqual(new gameSession({state:s.snapshot()}).snapshot(),s.snapshot());
 });
@@ -77,13 +77,13 @@ test('respawn changes gameplay and native placement only on success and preserve
 });
 test('native player gameplay data round trips with physical snapshots and reconnects by official entity ID without a surrogate',()=>{
  const source=createGameRuntime({schedule_frame:null}),p=source.api.session.player;
- p.takeDamage(30);p.addBuff('tea',{duration_seconds:20,modifiers:{speed:{multiply:2}}});source.api.session.addItem('stims',3);
+ p.takeDamage(30);p.addBuff('tea',{duration_seconds:20,modifiers:{speed:{multiply:2}}});source.api.items.grantItem('consumable:bubbleTea',{quantity:3});
  const physical=source.api.physics.savePhysicsState(),saved=source.api.session.snapshot();source.dispose();
  const session=new gameSession({state:saved}),e=new gameEngine({schedule_frame:null,asset_library:createGameAssetLibrary(),services:{session}});
  e.api.elements.registerEntityType(Player.entity_type,Player);e.api.physics.loadPhysicsState(physical);
  const restored=e.api.elements.fetchEntity(saved.player_entity_id),body=restored.body;
  e.registerSystem('session',session);e.registerSystem('player-state',new PlayerStateSystem({session,rules}));
- assert.equal(session.player,restored);assert.equal(restored.body,body);assert.equal(e.api.physics.getStatistics().bodies,1);assert.equal(restored.hp,70);assert.equal(restored.getStat('speed',10),20);assert.equal(session.getRecord('inventory','stims'),3);
+ assert.equal(session.player,restored);assert.equal(restored.body,body);assert.equal(e.api.physics.getStatistics().bodies,1);assert.equal(restored.hp,70);assert.equal(restored.getStat('speed',10),20);assert.equal(session.items.findItem('consumable:bubbleTea').quantity,3);
  let hit=false;session.on('player:damaged',()=>hit=true);restored.takeDamage(5);assert.equal(hit,true);assert.equal(restored.hp,65);e.dispose();
 });
 test('bad session/player snapshots reject and cannot silently spawn a replacement player',()=>{

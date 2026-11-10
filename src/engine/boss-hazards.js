@@ -350,7 +350,7 @@
                 this._triFallTick = _simTick;
                 const qs = this.questState || (this.questState = {}), first = !qs.triumvirateDefeats;
                 qs.triumvirateDefeats = (qs.triumvirateDefeats || 0) + 1;
-                if (first && !this.inventory.items.some(i => i.id === 'blood_pact') && this.dropBossWeapon('blood_pact', last.x, last.y + 8)) {
+                if (first && !this.items.listItems().some(i => i.id === 'blood_pact') && this.dropBossWeapon('blood_pact', last.x, last.y + 8)) {
                     game_timers.after(1.6, () => showMessage('COMPLINE LEAVES THE BLOOD PACT'), 'world');
                     if (this.hordeGauntlet) this.hordeGauntlet.spoil('Blood Pact');
                 }
@@ -358,9 +358,9 @@
 
             /** A boss's weapon on the floor where it fell, glowing gold (picked up like any weapon drop) */
             dropBossWeapon(id, x, y) {
-                const item = createItemFromRegistry(id, this); if (!item) return null;
+                const item = this.items.createItem(id); if (!item) return null;
                 const drop = { x, y, type: 'weapon_drop', item, angle: 0.6, dropTime: 0,
-                    draw(ctx) { ctx.save(); ctx.translate(this.x, this.y); ctx.save(); ctx.translate(0, 10); ctx.scale(1, 0.36); ctx.globalAlpha = 0.75; drawGlow(ctx, 0, 0, 22, '#ffd76a', 0.3); ctx.restore(); drawWeapon(ctx, this.item.id, 0, Math.sin(_frameTime / 500) * 3, this.angle, 0.9); ctx.restore(); } };
+                    draw(ctx) { ctx.save(); ctx.translate(this.x, this.y); ctx.save(); ctx.translate(0, 10); ctx.scale(1, 0.36); ctx.globalAlpha = 0.75; drawGlow(ctx, 0, 0, 22, '#ffd76a', 0.3); ctx.restore(); drawWeapon(ctx, this.item.definition_id, 0, Math.sin(_frameTime / 500) * 3, this.angle, 0.9); ctx.restore(); } };
                 this.loot.push(drop);
                 return drop;
             }

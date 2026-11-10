@@ -1,4 +1,6 @@
         class GameEngine {
+            get currentWeapon(){return this.items?.getEquippedWeapon()??null;}
+            get weaponMode(){return this.items?.getWeaponMode()??'none';}
             constructor() {
                 
                 // Pause registry — every subsystem that needs the world paused
@@ -13,7 +15,11 @@
                 
                 this.ui = new UISystem(this);
                 this.musicWidget = new MusicWidgetSystem(this);
-                this.inventory = new InventorySystem(this);
+                this.items=new DFNative.itemSystem({catalog:DFNative.createItemCatalog(GAME_DB.items)});
+                this.items.reset(DEFAULT_LOADOUT);
+                this.items.on('items:equipped',event=>{if(event.slot==='weapon'){this.cancelQuickDraw();this._drawnAt=_gameTimeSec;this._drawShotUsed=false;}});
+                this.items.on('items:unequipped',event=>{if(event.slot==='weapon')this.cancelQuickDraw();});
+                this.inventory = new InventoryView(this);
                 
                 this.cutscene = new CutsceneManager(this);
                 this.story = new StoryManager(this);
@@ -93,9 +99,7 @@
                 };
                 
                 this.currency = 100; this.scrap = 0; this.boosterCount = 4; this.maxBoosters = 4; this.debugMode = false; this.showProfiler = false;
-                this.weaponMode = 'none';  // 'normal' or 'sniper' - sniper shots penetrate everything
                 this.shootCooldown = 0;    // Tracks timing between shots
-                this.currentWeapon = null; // Stores the currently active weapon object
 
                 this.interactBtn = document.getElementById('btn-interact');
                 this.transitionBtn = document.getElementById('btn-transition');

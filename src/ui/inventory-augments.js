@@ -4,23 +4,10 @@
            Manages complex items beyond simple counters.
            Connects to the #freelancer-menu UI.
            ===================================================================== */
-        class InventoryItem {
-            constructor(id, name, type, icon, description, action = null, stats = {}) {
-                this.id = id;
-                this.name = name;
-                this.type = type; // 'weapon', 'consumable', 'intel', 'attachment'
-                this.icon = icon;
-                this.description = description;
-                this.action = action; // Function to execute on use
-                this.stats = stats;
-                if (stats.effect) this.effect = stats.effect;
-            }
-        }
-        
         /* =====================================================================
            ITEM REGISTRY — Single source of truth for all item definitions.
-           Items are stored as data; createItemFromRegistry() builds live objects.
-           Save stores IDs only; load reconstructs from this registry.
+           Items are definitions; itemSystem owns uniquely identified instances.
+           Saves preserve instance records and equipment references.
            ===================================================================== */
         const ITEM_REGISTRY = GAME_DB.items.gear;   // directory/game-db/items.json
         
@@ -97,29 +84,7 @@
         // Default loadout for new games
         const DEFAULT_LOADOUT = GAME_DB.items.default_loadout;   // directory/game-db/items.json
         
-        // Factory: create a live InventoryItem from registry ID
-        function createItemFromRegistry(id, game) {
-            const def = ITEM_REGISTRY[id];
-            if (!def) { console.warn(`[ITEM_REGISTRY] Unknown item: ${id}`); return null; }
-            
-            let action = null;
-            if (def.type === 'weapon') {
-                const mode = def.weaponMode || 'normal';
-                action = (item) => {
-                    if (game) {
-                        game.cancelQuickDraw();
-                        game.currentWeapon = item;
-                        game.weaponMode = mode;
-                        game._drawnAt = _gameTimeSec; game._drawShotUsed = false;   // Arms: Quick-Draw
-                    }
-                };
-            }
-            
-            const item = new InventoryItem(id, def.name, def.type, def.icon, def.desc, action, def.stats);
-            return item;
-        }
-        
-        // Views of existing ownership. These records never enter physical InventorySystem.items,
+        // Views of existing ownership. These records never enter the carried item model,
         // capacity calculations, save payloads, map entities or cosmetic acquisition methods.
         const INVENTORY_SPECIAL_COSMETICS = new Set(['outfit_academy', 'acc_umbrella']);
         const APARTMENT_FURNITURE_REGISTRY = Object.freeze(GAME_DB.items.furniture.map(entry => Object.freeze(entry)));   // directory/game-db/items.json
@@ -186,18 +151,12 @@
             return result;
         }
 
-        class InventorySystem {
+        class InventoryView {
             constructor(game) {
                 this.game = game;
-                this.items = [];
-                this.capacity = 10;
                 this.uiList = document.getElementById('inventory-list');
                 this.menu = document.getElementById('freelancer-menu');
                 
-                // --- DUAL EQUIP SLOTS ---
-                this.equippedWeaponId = null;     // Active weapon
-                this.equippedAttachments = [];    // Active attachments (laser sight, muzzle…), up to maxAttachments
-                this.maxAttachments = 2;
                 this.entryOrder = [];             // pill order the player dragged, as 'source:id' keys (saved)
                 
                 // --- ITEM TYPE CONFIG ---
@@ -216,128 +175,32 @@
                 const backBtn = document.getElementById('close-menu');
                 if (backBtn) backBtn.onclick = () => this.toggleMenu();
         
-                // Default Loadout (from ITEM_REGISTRY)
-                this.loadDefaultLoadout();
-                
-                // Auto-equip the first weapon found
-            }
-            
-            // Load default new-game items from ITEM_REGISTRY
-            loadDefaultLoadout() {
-                // (quietly: no OBTAINED toasts while the main menu is up, where this runs at boot and on New Game)
-                for (const id of DEFAULT_LOADOUT) {
-                    const item = createItemFromRegistry(id, this.game);
-                    if (item) this.items.push(item);
-                }
-            }
-            
-            // Rebuild inventory from an array of item IDs (used by save/load)
-            loadItemsFromIds(ids) {
-                this.items = [];
-                this.equippedWeaponId = null;
-                this.equippedAttachmentId = null;
-                for (const id of ids) {
-                    const item = createItemFromRegistry(id, this.game);
-                    if (item) this.items.push(item);
-                    else console.warn(`[LOAD] Unknown item ID in save: ${id}`);
-                }
-            }
-        
-            equipItem(id) {
-                const item = this.items.find(i => i.id === id);
-                if (!item) return;
-                const config = this.typeConfig[item.type];
-                if (!config || !config.slot) return; // Not equippable
-                
-                if (config.slot === 'weapon') {
-                    this.equippedWeaponId = id;
-                    if (item.action) item.action(item);
-                } else if (config.slot === 'attachment') {
-                    if (this.equippedAttachments.includes(id)) return;
-                    if (this.equippedAttachments.length >= this.maxAttachments) {
-                        showMessage(`MAX ${this.maxAttachments} ATTACHMENTS EQUIPPED. UNEQUIP ONE FIRST.`);
-                        return;
-                    }
-                    this.equippedAttachments.push(id);
-                    showMessage(`${item.name.toUpperCase()} EQUIPPED`);
-                }
-                this.render();
-            }
-        
-            unequipSlot(slot, id = null) {
-                if (slot === 'weapon') {
-                    this.equippedWeaponId = null;
-                    this.game.weaponMode = 'none';
-                    showMessage("WEAPON HOLSTERED");
-                } else if (slot === 'attachment') {
-                    // One attachment by id, or all of them
-                    this.equippedAttachments = id ? this.equippedAttachments.filter(a => a !== id) : [];
-                    showMessage("ATTACHMENT REMOVED");
-                }
-                this.render();
-            }
-            
-            // Legacy compat — unequips whatever was passed or defaults to weapon
-            unequip(itemId) {
-                if (itemId) {
-                    const item = this.items.find(i => i.id === itemId);
-                    if (item) {
-                        const config = this.typeConfig[item.type];
-                        if (config?.slot) { this.unequipSlot(config.slot, itemId); return; }
-                    }
-                }
-                this.unequipSlot('weapon');
-            }
-            
-            isItemEquipped(id) {
-                return this.equippedWeaponId === id || this.equippedAttachments.includes(id);
             }
 
-            /** The first equipped attachment (older saves and callers knew only one); setting it equips just that one */
-            get equippedAttachmentId() { return this.equippedAttachments[0] || null; }
-            set equippedAttachmentId(id) { this.equippedAttachments = id ? [id] : []; }
-
-            getEquippedAttachment() {
-                return this.equippedAttachmentId ? this.items.find(i => i.id === this.equippedAttachmentId) : null;
+            equipItem(instance_id) {
+                const item=this.game.items.getItem(instance_id);
+                if(!this.game.items.equipItem(instance_id)){showMessage('ATTACHMENT SLOTS FULL OR INCOMPATIBLE');return false;}
+                showMessage(`${item.name.toUpperCase()} EQUIPPED`);this.render();return true;
             }
-
-            /** The equipped attachments, as items */
-            getEquippedAttachments() {
-                return this.equippedAttachments.map(id => this.items.find(i => i.id === id)).filter(Boolean);
+            unequipSlot(slot,instance_id=null) {
+                if(instance_id)this.game.items.unequipItem(instance_id);else this.game.items.unequipSlot(slot);
+                showMessage(slot==='weapon'?'WEAPON HOLSTERED':'ATTACHMENT REMOVED');this.render();
             }
-
-            /** Is an attachment with this effect equipped? ('laser_sight', 'mirror_blade', 'blood_muzzle') */
-            hasAttachment(effect) {
-                return this.equippedAttachments.some(id => this.items.find(i => i.id === id)?.effect === effect);
+            receiveItem(packet) {
+                const item=packet.root_instance_id?this.game.items.receiveBundle(packet):this.game.items.receiveItem(packet);
+                if(!item){showMessage('INVENTORY FULL');return false;}
+                showMessage(`OBTAINED: ${item.name.toUpperCase()}`);this.render();return true;
             }
-        
-            addItem(item) {
-                // Attachments ride in their own case: craft as many as you like (two are worn at a time);
-                // the capacity counts everything else
-                if (item.type !== 'attachment' && this.items.filter(i => i.type !== 'attachment').length >= this.capacity) {
-                    showMessage("INVENTORY FULL");
-                    return false;
+            useItem(instance_id) {
+                const item=this.game.items.getItem(instance_id),effect=item.effect;
+                if(effect?.kind==='buff'){
+                    if(!this.game.player.buffSystem.activate(effect.buff_id,this.game.worldMinutes,this.game,{charge:false}))return false;
+                    this.game.items.consumeItem(instance_id);this.render();return true;
                 }
-                this.items.push(item);
-                // If we have nothing equipped and picked up a weapon, maybe auto-equip?
-                // For now, we'll just notify.
-                showMessage(`OBTAINED: ${item.name.toUpperCase()}`);
-                return true;
+                if(effect?.kind==='note'){this.game.openNote(effect.note_id);return true;}
+                return false;
             }
-        
-            removeItem(id) {
-                // If dropping equipped item, unequip first
-                if (this.isItemEquipped(id)) {
-                    this.unequip(id);
-                }
-                
-                const idx = this.items.findIndex(i => i.id === id);
-                if (idx > -1) {
-                    this.items.splice(idx, 1);
-                    this.render();
-                }
-            }
-        
+
             // Open the menu on the inventory, or close it (Screens keeps every sub-screen in step)
             toggleMenu() {
                 if (Screens.menuOpen()) Screens.close();
@@ -352,12 +215,12 @@
                     collectible: 'collectibles', intel: 'collectibles',
                     pet: 'pets', mount: 'mounts', vehicle: 'mounts'
                 }[type] || 'items');
-                const carried = this.items.map(item => ({
-                    id: item.id, source: 'carried', sourceId: item.id,
+                const carried = this.game.items.listItems().map(item => ({
+                    id:item.instance_id,source:'carried',sourceId:item.definition_id,
                     category: categoryOf(item.type), type: item.type,
                     name: item.name, description: item.description, icon: item.icon,
-                    detail: item.type === 'attachment' ? 'Weapon attachment' : '',
-                    isEquipped: this.isItemEquipped(item.id), item
+                    detail:item.type==='attachment'?(this.game.items.getParentWeapon(item.instance_id)?'Mounted on '+this.game.items.getParentWeapon(item.instance_id).name:'Weapon attachment'):'',
+                    isEquipped:this.game.items.isEquipped(item.instance_id),item
                 }));
                 return carried.concat(getOwnedInventoryEntries(this.game));
             }
@@ -379,13 +242,15 @@
 
             _dropCarriedItem(item) {
                 // Registry entries never reach the existing physical drop path.
-                if (!this.items.includes(item)) return;
+                if(!this.game.running||!this.game.loot||!this.game.items.hasInstance(item.instance_id))return;
+                const parent=this.game.items.getParentWeapon(item.instance_id);if(parent)this.game.items.detachFromWeapon(parent.instance_id,item.instance_id);
+                const packet=this.game.items.extractItem(item.instance_id);
                 if (this.game.loot) {
                     const throwAngle = Math.random() * Math.PI * 2;
                     this.game.loot.push({
                         x: this.game.playerPosition[0] + Math.cos(throwAngle) * 50,
                         y: this.game.playerPosition[1] + Math.sin(throwAngle) * 50,
-                        type: 'weapon_drop', item,
+                        type:'weapon_drop',item:packet,
                         angle: Math.random() * 6.28, dropTime: Date.now(),
                         draw: function(ctx) {
                             ctx.save();
@@ -394,12 +259,12 @@
                             ctx.save(); ctx.translate(0, 10); ctx.scale(1, 0.36); ctx.globalAlpha = 0.75;
                             drawGlow(ctx, 0, 0, 22, '#a469ff', 0.3);
                             ctx.restore();
-                            drawWeapon(ctx, this.item.id, 0, bob, this.angle, 0.8);
+                            drawWeapon(ctx, this.item.root_instance_id?this.item.records[0].definition_id:this.item.definition_id, 0, bob, this.angle, 0.8);
                             ctx.restore();
                         }
                     });
                 }
-                this.removeItem(item.id);
+                this.render();
                 showMessage(`DROPPED: ${item.name}`);
             }
 
@@ -439,20 +304,17 @@
                 const actions = [];
                 if (entry.source === 'carried') {
                     const config = this.typeConfig[entry.type] || {};
-                    if (config.slot || config.consumable || entry.item.action) {
+                    if (config.slot || config.consumable || entry.item.effect?.kind==='note') {
                         const kind = config.slot ? 'equip' : config.consumable ? 'consume' : 'inspect';
                         const label = config.slot ? (entry.isEquipped ? config.unequipLabel : config.equipLabel)
                             : config.consumable ? 'CONSUME' : (config.equipLabel || 'USE');
                         actions.push({ kind, label, run: () => {
                             // Read current state at the time of the action.
-                            if (!this.items.includes(entry.item)) return;
+                            if(!this.game.items.hasInstance(entry.item.instance_id))return;
                             if (config.slot) {
-                                if (this.isItemEquipped(entry.id)) this.unequipSlot(config.slot, entry.id);
+                                if (this.game.items.isEquipped(entry.id)) this.unequipSlot(config.slot, entry.id);
                                 else this.equipItem(entry.id);
-                            } else if (config.consumable) {
-                                if (entry.item.action) entry.item.action(entry.item);
-                                this.removeItem(entry.id);
-                            } else if (entry.item.action) entry.item.action(entry.item);
+                            } else this.useItem(entry.item.instance_id);
                         }});
                     }
                     actions.push({ kind: 'drop', label: 'DROP', run: () => this._dropCarriedItem(entry.item) });

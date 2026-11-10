@@ -1,6 +1,6 @@
 # Session and native player API
 
-Directory's `createGameRuntime()` installs `gameSession`, `PlayerStateSystem` and `PlayerControlSystem` as real lifecycle systems. They are available through `engine.api.session`, `engine.api.player_state` and `engine.api.player_controls`. The factory registers native types first, then creates **one persistent Player**. Callers obtain `api.session.player`; they must not create another player for each level.
+Directory's `createGameRuntime()` installs `gameSession`, `PlayerStateSystem` and `PlayerControlSystem` as real lifecycle systems. They are available through `engine.api.items`, `engine.api.session`, `engine.api.player_state` and `engine.api.player_controls`. The factory registers native types first, then creates **one persistent Player**. Callers obtain `api.session.player`; they must not create another player for each level.
 
 These are game classes, outside Basement. Basement owns bodies, movement, velocities, impulses, attachment mass, collision detection, checked placement and the one spatial grid. Gameplay owns health, ability costs and timers, inventory and quest rules. No converted class uses the old GameEngine, DOM, Canvas or a second physical index.
 
@@ -11,7 +11,8 @@ These are game classes, outside Basement. Basement owns bodies, movement, veloci
 | Position, facing, velocity, mass, collision shape, attachment | Official native entity/body/controller |
 | Health/max health | `playerVitals` referencing `Player.data.health` / `max_health` |
 | Attunement, Flit/invulnerability timers, sneak, buffs, regeneration timers | `playerVitals` referencing `Player.data.player_state` (format 1) |
-| Currency, inventory, equipment, quests, roster records, progression | `gameSession` |
+| Item instances, equipment, mounts, per-item state | `itemSystem`, exposed by `gameSession.items` |
+| Currency, quests, roster records, progression | `gameSession` |
 | Player reference | Session stores only the native numeric `player_entity_id`; lookup uses `api.elements` |
 | Input devices, held state, edges, normalization, dead zones | Basement `controlSystem` |
 | Control-block tokens and injected callbacks | Runtime lifetime; not save data |
@@ -21,26 +22,26 @@ Roster records are persistent domain records, not another registry of live bodie
 
 ## gameSession
 
-`new gameSession({player?, state?})`. `player` is the Directory entity packet used only when a new session has no player ID. `state` is a validated format-1 snapshot. `attach(context)` creates the official player with session lifetime, or retains the existing registered Player referenced by a restored ID. An unresolved ID fails; it never silently creates a replacement. `detach()` releases subscriptions and runtime references, not the session entity.
+`new gameSession({player?, state?, item_catalog?})`. `player` is the Directory entity packet used only when a new session has no player ID. `state` is a validated format-2 snapshot (known format-1 item counts migrate). `attach(context)` creates the official player with session lifetime, or retains the existing registered Player referenced by a restored ID. An unresolved ID fails; it never silently creates a replacement. `detach()` releases subscriptions and runtime references, not the session entity.
 
 | Member | Contract |
 |---|---|
 | `player`, `player_entity_id`, `currency` | Current official entity, numeric reference, current funds |
 | `changeCurrency(amount)` | Finite signed change; rejects a negative resulting balance |
-| `addItem(item_id, count=1)` | Signed integral change; resulting count must be a nonnegative safe integer |
+| `items` | The authoritative [itemSystem](items/README.md), also exposed as `api.items` |
 | `getRecord(collection, key)` | Detached copy, or undefined if absent |
-| `setRecord(collection, key, value)` | Set JSON data in equipment/quests/roster/progression; inventory uses `addItem` |
+| `setRecord(collection, key, value)` | Set JSON data in quests/roster/progression; item/equipment mutations use `items` |
 | `snapshot()` | Detached, versioned JSON records; no physical state or health copy |
 | `on(event, listener)` | Subscribe; returns idempotent unsubscribe |
 | `emit(event, detail={})` | Synchronous event dispatch with a copied detail packet |
 
-Collections are `inventory`, `equipment`, `quests`, `roster`, `progression`. Identifiers must be nonempty strings and cannot be `__proto__`, `constructor` or `prototype`. Snapshots reject cycles, nonfinite numbers and non-JSON objects. Listener errors propagate to the caller; runtime hook errors stop the loop. Events report committed state, not a transactional rollback mechanism.
+Generic record collections are `quests`, `roster`, `progression`. Inventory and equipment use the typed item API. Identifiers must be nonempty strings and cannot be `__proto__`, `constructor` or `prototype`. Snapshots reject cycles, nonfinite numbers and non-JSON objects. Listener errors propagate to the caller; runtime hook errors stop the loop. Events report committed state, not a transactional rollback mechanism.
 
 ```js
 const engine = createGameRuntime({schedule_frame:null});
 const {session} = engine.api;
-session.addItem('stims', 2);
-session.setRecord('equipment', 'weapon', 'pistol');
+const gun=session.items.grantItem('pistol_fpx');
+session.items.equipItem(gun.instance_id);
 const unsubscribe = session.on('player:damaged', ({health}) => updateHealthDisplay(health));
 // The UI layer owns updateHealthDisplay; the Player knows nothing about DOM.
 ```
@@ -104,7 +105,7 @@ At the existing apartment/legacy body-replacement boundary, the retiring player'
 
 Classic saves now include an additive `player.vitals` snapshot. The old scalar `player.health` is still exported for historical readers; the new record is authoritative when present. Older saves reconstruct health from the scalar and saved progression/buff rules. Validation rejects malformed vitals before changing live currency/player/map state; this is not an atomic validation claim for the rest of the classic save schema. Flit energy/protection, grace, recovery timing and combat timestamps now survive saves and map transitions. New-game reset clears them. Existing story/medbay death policy has one `respawnPlayer()` host entry point used by both player implementations, with explicit callbacks from native Player.
 
-Still pending: class extraction of weapons/quick draw and interactions, consumable purchase/shield policy, resonance/Last Stand/augment policy, story/death/medbay flow, production appearance/animation/audio, live level conversion, old mixins and production boot switch. Session equipment/quest/progression APIs own records; the old systems' complete behavior has not yet been ported into them. Legacy city movement, Flit landing geometry, projectile response and collision systems remain physical migration work; moving their gameplay state does not retire their physical implementations.
+Still pending: class extraction of weapons/quick draw and interactions, consumable purchase/shield policy, resonance/Last Stand/augment policy, story/death/medbay flow, production appearance/animation/audio, live level conversion, old mixins and production boot switch. The shared item API now owns production carried inventory/equipment and saves; weapon execution/quick draw and other systems' complete behavior still need class extraction. Legacy city movement, Flit landing geometry, projectile response and collision systems remain physical migration work; moving their gameplay state does not retire their physical implementations.
 
 ## playerVitals
 

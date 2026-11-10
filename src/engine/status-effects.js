@@ -235,7 +235,7 @@
                 const M = weaponModel(W && W.id);
                 this._slashStyle = M.swing || 'knife';
                 const ang = pl.angle, reach = st.reach || 36, arc = st.arc || 1.4;
-                const edge = this.inventory && this.inventory.hasAttachment('crimson_edge') ? ITEM_REGISTRY.crimson_edge.stats : null;
+                const edge = this.inventory && this.items.hasAttachment('crimson_edge') ? ITEM_REGISTRY.crimson_edge.stats : null;
                 let bladeDamage = (st.damage || 25) * this.playerDamageMult() * (edge ? edge.bladeDamageMult : 1);
                 // A Flit-cut: a swing inside the Flit-Strike window always crits (and Flit-Strike adds its share)
                 const flitCut = !!(this.resonance && this.player && _gameTimeSec - this.player.vitals.last_flit_at <= this.resonance.flitStrikeWindow());
@@ -397,7 +397,7 @@
             playerDamageMult() { return this.mirrorGlassOn() ? MIRROR.GLASS_DAMAGE : 1; },
             /** …and on her bullets (the Bloodthirsty Muzzle on top) */
             gunDamageMult() {
-                const muzzle = this.inventory && this.inventory.hasAttachment('blood_muzzle') ? ITEM_REGISTRY.blood_muzzle.stats.gunDamageMult : 1;
+                const muzzle = this.inventory && this.items.hasAttachment('blood_muzzle') ? ITEM_REGISTRY.blood_muzzle.stats.gunDamageMult : 1;
                 return muzzle * this.playerDamageMult();
             },
 
@@ -432,7 +432,7 @@
                 }
                 const S = this._swing;
                 let blade = null;
-                if (S && this.inventory && this.inventory.hasAttachment('mirror_blade')) {
+                if (S && this.inventory && this.items.hasAttachment('mirror_blade')) {
                     // The blade this tick: from a tick ago to now, in a few steps, during the cut only
                     const ph = swingPhases(S.style), age = _gameTimeSec - S.t0, from = Math.max(ph.windup * S.secs, age - step), to = Math.min(ph.cutEnd * S.secs, age);
                     if (to >= from) {

@@ -6,7 +6,7 @@ const {runtime}=require('./test-game-runtime.cjs');
 const tests=[];
 function test(name,code,check){const e=runtime(join(__dirname,'..','DFAB V8.html'),{events:true,timers:true});e.scope.dispatchEvent=e.dispatchWindow;const r=structuredClone(e.run(`(()=>{${setup}${code}})()`));check(r);assert.deepEqual(e.errors,[]);tests.push(name);}
 const setup=`game._doLoadMap('ollo_test');game.running=true;game.paused=false;game.player.visible=true;
- game.currentWeapon=createItemFromRegistry('sniper_sara',game);game.weaponMode='sniper';game.shootCooldown=0;
+ game.items.equipItem((game.items.findItem('sniper_sara')??game.items.grantItem('sniper_sara')).instance_id);game.items.setFireMode('sniper');game.shootCooldown=0;
  game.rollCrit=()=>1;// crits are random (engine/combat-fx.js); these compare exact damage
  game.resonance.deserialize({level:50,points:0,ranks:{hollow_points:3,quick_draw:3,flit_strike:3,quick_hands:3}});
  _gameTimeSec=10;game.player.vitals.state.last_flit_at=9.8;
@@ -41,12 +41,12 @@ test('Pause cancels the pending shot but preserves quick draw mode and flit char
  game.pauseSystem.acquire('test');game.pauseSystem.release('test');tick(20);
  return {active:!!game._quickDraw,count:game.projectiles.length,charge:game.player.attunement,expected:charge,holstered:game.weaponHolstered};`,r=>{assert.equal(r.active,true);assert.equal(r.count,0);assert.equal(r.charge,r.expected);assert.equal(r.holstered,true);});
 test('Weapon swaps and map changes cancel an unfinished draw',`
- game.armQuickDraw();game.requestQuickDraw(0);game.currentWeapon=createItemFromRegistry('pistol_fpx',game);tick(8);
- const swap=!!game._quickDraw;game.weaponMode='normal';game.armQuickDraw();game.requestQuickDraw(0);game._doLoadMap('apt_949');tick(8);
+ game.armQuickDraw();game.requestQuickDraw(0);game.items.equipItem((game.items.findItem('pistol_fpx')??game.items.grantItem('pistol_fpx')).instance_id);tick(8);
+ const swap=!!game._quickDraw;game.items.setFireMode('normal');game.armQuickDraw();game.requestQuickDraw(0);game._doLoadMap('apt_949');tick(8);
  return {swap,map:!!game._quickDraw,count:game.projectiles.length};`,r=>{assert.deepEqual(r,{swap:false,map:false,count:0});});
 test('Quick draw is available only on foot with a firearm, and holstered normal fire stays quiet',`
- game.isDriving=true;const driving=game.armQuickDraw();game.isDriving=false;game.weaponMode='melee';const melee=game.armQuickDraw();
- game.weaponMode='sniper';game.setWeaponHolstered(true);game.fireWeapon();return {driving,melee,count:game.projectiles.length};`,r=>{assert.deepEqual(r,{driving:false,melee:false,count:0});});
+ game.isDriving=true;const driving=game.armQuickDraw();game.isDriving=false;game.items.setFireMode('melee');const melee=game.armQuickDraw();
+ game.items.setFireMode('sniper');game.setWeaponHolstered(true);game.fireWeapon();return {driving,melee,count:game.projectiles.length};`,r=>{assert.deepEqual(r,{driving:false,melee:false,count:0});});
 test('Desktop press aims without firing and release requests exactly one shot',`
  game.armQuickDraw();game.canvas.dispatchEvent({type:'mousedown',button:0,clientX:150,clientY:100});
  const held=game.projectiles.length;window.dispatchEvent({type:'mouseup',button:0,clientX:150,clientY:100});tick(17);

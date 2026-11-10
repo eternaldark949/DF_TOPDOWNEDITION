@@ -53,11 +53,9 @@
                 this.player.vitals.reset();
                 this.boosterCount = 4;
                 this.maxBoosters = 4;
-                this.weaponMode = 'none';
                 this.setWeaponHolstered(false); this.holsterAnim = 1;
                 this._drawnAt = undefined; this._drawShotUsed = false;
                 this.shootCooldown = 0;
-                this.currentWeapon = null;
                 this.nightVision = false;
                 this.nvIntensity = 0;
                 
@@ -78,13 +76,9 @@
                 };
                 
                 // --- INVENTORY (rebuild from defaults) ---
-                if (this.inventory) {
-                    this.inventory.items = [];
-                    this.inventory.equippedWeaponId = null;
-                    this.inventory.equippedAttachmentId = null;
-                    this.inventory.loadDefaultLoadout();
-                }
-                
+                this.items.reset(DEFAULT_LOADOUT);
+                if(this.inventory)this.inventory.entryOrder=[];
+
                 // --- AUGMENTS ---
                 if (this.augments) {
                     this.augments.owned = [];

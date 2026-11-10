@@ -670,7 +670,7 @@
                         // the retract). Sniper models sit 2px lower in the hand, matching NPCs.
                         if (game.weaponMode === 'normal' || game.weaponMode === 'sniper') {
                             const wy = wyBase + (weaponId.includes('sniper') ? 2 : 0);
-                            const laser = !!(game.inventory && game.inventory.hasAttachment('laser_sight'));
+                            const laser = !!(game.inventory && game.items.hasAttachment('laser_sight'));
                             // the finisher's twirl (engine/finisher.js): the gun spins round her trigger finger
                             const tw = game.twirlAngle ? game.twirlAngle() : 0;
                             drawWeapon(ctx, weaponId, wx, wy, tw, scale, laser && !tw);

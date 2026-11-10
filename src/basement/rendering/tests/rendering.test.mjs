@@ -113,3 +113,11 @@ test('public rendering and camera members have a shareable API reference',async(
  const {readFileSync}=await import('node:fs'),api=await import('../index.mjs'),reference=readFileSync(new URL('../README.md',import.meta.url),'utf8');
  for(const [name,Class]of Object.entries(api)){assert.ok(reference.includes(name),name);for(const member of Object.getOwnPropertyNames(Class.prototype))if(member!=='constructor')assert.ok(reference.includes(member),`${name}.${member}`);}
 });
+
+test('target caches receive only successful backend frames and unsubscribe cleanly',async()=>{
+ const {render}=fixture(),events=[];const off=render.onFrameRendered(event=>events.push(event));
+ await render.registerResource('cache',{type:'target',width:10,height:10});let frame=render.beginFrame();frame.beginPass({target_id:'cache'});frame.endPass();render.endFrame();assert.equal(events.length,0,'headless collection did not draw a target');
+ render.registerRenderer('capture',Capture);await render.setRenderer('capture',{surface:{}});frame=render.beginFrame();frame.beginPass({target_id:'cache'});frame.endPass();render.abortFrame();assert.equal(events.length,0);
+ const backend=Capture.instances.at(-1),draw=backend.render;backend.render=()=>{throw new Error('GPU failure');};frame=render.beginFrame();frame.beginPass({target_id:'cache'});frame.endPass();assert.throws(()=>render.endFrame(),/GPU/);assert.equal(events.length,0);
+ backend.render=draw;frame=render.beginFrame();frame.beginPass({target_id:'cache'});frame.endPass();render.endFrame();assert.deepEqual(events[0].targets,['cache']);assert.ok(Object.isFrozen(events[0].targets));off();render.beginFrame();render.endFrame();assert.equal(events.length,1);render.dispose();
+});

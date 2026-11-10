@@ -55,7 +55,7 @@
                 this.animationFrameId = null;
         
                 // (the map's Back is the menu's: it closes every screen, the map among them)
-                // close-menu button is handled by InventorySystem.toggleMenu()
+                // close-menu button is handled by InventoryView.toggleMenu()
                 
                 window.addEventListener('resize', () => {
                     this.resizeMap();
@@ -1043,7 +1043,7 @@
             ownedMaps() {
                 const g = this.game, ids = new Set(g.visitedMaps || []);
                 if (g.activeMap) ids.add(g.activeMap.id);
-                for (const it of (g.inventory && g.inventory.items) || []) if (it && it.mapId && MAP_DATA[it.mapId]) ids.add(it.mapId);
+                for (const it of (g.inventory && g.items.listItems()) || []) if (it && it.state.mapId && MAP_DATA[it.state.mapId]) ids.add(it.state.mapId);
                 ids.delete('van_interior');                                 // a ride, not a place
                 const order = Object.keys(MAP_DATA);
                 return [...ids].filter(id => MAP_DATA[id]).sort((a, b) => order.indexOf(a) - order.indexOf(b))

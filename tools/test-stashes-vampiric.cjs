@@ -35,9 +35,9 @@ const setup=`game._doLoadMap('ollo_test');game.running=true;game.paused=false;ga
  game.activeMap={id:'vf_test',width:3000,height:3000,walls:[],buildings:[],buildingColliders:[]};
  game.player._game=game;game.player.x=1000;game.player.y=1000;game.player.angle=0;game.isDriving=false;
  game.weaponHolstered=false;game.projectiles=[];game.enemies=[];game.effects.of('number').length=0;_gameTimeSec=10;game.player.vitals.state.last_flit_at=-99;
- game.inventory.items=[];game.inventory.equippedAttachments=[];
- const give=id=>{const it=createItemFromRegistry(id,game);game.inventory.items.push(it);return it;};
- const wield=id=>{game.currentWeapon=give(id);game.weaponMode=ITEM_REGISTRY[id].weaponMode;game.shootCooldown=0;};
+ game.items.clear();
+ const give=id=>game.items.grantItem(id);
+ const wield=id=>{game.items.equipItem(give(id).instance_id);game.shootCooldown=0;};
  const ganger=(x,y,hp=5000)=>{const g=new Ganger(x,y,{hp});g.hp=g.maxHp=hp;g.state='IDLE';game.enemies.push(g);return g;};
  const rnd=Math.random;const withRandom=(v,f)=>{Math.random=()=>v;try{return f();}finally{Math.random=rnd;}};
  const land=()=>{for(let i=0;i<6&&game.projectiles.length;i++){_simTick++;CollisionSystem.beginProjectileStep(game);
@@ -45,7 +45,7 @@ const setup=`game._doLoadMap('ollo_test');game.running=true;game.paused=false;ga
  const punch=()=>{game.shootCooldown=0;withRandom(.99,()=>game.fireWeapon());land();_gameTimeSec+=0.25;};`;
 
 test('The schematic: 350 scrap makes the attachment, worn in a slot',e=>{
- const r=value(e,setup+`game.scrap=350;const made=game.craftSchematic('vampiric_fists');game.inventory.equipItem('vampiric_fists');
+ const r=value(e,setup+`game.scrap=350;const made=game.craftSchematic('vampiric_fists');game.inventory.equipItem(game.items.findItem('vampiric_fists').instance_id);
   return {made,scrap:game.scrap,worn:game.vampiricFists()};`);
  assert.deepEqual(r,{made:true,scrap:0,worn:true});
 });
@@ -54,7 +54,7 @@ test('Knuckles: jabs heal 15%, the haymaker 30% and bleeds; nothing without the 
  const r=value(e,setup+`wield('golden_retribution');const pl=game.player;
   const run=()=>{const out=[];for(let i=0;i<3;i++){game.enemies=[];const g=ganger(1036,1000);pl.vitals.setHealth(50);punch();
     out.push([pl.hp-50,!!(g._status&&g._status.bleed)]);}return out;};
-  const bare=run();give('vampiric_fists');game.inventory.equipItem('vampiric_fists');const vamp=run();
+  const bare=run();give('vampiric_fists');game.inventory.equipItem(game.items.findItem('vampiric_fists').instance_id);const vamp=run();
   return {bare:bare.map(x=>x[0]),vamp:vamp.map(x=>x[0]),bleed:vamp.map(x=>x[1]),motes:game.effects.of('knuckle').filter(f=>f.k==='drain').length};`);
  assert.deepEqual(r.bare,[0,0,0]);
  assert.deepEqual(r.vamp,[2,2,12]);                  // 16×.15 → 2, 16×.15 → 2, 40×.3 → 12
@@ -63,7 +63,7 @@ test('Knuckles: jabs heal 15%, the haymaker 30% and bleeds; nothing without the 
 });
 
 test('Bare fists drink too',e=>{
- const r=value(e,setup+`give('vampiric_fists');game.inventory.equipItem('vampiric_fists');game.weaponMode='none';game.currentWeapon=null;
+ const r=value(e,setup+`give('vampiric_fists');game.inventory.equipItem(game.items.findItem('vampiric_fists').instance_id);game.items.unequipSlot('weapon');
   const pl=game.player;ganger(1036,1000);pl.hp=50;punch();return pl.hp-50;`);
  assert.ok(r>=2,`${r}`);
 });

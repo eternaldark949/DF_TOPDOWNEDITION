@@ -15,7 +15,7 @@
                 if (this._laserKey === key) return this._laserGeom;
                 this._laserKey = key;
                 this._laserGeom = null;
-                if (!this.inventory.hasAttachment('laser_sight') || !this.player.visible) return null;
+                if (!this.items.hasAttachment('laser_sight') || !this.player.visible) return null;
                 if (!(this.weaponMode === 'normal' || this.weaponMode === 'sniper') || (this.weaponHolstered && !this._quickDraw && !this.isDriving)) return null;
                 if (!this.isDriving && (!this.player._muzzleLocal || !this.player._muzzleReady)) return null;
                 const shot = this.getPlayerShotGeometry();

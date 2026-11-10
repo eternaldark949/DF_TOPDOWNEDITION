@@ -52,7 +52,7 @@ test('The running game reads the JSON under the old names, hooks attached',()=>{
   same:ITEM_REGISTRY===GAME_DB.items.gear&&CONSUMABLES===GAME_DB.items.consumables,
   hooks:['unlockCheck','onActivate','onExpire'].map(k=>typeof CONSUMABLES.stellarLemonade[k]),
   frozen:Object.isFrozen(APARTMENT_FURNITURE_REGISTRY)&&APARTMENT_FURNITURE_REGISTRY.every(Object.isFrozen),
-  pistol:createItemFromRegistry('pistol_fpx',null).stats.damage}))())`));
+  pistol:DFNative.createItemCatalog(GAME_DB.items).pistol_fpx.stats.damage}))())`));
  assert.equal(got.same,true);
  assert.deepEqual(got.hooks,['function','function','function']);
  assert.equal(got.frozen,true);

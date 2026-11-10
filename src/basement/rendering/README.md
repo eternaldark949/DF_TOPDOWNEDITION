@@ -148,6 +148,7 @@ Screen coordinates are logical viewport units; client conversions account for th
 | `registerResource(id,descriptor)`, `releaseResource(id)`, `listResources()` | Backend-owned graphics resource lifecycle. |
 | `resize({width,height,pixel_ratio})` | Update the camera viewport and active backend dimensions. |
 | `getSurfaceBounds()` | Data-only CSS bounds for pointer conversion. |
+| `onFrameRendered(handler)` | Successful backend frame completion with immutable written `targets`; cache bookkeeping only, no resource mutation during callbacks. |
 | `onSurfaceChanged(handler)` | Platform composition notification; returns unsubscribe. The notification contains the host-supplied surface, never its context. |
 | `getVisibleEntities({blend,margin,...filters})` | Native shared-index query using render extents. |
 | `beginFrame(blend)`, `endFrame()`, `abortFrame()` | Runtime orchestration; one flush per render call. |

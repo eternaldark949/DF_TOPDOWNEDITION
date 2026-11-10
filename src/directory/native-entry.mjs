@@ -16,3 +16,9 @@ export { PlayerControlSystem } from '../gameplay/player-control-system.mjs';
 export { Player } from '../entities/player.mjs';
 
 export { playerVitals } from '../gameplay/player-vitals.mjs';
+
+export { itemSystem } from '../gameplay/items/item-system.mjs';
+export { createItemCatalog } from './game-items.mjs';
+
+export { GUN_MATERIALS, WEAPON_MODELS, LASER_MODULE, weaponModel } from './weapon-appearance.mjs';
+export { weaponAppearance } from '../presentation/weapon-appearance.mjs';

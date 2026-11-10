@@ -983,9 +983,9 @@
                     return `<div class="df-row"><span class="k">${label}</span><span class="v${modified ? (better ? ' up' : ' down') : ''}">${v}</span></div>`;
                 };
 
-                const weapId = this.inventory?.equippedWeaponId;
+                const weapId = this.items?.getEquippedWeapon()?.definition_id;
                 const weapName = weapId && typeof ITEM_REGISTRY !== 'undefined' && ITEM_REGISTRY[weapId] ? ITEM_REGISTRY[weapId].name : 'Unarmed';
-                const attIds = this.inventory?.equippedAttachments || [];
+                const attIds = this.items?.getEquippedAttachments().map(item=>item.definition_id) || [];
                 const attName = attIds.map(id => typeof ITEM_REGISTRY !== 'undefined' && ITEM_REGISTRY[id] ? ITEM_REGISTRY[id].name : null).filter(Boolean).join(', ') || 'None';
 
                 html += `<div class="df-rows" style="margin-top:8px;">`;
@@ -1394,7 +1394,7 @@
                 const KINDS = [['attachment', 'Attachments', 'Attachment', '#cab0fa'], ['weapon', 'Weapons', 'Weapon', '#e8a688'], ['accessory', 'Accessories', 'Accessory', '#ffc248'], ['home', 'For the Apartment', 'Furniture', '#f19ab0']];
                 const made = SCHEMATICS.filter(s => this.schematicOwned(s)).length;
                 const pct = SCHEMATICS.length ? Math.round(made / SCHEMATICS.length * 100) : 0;
-                const worn = this.inventory ? this.inventory.equippedAttachments.length : 0, maxWorn = this.inventory ? this.inventory.maxAttachments : 2;
+                const worn = this.inventory ? this.items.getEquippedAttachments().length : 0, maxWorn = this.inventory ? this.items.max_attachments : 2;
                 let html = `<div class="sk-head cr-head"><div class="sk-dial cr-dial" style="--v:${pct}"><div class="sk-dial-in"><div class="sk-level">${this.scrap}</div><div class="sk-pct">Scrap</div></div></div>`;
                 html += `<div class="sk-meta"><div class="sk-next">${made} of ${SCHEMATICS.length} schematics crafted</div>`;
                 html += `<div class="sk-caps"><span class="sk-cap lav">Attachments ${worn} / ${maxWorn} worn</span></div>`;
@@ -1455,7 +1455,7 @@
             /** A schematic is made: an item carried, or (cosmetic) a piece owned to wear */
             schematicOwned(sch) {
                 if (sch.furniture) return !!(this.questState && this.questState[sch.furniture]);
-                return sch.cosmetic ? !!(this.cosmetics && this.cosmetics.isOwned(sch.id)) : this.inventory.items.some(i => i.id === sch.id);
+                return sch.cosmetic ? !!(this.cosmetics && this.cosmetics.isOwned(sch.id)) : this.items.listItems().some(i => i.id === sch.id);
             },
 
             /** What a schematic still needs first (its `requires`, by name), or null */
@@ -1476,8 +1476,8 @@
                     if (!this.cosmetics || !COSMETICS_REGISTRY[sch.id]) return false;
                     this.cosmetics.owned.push(sch.id);
                 } else {
-                    const craftedItem = createItemFromRegistry(sch.id, this);
-                    if (!craftedItem || !this.inventory.addItem(craftedItem)) return false;   // (inventory full: the scrap stays)
+                    const craftedItem=this.items.grantItem(sch.id);
+                    if(!craftedItem){showMessage('INVENTORY FULL');return false;}   // (inventory full: the scrap stays)
                 }
                 this.scrap -= sch.scrapCost;
                 this.updateUI();

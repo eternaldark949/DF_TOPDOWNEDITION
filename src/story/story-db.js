@@ -44,7 +44,7 @@
             },
             SEARCH_SUITE: {
                 onStart: (game) => {
-                    if (game.inventory && game.inventory.items.some(i => i.id === 'pistol_fpx')) { game.inventory.equipItem('pistol_fpx'); game.weaponHolstered = false; }
+                    if (game.inventory && game.items.listItems().some(i => i.id === 'pistol_fpx')) { game.inventory.equipItem(game.items.findItem('pistol_fpx').instance_id); game.weaponHolstered = false; }
                     game.hud.reveal('holster');
                     game_timers.after(0.6, () => {
                         game.hud.reveal('fire', { title: 'Your FP-X', text: 'Hold to aim. Push past the gold line to fire.', timeout: 14000, until: g => g.fireJoystick.active || g.mouseDown });

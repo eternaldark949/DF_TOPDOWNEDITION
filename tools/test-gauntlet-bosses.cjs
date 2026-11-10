@@ -85,7 +85,7 @@ test('A solo duel saves and restores as a duel (decoys are not saved)', setup('s
 
 test('The Triumvirate: 1500 HP each, 2 s reloads, censer, hymn and hook, enrage, and the Blood Pact', setup('church_boss') + `
   game.questState.sanctumIntroSeen=true; game.player.maxHp=100000; heal();
-  game.inventory.items=game.inventory.items.filter(i=>i.id!=='blood_pact');
+  for(const item of game.items.listItems())if(item.definition_id==='blood_pact')game.items.removeItem(item.instance_id);
   game.spawnTriumvirate({short:true}); const W=game.enemies.filter(e=>e.persona);
   const kinds=new Set(); let revealed=0;
   for(let i=0;i<2400;i++){ step(); heal(); game.player.x=600; game.player.y=640;
@@ -96,7 +96,7 @@ test('The Triumvirate: 1500 HP each, 2 s reloads, censer, hymn and hook, enrage,
   const enraged=W.slice(1).map(w=>[w.burstDelay,w.reloadTime]);
   for(const w of W.slice(1)){ w.hp=1; w.takeDamage(5,0,0,{shot:true}); step(2); }
   return {hp, reload, kinds:[...kinds].sort(), revealed:revealed>0, enraged,
-    drop:game.loot.filter(l=>l.type==='weapon_drop').map(l=>l.item.id), defeats:game.questState.triumvirateDefeats};`, r => {
+    drop:game.loot.filter(l=>l.type==='weapon_drop').map(l=>l.item.definition_id), defeats:game.questState.triumvirateDefeats};`, r => {
   assert.deepEqual(r.hp, [1500,1500,1500]); assert.deepEqual(r.reload, [120,120,120]);
   for (const k of ['censer','fire','smoke','hymn','hook']) assert.ok(r.kinds.includes(k), k);
   assert.equal(r.revealed, true);
