@@ -4,9 +4,9 @@
 
 ## Composition and ownership
 
-Directory's `createGameRuntime()` installs `api.actors` alongside `api.session`, `api.items`, `api.combat`, `api.weapons` and `api.loot`. `actorSystem` attaches to that runtime's existing world. The actor map is an identity/lifecycle lookup, not a spatial index. Registration/removal events connect actors automatically. Full registry scans happen only at explicit reconnection boundaries; threats and noise use grid-local queries.
+Directory's `createGameRuntime()` installs `api.actors` alongside `api.session`, `api.items`, `api.combat`, `api.weapons`, `api.attacks`, `api.abilities` and `api.loot`. `actorSystem` attaches to that runtime's existing world. The actor map is an identity/lifecycle lookup, not a spatial index. Registration/removal events connect actors automatically. Full registry scans happen only at explicit reconnection boundaries; threats and noise use grid-local queries.
 
-The current runtime registers weapons before actors: actor fire intents execute in the next weapon phase, with one fixed-step latency. The classic apartment explicitly runs actors then weapons in its existing step. Neither creates another loop. Pause holds AI, health timers, contracts and weapon cooldowns. Rendering submits packets only.
+The runtime runs weapons/abilities, the universal attack queue, then actors: actor attack intents execute in the next attack phase, with one fixed-step latency. The classic apartment explicitly runs actor intent, weapons/abilities and the same attack queue in its existing step. Neither creates another loop. Pause holds AI, health timers, contracts and weapon cooldowns. Rendering submits packets only.
 
 | Record | Owner |
 |---|---|
@@ -64,7 +64,7 @@ Events: `actor:damaged`, `actor:defeated`, `actor:healed`, `actor:revived`, `act
 
 Equipment setters grant/equip real instances. `onWeaponFired` manages authored burst delays through the shared weapon controller. Roster import/export preserves burst size/delay/accuracy, cooldown and remaining burst count. Aliases are converted once at Directory/host boundaries. `rosterRecord(npc)` exports game metadata and a detached typed inventory; it is not another live owner.
 
-`actorSystem({weapons,combat,session?,get_player?,policy={}})` accepts `stationary(actor,context)`, `may_engage(target)`, `world_minutes_delta(seconds)`, `aura_interval(actor)`, `visibility(player)`, `search_points(ganger)`, `random()` and `on_event(event,detail)`. Defaults use elapsed seconds/60 for world minutes. A production world-time coordinator must supply its own rate and translate historical contract expiry when importing older saves.
+`actorSystem({attacks,combat,session?,get_player?,policy={}})` accepts `stationary(actor,context)`, `may_engage(target)`, `world_minutes_delta(seconds)`, `aura_interval(actor)`, `visibility(player)`, `search_points(ganger)`, `random()` and `on_event(event,detail)`. Defaults use elapsed seconds/60 for world minutes. A production world-time coordinator must supply its own rate and translate historical contract expiry when importing older saves.
 
 ## Ganger policy
 
@@ -95,3 +95,7 @@ Next class conversions: mounted companion attacks, specialized companion tactics
 Verification: `tools/test-actor-systems.mjs`, `tools/test-actor-callers.cjs`, `tools/test-actors-browser.py`, Basement `actor-support.test.mjs`, and the existing player/combat/apartment suites. Repeated identical movement requests retain path plans, failed paths respect the native retry interval, and grid-corner traversal has a regression test.
 
 Ability loadouts now live in `data.abilities`; `NPC.equippedAbilityId` derives from them. Directory supplies role defaults and imports prior aliases once. Actors ask `abilitySystem` to cast through the existing native projectile/contact pipeline. See the [ability API](../abilities/README.md).
+
+## Unified attack interface
+
+Native Player, NPC and Ganger requests now pass through [attackSystem and attackRegistry](../attacks/README.md). They use the same registered firearm, melee and ability definitions as plain gameCharacter subclasses. Actor policy selects a target and requests an attack; it no longer chooses separate fire/cast APIs or privately creates weapon controllers. The attack service binds each actual character and handles owned inventories, queued input and selection. Lower execution classes and their shared physics remain unchanged authorities.

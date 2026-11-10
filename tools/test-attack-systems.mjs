@@ -1,0 +1,66 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createGameRuntime} from '../src/directory/game-runtime.mjs';
+import {gameLevel} from '../src/runtime/game-level.mjs';
+import {gameCharacter} from '../src/basement/physics/index.mjs';
+import {attackRegistry} from '../src/gameplay/attacks/attack-registry.mjs';
+class Room extends gameLevel{}
+async function setup(){const engine=createGameRuntime({schedule_frame:null,actor_policy:{random:()=>.5},ability_policy:{random:()=>.5},player:{template:'df:player_949',entity_type:'df_player',position:[100,100]}});engine.registerLevel('a',Room).registerLevel('b',Room);await engine.loadLevel('a');engine.start();const api=engine.api;return {engine,api,player:api.session.player,tick:(n=1)=>{for(let i=0;i<n;i++)engine.updateState();}};}
+const soldier=(api,position=[50,100])=>api.actors.spawn({kind:'actor',position});
+test('registered types and immutable definitions cover every weapon, unarmed melee and all three abilities',async()=>{
+ const {engine,api}=await setup(),registry=api.attacks.registry;assert.deepEqual(registry.listAttackTypes(),['firearm','melee','ability']);assert.equal(registry.getAttack('weapon:pistol_fpx').attack_type,'firearm');assert.equal(registry.getAttack('weapon:maiden_kukri').attack_type,'melee');assert.equal(registry.getAttack('unarmed:punch').attack_type,'melee');assert.equal(registry.getAttack('ability:fireball').attack_type,'ability');assert.ok(registry.listAttacks().some(attack=>attack.attack_id==='ability:ember_burst'));assert.throws(()=>registry.getAttack('ability:fireball').range=1);assert.throws(()=>registry.registerAttackType('ability',{execute:()=>true}));assert.throws(()=>registry.registerAttack({attack_id:'test',attack_type:'missing',range:1}));assert.throws(()=>registry.registerAttackType('async',{execute:async()=>true}),/synchronous/);assert.throws(()=>registry.registerAttack({attack_id:'broken',attack_type:'firearm',range:1}),/item_id/);assert.throws(()=>registry.registerAttack({attack_id:'wrong',attack_type:'firearm',item_id:'maiden_kukri',range:1}),/match/);assert.throws(()=>registry.registerAttack({attack_id:'missing:spell',attack_type:'ability',ability_id:'not_a_spell',range:1}),/Unknown ability/);engine.dispose();
+});
+test('the same firearm/melee/ability front door works for the real player and generic native characters',async()=>{
+ const {engine,api,player,tick}=await setup(),actor=soldier(api,[50,250]);assert.ok(actor instanceof gameCharacter);assert.ok(api.attacks.getController(actor));const before=api.physics.getStatistics().bodies;
+ for(const source of [player,actor]){
+  const items=api.attacks.getItems(source);items.grantItem('pistol_fpx');items.grantItem('maiden_kukri');const abilities=api.abilities.getLoadout(source);abilities.learnAbility('fireball');
+  api.attacks.selectAttack(source,'weapon:pistol_fpx');assert.equal(api.attacks.canAttack(source,{direction:[1,0]}),true);assert.ok(api.attacks.executeAttack(source,{direction:[1,0]}));assert.equal(api.attacks.executeAttack(source,{attack_id:'ability:fireball',direction:[1,0]}),false);assert.equal(api.attacks.canAttack(source),false);assert.ok(api.attacks.getCooldown(source)>0);tick(80);
+  api.attacks.selectAttack(source,'weapon:maiden_kukri');assert.equal(api.attacks.executeAttack(source,{direction:[1,0]}),true);assert.ok(api.attacks.getController(source).active_swing);tick(80);
+  api.attacks.selectAttack(source,'ability:fireball');const shot=api.attacks.executeAttack(source,{direction:[1,0]});assert.equal(shot.data.ability_id,'fireball');tick(80);
+  api.attacks.selectAttack(source,'unarmed:punch');const punch=api.attacks.executeAttack(source,{direction:[1,0]});assert.equal(punch.data.melee,true);tick(80);
+ }
+ assert.equal(api.physics.getStatistics().bodies,before);engine.dispose();
+});
+test('plain gameCharacter subclasses receive a controller automatically without an actor wrapper or extra body',async()=>{
+ const {engine,api}=await setup();class CustomCharacter extends gameCharacter{static entity_type='custom_character';}api.elements.registerEntityType(CustomCharacter.entity_type,CustomCharacter);const custom=api.physics.createEntity({entity_type:CustomCharacter.entity_type,position:[500,0]});api.physics.commitCommands();const count=api.physics.getStatistics().bodies;
+ const items=api.attacks.getItems(custom),weapon=items.grantItem('pistol_fpx');api.attacks.selectAttack(custom,'weapon:pistol_fpx',{instance_id:weapon.instance_id});const shot=api.attacks.executeAttack(custom,{direction:[1,0]});assert.equal(shot.data.source_id,custom.entity_id);assert.equal(api.elements.fetchEntity(custom.entity_id),custom);assert.equal(api.physics.getStatistics().bodies,count+1);assert.equal(api.attacks.getController(custom),api.weapons.getActorController(custom));engine.dispose();
+});
+test('availability comes from owned instances and learned capabilities; registration never grants either',async()=>{
+ const {engine,api,player}=await setup(),items=api.items;assert.equal(api.attacks.getAvailableAttacks(player).some(attack=>attack.attack_id==='ability:fireball'),false);assert.throws(()=>api.attacks.selectAttack(player,'ability:fireball'),/Learn/);assert.throws(()=>api.attacks.selectAttack(player,'weapon:pistol_fpx'),/owned/);
+ const first=items.grantItem('pistol_fpx'),second=items.grantItem('pistol_fpx');items.setItemState(second.instance_id,{ammo:7});api.attacks.selectAttack(player,'weapon:pistol_fpx',{instance_id:second.instance_id});assert.equal(items.equipped_weapon_id,second.instance_id);assert.notEqual(first.instance_id,second.instance_id);api.abilities.getLoadout(player).learnAbility('fireball');assert.ok(api.attacks.getAvailableAttacks(player).some(attack=>attack.attack_id==='ability:fireball'));engine.dispose();
+});
+test('player input and NPC/Ganger intents execute through one registry without duplicate attacks',async()=>{
+ const {engine,api,player,tick}=await setup(),weapon=api.items.grantItem('pistol_fpx');api.items.equipItem(weapon.instance_id);let executed=0,shots=0;api.session.on('attack:executed',event=>{if(event.entity_id===player.entity_id)executed++;});api.session.on('weapon:fired',event=>{if(event.entity_id===player.entity_id)shots++;});api.session.emit('player:fire',{entity_id:player.entity_id,aim:{direction:[1,0]}});tick();assert.equal(shots,1);assert.equal(executed,1);
+ player.body.setPosition([400,100]);const npc=api.actors.spawn({kind:'npc',role:'teammate',position:[500,100],data:{recruited:true,weapon_definition_id:'pistol_fpx'}}),enemy=api.actors.spawn({kind:'ganger',position:[630,100]});let npcAttacks=0;api.session.on('attack:executed',event=>{if(event.entity_id===npc.entity_id)npcAttacks++;});tick(5);assert.equal(npcAttacks,1);assert.equal(enemy.hp,5);engine.dispose();
+});
+test('selecting a learned ability makes the player’s ordinary fire intent cast it while retaining the held weapon',async()=>{
+ const {engine,api,player,tick}=await setup(),weapon=api.items.grantItem('pistol_fpx');api.items.equipItem(weapon.instance_id);api.abilities.getLoadout(player).learnAbility('shadow_bolt');api.attacks.selectAttack(player,'ability:shadow_bolt');let casts=0,guns=0;api.session.on('ability:cast',()=>casts++);api.session.on('weapon:fired',()=>guns++);api.session.emit('player:fire',{aim:{direction:[1,0]}});tick();assert.equal(casts,1);assert.equal(guns,0);assert.equal(api.items.equipped_weapon_id,weapon.instance_id);engine.dispose();
+});
+test('queued attack bindings reject equipment copies, selection changes, forgotten abilities and blocked controls',async()=>{
+ const {engine,api,player,tick}=await setup(),first=api.items.grantItem('pistol_fpx'),second=api.items.grantItem('pistol_fpx');api.attacks.selectAttack(player,'weapon:pistol_fpx',{instance_id:first.instance_id});let executions=0;api.session.on('attack:executed',()=>executions++);api.attacks.requestAttack(player,{direction:[1,0]});api.items.equipItem(second.instance_id);tick();assert.equal(executions,0);
+ api.abilities.getLoadout(player).learnAbility('fireball');api.attacks.selectAttack(player,'ability:fireball');api.attacks.requestAttack(player);api.abilities.getLoadout(player).forgetAbility('fireball');tick();assert.equal(executions,0);
+ api.attacks.useDefaultAttack(player);api.attacks.requestAttack(player);const release=api.player_controls.block('test');tick();release();assert.equal(executions,0);engine.dispose();
+});
+test('custom attack types can be registered once and used by any character through the same readiness contract',async()=>{
+ const {engine,api,player}=await setup(),npc=soldier(api,[300,100]);api.attacks.registry.registerAttackType('signal',{canUse:()=>true,execute:({actor,controller,definition})=>{actor.data.last_signal=definition.signal;controller.setCooldown(.5);return true;}});api.attacks.registry.registerAttack({attack_id:'signal:warning',attack_type:'signal',name:'Warning',range:100,signal:'warning'});
+ for(const actor of [player,npc]){api.attacks.selectAttack(actor,'signal:warning');assert.equal(api.attacks.executeAttack(actor),true);assert.equal(actor.data.last_signal,'warning');assert.equal(api.attacks.executeAttack(actor),false);}engine.dispose();
+});
+test('pause, defeat, mounting and interrupted Gangers cannot bypass shared attack readiness',async()=>{
+ const {engine,api,player,tick}=await setup(),npc=soldier(api,[300,100]);api.attacks.requestAttack(npc);const resume=engine.pause('test');resume();tick();assert.equal(api.attacks.getController(npc).cooldown_seconds,0);const parent=api.physics.createVehicle({position:[300,100]});api.physics.attachBody(npc,{parent_body:parent});assert.equal(api.attacks.executeAttack(npc),false);api.physics.detachBody(npc,{exit_points:[[0,50]]});npc.takeDamage(npc.maxHp,{type:'ballistic'});assert.equal(api.attacks.executeAttack(npc),false);assert.throws(()=>api.attacks.executeAttack(parent),/character/);engine.dispose();
+});
+test('native snapshots retain attack choice, original IDs and one cooldown; removed sources cannot leave active controllers',async()=>{
+ const {engine,api,tick}=await setup(),npc=api.actors.spawn({kind:'npc',role:'teammate',position:[300,100],data:{recruited:true,hireType:'permanent'}});npc.abilities.learnAbility('fireball');api.attacks.selectAttack(npc,'ability:fireball');api.attacks.executeAttack(npc,{direction:[1,0]});const cooldown=npc.cooldown,id=npc.entity_id,saved=api.physics.savePhysicsState();api.physics.loadPhysicsState(saved);api.weapons.reconnectGameplay();api.attacks.reconnectGameplay();api.actors.reconnectGameplay();api.abilities.reconnectGameplay();const restored=api.elements.fetchEntity(id);assert.equal(api.attacks.getSelectedAttack(restored).attack_id,'ability:fireball');assert.equal(restored.cooldown,cooldown);const body=restored.body;await engine.loadLevel('b');assert.equal(restored.body,body);assert.equal(api.attacks.getSelectedAttack(restored).attack_id,'ability:fireball');restored.destroy();tick();assert.equal(api.weapons.getActorController(id),null);engine.dispose();
+});
+test('requests cannot inject physics/damage fields, registry changes cannot occur during rendering and no live record mutates',async()=>{
+ const {engine,api,player}=await setup();assert.throws(()=>api.attacks.executeAttack(player,{damage:999,owner_id:42}),/logical aim/);const before=api.physics.savePhysicsState();let checked=false;engine.registerSystem('inspect-render',{render(){assert.equal(api.attacks.canAttack(player),true);assert.throws(()=>api.attacks.executeAttack(player),/Rendering/);assert.throws(()=>api.attacks.requestAttack(player),/Rendering/);assert.throws(()=>api.attacks.selectAttack(player,'unarmed:punch'),/Rendering/);assert.throws(()=>api.attacks.beforePhysics(),/Rendering/);assert.throws(()=>api.attacks.registry.registerAttackType('bad',{execute:()=>true}),/idle/);checked=true;}});engine.render(1);assert.equal(checked,true);assert.deepEqual(api.physics.savePhysicsState(),before);engine.dispose();
+});
+
+
+test('shared held-weapon presentation uses canonical inventory for plain characters without an items property',async()=>{
+ const {combatPresentation}=await import('../src/presentation/combat-presentation.mjs');const {engine,api}=await setup(),custom=api.physics.createCharacter({position:[150,100]});const items=api.attacks.getItems(custom);items.grantItem('pistol_fpx');api.attacks.selectAttack(custom,'weapon:pistol_fpx');let drawn=0;const before=api.physics.savePhysicsState();new combatPresentation({weapon_art:{draw:()=>drawn++}}).render({api},1,{submit:()=>{}});assert.equal(custom.items,undefined);assert.equal(drawn,1);assert.deepEqual(api.physics.savePhysicsState(),before);engine.dispose();
+});
+
+
+test('choosing an ability cancels an armed quick draw without resetting the shared attack cooldown',async()=>{
+ const {engine,api,player}=await setup(),item=api.items.grantItem('pistol_fpx');api.items.equipItem(item.instance_id);api.weapons.armQuickDraw();api.weapons.setCooldown(.5);api.abilities.getLoadout(player).learnAbility('fireball');api.attacks.selectAttack(player,'ability:fireball');assert.equal(api.weapons.quick_draw,null);assert.equal(api.weapons.holstered,false);assert.equal(api.weapons.cooldown_seconds,.5);assert.equal(api.attacks.executeAttack(player),false);engine.dispose();
+});

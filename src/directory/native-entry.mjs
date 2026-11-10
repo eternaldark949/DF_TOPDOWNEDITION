@@ -42,3 +42,7 @@ export {resolveEmoteLines,NPC_EMOTE_REACTIONS} from './npc-reactions.mjs';
 export {abilityLoadout,actorAbilities} from '../gameplay/abilities/ability-loadout.mjs';
 export {abilitySystem} from '../gameplay/abilities/ability-system.mjs';
 export {createAbilityCatalog,importActorAbilities} from './game-abilities.mjs';
+
+export {attackRegistry,validateAttackState} from '../gameplay/attacks/attack-registry.mjs';
+export {attackSystem} from '../gameplay/attacks/attack-system.mjs';
+export {createAttackCatalog} from './game-attacks.mjs';

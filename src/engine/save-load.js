@@ -24,6 +24,8 @@ engineMixin({
                         y: this.player ? this.playerPosition[1] : 500,
                         health: this.player?.hp ?? 100,
                         vitals: this.player?.vitals.snapshot() ?? null,
+                        abilitiesSnapshot:this.player?.data.abilities?structuredClone(this.player.data.abilities):null,
+                        attackSelection:this.player?.data.attack_state?structuredClone(this.player.data.attack_state):null,
                         currency: this.currency ?? 500,
                         scrap: this.scrap ?? 0,
                         boosters: this.boosterCount ?? 0,
@@ -429,6 +431,7 @@ engineMixin({
                     equippedWeaponId: t.equippedWeaponId || null,
                     inventory:t.items?.snapshot(),
                     abilitiesSnapshot:t.abilities?.snapshot(),
+                    attackSelection:t.attackSelection,
                     equippedAbilityId:t.equippedAbilityId??null,
                     cooldown:t.cooldown??0,
                     hp: t.hp || 100,
@@ -500,8 +503,10 @@ engineMixin({
 
                     // Preflight companion capability records before changing currency, inventory or the live map.
                     const abilityCatalog=DFNative.createAbilityCatalog(GAME_DB.progression.abilities);
-                    for(const record of [...(save.teammates??[]),...(worldData.nativeLevel?.physics?.entities??[]).filter(entry=>entry.entity_type==='df_npc').map(entry=>entry.data)]){
+                    const attackCatalog=DFNative.createAttackCatalog({items:DFNative.createItemCatalog(GAME_DB.items),abilities:abilityCatalog});
+                    for(const record of [playerData,...(save.teammates??[]),...(worldData.nativeLevel?.physics?.entities??[]).filter(entry=>entry.entity_type==='df_npc'||entry.entity_type==='df_player'||entry.data?.attack_state||entry.data?.abilities).map(entry=>entry.data)]){
                         DFNative.importActorAbilities(structuredClone(record),abilityCatalog,{default_id:record.role==='red_demon_dancer'?'fireball':null});
+                        if(record.attackSelection??record.attack_state)DFNative.validateAttackState(record.attackSelection??record.attack_state,id=>this.attacks?.registry.hasAttack(id)??!!attackCatalog[id]);
                     }
 
                     const loadedVitals=new DFNative.playerVitals();
@@ -513,6 +518,8 @@ engineMixin({
                         loadedVitals.importHealth(playerData.health ?? defaults.player.health,shield?.active?Math.floor(maximum/2):maximum);
                     }
                     // 1. Load Player Data
+                    if(playerData.abilitiesSnapshot)this.player.data.abilities=structuredClone(playerData.abilitiesSnapshot);else delete this.player.data.abilities;
+                    if(playerData.attackSelection)this.player.data.attack_state=structuredClone(playerData.attackSelection);else delete this.player.data.attack_state;
                     this.currency = playerData.currency ?? defaults.player.currency;
                     this.scrap = playerData.scrap ?? defaults.player.scrap;
                     this.player.vitals.load(loadedVitals.snapshot());
@@ -582,6 +589,7 @@ engineMixin({
                             if(savedTm.abilitiesSnapshot)npc.abilitiesSnapshot=savedTm.abilitiesSnapshot;
                             else if(savedTm.equippedAbilityId!==undefined)npc.equippedAbilityId=savedTm.equippedAbilityId;
                             if(savedTm.cooldown!==undefined)npc.cooldown=savedTm.cooldown;
+                            if(savedTm.attackSelection)npc.attackSelection=savedTm.attackSelection;
                             npc.recruited = true;
                             if (!this.teammates.includes(npc)) this.teammates.push(npc);
                             const npcIdx = this.npcs.indexOf(npc);
@@ -595,6 +603,7 @@ engineMixin({
                                 if(savedTm.abilitiesSnapshot)tm.abilitiesSnapshot=savedTm.abilitiesSnapshot;
                                 else if(savedTm.equippedAbilityId!==undefined)tm.equippedAbilityId=savedTm.equippedAbilityId;
                                 if(savedTm.cooldown!==undefined)tm.cooldown=savedTm.cooldown;
+                                if(savedTm.attackSelection)tm.attackSelection=savedTm.attackSelection;
                                 if (savedTm.equippedWeaponId && ITEM_REGISTRY[savedTm.equippedWeaponId]) {
                                     tm.equippedWeaponId = savedTm.equippedWeaponId;
                                 }

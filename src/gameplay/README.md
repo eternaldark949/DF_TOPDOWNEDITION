@@ -146,3 +146,7 @@ Run `node --test tools/test-player-systems.mjs tools/test-player-vitals.mjs` for
 ## Shared abilities
 
 Directory now also installs `api.abilities`. `abilityLoadout` owns learned/equipped capabilities; `abilitySystem` executes all three existing projectile abilities through native launches and the shared combat impact policy. Weapon and spell readiness/cooldown share one attack controller. Native and remaining classic NPCs use the same capability record. See [ability API and migration boundaries](abilities/README.md).
+
+## Universal attacks
+
+`api.attacks` now exposes the common registered firearm/melee/ability interface for Player, NPC, Ganger and arbitrary native gameCharacter subclasses. `selectAttack`, `canAttack`, `requestAttack` and `executeAttack` use canonical inventory/capability ownership and the existing cooldown. Normal input and native AI use this path. See [attack API, extensibility, persistence and boundaries](attacks/README.md).

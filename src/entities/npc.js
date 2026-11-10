@@ -127,6 +127,8 @@
                 }
             }
 
+            get attackSelection(){return structuredClone(this.data.attack_state??{format_version:1,selected_id:null});}
+            set attackSelection(snapshot){this.data.attack_state=structuredClone(DFNative.validateAttackState(snapshot,()=>true));}
             get abilities(){return DFNative.actorAbilities(this.data,NPC_ABILITY_CATALOG);}
             get abilitiesSnapshot(){return this.abilities.snapshot();}
             set abilitiesSnapshot(snapshot){if(snapshot!==null)this.abilities.load(snapshot);}

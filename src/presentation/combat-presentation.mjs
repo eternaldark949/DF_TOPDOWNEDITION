@@ -16,7 +16,7 @@ export class combatPresentation{
     else frame.submit({type:'shape',position:pose.position,rotation:pose.rotation,geometry:{type:'rect',size:[10,10],radius:2},material:{fill:definition.type==='consumable'?'#78e4bd':'#b594ff'},layer:20});
    }
    const controller=api.weapons.getActorController(entity);
-   if(controller)this.#held(frame,api,entity,entity.items,controller,blend);
+   if(controller)this.#held(frame,api,entity,api.attacks.getItems(entity),controller,blend);
    const state=data.combat_state;
    if(state?.bleed)frame.submit({type:'text',text:'●'.repeat(state.bleed.stacks),position:pose.position,font:{size:10},align:'center',baseline:'bottom',matrix:[1,0,0,1,pose.position[0],pose.position[1]-22],material:{fill:'#ff2a4a'},layer:40});
    if(state?.orbs.length)frame.submit({type:'text',text:'✦'.repeat(state.orbs.length),matrix:[1,0,0,1,pose.position[0],pose.position[1]-12],font:{size:10},align:'center',material:{fill:'#ffd76a'},layer:40});

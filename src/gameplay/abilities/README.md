@@ -78,7 +78,7 @@ Aim accepts JSON `target:[x,y]`, `direction:[x,y]`, or `angle`. Physical packet 
 
 NPC policy preserves weapon-first selection, falling back to the equipped ability. It queries the shared grid using the selected attack's range, respects engagement policy and native line of sight, and requests facing/casting. Penetrating weapons may retain their existing through-wall targeting; abilities stop at obstacles. The low-level `cast` method accepts logical aim without choosing a target or enforcing an AI range cutoff; lifetime and contacts govern the actual projectile, just as for weapons.
 
-The runtime order is weapons (advance shared attack clock) → abilities (consume casts) → actors (select next intents), then native physics. AI requests execute on the next attack phase. The earlier classic apartment explicitly invokes actor policy → weapons → abilities in its one fixed step. Pending requests are transient, never saved, and discard on pause/level departure, source removal/defeat or equipped-ability change. The source's capability is checked again at execution.
+The runtime order is weapons (advance shared attack clock) → abilities (compatibility casts) → attacks (universal requests) → actors (select next intents), then native physics. AI requests execute on the next attack phase. The earlier classic apartment explicitly invokes actor policy → weapons → abilities → attacks in its one fixed step. Pending requests are transient, never saved, and discard on pause/level departure, source removal/defeat or equipped-ability change. The source's capability is checked again at execution.
 
 ## Contacts and events
 
@@ -101,3 +101,7 @@ Remaining companion work: vehicle cabin arcs, checked exit/muzzle placement and 
 `abilityPresentation.render(context,blend,frame)` reads visible official spell projectiles through the renderer's shared query and submits shape/glow packets. The runtime example installs it. `combatPresentation` skips these spell bodies to prevent double drawing. The classic apartment's existing separate projectile artist reads the same color/radius metadata; its full Canvas-to-packet conversion is still tracked separately. Entity and ability classes contain no Canvas calls.
 
 Tests: `node --test tools/test-ability-systems.mjs`, `node tools/test-ability-callers.cjs`, `python tools/test-abilities-browser.py`. They cover all three definitions, ownership/invalid saves, native targeting, single damage, readiness/cooldown sharing, queue cancellation, snapshots, real production save/transitions and actual Chromium pixels with stable physics during drawing. Basement's actor-support suite also covers saving immediately after removal of a motor's target: snapshots drop stale references without mutating live motor commands.
+
+## Universal attack registration
+
+Abilities are now registered alongside firearm and melee attacks through [attackRegistry and attackSystem](../attacks/README.md). For ordinary player/actor input, select `ability:fireball` and call `api.attacks.requestAttack(actor, aim)`. Player input and native NPC/Ganger callers use that shared entry point. The lower `abilitySystem` remains the executor and compatibility API. Plain gameCharacter subclasses are connected automatically; the service no longer requires a particular actor subclass to provide an items property.

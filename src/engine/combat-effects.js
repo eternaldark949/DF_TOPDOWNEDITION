@@ -267,7 +267,7 @@
             },
 
             fireWeapon() {
-                if(this.activeLevel)return this.weapons.fire(this._apartmentAim??{});
+                if(this.activeLevel)return this.attacks.executeAttack(this.player,this._apartmentAim??{});
                 if ((this._quickDraw && !this._quickDrawFiring) || (this.weaponHolstered && !this.isDriving)) return;
                 // 1. VISIBILITY CHECKS
                 if (!this.player.visible && !this.isDriving) return;

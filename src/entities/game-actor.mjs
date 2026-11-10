@@ -1,3 +1,4 @@
+import {validateAttackState} from '../gameplay/attacks/attack-registry.mjs';
 import {gameCharacter} from '../basement/physics/index.mjs';
 import {actorVitals} from '../gameplay/actors/actor-vitals.mjs';
 import {nonnegative,jsonCopy} from '../gameplay/values.mjs';
@@ -6,6 +7,8 @@ const stateFor=actor=>actor.data.actor_state??={format_version:1,defeated:false,
 /** Common actor gameplay over a real gameCharacter. No velocity, geometry or body mirrors. */
 export class gameActor extends gameCharacter{
  static entity_type='df_actor';
+ get attackSelection(){return jsonCopy(this.data.attack_state??{format_version:1,selected_id:null});}
+ set attackSelection(snapshot){this.data.attack_state=jsonCopy(validateAttackState(snapshot,()=>true));}
  get vitals(){let component=health.get(this);if(!component){component=new actorVitals(this.data);health.set(this,component);}return component;}
  get hp(){return this.vitals.health;}
  set hp(value){this.vitals.setHealth(value);}

@@ -33,3 +33,5 @@ The `df_street` library adds official traffic/pedestrian templates and rules. Re
 Actor definitions now register `df_actor`, `df_npc` and `df_ganger` with `registerGameEntityTypes`. `createActorPacket` resolves civilian/teammate roles and imports old roster aliases once. Actor rules, appearances and the enemy weapon definition come from Directory resources and the existing enemy/item catalogs. See [actor API](../../gameplay/actors/README.md).
 
 `df:abilities` is an immutable normalized catalog built from `game-db/progression.json` by `createAbilityCatalog`. Directory converts ticks/speeds once and supplies radius/launch defaults from `game-ability-rules.json`. Ability classes contain no copied balance table. [Ability API](../../gameplay/abilities/README.md).
+
+`df:attacks` registers immutable firearm/melee/ability references built by `createAttackCatalog` from the same item and capability resources. Targeting defaults live in `game-attack-rules.json`. Definitions grant no inventory item or learned capability. See [universal attack API](../../gameplay/attacks/README.md).

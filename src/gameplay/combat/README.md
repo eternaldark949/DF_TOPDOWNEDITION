@@ -113,3 +113,7 @@ Verification: `tools/test-combat-systems.mjs`, `src/basement/physics/tests/nativ
 `registerActor(actor,{items=actor.items,policy={}})`, `unregisterActor(id)`, `getActorController(actorOrId)` and `requestActorFire(actor,aim)` now route NPC/Ganger weapons through the same execution code and one global impact/contact subscription. Records remain on each official actor. `combat.canDamage(source,target,{source_alliance}={})` preserves projectile team policy after source removal; protected civilians reject friendly fire. Downed permanent companions emit `combat:downed`. See [actor API and remaining specialized conversions](../actors/README.md).
 
 `weaponSystem.canExecute()` now supplies common attack readiness to `abilitySystem`. Casts use the actor’s existing cooldown record. The one world projectile policy routes native spell bodies with `damage_type`/`ability_id` through combat; abilities add no collision listener. See [ability API](../abilities/README.md).
+
+## Universal character attacks
+
+Directory composition disables the weapon service’s own ordinary fire-input subscription (`input_events:false`) and installs [attackSystem](../attacks/README.md). Player input, native actor AI and the native apartment fire branch dispatch registered firearm, melee or ability attacks through that service. It owns generic character controller connections; actorSystem no longer duplicates binding policy. The existing weapon executors, shared cooldown and one world impact/contact subscription remain authoritative. Standalone hosts retain `input_events:true` by default.

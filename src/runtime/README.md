@@ -141,3 +141,5 @@ Production health and Flit-state consumers now use the active player's shared `p
 Systems can implement `gameplayPaused(context)`. The runtime calls it after clearing inputs when acquiring a pause token; native weapon policy discards pending release shots. After `afterPhysics` hooks, the runtime calls the existing native `commitCommands()` without advancing time, so completed steps have no queued removals/spawns blocking a snapshot. See the [shared combat API](../gameplay/combat/README.md) for weapons, timed effects and registered world loot.
 
 Recruited native NPCs are automatically retained by `actorSystem`; released contracts return to level lifetime. The same entity and body survive native level changes. See [actor lifetime and API contracts](../gameplay/actors/README.md).
+
+Directory now installs `api.attacks`: the shared registry and character-facing dispatch for firearm, melee and ability attacks. Native Player/NPC/Ganger and arbitrary gameCharacter subclasses share it. Automatic connections use official registration events; selection persists on the character and normal input has one queue. See [attack API](../gameplay/attacks/README.md).

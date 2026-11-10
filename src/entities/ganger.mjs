@@ -16,7 +16,7 @@ export class Ganger extends gameActor{
  setBehavior(value){if(!states.includes(value))throw new TypeError('Invalid ganger behavior');const state=stateFor(this);if(state.state!==value){state.state=value;this.emitActor('ganger:state-changed',{state:value});}}
  onDamaged({source,type}){const state=stateFor(this),actor=source==null?null:this.physics_system.elements.fetchEntity(source);state.suspicion=100;if(actor){state.investigate_position=[...actor.position];this.lookAtTarget(actor);}this.setBehavior('ALERT');if(type==='melee')this.interruptMelee();}
  interruptMelee(){const state=stateFor(this),rules=this.getAsset('actor_rules').data.ganger;if(this.dead||state.resistance_remaining>0)return false;state.interrupt_remaining=rules.interrupt_seconds;state.resistance_remaining=rules.interrupt_resistance;state.telegraphing=false;state.aim_position=null;state.shot_delay=Math.max(state.shot_delay,(this.data.telegraph_seconds??.15)+1/60);return true;}
- updateBehavior(seconds,{player,weapons,random=Math.random,visibility=1,search_points=[]}={}){
+ updateBehavior(seconds,{player,attacks,random=Math.random,visibility=1,search_points=[]}={}){
   if(this.dead||!this.active||this.physics_system.getAttachmentState(this))return;
   const state=stateFor(this),rules=this.getAsset('actor_rules').data.ganger,world=this.physics_system;
   for(const key of ['drain_remaining','suppression_remaining','wander_remaining','interrupt_remaining','resistance_remaining','shot_delay'])state[key]=Math.max(0,state[key]-seconds);
@@ -31,12 +31,12 @@ export class Ganger extends gameActor{
   if(state.state==='ALERT'&&!view)this.setBehavior(state.investigate_position?'SEARCHING':'IDLE');
   if(state.state==='ALERT'&&view&&player){
    this.lookAtTarget(player);if(view.distance>rules.engage_distance)this.followTarget(player,{speed:this.data.move_speed,arrival_distance:rules.engage_distance,face_movement:false});else if(view.distance<rules.retreat_distance)this.fleeTarget(player,{speed:rules.retreat_speed,safety_distance:rules.retreat_distance});else this.cancelMovement();
-   const stats=this.items.getEquippedWeapon()?.stats??{},lead=world.predictTargetPosition(this,player,{projectile_speed:(stats.projectileSpeed??24)*60});
+   const stats=this.items.getEquippedWeapon()?.stats??{},attack=attacks.getAttackProfile(this),lead=world.predictTargetPosition(this,player,{projectile_speed:attack.projectile_speed??(stats.projectileSpeed??24)*60});
    state.telegraphing=sees&&state.shot_delay>0&&state.shot_delay<=this.data.telegraph_seconds&&!state.interrupt_remaining;state.aim_position=state.telegraphing?lead.position:state.aim_position;
-   if(sees&&!state.shot_delay&&!state.interrupt_remaining){weapons.requestActorFire(this,{target:state.aim_position??lead.position});state.shot_delay=(stats.fireRate??45)/60+random()*rules.shot_jitter_seconds;state.telegraphing=false;}
+   if(sees&&!state.shot_delay&&!state.interrupt_remaining){attacks.requestAttack(this,{target:state.aim_position??lead.position});state.shot_delay=(attack.cooldown_seconds??(stats.fireRate??45)/60)+random()*rules.shot_jitter_seconds;state.telegraphing=false;}
   }else if(state.state==='SUPPRESSING'){
    this.cancelMovement();state.telegraphing=false;
-   if(state.investigate_position){this.lookAtTarget(state.investigate_position);const clear=world.observeTarget(this,state.investigate_position).line_clear;if((clear||this.items.getEquippedWeapon()?.stats.penetrating)&&!state.shot_delay&&!state.interrupt_remaining){weapons.requestActorFire(this,{target:state.investigate_position});state.shot_delay=rules.suppression_cooldown;}}
+   if(state.investigate_position){this.lookAtTarget(state.investigate_position);const clear=world.observeTarget(this,state.investigate_position).line_clear;if((clear||attacks.getAttackProfile(this).penetrating)&&!state.shot_delay&&!state.interrupt_remaining){attacks.requestAttack(this,{target:state.investigate_position});state.shot_delay=rules.suppression_cooldown;}}
    if(!state.suppression_remaining){this.setBehavior('SEARCHING');state.search_elapsed=0;state.search_positions=jsonCopy(search_points);}
   }else if(state.state==='SEARCHING'){
    state.telegraphing=false;state.search_elapsed+=seconds;

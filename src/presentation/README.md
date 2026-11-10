@@ -50,3 +50,5 @@ Verification: `node --test tools/test-weapon-appearance.mjs` and `python tools/t
 `actorPresentation` submits visible NPC names/speech and Ganger detection/telegraph labels. It uses the renderer’s shared visible-entity query and native interpolated anchor points. The example’s separate generic body artist remains responsible for actor shapes; full procedural humanoid animation is still pending. Rendering never advances actor or weapon policy.
 
 `abilityPresentation` submits spell color/shape/glow packets from visible official projectiles. It is installed in the native runtime example; combatPresentation skips those bodies to prevent duplicate drawing. Authored definitions remain in Directory, and entity/ability classes contain no Canvas instructions. Full classic casting animation, fire trails and audio remain presentation work.
+
+Shared held-weapon presentation now reads inventory through `api.attacks.getItems(entity)`. Plain native characters and custom subclasses need no items-property wrapper to use the same artist. The runtime example’s Attack menu routes ordinary player fire through the selected registered attack, including learned abilities.

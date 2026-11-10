@@ -1,3 +1,4 @@
+import {createAttackCatalog} from './game-attacks.mjs';
 import progression from './game-db/progression.json' with {type:'json'};
 import {createAbilityCatalog} from './game-abilities.mjs';
 import actorRules from './game-actor-rules.json' with {type:'json'};
@@ -28,6 +29,7 @@ export function createGameAssetLibrary({ game_db = { cast, vehicles, enemies, pl
     definition.resources.actor_rules={kind:'actor_rules',data:actorRules};
     definition.resources.actor_items={kind:'item_catalog',data:createItemCatalog(game_db.items,{enemy_kinds:game_db.enemies.kinds})};
     definition.resources.actor_appearances={kind:'appearance_catalog',data:game_db.cast.appearances};
+    definition.resources.attacks={kind:'attack_catalog',data:createAttackCatalog({items:definition.resources.actor_items.data,abilities:definition.resources.abilities.data})};
     const ganger=game_db.enemies.kinds.ganger;Object.assign(definition.templates.ganger,{mass:ganger.mass,collision_shape:{shape_type:'circle',radius:ganger.radius}});
     Object.assign(definition.templates.ganger.data,{health:ganger.hp,max_health:ganger.hp,move_speed:ganger.speed*60,damage_grace_seconds:ganger.invincible_frames/60,vision_range:ganger.vision_range,telegraph_seconds:ganger.telegraph_frames/60});
     return new assetLibrary({ libraries: [definition, streetDefinitions] });

@@ -8,8 +8,8 @@ import {jsonCopy,nonnegative} from '../values.mjs';
 const stateFor=(player,settings=rules)=>player.data.weapon_state??={format_version:1,elapsed:0,cooldown:0,holstered:false,drawn_at:null,draw_shot_used:false,quick_draw:null,punch_side:'right',haymaker:false,combo:0,last_punch_at:-99,swing:null,side:1,shield:{charge:settings.mirror.shield,spent:false,since_hit:999}};
 /** One executable weapon policy. Native physics owns every trajectory, sweep, contact and impulse. */
 export class weaponSystem{
- #items;#combat;#session;#player;#rules;#policy;#context=null;#pending=false;#lastAim={};#quickFiring=false;#unsubscribes=[];#controllers=new Map();#projectileEvents;
- constructor({items,combat,session,get_player=()=>session?.player,rules:settings=rules,policy={},projectile_events=true}={}){if(!items||!combat)throw new TypeError('Weapons require item and combat services');this.#items=items;this.#combat=combat;this.#session=session;this.#player=get_player;this.#rules=jsonCopy(settings);this.#policy=policy;this.#projectileEvents=projectile_events;}
+ #items;#combat;#session;#player;#rules;#policy;#context=null;#pending=false;#lastAim={};#quickFiring=false;#unsubscribes=[];#controllers=new Map();#projectileEvents;#inputEvents;
+ constructor({items,combat,session,get_player=()=>session?.player,rules:settings=rules,policy={},projectile_events=true,input_events=true}={}){if(!items||!combat)throw new TypeError('Weapons require item and combat services');this.#items=items;this.#combat=combat;this.#session=session;this.#player=get_player;this.#rules=jsonCopy(settings);this.#policy=policy;this.#projectileEvents=projectile_events;this.#inputEvents=input_events;}
  get state(){return this.#player()?.data.weapon_state??null;}
  get quick_draw(){return this.state?.quick_draw??null;}
  get cooldown_seconds(){return this.state?.cooldown??0;}
@@ -18,7 +18,8 @@ export class weaponSystem{
  get guarding(){const state=this.state;return !!state?.swing&&!state.holstered&&state.elapsed-state.swing.started<=state.swing.seconds;}
  attach(context){if(this.#context)throw new Error('Weapons already attached');this.#context=context;this.reconnectGameplay();
   if(this.#projectileEvents)this.#unsubscribes.push(context.api.physics.on('projectileHit',event=>this.#projectileHit(event)),context.api.physics.on('projectileRedirected',event=>{const data=event.projectile?.data;if(!data)return;data.source_id=event.owner_id;const owner=context.api.elements.fetchEntity(event.owner_id);data.source_alliance=owner?.alliance??owner?.data.alliance??null;if(data.pending_deflection){data.deflected=data.pending_deflection;delete data.pending_deflection;this.#emit('weapon:deflected',{projectile_id:event.projectile.entity_id,by:data.deflected});}}),context.api.physics.onProjectileContact(event=>this.#contactPolicy(event)));
-  if(this.#session)this.#unsubscribes.push(this.#session.on('player:fire',event=>this.requestFire(event.aim??{})),this.#session.on('player:fire-released',event=>{if(this.quick_draw)this.requestQuickDraw(Object.keys(event.aim??{}).length?event.aim:this.#lastAim);}),this.#session.on('player:controls-blocked',()=>this.gameplayPaused()));
+  if(this.#session&&this.#inputEvents)this.#unsubscribes.push(this.#session.on('player:fire',event=>this.requestFire(event.aim??{})),this.#session.on('player:fire-released',event=>{if(this.quick_draw)this.requestQuickDraw(Object.keys(event.aim??{}).length?event.aim:this.#lastAim);}));
+  if(this.#session)this.#unsubscribes.push(this.#session.on('player:controls-blocked',()=>this.gameplayPaused()));
   for(const event of ['items:equipped','items:unequipped','items:loaded'])this.#unsubscribes.push(this.#items.on(event,()=>{const s=this.state;if(s){s.swing=null;s.quick_draw=null;s.drawn_at=s.elapsed;s.draw_shot_used=false;}this.#pending=false;}));
  }
  detach(){for(const id of [...this.#controllers.keys()])this.unregisterActor(id);for(const off of this.#unsubscribes.splice(0))off();this.#context=null;this.#pending=false;}
