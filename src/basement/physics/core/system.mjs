@@ -28,7 +28,7 @@ export class physicsSystem {
     #stepping = false; #dispatching = false; #committing = false;
     #tick = 0; #motionEnvelope = null;
     #stepAuthority; #broadphaseEpoch=0; #candidateCache=null;
-    #queries; #particles; #attachments;
+    #queries; #particles; #attachments; #projectilePolicies=new Set();
     #stats = { steps: 0, narrow_checks: 0, candidate_pairs: 0, active_movers: 0, spatial_sync_requests: 0, spatial_sync_skips: 0, bounds_calculations: 0, swept_bounds_calculations: 0, attachment_placements: 0, broadphase_builds: 0, broadphase_reuses: 0 };
     constructor({ cell_size = 128, fixed_step = 1 / 60, gravity = [0, 0], solver_iterations = 6, sleep_speed = 0.05, sleep_delay = 0.5, asset_library, step_authority } = {}) {
         if (step_authority !== undefined && typeof step_authority !== 'symbol') throw new TypeError('step_authority must be a private Symbol');
@@ -117,13 +117,13 @@ export class physicsSystem {
     createEntity(packet = {}) { return this.elements.createEntity(packet); }
     createCharacter(packet = {}) { return this.elements.createCharacter(packet); }
     createVehicle(packet = {}) { return this.elements.createVehicle(packet); }
-    createProjectileFrom(source, { local_position = [0,0], target, direction, ...packet } = {}) {
+    createProjectileFrom(source, { local_position = [0,0], target, direction, angle, angle_offset=0, ...packet } = {}) {
         const r = this._record(referenceBody(source)), pose = this.getBodyPoint(source, local_position);
         const projectile = this.createProjectile({ ...packet, position:r.position, owner_id:r.id });
         try {
             const path = this.getPathClearance({body:projectile,from:r.position,to:pose.position,ignore_body:[r.handle,projectile],include_ghosts:false});
             if(path.clear)projectile.body.setPosition(pose.position);
-            projectile.launchProjectile(direction ?? [Math.cos(r.rotation),Math.sin(r.rotation)], target === undefined ? {} : {target});
+            projectile.launchProjectile(direction ?? [Math.cos(r.rotation),Math.sin(r.rotation)],{...(target===undefined?{}:{target}),...(angle===undefined?{}:{angle}),angle_offset});
             return projectile;
         } catch(error) { this.removeBody(projectile); throw error; }
     }
@@ -288,6 +288,16 @@ export class physicsSystem {
         if (prior) { prior.normal_impulse += packet.normal_impulse; prior.tangent_impulse += packet.tangent_impulse; }
         else this.#stepContacts.set(key, packet);
     }
+    #redirectAtContact(r,motor,from,to,fraction,decision){
+        const at=add(from.position,scale(sub(to.position,from.position),fraction));
+        const heading=decision.target!==undefined?sub(referencePosition(this,decision.target),at):scale(r.velocity,-1);
+        if(length(heading)<EPS)throw new TypeError('Projectile redirection heading must be nonzero');
+        let owner=decision.owner_id??motor.config.owner_id;if(owner!==null){if(decision.at_fraction!==undefined&&!this.fetchBody(owner))owner=null;else this._record(owner);}
+        const lifetime=number(decision.min_lifetime??0,'min_lifetime',0);
+        r.position=at;r.previous_position=[...at];r.velocity=scale(unit(heading),length(r.velocity));
+        motor.config.owner_id=owner;motor.hit_bodies.clear();motor.physical_hits=0;motor.remaining=Math.max(motor.remaining,lifetime);
+        this._emit('projectileRedirected',{projectile:this.elements.fetchEntity(r.id),body:r.handle,owner_id:owner});
+    }
     #projectiles(moving) {
         for (const r of moving) {
             const motor = r.motor; if (!(motor instanceof projectileMotor) || r.parent_mount || !bodyActive(r)) continue;
@@ -300,8 +310,22 @@ export class physicsSystem {
                 const c = collisionDetector.sweep(r.shape, from, to, target.shape, target.config.physics_type === 'static' ? pose(target) : previousPose(target), pose(target));
                 if (c) hits.push({ target, contact: c });
             }
-            hits.sort((a, b) => a.contact.fraction - b.contact.fraction || a.target.id - b.target.id);
-            for (const { target, contact } of hits) {
+            if(motor.interception){hits.push({interception:motor.interception,contact:{fraction:motor.interception.at_fraction}});motor.interception=null;}
+            hits.sort((a, b) => a.contact.fraction - b.contact.fraction || (a.target?.id??Infinity) - (b.target?.id??Infinity));
+            for (const { target, contact, interception } of hits) {
+                if(interception){this.#redirectAtContact(r,motor,from,to,contact.fraction,interception);break;}
+                let decision=null;
+                for(const handler of this.#projectilePolicies){
+                    const result=handler(Object.freeze({projectile:this.elements.fetchEntity(r.id),target_entity:this.elements.fetchEntity(target.id),target_body:target.handle,world_point:Object.freeze([...contact.world_point])}));
+                    if(result&&typeof result.then==='function'){Promise.resolve(result).catch(()=>{});throw new TypeError('Projectile contact policies must be synchronous');}
+                    if(result){decision=result;break;}
+                }
+                if(decision?.action==='ignore')continue;
+                if(decision?.action==='redirect'){
+                    this.#redirectAtContact(r,motor,from,to,contact.fraction,decision);break;
+                }
+                if(decision&&decision.action!=='hit')throw new TypeError('Unknown projectile contact decision');
+                const contactLoss=number(decision?.penetration_loss??motor.config.penetration_loss,'contact penetration_loss',0,1);
                 motor.hit_bodies.add(target.id);
                 const sensor = r.config.ghost || target.config.ghost;
                 if (!sensor && motor.config.impact_strength) changeVelocity(target, scale(unit(r.velocity), motor.config.impact_strength * motor.impact_scale), contact.world_point);
@@ -313,7 +337,7 @@ export class physicsSystem {
                         r.position = add(from.position, scale(sub(to.position, from.position), contact.fraction));
                         r.config.active = false; break;
                     }
-                    motor.impact_scale *= 1 - motor.config.penetration_loss;
+                    motor.impact_scale *= 1 - contactLoss;
                 }
             }
             if (motor.remaining <= 0) r.config.active = false;
@@ -510,6 +534,28 @@ export class physicsSystem {
     setDragTarget(c, position) { return this.setConstraintTarget(c, position); }
     rotateDraggedBody(c, rotation) { const v = constraintRecord(this.#constraint(c)); v.a.handle.setRotation(rotation, { preserve_velocity: true }); }
     endDrag(c) { this.removeConstraint(c); }
+    advanceBody(source,{distance,direction,angle,placement_bounds}={}){
+        const r=this._record(referenceBody(source));number(distance,'distance',0);if(angle!==undefined)number(angle,'angle');
+        const heading=direction?unit(vector(direction)):[Math.cos(angle??r.rotation),Math.sin(angle??r.rotation)];
+        if(length(heading)<=EPS)return 0;
+        const requested=add(r.position,scale(heading,distance));
+        const clearance=this.getPathClearance({body:source,from:r.position,to:requested,include_ghosts:false});
+        const traveled=Math.max(0,distance*clearance.fraction-(clearance.clear?0:1e-4));
+        const position=add(r.position,scale(heading,traveled));
+        if(!traveled||!this.isPlacementClear(source,position,{include_ghosts:false,placement_bounds}))return 0;
+        r.handle.setPosition(position,{preserve_velocity:true});return traveled;
+    }
+    onProjectileContact(handler){if(typeof handler!=='function')throw new TypeError('Projectile policy must be a function');this.#projectilePolicies.add(handler);return ()=>this.#projectilePolicies.delete(handler);}
+    applyImpulseBetween(source,target,{strength,world_point}={}){
+        const a=this._record(referenceBody(source)),b=this._record(referenceBody(target));number(strength,'strength',0);
+        const direction=unit(sub(b.position,a.position));b.handle.applyImpulse(scale(direction,strength),world_point?{world_point}:{});return b.handle;
+    }
+    sweepAttachedShape(source,{collision_shape,from_local_position=[0,0],to_local_position=from_local_position,from_local_rotation=0,to_local_rotation=from_local_rotation,line_of_sight=false,occlusion_groups=BODY_GROUP.STATIC|BODY_GROUP.PROP|BODY_GROUP.VEHICLE,...options}={},results=[]){
+        const r=this._record(referenceBody(source)),from=this.getBodyPoint(source,from_local_position,{local_rotation:from_local_rotation}),to=this.getBodyPoint(source,to_local_position,{local_rotation:to_local_rotation});
+        const hits=this.shapeCast({...options,collision_shape,from:from.position,to:to.position,from_rotation:from.rotation,to_rotation:to.rotation,ignore_body:options.ignore_body??r.handle});
+        results.length=0;
+        for(const hit of hits){if(line_of_sight&&this.raycast({from:r.position,to:hit.body.position,include_groups:occlusion_groups,include_ghosts:false,ignore_body:[r.handle,hit.body]}))continue;results.push(hit);}return results;
+    }
     createHitVolume(packet) { return this.elements.createTrigger({ ...packet, ghost: true, physics_type: 'kinematic', collision_group: packet.collision_group ?? BODY_GROUP.SENSOR }); }
     sweepHitVolume(body, to, options = {}, results = []) { const r = this._record(body); return this.shapeCast({ ...options, collision_shape: r.config.collision_shape, from: r.position, to, from_rotation: r.rotation, ignore_body: r.handle }, results); }
     removeHitVolume(body) { this.removeBody(body); }
@@ -573,7 +619,7 @@ export class physicsSystem {
                 suspended_for: m.suspended_for, path: clone(m.path), path_index: m.path_index ?? 1, replan: m.replan };
         }
         if (m instanceof vehicleMotor) return { type: 'vehicle', config: clone(m.config), inputs: clone(m.inputs), steering: m.steering, axles: clone(m.axles), surface: clone(m.surface), path: clone(m.path_controller.path), path_index: m.path_controller.index, options: clone(m.path_controller.options) };
-        return { type: 'projectile', config: clone(m.config), remaining: m.remaining, impact_scale: m.impact_scale, physical_hits: m.physical_hits, hit_bodies: [...m.hit_bodies] };
+        return { type: 'projectile', config: clone(m.config), remaining: m.remaining, impact_scale: m.impact_scale, physical_hits: m.physical_hits, hit_bodies: [...m.hit_bodies],...(m.interception?{interception:clone(m.interception)}:{}) };
     }
     savePhysicsState() { return this._exportState(); }
     loadPhysicsState(packet) {
@@ -609,7 +655,7 @@ export class physicsSystem {
                 if (m.path) { r.motor.followPath(m.path, m.options); r.motor.path_controller.index = m.path_index; }
             } else if (m.type === 'projectile') {
                 const velocity = [...r.velocity]; r.motor = new projectileMotor(r.handle, m.config); r.velocity = velocity;
-                r.motor.remaining = number(m.remaining, 'remaining'); r.motor.impact_scale = number(m.impact_scale, 'impact_scale', 0, 1); r.motor.physical_hits = number(m.physical_hits ?? 0, 'physical_hits', 0); r.motor.hit_bodies = new Set(m.hit_bodies);
+                r.motor.remaining = number(m.remaining, 'remaining'); r.motor.impact_scale = number(m.impact_scale, 'impact_scale', 0, 1); r.motor.physical_hits = number(m.physical_hits ?? 0, 'physical_hits', 0); r.motor.hit_bodies = new Set(m.hit_bodies);if(m.interception){const command=m.interception;number(command.at_fraction,'at_fraction',0,1);number(command.min_lifetime,'min_lifetime',0);if(command.target!==undefined)vector(command.target);if(command.owner_id!==null&&(!Number.isSafeInteger(command.owner_id)||command.owner_id<1))throw new TypeError('Invalid interception owner');r.motor.interception=clone(command);}
             } else throw new TypeError('Unknown saved motor');
         }
         const constraintIds = new Set();

@@ -22,3 +22,11 @@ export { createItemCatalog } from './game-items.mjs';
 
 export { GUN_MATERIALS, WEAPON_MODELS, LASER_MODULE, weaponModel } from './weapon-appearance.mjs';
 export { weaponAppearance } from '../presentation/weapon-appearance.mjs';
+
+export {combatSystem} from '../gameplay/combat/combat-system.mjs';
+export {weaponSystem} from '../gameplay/combat/weapon-system.mjs';
+export {lootSystem} from '../gameplay/items/loot-system.mjs';
+export {WorldLoot} from '../entities/world-loot.mjs';
+export {MELEE_SWING,WIDE_SWING,sampleMeleeSwing,sampleWideSwing,swingPhases,wideGrip} from '../gameplay/combat/melee-poses.mjs';
+export {COMBAT_RULES} from './game-combat.mjs';
+export {registerGameEntityTypes} from './game-entity-types.mjs';

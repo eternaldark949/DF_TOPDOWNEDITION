@@ -2,13 +2,15 @@
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>gameEngine runtime example</title>
 <style>body{background:#0b1020;color:#eef2ff;font:16px system-ui;max-width:720px;margin:32px auto}canvas{width:100%;border:1px solid #64748b}button{padding:10px;margin:8px 8px 8px 0}pre{white-space:pre-wrap}</style>
-<h1>Shared runtime example</h1><p>WASD moves the player. Change rooms to keep the same player body and physics world. Pause holds simulation.</p>
+<h1>Shared runtime example</h1><p>WASD moves the player. Change rooms to keep the same player body and physics world. Pause holds simulation. Choose a weapon, aim with the mouse or right stick, and hold fire. Quick draw fires when you release.</p>
 <canvas id="scene" width="640" height="360"></canvas>
+<label>Weapon <select id="weapon"><option value="">Bare hands</option></select></label> <button id="drop">Drop equipped weapon</button><button id="quick">Quick draw</button>
 <button id="switch">Change room</button><button id="pause">Pause</button><pre id="status"></pre>
 <div id="touch-move" style="width:110px;height:110px;border:1px solid #64748b;touch-action:none;display:inline-block">Move</div>
 <div id="touch-aim" style="width:110px;height:110px;border:1px solid #64748b;touch-action:none;display:inline-block">Aim</div>
 <button id="touch-fire" style="touch-action:none">Fire input</button>
 <script type="module">
+import {installCombatPresentation} from '../../presentation/combat-presentation.mjs';
 import { createRuntimeExample } from '../../directory/runtime-example.mjs';
 const status=document.getElementById('status');
 const surface=document.getElementById('scene');
@@ -20,10 +22,16 @@ await engine.api.render.setRenderer('canvas',{surface});
 engine.api.controls.touch.stick('move',{zone:'touch-move',anchor:'centre',travel:40,mouse:true});
 engine.api.controls.touch.stick('aim',{zone:'touch-aim',anchor:'centre',travel:40,mouse:true});
 engine.api.controls.touch.button('touch-fire','touchFire');
+const weaponSelect=document.getElementById('weapon');
+for(const [id,definition] of Object.entries((await import('../../directory/game-items.mjs')).createItemCatalog()))if(definition.type==='weapon'){const option=document.createElement('option');option.value=id;option.textContent=definition.name;weaponSelect.append(option);}
+weaponSelect.onchange=()=>{const id=weaponSelect.value;if(!id)engine.api.items.unequipSlot('weapon');else {const item=engine.api.items.findItem(id)??engine.api.items.grantItem(id);if(item)engine.api.items.equipItem(item.instance_id);}engine.api.weapons.setHolstered(false);};
+document.getElementById('drop').onclick=()=>{const item=engine.api.items.getEquippedWeapon();if(item)engine.api.loot.dropItem(item.instance_id);};
+document.getElementById('quick').onclick=()=>engine.api.weapons.armQuickDraw();
 const report=()=>{status.textContent=JSON.stringify({level:engine.active_level?.level_id,player_id:player.entity_id,tick:engine.api.physics.simulation_tick,bodies:engine.api.physics.getStatistics().bodies,paused:engine.paused},null,2);};
 engine.registerSystem('status',{render:report});
 document.getElementById('switch').onclick=async()=>{try{await engine.loadLevel(engine.active_level.level_id==='room_a'?'room_b':'room_a');}catch(error){status.textContent=error.stack;console.error(error);}};
 let resume;document.getElementById('pause').onclick=()=>{if(resume){resume();resume=null;}else resume=engine.pause('example');report();};
+await installCombatPresentation(engine);
 await engine.loadLevel('room_a');engine.start();
 // Inspection for the browser acceptance check; never used by the production boot.
 globalThis.runtimeExample={engine,player};

@@ -1,6 +1,12 @@
         class GameEngine {
             get currentWeapon(){return this.items?.getEquippedWeapon()??null;}
             get weaponMode(){return this.items?.getWeaponMode()??'none';}
+            get _quickDraw(){return this.activeLevel&&this.weapons?this.weapons.quick_draw:this._legacyQuickDraw??null;}
+            set _quickDraw(value){if(this.activeLevel&&this.weapons){if(value!==null)throw new Error('Use the weapon quick draw API');this.weapons.cancelQuickDraw();}else this._legacyQuickDraw=value;}
+            get shootCooldown(){return this.activeLevel&&this.weapons?this.weapons.cooldown_seconds*60:this._legacyShootCooldown??0;}
+            set shootCooldown(ticks){if(this.activeLevel&&this.weapons)this.weapons.setCooldown(ticks/60);else this._legacyShootCooldown=ticks;}
+            get weaponHolstered(){return this.activeLevel&&this.weapons?this.weapons.holstered:this._legacyWeaponHolstered??false;}
+            set weaponHolstered(value){if(this.activeLevel&&this.weapons)this.weapons.setHolstered(value);else this._legacyWeaponHolstered=!!value;}
             constructor() {
                 
                 // Pause registry — every subsystem that needs the world paused
@@ -17,7 +23,7 @@
                 this.musicWidget = new MusicWidgetSystem(this);
                 this.items=new DFNative.itemSystem({catalog:DFNative.createItemCatalog(GAME_DB.items)});
                 this.items.reset(DEFAULT_LOADOUT);
-                this.items.on('items:equipped',event=>{if(event.slot==='weapon'){this.cancelQuickDraw();this._drawnAt=_gameTimeSec;this._drawShotUsed=false;}});
+                this.items.on('items:equipped',event=>{if(event.slot==='weapon'){this.cancelQuickDraw();if(!this.activeLevel){this._drawnAt=_gameTimeSec;this._drawShotUsed=false;}}});
                 this.items.on('items:unequipped',event=>{if(event.slot==='weapon')this.cancelQuickDraw();});
                 this.inventory = new InventoryView(this);
                 

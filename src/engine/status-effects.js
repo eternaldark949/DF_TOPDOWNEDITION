@@ -14,7 +14,7 @@
         // can slow its swing (swingSecs, the Kukri's 0.22 s by default); its model names the edge
         // the trail follows and the trail's colours (ui/weapon-models.js).
 
-        const STATUS = { BLEED_MAX: 3, BLEED_TICK: 0.5 };
+        const STATUS={BLEED_MAX:DFNative.COMBAT_RULES.bleed.max_stacks,BLEED_TICK:DFNative.COMBAT_RULES.bleed.interval_seconds};
 
         // The Kukri's trail: its gold edge tip (model units) and three strokes [width, 'r, g, b', alpha]
         const DEFAULT_SLASH_TRAIL = { edge: [19.4, 2.6], dust: '#ffd76a',
@@ -22,7 +22,7 @@
 
         // One game-time pose for the arm, the held blade and its trailing edge. `secs` stretches the
         // whole swing (a heavier blade); the phases keep their shares of it.
-        const MELEE_SWING = { duration: .22, windup: .0264, cutEnd: .1584 };
+        const {MELEE_SWING,WIDE_SWING,sampleMeleeSwing,sampleWideSwing,swingPhases,wideGrip}=DFNative;
 
         // A swing's hitbox is its drawn blade (fist to edge tip), swept through the cut in CUT_STEPS
         // samples: a body is cut when the blade passes within its radius + HALF_WIDTH. MAX_HAND bounds
@@ -38,8 +38,8 @@
         // turns the shots it meets (within the blade's width + BLADE_PAD of their path).
         // Blades (ETERNAL's melee pass): each cut heals her LIFESTEAL of its damage; mid-swing she takes GUARD of
         // what would hit her; a swing inside the Flit-Strike window always crits
-        const BLADE_PERKS = { LIFESTEAL: 0.04, GUARD: 0.75 };
-        const MIRROR = { GLASS_ID: 'acc_mirror_glass', GLASS_DAMAGE: 1.35, SHIELD: 90, RECHARGE_SECS: 3, REGEN_DELAY: 1.5, BLADE_PAD: 6 };
+        const BLADE_PERKS={LIFESTEAL:DFNative.COMBAT_RULES.blade.lifesteal,GUARD:DFNative.COMBAT_RULES.blade.guard_multiplier};
+        const MIRROR={GLASS_ID:DFNative.COMBAT_RULES.mirror.accessory_id,GLASS_DAMAGE:DFNative.COMBAT_RULES.mirror.damage_multiplier,SHIELD:DFNative.COMBAT_RULES.mirror.shield,RECHARGE_SECS:DFNative.COMBAT_RULES.mirror.recharge_seconds,REGEN_DELAY:DFNative.COMBAT_RULES.mirror.regen_delay_seconds,BLADE_PAD:6};
 
         /** Squared distance between segments ab and cd */
         function _segSegDist2(ax, ay, bx, by, cx, cy, dx, dy) {
@@ -49,74 +49,6 @@
             if (((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0)) && d1 && d2 && d3 && d4) return 0;   // they cross
             const D = shapeKit.segmentDistanceSq;
             return Math.min(D(ax, ay, cx, cy, dx, dy), D(bx, by, cx, cy, dx, dy), D(cx, cy, ax, ay, bx, by), D(dx, dy, ax, ay, bx, by));
-        }
-
-        /* A long blade's swing (a model with swing: 'wide', Blood Pact): two hands on the grip, she
-           winds the blade far back to one side, then sweeps it round in front of her in one wide arc
-           (the hands travel a half-circle about her chest), body turning with it, and settles back to
-           a two-handed guard. Phases are shares of the swing's time; the left hand rides the grip,
-           WIDE_SWING.grip model units behind the right. */
-        const WIDE_SWING = { windup: .22, cutEnd: .7, guard: { a: .3, handX: 11, handY: 3 },
-            centerX: 2, radius: 16, handArc: 1.25, bladeArc: 2.0, twist: .45, grip: 6.2 };
-        function _wideHand(theta, out) {
-            out.handX = WIDE_SWING.centerX + WIDE_SWING.radius * Math.cos(theta);
-            out.handY = WIDE_SWING.radius * Math.sin(theta);
-        }
-        function sampleWideSwing(u, sign, out) {
-            const W = WIDE_SWING, G = W.guard, smooth = x => x * x * (3 - 2 * x);
-            if (u < W.windup) {                                                     // wind back to one side
-                const w = smooth(u / W.windup);
-                _wideHand(sign * W.handArc, out);
-                out.handX = G.handX + (out.handX - G.handX) * w; out.handY = G.handY + (out.handY - G.handY) * w;
-                out.a = G.a + (sign * W.bladeArc - G.a) * w; out.twist = sign * W.twist * w;
-            } else if (u <= W.cutEnd) {                                             // the sweep across her front
-                const p = smooth((u - W.windup) / (W.cutEnd - W.windup));
-                _wideHand(sign * W.handArc * (1 - 2 * p), out);
-                out.a = sign * W.bladeArc * (1 - 2 * p); out.twist = sign * W.twist * Math.cos(p * Math.PI);
-            } else {                                                                // the follow-through settles to guard
-                const r = smooth((u - W.cutEnd) / (1 - W.cutEnd));
-                _wideHand(-sign * W.handArc, out);
-                out.handX += (G.handX - out.handX) * r; out.handY += (G.handY - out.handY) * r;
-                out.a = -sign * W.bladeArc + (G.a + sign * W.bladeArc) * r; out.twist = -sign * W.twist * (1 - r);
-            }
-            out.reach = out.handX - 8;
-            return wideGrip(out);
-        }
-        /** The left hand on a long blade's grip, behind the right (sets lHandX/lHandY on a pose) */
-        function wideGrip(pose) {
-            pose.lHandX = pose.handX - WIDE_SWING.grip * Math.cos(pose.a);
-            pose.lHandY = pose.handY - WIDE_SWING.grip * Math.sin(pose.a);
-            return pose;
-        }
-        /** A swing style's phase times, as shares of the swing */
-        function swingPhases(style) {
-            return style === 'wide' ? WIDE_SWING : { windup: MELEE_SWING.windup / MELEE_SWING.duration, cutEnd: MELEE_SWING.cutEnd / MELEE_SWING.duration };
-        }
-
-        function sampleMeleeSwing(age, side, out = {}, secs = MELEE_SWING.duration, style = 'knife') {
-            if (style === 'wide') return age < 0 || age > secs ? null : sampleWideSwing(age / secs, side || 1, out);
-            age *= MELEE_SWING.duration / secs;
-            if (age < 0 || age > MELEE_SWING.duration) return null;
-            const smooth = x => x * x * (3 - 2 * x);
-            const sign = side || 1;
-            let a, x, y, twist;
-            if (age < MELEE_SWING.windup) {
-                const w = smooth(age / MELEE_SWING.windup);
-                a = .35 + (sign * 1.15 - .35) * w;
-                x = 8; y = 9 + sign * 8 * w; twist = sign * .18 * w;
-            } else if (age <= MELEE_SWING.cutEnd) {
-                const p = smooth((age - MELEE_SWING.windup) / (MELEE_SWING.cutEnd - MELEE_SWING.windup));
-                a = sign * (1.15 - 2.3 * p);
-                x = 8 + 14 * Math.sin(p * Math.PI);
-                y = 9 + sign * 8 * Math.cos(p * Math.PI);
-                twist = sign * .18 * Math.cos(p * Math.PI);
-            } else {
-                const r = smooth((age - MELEE_SWING.cutEnd) / (MELEE_SWING.duration - MELEE_SWING.cutEnd));
-                a = -sign * 1.15 + (.35 + sign * 1.15) * r;
-                x = 8; y = 9 - sign * 8 * (1 - r); twist = -sign * .18 * (1 - r);
-            }
-            out.a = a; out.handX = x; out.handY = y; out.twist = twist; out.reach = x - 8;
-            return out;
         }
 
         engineMixin({
@@ -491,6 +423,7 @@
 
             /** The blade's swing for the renderer: angle across the slash, and how far it reaches out (null at rest) */
             slashAngle() {
+                if(this.activeLevel)return this.weapons?.getSwingPose()??null;
                 if (this._slashT === undefined) return null;
                 return sampleMeleeSwing(_gameTimeSec - this._slashT, this._slashSide,
                     this._slashPose || (this._slashPose = {}), this._slashSecs || MELEE_SWING.duration, this._slashStyle);

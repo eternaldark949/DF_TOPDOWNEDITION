@@ -2,11 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { physicsSystem, gameEntity } from '../src/basement/physics/index.mjs';
-import { registerStreetEntityTypes } from '../src/directory/game-street.mjs';
+import {registerGameEntityTypes} from '../src/directory/game-entity-types.mjs';
 import { createGameAssetLibrary } from '../src/directory/game-assets.mjs';
 
 test('Directory libraries create registered official entities for every declared template', () => {
-    const p = new physicsSystem({ asset_library: createGameAssetLibrary() }); registerStreetEntityTypes(p);
+    const p = new physicsSystem({ asset_library: createGameAssetLibrary() }); registerGameEntityTypes(p);
     for (const template of p.elements.asset_library.listTemplates()) {
         const entity = p.createEntity({ template }); assert.ok(entity instanceof gameEntity); assert.equal(entity.template_id, template);
         assert.equal(p.elements.fetchEntity(entity.entity_id), entity); assert.equal(p.fetchBody(entity.body_id), entity.body);

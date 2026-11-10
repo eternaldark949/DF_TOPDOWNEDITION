@@ -59,3 +59,7 @@ The original acceptance fixture called `_doLoadMap` directly and missed the publ
 ## Player vitals ownership follow-up
 
 The production apartment and legacy player implementations now use the same [playerVitals component](../gameplay/README.md#playervitals). Health/max health, Flit energy/protection, grace, recovery timing and combat timestamps live in the active player's data. Existing scene replacement transfers that validated record once; there is no host health/Flit mirror or per-tick synchronization. Classic saves include the record and still import older health-only saves. Native death calls the existing shared medbay policy. This retires gameplay ledgers, not the classic scene-owned world or city collision implementation.
+
+### Shared combat and physical loot
+
+The native host now composes the same `combatSystem`, `weaponSystem` and `lootSystem` as the new runtime. The simplified `_fireApartmentWeapon` and native projectile-list mirror are removed. Weapons use official projectiles/swept queries, native interception/impulses and target-owned timed records. Inventory drops create registered `WorldLoot` bodies and retain exact bundles in native scene saves. The classic UI reads cooldown/holster/quick-draw state through derived accessors; it does not advance a second native combat clock. Native scene retirement detaches the shared services. The [combat API and removal ledger](../gameplay/combat/README.md) names the still-executable legacy city branches and their deletion conditions.

@@ -41,7 +41,7 @@
            the weapon's stats.critChance; a crit deals stats.critMult (CRIT.mult) times the damage.
            Shown as a bigger gold number with a '!', a burst of sparks and a bright ping. Bleeds,
            burns, executions and anyone else's hits never crit. */
-        const CRIT = { chance: 0.1, mult: 2 };
+        const CRIT={chance:DFNative.COMBAT_RULES.crit_chance,mult:DFNative.COMBAT_RULES.crit_multiplier};
 
         engineMixin({
             /** Roll a crit for her weapon's stats: the multiplier to apply (1 when it isn't one). */

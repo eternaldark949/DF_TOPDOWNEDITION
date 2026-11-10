@@ -2,7 +2,7 @@
 engineMixin({
     setWeaponHolstered(on) {
         this.weaponHolstered = !!on;
-        if (!on) { this._drawnAt = _gameTimeSec; this._drawShotUsed = false; }
+        if (!on&&!this.activeLevel) { this._drawnAt = _gameTimeSec; this._drawShotUsed = false; }
         this.holsterAnimTarget = on ? 0 : 1;
         const quick = !!this._quickDraw;
         this.holsterBtn.classList.toggle('holstered', !!on);
@@ -19,12 +19,14 @@ engineMixin({
             || !this.player.visible || !this.currentWeapon || !['normal', 'sniper'].includes(this.weaponMode)
             || this.furniture?.busy() || this.cutscene?.active) return false;
         clearGameplayInputs(this);
+        if(this.activeLevel){const armed=this.weapons.armQuickDraw();if(armed){this.setWeaponHolstered(true);showMessage('QUICK DRAW — AIM PAST THE RING AND RELEASE');}return armed;}
         this._quickDraw = { weapon_instance_id:this.currentWeapon.instance_id, phase: 'ready', ticks: 0 };
         this.setWeaponHolstered(true);
         showMessage('QUICK DRAW — AIM PAST THE RING AND RELEASE');
         return true;
     },
     interruptQuickDrawShot() {
+        if(this.activeLevel)return this.weapons.interruptQuickDraw();
         const q = this._quickDraw;
         if (!q) return;
         if (q.weapon_instance_id !== this.currentWeapon?.instance_id || this.isDriving || this.player.dead) { this.cancelQuickDraw(); return; }
@@ -44,6 +46,7 @@ engineMixin({
             || this.currentWeapon?.instance_id !== q.weapon_instance_id || this.furniture?.busy() || this.cutscene?.active) return false;
         // A release during recovery is discarded, never queued to fire later.
         if (this.shootCooldown > 0) { showMessage('QUICK DRAW — RECOVERING'); return false; }
+        if(this.activeLevel)return this.weapons.requestQuickDraw(aimPoint?{target:[aimPoint.x,aimPoint.y]}:{angle});
         q.phase = 'draw'; q.ticks = 7; q.angle = angle;
         q.aimPoint = aimPoint ? { x: aimPoint.x, y: aimPoint.y } : null;
         this.setWeaponHolstered(false);
@@ -61,6 +64,7 @@ engineMixin({
         const label = q.phase === 'draw' ? 'DRAWING' : this.shootCooldown > 0
             ? `RECOVER<br>${(Math.ceil(this.shootCooldown / 6) / 10).toFixed(1)}s` : 'QUICK<br>DRAW';
         if (this.holsterBtn.innerHTML !== label) this.holsterBtn.innerHTML = label;
+        if(this.activeLevel)return; // The shared weapon system advances phases and fires.
         if (q.phase === 'ready') return;
         if(this.activeLevel)this.player.setRotation(q.angle,{preserve_velocity:true});else this.player.angle=q.angle;
         if (--q.ticks > 0) return;

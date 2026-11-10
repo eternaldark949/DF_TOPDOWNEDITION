@@ -4,7 +4,7 @@ import { gameLevel } from './game-level.mjs';
 import { controlSystem } from '../basement/controls/index.mjs';
 import { cameraSystem, renderSystem } from '../basement/rendering/index.mjs';
 
-const hooks = ['attach', 'detach', 'beforePhysics', 'afterPhysics', 'render', 'levelEntered', 'levelLeaving'];
+const hooks = ['attach', 'detach', 'beforePhysics', 'afterPhysics', 'render', 'levelEntered', 'levelLeaving','gameplayPaused'];
 function synchronous(fn, receiver, args) {
     if (fn && ['AsyncFunction', 'GeneratorFunction', 'AsyncGeneratorFunction'].includes(fn.constructor.name)) throw new TypeError('Runtime hooks must be synchronous; load assets in level.prepare');
     const result = fn?.apply(receiver, args);
@@ -180,7 +180,7 @@ export class gameEngine {
     pause(reason = 'manual') {
         this.#live(); if (typeof reason !== 'string' || !reason) throw new TypeError('Pause requires a reason');
         const token = Symbol(reason); this.#pauses.set(token, reason);
-        try { this.#controls.clear(); } catch(error) { this.#pauses.delete(token); throw error; }
+        try { this.#controls.clear();this.#callSystems('gameplayPaused'); } catch(error) { this.#pauses.delete(token); throw error; }
         return () => { const released=this.#pauses.delete(token);if(released&&!this.paused)this.#controls.clear();return released; };
     }
     updateState() {
@@ -193,7 +193,7 @@ export class gameEngine {
             this.#callSystems('beforePhysics', seconds); synchronous(level.beforePhysics, level, [context, seconds]);
             this.#phase = 'physics'; this.#world.updateState(seconds, this.#authority);
             this.#phase = 'afterPhysics';
-            synchronous(level.afterPhysics, level, [context, seconds]); this.#callSystems('afterPhysics', seconds);
+            synchronous(level.afterPhysics, level, [context, seconds]); this.#callSystems('afterPhysics', seconds);this.#world.commitCommands();
             this.#camera.updateState(seconds);
             return true;
         } catch (error) { this.stop(); throw error; }

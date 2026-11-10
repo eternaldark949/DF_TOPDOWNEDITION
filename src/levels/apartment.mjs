@@ -1,8 +1,7 @@
+import {registerGameEntityTypes} from '../directory/game-entity-types.mjs';
 import { physicsSystem } from '../basement/physics/index.mjs';
 import { createApartmentAssetLibrary } from '../directory/apartment-assets.mjs';
 import { resolveApartmentDefinition, resolveApartmentDyer } from '../directory/apartment-definition.mjs';
-import { Player } from '../entities/player.mjs';
-import { ApartmentProp } from '../entities/apartment-prop.mjs';
 import { ApartmentCompanion, rosterRecord } from '../entities/apartment-companion.mjs';
 import { gameProp } from '../basement/physics/index.mjs';
 class ApartmentDoor extends gameProp { static entity_type = 'df_apartment_door'; }
@@ -12,7 +11,7 @@ export class ApartmentLevel {
     constructor({ game_db, spawn, layout = {}, roster = [] }) {
         const library = createApartmentAssetLibrary({ game_db });
         this.physics = new physicsSystem({ asset_library: library });
-        for(const Class of [Player,ApartmentProp,ApartmentDoor,ApartmentCompanion])this.physics.elements.registerEntityType(Class.entity_type,Class);
+        registerGameEntityTypes(this.physics);this.physics.elements.registerEntityType(ApartmentDoor.entity_type,ApartmentDoor);
         this.definition = resolveApartmentDefinition(library, game_db);
         this.entities = this.definition.entities.map(p=>this.physics.createEntity(p));
         this.player = this.physics.createEntity({...this.definition.player,...(spawn?{position:spawn}:{})});
@@ -22,7 +21,6 @@ export class ApartmentLevel {
     reconnect() {
         this.entities=this.physics.elements.getEntities().filter(e=>e.entity_type!=='df_player');
         this.player=this.physics.elements.getEntities({entity_type:'df_player'})[0];
-        this.projectiles=this.entities.filter(e=>e.data.role==='projectile');
         this.props=this.entities.filter(e=>e.data.role==='prop'); this.doors=this.entities.filter(e=>e.data.role==='door');
         this.curtains=this.entities.filter(e=>e.data.role==='curtain');
         this.companions=this.entities.filter(e=>e.entity_type===ApartmentCompanion.entity_type);

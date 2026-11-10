@@ -68,10 +68,13 @@ export class physicsQueries {
         const shape = packet.collision_shape instanceof collisionShape ? packet.collision_shape : new collisionShape(packet.collision_shape);
         const from = { position: vector(packet.from), rotation: number(packet.from_rotation ?? 0, 'from_rotation') };
         const to = { position: vector(packet.to), rotation: number(packet.to_rotation ?? from.rotation, 'to_rotation') };
+        const seconds=number(packet.predict_seconds??0,'predict_seconds',0,10);
         const reach = shapeReach(shape), hits = [], delta = sub(to.position, from.position), distance = length(delta);
-        for (const b of this.world.spatial_grid.querySweep({ from: from.position, to: to.position, radius: reach })) {
+        const envelope=seconds?this.world._getMotionEnvelope():null;
+        const search=reach+(envelope?envelope.max_speed*seconds+envelope.max_reach:0);
+        for (const b of this.world.spatial_grid.querySweep({ from: from.position, to: to.position, radius: search })) {
             if (!accepts(this.world, b, packet)) continue;
-            const r = this.world._record(b), c = collisionDetector.sweep(shape, from, to, r.shape, pose(r));
+            const r = this.world._record(b), c = collisionDetector.sweep(shape, from, to, r.shape, pose(r), seconds?{position:add(r.position,scale(r.velocity,seconds)),rotation:r.rotation+r.angular_velocity*seconds}:pose(r));
             if (c) hits.push({ ...c, body: b, body_id: r.id, entity: this.world.elements.fetchEntity(r.id), distance: distance * c.fraction });
         }
         return finish(hits, packet, results);

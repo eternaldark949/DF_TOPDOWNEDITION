@@ -656,7 +656,7 @@ engineMixin({
                     }
                     // 8. Restore the validated authoritative item model and UI ordering.
                     this.items.load(loadedItems.snapshot());this.cancelQuickDraw();
-                    this._drawnAt=_gameTimeSec;this._drawShotUsed=false;
+                    if(!this.activeLevel){this._drawnAt=_gameTimeSec;this._drawShotUsed=false;}
                     this.inventory.entryOrder=Array.isArray(save.inventory?.order)?save.inventory.order.filter(key=>typeof key==='string'):[];
                     if(!save.inventory?.model)this.inventory.entryOrder=this.inventory.entryOrder.map(key=>{
                         if(!key.startsWith('carried:'))return key;const item=this.items.findItem(key.slice(8));return item?'carried:'+item.instance_id:key;

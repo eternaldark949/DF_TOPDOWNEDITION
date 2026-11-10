@@ -47,12 +47,13 @@ jobs:
           tools/test-game-physics-scenarios.mjs tools/test-entity-assets.mjs
           tools/test-street-population.mjs tools/test-player-systems.mjs tools/test-player-vitals.mjs
           tools/test-game-engine.mjs tools/test-native-bundle.mjs
-          tools/test-item-system.mjs tools/test-weapon-appearance.mjs
+          tools/test-item-system.mjs tools/test-weapon-appearance.mjs tools/test-combat-systems.mjs
 
       - name: Check player-state callers in the playable build
         run: |
           node tools/test-player-state-callers.cjs
           node tools/test-item-callers.cjs
+          node tools/test-native-combat-callers.cjs
 
       - name: Check gameplay and rendering regressions
         run: node tools/test-game-regressions.cjs

@@ -11,7 +11,7 @@ class ApartmentRenderer {
     personPacket(entity,blend){
         let packet=this.people.get(entity.entity_id);if(!packet){packet={enginePresentation:true,entity_id:entity.entity_id,type:entity===this.game.player?'player':'npc',_game:this.game};this.people.set(entity.entity_id,packet);}
         const pose=entity.getRenderState(blend),velocity=entity.linear_velocity;
-        Object.assign(packet,{x:pose.position[0],y:pose.position[1],angle:pose.rotation,velX:velocity[0]/60,velY:velocity[1]/60,vx:velocity[0]/60,vy:velocity[1]/60,radius:12,visible:entity.visible!==false&&entity.active,isHidden:!!entity.isHidden,dead:!!entity.dead,walkPhase:packet.walkPhase??0});
+        Object.assign(packet,{punchSide:entity.data.weapon_state?.punch_side,punchHay:!!entity.data.weapon_state?.haymaker,x:pose.position[0],y:pose.position[1],angle:pose.rotation,velX:velocity[0]/60,velY:velocity[1]/60,vx:velocity[0]/60,vy:velocity[1]/60,radius:12,visible:entity.visible!==false&&entity.active,isHidden:!!entity.isHidden,dead:!!entity.dead,walkPhase:packet.walkPhase??0});
         return packet;
     }
     destroy(){PropSprites.clear([...this.props.values()]);this.props.clear();this.people.clear();}
@@ -62,7 +62,8 @@ class ApartmentRenderer {
         for(const{entity:e}of visible)if(e?.data.role==='lamp'){
             const a=e.data.appearance,p=e.getRenderState(blend);if(a.visible!==false)drawLampFixtureLit(ctx,a.fixture??'shade_rose',...p.position,a.color,game.roomSystem.lightAt(...p.position),{angle:a.angle??0});
         }
-        for(const p of game.projectiles)if(!p.destroyed){const s=p.getRenderState(blend);ctx.fillStyle='#ffd891';ctx.beginPath();ctx.arc(...s.position,2,0,Math.PI*2);ctx.fill();}
+        for(const {entity:p}of visible)if(p?.data.role==='projectile'&&!p.destroyed&&!p.data.melee){const s=p.getRenderState(blend);ctx.fillStyle='#ffd891';ctx.beginPath();ctx.arc(...s.position,2,0,Math.PI*2);ctx.fill();}
+        for(const {entity:loot}of visible)if(loot?.entity_type==='df_world_loot'){const p=loot.getRenderState(blend),definition=game.items.getDefinition(loot.definition_id);if(definition.type==='weapon')drawWeapon(ctx,loot.definition_id,...p.position,p.rotation,.8);else{ctx.fillStyle=definition.type==='consumable'?'#78e4bd':'#b594ff';ctx.fillRect(p.position[0]-5,p.position[1]-5,10,10);}}
         const target=game.furniture.target??game.furniture.cand;
         if(target){const p=target.getRenderState(blend),[w,h]=target.collision_shape.dimensions;ctx.save();ctx.translate(...p.position);ctx.rotate(p.rotation);ctx.strokeStyle='#ead49c';ctx.lineWidth=1.5;ctx.strokeRect(-w/2-3,-h/2-3,w+6,h+6);ctx.restore();}
         if(game.playerEmote.text&&game.playerEmote.age<game.playerEmote.duration)drawSpeechBubble(ctx,player.x,player.y-34,game.playerEmote.text,1);

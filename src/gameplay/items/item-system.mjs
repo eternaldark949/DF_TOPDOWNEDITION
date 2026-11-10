@@ -120,6 +120,13 @@ export class itemSystem {
         for(const key of ids){delete this.#data.records[key];this.#views.delete(key);this.#parents.delete(key);}this.#data.order=this.#data.order.filter(key=>!ids.includes(key));
         this.#changed('items:removed',{instance_id:id,definition_id:root.definition_id});return bundle;
     }
+    validateBundle(bundle){
+        const copy=jsonCopy(bundle);if(copy.format_version!==1||!Array.isArray(copy.records)||!copy.records.length)throw new TypeError('Invalid item bundle');
+        const data=this.#empty();data.capacity=copy.records.length;data.max_attachments=Math.max(this.max_attachments,copy.records.length);
+        for(const record of copy.records){this.#validateRecord(record);if(Object.hasOwn(data.records,record.instance_id))throw new TypeError('Duplicate item bundle identity');data.records[record.instance_id]=record;data.order.push(record.instance_id);const prefix=`${data.owner_id}:item:`;if(record.instance_id.startsWith(prefix))data.next_instance_id=Math.max(data.next_instance_id,Number(record.instance_id.slice(prefix.length))+1);}
+        const root=data.records[copy.root_instance_id];if(!root||new Set([root.instance_id,...root.attachments]).size!==copy.records.length||copy.records.some(record=>record!==root&&!root.attachments.includes(record.instance_id)))throw new TypeError('Invalid bundle root/children');
+        this.#validate(data);return true;
+    }
     receiveBundle(bundle){
         const copy=jsonCopy(bundle);if(copy.format_version!==1||!Array.isArray(copy.records)||!copy.records.length)throw new TypeError('Invalid item bundle');
         identifier(copy.root_instance_id);const root=copy.records.find(record=>record.instance_id===copy.root_instance_id);if(!root)throw new TypeError('Missing bundle root');

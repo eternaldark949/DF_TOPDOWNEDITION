@@ -487,6 +487,26 @@
         "hazard"
       ],
       "physics_type": "kinematic"
+    },
+    "world_loot": {
+      "extends": "prop",
+      "entity_type": "df_world_loot",
+      "physics_type": "rigid",
+      "mass": 0.25,
+      "linear_damping": 8,
+      "collision_group": 8,
+      "collision_mask": 9,
+      "collision_shape": {
+        "shape_type": "circle",
+        "radius": 6
+      },
+      "render_shape": {
+        "shape_type": "circle",
+        "radius": 28
+      },
+      "data": {
+        "role": "world_loot"
+      }
     }
   }
 }

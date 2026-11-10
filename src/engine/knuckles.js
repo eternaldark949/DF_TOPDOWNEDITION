@@ -28,6 +28,7 @@
         engineMixin({
             /** Ticks into the punch for the body's strike curve: a quicker punch runs the same 15-tick curve faster */
             punchStanceTicks() {
+                if(this.activeLevel){const duration=this.weapons.state.punch_duration??.25;return Math.max(0,(duration-this.weapons.cooldown_seconds-1/60+RenderInterp.alpha/60)*CONFIG.PUNCH.DURATION_TICKS/duration);}
                 const D = CONFIG.PUNCH.DURATION_TICKS, dur = this._punchDur || D;
                 return Math.max(0, (dur - this.shootCooldown - 1 + RenderInterp.alpha) * D / dur);
             },

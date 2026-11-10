@@ -34,6 +34,7 @@ Carried records contain only `instance_id`, `definition_id`, `quantity`, `state`
 | `grantItem(definition_id, options={})` | Create and receive. Matching stackable state/upgrades merge within `max_stack`; weapons/attachments never stack. |
 | `removeItem(instance_id)` | Unequip, remove and return an unmounted record. Mounted children/parents require detach or extraction. |
 | `extractItem(instance_id)` | Remove a root and all its mounted attachments as one transfer bundle. |
+| `validateBundle(bundle)` | Validate an unowned root/attachment packet without creating another inventory or acquiring it. |
 | `receiveBundle(bundle)` | Validate and receive that exact root/children atomically. Null if full. |
 | `equipItem(instance_id)` | Equip an owned weapon or wear an attachment. False for routine incompatibility/full attachment slots. |
 | `unequipItem(instance_id)`, `unequipSlot('weapon'\|'attachment')` | Remove equipment; the attachment slot includes active weapon mounts. |
@@ -71,6 +72,6 @@ const received = destination.receiveBundle(bundle);
 
 Inventory snapshots use format 1 with `records`, `order`, `equipment`, and allocation/configuration fields. Session snapshots use format 2 and embed that same inventory; they do not serialize a separate equipment ledger. Format-1 session counts migrate known definitions to instances. Classic saves write `inventory.model`; legacy item-ID lists migrate once, preserving duplicate weapons and translating equipment and UI order. A typed empty inventory stays empty. Invalid typed snapshots fail before live inventory/currency/map mutation. Historical classic saves that bypassed bag limits retain their contents by increasing imported capacity.
 
-The physical loot entity, weapon execution/quick draw, melee/special-weapon rules and rich character artist are further conversions. This model adds no collision math, body integration, physics registry or spatial index. Physical attachments and combined mass remain Basement APIs, separate from item ownership.
+Native weapon execution/quick draw, melee/special rules and registered physical loot now use the [shared combat services](../combat/README.md). Their remaining classic city callers and rich character artists still require conversion. This model adds no collision math, body integration, physics registry or spatial index. Physical attachments and combined mass remain Basement APIs, separate from item ownership.
 
 Tests: `node --test tools/test-item-system.mjs`; generated-game callers: `node tools/test-item-callers.cjs`. Combat/crafting suites acquire and equip actual owned instances.

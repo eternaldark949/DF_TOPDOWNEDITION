@@ -244,6 +244,7 @@
                 // Registry entries never reach the existing physical drop path.
                 if(!this.game.running||!this.game.loot||!this.game.items.hasInstance(item.instance_id))return;
                 const parent=this.game.items.getParentWeapon(item.instance_id);if(parent)this.game.items.detachFromWeapon(parent.instance_id,item.instance_id);
+                if(this.game.activeLevel){this.game.worldLoot.dropItem(item.instance_id);this.render();showMessage(`DROPPED: ${item.name}`);return;}
                 const packet=this.game.items.extractItem(item.instance_id);
                 if (this.game.loot) {
                     const throwAngle = Math.random() * Math.PI * 2;

@@ -42,3 +42,7 @@ This is the portable **static weapon art**, including faceting, glass, emitters 
 `render.onFrameRendered(handler)` returns an unsubscribe. After a synchronous backend successfully draws a frame, its event contains immutable `targets` (IDs written by the frame). Headless packet collection and failed/aborted frames do not notify. Resource mutation remains forbidden during notification; presentation only updates its cache bookkeeping. Backend changes are reported separately by `onSurfaceChanged`.
 
 Verification: `node --test tools/test-weapon-appearance.mjs` and `python tools/test-weapon-appearance-browser.py`. The browser draws all models with/without the laser module and compares warm-cache and replacement-backend pixels while verifying unchanged physical state.
+
+## Combat presentation
+
+`combatPresentation({weapon_art,owns_art=false})` uses `render(context,blend,frame)` to read visible official projectiles, loot and status records, plus the player's held weapon pose. It submits shape/text/sprite packets; `detach()` disposes owned art. `await installCombatPresentation(engine)` prepares assets and installs the lifecycle system with ownership cleanup. The shared runtime example uses it now. Collision, damage, projectile motion and item ownership remain in the documented native services.
