@@ -17,18 +17,15 @@ export function createRuntimeExample(options = {}) {
     engine.registerLevel('room_a', RuntimeExampleLevel).registerLevel('room_b', RuntimeExampleLevel);
     const player = engine.createEntity({ template:'df:player_949', entity_type:'df_player', position:[100,180] }, { lifetime:'session' });
     engine.registerSystem('input', { beforePhysics(context) { player.setMovement(context.api.controls.direction('move')); } });
-    engine.registerSystem('canvas', {
-        render(context, blend, canvas) {
-            if (!canvas) return;
-            const ctx = canvas.getContext('2d'), world = context.api.physics;
-            ctx.fillStyle = context.engine.active_level.definition.background; ctx.fillRect(0,0,canvas.width,canvas.height);
-            const hits = world.queryEntitiesInBounds({ bounds:{left:0,top:0,right:canvas.width,bottom:canvas.height}, bounds_type:'render' });
+    engine.registerSystem('appearance', {
+        render(context, blend, frame) {
+            frame.clear(context.engine.active_level.definition.background);
+            const hits = context.api.render.getVisibleEntities({blend});
             for (const { entity } of hits) {
                 const pose = entity.getRenderState(blend), shape = entity.collision_shape;
-                ctx.save(); ctx.translate(...pose.position); ctx.rotate(pose.rotation); ctx.fillStyle = entity.data.color ?? '#c9f6ef';
-                if (shape.shape_type === 'circle') { ctx.beginPath(); ctx.arc(0,0,shape.radius,0,Math.PI*2); ctx.fill(); }
-                else { const [width,height] = shape.dimensions; ctx.fillRect(-width/2,-height/2,width,height); }
-                ctx.restore();
+                frame.submit({type:'shape',position:pose.position,rotation:pose.rotation,
+                    geometry:shape.shape_type==='circle'?{type:'ellipse',radii:[shape.radius,shape.radius]}:{type:'rect',size:shape.dimensions},
+                    material:{fill:entity.data.color??'#c9f6ef'}});
             }
         }
     });

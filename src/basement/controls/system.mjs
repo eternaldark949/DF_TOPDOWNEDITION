@@ -115,6 +115,7 @@ export class controlSystem {
         return instances.flatMap(instance=>instance.getActiveInputs());
     }
     getActiveActions() { return [...new Set([...Object.keys(this.inputs),...Object.keys(this.vectors)])].filter(action=>this.active(action)); }
+    setMouseTarget(target) { if(this.#disposed)throw new Error('controlSystem is disposed');this.mouse.dispose();this.mouse=new mouseInstance(this,target);this.queue.length=0;return this; }
     setInput(device,input,pressed) {
         const instance=this[device];if(!instance||this.instanceOf(input)!==instance)throw new TypeError('Input does not belong to that device');
         const event=this.ev(device,input);pressed?this.press(instance,input,event):this.release(instance,input,event);

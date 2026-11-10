@@ -138,3 +138,20 @@ test('pause, resume and level changes cannot carry a held action into a new game
  e.api.controls.setInput('keyboard','space',false);e.api.controls.setInput('keyboard','space',true);assert.equal(e.api.controls.active('fire'),true);
  await e.loadLevel('two');assert.equal(e.api.controls.active('fire'),false);assert.equal(e.api.controls.readQueue('fire'),false);e.dispose();
 });
+
+test('render hooks receive a neutral frame, camera follows the same player, and drawing cannot advance physics',async()=>{
+ const e=await ready(),player=e.createEntity({entity_type:'character'},{lifetime:'session'});e.api.camera.follow(player);
+ let frameRef;e.registerSystem('appearance',{render(c,blend,frame){frameRef=frame;assert.equal(typeof frame.getContext,'undefined');frame.submit({type:'shape',position:player.getRenderState(blend).position,geometry:{type:'ellipse',radii:[12,12]},material:{fill:'#fff'}});}});
+ e.start();player.setMovement([1,0]);e.updateState();assert.deepEqual(e.api.camera.getView().position,player.position);
+ const before=e.api.physics.savePhysicsState();e.render(.5);e.render(.5);assert.deepEqual(e.api.physics.savePhysicsState(),before);assert.equal(e.api.render.getFrameSnapshot().packet_count,1);assert.throws(()=>frameRef.submit({type:'custom'}),/open/);e.dispose();assert.equal(e.api.render.disposed,true);
+});
+
+test('failed render producers abort partial frames and stop the loop without invoking a backend',async()=>{
+ const e=await ready();e.registerSystem('broken',{render(c,a,frame){frame.submit({type:'shape',geometry:{type:'rect',size:[1,1]}});throw Error('bad producer');}});e.start();assert.throws(()=>e.render(),/bad producer/);
+ assert.equal(e.phase,'idle');assert.equal(e.running,false);assert.equal(e.api.render.getStatistics().packets,0);e.removeSystem('broken');e.start();assert.doesNotThrow(()=>e.render());e.dispose();
+});
+
+
+test('the game appearance producer only submits packets and never touches a Canvas context',()=>{
+ const producer=readFileSync(new URL('../src/directory/runtime-example.mjs',import.meta.url),'utf8');assert.doesNotMatch(producer,/getContext|ctx\.|\.drawImage|new physicsSystem|new spatialGrid/);
+});

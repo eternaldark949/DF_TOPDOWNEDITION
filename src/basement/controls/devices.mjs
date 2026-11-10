@@ -31,19 +31,20 @@ export class keyboardInstance extends inputInstance {
 
 export class mouseInstance extends inputInstance {
     constructor(system,target=system.event_target){
-        super(system,'mouse');this.x=0;this.y=0;this.delta=[0,0];this.wheel=[0,0];this.known=false;
+        super(system,'mouse');this.disposers=[];const listen=(...args)=>this.disposers.push(system.listen(...args));this.x=0;this.y=0;this.delta=[0,0];this.wheel=[0,0];this.known=false;
         const buttons=['mouseLeft','mouseMiddle','mouseRight'];
         const sample=event=>{
             if(event.sourceCapabilities?.firesTouchEvents||!Number.isFinite(event.clientX)||!Number.isFinite(event.clientY))return;
             if(this.known){this.delta[0]+=event.clientX-this.x;this.delta[1]+=event.clientY-this.y;}
             this.x=event.clientX;this.y=event.clientY;this.known=true;system.active_device='mouse';
         };
-        system.listen(target,'mousemove',sample,{passive:true});
-        if(target!==system.event_target)system.listen(system.event_target,'mousemove',event=>{if(this.input_active.size)sample(event);},{passive:true});
-        system.listen(target,'mousedown',event=>{if(event.sourceCapabilities?.firesTouchEvents)return;const input=buttons[event.button];if(input){sample(event);system.press(this,input,system.ev('mouse',input,event));}});
-        system.listen(system.event_target,'mouseup',event=>{const input=buttons[event.button];if(input){if(this.input_active.has(input))sample(event);system.release(this,input,system.ev('mouse',input,event));}});
-        system.listen(target,'wheel',event=>{const unit=event.deltaMode===1?16:event.deltaMode===2?(target.innerHeight||800):1;this.wheel[0]+=event.deltaX*unit;this.wheel[1]+=event.deltaY*unit;system.active_device='mouse';},{passive:true});
+        listen(target,'mousemove',sample,{passive:true});
+        if(target!==system.event_target)listen(system.event_target,'mousemove',event=>{if(this.input_active.size)sample(event);},{passive:true});
+        listen(target,'mousedown',event=>{if(event.sourceCapabilities?.firesTouchEvents)return;const input=buttons[event.button];if(input){sample(event);system.press(this,input,system.ev('mouse',input,event));}});
+        listen(system.event_target,'mouseup',event=>{const input=buttons[event.button];if(input){if(this.input_active.has(input))sample(event);system.release(this,input,system.ev('mouse',input,event));}});
+        listen(target,'wheel',event=>{const unit=event.deltaMode===1?16:event.deltaMode===2?(target.innerHeight||800):1;this.wheel[0]+=event.deltaX*unit;this.wheel[1]+=event.deltaY*unit;system.active_device='mouse';},{passive:true});
     }
+    dispose(){this.releaseAll();this.disposers.splice(0).forEach(drop=>drop());}
     generateGhostImage(){super.generateGhostImage();this.delta=[0,0];this.wheel=[0,0];}
 }
 

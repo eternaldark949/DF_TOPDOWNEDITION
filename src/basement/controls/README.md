@@ -91,6 +91,8 @@ input.updateState();       // poll the selected pad; recognize timed holds/taps
 input.generateGhostImage();// consume edges and mouse deltas after all clients read
 ```
 
+`setMouseTarget(element)` cancels the old mouse state, removes its listeners, clears buffered actions, and binds the new surface. Directory renderer composition uses this after backend replacement.
+
 `clear()` suppresses held inputs until their release/neutral state and clears queues/edges. `cancel()` handles focus loss, visibility changes and loss of contacts without firing release/tap/hold actions. `dispose()` cancels input, removes all owned listeners, disposes touch bindings and cancels any owned polling callback. Cleanup continues after frontend callback failures and reports aggregated errors. The constructor accepts `event_target`, `document`, `mouse_target`, `read_gamepads` and `now` for platform adapters/tests; `now` returns seconds. Set `mouse_target` to the game canvas to keep UI clicks out of gameplay fire bindings; the Directory factory does this for a canvas render target.
 
 By default there is no input-owned animation loop. The old classic client explicitly requests `auto_update:true` while it still owns its separate legacy application flow; the new `gameEngine` disallows that option and drives the same implementation through its Lobby. Do not construct another controlSystem inside a player/system already using the runtime service.
@@ -113,4 +115,4 @@ Pure query bindings also buffer recognized actions by default. The classic clien
 
 Run `node --test src/basement/controls/tests/*.test.mjs` from the game checkout (or `node --test tests/*.test.mjs` after copying this folder). `python tools/test-controls-browser.py` exercises actual keyboard/mouse events and three touch contacts in Chromium, plus supplied standard Gamepad API samples. A physical controller/device matrix remains manual testing. Existing game and quick-draw regressions exercise classic callers of the same implementation.
 
-Verified batch: 16 control-package tests also pass after copying this folder outside the game checkout. The combined engine/controls/Directory/runtime suite passes 199 tests; existing quick-draw, generated-apartment and game regressions remain separate gates.
+Verified batch: 17 control-package tests also pass after copying this folder outside the game checkout. The combined engine/controls/Directory/runtime suite passes 217 tests; existing quick-draw, generated-apartment and game regressions remain separate gates.

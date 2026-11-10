@@ -1,5 +1,12 @@
 # Changelog
 
+## Shared renderer/camera boundary — 2026-11-10
+
+- Added the separate Basement rendering package and exposed `api.render` / `api.camera` in the new runtime. Only the Canvas backend owns contexts; appearance producers submit pooled data packets and ordered passes.
+- Added cached geometry/materials, image/target ownership, clips, gradients, text, shadows, dashes, capability checks and fresh-surface backend preparation. Visibility queries use the same physical world index.
+- Camera following and coordinate conversion are independent of drawing and physical state. Surface changes retarget the central mouse adapter. The regular new-runtime example now draws by packets.
+- Existing classic artwork and production boot still need class conversions. No WebGL implementation is claimed. The complete contract is in `src/basement/rendering/README.md` in the checkout.
+
 ## Shared controls service — 2026-11-10
 
 - The game runtime now owns the canonical Basement `controlSystem` through `api.controls`; the controls package is separate from physical simulation. Its API is documented in `src/basement/controls/README.md` in the game checkout.

@@ -9,7 +9,7 @@ export class gameLevel {
     enter(context, prepared) {}
     beforePhysics(context, seconds) {}
     afterPhysics(context, seconds) {}
-    render(context, blend, target) {}
+    render(context, blend, frame) {}
     leave(context) {}
     disposePrepared(prepared) {}
 }

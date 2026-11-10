@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '892d8e6b77de';
+        const DFAB_BUILD = 'd785f2b5859e';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="5457">
+    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="5829">
 const DFNative = (()=>{
 'use strict';
 // src/basement/physics/core/values.mjs
@@ -19626,7 +19626,7 @@ class gameLevel {
     enter(context, prepared) {}
     beforePhysics(context, seconds) {}
     afterPhysics(context, seconds) {}
-    render(context, blend, target) {}
+    render(context, blend, frame) {}
     leave(context) {}
     disposePrepared(prepared) {}
 }
@@ -19791,19 +19791,20 @@ class keyboardInstance extends inputInstance {
 
 class mouseInstance extends inputInstance {
     constructor(system,target=system.event_target){
-        super(system,'mouse');this.x=0;this.y=0;this.delta=[0,0];this.wheel=[0,0];this.known=false;
+        super(system,'mouse');this.disposers=[];const listen=(...args)=>this.disposers.push(system.listen(...args));this.x=0;this.y=0;this.delta=[0,0];this.wheel=[0,0];this.known=false;
         const buttons=['mouseLeft','mouseMiddle','mouseRight'];
         const sample=event=>{
             if(event.sourceCapabilities?.firesTouchEvents||!Number.isFinite(event.clientX)||!Number.isFinite(event.clientY))return;
             if(this.known){this.delta[0]+=event.clientX-this.x;this.delta[1]+=event.clientY-this.y;}
             this.x=event.clientX;this.y=event.clientY;this.known=true;system.active_device='mouse';
         };
-        system.listen(target,'mousemove',sample,{passive:true});
-        if(target!==system.event_target)system.listen(system.event_target,'mousemove',event=>{if(this.input_active.size)sample(event);},{passive:true});
-        system.listen(target,'mousedown',event=>{if(event.sourceCapabilities?.firesTouchEvents)return;const input=buttons[event.button];if(input){sample(event);system.press(this,input,system.ev('mouse',input,event));}});
-        system.listen(system.event_target,'mouseup',event=>{const input=buttons[event.button];if(input){if(this.input_active.has(input))sample(event);system.release(this,input,system.ev('mouse',input,event));}});
-        system.listen(target,'wheel',event=>{const unit=event.deltaMode===1?16:event.deltaMode===2?(target.innerHeight||800):1;this.wheel[0]+=event.deltaX*unit;this.wheel[1]+=event.deltaY*unit;system.active_device='mouse';},{passive:true});
+        listen(target,'mousemove',sample,{passive:true});
+        if(target!==system.event_target)listen(system.event_target,'mousemove',event=>{if(this.input_active.size)sample(event);},{passive:true});
+        listen(target,'mousedown',event=>{if(event.sourceCapabilities?.firesTouchEvents)return;const input=buttons[event.button];if(input){sample(event);system.press(this,input,system.ev('mouse',input,event));}});
+        listen(system.event_target,'mouseup',event=>{const input=buttons[event.button];if(input){if(this.input_active.has(input))sample(event);system.release(this,input,system.ev('mouse',input,event));}});
+        listen(target,'wheel',event=>{const unit=event.deltaMode===1?16:event.deltaMode===2?(target.innerHeight||800):1;this.wheel[0]+=event.deltaX*unit;this.wheel[1]+=event.deltaY*unit;system.active_device='mouse';},{passive:true});
     }
+    dispose(){this.releaseAll();this.disposers.splice(0).forEach(drop=>drop());}
     generateGhostImage(){super.generateGhostImage();this.delta=[0,0];this.wheel=[0,0];}
 }
 
@@ -19995,6 +19996,7 @@ class controlSystem {
         return instances.flatMap(instance=>instance.getActiveInputs());
     }
     getActiveActions() { return [...new Set([...Object.keys(this.inputs),...Object.keys(this.vectors)])].filter(action=>this.active(action)); }
+    setMouseTarget(target) { if(this.#disposed)throw new Error('controlSystem is disposed');this.mouse.dispose();this.mouse=new mouseInstance(this,target);this.queue.length=0;return this; }
     setInput(device,input,pressed) {
         const instance=this[device];if(!instance||this.instanceOf(input)!==instance)throw new TypeError('Input does not belong to that device');
         const event=this.ev(device,input);pressed?this.press(instance,input,event):this.release(instance,input,event);
@@ -20125,12 +20127,406 @@ const m44 = (()=>{
 
 return Object.freeze({get controlSystem(){return m45.controlSystem;},get controlsSystem(){return m45.controlSystem;},get inputInstance(){return m47.inputInstance;},get keyboardInstance(){return m47.keyboardInstance;},get mouseInstance(){return m47.mouseInstance;},get touchInstance(){return m47.touchInstance;},get gamepadInstance(){return m47.gamepadInstance;},get touchStick(){return m48.touchStick;},get TAP(){return m46.TAP;},get DOUBLETAP(){return m46.DOUBLETAP;},get HELD(){return m46.HELD;},get PRESS(){return m46.PRESS;},get REPEAT(){return m46.REPEAT;},get RELEASE(){return m46.RELEASE;}});
 })();
+// src/basement/rendering/values.mjs
+const m51 = (()=>{
+function finite(value,name,min=-Infinity){if(!Number.isFinite(value)||value<min)throw new TypeError(`Invalid ${name}`);return value;}
+function vector(value,name='vector',out=[]){if(!Array.isArray(value)||value.length!==2)throw new TypeError(`Invalid ${name}`);out[0]=finite(value[0],name);out[1]=finite(value[1],name);return out;}
+function identifier(value){if(typeof value!=='string'||!value||value==='screen')throw new TypeError('A nonempty resource/renderer ID is required (screen is reserved)');return value;}
+function matrix(value,out=[]){if(!Array.isArray(value)||value.length!==6)throw new TypeError('Expected an affine matrix');for(let i=0;i<6;i++)out[i]=finite(value[i],'matrix');return out;}
+function inverse(m){const [a,b,c,d,e,f]=m,k=a*d-b*c;if(Math.abs(k)<1e-12)throw new TypeError('Singular transform');return [d/k,-b/k,-c/k,a/k,(c*f-d*e)/k,(b*e-a*f)/k];}
+function point(m,p){return [m[0]*p[0]+m[2]*p[1]+m[4],m[1]*p[0]+m[3]*p[1]+m[5]];}
+const origin=Object.freeze([0,0]),unitScale=Object.freeze([1,1]);
+function transform(packet={},out=[]){if(packet.matrix)return matrix(packet.matrix,out);const p=packet.position??origin,s=packet.scale??unitScale;if(!Array.isArray(p)||p.length!==2||!Array.isArray(s)||s.length!==2)throw new TypeError('Invalid position/scale');finite(p[0],'position');finite(p[1],'position');finite(s[0],'scale');finite(s[1],'scale');const r=finite(packet.rotation??0,'rotation'),c=Math.cos(r),n=Math.sin(r);out[0]=c*s[0];out[1]=n*s[0];out[2]=-n*s[1];out[3]=c*s[1];out[4]=p[0];out[5]=p[1];return out;}
+function viewport(packet){return Object.freeze({width:finite(packet.width,'viewport width',1),height:finite(packet.height,'viewport height',1),pixel_ratio:finite(packet.pixel_ratio??1,'pixel ratio',.01)});}
+function freezeData(value){if(value&&typeof value==='object'&&!ArrayBuffer.isView(value)){for(const entry of Object.values(value))freezeData(entry);Object.freeze(value);}return value;}
+function color(value){if(typeof value!=='string'||!value.trim())throw new TypeError('A color string is required');return value;}
+const BLENDS = Object.freeze({normal:'source-over',add:'lighter',multiply:'multiply',screen:'screen','source-in':'source-in','source-out':'source-out','destination-in':'destination-in','destination-out':'destination-out'});
+
+return Object.freeze({get finite(){return finite;},get vector(){return vector;},get identifier(){return identifier;},get matrix(){return matrix;},get inverse(){return inverse;},get point(){return point;},get transform(){return transform;},get viewport(){return viewport;},get freezeData(){return freezeData;},get color(){return color;},get BLENDS(){return BLENDS;}});
+})();
+// src/basement/rendering/camera.mjs
+const m50 = (()=>{
+const {finite,vector,viewport,inverse,point,freezeData} = m51;
+
+/** View state only. Following reads native poses; this class never moves a body. */
+class cameraSystem {
+    #current;#previous;#viewport;#follow=null;#offset=[0,0];#smoothing=0;#bounds=null;
+    constructor({position=[0,0],zoom=1,rotation=0,viewport:dimensions={width:640,height:360},bounds=null}={}){
+        this.#current={position:vector(position),zoom:finite(zoom,'zoom',.0001),rotation:finite(rotation,'rotation')};
+        this.#previous=structuredClone(this.#current);this.#viewport=viewport(dimensions);this.setBounds(bounds);
+    }
+    get viewport(){return this.#viewport;}
+    setViewport(packet){this.#viewport=viewport(packet);return this;}
+    setBounds(bounds){
+        if(bounds!==null){const {left,top,right,bottom}=bounds;[left,top,right,bottom].forEach(v=>finite(v,'camera bounds'));if(left>=right||top>=bottom)throw new TypeError('Invalid camera bounds');bounds={left,top,right,bottom};}
+        this.#bounds=bounds;return this;
+    }
+    setView({position=this.#current.position,zoom=this.#current.zoom,rotation=this.#current.rotation}={}){
+        const next={position:vector(position),zoom:finite(zoom,'zoom',.0001),rotation:finite(rotation,'rotation')};this.#current=next;this.#previous=structuredClone(next);return this;
+    }
+    follow(entity,{offset=[0,0],smoothing=0,snap=true}={}){
+        if(!entity||typeof entity.getRenderState!=='function'||entity.destroyed)throw new TypeError('Follow a live native entity');
+        const nextOffset=vector(offset);finite(smoothing,'camera smoothing',0);
+        this.#follow=entity;this.#offset=nextOffset;this.#smoothing=smoothing;
+        if(snap)this.setView({position:entity.position.map((v,i)=>v+nextOffset[i])});return this;
+    }
+    stopFollowing(){this.#follow=null;return this;}
+    updateState(seconds){
+        finite(seconds,'camera seconds',0);this.#previous=structuredClone(this.#current);
+        if(this.#follow?.destroyed)this.#follow=null;
+        if(this.#follow){const p=this.#follow.position,k=this.#smoothing===0?1:1-Math.exp(-seconds/this.#smoothing);this.#current.position=this.#current.position.map((value,i)=>value+(p[i]+this.#offset[i]-value)*k);}
+    }
+    getView(blend=1){
+        finite(blend,'blend',0);if(blend>1)throw new TypeError('Blend must be in [0,1]');
+        const a=this.#previous,b=this.#current,p=a.position.map((v,i)=>v+(b.position[i]-v)*blend),zoom=a.zoom+(b.zoom-a.zoom)*blend,rotation=a.rotation+(b.rotation-a.rotation)*blend;
+        const {width,height,pixel_ratio}=this.#viewport,c=Math.cos(rotation),s=Math.sin(rotation),hx=(Math.abs(c)*width+Math.abs(s)*height)/zoom/2,hy=(Math.abs(s)*width+Math.abs(c)*height)/zoom/2;
+        if(this.#bounds){const box=this.#bounds;for(const [i,lo,hi,h]of [[0,box.left,box.right,hx],[1,box.top,box.bottom,hy]])p[i]=hi-lo<2*h?(lo+hi)/2:Math.max(lo+h,Math.min(hi-h,p[i]));}
+        const m=[c*zoom,-s*zoom,s*zoom,c*zoom,width/2-(c*p[0]+s*p[1])*zoom,height/2-(-s*p[0]+c*p[1])*zoom];
+        return freezeData({position:p,zoom,rotation,width,height,pixel_ratio,world_to_screen:m,screen_to_world:inverse(m),bounds:{left:p[0]-hx,top:p[1]-hy,right:p[0]+hx,bottom:p[1]+hy}});
+    }
+    worldToScreen(position,blend=1){return point(this.getView(blend).world_to_screen,vector(position));}
+    screenToWorld(position,blend=1){return point(this.getView(blend).screen_to_world,vector(position));}
+    clientToWorld(position,bounds,blend=1){
+        const p=vector(position),v=this.#viewport;finite(bounds.left,'surface left');finite(bounds.top,'surface top');finite(bounds.width,'surface width',.0001);finite(bounds.height,'surface height',.0001);
+        return this.screenToWorld([(p[0]-bounds.left)*v.width/bounds.width,(p[1]-bounds.top)*v.height/bounds.height],blend);
+    }
+    worldToClient(position,bounds,blend=1){
+        const p=this.worldToScreen(position,blend),v=this.#viewport;finite(bounds.left,'surface left');finite(bounds.top,'surface top');finite(bounds.width,'surface width',.0001);finite(bounds.height,'surface height',.0001);
+        return [bounds.left+p[0]*bounds.width/v.width,bounds.top+p[1]*bounds.height/v.height];
+    }
+    getVisibleBounds({blend=1,margin=0}={}){finite(margin,'margin',0);const b=this.getView(blend).bounds;return Object.freeze({left:b.left-margin,top:b.top-margin,right:b.right+margin,bottom:b.bottom+margin});}
+}
+
+return Object.freeze({get cameraSystem(){return cameraSystem;}});
+})();
+// src/basement/rendering/packets.mjs
+const m53 = (()=>{
+const {finite,vector,matrix,inverse,transform,color,identifier,BLENDS} = m51;
+
+const geometryBuffers = new WeakMap();
+
+function geometry(packet,out={}){
+    if(!packet||typeof packet!=='object')throw new TypeError('Geometry is required');
+    if(out.type!==packet.type){delete out.size;delete out.radii;delete out.radius;delete out.commands;}
+    out.type=packet.type;
+    if(packet.type==='rect'){out.size=vector(packet.size,'size',out.size);out.size.forEach(v=>finite(v,'size',0));out.radius=finite(packet.radius??0,'corner radius',0);}
+    else if(packet.type==='ellipse'){out.radii=vector(packet.radii,'radii',out.radii);out.radii.forEach(v=>finite(v,'radius',0));}
+    else if(packet.type==='path'){
+        if(!Array.isArray(packet.commands))throw new TypeError('Path commands must be data arrays');out.commands??=[];out.commands.length=packet.commands.length;
+        const sizes={move:2,line:2,quadratic:4,cubic:6,ellipse:8,close:0};
+        for(let i=0;i<packet.commands.length;i++){const cmd=packet.commands[i],kind=cmd?.[0];if(!Object.hasOwn(sizes,kind)||cmd.length!==sizes[kind]+1)throw new TypeError('Invalid path command');const dst=out.commands[i]??[];dst.length=cmd.length;dst[0]=kind;for(let j=1;j<cmd.length;j++)dst[j]=finite(cmd[j],'path coordinate');if(kind==='ellipse'&&(dst[3]<0||dst[4]<0))throw new TypeError('Negative ellipse radius');out.commands[i]=dst;}
+    }else throw new TypeError(`Unknown geometry: ${packet.type}`);
+    out.fill_rule=packet.fill_rule??'nonzero';if(!['nonzero','evenodd'].includes(out.fill_rule))throw new TypeError('Invalid fill rule');
+    return out;
+}
+function paint(packet,out){
+    if(packet===null)return null;if(typeof packet==='string')return color(packet);
+    if(!packet||!['linear','radial'].includes(packet.type))throw new TypeError('Invalid paint');
+    if(!Array.isArray(packet.stops)||packet.stops.length<2)throw new TypeError('Gradient requires stops');
+    if(!out||typeof out!=='object')out={};out.type=packet.type;out.from=vector(packet.from,'gradient from',out.from);out.to=vector(packet.to,'gradient to',out.to);
+    if(packet.type==='radial'){out.inner_radius=finite(packet.inner_radius??0,'inner radius',0);out.outer_radius=finite(packet.outer_radius,'outer radius',0);}
+    out.stops??=[];out.stops.length=packet.stops.length;
+    packet.stops.forEach((stop,i)=>{if(!Array.isArray(stop)||stop.length!==2||finite(stop[0],'gradient stop',0)>1)throw new TypeError('Invalid gradient stop');const dst=out.stops[i]??[];dst[0]=stop[0];dst[1]=color(stop[1]);out.stops[i]=dst;});return out;
+}
+function material(packet={},out={}){
+    out.fill=paint(packet.fill===undefined?'#000':packet.fill,out.fill);out.stroke=paint(packet.stroke??null,out.stroke);out.stroke_width=finite(packet.stroke_width??1,'stroke width',0);
+    out.line_cap=packet.line_cap??'butt';out.line_join=packet.line_join??'miter';if(!['butt','round','square'].includes(out.line_cap)||!['miter','bevel','round'].includes(out.line_join))throw new TypeError('Invalid line style');
+    const dash=packet.dash??[];if(!Array.isArray(dash))throw new TypeError('Dash must be an array');out.dash??=[];out.dash.length=dash.length;dash.forEach((v,i)=>{out.dash[i]=finite(v,'dash length',0);});out.dash_offset=finite(packet.dash_offset??0,'dash offset');
+    if(packet.shadow){out.shadow??={};out.shadow.color=color(packet.shadow.color);out.shadow.blur=finite(packet.shadow.blur??0,'shadow blur',0);out.shadow.offset=vector(packet.shadow.offset??[0,0],'shadow offset',out.shadow.offset);}else out.shadow=null;
+    return out;
+}
+function packet(input,out={}){
+    if(!input||!['shape','sprite','text'].includes(input.type))throw new TypeError('Expected a shape, sprite or text packet');out.type=input.type;
+    out.layer=finite(input.layer??0,'layer');out.depth=finite(input.depth??0,'depth');out.space=input.space??'world';if(!['world','screen'].includes(out.space))throw new TypeError('Invalid coordinate space');
+    out.opacity=finite(input.opacity??1,'opacity',0);if(out.opacity>1)throw new TypeError('Opacity must be in [0,1]');out.blend=input.blend??'normal';if(!Object.hasOwn(BLENDS,out.blend))throw new TypeError('Unsupported blend');
+    out.transform=transform(input,out.transform);out.material_id=input.material_id===undefined?null:identifier(input.material_id);out.material=out.material_id?null:material(input.material,out.material??{});
+    out.geometry_id=null;out.geometry=null;out.resource_id=null;out.text=null;
+    if(input.type!=='sprite'){out.size=null;out.source=null;out.origin=null;}
+    if(input.type!=='text'){out.font=null;out.align=null;out.baseline=null;}
+    if(input.type==='shape'){out.geometry_id=input.geometry_id===undefined?null:identifier(input.geometry_id);if(!out.geometry_id){out.geometry=geometry(input.geometry,geometryBuffers.get(out)??{});geometryBuffers.set(out,out.geometry);}}
+    if(input.type==='sprite'){
+        out.resource_id=identifier(input.resource_id);out.size=vector(input.size,'sprite size',out.size??[]);out.size.forEach(v=>finite(v,'sprite size',0));
+        out.source=input.source?matrixSource(input.source,out.source??[]):null;
+        out.origin=vector(input.origin??[.5,.5],'sprite origin',out.origin??[]);
+    }
+    if(input.type==='text'){
+        if(typeof input.text!=='string')throw new TypeError('Text must be a string');out.text=input.text;
+        const f=input.font??{};out.font??={};out.font.family=color(f.family??'sans-serif');out.font.size=finite(f.size??16,'font size',.01);out.font.weight=f.weight??400;out.font.style=f.style??'normal';
+        if(![100,200,300,400,500,600,700,800,900,'normal','bold'].includes(out.font.weight)||!['normal','italic','oblique'].includes(out.font.style))throw new TypeError('Invalid font');
+        out.align=input.align??'left';out.baseline=input.baseline??'alphabetic';if(!['left','center','right'].includes(out.align)||!['top','middle','bottom','alphabetic'].includes(out.baseline))throw new TypeError('Invalid text alignment');
+    }
+    const clips=input.clips??[];if(!Array.isArray(clips))throw new TypeError('Clips must be an array');out.clips??=[];out.clips.length=clips.length;
+    clips.forEach((clip,i)=>{const dst=out.clips[i]??{};dst.geometry_id=clip.geometry_id===undefined?null:identifier(clip.geometry_id);dst.geometry=dst.geometry_id?null:geometry(clip.geometry,dst.geometry??{});dst.transform=matrix(clip.transform??[1,0,0,1,0,0],dst.transform);dst.inverse=inverse(dst.transform);dst.rule=clip.rule??'nonzero';if(!['nonzero','evenodd'].includes(dst.rule))throw new TypeError('Invalid clip rule');out.clips[i]=dst;});
+    return out;
+}
+function matrixSource(source,out){if(!Array.isArray(source)||source.length!==4)throw new TypeError('Sprite source must be [x,y,width,height]');for(let i=0;i<4;i++)out[i]=finite(source[i],'sprite source',0);if(!out[2]||!out[3])throw new TypeError('Empty sprite source');return out;}
+function requirements(draw,resolve,result=[]){
+    result.length=0;result.push(draw.type,`blend:${draw.blend}`);const g=draw.geometry_id?resolve(draw.geometry_id,'geometry').geometry:draw.geometry,m=draw.material_id?resolve(draw.material_id,'material').material:draw.material;
+    if(g)result.push(`geometry:${g.type}`);if(draw.clips.length)result.push('clip');if(m.shadow)result.push('shadow');if(m.dash.length)result.push('dash');
+    for(const p of [m.fill,m.stroke])if(p&&typeof p==='object')result.push(`gradient:${p.type}`);
+    for(const clip of draw.clips){const g=clip.geometry_id?resolve(clip.geometry_id,'geometry').geometry:clip.geometry;result.push(`geometry:${g.type}`);}
+    if(draw.resource_id&&resolve(draw.resource_id,['image','target']).type==='target')result.push('target');return result;
+}
+
+return Object.freeze({get geometry(){return geometry;},get material(){return material;},get packet(){return packet;},get requirements(){return requirements;}});
+})();
+// src/basement/rendering/frame.mjs
+const m52 = (()=>{
+const {packet} = m53;
+const {color,finite,freezeData} = m51;
+
+/** Reused command buffers. Producers submit data; a backend borrows a completed frame. */
+class renderFrame {
+    #pool=[];#passPool=[];#passes=[];#stack=[];#current=null;#count=0;#open=false;#view;
+    begin(view,{clear_color='transparent'}={}){
+        if(this.#open)throw new Error('A render frame is already open');this.#open=true;this.#view=view;this.#passes.length=0;this.#stack.length=0;this.#count=0;
+        this.#current=this.#pass(null,clear_color,{width:view.width,height:view.height});return this;
+    }
+    #pass(target_id,clear_color,viewport){
+        const index=this.#passes.length,pass=this.#passPool[index]??{packets:[]};this.#passPool[index]=pass;
+        pass.target_id=target_id;pass.clear_color=clear_color===false?false:color(clear_color);pass.viewport={width:finite(viewport.width,'pass width',1),height:finite(viewport.height,'pass height',1)};
+        pass.packets.length=0;this.#passes.push(pass);return pass;
+    }
+    #require(){if(!this.#open)throw new Error('Submit only during an open render frame');}
+    clear(clear_color){this.#require();if(this.#current.packets.length)throw new Error('Clear must precede packets in its pass');this.#current.clear_color=color(clear_color);return this;}
+    submit(description){
+        this.#require();const slot=this.#pool[this.#count]??{};packet(description,slot);slot.sequence=this.#count;this.#pool[this.#count++]=slot;this.#current.packets.push(slot);return this;
+    }
+    beginPass({target_id=null,clear_color='transparent',viewport}={}){
+        this.#require();if(target_id!==null&&(typeof target_id!=='string'||!target_id))throw new TypeError('Pass target must be a resource ID');
+        const previous=this.#current;this.#stack.push(previous);
+        try{this.#current=this.#pass(target_id,clear_color,viewport??previous.viewport);}catch(error){this.#stack.pop();throw error;}return this;
+    }
+    endPass(){this.#require();if(!this.#stack.length)throw new Error('No nested render pass');const previous=this.#stack.pop();this.#current=this.#pass(previous.target_id,false,previous.viewport);return this;}
+    finish(){
+        this.#require();if(this.#stack.length)throw new Error('Unclosed render pass');
+        for(const pass of this.#passes)pass.packets.sort((a,b)=>a.layer-b.layer||a.depth-b.depth||a.sequence-b.sequence);
+        this.#open=false;return {format_version:1,view:this.#view,passes:this.#passes,packet_count:this.#count};
+    }
+    abort(){this.#open=false;this.#current=null;this.#passes.length=0;this.#stack.length=0;this.#count=0;}
+    snapshot(){return freezeData(structuredClone({format_version:1,view:this.#view,passes:this.#passes,packet_count:this.#count}));}
+    getStatistics(){return {packets:this.#count,packet_capacity:this.#pool.length,passes:this.#passes.length,pass_capacity:this.#passPool.length};}
+}
+
+return Object.freeze({get renderFrame(){return renderFrame;}});
+})();
+// src/basement/rendering/system.mjs
+const m54 = (()=>{
+const {renderFrame} = m52;
+const {geometry,material,requirements} = m53;
+const {finite,identifier,freezeData} = m51;
+
+function normalizeResource(description){
+    if(!description||typeof description!=='object')throw new TypeError('A data resource descriptor is required');
+    const type=description.type;
+    if(type==='geometry')return freezeData({type,geometry:geometry(description.geometry)});
+    if(type==='material')return freezeData({type,material:material(description.material)});
+    if(!['image','target'].includes(type))throw new TypeError('Unknown rendering resource');
+    if(type==='image'&&description.url!==undefined){if(typeof description.url!=='string'||!description.url)throw new TypeError('Image URL required');return Object.freeze({type,url:description.url});}
+    const width=finite(description.width,'resource width',1),height=finite(description.height,'resource height',1);if(!Number.isInteger(width)||!Number.isInteger(height))throw new TypeError('Resource sizes must be integral');
+    if(type==='target')return Object.freeze({type,width,height});
+    const data=description.pixels;if((!Array.isArray(data)&&!ArrayBuffer.isView(data))||data.length!==width*height*4||Array.prototype.some.call(data,v=>!Number.isFinite(v)||v<0||v>255))throw new TypeError('Expected width*height*4 RGBA bytes');
+    return Object.freeze({type,width,height,pixels:new Uint8ClampedArray(data)});
+}
+const methods=['initialize','resize','render','registerResource','releaseResource','getSurfaceBounds','dispose'];
+
+/** Backend selection and frame orchestration. Visibility uses the existing native world index. */
+class renderSystem {
+    #world;#camera;#frame=new renderFrame();#renderers=new Map();#resources=new Map();#backend=null;#backendId=null;#surface=null;
+    #collecting=false;#busy=false;#disposed=false;#generation=0;#last=null;#surfaceListeners=new Set();#requirements=[];
+    constructor({physics_system,camera}={}){if(!physics_system?.queryEntitiesInBounds||!camera?.getView)throw new TypeError('renderSystem requires native world and camera');this.#world=physics_system;this.#camera=camera;}
+    get renderer_id(){return this.#backendId;}
+    get disposed(){return this.#disposed;}
+    #live(){if(this.#disposed)throw new Error('renderSystem is disposed');}
+    #boundary(){this.#live();if(this.#collecting||this.#busy)throw new Error('Rendering resources/backend changes require an idle boundary');}
+    registerRenderer(renderer_id,Constructor){this.#boundary();identifier(renderer_id);if(typeof Constructor!=='function')throw new TypeError('Register a renderer class');if(this.#renderers.has(renderer_id))throw new Error('Renderer already registered');this.#renderers.set(renderer_id,Constructor);return this;}
+    listRenderers(){return [...this.#renderers.keys()];}
+    getCapabilities(){this.#live();return Object.freeze(this.#backend?[...this.#backend.capabilities]:[]);}
+    getSurfaceBounds(){this.#live();return this.#backend?.getSurfaceBounds()??Object.freeze({left:0,top:0,width:this.#camera.viewport.width,height:this.#camera.viewport.height});}
+    onSurfaceChanged(handler){this.#boundary();if(typeof handler!=='function')throw new TypeError('Surface handler must be a function');this.#surfaceListeners.add(handler);return ()=>this.#surfaceListeners.delete(handler);}
+    async setRenderer(renderer_id,{surface}={}){
+        this.#boundary();const Constructor=this.#renderers.get(renderer_id);if(!Constructor)throw new Error('Unknown renderer');
+        if(this.#backend&&surface===this.#surface){if(renderer_id===this.#backendId)return;throw new Error('A different backend requires a fresh surface; context types cannot share a canvas');}
+        this.#busy=true;const generation=this.#generation;let next=null,installed=false;
+        try{
+            next=new Constructor();for(const method of methods)if(typeof next[method]!=='function')throw new TypeError(`Renderer is missing ${method}`);
+            if(!Array.isArray(next.capabilities)||next.capabilities.some(v=>typeof v!=='string'))throw new TypeError('Renderer must declare capabilities');
+            await next.initialize(surface,{viewport:this.#camera.viewport});
+            for(const [id,resource]of this.#resources)await next.registerResource(id,resource);
+            if(this.#disposed||generation!==this.#generation)throw new Error('Renderer preparation was cancelled');
+            const old=this.#backend;this.#backend=next;this.#backendId=renderer_id;this.#surface=surface;installed=true;
+            const errors=[];
+            try{old?.dispose();}catch(error){errors.push(error);}
+            for(const handler of this.#surfaceListeners)try{handler(Object.freeze({surface,renderer_id}));}catch(error){errors.push(error);}
+            if(errors.length)throw new AggregateError(errors,'Renderer installed; surface notification/old-backend cleanup failed');
+        }finally{try{if(next&&!installed)next.dispose();}finally{this.#busy=false;}}
+    }
+    async registerResource(resource_id,description){
+        this.#boundary();identifier(resource_id);const normalized=normalizeResource(description),generation=this.#generation;this.#busy=true;
+        try{if(this.#backend)await this.#backend.registerResource(resource_id,normalized);if(this.#disposed||generation!==this.#generation)throw new Error('Resource registration was cancelled');this.#resources.set(resource_id,normalized);}
+        finally{this.#busy=false;}return resource_id;
+    }
+    releaseResource(resource_id){this.#boundary();if(!this.#resources.has(resource_id))return false;this.#backend?.releaseResource(resource_id);return this.#resources.delete(resource_id);}
+    listResources(){return [...this.#resources.keys()];}
+    #resource(id,types){const data=this.#resources.get(id);if(!data||!(Array.isArray(types)?types:[types]).includes(data.type))throw new Error(`Missing or incompatible rendering resource: ${id}`);return data;}
+    resize(dimensions){
+        this.#boundary();const old=this.#camera.viewport;
+        this.#camera.setViewport(dimensions);
+        try{this.#backend?.resize(this.#camera.viewport);}catch(error){this.#camera.setViewport(old);throw error;}return this;
+    }
+    getVisibleEntities({blend=1,margin=0,...options}={},results=[]){this.#live();return this.#world.queryEntitiesInBounds({...options,bounds:this.#camera.getVisibleBounds({blend,margin}),bounds_type:'render'},results);}
+    beginFrame(blend=1){this.#live();if(this.#collecting)throw new Error('A render frame is already open');this.#collecting=true;try{return this.#frame.begin(this.#camera.getView(blend));}catch(error){this.#collecting=false;throw error;}}
+    endFrame(){
+        this.#live();if(!this.#collecting)throw new Error('No open render frame');
+        try{
+            const frame=this.#frame.finish(),caps=this.#backend?new Set(this.#backend.capabilities):null;
+            for(const pass of frame.passes){
+                if(pass.target_id!==null){this.#resource(pass.target_id,'target');if(caps&&!caps.has('target'))throw new Error('Renderer does not support targets');}
+                for(const draw of pass.packets){
+                    if(draw.resource_id===pass.target_id&&pass.target_id!==null)throw new Error('A pass cannot sample its own render target');
+                    for(const need of requirements(draw,(id,types)=>this.#resource(id,types),this.#requirements))if(caps&&!caps.has(need))throw new Error(`Renderer capability unavailable: ${need}`);
+                }
+            }
+            const result=this.#backend?.render(frame);if(result&&typeof result.then==='function'){Promise.resolve(result).catch(()=>{});throw new TypeError('Renderer.render must be synchronous');}
+            this.#last=frame;return frame.packet_count;
+        }finally{this.#collecting=false;}
+    }
+    abortFrame(){this.#frame.abort();this.#collecting=false;}
+    getFrameSnapshot(){this.#live();return this.#frame.snapshot();}
+    getStatistics(){return {...this.#frame.getStatistics(),resources:this.#resources.size,renderer_id:this.#backendId};}
+    dispose(){if(this.#disposed)return;this.#disposed=true;this.#generation++;this.abortFrame();try{this.#backend?.dispose();}finally{this.#backend=null;this.#surface=null;this.#resources.clear();this.#renderers.clear();this.#surfaceListeners.clear();this.#last=null;}}
+}
+
+return Object.freeze({get renderSystem(){return renderSystem;}});
+})();
+// src/basement/rendering/canvas.mjs
+const m55 = (()=>{
+const {BLENDS} = m51;
+
+function createSurface(width,height){
+    if(typeof OffscreenCanvas!=='undefined')return new OffscreenCanvas(width,height);
+    if(typeof document==='undefined')throw new Error('Supply a Canvas surface factory on this platform');
+    const surface=document.createElement('canvas');surface.width=width;surface.height=height;return surface;
+}
+function decodeImage(url){
+    if(typeof Image==='undefined')throw new Error('Supply an image decoder on this platform');
+    return new Promise((resolve,reject)=>{const image=new Image();image.crossOrigin='anonymous';image.onload=()=>resolve(image);image.onerror=()=>reject(new Error(`Cannot decode image: ${url.slice(0,100)}`));image.src=url;});
+}
+function buildPath(target,g){
+    target.beginPath?.();
+    if(g.type==='rect'){const [w,h]=g.size;if(g.radius)target.roundRect(-w/2,-h/2,w,h,Math.min(g.radius,w/2,h/2));else target.rect(-w/2,-h/2,w,h);}
+    else if(g.type==='ellipse'){target.ellipse(0,0,...g.radii,0,0,Math.PI*2);target.closePath();}
+    else for(const command of g.commands){
+        const [op,...v]=command;
+        if(op==='move')target.moveTo(...v);else if(op==='line')target.lineTo(...v);else if(op==='quadratic')target.quadraticCurveTo(...v);else if(op==='cubic')target.bezierCurveTo(...v);else if(op==='ellipse')target.ellipse(...v.slice(0,7),!!v[7]);else target.closePath();
+    }
+}
+const capabilities=Object.freeze(['shape','sprite','text','geometry:rect','geometry:ellipse','geometry:path','gradient:linear','gradient:radial','clip','shadow','dash','target',...Object.keys(BLENDS).map(name=>`blend:${name}`)]);
+
+/** Canvas implementation of the packet contract. Contexts and Canvas/GPU-like handles stay private. */
+class canvasRenderer {
+    #surface;#context;#viewport;#resources=new Map();#createSurface;#decodeImage;#createPath;#disposed=false;#generation=0;
+    constructor({create_surface=createSurface,decode_image=decodeImage,create_path=()=>typeof Path2D==='undefined'?null:new Path2D()}={}){this.#createSurface=create_surface;this.#decodeImage=decode_image;this.#createPath=create_path;}
+    get capabilities(){return capabilities;}
+    initialize(surface,{viewport}){
+        if(this.#disposed||this.#context)throw new Error('Renderer cannot initialize twice');
+        if(!surface||typeof surface.getContext!=='function')throw new TypeError('Canvas renderer requires a surface');
+        const ctx=surface.getContext('2d');if(!ctx)throw new Error('Canvas 2D context unavailable');this.#surface=surface;this.#context=ctx;this.resize(viewport);
+    }
+    #live(){if(this.#disposed||!this.#context)throw new Error('Canvas renderer is not initialized');}
+    getSurfaceBounds(){this.#live();const r=this.#surface.getBoundingClientRect?.();return Object.freeze(r?{left:r.left,top:r.top,width:r.width,height:r.height}:{left:0,top:0,width:this.#viewport.width,height:this.#viewport.height});}
+    resize(viewport){
+        this.#live();const w=Math.max(1,Math.round(viewport.width*viewport.pixel_ratio)),h=Math.max(1,Math.round(viewport.height*viewport.pixel_ratio));
+        if(this.#surface.width!==w)this.#surface.width=w;if(this.#surface.height!==h)this.#surface.height=h;this.#viewport=viewport;
+    }
+    async registerResource(id,descriptor){
+        this.#live();const generation=this.#generation;let entry={descriptor};
+        try{
+            if(descriptor.type==='image'){
+                if(descriptor.url)entry.image=await this.#decodeImage(descriptor.url);
+                else{
+                    const surface=this.#createSurface(descriptor.width,descriptor.height);entry.surface=surface;const ctx=surface.getContext('2d');if(!ctx)throw new Error('Image surface unavailable');
+                    const data=ctx.createImageData(descriptor.width,descriptor.height);data.data.set(descriptor.pixels);ctx.putImageData(data,0,0);entry.image=surface;
+                }
+            }else if(descriptor.type==='target'){
+                entry.surface=this.#createSurface(descriptor.width,descriptor.height);entry.context=entry.surface.getContext('2d');if(!entry.context)throw new Error('Render target unavailable');entry.image=entry.surface;
+            }else if(descriptor.type==='geometry'){
+                entry.path=this.#createPath();if(entry.path)buildPath(entry.path,descriptor.geometry);
+            }
+            if(this.#disposed||generation!==this.#generation)throw new Error('Resource creation was cancelled');
+            const old=this.#resources.get(id);this.#resources.set(id,entry);entry=null;if(old)this.#release(old);
+        }finally{if(entry)this.#release(entry);}
+    }
+    #release(entry){entry.image?.close?.();if(entry.surface){entry.surface.width=0;entry.surface.height=0;}}
+    releaseResource(id){const entry=this.#resources.get(id);if(!entry)return;this.#resources.delete(id);this.#release(entry);}
+    #paint(ctx,paint){
+        if(typeof paint==='string'||paint===null)return paint;
+        const gradient=paint.type==='linear'?ctx.createLinearGradient(...paint.from,...paint.to):ctx.createRadialGradient(...paint.from,paint.inner_radius,...paint.to,paint.outer_radius);
+        for(const [offset,color]of paint.stops)gradient.addColorStop(offset,color);return gradient;
+    }
+    #style(ctx,m,draw,sx,sy){
+        ctx.globalAlpha=draw.opacity;ctx.globalCompositeOperation=BLENDS[draw.blend];
+        ctx.fillStyle=this.#paint(ctx,m.fill)??'transparent';ctx.strokeStyle=this.#paint(ctx,m.stroke)??'transparent';ctx.lineWidth=m.stroke_width||1;ctx.lineCap=m.line_cap;ctx.lineJoin=m.line_join;
+        ctx.setLineDash(m.dash);ctx.lineDashOffset=m.dash_offset;
+        ctx.shadowColor=m.shadow?.color??'transparent';ctx.shadowBlur=(m.shadow?.blur??0)*Math.max(sx,sy);ctx.shadowOffsetX=(m.shadow?.offset[0]??0)*sx;ctx.shadowOffsetY=(m.shadow?.offset[1]??0)*sy;
+    }
+    #geometry(id,inline){return id?this.#resources.get(id):{descriptor:{geometry:inline},path:null};}
+    #shape(ctx,entry,m){
+        const g=entry.descriptor.geometry,rule=g.fill_rule??'nonzero';
+        if(!entry.path)buildPath(ctx,g);
+        if(m.fill!==null)entry.path?ctx.fill(entry.path,rule):ctx.fill(rule);
+        if(m.stroke!==null&&m.stroke_width>0)entry.path?ctx.stroke(entry.path):ctx.stroke();
+    }
+    #draw(ctx,draw,view,sx,sy){
+        ctx.save();
+        try{
+            const m=draw.space==='world'?view.world_to_screen:[1,0,0,1,0,0];ctx.setTransform(m[0]*sx,m[1]*sy,m[2]*sx,m[3]*sy,m[4]*sx,m[5]*sy);ctx.transform(...draw.transform);
+            for(const clip of draw.clips){ctx.transform(...clip.transform);const entry=this.#geometry(clip.geometry_id,clip.geometry);if(entry.path)ctx.clip(entry.path,clip.rule);else{buildPath(ctx,entry.descriptor.geometry);ctx.clip(clip.rule);}ctx.transform(...clip.inverse);}
+            const material=draw.material_id?this.#resources.get(draw.material_id).descriptor.material:draw.material;this.#style(ctx,material,draw,sx,sy);
+            if(draw.type==='shape')this.#shape(ctx,this.#geometry(draw.geometry_id,draw.geometry),material);
+            else if(draw.type==='sprite'){
+                const image=this.#resources.get(draw.resource_id).image,[w,h]=draw.size;
+                if(draw.source)ctx.drawImage(image,...draw.source,-w*draw.origin[0],-h*draw.origin[1],w,h);else ctx.drawImage(image,-w*draw.origin[0],-h*draw.origin[1],w,h);
+            }else{
+                const f=draw.font;ctx.font=`${f.style} ${f.weight} ${f.size}px ${f.family}`;ctx.textAlign=draw.align;ctx.textBaseline=draw.baseline;
+                if(material.fill!==null)ctx.fillText(draw.text,0,0);if(material.stroke!==null&&material.stroke_width>0)ctx.strokeText(draw.text,0,0);
+            }
+        }finally{ctx.restore();}
+    }
+    render(frame){
+        this.#live();
+        if(frame.format_version!==1)throw new TypeError('Unsupported render frame version');
+        for(const pass of frame.passes){
+            const target=pass.target_id===null?{surface:this.#surface,context:this.#context}:this.#resources.get(pass.target_id),ctx=target.context;
+            const sx=target.surface.width/pass.viewport.width,sy=target.surface.height/pass.viewport.height;
+            ctx.save();
+            try{
+                if(pass.clear_color!==false){ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.clearRect(0,0,target.surface.width,target.surface.height);ctx.fillStyle=pass.clear_color;ctx.fillRect(0,0,target.surface.width,target.surface.height);}
+                for(const draw of pass.packets)this.#draw(ctx,draw,frame.view,sx,sy);
+            }finally{ctx.restore();}
+        }
+    }
+    dispose(){if(this.#disposed)return;this.#disposed=true;this.#generation++;for(const entry of this.#resources.values())this.#release(entry);this.#resources.clear();this.#context=null;this.#surface=null;}
+}
+
+return Object.freeze({get canvasRenderer(){return canvasRenderer;}});
+})();
+// src/basement/rendering/index.mjs
+const m49 = (()=>{
+
+
+
+
+
+return Object.freeze({get cameraSystem(){return m50.cameraSystem;},get renderFrame(){return m52.renderFrame;},get renderSystem(){return m54.renderSystem;},get canvasRenderer(){return m55.canvasRenderer;}});
+})();
 // src/runtime/game-engine.mjs
 const m41 = (()=>{
 const {physicsSystem,assetLibrary} = m1;
 const {levelLobby} = m42;
 const {gameLevel} = m43;
 const {controlSystem} = m44;
+const {cameraSystem,renderSystem} = m49;
 
 const hooks = ['attach', 'detach', 'beforePhysics', 'afterPhysics', 'render', 'levelEntered', 'levelLeaving'];
 function synchronous(fn, receiver, args) {
@@ -20149,15 +20545,16 @@ function failures(errors, message) { if (errors.length) throw new AggregateError
 
 /** Application coordinator. Basement supplies all physical behavior; the Lobby supplies time. */
 class gameEngine {
-    #world; #authority = Symbol('runtime simulation clock'); #api; #lobby; #controls;
+    #world; #authority = Symbol('runtime simulation clock'); #api; #lobby; #controls; #camera; #render;
     #levels = new Map(); #systems = new Map(); #active = null; #persistent = new Set();
     #running = false; #destroyed = false; #phase = 'idle'; #loading = false; #pauses = new Map();
-    #schedule; #cancel; #frame = null; #generation = 0; #renderTarget;
+    #schedule; #cancel; #frame = null; #generation = 0;
 
-    constructor({ asset_library = new assetLibrary(), physics = {}, controls = {}, clock = {}, frame_clock,
+    constructor({ asset_library = new assetLibrary(), physics = {}, controls = {}, camera = {}, clock = {}, frame_clock,
         schedule_frame = typeof requestAnimationFrame === 'function' ? callback => requestAnimationFrame(callback) : null,
         cancel_frame = typeof cancelAnimationFrame === 'function' ? handle => cancelAnimationFrame(handle) : null,
-        render_target = null } = {}) {
+        render_target } = {}) {
+        if(render_target!==undefined)throw new TypeError('Mount a renderer surface through api.render.setRenderer; render hooks receive a frame');
         if (Object.hasOwn(physics, 'step_authority') || Object.hasOwn(physics, 'asset_library')) throw new TypeError('The runtime owns physics authority and its asset library');
         if (schedule_frame !== null && typeof schedule_frame !== 'function' || cancel_frame !== null && typeof cancel_frame !== 'function') throw new TypeError('Frame scheduling requires functions');
         this.#world = new physicsSystem({ ...physics, asset_library, step_authority: this.#authority });
@@ -20165,10 +20562,12 @@ class gameEngine {
         if (config.STEP_MS !== this.#world.config.fixed_step * 1000) throw new TypeError('Lobby and physics fixed steps must match');
         if (![config.MAX_FRAME_MS, config.MAX_STEPS, config.GAME_SPEED].every(v => Number.isFinite(v) && v > 0) || !Number.isInteger(config.MAX_STEPS)) throw new TypeError('Invalid Lobby clock configuration');
         if(controls.auto_update)throw new TypeError('The runtime owns control polling');
+        this.#camera = new cameraSystem(camera);
         this.#controls = new controlSystem({ ...controls, auto_update:false });
+        this.#render = new renderSystem({physics_system:this.#world,camera:this.#camera});
         this.#api = Object.freeze({ physics: this.#world, elements: this.#world.elements, assets: asset_library,
-            motion: this.#world.motion, traffic: this.#world.traffic, controls:this.#controls });
-        this.#schedule = schedule_frame; this.#cancel = cancel_frame; this.#renderTarget = render_target;
+            motion: this.#world.motion, traffic: this.#world.traffic, controls:this.#controls, camera:this.#camera, render:this.#render });
+        this.#schedule = schedule_frame; this.#cancel = cancel_frame;
         this.#lobby = new levelLobby(Object.freeze(config), frame_clock);
         this.#lobby.plugIn({ isRunning: () => this.running, isPaused: () => this.paused || !this.active_level,
             beginFrame: () => { if(this.paused || !this.active_level)this.#pollControls(); },
@@ -20317,6 +20716,7 @@ class gameEngine {
             this.#phase = 'physics'; this.#world.updateState(seconds, this.#authority);
             this.#phase = 'afterPhysics';
             synchronous(level.afterPhysics, level, [context, seconds]); this.#callSystems('afterPhysics', seconds);
+            this.#camera.updateState(seconds);
             return true;
         } catch (error) { this.stop(); throw error; }
         finally { this.#controls.generateGhostImage();this.#phase = 'idle'; }
@@ -20327,15 +20727,17 @@ class gameEngine {
         catch(error){this.stop();throw error;}
         finally{this.#phase='idle';}
     }
-    render(blend = 1, target = this.#renderTarget) {
+    render(blend = 1) {
         this.#idle(); if (!Number.isFinite(blend) || blend < 0 || blend > 1) throw new TypeError('Render blend must be between 0 and 1');
         if (!this.#active) return false;
         const { level, context } = this.#active;
         try {
             this.#phase = 'render'; const alpha = this.paused ? 1 : blend;
-            synchronous(level.render, level, [context, alpha, target]); this.#callSystems('render', alpha, target);
+            const frame=this.#render.beginFrame(alpha);
+            synchronous(level.render, level, [context, alpha, frame]); this.#callSystems('render', alpha, frame);
+            this.#render.endFrame();
             return true;
-        } catch (error) { this.stop(); throw error; }
+        } catch (error) { this.#render.abortFrame();this.stop(); throw error; }
         finally { this.#phase = 'idle'; }
     }
     #queueFrame() {
@@ -20362,6 +20764,8 @@ class gameEngine {
             }
             this.#systems.clear(); this.#persistent.clear(); this.#pauses.clear();
             attempt(errors, () => this.#controls.dispose());
+            attempt(errors, () => this.#render.dispose());
+            attempt(errors, () => this.#camera.stopFollowing());
             attempt(errors, () => this.#world.clearWorld()); this.#levels.clear();
         } finally { this.#destroyed = true; this.#phase = 'disposed'; }
         failures(errors, 'Runtime disposal failed');
@@ -20371,7 +20775,7 @@ class gameEngine {
 return Object.freeze({get gameEngine(){return gameEngine;}});
 })();
 // src/directory/street-definitions.mjs
-const m52 = (()=>{
+const m59 = (()=>{
 /** Directory authoring only: convert immutable catalog units once, never during simulation. */
 const vehicleDefinitions = new WeakMap();
 function resolveStreetVehicle(library, { brand, model, control_mode = 'AI', color } = {}) {
@@ -20438,8 +20842,8 @@ function resolveVehicleSeats(library, { brand, model }) {
 return Object.freeze({get resolveStreetVehicle(){return resolveStreetVehicle;},get resolveVehicleSeats(){return resolveVehicleSeats;}});
 })();
 // src/traffic/traffic-vehicle.mjs
-const m51 = (()=>{
-const {resolveStreetVehicle,resolveVehicleSeats} = m52;
+const m58 = (()=>{
+const {resolveStreetVehicle,resolveVehicleSeats} = m59;
 const {gameVehicle} = m1;
 const bindings = new WeakMap();
 /** Official gameplay entity. Body state and driving calculations belong to Basement. */
@@ -20527,10 +20931,10 @@ class TrafficVehicle extends gameVehicle {
 return Object.freeze({get TrafficVehicle(){return TrafficVehicle;}});
 })();
 // src/directory/game-vehicle-factory.mjs
-const m54 = (()=>{
-const {TrafficVehicle} = m51;
+const m61 = (()=>{
+const {TrafficVehicle} = m58;
 const {pathGeometry} = m1;
-const {resolveStreetVehicle} = m52;
+const {resolveStreetVehicle} = m59;
 
 const purposes = new Set(['ambient', 'owned', 'mission', 'taxi']);
 /** Shared official creation. Population limits belong to the requesting population manager. */
@@ -20570,9 +20974,9 @@ function createGameVehicle(world, packet = {}, { hooks = {} } = {}) {
 return Object.freeze({get createGameVehicle(){return createGameVehicle;}});
 })();
 // src/traffic/traffic-manager.mjs
-const m53 = (()=>{
-const {TrafficVehicle} = m51;
-const {createGameVehicle} = m54;
+const m60 = (()=>{
+const {TrafficVehicle} = m58;
+const {createGameVehicle} = m61;
 /** Spawn, ownership and driver policy. The physics world owns every spatial/physical operation. */
 class TrafficManager {
     #pendingSpawns = new Set();
@@ -20617,7 +21021,7 @@ class TrafficManager {
 return Object.freeze({get TrafficManager(){return TrafficManager;}});
 })();
 // src/entities/pedestrians.mjs
-const m55 = (()=>{
+const m62 = (()=>{
 const {gameCharacter,gameVehicle,BODY_GROUP} = m1;
 const bindings = new WeakMap();
 /** Civilian decisions and reactions. Movement, prediction and impacts stay in Basement. */
@@ -20698,8 +21102,8 @@ class Pedestrian extends gameCharacter {
 return Object.freeze({get Pedestrian(){return Pedestrian;}});
 })();
 // src/entities/pedestrian-manager.mjs
-const m56 = (()=>{
-const {Pedestrian} = m55;
+const m63 = (()=>{
+const {Pedestrian} = m62;
 /** Population and waypoint policy only. No positions, obstacle cache or sensing grid. */
 class PedestrianManager {
     #network = new Map();
@@ -20771,11 +21175,11 @@ class PedestrianManager {
 return Object.freeze({get PedestrianManager(){return PedestrianManager;}});
 })();
 // src/directory/game-street.mjs
-const m50 = (()=>{
-const {TrafficVehicle} = m51;
-const {TrafficManager} = m53;
-const {Pedestrian} = m55;
-const {PedestrianManager} = m56;
+const m57 = (()=>{
+const {TrafficVehicle} = m58;
+const {TrafficManager} = m60;
+const {Pedestrian} = m62;
+const {PedestrianManager} = m63;
 
 
 function registerStreetEntityTypes(world) {
@@ -20795,9 +21199,9 @@ class StreetPopulation {
     clearStreet() { this.traffic.clearStreet(); this.pedestrians.clearStreet(); }
 }
 
-return Object.freeze({get TrafficVehicle(){return TrafficVehicle;},get TrafficManager(){return TrafficManager;},get Pedestrian(){return Pedestrian;},get PedestrianManager(){return PedestrianManager;},get createGameVehicle(){return m54.createGameVehicle;},get registerStreetEntityTypes(){return registerStreetEntityTypes;},get StreetPopulation(){return StreetPopulation;}});
+return Object.freeze({get TrafficVehicle(){return TrafficVehicle;},get TrafficManager(){return TrafficManager;},get Pedestrian(){return Pedestrian;},get PedestrianManager(){return PedestrianManager;},get createGameVehicle(){return m61.createGameVehicle;},get registerStreetEntityTypes(){return registerStreetEntityTypes;},get StreetPopulation(){return StreetPopulation;}});
 })();
-const m57 = Object.freeze({default:{
+const m64 = Object.freeze({default:{
   "keymap": {
     "move_up":["w","ArrowUp"],"move_down":["s","ArrowDown"],"move_left":["a","ArrowLeft"],"move_right":["d","ArrowRight"],
     "fire":["mouseLeft","space","gamepadRTrigger","touchFire"],
@@ -20810,18 +21214,23 @@ const m57 = Object.freeze({default:{
   }
 }});
 // src/directory/game-runtime.mjs
-const m49 = (()=>{
+const m56 = (()=>{
 const {gameEngine} = m41;
 const {createApartmentAssetLibrary} = m35;
 const {Player} = m38;
 const {ApartmentProp} = m39;
 const {ApartmentCompanion} = m40;
-const {registerStreetEntityTypes} = m50;
-const controlProfile = m57.default;
+const {registerStreetEntityTypes} = m57;
+const controlProfile = m64.default;
+const {canvasRenderer} = m49;
 
 /** Explicit game composition. Importing this file never starts a second runtime. */
-function createGameRuntime({ game_db, ...options } = {}) {
-    const engine = new gameEngine({ ...options, controls:{...controlProfile,...(options.render_target?.addEventListener?{mouse_target:options.render_target}:{}),...options.controls}, asset_library: createApartmentAssetLibrary({ game_db }) });
+function createGameRuntime({ game_db, surface, ...options } = {}) {
+    const engine = new gameEngine({ ...options, controls:{...controlProfile,...(surface?.addEventListener?{mouse_target:surface}:{}),...options.controls}, asset_library: createApartmentAssetLibrary({ game_db }) });
+    engine.api.render.registerRenderer('canvas',canvasRenderer);
+    engine.registerSystem('surface-input',{
+        attach(context){context.defer(context.api.render.onSurfaceChanged(({surface})=>context.api.controls.setMouseTarget(options.controls?.mouse_target??surface)));}
+    });
     for (const Class of [Player, ApartmentProp, ApartmentCompanion]) engine.api.elements.registerEntityType(Class.entity_type, Class);
     registerStreetEntityTypes(engine.api.physics);
     return engine;
@@ -20842,7 +21251,8 @@ const m0 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get assetLibrary(){return m1.assetLibrary;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get createGameAssetLibrary(){return m26.createGameAssetLibrary;},get ApartmentLevel(){return m34.ApartmentLevel;},get APARTMENT_RULES(){return m35.APARTMENT_RULES;},get gameEngine(){return m41.gameEngine;},get gameLevel(){return m43.gameLevel;},get levelLobby(){return m42.levelLobby;},get createGameRuntime(){return m49.createGameRuntime;},get controlSystem(){return m44.controlSystem;},get controlsSystem(){return m44.controlsSystem;},get inputInstance(){return m44.inputInstance;},get keyboardInstance(){return m44.keyboardInstance;},get mouseInstance(){return m44.mouseInstance;},get touchInstance(){return m44.touchInstance;},get touchStick(){return m44.touchStick;},get gamepadInstance(){return m44.gamepadInstance;},get TAP(){return m44.TAP;},get DOUBLETAP(){return m44.DOUBLETAP;},get HELD(){return m44.HELD;},get PRESS(){return m44.PRESS;},get REPEAT(){return m44.REPEAT;},get RELEASE(){return m44.RELEASE;}});
+
+return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get assetLibrary(){return m1.assetLibrary;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get createGameAssetLibrary(){return m26.createGameAssetLibrary;},get ApartmentLevel(){return m34.ApartmentLevel;},get APARTMENT_RULES(){return m35.APARTMENT_RULES;},get gameEngine(){return m41.gameEngine;},get gameLevel(){return m43.gameLevel;},get levelLobby(){return m42.levelLobby;},get createGameRuntime(){return m56.createGameRuntime;},get controlSystem(){return m44.controlSystem;},get controlsSystem(){return m44.controlsSystem;},get inputInstance(){return m44.inputInstance;},get keyboardInstance(){return m44.keyboardInstance;},get mouseInstance(){return m44.mouseInstance;},get touchInstance(){return m44.touchInstance;},get touchStick(){return m44.touchStick;},get gamepadInstance(){return m44.gamepadInstance;},get TAP(){return m44.TAP;},get DOUBLETAP(){return m44.DOUBLETAP;},get HELD(){return m44.HELD;},get PRESS(){return m44.PRESS;},get REPEAT(){return m44.REPEAT;},get RELEASE(){return m44.RELEASE;},get renderSystem(){return m49.renderSystem;},get renderFrame(){return m49.renderFrame;},get canvasRenderer(){return m49.canvasRenderer;},get cameraSystem(){return m49.cameraSystem;}});
 })();
 return m0;
 })();

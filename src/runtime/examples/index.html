@@ -11,7 +11,12 @@
 <script type="module">
 import { createRuntimeExample } from '../../directory/runtime-example.mjs';
 const status=document.getElementById('status');
-const {engine,player}=createRuntimeExample({render_target:document.getElementById('scene')});
+const surface=document.getElementById('scene');
+const {engine,player}=createRuntimeExample({surface});
+const rect=surface.getBoundingClientRect();
+engine.api.render.resize({width:rect.width,height:rect.height,pixel_ratio:devicePixelRatio});
+engine.api.camera.setView({position:[rect.width/2,rect.height/2]});
+await engine.api.render.setRenderer('canvas',{surface});
 engine.api.controls.touch.stick('move',{zone:'touch-move',anchor:'centre',travel:40,mouse:true});
 engine.api.controls.touch.stick('aim',{zone:'touch-aim',anchor:'centre',travel:40,mouse:true});
 engine.api.controls.touch.button('touch-fire','touchFire');

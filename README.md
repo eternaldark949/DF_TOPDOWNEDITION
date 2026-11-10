@@ -29,6 +29,8 @@ The [new gameEngine runtime](src/runtime/README.md) owns the native physics API,
 
 The [Basement controlSystem API](src/basement/controls/README.md) centralizes keyboard, mouse, gamepad and multi-touch input. The new runtime exposes it as `engine.api.controls`; bindings remain in the Directory.
 
+The [shared rendering/camera API](src/basement/rendering/README.md) separates data-only frames from the Canvas backend. [Its browser example](src/runtime/examples/rendering.html) demonstrates the new runtime boundary; existing game artwork still needs class conversion.
+
 ## Adding your own images or sounds (works from the phone)
 1. On GitHub, open `assets/images` (or `assets/audio`), then choose **Add file → Upload files**.
 2. Give the file a simple name, like `portrait_949.png`.

@@ -7,7 +7,7 @@ The classic playable boot still constructs `GameEngine`. Loading the new class i
 ## Ownership decisions
 
 1. **One world per runtime lifetime.** `physicsSystem` constructs the only spatial grid. Levels neither construct a world nor step it. A private Symbol authorizes only the runtime's simulation call. Independent standalone worlds remain supported.
-2. **The API points to the real engine services.** `api.physics`, `api.elements`, `api.assets`, `api.motion`, `api.traffic` and `api.controls` are stable references, not copied implementations or per-method forwarding wrappers. Basement's handles, registration, queries and events remain authoritative.
+2. **The API points to the real engine services.** `api.physics`, `api.elements`, `api.assets`, `api.motion`, `api.traffic`, `api.controls`, `api.render` and `api.camera` are stable references, not copied implementations or per-method forwarding wrappers. Basement's handles, registration, queries and events remain authoritative.
 3. **Explicit composition replaces mixins.** Systems are normal instances with named lifecycle hooks, called in registration order. No `Object.assign`/prototype injection or legacy fallback is used. Directory composition passes dependencies between game systems explicitly instead of making the coordinator a service locator for old mixin methods. Removing the old production mixins is part of the following class conversions.
 4. **Levels own content and policy.** `gameLevel` supplies prepare/enter/leave and optional policy/presentation hooks. Asynchronous `prepare` receives assets only. It cannot obtain the runtime's live world through its supplied context.
 5. **Default entity lifetime is the active level.** Level exit enumerates the official native registry and retires nonpersistent entities, including entities made by direct native factories. This is lifecycle filtering, not a second entity or spatial registry. Session lifetime is explicit and preserves the original entity/body across level changes.
@@ -15,7 +15,7 @@ The classic playable boot still constructs `GameEngine`. Loading the new class i
 7. **Entry failure is explicit.** Once preparation succeeds, the previous level leaves before new bodies are created. If entry fails, partial level entities/resources are cleaned and the runtime has no active level. Session entities remain. A subsequent load can recover. This is not advertised as rollback of arbitrary gameplay side effects.
 8. **Cleanup is scoped and exhaustive.** `context.on` subscriptions and `context.defer` callbacks retire with their level/system. Cleanup runs in reverse order, continues after failures, and reports aggregated errors. Retired context helper methods reject late creation/subscription attempts. Use `defer` for native pools, constraints that only reference session bodies, external resources and other resources not automatically owned by a retiring entity. A system owns its detach/deferred cleanup; entity session lifetime is independent of system registration.
 9. **The existing Lobby remains the clock implementation.** Its canonical source is now ESM (`lobby/level-lobby.mjs`); the classic script references the bundled same class. The new runtime schedules that class, not another accumulator/integrator. Stop/restart invalidates old callbacks and start is idempotent. Without a scheduler, headless clients advance explicit runtime steps.
-10. **Presentation reads snapshots.** Rendering is separate from stepping and receives interpolation blend and an optional target. Native snapshots remain the read contract. Render hooks must not issue body commands through retained API references; these are ordinary trusted application systems, not a JavaScript sandbox. The runtime rejects its own entity factory during rendering and physics rejects unauthorized stepping.
+10. **Presentation reads snapshots.** Rendering is separate from stepping and receives interpolation blend and a data-packet frame builder. Native snapshots remain the read contract. Render hooks must not issue body commands through retained API references; these are ordinary trusted application systems, not a JavaScript sandbox. The runtime rejects its own entity factory during rendering and physics rejects unauthorized stepping.
 11. **Persistence is not silently adapted.** The native physics API already provides full physical snapshots. A new runtime-wide gameplay/save envelope and reconnection of gameplay systems belong to the persistence class conversion; current classic saves do not automatically load into this coordinator.
 
 ## Public classes and methods
@@ -31,13 +31,13 @@ new gameEngine({
     frame_clock,         // Optional existing clock observer
     schedule_frame,      // Defaults to browser requestAnimationFrame, or null headlessly
     cancel_frame,
-    render_target        // Canvas, renderer object, or another frontend-owned target
+    camera: {}           // Camera position/zoom/rotation/viewport/bounds
 });
 ```
 
 | Member | Contract |
 |---|---|
-| `api` | Frozen service-reference object: `physics`, `elements`, `assets`, `motion`, `traffic`, `controls`. |
+| `api` | Frozen service-reference object: `physics`, `elements`, `assets`, `motion`, `traffic`, `controls`, `render`, `camera`. |
 | `physics_system`, `lobby` | Canonical owned world and Lobby; no writable replacement setters. |
 | `active_level`, `running`, `loading`, `paused`, `pause_reasons`, `phase`, `destroyed` | Lifecycle observations. |
 | `registerLevel(level_id, LevelClass)` | Register a `gameLevel` subclass. Duplicate IDs reject. |
@@ -53,7 +53,7 @@ new gameEngine({
 | `pause(reason)` | Return an idempotent release function. Multiple tokens compose. |
 | `start()`, `stop()` | Start/stop the sole scheduled loop. Starting twice does not schedule twice. |
 | `updateState()` | One fixed native step when running, unpaused and a level is active; otherwise returns false. |
-| `render(blend=1, target)` | Render separately, even for stopped inspection. Paused rendering uses blend 1. |
+| `render(blend=1)` | Render separately, even for stopped inspection. Paused rendering uses blend 1. |
 | `dispose()` | Terminal cleanup of levels, systems, subscriptions, all bodies and scheduling. |
 
 ### gameLevel
@@ -64,7 +64,7 @@ A level constructor receives `{level_id}`. The read-only `level_id` must match r
 - `enter(context, prepared)` instantiates official content.
 - `beforePhysics(context, seconds)` sends intentions.
 - `afterPhysics(context, seconds)` applies gameplay consequences.
-- `render(context, blend, target)` reads presentation state.
+- `render(context, blend, frame)` reads presentation state.
 - `leave(context)` performs level policy cleanup.
 - `disposePrepared(prepared)` releases preparation resources on exit or failure.
 
@@ -72,9 +72,9 @@ Except `prepare`, hooks must be synchronous. Levels can omit hooks via the base 
 
 ### Composed systems
 
-A system is an ordinary object/class instance, not an extension to `gameEngine.prototype`. Its optional synchronous hooks are `attach(context)`, `beforePhysics(context,seconds)`, `afterPhysics(context,seconds)`, `render(context,blend,target)`, `levelEntered(context,level)`, `levelLeaving(context,level)`, and `detach(context)`.
+A system is an ordinary object/class instance, not an extension to `gameEngine.prototype`. Its optional synchronous hooks are `attach(context)`, `beforePhysics(context,seconds)`, `afterPhysics(context,seconds)`, `render(context,blend,frame)`, `levelEntered(context,level)`, `levelLeaving(context,level)`, and `detach(context)`.
 
-A simulation tick first samples the owned controls service, then runs systems' `beforePhysics`, level `beforePhysics`, **one** Basement step (including native contact events), level `afterPhysics`, and systems' `afterPhysics`. Rendering runs level presentation then systems' presentation. Exit/detach cleanup reverses registration order. A simulation/presentation hook error stops scheduling and propagates; it is not caught repeatedly in an endless frame-error loop.
+A simulation tick first samples the owned controls service, then runs systems' `beforePhysics`, level `beforePhysics`, **one** Basement step (including native contact events), level `afterPhysics`, and systems' `afterPhysics`, then updates the camera once. Rendering runs level presentation then systems' presentation. Exit/detach cleanup reverses registration order. A simulation/presentation hook error stops scheduling and propagates; it is not caught repeatedly in an endless frame-error loop.
 
 ### Lifecycle context
 
@@ -111,10 +111,18 @@ Run `node --test tools/test-game-engine.mjs tools/test-native-bundle.mjs` and `p
 
 Next convert shared session/player control and the remaining game-specific input callers, level construction/lifecycle, population/vehicle ownership, combat/abilities, story/interactions, presentation and persistence into explicit registered systems. Keep game-specific policy in those classes and add missing physical capability inside Basement. Remove each old mixin as its responsibilities and callers are converted. Replacing the production boot happens against that shared class composition, not by adding more map-specific bypasses.
 
-Verified this batch: **199 combined tests**, **134 isolated engine tests**, **13 apartment acceptance checks**, **118 existing game regression cases / 1,456 assertions**, GameDB and vehicle-construction checks, and both new-runtime and apartment Chromium checks pass. The global legacy retirement audit remains incomplete because production class conversion is pending.
+Verified this batch: **217 combined tests**, **134 isolated engine tests**, **13 apartment acceptance checks**, **118 existing game regression cases / 1,456 assertions**, GameDB and vehicle-construction checks, and both new-runtime and apartment Chromium checks pass. The global legacy retirement audit remains incomplete because production class conversion is pending.
 
 ## Central input service
 
 `api.controls` is the canonical Basement `controlSystem`; see [its standalone API](../basement/controls/README.md). The coordinator constructs it once, polls it before simulation policy, and consumes edges after all before/after-physics systems read them. Paused/no-level frames still sample input for UI. Input callbacks run in an `input` phase, so they can request an asynchronous level load but cannot recursively step the runtime. Pause/resume, stop and level commit suppress held gameplay input until release/neutral. Disposal removes the service's listeners and touch bindings.
 
 Directory composition supplies `game-control-profile.json`. The runtime example now requests `context.api.controls.direction('move')`; it has no private keyboard state. Touch bindings use the same service for movement/aim sticks and buttons. Old classic input dispatch uses this same implementation through its name alias and explicitly requested legacy polling loop; conversion of its game-side joystick/gamepad policy remains pending.
+
+## Renderer and camera boundary
+
+`api.render` and `api.camera` are the real Basement services, documented in [the rendering API](../basement/rendering/README.md). The runtime opens a frame, passes the data-only builder to level/system render hooks, and flushes the selected backend exactly once. Producer failures abort partial frames. No Canvas context or arbitrary draw callback goes through that contract.
+
+Directory composition registers the Canvas backend; mounting is explicit: `await api.render.setRenderer('canvas',{surface})`. The previous `render_target` runtime option is rejected with migration guidance. The Directory factory accepts `surface` for initial input binding, and its `surface-input` system retargets controls after successful backend replacement. Use `api.render.resize` for logical viewport/DPR changes. Only the backend obtains contexts.
+
+The regular runtime example now draws by packets. `examples/rendering.html` exercises paths, gradients, clipping, images, text, shadows and offscreen composition from Directory data. WebGL is an intended backend, not an implementation supplied here. The classic Canvas artists and the original playable boot remain pending shared class conversions.

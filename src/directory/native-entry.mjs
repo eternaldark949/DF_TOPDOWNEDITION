@@ -8,3 +8,4 @@ export { gameLevel } from '../runtime/game-level.mjs';
 export { levelLobby } from '../lobby/level-lobby.mjs';
 export { createGameRuntime } from './game-runtime.mjs';
 export { controlSystem, controlsSystem, inputInstance, keyboardInstance, mouseInstance, touchInstance, touchStick, gamepadInstance, TAP, DOUBLETAP, HELD, PRESS, REPEAT, RELEASE } from '../basement/controls/index.mjs';
+export { renderSystem, renderFrame, canvasRenderer, cameraSystem } from '../basement/rendering/index.mjs';

@@ -324,3 +324,9 @@ The playable boot still uses the original `GameEngine`; importing the new coordi
 ## Canonical controls
 
 `basement/controls/index.mjs` exports the standalone `controlSystem`, documented in [the controls API](basement/controls/README.md). `system.mjs` owns named actions/queries/timing, `devices.mjs` owns keyboard/mouse/touch-button/gamepad adapters, and `touch-stick.mjs` owns gesture geometry and finger lifetimes. The classic `basement/controls-system.js` references these same exports. `directory/game-control-profile.json` defines the new runtime's logical actions and vectors. `tools/test-controls-browser.py` covers real DOM keyboard/mouse/multi-touch plus supplied standard gamepad samples.
+
+## Shared rendering destination
+
+[The rendering/camera API](basement/rendering/README.md) documents `api.render` and `api.camera`. `basement/rendering/system.mjs` selects a backend and uses the existing world index for visibility; `frame.mjs` pools data packets/passes; `camera.mjs` owns view transforms/following; `canvas.mjs` owns all Canvas contexts for the new contract. `packets.mjs` validates backend-neutral data. The classic drawing classes remain pending conversion.
+
+`directory/game-assets/rendering-example.json` and `directory/rendering-example.mjs` define the visual fixture. `runtime/examples/rendering.html` and `tools/test-rendering-browser.py` exercise actual pixels, offscreen passes, fresh-surface replacement and pointer retargeting.

@@ -136,3 +136,10 @@ test('frontend callback failures cannot prevent other touch cleanup or retain de
  }
  assert.throws(()=>input.dispose(),/disposal failed/);assert.equal(input.disposed,true);assert.equal(other,1);windowEmit('keydown',{key:'d'});assert.equal(input.active('move_right'),false);
 });
+
+test('surface retargeting cancels old mouse input and removes old listeners without duplicating new ones',()=>{
+ const old=new Element(),next=new Element(),{input}=fixture({mouse_target:old,keymap:{fire:['mouseLeft']}});
+ emit(old,'mousedown',{button:0,clientX:1,clientY:2});assert.equal(input.active('fire'),true);input.setMouseTarget(next);assert.equal(input.active('fire'),false);assert.equal(input.readQueue('fire'),false);
+ emit(old,'mousemove',{clientX:100,clientY:100});assert.equal(input.pointer().known,false);emit(next,'mousemove',{clientX:20,clientY:30});assert.deepEqual(input.pointer().position,[20,30]);
+ input.dispose();emit(next,'mousedown',{button:0,clientX:20,clientY:30});assert.equal(input.active('fire'),false);
+});
