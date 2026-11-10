@@ -12,11 +12,10 @@ class RuntimeExampleLevel extends gameLevel {
 }
 
 export function createRuntimeExample(options = {}) {
-    const engine = createGameRuntime(options);
+    const engine = createGameRuntime({player:{template:'df:player_949',entity_type:'df_player',position:[100,180]},...options});
     engine.api.assets.registerLibrary(definitions);
     engine.registerLevel('room_a', RuntimeExampleLevel).registerLevel('room_b', RuntimeExampleLevel);
-    const player = engine.createEntity({ template:'df:player_949', entity_type:'df_player', position:[100,180] }, { lifetime:'session' });
-    engine.registerSystem('input', { beforePhysics(context) { player.setMovement(context.api.controls.direction('move')); } });
+    const player = engine.api.session.player;
     engine.registerSystem('appearance', {
         render(context, blend, frame) {
             frame.clear(context.engine.active_level.definition.background);

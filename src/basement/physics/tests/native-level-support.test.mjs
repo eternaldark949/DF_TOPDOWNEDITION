@@ -68,3 +68,15 @@ test('optional runtime step authority survives saves without becoming serialized
  p.loadPhysicsState(state);assert.throws(()=>p.updateState(),/owning runtime/);p.updateState(p.config.fixed_step,authority);assert.equal(p.simulation_tick,2);
  assert.throws(()=>new physicsSystem({step_authority:'clock'}),/Symbol/);
 });
+
+test('directional placement rejects zero headings and enforces minimum accepted travel inside the engine',()=>{
+ const p=new physicsSystem(),person=p.createCharacter({position:[50,50],collision_shape:{shape_type:'circle',radius:3}});
+ assert.equal(person.teleportInDirection([0,0],{distance:100}),null);
+ assert.equal(p.findDirectionalPlacement(person,{direction:[0,0],distance:100}),null);
+ assert.equal(p.findDirectionalPlacement(person,{direction:[1,0],distance:100,min_distance:1,placement_bounds:{left:0,top:0,right:53.5,bottom:100}}),null);
+ assert.equal(person.teleportInDirection([1,0],{distance:.5,min_distance:1}),null);
+ assert.deepEqual(person.position,[50,50]);
+ assert.throws(()=>p.findClearPlacement({body:person,to:[100,50],min_distance:-1}));
+ const landing=p.findDirectionalPlacement(person,{direction:[1,0],distance:100,min_distance:1,placement_bounds:{left:0,top:0,right:60,bottom:100}});
+ assert.ok(landing.distance>6.99&&landing.distance<7);
+});

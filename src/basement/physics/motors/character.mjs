@@ -24,8 +24,9 @@ export class characterMotor {
     teleportInDirection(direction, { distance, angle, ...options }) {
         const r = bodyRecord(this.body); number(distance, 'distance', 0);
         if(angle!==undefined)number(angle,'angle');
-        const heading=direction??[Math.cos(angle??r.rotation),Math.sin(angle??r.rotation)];
-        return this.teleportTo(add(r.position, scale(unit(vector(heading)), distance)), options);
+        const heading=vector(direction??[Math.cos(angle??r.rotation),Math.sin(angle??r.rotation)]);
+        if(length(heading)<=EPS)return null;
+        return this.teleportTo(add(r.position, scale(unit(heading), distance)), options);
     }
     dashTo(position, options = {}) { return this.moveTo(position, { ...options, speed: options.speed ?? this.config.max_speed * 3, direct: true }); }
     teleportTo(position, options = {}) {

@@ -31,6 +31,8 @@ The [Basement controlSystem API](src/basement/controls/README.md) centralizes ke
 
 The [shared rendering/camera API](src/basement/rendering/README.md) separates data-only frames from the Canvas backend. [Its browser example](src/runtime/examples/rendering.html) demonstrates the new runtime boundary; existing game artwork still needs class conversion.
 
+The [session/player API](src/gameplay/README.md) documents the shared session, native player health and abilities, and player input policy now installed by Directory composition. Production gameplay callers remain under conversion.
+
 ## Adding your own images or sounds (works from the phone)
 1. On GitHub, open `assets/images` (or `assets/audio`), then choose **Add file → Upload files**.
 2. Give the file a simple name, like `portrait_949.png`.

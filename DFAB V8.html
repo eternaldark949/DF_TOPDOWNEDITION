@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'd785f2b5859e';
+        const DFAB_BUILD = '0813be0505d6';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="5829">
+    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="6041">
 const DFNative = (()=>{
 'use strict';
 // src/basement/physics/core/values.mjs
@@ -10117,6 +10117,8 @@ class physicsQueries {
         const body = packet.body ? this.world._record(referenceBody(packet.body)) : null;
         const shape = new collisionShape(packet.collision_shape ?? body?.config.collision_shape);
         const rotation = number(packet.rotation ?? body?.rotation ?? 0, 'rotation'), delta = sub(to, from), distance = length(delta);
+        const minDistance = number(packet.min_distance ?? 0, 'min_distance', 0);
+        if(distance < minDistance)return null;
         const options = { ...packet, include_ghosts: packet.include_ghosts ?? false, query_body: body?.handle, ignore_body: packet.ignore_body ?? body?.handle };
         if (this.isPlacementClear(body?.handle ?? shape.packet, to, options)) return Object.assign(result, { position: to, fraction: 1, distance });
         if (distance <= EPS) return null;
@@ -10159,7 +10161,7 @@ class physicsQueries {
             const [lo, hi] = merged[i];
             if (fraction >= lo - EPS && fraction <= hi + EPS) fraction = lo - skin / distance;
         }
-        if (fraction < 0) return null;
+        if (fraction < 0 || distance * fraction < minDistance) return null;
         const position = add(from, scale(delta, fraction));
         if (!this.isPlacementClear(body?.handle ?? shape.packet, position, options)) return null;
         return Object.assign(result, { position, fraction, distance: distance * fraction });
@@ -10263,8 +10265,9 @@ class characterMotor {
     teleportInDirection(direction, { distance, angle, ...options }) {
         const r = bodyRecord(this.body); number(distance, 'distance', 0);
         if(angle!==undefined)number(angle,'angle');
-        const heading=direction??[Math.cos(angle??r.rotation),Math.sin(angle??r.rotation)];
-        return this.teleportTo(add(r.position, scale(unit(vector(heading)), distance)), options);
+        const heading=vector(direction??[Math.cos(angle??r.rotation),Math.sin(angle??r.rotation)]);
+        if(length(heading)<=EPS)return null;
+        return this.teleportTo(add(r.position, scale(unit(heading), distance)), options);
     }
     dashTo(position, options = {}) { return this.moveTo(position, { ...options, speed: options.speed ?? this.config.max_speed * 3, direct: true }); }
     teleportTo(position, options = {}) {
@@ -12168,8 +12171,9 @@ class physicsSystem {
     findNearbyPlacement(body,options){return this.#queries.findNearbyPlacement(body,options);}
     findDirectionalPlacement(body, {direction,angle,distance,...options}){
         const r=this._record(referenceBody(body));number(distance,'distance',0);if(angle!==undefined)number(angle,'angle');
-        const heading=direction??[Math.cos(angle??r.rotation),Math.sin(angle??r.rotation)];
-        return this.findClearPlacement({...options,body,from:r.position,to:add(r.position,scale(unit(vector(heading)),distance))});
+        const heading=vector(direction??[Math.cos(angle??r.rotation),Math.sin(angle??r.rotation)]);
+        if(length(heading)<=EPS)return null;
+        return this.findClearPlacement({...options,body,from:r.position,to:add(r.position,scale(unit(heading),distance))});
     }
     getBodyGrip(body, options) { const r = this._record(referenceBody(body)); return layoutGeometry.boxGrip(r.shape, pose(r), options); }
     getMassProperties(body) {
@@ -12345,6 +12349,24 @@ const m1 = (()=>{
 return Object.freeze({get physicsSystem(){return m2.physicsSystem;},get physicsBody(){return m7.physicsBody;},get collisionShape(){return m4.collisionShape;},get collisionDetector(){return m8.collisionDetector;},get contactSolver(){return m9.contactSolver;},get spatialGrid(){return m10.spatialGrid;},get physicsConstraint(){return m19.physicsConstraint;},get constraintSolver(){return m19.constraintSolver;},get characterMotor(){return m12.characterMotor;},get vehicleMotor(){return m13.vehicleMotor;},get pathMotor(){return m13.pathMotor;},get projectileMotor(){return m14.projectileMotor;},get particlePhysics(){return m25.particlePhysics;},get gameEntity(){return m16.gameEntity;},get gameElements(){return m17.gameElements;},get assetLibrary(){return m18.assetLibrary;},get gameCharacter(){return m15.gameCharacter;},get gameVehicle(){return m15.gameVehicle;},get gameProjectile(){return m15.gameProjectile;},get gameProp(){return m15.gameProp;},get gameStatic(){return m15.gameStatic;},get gameTrigger(){return m15.gameTrigger;},get gameDecoration(){return m15.gameDecoration;},get awarenessMatrix(){return m15.awarenessMatrix;},get BODY_GROUP(){return m5.BODY_GROUP;},get QUERY_GROUP(){return m5.QUERY_GROUP;},get PHYSICS_TYPES(){return m5.PHYSICS_TYPES;},get trafficController(){return m21.trafficController;},get motionController(){return m20.motionController;},get pathGeometry(){return m23.pathGeometry;},get layoutGeometry(){return m24.layoutGeometry;}});
 })();
 const m27 = Object.freeze({default:{
+  "max_health": 100,
+  "movement_speed": 312,
+  "sneak_speed_factor": 0.55,
+  "regeneration": {
+    "delay_seconds": 10,
+    "interval_seconds": 1,
+    "amount": 5
+  },
+  "flit": {
+    "capacity": 120,
+    "cost": 40,
+    "recharge_per_second": 120,
+    "distance": 120,
+    "invulnerability_seconds": 0.25,
+    "minimum_distance": 1
+  }
+}});
+const m28 = Object.freeze({default:{
   "library_id": "df",
   "description": "Directory-owned entity definitions for the standalone engine. Existing game classes migrate to these contracts in the next phase. Units: world pixels, seconds, radians and kilograms.",
   "resources": {
@@ -12836,7 +12858,7 @@ const m27 = Object.freeze({default:{
     }
   }
 }});
-const m28 = Object.freeze({default:{
+const m29 = Object.freeze({default:{
   "library_id": "df_street",
   "resources": {
     "rules": {
@@ -12903,7 +12925,7 @@ const m28 = Object.freeze({default:{
     }
   }
 }});
-const m29 = Object.freeze({default:{
+const m30 = Object.freeze({default:{
   "_about": {
     "chapter": "Cast and looks: every speaker's colour, who stands where in a cinematic scene, where the crew idles at home, how every named character looks, the colours looks share, the Double Nights android finishes, the wardrobe Stella can buy and wear, and the finishes and named materials it is drawn with.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.cast and checked by tools/test-game-db.cjs. Colours are '#rrggbb' (or '#rgb'). In appearances, { \"palette\": \"<name>\" } stands for that colour from palette, so a colour several looks share is changed once. Crowds (ROLE_LOOKS) and the field mask are code and stay in core/appearances.js. _about.notes keeps the explanations that were comments in the code, keyed by path.",
@@ -14373,7 +14395,7 @@ const m29 = Object.freeze({default:{
     }
   ]
 }});
-const m30 = Object.freeze({default:{
+const m31 = Object.freeze({default:{
   "_about": {
     "chapter": "Vehicles and traffic: the car brands and models, BlackMark's factory look, the Zib cabs and where they go, how traffic treats people in the road, and the driving feel every car shares.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.vehicles and checked by tools/test-game-db.cjs. Speeds are px a tick (60 ticks a second), accelerations px a tick², times in ticks unless a name says ms, distances px, angles radians. Keys in camelCase or UPPER_SNAKE are read by the code under those names. Brand and model keys are in save files: never rename one. _about.fields explains each field of the tuning tables.",
@@ -15097,7 +15119,7 @@ const m30 = Object.freeze({default:{
     "exit_clearance": 24
   }
 }});
-const m31 = Object.freeze({default:{
+const m32 = Object.freeze({default:{
   "_about": {
     "chapter": "Enemies and encounters: what each enemy kind starts with, the drones, the Triumvirate and Lilitu, their hazards, and the Horde Gauntlet.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.enemies and checked by tools/test-game-db.cjs. Times are seconds unless a name says frames (60 a second); distances px; damage HP. Keys in UPPER_SNAKE are read by the code under those names. Gauntlet ids and kind ids are in save files: never rename one.",
@@ -15639,7 +15661,7 @@ const m31 = Object.freeze({default:{
     }
   }
 }});
-const m32 = Object.freeze({default:{
+const m33 = Object.freeze({default:{
   "_about": {
     "chapter": "Places: every map's size, floors, walls, zones, landmarks and ways in and out; the rooms and doors inside them; where the city's landmark blocks are; the fireplaces; and where the dyer stands.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.places and checked by tools/test-game-db.cjs. Positions and sizes are world px, from the map's top-left; angles radians. Keys in camelCase or UPPER_SNAKE are read by the code under those names. Map ids and room ids are in save files and story steps: never rename one. _about.notes keeps the explanations that were comments in the code, keyed by where they apply (maps.apt_949.cameraBounds, rooms.apt_949.doors[0], …); they're for people only.",
@@ -17378,7 +17400,7 @@ const m32 = Object.freeze({default:{
   "hearths": {"apt_949":{"x":580,"y":432},"keepers_parlor":{"x":450,"y":62},"cozy_cafe_interior":{"x":90,"y":535}},
   "dyer_station": {"x":1176,"y":214,"width":58,"height":30}
 }});
-const m33 = Object.freeze({default:{
+const m34 = Object.freeze({default:{
   "_about": {
     "chapter": "Items and gear: everything she can carry, drink, read, craft or own.",
     "how_to_edit": "Plain JSON. tools/build.mjs inlines this file as GAME_DB.items when it builds the game, and tools/test-game-db.cjs checks it. Entry field names stay camelCase because the game code reads them by those names. A \"note\" field is for people and is never read by the game.",
@@ -18165,17 +18187,19 @@ const m33 = Object.freeze({default:{
 // src/directory/game-assets.mjs
 const m26 = (()=>{
 const {assetLibrary} = m1;
-const definitions = m27.default;
-const streetDefinitions = m28.default;
-const cast = m29.default;
-const vehicles = m30.default;
-const enemies = m31.default;
-const places = m32.default;
-const items = m33.default;
+const playerRules = m27.default;
+const definitions = m28.default;
+const streetDefinitions = m29.default;
+const cast = m30.default;
+const vehicles = m31.default;
+const enemies = m32.default;
+const places = m33.default;
+const items = m34.default;
 
 /** Game data is wired here, never imported by the reusable Basement package. */
 function createGameAssetLibrary({ game_db = { cast, vehicles, enemies, places, items } } = {}) {
     const definition = structuredClone(definitions);
+    definition.templates.player_949.data={health:playerRules.max_health,max_health:playerRules.max_health};
     for (const resource of Object.values(definition.resources)) {
         let data = game_db;
         for (const key of resource.source) {
@@ -18189,7 +18213,7 @@ function createGameAssetLibrary({ game_db = { cast, vehicles, enemies, places, i
 
 return Object.freeze({get createGameAssetLibrary(){return createGameAssetLibrary;}});
 })();
-const m36 = Object.freeze({default:{
+const m37 = Object.freeze({default:{
   "library_id": "df_apartment",
   "description": "Authored Silver Queen apartment assets. Furniture order preserves existing questState.aptLayout indices. Physics state is held only by Basement bodies.",
   "resources": {
@@ -19275,9 +19299,9 @@ const m36 = Object.freeze({default:{
   }
 }});
 // src/directory/apartment-assets.mjs
-const m35 = (()=>{
+const m36 = (()=>{
 const {createGameAssetLibrary} = m26;
-const definition = m36.default;
+const definition = m37.default;
 
 function createApartmentAssetLibrary(options = {}) {
     const library = createGameAssetLibrary(options);
@@ -19290,7 +19314,7 @@ const APARTMENT_RULES = Object.freeze(definition.resources.rules.data);
 return Object.freeze({get createApartmentAssetLibrary(){return createApartmentAssetLibrary;},get APARTMENT_RULES(){return APARTMENT_RULES;}});
 })();
 // src/directory/apartment-definition.mjs
-const m37 = (()=>{
+const m38 = (()=>{
 const {layoutGeometry,BODY_GROUP} = m1;
 const MOVABLE = new Set(['apt_sofa','apt_coffee','apt_chair','apt_console','apt_plant','apt_planter','apt_stool','apt_bed','apt_side','apt_lounger','apt_bistro','apt_telescope','apt_dining','apt_bench','apt_chaise','apt_patio_sofa']);
 const rectangle = (r, template, data = {}) => ({ template, position: [r.x + r.w / 2, r.y + r.h / 2], collision_shape: { shape_type: 'box', dimensions: [r.w, r.h] }, data });
@@ -19347,42 +19371,158 @@ function resolveApartmentDyer(game_db){
 
 return Object.freeze({get resolveApartmentDefinition(){return resolveApartmentDefinition;},get resolveApartmentDyer(){return resolveApartmentDyer;}});
 })();
-// src/entities/player.mjs
-const m38 = (()=>{
-const {gameCharacter} = m1;
-const services = new WeakMap();
+// src/gameplay/values.mjs
+const m40 = (()=>{
+// Gameplay validation, deliberately unrelated to physical vectors or integration.
+function nonnegative(value, name) {
+    if (!Number.isFinite(value) || value < 0) throw new TypeError(`${name} must be finite and nonnegative`);
+    return value;
+}
+function identifier(value) {
+    if (typeof value !== 'string' || !value.trim() || ['__proto__', 'prototype', 'constructor'].includes(value)) throw new TypeError('Expected a safe nonempty identifier');
+    return value;
+}
+function jsonCopy(value) {
+    // Reject values that JSON would silently discard or change in a save file.
+    const visit = (v, seen = new Set()) => {
+        if (v === null || typeof v === 'string' || typeof v === 'boolean' || typeof v === 'number' && Number.isFinite(v)) return;
+        if (!v || typeof v !== 'object' || seen.has(v) || !Array.isArray(v) && Object.getPrototypeOf(v) !== null && Object.getPrototypeOf(Object.getPrototypeOf(v)) !== null) throw new TypeError('Session data must contain only finite JSON values');
+        if(Array.isArray(v) && Object.keys(v).length!==v.length)throw new TypeError('Session arrays must be dense');
+        seen.add(v);
+        for (const [key, item] of Object.entries(v)) { identifier(key); visit(item, seen); }
+        seen.delete(v);
+    };
+    visit(value); return structuredClone(value);
+}
 
-/** Gameplay identity and health. The inherited body/controller own every physical value. */
+return Object.freeze({get nonnegative(){return nonnegative;},get identifier(){return identifier;},get jsonCopy(){return jsonCopy;}});
+})();
+// src/entities/player.mjs
+const m39 = (()=>{
+const {gameCharacter} = m1;
+const {identifier,jsonCopy,nonnegative} = m40;
+const services = new WeakMap();
+function emitPlayer(player,event,detail = {}) { services.get(player)?.emit?.(event,{entity_id:player.entity_id,...detail}); }
+function playerState(player) {
+    if(!player.data.player_state)throw new Error('Initialize Player gameplay state before using player rules');
+    return player.data.player_state;
+}
+function validateModifiers(modifiers) {
+    const copy=jsonCopy(modifiers);
+    if(!copy || typeof copy!=='object' || Array.isArray(copy))throw new TypeError('Buff modifiers must be a record');
+    for(const modifier of Object.values(copy)) {
+        if(!modifier || typeof modifier!=='object' || Array.isArray(modifier) || Object.keys(modifier).some(key=>!['add','multiply'].includes(key)))throw new TypeError('Buff modifiers require add and/or multiply');
+        if(modifier.add!==undefined&&!Number.isFinite(modifier.add))throw new TypeError('Buff addition must be finite');
+        if(modifier.multiply!==undefined)nonnegative(modifier.multiply,'buff multiplier');
+    }
+    return copy;
+}
+
+
+/** Official gameplay identity; native body/controller own all physical state. */
 class Player extends gameCharacter {
     static entity_type = 'df_player';
-    connectGameplay({ game, buff_system } = {}) { services.set(this, { game, buff_system }); return this; }
+    connectGameplay({ emit, is_invulnerable, on_damage, buff_system } = {}) {
+        for(const callback of [emit,is_invulnerable,on_damage])if(callback!==undefined&&typeof callback!=='function')throw new TypeError('Gameplay callbacks must be functions');
+        services.set(this,{emit,is_invulnerable,on_damage,buff_system}); return this;
+    }
+    disconnectGameplay() { services.delete(this); }
     get buffSystem() { return services.get(this)?.buff_system; }
     get visible() { return this.data.visible !== false; }
     set visible(value) { this.data.visible = !!value; }
-    get hp() { return this.data.health; }
-    set hp(value) { this.data.health = value; }
-    get maxHp() { return this.data.max_health; }
-    set maxHp(value) { this.data.max_health = value; }
+    get hp() { return this.data.health ?? 0; }
+    set hp(value) { this.data.health = Math.min(nonnegative(value,'health'),this.maxHp); }
+    get maxHp() { return this.data.max_health ?? 0; }
+    set maxHp(value) { nonnegative(value,'max_health');if(value===0)throw new TypeError('max_health must be positive');this.data.max_health=value;this.hp=this.hp; }
     get dead() { return this.hp <= 0; }
     get alliance() { return 'friendly'; }
     get radius() { return this.collision_shape.radius; }
     get isHidden() { return !!this.data.hidden; }
     set isHidden(value) { this.data.hidden = !!value; }
-    syncHealth(health, maximum=this.maxHp??100) { this.data.health = health; this.data.max_health = maximum; }
-    takeDamage(amount, { impulse } = {}) {
-        const game = services.get(this)?.game;
-        if (this.dead || game?.flitState?.active) return false;
-        this.hp = Math.max(0, this.hp - amount);
-        if (impulse) this.body.applyImpulse(impulse);
-        if (game) { game.playerHealth = this.hp; game.lastHurtAt = game.physics_system.simulation_tick * game.physics_system.config.fixed_step; }
+    get sneaking() { return !!this.data.player_state?.sneaking; }
+    set sneaking(value) { playerState(this).sneaking=!!value; }
+    get flitting() { return (this.data.player_state?.flit_remaining ?? 0)>0; }
+    get attunement() { return this.data.player_state?.attunement ?? 0; }
+    initializeState(rules) {
+        if(this.data.player_state){
+            const state=jsonCopy(this.data.player_state);
+            if(state.format_version!==1 || typeof state.sneaking!=='boolean' || !state.buffs || Array.isArray(state.buffs) || typeof state.buffs!=='object')throw new TypeError('Invalid saved Player state');
+            for(const key of ['attunement','flit_remaining','invulnerable_remaining','seconds_since_damage','regeneration_elapsed'])nonnegative(state[key],key);
+            nonnegative(this.data.health,'health');nonnegative(this.data.max_health,'max_health');
+            if(this.maxHp<=0 || this.hp>this.maxHp || state.attunement>rules.flit.capacity)throw new TypeError('Invalid saved Player health or attunement');
+            for(const [id,buff] of Object.entries(state.buffs)){identifier(id);nonnegative(buff.remaining,'buff duration');validateModifiers(buff.modifiers);}
+            return this;
+        }
+        this.syncHealth(this.data.health ?? rules.max_health,this.data.max_health ?? rules.max_health);
+        this.data.player_state={format_version:1,attunement:rules.flit.capacity,flit_remaining:0,invulnerable_remaining:0,seconds_since_damage:0,regeneration_elapsed:0,sneaking:false,buffs:{}};
+        return this;
+    }
+    syncHealth(health, maximum=this.maxHp) {
+        nonnegative(health,'health');nonnegative(maximum,'max_health');if(maximum===0)throw new TypeError('max_health must be positive');
+        this.data.max_health=maximum;this.data.health=Math.min(health,maximum);
+    }
+    takeDamage(amount, { impulse, bypass_invulnerability=false, source=null } = {}) {
+        nonnegative(amount,'damage'); const state=this.data.player_state;
+        if(this.dead || amount===0 || this.flitting || services.get(this)?.is_invulnerable?.() || !bypass_invulnerability && state?.invulnerable_remaining>0)return false;
+        // A supplied impulse is already a physical command, never reconstructed from damage here.
+        if(impulse)this.body.applyImpulse(impulse);
+        const applied=Math.min(this.hp,amount);this.hp-=applied;
+        if(state){state.seconds_since_damage=0;state.regeneration_elapsed=0;}
+        services.get(this)?.on_damage?.({player:this,amount:applied});
+        emitPlayer(this,'player:damaged',{amount:applied,health:this.hp,source});
+        if(this.dead){this.cancelMovement();emitPlayer(this,'player:died',{source});}
         return true;
+    }
+    heal(amount) {
+        nonnegative(amount,'healing');if(this.dead || amount===0)return 0;
+        const applied=Math.min(this.maxHp-this.hp,amount);this.hp+=applied;
+        if(applied)emitPlayer(this,'player:healed',{amount:applied,health:this.hp});return applied;
+    }
+    makeInvulnerable(seconds) { playerState(this).invulnerable_remaining=nonnegative(seconds,'invulnerability'); }
+    beginFlit(cost,seconds) {
+        nonnegative(cost,'Flit cost');nonnegative(seconds,'Flit duration');const state=playerState(this);
+        if(state.attunement<cost)throw new Error('Insufficient attunement');
+        state.attunement-=cost;state.flit_remaining=seconds;emitPlayer(this,'player:flitted',{attunement:state.attunement});
+    }
+    addBuff(buff_id,{duration_seconds,modifiers={}}) {
+        identifier(buff_id);nonnegative(duration_seconds,'buff duration');
+        const copy=validateModifiers(modifiers);
+        playerState(this).buffs[buff_id]={remaining:duration_seconds,modifiers:copy};
+        emitPlayer(this,'player:buff-added',{buff_id});return this;
+    }
+    getStat(stat,base) {
+        nonnegative(base,'base stat');let add=0,multiply=1;
+        for(const buff of Object.values(this.data.player_state?.buffs ?? {})) {
+            if(buff.remaining<=0)continue;
+            const modifier=buff.modifiers[stat];if(modifier){add+=modifier.add??0;multiply*=modifier.multiply??1;}
+        }
+        return Math.max(0,(base+add)*multiply);
+    }
+    advanceState(seconds,rules) {
+        nonnegative(seconds,'elapsed seconds');const state=playerState(this);
+        state.flit_remaining=state.flit_remaining<=seconds+1e-9?0:state.flit_remaining-seconds;
+        state.invulnerable_remaining=state.invulnerable_remaining<=seconds+1e-9?0:state.invulnerable_remaining-seconds;
+        for(const [buff_id,buff] of Object.entries(state.buffs)) {
+            buff.remaining=buff.remaining<=seconds+1e-9?0:buff.remaining-seconds;
+            if(buff.remaining===0){delete state.buffs[buff_id];emitPlayer(this,'player:buff-expired',{buff_id});}
+        }
+        if(this.dead)return;
+        state.attunement=Math.min(rules.flit.capacity,state.attunement+rules.flit.recharge_per_second*seconds);
+        const previous=state.seconds_since_damage;state.seconds_since_damage+=seconds;
+        const regeneration=rules.regeneration;
+        state.regeneration_elapsed+=Math.max(0,state.seconds_since_damage-Math.max(previous,regeneration.delay_seconds));
+        const intervals=Math.floor((state.regeneration_elapsed+1e-9)/regeneration.interval_seconds);
+        if(intervals){state.regeneration_elapsed=Math.max(0,state.regeneration_elapsed-intervals*regeneration.interval_seconds);this.heal(intervals*this.getStat('regeneration',regeneration.amount));}
+    }
+    resetState(rules) {
+        this.data.player_state=null;this.syncHealth(rules.max_health,rules.max_health);this.initializeState(rules);
     }
 }
 
 return Object.freeze({get Player(){return Player;}});
 })();
 // src/entities/apartment-prop.mjs
-const m39 = (()=>{
+const m41 = (()=>{
 const {gameProp} = m1;
 
 /** Furniture/fixture gameplay metadata; no local transform or integration. */
@@ -19397,7 +19537,7 @@ class ApartmentProp extends gameProp {
 return Object.freeze({get ApartmentProp(){return ApartmentProp;}});
 })();
 // src/entities/apartment-companion.mjs
-const m40 = (()=>{
+const m42 = (()=>{
 const {gameCharacter} = m1;
 const ROSTER_FIELDS = ['recruited','downed','equippedWeaponId','weaponId','hp','maxHp','teammateStims','maxTeammateStims','relationship','hireType','hireDuration','hireTime','hireCost','hired','role','bio','alliance'];
 /** Roster gameplay data plus an ordinary native character while present in this scene. */
@@ -19416,13 +19556,13 @@ function rosterRecord(entity) { return {name:entity.name,...Object.fromEntries(R
 return Object.freeze({get ROSTER_FIELDS(){return ROSTER_FIELDS;},get ApartmentCompanion(){return ApartmentCompanion;},get rosterRecord(){return rosterRecord;}});
 })();
 // src/levels/apartment.mjs
-const m34 = (()=>{
+const m35 = (()=>{
 const {physicsSystem} = m1;
-const {createApartmentAssetLibrary} = m35;
-const {resolveApartmentDefinition,resolveApartmentDyer} = m37;
-const {Player} = m38;
-const {ApartmentProp} = m39;
-const {ApartmentCompanion,rosterRecord} = m40;
+const {createApartmentAssetLibrary} = m36;
+const {resolveApartmentDefinition,resolveApartmentDyer} = m38;
+const {Player} = m39;
+const {ApartmentProp} = m41;
+const {ApartmentCompanion,rosterRecord} = m42;
 const {gameProp} = m1;
 class ApartmentDoor extends gameProp { static entity_type = 'df_apartment_door'; }
 
@@ -19477,7 +19617,7 @@ class ApartmentLevel {
 return Object.freeze({get ApartmentLevel(){return ApartmentLevel;}});
 })();
 // src/lobby/level-lobby.mjs
-const m42 = (()=>{
+const m44 = (()=>{
 // ===== LV1 LOBBY =====
 // The engine's game loop. The Lobby keeps the clock and nothing else: it knows when a frame is due,
 // how many fixed simulation steps that frame owes, and how far the drawn frame sits between two steps.
@@ -19614,7 +19754,7 @@ class levelLobby {
 return Object.freeze({get levelLobby(){return levelLobby;}});
 })();
 // src/runtime/game-level.mjs
-const m43 = (()=>{
+const m45 = (()=>{
 /** Content/lifecycle contract. A level never owns a world, clock or collision solver. */
 class gameLevel {
     constructor({ level_id } = {}) {
@@ -19634,7 +19774,7 @@ class gameLevel {
 return Object.freeze({get gameLevel(){return gameLevel;}});
 })();
 // src/basement/controls/values.mjs
-const m46 = (()=>{
+const m48 = (()=>{
 const TAP = 0;
 const DOUBLETAP = 1;
 const HELD = 2;
@@ -19658,7 +19798,7 @@ function radialStick(value, dead_zone = 0.15) {
 return Object.freeze({get TAP(){return TAP;},get DOUBLETAP(){return DOUBLETAP;},get HELD(){return HELD;},get PRESS(){return PRESS;},get REPEAT(){return REPEAT;},get RELEASE(){return RELEASE;},get cleanupAll(){return cleanupAll;},get radialStick(){return radialStick;}});
 })();
 // src/basement/controls/touch-stick.mjs
-const m48 = (()=>{
+const m50 = (()=>{
 class touchStick {
     constructor(system, name, packet) {
         Object.assign(this, { anchor: 'centre', base_radius: 0, travel: 40, scale: () => 1, edge: 0, ring: null, input: null, slots: null, mouse: false, free: () => !this.s.active, onStart() {}, onMove() {}, onEnd() {} }, packet);
@@ -19757,9 +19897,9 @@ class touchStick {
 return Object.freeze({get touchStick(){return touchStick;}});
 })();
 // src/basement/controls/devices.mjs
-const m47 = (()=>{
-const {touchStick} = m48;
-const {radialStick,cleanupAll} = m46;
+const m49 = (()=>{
+const {touchStick} = m50;
+const {radialStick,cleanupAll} = m48;
 
 /** Device state uses the terminology from the original Python input instances. */
 class inputInstance {
@@ -19878,10 +20018,10 @@ class gamepadInstance extends inputInstance {
 return Object.freeze({get inputInstance(){return inputInstance;},get keyboardInstance(){return keyboardInstance;},get mouseInstance(){return mouseInstance;},get touchInstance(){return touchInstance;},get gamepadInstance(){return gamepadInstance;}});
 })();
 // src/basement/controls/system.mjs
-const m45 = (()=>{
-const {TAP,DOUBLETAP,HELD,PRESS,REPEAT,RELEASE} = m46;
-const {radialStick,cleanupAll} = m46;
-const {keyboardInstance,mouseInstance,touchInstance,gamepadInstance} = m47;
+const m47 = (()=>{
+const {TAP,DOUBLETAP,HELD,PRESS,REPEAT,RELEASE} = m48;
+const {radialStick,cleanupAll} = m48;
+const {keyboardInstance,mouseInstance,touchInstance,gamepadInstance} = m49;
 
 class controlSystem {
     #listeners = new Set();
@@ -20119,16 +20259,16 @@ class controlSystem {
 return Object.freeze({get controlSystem(){return controlSystem;}});
 })();
 // src/basement/controls/index.mjs
-const m44 = (()=>{
+const m46 = (()=>{
 
 
 
 
 
-return Object.freeze({get controlSystem(){return m45.controlSystem;},get controlsSystem(){return m45.controlSystem;},get inputInstance(){return m47.inputInstance;},get keyboardInstance(){return m47.keyboardInstance;},get mouseInstance(){return m47.mouseInstance;},get touchInstance(){return m47.touchInstance;},get gamepadInstance(){return m47.gamepadInstance;},get touchStick(){return m48.touchStick;},get TAP(){return m46.TAP;},get DOUBLETAP(){return m46.DOUBLETAP;},get HELD(){return m46.HELD;},get PRESS(){return m46.PRESS;},get REPEAT(){return m46.REPEAT;},get RELEASE(){return m46.RELEASE;}});
+return Object.freeze({get controlSystem(){return m47.controlSystem;},get controlsSystem(){return m47.controlSystem;},get inputInstance(){return m49.inputInstance;},get keyboardInstance(){return m49.keyboardInstance;},get mouseInstance(){return m49.mouseInstance;},get touchInstance(){return m49.touchInstance;},get gamepadInstance(){return m49.gamepadInstance;},get touchStick(){return m50.touchStick;},get TAP(){return m48.TAP;},get DOUBLETAP(){return m48.DOUBLETAP;},get HELD(){return m48.HELD;},get PRESS(){return m48.PRESS;},get REPEAT(){return m48.REPEAT;},get RELEASE(){return m48.RELEASE;}});
 })();
 // src/basement/rendering/values.mjs
-const m51 = (()=>{
+const m53 = (()=>{
 function finite(value,name,min=-Infinity){if(!Number.isFinite(value)||value<min)throw new TypeError(`Invalid ${name}`);return value;}
 function vector(value,name='vector',out=[]){if(!Array.isArray(value)||value.length!==2)throw new TypeError(`Invalid ${name}`);out[0]=finite(value[0],name);out[1]=finite(value[1],name);return out;}
 function identifier(value){if(typeof value!=='string'||!value||value==='screen')throw new TypeError('A nonempty resource/renderer ID is required (screen is reserved)');return value;}
@@ -20145,8 +20285,8 @@ const BLENDS = Object.freeze({normal:'source-over',add:'lighter',multiply:'multi
 return Object.freeze({get finite(){return finite;},get vector(){return vector;},get identifier(){return identifier;},get matrix(){return matrix;},get inverse(){return inverse;},get point(){return point;},get transform(){return transform;},get viewport(){return viewport;},get freezeData(){return freezeData;},get color(){return color;},get BLENDS(){return BLENDS;}});
 })();
 // src/basement/rendering/camera.mjs
-const m50 = (()=>{
-const {finite,vector,viewport,inverse,point,freezeData} = m51;
+const m52 = (()=>{
+const {finite,vector,viewport,inverse,point,freezeData} = m53;
 
 /** View state only. Following reads native poses; this class never moves a body. */
 class cameraSystem {
@@ -20200,8 +20340,8 @@ class cameraSystem {
 return Object.freeze({get cameraSystem(){return cameraSystem;}});
 })();
 // src/basement/rendering/packets.mjs
-const m53 = (()=>{
-const {finite,vector,matrix,inverse,transform,color,identifier,BLENDS} = m51;
+const m55 = (()=>{
+const {finite,vector,matrix,inverse,transform,color,identifier,BLENDS} = m53;
 
 const geometryBuffers = new WeakMap();
 
@@ -20271,9 +20411,9 @@ function requirements(draw,resolve,result=[]){
 return Object.freeze({get geometry(){return geometry;},get material(){return material;},get packet(){return packet;},get requirements(){return requirements;}});
 })();
 // src/basement/rendering/frame.mjs
-const m52 = (()=>{
-const {packet} = m53;
-const {color,finite,freezeData} = m51;
+const m54 = (()=>{
+const {packet} = m55;
+const {color,finite,freezeData} = m53;
 
 /** Reused command buffers. Producers submit data; a backend borrows a completed frame. */
 class renderFrame {
@@ -20311,10 +20451,10 @@ class renderFrame {
 return Object.freeze({get renderFrame(){return renderFrame;}});
 })();
 // src/basement/rendering/system.mjs
-const m54 = (()=>{
-const {renderFrame} = m52;
-const {geometry,material,requirements} = m53;
-const {finite,identifier,freezeData} = m51;
+const m56 = (()=>{
+const {renderFrame} = m54;
+const {geometry,material,requirements} = m55;
+const {finite,identifier,freezeData} = m53;
 
 function normalizeResource(description){
     if(!description||typeof description!=='object')throw new TypeError('A data resource descriptor is required');
@@ -20400,8 +20540,8 @@ class renderSystem {
 return Object.freeze({get renderSystem(){return renderSystem;}});
 })();
 // src/basement/rendering/canvas.mjs
-const m55 = (()=>{
-const {BLENDS} = m51;
+const m57 = (()=>{
+const {BLENDS} = m53;
 
 function createSurface(width,height){
     if(typeof OffscreenCanvas!=='undefined')return new OffscreenCanvas(width,height);
@@ -20512,21 +20652,21 @@ class canvasRenderer {
 return Object.freeze({get canvasRenderer(){return canvasRenderer;}});
 })();
 // src/basement/rendering/index.mjs
-const m49 = (()=>{
+const m51 = (()=>{
 
 
 
 
 
-return Object.freeze({get cameraSystem(){return m50.cameraSystem;},get renderFrame(){return m52.renderFrame;},get renderSystem(){return m54.renderSystem;},get canvasRenderer(){return m55.canvasRenderer;}});
+return Object.freeze({get cameraSystem(){return m52.cameraSystem;},get renderFrame(){return m54.renderFrame;},get renderSystem(){return m56.renderSystem;},get canvasRenderer(){return m57.canvasRenderer;}});
 })();
 // src/runtime/game-engine.mjs
-const m41 = (()=>{
+const m43 = (()=>{
 const {physicsSystem,assetLibrary} = m1;
-const {levelLobby} = m42;
-const {gameLevel} = m43;
-const {controlSystem} = m44;
-const {cameraSystem,renderSystem} = m49;
+const {levelLobby} = m44;
+const {gameLevel} = m45;
+const {controlSystem} = m46;
+const {cameraSystem,renderSystem} = m51;
 
 const hooks = ['attach', 'detach', 'beforePhysics', 'afterPhysics', 'render', 'levelEntered', 'levelLeaving'];
 function synchronous(fn, receiver, args) {
@@ -20553,7 +20693,8 @@ class gameEngine {
     constructor({ asset_library = new assetLibrary(), physics = {}, controls = {}, camera = {}, clock = {}, frame_clock,
         schedule_frame = typeof requestAnimationFrame === 'function' ? callback => requestAnimationFrame(callback) : null,
         cancel_frame = typeof cancelAnimationFrame === 'function' ? handle => cancelAnimationFrame(handle) : null,
-        render_target } = {}) {
+        render_target, services = {} } = {}) {
+        if (!services || typeof services !== 'object' || Array.isArray(services) || Object.keys(services).some(key => ['physics','elements','assets','motion','traffic','controls','camera','render','__proto__','constructor','prototype'].includes(key))) throw new TypeError('Game services must not replace runtime APIs');
         if(render_target!==undefined)throw new TypeError('Mount a renderer surface through api.render.setRenderer; render hooks receive a frame');
         if (Object.hasOwn(physics, 'step_authority') || Object.hasOwn(physics, 'asset_library')) throw new TypeError('The runtime owns physics authority and its asset library');
         if (schedule_frame !== null && typeof schedule_frame !== 'function' || cancel_frame !== null && typeof cancel_frame !== 'function') throw new TypeError('Frame scheduling requires functions');
@@ -20565,7 +20706,7 @@ class gameEngine {
         this.#camera = new cameraSystem(camera);
         this.#controls = new controlSystem({ ...controls, auto_update:false });
         this.#render = new renderSystem({physics_system:this.#world,camera:this.#camera});
-        this.#api = Object.freeze({ physics: this.#world, elements: this.#world.elements, assets: asset_library,
+        this.#api = Object.freeze({ ...services, physics: this.#world, elements: this.#world.elements, assets: asset_library,
             motion: this.#world.motion, traffic: this.#world.traffic, controls:this.#controls, camera:this.#camera, render:this.#render });
         this.#schedule = schedule_frame; this.#cancel = cancel_frame;
         this.#lobby = new levelLobby(Object.freeze(config), frame_clock);
@@ -20648,7 +20789,8 @@ class gameEngine {
         return entity;
     }
     retainEntity(entity) {
-        this.#idle();
+        this.#live();
+        if(!['idle','registration'].includes(this.#phase))throw new Error('Retain entities at a runtime or registration boundary');
         if (!entity || this.api.elements.fetchEntity(entity.entity_id) !== entity) throw new Error('Retain an official entity belonging to this runtime');
         this.#persistent.add(entity); return entity;
     }
@@ -20775,7 +20917,7 @@ class gameEngine {
 return Object.freeze({get gameEngine(){return gameEngine;}});
 })();
 // src/directory/street-definitions.mjs
-const m59 = (()=>{
+const m61 = (()=>{
 /** Directory authoring only: convert immutable catalog units once, never during simulation. */
 const vehicleDefinitions = new WeakMap();
 function resolveStreetVehicle(library, { brand, model, control_mode = 'AI', color } = {}) {
@@ -20842,8 +20984,8 @@ function resolveVehicleSeats(library, { brand, model }) {
 return Object.freeze({get resolveStreetVehicle(){return resolveStreetVehicle;},get resolveVehicleSeats(){return resolveVehicleSeats;}});
 })();
 // src/traffic/traffic-vehicle.mjs
-const m58 = (()=>{
-const {resolveStreetVehicle,resolveVehicleSeats} = m59;
+const m60 = (()=>{
+const {resolveStreetVehicle,resolveVehicleSeats} = m61;
 const {gameVehicle} = m1;
 const bindings = new WeakMap();
 /** Official gameplay entity. Body state and driving calculations belong to Basement. */
@@ -20931,10 +21073,10 @@ class TrafficVehicle extends gameVehicle {
 return Object.freeze({get TrafficVehicle(){return TrafficVehicle;}});
 })();
 // src/directory/game-vehicle-factory.mjs
-const m61 = (()=>{
-const {TrafficVehicle} = m58;
+const m63 = (()=>{
+const {TrafficVehicle} = m60;
 const {pathGeometry} = m1;
-const {resolveStreetVehicle} = m59;
+const {resolveStreetVehicle} = m61;
 
 const purposes = new Set(['ambient', 'owned', 'mission', 'taxi']);
 /** Shared official creation. Population limits belong to the requesting population manager. */
@@ -20974,9 +21116,9 @@ function createGameVehicle(world, packet = {}, { hooks = {} } = {}) {
 return Object.freeze({get createGameVehicle(){return createGameVehicle;}});
 })();
 // src/traffic/traffic-manager.mjs
-const m60 = (()=>{
-const {TrafficVehicle} = m58;
-const {createGameVehicle} = m61;
+const m62 = (()=>{
+const {TrafficVehicle} = m60;
+const {createGameVehicle} = m63;
 /** Spawn, ownership and driver policy. The physics world owns every spatial/physical operation. */
 class TrafficManager {
     #pendingSpawns = new Set();
@@ -21021,7 +21163,7 @@ class TrafficManager {
 return Object.freeze({get TrafficManager(){return TrafficManager;}});
 })();
 // src/entities/pedestrians.mjs
-const m62 = (()=>{
+const m64 = (()=>{
 const {gameCharacter,gameVehicle,BODY_GROUP} = m1;
 const bindings = new WeakMap();
 /** Civilian decisions and reactions. Movement, prediction and impacts stay in Basement. */
@@ -21102,8 +21244,8 @@ class Pedestrian extends gameCharacter {
 return Object.freeze({get Pedestrian(){return Pedestrian;}});
 })();
 // src/entities/pedestrian-manager.mjs
-const m63 = (()=>{
-const {Pedestrian} = m62;
+const m65 = (()=>{
+const {Pedestrian} = m64;
 /** Population and waypoint policy only. No positions, obstacle cache or sensing grid. */
 class PedestrianManager {
     #network = new Map();
@@ -21175,11 +21317,11 @@ class PedestrianManager {
 return Object.freeze({get PedestrianManager(){return PedestrianManager;}});
 })();
 // src/directory/game-street.mjs
-const m57 = (()=>{
-const {TrafficVehicle} = m58;
-const {TrafficManager} = m60;
-const {Pedestrian} = m62;
-const {PedestrianManager} = m63;
+const m59 = (()=>{
+const {TrafficVehicle} = m60;
+const {TrafficManager} = m62;
+const {Pedestrian} = m64;
+const {PedestrianManager} = m65;
 
 
 function registerStreetEntityTypes(world) {
@@ -21199,13 +21341,14 @@ class StreetPopulation {
     clearStreet() { this.traffic.clearStreet(); this.pedestrians.clearStreet(); }
 }
 
-return Object.freeze({get TrafficVehicle(){return TrafficVehicle;},get TrafficManager(){return TrafficManager;},get Pedestrian(){return Pedestrian;},get PedestrianManager(){return PedestrianManager;},get createGameVehicle(){return m61.createGameVehicle;},get registerStreetEntityTypes(){return registerStreetEntityTypes;},get StreetPopulation(){return StreetPopulation;}});
+return Object.freeze({get TrafficVehicle(){return TrafficVehicle;},get TrafficManager(){return TrafficManager;},get Pedestrian(){return Pedestrian;},get PedestrianManager(){return PedestrianManager;},get createGameVehicle(){return m63.createGameVehicle;},get registerStreetEntityTypes(){return registerStreetEntityTypes;},get StreetPopulation(){return StreetPopulation;}});
 })();
-const m64 = Object.freeze({default:{
+const m66 = Object.freeze({default:{
   "keymap": {
     "move_up":["w","ArrowUp"],"move_down":["s","ArrowDown"],"move_left":["a","ArrowLeft"],"move_right":["d","ArrowRight"],
     "fire":["mouseLeft","space","gamepadRTrigger","touchFire"],
-    "interact":["e","gamepadA","touchInteract"],"flit":["gamepadB","touchFlit"],
+    "interact":["e","gamepadA","touchInteract"],"flit":["Shift","gamepadB","touchFlit"],
+    "sneak":["c","gamepadLStickButton","touchSneak"],
     "pause":["Escape","gamepadStart","touchPause"],"back":["Escape","gamepadB","touchBack"]
   },
   "vectors": {
@@ -21213,27 +21356,206 @@ const m64 = Object.freeze({default:{
     "aim":{"gamepad":"right","touch":"aim","dead_zone":0.15}
   }
 }});
+// src/gameplay/game-session.mjs
+const m67 = (()=>{
+const {identifier,jsonCopy,nonnegative} = m40;
+
+const recordNames = ['inventory', 'equipment', 'quests', 'roster', 'progression'];
+
+/** Persistent game records and a reference to the official player, never a body or health mirror. */
+class gameSession {
+    #state; #context = null; #listeners = new Map(); #playerPacket;
+    constructor({ player, state } = {}) {
+        this.#playerPacket = jsonCopy(player ?? {template:'df:player_949', entity_type:'df_player'});
+        this.#state = this.#validate(state ?? {format_version:1, player_entity_id:null, currency:0, inventory:{}, equipment:{}, quests:{}, roster:{}, progression:{}});
+    }
+    #validate(state) {
+        const copy = jsonCopy(state);
+        if (copy.format_version !== 1 || Object.keys(copy).some(key => !['format_version','player_entity_id','currency',...recordNames].includes(key))) throw new TypeError('Unsupported session snapshot');
+        if (copy.player_entity_id !== null && (!Number.isSafeInteger(copy.player_entity_id) || copy.player_entity_id < 1)) throw new TypeError('Invalid player entity ID');
+        nonnegative(copy.currency, 'currency');
+        for (const name of recordNames) if (!copy[name] || Array.isArray(copy[name]) || typeof copy[name] !== 'object') throw new TypeError(`Invalid session record: ${name}`);
+        for (const count of Object.values(copy.inventory)) if (!Number.isSafeInteger(count) || count < 0) throw new TypeError('Inventory counts must be nonnegative safe integers');
+        return copy;
+    }
+    get player_entity_id() { return this.#state.player_entity_id; }
+    get player() { return this.#context?.api.elements.fetchEntity(this.player_entity_id) ?? null; }
+    get currency() { return this.#state.currency; }
+    attach(context) {
+        if (this.#context) throw new Error('Session is already attached');
+        if (this.player_entity_id !== null) {
+            const existing = context.api.elements.fetchEntity(this.player_entity_id);
+            if (!existing || existing.entity_type !== 'df_player' || existing.destroyed) throw new Error('Session player must resolve to an official live Player');
+            context.engine.retainEntity(existing);
+        } else {
+            const player = context.createEntity(this.#playerPacket, {lifetime:'session'});
+            if (player.entity_type !== 'df_player') { player.destroy(); throw new TypeError('Session requires a Player entity'); }
+            this.#state.player_entity_id = player.entity_id;
+        }
+        this.#context = context;
+    }
+    detach() { this.#context = null; this.#listeners.clear(); }
+    snapshot() { return jsonCopy(this.#state); }
+    getRecord(collection, key) { this.#collection(collection); identifier(key); const value=this.#state[collection][key]; return value === undefined ? undefined : jsonCopy(value); }
+    setRecord(collection, key, value) {
+        this.#collection(collection); identifier(key);
+        if (collection === 'inventory') throw new TypeError('Use addItem to change inventory counts');
+        const copy = jsonCopy(value); this.#state[collection][key] = copy;
+        this.emit('session:changed', {collection, key}); return this;
+    }
+    #collection(name) { if (!recordNames.includes(name)) throw new TypeError(`Unknown session collection: ${name}`); }
+    addItem(item_id, count = 1) {
+        identifier(item_id);
+        const total=(this.#state.inventory[item_id] ?? 0)+count;
+        if (!Number.isSafeInteger(count) || !Number.isSafeInteger(total) || total < 0) throw new TypeError('Inventory change must leave a nonnegative safe integer count');
+        this.#state.inventory[item_id]=total; this.emit('session:changed',{collection:'inventory',key:item_id}); return total;
+    }
+    changeCurrency(amount) {
+        if (!Number.isFinite(amount)) throw new TypeError('Currency change must be finite');
+        const total=nonnegative(this.currency+amount,'currency'); this.#state.currency=total;
+        this.emit('session:changed',{collection:'currency'}); return total;
+    }
+    on(event, listener) {
+        identifier(event); if (typeof listener !== 'function') throw new TypeError('Listener must be a function');
+        const listeners=this.#listeners.get(event) ?? new Set(); this.#listeners.set(event,listeners); listeners.add(listener);
+        return () => { listeners.delete(listener); if(!listeners.size)this.#listeners.delete(event); };
+    }
+    emit(event, detail = {}) {
+        identifier(event); const packet=Object.freeze({...jsonCopy(detail),event});
+        for (const listener of [...(this.#listeners.get(event) ?? [])]) listener(packet);
+    }
+}
+
+return Object.freeze({get gameSession(){return gameSession;}});
+})();
+// src/gameplay/player-state-system.mjs
+const m68 = (()=>{
+const {nonnegative,jsonCopy} = m40;
+
+/** Game rules only. The native entity/body remains the sole owner of physical state. */
+class PlayerStateSystem {
+    #session; #rules; #context = null;
+    constructor({ session, rules }) {
+        this.#session=session; this.#rules=jsonCopy(rules);
+        for(const key of ['max_health','movement_speed','sneak_speed_factor'])nonnegative(this.#rules[key],key);
+        if(this.#rules.max_health===0)throw new TypeError('max_health must be positive');
+        for(const key of ['delay_seconds','interval_seconds','amount'])nonnegative(this.#rules.regeneration?.[key],key);
+        for(const key of ['capacity','cost','recharge_per_second','distance','invulnerability_seconds','minimum_distance'])nonnegative(this.#rules.flit?.[key],key);
+        if(!(this.#rules.regeneration.interval_seconds>0))throw new TypeError('Regeneration interval must be positive');
+    }
+    get player() { return this.#session.player; }
+    attach(context) {
+        const player=this.player;
+        if(!player)throw new Error('Attach the session before player state');
+        player.initializeState(this.#rules);
+        this.#context=context;
+        player.connectGameplay({emit:(event,detail)=>this.#session.emit(event,detail)});
+        context.defer(()=>{this.#context=null;player.disconnectGameplay();});
+    }
+    beforePhysics(context, seconds) { this.player?.advanceState(seconds, this.#rules); }
+    get movement_speed() { return this.player.getStat('speed',this.#rules.movement_speed) * (this.player.sneaking ? this.#rules.sneak_speed_factor : 1); }
+    #actionBoundary() {
+        if(!this.#context)throw new Error('Player state is not attached');
+        if(!['idle','beforePhysics','afterPhysics'].includes(this.#context.engine.phase))throw new Error('Request abilities at a gameplay boundary, outside physics callbacks and rendering');
+        return !this.#context.engine.paused && !!this.#context.engine.active_level;
+    }
+    tryFlit({ direction, placement_bounds } = {}) {
+        if(!this.#actionBoundary())return false;
+        const player=this.player, rules=this.#rules.flit;
+        if (!player || player.dead || player.isHidden || player.flitting || player.physics_system.getAttachmentState(player.body)) return false;
+        const cost=player.getStat('flitCooldown',rules.cost);
+        if(player.attunement < cost)return false;
+        // Placement, direction normalization and collision queries are entirely Basement's job.
+        const landed=player.teleportInDirection(direction,{distance:player.getStat('flitDistance',rules.distance),placement_mode:'clear',min_distance:rules.minimum_distance,...(placement_bounds ? {placement_bounds} : {})});
+        if(!landed)return false;
+        player.beginFlit(cost,rules.invulnerability_seconds);
+        return true;
+    }
+    respawn({position, ...placement} = {}) {
+        if(!this.#actionBoundary())return false;
+        const player=this.player;
+        if(!player || !player.dead) return false;
+        if(player.physics_system.getAttachmentState(player.body))return false;
+        if(!player.teleportTo(position,{...placement,placement_mode:'clear'}))return false;
+        player.resetState(this.#rules);
+        this.#session.emit('player:respawned',{entity_id:player.entity_id});return true;
+    }
+}
+
+return Object.freeze({get PlayerStateSystem(){return PlayerStateSystem;}});
+})();
+// src/gameplay/player-control-system.mjs
+const m69 = (()=>{
+/** Turns input terminology into native motor requests and gameplay intents. No physical math. */
+class PlayerControlSystem {
+    #session; #state; #blocked = new Set(); #placement; #context = null;
+    constructor({session, player_state, placement_bounds} = {}) { this.#session=session; this.#state=player_state; this.#placement=placement_bounds; }
+    attach(context) { this.#context=context; }
+    block(reason) {
+        if(typeof reason!=='string'||!reason)throw new TypeError('Control block requires a reason');
+        if(!this.#context)throw new Error('Player controls are not attached');
+        this.#context.api.controls.clear();
+        const token=Symbol(reason);this.#blocked.add(token);
+        this.#session.player?.cancelMovement();
+        return ()=>{const released=this.#blocked.delete(token);if(released&&this.#context&&!this.#blocked.size)this.#context.api.controls.clear();return released;};
+    }
+    beforePhysics(context) {
+        const player=this.#session.player, input=context.api.controls;
+        if(!player)return;
+        if(player.dead || player.isHidden || this.#blocked.size || context.api.physics.getAttachmentState(player.body)) {player.cancelMovement();return;}
+        if(input.justActivated('sneak'))player.sneaking=!player.sneaking;
+        const aim=input.direction('aim');
+        let facing=false;
+        if(aim[0] || aim[1]) {player.lookInDirection(aim);facing=true;}
+        else if(input.active_device==='mouse' && input.pointer().known) {
+            const bounds=context.api.render.getSurfaceBounds();
+            if(bounds) {player.lookAtTarget(context.api.camera.clientToWorld(input.pointer().position,bounds));facing=true;}
+        }
+        if(!facing)player.clearFacing();
+        player.setMovement(input.direction('move'),{speed:this.#state.movement_speed,face_movement:!facing});
+        if(input.justActivated('flit'))this.#state.tryFlit({placement_bounds:this.#placement?.(context)});
+        for(const action of ['fire','interact'])if(action==='fire'?input.active(action):input.justActivated(action))this.#session.emit(`player:${action}`,{entity_id:player.entity_id});
+    }
+    levelLeaving(context) { this.#session.player?.cancelMovement(); context.api.controls.clear(); }
+    detach() { this.#context=null;this.#blocked.clear();this.#session.player?.cancelMovement(); }
+}
+
+return Object.freeze({get PlayerControlSystem(){return PlayerControlSystem;}});
+})();
 // src/directory/game-runtime.mjs
-const m56 = (()=>{
-const {gameEngine} = m41;
-const {createApartmentAssetLibrary} = m35;
-const {Player} = m38;
-const {ApartmentProp} = m39;
-const {ApartmentCompanion} = m40;
-const {registerStreetEntityTypes} = m57;
-const controlProfile = m64.default;
-const {canvasRenderer} = m49;
+const m58 = (()=>{
+const {gameEngine} = m43;
+const {createApartmentAssetLibrary} = m36;
+const {Player} = m39;
+const {ApartmentProp} = m41;
+const {ApartmentCompanion} = m42;
+const {registerStreetEntityTypes} = m59;
+const controlProfile = m66.default;
+const {gameSession} = m67;
+const {PlayerStateSystem} = m68;
+const {PlayerControlSystem} = m69;
+const playerRules = m27.default;
+const {canvasRenderer} = m51;
 
 /** Explicit game composition. Importing this file never starts a second runtime. */
-function createGameRuntime({ game_db, surface, ...options } = {}) {
-    const engine = new gameEngine({ ...options, controls:{...controlProfile,...(surface?.addEventListener?{mouse_target:surface}:{}),...options.controls}, asset_library: createApartmentAssetLibrary({ game_db }) });
+function createGameRuntime({ game_db, surface, session_state, player, ...options } = {}) {
+    const session=new gameSession({state:session_state,player});
+    const player_state=new PlayerStateSystem({session,rules:playerRules});
+    const player_controls=new PlayerControlSystem({session,player_state,placement_bounds:context=>context.engine.active_level?.player_placement_bounds});
+    if(options.services && ['session','player_state','player_controls'].some(key=>Object.hasOwn(options.services,key)))throw new TypeError('Directory owns player services');
+    const engine = new gameEngine({ ...options, services:{...options.services,session,player_state,player_controls}, controls:{...controlProfile,...(surface?.addEventListener?{mouse_target:surface}:{}),...options.controls}, asset_library: createApartmentAssetLibrary({ game_db }) });
     engine.api.render.registerRenderer('canvas',canvasRenderer);
     engine.registerSystem('surface-input',{
         attach(context){context.defer(context.api.render.onSurfaceChanged(({surface})=>context.api.controls.setMouseTarget(options.controls?.mouse_target??surface)));}
     });
     for (const Class of [Player, ApartmentProp, ApartmentCompanion]) engine.api.elements.registerEntityType(Class.entity_type, Class);
     registerStreetEntityTypes(engine.api.physics);
-    return engine;
+    try {
+        engine.registerSystem('session',session);
+        engine.registerSystem('player-state',player_state);
+        engine.registerSystem('player-controls',player_controls);
+        return engine;
+    } catch(error) { engine.dispose();throw error; }
 }
 
 return Object.freeze({get createGameRuntime(){return createGameRuntime;}});
@@ -21252,7 +21574,12 @@ const m0 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get assetLibrary(){return m1.assetLibrary;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get createGameAssetLibrary(){return m26.createGameAssetLibrary;},get ApartmentLevel(){return m34.ApartmentLevel;},get APARTMENT_RULES(){return m35.APARTMENT_RULES;},get gameEngine(){return m41.gameEngine;},get gameLevel(){return m43.gameLevel;},get levelLobby(){return m42.levelLobby;},get createGameRuntime(){return m56.createGameRuntime;},get controlSystem(){return m44.controlSystem;},get controlsSystem(){return m44.controlsSystem;},get inputInstance(){return m44.inputInstance;},get keyboardInstance(){return m44.keyboardInstance;},get mouseInstance(){return m44.mouseInstance;},get touchInstance(){return m44.touchInstance;},get touchStick(){return m44.touchStick;},get gamepadInstance(){return m44.gamepadInstance;},get TAP(){return m44.TAP;},get DOUBLETAP(){return m44.DOUBLETAP;},get HELD(){return m44.HELD;},get PRESS(){return m44.PRESS;},get REPEAT(){return m44.REPEAT;},get RELEASE(){return m44.RELEASE;},get renderSystem(){return m49.renderSystem;},get renderFrame(){return m49.renderFrame;},get canvasRenderer(){return m49.canvasRenderer;},get cameraSystem(){return m49.cameraSystem;}});
+
+
+
+
+
+return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get assetLibrary(){return m1.assetLibrary;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get createGameAssetLibrary(){return m26.createGameAssetLibrary;},get ApartmentLevel(){return m35.ApartmentLevel;},get APARTMENT_RULES(){return m36.APARTMENT_RULES;},get gameEngine(){return m43.gameEngine;},get gameLevel(){return m45.gameLevel;},get levelLobby(){return m44.levelLobby;},get createGameRuntime(){return m58.createGameRuntime;},get controlSystem(){return m46.controlSystem;},get controlsSystem(){return m46.controlsSystem;},get inputInstance(){return m46.inputInstance;},get keyboardInstance(){return m46.keyboardInstance;},get mouseInstance(){return m46.mouseInstance;},get touchInstance(){return m46.touchInstance;},get touchStick(){return m46.touchStick;},get gamepadInstance(){return m46.gamepadInstance;},get TAP(){return m46.TAP;},get DOUBLETAP(){return m46.DOUBLETAP;},get HELD(){return m46.HELD;},get PRESS(){return m46.PRESS;},get REPEAT(){return m46.REPEAT;},get RELEASE(){return m46.RELEASE;},get renderSystem(){return m51.renderSystem;},get renderFrame(){return m51.renderFrame;},get canvasRenderer(){return m51.canvasRenderer;},get cameraSystem(){return m51.cameraSystem;},get gameSession(){return m67.gameSession;},get PlayerStateSystem(){return m68.PlayerStateSystem;},get PlayerControlSystem(){return m69.PlayerControlSystem;},get Player(){return m39.Player;}});
 })();
 return m0;
 })();
@@ -106763,7 +107090,7 @@ class ApartmentRenderer {
     }
 }
     </script>
-    <script type="text/dfab" data-src="engine/apartment-level.js" data-cost="101">
+    <script type="text/dfab" data-src="engine/apartment-level.js" data-cost="103">
 // Native apartment host: scene lifecycle and game policy, separate from Basement simulation.
 const APARTMENT_ROSTER_FIELDS=['recruited','downed','equippedWeaponId','weaponId','hp','maxHp','teammateStims','maxTeammateStims','relationship','hireType','hireDuration','hireTime','hireCost','hired','role','bio','alliance'];
 const apartmentRosterRecord=t=>({name:t.name,...Object.fromEntries(APARTMENT_ROSTER_FIELDS.map(k=>[k,t[k]??null]))});
@@ -106792,7 +107119,7 @@ engineMixin({
         this.activeLevel=candidate;
         this._pendingApartmentRoster=null;this.physics_system=this.activeLevel.physics;
         this._pendingApartmentState=null;
-        this.player=this.activeLevel.player;this.player.connectGameplay({game:this,buff_system:buffs});this.player.syncHealth(this.playerHealth,this.maxPlayerHealth);
+        this.player=this.activeLevel.player;this.player.connectGameplay({buff_system:buffs,is_invulnerable:()=>!!this.flitState?.active,on_damage:({player})=>{this.playerHealth=player.hp;this.lastHurtAt=this.physics_system.simulation_tick*this.physics_system.config.fixed_step;}});this.player.syncHealth(this.playerHealth,this.maxPlayerHealth);
         this.projectiles=this.activeLevel.projectiles;this.props=this.activeLevel.props;this.lamps=this.activeLevel.lamps;this.teammates=this.activeLevel.companions;
         this.activeMap={...this.activeLevel.definition.map,props:this.props,npcs:[],lamps:this.lamps,buildings:[],foliage:[],softLights:this.activeLevel.definition.soft_lights};
         this.roomSystem=new ApartmentRooms(this.activeLevel,this);this.furniture=new FurnitureSystem(this);this.apartmentRenderer=new ApartmentRenderer(this);

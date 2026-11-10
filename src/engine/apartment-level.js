@@ -26,7 +26,7 @@ engineMixin({
         this.activeLevel=candidate;
         this._pendingApartmentRoster=null;this.physics_system=this.activeLevel.physics;
         this._pendingApartmentState=null;
-        this.player=this.activeLevel.player;this.player.connectGameplay({game:this,buff_system:buffs});this.player.syncHealth(this.playerHealth,this.maxPlayerHealth);
+        this.player=this.activeLevel.player;this.player.connectGameplay({buff_system:buffs,is_invulnerable:()=>!!this.flitState?.active,on_damage:({player})=>{this.playerHealth=player.hp;this.lastHurtAt=this.physics_system.simulation_tick*this.physics_system.config.fixed_step;}});this.player.syncHealth(this.playerHealth,this.maxPlayerHealth);
         this.projectiles=this.activeLevel.projectiles;this.props=this.activeLevel.props;this.lamps=this.activeLevel.lamps;this.teammates=this.activeLevel.companions;
         this.activeMap={...this.activeLevel.definition.map,props:this.props,npcs:[],lamps:this.lamps,buildings:[],foliage:[],softLights:this.activeLevel.definition.soft_lights};
         this.roomSystem=new ApartmentRooms(this.activeLevel,this);this.furniture=new FurnitureSystem(this);this.apartmentRenderer=new ApartmentRenderer(this);

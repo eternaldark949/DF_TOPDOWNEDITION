@@ -430,8 +430,9 @@ export class physicsSystem {
     findNearbyPlacement(body,options){return this.#queries.findNearbyPlacement(body,options);}
     findDirectionalPlacement(body, {direction,angle,distance,...options}){
         const r=this._record(referenceBody(body));number(distance,'distance',0);if(angle!==undefined)number(angle,'angle');
-        const heading=direction??[Math.cos(angle??r.rotation),Math.sin(angle??r.rotation)];
-        return this.findClearPlacement({...options,body,from:r.position,to:add(r.position,scale(unit(vector(heading)),distance))});
+        const heading=vector(direction??[Math.cos(angle??r.rotation),Math.sin(angle??r.rotation)]);
+        if(length(heading)<=EPS)return null;
+        return this.findClearPlacement({...options,body,from:r.position,to:add(r.position,scale(unit(heading),distance))});
     }
     getBodyGrip(body, options) { const r = this._record(referenceBody(body)); return layoutGeometry.boxGrip(r.shape, pose(r), options); }
     getMassProperties(body) {

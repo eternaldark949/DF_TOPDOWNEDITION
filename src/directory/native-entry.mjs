@@ -9,3 +9,8 @@ export { levelLobby } from '../lobby/level-lobby.mjs';
 export { createGameRuntime } from './game-runtime.mjs';
 export { controlSystem, controlsSystem, inputInstance, keyboardInstance, mouseInstance, touchInstance, touchStick, gamepadInstance, TAP, DOUBLETAP, HELD, PRESS, REPEAT, RELEASE } from '../basement/controls/index.mjs';
 export { renderSystem, renderFrame, canvasRenderer, cameraSystem } from '../basement/rendering/index.mjs';
+
+export { gameSession } from '../gameplay/game-session.mjs';
+export { PlayerStateSystem } from '../gameplay/player-state-system.mjs';
+export { PlayerControlSystem } from '../gameplay/player-control-system.mjs';
+export { Player } from '../entities/player.mjs';

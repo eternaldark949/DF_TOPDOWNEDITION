@@ -2,7 +2,7 @@
 
 `gameEngine` is the destination application coordinator. It owns one Basement world, the public API references, the shared Lobby clock, a level registry and explicit system instances. It contains no game collision math, private spatial index, old GameEngine delegate, or prototype mixins.
 
-The classic playable boot still constructs `GameEngine`. Loading the new class into `DFNative` does not construct another world or silently route old classes through it. The class conversions come next. The existing `ApartmentLevel` is the earlier scene-owned integration; it is not yet a `gameLevel` subclass and must relinquish its world/step when converted.
+The classic playable boot still constructs `GameEngine`. Loading the new class into `DFNative` does not construct another world or silently route old classes through it. The first shared session/player/control conversion is installed by Directory; other production class conversions remain pending. The existing `ApartmentLevel` is the earlier scene-owned integration; it is not yet a `gameLevel` subclass and must relinquish its world/step when converted.
 
 ## Ownership decisions
 
@@ -31,13 +31,14 @@ new gameEngine({
     frame_clock,         // Optional existing clock observer
     schedule_frame,      // Defaults to browser requestAnimationFrame, or null headlessly
     cancel_frame,
+    services: {},        // Explicit game service references; cannot shadow Basement APIs
     camera: {}           // Camera position/zoom/rotation/viewport/bounds
 });
 ```
 
 | Member | Contract |
 |---|---|
-| `api` | Frozen service-reference object: `physics`, `elements`, `assets`, `motion`, `traffic`, `controls`, `render`, `camera`. |
+| `api` | Frozen service-reference object: `physics`, `elements`, `assets`, `motion`, `traffic`, `controls`, `render`, `camera`, plus explicitly supplied game services. |
 | `physics_system`, `lobby` | Canonical owned world and Lobby; no writable replacement setters. |
 | `active_level`, `running`, `loading`, `paused`, `pause_reasons`, `phase`, `destroyed` | Lifecycle observations. |
 | `registerLevel(level_id, LevelClass)` | Register a `gameLevel` subclass. Duplicate IDs reject. |
@@ -126,3 +127,11 @@ Directory composition supplies `game-control-profile.json`. The runtime example 
 Directory composition registers the Canvas backend; mounting is explicit: `await api.render.setRenderer('canvas',{surface})`. The previous `render_target` runtime option is rejected with migration guidance. The Directory factory accepts `surface` for initial input binding, and its `surface-input` system retargets controls after successful backend replacement. Use `api.render.resize` for logical viewport/DPR changes. Only the backend obtains contexts.
 
 The regular runtime example now draws by packets. `examples/rendering.html` exercises paths, gradients, clipping, images, text, shadows and offscreen composition from Directory data. WebGL is an intended backend, not an implementation supplied here. The classic Canvas artists and the original playable boot remain pending shared class conversions.
+
+## Shared session and player composition
+
+Directory's `createGameRuntime({player?, session_state?, ...runtimeOptions})` now installs the official `gameSession`, `PlayerStateSystem` and `PlayerControlSystem`, available at `api.session`, `api.player_state` and `api.player_controls`. Obtain the persistent native player with `api.session.player`; callers no longer need a temporary input system or per-level player factory. `player` supplies a new session's entity packet. `session_state` supplies validated domain records; a saved entity ID must already resolve in the official registry and cannot silently create a replacement. The bare `gameEngine` remains game independent and creates no default player.
+
+The shared classes own gameplay state/rules and issue Basement motor/placement requests. Directory owns their tuning and composition. See the [gameplay API reference](../gameplay/README.md) for ownership, methods, events, examples, restoration and exact migration limits. Existing production weapons, progression policies, story/death flow and classic save coordination remain pending.
+
+`retainEntity(entity)` also accepts a system-registration boundary so an attaching session can retain an actual restored native body. This does not create another registry or physical owner. Full runtime save/load remains a separate conversion; loading a raw world snapshot beneath already attached systems is not the supported reconnection sequence.

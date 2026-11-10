@@ -2,7 +2,8 @@
   "keymap": {
     "move_up":["w","ArrowUp"],"move_down":["s","ArrowDown"],"move_left":["a","ArrowLeft"],"move_right":["d","ArrowRight"],
     "fire":["mouseLeft","space","gamepadRTrigger","touchFire"],
-    "interact":["e","gamepadA","touchInteract"],"flit":["gamepadB","touchFlit"],
+    "interact":["e","gamepadA","touchInteract"],"flit":["Shift","gamepadB","touchFlit"],
+    "sneak":["c","gamepadLStickButton","touchSneak"],
     "pause":["Escape","gamepadStart","touchPause"],"back":["Escape","gamepadB","touchBack"]
   },
   "vectors": {

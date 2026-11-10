@@ -19,9 +19,11 @@ try:
   page.wait_for_function('!!globalThis.runtimeExample?.engine.active_level')
   page.keyboard.down('d');page.wait_for_function('runtimeExample.engine.api.controls.active("move")');
   keyboard=page.evaluate('runtimeExample.engine.api.controls.direction("move")');page.keyboard.up('d');assert keyboard==[1,0],keyboard
+  page.evaluate('''() => {globalThis.fireIntents=0;runtimeExample.engine.api.session.on('player:fire',()=>fireIntents++);}''')
   canvas=page.locator('#scene').bounding_box();page.mouse.move(canvas['x']+30,canvas['y']+30);page.mouse.down()
   assert page.evaluate('runtimeExample.engine.api.controls.active("fire")')
   assert page.evaluate('runtimeExample.engine.api.controls.pointer().known')
+  page.wait_for_function('fireIntents>0')
   page.mouse.up();assert not page.evaluate('runtimeExample.engine.api.controls.active("fire")')
   page.evaluate('''() => {const c=runtimeExample.engine.api.controls;c.bind('tap_fire',['touchFire',0]);}''')
   cdp=page.context.new_cdp_session(page)

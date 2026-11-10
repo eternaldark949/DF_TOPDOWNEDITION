@@ -120,6 +120,8 @@ export class physicsQueries {
         const body = packet.body ? this.world._record(referenceBody(packet.body)) : null;
         const shape = new collisionShape(packet.collision_shape ?? body?.config.collision_shape);
         const rotation = number(packet.rotation ?? body?.rotation ?? 0, 'rotation'), delta = sub(to, from), distance = length(delta);
+        const minDistance = number(packet.min_distance ?? 0, 'min_distance', 0);
+        if(distance < minDistance)return null;
         const options = { ...packet, include_ghosts: packet.include_ghosts ?? false, query_body: body?.handle, ignore_body: packet.ignore_body ?? body?.handle };
         if (this.isPlacementClear(body?.handle ?? shape.packet, to, options)) return Object.assign(result, { position: to, fraction: 1, distance });
         if (distance <= EPS) return null;
@@ -162,7 +164,7 @@ export class physicsQueries {
             const [lo, hi] = merged[i];
             if (fraction >= lo - EPS && fraction <= hi + EPS) fraction = lo - skin / distance;
         }
-        if (fraction < 0) return null;
+        if (fraction < 0 || distance * fraction < minDistance) return null;
         const position = add(from, scale(delta, fraction));
         if (!this.isPlacementClear(body?.handle ?? shape.packet, position, options)) return null;
         return Object.assign(result, { position, fraction, distance: distance * fraction });

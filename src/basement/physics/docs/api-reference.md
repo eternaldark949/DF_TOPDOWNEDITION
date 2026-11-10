@@ -134,7 +134,7 @@ Filter options: `include_groups=ALL`, `exclude_groups=0`, `query_bit=ALL`, `igno
 | `shapeCast({collision_shape,from,to,from_rotation=0,to_rotation=from_rotation,...filters}, results=[])` | Contacts with `fraction`, `distance`, `normal`, `world_point`, `penetration_depth`, `body`, `body_id`. |
 | `overlapShape({collision_shape,position,rotation=0,...filters}, results=[])` | Exact overlap contacts. |
 | `isPlacementClear(body_or_shape, position, options={})` | Boolean. Touching counts as occupied within tolerance. |
-| `findClearPlacement({body OR collision_shape,from?,to,max_attempts=64,...filters}, result={})` | Endpoint-first bounded search; `{position,fraction,distance}` or `null`. Can cross solids, always validates returned endpoint. |
+| `findClearPlacement({body OR collision_shape,from?,to,min_distance=0,max_attempts=64,...filters}, result={})` | Endpoint-first bounded search; `{position,fraction,distance}` or `null`. Can cross solids, always validates returned endpoint. |
 | `findPath({body OR collision_shape,from?,to,node_spacing?,max_nodes=2048,search_margin?,search_bounds?,...filters}, result={})` | `{points,visited_nodes}` or `null`. Bounded A* routing nodes query the same index for every edge. |
 | `getPathClearance({body OR collision_shape,from,to,...filters}, result={})` | `{clear,distance,fraction,hit}`. |
 | `predictCollision({body_a,body_b,seconds=1}, result={})` | Geometric constant-velocity prediction or `null`, including `seconds` to impact. This does not forecast future AI decisions. |
@@ -282,7 +282,7 @@ Bodies must be nonstatic. Scripts suspend the normal motor/force integration whi
 
 ## Flit clearance
 
-`findClearPlacement` now unions occupied intervals from shared-index candidates, decomposing compound shapes into convex pieces and sweeping in both directions. It returns the furthest clear endpoint along a constant-orientation translation, with a numerical `clearance` skin (default 0.0001 units), or null. It can cross walls as a teleport; endpoint occupancy is checked again before returning. `max_attempts`, when supplied, is validated for compatibility but no longer controls a fixed sample scan. This operation does not search through rotating placements. Sweep convergence limits still apply.
+`findClearPlacement` now unions occupied intervals from shared-index candidates, decomposing compound shapes into convex pieces and sweeping in both directions. It returns the furthest clear endpoint along a constant-orientation translation, with a numerical `clearance` skin (default 0.0001 units), or null. It can cross walls as a teleport; endpoint occupancy is checked again before returning. `min_distance` (default 0, finite and nonnegative) rejects destinations and clipped landings shorter than the requested minimum, inside the engine. `max_attempts`, when supplied, is validated for compatibility but no longer controls a fixed sample scan. This operation does not search through rotating placements. Sweep convergence limits still apply.
 
 
 ## Street-consumer additions
@@ -343,7 +343,7 @@ Characters can opt into torque-limited facing with `movement:{physical_turning:t
 
 `layoutGeometry.cutWallOpenings(walls,openings,{margin=2})` compiles authored `{x,y,w,h}` wall rectangles into segments around openings, without mutating the definitions. This is a level-construction operation, not a runtime obstacle index. `layoutGeometry.boxGrip(shape,pose,{near,side?,direction?,gap=0})` returns a box face's `{side,position,local_position,rotation,distance}`; sides 0–3 are +x,+y,-x,-y. A world-space direction can select the face. `getBodyGrip(body,options)` evaluates this geometry using the canonical body's current shape/pose. `distance` is distance from `near` to the box surface.
 
-Character `lookInDirection(direction,options={})` requests facing through the motor. `teleportInDirection(direction,{distance,angle?,...placement_options})` computes a directional destination and uses the existing checked teleport pipeline. Undefined direction uses `angle` when supplied, otherwise the body's current rotation. These commands are also exposed by `gameCharacter`.
+Character `lookInDirection(direction,options={})` requests facing through the motor. `teleportInDirection(direction,{distance,angle?,...placement_options})` computes a directional destination and uses the existing checked teleport pipeline. Undefined direction uses `angle` when supplied, otherwise the body's current rotation. An explicitly supplied zero heading returns null rather than choosing a fallback direction; `findDirectionalPlacement` follows the same rule. These commands are also exposed by `gameCharacter`.
 
 Motion `rotateBodyBy(body,{angle,duration=0.2,easing='smooth'})` requests a relative rotation through the ordinary scripted-motion/CCD pipeline. Obstructions may stop the motion short; it does not promise a successful full turn.
 

@@ -109,9 +109,9 @@ test('one scheduled loop survives stop/restart without stale callbacks stealing 
 
 test('Directory composition installs real native types without booting legacy game code',async()=>{
  const e=createGameRuntime({schedule_frame:null});e.registerLevel('room',Room);await e.loadLevel('room');
- const player=e.createEntity({template:'df:player_949',entity_type:'df_player'},{lifetime:'session'});
+ const player=e.api.session.player;
  assert.equal(player.physics_system,e.api.physics);assert.ok(e.api.elements.listEntityTypes().includes('df_traffic_vehicle'));assert.throws(()=>{player.x=5;},/engine requests/);
- e.start();player.setMovement([1,0]);e.updateState();assert.ok(player.position[0]>0);e.dispose();
+ e.start();e.api.controls.setInput('keyboard','d',true);e.updateState();assert.ok(player.position[0]>0);e.dispose();
 });
 
 test('runtime composition contains no mixins, legacy fallbacks, local collision solver or second index',()=>{
