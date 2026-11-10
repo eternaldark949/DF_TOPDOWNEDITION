@@ -5,7 +5,7 @@ engineMixin({
     get playerPosition(){return this.player?.physics_system?this.player.position:[this.player?.x??0,this.player?.y??0];},
     get playerRotation(){return this.player?.physics_system?this.player.rotation:this.player?.angle??0;},
     _enterApartment(spawnAt){
-        const roster=this._pendingApartmentRoster??this.teammates.map(apartmentRosterRecord),buffs=this.player.buffSystem;
+        const roster=this._pendingApartmentRoster??this.teammates.map(apartmentRosterRecord),buffs=this.player.buffSystem,vitals=this.player.vitals.snapshot();
         const spawn=spawnAt&&Number.isFinite(spawnAt.x)?[spawnAt.x,spawnAt.y]:undefined;
         // Prepare/validate an unstepped replacement before retiring the live scene.
         const candidate=new DFNative.ApartmentLevel({game_db:GAME_DB,spawn,layout:this.questState.aptLayout??{},roster});
@@ -26,7 +26,8 @@ engineMixin({
         this.activeLevel=candidate;
         this._pendingApartmentRoster=null;this.physics_system=this.activeLevel.physics;
         this._pendingApartmentState=null;
-        this.player=this.activeLevel.player;this.player.connectGameplay({buff_system:buffs,is_invulnerable:()=>!!this.flitState?.active,on_damage:({player})=>{this.playerHealth=player.hp;this.lastHurtAt=this.physics_system.simulation_tick*this.physics_system.config.fixed_step;}});this.player.syncHealth(this.playerHealth,this.maxPlayerHealth);
+        this.player=this.activeLevel.player;this.player.vitals.load(vitals);
+        this.player.connectGameplay({buff_system:buffs,on_damage:({player})=>{player.vitals.recordDamage(_gameTimeSec);this.updateUI();},on_death:()=>this.respawnPlayer()});
         this.projectiles=this.activeLevel.projectiles;this.props=this.activeLevel.props;this.lamps=this.activeLevel.lamps;this.teammates=this.activeLevel.companions;
         this.activeMap={...this.activeLevel.definition.map,props:this.props,npcs:[],lamps:this.lamps,buildings:[],foliage:[],softLights:this.activeLevel.definition.soft_lights};
         this.roomSystem=new ApartmentRooms(this.activeLevel,this);this.furniture=new FurnitureSystem(this);this.apartmentRenderer=new ApartmentRenderer(this);
@@ -39,9 +40,9 @@ engineMixin({
     _leaveApartment(){
         if(!this.activeLevel)return;
         this.furniture.release();this.questState.aptLayout=this.activeLevel.getLayout();
-        const roster=this.activeLevel.getRoster(),buffs=this.player.buffSystem;
+        const roster=this.activeLevel.getRoster(),buffs=this.player.buffSystem,vitals=this.player.vitals.snapshot();
         this.apartmentRenderer?.destroy();this.activeLevel.destroy();this._releaseMapBakes(null);this.activeLevel=null;this.physics_system=null;this.apartmentRenderer=null;
-        this.player=new PlayerEntity({x:0,y:0});this.player.setGame(this);this.player.buffSystem=buffs;this.player.syncHealth(this.playerHealth,this.maxPlayerHealth);
+        this.player=new PlayerEntity({x:0,y:0});this.player.setGame(this);this.player.buffSystem=buffs;this.player.vitals.load(vitals);
         this.teammates=roster.map(r=>{const t=new NPC(0,0,r.name,r.role||'teammate',{weaponId:r.weaponId||r.equippedWeaponId});for(const k of APARTMENT_ROSTER_FIELDS)if(r[k]!=null)t[k]=r[k];return t;});
         this.ownedCar=gameVehicles.create({purpose:'owned',control_mode:'PLAYER',brand:this._parkedCar?.brand,model:this._parkedCar?.model,position:this._parkedCar?[this._parkedCar.x,this._parkedCar.y]:[CAR_START.x,CAR_START.y],rotation:this._parkedCar?.angle??CAR_START.angle});
         this.garage.applyToVehicle(this.ownedCar);this.car=this.ownedCar;
@@ -64,9 +65,7 @@ engineMixin({
         }else if(direction[0]||direction[1])this.furniture.release();
         if(this.shootCooldown>0)this.shootCooldown--;this.updateQuickDraw();
         if(!blocked&&(this.mouseDown||F.active&&F.firing)&&this.shootCooldown<=0)this._fireApartmentWeapon();
-        if(this.flitState.active&&--this.flitState.duration<=0)this.flitState.active=false;
-        this.flitState.attunement=Math.min(this.flitState.maxAttunement,this.flitState.attunement+this.flitState.rechargeRate);
-        level.updateState();this.roomSystem.update();this.updateScope();this.updatePlayerRecovery();
+        level.updateState();this.roomSystem.update();this.updateScope();this.updatePlayerRecovery();this.updateFlitRing();
         this.weather.setIndoorSuppressed(!this.roomSystem.isPlayerOutdoor());
         this.projectiles=this.projectiles.filter(p=>!p.destroyed);
         this.updateTime();this.updateUI();this.story.update();if(this.activeLevel!==level)return;
@@ -91,10 +90,10 @@ engineMixin({
         this.projectiles.push(projectile);audioSys.sfx('shoot');
     },
     _flitApartment(angle){
-        if(this.paused||this.furniture.busy())return false;
-        const cost=this.player.buffSystem.getStat('flitCooldown',this.flitState.dashCost);
-        if(this.flitState.attunement<cost)return false;
-        const result=this.player.teleportInDirection(undefined,{angle,distance:this.player.buffSystem.getStat('flitDistance',120),placement_bounds:{left:8,top:8,right:this.activeMap.width-8,bottom:this.activeMap.height-8},placement_mode:'clear'});
-        if(!result)return false;this.flitState.attunement-=cost;this.flitState.active=true;this.flitState.duration=15;this.flitState.lastFlitAt=_gameTimeSec;showMessage('FLIT!');return true;
+        if(this.paused||this.player.dead||this.isDriving||this.furniture.busy()||this.hud&&!this.hud.has('flit'))return false;
+        const cost=this.flitCost();
+        if(this.player.vitals.attunement<cost)return false;
+        const result=this.player.teleportInDirection(undefined,{angle,distance:this.flitDistance(),placement_bounds:{left:8,top:8,right:this.activeMap.width-8,bottom:this.activeMap.height-8},placement_mode:'clear',min_distance:this.player.vitals.flit_minimum_distance});
+        if(!result)return false;this.player.vitals.beginFlit(cost,undefined,_gameTimeSec);showMessage('FLIT!');return true;
     }
 });

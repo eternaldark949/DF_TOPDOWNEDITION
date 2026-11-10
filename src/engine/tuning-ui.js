@@ -7,11 +7,9 @@
                 if (!this.resonance) return;
                 const maxHp = Math.round(this.resonance.stat('maxHealth', 100));
                 const sl = this.player && this.player.buffSystem.active.stellarLemonade;   // Stellar Lemonade halves max HP while active
-                if (sl && sl.active) { sl.savedMaxHp = maxHp; this.maxPlayerHealth = Math.floor(maxHp / 2); }
-                else this.maxPlayerHealth = maxHp;
-                this.playerHealth = Math.min(this.playerHealth, this.maxPlayerHealth);
-                this.flitState.maxAttunement = this.resonance.stat('maxAttunement', 120);
-                if (this.player) this.player.syncHealth(this.playerHealth, this.maxPlayerHealth);
+                if (sl && sl.active) { sl.savedMaxHp = maxHp; this.player.vitals.setMaximumHealth(Math.floor(maxHp / 2)); }
+                else this.player.vitals.setMaximumHealth(maxHp);
+                this.player.vitals.setMaximumAttunement(this.resonance.stat('maxAttunement',120));
             },
 
             /** HUD: level and how much unsettled Resonance you're carrying (it glows brighter the more). */

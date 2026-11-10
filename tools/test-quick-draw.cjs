@@ -9,7 +9,7 @@ const setup=`game._doLoadMap('ollo_test');game.running=true;game.paused=false;ga
  game.currentWeapon=createItemFromRegistry('sniper_sara',game);game.weaponMode='sniper';game.shootCooldown=0;
  game.rollCrit=()=>1;// crits are random (engine/combat-fx.js); these compare exact damage
  game.resonance.deserialize({level:50,points:0,ranks:{hollow_points:3,quick_draw:3,flit_strike:3,quick_hands:3}});
- _gameTimeSec=10;game.flitState.lastFlitAt=9.8;
+ _gameTimeSec=10;game.player.vitals.state.last_flit_at=9.8;
  const tick=(n)=>{for(let i=0;i<n;i++){_gameTimeSec+=1/60;if(game.shootCooldown>0)game.shootCooldown--;game.updateQuickDraw();}};
  const touch=(type,x)=>{const F=game.fireJoystick, r=game.fireBtn.getBoundingClientRect();
  game.fireBtn.dispatchEvent({type,preventDefault(){},changedTouches:[{identifier:7,clientX:r.left+r.width/2+x,clientY:r.top+r.height/2}]});};
@@ -37,9 +37,9 @@ test('Dragging back inside the ring and touch cancellation never fire',`
  touch('touchstart',0);touch('touchmove',90);touch('touchcancel',90);tick(20);
  return {count:game.projectiles.length,phase:game._quickDraw.phase,release:game._releaseShot,active:game.fireJoystick.active,firing:game.fireJoystick.firing};`,r=>{assert.deepEqual(r,{count:0,phase:'ready',release:null,active:false,firing:false});});
 test('Pause cancels the pending shot but preserves quick draw mode and flit charge',`
- game.armQuickDraw();const charge=game.flitState.attunement;game.requestQuickDraw(0);tick(3);
+ game.armQuickDraw();const charge=game.player.attunement;game.requestQuickDraw(0);tick(3);
  game.pauseSystem.acquire('test');game.pauseSystem.release('test');tick(20);
- return {active:!!game._quickDraw,count:game.projectiles.length,charge:game.flitState.attunement,expected:charge,holstered:game.weaponHolstered};`,r=>{assert.equal(r.active,true);assert.equal(r.count,0);assert.equal(r.charge,r.expected);assert.equal(r.holstered,true);});
+ return {active:!!game._quickDraw,count:game.projectiles.length,charge:game.player.attunement,expected:charge,holstered:game.weaponHolstered};`,r=>{assert.equal(r.active,true);assert.equal(r.count,0);assert.equal(r.charge,r.expected);assert.equal(r.holstered,true);});
 test('Weapon swaps and map changes cancel an unfinished draw',`
  game.armQuickDraw();game.requestQuickDraw(0);game.currentWeapon=createItemFromRegistry('pistol_fpx',game);tick(8);
  const swap=!!game._quickDraw;game.weaponMode='normal';game.armQuickDraw();game.requestQuickDraw(0);game._doLoadMap('apt_949');tick(8);

@@ -28,18 +28,13 @@
             /** One tick, called directly (tests, tools): skipped while stopped or paused, like a Lobby step.
              *  The Lobby itself advances the tick and calls stepWorld() (engine/loop.js). */
             updatePlayerRecovery(){
-                // Passive Health Regen (5 HP/sec after 10s no damage)
-                if (this.playerHealth < this.maxPlayerHealth) {
-                    this.healthRegenTimer++;
-                    const regenDelay = this.resonance.stat('regenDelay', 600);                       // Frame: Idle Mend
-                    if (this.healthRegenTimer >= regenDelay && (this.healthRegenTimer - regenDelay) % 60 === 0) {
-                        const heal = this.resonance.stat('regenAmount', 5) * (this.augments.isEquipped('health_regen') ? 2 : 1);
-                        this.playerHealth = Math.min(this.playerHealth + heal, this.maxPlayerHealth);
-                        this.player.syncHealth(this.playerHealth, this.maxPlayerHealth);  // Sync with entity
-                    }
-                } else {
-                    this.healthRegenTimer = 0;
-                }
+                // Shared gameplay timers; this is the sole vitals tick in the classic host.
+                const healed=this.player.vitals.advance(1/60,{
+                    regeneration_delay:this.resonance.stat('regenDelay',600)/60,
+                    regeneration_amount:this.resonance.stat('regenAmount',5)*(this.augments.isEquipped('health_regen')?2:1)
+                });
+                if(healed)this.updateUI();
+                this.flitBtn.classList.toggle('cooldown',this.player.attunement<this.flitCost());
             },
             update() {
                 if (!this.running || this.paused) return;
@@ -158,14 +153,6 @@
                 }
 
                 // Ability & Regen Timers
-                // Flit Attunement recharge
-                if (this.flitState.attunement < this.flitState.maxAttunement) {
-                    this.flitState.attunement = Math.min(
-                        this.flitState.attunement + this.flitState.rechargeRate,
-                        this.flitState.maxAttunement
-                    );
-                    if (this.flitState.attunement >= this.flitCost()) this.flitBtn.classList.remove('cooldown');
-                }
                 // At the wheel the Flit button goes and the handbrake takes its place (styles/panels-phone.css)
                 if (this._uiDriving !== !!this.isDriving) {
                     this._uiDriving = !!this.isDriving;
@@ -174,10 +161,6 @@
                 this.updateFlitRing();
                 this.updateNoiseRipples();
                 this.updateScope();
-                if (this.flitState.active) {
-                    this.flitState.duration--;
-                    if (this.flitState.duration <= 0) this.flitState.active = false;
-                }
                 // Update flit visual effects (ghost afterimages, lightning trails)
                 if (this.flitVFX.length > 0) this.updateFlitVFX();
 
@@ -958,9 +941,9 @@
                     // (runs after this in the update loop)
 
                     // --- BLOOD TRAIL LOGIC (PLAYER) ---
-                    if (this.playerHealth < 50) {
+                    if (this.player.hp < 50) {
                         const isMoving = (Math.abs(inputX) > 0 || Math.abs(inputY) > 0);
-                        const bleedChance = this.playerHealth < 20 ? 0.3 : 0.1;
+                        const bleedChance = this.player.hp < 20 ? 0.3 : 0.1;
 
                         // Drops as she moves (now and then when still), more often when badly hurt
                         if ((isMoving || Math.random() < 0.05) && Math.random() < bleedChance) {

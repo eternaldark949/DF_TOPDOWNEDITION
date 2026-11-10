@@ -59,12 +59,15 @@
                 });
                 
                 // Health system
-                this.hp = config.hp ?? 100;
-                this.maxHp = config.maxHp ?? this.hp;
-                this.dead = false;
+                if (config.vitals) this.vitals = config.vitals;
+                else {
+                    this.hp = config.hp ?? 100;
+                    this.maxHp = config.maxHp ?? this.hp;
+                    this.dead = false;
+                }
                 
                 // Invincibility frames to prevent damage spam
-                this.invincibleTimer = 0;
+                if(!config.vitals)this.invincibleTimer = 0;
                 
                 // Alliance system — determines projectile pass-through and collision softening
                 // 'friendly' = player side, 'hostile' = enemy side, 'neutral' = civilians
@@ -104,7 +107,7 @@
                 const bleed = !!(opts && (opts.type === 'bleed' || opts.type === 'burn'));
                 if (this.dead || (this.invincibleTimer > 0 && !(bleed || shot))) return false;
                 
-                this.hp -= amount;
+                if(this.vitals)this.vitals.damage(amount);else this.hp -= amount;
                 // Damage number, health bar, blood, flinch (engine/combat-fx.js); opts.type: the kind of damage
                 if (typeof game !== 'undefined' && game && game.onActorHit) game.onActorHit(this, amount, knockbackX, knockbackY, opts);
                 
@@ -342,14 +345,14 @@
          */
         class PlayerEntity extends ActorEntity {
             constructor(config) {
+                const data={};
                 super({
+                    data, vitals:new DFNative.playerVitals(data),
                     x: config.x || 0,
                     y: config.y || 0,
                     radius: 12,  // Slightly smaller than other actors for tight movement
                     type: 'player',
                     alliance: 'friendly',
-                    hp: 100,
-                    maxHp: 100,
                     speed: 5.2,
                     mass: 15,  // Heavier than NPCs
                     friction: 0.9,
@@ -377,6 +380,14 @@
                 this._game = null;
             }
             
+            get hp() { return this.vitals.health; }
+            set hp(value) { this.vitals.setHealth(value); }
+            get maxHp() { return this.vitals.max_health; }
+            set maxHp(value) { this.vitals.setMaximumHealth(value); }
+            get dead() { return this.vitals.dead; }
+            get flitting() { return this.vitals.flitting; }
+            get attunement() { return this.vitals.attunement; }
+
             /**
              * Set reference to game engine for damage handling.
              */
@@ -400,11 +411,6 @@
              */
             update() {
                 if (this.dead || !this.visible) return;
-                
-                // Decrement invincibility (from ActorEntity)
-                if (this.invincibleTimer > 0) {
-                    this.invincibleTimer--;
-                }
                 
                 // Walk phase is advanced by the shared gait controller (syncHumanoidGait)
                 
@@ -435,13 +441,13 @@
              */
             takeDamage(amount, knockbackX = 0, knockbackY = 0) {
                 // FLIT grants invulnerability
-                if (this._game && this._game.flitState && this._game.flitState.active) {
+                if (this.flitting || this.vitals.state.invulnerable_remaining>0) {
                     return false;
                 }
                 const g = this._game;
                 if (g && g.swingGuard) amount = g.swingGuard(amount);             // mid-swing, a blade takes the edge off (engine/status-effects.js)
                 let lastStood = false;
-                if (g && g.resonance && !(this.invincibleTimer > 0) && !this.dead) {
+                if (g && g.resonance && !this.dead) {
                     amount = g.resonance.stat('damageTaken', amount);                 // Frame: Plating
                     // Frame: Last Stand — a hit that would kill leaves 1 HP and a moment's grace
                     if (this.hp - amount <= 0 && g.resonance.tryLastStand(_gameTimeSec)) {
@@ -450,19 +456,16 @@
                         showMessage('LAST STAND');
                         if (g.weather) g.weather.spawnExplosion(this.x, this.y, 'rgba(196, 86, 110, 1)');
                     }
-                    g.lastHurtAt = _gameTimeSec;
                 }
                 
                 // Use ActorEntity's damage system
                 const kbScale = g && g.resonance ? g.resonance.stat('knockbackTaken', 1) : 1;
                 const damaged = super.takeDamage(amount, knockbackX * kbScale, knockbackY * kbScale);
-                if (lastStood) this.invincibleTimer = 60;                 // a moment's grace after Last Stand
+                if (lastStood) this.vitals.makeInvulnerable(1);                 // a moment's grace after Last Stand
                 
                 if (damaged && this._game) {
                     if (this._game.spillOnHit) this._game.spillOnHit(amount, knockbackX, knockbackY);   // a hit slops her drink (engine/spills.js)
-                    // Sync with legacy health system
-                    this._game.playerHealth = this.hp;
-                    this._game.healthRegenTimer = 0;
+                    this.vitals.recordDamage(_gameTimeSec);
                     this._game.updateUI();
                 }
                 
@@ -472,46 +475,14 @@
             /**
              * Override die to trigger respawn instead of removal.
              */
-            die() {
-                if (this._game) {
-                    showMessage("CRITICAL FAILURE - RESPONDING TO MEDBAY");
-                    // Half the unsettled Resonance scatters on the way back to Dr. Yin
-                    if (this._game.resonance) {
-                        const lost = this._game.resonance.onDeath();
-                        if (lost > 0) game_timers.after(1.8, () => showMessage(`${lost} UNSETTLED RESONANCE SCATTERED IN THE RETURN`), 'world');
-                    }
-                    
-                    // Clear all active buffs (restores maxHP if Stellar Lemonade was active, etc.)
-                    this.buffSystem.clearAll(this._game);
-                    
-                    // Reset health
-                    this.hp = this.maxHp;
-                    this.dead = false;
-                    this._game.playerHealth = this.hp;
-                    this._game.boosterCount = this._game.getEffectiveMaxBoosters();
-                    this._game.questState.suiteAmbushTriggered = false;
-                    // Reset story step so ambush can re-trigger on return
-                    const st = this._game.story;
-                    if (st && !st.isBefore('SEARCH_SUITE') && st.isBefore('FIND_NOTE')) st.goTo('TAKE_ELEVATOR');
-                    // Reset optional sanctum quest if active (boss respawns on re-entry)
-                    if (this._game.story && this._game.story.activeOptional && this._game.story.activeOptional.id === 'sanctum') {
-                        this._game.story.activeOptional = null;
-                    }
-                    this._game.updateUI();
-                    
-                    // Respawn at the medbay: wake beside the recovery bed in Dr. Yin's clinic
-                    const rs = (MAP_DATA.medbay_sw && MAP_DATA.medbay_sw.respawn) || { x: 212, y: 328 };
-                    this._game.loadMap('medbay_sw', { x: rs.x, y: rs.y });
-                }
-            }
-            
+            die() { if(this._game)this._game.respawnPlayer(); }
+
             /**
              * Heal the player.
              */
             heal(amount) {
-                const healed = super.heal(amount);
+                const healed = this.vitals.heal(amount);
                 if (healed > 0 && this._game) {
-                    this._game.playerHealth = this.hp;
                     this._game.updateUI();
                 }
                 return healed;
@@ -538,17 +509,6 @@
                     this.takeDamage(projectile.damage, kbX, kbY);
                 } else {
                     this.takeDamage(projectile.damage);
-                }
-            }
-            
-            /**
-             * Sync health from legacy system.
-             * Called when health is modified externally (boosters, medbay, etc.)
-             */
-            syncHealth(newHp, newMaxHp = null) {
-                this.hp = newHp;
-                if (newMaxHp !== null) {
-                    this.maxHp = newMaxHp;
                 }
             }
             

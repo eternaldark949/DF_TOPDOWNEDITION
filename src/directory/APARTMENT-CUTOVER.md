@@ -55,3 +55,7 @@ The full API remains in [Basement's API reference](../basement/physics/docs/api-
 ### Loading regression follow-up
 
 The original acceptance fixture called `_doLoadMap` directly and missed the public loader's legacy lighting bake. Normal entry threw on native `lamp.x`; the native scene now bypasses that old cache, and texture warmup consumes render packets. Real Lobby movement also exposed the footstep callback reading the native player's legacy coordinates; footsteps now read the authoritative player pose and recognize native presentation identity. Once the apartment music decoded, room attenuation also expected legacy door records; it now reads the native room connection policy. The browser check exercises these public loading and moving paths, including music playback and console errors caught by the Lobby.
+
+## Player vitals ownership follow-up
+
+The production apartment and legacy player implementations now use the same [playerVitals component](../gameplay/README.md#playervitals). Health/max health, Flit energy/protection, grace, recovery timing and combat timestamps live in the active player's data. Existing scene replacement transfers that validated record once; there is no host health/Flit mirror or per-tick synchronization. Classic saves include the record and still import older health-only saves. Native death calls the existing shared medbay policy. This retires gameplay ledgers, not the classic scene-owned world or city collision implementation.

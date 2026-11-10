@@ -22,7 +22,8 @@ engineMixin({
                     player: {
                         x: this.player ? this.playerPosition[0] : 500,
                         y: this.player ? this.playerPosition[1] : 500,
-                        health: this.playerHealth ?? 100,
+                        health: this.player?.hp ?? 100,
+                        vitals: this.player?.vitals.snapshot() ?? null,
                         currency: this.currency ?? 500,
                         scrap: this.scrap ?? 0,
                         boosters: this.boosterCount ?? 0,
@@ -169,6 +170,7 @@ engineMixin({
                         x: 500,
                         y: 500,
                         health: 100,
+                        vitals: null,
                         currency: 500,
                         scrap: 0,
                         boosters: 0,
@@ -490,23 +492,24 @@ engineMixin({
                     
                     console.log(`[LOAD] Loading save (v${fromVersion} → v${save.version}), merged with defaults`);
         
+                    // Validate vitals before changing live player/session records.
+                    const loadedVitals=new DFNative.playerVitals();
+                    if(playerData.vitals)loadedVitals.load(playerData.vitals);
+                    else {
+                        const restoredRanks=new ResonanceSystem();restoredRanks.deserialize(save.resonance);
+                        const shield=playerData.buffs?.stellarLemonade;
+                        const maximum=Math.round(restoredRanks.stat('maxHealth',100));
+                        loadedVitals.importHealth(playerData.health ?? defaults.player.health,shield?.active?Math.floor(maximum/2):maximum);
+                    }
                     // 1. Load Player Data
                     this.currency = playerData.currency ?? defaults.player.currency;
                     this.scrap = playerData.scrap ?? defaults.player.scrap;
-                    this.playerHealth = playerData.health ?? defaults.player.health;
+                    this.player.vitals.load(loadedVitals.snapshot());
                     this.boosterCount = playerData.boosters ?? defaults.player.boosters;
                     
                     // Restore buff system from save data
                     this.player.buffSystem.active = {};                 // only the save's buffs: none carried in from the run before
                     this.player.buffSystem.deserialize(playerData.buffs || {});
-                    
-                    // Re-apply persistent buff side-effects (e.g. Stellar Lemonade halved maxHP)
-                    const slBuff = this.player.buffSystem.active.stellarLemonade;
-                    if (slBuff && slBuff.active && slBuff.savedMaxHp > 0) {
-                        this.maxPlayerHealth = Math.floor(slBuff.savedMaxHp / 2);
-                    }
-                    
-                    this.player.syncHealth(this.playerHealth, this.maxPlayerHealth);
                     
                     // 2. Load World State
                     this.worldMinutes = worldData.worldMinutes ?? defaults.world.worldMinutes;

@@ -12,7 +12,7 @@ const setup=`game._doLoadMap('ollo_test');game.story.update=()=>{};game.running=
  game.camera.x=1000;game.camera.y=1000;game.camera.zoom=1;game.isDriving=false;
  game.mouseDown=false;game.fireJoystick.active=false;game._releaseShot=null;game._execTarget=null;game.weaponHolstered=true;
  game.traffic.vehicles=[];game.ownedCar.visible=false;game.rollCrit=()=>1;Math.random=()=>.5;
- game.cosmetics.equippedAccessory=null;game.augments.equipped=[];game.resonance.ranks={};game.flitState.lastFlitAt=-99;
+ game.cosmetics.equippedAccessory=null;game.augments.equipped=[];game.resonance.ranks={};game.player.vitals.state.last_flit_at=-99;
  const enemy=(x,y=1000)=>{const g=new Ganger(x,y,{hp:5000});g.update=()=>{};game.enemies.push(g);return g;};
  const bullet=(x=1000,y=1000,opts={})=>{const p=new ProjectileEntity({x,y,angle:0,speed:80,damage:100,owner:game.player,...opts});game.projectiles.push(p);return p;};
  const tick=()=>{_gameTimeSec+=1/60;game.update();};
@@ -82,7 +82,7 @@ function run(){
   const g=enemy(1040);g._projectileStartTick=_simTick;g._projectileStartX=960;g._projectileStartY=1000;
   const p=bullet();CollisionSystem.resolveProjectile(p,game);return g.hp;`,r=>assert.equal(r,5000));
  test('An enemy round hits a player crossing its path during the same tick',`
-  game.player.syncHealth(100,100);game.player.invincibleTimer=0;game.player.x=1040;game.player.y=970;
+  game.player.vitals.importHealth(100,100);game.player.vitals.makeInvulnerable(0);game.player.x=1040;game.player.y=970;
   game.player.applyMovement=()=>{game.player.y=1030;};const owner=enemy(1600,1600);
   bullet(1000,1000,{isEnemy:true,owner,damage:10});tick();return game.player.hp;`,r=>assert.equal(r,90));
  test('A shot can hit on its last lifetime tick',`

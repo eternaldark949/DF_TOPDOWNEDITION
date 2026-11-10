@@ -58,8 +58,8 @@ test('regeneration and buff durations advance once per fixed step, stop while pa
  const e=await ready(),p=e.api.session.player;
  p.takeDamage(40);p.addBuff('tea',{duration_seconds:1,modifiers:{speed:{add:10,multiply:2}}});assert.equal(p.getStat('speed',20),60);
  steps(e,30);const state=structuredClone(p.data.player_state),resume=e.pause('inventory');steps(e,120);assert.deepEqual(p.data.player_state,state);resume();
- steps(e,30);assert.equal(p.getStat('speed',20),20);steps(e,600);assert.equal(p.hp,65);
- p.takeDamage(5);steps(e,600);assert.equal(p.hp,60);steps(e,60);assert.equal(p.hp,65);e.dispose();
+ steps(e,30);assert.equal(p.getStat('speed',20),20);steps(e,540);assert.equal(p.hp,65);
+ p.takeDamage(5);steps(e,599);assert.equal(p.hp,60);steps(e,1);assert.equal(p.hp,65);steps(e,60);assert.equal(p.hp,70);e.dispose();
 });
 test('Flit uses native bounded placement, spends only successful landings and protects during the active interval',async()=>{
  const e=await ready(),p=e.api.session.player,state=e.api.player_state;

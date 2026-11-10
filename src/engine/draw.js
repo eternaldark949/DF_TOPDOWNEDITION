@@ -861,7 +861,7 @@
                 if (RenderStats.timed) this._entLap('Entities: Effects');
                 // Player
                 if (RL.at('stella') && this.player.visible) {
-                    if (this.flitState.active) this.ctx.globalAlpha = 0.5;
+                    if (this.player.flitting) this.ctx.globalAlpha = 0.5;
                     this.drawPlayer();
                     this.ctx.globalAlpha = 1.0;
                 }

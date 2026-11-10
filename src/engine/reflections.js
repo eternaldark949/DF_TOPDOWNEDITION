@@ -908,7 +908,8 @@
             /** Detailed actor art reflected about the ground beneath its body, at current facing. */
             _drawUltraReflectionWalker(ctx, e, alpha = 0.58, mark = null, crowd = false) {
                 if (!e || e.dead || e.visible === false || e.inCar || e === this.player && this.isDriving) return false;
-                if (e.invincibleTimer > 0 && e.invincibleTimer % 6 < 3) return false;
+                const grace=e===this.player?e.vitals.state.invulnerable_remaining*60:e.invincibleTimer;
+                if (grace > 0 && grace % 6 < 3) return false;
                 let angle = e.angle || 0, sx = 1, sy = 1, fade = e.life === undefined ? 1 : Math.max(0, Math.min(1, e.life));
                 const ped = typeof Pedestrian !== 'undefined' && e instanceof Pedestrian;
                 if (ped && e.state === 'sprawled') { sx = 1.1; sy = 0.55; }
@@ -954,7 +955,7 @@
                     if (e.state === 'sprawled') fade *= 0.92;
                     else if (e.state === 'recovering') fade *= 0.92 + 0.08 * (1 - e.recoverTimer / 24);
                 }
-                if (e === this.player && (e.isHidden || this.flitState && this.flitState.active)) fade *= 0.5;
+                if (e === this.player && (e.isHidden || this.player && this.player.flitting)) fade *= 0.5;
                 ctx.globalAlpha = alpha * fade;
                 // Mirror the body below its feet; compensate rotation so its world heading stays the same;
                 // flip the sideways artwork while preserving its forward facing (ctx: the detail layer, in this._ultraView)

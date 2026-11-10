@@ -19,18 +19,15 @@
                 unlockCheck: (game) => game.missions && game.missions.completedBounties >= 5,
                 onActivate: (game, buff, config) => {
                     buff.shield = buff.maxShield;
-                    buff.savedMaxHp = game.maxPlayerHealth;
-                    game.maxPlayerHealth = Math.floor(game.maxPlayerHealth / 2);
-                    game.playerHealth = Math.min(game.playerHealth, game.maxPlayerHealth);
-                    game.player.syncHealth(game.playerHealth, game.maxPlayerHealth);
+                    buff.savedMaxHp = game.player.maxHp;
+                    game.player.vitals.setMaximumHealth(Math.floor(game.player.maxHp / 2));
                 },
                 onExpire: (game, buff) => {
                     buff.shield = 0;
                     if (buff.savedMaxHp > 0) {
-                        game.maxPlayerHealth = buff.savedMaxHp;
+                        game.player.vitals.setMaximumHealth(buff.savedMaxHp);
                         buff.savedMaxHp = 0;
                     }
-                    game.player.syncHealth(game.playerHealth, game.maxPlayerHealth);
                 }
             }
         };

@@ -38,8 +38,14 @@ try:
   ui=page.evaluate("""() => {
    game.inventory.toggleMenu();const inventory=Screens.menuOpen();Screens.close();
    game.ui.toggleMap(true);const map=Screens.mapOpen();game.ui.centerOnPlayer();game.ui.toggleMap(false);
-   const old=game.physics_system;game.saveGame({auto:true});const loaded=game.loadGame(AUTOSAVE_KEY);
-   return {inventory,map,loaded,retired:old.getStatistics().bodies,native:game.player.physics_system===game.physics_system};
+   game.hud.revealAll();game.player.vitals.reset();game.player.takeDamage(40);game.boosterCount=4;game.useBooster();
+   const stim={health:game.player.hp,boosters:game.boosterCount};
+   game.player.takeDamage(25);game.player.vitals.beginFlit(40,.25,_gameTimeSec);game.updateUI();
+   const expected=JSON.stringify(game.player.vitals.snapshot()),healthWidth=game.healthBar.style.width;
+   const old=game.physics_system;game.saveGame({auto:true});game.player.vitals.reset();const loaded=game.loadGame(AUTOSAVE_KEY);
+   return {inventory,map,loaded,retired:old.getStatistics().bodies,native:game.player.physics_system===game.physics_system,
+    stim,healthWidth,vitalsRestored:JSON.stringify(game.player.vitals.snapshot())===expected,
+    retiredLedgers:['playerHealth','maxPlayerHealth','flitState','healthRegenTimer'].filter(key=>key in game)};
   }""")
   # The public session entry runs the real Lobby/ambience/render callbacks, not only manual ticks.
   start=page.evaluate("""() => {game.running=false;game.enterWorld();return {x:game.player.position[0],tick:game.physics_system.simulation_tick};}""")
@@ -57,6 +63,6 @@ try:
   print(json.dumps({'transition':transition,'report':report,'ui':ui,'errors':errors},indent=2))
   assert report['native'] and report['steps']==30 and report['render_unchanged'],report
   assert not errors,errors
-  assert ui=={'inventory':True,'map':True,'loaded':True,'retired':0,'native':True},ui
+  assert ui=={'inventory':True,'map':True,'loaded':True,'retired':0,'native':True,'stim':{'health':100,'boosters':3},'healthWidth':'75%','vitalsRestored':True,'retiredLedgers':[]},ui
   browser.close()
 finally:server.shutdown();server.server_close()

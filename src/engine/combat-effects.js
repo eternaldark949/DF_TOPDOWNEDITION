@@ -332,7 +332,7 @@
                 const shotSpeed  = stats.projectileSpeed || 25;
                 // Arms: Hollow Points; Flit: Flit-Strike (shots just after a flit); Arms: Quick-Draw (first shot after drawing)
                 let shotDamage = this.resonance.stat('gunDamage', stats.damage || 35);
-                if (_gameTimeSec - this.flitState.lastFlitAt <= this.resonance.flitStrikeWindow()) shotDamage *= 1 + this.resonance.value('flit_strike', 'damage') * this.resonance.rank('flit_strike');
+                if (_gameTimeSec - this.player.vitals.last_flit_at <= this.resonance.flitStrikeWindow()) shotDamage *= 1 + this.resonance.value('flit_strike', 'damage') * this.resonance.rank('flit_strike');
                 if (this._drawnAt !== undefined && _gameTimeSec - this._drawnAt <= this.resonance.value('quick_draw', 'window') && !this._drawShotUsed) { shotDamage *= 1 + this.resonance.value('quick_draw', 'damage') * this.resonance.rank('quick_draw'); this._drawShotUsed = true; }
                 shotDamage *= this.gunDamageMult();                      // the Bloodthirsty Muzzle, the Mirrored Glass (engine/status-effects.js)
                 const shotCrit = this.rollCrit(stats);                   // a critical hit (engine/combat-fx.js)
@@ -438,16 +438,46 @@
                 return max;
             },
             
+            // Existing story/medbay policy, shared by native and legacy player death.
+            // Game-flow class extraction remains separate from the vitals ownership cutover.
+            respawnPlayer() {
+                showMessage("CRITICAL FAILURE - RESPONDING TO MEDBAY");
+                // Half the unsettled Resonance scatters on the way back to Dr. Yin
+                if (this.resonance) {
+                    const lost = this.resonance.onDeath();
+                    if (lost > 0) game_timers.after(1.8, () => showMessage(`${lost} UNSETTLED RESONANCE SCATTERED IN THE RETURN`), 'world');
+                }
+
+                // Clear all active buffs (restores maxHP if Stellar Lemonade was active, etc.)
+                this.player.buffSystem.clearAll(this);
+
+                // Reset health
+                this.player.vitals.restoreHealth();
+                this.boosterCount = this.getEffectiveMaxBoosters();
+                this.questState.suiteAmbushTriggered = false;
+                // Reset story step so ambush can re-trigger on return
+                const st = this.story;
+                if (st && !st.isBefore('SEARCH_SUITE') && st.isBefore('FIND_NOTE')) st.goTo('TAKE_ELEVATOR');
+                // Reset optional sanctum quest if active (boss respawns on re-entry)
+                if (this.story && this.story.activeOptional && this.story.activeOptional.id === 'sanctum') {
+                    this.story.activeOptional = null;
+                }
+                this.updateUI();
+
+                // Respawn at the medbay: wake beside the recovery bed in Dr. Yin's clinic
+                const rs = (MAP_DATA.medbay_sw && MAP_DATA.medbay_sw.respawn) || { x: 212, y: 328 };
+                this.loadMap('medbay_sw', { x: rs.x, y: rs.y });
+            },
+
             useBooster() {
                 if (!this.running || this.paused || hudInputBlocked()) return;
-                if (this.playerHealth >= this.maxPlayerHealth) { 
+                if (this.player.hp >= this.player.maxHp) {
                     showMessage("HEALTH FULL"); 
                     return; 
                 }
                 if (this.boosterCount > 0) { 
                     this.boosterCount--; 
-                    this.playerHealth = Math.min(this.playerHealth + this.resonance.stat('stimHeal', 50), this.maxPlayerHealth);
-                    this.player.syncHealth(this.playerHealth, this.maxPlayerHealth);  // Sync with entity
+                    this.player.heal(this.resonance.stat('stimHeal',50));
                     this.updateUI(); // Updates health bar AND booster count
                     showMessage("STIM PACK USED. HP RESTORED."); 
                 } else { 
@@ -509,8 +539,7 @@
                ========================================================= */
             refillStims() {
                 this.boosterCount = this.getEffectiveMaxBoosters();
-                this.playerHealth = this.maxPlayerHealth;
-                this.player.syncHealth(this.playerHealth, this.maxPlayerHealth);
+                this.player.vitals.restoreHealth();
                 
                 // Refill teammate stims too
                 if (this.teammates) {

@@ -22,13 +22,13 @@
 
                 // --- 1. HEALTH BAR (Red gradient) ---
                 // Displays player's current HP as percentage of max
-                const healthPercent = Math.max(0, (this.playerHealth / this.maxPlayerHealth) * 100);
+                const healthPercent = Math.max(0, (this.player.hp / this.player.maxHp) * 100);
                 set('hp', healthPercent.toFixed(1), v => { this.healthBar.style.width = `${v}%`; });
                 
                 // --- 2. FLIT ATTUNEMENT BAR (Champagne/Gold) ---
                 // Shows current attunement pool. Full bar = max charges available.
                 const flitPercent = Math.max(0, Math.min(100, 
-                    (this.flitState.attunement / this.flitState.maxAttunement) * 100));
+                    (this.player.vitals.attunement / this.player.vitals.max_attunement) * 100));
                 if (U.flit) set('flit', flitPercent.toFixed(1), v => { U.flit.style.width = `${v}%`; });
 
                 // --- 3. ECONOMY DISPLAY ---
@@ -960,8 +960,8 @@
                 // ══════════════════════════════════════════════════
                 html += `<div class="df-section"><span>Stats</span></div><div class="df-card">`;
 
-                const hp = this.playerHealth ?? 0;
-                const maxHp = this.maxPlayerHealth ?? 100;
+                const hp = this.player.hp ?? 0;
+                const maxHp = this.player.maxHp ?? 100;
                 const hpPct = Math.max(0, Math.round((hp / maxHp) * 100));
                 html += `<div class="df-bar-label" style="margin-top:0;"><span>Vitals</span><span>${hp} / ${maxHp}</span></div><div class="df-bar crimson${hpPct ? '' : ' zero'}"><i style="--v:${hpPct}%"></i></div>`;
 
@@ -969,10 +969,8 @@
                 const baseSpeed = this.player?.speed ?? 5.2;
                 const finalSpeed = this.player?.buffSystem?.getStat('speed', baseSpeed) ?? baseSpeed;
                 const baseFlitDist = 120;
-                let finalFlitDist = this.player?.buffSystem?.getStat('flitDistance', baseFlitDist) ?? baseFlitDist;
-                if (this.augments && this.augments.isEquipped('flit_ext')) finalFlitDist *= 1.3;
-                if (this.resonance) finalFlitDist = this.resonance.stat('flitDistance', finalFlitDist);
-                const baseFlitCost = this.flitState?.dashCost ?? 40;
+                const finalFlitDist=this.flitDistance();
+                const baseFlitCost = this.player?.vitals.flit_cost ?? 40;
                 const finalFlitCost = this.flitCost ? this.flitCost() : baseFlitCost;
                 const baseDetect = 1.0;
                 const finalDetect = this.player?.buffSystem?.getStat('detectionRange', baseDetect) ?? baseDetect;

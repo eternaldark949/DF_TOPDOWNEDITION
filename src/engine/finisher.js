@@ -125,10 +125,10 @@
                 const near = others.some(o => Math.hypot(o.x - this.playerPosition[0], o.y - this.playerPosition[1]) < 900
                     && (o.state === 'ALERT' || o.state === 'SUPPRESSING' || o.state === 'SEARCHING'));
                 if (near) return null;
-                if (_gameTimeSec - (this.flitState.lastFlitAt ?? -99) <= 1) return 'flit';
+                if (_gameTimeSec - (this.player.vitals.last_flit_at ?? -99) <= 1) return 'flit';
                 if (e.lastHitMelee) return 'punch';
                 if ((e._hits || 0) <= 1 && this.currentWeapon && /sniper/.test(this.currentWeapon.id)) return 'one shot';
-                if (this.playerHealth >= (this.maxPlayerHealth || 100) && _gameTimeSec - (this.lastHurtAt ?? -99) > 30 && e._engaged) return 'untouched';
+                if (this.player.hp >= (this.player.maxHp || 100) && _gameTimeSec - (this.player.vitals.last_hurt_at ?? -99) > 30 && e._engaged) return 'untouched';
                 return null;
             },
 
@@ -160,7 +160,7 @@
                 if (this.paused) return;
                 F.ms += elapsedMs;
                 // cut short: she fires again, flits, or something takes the stage
-                if ((this.shotsFired || 0) > this._finShot || _gameTimeSec - (this.flitState.lastFlitAt ?? -99) < 0.05 && F.ms > 200
+                if ((this.shotsFired || 0) > this._finShot || _gameTimeSec - (this.player.vitals.last_flit_at ?? -99) < 0.05 && F.ms > 200
                     || (this.scenes && this.scenes.running) || this.isDriving) { this.endFinisher(true); return; }
                 const onStella = F.ms > F.tBody;
                 if (onStella && !F.burst) { F.burst = true; this.finisherBurst(F); }

@@ -81,13 +81,13 @@
                     // A stim after the first hit; the flit once they start telegraphing (or she's hit)
                     S.watch(g => {
                         if (g.coach.cur) return false;
-                        if (g.playerHealth < g.maxPlayerHealth) { H.reveal('heal', { title: 'Stims', text: 'Hurt? Tap to heal.', mode: 'ring', timeout: 5000 }); return true; }
+                        if (g.player.hp < g.player.maxHp) { H.reveal('heal', { title: 'Stims', text: 'Hurt? Tap to heal.', mode: 'ring', timeout: 5000 }); return true; }
                         return false;
                     });
                     S.watch(g => {
                         if (g.coach.cur) return false;
                         const tele = (g.enemies || []).some(e => e.telegraph || e.isTelegraphing || e._telegraph);
-                        if (tele || g.playerHealth < g.maxPlayerHealth * 0.8) {
+                        if (tele || g.player.hp < g.player.maxHp * 0.8) {
                             H.reveal('flit', { title: 'Flit', text: 'Tap ⚡ (or drag past the ring) to blink out of the line.', mode: 'ring', timeout: 6000 });
                             return true;
                         }

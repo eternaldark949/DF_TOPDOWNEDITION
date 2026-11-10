@@ -264,7 +264,7 @@
             },
             /** A Trusted friend leaves her a stim after a job that went badly */
             onJobDone(g) {
-                if (!this._freeOk() || g.playerHealth > g.maxPlayerHealth * 0.35) return;
+                if (!this._freeOk() || g.player.hp > g.player.maxHp * 0.35) return;
                 if (!g.getEffectiveMaxBoosters || g.boosterCount >= g.getEffectiveMaxBoosters()) return;
                 const close = this._crewHere(g).filter(n => this._tier(g, n) >= 2);
                 if (!close.length) return;

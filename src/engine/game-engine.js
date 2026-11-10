@@ -76,11 +76,6 @@
                     larissa_loadout_hint: false
                 };
                 this.velvetCat = null; // Active VelvetCat entity
-                this.flitState = { 
-                    active: false, duration: 0, maxDuration: 15,
-                    attunement: 120, maxAttunement: 120, 
-                    dashCost: 40, rechargeRate: 2 // 2/frame = full in 1s
-                };
                 this.flitVFX = []; // Active flit visual effects (ghost afterimages, lightning trails)
                 this.graveyardGhosts = []; // Procedural humanoid ghosts in the cemetery
                 this.lobbyLife = new LobbyLife(); // The Double Nights lobby's guests and staff (directory/lobby-life.js)
@@ -97,8 +92,7 @@
                     transitionSpeed: 0.05 // How fast we lerp between scales
                 };
                 
-                this.currency = 100; this.scrap = 0; this.playerHealth = 100; this.maxPlayerHealth = 100; this.boosterCount = 4; this.maxBoosters = 4; this.debugMode = false; this.showProfiler = false;
-                this.healthRegenTimer = 0; // Frames since health was not full (for passive regen)
+                this.currency = 100; this.scrap = 0; this.boosterCount = 4; this.maxBoosters = 4; this.debugMode = false; this.showProfiler = false;
                 this.weaponMode = 'none';  // 'normal' or 'sniper' - sniper shots penetrate everything
                 this.shootCooldown = 0;    // Tracks timing between shots
                 this.currentWeapon = null; // Stores the currently active weapon object
@@ -153,7 +147,6 @@
                 this.isDriving = false;
                 this.player = new PlayerEntity({ x: 0, y: 0 });
                 this.player.setGame(this);  // Link player to game for damage callbacks
-                this.player.syncHealth(this.playerHealth, this.maxPlayerHealth);  // Initial sync
                 
                 // Player's OWNED car: LADY Blackmark V1 (Luxury SUV) - This is YOUR car
                 this.ownedCar = gameVehicles.create({ purpose: 'owned', control_mode: 'PLAYER', position: [CAR_START.x, CAR_START.y], rotation: CAR_START.angle });
@@ -172,7 +165,6 @@
                 this.augments = new AugmentSystem();
                 this.resonance = new ResonanceSystem();      // 949's progression (core/resonance.js)
                 this.darkElement = 0;                        // premium shards (off-market goods)
-                this.lastHurtAt = -99; this.flitState.lastFlitAt = -99;
                 this.bumperMinigame = new BumperCarMinigame();
                 this.bonding = new BondingSystem();
                 this.dialogueSeq = new DialogueSequence(this);

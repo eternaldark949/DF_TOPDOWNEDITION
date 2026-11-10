@@ -36,7 +36,7 @@ export class PlayerStateSystem {
         // Placement, direction normalization and collision queries are entirely Basement's job.
         const landed=player.teleportInDirection(direction,{distance:player.getStat('flitDistance',rules.distance),placement_mode:'clear',min_distance:rules.minimum_distance,...(placement_bounds ? {placement_bounds} : {})});
         if(!landed)return false;
-        player.beginFlit(cost,rules.invulnerability_seconds);
+        player.beginFlit(cost,player.vitals.flit_duration);
         return true;
     }
     respawn({position, ...placement} = {}) {

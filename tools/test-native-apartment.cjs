@@ -37,7 +37,7 @@ check('the common solver stops the player at the exterior wall',`
 check('paused gameplay never advances the native simulation',`
  const t=game.physics_system.simulation_tick;game.paused=true;game.update();game.draw();game.paused=false;return game.physics_system.simulation_tick-t;`,r=>assert.equal(r,0));
 check('Flit uses native landing clearance and remains inside the map',`
- game.player.body.setPosition([700,850]);game.flitState.attunement=120;game.player.setRotation(Math.PI/2);
+ game.player.body.setPosition([700,850]);game.player.vitals.setAttunement(120);game.player.setRotation(Math.PI/2);
  const accepted=game.triggerFlit(Math.PI/2);return {accepted,position:game.player.position};`,r=>{assert.equal(r.accepted,true);assert.ok(r.position[1]<=880.001,r);});
 check('furniture grip, spring coupling, rotation and release use the existing native body',`
  game.player.body.setPosition([460,620]);game.update();const target=game.furniture.cand,id=target.body_id;

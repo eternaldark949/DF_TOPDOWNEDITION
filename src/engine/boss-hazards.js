@@ -34,7 +34,7 @@
             },
 
             /** Flitting: out of reach of every hazard */
-            playerDodging() { return !!(this.flitState && this.flitState.active); },
+            playerDodging() { return !!(this.player && this.player.flitting); },
 
             /** A boss move lands on her (unless she's mid-flit); true if it did */
             hurtPlayer(amount) {

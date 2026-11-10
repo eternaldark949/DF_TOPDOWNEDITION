@@ -9,8 +9,8 @@ These are game classes, outside Basement. Basement owns bodies, movement, veloci
 | State | Authoritative owner |
 |---|---|
 | Position, facing, velocity, mass, collision shape, attachment | Official native entity/body/controller |
-| Health/max health | `Player.data.health` / `max_health` |
-| Attunement, Flit/invulnerability timers, sneak, buffs, regeneration timers | `Player.data.player_state` (format 1) |
+| Health/max health | `playerVitals` referencing `Player.data.health` / `max_health` |
+| Attunement, Flit/invulnerability timers, sneak, buffs, regeneration timers | `playerVitals` referencing `Player.data.player_state` (format 1) |
 | Currency, inventory, equipment, quests, roster records, progression | `gameSession` |
 | Player reference | Session stores only the native numeric `player_entity_id`; lookup uses `api.elements` |
 | Input devices, held state, edges, normalization, dead zones | Basement `controlSystem` |
@@ -61,8 +61,8 @@ const unsubscribe = session.on('player:damaged', ({health}) => updateHealthDispl
 | `initializeState(rules)` | Initialize once; validate existing restored data without resetting it |
 | `advanceState(seconds, rules)` | Fixed-step gameplay timers; called only by PlayerStateSystem in the composed runtime |
 | `beginFlit(cost, seconds)`, `resetState(rules)` | State transitions used by PlayerStateSystem after successful native placement |
-| `connectGameplay({emit?, is_invulnerable?, on_damage?, buff_system?})` | Explicit injected callbacks; no legacy host object. `disconnectGameplay()` retires them |
-| `syncHealth(health, maximum)` | Explicit import boundary used by the old host; native session callers use damage/heal instead |
+| `connectGameplay({emit?, is_invulnerable?, on_damage?, on_death?, buff_system?})` | Explicit injected callbacks; no legacy host object. `disconnectGameplay()` retires them |
+| `vitals` | The shared gameplay component; reads the same entity data, never a second health ledger |
 
 Buff modifiers use `{statName:{add?,multiply?}}`, e.g. `{speed:{multiply:1.75}, flitCooldown:{multiply:1/3}}`. Durations are **seconds**, not old world-minute consumable durations. Zero-duration buffs have no effect. The session system does not import old purchase hooks or silently reinterpret their units.
 
@@ -70,7 +70,7 @@ Events: `player:damaged` (`amount`, `health`, `source`), `player:healed` (`amoun
 
 ## PlayerStateSystem
 
-`new PlayerStateSystem({session, rules})` connects player events and advances timers once per runtime step, before controls. Paused/no-level runtime frames do not advance gameplay timers. Damage restarts regeneration's delay. Default regeneration is 5 HP each second after 10 seconds without damage. Dead players do not regenerate.
+`new PlayerStateSystem({session, rules})` connects player events and advances timers once per runtime step, before controls. Paused/no-level runtime frames do not advance gameplay timers. Damage restarts regeneration's delay. Default regeneration heals 5 HP at exactly 10 seconds without damage, then every second. This preserves the production cadence. Dead players do not regenerate.
 
 `movement_speed` applies the `speed` buff and the sneak multiplier to the Directory speed (312 units/second). Basement integrates that motor request.
 
@@ -98,10 +98,42 @@ For low-level restoration, create a bare `gameEngine` with the Directory asset l
 
 **This is not a runtime-wide save/load implementation.** Coordinating saved level content, system reconnection, version migration and atomic gameplay restoration remains part of the persistence conversion. Classic save files are not automatically translated into the new coordinator.
 
-The two-room runtime example now uses these official session/player/control classes; its temporary player factory and input system are deleted. The classic production boot and its `PlayerEntity` remain. Its apartment host now passes explicit damage/invulnerability callbacks rather than injecting the entire old GameEngine into native Player, but the host still imports/synchronizes its legacy health and owns old buff/recovery/control rules. That boundary is not counted as retired ownership.
+The two-room runtime example uses these official session/player/control classes. Production's remaining `PlayerEntity` now uses the **same playerVitals component** as native Player, with its legacy movement still explicit. HUD/stats, stims/clinics, Stellar Lemonade maximum-health hooks, progression tuning, combat windows, story health checks, new-game reset and classic saves read the active player. The host fields `playerHealth`, `maxPlayerHealth`, `healthRegenTimer`, `flitState`, `lastHurtAt` and the `syncHealth` API are retired. No compatibility getters or synchronization loop replace them.
 
-Still pending: production player callers, full weapons/quick draw, consumable purchase/shield hooks, resonance/Last Stand/augment policies, story-specific death consequences and medbay flow, production appearance/animation/audio, live level conversion, legacy health/Flit ledgers, old mixins and production boot switch. Session equipment/quest/progression APIs own records; the old systems' complete behavior has not yet been ported into them.
+At the existing apartment/legacy body-replacement boundary, the retiring player's vitals snapshot transfers to its replacement. There is no host copy between transitions and no additional physical body. This is a state transfer at an existing physical migration boundary; it does **not** claim session body identity is preserved by the classic host. The destination runtime already preserves body identity across its levels.
+
+Classic saves now include an additive `player.vitals` snapshot. The old scalar `player.health` is still exported for historical readers; the new record is authoritative when present. Older saves reconstruct health from the scalar and saved progression/buff rules. Validation rejects malformed vitals before changing live currency/player/map state; this is not an atomic validation claim for the rest of the classic save schema. Flit energy/protection, grace, recovery timing and combat timestamps now survive saves and map transitions. New-game reset clears them. Existing story/medbay death policy has one `respawnPlayer()` host entry point used by both player implementations, with explicit callbacks from native Player.
+
+Still pending: class extraction of weapons/quick draw and interactions, consumable purchase/shield policy, resonance/Last Stand/augment policy, story/death/medbay flow, production appearance/animation/audio, live level conversion, old mixins and production boot switch. Session equipment/quest/progression APIs own records; the old systems' complete behavior has not yet been ported into them. Legacy city movement, Flit landing geometry, projectile response and collision systems remain physical migration work; moving their gameplay state does not retire their physical implementations.
+
+## playerVitals
+
+`new playerVitals(ownerData={}, rules=DirectoryPlayerRules)` is a gameplay component shared by native Player and the remaining production PlayerEntity. It retains a reference to `ownerData`, not a copy. Native instances obtain it lazily after restoration; the component itself is constructed normally, so private implementation fields are safe. Directory owns all default tuning.
+
+| Member | Contract |
+|---|---|
+| `health`, `max_health`, `dead` | Current entity health; death derives from health, not a second flag |
+| `attunement`, `max_attunement`, `flitting` | Current ability state |
+| `flit_cost`, `flit_duration`, `flit_distance`, `flit_minimum_distance` | Directory rule values; durations are seconds |
+| `last_flit_at`, `last_hurt_at` | Combat window timestamps in the owning runtime's game-time clock |
+| `state` | The owner's actual `data.player_state` record, including timers, timestamps and native timed buffs |
+| `setHealth(value)`, `setMaximumHealth(value)` | Validated health changes; maximum changes clamp current health |
+| `setAttunement(value)`, `setMaximumAttunement(value)` | Validated energy/capacity changes; clamp to capacity |
+| `damage(amount, time=elapsed_seconds)` | Apply damage and restart recovery; returns amount applied. Damage policy/protection checks belong to Player |
+| `recordDamage(time=elapsed_seconds)` | Restart recovery and stamp a confirmed hit |
+| `heal(amount)` | Clamp healing to maximum; returns amount restored; cannot resurrect |
+| `restoreHealth()` | Explicit full restoration used by clinics/respawn; clears recovery timing |
+| `importHealth(health, maximum=max_health)` | Validated historical health import boundary |
+| `makeInvulnerable(seconds)` | Set grace/protection timer; the classic Last Stand caller now uses this rather than a player frame counter |
+| `beginFlit(cost, seconds=flit_duration, time=elapsed_seconds)` | Spend energy and start protection **after** the physical owner accepts placement |
+| `advance(seconds, {regeneration_delay?, regeneration_interval?, regeneration_amount?}={})` | Advance gameplay timers/recharge/recovery once; returns health restored |
+| `snapshot()`, `load(snapshot)` | Detached JSON exchange; validate the whole vitals record before replacing its fields |
+| `configureRules(rules)`, `validate()`, `reset()` | Configure/validate without resetting saved state; reset returns to Directory new-game defaults |
+
+Both runtimes use this one timer implementation. PlayerStateSystem calls it through native Player's `advanceState`; the classic host calls it once in `updatePlayerRecovery`, in either its regular or apartment branch. Paused frames call neither. Classic progression supplies regeneration overrides in seconds. Native timed-buff expiry remains Player's responsibility; the old world-minute BuffSystem retains its existing separate consumable policy until its class conversion.
 
 ## Verification
 
-Run `node --test tools/test-player-systems.mjs` for ownership, session mutation, native input, mounting, damage/impulses, timers/pause, Flit, checked respawn, saved identity reconnection and invalid-state rejection. Shared engine placement tests cover minimum travel and zero headings. Browser runtime and controls checks use these classes and verify health/inventory/equipment persistence across levels, actual mouse fire intents and simultaneous device input.
+Run `node --test tools/test-player-systems.mjs tools/test-player-vitals.mjs` for ownership, session mutation, native input, mounting, damage/impulses, timers/pause, Flit, checked respawn, saved identity reconnection and invalid-state rejection. Shared engine placement tests cover minimum travel and zero headings. Browser runtime and controls checks use these classes and verify health/inventory/equipment persistence across levels, actual mouse fire intents and simultaneous device input.
+
+`node tools/test-player-state-callers.cjs` exercises the actual generated production build: absent host ledgers, stims/HUD, clinics, recovery, Last Stand grace, Stellar Lemonade, native/legacy transitions, single ticking, saves, upgraded old-save health, native death, invalid snapshot rejection and reset. The vitals suite also scans every production JS/ESM source for retired ledger names and synchronization methods. Both suites run in CI.

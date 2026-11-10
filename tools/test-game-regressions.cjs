@@ -98,7 +98,7 @@ function flitFixture(env, walls) {
     Object.assign(game.player,{x:100,y:100,angle:0,radius:12});
     game.player.buffSystem={getStat:(name,base)=>base}; game.augments={isEquipped:()=>false};
     game.resonance=Object.assign(new ResonanceSystem(),{stat:(name,base)=>base,rank:()=>0});
-    game.flitState={active:false,duration:0,maxDuration:15,attunement:120,maxAttunement:120,dashCost:40,rechargeRate:2,lastFlitAt:-99};
+    game.player.vitals.reset();
     game._afterimage={x:1,y:2,until:3}; game.flitVFX=[];
     globalThis.__effects=[]; globalThis.__randomCalls=0;
     const priorRandom=Math.random; Math.random=()=>{__randomCalls++;return priorRandom();};
@@ -109,7 +109,7 @@ function flitFixture(env, walls) {
   `);
 }
 function flitState(env) {
-  return value(env, 'return {player:{x:game.player.x,y:game.player.y,angle:game.player.angle},charge:game.flitState,ghost:game._afterimage,vfx:game.flitVFX,effects:__effects,random:__randomCalls};');
+  return value(env, 'return {player:{x:game.player.x,y:game.player.y,angle:game.player.angle},charge:game.player.vitals.state,ghost:game._afterimage,vfx:game.flitVFX,effects:__effects,random:__randomCalls};');
 }
 test('Rejected Flit spends no charge, only the blocked cue; shortened landing clears the actor radius', env => {
   flitFixture(env, [{x:0,y:0,w:300,h:300}]);

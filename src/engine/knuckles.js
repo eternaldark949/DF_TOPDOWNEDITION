@@ -41,7 +41,7 @@
                 if (now - (this._punchAt ?? -99) > KNUCKLES.COMBO_RESET) this._punchCombo = 0;
                 this._punchAt = now;
                 this._punchCombo = (this._punchCombo || 0) + 1;
-                const flit = _gameTimeSec - this.flitState.lastFlitAt <= this.resonance.flitStrikeWindow();
+                const flit = _gameTimeSec - this.player.vitals.last_flit_at <= this.resonance.flitStrikeWindow();
                 const hay = flit || this._punchCombo % (st.haymakerEvery || KNUCKLES.EVERY) === 0;
                 if (hay) this._punchCombo = 0;
                 const ang = pl.angle;

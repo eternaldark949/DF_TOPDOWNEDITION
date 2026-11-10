@@ -13,23 +13,23 @@ game.roomSystem={active:false,doors:[]};
  Object.assign(game.player,{x:100,y:100,angle:0,radius:12});
  game.player.buffSystem={getStat:(name,base)=>base};game.augments={isEquipped:()=>false};
  game.resonance=Object.assign(new ResonanceSystem(),{stat:(name,base)=>base,rank:()=>0});_gameTimeSec=10;
- game.flitState={active:true,duration:7,maxDuration:15,attunement:120,maxAttunement:120,dashCost:40,rechargeRate:2,lastFlitAt:9.8};
+ game.player.vitals.reset();game.player.vitals.beginFlit(0,7/60,9.8);
  game._afterimage={x:30,y:30,until:11};game.flitVFX=[];game._drawnAt=9.8;game._drawShotUsed=true;
  const feedback=[];audioSys.sfx=s=>feedback.push(s);navigator.vibrate=p=>{feedback.push(p);return true;};
 `;
 test('Rejected landing changes only feedback, preserving charge and existing combat windows',e=>{
  const r=value(e,setup+`
  game.activeMap.walls=[{x:0,y:0,w:300,h:300}];
- const before={position:[game.player.x,game.player.y],flit:{...game.flitState},ghost:{...game._afterimage},draw:game._drawnAt,used:game._drawShotUsed};
+ const before={position:[game.player.x,game.player.y],flit:{...game.player.vitals.state},ghost:{...game._afterimage},draw:game._drawnAt,used:game._drawShotUsed};
  const success=game.triggerFlit(0);
- return {before,after:{position:[game.player.x,game.player.y],flit:{...game.flitState},ghost:{...game._afterimage},draw:game._drawnAt,used:game._drawShotUsed},
+ return {before,after:{position:[game.player.x,game.player.y],flit:{...game.player.vitals.state},ghost:{...game._afterimage},draw:game._drawnAt,used:game._drawShotUsed},
  success,cue:{...game._flitFeedback},feedback,vfx:game.flitVFX.length};`);
  assert.equal(r.success,false);assert.deepEqual(r.after,r.before);assert.equal(r.cue.kind,'blocked');assert.equal(r.vfx,0);assert.deepEqual(r.feedback,['knock',[15,35,15]]);
 });
 test('Short landing still spends normal cost, renews protection and plays the success effect',e=>{
  const r=value(e,setup+`
  game.activeMap.walls=[{x:210,y:50,w:50,h:100}];const success=game.triggerFlit(0);
- return {success,x:game.player.x,cue:game._flitFeedback.kind,cost:120-game.flitState.attunement,duration:game.flitState.duration,last:game.flitState.lastFlitAt,vfx:game.flitVFX.length,audio:feedback.filter(x=>typeof x==='string')};`);
+ return {success,x:game.player.x,cue:game._flitFeedback.kind,cost:120-game.player.attunement,duration:game.player.vitals.state.flit_remaining*60,last:game.player.vitals.state.last_flit_at,vfx:game.flitVFX.length,audio:feedback.filter(x=>typeof x==='string')};`);
  assert.equal(r.success,true);assert.ok(Math.abs(r.x-198)<1e-5);assert.equal(r.cue,'short');assert.equal(r.cost,40);assert.equal(r.duration,15);assert.equal(r.last,10);assert.equal(r.vfx,1);assert.deepEqual(r.audio,['flit']);
 });
 test('Clear full-range flits through thin walls clear stale failure and short-landing cues',e=>{
@@ -59,7 +59,7 @@ test('Low-FPS cues persist through several frames, then expire independently of 
  const r=value(e,setup+`
  let labels=0;game.ctx.fillText=()=>labels++;game._signalFlitLanding('blocked',0);
  for(const age of [.0625,.125,.25,.5,.625]){_gameTimeSec=10+age;game.drawFlitFeedback(game.ctx);}
- _gameTimeSec=10.66;game.drawFlitFeedback(game.ctx);return {labels,cue:game._flitFeedback,duration:game.flitState.duration};`);
+ _gameTimeSec=10.66;game.drawFlitFeedback(game.ctx);return {labels,cue:game._flitFeedback,duration:game.player.vitals.state.flit_remaining*60};`);
  assert.deepEqual(r,{labels:5,cue:null,duration:7});
 });
 test('Ring results exclude conflicting animations and reset cancels pending old results',e=>{

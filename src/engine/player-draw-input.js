@@ -37,7 +37,7 @@
                 this.ctx.rotate(vehiclePose ? this.car.angle : presentation.angle);
                 
                 // Stealth/Flit Ghosting
-                if (presentation.isHidden || this.flitState.active) this.ctx.globalAlpha = 0.5;
+                if (presentation.isHidden || this.player.flitting) this.ctx.globalAlpha = 0.5;
             
                 // ── Fully cosmetics-driven appearance ──
                 const cosmeticConfig = this.cosmetics.getRenderConfig();
@@ -445,7 +445,7 @@
             /** The flit ring's charge (fill, ready pulse, dim when unaffordable) — only touched when it changes. */
             updateFlitRing() {
                 const el = this.flitRingEl; if (!el) return;
-                const fs = this.flitState, fill = Math.round(100 * fs.attunement / fs.maxAttunement), ready = fs.attunement >= this.flitCost();
+                const vitals = this.player.vitals, fill = Math.round(100 * vitals.attunement / vitals.max_attunement), ready = vitals.attunement >= this.flitCost();
                 if (fill !== this._ringFill) { this._ringFill = fill; el.style.setProperty('--fill', fill + '%'); }
                 if (ready !== this._ringReady) {
                     this._ringReady = ready; el.classList.toggle('dim', !ready);

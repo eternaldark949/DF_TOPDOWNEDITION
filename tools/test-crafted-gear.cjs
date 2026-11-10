@@ -192,12 +192,12 @@ test('Blades: Crimson Edge cuts ×1.5 and bleeds five deep; Quick Hands and Refl
 
 test('Blades: a cut heals 4% of its damage; mid-swing she takes 25% less; a Flit-cut always crits',e=>{
  const r=value(e,setup+`const g=ganger(1030,1000);wield('blood_pact');
-  game.playerHealth=50;game.player.hp=50;game.player.maxHp=game.maxPlayerHealth=100;
+  game.player.vitals.importHealth(50,100);
   const s=withRandom(.99,()=>game.meleeSlash());
   const before=game.player.hp;game.player.invincibleTimer=0;game.player.takeDamage(20);const guarded=before-game.player.hp;
   while(game._swing===s)tick();const healedTo=game.player.hp;
   _gameTimeSec+=2;game.player.invincibleTimer=0;const b2=game.player.hp;game.player.takeDamage(20);const open=b2-game.player.hp;
-  game.flitState.lastFlitAt=_gameTimeSec;const hp=g.hp;game.shootCooldown=0;const s2=withRandom(.99,()=>game.meleeSlash());while(game._swing===s2)tick();
+  game.player.vitals.state.last_flit_at=_gameTimeSec;const hp=g.hp;game.shootCooldown=0;const s2=withRandom(.99,()=>game.meleeSlash());while(game._swing===s2)tick();
   return {guarded,healed:healedTo-(before-guarded),open,flit:hp-g.hp};`);
  assert.equal(r.guarded,15);assert.equal(r.healed,2);assert.equal(r.open,20);assert.equal(r.flit,90);
 });

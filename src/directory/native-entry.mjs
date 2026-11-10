@@ -14,3 +14,5 @@ export { gameSession } from '../gameplay/game-session.mjs';
 export { PlayerStateSystem } from '../gameplay/player-state-system.mjs';
 export { PlayerControlSystem } from '../gameplay/player-control-system.mjs';
 export { Player } from '../entities/player.mjs';
+
+export { playerVitals } from '../gameplay/player-vitals.mjs';

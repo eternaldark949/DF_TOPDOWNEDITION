@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '0813be0505d6';
+        const DFAB_BUILD = '662e8260f8bd';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="6041">
+    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="6098">
 const DFNative = (()=>{
 'use strict';
 // src/basement/physics/core/values.mjs
@@ -19372,7 +19372,7 @@ function resolveApartmentDyer(game_db){
 return Object.freeze({get resolveApartmentDefinition(){return resolveApartmentDefinition;},get resolveApartmentDyer(){return resolveApartmentDyer;}});
 })();
 // src/gameplay/values.mjs
-const m40 = (()=>{
+const m41 = (()=>{
 // Gameplay validation, deliberately unrelated to physical vectors or integration.
 function nonnegative(value, name) {
     if (!Number.isFinite(value) || value < 0) throw new TypeError(`${name} must be finite and nonnegative`);
@@ -19395,18 +19395,6 @@ function jsonCopy(value) {
     visit(value); return structuredClone(value);
 }
 
-return Object.freeze({get nonnegative(){return nonnegative;},get identifier(){return identifier;},get jsonCopy(){return jsonCopy;}});
-})();
-// src/entities/player.mjs
-const m39 = (()=>{
-const {gameCharacter} = m1;
-const {identifier,jsonCopy,nonnegative} = m40;
-const services = new WeakMap();
-function emitPlayer(player,event,detail = {}) { services.get(player)?.emit?.(event,{entity_id:player.entity_id,...detail}); }
-function playerState(player) {
-    if(!player.data.player_state)throw new Error('Initialize Player gameplay state before using player rules');
-    return player.data.player_state;
-}
 function validateModifiers(modifiers) {
     const copy=jsonCopy(modifiers);
     if(!copy || typeof copy!=='object' || Array.isArray(copy))throw new TypeError('Buff modifiers must be a record');
@@ -19418,71 +19406,172 @@ function validateModifiers(modifiers) {
     return copy;
 }
 
+return Object.freeze({get nonnegative(){return nonnegative;},get identifier(){return identifier;},get jsonCopy(){return jsonCopy;},get validateModifiers(){return validateModifiers;}});
+})();
+// src/gameplay/player-vitals.mjs
+const m40 = (()=>{
+const defaults = m27.default;
+const {nonnegative,jsonCopy,identifier,validateModifiers} = m41;
 
+/** Shared gameplay component. It references its owner's data; it never owns or mirrors a body. */
+class playerVitals {
+    #data; #rules;
+    constructor(data = {}, rules = defaults) { this.#data=data; this.configureRules(rules); }
+    configureRules(rules) {
+        const copy=jsonCopy(rules);
+        nonnegative(copy.max_health,'max_health');if(!copy.max_health)throw new TypeError('max_health must be positive');
+        for(const key of ['capacity','cost','distance','recharge_per_second','invulnerability_seconds','minimum_distance'])nonnegative(copy.flit?.[key],key);
+        for(const key of ['delay_seconds','interval_seconds','amount'])nonnegative(copy.regeneration?.[key],key);
+        if(!copy.regeneration.interval_seconds)throw new TypeError('Regeneration interval must be positive');
+        this.#rules=copy;
+        const data=this.#data;
+        data.health ??= copy.max_health;data.max_health ??=copy.max_health;
+        data.player_state ??= {format_version:1,attunement:copy.flit.capacity,flit_remaining:0,invulnerable_remaining:0,seconds_since_damage:0,regeneration_elapsed:0,sneaking:false,buffs:{}};
+        // Additive version-1 fields: older native saves retain all existing values.
+        const state=data.player_state;
+        state.max_attunement ??=copy.flit.capacity;state.last_flit_at ??=-99;state.last_hurt_at ??=-99;state.elapsed_seconds ??=0;
+        this.validate();return this;
+    }
+    validate() {
+        const data=jsonCopy(this.#data), state=data.player_state;
+        nonnegative(data.health,'health');nonnegative(data.max_health,'max_health');
+        if(!data.max_health || data.health>data.max_health || state?.format_version!==1 || typeof state.sneaking!=='boolean' || !state.buffs || typeof state.buffs!=='object' || Array.isArray(state.buffs))throw new TypeError('Invalid saved Player state');
+        for(const key of ['attunement','max_attunement','flit_remaining','invulnerable_remaining','seconds_since_damage','regeneration_elapsed','elapsed_seconds'])nonnegative(state[key],key);
+        if(state.attunement>state.max_attunement || !Number.isFinite(state.last_flit_at) || !Number.isFinite(state.last_hurt_at))throw new TypeError('Invalid saved Player attunement or timestamps');
+        for(const [id,buff] of Object.entries(state.buffs)){identifier(id);nonnegative(buff?.remaining,'buff duration');validateModifiers(buff.modifiers);}
+        return this;
+    }
+    get health() { return this.#data.health; }
+    get max_health() { return this.#data.max_health; }
+    get dead() { return this.health<=0; }
+    get state() { return this.#data.player_state; }
+    get flitting() { return this.state.flit_remaining>0; }
+    get attunement() { return this.state.attunement; }
+    get max_attunement() { return this.state.max_attunement; }
+    get flit_cost() { return this.#rules.flit.cost; }
+    get flit_duration() { return this.#rules.flit.invulnerability_seconds; }
+    get flit_distance() { return this.#rules.flit.distance; }
+    get flit_minimum_distance() { return this.#rules.flit.minimum_distance; }
+    get last_flit_at() { return this.state.last_flit_at; }
+    get last_hurt_at() { return this.state.last_hurt_at; }
+    setHealth(health) { this.#data.health=Math.min(nonnegative(health,'health'),this.max_health);return this.health; }
+    setMaximumHealth(maximum) {
+        nonnegative(maximum,'max_health');if(!maximum)throw new TypeError('max_health must be positive');
+        this.#data.max_health=maximum;this.setHealth(this.health);return maximum;
+    }
+    setMaximumAttunement(maximum) { this.state.max_attunement=nonnegative(maximum,'max_attunement');this.setAttunement(this.attunement);return maximum; }
+    setAttunement(value) { this.state.attunement=Math.min(nonnegative(value,'attunement'),this.max_attunement);return this.attunement; }
+    restoreHealth() { this.#data.health=this.max_health;this.state.seconds_since_damage=0;this.state.regeneration_elapsed=0; }
+    importHealth(health, maximum=this.max_health) {
+        nonnegative(health,'health');nonnegative(maximum,'max_health');if(!maximum)throw new TypeError('max_health must be positive');
+        this.#data.max_health=maximum;this.setHealth(health);
+    }
+    heal(amount) { nonnegative(amount,'healing');if(this.dead)return 0;const applied=Math.min(this.max_health-this.health,amount);this.setHealth(this.health+applied);return applied; }
+    damage(amount, time=this.state.elapsed_seconds) {
+        nonnegative(amount,'damage');if(!Number.isFinite(time))throw new TypeError('Damage time must be finite');
+        if(this.dead || amount===0)return 0;
+        const applied=Math.min(this.health,amount);this.setHealth(this.health-applied);this.recordDamage(time);return applied;
+    }
+    recordDamage(time=this.state.elapsed_seconds) {
+        if(!Number.isFinite(time))throw new TypeError('Damage time must be finite');
+        this.state.last_hurt_at=time;this.state.seconds_since_damage=0;this.state.regeneration_elapsed=0;
+    }
+    makeInvulnerable(seconds) { this.state.invulnerable_remaining=nonnegative(seconds,'invulnerability'); }
+    beginFlit(cost,seconds=this.flit_duration,time=this.state.elapsed_seconds) {
+        nonnegative(cost,'Flit cost');nonnegative(seconds,'Flit duration');if(!Number.isFinite(time))throw new TypeError('Flit time must be finite');
+        if(this.attunement<cost)throw new Error('Insufficient attunement');
+        this.state.attunement-=cost;this.state.flit_remaining=seconds;this.state.last_flit_at=time;
+    }
+    advance(seconds,{regeneration_delay=this.#rules.regeneration.delay_seconds,regeneration_interval=this.#rules.regeneration.interval_seconds,regeneration_amount=this.#rules.regeneration.amount}={}) {
+        nonnegative(seconds,'elapsed seconds');nonnegative(regeneration_delay,'regeneration delay');nonnegative(regeneration_interval,'regeneration interval');nonnegative(regeneration_amount,'regeneration amount');
+        if(!regeneration_interval)throw new TypeError('Regeneration interval must be positive');
+        if(seconds===0)return 0;
+        const state=this.state;state.elapsed_seconds+=seconds;
+        for(const key of ['flit_remaining','invulnerable_remaining'])state[key]=state[key]<=seconds+1e-9?0:state[key]-seconds;
+        if(this.dead)return 0;
+        this.setAttunement(this.attunement+this.#rules.flit.recharge_per_second*seconds);
+        const previous=state.seconds_since_damage;state.seconds_since_damage+=seconds;
+        // Existing game cadence: first heal at the delay, then once per interval.
+        const count=time=>time+1e-9<regeneration_delay?0:1+Math.floor((time-regeneration_delay+1e-9)/regeneration_interval);
+        return this.heal(Math.max(0,count(state.seconds_since_damage)-(previous===0?0:count(previous)))*regeneration_amount);
+    }
+    reset() { delete this.#data.player_state;this.#data.health=this.#rules.max_health;this.#data.max_health=this.#rules.max_health;this.configureRules(this.#rules); }
+    snapshot() { return jsonCopy({health:this.health,max_health:this.max_health,player_state:this.state}); }
+    load(snapshot) {
+        const copy=jsonCopy(snapshot);
+        if(!copy || typeof copy!=='object' || Array.isArray(copy) || !['health','max_health','player_state'].every(key=>Object.hasOwn(copy,key)) || !copy.player_state || Object.keys(copy).some(key=>!['health','max_health','player_state'].includes(key)))throw new TypeError('Invalid vitals snapshot');
+        new playerVitals(copy,this.#rules); // Validate before replacing the live record.
+        this.#data.health=copy.health;this.#data.max_health=copy.max_health;this.#data.player_state=copy.player_state;
+    }
+}
+
+return Object.freeze({get playerVitals(){return playerVitals;}});
+})();
+// src/entities/player.mjs
+const m39 = (()=>{
+const {gameCharacter} = m1;
+const {playerVitals} = m40;
+const {identifier,validateModifiers,nonnegative} = m41;
+const services = new WeakMap();
+const components = new WeakMap();
+function vitalsFor(player,rules) {
+    let vitals=components.get(player);
+    if(!vitals){vitals=new playerVitals(player.data,rules);components.set(player,vitals);}
+    return vitals;
+}
+function emitPlayer(player,event,detail = {}) { services.get(player)?.emit?.(event,{entity_id:player.entity_id,...detail}); }
+function playerState(player) {
+    if(!player.data.player_state)throw new Error('Initialize Player gameplay state before using player rules');
+    return player.data.player_state;
+}
 /** Official gameplay identity; native body/controller own all physical state. */
 class Player extends gameCharacter {
     static entity_type = 'df_player';
-    connectGameplay({ emit, is_invulnerable, on_damage, buff_system } = {}) {
-        for(const callback of [emit,is_invulnerable,on_damage])if(callback!==undefined&&typeof callback!=='function')throw new TypeError('Gameplay callbacks must be functions');
-        services.set(this,{emit,is_invulnerable,on_damage,buff_system}); return this;
+    connectGameplay({ emit, is_invulnerable, on_damage, on_death, buff_system } = {}) {
+        for(const callback of [emit,is_invulnerable,on_damage,on_death])if(callback!==undefined&&typeof callback!=='function')throw new TypeError('Gameplay callbacks must be functions');
+        services.set(this,{emit,is_invulnerable,on_damage,on_death,buff_system}); return this;
     }
     disconnectGameplay() { services.delete(this); }
     get buffSystem() { return services.get(this)?.buff_system; }
     get visible() { return this.data.visible !== false; }
     set visible(value) { this.data.visible = !!value; }
-    get hp() { return this.data.health ?? 0; }
-    set hp(value) { this.data.health = Math.min(nonnegative(value,'health'),this.maxHp); }
-    get maxHp() { return this.data.max_health ?? 0; }
-    set maxHp(value) { nonnegative(value,'max_health');if(value===0)throw new TypeError('max_health must be positive');this.data.max_health=value;this.hp=this.hp; }
-    get dead() { return this.hp <= 0; }
+    get vitals() { return vitalsFor(this); }
+    get hp() { return this.vitals.health; }
+    set hp(value) { this.vitals.setHealth(value); }
+    get maxHp() { return this.vitals.max_health; }
+    set maxHp(value) { this.vitals.setMaximumHealth(value); }
+    get dead() { return this.vitals.dead; }
     get alliance() { return 'friendly'; }
     get radius() { return this.collision_shape.radius; }
     get isHidden() { return !!this.data.hidden; }
     set isHidden(value) { this.data.hidden = !!value; }
     get sneaking() { return !!this.data.player_state?.sneaking; }
     set sneaking(value) { playerState(this).sneaking=!!value; }
-    get flitting() { return (this.data.player_state?.flit_remaining ?? 0)>0; }
-    get attunement() { return this.data.player_state?.attunement ?? 0; }
+    get flitting() { return this.vitals.flitting; }
+    get attunement() { return this.vitals.attunement; }
     initializeState(rules) {
-        if(this.data.player_state){
-            const state=jsonCopy(this.data.player_state);
-            if(state.format_version!==1 || typeof state.sneaking!=='boolean' || !state.buffs || Array.isArray(state.buffs) || typeof state.buffs!=='object')throw new TypeError('Invalid saved Player state');
-            for(const key of ['attunement','flit_remaining','invulnerable_remaining','seconds_since_damage','regeneration_elapsed'])nonnegative(state[key],key);
-            nonnegative(this.data.health,'health');nonnegative(this.data.max_health,'max_health');
-            if(this.maxHp<=0 || this.hp>this.maxHp || state.attunement>rules.flit.capacity)throw new TypeError('Invalid saved Player health or attunement');
-            for(const [id,buff] of Object.entries(state.buffs)){identifier(id);nonnegative(buff.remaining,'buff duration');validateModifiers(buff.modifiers);}
-            return this;
-        }
-        this.syncHealth(this.data.health ?? rules.max_health,this.data.max_health ?? rules.max_health);
-        this.data.player_state={format_version:1,attunement:rules.flit.capacity,flit_remaining:0,invulnerable_remaining:0,seconds_since_damage:0,regeneration_elapsed:0,sneaking:false,buffs:{}};
+        vitalsFor(this,rules).configureRules(rules);
         return this;
-    }
-    syncHealth(health, maximum=this.maxHp) {
-        nonnegative(health,'health');nonnegative(maximum,'max_health');if(maximum===0)throw new TypeError('max_health must be positive');
-        this.data.max_health=maximum;this.data.health=Math.min(health,maximum);
     }
     takeDamage(amount, { impulse, bypass_invulnerability=false, source=null } = {}) {
         nonnegative(amount,'damage'); const state=this.data.player_state;
         if(this.dead || amount===0 || this.flitting || services.get(this)?.is_invulnerable?.() || !bypass_invulnerability && state?.invulnerable_remaining>0)return false;
         // A supplied impulse is already a physical command, never reconstructed from damage here.
         if(impulse)this.body.applyImpulse(impulse);
-        const applied=Math.min(this.hp,amount);this.hp-=applied;
-        if(state){state.seconds_since_damage=0;state.regeneration_elapsed=0;}
+        const applied=this.vitals.damage(amount);
         services.get(this)?.on_damage?.({player:this,amount:applied});
         emitPlayer(this,'player:damaged',{amount:applied,health:this.hp,source});
-        if(this.dead){this.cancelMovement();emitPlayer(this,'player:died',{source});}
+        if(this.dead){this.cancelMovement();emitPlayer(this,'player:died',{source});services.get(this)?.on_death?.(this);}
         return true;
     }
     heal(amount) {
         nonnegative(amount,'healing');if(this.dead || amount===0)return 0;
-        const applied=Math.min(this.maxHp-this.hp,amount);this.hp+=applied;
+        const applied=this.vitals.heal(amount);
         if(applied)emitPlayer(this,'player:healed',{amount:applied,health:this.hp});return applied;
     }
-    makeInvulnerable(seconds) { playerState(this).invulnerable_remaining=nonnegative(seconds,'invulnerability'); }
+    makeInvulnerable(seconds) { this.vitals.makeInvulnerable(seconds); }
     beginFlit(cost,seconds) {
-        nonnegative(cost,'Flit cost');nonnegative(seconds,'Flit duration');const state=playerState(this);
-        if(state.attunement<cost)throw new Error('Insufficient attunement');
-        state.attunement-=cost;state.flit_remaining=seconds;emitPlayer(this,'player:flitted',{attunement:state.attunement});
+        this.vitals.beginFlit(cost,seconds);emitPlayer(this,'player:flitted',{attunement:this.attunement});
     }
     addBuff(buff_id,{duration_seconds,modifiers={}}) {
         identifier(buff_id);nonnegative(duration_seconds,'buff duration');
@@ -19500,29 +19589,22 @@ class Player extends gameCharacter {
     }
     advanceState(seconds,rules) {
         nonnegative(seconds,'elapsed seconds');const state=playerState(this);
-        state.flit_remaining=state.flit_remaining<=seconds+1e-9?0:state.flit_remaining-seconds;
-        state.invulnerable_remaining=state.invulnerable_remaining<=seconds+1e-9?0:state.invulnerable_remaining-seconds;
         for(const [buff_id,buff] of Object.entries(state.buffs)) {
             buff.remaining=buff.remaining<=seconds+1e-9?0:buff.remaining-seconds;
             if(buff.remaining===0){delete state.buffs[buff_id];emitPlayer(this,'player:buff-expired',{buff_id});}
         }
-        if(this.dead)return;
-        state.attunement=Math.min(rules.flit.capacity,state.attunement+rules.flit.recharge_per_second*seconds);
-        const previous=state.seconds_since_damage;state.seconds_since_damage+=seconds;
-        const regeneration=rules.regeneration;
-        state.regeneration_elapsed+=Math.max(0,state.seconds_since_damage-Math.max(previous,regeneration.delay_seconds));
-        const intervals=Math.floor((state.regeneration_elapsed+1e-9)/regeneration.interval_seconds);
-        if(intervals){state.regeneration_elapsed=Math.max(0,state.regeneration_elapsed-intervals*regeneration.interval_seconds);this.heal(intervals*this.getStat('regeneration',regeneration.amount));}
+        const healed=this.vitals.advance(seconds,{regeneration_delay:rules.regeneration.delay_seconds,regeneration_interval:rules.regeneration.interval_seconds,regeneration_amount:this.getStat('regeneration',rules.regeneration.amount)});
+        if(healed)emitPlayer(this,'player:healed',{amount:healed,health:this.hp});
     }
     resetState(rules) {
-        this.data.player_state=null;this.syncHealth(rules.max_health,rules.max_health);this.initializeState(rules);
+        this.vitals.configureRules(rules).reset();
     }
 }
 
 return Object.freeze({get Player(){return Player;}});
 })();
 // src/entities/apartment-prop.mjs
-const m41 = (()=>{
+const m42 = (()=>{
 const {gameProp} = m1;
 
 /** Furniture/fixture gameplay metadata; no local transform or integration. */
@@ -19537,7 +19619,7 @@ class ApartmentProp extends gameProp {
 return Object.freeze({get ApartmentProp(){return ApartmentProp;}});
 })();
 // src/entities/apartment-companion.mjs
-const m42 = (()=>{
+const m43 = (()=>{
 const {gameCharacter} = m1;
 const ROSTER_FIELDS = ['recruited','downed','equippedWeaponId','weaponId','hp','maxHp','teammateStims','maxTeammateStims','relationship','hireType','hireDuration','hireTime','hireCost','hired','role','bio','alliance'];
 /** Roster gameplay data plus an ordinary native character while present in this scene. */
@@ -19561,8 +19643,8 @@ const {physicsSystem} = m1;
 const {createApartmentAssetLibrary} = m36;
 const {resolveApartmentDefinition,resolveApartmentDyer} = m38;
 const {Player} = m39;
-const {ApartmentProp} = m41;
-const {ApartmentCompanion,rosterRecord} = m42;
+const {ApartmentProp} = m42;
+const {ApartmentCompanion,rosterRecord} = m43;
 const {gameProp} = m1;
 class ApartmentDoor extends gameProp { static entity_type = 'df_apartment_door'; }
 
@@ -19617,7 +19699,7 @@ class ApartmentLevel {
 return Object.freeze({get ApartmentLevel(){return ApartmentLevel;}});
 })();
 // src/lobby/level-lobby.mjs
-const m44 = (()=>{
+const m45 = (()=>{
 // ===== LV1 LOBBY =====
 // The engine's game loop. The Lobby keeps the clock and nothing else: it knows when a frame is due,
 // how many fixed simulation steps that frame owes, and how far the drawn frame sits between two steps.
@@ -19754,7 +19836,7 @@ class levelLobby {
 return Object.freeze({get levelLobby(){return levelLobby;}});
 })();
 // src/runtime/game-level.mjs
-const m45 = (()=>{
+const m46 = (()=>{
 /** Content/lifecycle contract. A level never owns a world, clock or collision solver. */
 class gameLevel {
     constructor({ level_id } = {}) {
@@ -19774,7 +19856,7 @@ class gameLevel {
 return Object.freeze({get gameLevel(){return gameLevel;}});
 })();
 // src/basement/controls/values.mjs
-const m48 = (()=>{
+const m49 = (()=>{
 const TAP = 0;
 const DOUBLETAP = 1;
 const HELD = 2;
@@ -19798,7 +19880,7 @@ function radialStick(value, dead_zone = 0.15) {
 return Object.freeze({get TAP(){return TAP;},get DOUBLETAP(){return DOUBLETAP;},get HELD(){return HELD;},get PRESS(){return PRESS;},get REPEAT(){return REPEAT;},get RELEASE(){return RELEASE;},get cleanupAll(){return cleanupAll;},get radialStick(){return radialStick;}});
 })();
 // src/basement/controls/touch-stick.mjs
-const m50 = (()=>{
+const m51 = (()=>{
 class touchStick {
     constructor(system, name, packet) {
         Object.assign(this, { anchor: 'centre', base_radius: 0, travel: 40, scale: () => 1, edge: 0, ring: null, input: null, slots: null, mouse: false, free: () => !this.s.active, onStart() {}, onMove() {}, onEnd() {} }, packet);
@@ -19897,9 +19979,9 @@ class touchStick {
 return Object.freeze({get touchStick(){return touchStick;}});
 })();
 // src/basement/controls/devices.mjs
-const m49 = (()=>{
-const {touchStick} = m50;
-const {radialStick,cleanupAll} = m48;
+const m50 = (()=>{
+const {touchStick} = m51;
+const {radialStick,cleanupAll} = m49;
 
 /** Device state uses the terminology from the original Python input instances. */
 class inputInstance {
@@ -20018,10 +20100,10 @@ class gamepadInstance extends inputInstance {
 return Object.freeze({get inputInstance(){return inputInstance;},get keyboardInstance(){return keyboardInstance;},get mouseInstance(){return mouseInstance;},get touchInstance(){return touchInstance;},get gamepadInstance(){return gamepadInstance;}});
 })();
 // src/basement/controls/system.mjs
-const m47 = (()=>{
-const {TAP,DOUBLETAP,HELD,PRESS,REPEAT,RELEASE} = m48;
-const {radialStick,cleanupAll} = m48;
-const {keyboardInstance,mouseInstance,touchInstance,gamepadInstance} = m49;
+const m48 = (()=>{
+const {TAP,DOUBLETAP,HELD,PRESS,REPEAT,RELEASE} = m49;
+const {radialStick,cleanupAll} = m49;
+const {keyboardInstance,mouseInstance,touchInstance,gamepadInstance} = m50;
 
 class controlSystem {
     #listeners = new Set();
@@ -20259,16 +20341,16 @@ class controlSystem {
 return Object.freeze({get controlSystem(){return controlSystem;}});
 })();
 // src/basement/controls/index.mjs
-const m46 = (()=>{
+const m47 = (()=>{
 
 
 
 
 
-return Object.freeze({get controlSystem(){return m47.controlSystem;},get controlsSystem(){return m47.controlSystem;},get inputInstance(){return m49.inputInstance;},get keyboardInstance(){return m49.keyboardInstance;},get mouseInstance(){return m49.mouseInstance;},get touchInstance(){return m49.touchInstance;},get gamepadInstance(){return m49.gamepadInstance;},get touchStick(){return m50.touchStick;},get TAP(){return m48.TAP;},get DOUBLETAP(){return m48.DOUBLETAP;},get HELD(){return m48.HELD;},get PRESS(){return m48.PRESS;},get REPEAT(){return m48.REPEAT;},get RELEASE(){return m48.RELEASE;}});
+return Object.freeze({get controlSystem(){return m48.controlSystem;},get controlsSystem(){return m48.controlSystem;},get inputInstance(){return m50.inputInstance;},get keyboardInstance(){return m50.keyboardInstance;},get mouseInstance(){return m50.mouseInstance;},get touchInstance(){return m50.touchInstance;},get gamepadInstance(){return m50.gamepadInstance;},get touchStick(){return m51.touchStick;},get TAP(){return m49.TAP;},get DOUBLETAP(){return m49.DOUBLETAP;},get HELD(){return m49.HELD;},get PRESS(){return m49.PRESS;},get REPEAT(){return m49.REPEAT;},get RELEASE(){return m49.RELEASE;}});
 })();
 // src/basement/rendering/values.mjs
-const m53 = (()=>{
+const m54 = (()=>{
 function finite(value,name,min=-Infinity){if(!Number.isFinite(value)||value<min)throw new TypeError(`Invalid ${name}`);return value;}
 function vector(value,name='vector',out=[]){if(!Array.isArray(value)||value.length!==2)throw new TypeError(`Invalid ${name}`);out[0]=finite(value[0],name);out[1]=finite(value[1],name);return out;}
 function identifier(value){if(typeof value!=='string'||!value||value==='screen')throw new TypeError('A nonempty resource/renderer ID is required (screen is reserved)');return value;}
@@ -20285,8 +20367,8 @@ const BLENDS = Object.freeze({normal:'source-over',add:'lighter',multiply:'multi
 return Object.freeze({get finite(){return finite;},get vector(){return vector;},get identifier(){return identifier;},get matrix(){return matrix;},get inverse(){return inverse;},get point(){return point;},get transform(){return transform;},get viewport(){return viewport;},get freezeData(){return freezeData;},get color(){return color;},get BLENDS(){return BLENDS;}});
 })();
 // src/basement/rendering/camera.mjs
-const m52 = (()=>{
-const {finite,vector,viewport,inverse,point,freezeData} = m53;
+const m53 = (()=>{
+const {finite,vector,viewport,inverse,point,freezeData} = m54;
 
 /** View state only. Following reads native poses; this class never moves a body. */
 class cameraSystem {
@@ -20340,8 +20422,8 @@ class cameraSystem {
 return Object.freeze({get cameraSystem(){return cameraSystem;}});
 })();
 // src/basement/rendering/packets.mjs
-const m55 = (()=>{
-const {finite,vector,matrix,inverse,transform,color,identifier,BLENDS} = m53;
+const m56 = (()=>{
+const {finite,vector,matrix,inverse,transform,color,identifier,BLENDS} = m54;
 
 const geometryBuffers = new WeakMap();
 
@@ -20411,9 +20493,9 @@ function requirements(draw,resolve,result=[]){
 return Object.freeze({get geometry(){return geometry;},get material(){return material;},get packet(){return packet;},get requirements(){return requirements;}});
 })();
 // src/basement/rendering/frame.mjs
-const m54 = (()=>{
-const {packet} = m55;
-const {color,finite,freezeData} = m53;
+const m55 = (()=>{
+const {packet} = m56;
+const {color,finite,freezeData} = m54;
 
 /** Reused command buffers. Producers submit data; a backend borrows a completed frame. */
 class renderFrame {
@@ -20451,10 +20533,10 @@ class renderFrame {
 return Object.freeze({get renderFrame(){return renderFrame;}});
 })();
 // src/basement/rendering/system.mjs
-const m56 = (()=>{
-const {renderFrame} = m54;
-const {geometry,material,requirements} = m55;
-const {finite,identifier,freezeData} = m53;
+const m57 = (()=>{
+const {renderFrame} = m55;
+const {geometry,material,requirements} = m56;
+const {finite,identifier,freezeData} = m54;
 
 function normalizeResource(description){
     if(!description||typeof description!=='object')throw new TypeError('A data resource descriptor is required');
@@ -20540,8 +20622,8 @@ class renderSystem {
 return Object.freeze({get renderSystem(){return renderSystem;}});
 })();
 // src/basement/rendering/canvas.mjs
-const m57 = (()=>{
-const {BLENDS} = m53;
+const m58 = (()=>{
+const {BLENDS} = m54;
 
 function createSurface(width,height){
     if(typeof OffscreenCanvas!=='undefined')return new OffscreenCanvas(width,height);
@@ -20652,21 +20734,21 @@ class canvasRenderer {
 return Object.freeze({get canvasRenderer(){return canvasRenderer;}});
 })();
 // src/basement/rendering/index.mjs
-const m51 = (()=>{
+const m52 = (()=>{
 
 
 
 
 
-return Object.freeze({get cameraSystem(){return m52.cameraSystem;},get renderFrame(){return m54.renderFrame;},get renderSystem(){return m56.renderSystem;},get canvasRenderer(){return m57.canvasRenderer;}});
+return Object.freeze({get cameraSystem(){return m53.cameraSystem;},get renderFrame(){return m55.renderFrame;},get renderSystem(){return m57.renderSystem;},get canvasRenderer(){return m58.canvasRenderer;}});
 })();
 // src/runtime/game-engine.mjs
-const m43 = (()=>{
+const m44 = (()=>{
 const {physicsSystem,assetLibrary} = m1;
-const {levelLobby} = m44;
-const {gameLevel} = m45;
-const {controlSystem} = m46;
-const {cameraSystem,renderSystem} = m51;
+const {levelLobby} = m45;
+const {gameLevel} = m46;
+const {controlSystem} = m47;
+const {cameraSystem,renderSystem} = m52;
 
 const hooks = ['attach', 'detach', 'beforePhysics', 'afterPhysics', 'render', 'levelEntered', 'levelLeaving'];
 function synchronous(fn, receiver, args) {
@@ -20917,7 +20999,7 @@ class gameEngine {
 return Object.freeze({get gameEngine(){return gameEngine;}});
 })();
 // src/directory/street-definitions.mjs
-const m61 = (()=>{
+const m62 = (()=>{
 /** Directory authoring only: convert immutable catalog units once, never during simulation. */
 const vehicleDefinitions = new WeakMap();
 function resolveStreetVehicle(library, { brand, model, control_mode = 'AI', color } = {}) {
@@ -20984,8 +21066,8 @@ function resolveVehicleSeats(library, { brand, model }) {
 return Object.freeze({get resolveStreetVehicle(){return resolveStreetVehicle;},get resolveVehicleSeats(){return resolveVehicleSeats;}});
 })();
 // src/traffic/traffic-vehicle.mjs
-const m60 = (()=>{
-const {resolveStreetVehicle,resolveVehicleSeats} = m61;
+const m61 = (()=>{
+const {resolveStreetVehicle,resolveVehicleSeats} = m62;
 const {gameVehicle} = m1;
 const bindings = new WeakMap();
 /** Official gameplay entity. Body state and driving calculations belong to Basement. */
@@ -21073,10 +21155,10 @@ class TrafficVehicle extends gameVehicle {
 return Object.freeze({get TrafficVehicle(){return TrafficVehicle;}});
 })();
 // src/directory/game-vehicle-factory.mjs
-const m63 = (()=>{
-const {TrafficVehicle} = m60;
+const m64 = (()=>{
+const {TrafficVehicle} = m61;
 const {pathGeometry} = m1;
-const {resolveStreetVehicle} = m61;
+const {resolveStreetVehicle} = m62;
 
 const purposes = new Set(['ambient', 'owned', 'mission', 'taxi']);
 /** Shared official creation. Population limits belong to the requesting population manager. */
@@ -21116,9 +21198,9 @@ function createGameVehicle(world, packet = {}, { hooks = {} } = {}) {
 return Object.freeze({get createGameVehicle(){return createGameVehicle;}});
 })();
 // src/traffic/traffic-manager.mjs
-const m62 = (()=>{
-const {TrafficVehicle} = m60;
-const {createGameVehicle} = m63;
+const m63 = (()=>{
+const {TrafficVehicle} = m61;
+const {createGameVehicle} = m64;
 /** Spawn, ownership and driver policy. The physics world owns every spatial/physical operation. */
 class TrafficManager {
     #pendingSpawns = new Set();
@@ -21163,7 +21245,7 @@ class TrafficManager {
 return Object.freeze({get TrafficManager(){return TrafficManager;}});
 })();
 // src/entities/pedestrians.mjs
-const m64 = (()=>{
+const m65 = (()=>{
 const {gameCharacter,gameVehicle,BODY_GROUP} = m1;
 const bindings = new WeakMap();
 /** Civilian decisions and reactions. Movement, prediction and impacts stay in Basement. */
@@ -21244,8 +21326,8 @@ class Pedestrian extends gameCharacter {
 return Object.freeze({get Pedestrian(){return Pedestrian;}});
 })();
 // src/entities/pedestrian-manager.mjs
-const m65 = (()=>{
-const {Pedestrian} = m64;
+const m66 = (()=>{
+const {Pedestrian} = m65;
 /** Population and waypoint policy only. No positions, obstacle cache or sensing grid. */
 class PedestrianManager {
     #network = new Map();
@@ -21317,11 +21399,11 @@ class PedestrianManager {
 return Object.freeze({get PedestrianManager(){return PedestrianManager;}});
 })();
 // src/directory/game-street.mjs
-const m59 = (()=>{
-const {TrafficVehicle} = m60;
-const {TrafficManager} = m62;
-const {Pedestrian} = m64;
-const {PedestrianManager} = m65;
+const m60 = (()=>{
+const {TrafficVehicle} = m61;
+const {TrafficManager} = m63;
+const {Pedestrian} = m65;
+const {PedestrianManager} = m66;
 
 
 function registerStreetEntityTypes(world) {
@@ -21341,9 +21423,9 @@ class StreetPopulation {
     clearStreet() { this.traffic.clearStreet(); this.pedestrians.clearStreet(); }
 }
 
-return Object.freeze({get TrafficVehicle(){return TrafficVehicle;},get TrafficManager(){return TrafficManager;},get Pedestrian(){return Pedestrian;},get PedestrianManager(){return PedestrianManager;},get createGameVehicle(){return m63.createGameVehicle;},get registerStreetEntityTypes(){return registerStreetEntityTypes;},get StreetPopulation(){return StreetPopulation;}});
+return Object.freeze({get TrafficVehicle(){return TrafficVehicle;},get TrafficManager(){return TrafficManager;},get Pedestrian(){return Pedestrian;},get PedestrianManager(){return PedestrianManager;},get createGameVehicle(){return m64.createGameVehicle;},get registerStreetEntityTypes(){return registerStreetEntityTypes;},get StreetPopulation(){return StreetPopulation;}});
 })();
-const m66 = Object.freeze({default:{
+const m67 = Object.freeze({default:{
   "keymap": {
     "move_up":["w","ArrowUp"],"move_down":["s","ArrowDown"],"move_left":["a","ArrowLeft"],"move_right":["d","ArrowRight"],
     "fire":["mouseLeft","space","gamepadRTrigger","touchFire"],
@@ -21357,8 +21439,8 @@ const m66 = Object.freeze({default:{
   }
 }});
 // src/gameplay/game-session.mjs
-const m67 = (()=>{
-const {identifier,jsonCopy,nonnegative} = m40;
+const m68 = (()=>{
+const {identifier,jsonCopy,nonnegative} = m41;
 
 const recordNames = ['inventory', 'equipment', 'quests', 'roster', 'progression'];
 
@@ -21429,8 +21511,8 @@ class gameSession {
 return Object.freeze({get gameSession(){return gameSession;}});
 })();
 // src/gameplay/player-state-system.mjs
-const m68 = (()=>{
-const {nonnegative,jsonCopy} = m40;
+const m69 = (()=>{
+const {nonnegative,jsonCopy} = m41;
 
 /** Game rules only. The native entity/body remains the sole owner of physical state. */
 class PlayerStateSystem {
@@ -21468,7 +21550,7 @@ class PlayerStateSystem {
         // Placement, direction normalization and collision queries are entirely Basement's job.
         const landed=player.teleportInDirection(direction,{distance:player.getStat('flitDistance',rules.distance),placement_mode:'clear',min_distance:rules.minimum_distance,...(placement_bounds ? {placement_bounds} : {})});
         if(!landed)return false;
-        player.beginFlit(cost,rules.invulnerability_seconds);
+        player.beginFlit(cost,player.vitals.flit_duration);
         return true;
     }
     respawn({position, ...placement} = {}) {
@@ -21485,7 +21567,7 @@ class PlayerStateSystem {
 return Object.freeze({get PlayerStateSystem(){return PlayerStateSystem;}});
 })();
 // src/gameplay/player-control-system.mjs
-const m69 = (()=>{
+const m70 = (()=>{
 /** Turns input terminology into native motor requests and gameplay intents. No physical math. */
 class PlayerControlSystem {
     #session; #state; #blocked = new Set(); #placement; #context = null;
@@ -21523,19 +21605,19 @@ class PlayerControlSystem {
 return Object.freeze({get PlayerControlSystem(){return PlayerControlSystem;}});
 })();
 // src/directory/game-runtime.mjs
-const m58 = (()=>{
-const {gameEngine} = m43;
+const m59 = (()=>{
+const {gameEngine} = m44;
 const {createApartmentAssetLibrary} = m36;
 const {Player} = m39;
-const {ApartmentProp} = m41;
-const {ApartmentCompanion} = m42;
-const {registerStreetEntityTypes} = m59;
-const controlProfile = m66.default;
-const {gameSession} = m67;
-const {PlayerStateSystem} = m68;
-const {PlayerControlSystem} = m69;
+const {ApartmentProp} = m42;
+const {ApartmentCompanion} = m43;
+const {registerStreetEntityTypes} = m60;
+const controlProfile = m67.default;
+const {gameSession} = m68;
+const {PlayerStateSystem} = m69;
+const {PlayerControlSystem} = m70;
 const playerRules = m27.default;
-const {canvasRenderer} = m51;
+const {canvasRenderer} = m52;
 
 /** Explicit game composition. Importing this file never starts a second runtime. */
 function createGameRuntime({ game_db, surface, session_state, player, ...options } = {}) {
@@ -21579,7 +21661,9 @@ const m0 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get assetLibrary(){return m1.assetLibrary;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get createGameAssetLibrary(){return m26.createGameAssetLibrary;},get ApartmentLevel(){return m35.ApartmentLevel;},get APARTMENT_RULES(){return m36.APARTMENT_RULES;},get gameEngine(){return m43.gameEngine;},get gameLevel(){return m45.gameLevel;},get levelLobby(){return m44.levelLobby;},get createGameRuntime(){return m58.createGameRuntime;},get controlSystem(){return m46.controlSystem;},get controlsSystem(){return m46.controlsSystem;},get inputInstance(){return m46.inputInstance;},get keyboardInstance(){return m46.keyboardInstance;},get mouseInstance(){return m46.mouseInstance;},get touchInstance(){return m46.touchInstance;},get touchStick(){return m46.touchStick;},get gamepadInstance(){return m46.gamepadInstance;},get TAP(){return m46.TAP;},get DOUBLETAP(){return m46.DOUBLETAP;},get HELD(){return m46.HELD;},get PRESS(){return m46.PRESS;},get REPEAT(){return m46.REPEAT;},get RELEASE(){return m46.RELEASE;},get renderSystem(){return m51.renderSystem;},get renderFrame(){return m51.renderFrame;},get canvasRenderer(){return m51.canvasRenderer;},get cameraSystem(){return m51.cameraSystem;},get gameSession(){return m67.gameSession;},get PlayerStateSystem(){return m68.PlayerStateSystem;},get PlayerControlSystem(){return m69.PlayerControlSystem;},get Player(){return m39.Player;}});
+
+
+return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get assetLibrary(){return m1.assetLibrary;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get createGameAssetLibrary(){return m26.createGameAssetLibrary;},get ApartmentLevel(){return m35.ApartmentLevel;},get APARTMENT_RULES(){return m36.APARTMENT_RULES;},get gameEngine(){return m44.gameEngine;},get gameLevel(){return m46.gameLevel;},get levelLobby(){return m45.levelLobby;},get createGameRuntime(){return m59.createGameRuntime;},get controlSystem(){return m47.controlSystem;},get controlsSystem(){return m47.controlsSystem;},get inputInstance(){return m47.inputInstance;},get keyboardInstance(){return m47.keyboardInstance;},get mouseInstance(){return m47.mouseInstance;},get touchInstance(){return m47.touchInstance;},get touchStick(){return m47.touchStick;},get gamepadInstance(){return m47.gamepadInstance;},get TAP(){return m47.TAP;},get DOUBLETAP(){return m47.DOUBLETAP;},get HELD(){return m47.HELD;},get PRESS(){return m47.PRESS;},get REPEAT(){return m47.REPEAT;},get RELEASE(){return m47.RELEASE;},get renderSystem(){return m52.renderSystem;},get renderFrame(){return m52.renderFrame;},get canvasRenderer(){return m52.canvasRenderer;},get cameraSystem(){return m52.cameraSystem;},get gameSession(){return m68.gameSession;},get PlayerStateSystem(){return m69.PlayerStateSystem;},get PlayerControlSystem(){return m70.PlayerControlSystem;},get Player(){return m39.Player;},get playerVitals(){return m40.playerVitals;}});
 })();
 return m0;
 })();
@@ -23252,7 +23336,7 @@ const { controlSystem, controlsSystem, inputInstance, keyboardInstance, mouseIns
         for (const name of Object.keys(ASSETS.images)) getImage(name);
 
     </script>
-    <script type="text/dfab" data-src="core/registries.js" data-cost="230">
+    <script type="text/dfab" data-src="core/registries.js" data-cost="227">
         // ============================================================================
         //  NOTE REGISTRY — Readable documents, letters, briefings, lore.
         //  Each entry defines content + visual style. Found notes are tracked
@@ -23274,18 +23358,15 @@ const { controlSystem, controlsSystem, inputInstance, keyboardInstance, mouseIns
                 unlockCheck: (game) => game.missions && game.missions.completedBounties >= 5,
                 onActivate: (game, buff, config) => {
                     buff.shield = buff.maxShield;
-                    buff.savedMaxHp = game.maxPlayerHealth;
-                    game.maxPlayerHealth = Math.floor(game.maxPlayerHealth / 2);
-                    game.playerHealth = Math.min(game.playerHealth, game.maxPlayerHealth);
-                    game.player.syncHealth(game.playerHealth, game.maxPlayerHealth);
+                    buff.savedMaxHp = game.player.maxHp;
+                    game.player.vitals.setMaximumHealth(Math.floor(game.player.maxHp / 2));
                 },
                 onExpire: (game, buff) => {
                     buff.shield = 0;
                     if (buff.savedMaxHp > 0) {
-                        game.maxPlayerHealth = buff.savedMaxHp;
+                        game.player.vitals.setMaximumHealth(buff.savedMaxHp);
                         buff.savedMaxHp = 0;
                     }
-                    game.player.syncHealth(game.playerHealth, game.maxPlayerHealth);
                 }
             }
         };
@@ -26400,13 +26481,13 @@ const { controlSystem, controlsSystem, inputInstance, keyboardInstance, mouseIns
                     // A stim after the first hit; the flit once they start telegraphing (or she's hit)
                     S.watch(g => {
                         if (g.coach.cur) return false;
-                        if (g.playerHealth < g.maxPlayerHealth) { H.reveal('heal', { title: 'Stims', text: 'Hurt? Tap to heal.', mode: 'ring', timeout: 5000 }); return true; }
+                        if (g.player.hp < g.player.maxHp) { H.reveal('heal', { title: 'Stims', text: 'Hurt? Tap to heal.', mode: 'ring', timeout: 5000 }); return true; }
                         return false;
                     });
                     S.watch(g => {
                         if (g.coach.cur) return false;
                         const tele = (g.enemies || []).some(e => e.telegraph || e.isTelegraphing || e._telegraph);
-                        if (tele || g.playerHealth < g.maxPlayerHealth * 0.8) {
+                        if (tele || g.player.hp < g.player.maxHp * 0.8) {
                             H.reveal('flit', { title: 'Flit', text: 'Tap ⚡ (or drag past the ring) to blink out of the line.', mode: 'ring', timeout: 6000 });
                             return true;
                         }
@@ -37472,7 +37553,7 @@ const { controlSystem, controlsSystem, inputInstance, keyboardInstance, mouseIns
         }
 
     </script>
-    <script type="text/dfab" data-src="entities/actors.js" data-cost="602">
+    <script type="text/dfab" data-src="entities/actors.js" data-cost="581">
         /**
          * =====================================================================
          *  ACTOR ENTITY (Base Class for NPCs & Enemies)
@@ -37534,12 +37615,15 @@ const { controlSystem, controlsSystem, inputInstance, keyboardInstance, mouseIns
                 });
                 
                 // Health system
-                this.hp = config.hp ?? 100;
-                this.maxHp = config.maxHp ?? this.hp;
-                this.dead = false;
+                if (config.vitals) this.vitals = config.vitals;
+                else {
+                    this.hp = config.hp ?? 100;
+                    this.maxHp = config.maxHp ?? this.hp;
+                    this.dead = false;
+                }
                 
                 // Invincibility frames to prevent damage spam
-                this.invincibleTimer = 0;
+                if(!config.vitals)this.invincibleTimer = 0;
                 
                 // Alliance system — determines projectile pass-through and collision softening
                 // 'friendly' = player side, 'hostile' = enemy side, 'neutral' = civilians
@@ -37579,7 +37663,7 @@ const { controlSystem, controlsSystem, inputInstance, keyboardInstance, mouseIns
                 const bleed = !!(opts && (opts.type === 'bleed' || opts.type === 'burn'));
                 if (this.dead || (this.invincibleTimer > 0 && !(bleed || shot))) return false;
                 
-                this.hp -= amount;
+                if(this.vitals)this.vitals.damage(amount);else this.hp -= amount;
                 // Damage number, health bar, blood, flinch (engine/combat-fx.js); opts.type: the kind of damage
                 if (typeof game !== 'undefined' && game && game.onActorHit) game.onActorHit(this, amount, knockbackX, knockbackY, opts);
                 
@@ -37817,14 +37901,14 @@ const { controlSystem, controlsSystem, inputInstance, keyboardInstance, mouseIns
          */
         class PlayerEntity extends ActorEntity {
             constructor(config) {
+                const data={};
                 super({
+                    data, vitals:new DFNative.playerVitals(data),
                     x: config.x || 0,
                     y: config.y || 0,
                     radius: 12,  // Slightly smaller than other actors for tight movement
                     type: 'player',
                     alliance: 'friendly',
-                    hp: 100,
-                    maxHp: 100,
                     speed: 5.2,
                     mass: 15,  // Heavier than NPCs
                     friction: 0.9,
@@ -37852,6 +37936,14 @@ const { controlSystem, controlsSystem, inputInstance, keyboardInstance, mouseIns
                 this._game = null;
             }
             
+            get hp() { return this.vitals.health; }
+            set hp(value) { this.vitals.setHealth(value); }
+            get maxHp() { return this.vitals.max_health; }
+            set maxHp(value) { this.vitals.setMaximumHealth(value); }
+            get dead() { return this.vitals.dead; }
+            get flitting() { return this.vitals.flitting; }
+            get attunement() { return this.vitals.attunement; }
+
             /**
              * Set reference to game engine for damage handling.
              */
@@ -37875,11 +37967,6 @@ const { controlSystem, controlsSystem, inputInstance, keyboardInstance, mouseIns
              */
             update() {
                 if (this.dead || !this.visible) return;
-                
-                // Decrement invincibility (from ActorEntity)
-                if (this.invincibleTimer > 0) {
-                    this.invincibleTimer--;
-                }
                 
                 // Walk phase is advanced by the shared gait controller (syncHumanoidGait)
                 
@@ -37910,13 +37997,13 @@ const { controlSystem, controlsSystem, inputInstance, keyboardInstance, mouseIns
              */
             takeDamage(amount, knockbackX = 0, knockbackY = 0) {
                 // FLIT grants invulnerability
-                if (this._game && this._game.flitState && this._game.flitState.active) {
+                if (this.flitting || this.vitals.state.invulnerable_remaining>0) {
                     return false;
                 }
                 const g = this._game;
                 if (g && g.swingGuard) amount = g.swingGuard(amount);             // mid-swing, a blade takes the edge off (engine/status-effects.js)
                 let lastStood = false;
-                if (g && g.resonance && !(this.invincibleTimer > 0) && !this.dead) {
+                if (g && g.resonance && !this.dead) {
                     amount = g.resonance.stat('damageTaken', amount);                 // Frame: Plating
                     // Frame: Last Stand — a hit that would kill leaves 1 HP and a moment's grace
                     if (this.hp - amount <= 0 && g.resonance.tryLastStand(_gameTimeSec)) {
@@ -37925,19 +38012,16 @@ const { controlSystem, controlsSystem, inputInstance, keyboardInstance, mouseIns
                         showMessage('LAST STAND');
                         if (g.weather) g.weather.spawnExplosion(this.x, this.y, 'rgba(196, 86, 110, 1)');
                     }
-                    g.lastHurtAt = _gameTimeSec;
                 }
                 
                 // Use ActorEntity's damage system
                 const kbScale = g && g.resonance ? g.resonance.stat('knockbackTaken', 1) : 1;
                 const damaged = super.takeDamage(amount, knockbackX * kbScale, knockbackY * kbScale);
-                if (lastStood) this.invincibleTimer = 60;                 // a moment's grace after Last Stand
+                if (lastStood) this.vitals.makeInvulnerable(1);                 // a moment's grace after Last Stand
                 
                 if (damaged && this._game) {
                     if (this._game.spillOnHit) this._game.spillOnHit(amount, knockbackX, knockbackY);   // a hit slops her drink (engine/spills.js)
-                    // Sync with legacy health system
-                    this._game.playerHealth = this.hp;
-                    this._game.healthRegenTimer = 0;
+                    this.vitals.recordDamage(_gameTimeSec);
                     this._game.updateUI();
                 }
                 
@@ -37947,46 +38031,14 @@ const { controlSystem, controlsSystem, inputInstance, keyboardInstance, mouseIns
             /**
              * Override die to trigger respawn instead of removal.
              */
-            die() {
-                if (this._game) {
-                    showMessage("CRITICAL FAILURE - RESPONDING TO MEDBAY");
-                    // Half the unsettled Resonance scatters on the way back to Dr. Yin
-                    if (this._game.resonance) {
-                        const lost = this._game.resonance.onDeath();
-                        if (lost > 0) game_timers.after(1.8, () => showMessage(`${lost} UNSETTLED RESONANCE SCATTERED IN THE RETURN`), 'world');
-                    }
-                    
-                    // Clear all active buffs (restores maxHP if Stellar Lemonade was active, etc.)
-                    this.buffSystem.clearAll(this._game);
-                    
-                    // Reset health
-                    this.hp = this.maxHp;
-                    this.dead = false;
-                    this._game.playerHealth = this.hp;
-                    this._game.boosterCount = this._game.getEffectiveMaxBoosters();
-                    this._game.questState.suiteAmbushTriggered = false;
-                    // Reset story step so ambush can re-trigger on return
-                    const st = this._game.story;
-                    if (st && !st.isBefore('SEARCH_SUITE') && st.isBefore('FIND_NOTE')) st.goTo('TAKE_ELEVATOR');
-                    // Reset optional sanctum quest if active (boss respawns on re-entry)
-                    if (this._game.story && this._game.story.activeOptional && this._game.story.activeOptional.id === 'sanctum') {
-                        this._game.story.activeOptional = null;
-                    }
-                    this._game.updateUI();
-                    
-                    // Respawn at the medbay: wake beside the recovery bed in Dr. Yin's clinic
-                    const rs = (MAP_DATA.medbay_sw && MAP_DATA.medbay_sw.respawn) || { x: 212, y: 328 };
-                    this._game.loadMap('medbay_sw', { x: rs.x, y: rs.y });
-                }
-            }
-            
+            die() { if(this._game)this._game.respawnPlayer(); }
+
             /**
              * Heal the player.
              */
             heal(amount) {
-                const healed = super.heal(amount);
+                const healed = this.vitals.heal(amount);
                 if (healed > 0 && this._game) {
-                    this._game.playerHealth = this.hp;
                     this._game.updateUI();
                 }
                 return healed;
@@ -38013,17 +38065,6 @@ const { controlSystem, controlsSystem, inputInstance, keyboardInstance, mouseIns
                     this.takeDamage(projectile.damage, kbX, kbY);
                 } else {
                     this.takeDamage(projectile.damage);
-                }
-            }
-            
-            /**
-             * Sync health from legacy system.
-             * Called when health is modified externally (boosters, medbay, etc.)
-             */
-            syncHealth(newHp, newMaxHp = null) {
-                this.hp = newHp;
-                if (newMaxHp !== null) {
-                    this.maxHp = newMaxHp;
                 }
             }
             
@@ -85738,7 +85779,7 @@ const levelLobby = DFNative.levelLobby;
             }
         };
     </script>
-    <script type="text/dfab" data-src="engine/game-engine.js" data-cost="181">
+    <script type="text/dfab" data-src="engine/game-engine.js" data-cost="175">
         class GameEngine {
             constructor() {
                 
@@ -85817,11 +85858,6 @@ const levelLobby = DFNative.levelLobby;
                     larissa_loadout_hint: false
                 };
                 this.velvetCat = null; // Active VelvetCat entity
-                this.flitState = { 
-                    active: false, duration: 0, maxDuration: 15,
-                    attunement: 120, maxAttunement: 120, 
-                    dashCost: 40, rechargeRate: 2 // 2/frame = full in 1s
-                };
                 this.flitVFX = []; // Active flit visual effects (ghost afterimages, lightning trails)
                 this.graveyardGhosts = []; // Procedural humanoid ghosts in the cemetery
                 this.lobbyLife = new LobbyLife(); // The Double Nights lobby's guests and staff (directory/lobby-life.js)
@@ -85838,8 +85874,7 @@ const levelLobby = DFNative.levelLobby;
                     transitionSpeed: 0.05 // How fast we lerp between scales
                 };
                 
-                this.currency = 100; this.scrap = 0; this.playerHealth = 100; this.maxPlayerHealth = 100; this.boosterCount = 4; this.maxBoosters = 4; this.debugMode = false; this.showProfiler = false;
-                this.healthRegenTimer = 0; // Frames since health was not full (for passive regen)
+                this.currency = 100; this.scrap = 0; this.boosterCount = 4; this.maxBoosters = 4; this.debugMode = false; this.showProfiler = false;
                 this.weaponMode = 'none';  // 'normal' or 'sniper' - sniper shots penetrate everything
                 this.shootCooldown = 0;    // Tracks timing between shots
                 this.currentWeapon = null; // Stores the currently active weapon object
@@ -85894,7 +85929,6 @@ const levelLobby = DFNative.levelLobby;
                 this.isDriving = false;
                 this.player = new PlayerEntity({ x: 0, y: 0 });
                 this.player.setGame(this);  // Link player to game for damage callbacks
-                this.player.syncHealth(this.playerHealth, this.maxPlayerHealth);  // Initial sync
                 
                 // Player's OWNED car: LADY Blackmark V1 (Luxury SUV) - This is YOUR car
                 this.ownedCar = gameVehicles.create({ purpose: 'owned', control_mode: 'PLAYER', position: [CAR_START.x, CAR_START.y], rotation: CAR_START.angle });
@@ -85913,7 +85947,6 @@ const levelLobby = DFNative.levelLobby;
                 this.augments = new AugmentSystem();
                 this.resonance = new ResonanceSystem();      // 949's progression (core/resonance.js)
                 this.darkElement = 0;                        // premium shards (off-market goods)
-                this.lastHurtAt = -99; this.flitState.lastFlitAt = -99;
                 this.bumperMinigame = new BumperCarMinigame();
                 this.bonding = new BondingSystem();
                 this.dialogueSeq = new DialogueSequence(this);
@@ -86299,7 +86332,7 @@ const levelLobby = DFNative.levelLobby;
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/combat-effects.js" data-cost="348">
+    <script type="text/dfab" data-src="engine/combat-effects.js" data-cost="364">
         // GameEngine — Screen shake, time slow, death, resize, firing, boosters, player damage.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         const _muzzleStars = new Map();
@@ -86634,7 +86667,7 @@ const levelLobby = DFNative.levelLobby;
                 const shotSpeed  = stats.projectileSpeed || 25;
                 // Arms: Hollow Points; Flit: Flit-Strike (shots just after a flit); Arms: Quick-Draw (first shot after drawing)
                 let shotDamage = this.resonance.stat('gunDamage', stats.damage || 35);
-                if (_gameTimeSec - this.flitState.lastFlitAt <= this.resonance.flitStrikeWindow()) shotDamage *= 1 + this.resonance.value('flit_strike', 'damage') * this.resonance.rank('flit_strike');
+                if (_gameTimeSec - this.player.vitals.last_flit_at <= this.resonance.flitStrikeWindow()) shotDamage *= 1 + this.resonance.value('flit_strike', 'damage') * this.resonance.rank('flit_strike');
                 if (this._drawnAt !== undefined && _gameTimeSec - this._drawnAt <= this.resonance.value('quick_draw', 'window') && !this._drawShotUsed) { shotDamage *= 1 + this.resonance.value('quick_draw', 'damage') * this.resonance.rank('quick_draw'); this._drawShotUsed = true; }
                 shotDamage *= this.gunDamageMult();                      // the Bloodthirsty Muzzle, the Mirrored Glass (engine/status-effects.js)
                 const shotCrit = this.rollCrit(stats);                   // a critical hit (engine/combat-fx.js)
@@ -86740,16 +86773,46 @@ const levelLobby = DFNative.levelLobby;
                 return max;
             },
             
+            // Existing story/medbay policy, shared by native and legacy player death.
+            // Game-flow class extraction remains separate from the vitals ownership cutover.
+            respawnPlayer() {
+                showMessage("CRITICAL FAILURE - RESPONDING TO MEDBAY");
+                // Half the unsettled Resonance scatters on the way back to Dr. Yin
+                if (this.resonance) {
+                    const lost = this.resonance.onDeath();
+                    if (lost > 0) game_timers.after(1.8, () => showMessage(`${lost} UNSETTLED RESONANCE SCATTERED IN THE RETURN`), 'world');
+                }
+
+                // Clear all active buffs (restores maxHP if Stellar Lemonade was active, etc.)
+                this.player.buffSystem.clearAll(this);
+
+                // Reset health
+                this.player.vitals.restoreHealth();
+                this.boosterCount = this.getEffectiveMaxBoosters();
+                this.questState.suiteAmbushTriggered = false;
+                // Reset story step so ambush can re-trigger on return
+                const st = this.story;
+                if (st && !st.isBefore('SEARCH_SUITE') && st.isBefore('FIND_NOTE')) st.goTo('TAKE_ELEVATOR');
+                // Reset optional sanctum quest if active (boss respawns on re-entry)
+                if (this.story && this.story.activeOptional && this.story.activeOptional.id === 'sanctum') {
+                    this.story.activeOptional = null;
+                }
+                this.updateUI();
+
+                // Respawn at the medbay: wake beside the recovery bed in Dr. Yin's clinic
+                const rs = (MAP_DATA.medbay_sw && MAP_DATA.medbay_sw.respawn) || { x: 212, y: 328 };
+                this.loadMap('medbay_sw', { x: rs.x, y: rs.y });
+            },
+
             useBooster() {
                 if (!this.running || this.paused || hudInputBlocked()) return;
-                if (this.playerHealth >= this.maxPlayerHealth) { 
+                if (this.player.hp >= this.player.maxHp) {
                     showMessage("HEALTH FULL"); 
                     return; 
                 }
                 if (this.boosterCount > 0) { 
                     this.boosterCount--; 
-                    this.playerHealth = Math.min(this.playerHealth + this.resonance.stat('stimHeal', 50), this.maxPlayerHealth);
-                    this.player.syncHealth(this.playerHealth, this.maxPlayerHealth);  // Sync with entity
+                    this.player.heal(this.resonance.stat('stimHeal',50));
                     this.updateUI(); // Updates health bar AND booster count
                     showMessage("STIM PACK USED. HP RESTORED."); 
                 } else { 
@@ -86811,8 +86874,7 @@ const levelLobby = DFNative.levelLobby;
                ========================================================= */
             refillStims() {
                 this.boosterCount = this.getEffectiveMaxBoosters();
-                this.playerHealth = this.maxPlayerHealth;
-                this.player.syncHealth(this.playerHealth, this.maxPlayerHealth);
+                this.player.vitals.restoreHealth();
                 
                 // Refill teammate stims too
                 if (this.teammates) {
@@ -87193,7 +87255,7 @@ engineMixin({
                 const byPlayer = by === this.player, byTeammate = !!(by && by.role === 'teammate');
                 const { amount, tags } = this.resonance.scoreKill(enemy, {
                     byPlayer, byTeammate, melee: !!enemy.lastHitMelee, now: _gameTimeSec,
-                    lastFlitAt: this.flitState.lastFlitAt ?? -99, lastHurtAt: this.lastHurtAt ?? -99,
+                    lastFlitAt: this.player.vitals.last_flit_at ?? -99, lastHurtAt: this.player.vitals.last_hurt_at ?? -99,
                     drinkLevel: this.heldDrink() ? this.cosmetics.drinkLevel : -1 });
                 if (amount > 0) this.earnResonance(amount, tags.join(' '), enemy.x, enemy.y - 26);
                 // Dark Element: rare shards from the toughest foes
@@ -87471,7 +87533,7 @@ engineMixin({
             },
 
             /** Flitting: out of reach of every hazard */
-            playerDodging() { return !!(this.flitState && this.flitState.active); },
+            playerDodging() { return !!(this.player && this.player.flitting); },
 
             /** A boss move lands on her (unless she's mid-flit); true if it did */
             hurtPlayer(amount) {
@@ -88309,10 +88371,10 @@ engineMixin({
                 const near = others.some(o => Math.hypot(o.x - this.playerPosition[0], o.y - this.playerPosition[1]) < 900
                     && (o.state === 'ALERT' || o.state === 'SUPPRESSING' || o.state === 'SEARCHING'));
                 if (near) return null;
-                if (_gameTimeSec - (this.flitState.lastFlitAt ?? -99) <= 1) return 'flit';
+                if (_gameTimeSec - (this.player.vitals.last_flit_at ?? -99) <= 1) return 'flit';
                 if (e.lastHitMelee) return 'punch';
                 if ((e._hits || 0) <= 1 && this.currentWeapon && /sniper/.test(this.currentWeapon.id)) return 'one shot';
-                if (this.playerHealth >= (this.maxPlayerHealth || 100) && _gameTimeSec - (this.lastHurtAt ?? -99) > 30 && e._engaged) return 'untouched';
+                if (this.player.hp >= (this.player.maxHp || 100) && _gameTimeSec - (this.player.vitals.last_hurt_at ?? -99) > 30 && e._engaged) return 'untouched';
                 return null;
             },
 
@@ -88344,7 +88406,7 @@ engineMixin({
                 if (this.paused) return;
                 F.ms += elapsedMs;
                 // cut short: she fires again, flits, or something takes the stage
-                if ((this.shotsFired || 0) > this._finShot || _gameTimeSec - (this.flitState.lastFlitAt ?? -99) < 0.05 && F.ms > 200
+                if ((this.shotsFired || 0) > this._finShot || _gameTimeSec - (this.player.vitals.last_flit_at ?? -99) < 0.05 && F.ms > 200
                     || (this.scenes && this.scenes.running) || this.isDriving) { this.endFinisher(true); return; }
                 const onStella = F.ms > F.tBody;
                 if (onStella && !F.burst) { F.burst = true; this.finisherBurst(F); }
@@ -88389,7 +88451,7 @@ engineMixin({
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/reflections.js" data-cost="896">
+    <script type="text/dfab" data-src="engine/reflections.js" data-cost="897">
         // GameEngine — Reflections. Methods are added to GameEngine.prototype
         // (see engineMixin in game-engine.js).
         //
@@ -89300,7 +89362,8 @@ engineMixin({
             /** Detailed actor art reflected about the ground beneath its body, at current facing. */
             _drawUltraReflectionWalker(ctx, e, alpha = 0.58, mark = null, crowd = false) {
                 if (!e || e.dead || e.visible === false || e.inCar || e === this.player && this.isDriving) return false;
-                if (e.invincibleTimer > 0 && e.invincibleTimer % 6 < 3) return false;
+                const grace=e===this.player?e.vitals.state.invulnerable_remaining*60:e.invincibleTimer;
+                if (grace > 0 && grace % 6 < 3) return false;
                 let angle = e.angle || 0, sx = 1, sy = 1, fade = e.life === undefined ? 1 : Math.max(0, Math.min(1, e.life));
                 const ped = typeof Pedestrian !== 'undefined' && e instanceof Pedestrian;
                 if (ped && e.state === 'sprawled') { sx = 1.1; sy = 0.55; }
@@ -89346,7 +89409,7 @@ engineMixin({
                     if (e.state === 'sprawled') fade *= 0.92;
                     else if (e.state === 'recovering') fade *= 0.92 + 0.08 * (1 - e.recoverTimer / 24);
                 }
-                if (e === this.player && (e.isHidden || this.flitState && this.flitState.active)) fade *= 0.5;
+                if (e === this.player && (e.isHidden || this.player && this.player.flitting)) fade *= 0.5;
                 ctx.globalAlpha = alpha * fade;
                 // Mirror the body below its feet; compensate rotation so its world heading stays the same;
                 // flip the sideways artwork while preserving its forward facing (ctx: the detail layer, in this._ultraView)
@@ -90439,7 +90502,7 @@ engineMixin({
                 const edge = this.inventory && this.inventory.hasAttachment('crimson_edge') ? ITEM_REGISTRY.crimson_edge.stats : null;
                 let bladeDamage = (st.damage || 25) * this.playerDamageMult() * (edge ? edge.bladeDamageMult : 1);
                 // A Flit-cut: a swing inside the Flit-Strike window always crits (and Flit-Strike adds its share)
-                const flitCut = !!(this.resonance && this.flitState && _gameTimeSec - this.flitState.lastFlitAt <= this.resonance.flitStrikeWindow());
+                const flitCut = !!(this.resonance && this.player && _gameTimeSec - this.player.vitals.last_flit_at <= this.resonance.flitStrikeWindow());
                 if (flitCut) bladeDamage *= 1 + this.resonance.value('flit_strike', 'damage') * this.resonance.rank('flit_strike');
                 const swing = this._swing = { t0: this._slashT, secs: this._slashSecs, style: this._slashStyle, side, weapon: W, st,
                     damage: bladeDamage, flitCut, bleedMax: edge ? edge.bleedMax : STATUS.BLEED_MAX,
@@ -90784,7 +90847,7 @@ engineMixin({
                     // it falls forward, the way it was facing
                     const killed = e.takeDamage(e.hp + 1, Math.cos(e.angle) * 5, Math.sin(e.angle) * 5, { type: X.blade ? 'melee' : 'blunt' }) && e.dead;
                     if (killed) {
-                        const maxHP = this.maxPlayerHealth || pl.maxHp;
+                        const maxHP = this.player.maxHp || pl.maxHp;
                         const healed = pl.heal(Math.min(maxHP * 0.15, Math.max(0, maxHP - pl.hp)));
                         if (healed > 0) {
                             const bar = this.healthBar && this.healthBar.parentElement;
@@ -91233,7 +91296,7 @@ engineMixin({
                 if (now - (this._punchAt ?? -99) > KNUCKLES.COMBO_RESET) this._punchCombo = 0;
                 this._punchAt = now;
                 this._punchCombo = (this._punchCombo || 0) + 1;
-                const flit = _gameTimeSec - this.flitState.lastFlitAt <= this.resonance.flitStrikeWindow();
+                const flit = _gameTimeSec - this.player.vitals.last_flit_at <= this.resonance.flitStrikeWindow();
                 const hay = flit || this._punchCombo % (st.haymakerEvery || KNUCKLES.EVERY) === 0;
                 if (hay) this._punchCombo = 0;
                 const ang = pl.angle;
@@ -92201,7 +92264,7 @@ engineMixin({
             },
         });
     </script>
-    <script type="text/dfab" data-src="engine/tuning-ui.js" data-cost="116">
+    <script type="text/dfab" data-src="engine/tuning-ui.js" data-cost="115">
         // GameEngine — Resonance on screen: the HUD meter, Dr. Yin's tuning overlay, the
         // SKILLS screen, and applying installed ranks to 949's stats (see core/resonance.js).
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
@@ -92211,11 +92274,9 @@ engineMixin({
                 if (!this.resonance) return;
                 const maxHp = Math.round(this.resonance.stat('maxHealth', 100));
                 const sl = this.player && this.player.buffSystem.active.stellarLemonade;   // Stellar Lemonade halves max HP while active
-                if (sl && sl.active) { sl.savedMaxHp = maxHp; this.maxPlayerHealth = Math.floor(maxHp / 2); }
-                else this.maxPlayerHealth = maxHp;
-                this.playerHealth = Math.min(this.playerHealth, this.maxPlayerHealth);
-                this.flitState.maxAttunement = this.resonance.stat('maxAttunement', 120);
-                if (this.player) this.player.syncHealth(this.playerHealth, this.maxPlayerHealth);
+                if (sl && sl.active) { sl.savedMaxHp = maxHp; this.player.vitals.setMaximumHealth(Math.floor(maxHp / 2)); }
+                else this.player.vitals.setMaximumHealth(maxHp);
+                this.player.vitals.setMaximumAttunement(this.resonance.stat('maxAttunement',120));
             },
 
             /** HUD: level and how much unsettled Resonance you're carrying (it glows brighter the more). */
@@ -92345,7 +92406,7 @@ engineMixin({
             },
         });
     </script>
-    <script type="text/dfab" data-src="engine/shops-menus.js" data-cost="350">
+    <script type="text/dfab" data-src="engine/shops-menus.js" data-cost="349">
         // GameEngine — Vending, garage, auto shop, Zib rides, sleep menu.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -92811,8 +92872,7 @@ engineMixin({
                     this.worldMinutes += diff;
                     
                     // 3. Heal Player & Refill Boosters
-                    this.playerHealth = this.maxPlayerHealth;
-                    this.player.syncHealth(this.playerHealth);
+                    this.player.vitals.restoreHealth();
                     this.boosterCount = this.getEffectiveMaxBoosters();
                     
                     // 4. Save Game
@@ -92838,7 +92898,7 @@ engineMixin({
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/daytime-flit.js" data-cost="346">
+    <script type="text/dfab" data-src="engine/daytime-flit.js" data-cost="347">
         // GameEngine — Daytime exposure, flit teleport effects, graveyard ghosts.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -92871,20 +92931,27 @@ engineMixin({
 
             /** What a flit costs right now: augment, buffs, and Resonance (Quick Return; Double Step's quick second flit). */
             flitCost() {
-                let cost = this.flitState.dashCost;
+                let cost = this.player.vitals.flit_cost;
                 if (this.augments && this.augments.isEquipped('flit_ext')) cost = Math.floor(cost * 0.7); // 30% cost reduction
                 cost = this.player.buffSystem.getStat('flitCooldown', cost);
                 if (this.resonance) {
                     cost = this.resonance.stat('flitCost', cost);
                     const R = this.resonance, half = R.value('double_step', 'half_cost_window');
-                    if (R.rank('double_step') >= R.value('double_step', 'half_cost_rank') && _gameTimeSec - this.flitState.lastFlitAt <= half) cost *= R.value('double_step', 'half_cost');
+                    if (R.rank('double_step') >= R.value('double_step', 'half_cost_rank') && _gameTimeSec - this.player.vitals.last_flit_at <= half) cost *= R.value('double_step', 'half_cost');
                 }
                 return Math.floor(cost);
             },
 
+            /** Range policy shared by the legacy and native physical clients and the stats screen. */
+            flitDistance() {
+                let distance=this.player.buffSystem.getStat('flitDistance',this.player.vitals.flit_distance);
+                if(this.augments?.isEquipped('flit_ext'))distance*=1.3;
+                return this.resonance?this.resonance.stat('flitDistance',distance):distance;
+            },
+
             /** Event-only landing search: teleport through obstacles, but finish with a clear player circle. */
             findFlitLanding(angle, distance) {
-                if(this.activeLevel){const hit=this.physics_system.findDirectionalPlacement(this.player,{angle,distance,placement_bounds:{left:8,top:8,right:this.activeMap.width-8,bottom:this.activeMap.height-8}});return hit?{x:hit.position[0],y:hit.position[1],distance:hit.distance}:null;}
+                if(this.activeLevel){const hit=this.physics_system.findDirectionalPlacement(this.player,{angle,distance,min_distance:this.player.vitals.flit_minimum_distance,placement_bounds:{left:8,top:8,right:this.activeMap.width-8,bottom:this.activeMap.height-8}});return hit?{x:hit.position[0],y:hit.position[1],distance:hit.distance}:null;}
                 const p = this.player, map = this.activeMap, margin = 20, minTravel = 1;
                 if (!p || !map || ![p.x, p.y, angle, distance, map.width, map.height].every(Number.isFinite) || distance < minTravel || map.width < margin * 2 || map.height < margin * 2) return null;
                 const sx = p.x, sy = p.y, ux = Math.cos(angle), uy = Math.sin(angle);
@@ -93008,15 +93075,13 @@ engineMixin({
                 const cost = this.flitCost();
                 
                 // Check attunement pool
-                if (this.flitState.attunement < cost) return false;
+                if (this.player.vitals.attunement < cost) return false;
                 // --- Capture start state for VFX ---
                 const startX = this.playerPosition[0];
                 const startY = this.playerPosition[1];
                 const startAngle = this.playerRotation;
                 
-                let flitDist = this.player.buffSystem.getStat('flitDistance', 120);
-                if (this.augments && this.augments.isEquipped('flit_ext')) flitDist *= 1.3; // 30% more range
-                if (this.resonance) flitDist = this.resonance.stat('flitDistance', flitDist);   // Flit: Reach
+                const flitDist=this.flitDistance();
 
                 // Flit direction: use movement keys (WASD) or joystick if active, otherwise fall back to facing angle
                 let flitAngle = this.playerRotation;
@@ -93044,12 +93109,9 @@ engineMixin({
                 this._restartRingAnim('flash');
                 
                 // Spend attunement
-                this.flitState.attunement -= cost;
-                this.flitState.active = true;
-                this.flitState.duration = this.flitState.maxDuration;
-                if (this.flitState.attunement < cost) this.flitBtn.classList.add('cooldown');
+                this.player.vitals.beginFlit(cost,undefined,_gameTimeSec);
+                if (this.player.vitals.attunement < cost) this.flitBtn.classList.add('cooldown');
                 
-                this.flitState.lastFlitAt = _gameTimeSec;
                 // Flit: Afterimage — gangers keep seeing you where you left
                 const ai = this.resonance ? this.resonance.rank('afterimage') : 0;
                 this._afterimage = ai ? { x: startX, y: startY, until: _gameTimeSec + this.resonance.value('afterimage', 'secs') * ai } : null;
@@ -93433,7 +93495,7 @@ engineMixin({
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/screens-ui.js" data-cost="976">
+    <script type="text/dfab" data-src="engine/screens-ui.js" data-cost="974">
         // GameEngine — HUD update, dialogue and portraits, shops, character/team/story/collection screens, notes, crafting.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -93458,13 +93520,13 @@ engineMixin({
 
                 // --- 1. HEALTH BAR (Red gradient) ---
                 // Displays player's current HP as percentage of max
-                const healthPercent = Math.max(0, (this.playerHealth / this.maxPlayerHealth) * 100);
+                const healthPercent = Math.max(0, (this.player.hp / this.player.maxHp) * 100);
                 set('hp', healthPercent.toFixed(1), v => { this.healthBar.style.width = `${v}%`; });
                 
                 // --- 2. FLIT ATTUNEMENT BAR (Champagne/Gold) ---
                 // Shows current attunement pool. Full bar = max charges available.
                 const flitPercent = Math.max(0, Math.min(100, 
-                    (this.flitState.attunement / this.flitState.maxAttunement) * 100));
+                    (this.player.vitals.attunement / this.player.vitals.max_attunement) * 100));
                 if (U.flit) set('flit', flitPercent.toFixed(1), v => { U.flit.style.width = `${v}%`; });
 
                 // --- 3. ECONOMY DISPLAY ---
@@ -94396,8 +94458,8 @@ engineMixin({
                 // ══════════════════════════════════════════════════
                 html += `<div class="df-section"><span>Stats</span></div><div class="df-card">`;
 
-                const hp = this.playerHealth ?? 0;
-                const maxHp = this.maxPlayerHealth ?? 100;
+                const hp = this.player.hp ?? 0;
+                const maxHp = this.player.maxHp ?? 100;
                 const hpPct = Math.max(0, Math.round((hp / maxHp) * 100));
                 html += `<div class="df-bar-label" style="margin-top:0;"><span>Vitals</span><span>${hp} / ${maxHp}</span></div><div class="df-bar crimson${hpPct ? '' : ' zero'}"><i style="--v:${hpPct}%"></i></div>`;
 
@@ -94405,10 +94467,8 @@ engineMixin({
                 const baseSpeed = this.player?.speed ?? 5.2;
                 const finalSpeed = this.player?.buffSystem?.getStat('speed', baseSpeed) ?? baseSpeed;
                 const baseFlitDist = 120;
-                let finalFlitDist = this.player?.buffSystem?.getStat('flitDistance', baseFlitDist) ?? baseFlitDist;
-                if (this.augments && this.augments.isEquipped('flit_ext')) finalFlitDist *= 1.3;
-                if (this.resonance) finalFlitDist = this.resonance.stat('flitDistance', finalFlitDist);
-                const baseFlitCost = this.flitState?.dashCost ?? 40;
+                const finalFlitDist=this.flitDistance();
+                const baseFlitCost = this.player?.vitals.flit_cost ?? 40;
                 const finalFlitCost = this.flitCost ? this.flitCost() : baseFlitCost;
                 const baseDetect = 1.0;
                 const finalDetect = this.player?.buffSystem?.getStat('detectionRange', baseDetect) ?? baseDetect;
@@ -94926,7 +94986,7 @@ engineMixin({
 
         });
     </script>
-    <script type="text/dfab" data-src="engine/save-load.js" data-cost="525">
+    <script type="text/dfab" data-src="engine/save-load.js" data-cost="528">
         // GameEngine — Save schema, migrations, saveGame / loadGame.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
                 const AUTOSAVE_KEY = 'dfab_save_slot_auto';   // written when the app goes to the background (onPageHidden)
@@ -94951,7 +95011,8 @@ engineMixin({
                     player: {
                         x: this.player ? this.playerPosition[0] : 500,
                         y: this.player ? this.playerPosition[1] : 500,
-                        health: this.playerHealth ?? 100,
+                        health: this.player?.hp ?? 100,
+                        vitals: this.player?.vitals.snapshot() ?? null,
                         currency: this.currency ?? 500,
                         scrap: this.scrap ?? 0,
                         boosters: this.boosterCount ?? 0,
@@ -95098,6 +95159,7 @@ engineMixin({
                         x: 500,
                         y: 500,
                         health: 100,
+                        vitals: null,
                         currency: 500,
                         scrap: 0,
                         boosters: 0,
@@ -95419,23 +95481,24 @@ engineMixin({
                     
                     console.log(`[LOAD] Loading save (v${fromVersion} → v${save.version}), merged with defaults`);
         
+                    // Validate vitals before changing live player/session records.
+                    const loadedVitals=new DFNative.playerVitals();
+                    if(playerData.vitals)loadedVitals.load(playerData.vitals);
+                    else {
+                        const restoredRanks=new ResonanceSystem();restoredRanks.deserialize(save.resonance);
+                        const shield=playerData.buffs?.stellarLemonade;
+                        const maximum=Math.round(restoredRanks.stat('maxHealth',100));
+                        loadedVitals.importHealth(playerData.health ?? defaults.player.health,shield?.active?Math.floor(maximum/2):maximum);
+                    }
                     // 1. Load Player Data
                     this.currency = playerData.currency ?? defaults.player.currency;
                     this.scrap = playerData.scrap ?? defaults.player.scrap;
-                    this.playerHealth = playerData.health ?? defaults.player.health;
+                    this.player.vitals.load(loadedVitals.snapshot());
                     this.boosterCount = playerData.boosters ?? defaults.player.boosters;
                     
                     // Restore buff system from save data
                     this.player.buffSystem.active = {};                 // only the save's buffs: none carried in from the run before
                     this.player.buffSystem.deserialize(playerData.buffs || {});
-                    
-                    // Re-apply persistent buff side-effects (e.g. Stellar Lemonade halved maxHP)
-                    const slBuff = this.player.buffSystem.active.stellarLemonade;
-                    if (slBuff && slBuff.active && slBuff.savedMaxHp > 0) {
-                        this.maxPlayerHealth = Math.floor(slBuff.savedMaxHp / 2);
-                    }
-                    
-                    this.player.syncHealth(this.playerHealth, this.maxPlayerHealth);
                     
                     // 2. Load World State
                     this.worldMinutes = worldData.worldMinutes ?? defaults.world.worldMinutes;
@@ -99021,7 +99084,7 @@ engineMixin({
             },
         });
     </script>
-    <script type="text/dfab" data-src="engine/update.js" data-cost="725">
+    <script type="text/dfab" data-src="engine/update.js" data-cost="715">
         // GameEngine — The per-tick simulation (update) and traffic collision helpers.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         /** Props you can use, and what the action pill says for them: type → [verb, name, name from the prop's own label].
@@ -99052,18 +99115,13 @@ engineMixin({
             /** One tick, called directly (tests, tools): skipped while stopped or paused, like a Lobby step.
              *  The Lobby itself advances the tick and calls stepWorld() (engine/loop.js). */
             updatePlayerRecovery(){
-                // Passive Health Regen (5 HP/sec after 10s no damage)
-                if (this.playerHealth < this.maxPlayerHealth) {
-                    this.healthRegenTimer++;
-                    const regenDelay = this.resonance.stat('regenDelay', 600);                       // Frame: Idle Mend
-                    if (this.healthRegenTimer >= regenDelay && (this.healthRegenTimer - regenDelay) % 60 === 0) {
-                        const heal = this.resonance.stat('regenAmount', 5) * (this.augments.isEquipped('health_regen') ? 2 : 1);
-                        this.playerHealth = Math.min(this.playerHealth + heal, this.maxPlayerHealth);
-                        this.player.syncHealth(this.playerHealth, this.maxPlayerHealth);  // Sync with entity
-                    }
-                } else {
-                    this.healthRegenTimer = 0;
-                }
+                // Shared gameplay timers; this is the sole vitals tick in the classic host.
+                const healed=this.player.vitals.advance(1/60,{
+                    regeneration_delay:this.resonance.stat('regenDelay',600)/60,
+                    regeneration_amount:this.resonance.stat('regenAmount',5)*(this.augments.isEquipped('health_regen')?2:1)
+                });
+                if(healed)this.updateUI();
+                this.flitBtn.classList.toggle('cooldown',this.player.attunement<this.flitCost());
             },
             update() {
                 if (!this.running || this.paused) return;
@@ -99182,14 +99240,6 @@ engineMixin({
                 }
 
                 // Ability & Regen Timers
-                // Flit Attunement recharge
-                if (this.flitState.attunement < this.flitState.maxAttunement) {
-                    this.flitState.attunement = Math.min(
-                        this.flitState.attunement + this.flitState.rechargeRate,
-                        this.flitState.maxAttunement
-                    );
-                    if (this.flitState.attunement >= this.flitCost()) this.flitBtn.classList.remove('cooldown');
-                }
                 // At the wheel the Flit button goes and the handbrake takes its place (styles/panels-phone.css)
                 if (this._uiDriving !== !!this.isDriving) {
                     this._uiDriving = !!this.isDriving;
@@ -99198,10 +99248,6 @@ engineMixin({
                 this.updateFlitRing();
                 this.updateNoiseRipples();
                 this.updateScope();
-                if (this.flitState.active) {
-                    this.flitState.duration--;
-                    if (this.flitState.duration <= 0) this.flitState.active = false;
-                }
                 // Update flit visual effects (ghost afterimages, lightning trails)
                 if (this.flitVFX.length > 0) this.updateFlitVFX();
 
@@ -99982,9 +100028,9 @@ engineMixin({
                     // (runs after this in the update loop)
 
                     // --- BLOOD TRAIL LOGIC (PLAYER) ---
-                    if (this.playerHealth < 50) {
+                    if (this.player.hp < 50) {
                         const isMoving = (Math.abs(inputX) > 0 || Math.abs(inputY) > 0);
-                        const bleedChance = this.playerHealth < 20 ? 0.3 : 0.1;
+                        const bleedChance = this.player.hp < 20 ? 0.3 : 0.1;
 
                         // Drops as she moves (now and then when still), more often when badly hurt
                         if ((isMoving || Math.random() < 0.05) && Math.random() < bleedChance) {
@@ -101155,7 +101201,7 @@ engineMixin({
                 if (RenderStats.timed) this._entLap('Entities: Effects');
                 // Player
                 if (RL.at('stella') && this.player.visible) {
-                    if (this.flitState.active) this.ctx.globalAlpha = 0.5;
+                    if (this.player.flitting) this.ctx.globalAlpha = 0.5;
                     this.drawPlayer();
                     this.ctx.globalAlpha = 1.0;
                 }
@@ -106140,7 +106186,7 @@ engineMixin({
                 this.ctx.rotate(vehiclePose ? this.car.angle : presentation.angle);
                 
                 // Stealth/Flit Ghosting
-                if (presentation.isHidden || this.flitState.active) this.ctx.globalAlpha = 0.5;
+                if (presentation.isHidden || this.player.flitting) this.ctx.globalAlpha = 0.5;
             
                 // ── Fully cosmetics-driven appearance ──
                 const cosmeticConfig = this.cosmetics.getRenderConfig();
@@ -106548,7 +106594,7 @@ engineMixin({
             /** The flit ring's charge (fill, ready pulse, dim when unaffordable) — only touched when it changes. */
             updateFlitRing() {
                 const el = this.flitRingEl; if (!el) return;
-                const fs = this.flitState, fill = Math.round(100 * fs.attunement / fs.maxAttunement), ready = fs.attunement >= this.flitCost();
+                const vitals = this.player.vitals, fill = Math.round(100 * vitals.attunement / vitals.max_attunement), ready = vitals.attunement >= this.flitCost();
                 if (fill !== this._ringFill) { this._ringFill = fill; el.style.setProperty('--fill', fill + '%'); }
                 if (ready !== this._ringReady) {
                     this._ringReady = ready; el.classList.toggle('dim', !ready);
@@ -106558,7 +106604,7 @@ engineMixin({
         });
 
     </script>
-    <script type="text/dfab" data-src="directory/new-game-state.js" data-cost="121">
+    <script type="text/dfab" data-src="directory/new-game-state.js" data-cost="115">
         // ===== LV2 DIRECTORY =====
         // GameEngine: this game's new-game defaults (resetGameState): player, quest flags, inventory, crew,
         // story, missions, phone, the last run's world. Called on exit to the main menu and before a new game.
@@ -106610,11 +106656,10 @@ engineMixin({
                 // --- PLAYER STATE ---
                 this.currency = 100;
                 this.scrap = 0;
-                this.playerHealth = 100;
-                this.maxPlayerHealth = 100;
+                this.player.buffSystem.active={};
+                this.player.vitals.reset();
                 this.boosterCount = 4;
                 this.maxBoosters = 4;
-                this.healthRegenTimer = 0;
                 this.weaponMode = 'none';
                 this.setWeaponHolstered(false); this.holsterAnim = 1;
                 this._drawnAt = undefined; this._drawShotUsed = false;
@@ -106656,8 +106701,6 @@ engineMixin({
                 // --- RESONANCE & DARK ELEMENT ---
                 if (this.resonance) { this.resonance.reset(); this.applyResonanceStats(); }
                 this.darkElement = 0;
-                if (this.flitState) this.flitState.lastFlitAt = -99;
-                this.lastHurtAt = -99;
 
                 // --- COSMETICS ---
                 if (this.cosmetics) {
@@ -106678,7 +106721,6 @@ engineMixin({
                 // --- NOTES, THE TRANSCRIPT, BUFFS ---
                 this.foundNotes = [];
                 if (typeof DialogueTranscript !== 'undefined') this.transcript = new DialogueTranscript();   // the last run's lines aren't this run's
-                if (this.player && this.player.buffSystem) this.player.buffSystem.active = {};          // nor its drinks (maxHP is reset above)
                 
                 // --- BONDING ---
                 if (this.bonding) {
@@ -106726,11 +106768,6 @@ engineMixin({
                 }
                 
                 // --- FLIT / TIME SLOW ---
-                this.flitState = { 
-                    active: false, duration: 0, maxDuration: 15,
-                    attunement: 120, maxAttunement: 120, 
-                    dashCost: 40, rechargeRate: 2
-                };
                 this.flitVFX = []; this._resetFlitFeedback();
                 this.graveyardGhosts = [];
                 this.timeSlowState = { active: false, scale: 1.0, targetScale: 1.0, duration: 0, transitionSpeed: 0.05 };
@@ -106773,7 +106810,7 @@ engineMixin({
                 if (this.player) {
                     this.player.x = 0;
                     this.player.y = 0;
-                    this.player.hp = this.maxPlayerHealth;
+                    this.player.vitals.restoreHealth();
                     this.player.visible = true;
                     this.player.isHidden = false;
                 }
@@ -107090,7 +107127,7 @@ class ApartmentRenderer {
     }
 }
     </script>
-    <script type="text/dfab" data-src="engine/apartment-level.js" data-cost="103">
+    <script type="text/dfab" data-src="engine/apartment-level.js" data-cost="100">
 // Native apartment host: scene lifecycle and game policy, separate from Basement simulation.
 const APARTMENT_ROSTER_FIELDS=['recruited','downed','equippedWeaponId','weaponId','hp','maxHp','teammateStims','maxTeammateStims','relationship','hireType','hireDuration','hireTime','hireCost','hired','role','bio','alliance'];
 const apartmentRosterRecord=t=>({name:t.name,...Object.fromEntries(APARTMENT_ROSTER_FIELDS.map(k=>[k,t[k]??null]))});
@@ -107098,7 +107135,7 @@ engineMixin({
     get playerPosition(){return this.player?.physics_system?this.player.position:[this.player?.x??0,this.player?.y??0];},
     get playerRotation(){return this.player?.physics_system?this.player.rotation:this.player?.angle??0;},
     _enterApartment(spawnAt){
-        const roster=this._pendingApartmentRoster??this.teammates.map(apartmentRosterRecord),buffs=this.player.buffSystem;
+        const roster=this._pendingApartmentRoster??this.teammates.map(apartmentRosterRecord),buffs=this.player.buffSystem,vitals=this.player.vitals.snapshot();
         const spawn=spawnAt&&Number.isFinite(spawnAt.x)?[spawnAt.x,spawnAt.y]:undefined;
         // Prepare/validate an unstepped replacement before retiring the live scene.
         const candidate=new DFNative.ApartmentLevel({game_db:GAME_DB,spawn,layout:this.questState.aptLayout??{},roster});
@@ -107119,7 +107156,8 @@ engineMixin({
         this.activeLevel=candidate;
         this._pendingApartmentRoster=null;this.physics_system=this.activeLevel.physics;
         this._pendingApartmentState=null;
-        this.player=this.activeLevel.player;this.player.connectGameplay({buff_system:buffs,is_invulnerable:()=>!!this.flitState?.active,on_damage:({player})=>{this.playerHealth=player.hp;this.lastHurtAt=this.physics_system.simulation_tick*this.physics_system.config.fixed_step;}});this.player.syncHealth(this.playerHealth,this.maxPlayerHealth);
+        this.player=this.activeLevel.player;this.player.vitals.load(vitals);
+        this.player.connectGameplay({buff_system:buffs,on_damage:({player})=>{player.vitals.recordDamage(_gameTimeSec);this.updateUI();},on_death:()=>this.respawnPlayer()});
         this.projectiles=this.activeLevel.projectiles;this.props=this.activeLevel.props;this.lamps=this.activeLevel.lamps;this.teammates=this.activeLevel.companions;
         this.activeMap={...this.activeLevel.definition.map,props:this.props,npcs:[],lamps:this.lamps,buildings:[],foliage:[],softLights:this.activeLevel.definition.soft_lights};
         this.roomSystem=new ApartmentRooms(this.activeLevel,this);this.furniture=new FurnitureSystem(this);this.apartmentRenderer=new ApartmentRenderer(this);
@@ -107132,9 +107170,9 @@ engineMixin({
     _leaveApartment(){
         if(!this.activeLevel)return;
         this.furniture.release();this.questState.aptLayout=this.activeLevel.getLayout();
-        const roster=this.activeLevel.getRoster(),buffs=this.player.buffSystem;
+        const roster=this.activeLevel.getRoster(),buffs=this.player.buffSystem,vitals=this.player.vitals.snapshot();
         this.apartmentRenderer?.destroy();this.activeLevel.destroy();this._releaseMapBakes(null);this.activeLevel=null;this.physics_system=null;this.apartmentRenderer=null;
-        this.player=new PlayerEntity({x:0,y:0});this.player.setGame(this);this.player.buffSystem=buffs;this.player.syncHealth(this.playerHealth,this.maxPlayerHealth);
+        this.player=new PlayerEntity({x:0,y:0});this.player.setGame(this);this.player.buffSystem=buffs;this.player.vitals.load(vitals);
         this.teammates=roster.map(r=>{const t=new NPC(0,0,r.name,r.role||'teammate',{weaponId:r.weaponId||r.equippedWeaponId});for(const k of APARTMENT_ROSTER_FIELDS)if(r[k]!=null)t[k]=r[k];return t;});
         this.ownedCar=gameVehicles.create({purpose:'owned',control_mode:'PLAYER',brand:this._parkedCar?.brand,model:this._parkedCar?.model,position:this._parkedCar?[this._parkedCar.x,this._parkedCar.y]:[CAR_START.x,CAR_START.y],rotation:this._parkedCar?.angle??CAR_START.angle});
         this.garage.applyToVehicle(this.ownedCar);this.car=this.ownedCar;
@@ -107157,9 +107195,7 @@ engineMixin({
         }else if(direction[0]||direction[1])this.furniture.release();
         if(this.shootCooldown>0)this.shootCooldown--;this.updateQuickDraw();
         if(!blocked&&(this.mouseDown||F.active&&F.firing)&&this.shootCooldown<=0)this._fireApartmentWeapon();
-        if(this.flitState.active&&--this.flitState.duration<=0)this.flitState.active=false;
-        this.flitState.attunement=Math.min(this.flitState.maxAttunement,this.flitState.attunement+this.flitState.rechargeRate);
-        level.updateState();this.roomSystem.update();this.updateScope();this.updatePlayerRecovery();
+        level.updateState();this.roomSystem.update();this.updateScope();this.updatePlayerRecovery();this.updateFlitRing();
         this.weather.setIndoorSuppressed(!this.roomSystem.isPlayerOutdoor());
         this.projectiles=this.projectiles.filter(p=>!p.destroyed);
         this.updateTime();this.updateUI();this.story.update();if(this.activeLevel!==level)return;
@@ -107184,11 +107220,11 @@ engineMixin({
         this.projectiles.push(projectile);audioSys.sfx('shoot');
     },
     _flitApartment(angle){
-        if(this.paused||this.furniture.busy())return false;
-        const cost=this.player.buffSystem.getStat('flitCooldown',this.flitState.dashCost);
-        if(this.flitState.attunement<cost)return false;
-        const result=this.player.teleportInDirection(undefined,{angle,distance:this.player.buffSystem.getStat('flitDistance',120),placement_bounds:{left:8,top:8,right:this.activeMap.width-8,bottom:this.activeMap.height-8},placement_mode:'clear'});
-        if(!result)return false;this.flitState.attunement-=cost;this.flitState.active=true;this.flitState.duration=15;this.flitState.lastFlitAt=_gameTimeSec;showMessage('FLIT!');return true;
+        if(this.paused||this.player.dead||this.isDriving||this.furniture.busy()||this.hud&&!this.hud.has('flit'))return false;
+        const cost=this.flitCost();
+        if(this.player.vitals.attunement<cost)return false;
+        const result=this.player.teleportInDirection(undefined,{angle,distance:this.flitDistance(),placement_bounds:{left:8,top:8,right:this.activeMap.width-8,bottom:this.activeMap.height-8},placement_mode:'clear',min_distance:this.player.vitals.flit_minimum_distance});
+        if(!result)return false;this.player.vitals.beginFlit(cost,undefined,_gameTimeSec);showMessage('FLIT!');return true;
     }
 });
     </script>
@@ -110319,7 +110355,7 @@ engineMixin({
             },
             /** A Trusted friend leaves her a stim after a job that went badly */
             onJobDone(g) {
-                if (!this._freeOk() || g.playerHealth > g.maxPlayerHealth * 0.35) return;
+                if (!this._freeOk() || g.player.hp > g.player.maxHp * 0.35) return;
                 if (!g.getEffectiveMaxBoosters || g.boosterCount >= g.getEffectiveMaxBoosters()) return;
                 const close = this._crewHere(g).filter(n => this._tier(g, n) >= 2);
                 if (!close.length) return;
