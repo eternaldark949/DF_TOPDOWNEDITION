@@ -1,3 +1,4 @@
+import {importActorAbilities} from '../directory/game-abilities.mjs';
 import {registerGameEntityTypes} from '../directory/game-entity-types.mjs';
 import { physicsSystem } from '../basement/physics/index.mjs';
 import { createApartmentAssetLibrary } from '../directory/apartment-assets.mjs';
@@ -55,8 +56,9 @@ export class ApartmentLevel {
         const migrated=structuredClone(snapshot);
         for(const record of migrated.entities??[])if(record.entity_type==='df_apartment_companion'){
             record.entity_type=NPC.entity_type;const data=record.data;data.health=data.hp??100;data.max_health=data.maxHp??100;data.role??='teammate';data.alliance??='friendly';data.weapon_definition_id=data.equippedWeaponId??data.weaponId??null;delete data.hp;delete data.maxHp;delete data.equippedWeaponId;delete data.weaponId;
-            record.assets={...record.assets,actor_rules:'df:actor_rules',items:'df:actor_items',appearances:'df:actor_appearances'};
+            record.assets={...record.assets,actor_rules:'df:actor_rules',items:'df:actor_items',appearances:'df:actor_appearances',abilities:'df:abilities'};
         }
+        for(const record of migrated.entities??[])if(record.entity_type===NPC.entity_type)importActorAbilities(record.data,this.physics.elements.asset_library.getResource('df:abilities').data,{default_id:record.data.role==='red_demon_dancer'?'fireball':null});
         this.physics.loadPhysicsState(migrated); this.reconnect();
     }
     destroy() { this.physics.clearWorld(); }

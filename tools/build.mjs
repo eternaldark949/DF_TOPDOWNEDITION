@@ -189,6 +189,7 @@ const SCRIPTS = [
     'world/scrapyard.js',
     'world/billboards.js',
     'ui/inventory-augments.js',
+    'gameplay/abilities/legacy-ability-launch.js',
     'ui/action-dock.js',
     'world/bokeh.js',
     'story/missions.js',

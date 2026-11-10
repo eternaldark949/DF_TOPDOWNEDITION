@@ -17,6 +17,7 @@
          * - Wall collision handled automatically by CollisionSystem
          * - Preserves all existing visual rendering exactly
          */
+        const NPC_ABILITY_CATALOG=DFNative.createAbilityCatalog(GAME_DB.progression.abilities);
         const NPC_ITEM_CATALOG=DFNative.createItemCatalog(GAME_DB.items);
         class NPC extends ActorEntity {
             /**
@@ -126,6 +127,11 @@
                 }
             }
 
+            get abilities(){return DFNative.actorAbilities(this.data,NPC_ABILITY_CATALOG);}
+            get abilitiesSnapshot(){return this.abilities.snapshot();}
+            set abilitiesSnapshot(snapshot){if(snapshot!==null)this.abilities.load(snapshot);}
+            get equippedAbilityId(){return this.abilities.equipped_id;}
+            set equippedAbilityId(id){if(id!==null)this.abilities.learnAbility(id);this.abilities.equipAbility(id);}
             get items(){return DFNative.actorItems(this.data,`legacy-actor:${this.id}`,NPC_ITEM_CATALOG);}
             get inventory(){return this.items.snapshot();}
             set inventory(snapshot){DFNative.restoreActorItems(this.data,snapshot,NPC_ITEM_CATALOG);}

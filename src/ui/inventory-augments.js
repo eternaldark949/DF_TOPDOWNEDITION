@@ -14,7 +14,7 @@
         // ============================================================================
         //  ABILITY REGISTRY — Data-driven abilities (magic, fireballs, etc.)
         //  Same stat pattern as ITEM_REGISTRY weapons but for innate/learned abilities.
-        //  Any humanoid can use these via ActorEntity.castAbility().
+        //  Directory ability catalog and shared abilitySystem own native execution.
         // ============================================================================
         const ABILITY_REGISTRY = GAME_DB.progression.abilities;   // directory/game-db/progression.json
         
@@ -50,34 +50,6 @@
                 damage: stats.damage || 20,
                 life: stats.projectileLife || 60,
                 penetrating: stats.penetrating || false
-            });
-        }
-        
-        /**
-         * Create a combat projectile from an ability in ABILITY_REGISTRY.
-         * @param {Object} source - The entity casting (must have x, y)
-         * @param {number} angle - Casting angle in radians
-         * @param {string} abilityId - ABILITY_REGISTRY key
-         * @param {Object} [opts] - { isEnemy }
-         * @returns {ProjectileEntity}
-         */
-        function castAbilityProjectile(source, angle, abilityId, opts = {}) {
-            const def = ABILITY_REGISTRY[abilityId];
-            if (!def) return null;
-            const stats = def.stats;
-            const spread = (Math.random() - 0.5) * (stats.spread || 0.1);
-            
-            return new ProjectileEntity({
-                x: (opts.origin || source).x,
-                y: (opts.origin || source).y,
-                angle: angle + spread,
-                isEnemy: opts.isEnemy || false,
-                owner: source,
-                color: stats.projectileColor || '#ff3300',
-                speed: stats.projectileSpeed || 18,
-                damage: stats.damage || 25,
-                life: stats.projectileLife || 50,
-                penetrating: false
             });
         }
         

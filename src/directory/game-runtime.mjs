@@ -1,3 +1,4 @@
+import {abilitySystem} from '../gameplay/abilities/ability-system.mjs';
 import {actorSystem} from '../gameplay/actors/actor-system.mjs';
 import {registerGameEntityTypes} from './game-entity-types.mjs';
 import { gameEngine } from '../runtime/game-engine.mjs';
@@ -14,16 +15,17 @@ import {lootSystem} from '../gameplay/items/loot-system.mjs';
 import { canvasRenderer } from '../basement/rendering/index.mjs';
 
 /** Explicit game composition. Importing this file never starts a second runtime. */
-export function createGameRuntime({ game_db, surface, session_state, player, weapon_policy={}, combat_policy={}, actor_policy={}, ...options } = {}) {
+export function createGameRuntime({ game_db, surface, session_state, player, weapon_policy={}, combat_policy={}, actor_policy={}, ability_policy={}, ...options } = {}) {
     const session=new gameSession({state:session_state,player,item_catalog:createItemCatalog(game_db?.items)});
     const player_state=new PlayerStateSystem({session,rules:playerRules});
     const player_controls=new PlayerControlSystem({session,player_state,placement_bounds:context=>context.engine.active_level?.player_placement_bounds});
     const combat=new combatSystem({session,policy:{...combat_policy,incoming_multiplier:(target,type)=>(target===session.player&&weapons.guarding?.75:1)*(combat_policy.incoming_multiplier?.(target,type)??1)}});
     const weapons=new weaponSystem({session,items:session.items,combat,policy:weapon_policy});
-    const actors=new actorSystem({weapons,combat,session,policy:actor_policy});
+    const abilities=new abilitySystem({weapons,combat,get_player:()=>session.player,policy:ability_policy});
+    const actors=new actorSystem({weapons,combat,abilities,session,policy:actor_policy});
     const loot=new lootSystem({items:session.items,get_player:()=>session.player,on_event:(event,detail)=>session.emit(event,detail)});
-    if(options.services && ['session','items','player_state','player_controls','combat','weapons','loot','actors'].some(key=>Object.hasOwn(options.services,key)))throw new TypeError('Directory owns player services');
-    const engine = new gameEngine({ ...options, services:{...options.services,session,items:session.items,player_state,player_controls,combat,weapons,loot,actors}, controls:{...controlProfile,...(surface?.addEventListener?{mouse_target:surface}:{}),...options.controls}, asset_library: createApartmentAssetLibrary({ game_db }) });
+    if(options.services && ['session','items','player_state','player_controls','combat','weapons','loot','actors','abilities'].some(key=>Object.hasOwn(options.services,key)))throw new TypeError('Directory owns player services');
+    const engine = new gameEngine({ ...options, services:{...options.services,session,items:session.items,player_state,player_controls,combat,weapons,loot,actors,abilities}, controls:{...controlProfile,...(surface?.addEventListener?{mouse_target:surface}:{}),...options.controls}, asset_library: createApartmentAssetLibrary({ game_db }) });
     engine.api.render.registerRenderer('canvas',canvasRenderer);
     engine.registerSystem('surface-input',{
         attach(context){context.defer(context.api.render.onSurfaceChanged(({surface})=>context.api.controls.setMouseTarget(options.controls?.mouse_target??surface)));}
@@ -34,7 +36,7 @@ export function createGameRuntime({ game_db, surface, session_state, player, wea
         engine.registerSystem('items',session.items);
         engine.registerSystem('player-state',player_state);
         engine.registerSystem('player-controls',player_controls);
-        engine.registerSystem('combat',combat);engine.registerSystem('weapons',weapons);engine.registerSystem('actors',actors);engine.registerSystem('loot',loot);
+        engine.registerSystem('combat',combat);engine.registerSystem('weapons',weapons);engine.registerSystem('abilities',abilities);engine.registerSystem('actors',actors);engine.registerSystem('loot',loot);
         return engine;
     } catch(error) { engine.dispose();throw error; }
 }

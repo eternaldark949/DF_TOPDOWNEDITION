@@ -6,8 +6,8 @@ import {createActorPacket} from '../../directory/game-actor-factory.mjs';
 
 /** Registered actor lifetimes and policy updates in the existing fixed step. No second world or index. */
 export class actorSystem{
- #context=null;#actors=new Map();#weapons;#combat;#player;#session;#policy;#off=[];#pendingLifetime=new Map();
- constructor({weapons,combat,session,get_player=()=>session?.player,policy={}}={}){this.#weapons=weapons;this.#combat=combat;this.#player=get_player;this.#session=session;this.#policy=policy;}
+ #context=null;#actors=new Map();#weapons;#abilities;#combat;#player;#session;#policy;#off=[];#pendingLifetime=new Map();
+ constructor({weapons,combat,abilities,session,get_player=()=>session?.player,policy={}}={}){this.#weapons=weapons;this.#abilities=abilities;this.#combat=combat;this.#player=get_player;this.#session=session;this.#policy=policy;}
  attach(context){if(this.#context)throw new Error('Actors already attached');this.#context=context;this.#off.push(context.api.physics.on('entityRegistered',event=>this.#track(event.entity)),context.api.physics.on('entityRemoved',event=>this.#untrack(event.entity.entity_id)));this.reconnectGameplay();}
  detach(){for(const off of this.#off.splice(0))off();for(const id of [...this.#actors.keys()])this.#untrack(id);this.#context=null;}
  #lifetime(actor,retain){if(this.#context.engine?.phase==='physics'){this.#pendingLifetime.set(actor.entity_id,retain);return;}this.#context.engine?.[retain?'retainEntity':'releaseEntity']?.(actor);}
@@ -24,7 +24,7 @@ export class actorSystem{
   this.#actors.set(actor.entity_id,actor);
   if(actor instanceof NPC&&actor.recruited)this.#lifetime(actor,true);
  }
- #untrack(id){const actor=this.#actors.get(id);if(!actor)return;this.#weapons.unregisterActor(id);if(!actor.destroyed)actor.cancelMovement();actor.disconnectActor();this.#actors.delete(id);this.#pendingLifetime.delete(id);}
+ #untrack(id){const actor=this.#actors.get(id);if(!actor)return;this.#weapons.unregisterActor(id);this.#abilities?.cancelCast(id);if(!actor.destroyed)actor.cancelMovement();actor.disconnectActor();this.#actors.delete(id);this.#pendingLifetime.delete(id);}
  getActors(){return [...this.#actors.values()];}
  spawn(packet={},options={}){if(!this.#context)throw new Error('Actor system is detached');const actor=this.#context.createEntity(createActorPacket(this.#context.api.physics,packet),options);try{this.#track(actor);return actor;}catch(error){this.#weapons.unregisterActor(actor.entity_id);actor.disconnectActor();this.#context.engine?.releaseEntity?.(actor);actor.destroy();throw error;}}
  beforePhysics(context,seconds=context.api.physics.config.fixed_step){
@@ -34,8 +34,8 @@ export class actorSystem{
   for(const actor of this.#actors.values()){
    if(actor.destroyed){this.#untrack(actor.entity_id);continue;}actor.advanceActor(seconds);
    if(actor.dead||!actor.active)continue;
-   if(actor instanceof NPC){const rules=actor.getAsset('actor_rules').data.npc;const targets=world.peruseNearbyEntities(actor,{near_range:rules.combat_range,include_groups:BODY_GROUP.CHARACTER}).filter(hit=>hit.entity?.alliance==='hostile'&&this.#combat.canDamage(actor,hit.entity));
-    actor.updateBehavior(seconds,{player,targets,weapons:this.#weapons,stationary:!!this.#policy.stationary?.(actor,context),world_minutes_delta:this.#policy.world_minutes_delta?.(seconds)??seconds/60,may_engage:this.#policy.may_engage??(()=>true),aura_interval:this.#policy.aura_interval?.(actor)});
+   if(actor instanceof NPC){const rules=actor.getAsset('actor_rules').data.npc;const targets=world.peruseNearbyEntities(actor,{near_range:actor.equippedWeaponId?rules.combat_range:actor.abilities.getEquippedAbility()?.range??rules.combat_range,include_groups:BODY_GROUP.CHARACTER}).filter(hit=>hit.entity?.alliance==='hostile'&&this.#combat.canDamage(actor,hit.entity));
+    actor.updateBehavior(seconds,{player,targets,weapons:this.#weapons,abilities:this.#abilities,stationary:!!this.#policy.stationary?.(actor,context),world_minutes_delta:this.#policy.world_minutes_delta?.(seconds)??seconds/60,may_engage:this.#policy.may_engage??(()=>true),aura_interval:this.#policy.aura_interval?.(actor)});
    }else if(actor instanceof Ganger)actor.updateBehavior(seconds,{player,weapons:this.#weapons,random:this.#policy.random??Math.random,visibility:this.#policy.visibility?.(player)??player?.data.visibility??1,search_points:this.#policy.search_points?.(actor)??[]});
   }
  }

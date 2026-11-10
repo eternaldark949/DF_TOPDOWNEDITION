@@ -617,10 +617,18 @@ export class physicsSystem {
     _saveMotor(m) {
         if (!m) return null;
         if (m instanceof characterMotor) {
-            const target = v => !v ? null : Array.isArray(v) ? { position: [...v] } : { body_id: this._record(v).id };
-            const intent = m.intent ? { ...m.intent, target: target(m.intent.target) } : null;
-            return { type: 'character', config: clone(m.config), intent: clone(intent), facing: m.facing ? { ...m.facing, target: target(m.facing.target) } : null,
-                suspended_for: m.suspended_for, path: clone(m.path), path_index: m.path_index ?? 1, replan: m.replan };
+            const target = value => {
+                if (!value) return null;
+                if (Array.isArray(value)) return { position: [...value] };
+                const id = typeof value === 'number' ? value : referenceBody(value)?.body_id;
+                return this.#bodies.has(id) ? { body_id: id } : null;
+            };
+            const savedIntent = m.intent ? { ...m.intent, target: target(m.intent.target) } : null;
+            const savedFacing = m.facing ? { ...m.facing, target: target(m.facing.target) } : null;
+            const intent = savedIntent && (savedIntent.mode === 'direction' || savedIntent.target) ? savedIntent : null;
+            const facing = savedFacing && (savedFacing.direction || savedFacing.target) ? savedFacing : null;
+            return { type: 'character', config: clone(m.config), intent: clone(intent), facing: clone(facing),
+                suspended_for: m.suspended_for, path: intent ? clone(m.path) : null, path_index: m.path_index ?? 1, replan: m.replan };
         }
         if (m instanceof vehicleMotor) return { type: 'vehicle', config: clone(m.config), inputs: clone(m.inputs), steering: m.steering, axles: clone(m.axles), surface: clone(m.surface), path: clone(m.path_controller.path), path_index: m.path_controller.index, options: clone(m.path_controller.options) };
         return { type: 'projectile', config: clone(m.config), remaining: m.remaining, impact_scale: m.impact_scale, physical_hits: m.physical_hits, hit_bodies: [...m.hit_bodies],...(m.interception?{interception:clone(m.interception)}:{}) };

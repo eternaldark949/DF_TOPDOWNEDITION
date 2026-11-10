@@ -8,7 +8,7 @@ export class combatPresentation{
   const api=context.api;
   for(const {entity}of api.render.getVisibleEntities({blend})){
    if(!entity)continue;const data=entity.data,pose=entity.getRenderState(blend);
-   if(data.role==='projectile'&&!data.melee){
+   if(data.role==='projectile'&&!data.melee&&!data.ability_id){
     frame.submit({type:'shape',position:pose.position,rotation:pose.rotation,geometry:{type:'ellipse',radii:[5,2]},material:{fill:data.color??'#ffd891'},layer:30});
    }else if(entity.entity_type==='df_world_loot'){
     const definition=api.items.getDefinition(entity.definition_id);

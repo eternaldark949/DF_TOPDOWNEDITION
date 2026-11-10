@@ -1,14 +1,21 @@
+import {importActorAbilities} from '../directory/game-abilities.mjs';
+import {actorAbilities} from '../gameplay/abilities/ability-loadout.mjs';
 import {resolveEmoteLines,NPC_EMOTE_REACTIONS} from '../directory/npc-reactions.mjs';
 import {gameActor} from './game-actor.mjs';
 import {actorItems,restoreActorItems} from '../gameplay/actors/actor-inventory.mjs';
 import {nonnegative,jsonCopy} from '../gameplay/values.mjs';
 const actorContract=npc=>npc.data.hireType==='contract'?(npc.data.contract_remaining??npc.data.hireDuration??0):0;
 const stateFor=npc=>npc.data.npc_state??={format_version:1,stim_remaining:0,out_of_combat:0,regen_elapsed:0,aura_elapsed:0,quip:null,quip_remaining:0,quip_delay:0,contract_remaining:actorContract(npc)};
-export const ROSTER_FIELDS=['recruited','downed','teammateStims','maxTeammateStims','relationship','hireType','hireDuration','hireTime','hireCost','hired','role','bio','alliance','burstSize','burstDelay','accuracyMod','equippedAbilityId','cooldown','shotsLeftInBurst'];
+export const ROSTER_FIELDS=['recruited','downed','teammateStims','maxTeammateStims','relationship','hireType','hireDuration','hireTime','hireCost','hired','role','bio','alliance','burstSize','burstDelay','accuracyMod','equippedAbilityId','cooldown','shotsLeftInBurst','abilitiesSnapshot'];
 /** Full native NPC identity. Role/hiring/following are game rules; the inherited motor owns movement. */
 export class NPC extends gameActor{
  static entity_type='df_npc';
  get items(){return actorItems(this.data,this.data.actor_key??`actor:${this.entity_id}`,this.getAsset('items').data);}
+ get abilities(){return actorAbilities(this.data,this.getAsset('abilities').data);}
+ get abilitiesSnapshot(){return this.abilities.snapshot();}
+ set abilitiesSnapshot(snapshot){if(snapshot!==null)this.abilities.load(snapshot);}
+ get equippedAbilityId(){return this.abilities.equipped_id;}
+ set equippedAbilityId(id){if(id!==null)this.abilities.learnAbility(id);this.abilities.equipAbility(id);}
  get inventory(){return this.items.snapshot();}
  set inventory(value){this.restoreInventory(value);}
  get equippedWeaponId(){return this.items.getEquippedWeapon()?.definition_id??null;}
@@ -41,7 +48,7 @@ export class NPC extends gameActor{
  say(text,seconds=2,delay=0){nonnegative(delay,'quip delay');nonnegative(seconds,'quip duration');const state=stateFor(this);state.quip=String(text);state.quip_remaining=seconds+delay;state.quip_delay=delay;this.emitActor('actor:said',{text:state.quip,seconds});}
  reactToEmote(emote,{tier=0,random=Math.random}={}){const state=stateFor(this);if(this.dead||state.quip_remaining>0)return false;const category={smile:'reactSmile',zany:'reactZany',cry:'reactCry',frown:'reactFrown'}[emote],lines=resolveEmoteLines(NPC_EMOTE_REACTIONS[this.name],category,tier);if(!lines)return false;this.say(lines[Math.floor(random()*lines.length)],2,.4);return true;}
  onWeaponFired(controller){const state=stateFor(this),burst=this.data.burst_size??1;state.shots_left=(state.shots_left??burst)-1;if(state.shots_left>0)controller.setCooldown((this.data.burst_delay_ticks??10)/60);else{state.shots_left=burst;controller.setCooldown((this.items.getEquippedWeapon()?.stats.fireRate??20)/60*Math.max(2,burst));}}
- updateBehavior(seconds,{player,targets,weapons,stationary=false,world_minutes_delta=0,may_engage=()=>true,aura_interval}={}){
+ updateBehavior(seconds,{player,targets,weapons,abilities,stationary=false,world_minutes_delta=0,may_engage=()=>true,aura_interval}={}){
   const state=stateFor(this),rules=this.getAsset('actor_rules').data.npc;
   for(const key of ['stim_remaining','quip_remaining','quip_delay'])state[key]=Math.max(0,state[key]-seconds);if(!state.quip_remaining)state.quip=null;
   if(this.data.hireType==='contract'&&this.recruited){state.contract_remaining=Math.max(0,state.contract_remaining-world_minutes_delta);if(!state.contract_remaining){this.release();return;}}
@@ -54,16 +61,17 @@ export class NPC extends gameActor{
   if(view&&view.distance<rules.aura_range&&this.hp<this.maxHp){state.aura_elapsed+=seconds;const interval=aura_interval??rules.aura_interval;while(state.aura_elapsed+1e-9>=interval){state.aura_elapsed-=interval;this.heal(1);}}else state.aura_elapsed=0;
   // Seating remains owned by the attachment system. Cabin/window firing is a separate vehicle contract.
   if(this.inCar)return;
-  const nearest=threats.find(hit=>world.observeTarget(this,hit.entity,{near_range:rules.combat_range}).line_clear);
-  if(nearest&&this.equippedWeaponId){this.lookAtTarget(nearest.entity);weapons.requestActorFire(this,{target:nearest.entity.position});}else this.clearFacing();
+  const weapon=this.items.getEquippedWeapon(),range=weapon?rules.combat_range:this.abilities.getEquippedAbility()?.range??0;
+  const nearest=threats.find(hit=>{const sight=world.observeTarget(this,hit.entity,{near_range:range});return sight.in_range&&(sight.line_clear||weapon?.stats.penetrating);});
+  if(nearest){this.lookAtTarget(nearest.entity);if(weapon)weapons.requestActorFire(this,{target:nearest.entity.position});else if(this.equippedAbilityId)abilities?.requestCast(this,this.equippedAbilityId,{target:nearest.entity.position});}else this.clearFacing();
   if(stationary||!player){this.cancelMovement();return;}
   if(view.distance>rules.recover_distance){const spot=world.findNearbyPlacement(player,{near_range:rules.follow_distance,spacing:20,include_ghosts:false,ignore_body:[player,this]});if(spot&&world.isPlacementClear(this.collision_shape,spot.position,{ignore_body:[this,player],include_ghosts:false}))this.teleportTo(spot.position,{placement_mode:'clear'});}
   const speed=view.distance>rules.catchup_distance?rules.catchup_speed:view.distance>rules.match_distance?rules.match_speed:rules.cruise_speed;
   this.followTarget(player,{speed,arrival_distance:rules.follow_distance,personal_space:28,face_movement:!nearest});
  }
- validateNPC(){const state=stateFor(this);jsonCopy(state);if(state.format_version!==1)throw new TypeError('Invalid NPC state');for(const key of ['stim_remaining','out_of_combat','regen_elapsed','aura_elapsed','quip_remaining','quip_delay','contract_remaining'])nonnegative(state[key],key);this.items;return this;}
+ validateNPC(){importActorAbilities(this.data,this.getAsset('abilities').data,{default_id:this.role==='red_demon_dancer'?'fireball':null});const state=stateFor(this);jsonCopy(state);if(state.format_version!==1)throw new TypeError('Invalid NPC state');for(const key of ['stim_remaining','out_of_combat','regen_elapsed','aura_elapsed','quip_remaining','quip_delay','contract_remaining'])nonnegative(state[key],key);this.items;this.abilities.validate();return this;}
 }
-for(const key of ROSTER_FIELDS.filter(key=>!['role','recruited','downed','alliance','burstSize','burstDelay','accuracyMod','cooldown','shotsLeftInBurst'].includes(key)))Object.defineProperty(NPC.prototype,key,{get(){return this.data[key];},set(value){this.data[key]=value;}});
+for(const key of ROSTER_FIELDS.filter(key=>!['role','recruited','downed','alliance','burstSize','burstDelay','accuracyMod','cooldown','shotsLeftInBurst','equippedAbilityId','abilitiesSnapshot'].includes(key)))Object.defineProperty(NPC.prototype,key,{get(){return this.data[key];},set(value){this.data[key]=value;}});
 export function rosterRecord(entity){return {name:entity.name,...Object.fromEntries(ROSTER_FIELDS.map(key=>[key,entity[key]??null])),hp:entity.hp,maxHp:entity.maxHp,equippedWeaponId:entity.equippedWeaponId,weaponId:entity.equippedWeaponId,inventory:entity.items.snapshot()};}
 
 for(const [key,field] of Object.entries({burstSize:'burst_size',burstDelay:'burst_delay_ticks',accuracyMod:'accuracy_mod'}))Object.defineProperty(NPC.prototype,key,{get(){return this.data[field];},set(value){nonnegative(value,key);this.data[field]=value;}});

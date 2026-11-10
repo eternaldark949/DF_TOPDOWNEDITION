@@ -428,6 +428,9 @@ engineMixin({
                     downed: t.downed || false,
                     equippedWeaponId: t.equippedWeaponId || null,
                     inventory:t.items?.snapshot(),
+                    abilitiesSnapshot:t.abilities?.snapshot(),
+                    equippedAbilityId:t.equippedAbilityId??null,
+                    cooldown:t.cooldown??0,
                     hp: t.hp || 100,
                     teammateStims: t.teammateStims ?? 3,
                     relationship: t.relationship ?? 0,
@@ -493,6 +496,12 @@ engineMixin({
                         const legacy=save.inventory??{};
                         loadedItems.importLegacy({...legacy,items:legacy.items?.length?legacy.items:DEFAULT_LOADOUT});
                         if(GameSettings.kukriFromArmory!==false)for(const id of ['maiden_kukri','blood_pact'])if(!loadedItems.hasItem(id))loadedItems.grantItem(id);
+                    }
+
+                    // Preflight companion capability records before changing currency, inventory or the live map.
+                    const abilityCatalog=DFNative.createAbilityCatalog(GAME_DB.progression.abilities);
+                    for(const record of [...(save.teammates??[]),...(worldData.nativeLevel?.physics?.entities??[]).filter(entry=>entry.entity_type==='df_npc').map(entry=>entry.data)]){
+                        DFNative.importActorAbilities(structuredClone(record),abilityCatalog,{default_id:record.role==='red_demon_dancer'?'fireball':null});
                     }
 
                     const loadedVitals=new DFNative.playerVitals();
@@ -570,6 +579,9 @@ engineMixin({
                             npc.hireCost = savedTm.hireCost || CONFIG.COMPANION.DEFAULT_HIRE_COST;
                             npc.alliance = 'friendly';
                             if(savedTm.inventory)npc.inventory=savedTm.inventory;
+                            if(savedTm.abilitiesSnapshot)npc.abilitiesSnapshot=savedTm.abilitiesSnapshot;
+                            else if(savedTm.equippedAbilityId!==undefined)npc.equippedAbilityId=savedTm.equippedAbilityId;
+                            if(savedTm.cooldown!==undefined)npc.cooldown=savedTm.cooldown;
                             npc.recruited = true;
                             if (!this.teammates.includes(npc)) this.teammates.push(npc);
                             const npcIdx = this.npcs.indexOf(npc);
@@ -580,6 +592,9 @@ engineMixin({
                             if (tm) {
                                 tm.recruited = savedTm.recruited;
                                 if(savedTm.inventory)tm.inventory=savedTm.inventory;
+                                if(savedTm.abilitiesSnapshot)tm.abilitiesSnapshot=savedTm.abilitiesSnapshot;
+                                else if(savedTm.equippedAbilityId!==undefined)tm.equippedAbilityId=savedTm.equippedAbilityId;
+                                if(savedTm.cooldown!==undefined)tm.cooldown=savedTm.cooldown;
                                 if (savedTm.equippedWeaponId && ITEM_REGISTRY[savedTm.equippedWeaponId]) {
                                     tm.equippedWeaponId = savedTm.equippedWeaponId;
                                 }

@@ -69,7 +69,7 @@ engineMixin({
             const speed=this.player.buffSystem.getStat('speed',5.2)*60*(this.sneaking?.55:1)*(this.furniture.holding?FURNITURE_GRAB.MOVE_MUL:1);
             this.player.setMovement(direction,{speed,face_movement:!aiming&&!this.furniture.holding});
         }else if(direction[0]||direction[1])this.furniture.release();
-        this.actors.beforePhysics(this._nativeActorContext,world.config.fixed_step);this.weapons.beforePhysics(this._nativeActorContext);this.updateQuickDraw();
+        this.actors.beforePhysics(this._nativeActorContext,world.config.fixed_step);this.weapons.beforePhysics(this._nativeActorContext);this.abilities.beforePhysics(this._nativeActorContext);this.updateQuickDraw();
         if(!blocked&&(this.mouseDown||F.active&&F.firing)&&this.shootCooldown<=0)this.fireWeapon();
         level.updateState();this.combat.advance(world.config.fixed_step);this.worldLoot.advance(world.config.fixed_step);world.commitCommands();this.roomSystem.update();this.updateScope();this.updatePlayerRecovery();this.updateFlitRing();
         this.weather.setIndoorSuppressed(!this.roomSystem.isPlayerOutdoor());
@@ -94,12 +94,13 @@ engineMixin({
         this.weapons=new DFNative.weaponSystem({items:this.items,combat:this.combat,get_player:()=>this.player,policy:{stat:(name,base)=>this.resonance.stat(name,base),roll_crit:stats=>this.rollCrit(stats),fast_reload:()=>this.augments.isEquipped('fast_reload'),mirror_glass:()=>this.mirrorGlassOn(),flit_active:()=>_gameTimeSec-this.player.vitals.last_flit_at<=this.resonance.flitStrikeWindow(),flit_multiplier:()=>1+this.resonance.value('flit_strike','damage')*this.resonance.rank('flit_strike'),quick_draw_window:()=>this.resonance.value('quick_draw','window'),quick_draw_multiplier:()=>1+this.resonance.value('quick_draw','damage')*this.resonance.rank('quick_draw'),can_fire:()=>!this.paused&&!this.furniture.busy()}});
         this.worldLoot=new DFNative.lootSystem({items:this.items,get_player:()=>this.player,on_event:(event,detail)=>{if(event==='loot:picked-up'){this.inventory.render();showMessage('ITEM RECOVERED');}}});
         const restored=!!this.player.data.weapon_state;this.combat.attach(context);this.weapons.attach(context);this.worldLoot.attach(context);
-        this._nativeActorContext=context;this.actors=new DFNative.actorSystem({weapons:this.weapons,combat:this.combat,get_player:()=>this.player,policy:{stationary:()=>true,on_event:(event,detail)=>{if(event==='npc:downed')showMessage('COMPANION DOWNED');}}});this.actors.attach(context);
+        this.abilities=new DFNative.abilitySystem({weapons:this.weapons,combat:this.combat,get_player:()=>this.player});this.abilities.attach(context);
+        this._nativeActorContext=context;this.actors=new DFNative.actorSystem({weapons:this.weapons,combat:this.combat,abilities:this.abilities,get_player:()=>this.player,policy:{stationary:()=>true,on_event:(event,detail)=>{if(event==='npc:downed')showMessage('COMPANION DOWNED');}}});this.actors.attach(context);
         if(!restored){this.weapons.setHolstered(previous.holstered);this.weapons.setCooldown(previous.cooldown/60);if(previous.shield)this.weapons.state.shield={...previous.shield};this.weapons.state.combo=previous.combo;this.weapons.state.last_punch_at=this.weapons.state.elapsed-previous.punch_age;}
         for(const key of ['_legacyShootCooldown','_legacyWeaponHolstered','_legacyQuickDraw','_drawnAt','_drawShotUsed','_swing','_slashT','_slashSecs','_slashSide','_slashStyle','_punchDur','_punchCombo','_punchAt','_mirrorShield','_mirrorFlashT'])delete this[key];
     },
     _disposeNativeCombat(){
-        this.actors?.detach();this.actors=null;this._nativeActorContext=null;this.weapons?.detach();this.combat?.detach();this.worldLoot?.detach();for(const fn of this._nativeCombatCleanups??[])fn();this._nativeCombatCleanups=[];this.weapons=null;this.combat=null;this.worldLoot=null;
+        this.actors?.detach();this.actors=null;this._nativeActorContext=null;this.abilities?.detach();this.abilities=null;this.weapons?.detach();this.combat?.detach();this.worldLoot?.detach();for(const fn of this._nativeCombatCleanups??[])fn();this._nativeCombatCleanups=[];this.weapons=null;this.combat=null;this.worldLoot=null;
     },
     _flitApartment(angle){
         if(this.paused||this.player.dead||this.isDriving||this.furniture.busy()||this.hud&&!this.hud.has('flit'))return false;

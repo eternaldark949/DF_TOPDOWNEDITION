@@ -390,3 +390,5 @@ These operations are reusable physics APIs; weapon identities, damage, teams, ch
 `findWanderPlacement(body,{origin?,near_range=200,angle_sample=.5,radius_sample=.5,...placement_options})` resolves two authored RNG samples (0..1) into a nearby, checked position through the native placement query. Game AI supplies random samples and behavior timing; it does not calculate offsets or build another navigation grid.
 
 The official registry reports `entityRegistered` and `entityRemoved` with `{entity,body,simulation_tick}`. These follow the existing deferred world-event dispatch. Registration happens through the same normal/restored base path; removal retires subscriptions and identity. A gameplay actor service can maintain an ID set from these events and explicit level-entry reconnection without scanning every world entity every simulation step. Runtime command commits do not run another physics step.
+
+Character snapshot serialization omits intent/facing references to bodies removed before the next motor update. Direction intents/facing remain intact. Saving does not mutate the live motor; restored state never contains an invalid removed target ID.

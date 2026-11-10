@@ -142,3 +142,7 @@ Run `node --test tools/test-player-systems.mjs tools/test-player-vitals.mjs` for
 ## Shared actors
 
 `Player`, `NPC` and `Ganger` now inherit native `gameActor`. `playerVitals extends actorVitals` shares canonical health operations with native and remaining legacy actors. `api.actors` connects their behavior and owned weapon execution to the existing runtime. See [the actor API, ownership contracts and removal ledger](actors/README.md). Specialized actor subclasses and the classic city callers remain conversion work.
+
+## Shared abilities
+
+Directory now also installs `api.abilities`. `abilityLoadout` owns learned/equipped capabilities; `abilitySystem` executes all three existing projectile abilities through native launches and the shared combat impact policy. Weapon and spell readiness/cooldown share one attack controller. Native and remaining classic NPCs use the same capability record. See [ability API and migration boundaries](abilities/README.md).

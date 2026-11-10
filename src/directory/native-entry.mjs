@@ -38,3 +38,7 @@ export {Ganger} from '../entities/ganger.mjs';
 export {actorSystem} from '../gameplay/actors/actor-system.mjs';
 export {actorItems,restoreActorItems} from '../gameplay/actors/actor-inventory.mjs';
 export {resolveEmoteLines,NPC_EMOTE_REACTIONS} from './npc-reactions.mjs';
+
+export {abilityLoadout,actorAbilities} from '../gameplay/abilities/ability-loadout.mjs';
+export {abilitySystem} from '../gameplay/abilities/ability-system.mjs';
+export {createAbilityCatalog,importActorAbilities} from './game-abilities.mjs';

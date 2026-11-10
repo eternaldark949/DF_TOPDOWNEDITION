@@ -1,3 +1,5 @@
+import progression from './game-db/progression.json' with {type:'json'};
+import {createAbilityCatalog} from './game-abilities.mjs';
 import actorRules from './game-actor-rules.json' with {type:'json'};
 import {createItemCatalog} from './game-items.mjs';
 import { assetLibrary } from '../basement/physics/index.mjs';
@@ -22,6 +24,7 @@ export function createGameAssetLibrary({ game_db = { cast, vehicles, enemies, pl
         }
         resource.data = data;
     }
+    definition.resources.abilities={kind:'ability_catalog',data:createAbilityCatalog(game_db.progression?.abilities??progression.abilities)};
     definition.resources.actor_rules={kind:'actor_rules',data:actorRules};
     definition.resources.actor_items={kind:'item_catalog',data:createItemCatalog(game_db.items,{enemy_kinds:game_db.enemies.kinds})};
     definition.resources.actor_appearances={kind:'appearance_catalog',data:game_db.cast.appearances};

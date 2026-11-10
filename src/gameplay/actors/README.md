@@ -60,7 +60,7 @@ Events: `actor:damaged`, `actor:defeated`, `actor:healed`, `actor:revived`, `act
 
 `NPC` (`df_npc`) handles civilian and teammate roles. Teammates use native follow/flee/placement facilities; self stims, out-of-combat regeneration and proximity healing use shared health. Permanent teammates down and revive. `hire({kind='contract',cost,minutes,world_minutes=0})` configures a contract/permanent recruitment; payment remains the caller's responsibility. `release()` ends it. `say(text,seconds=2,delay=0)` and `reactToEmote(emote,{tier=0,random=Math.random})` share authored reaction content with existing NPCs.
 
-`inCar` and `seatIndex` read real attachments and vehicle occupants. No seat coordinates are copied. Mounted NPCs currently hold fire: cabin/window attack policy and specialized companion abilities (including fireball) are pending conversions. Baseline ranged companion combat is implemented; specialized abilities are not silently replaced with generic attacks.
+`inCar` and `seatIndex` read real attachments and vehicle occupants. No seat coordinates are copied. Mounted NPCs currently hold fire pending cabin/window attack policy. On foot, Fireball, Shadow Bolt and Ember Burst use the shared abilitySystem and the same attack cooldown as weapons. See [ability ownership, casting and remaining work](../abilities/README.md).
 
 Equipment setters grant/equip real instances. `onWeaponFired` manages authored burst delays through the shared weapon controller. Roster import/export preserves burst size/delay/accuracy, cooldown and remaining burst count. Aliases are converted once at Directory/host boundaries. `rosterRecord(npc)` exports game metadata and a detached typed inventory; it is not another live owner.
 
@@ -90,6 +90,8 @@ Removed: the apartment-only `ApartmentCompanion` class; duplicate common health 
 
 Still executable: classic `ActorEntity`, `NPC`, `Ganger`, specialized descendants, legacy city projectile/collision loops and classic mixins. Shared health and typed NPC inventories are now used there, but their physical ownership remains legacy. Their deletion depends on converting the city world/callers and specialized classes to native identities. No native body is created alongside a legacy actor to pretend that conversion is complete.
 
-Next class conversions: specialized companions/abilities and hostile subclasses; their factories/room coordinators; native city population consumers and level composition; remaining legacy collision/combat branches; production boot/mixins and full presentation/save coordination. [Combat removal ledger](../combat/README.md) tracks the corresponding executable branches.
+Next class conversions: mounted companion attacks, specialized companion tactics and hostile subclasses; their factories/room coordinators; native city population consumers and level composition; remaining legacy collision/combat branches; production boot/mixins and full presentation/save coordination. [Combat removal ledger](../combat/README.md) tracks the corresponding executable branches.
 
 Verification: `tools/test-actor-systems.mjs`, `tools/test-actor-callers.cjs`, `tools/test-actors-browser.py`, Basement `actor-support.test.mjs`, and the existing player/combat/apartment suites. Repeated identical movement requests retain path plans, failed paths respect the native retry interval, and grid-corner traversal has a regression test.
+
+Ability loadouts now live in `data.abilities`; `NPC.equippedAbilityId` derives from them. Directory supplies role defaults and imports prior aliases once. Actors ask `abilitySystem` to cast through the existing native projectile/contact pipeline. See the [ability API](../abilities/README.md).

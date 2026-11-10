@@ -30,3 +30,9 @@ test('unreachable destinations respect the same retry interval instead of search
  const world=new physicsSystem(),actor=world.createCharacter();world.elements.createStatic({position:[100,0],collision_shape:{shape_type:'box',dimensions:[20,20]}});let searches=0;const find=world.findPath.bind(world);world.findPath=(...args)=>{searches++;return find(...args);};
  for(let n=0;n<60;n++){actor.moveTo([100,0]);world.updateState();}assert.ok(searches>=3&&searches<=5,String(searches));
 });
+
+test('saving immediately after target removal omits stale motor references without mutating live commands',()=>{
+ const world=new physicsSystem(),actor=world.createCharacter(),target=world.createCharacter({position:[100,0]});actor.followTarget(target);actor.lookAtTarget(target);target.destroy();
+ const before=actor.getMovementState(),snapshot=world.savePhysicsState(),motor=snapshot.bodies.find(body=>body.body_id===actor.body_id).motor;
+ assert.equal(motor.intent,null);assert.equal(motor.facing,null);assert.deepEqual(actor.getMovementState(),before);world.loadPhysicsState(snapshot);world.updateState();assert.equal(world.elements.fetchEntity(actor.entity_id).getMovementState().mode,'idle');
+});

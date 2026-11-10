@@ -36,7 +36,7 @@ New saves contain the official native world snapshot. Old apartment saves retain
 ## Remaining work and parity limits
 
 - City streets, traffic, pedestrians, vehicles, enemies, other maps and minigames still use legacy physical ownership. Their official ESM clients exist but production callers still need migration.
-- Apartment companions are actual native NPCs with shared health, typed owned weapons, recovery/stims, speech and baseline AI. Specialized companion abilities, mounted attacks, optional cat behavior and the broader NPC ecosystem still need conversion.
+- Apartment companions are actual native NPCs with shared health, typed owned weapons, recovery/stims, speech and baseline AI. Mounted attacks, specialized companion tactics, optional cat behavior and the broader NPC ecosystem still need conversion.
 - The native host uses shared firearms, punches, swept blades, bonuses, deflection and physical loot. Specialized attacks, encounter-specific rules and broader damage/death consequences remain to be ported.
 - Story scene actors and special scripted movement still need native scene integration.
 - Wardrobe/hair fitting and animation physics, full lighting/reflection/weather/VFX parity remain. Native curtains and shared-index lamp sensing are connected; that does not complete cosmetic migration.
@@ -67,3 +67,5 @@ The native host now composes the same `combatSystem`, `weaponSystem` and `lootSy
 ### Shared actor conversion
 
 The apartment-only `ApartmentCompanion` class is deleted. Directory creates actual `NPC extends gameActor` instances, and `actorSystem` connects each to its real native body and shared weapon execution. Old companion snapshots migrate by ID. Roster saves and the existing classic scene boundary preserve exact item identities/upgrades and game metadata; they never retain departed bodies. See [actor APIs, native runtime retention and remaining class conversions](../gameplay/actors/README.md).
+
+The native apartment now installs the same `abilitySystem` as the shared runtime. NPCs cast all three existing abilities using canonical learned/equipped loadouts and the shared attack cooldown. Learned state and cooldown survive saves and the explicit classic scene boundary. See [ability API and remaining mounted/presentation work](../gameplay/abilities/README.md).

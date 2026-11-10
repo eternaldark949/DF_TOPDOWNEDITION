@@ -111,3 +111,5 @@ Verification: `tools/test-combat-systems.mjs`, `src/basement/physics/tests/nativ
 ## Actor execution update
 
 `registerActor(actor,{items=actor.items,policy={}})`, `unregisterActor(id)`, `getActorController(actorOrId)` and `requestActorFire(actor,aim)` now route NPC/Ganger weapons through the same execution code and one global impact/contact subscription. Records remain on each official actor. `combat.canDamage(source,target,{source_alliance}={})` preserves projectile team policy after source removal; protected civilians reject friendly fire. Downed permanent companions emit `combat:downed`. See [actor API and remaining specialized conversions](../actors/README.md).
+
+`weaponSystem.canExecute()` now supplies common attack readiness to `abilitySystem`. Casts use the actor’s existing cooldown record. The one world projectile policy routes native spell bodies with `damage_type`/`ability_id` through combat; abilities add no collision listener. See [ability API](../abilities/README.md).

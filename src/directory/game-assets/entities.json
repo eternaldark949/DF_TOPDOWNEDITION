@@ -529,7 +529,8 @@
       "assets": {
         "actor_rules": "actor_rules",
         "items": "actor_items",
-        "appearances": "actor_appearances"
+        "appearances": "actor_appearances",
+        "abilities": "abilities"
       },
       "data": {
         "health": 100,

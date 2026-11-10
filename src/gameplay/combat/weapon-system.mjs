@@ -53,10 +53,14 @@ export class weaponSystem{
   }
   this.#updateSwing(player,state,seconds);
  }
+ canExecute(){
+  const actor=this.#player(),state=this.state,context=this.#context;
+  return !!context&&context.engine?.running!==false&&context.engine?.active_level!==null&&(!state?.quick_draw||this.#quickFiring)&&!!actor&&!isCombatDead(actor)&&actor.active!==false&&actor.visible!==false&&state.cooldown<=1e-9&&!state.holstered&&!context.engine?.paused&&this.#policy.can_fire?.()!==false&&!context.api.physics.getAttachmentState(actor);
+ }
  fire(aim={}){
   if(this.#context?.engine?.phase==='render')throw new Error('Rendering cannot fire weapons');
   const player=this.#player(),state=this.state,context=this.#context;
-  if(!context||context.engine?.running===false||context.engine?.active_level===null||state?.quick_draw&&!this.#quickFiring||!player||isCombatDead(player)||player.visible===false||state.cooldown>1e-9||state.holstered||context.engine?.paused||this.#policy.can_fire?.()===false||context.api.physics.getAttachmentState(player))return false;
+  if(!this.canExecute())return false;
   const weapon=this.#items.getEquippedWeapon(),stats=weapon?.stats??{},mode=weapon?.weaponMode??'none',flit=this.#flit(player);
   if(mode==='melee')return this.#startSwing(player,state,weapon,stats,flit);
   const punch=mode==='none'||mode==='fists',R=this.#rules,world=context.api.physics;
@@ -131,7 +135,7 @@ export class weaponSystem{
  #applyProjectileHit(event){
   if(event.sensor_only)return;const data=event.projectile?.data,target=event.target_entity;if(!data||!target||!Number.isFinite(data.damage))return;
   const source=this.#context.api.elements.fetchEntity(data.source_id);if(!this.#combat.canDamage(source,target,{source_alliance:data.source_alliance}))return;
-  const damage=Math.round(data.damage*event.impact_scale);if(!this.#combat.damage(target,damage,{source_id:data.source_id,type:data.melee?'melee':'ballistic',crit:data.crit,bypass_invulnerability:!!data.melee}))return;
+  const damage=Math.round(data.damage*event.impact_scale);if(!this.#combat.damage(target,damage,{source_id:data.source_id,type:data.damage_type??(data.melee?'melee':'ballistic'),crit:data.crit,bypass_invulnerability:!!data.melee,...(data.ability_id?{ability_id:data.ability_id}:{})}))return;
   if(data.sticky)this.#combat.attachOrb(target,{damage:data.dot_damage,interval_seconds:data.dot_interval,ticks:data.dot_ticks,max_orbs:data.max_orbs,source_id:data.source_id});
   if(data.knuckles&&data.haymaker)this.#combat.haymaker(target,{damage,source_id:data.source_id});
   if(data.melee&&source===this.#player()){
