@@ -1,5 +1,10 @@
 # Changelog
 
+## Runtime coordinator — 2026-11-10
+
+- Added optional private `step_authority` for runtime-owned worlds; direct unauthorized stepping rejects before commands or time advance. Standalone callers remain unchanged, and physical saves do not serialize or release clock authority.
+- The game checkout now contains `src/runtime/game-engine.mjs` and its level/system lifecycle API, executable multi-level example and acceptance tests. This coordinator uses the canonical Lobby and one native world; production class conversion/boot replacement remains pending.
+
 ## Playable apartment cutover — 2026-11-10
 
 - Bundled the native runtime into the playable build; Directory-authored apartment actors now own official bodies, one shared index and one simulation clock.

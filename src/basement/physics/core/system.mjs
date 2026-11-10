@@ -27,9 +27,12 @@ export class physicsSystem {
     #nextId = 1; #nextConstraint = 1;
     #stepping = false; #dispatching = false; #committing = false;
     #tick = 0; #motionEnvelope = null;
+    #stepAuthority;
     #queries; #particles; #attachments;
     #stats = { steps: 0, narrow_checks: 0, candidate_pairs: 0, active_movers: 0 };
-    constructor({ cell_size = 128, fixed_step = 1 / 60, gravity = [0, 0], solver_iterations = 6, sleep_speed = 0.05, sleep_delay = 0.5, asset_library } = {}) {
+    constructor({ cell_size = 128, fixed_step = 1 / 60, gravity = [0, 0], solver_iterations = 6, sleep_speed = 0.05, sleep_delay = 0.5, asset_library, step_authority } = {}) {
+        if (step_authority !== undefined && typeof step_authority !== 'symbol') throw new TypeError('step_authority must be a private Symbol');
+        this.#stepAuthority = step_authority;
         Object.defineProperty(this, 'config', { value: freeze({ cell_size: number(cell_size, 'cell_size', 1), fixed_step: number(fixed_step, 'fixed_step', EPS, 0.1), gravity: vector(gravity),
             solver_iterations: number(solver_iterations, 'solver_iterations', 1, 32), sleep_speed: number(sleep_speed, 'sleep_speed', 0), sleep_delay: number(sleep_delay, 'sleep_delay', 0) }), enumerable: true });
         if (!Number.isInteger(solver_iterations)) throw new TypeError('solver_iterations must be integral');
@@ -339,7 +342,8 @@ export class physicsSystem {
         const queued = this.#queue; this.#queue = []; this.#committing = true;
         try { for (const fn of queued) fn(); } finally { this.#committing = false; }
     }
-    updateState(step_seconds = this.config.fixed_step) {
+    updateState(step_seconds = this.config.fixed_step, authority) {
+        if (this.#stepAuthority !== undefined && authority !== this.#stepAuthority) throw new Error('Only the owning runtime may step this physicsSystem');
         number(step_seconds, 'step_seconds', EPS, 0.1);
         if (this.#stepping || this.#dispatching) throw new Error('Physics updates are not reentrant');
         this.commitCommands();

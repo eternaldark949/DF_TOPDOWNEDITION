@@ -17,6 +17,8 @@ A player may own a car, while Basement owns that car's physical body. The game c
 
 ## Current live game versus the official implementation
 
+The destination coordinator is now implemented as [`gameEngine`](../runtime/README.md). It owns one session world and gives levels explicit content/lifecycle hooks. Existing production boot and the earlier apartment host have not yet switched to it. Shared class conversions will replace those callers and remove their mixins.
+
 The live legacy `GameEntity` still stores writable `x`, `y`, `vx`, `vy` and rotation-related fields. Traffic, character and collision paths still write those fields. Moving a helper into Basement does not, by itself, make the live body's state engine-owned.
 
 Official `gameEntity` instances instead register an authoritative engine body by construction. `position` and velocity getters return detached/frozen state, and render snapshots cannot alter simulation state. Legacy physical aliases are rejected. The vehicle and pedestrian ESM clients already use this design. The playable apartment now uses this ownership design, including its player, props, doors, lights and curtains. Other scenes retain legacy ownership. See [the apartment cutover](APARTMENT-CUTOVER.md) for scope and remaining parity work.

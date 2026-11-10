@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'b72891e45d24';
+        const DFAB_BUILD = '5d37d3f9c98d';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9874,7 +9874,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="4539">
+    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="5070">
 const DFNative = (()=>{
 'use strict';
 // src/basement/physics/core/values.mjs
@@ -12273,9 +12273,12 @@ class physicsSystem {
     #nextId = 1; #nextConstraint = 1;
     #stepping = false; #dispatching = false; #committing = false;
     #tick = 0; #motionEnvelope = null;
+    #stepAuthority;
     #queries; #particles; #attachments;
     #stats = { steps: 0, narrow_checks: 0, candidate_pairs: 0, active_movers: 0 };
-    constructor({ cell_size = 128, fixed_step = 1 / 60, gravity = [0, 0], solver_iterations = 6, sleep_speed = 0.05, sleep_delay = 0.5, asset_library } = {}) {
+    constructor({ cell_size = 128, fixed_step = 1 / 60, gravity = [0, 0], solver_iterations = 6, sleep_speed = 0.05, sleep_delay = 0.5, asset_library, step_authority } = {}) {
+        if (step_authority !== undefined && typeof step_authority !== 'symbol') throw new TypeError('step_authority must be a private Symbol');
+        this.#stepAuthority = step_authority;
         Object.defineProperty(this, 'config', { value: freeze({ cell_size: number(cell_size, 'cell_size', 1), fixed_step: number(fixed_step, 'fixed_step', EPS, 0.1), gravity: vector(gravity),
             solver_iterations: number(solver_iterations, 'solver_iterations', 1, 32), sleep_speed: number(sleep_speed, 'sleep_speed', 0), sleep_delay: number(sleep_delay, 'sleep_delay', 0) }), enumerable: true });
         if (!Number.isInteger(solver_iterations)) throw new TypeError('solver_iterations must be integral');
@@ -12585,7 +12588,8 @@ class physicsSystem {
         const queued = this.#queue; this.#queue = []; this.#committing = true;
         try { for (const fn of queued) fn(); } finally { this.#committing = false; }
     }
-    updateState(step_seconds = this.config.fixed_step) {
+    updateState(step_seconds = this.config.fixed_step, authority) {
+        if (this.#stepAuthority !== undefined && authority !== this.#stepAuthority) throw new Error('Only the owning runtime may step this physicsSystem');
         number(step_seconds, 'step_seconds', EPS, 0.1);
         if (this.#stepping || this.#dispatching) throw new Error('Physics updates are not reentrant');
         this.commitCommands();
@@ -19980,6 +19984,839 @@ class ApartmentLevel {
 
 return Object.freeze({get ApartmentLevel(){return ApartmentLevel;}});
 })();
+// src/lobby/level-lobby.mjs
+const m42 = (()=>{
+// ===== LV1 LOBBY =====
+// The engine's game loop. The Lobby keeps the clock and nothing else: it knows when a frame is due,
+// how many fixed simulation steps that frame owes, and how far the drawn frame sits between two steps.
+// It knows nothing about the game. Whatever the game wants done in a frame (profiling, audio,
+// slow-mo, the simulation itself, drawing) is plugged into its jacks with plugIn().
+//
+// FIXED TIMESTEP: the simulation advances in steps of loop_config.STEP_MS of game time, and the
+// screen is drawn whenever the display allows. Leftover time carries over in the accumulator, so
+// steps land at a true rate on average on any monitor. A stall (alt-tab, GC, debugger) is clamped
+// to MAX_FRAME_MS, and a frame never runs more than MAX_STEPS steps: past that the backlog is
+// dropped rather than letting the world fast-forward or spiral.
+//
+// JACKS (each optional; an empty jack does nothing):
+//   isRunning()                 -> bool    the loop stops re-arming itself when false
+//   beginFrame()                           every display frame, before the FPS limiter
+//   frameRateLimit()            -> number  frames per second to draw at, 0 = as fast as the display
+//   acceptFrame()                          a frame the limiter let through (the frame clock is stamped right after)
+//   timeScale(elapsed_ms)       -> number  1 = normal, 0.4 = slow-mo; stretches each step in real time
+//   isPaused()                  -> bool    hold the world: step slots pass, the tick and the world stay put
+//   beforeStep()                           every step slot, held or not (e.g. an interpolation snapshot)
+//   simulateStep()                         one fixed step of the world; the frame clock's tick has advanced
+//   afterSimulation(steps)                 after this frame's steps
+//   renderFrame(blend)                     draw; blend 0..1 = how far between the last two steps
+//   endFrame(steps, dropped_ms)            after drawing
+//   scheduleNextFrame(run)                 arm the next frame (default: requestAnimationFrame)
+class levelLobby {
+    constructor (loop_config, frame_clock) {
+        this.loop_config = loop_config;          // read live every frame: { STEP_MS, MAX_FRAME_MS, MAX_STEPS, GAME_SPEED }
+        this.frame_clock = frame_clock;          // the Basement's frame clock (basement/frame-clock.js)
+        this.jacks = {};
+
+        // --- CLOCK STATE ---
+        this.last_frame_time = undefined;        // performance.now() of the last accepted frame
+        this.next_draw_due = undefined;          // when the FPS limiter lets the next frame through
+        this.accumulator = 0;                    // real ms owed to the simulation
+        this.frame_ms = 0;                       // raw time between accepted frames (render cadence)
+        this.time_scale = 1;                     // this frame's slow-mo scale
+        this.step_ms = 0;                        // this frame's real length of one step
+        this.steps_taken = 0;                    // steps run in the last frame
+
+        this.engine_clock = this.runEngine.bind(this);
+    }
+
+    /** Plug the game into the Lobby: { jackName: function }. Later calls add to or replace earlier ones. */
+    plugIn (jacks) {
+        Object.assign(this.jacks, jacks);
+        return this;
+    }
+
+    /** One display frame. */
+    runEngine () {
+        const J = this.jacks, L = this.loop_config;
+        if (J.isRunning && !J.isRunning()) return;
+        if (J.beginFrame) J.beginFrame();
+
+        // --- FPS LIMITER ---
+        // Scheduled against a running due-time rather than the last drawn frame. Comparing to the last
+        // frame overshoots whenever the display period doesn't divide the target evenly: on a 144Hz panel
+        // (6.94ms) a 16.67ms target could only land every 3rd frame, so "60 FPS" delivered 48.
+        const fps_limit = J.frameRateLimit ? J.frameRateLimit() : 0;
+        if (fps_limit > 0) {
+            const now = performance.now();
+            const min_interval = 1000 / fps_limit;
+            if (this.next_draw_due === undefined) this.next_draw_due = now;
+            if (now < this.next_draw_due) {
+                this.scheduleNextFrame();
+                return;
+            }
+            // Carry the schedule forward; resync if we've fallen far behind.
+            this.next_draw_due = (now - this.next_draw_due > min_interval)
+                ? now + min_interval
+                : this.next_draw_due + min_interval;
+        } else {
+            this.next_draw_due = undefined;
+        }
+        if (J.acceptFrame) J.acceptFrame();
+        if (this.frame_clock) this.frame_clock.stampFrame();   // real time of the frame being drawn
+
+        // --- ELAPSED TIME ---
+        const now_ms = performance.now();
+        if (this.last_frame_time === undefined) this.last_frame_time = now_ms;
+        let elapsed = now_ms - this.last_frame_time;
+        this.frame_ms = elapsed;                 // raw render cadence; never changes the fixed step
+        this.last_frame_time = now_ms;
+
+        const clamped_ms = Math.max(0, elapsed - L.MAX_FRAME_MS);
+        if (elapsed > L.MAX_FRAME_MS) elapsed = L.MAX_FRAME_MS;
+        if (elapsed < 0) elapsed = 0;
+        this.accumulator = (this.accumulator || 0) + elapsed;
+
+        // --- STEP LENGTH ---
+        // Real-time length of one step. GAME_SPEED 0.5 -> 33.3ms -> 30 steps/sec. A time scale stretches
+        // it the same way: evenly spaced, interpolated steps.
+        const scale = this.time_scale = J.timeScale ? J.timeScale(elapsed) : 1;
+        const step_ms = this.step_ms = L.STEP_MS / Math.max(0.05, (L.GAME_SPEED || 1) * scale);
+
+        // --- SIMULATION ---
+        // While paused (or stopped mid-frame) the step slots still pass, so time doesn't bank up
+        // and burst out on unpause; the tick and the world simply don't move.
+        let steps = 0;
+        while (this.accumulator >= step_ms && steps < L.MAX_STEPS) {
+            if (J.beforeStep) J.beforeStep();
+            if (this.isStepping()) {
+                if (this.frame_clock) this.frame_clock.advanceTick();
+                if (J.simulateStep) J.simulateStep();
+            }
+            this.accumulator -= step_ms;
+            steps++;
+        }
+        // Machine can't keep up: drop the backlog rather than spiral.
+        const dropped_ms = clamped_ms + (steps >= L.MAX_STEPS ? this.accumulator : 0);
+        if (steps >= L.MAX_STEPS) this.accumulator = 0;
+        this.steps_taken = steps;
+        if (J.afterSimulation) J.afterSimulation(steps);
+
+        // --- RENDER ---
+        if (J.renderFrame) J.renderFrame(this.accumulator / step_ms);
+        if (J.endFrame) J.endFrame(steps, dropped_ms);
+        this.scheduleNextFrame();
+    }
+
+    /** Does a step slot move the world right now? */
+    isStepping () {
+        const J = this.jacks;
+        return !(J.isRunning && !J.isRunning()) && !(J.isPaused && J.isPaused());
+    }
+
+    scheduleNextFrame () {
+        if (this.jacks.scheduleNextFrame) this.jacks.scheduleNextFrame(this.engine_clock);
+        else requestAnimationFrame(this.engine_clock);
+    }
+}
+
+return Object.freeze({get levelLobby(){return levelLobby;}});
+})();
+// src/runtime/game-level.mjs
+const m43 = (()=>{
+/** Content/lifecycle contract. A level never owns a world, clock or collision solver. */
+class gameLevel {
+    constructor({ level_id } = {}) {
+        if (typeof level_id !== 'string' || !level_id.trim()) throw new TypeError('A level requires level_id');
+        Object.defineProperty(this, 'level_id', { value: level_id, enumerable: true });
+    }
+    // Preparation may be asynchronous. Its context contains assets, not a live world.
+    prepare({ assets }, options) { return options; }
+    enter(context, prepared) {}
+    beforePhysics(context, seconds) {}
+    afterPhysics(context, seconds) {}
+    render(context, blend, target) {}
+    leave(context) {}
+    disposePrepared(prepared) {}
+}
+
+return Object.freeze({get gameLevel(){return gameLevel;}});
+})();
+// src/runtime/game-engine.mjs
+const m41 = (()=>{
+const {physicsSystem,assetLibrary} = m1;
+const {levelLobby} = m42;
+const {gameLevel} = m43;
+
+const hooks = ['attach', 'detach', 'beforePhysics', 'afterPhysics', 'render', 'levelEntered', 'levelLeaving'];
+function synchronous(fn, receiver, args) {
+    if (fn && ['AsyncFunction', 'GeneratorFunction', 'AsyncGeneratorFunction'].includes(fn.constructor.name)) throw new TypeError('Runtime hooks must be synchronous; load assets in level.prepare');
+    const result = fn?.apply(receiver, args);
+    if (result && typeof result.then === 'function') {
+        // Reject the contract while observing a returned rejection; do not leak an
+        // unhandled asynchronous error after the caller's synchronous cleanup.
+        Promise.resolve(result).catch(() => {});
+        throw new TypeError('Runtime hooks must be synchronous; load assets in level.prepare');
+    }
+    return result;
+}
+function attempt(errors, fn) { try { fn(); } catch (error) { errors.push(error); } }
+function failures(errors, message) { if (errors.length) throw new AggregateError(errors, message); }
+
+/** Application coordinator. Basement supplies all physical behavior; the Lobby supplies time. */
+class gameEngine {
+    #world; #authority = Symbol('runtime simulation clock'); #api; #lobby;
+    #levels = new Map(); #systems = new Map(); #active = null; #persistent = new Set();
+    #running = false; #destroyed = false; #phase = 'idle'; #loading = false; #pauses = new Map();
+    #schedule; #cancel; #frame = null; #generation = 0; #renderTarget;
+
+    constructor({ asset_library = new assetLibrary(), physics = {}, clock = {}, frame_clock,
+        schedule_frame = typeof requestAnimationFrame === 'function' ? callback => requestAnimationFrame(callback) : null,
+        cancel_frame = typeof cancelAnimationFrame === 'function' ? handle => cancelAnimationFrame(handle) : null,
+        render_target = null } = {}) {
+        if (Object.hasOwn(physics, 'step_authority') || Object.hasOwn(physics, 'asset_library')) throw new TypeError('The runtime owns physics authority and its asset library');
+        if (schedule_frame !== null && typeof schedule_frame !== 'function' || cancel_frame !== null && typeof cancel_frame !== 'function') throw new TypeError('Frame scheduling requires functions');
+        this.#world = new physicsSystem({ ...physics, asset_library, step_authority: this.#authority });
+        this.#api = Object.freeze({ physics: this.#world, elements: this.#world.elements, assets: asset_library,
+            motion: this.#world.motion, traffic: this.#world.traffic });
+        this.#schedule = schedule_frame; this.#cancel = cancel_frame; this.#renderTarget = render_target;
+        const config = { STEP_MS: this.#world.config.fixed_step * 1000, MAX_FRAME_MS: 100, MAX_STEPS: 6, GAME_SPEED: 1, ...clock };
+        if (config.STEP_MS !== this.#world.config.fixed_step * 1000) throw new TypeError('Lobby and physics fixed steps must match');
+        if (![config.MAX_FRAME_MS, config.MAX_STEPS, config.GAME_SPEED].every(v => Number.isFinite(v) && v > 0) || !Number.isInteger(config.MAX_STEPS)) throw new TypeError('Invalid Lobby clock configuration');
+        this.#lobby = new levelLobby(Object.freeze(config), frame_clock);
+        this.#lobby.plugIn({ isRunning: () => this.running, isPaused: () => this.paused || !this.active_level,
+            simulateStep: () => this.updateState(), renderFrame: blend => this.render(blend),
+            scheduleNextFrame: () => this.#queueFrame() });
+    }
+    get api() { return this.#api; }
+    get physics_system() { return this.#world; }
+    get lobby() { return this.#lobby; }
+    get active_level() { return this.#active?.level ?? null; }
+    get running() { return this.#running; }
+    get loading() { return this.#loading; }
+    get paused() { return this.#pauses.size > 0; }
+    get pause_reasons() { return [...this.#pauses.values()]; }
+    get phase() { return this.#phase; }
+    get destroyed() { return this.#destroyed; }
+    listLevels() { return [...this.#levels.keys()]; }
+    listSystems() { return [...this.#systems.keys()]; }
+    #live() { if (this.#destroyed) throw new Error('Runtime is disposed'); }
+    #idle() { this.#live(); if (this.#phase !== 'idle') throw new Error(`Operation requires a runtime boundary; current phase: ${this.#phase}`); }
+    #context(cleanups) {
+        let live = true;
+        cleanups.push(() => { live = false; });
+        const requireLive = () => { this.#live(); if (!live) throw new Error('Lifecycle context has been retired'); };
+        return Object.freeze({ engine: this, api: this.api,
+            createEntity: (packet, options) => { requireLive(); return this.createEntity(packet, options); },
+            on: (event, handler) => {
+                requireLive();
+                const unsubscribe = this.#world.on(event, handler); cleanups.push(unsubscribe); return unsubscribe;
+            },
+            defer: cleanup => { requireLive(); if (typeof cleanup !== 'function') throw new TypeError('Cleanup must be a function'); cleanups.push(cleanup); }
+        });
+    }
+    #clean(cleanups, errors) { for (const cleanup of cleanups.splice(0).reverse()) attempt(errors, cleanup); }
+    #callSystems(hook, ...args) {
+        for (const entry of this.#systems.values()) synchronous(entry.system[hook], entry.system, [entry.context, ...args]);
+    }
+    registerLevel(level_id, Level) {
+        this.#idle();
+        if (typeof level_id !== 'string' || !level_id.trim() || typeof Level !== 'function' || !(Level.prototype instanceof gameLevel) && Level !== gameLevel) throw new TypeError('Register a level_id and gameLevel class');
+        if (this.#levels.has(level_id)) throw new Error(`Level already registered: ${level_id}`);
+        this.#levels.set(level_id, Level); return this;
+    }
+    registerSystem(system_id, system) {
+        this.#idle();
+        if (typeof system_id !== 'string' || !system_id.trim() || !system || typeof system !== 'object') throw new TypeError('Register a system_id and system instance');
+        if (this.#systems.has(system_id)) throw new Error(`System already registered: ${system_id}`);
+        for (const name of hooks) if (system[name] !== undefined && typeof system[name] !== 'function') throw new TypeError(`Invalid system hook: ${name}`);
+        const cleanups = [], entry = { system, cleanups, context: this.#context(cleanups) };
+        this.#phase = 'registration';
+        try {
+            synchronous(system.attach, system, [entry.context]);
+            if (this.active_level) synchronous(system.levelEntered, system, [entry.context, this.active_level]);
+            this.#systems.set(system_id, entry);
+        } catch (error) {
+            const errors = [error]; attempt(errors, () => synchronous(system.detach, system, [entry.context])); this.#clean(cleanups, errors);
+            failures(errors, `Failed to attach system: ${system_id}`);
+        } finally { this.#phase = 'idle'; }
+        return this;
+    }
+    removeSystem(system_id) {
+        this.#idle(); const entry = this.#systems.get(system_id); if (!entry) return false;
+        this.#phase = 'registration'; const errors = []; this.#systems.delete(system_id);
+        try {
+            if (this.active_level) attempt(errors, () => synchronous(entry.system.levelLeaving, entry.system, [entry.context, this.active_level]));
+            attempt(errors, () => synchronous(entry.system.detach, entry.system, [entry.context])); this.#clean(entry.cleanups, errors);
+            failures(errors, `Failed to remove system: ${system_id}`);
+        } finally { this.#phase = 'idle'; }
+        return true;
+    }
+    createEntity(packet = {}, { lifetime = 'level' } = {}) {
+        this.#live();
+        if (this.#phase === 'render') throw new Error('Render hooks cannot create entities');
+        if (!['level', 'session'].includes(lifetime)) throw new TypeError('lifetime must be level or session');
+        if (lifetime === 'level' && !this.active_level) throw new Error('Level entities require an active level; use session lifetime for persistent actors');
+        const entity = this.#world.createEntity(packet);
+        if (lifetime === 'session') this.#persistent.add(entity);
+        return entity;
+    }
+    retainEntity(entity) {
+        this.#idle();
+        if (!entity || this.api.elements.fetchEntity(entity.entity_id) !== entity) throw new Error('Retain an official entity belonging to this runtime');
+        this.#persistent.add(entity); return entity;
+    }
+    releaseEntity(entity) { this.#idle(); return this.#persistent.delete(entity); }
+    async loadLevel(level_id, options = {}) {
+        this.#live();
+        if (!['idle', 'beforePhysics', 'physics', 'afterPhysics'].includes(this.#phase)) throw new Error('Level loading is not allowed during rendering or lifecycle hooks');
+        if (this.#loading) throw new Error('A level load is already in progress');
+        const Level = this.#levels.get(level_id); if (!Level) throw new Error(`Unknown level: ${level_id}`);
+        this.#loading = true; let candidate, prepared, entered = false;
+        try {
+            candidate = new Level({ level_id });
+            if (candidate.level_id !== level_id) throw new Error('Level identity does not match registration');
+            prepared = await candidate.prepare(Object.freeze({ assets: this.api.assets }), options);
+            this.#idle(); this.#phase = 'transition';
+            this.#world.commitCommands();
+            this.#unload();
+            const cleanups = [], context = this.#context(cleanups);
+            this.#active = { level: candidate, context, cleanups, prepared }; entered = true;
+            synchronous(candidate.enter, candidate, [context, prepared]);
+            this.#world.commitCommands();
+            this.#callSystems('levelEntered', candidate);
+            return candidate;
+        } catch (error) {
+            const errors = [error];
+            if (entered) attempt(errors, () => this.#unload());
+            else if (candidate) attempt(errors, () => synchronous(candidate.disposePrepared, candidate, [prepared]));
+            failures(errors, `Failed to load level: ${level_id}`);
+        } finally { if (this.#phase === 'transition') this.#phase = 'idle'; this.#loading = false; }
+    }
+    #unload() {
+        const active = this.#active; if (!active) return;
+        const errors = [];
+        for (const entry of [...this.#systems.values()].reverse()) attempt(errors, () => synchronous(entry.system.levelLeaving, entry.system, [entry.context, active.level]));
+        attempt(errors, () => synchronous(active.level.leave, active.level, [active.context]));
+        this.#clean(active.cleanups, errors);
+        // The official registry is the source of truth, including entities spawned by raw
+        // native factories. This is lifecycle filtering, not another entity/spatial registry.
+        for (const entity of this.api.elements.getEntities()) if (!this.#persistent.has(entity)) attempt(errors, () => entity.destroy());
+        for (const entity of this.#persistent) if (entity.destroyed) this.#persistent.delete(entity);
+        this.#active = null;
+        attempt(errors, () => this.#world.commitCommands());
+        attempt(errors, () => synchronous(active.level.disposePrepared, active.level, [active.prepared]));
+        failures(errors, 'Failed to unload level');
+    }
+    unloadLevel() {
+        this.#idle(); if (this.#loading) throw new Error('A level load is in progress');
+        this.#phase = 'transition'; try { this.#unload(); } finally { this.#phase = 'idle'; }
+    }
+    pause(reason = 'manual') {
+        this.#live(); if (typeof reason !== 'string' || !reason) throw new TypeError('Pause requires a reason');
+        const token = Symbol(reason); this.#pauses.set(token, reason);
+        return () => this.#pauses.delete(token);
+    }
+    updateState() {
+        this.#idle(); if (!this.running || this.paused || !this.#active) return false;
+        const { level, context } = this.#active, seconds = this.#world.config.fixed_step;
+        try {
+            this.#phase = 'beforePhysics';
+            this.#callSystems('beforePhysics', seconds); synchronous(level.beforePhysics, level, [context, seconds]);
+            this.#phase = 'physics'; this.#world.updateState(seconds, this.#authority);
+            this.#phase = 'afterPhysics';
+            synchronous(level.afterPhysics, level, [context, seconds]); this.#callSystems('afterPhysics', seconds);
+            return true;
+        } catch (error) { this.stop(); throw error; }
+        finally { this.#phase = 'idle'; }
+    }
+    render(blend = 1, target = this.#renderTarget) {
+        this.#idle(); if (!Number.isFinite(blend) || blend < 0 || blend > 1) throw new TypeError('Render blend must be between 0 and 1');
+        if (!this.#active) return false;
+        const { level, context } = this.#active;
+        try {
+            this.#phase = 'render'; const alpha = this.paused ? 1 : blend;
+            synchronous(level.render, level, [context, alpha, target]); this.#callSystems('render', alpha, target);
+            return true;
+        } catch (error) { this.stop(); throw error; }
+        finally { this.#phase = 'idle'; }
+    }
+    #queueFrame() {
+        if (!this.#schedule || !this.running || this.#frame !== null) return;
+        const generation = this.#generation;
+        this.#frame = this.#schedule(() => { if (generation !== this.#generation) return; this.#frame = null; if (this.running) this.#lobby.runEngine(); });
+    }
+    start() {
+        this.#idle(); if (this.running) return false;
+        this.#running = true; this.#lobby.last_frame_time = undefined; this.#lobby.accumulator = 0; this.#lobby.next_draw_due = undefined;
+        this.#queueFrame(); return true;
+    }
+    stop() {
+        this.#running = false; this.#generation++;
+        if (this.#frame !== null && this.#cancel) this.#cancel(this.#frame);
+        this.#frame = null;
+    }
+    dispose() {
+        this.#idle(); this.stop(); this.#phase = 'disposal'; const errors = [];
+        try {
+            attempt(errors, () => this.#unload());
+            for (const entry of [...this.#systems.values()].reverse()) {
+                attempt(errors, () => synchronous(entry.system.detach, entry.system, [entry.context])); this.#clean(entry.cleanups, errors);
+            }
+            this.#systems.clear(); this.#persistent.clear(); this.#pauses.clear();
+            attempt(errors, () => this.#world.clearWorld()); this.#levels.clear();
+        } finally { this.#destroyed = true; this.#phase = 'disposed'; }
+        failures(errors, 'Runtime disposal failed');
+    }
+}
+
+return Object.freeze({get gameEngine(){return gameEngine;}});
+})();
+// src/directory/street-definitions.mjs
+const m47 = (()=>{
+/** Directory authoring only: convert immutable catalog units once, never during simulation. */
+const vehicleDefinitions = new WeakMap();
+function resolveStreetVehicle(library, { brand, model, control_mode = 'AI', color } = {}) {
+    const catalog = library.getResource('df:vehicle_brands').data;
+    brand ??= Object.keys(catalog)[0];
+    const maker = catalog[brand]; if (!maker) throw new TypeError(`Unknown vehicle brand: ${brand}`);
+    model ??= Object.keys(maker.models)[0];
+    const spec = maker.models[model]; if (!spec) throw new TypeError(`Unknown vehicle model: ${model}`);
+    if (!['AI', 'PLAYER', 'PARKED'].includes(control_mode)) throw new TypeError('Invalid control_mode');
+    let cache = vehicleDefinitions.get(library); if (!cache) vehicleDefinitions.set(library, cache = new Map());
+    const key = JSON.stringify([brand, model, control_mode === 'PLAYER']);
+    if (!cache.has(key)) {
+        const driven = control_mode === 'PLAYER', stats = maker.baseStats;
+        const top = driven ? spec.driven?.top ?? stats.maxSpeed * spec.speedMod : stats.maxSpeed * spec.speedMod;
+        const acceleration = driven ? spec.driven?.accel ?? stats.acceleration : stats.acceleration;
+        cache.set(key, {
+            template: 'df_street:vehicle', collision_shape: { shape_type: 'box', dimensions: [spec.length, spec.width] },
+            mass: spec.mass ?? stats.mass ?? 1200,
+            vehicle_template: { tyre_model: driven ? 'two_axle' : 'bicycle', max_speed: top * 60, reverse_speed: top * 18,
+                acceleration: acceleration * 3600, braking: (stats.brake ?? 0.3) * 3600,
+                wheel_base: spec.length * 0.65, drag: -60 * Math.log(top / (top + acceleration)),
+                front_grip: maker.drive?.gripF ?? 1, rear_grip: maker.drive?.gripR ?? 1 },
+            data: { brand, model, model_name: spec.name, seats: spec.seats ?? stats.seats ?? 4,
+                color: maker.colors[0], visual_style: maker.visualStyle, glow_color: maker.glowColor,
+                headlight_color: maker.headlightColor ?? '#ffffaa' },
+        });
+    }
+    const definition = structuredClone(cache.get(key));
+    definition.data.control_mode = control_mode;
+    if (color !== undefined) definition.data.color = color;
+    return definition;
+}
+
+
+const seatDefinitions = new WeakMap();
+/** Resolve authored cabin data once per model, independently of simulation or rendering. */
+function resolveVehicleSeats(library, { brand, model }) {
+    const maker = library.getResource('df:vehicle_brands').data[brand], spec = maker?.models[model];
+    if (!spec) throw new TypeError('Seat layout requires a known vehicle model');
+    let cache = seatDefinitions.get(library); if (!cache) seatDefinitions.set(library, cache = new Map());
+    const key = JSON.stringify([brand, model]); if (cache.has(key)) return cache.get(key);
+    const count = spec.seats ?? maker.baseStats.seats ?? 4;
+    if (!Number.isInteger(count) || count < 1 || count > 32) throw new TypeError('Vehicle needs 1..32 seats');
+    const rules = library.getResource('df:vehicle_seating').data;
+    const rows = Math.ceil(count / 2);
+    const layout = spec.seat_layout ?? Array.from({ length: count }, (_, index) => {
+        const row = Math.floor(index / 2), side = index % 2 ? 1 : -1;
+        const x = spec.length * (rules.front_fraction + (rows === 1 ? 0 : row / (rows - 1)) * (rules.rear_fraction - rules.front_fraction));
+        const y = side * (spec.width / 2 + rules.exit_clearance);
+        return { local_position: [x, side * spec.width * rules.side_fraction], local_rotation: 0, exit_points: [[x, y], [x, -y]] };
+    });
+    if (!Array.isArray(layout) || layout.length !== count) throw new TypeError('Invalid authored seat count');
+    const point = p => { if (!Array.isArray(p) || p.length !== 2 || !p.every(Number.isFinite)) throw new TypeError('Invalid seat point'); return Object.freeze([...p]); };
+    const resolved = Object.freeze(layout.map((seat, index) => {
+        const rotation = seat.local_rotation ?? 0, combine_mass = seat.combine_mass ?? rules.combine_mass ?? false;
+        if (typeof combine_mass !== 'boolean') throw new TypeError('Invalid seat combine_mass');
+        if (!Number.isFinite(rotation) || !Array.isArray(seat.exit_points) || !seat.exit_points.length || seat.exit_points.length > 64) throw new TypeError('Invalid seat configuration');
+        return Object.freeze({ seat_index: index, role: index ? 'passenger' : 'driver', combine_mass, local_position: point(seat.local_position), local_rotation: rotation,
+            exit_points: Object.freeze(seat.exit_points.map(point)) });
+    }));
+    cache.set(key, resolved); return resolved;
+}
+
+return Object.freeze({get resolveStreetVehicle(){return resolveStreetVehicle;},get resolveVehicleSeats(){return resolveVehicleSeats;}});
+})();
+// src/traffic/traffic-vehicle.mjs
+const m46 = (()=>{
+const {resolveStreetVehicle,resolveVehicleSeats} = m47;
+const {gameVehicle} = m1;
+const bindings = new WeakMap();
+/** Official gameplay entity. Body state and driving calculations belong to Basement. */
+class TrafficVehicle extends gameVehicle {
+    static entity_type = 'df_traffic_vehicle';
+    constructor(elements, packet) { super(elements, packet); this.connectGameplay(); }
+    connectGameplay(hooks = {}) {
+        if (Number.isInteger(this.data.seats) && this.data.seats > 0 && !this.data.occupants?.length) this.data.occupants = Array(this.data.seats).fill(null);
+        const previous = bindings.get(this); previous?.forEach(drop => drop());
+        bindings.set(this, [
+            this.on('contactBegin', event => hooks.onContact?.(this, event)),
+            this.on('bodyAttached', event => { if (event.parent_body?.body_id === this.body_id) hooks.onPassengerEntered?.(this, event.entity, event); }),
+            this.on('bodyDetached', event => {
+                if (event.parent_body?.body_id !== this.body_id) return;
+                const index = this.data.occupants.indexOf(event.body.body_id); if (index !== -1) this.data.occupants[index] = null;
+                hooks.onPassengerExited?.(this, event.entity, event);
+            }),
+            this.on('trafficRouteCompleted', event => { this.data.route_complete = true; hooks.onRouteCompleted?.(this, event); }),
+        ]);
+        return this;
+    }
+    getSeatLayout() { return resolveVehicleSeats(this.physics_system.elements.asset_library, { brand: this.data.brand, model: this.data.model }); }
+    getSeatWorldPose(seat_index, { blend = 1 } = {}) {
+        const seat = this.getSeatLayout()[seat_index]; if (!seat) throw new RangeError('Unknown seat');
+        return this.physics_system.getBodyPoint(this, seat.local_position, { blend, local_rotation: seat.local_rotation });
+    }
+    assignSeat(entity, seat_index, { combine_mass } = {}) {
+        const seat = this.getSeatLayout()[seat_index];
+        if (!Number.isInteger(seat_index) || !seat) throw new RangeError('Unknown seat');
+        if (!entity || entity.destroyed || entity.physics_system !== this.physics_system || entity === this) throw new TypeError('Passenger must be a live entity in the same world');
+        if (this.data.occupants[seat_index] != null || this.physics_system.getAttachmentState(entity)) return -1;
+        entity.cancelMovement?.();
+        this.physics_system.attachBody(entity, { parent_body: this, local_position: seat.local_position, local_rotation: seat.local_rotation, combine_mass: combine_mass ?? seat.combine_mass });
+        this.data.occupants[seat_index] = entity.entity_id; return seat_index;
+    }
+    assignDriver(entity, options) { return this.assignSeat(entity, 0, options); }
+    assignPassenger(entity, options) {
+        const layout = this.getSeatLayout();
+        for (let index = 1; index < layout.length; index++) if (this.data.occupants[index] == null) return this.assignSeat(entity, index, options);
+        return -1;
+    }
+    getPassengers(results = []) {
+        results.length = 0;
+        for (const id of this.data.occupants) {
+            const entity = this.physics_system.elements.fetchEntity(id);
+            if (entity && this.physics_system.getAttachmentState(entity)?.parent_body_id === this.body_id) results.push(entity);
+        }
+        return results;
+    }
+    releasePassenger(entity, { inherit_velocity } = {}) {
+        if (!entity || entity.destroyed || entity.physics_system !== this.physics_system) return null;
+        const index = this.data.occupants.indexOf(entity.entity_id); if (index === -1) return null;
+        const request = this.physics_system.detachBody(entity, { exit_points: this.getSeatLayout()[index].exit_points, inherit_velocity });
+        if (request && !this.physics_system.getAttachmentState(entity)) this.data.occupants[index] = null;
+        return request;
+    }
+    followRoute(route_id, options = {}) {
+        // The owner is an engine reference, not a game-side driving service.
+        const profile = resolveStreetVehicle(this.physics_system.elements.asset_library, { brand: this.data.brand, model: this.data.model, control_mode: 'AI' });
+        this.physics_system.traffic.addVehicle(this, { ...options, route_id });
+        this.assembleVehicle(profile.vehicle_template);
+        this.data.control_mode = 'AI'; this.data.route_id = route_id; this.data.route_complete = false; return this;
+    }
+    setControlMode(mode) {
+        if (!['AI', 'PLAYER', 'PARKED'].includes(mode)) throw new TypeError('Invalid control mode');
+        if (mode === 'AI') {
+            if (!this.data.route_id) throw new Error('AI driving needs an itinerary');
+            return this.followRoute(this.data.route_id);
+        }
+        const profile = resolveStreetVehicle(this.physics_system.elements.asset_library, { brand: this.data.brand, model: this.data.model, control_mode: mode });
+        this.assembleVehicle(profile.vehicle_template);
+        this.physics_system.traffic.removeVehicle(this);
+        if (mode === 'PARKED') this.parkVehicle(); else this.stopVehicle();
+        this.data.control_mode = mode; return this;
+    }
+    setControls({ accelerator = 0, brake = 0, steering = 0, handbrake = 0, reverse = false } = {}) {
+        if (this.data.control_mode !== 'PLAYER') throw new Error('Manual controls require PLAYER mode');
+        for (const [key, value] of Object.entries({ accelerator, brake, steering, handbrake })) if (!Number.isFinite(value) || value < (key === 'steering' ? -1 : 0) || value > 1) throw new TypeError(`Invalid ${key}`);
+        if (typeof reverse !== 'boolean') throw new TypeError('reverse must be boolean');
+        if (reverse) this.reverseVehicle(accelerator); else this.accelerateVehicle(accelerator);
+        this.brakeVehicle(brake); this.steerVehicle(steering); this.setHandbrake(handbrake); return this;
+    }
+}
+
+return Object.freeze({get TrafficVehicle(){return TrafficVehicle;}});
+})();
+// src/directory/game-vehicle-factory.mjs
+const m49 = (()=>{
+const {TrafficVehicle} = m46;
+const {pathGeometry} = m1;
+const {resolveStreetVehicle} = m47;
+
+const purposes = new Set(['ambient', 'owned', 'mission', 'taxi']);
+/** Shared official creation. Population limits belong to the requesting population manager. */
+function createGameVehicle(world, packet = {}, { hooks = {} } = {}) {
+    const { purpose = 'ambient', route_id, position, rotation, anchor, mission_id, replaces, data = {}, color, glow_color, headlight_color } = packet;
+    if (!purposes.has(purpose)) throw new TypeError('Invalid vehicle purpose');
+    if (!world.elements.listEntityTypes().includes(TrafficVehicle.entity_type)) world.elements.registerEntityType(TrafficVehicle.entity_type, TrafficVehicle);
+    const preset = purpose === 'owned' ? world.elements.asset_library.getResource('df:owned_vehicle_defaults').data
+        : purpose === 'taxi' ? world.elements.asset_library.getResource('df:taxi_vehicle_defaults').data
+        : purpose === 'mission' && mission_id ? world.elements.asset_library.getResource('df:mission_vehicle_defaults').data[mission_id] : {};
+    if (!preset) throw new TypeError('Unknown mission vehicle');
+    if (replaces && (!(replaces instanceof TrafficVehicle) || replaces.physics_system !== world || replaces.destroyed)) throw new TypeError('Invalid replacement vehicle');
+    if (replaces && world.getAttachedBodies(replaces).length) throw new Error('Release passengers and mounted bodies before replacing the vehicle');
+    const control_mode = packet.control_mode ?? (purpose === 'ambient' || purpose === 'taxi' ? 'AI' : 'PARKED');
+    const definition = resolveStreetVehicle(world.elements.asset_library, { brand: packet.brand ?? preset.brand, model: packet.model ?? preset.model,
+        control_mode, color: color ?? preset.paintColor });
+    if (control_mode === 'AI' && !route_id) throw new TypeError('AI vehicle creation needs a registered route');
+    const start = anchor ? pathGeometry.transformPose(anchor, preset.spawn)
+        : replaces ? { position: replaces.position, rotation: replaces.rotation }
+        : route_id ? world.traffic.getRouteStart(route_id) : { position: [0, 0], rotation: 0 };
+    const pose = { position: position ?? start.position, rotation: rotation ?? start.rotation };
+    if (!world.isPlacementClear(definition.collision_shape, pose.position, { rotation: pose.rotation, include_ghosts: false, ignore_body: replaces?.body })) return null;
+    const vehicle = world.elements.createVehicle({ ...definition, ...pose, data: { ...data, ...definition.data, purpose, mission_id: mission_id ?? null,
+        persistent: data.persistent ?? (purpose === 'owned' || purpose === 'mission'),
+        glow_color: glow_color !== undefined ? glow_color : preset.underglowColor !== undefined ? preset.underglowColor : definition.data.glow_color,
+        headlight_color: headlight_color !== undefined ? headlight_color : preset.headlightColor !== undefined ? preset.headlightColor : definition.data.headlight_color,
+    } });
+    try {
+        if (!(vehicle instanceof TrafficVehicle)) throw new TypeError('Vehicle factory requires the official TrafficVehicle class');
+        vehicle.connectGameplay(hooks);
+        if (control_mode === 'AI') vehicle.followRoute(route_id);
+        if (replaces) world.removeBody(replaces.body);
+    } catch (error) { world.removeBody(vehicle.body); throw error; }
+    return vehicle;
+}
+
+return Object.freeze({get createGameVehicle(){return createGameVehicle;}});
+})();
+// src/traffic/traffic-manager.mjs
+const m48 = (()=>{
+const {TrafficVehicle} = m46;
+const {createGameVehicle} = m49;
+/** Spawn, ownership and driver policy. The physics world owns every spatial/physical operation. */
+class TrafficManager {
+    #pendingSpawns = new Set();
+    constructor(world, { hooks = {}, despawn_on_completion = true } = {}) {
+        Object.defineProperty(this, 'physics', { value: world }); this.hooks = hooks; this.despawn_on_completion = despawn_on_completion;
+        if (!world.elements.listEntityTypes().includes(TrafficVehicle.entity_type)) world.elements.registerEntityType(TrafficVehicle.entity_type, TrafficVehicle);
+    }
+    registerRoute(route_id, packet) { return this.physics.traffic.registerRoute(route_id, packet); }
+    setSignal(signal_id, state) { this.physics.traffic.setSignal(signal_id, state); }
+    spawn(packet = {}) {
+        const rules = this.physics.elements.asset_library.getResource('df_street:rules').data;
+        for (const vehicle of this.#pendingSpawns) if (vehicle.destroyed || vehicle.registered) this.#pendingSpawns.delete(vehicle);
+        if (this.getAmbientVehicles().length + this.#pendingSpawns.size >= rules.max_vehicles) return null;
+        const vehicle = createGameVehicle(this.physics, { ...packet, purpose: 'ambient' }, { hooks: this.hooks });
+        if (vehicle?.pending) this.#pendingSpawns.add(vehicle);
+        return vehicle;
+    }
+    getAmbientVehicles(results = []) {
+        const vehicles = this.getVehicles(); results.length = 0;
+        for (const vehicle of vehicles) if (vehicle.data.purpose === 'ambient') results.push(vehicle);
+        return results;
+    }
+    getVehicles(results = []) { return this.physics.elements.getEntities({ entity_type: TrafficVehicle.entity_type }, results); }
+    getVisibleVehicles(bounds, results = []) {
+        results.length = 0;
+        for (const hit of this.physics.queryEntitiesInBounds({ bounds })) if (hit.entity instanceof TrafficVehicle) results.push(hit.entity);
+        return results;
+    }
+    updateState() {
+        for (const vehicle of this.getVehicles()) if (vehicle.data.route_complete && vehicle.data.control_mode === 'AI') {
+            if (vehicle.data.purpose === 'ambient' && this.despawn_on_completion && !vehicle.data.persistent) vehicle.destroy(); else vehicle.setControlMode('PARKED');
+        }
+    }
+    reconnectGameplay() { for (const v of this.getVehicles()) v.connectGameplay(this.hooks); }
+    clearStreet() {
+        for (const v of this.#pendingSpawns) v.destroy(); this.#pendingSpawns.clear();
+        for (const v of this.getAmbientVehicles()) v.destroy();
+    }
+    reset() { this.clearStreet(); }
+}
+
+return Object.freeze({get TrafficManager(){return TrafficManager;}});
+})();
+// src/entities/pedestrians.mjs
+const m50 = (()=>{
+const {gameCharacter,gameVehicle,BODY_GROUP} = m1;
+const bindings = new WeakMap();
+/** Civilian decisions and reactions. Movement, prediction and impacts stay in Basement. */
+class Pedestrian extends gameCharacter {
+    static entity_type = 'df_pedestrian';
+    constructor(elements, packet) { super(elements, packet); this.connectGameplay(); }
+    connectGameplay(hooks = {}) {
+        bindings.get(this)?.forEach(drop => drop());
+        bindings.set(this, [
+            this.on('bodyDetached', () => { if (!['dead', 'sprawled', 'recovering'].includes(this.data.state)) { this.data.state = 'idle'; this.data.arrived = false; } }),
+            this.on('destinationReached', () => {
+                if (this.data.state === 'walking' || this.data.state === 'crossing') this.data.arrived = true;
+            }),
+            this.on('contactBegin', event => this._vehicleContact(event, hooks)),
+            this.on('contactStay', event => this._vehicleContact(event, hooks)),
+        ]); return this;
+    }
+    _vehicleContact(event, hooks) {
+        if (event.sensor_only || this.data.state === 'dead' || this.data.damage_grace > 0) return;
+        const other = event.entity_a === this ? event.entity_b : event.entity_a;
+        const rules = this.getAsset('street_rules').data;
+        if (!(other instanceof gameVehicle) || event.relative_speed < rules.vehicle_hit_speed) return;
+        this.takeDamage(rules.vehicle_damage);
+        if (this.data.state !== 'dead') {
+            this.data.state = 'sprawled'; this.data.state_seconds = rules.sprawl_seconds;
+            this.cancelMovement(); this.suspendMovement(rules.sprawl_seconds);
+            this.say('Watch where you’re driving!', rules.sprawl_seconds);
+        }
+        hooks.onVehicleHit?.(this, other, event);
+    }
+    takeDamage(amount) {
+        if (!Number.isFinite(amount) || amount < 0) throw new TypeError('Damage must be nonnegative');
+        if (this.data.state === 'dead' || this.data.damage_grace > 0) return false;
+        this.data.health -= amount;
+        this.data.damage_grace = this.getAsset('street_rules').data.damage_grace_seconds;
+        if (this.data.health <= 0) { this.data.state = 'dead'; this.cancelMovement(); this.suspendMovement(Number.MAX_VALUE); }
+        return true;
+    }
+    say(text, seconds = 2) {
+        if (!Number.isFinite(seconds) || seconds < 0) throw new TypeError('Invalid quip lifetime');
+        this.data.quip = String(text); this.data.quip_seconds = seconds;
+    }
+    hearNoise(source) {
+        if (this.physics_system.getAttachmentState(this)) return;
+        if (this.data.state === 'dead' || this.data.state === 'sprawled' || this.data.state === 'recovering') return;
+        this.fleeTarget(source, { safety_distance: 200, face_movement: true });
+        this.data.state = 'fleeing'; this.data.state_seconds = 1.5; this.say('What was that?');
+    }
+    updateState(seconds, { target, crossing = false, signal = 'go' } = {}) {
+        if (this.destroyed || !this.active) return;
+        if (!Number.isFinite(seconds) || seconds < 0 || seconds > 0.1) throw new TypeError('Invalid gameplay step');
+        const d = this.data, rules = this.getAsset('street_rules').data;
+        d.damage_grace = Math.max(0, d.damage_grace - seconds);
+        d.quip_seconds = Math.max(0, d.quip_seconds - seconds); if (!d.quip_seconds) d.quip = null;
+        if (d.state === 'dead' || this.physics_system.getAttachmentState(this)) return;
+        if (['sprawled', 'recovering', 'dodging', 'fleeing'].includes(d.state)) {
+            d.state_seconds = Math.max(0, d.state_seconds - seconds);
+            if (d.state_seconds) return;
+            if (d.state === 'sprawled') { d.state = 'recovering'; d.state_seconds = rules.recovery_seconds; this.stopMovement(); return; }
+            d.state = 'idle';
+        }
+        if (!target) { this.stopMovement(); d.state = 'idle'; return; }
+        if (crossing && d.state !== 'crossing') {
+            const hits = this.physics_system.predictMovementContacts({ body: this, to: target, speed: rules.crossing_speed, seconds: rules.prediction_seconds, include_groups: BODY_GROUP.VEHICLE, max_results: 1 });
+            if (signal !== 'go' || hits.length) { if (d.state !== 'waiting') this.stopMovement(); d.state = 'waiting'; return; }
+        }
+        if (d.state !== 'walking' && d.state !== 'crossing') {
+            this.moveTo(target, { direct: true, avoid_groups: BODY_GROUP.CHARACTER, speed: crossing ? rules.crossing_speed : undefined, personal_space: rules.personal_space, face_movement: true });
+            d.state = crossing ? 'crossing' : 'walking';
+        }
+        const threats = this.physics_system.predictMovementContacts({ body: this, seconds: rules.prediction_seconds, include_groups: BODY_GROUP.VEHICLE, max_results: 1 });
+        if (threats.length && this.evadeBody(threats[0].body, { distance: rules.dodge_distance, speed: rules.dodge_speed })) {
+            d.state = 'dodging'; d.state_seconds = rules.dodge_seconds; this.say('Look out!');
+        }
+    }
+}
+
+return Object.freeze({get Pedestrian(){return Pedestrian;}});
+})();
+// src/entities/pedestrian-manager.mjs
+const m51 = (()=>{
+const {Pedestrian} = m50;
+/** Population and waypoint policy only. No positions, obstacle cache or sensing grid. */
+class PedestrianManager {
+    #network = new Map();
+    constructor(world, { random = Math.random, hooks = {} } = {}) {
+        Object.defineProperty(this, 'physics', { value: world }); this.random = random; this.hooks = hooks;
+        if (!world.elements.listEntityTypes().includes(Pedestrian.entity_type)) world.elements.registerEntityType(Pedestrian.entity_type, Pedestrian);
+    }
+    setNetwork(network) {
+        const next = new Map(), crossingIds = new Map();
+        for (const node of network.nodes ?? []) {
+            if (node.id === undefined || next.has(node.id)) throw new TypeError('Sidewalk nodes need unique ids');
+            const position = node.position ?? [node.x, node.y];
+            if (position.length !== 2 || !position.every(Number.isFinite)) throw new TypeError('Invalid sidewalk position');
+            let crossing_id = node.crosswalk_id ?? node.crosswalkData?.id ?? null;
+            if (node.crosswalkData && crossing_id === null) {
+                if (!crossingIds.has(node.crosswalkData)) crossingIds.set(node.crosswalkData, `crosswalk:${crossingIds.size}`);
+                crossing_id = crossingIds.get(node.crosswalkData);
+            }
+            next.set(node.id, Object.freeze({ id: node.id, position: Object.freeze([...position]), connections: Object.freeze([...(node.connections ?? [])]),
+                crossing_id, signal_id: node.signal_id ?? null }));
+        }
+        for (const n of next.values()) for (const id of n.connections) if (!next.has(id)) throw new TypeError(`Unknown sidewalk connection: ${id}`);
+        this.#network = next;
+    }
+    setSignal(signal_id, state) {
+        this.physics.traffic.setSignal(signal_id, state);
+    }
+    spawnAtNode(node_id, packet = {}) {
+        const node = this.#network.get(node_id); if (!node) throw new TypeError('Unknown sidewalk node');
+        const cap = this.physics.elements.asset_library.getResource('df_street:rules').data.max_pedestrians;
+        if (this.getPedestrians().length >= cap) return null;
+        const definition = this.physics.elements.asset_library.getTemplate('df_street:pedestrian');
+        if (!this.physics.isPlacementClear(definition.collision_shape, node.position, { include_ghosts: false })) return null;
+        const appearances = this.physics.elements.asset_library.getResource('df:pedestrian_appearances').data;
+        const appearance_id = packet.data?.appearance_id ?? appearances[Math.floor(this.random() * appearances.length)].name;
+        if (!appearances.some(a => a.name === appearance_id)) throw new TypeError('Unknown pedestrian appearance');
+        const pedestrian = this.physics.elements.createCharacter({ ...packet, template: 'df_street:pedestrian', entity_type: Pedestrian.entity_type, position: node.position,
+            data: { ...packet.data, appearance_id, node_id, target_node_id: null, previous_node_id: null } });
+        pedestrian.connectGameplay(this.hooks); return pedestrian;
+    }
+    getPedestrians(results = []) { return this.physics.elements.getEntities({ entity_type: Pedestrian.entity_type }, results); }
+    getVisiblePedestrians(bounds, results = []) {
+        results.length = 0;
+        for (const hit of this.physics.queryEntitiesInBounds({ bounds })) if (hit.entity instanceof Pedestrian) results.push(hit.entity);
+        return results;
+    }
+    reconnectGameplay() { for (const p of this.getPedestrians()) p.connectGameplay(this.hooks); }
+    updateState(seconds) {
+        for (const p of this.getPedestrians()) {
+            if (!p.active || p.data.state === 'dead') continue;
+            if (this.physics.getAttachmentState(p)) { p.updateState(seconds); continue; }
+            const d = p.data;
+            if (d.arrived) { d.previous_node_id = d.node_id; d.node_id = d.target_node_id; d.target_node_id = null; d.arrived = false; d.state = 'idle'; }
+            const from = this.#network.get(d.node_id); if (!from) { p.updateState(seconds); continue; }
+            if (d.target_node_id === null) {
+                let choices = from.connections.filter(id => id !== d.previous_node_id);
+                if (!choices.length) choices = from.connections;
+                d.target_node_id = choices.length ? choices[Math.floor(this.random() * choices.length)] : null;
+            }
+            const to = this.#network.get(d.target_node_id), crossing = !!to && from.crossing_id !== null && from.crossing_id === to.crossing_id;
+            const signal_id = from.signal_id ?? to?.signal_id;
+            p.updateState(seconds, { target: to?.position, crossing, signal: signal_id ? this.physics.traffic.getSignal(signal_id) : 'go' });
+        }
+    }
+    clearStreet() { for (const p of this.getPedestrians()) p.destroy(); }
+    reset() { this.clearStreet(); this.#network.clear(); }
+}
+
+return Object.freeze({get PedestrianManager(){return PedestrianManager;}});
+})();
+// src/directory/game-street.mjs
+const m45 = (()=>{
+const {TrafficVehicle} = m46;
+const {TrafficManager} = m48;
+const {Pedestrian} = m50;
+const {PedestrianManager} = m51;
+
+
+function registerStreetEntityTypes(world) {
+    for (const Constructor of [TrafficVehicle, Pedestrian]) if (!world.elements.listEntityTypes().includes(Constructor.entity_type)) world.elements.registerEntityType(Constructor.entity_type, Constructor);
+}
+/** One client of an existing session world; never constructs a second physics world or grid. */
+class StreetPopulation {
+    constructor(world, { traffic = {}, pedestrians = {} } = {}) {
+        Object.defineProperty(this, 'physics', { value: world }); registerStreetEntityTypes(world);
+        this.traffic = new TrafficManager(world, traffic); this.pedestrians = new PedestrianManager(world, pedestrians);
+    }
+    updateState(seconds = this.physics.config.fixed_step) {
+        if (!Number.isFinite(seconds) || seconds <= 0 || seconds > 0.1) throw new TypeError('Invalid policy step');
+        this.traffic.updateState(); this.pedestrians.updateState(seconds);
+    }
+    reconnectGameplay() { this.traffic.reconnectGameplay(); this.pedestrians.reconnectGameplay(); }
+    clearStreet() { this.traffic.clearStreet(); this.pedestrians.clearStreet(); }
+}
+
+return Object.freeze({get TrafficVehicle(){return TrafficVehicle;},get TrafficManager(){return TrafficManager;},get Pedestrian(){return Pedestrian;},get PedestrianManager(){return PedestrianManager;},get createGameVehicle(){return m49.createGameVehicle;},get registerStreetEntityTypes(){return registerStreetEntityTypes;},get StreetPopulation(){return StreetPopulation;}});
+})();
+// src/directory/game-runtime.mjs
+const m44 = (()=>{
+const {gameEngine} = m41;
+const {createApartmentAssetLibrary} = m35;
+const {Player} = m38;
+const {ApartmentProp} = m39;
+const {ApartmentCompanion} = m40;
+const {registerStreetEntityTypes} = m45;
+
+/** Explicit game composition. Importing this file never starts a second runtime. */
+function createGameRuntime({ game_db, ...options } = {}) {
+    const engine = new gameEngine({ ...options, asset_library: createApartmentAssetLibrary({ game_db }) });
+    for (const Class of [Player, ApartmentProp, ApartmentCompanion]) engine.api.elements.registerEntityType(Class.entity_type, Class);
+    registerStreetEntityTypes(engine.api.physics);
+    return engine;
+}
+
+return Object.freeze({get createGameRuntime(){return createGameRuntime;}});
+})();
 // src/directory/native-entry.mjs
 const m0 = (()=>{
 // The classic playable build links this entry. Browser/module clients use the same sources.
@@ -19988,7 +20825,11 @@ const m0 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get assetLibrary(){return m1.assetLibrary;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get createGameAssetLibrary(){return m26.createGameAssetLibrary;},get ApartmentLevel(){return m34.ApartmentLevel;},get APARTMENT_RULES(){return m35.APARTMENT_RULES;}});
+
+
+
+
+return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get assetLibrary(){return m1.assetLibrary;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get createGameAssetLibrary(){return m26.createGameAssetLibrary;},get ApartmentLevel(){return m34.ApartmentLevel;},get APARTMENT_RULES(){return m35.APARTMENT_RULES;},get gameEngine(){return m41.gameEngine;},get gameLevel(){return m43.gameLevel;},get levelLobby(){return m42.levelLobby;},get createGameRuntime(){return m44.createGameRuntime;}});
 })();
 return m0;
 })();
@@ -83446,139 +84287,9 @@ Object.assign(TrafficVehicle.prototype, {
             yield 120;
         });
     </script>
-    <script type="text/dfab" data-src="lobby/level-lobby.js" data-cost="81">
-        // ===== LV1 LOBBY =====
-        // The engine's game loop. The Lobby keeps the clock and nothing else: it knows when a frame is due,
-        // how many fixed simulation steps that frame owes, and how far the drawn frame sits between two steps.
-        // It knows nothing about the game. Whatever the game wants done in a frame (profiling, audio,
-        // slow-mo, the simulation itself, drawing) is plugged into its jacks with plugIn().
-        //
-        // FIXED TIMESTEP: the simulation advances in steps of loop_config.STEP_MS of game time, and the
-        // screen is drawn whenever the display allows. Leftover time carries over in the accumulator, so
-        // steps land at a true rate on average on any monitor. A stall (alt-tab, GC, debugger) is clamped
-        // to MAX_FRAME_MS, and a frame never runs more than MAX_STEPS steps: past that the backlog is
-        // dropped rather than letting the world fast-forward or spiral.
-        //
-        // JACKS (each optional; an empty jack does nothing):
-        //   isRunning()                 -> bool    the loop stops re-arming itself when false
-        //   beginFrame()                           every display frame, before the FPS limiter
-        //   frameRateLimit()            -> number  frames per second to draw at, 0 = as fast as the display
-        //   acceptFrame()                          a frame the limiter let through (the frame clock is stamped right after)
-        //   timeScale(elapsed_ms)       -> number  1 = normal, 0.4 = slow-mo; stretches each step in real time
-        //   isPaused()                  -> bool    hold the world: step slots pass, the tick and the world stay put
-        //   beforeStep()                           every step slot, held or not (e.g. an interpolation snapshot)
-        //   simulateStep()                         one fixed step of the world; the frame clock's tick has advanced
-        //   afterSimulation(steps)                 after this frame's steps
-        //   renderFrame(blend)                     draw; blend 0..1 = how far between the last two steps
-        //   endFrame(steps, dropped_ms)            after drawing
-        //   scheduleNextFrame(run)                 arm the next frame (default: requestAnimationFrame)
-        class levelLobby {
-            constructor (loop_config, frame_clock) {
-                this.loop_config = loop_config;          // read live every frame: { STEP_MS, MAX_FRAME_MS, MAX_STEPS, GAME_SPEED }
-                this.frame_clock = frame_clock;          // the Basement's frame clock (basement/frame-clock.js)
-                this.jacks = {};
-
-                // --- CLOCK STATE ---
-                this.last_frame_time = undefined;        // performance.now() of the last accepted frame
-                this.next_draw_due = undefined;          // when the FPS limiter lets the next frame through
-                this.accumulator = 0;                    // real ms owed to the simulation
-                this.frame_ms = 0;                       // raw time between accepted frames (render cadence)
-                this.time_scale = 1;                     // this frame's slow-mo scale
-                this.step_ms = 0;                        // this frame's real length of one step
-                this.steps_taken = 0;                    // steps run in the last frame
-
-                this.engine_clock = this.runEngine.bind(this);
-            }
-
-            /** Plug the game into the Lobby: { jackName: function }. Later calls add to or replace earlier ones. */
-            plugIn (jacks) {
-                Object.assign(this.jacks, jacks);
-                return this;
-            }
-
-            /** One display frame. */
-            runEngine () {
-                const J = this.jacks, L = this.loop_config;
-                if (J.isRunning && !J.isRunning()) return;
-                if (J.beginFrame) J.beginFrame();
-
-                // --- FPS LIMITER ---
-                // Scheduled against a running due-time rather than the last drawn frame. Comparing to the last
-                // frame overshoots whenever the display period doesn't divide the target evenly: on a 144Hz panel
-                // (6.94ms) a 16.67ms target could only land every 3rd frame, so "60 FPS" delivered 48.
-                const fps_limit = J.frameRateLimit ? J.frameRateLimit() : 0;
-                if (fps_limit > 0) {
-                    const now = performance.now();
-                    const min_interval = 1000 / fps_limit;
-                    if (this.next_draw_due === undefined) this.next_draw_due = now;
-                    if (now < this.next_draw_due) {
-                        this.scheduleNextFrame();
-                        return;
-                    }
-                    // Carry the schedule forward; resync if we've fallen far behind.
-                    this.next_draw_due = (now - this.next_draw_due > min_interval)
-                        ? now + min_interval
-                        : this.next_draw_due + min_interval;
-                } else {
-                    this.next_draw_due = undefined;
-                }
-                if (J.acceptFrame) J.acceptFrame();
-                if (this.frame_clock) this.frame_clock.stampFrame();   // real time of the frame being drawn
-
-                // --- ELAPSED TIME ---
-                const now_ms = performance.now();
-                if (this.last_frame_time === undefined) this.last_frame_time = now_ms;
-                let elapsed = now_ms - this.last_frame_time;
-                this.frame_ms = elapsed;                 // raw render cadence; never changes the fixed step
-                this.last_frame_time = now_ms;
-
-                const clamped_ms = Math.max(0, elapsed - L.MAX_FRAME_MS);
-                if (elapsed > L.MAX_FRAME_MS) elapsed = L.MAX_FRAME_MS;
-                if (elapsed < 0) elapsed = 0;
-                this.accumulator = (this.accumulator || 0) + elapsed;
-
-                // --- STEP LENGTH ---
-                // Real-time length of one step. GAME_SPEED 0.5 -> 33.3ms -> 30 steps/sec. A time scale stretches
-                // it the same way: evenly spaced, interpolated steps.
-                const scale = this.time_scale = J.timeScale ? J.timeScale(elapsed) : 1;
-                const step_ms = this.step_ms = L.STEP_MS / Math.max(0.05, (L.GAME_SPEED || 1) * scale);
-
-                // --- SIMULATION ---
-                // While paused (or stopped mid-frame) the step slots still pass, so time doesn't bank up
-                // and burst out on unpause; the tick and the world simply don't move.
-                let steps = 0;
-                while (this.accumulator >= step_ms && steps < L.MAX_STEPS) {
-                    if (J.beforeStep) J.beforeStep();
-                    if (this.isStepping()) {
-                        if (this.frame_clock) this.frame_clock.advanceTick();
-                        if (J.simulateStep) J.simulateStep();
-                    }
-                    this.accumulator -= step_ms;
-                    steps++;
-                }
-                // Machine can't keep up: drop the backlog rather than spiral.
-                const dropped_ms = clamped_ms + (steps >= L.MAX_STEPS ? this.accumulator : 0);
-                if (steps >= L.MAX_STEPS) this.accumulator = 0;
-                this.steps_taken = steps;
-                if (J.afterSimulation) J.afterSimulation(steps);
-
-                // --- RENDER ---
-                if (J.renderFrame) J.renderFrame(this.accumulator / step_ms);
-                if (J.endFrame) J.endFrame(steps, dropped_ms);
-                this.scheduleNextFrame();
-            }
-
-            /** Does a step slot move the world right now? */
-            isStepping () {
-                const J = this.jacks;
-                return !(J.isRunning && !J.isRunning()) && !(J.isPaused && J.isPaused());
-            }
-
-            scheduleNextFrame () {
-                if (this.jacks.scheduleNextFrame) this.jacks.scheduleNextFrame(this.engine_clock);
-                else requestAnimationFrame(this.engine_clock);
-            }
-        }
+    <script type="text/dfab" data-src="lobby/level-lobby.js" data-cost="1">
+// The classic client and native runtime share the same Lobby implementation.
+const levelLobby = DFNative.levelLobby;
     </script>
     <script type="text/dfab" data-src="lobby/level-pause.js" data-cost="23">
         // ===== LV1 LOBBY =====

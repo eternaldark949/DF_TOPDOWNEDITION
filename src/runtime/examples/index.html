@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>gameEngine runtime example</title>
+<style>body{background:#0b1020;color:#eef2ff;font:16px system-ui;max-width:720px;margin:32px auto}canvas{width:100%;border:1px solid #64748b}button{padding:10px;margin:8px 8px 8px 0}pre{white-space:pre-wrap}</style>
+<h1>Shared runtime example</h1><p>WASD moves the player. Change rooms to keep the same player body and physics world. Pause holds simulation.</p>
+<canvas id="scene" width="640" height="360"></canvas>
+<button id="switch">Change room</button><button id="pause">Pause</button><pre id="status"></pre>
+<script type="module">
+import { createRuntimeExample } from '../../directory/runtime-example.mjs';
+const keys=new Set(),status=document.getElementById('status');
+addEventListener('keydown',event=>keys.add(event.key.toLowerCase()));addEventListener('keyup',event=>keys.delete(event.key.toLowerCase()));addEventListener('blur',()=>keys.clear());
+const {engine,player}=createRuntimeExample({render_target:document.getElementById('scene'),direction:()=>[(keys.has('d')?1:0)-(keys.has('a')?1:0),(keys.has('s')?1:0)-(keys.has('w')?1:0)]});
+const report=()=>{status.textContent=JSON.stringify({level:engine.active_level?.level_id,player_id:player.entity_id,tick:engine.api.physics.simulation_tick,bodies:engine.api.physics.getStatistics().bodies,paused:engine.paused},null,2);};
+engine.registerSystem('status',{render:report});
+document.getElementById('switch').onclick=async()=>{try{await engine.loadLevel(engine.active_level.level_id==='room_a'?'room_b':'room_a');}catch(error){status.textContent=error.stack;console.error(error);}};
+let resume;document.getElementById('pause').onclick=()=>{if(resume){resume();resume=null;}else resume=engine.pause('example');report();};
+await engine.loadLevel('room_a');engine.start();
+// Inspection for the browser acceptance check; never used by the production boot.
+globalThis.runtimeExample={engine,player};
+</script></html>

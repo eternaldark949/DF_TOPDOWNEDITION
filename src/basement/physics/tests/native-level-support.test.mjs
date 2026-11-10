@@ -60,3 +60,11 @@ test('nearby rescue placement checks the shared index and never returns an occup
  assert.equal(p.findNearbyPlacement(person,{near_range:0,fallback_position:[0,0]}),null);
  assert.deepEqual(p.findNearbyPlacement(person,{near_range:0,fallback_position:[30,0]}).position,[30,0]);
 });
+test('optional runtime step authority survives saves without becoming serialized configuration',()=>{
+ const authority=Symbol('clock'),p=new physicsSystem({step_authority:authority});p.createCharacter();
+ assert.throws(()=>p.updateState(),/owning runtime/);assert.throws(()=>p.updateState(p.config.fixed_step,Symbol('other clock')),/owning runtime/);
+ assert.equal(p.simulation_tick,0);p.updateState(p.config.fixed_step,authority);
+ const state=p.savePhysicsState();assert.equal(Object.hasOwn(state.config,'step_authority'),false);
+ p.loadPhysicsState(state);assert.throws(()=>p.updateState(),/owning runtime/);p.updateState(p.config.fixed_step,authority);assert.equal(p.simulation_tick,2);
+ assert.throws(()=>new physicsSystem({step_authority:'clock'}),/Symbol/);
+});

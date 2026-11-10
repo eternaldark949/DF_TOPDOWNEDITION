@@ -304,3 +304,19 @@ Game-specific code carved out of `GameEngine`, still attached with `engineMixin`
 | `app/boot.js` | Colour grade: presets (`GAME_GRADE_PRESETS`, each with its `GameSettings.colorGrade` key), sliders, `setGameGradeValue` (→ `colorGrade: 'custom'` + `gradeCustom`, saved), `restoreGameGrade` (boot and load), `gradeWash` / `gradePhotoPass` (photos match the screen), `syncGradeDrawer` (Cinematic View's drawer). Settings menu wiring (incl. ambience slider), final start-up |
 
 Static physics broadphase candidates reuse bounded cell-range lists (256 ranges / 16,384 references per source), preserving source slots and order. Per-tick geometry checks and explicit invalidation clear those lists when geometry changes. See `docs/performance-investigation/README.md`.
+
+## Native runtime destination
+
+The new [gameEngine API and ownership decisions](runtime/README.md) describe the class-based runtime for the forthcoming shared conversions.
+
+| File | Responsibility |
+|---|---|
+| `runtime/game-engine.mjs` | One native world/API, explicit composed systems, level transitions, session entity lifetime, pause and the single Lobby clock. |
+| `runtime/game-level.mjs` | Level content, preparation, policy, rendering and cleanup contract; no world or step ownership. |
+| `lobby/level-lobby.mjs` | Canonical clock implementation shared by both runtimes. The classic `.js` file references its native bundle export. |
+| `directory/game-runtime.mjs` | Directory library/type composition; returns an unstarted runtime without legacy dependencies. |
+| `directory/runtime-example.mjs`, `directory/game-assets/runtime-example.json` | Two authored demonstration levels and native input/render composition. |
+| `runtime/examples/index.html` | Executable browser example of the actual new coordinator. |
+| `tools/test-game-engine.mjs`, `tools/test-game-engine-browser.py` | Ownership, lifecycle, failures, timing and actual multi-level browser acceptance. |
+
+The playable boot still uses the original `GameEngine`; importing the new coordinator does not start a second world. The earlier apartment host also remains pending conversion to the shared level contract.
