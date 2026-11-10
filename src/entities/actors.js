@@ -884,7 +884,7 @@
                 const hitY = this.y;
                 
                 // Distance check for audio/visual effects (performance)
-                const distToPlayer = Math.hypot(hitX - game.player.x, hitY - game.player.y);
+                const distToPlayer = Math.hypot(hitX - game.playerPosition[0], hitY - game.playerPosition[1]);
                 
                 if (distToPlayer < 800) {
                     // Play impact sound

@@ -69,7 +69,7 @@
                         let dx = R.x, dy = R.y;
                         if (!R.m) {                              // no stick: keep the last pad aim, or face where she faces
                             if (state.ownsAim && F.aimed) { dx = F.dx; dy = F.dy; }
-                            else { dx = Math.cos(g.player.angle); dy = Math.sin(g.player.angle); }
+                            else { dx = Math.cos(g.playerRotation); dy = Math.sin(g.playerRotation); }
                         }
                         const m = Math.hypot(dx, dy) || 1;
                         const quick = !!g._quickDraw;
@@ -82,7 +82,7 @@
                         state.ownsAim = false;
                     }
                     // Quick draw fires on release, like lifting the thumb off the fire stick
-                    if (g._quickDraw && up('gamepadRTrigger')) g.requestQuickDraw(Math.atan2(F.dy || Math.sin(g.player.angle), F.dx || Math.cos(g.player.angle)));
+                    if (g._quickDraw && up('gamepadRTrigger')) g.requestQuickDraw(Math.atan2(F.dy || Math.sin(g.playerRotation), F.dx || Math.cos(g.playerRotation)));
                 }
                 // LT is the handbrake (the 'handbrake' action, read by engine/update.js): light its button
                 const hb = !!(g.isDriving && pressed('gamepadLTrigger'));

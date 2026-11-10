@@ -383,8 +383,8 @@
                 if (this.game.loot) {
                     const throwAngle = Math.random() * Math.PI * 2;
                     this.game.loot.push({
-                        x: this.game.player.x + Math.cos(throwAngle) * 50,
-                        y: this.game.player.y + Math.sin(throwAngle) * 50,
+                        x: this.game.playerPosition[0] + Math.cos(throwAngle) * 50,
+                        y: this.game.playerPosition[1] + Math.sin(throwAngle) * 50,
                         type: 'weapon_drop', item,
                         angle: Math.random() * 6.28, dropTime: Date.now(),
                         draw: function(ctx) {

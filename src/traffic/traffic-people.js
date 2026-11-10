@@ -172,7 +172,7 @@
             /** The horn, if it's near enough to hear */
             _toot(v) {
                 if (typeof ambience === 'undefined' || !ambience.ready || !ambience._horn || typeof game === 'undefined' || !game.player) return;
-                if (Math.hypot(this.x - game.player.x, this.y - game.player.y) < 700) ambience._horn(v);
+                if (Math.hypot(this.x - game.playerPosition[0], this.y - game.playerPosition[1]) < 700) ambience._horn(v);
             },
 
             /**

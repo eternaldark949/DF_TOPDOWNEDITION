@@ -482,7 +482,7 @@
                 if (!M) return;
                 this.mapView.baseScale = Math.min(cw / M.width, ch / M.height);
                 const fs = this.mapView.baseScale * this.mapView.zoom;
-                if (recenter) { this.mapView.offsetX = cw / 2 - game.player.x * fs; this.mapView.offsetY = ch / 2 - game.player.y * fs; }
+                if (recenter) { this.mapView.offsetX = cw / 2 - game.playerPosition[0] * fs; this.mapView.offsetY = ch / 2 - game.playerPosition[1] * fs; }
                 const ox = this.mapView.offsetX, oy = this.mapView.offsetY;
                 ctx.setTransform(D * fs, 0, 0, D * fs, D * ox, D * oy);
                 MapArt.paintCity(ctx, M, { px: D * fs, dpr: D, bounds: { x: -ox / fs, y: -oy / fs, w: cw / fs, h: ch / fs },
@@ -499,8 +499,8 @@
                 }
                 if (game.deliveryVehicle && game.deliveryVehicle.visible) { const v = game.deliveryVehicle, p = S(v.x, v.y); if (on(p)) MapIcons.draw(ctx, 'car:amber', p.x, p.y, { dpr: D, css: MapIcons.SIZE.car * k, rot: v.angle }); }   // Amber's van
                 if (game.ownedCar && game.ownedCar.visible) { const p = S(game.ownedCar.x, game.ownedCar.y); if (on(p)) MapIcons.draw(ctx, 'car', p.x, p.y, { dpr: D, css: MapIcons.SIZE.car * k, rot: game.ownedCar.angle }); }
-                const pp = S(game.player.x, game.player.y);
-                MapIcons.draw(ctx, 'player', pp.x, pp.y, { dpr: D, css: MapIcons.SIZE.player * k, rot: game.player.angle });
+                const pp = S(game.playerPosition[0], game.playerPosition[1]);
+                MapIcons.draw(ctx, 'player', pp.x, pp.y, { dpr: D, css: MapIcons.SIZE.player * k, rot: game.playerRotation });
                 MapIcons.draw(ctx, 'search', 16 * D, canvas.height - 14 * D, { dpr: D, css: 12 });
                 ctx.fillStyle = '#ffd76a'; ctx.font = `600 ${10 * D}px Montserrat, sans-serif`; ctx.textBaseline = 'middle';
                 ctx.fillText(`${this.mapView.zoom.toFixed(1)}×`, 28 * D, canvas.height - 14 * D);
@@ -735,6 +735,13 @@
             },
             stickyMe() { 
                 this.close();
+                if(game.activeLevel){
+                    const placement_bounds={left:8,top:8,right:game.activeMap.width-8,bottom:game.activeMap.height-8};
+                    const landing=game.physics_system.findNearbyPlacement(game.player,{placement_bounds,fallback_position:[game.activeMap.spawn.x,game.activeMap.spawn.y]});
+                    if(landing){game.player.teleportTo(landing.position,{placement_mode:'clear',placement_bounds});showMessage('RELOCATED TO A SAFE SPOT');}
+                    else showMessage('NO SAFE PLACEMENT AVAILABLE');
+                    return;
+                }
                 
                 const margin = 20;
                 const isInWall = (x, y) => {
@@ -749,8 +756,8 @@
                 // otherwise the player on foot. This gives a local rescue rather
                 // than a long teleport back to spawn.
                 const inVehicle = !!(game.isDriving && game.car);
-                let startX = inVehicle ? game.car.x : game.player.x;
-                let startY = inVehicle ? game.car.y : game.player.y;
+                let startX = inVehicle ? game.car.x : game.playerPosition[0];
+                let startY = inVehicle ? game.car.y : game.playerPosition[1];
                 
                 // Clamp starting position to map bounds
                 startX = Math.max(margin, Math.min(game.activeMap.width - margin, startX));
@@ -836,61 +843,13 @@
                     return;
                 }
                 
-                // Find nearest lane to spawn a Zib on
-                const px = game.player.x, py = game.player.y;
-                const allLanes = game.traffic.network.allLanes;
-                if (!allLanes || allLanes.length === 0) {
-                    showMessage("NO ROADS AVAILABLE");
-                    audioSys.sfx('ui');
-                    return;
+                const request = game.zibSystem.summonNearest(game.traffic, [game.playerPosition[0], game.playerPosition[1]]);
+                if (!request.vehicle) {
+                    showMessage(request.reason === 'no_roads' ? "NO ROADS AVAILABLE" : "NO ROADS NEARBY FOR ZIB PICKUP");
+                    audioSys.sfx('ui'); return;
                 }
-                
-                let bestLane = null, bestDist = Infinity;
-                for (const lane of allLanes) {
-                    if (!lane.start) continue;
-                    // Project player onto lane to find closest point
-                    const lx = px - lane.start.x;
-                    const ly = py - lane.start.y;
-                    const dot = lx * lane.ux + ly * lane.uy;
-                    const t = Math.max(0, Math.min(dot, lane.length));
-                    const cx = lane.start.x + lane.ux * t;
-                    const cy = lane.start.y + lane.uy * t;
-                    const dist = Math.hypot(px - cx, py - cy);
-                    // Must be within reasonable range and not a dead-end
-                    const hasExit = game.traffic.network.laneHasExit(lane);
-                    if (dist < bestDist && hasExit) {
-                        bestDist = dist;
-                        bestLane = lane;
-                    }
-                }
-                
-                if (!bestLane || bestDist > 500) {
-                    showMessage("NO ROADS NEARBY FOR ZIB PICKUP");
-                    audioSys.sfx('ui');
-                    return;
-                }
-                
-                // Spawn Zib on the nearest lane
-                const zib = new TrafficVehicle(bestLane, ZIB_CONFIG.brand, ZIB_CONFIG.model, 'AI');
-                zib.color = ZIB_CONFIG.paintColor;
-                zib.glowColor = ZIB_CONFIG.underglowColor;
-                zib.headlightColor = ZIB_CONFIG.headlightColor;
-                zib.isZib = true;
-                zib.driverType = 'traffic';
-                zib.hasDriver = false;
-                
-                // Position Zib on the lane near the player
-                const lx = px - bestLane.start.x;
-                const ly = py - bestLane.start.y;
-                const dot = lx * bestLane.ux + ly * bestLane.uy;
-                const t = Math.max(50, Math.min(dot, bestLane.length - 50));
-                zib.x = bestLane.start.x + bestLane.ux * t;
-                zib.y = bestLane.start.y + bestLane.uy * t;
-                zib.angle = bestLane.angle;
-                
-                game.traffic.vehicles.push(zib);
-                game.zibSystem.activeZibs.push(zib);
-                
+                const zib = request.vehicle;
+
                 // Close phone and open destination menu
                 this.close();
                 game.openZibMenu(zib);
@@ -946,7 +905,7 @@
                     if (idx !== game.garage.activeIndex) game.switchGarageCar(idx);
                     // Summon to player position (the hub only: cars live there)
                     if (game.activeMap.id !== 'sdc' || (game.isDriving && game.car === game.ownedCar)) return;
-                    Object.assign(game.ownedCar, { x: game.player.x + 50, y: game.player.y, vx: 0, vy: 0, speed: 0 });
+                    Object.assign(game.ownedCar, { x: game.playerPosition[0] + 50, y: game.playerPosition[1], vx: 0, vy: 0, speed: 0 });
                     game.ownedCar.visible = true;
                     showMessage(`${game.garage.getDisplayName(idx).toUpperCase()} DELIVERED`);
                     audioSys.sfx('ui');

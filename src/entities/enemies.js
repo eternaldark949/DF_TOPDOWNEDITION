@@ -2079,7 +2079,7 @@
             }
             _safeSpawn(game,p,nav) {
                 if(p.x<this.x+25||p.x>this.x+this.w-25||p.y<this.y+25||p.y>this.y+this.h-25)return false;
-                if(Math.hypot(p.x-game.player.x,p.y-game.player.y)<350||!nav.walkable(p.x,p.y))return false;
+                if(Math.hypot(p.x-game.playerPosition[0],p.y-game.playerPosition[1])<350||!nav.walkable(p.x,p.y))return false;
                 if(game.enemies.some(h=>!h.dead&&Math.hypot(h.x-p.x,h.y-p.y)<75))return false;
                 const cars=game.traffic?.vehicles||[];
                 return !cars.some(v=>Math.hypot(v.x-p.x,v.y-p.y)<100);
@@ -2097,8 +2097,8 @@
                     const h=new Ganger(at.x,at.y,{hp:50+this.clearCount*8,speed:2.6+Math.min(this.clearCount*.15,1.2),visionRange:360,weaponId});
                     h._restrictedZoneId=this.id;
                     // Reinforcements investigate the intrusion rather than idling at the far end of the yard.
-                    h.state='SEARCHING';h.suspicion=70;h.investigateTarget={x:game.player.x,y:game.player.y};
-                    h.angle=Math.atan2(game.player.y-at.y,game.player.x-at.x);
+                    h.state='SEARCHING';h.suspicion=70;h.investigateTarget={x:game.playerPosition[0],y:game.playerPosition[1]};
+                    h.angle=Math.atan2(game.playerPosition[1]-at.y,game.playerPosition[0]-at.x);
                     this.hostiles.push(h);game.enemies.push(h);this.pendingSpawns--;
                 }
                 this._spawnRetry=30;
@@ -2366,7 +2366,7 @@
 
             /** Walkable spawn points far enough from 949, shuffled; reused (jittered) when a wave outnumbers them. */
             _spawnPoints(game, list, n) {
-                const nav = NavGrid.for(game.activeMap), px = game.player.x, py = game.player.y;
+                const nav = NavGrid.for(game.activeMap), px = game.playerPosition[0], py = game.playerPosition[1];
                 let pts = list.map(([x, y]) => ({ x, y }))
                     .filter(p => (!nav || nav.walkable(p.x, p.y)) && Math.hypot(p.x - px, p.y - py) >= GAUNTLET_SPAWN_MIN_DIST);
                 if (!pts.length) pts = list.map(([x, y]) => ({ x, y }));
@@ -2586,7 +2586,7 @@
                     game.currency += reward;
                     game.scrap += scrapReward;
                     if (game.resonance) game.earnResonance(40 * this.wave, `WAVE ${this.wave}`);
-                    if (this.wave % 3 === 0) game.loot.push(new Loot(game.player.x + 30, game.player.y, 'dark_element'));   // every 3rd wave
+                    if (this.wave % 3 === 0) game.loot.push(new Loot(game.playerPosition[0] + 30, game.playerPosition[1], 'dark_element'));   // every 3rd wave
                     this._secured = [`+${reward} personics`, `+${scrapReward} scrap`, ...(this.wave % 3 === 0 ? ['Dark Element'] : []), ...(this._spoils || [])];
                     game.updateUI();
                     showMessage(`WAVE ${this.wave} CLEARED — +${reward} PERSONICS, +${scrapReward} SCRAP`);

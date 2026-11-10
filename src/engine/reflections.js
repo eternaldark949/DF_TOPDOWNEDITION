@@ -980,7 +980,7 @@
                     if (e.combatTargetTimer > 0 && e.combatTargetAngle !== undefined) return e.combatTargetAngle;
                     if (gait && gait.speed > 0.1) return Math.atan2(gait.dirY, gait.dirX);
                     if (e.role === 'teammate' && (e.hired || e.recruited) && this.player)
-                        return Math.atan2(this.player.y - e.y, this.player.x - e.x);
+                        return Math.atan2(this.playerPosition[1] - e.y, this.playerPosition[0] - e.x);
                     return cfg && cfg.idleAngle !== undefined ? cfg.idleAngle : 0;
                 }
                 return e.angle || 0;

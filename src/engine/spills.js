@@ -64,7 +64,7 @@
                 this._lastSpillAt = now;
                 const lost = Math.min(C.drinkLevel, this.resonance ? this.resonance.stat('spill', amount) : amount);   // Arms: Steady
                 C.drinkLevel = Math.max(0, C.drinkLevel - lost);
-                const ox = (x ?? this.player.x), oy = (y ?? this.player.y);
+                const ox = (x ?? this.playerPosition[0]), oy = (y ?? this.playerPosition[1]);
                 const r = 4 + Math.sqrt(lost) * 34;                                // 2.5% ≈ 9 px, 7% ≈ 13 px
                 const px = ox + dx * (10 + r * 0.6), py = oy + dy * (10 + r * 0.6);
                 const spills = this.effects.of('spill');

@@ -1341,7 +1341,7 @@
             },
 
             /** apt_949 glows after the darkness layer: lamp shades, pendants, fireplace, cooktops, veranda string lights. */
-            drawApartmentGlow(ctx) {
+            drawApartmentGlow(ctx, props = this.activeLevel ? this.activeLevel.props.map(e=>this.apartmentRenderer.propPacket(e,1)) : this.props) {
                 if (this._cityView) this._cityView.drawGlow(ctx, this.dayCycle().darkness);   // the city below lights up with the sky's dark
                 const t = _frameTime / 1000, rs = this.roomSystem;
                 const lightAt = (x, y) => rs && rs.active ? rs.lightAt(x, y) : 1;   // room switches fade these
@@ -1349,7 +1349,7 @@
                 const glow = (x, y, r, rgb, a) => glowA(ctx, x, y, r, rgb, a);
                 // Lamp shades and bar pendants, lit (the lamp library, entities/lamps.js; they follow the room switches)
                 const shades = [[991, 232, 'shade_table'], [1115, 232, 'shade_table']];             // the bedside lamps
-                for (const p of this.props) {                                                      // the rest travel with their furniture
+                for (const p of props) {                                                           // the rest travel with their furniture
                     const x = p.x, y = p.y, w = p.width, h = p.height;
                     if (p.decorType === 'apt_floor_lamp') shades.push([x + w / 2, y + h / 2, 'shade_floor', w / 26]);
                     else if (p.light && p.decorType === 'apt_side') shades.push([x + w * 0.42, y + h * 0.45, 'shade_table', Math.min(w, h) / 30]);
@@ -1377,12 +1377,12 @@
                     glow(x, y, 12, '255, 200, 130', 0.5 * f);
                 }
                 // The workbench: the schematic tablet's violet, the soldering iron's ember
-                for (const p of this.props) if (p.decorType === 'apt_craft') {
+                for (const p of props) if (p.decorType === 'apt_craft') {
                     glow(p.x + p.width * 0.59, p.y + 11 + p.height * 0.21, 22, '180, 130, 255', 0.3 + 0.06 * Math.sin(t * 2.4));
                     glow(p.x + p.width - 29, p.y + p.height - 14.5, 7, '255, 150, 70', 0.5 + 0.2 * Math.sin(t * 7));
                 }
                 // The veranda's fire bowl and the candles on the dining table (they go where the pieces go)
-                for (const p of this.props) {
+                for (const p of props) {
                     if (p.decorType === 'apt_firepit') {
                         const cx = p.x + p.width / 2, cy = p.y + p.height / 2, f = 0.8 + 0.12 * Math.sin(t * 6.1) + 0.08 * Math.sin(t * 11.3);
                         glow(cx, cy, 120, '255, 130, 50', 0.22 * f); glow(cx, cy, 30, '255, 190, 90', 0.5 * f);

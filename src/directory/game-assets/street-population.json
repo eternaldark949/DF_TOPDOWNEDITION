@@ -1,0 +1,67 @@
+{
+  "library_id": "df_street",
+  "resources": {
+    "rules": {
+      "kind": "street_rules",
+      "data": {
+        "prediction_seconds": 1.5,
+        "dodge_distance": 50,
+        "dodge_speed": 360,
+        "dodge_seconds": 0.45,
+        "vehicle_hit_speed": 90,
+        "vehicle_damage": 20,
+        "sprawl_seconds": 1.2,
+        "recovery_seconds": 0.5,
+        "damage_grace_seconds": 0.5,
+        "crossing_speed": 240,
+        "personal_space": 48,
+        "max_pedestrians": 40,
+        "max_vehicles": 40
+      }
+    }
+  },
+  "templates": {
+    "pedestrian": {
+      "extends": "df:crowd_walker",
+      "entity_type": "df_pedestrian",
+      "mass": 8,
+      "linear_damping": 3,
+      "movement": {
+        "max_speed": 216,
+        "acceleration": 1200,
+        "braking": 1500,
+        "arrival_distance": 2
+      },
+      "assets": {
+        "street_rules": "rules",
+        "appearance_catalog": "df:pedestrian_appearances"
+      },
+      "data": {
+        "health": 100,
+        "state": "idle",
+        "state_seconds": 0,
+        "damage_grace": 0,
+        "node_id": null,
+        "target_node_id": null,
+        "previous_node_id": null,
+        "arrived": false,
+        "quip": null,
+        "quip_seconds": 0,
+        "appearance_id": null
+      }
+    },
+    "vehicle": {
+      "extends": "df:traffic_vehicle",
+      "entity_type": "df_traffic_vehicle",
+      "assets": {
+        "street_rules": "rules"
+      },
+      "data": {
+        "control_mode": "PARKED",
+        "route_id": null,
+        "route_complete": false,
+        "occupants": []
+      }
+    }
+  }
+}

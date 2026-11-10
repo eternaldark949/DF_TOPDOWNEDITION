@@ -79,8 +79,8 @@
                     } else {
                         console.warn(`CutsceneManager: getLandmark('${targetId}') failed. GameEngine method missing.`);
                         // Fallback to player position to prevent crash
-                        this.camTargetX = this.game.player.x;
-                        this.camTargetY = this.game.player.y;
+                        this.camTargetX = this.game.playerPosition[0];
+                        this.camTargetY = this.game.playerPosition[1];
                     }
                     
                     this.camZoomTarget = zoom;
@@ -209,7 +209,7 @@
                         return g.activeMap.id === 'church_boss';
 
                     case "PLAYER_DEEP_IN_SUITE":
-                        return g.activeMap.id === 'hotel_suite' && g.player.y > 800;
+                        return g.activeMap.id === 'hotel_suite' && g.playerPosition[1] > 800;
 
                     case "AMBUSH_CLEARED":
                         return g.questState.suiteAmbushTriggered && g.enemies.length === 0;

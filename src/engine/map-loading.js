@@ -111,8 +111,8 @@ engineMixin({
                     const drv = this.isDriving && this.car, LA = CONFIG.VEHICLE_DRIVE.CAM_LOOK_AHEAD, k = 1 - Math.exp(-dt / LA.TAU_MS);
                     const dx = (this.driveLeanX || 0) + ((drv ? (this.car.vx || 0) * LA.PER_SPEED : 0) - (this.driveLeanX || 0)) * k;
                     const dy = (this.driveLeanY || 0) + ((drv ? (this.car.vy || 0) * LA.PER_SPEED : 0) - (this.driveLeanY || 0)) * k;
-                    x = this.player.x + (this.scopeLeanX || 0) + dx;
-                    y = this.player.y + (this.scopeLeanY || 0) + dy;
+                    x = this.playerPosition[0] + (this.scopeLeanX || 0) + dx;
+                    y = this.playerPosition[1] + (this.scopeLeanY || 0) + dy;
                 }
                 if (this.cineCam) { x += this.cineCam.dx; y += this.cineCam.dy; }
                 if (this.finCam) { x += this.finCam.dx; y += this.finCam.dy; }
@@ -293,6 +293,8 @@ engineMixin({
             },
 
             _doLoadMap(mapId, spawnAt) {
+                if(mapId==='apt_949')return this._enterApartment(spawnAt);
+                if(this.activeLevel)this._leaveApartment();
                 if (mapId === 'hub_949') mapId = 'sdc';
                 this._cancelQuickDrawHold?.(); this.cancelQuickDraw();
                 const previousMapId = this.activeMap?.id;
@@ -1518,9 +1520,9 @@ engineMixin({
             
                 const occupiedSpots = [];
                 const map = this.activeMap;
-                const pX = this.player.x;
-                const pY = this.player.y;
-                const pAngle = this.player.angle || 0; // Direction player is looking
+                const pX = this.playerPosition[0];
+                const pY = this.playerPosition[1];
+                const pAngle = this.playerRotation || 0; // Direction player is looking
             
                 // 1. Helper: Collision Check (includes Door Override)
                 const isSpotValid = (x, y) => {

@@ -47,7 +47,7 @@ engineMixin({
         q.phase = 'draw'; q.ticks = 7; q.angle = angle;
         q.aimPoint = aimPoint ? { x: aimPoint.x, y: aimPoint.y } : null;
         this.setWeaponHolstered(false);
-        this.player.angle = angle;
+        if(this.activeLevel)this.player.setRotation(angle,{preserve_velocity:true});else this.player.angle=angle;
         return true;
     },
     updateQuickDraw() {
@@ -62,7 +62,7 @@ engineMixin({
             ? `RECOVER<br>${(Math.ceil(this.shootCooldown / 6) / 10).toFixed(1)}s` : 'QUICK<br>DRAW';
         if (this.holsterBtn.innerHTML !== label) this.holsterBtn.innerHTML = label;
         if (q.phase === 'ready') return;
-        this.player.angle = q.angle;
+        if(this.activeLevel)this.player.setRotation(q.angle,{preserve_velocity:true});else this.player.angle=q.angle;
         if (--q.ticks > 0) return;
         if (q.phase === 'draw') {
             this.player._aimPoint = q.aimPoint;

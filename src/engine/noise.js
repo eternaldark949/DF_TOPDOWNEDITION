@@ -40,7 +40,7 @@
                     // opts.ring === false: no ripple (her footsteps; a puddle step keeps one, small)
                     if (opts.ring !== false) this._spawnRing(x, y, reach, false, opts.src);
                 } else if (opts.ring !== false && GameSettings.enemyRings !== false && this.player
-                           && Math.hypot(this.player.x - x, this.player.y - y) <= reach) {
+                           && Math.hypot(this.playerPosition[0] - x, this.playerPosition[1] - y) <= reach) {
                     // theirs, in ember, when it reaches her: gunfire, a dash, a guard's hard steps
                     this._spawnRing(x, y, Math.min(reach, 260), true, opts.src);
                 }

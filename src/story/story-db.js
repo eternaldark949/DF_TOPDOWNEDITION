@@ -21,10 +21,10 @@
                 onStart: (game) => {
                     const H = game.hud, S = game.story;
                     H.reveal('health'); H.reveal('location');
-                    const x0 = game.player.x, y0 = game.player.y;
+                    const x0 = game.playerPosition[0], y0 = game.playerPosition[1];
                     if (game.activeMap.id === 'sdc' && !game.coach.taught.has('move'))
                         H.reveal('move', { title: 'Move', text: 'Drag anywhere here to move.', ghost: 'drag', timeout: 12000,
-                                           until: g => Math.hypot(g.player.x - x0, g.player.y - y0) > 40 });
+                                           until: g => Math.hypot(g.playerPosition[0] - x0, g.playerPosition[1] - y0) > 40 });
                     else H.reveal('move');
                     S.watch(g => {                                            // the first pill she meets: the door
                         if (H.has('action') || g.coach.cur) return H.has('action');
@@ -106,7 +106,7 @@
                     S.watch(g => {
                         const note = (g.props || []).find(p => p.noteId === 'dark_maker_letter' || (p.interactionType === 'read_note' && /dark/i.test(p.noteId || p.label || '')));
                         if (!note || g.activeMap.id !== 'hotel_suite') return false;
-                        if (Math.hypot(g.player.x - (note.x + (note.w || 0) / 2), g.player.y - (note.y + (note.h || 0) / 2)) > 150) return false;
+                        if (Math.hypot(g.playerPosition[0] - (note.x + (note.w || 0) / 2), g.playerPosition[1] - (note.y + (note.h || 0) / 2)) > 150) return false;
                         S.triggerComms("Yenna", "What's that?", 2400);
                         game_timers.after(2.6, () => S.triggerComms("949", "Yenna, you really are a sniper.", 2600), 'world');
                         return true;

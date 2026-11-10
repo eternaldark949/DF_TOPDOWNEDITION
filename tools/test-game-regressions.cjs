@@ -662,12 +662,12 @@ test('Contact shadows stay on the ground across rotation, bobbing, vector and sp
     const balanced=ctx._stack.length===0;
     shots.length=0; const loot=new Loot(100,120,'scrap');_gameTimeSec=0;loot.draw(ctx);_gameTimeSec=1;loot.draw(ctx);
     const lootFixed=JSON.stringify(shots[0])===JSON.stringify(shots[1]);
-    const sofa=game.props.find(p=>p.decorType==='apt_sofa');
+    const sofa=game.apartmentRenderer.propPacket(game.props.find(p=>p.decorType==='apt_sofa'),1);
     shots.length=0;GameSettings.propSprites=false;sofa.angle=0.7;sofa.draw(ctx);
     const vector=shots.length===1 && shots[0].m[4]===sofa.x+sofa.width/2 && shots[0].m[5]===sofa.y+sofa.height/2 && shots[0].args[0]===-sofa.width/2-5 && shots[0].args[1]===-sofa.height/2-5;
     shots.length=0;GameSettings.propSprites=true;PropSprites.frame(1.4);sofa.draw(ctx);sofa.draw(ctx);
     const stamped=shots.length===2;
-    const craft=game.props.find(p=>p.decorType==='apt_craft');shots.length=0;craft.draw(ctx);craft.draw(ctx);
+    const craft=game.apartmentRenderer.propPacket(game.props.find(p=>p.decorType==='apt_craft'),1);shots.length=0;craft.draw(ctx);craft.draw(ctx);
     const split=shots.length===2;
     shots.length=0;PropSprites._canvas(sofa,PropSprites._plan(sofa,null),0);
     const notBaked=shots.length===0;
@@ -684,7 +684,7 @@ test('Humanoid contact and sun shadows keep their world placement as bodies turn
     const capture=(angle,sun)=>{
       _sunShadow={on:sun,dx:0.6,dy:0.8,len:1,k:0.7};shots.length=0;
       ctx.save();ctx.translate(90,110);ctx.scale(2,2);ctx.rotate(angle);ctx.globalAlpha=0.45;_bodyRot=angle;
-      drawHumanContactShadow(ctx,game.player);ctx.restore();return structuredClone(shots);
+      drawHumanContactShadow(ctx,game.apartmentRenderer.personPacket(game.player,1));ctx.restore();return structuredClone(shots);
     };
     const indoor=[0,Math.PI/2,Math.PI].map(a=>capture(a,false));
     const day=[0,Math.PI/2,Math.PI].map(a=>capture(a,true));
@@ -692,9 +692,9 @@ test('Humanoid contact and sun shadows keep their world placement as bodies turn
     const ground=indoor[0][0];
     const placement=ground.contact && JSON.stringify(ground.m)===JSON.stringify([2,0,0,2,90,110]) && JSON.stringify(ground.args)===JSON.stringify([-18,-14,36,28]) && ground.alpha===0.45;
     const sunKept=day[0].length===2 && !day[0][0].contact && day[0][1].contact;
-    _sunShadow.on=false;shots.length=0;drawProceduralHumanoid(ctx,game.player,{noShadow:true});const suppressed=shots.every(s=>!s.contact);
-    shots.length=0;drawProceduralHumanoid(ctx,game.player,{isDriving:true});const driver=shots.every(s=>!s.contact);
-    shots.length=0;_zoomLOD=2;drawHumanContactShadow(ctx,game.player);const far=shots.length===0;
+    _sunShadow.on=false;shots.length=0;drawProceduralHumanoid(ctx,game.apartmentRenderer.personPacket(game.player,1),{noShadow:true});const suppressed=shots.every(s=>!s.contact);
+    shots.length=0;drawProceduralHumanoid(ctx,game.apartmentRenderer.personPacket(game.player,1),{isDriving:true});const driver=shots.every(s=>!s.contact);
+    shots.length=0;_zoomLOD=2;drawHumanContactShadow(ctx,game.apartmentRenderer.personPacket(game.player,1));const far=shots.length===0;
     ctx.drawImage=original;return {indoor:stable(indoor),day:stable(day),placement,sunKept,suppressed,driver,far,balanced:ctx._stack.length===0};
   `);
   equal(r,{indoor:true,day:true,placement:true,sunKept:true,suppressed:true,driver:true,far:true,balanced:true});
@@ -704,7 +704,7 @@ test('Furniture sprites: painted runs never change over time, loops repeat per p
   env.run('game.story.update=()=>{};');
   // Every painted-once run of every prop on every bundled map draws the same at any time (an animation left
   // in a still run would freeze); every loop paints the same one period on; a live piece forced still varies.
-  const runTrace = (i, run, T) => { env.setTrace(true); env.run(`(() => { const p = game.props[${i}]; PropSprites._canvas(p, PropSprites._plan(p, null), ${run}, ${T}); })()`);
+  const runTrace = (i, run, T) => { env.setTrace(true); env.run(`(() => { const p = game.activeLevel ? game.apartmentRenderer.propPacket(game.props[${i}],1) : game.props[${i}]; PropSprites._canvas(p, PropSprites._plan(p, null), ${run}, ${T}); })()`);
     const t = JSON.stringify(env.trace.map(op => op.slice(1)), (k, v) => typeof v === 'number' ? Math.round(v * 1e5) / 1e5 : v); env.setTrace(false); return t; };
   let checked = 0, loops = 0;
   for (const id of Object.keys(env.probe.MAPS)) {
@@ -732,8 +732,8 @@ test('Furniture sprites: painted runs never change over time, loops repeat per p
   const r = value(env, `
     game._doLoadMap('apt_949'); game.running=true; game.paused=false; game.worldMinutes=22*60;
     const P = CanvasRenderingContext2D.prototype, ctx = game.ctx;
-    const sofa = game.props.find(p => p.decorType === 'apt_sofa'), sw = game.props.find(p => p.interactionType === 'light_switch');
-    const craft = game.props.find(p => p.decorType === 'apt_craft');
+    const sofa = game.apartmentRenderer.propPacket(game.props.find(p => p.decorType === 'apt_sofa'),1), sw = game.apartmentRenderer.propPacket(game.props.find(p => p.interactionType === 'light_switch'),1);
+    const craft = game.apartmentRenderer.propPacket(game.props.find(p => p.decorType === 'apt_craft'),1);
     PropSprites.frame(1.4);
     const calls = (p) => { const before = __calls.n; p.draw(ctx); return __calls.n - before; };
     globalThis.__calls = { n: 0 }; for (const k of ['drawImage','fillRect','fill','stroke','save','restore','translate','rotate','arc','ellipse','roundRect','beginPath']) { const f = P[k]; P[k] = function () { __calls.n++; return f.apply(this, arguments); }; }
@@ -932,7 +932,7 @@ test('Look-out: at the veranda edge the camera leans out over the city; nowhere 
   env.run(`game.story.update=()=>{}; game._doLoadMap('apt_949'); game.running=false; game.enterWorld(); game.loop=()=>{};`);
   const at = (x, y) => value(env, `
     if (!game._cityView) game._cityView = game._makeAptCityView();
-    for (let i = 0; i < 120; i++) { game.player.x = ${x}; game.player.y = ${y}; _frameTime += 50; game.draw(); }
+    for (let i = 0; i < 120; i++) { game.player.body.setPosition([${x},${y}]); _frameTime += 50; game.draw(); }
     return { lean: game.lookLeanY, want: -game._cityView.lookout / game.camera.zoom, camY: game.camera.y, top: game.activeMap.cameraBounds.top + game.canvas.height / 2 / game.camera.zoom };`);
   const edge = at(700, 20), room = at(400, 500);
   ok(Math.abs(edge.lean - edge.want) < 1, `at the railing it leans ${Math.round(edge.lean)} px (${Math.round(edge.want)} wanted: the same on screen at any zoom)`);
@@ -947,7 +947,7 @@ test('Camera edge lock: the view stays inside the map, a narrow map is centred, 
   const view = (map, px, py, pre = '') => value(env, `
     if (!game.activeMap || game.activeMap.id !== '${map}') { game._doLoadMap('${map}'); game.running=false; game.enterWorld(); game.loop=()=>{}; }
     ${pre}
-    for (let i = 0; i < 3; i++) { game.player.x = ${px}; game.player.y = ${py}; _frameTime += 50; game.draw(); }
+    for (let i = 0; i < 3; i++) { if(game.activeLevel)game.player.body.setPosition([${px},${py}]);else {game.player.x=${px};game.player.y=${py};} _frameTime += 50; game.draw(); }
     const v = game.view, hw = game.canvas.width / 2 / v.zoom, hh = game.canvas.height / 2 / v.zoom;
     return { l: v.x - hw, r: v.x + hw, t: v.y - hh, b: v.y + hh, x: v.x, y: v.y, cx: game.camera.x, cy: game.camera.y };`);
   const e = 1e-6;

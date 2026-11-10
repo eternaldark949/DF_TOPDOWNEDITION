@@ -376,7 +376,7 @@
                             showMessage('HEAD TO THE AMBER DELIVERY VEHICLE NEAR COZY CAFE.');
                         }
                     } else if (game.activeMap.id === 'sdc') {
-                        const dist = Math.hypot(game.player.x - m.targetX, game.player.y - m.targetY);
+                        const dist = Math.hypot(game.playerPosition[0] - m.targetX, game.playerPosition[1] - m.targetY);
                         // The resident comes out to meet her as she pulls up
                         let r = m._recipientEntity && this._recipients.find(q => q.npc === m._recipientEntity);
                         if (!r && dist < 320) r = this._spawnRecipient(game, m);
@@ -385,7 +385,7 @@
                             m._walkHint = true;
                             showMessage('STEP OUT AND WALK THE PACKAGE TO THE DOOR.');
                         }
-                        if (r && !game.isDriving && !game.player.inCar && Math.hypot(game.player.x - r.npc.x, game.player.y - r.npc.y) < 40) {
+                        if (r && !game.isDriving && !game.player.inCar && Math.hypot(game.playerPosition[0] - r.npc.x, game.playerPosition[1] - r.npc.y) < 40) {
                             r.phase = 'thanks'; r.t = 0;
                             r.npc.heldParcel = true;
                             r.npc._setQuip(m.condition < 60 ? 'Is it… supposed to rattle?' : ['Thank you!', 'Oh, that smells amazing.', 'Right on time. Thanks!', 'You\'re a lifesaver.'][Math.floor(Math.random() * 4)]);
@@ -491,7 +491,7 @@
                 if (!m) return null;
                 if (m.type === MISSION_TYPES.DELIVERY) {
                     const g = typeof game !== 'undefined' ? game : null;
-                    const there = m.pickedUp && g && g.player && Math.hypot(g.player.x - m.targetX, g.player.y - m.targetY) < m.targetRadius * 1.6;
+                    const there = m.pickedUp && g && g.player && Math.hypot(g.playerPosition[0] - m.targetX, g.playerPosition[1] - m.targetY) < m.targetRadius * 1.6;
                     const step = !m.pickedUp ? 'Pick up the package at Cozy Cafe'
                         : there ? (g.isDriving ? 'Step out and walk it to the door' : 'Hand it to the resident')
                         : `Deliver to ${m.targetLabel || 'the apartments'}`;

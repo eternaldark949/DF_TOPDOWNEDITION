@@ -156,10 +156,7 @@
                 this.player.syncHealth(this.playerHealth, this.maxPlayerHealth);  // Initial sync
                 
                 // Player's OWNED car: LADY Blackmark V1 (Luxury SUV) - This is YOUR car
-                this.ownedCar = new TrafficVehicle(null, 'LADY', 'suv', 'PLAYER');
-                this.ownedCar.color = '#1a1a1a'; // Consistent dark color for player's car
-                this.ownedCar.isOwnedCar = true; // Mark as player's owned vehicle
-                Object.assign(this.ownedCar, CAR_START);  // parked on the hub where a new game starts (engine/cars.js)
+                this.ownedCar = gameVehicles.create({ purpose: 'owned', control_mode: 'PLAYER', position: [CAR_START.x, CAR_START.y], rotation: CAR_START.angle });
                 
                 // Garage system — multi-car ownership & customization
                 this.garage = new PlayerGarage();

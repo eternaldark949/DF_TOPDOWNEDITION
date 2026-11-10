@@ -267,6 +267,7 @@
             },
 
             fireWeapon() {
+                if(this.activeLevel)return this._fireApartmentWeapon();
                 if ((this._quickDraw && !this._quickDrawFiring) || (this.weaponHolstered && !this.isDriving)) return;
                 // 1. VISIBILITY CHECKS
                 if (!this.player.visible && !this.isDriving) return;
@@ -284,12 +285,12 @@
                     this.shootCooldown = this._punchDur = CONFIG.PUNCH.DURATION_TICKS;
                     // Toggle Punch Side
                     this.player.punchSide = (this.player.punchSide === 'right') ? 'left' : 'right'; this.player.punchHay = false;
-                    const punchAngle = this.player.angle;
+                    const punchAngle = this.playerRotation;
                     
-                    const px = this.player.x + Math.cos(punchAngle) * 20;
-                    const py = this.player.y + Math.sin(punchAngle) * 20;
+                    const px = this.playerPosition[0] + Math.cos(punchAngle) * 20;
+                    const py = this.playerPosition[1] + Math.sin(punchAngle) * 20;
                     
-                    this.emitNoise(this.player.x, this.player.y, CONFIG.NOISE.punch, 'punch');
+                    this.emitNoise(this.playerPosition[0], this.playerPosition[1], CONFIG.NOISE.punch, 'punch');
                     const punchCrit = this.rollCrit(null);                // a punch can crit too (engine/combat-fx.js)
                     this.projectiles.push(new ProjectileEntity({
                         x: px, y: py, 
@@ -314,7 +315,7 @@
                 audioSys.sfx('shoot');
             
                 // 2. Calculate Spawn Position & Angle
-                let px, py, angle = this.player.angle;
+                let px, py, angle = this.playerRotation;
                 const shotGeometry = this.getPlayerShotGeometry();
                 px = shotGeometry.x; py = shotGeometry.y; angle = shotGeometry.angle;
 
@@ -376,7 +377,7 @@
                 // Gunfire carries: gangers in earshot come to look (engine/noise.js)
                 { const N = CONFIG.NOISE, id = (this.currentWeapon && this.currentWeapon.id) || '';
                   const reach = isSniperVisual || id.includes('sniper') ? N.sniper : id.includes('rifle') ? N.rifle : N.pistol;
-                  this.emitNoise(this.player.x, this.player.y, this.resonance.stat('gunNoise', reach), 'shot'); }
+                  this.emitNoise(this.playerPosition[0], this.playerPosition[1], this.resonance.stat('gunNoise', reach), 'shot'); }
                 this._loudUntil = _gameTimeSec + 10;                     // she's fired: the crew is weapons free (engine/sneak.js)
 
                 // 5. Spawn Muzzle Flash
@@ -470,10 +471,15 @@
                 let nearestTm = null;
                 let nearestDist = 200; // Must be within 200px
                 
-                for (let tm of this.teammates) {
+                const nativeApartment = !!this.activeLevel;
+                const allies = nativeApartment
+                    ? this.physics_system.peruseNearbyEntities(this.player, {near_range: 200}).map(hit => hit.entity).filter(tm => tm?.entity_type === 'df_apartment_companion')
+                    : this.teammates;
+                for (let tm of allies) {
                     if (!tm.recruited || tm.dead || tm.inCar) continue;
                     if (tm.hp >= tm.maxHp) continue; // Skip full HP
-                    const d = Math.hypot(this.player.x - tm.x, this.player.y - tm.y);
+                    if (nativeApartment) { nearestTm = tm; break; }
+                    const d = Math.hypot(this.playerPosition[0] - tm.x, this.playerPosition[1] - tm.y);
                     if (d < nearestDist) {
                         nearestDist = d;
                         nearestTm = tm;

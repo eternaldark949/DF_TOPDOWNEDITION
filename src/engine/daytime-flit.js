@@ -43,6 +43,7 @@
 
             /** Event-only landing search: teleport through obstacles, but finish with a clear player circle. */
             findFlitLanding(angle, distance) {
+                if(this.activeLevel){const hit=this.physics_system.findDirectionalPlacement(this.player,{angle,distance,placement_bounds:{left:8,top:8,right:this.activeMap.width-8,bottom:this.activeMap.height-8}});return hit?{x:hit.position[0],y:hit.position[1],distance:hit.distance}:null;}
                 const p = this.player, map = this.activeMap, margin = 20, minTravel = 1;
                 if (!p || !map || ![p.x, p.y, angle, distance, map.width, map.height].every(Number.isFinite) || distance < minTravel || map.width < margin * 2 || map.height < margin * 2) return null;
                 const sx = p.x, sy = p.y, ux = Math.cos(angle), uy = Math.sin(angle);
@@ -159,6 +160,7 @@
             },
 
             triggerFlit(angleOverride, source) {
+                if(this.activeLevel)return this._flitApartment(arguments[0]);
                 if (this.isDriving || this.paused) return false;
                 if (this.hud && !this.hud.has('flit')) return false;   // not introduced yet (ui/hud-reveal.js)
                 
@@ -167,16 +169,16 @@
                 // Check attunement pool
                 if (this.flitState.attunement < cost) return false;
                 // --- Capture start state for VFX ---
-                const startX = this.player.x;
-                const startY = this.player.y;
-                const startAngle = this.player.angle;
+                const startX = this.playerPosition[0];
+                const startY = this.playerPosition[1];
+                const startAngle = this.playerRotation;
                 
                 let flitDist = this.player.buffSystem.getStat('flitDistance', 120);
                 if (this.augments && this.augments.isEquipped('flit_ext')) flitDist *= 1.3; // 30% more range
                 if (this.resonance) flitDist = this.resonance.stat('flitDistance', flitDist);   // Flit: Reach
 
                 // Flit direction: use movement keys (WASD) or joystick if active, otherwise fall back to facing angle
-                let flitAngle = this.player.angle;
+                let flitAngle = this.playerRotation;
                 let [moveX, moveY] = controls.direction('move');
                 if (this.joystick && this.joystick.active) {
                     moveX = this.joystick.dx;

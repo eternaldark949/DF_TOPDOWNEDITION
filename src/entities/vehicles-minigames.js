@@ -1063,8 +1063,8 @@
                     for (const tm of this._hiddenTeammates) {
                         tm.inCar = false;
                         tm.seatIndex = -1;
-                        tm.x = game.player.x + (Math.random() - 0.5) * 60;
-                        tm.y = game.player.y + 30 + Math.random() * 30;
+                        tm.x = game.playerPosition[0] + (Math.random() - 0.5) * 60;
+                        tm.y = game.playerPosition[1] + 30 + Math.random() * 30;
                     }
                     this._hiddenTeammates = [];
                 }

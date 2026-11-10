@@ -48,8 +48,9 @@ Object.assign(TrafficVehicle.prototype, {
     },
     occupantShot(index, angle, lean, weaponId) {
         const pose = this.occupantPose(index, angle, lean, weaponId);
-        const seat = this.getSeatWorldPos(index), c = Math.cos(this.angle), s = Math.sin(this.angle);
-        const x = this.x + pose.muzzleX * c - pose.muzzleY * s, y = this.y + pose.muzzleX * s + pose.muzzleY * c;
+        const seat = this.getSeatWorldPos(index);
+        const muzzle = pathGeometry.transformPose({ position: [this.x, this.y], rotation: this.angle }, { local_position: [pose.muzzleX, pose.muzzleY] });
+        const [x, y] = muzzle.position;
         const map = typeof game !== 'undefined' && game.activeMap;
         if (map && collisionWorld.lineBlocked(seat.x, seat.y, x, y, map.walls || [], getColliders(map)))
             return { x: seat.x, y: seat.y, angle: pose.angle };

@@ -15,18 +15,7 @@
         const CROSSING_QUEUE = { MAX: 6, SPACING: 28, SETBACK: 18, REACH: 190 };
         class Pedestrian extends ActorEntity {
             // Appearance presets for variety
-            static APPEARANCES = [
-                { name: 'suit_male', bodyColor: '#1a1a2e', headColor: '#dcc6ac', hairColor: '#222', hasHat: false },
-                { name: 'suit_female', bodyColor: '#2d132c', headColor: '#e8d5c4', hairColor: '#4a3728', hasHat: false },
-                { name: 'casual_male', bodyColor: '#3d5a80', headColor: '#c9a87c', hairColor: '#1a1a1a', hasHat: false },
-                { name: 'casual_female', bodyColor: '#ee6c4d', headColor: '#e8d5c4', hairColor: '#8b4513', hasHat: false },
-                { name: 'worker', bodyColor: '#ff6b35', headColor: '#c9a87c', hairColor: '#222', hasHat: true, hatColor: '#ffcc00' },
-                { name: 'corporate', bodyColor: '#293241', headColor: '#dcc6ac', hairColor: '#333', hasHat: false },
-                { name: 'hipster', bodyColor: '#606c38', headColor: '#dcc6ac', hairColor: '#8b4513', hasHat: true, hatColor: '#333' },
-                { name: 'punk', bodyColor: '#9d4edd', headColor: '#e8d5c4', hairColor: '#ff006e', hasHat: false },
-                { name: 'tourist', bodyColor: '#48cae4', headColor: '#c9a87c', hairColor: '#654321', hasHat: true, hatColor: '#fff' },
-                { name: 'delivery', bodyColor: '#2ec4b6', headColor: '#dcc6ac', hairColor: '#1a1a1a', hasHat: true, hatColor: '#2ec4b6' }
-            ];
+            static APPEARANCES = GAME_DB.cast.pedestrian_appearances;
 
             /** Is it raining where this pedestrian is? */
             _raining() {

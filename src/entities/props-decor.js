@@ -45,7 +45,7 @@
          * =====================================================================
          * Pushable objects with physics. Props can be pushed by the player,
          * collide with walls, and interact with other props.
-         * 
+         *
          * Features:
          * - AABB collision via CollisionSystem
          * - Wall bounce physics
@@ -2630,6 +2630,231 @@
             }
         }
 
+        /** Pure prop artwork. Native renderers pass presentation packets, never mutable physics objects. */
+        function drawPropAppearance(ctx, p, { use_cache = true } = {}) {
+                if (!p.visible) return;
+                // Painting or replaying a split run draws body art only. The outer pass
+                // adds exactly one ground shadow, including vector fallback and live props.
+                if (PropPass.mode === 0) {
+                    drawGroundContactShadow(ctx, p.x + p.width / 2, p.y + p.height / 2,
+                        p.width / 2 + 5, p.height / 2 + 5, p.angle || 0);
+                }
+                if (use_cache && PropSprites.stamp(ctx, p)) return;      // painted once, stamped (entities/prop-sprites.js)
+
+                ctx.save();
+                const center = { x:p.x+p.width/2, y:p.y+p.height/2 };
+                ctx.translate(center.x, center.y);
+                ctx.rotate(p.angle);
+
+                ctx.fillStyle = p.color;
+
+                if (p.decorType) {
+                    ctx.translate(-center.x, -center.y);
+                    drawClinicDecorProp(ctx, p);
+                } else if (p.interactionType === 'medbay_refill') {
+                    ctx.translate(-center.x, -center.y);
+                    drawHealthStation(ctx, p);
+                } else if (p.interactionType === 'armory') {
+                    // === ARMORY LOCKER (wall-mounted weapons rack) ===
+                    ctx.translate(-center.x, -center.y);
+
+                    const ax = p.x, ay = p.y, aw = p.width, ah = p.height;
+
+                    // Dark metal casing
+                    ctx.fillStyle = '#1a1a22';
+                    ctx.fillRect(ax, ay, aw, ah);
+
+                    // Inner panel (dark violet)
+                    ctx.fillStyle = '#1a0f2a';
+                    ctx.fillRect(ax + 3, ay + 3, aw - 6, ah - 6);
+
+                    // Weapon silhouettes — three horizontal bars representing guns
+                    ctx.fillStyle = '#444';
+                    const barH = 3;
+                    const barInset = 8;
+                    for (let i = 0; i < 3; i++) {
+                        const by = ay + 10 + i * (ah - 20) / 3;
+                        ctx.fillRect(ax + barInset, by, aw - barInset * 2, barH);
+                        // Small grip nub
+                        ctx.fillRect(ax + barInset + 4, by - 2, 5, barH + 4);
+                    }
+
+                    // Pulsing violet glow (indicates interactable)
+                    const armPulse = 0.5 + Math.sin(_frameTime / 500) * 0.4;
+                    ctx.shadowColor = '#a469ff';
+                    ctx.shadowBlur = 12 * armPulse;
+                    ctx.fillStyle = `rgba(164, 105, 255, ${0.1 * armPulse})`;
+                    ctx.fillRect(ax + 2, ay + 2, aw - 4, ah - 4);
+
+                    // "LOADOUT" label
+                    ctx.shadowBlur = 0;
+                    ctx.fillStyle = `rgba(164, 105, 255, ${0.5 + armPulse * 0.3})`;
+                    ctx.font = 'bold 5px Orbitron';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('LOADOUT', ax + aw / 2, ay + ah - 5);
+                    ctx.textAlign = 'start';
+
+                } else if (p.interactionType === 'vending_machine') {
+                    ctx.translate(-center.x, -center.y);
+                    drawMiniSpree(ctx, p);
+                } else if (p.interactionType === 'bed_sleep') {
+                    // --- NEW: SMALLER BED RENDERER ---
+                    ctx.translate(-center.x, -center.y);
+
+                    // Mattress
+                    ctx.fillStyle = '#202025';
+                    ctx.fillRect(p.x, p.y, p.width, p.height);
+
+                    // Pillow (White rect at top)
+                    ctx.fillStyle = '#dddddd';
+                    ctx.fillRect(p.x + 3, p.y + 3, p.width - 6, 15);
+
+                    // Blanket (Colored rect covering bottom 3/4)
+                    ctx.fillStyle = p.color;
+                    ctx.fillRect(p.x, p.y + 25, p.width, p.height - 25);
+
+                    // Fold/Detail line
+                    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                    ctx.fillRect(p.x, p.y + 25, p.width, 3);
+
+                } else if (p.interactionType === 'couch_two_seater') {
+                    // --- TWO SEATER COUCH (Top-down view) ---
+                    ctx.translate(-center.x, -center.y);
+
+                    // Couch base/frame (darker)
+                    ctx.fillStyle = '#1a1215';
+                    ctx.fillRect(p.x, p.y, p.width, p.height);
+
+                    // Back rest (top portion, slightly raised look)
+                    ctx.fillStyle = p.color;
+                    ctx.fillRect(p.x + 4, p.y + 4, p.width - 8, 18);
+
+                    // Seat cushions (two side by side)
+                    const cushionGap = 4;
+                    const cushionWidth = (p.width - 12 - cushionGap) / 2;
+                    ctx.fillStyle = p.color;
+                    ctx.fillRect(p.x + 6, p.y + 26, cushionWidth, p.height - 34);
+                    ctx.fillRect(p.x + 6 + cushionWidth + cushionGap, p.y + 26, cushionWidth, p.height - 34);
+
+                    // Cushion detail lines (subtle indent)
+                    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+                    ctx.fillRect(p.x + 6, p.y + 26, cushionWidth, 3);
+                    ctx.fillRect(p.x + 6 + cushionWidth + cushionGap, p.y + 26, cushionWidth, 3);
+
+                    // Arm rests (left and right sides)
+                    ctx.fillStyle = '#0d0a0c';
+                    ctx.fillRect(p.x, p.y + 20, 6, p.height - 24);
+                    ctx.fillRect(p.x + p.width - 6, p.y + 20, 6, p.height - 24);
+
+                } else if (p.interactionType === 'tv_screen') {
+                    // --- TV SCREEN (Top-down, warm glow for fireplace effect) ---
+                    ctx.translate(-center.x, -center.y);
+
+                    // TV frame (black border)
+                    ctx.fillStyle = '#0a0a0a';
+                    ctx.fillRect(p.x, p.y, p.width, p.height);
+
+                    // Screen with warm glow (simulating fireplace video)
+                    ctx.shadowColor = p.color || '#ff6622';
+                    ctx.shadowBlur = 25;
+                    ctx.fillStyle = p.color || '#ff6622';
+                    ctx.fillRect(p.x + 4, p.y + 4, p.width - 8, p.height - 8);
+
+                    // Inner flame detail (lighter center)
+                    ctx.fillStyle = '#ffaa44';
+                    ctx.fillRect(p.x + 8, p.y + 6, p.width - 16, p.height - 14);
+
+                    // Flickering core (brightest)
+                    ctx.fillStyle = '#ffdd88';
+                    const flicker = Math.sin(_frameTime / 200) * 2;
+                    ctx.fillRect(p.x + 12 + flicker, p.y + 8, p.width - 26, p.height - 18);
+
+                    ctx.shadowBlur = 0;
+
+                } else if (p.interactionType === 'light_switch') {
+                    // --- LIGHT SWITCH (Wall-mounted panel with LED indicator) ---
+                    ctx.translate(-center.x, -center.y);
+
+                    const sx = p.x, sy = p.y, sw = p.width, sh = p.height;
+
+                    // Wall plate (dark gray housing)
+                    ctx.fillStyle = '#1a1a1a';
+                    ctx.fillRect(sx, sy, sw, sh);
+
+                    // Plate border highlight
+                    ctx.fillStyle = 'rgba(255,255,255,0.06)';
+                    ctx.fillRect(sx, sy, sw, 1);
+                    ctx.fillRect(sx, sy, 1, sh);
+                    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                    ctx.fillRect(sx + sw - 1, sy, 1, sh);
+                    ctx.fillRect(sx, sy + sh - 1, sw, 1);
+
+                    // Toggle rocker (raised rectangle)
+                    ctx.fillStyle = '#2a2a2a';
+                    ctx.fillRect(sx + 2, sy + 3, sw - 4, sh - 6);
+
+                    // LED indicator
+                    const ledColor = p._switchState ? '#44ff88' : '#ff3333';
+                    const ledGlow = p._switchState ? 'rgba(68, 255, 136, 0.6)' : 'rgba(255, 51, 51, 0.4)';
+                    ctx.shadowColor = ledGlow;
+                    ctx.shadowBlur = 6;
+                    ctx.fillStyle = ledColor;
+                    ctx.beginPath();
+                    ctx.arc(sx + sw / 2, sy + sh - 3, 1.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+
+                } else if (p.interactionType === 'bedside_table') {
+                    // --- BEDSIDE TABLE (Top-down, small square table) ---
+                    ctx.translate(-center.x, -center.y);
+
+                    // Table top
+                    ctx.fillStyle = p.color || '#2a1f1a';
+                    ctx.fillRect(p.x, p.y, p.width, p.height);
+
+                    // Wood grain detail (subtle lines)
+                    ctx.fillStyle = 'rgba(0,0,0,0.15)';
+                    ctx.fillRect(p.x + 5, p.y + 3, 2, p.height - 6);
+                    ctx.fillRect(p.x + 12, p.y + 3, 1, p.height - 6);
+                    ctx.fillRect(p.x + p.width - 8, p.y + 3, 2, p.height - 6);
+
+                    // Highlight edge (top)
+                    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+                    ctx.fillRect(p.x, p.y, p.width, 3);
+
+                    // Shadow edge (bottom/right)
+                    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+                    ctx.fillRect(p.x, p.y + p.height - 3, p.width, 3);
+                    ctx.fillRect(p.x + p.width - 3, p.y, 3, p.height);
+
+                } else if (p.color === '#555') {
+                    // Gravestones (no rotation for gravestones)
+                    ctx.translate(-center.x, -center.y);
+                    ctx.fillStyle = '#444';
+                    ctx.beginPath();
+                    ctx.arc(p.x + p.width/2, p.y, p.width/2, Math.PI, 0);
+                    ctx.lineTo(p.x + p.width, p.y + p.height);
+                    ctx.lineTo(p.x, p.y + p.height);
+                    ctx.fill();
+                    ctx.strokeStyle = '#222';
+                    ctx.stroke();
+
+                } else {
+                    // Default prop with 3D highlights (rotated)
+                    const hw = p.width / 2;
+                    const hh = p.height / 2;
+                    ctx.fillRect(-hw, -hh, p.width, p.height);
+                    // Top highlight
+                    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+                    ctx.fillRect(-hw, -hh, p.width, 5);
+                    // Right shadow
+                    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                    ctx.fillRect(hw - 5, -hh, 5, p.height);
+                }
+
+                ctx.restore();
+        }
+
         class PropEntity extends GameEntity {
             constructor(config) {
                 super({
@@ -2689,9 +2914,9 @@
              * Get center position (for OBB collision)
              */
             getCenter() {
-                return { 
-                    x: this.x + this.width / 2, 
-                    y: this.y + this.height / 2 
+                return {
+                    x: this.x + this.width / 2,
+                    y: this.y + this.height / 2
                 };
             }
 
@@ -2725,227 +2950,8 @@
 
 
             draw(ctx) {
-                if (!this.visible) return;
-                // Painting or replaying a split run draws body art only. The outer pass
-                // adds exactly one ground shadow, including vector fallback and live props.
-                if (PropPass.mode === 0) {
-                    drawGroundContactShadow(ctx, this.x + this.width / 2, this.y + this.height / 2,
-                        this.width / 2 + 5, this.height / 2 + 5, this.angle || 0);
-                }
-                if (PropSprites.stamp(ctx, this)) return;      // painted once, stamped (entities/prop-sprites.js)
+                drawPropAppearance(ctx, this);
 
-                ctx.save();
-                const center = this.getCenter();
-                ctx.translate(center.x, center.y);
-                ctx.rotate(this.angle);
-
-                ctx.fillStyle = this.color;
-
-                if (this.decorType) {
-                    ctx.translate(-center.x, -center.y);
-                    drawClinicDecorProp(ctx, this);
-                } else if (this.interactionType === 'medbay_refill') {
-                    ctx.translate(-center.x, -center.y);
-                    drawHealthStation(ctx, this);
-                } else if (this.interactionType === 'armory') {
-                    // === ARMORY LOCKER (wall-mounted weapons rack) ===
-                    ctx.translate(-center.x, -center.y);
-
-                    const ax = this.x, ay = this.y, aw = this.width, ah = this.height;
-
-                    // Dark metal casing
-                    ctx.fillStyle = '#1a1a22';
-                    ctx.fillRect(ax, ay, aw, ah);
-
-                    // Inner panel (dark violet)
-                    ctx.fillStyle = '#1a0f2a';
-                    ctx.fillRect(ax + 3, ay + 3, aw - 6, ah - 6);
-
-                    // Weapon silhouettes — three horizontal bars representing guns
-                    ctx.fillStyle = '#444';
-                    const barH = 3;
-                    const barInset = 8;
-                    for (let i = 0; i < 3; i++) {
-                        const by = ay + 10 + i * (ah - 20) / 3;
-                        ctx.fillRect(ax + barInset, by, aw - barInset * 2, barH);
-                        // Small grip nub
-                        ctx.fillRect(ax + barInset + 4, by - 2, 5, barH + 4);
-                    }
-
-                    // Pulsing violet glow (indicates interactable)
-                    const armPulse = 0.5 + Math.sin(_frameTime / 500) * 0.4;
-                    ctx.shadowColor = '#a469ff';
-                    ctx.shadowBlur = 12 * armPulse;
-                    ctx.fillStyle = `rgba(164, 105, 255, ${0.1 * armPulse})`;
-                    ctx.fillRect(ax + 2, ay + 2, aw - 4, ah - 4);
-
-                    // "LOADOUT" label
-                    ctx.shadowBlur = 0;
-                    ctx.fillStyle = `rgba(164, 105, 255, ${0.5 + armPulse * 0.3})`;
-                    ctx.font = 'bold 5px Orbitron';
-                    ctx.textAlign = 'center';
-                    ctx.fillText('LOADOUT', ax + aw / 2, ay + ah - 5);
-                    ctx.textAlign = 'start';
-
-                } else if (this.interactionType === 'vending_machine') {
-                    ctx.translate(-center.x, -center.y);
-                    drawMiniSpree(ctx, this);
-                } else if (this.interactionType === 'bed_sleep') {
-                    // --- NEW: SMALLER BED RENDERER ---
-                    ctx.translate(-center.x, -center.y);
-
-                    // Mattress
-                    ctx.fillStyle = '#202025'; 
-                    ctx.fillRect(this.x, this.y, this.width, this.height);
-
-                    // Pillow (White rect at top)
-                    ctx.fillStyle = '#dddddd';
-                    ctx.fillRect(this.x + 3, this.y + 3, this.width - 6, 15);
-
-                    // Blanket (Colored rect covering bottom 3/4)
-                    ctx.fillStyle = this.color; 
-                    ctx.fillRect(this.x, this.y + 25, this.width, this.height - 25);
-
-                    // Fold/Detail line
-                    ctx.fillStyle = 'rgba(0,0,0,0.2)';
-                    ctx.fillRect(this.x, this.y + 25, this.width, 3);
-
-                } else if (this.interactionType === 'couch_two_seater') {
-                    // --- TWO SEATER COUCH (Top-down view) ---
-                    ctx.translate(-center.x, -center.y);
-
-                    // Couch base/frame (darker)
-                    ctx.fillStyle = '#1a1215';
-                    ctx.fillRect(this.x, this.y, this.width, this.height);
-
-                    // Back rest (top portion, slightly raised look)
-                    ctx.fillStyle = this.color;
-                    ctx.fillRect(this.x + 4, this.y + 4, this.width - 8, 18);
-
-                    // Seat cushions (two side by side)
-                    const cushionGap = 4;
-                    const cushionWidth = (this.width - 12 - cushionGap) / 2;
-                    ctx.fillStyle = this.color;
-                    ctx.fillRect(this.x + 6, this.y + 26, cushionWidth, this.height - 34);
-                    ctx.fillRect(this.x + 6 + cushionWidth + cushionGap, this.y + 26, cushionWidth, this.height - 34);
-
-                    // Cushion detail lines (subtle indent)
-                    ctx.fillStyle = 'rgba(0,0,0,0.2)';
-                    ctx.fillRect(this.x + 6, this.y + 26, cushionWidth, 3);
-                    ctx.fillRect(this.x + 6 + cushionWidth + cushionGap, this.y + 26, cushionWidth, 3);
-
-                    // Arm rests (left and right sides)
-                    ctx.fillStyle = '#0d0a0c';
-                    ctx.fillRect(this.x, this.y + 20, 6, this.height - 24);
-                    ctx.fillRect(this.x + this.width - 6, this.y + 20, 6, this.height - 24);
-
-                } else if (this.interactionType === 'tv_screen') {
-                    // --- TV SCREEN (Top-down, warm glow for fireplace effect) ---
-                    ctx.translate(-center.x, -center.y);
-
-                    // TV frame (black border)
-                    ctx.fillStyle = '#0a0a0a';
-                    ctx.fillRect(this.x, this.y, this.width, this.height);
-
-                    // Screen with warm glow (simulating fireplace video)
-                    ctx.shadowColor = this.color || '#ff6622';
-                    ctx.shadowBlur = 25;
-                    ctx.fillStyle = this.color || '#ff6622';
-                    ctx.fillRect(this.x + 4, this.y + 4, this.width - 8, this.height - 8);
-
-                    // Inner flame detail (lighter center)
-                    ctx.fillStyle = '#ffaa44';
-                    ctx.fillRect(this.x + 8, this.y + 6, this.width - 16, this.height - 14);
-
-                    // Flickering core (brightest)
-                    ctx.fillStyle = '#ffdd88';
-                    const flicker = Math.sin(_frameTime / 200) * 2;
-                    ctx.fillRect(this.x + 12 + flicker, this.y + 8, this.width - 26, this.height - 18);
-
-                    ctx.shadowBlur = 0;
-
-                } else if (this.interactionType === 'light_switch') {
-                    // --- LIGHT SWITCH (Wall-mounted panel with LED indicator) ---
-                    ctx.translate(-center.x, -center.y);
-
-                    const sx = this.x, sy = this.y, sw = this.width, sh = this.height;
-
-                    // Wall plate (dark gray housing)
-                    ctx.fillStyle = '#1a1a1a';
-                    ctx.fillRect(sx, sy, sw, sh);
-
-                    // Plate border highlight
-                    ctx.fillStyle = 'rgba(255,255,255,0.06)';
-                    ctx.fillRect(sx, sy, sw, 1);
-                    ctx.fillRect(sx, sy, 1, sh);
-                    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-                    ctx.fillRect(sx + sw - 1, sy, 1, sh);
-                    ctx.fillRect(sx, sy + sh - 1, sw, 1);
-
-                    // Toggle rocker (raised rectangle)
-                    ctx.fillStyle = '#2a2a2a';
-                    ctx.fillRect(sx + 2, sy + 3, sw - 4, sh - 6);
-
-                    // LED indicator
-                    const ledColor = this._switchState ? '#44ff88' : '#ff3333';
-                    const ledGlow = this._switchState ? 'rgba(68, 255, 136, 0.6)' : 'rgba(255, 51, 51, 0.4)';
-                    ctx.shadowColor = ledGlow;
-                    ctx.shadowBlur = 6;
-                    ctx.fillStyle = ledColor;
-                    ctx.beginPath();
-                    ctx.arc(sx + sw / 2, sy + sh - 3, 1.5, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.shadowBlur = 0;
-
-                } else if (this.interactionType === 'bedside_table') {
-                    // --- BEDSIDE TABLE (Top-down, small square table) ---
-                    ctx.translate(-center.x, -center.y);
-
-                    // Table top
-                    ctx.fillStyle = this.color || '#2a1f1a';
-                    ctx.fillRect(this.x, this.y, this.width, this.height);
-
-                    // Wood grain detail (subtle lines)
-                    ctx.fillStyle = 'rgba(0,0,0,0.15)';
-                    ctx.fillRect(this.x + 5, this.y + 3, 2, this.height - 6);
-                    ctx.fillRect(this.x + 12, this.y + 3, 1, this.height - 6);
-                    ctx.fillRect(this.x + this.width - 8, this.y + 3, 2, this.height - 6);
-
-                    // Highlight edge (top)
-                    ctx.fillStyle = 'rgba(255,255,255,0.08)';
-                    ctx.fillRect(this.x, this.y, this.width, 3);
-
-                    // Shadow edge (bottom/right)
-                    ctx.fillStyle = 'rgba(0,0,0,0.25)';
-                    ctx.fillRect(this.x, this.y + this.height - 3, this.width, 3);
-                    ctx.fillRect(this.x + this.width - 3, this.y, 3, this.height);
-
-                } else if (this.color === '#555') {
-                    // Gravestones (no rotation for gravestones)
-                    ctx.translate(-center.x, -center.y);
-                    ctx.fillStyle = '#444';
-                    ctx.beginPath();
-                    ctx.arc(this.x + this.width/2, this.y, this.width/2, Math.PI, 0);
-                    ctx.lineTo(this.x + this.width, this.y + this.height);
-                    ctx.lineTo(this.x, this.y + this.height);
-                    ctx.fill();
-                    ctx.strokeStyle = '#222';
-                    ctx.stroke();
-
-                } else {
-                    // Default prop with 3D highlights (rotated)
-                    const hw = this.width / 2;
-                    const hh = this.height / 2;
-                    ctx.fillRect(-hw, -hh, this.width, this.height);
-                    // Top highlight
-                    ctx.fillStyle = 'rgba(255,255,255,0.1)';
-                    ctx.fillRect(-hw, -hh, this.width, 5);
-                    // Right shadow
-                    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-                    ctx.fillRect(hw - 5, -hh, 5, this.height);
-                }
-
-                ctx.restore();
             }
         }
 

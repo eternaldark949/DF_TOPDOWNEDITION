@@ -11,7 +11,8 @@
       "appearances": "How every named character looks (APPEARANCES), by name: the humanoid config of ui/wardrobe.js (gender, build, skinColor, hair, top, bottom, shoes, train, hat, jewelry, held, body, pose) plus eyeColor (portrait irises), accent (their signature colour: car paint, the crew dot), blood (a BLOOD_KINDS name or '#hex') and faceRoom (staff: face the room when idle).",
       "cosmetics": "Everything Stella can buy at Neural Systems and wear through Neu.Me (COSMETICS_REGISTRY), by id: category (wig, skin, vocal, outfit, accessory, hat, jewelry, legwear), name, desc, price, data (the humanoid config fields it sets), and default (owned from the start), crafted (made at the workbench, never sold), pairsWith, options.",
       "finishes": "How each finish is drawn (materialKit rules, directory/game-materials.js); see _about.fields.finishes.",
-      "materials": "Named materials the wardrobe links to by `material`: [color, fabric, finish], leaving out what doesn't apply."
+      "materials": "Named materials the wardrobe links to by `material`: [color, fabric, finish], leaving out what doesn't apply.",
+      "pedestrian_appearances": "Street civilian appearance archetypes shared by the classic population and official entity resource catalog."
     },
     "fields": {
       "finishes": {
@@ -1389,5 +1390,81 @@
       "portrait_shine": 0.15
     }
   },
-  "materials": {"silver_sequin":["#c9ccd8","sequin","gloss"],"crimson_velvet":["#7a0f22","velvet"],"champagne_satin":["#e9d8b4","satin"]}
+  "materials": {"silver_sequin":["#c9ccd8","sequin","gloss"],"crimson_velvet":["#7a0f22","velvet"],"champagne_satin":["#e9d8b4","satin"]},
+  "pedestrian_appearances": [
+    {
+      "name": "suit_male",
+      "bodyColor": "#1a1a2e",
+      "headColor": "#dcc6ac",
+      "hairColor": "#222",
+      "hasHat": false
+    },
+    {
+      "name": "suit_female",
+      "bodyColor": "#2d132c",
+      "headColor": "#e8d5c4",
+      "hairColor": "#4a3728",
+      "hasHat": false
+    },
+    {
+      "name": "casual_male",
+      "bodyColor": "#3d5a80",
+      "headColor": "#c9a87c",
+      "hairColor": "#1a1a1a",
+      "hasHat": false
+    },
+    {
+      "name": "casual_female",
+      "bodyColor": "#ee6c4d",
+      "headColor": "#e8d5c4",
+      "hairColor": "#8b4513",
+      "hasHat": false
+    },
+    {
+      "name": "worker",
+      "bodyColor": "#ff6b35",
+      "headColor": "#c9a87c",
+      "hairColor": "#222",
+      "hasHat": true,
+      "hatColor": "#ffcc00"
+    },
+    {
+      "name": "corporate",
+      "bodyColor": "#293241",
+      "headColor": "#dcc6ac",
+      "hairColor": "#333",
+      "hasHat": false
+    },
+    {
+      "name": "hipster",
+      "bodyColor": "#606c38",
+      "headColor": "#dcc6ac",
+      "hairColor": "#8b4513",
+      "hasHat": true,
+      "hatColor": "#333"
+    },
+    {
+      "name": "punk",
+      "bodyColor": "#9d4edd",
+      "headColor": "#e8d5c4",
+      "hairColor": "#ff006e",
+      "hasHat": false
+    },
+    {
+      "name": "tourist",
+      "bodyColor": "#48cae4",
+      "headColor": "#c9a87c",
+      "hairColor": "#654321",
+      "hasHat": true,
+      "hatColor": "#fff"
+    },
+    {
+      "name": "delivery",
+      "bodyColor": "#2ec4b6",
+      "headColor": "#dcc6ac",
+      "hairColor": "#1a1a1a",
+      "hasHat": true,
+      "hatColor": "#2ec4b6"
+    }
+  ]
 }

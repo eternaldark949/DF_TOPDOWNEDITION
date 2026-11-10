@@ -1,0 +1,30 @@
+# API status and integration limits
+
+Version **0.3.0** supplies native capabilities for all six migration groups. The playable apartment now constructs and steps official entities, with native furniture, doors, curtain cloth, saves and snapshot rendering. The engine is included in the classic build. City/other scenes and their traffic, pedestrian, vehicle and enemy callers remain legacy. See the apartment cutover and remaining parity work (game checkout: `src/directory/APARTMENT-CUTOVER.md`).
+
+| Concern | Implemented | Remaining work |
+|---|---|---|
+| Entity ownership | Official `gameEntity` inheritance, automatic registration, protected physical state, scoped cleanup, Directory templates and resource catalogs. | Rewrite legacy constructors, factories, population objects and gameplay subscriptions; extend the apartment cutover to remaining scenes. |
+| One spatial service | Incremental rotated/swept body bounds; independent collision/render/light extents share the same index. Physical pairs filter physical bounds. | Replace live game's traffic, crowd, navigation, render, effect and transition indexes. Tune light-heavy and populated scenes. |
+| Geometry and contacts | Circle/box/convex/capsule/segment/compound contacts, translation/rotation sweeps, analytic linear circle sweeps, mass/lock-aware impulses, masks, exclusions, priorities and ghost events. | Multi-point manifolds, warm starting, exact compound inertia, stable large stacks and remaining-time CCD advancement. Retire live game's collision routes. |
+| Character and Flit | Input, approach/follow/flee, facing, discrete-step braking, A*, dash, and farthest-clear teleport interval search including compound blockers. | Game abilities/controls, route caching, crowded-map behavior and feel validation. Path searches remain bounded; starting in contact can fail where manual movement could slide out. |
+| Vehicles and traffic | Bicycle and two-axle models, axle load/grip/wetness, shared tyre impulses, routes, predictive avoidance, signals, crossing reservations and clearance-checked authored passing routes. | Convert road topology and old tuning, route/personality policies, lane-runner consumers, signals and minigame scoring. The reservation controller is not full parity with the old traffic behavior. |
+| Mechanisms and scenes | Distance/spring/hinge/slider/attachment/drag joints; template joints; scripted movement/orbits through the collision pipeline. | Rewrite doors/windows/furniture/cutscenes/rides; richer grab/rotation-clearance policy and articulated-body behavior. |
+| Mounted bodies | Stable body identity, parent-local poses, optional composite mass/center/inertia, inherited activity, composed interpolation, checked exits, lifecycle/save support and suspended ground/traffic controllers. | Switch live passenger loops and seat consumers. Child collision shapes remain suspended; occupied vehicle replacement requires releasing mounts first. |
+| Cosmetic physics | Particle pools, chains and authored edge cloth meshes, owner-local anchors, wind, optional world collisions, owner exclusions, automatic mesh cleanup and snapshots. | Wardrobe/hair fitting, visual bindings, rest-shape/bending models and high-volume cosmetic optimization. Old render-time solvers remain in the game. |
+| Save and frontend | Format-2 body/entity/controller/joint/particle/cloth/traffic/motion snapshots; isolated headless and browser examples. | Extend apartment save/pause/control/render integration to remaining scenes. |
+
+See [six-group migration ledger](six-groups.md) for the explicit cutover status. Run `node tools/audit-physics-ownership.mjs --check` from the game repository to detect remaining known legacy owners/API references. This gate currently **fails by design because migration is incomplete**, not because every physical calculation has been automatically identified.
+
+## Native behavior limits
+
+- Collision shapes are centered with optional local offsets. Noncircle mass properties use enclosing rectangles; compounds resolve one deepest child contact per iteration.
+- CCD clips at first impact; it does not simulate all remaining time. General sweeps have a convergence budget and can throw for difficult near-tangent/rotating configurations. Linear circle sweeps have an analytic path.
+- Teleport interval union handles constant-orientation translation with numerical clearance. It can cross solids but never returns an occupied fallback. It does not search rotating placements.
+- Traffic reservations conservatively serialize shared conflict resources in registration order. Passing uses authored alternative itineraries; it does not invent road geometry or forecast every future driver decision.
+- Scripted rigid/character motion can be blocked; kinematic motion is prescribed moving geometry. Timeline completion reports requested completion, so clients must inspect actual poses if arrival matters.
+- Cloth is an edge mesh using shared body constraints. Its existence does not mean the wardrobe renderer is migrated or fully fitted.
+- Composite mounts use configured mass at each body's authored origin, exact circle intrinsic inertia and the existing enclosing-rectangle approximation for other shapes. Prescribed local-pose edits and checked exit repositioning are placement commands, not simulated internal actuators. Use joints for swinging equipment. Character torque-limited facing is opt-in through `movement.physical_turning`.
+- Saves are validated in a disposable world before replacing the live state. Cross-version migration and hardening for hostile save files remain outside this release.
+
+Missing behavior must be added inside the engine before its game consumer is switched over. No game-owned fallback solver or replacement grid is authorized by these limits.

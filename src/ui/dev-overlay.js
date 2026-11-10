@@ -388,7 +388,7 @@
                     for (const e of this.enemies) if (e && !e.dead) tag(e, e.constructor ? e.constructor.name : 'enemy');
                     for (const n of (this.npcs || [])) tag(n, n.name || n.role || 'npc');
                     for (const t of (this.teammates || [])) if (t.recruited && !t.inCar) tag(t, t.name);
-                    if (this.player) label(`949 ${Math.round(this.player.x)},${Math.round(this.player.y)}`, this.player.x, this.player.y + 26, '#fff');
+                    if (this.player) label(`949 ${Math.round(this.playerPosition[0])},${Math.round(this.playerPosition[1])}`, this.playerPosition[0], this.playerPosition[1] + 26, '#fff');
                 }
                 ctx.restore();
             }

@@ -123,7 +123,7 @@
                     if (!I.backAt && f === allLit + 110) I.backAt = f;
                     if (I.backAt && f === I.backAt) {                   // the camera comes back to her
                         this._bossTitle(false);
-                        this.cutscene.camTargetX = this.player.x; this.cutscene.camTargetY = this.player.y; this.cutscene.camZoomTarget = I.zoom;
+                        this.cutscene.camTargetX = this.playerPosition[0]; this.cutscene.camTargetY = this.playerPosition[1]; this.cutscene.camZoomTarget = I.zoom;
                     }
                     if (I.backAt && f === I.backAt + 42) {             // control back; grace; then they wake
                         this.cutscene.end(); this.camera.zoom = I.zoom;

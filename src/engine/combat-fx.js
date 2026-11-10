@@ -69,7 +69,7 @@
             earnResonance(amount, label, x, y) {
                 if (!this.resonance || !(amount > 0)) return;
                 this.resonance.earn(amount);
-                this.effects.spawn('number', { target: null, x: x ?? this.player.x, y: y ?? this.player.y - 30, value: 0, text: `+${Math.round(amount)} ◈${label ? ' ' + label : ''}`,
+                this.effects.spawn('number', { target: null, x: x ?? this.playerPosition[0], y: y ?? this.playerPosition[1] - 30, value: 0, text: `+${Math.round(amount)} ◈${label ? ' ' + label : ''}`,
                              color: '#c9a6ff', t0: _gameTimeSec, pop: _gameTimeSec, drift: 0, big: true });
                 this._resPulse = _gameTimeSec;
                 if (this.updateUI) this.updateUI();

@@ -20,8 +20,8 @@ engineMixin({
                     
                     // --- PLAYER DATA ---
                     player: {
-                        x: this.player?.x ?? 500,
-                        y: this.player?.y ?? 500,
+                        x: this.player ? this.playerPosition[0] : 500,
+                        y: this.player ? this.playerPosition[1] : 500,
                         health: this.playerHealth ?? 100,
                         currency: this.currency ?? 500,
                         scrap: this.scrap ?? 0,
@@ -31,6 +31,7 @@ engineMixin({
                     
                     // --- WORLD STATE ---
                     world: {
+                        nativeLevel: this.activeLevel ? {id:'apt_949',physics:this.activeLevel.saveState()} : null,
                         mapId: this.activeMap?.id ?? 'sdc',
                         worldMinutes: this.worldMinutes ?? 480,
                         questState: this.questState ?? {},
@@ -45,9 +46,9 @@ engineMixin({
                     // Her own car, where it's parked on the hub (cars live there: engine/cars.js). A hijacked car
                     // or a Zib ride isn't kept: the load finds her on foot where she was.
                     car: {
-                        x: this.ownedCar?.x ?? CAR_START.x,
-                        y: this.ownedCar?.y ?? CAR_START.y,
-                        angle: this.ownedCar?.angle ?? CAR_START.angle,
+                        x: this.ownedCar?.x ?? this._parkedCar?.x ?? CAR_START.x,
+                        y: this.ownedCar?.y ?? this._parkedCar?.y ?? CAR_START.y,
+                        angle: this.ownedCar?.angle ?? this._parkedCar?.angle ?? CAR_START.angle,
                         mapId: 'sdc',
                         visible: true
                     },
@@ -419,6 +420,7 @@ engineMixin({
                 screen's Autosave card), never the player's, no message or sound. */
             saveGame(opts = {}) {
                 const auto = !!opts.auto;
+                if(this.activeLevel){if(this.furniture.busy())this.furniture.release();this.physics_system.commitCommands();}
                 if (this.scenes && this.scenes.running) { if (!auto) showMessage("Can't save during a scene"); return; }
                 // Build save data from schema (captures current game state)
                 const saveData = this.getSaveSchema();
@@ -516,6 +518,8 @@ engineMixin({
                     if (worldData.weather) this.weather.deserialize(worldData.weather);
                     this.visitedMaps = new Set(worldData.visitedMaps || []); this._mapSnaps = {};
                     
+                    this._pendingApartmentState = worldData.mapId==='apt_949'&&worldData.nativeLevel?.id==='apt_949' ? worldData.nativeLevel.physics : null;
+                    this._pendingApartmentRoster = worldData.mapId==='apt_949'&&save.teammates?.length ? save.teammates : null;
                     // 3. Load Map & Player Position
                     // (her own car again: whatever she'd taken in this session isn't in the save)
                     this._endDrive();
@@ -528,15 +532,17 @@ engineMixin({
                     // Consumed by _doLoadMap after entities exist, not while the previous map fades out.
                     this._pendingGauntletLoad = { data: save.hordeGauntlet };
                     // Saved in Grum's old arena: it's the House of Death now — start at its door
-                    if (mapId === 'grum_arena') { mapId = 'house_of_death'; this.loadMap(mapId); }
-                    else if (mapId === 'road_test') { mapId = 'sdc'; this.loadMap(mapId); }   // the old road test zone is gone: back to the city's spawn
-                    else this.loadMap(mapId, { x: playerX, y: playerY });
+                    if (mapId === 'grum_arena') { mapId = 'house_of_death'; this._doLoadMap(mapId); }
+                    else if (mapId === 'road_test') { mapId = 'sdc'; this._doLoadMap(mapId); }   // the old road test zone is gone: back to the city's spawn
+                    else this._doLoadMap(mapId, { x: playerX, y: playerY });
+                    if(!this.activeLevel)this.bakeStaticLighting();
                     // The city's layout changes now and then (it grew four times over): a spot saved where a building stands now
                     // goes back to the city's spawn, and her car (below) to where it waits in a new game
                     const hubCols = this.activeMap.id === 'sdc' ? this.activeMap.buildingColliders : this._hubCache && this._hubCache.buildingColliders;
                     const inBuilding = (x, y) => (hubCols || []).some(b => x > b.x && x < b.x + b.w && y > b.y && y < b.y + b.h);
-                    if (this.activeMap.id === 'sdc' && inBuilding(this.player.x, this.player.y)) { this.player.x = this.activeMap.spawn.x; this.player.y = this.activeMap.spawn.y; }
+                    if (this.activeMap.id === 'sdc' && inBuilding(this.playerPosition[0], this.playerPosition[1])) { this.player.x = this.activeMap.spawn.x; this.player.y = this.activeMap.spawn.y; }
         
+                    if(!this.activeLevel){
                     // 4. Restore Teammates (unified — permanent + contract)
                     const savedTeammates = save.teammates || rawSave.teammates || [];
                     
@@ -550,7 +556,7 @@ engineMixin({
                                 ? 'red_demon_dancer' : 'dancer');
                             let npc = this.npcs.find(n => n.name === savedTm.name);
                             if (!npc) {
-                                npc = new NPC(this.player.x, this.player.y, savedTm.name, role);
+                                npc = new NPC(this.playerPosition[0], this.playerPosition[1], savedTm.name, role);
                             }
                             npc.hired = true;
                             npc.hireType = 'contract';
@@ -594,7 +600,7 @@ engineMixin({
                             ? 'red_demon_dancer' : 'dancer';
                         let npc = this.npcs.find(n => n.name === savedDancer.name);
                         if (!npc) {
-                            npc = new NPC(this.player.x, this.player.y, savedDancer.name, role);
+                            npc = new NPC(this.playerPosition[0], this.playerPosition[1], savedDancer.name, role);
                         }
                         npc.hired = true;
                         npc.hireType = 'contract';
@@ -607,6 +613,12 @@ engineMixin({
                         if (npcIdx > -1) this.npcs.splice(npcIdx, 1);
                     });
         
+                    }
+                    if(this.activeLevel){
+                        if(save.garage)this.garage.deserialize(save.garage);
+                        const active=this.garage.getActive();
+                        this._parkedCar={...active,x:carData.x??defaults.car.x,y:carData.y??defaults.car.y,angle:carData.angle??defaults.car.angle};
+                    }else{
                     // 6. Restore Garage & Car
                     if (save.garage) {
                         this.garage.deserialize(save.garage);
@@ -637,6 +649,7 @@ engineMixin({
                         this.toggleVehicle();
                     }
         
+                    }
                     // 8. Restore Inventory & Equipped Weapon
                     const invData = save.inventory || rawSave.inventory || defaults.inventory;
                     if (invData && this.inventory) {

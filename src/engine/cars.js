@@ -36,10 +36,9 @@
             /** Her garage car built new (another model from the garage, or a load): it stands where the old one
              *  stood, and the old one is gone for good, not left behind as an invisible wall */
             _replaceOwnedCar(brand, model) {
-                const old = this.ownedCar, c = new TrafficVehicle(null, brand, model, 'PLAYER');
-                c.isOwnedCar = true;
+                const old = this.ownedCar, c = gameVehicles.create({ purpose: 'owned', brand, model, control_mode: 'PLAYER', position: old ? [old.x, old.y] : undefined, rotation: old?.angle });
                 if (old) {
-                    Object.assign(c, { x: old.x, y: old.y, angle: old.angle, visible: old.visible, active: old.active, lampsOn: old.lampsOn });
+                    Object.assign(c, { visible: old.visible, active: old.active, lampsOn: old.lampsOn });
                     old.visible = false; old.destroy();
                     if (this.car === old) this.car = c;
                 }
@@ -185,8 +184,8 @@
 
                     // Position cat near player on exit
                     if (this.velvetCat && this.questState.hasVelvetCat) {
-                        this.velvetCat.x = this.player.x - 25;
-                        this.velvetCat.y = this.player.y + 20;
+                        this.velvetCat.x = this.playerPosition[0] - 25;
+                        this.velvetCat.y = this.playerPosition[1] + 20;
                     }
 
                     // Reset animation state to prevent limb splay from position jump
@@ -252,14 +251,8 @@
             _spawnDeliveryVan() {
                 const cafe = this.landmarkRegistry && this.landmarkRegistry['cozy_cafe'];
                 if (!cafe) return null;
-                const van = new TrafficVehicle(null, 'LADY', 'suv2', 'PARKED');
-                van.color = '#58391C';                 // amber-brown body
-                van.glowColor = '#a469ff';             // violet underglow
-                van.headlightColor = '#a469ff';        // violet headlights
-                van.isDeliveryVehicle = true;
-                van.hasDriver = false;
-                van.home = { x: cafe.x - 80, y: cafe.y + 20, angle: Math.PI / 2 };   // to the side of the door, facing south
-                Object.assign(van, van.home);
+                const van = gameVehicles.create({ purpose: 'mission', mission_id: 'amber_delivery', anchor: { position: [cafe.x, cafe.y] } });
+                van.home = { x: van.x, y: van.y, angle: van.angle };
                 return (this.deliveryVehicle = van);
             },
 

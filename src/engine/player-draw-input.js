@@ -2,8 +2,8 @@
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
             /** An unanimated ivory diamond below the player, sized in CSS pixels rather than world units. */
-            drawPlayerMarker(ctx) {
-                const p = this.player;
+            drawPlayerMarker(ctx, presentation = this.player) {
+                const p = presentation;
                 if (!this.running || !p || !p.visible || p.isHidden || p.dead || this.isDriving || p.inCar ||
                     (this.scenes && this.scenes.running) || (this.cutscene && this.cutscene.active) ||
                     this.cineCam || this.finisher || this.finCam) return;
@@ -28,16 +28,16 @@
                 ctx.restore();
             },
 
-            drawPlayer() {
+            drawPlayer(presentation = this.player) {
                 this.ctx.save();
                 const vehiclePose = this.isDriving && this.car
-                    ? this.car.occupantPose(0, this.player.angle, this.player._vehicleLean || 0, this.currentWeapon?.id) : null;
+                    ? this.car.occupantPose(0, presentation.angle, presentation._vehicleLean || 0, this.currentWeapon?.id) : null;
                 if (vehiclePose) this.car.clipOccupant(this.ctx,0,vehiclePose.lean>.05);
-                this.ctx.translate(this.player.x, this.player.y);
-                this.ctx.rotate(vehiclePose ? this.car.angle : this.player.angle);
+                this.ctx.translate(presentation.x, presentation.y);
+                this.ctx.rotate(vehiclePose ? this.car.angle : presentation.angle);
                 
                 // Stealth/Flit Ghosting
-                if (this.player.isHidden || this.flitState.active) this.ctx.globalAlpha = 0.5;
+                if (presentation.isHidden || this.flitState.active) this.ctx.globalAlpha = 0.5;
             
                 // ── Fully cosmetics-driven appearance ──
                 const cosmeticConfig = this.cosmetics.getRenderConfig();
@@ -64,10 +64,10 @@
 
                 // Outfit from equipped cosmetic
                 const outfit = cosmeticConfig.outfit;
-                const wx = weatherAt(this.player), rainOn = !!(wx && wx.rain > 0.05);
+                const wx = weatherAt(presentation), rainOn = !!(wx && wx.rain > 0.05);
 
                 SilhouetteFX.glow = this._playerGlowOn();   // her halo (ui/silhouette-fx.js; drawn after the light)
-                drawProceduralHumanoid(this.ctx, this.player, {
+                drawProceduralHumanoid(this.ctx, presentation, {
                     skinColor: cosmeticConfig.skinColor,
                     hair: cosmeticConfig.hair,
                     gender: APPEARANCES['949'].gender,
@@ -130,6 +130,13 @@
                 this.playerExpression = faces[key];
                 this.renderSidebarPortrait();
 
+                if(this.activeLevel){
+                    const hit=this.physics_system.peruseNearbyEntities(this.player,{near_range:180}).find(h=>h.entity?.entity_type==='df_apartment_companion'&&h.entity.recruited&&NPC_EMOTE_REACTIONS[h.entity.name]);
+                    if(hit){const e=hit.entity,category={smile:'reactSmile',zany:'reactZany',cry:'reactCry',frown:'reactFrown'}[key];
+                        const lines=resolveEmoteLines(NPC_EMOTE_REACTIONS[e.name],category,this.bonding.getTier(e.relationship??0));
+                        if(lines?.length){e.data.quip=lines[0];e.data.quip_start=this.physics_system.simulation_tick+24;e.data.quip_end=e.data.quip_start+120;}}
+                    return;
+                }
                 // Trigger nearest reactor's response within range — slight delay
                 // so it feels like processing rather than reflex. Eligible
                 // reactors: pedestrians (always) + named NPCs that have an
@@ -137,7 +144,7 @@
                 // pick the nearest across both pools so a bubble doesn't
                 // double-fire.
                 const REACT_RANGE = 180;
-                const px = this.player.x, py = this.player.y;
+                const px = this.playerPosition[0], py = this.playerPosition[1];
                 let nearest = null;
                 let nearestDistSq = REACT_RANGE * REACT_RANGE;
                 
@@ -211,7 +218,7 @@
                 // update()) so the bubble doesn't keep counting down during pause.
                 if (this.playerEmote.age >= this.playerEmote.duration) return;
                 // Her bubble wears deep bronze-gold; passersby wear smoky silver (drawSpeechBubble: entities/npc.js)
-                drawSpeechBubble(this.ctx, this.player.x, this.player.y - 34, this.playerEmote.text,
+                drawSpeechBubble(this.ctx, this.playerPosition[0], this.playerPosition[1] - 34, this.playerEmote.text,
                     speechBubbleScale(this.playerEmote.age, this.playerEmote.duration), { metal: 'bronzeDeep', emoji: true });
             },
             
