@@ -36,8 +36,8 @@ New saves contain the official native world snapshot. Old apartment saves retain
 ## Remaining work and parity limits
 
 - City streets, traffic, pedestrians, vehicles, enemies, other maps and minigames still use legacy physical ownership. Their official ESM clients exist but production callers still need migration.
-- Apartment companions have official identities and roster/interaction data. Full companion AI, optional cat behavior and the broader NPC ecosystem still need native bindings.
-- The native host supports standard weapon projectiles. Full melee, weapon bonuses, special attacks, damage/death consequences and encounter parity remain to be ported.
+- Apartment companions are actual native NPCs with shared health, typed owned weapons, recovery/stims, speech and baseline AI. Specialized companion abilities, mounted attacks, optional cat behavior and the broader NPC ecosystem still need conversion.
+- The native host uses shared firearms, punches, swept blades, bonuses, deflection and physical loot. Specialized attacks, encounter-specific rules and broader damage/death consequences remain to be ported.
 - Story scene actors and special scripted movement still need native scene integration.
 - Wardrobe/hair fitting and animation physics, full lighting/reflection/weather/VFX parity remain. Native curtains and shared-index lamp sensing are connected; that does not complete cosmetic migration.
 
@@ -63,3 +63,7 @@ The production apartment and legacy player implementations now use the same [pla
 ### Shared combat and physical loot
 
 The native host now composes the same `combatSystem`, `weaponSystem` and `lootSystem` as the new runtime. The simplified `_fireApartmentWeapon` and native projectile-list mirror are removed. Weapons use official projectiles/swept queries, native interception/impulses and target-owned timed records. Inventory drops create registered `WorldLoot` bodies and retain exact bundles in native scene saves. The classic UI reads cooldown/holster/quick-draw state through derived accessors; it does not advance a second native combat clock. Native scene retirement detaches the shared services. The [combat API and removal ledger](../gameplay/combat/README.md) names the still-executable legacy city branches and their deletion conditions.
+
+### Shared actor conversion
+
+The apartment-only `ApartmentCompanion` class is deleted. Directory creates actual `NPC extends gameActor` instances, and `actorSystem` connects each to its real native body and shared weapon execution. Old companion snapshots migrate by ID. Roster saves and the existing classic scene boundary preserve exact item identities/upgrades and game metadata; they never retain departed bodies. See [actor APIs, native runtime retention and remaining class conversions](../gameplay/actors/README.md).

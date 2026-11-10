@@ -111,10 +111,25 @@
       "contact_priority": 10
     },
     "npc": {
-      "extends": "character",
+      "extends": "actor",
+      "entity_type": "df_npc",
       "tags": [
         "npc"
-      ]
+      ],
+      "data": {
+        "role": "civilian",
+        "health": 5000000,
+        "max_health": 5000000,
+        "damage_grace_seconds": 0.5,
+        "recruited": false,
+        "downed": false,
+        "hired": false,
+        "hireType": "none",
+        "teammateStims": 3,
+        "maxTeammateStims": 3,
+        "weapon_definition_id": null,
+        "player_protected": true
+      }
     },
     "enemy": {
       "extends": "character",
@@ -506,6 +521,32 @@
       },
       "data": {
         "role": "world_loot"
+      }
+    },
+    "actor": {
+      "extends": "character",
+      "entity_type": "df_actor",
+      "assets": {
+        "actor_rules": "actor_rules",
+        "items": "actor_items",
+        "appearances": "actor_appearances"
+      },
+      "data": {
+        "health": 100,
+        "max_health": 100,
+        "alliance": "neutral"
+      }
+    },
+    "ganger": {
+      "extends": "actor",
+      "entity_type": "df_ganger",
+      "tags": [
+        "enemy",
+        "ganger"
+      ],
+      "data": {
+        "alliance": "hostile",
+        "weapon_definition_id": "pistol_ganger"
       }
     }
   }

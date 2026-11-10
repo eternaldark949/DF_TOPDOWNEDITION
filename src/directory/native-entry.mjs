@@ -30,3 +30,11 @@ export {WorldLoot} from '../entities/world-loot.mjs';
 export {MELEE_SWING,WIDE_SWING,sampleMeleeSwing,sampleWideSwing,swingPhases,wideGrip} from '../gameplay/combat/melee-poses.mjs';
 export {COMBAT_RULES} from './game-combat.mjs';
 export {registerGameEntityTypes} from './game-entity-types.mjs';
+
+export {actorVitals} from '../gameplay/actors/actor-vitals.mjs';
+export {gameActor} from '../entities/game-actor.mjs';
+export {NPC,rosterRecord,ROSTER_FIELDS} from '../entities/npc.mjs';
+export {Ganger} from '../entities/ganger.mjs';
+export {actorSystem} from '../gameplay/actors/actor-system.mjs';
+export {actorItems,restoreActorItems} from '../gameplay/actors/actor-inventory.mjs';
+export {resolveEmoteLines,NPC_EMOTE_REACTIONS} from './npc-reactions.mjs';

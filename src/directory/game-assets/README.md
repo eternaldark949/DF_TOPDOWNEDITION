@@ -29,3 +29,5 @@ The library now includes definitions for compound billboards/buildings, terrain 
 Run `node --test tools/test-game-physics-scenarios.mjs` for six group-specific capability scenarios.
 
 The `df_street` library adds official traffic/pedestrian templates and rules. Register their types with `registerStreetEntityTypes(world)` from `../game-street.mjs` (or construct `StreetPopulation`) before creating those templates/loading their saves. The new game-client API and cutover status are documented in `../STREET-POPULATION.md`.
+
+Actor definitions now register `df_actor`, `df_npc` and `df_ganger` with `registerGameEntityTypes`. `createActorPacket` resolves civilian/teammate roles and imports old roster aliases once. Actor rules, appearances and the enemy weapon definition come from Directory resources and the existing enemy/item catalogs. See [actor API](../../gameplay/actors/README.md).

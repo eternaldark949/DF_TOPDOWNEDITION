@@ -1,4 +1,4 @@
-import { gameCharacter } from '../basement/physics/index.mjs';
+import {gameActor} from './game-actor.mjs';
 import { playerVitals } from '../gameplay/player-vitals.mjs';
 import { identifier, validateModifiers, nonnegative } from '../gameplay/values.mjs';
 const services = new WeakMap();
@@ -14,7 +14,7 @@ function playerState(player) {
     return player.data.player_state;
 }
 /** Official gameplay identity; native body/controller own all physical state. */
-export class Player extends gameCharacter {
+export class Player extends gameActor {
     static entity_type = 'df_player';
     connectGameplay({ emit, is_invulnerable, on_damage, on_death, buff_system } = {}) {
         for(const callback of [emit,is_invulnerable,on_damage,on_death])if(callback!==undefined&&typeof callback!=='function')throw new TypeError('Gameplay callbacks must be functions');
@@ -25,10 +25,6 @@ export class Player extends gameCharacter {
     get visible() { return this.data.visible !== false; }
     set visible(value) { this.data.visible = !!value; }
     get vitals() { return vitalsFor(this); }
-    get hp() { return this.vitals.health; }
-    set hp(value) { this.vitals.setHealth(value); }
-    get maxHp() { return this.vitals.max_health; }
-    set maxHp(value) { this.vitals.setMaximumHealth(value); }
     get dead() { return this.vitals.dead; }
     get alliance() { return 'friendly'; }
     get radius() { return this.collision_shape.radius; }

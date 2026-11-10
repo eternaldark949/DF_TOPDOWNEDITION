@@ -58,19 +58,10 @@
                     friction: config.friction ?? 0.9
                 });
                 
-                // Health system
-                if (config.vitals) this.vitals = config.vitals;
-                else {
-                    this.hp = config.hp ?? 100;
-                    this.maxHp = config.maxHp ?? this.hp;
-                    this.dead = false;
-                }
-                
-                // Invincibility frames to prevent damage spam
-                if(!config.vitals)this.invincibleTimer = 0;
-                
-                // Alliance system — determines projectile pass-through and collision softening
-                // 'friendly' = player side, 'hostile' = enemy side, 'neutral' = civilians
+                // One shared health record. Native and legacy actor classes use this component.
+                this.vitals=config.vitals??new DFNative.actorVitals(this.data,{max_health:config.maxHp??config.hp??100});
+                if(!config.vitals){this.vitals.importHealth(config.hp??100,config.maxHp??config.hp??100);this.data.actor_state={defeated:false,invulnerable_remaining:0};}
+                // Alliance remains game policy; physical ownership below is still legacy.
                 this.alliance = config.alliance || 'neutral';
                 this.invincibleDuration = config.invincibleDuration ?? 0; // 0 = no i-frames
                 
@@ -89,6 +80,15 @@
                 this._onDamage = config.onDamage || null;
             }
             
+            get hp(){return this.vitals.health;}
+            set hp(value){this.vitals.setHealth(value);}
+            get maxHp(){return this.vitals.max_health;}
+            set maxHp(value){this.vitals.setMaximumHealth(value);}
+            get dead(){return !!this.data.actor_state?.defeated;}
+            set dead(value){this.data.actor_state??={invulnerable_remaining:0};this.data.actor_state.defeated=!!value;}
+            get invincibleTimer(){return Math.round((this.data.actor_state?.invulnerable_remaining??0)*60);}
+            set invincibleTimer(ticks){if(!Number.isFinite(ticks))throw new TypeError('Invalid actor grace');this.data.actor_state??={defeated:false};this.data.actor_state.invulnerable_remaining=Math.max(0,ticks)/60;}
+
             /**
              * Apply damage and optional knockback.
              * Returns true if damage was applied, false if invincible/dead.
@@ -158,9 +158,7 @@
             heal(amount) {
                 if (this.dead) return 0;
                 
-                const oldHp = this.hp;
-                this.hp = Math.min(this.hp + amount, this.maxHp);
-                return this.hp - oldHp;
+                return this.vitals.heal(amount);
             }
             
             
@@ -171,17 +169,6 @@
              * @param {number} dx - X direction (-1 to 1)
              * @param {number} dy - Y direction (-1 to 1)
              */
-            setMoveDirection(dx, dy) {
-                const len = Math.hypot(dx, dy);
-                if (len > 0) {
-                    this.moveDir.x = dx / len;
-                    this.moveDir.y = dy / len;
-                } else {
-                    this.moveDir.x = 0;
-                    this.moveDir.y = 0;
-                }
-            }
-            
             /**
              * Update physics - velocity, knockback, friction.
              * Call super.update() in subclasses to apply physics.

@@ -1,7 +1,7 @@
 import { pose, physical, bodyBounds } from '../core/state.mjs';
 import { collisionShape, shapeBounds, shapeReach, pieces } from '../collision/shape.mjs';
 import { collisionDetector } from '../collision/detector.mjs';
-import { vector, number, sub, add, scale, unit, length, BODY_GROUP, EPS, validBounds, boundsMeet, unionBounds } from '../core/values.mjs';
+import { vector, number, sub, add, scale, unit, length, BODY_GROUP, EPS, validBounds, boundsMeet, unionBounds, angleDelta } from '../core/values.mjs';
 
 export function referenceBody(value) { return value?.physics_controller?.body ?? value?.body ?? value; }
 export function referencePosition(world, value) {
@@ -30,6 +30,22 @@ function finish(hits, options, results) {
 }
 export class physicsQueries {
     constructor(world) { this.world = world; }
+    observeTarget(observer,target,{near_range=400,fov=Math.PI*2,personal_space=0,touch_distance=0,occlusion_groups=BODY_GROUP.STATIC|BODY_GROUP.PROP|BODY_GROUP.VEHICLE}={}){
+        const r=this.world._record(referenceBody(observer)),at=referencePosition(this.world,target),delta=sub(at,r.position),distance=length(delta);
+        number(near_range,'near_range',0);number(fov,'fov',0,Math.PI*2);number(personal_space,'personal_space',0);number(touch_distance,'touch_distance',0);
+        const bearing=distance>EPS?Math.atan2(delta[1],delta[0]):r.rotation,relative=angleDelta(r.rotation,bearing),targetBody=Array.isArray(target)?null:referenceBody(target);
+        return {position:[...at],distance,direction:unit(delta),bearing,relative_angle:relative,behind:Math.abs(relative)>Math.PI/2,in_range:distance<=near_range,in_cone:Math.abs(relative)<=fov/2,close:distance<=personal_space,touching:distance<=touch_distance,
+            line_clear:!this.raycast({from:r.position,to:at,include_groups:occlusion_groups,ignore_body:[r.handle,...(targetBody?[targetBody]:[])],include_ghosts:false})};
+    }
+    predictTargetPosition(observer,target,{projectile_speed,max_seconds=2}={}){
+        const r=this.world._record(referenceBody(target)),from=referencePosition(this.world,observer);number(projectile_speed,'projectile_speed',EPS);number(max_seconds,'max_seconds',0);
+        const seconds=Math.min(max_seconds,length(sub(r.position,from))/projectile_speed);return {position:add(r.position,scale(r.velocity,seconds)),seconds};
+    }
+    findWanderPlacement(body,{origin,near_range=200,angle_sample=.5,radius_sample=.5,...options}={}){
+        number(near_range,'near_range',0);number(angle_sample,'angle_sample',0,1);number(radius_sample,'radius_sample',0,1);
+        const at=origin?vector(origin):referencePosition(this.world,body),radius=Math.sqrt(radius_sample)*near_range,angle=angle_sample*Math.PI*2;
+        return this.findClearPlacement({...options,body,from:at,to:add(at,[Math.cos(angle)*radius,Math.sin(angle)*radius]),query_unmounted:true});
+    }
     getBodyBounds(body, { bounds_type = 'collision' } = {}) {
         const r = this.world._record(referenceBody(body));
         if (!['collision', 'render', 'light'].includes(bounds_type)) throw new TypeError('Invalid bounds_type');

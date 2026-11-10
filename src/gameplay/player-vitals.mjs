@@ -1,10 +1,11 @@
+import {actorVitals} from './actors/actor-vitals.mjs';
 import defaults from '../directory/game-player-rules.json' with { type:'json' };
 import { nonnegative, jsonCopy, identifier, validateModifiers } from './values.mjs';
 
 /** Shared gameplay component. It references its owner's data; it never owns or mirrors a body. */
-export class playerVitals {
+export class playerVitals extends actorVitals {
     #data; #rules;
-    constructor(data = {}, rules = defaults) { this.#data=data; this.configureRules(rules); }
+    constructor(data = {}, rules = defaults) { super(data,{max_health:rules.max_health});this.#data=data; this.configureRules(rules); }
     configureRules(rules) {
         const copy=jsonCopy(rules);
         nonnegative(copy.max_health,'max_health');if(!copy.max_health)throw new TypeError('max_health must be positive');
@@ -29,9 +30,6 @@ export class playerVitals {
         for(const [id,buff] of Object.entries(state.buffs)){identifier(id);nonnegative(buff?.remaining,'buff duration');validateModifiers(buff.modifiers);}
         return this;
     }
-    get health() { return this.#data.health; }
-    get max_health() { return this.#data.max_health; }
-    get dead() { return this.health<=0; }
     get state() { return this.#data.player_state; }
     get flitting() { return this.state.flit_remaining>0; }
     get attunement() { return this.state.attunement; }
@@ -42,23 +40,13 @@ export class playerVitals {
     get flit_minimum_distance() { return this.#rules.flit.minimum_distance; }
     get last_flit_at() { return this.state.last_flit_at; }
     get last_hurt_at() { return this.state.last_hurt_at; }
-    setHealth(health) { this.#data.health=Math.min(nonnegative(health,'health'),this.max_health);return this.health; }
-    setMaximumHealth(maximum) {
-        nonnegative(maximum,'max_health');if(!maximum)throw new TypeError('max_health must be positive');
-        this.#data.max_health=maximum;this.setHealth(this.health);return maximum;
-    }
     setMaximumAttunement(maximum) { this.state.max_attunement=nonnegative(maximum,'max_attunement');this.setAttunement(this.attunement);return maximum; }
     setAttunement(value) { this.state.attunement=Math.min(nonnegative(value,'attunement'),this.max_attunement);return this.attunement; }
     restoreHealth() { this.#data.health=this.max_health;this.state.seconds_since_damage=0;this.state.regeneration_elapsed=0; }
-    importHealth(health, maximum=this.max_health) {
-        nonnegative(health,'health');nonnegative(maximum,'max_health');if(!maximum)throw new TypeError('max_health must be positive');
-        this.#data.max_health=maximum;this.setHealth(health);
-    }
-    heal(amount) { nonnegative(amount,'healing');if(this.dead)return 0;const applied=Math.min(this.max_health-this.health,amount);this.setHealth(this.health+applied);return applied; }
     damage(amount, time=this.state.elapsed_seconds) {
         nonnegative(amount,'damage');if(!Number.isFinite(time))throw new TypeError('Damage time must be finite');
         if(this.dead || amount===0)return 0;
-        const applied=Math.min(this.health,amount);this.setHealth(this.health-applied);this.recordDamage(time);return applied;
+        const applied=super.damage(amount);this.recordDamage(time);return applied;
     }
     recordDamage(time=this.state.elapsed_seconds) {
         if(!Number.isFinite(time))throw new TypeError('Damage time must be finite');

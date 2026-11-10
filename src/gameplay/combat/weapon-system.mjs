@@ -8,8 +8,8 @@ import {jsonCopy,nonnegative} from '../values.mjs';
 const stateFor=(player,settings=rules)=>player.data.weapon_state??={format_version:1,elapsed:0,cooldown:0,holstered:false,drawn_at:null,draw_shot_used:false,quick_draw:null,punch_side:'right',haymaker:false,combo:0,last_punch_at:-99,swing:null,side:1,shield:{charge:settings.mirror.shield,spent:false,since_hit:999}};
 /** One executable weapon policy. Native physics owns every trajectory, sweep, contact and impulse. */
 export class weaponSystem{
- #items;#combat;#session;#player;#rules;#policy;#context=null;#pending=false;#lastAim={};#quickFiring=false;#unsubscribes=[];
- constructor({items,combat,session,get_player=()=>session?.player,rules:settings=rules,policy={}}={}){if(!items||!combat)throw new TypeError('Weapons require item and combat services');this.#items=items;this.#combat=combat;this.#session=session;this.#player=get_player;this.#rules=jsonCopy(settings);this.#policy=policy;}
+ #items;#combat;#session;#player;#rules;#policy;#context=null;#pending=false;#lastAim={};#quickFiring=false;#unsubscribes=[];#controllers=new Map();#projectileEvents;
+ constructor({items,combat,session,get_player=()=>session?.player,rules:settings=rules,policy={},projectile_events=true}={}){if(!items||!combat)throw new TypeError('Weapons require item and combat services');this.#items=items;this.#combat=combat;this.#session=session;this.#player=get_player;this.#rules=jsonCopy(settings);this.#policy=policy;this.#projectileEvents=projectile_events;}
  get state(){return this.#player()?.data.weapon_state??null;}
  get quick_draw(){return this.state?.quick_draw??null;}
  get cooldown_seconds(){return this.state?.cooldown??0;}
@@ -17,11 +17,11 @@ export class weaponSystem{
  get active_swing(){return this.state?.swing??null;}
  get guarding(){const state=this.state;return !!state?.swing&&!state.holstered&&state.elapsed-state.swing.started<=state.swing.seconds;}
  attach(context){if(this.#context)throw new Error('Weapons already attached');this.#context=context;this.reconnectGameplay();
-  this.#unsubscribes.push(context.api.physics.on('projectileHit',event=>this.#projectileHit(event)),context.api.physics.on('projectileRedirected',event=>{const data=event.projectile?.data;if(!data)return;data.source_id=event.owner_id;if(data.pending_deflection){data.deflected=data.pending_deflection;delete data.pending_deflection;this.#emit('weapon:deflected',{projectile_id:event.projectile.entity_id,by:data.deflected});}}),context.api.physics.onProjectileContact(event=>this.#contactPolicy(event)));
+  if(this.#projectileEvents)this.#unsubscribes.push(context.api.physics.on('projectileHit',event=>this.#projectileHit(event)),context.api.physics.on('projectileRedirected',event=>{const data=event.projectile?.data;if(!data)return;data.source_id=event.owner_id;const owner=context.api.elements.fetchEntity(event.owner_id);data.source_alliance=owner?.alliance??owner?.data.alliance??null;if(data.pending_deflection){data.deflected=data.pending_deflection;delete data.pending_deflection;this.#emit('weapon:deflected',{projectile_id:event.projectile.entity_id,by:data.deflected});}}),context.api.physics.onProjectileContact(event=>this.#contactPolicy(event)));
   if(this.#session)this.#unsubscribes.push(this.#session.on('player:fire',event=>this.requestFire(event.aim??{})),this.#session.on('player:fire-released',event=>{if(this.quick_draw)this.requestQuickDraw(Object.keys(event.aim??{}).length?event.aim:this.#lastAim);}),this.#session.on('player:controls-blocked',()=>this.gameplayPaused()));
   for(const event of ['items:equipped','items:unequipped','items:loaded'])this.#unsubscribes.push(this.#items.on(event,()=>{const s=this.state;if(s){s.swing=null;s.quick_draw=null;s.drawn_at=s.elapsed;s.draw_shot_used=false;}this.#pending=false;}));
  }
- detach(){for(const off of this.#unsubscribes.splice(0))off();this.#context=null;this.#pending=false;}
+ detach(){for(const id of [...this.#controllers.keys()])this.unregisterActor(id);for(const off of this.#unsubscribes.splice(0))off();this.#context=null;this.#pending=false;}
  #emit(event,detail={}){this.#combat.emit(event,detail);}
  #stat(name,base){const value=this.#policy.stat?.(name,base)??base;return nonnegative(value,name);}
  #effect(effect){return this.#items.getEquippedAttachments().find(item=>item.effect===effect)?.stats??null;}
@@ -38,7 +38,7 @@ export class weaponSystem{
  interruptQuickDraw(){const q=this.quick_draw;if(!q)return false;q.phase='ready';q.remaining=0;q.aim=null;this.setHolstered(true);this.#pending=false;return true;}
  requestQuickDraw(aim={}){const q=this.quick_draw;if(!q||q.phase!=='ready'||this.cooldown_seconds>1e-9||this.#context.engine?.paused||this.#policy.can_fire?.()===false)return false;q.aim=jsonCopy(aim);q.phase='draw';q.remaining=this.#rules.quick_draw.draw_seconds;this.setHolstered(false);return true;}
  requestFire(aim={}){if(this.#context?.engine?.paused)return false;this.#lastAim=jsonCopy(aim);this.#pending=true;return true;}
- beforePhysics(context){this.advance(context.api.physics.config.fixed_step);if(this.#pending){this.#pending=false;this.fire(this.#lastAim);}}
+ beforePhysics(context){this.advance(context.api.physics.config.fixed_step);if(this.#pending){this.#pending=false;this.fire(this.#lastAim);}for(const [id,entry] of this.#controllers){if(entry.actor.destroyed){this.unregisterActor(id);continue;}entry.controller.beforePhysics(context);}}
  advance(seconds){nonnegative(seconds,'weapon step');if(this.#context?.engine?.phase==='render')throw new Error('Rendering cannot advance weapons');if(this.#context?.engine?.paused)return;const player=this.#player();if(!player||!this.#context)return;const state=stateFor(player,this.#rules);state.elapsed+=seconds;state.cooldown=Math.max(0,state.cooldown-seconds);state.shield.since_hit+=seconds;
   if(this.#glass()&&(state.shield.spent||state.shield.since_hit>=this.#rules.mirror.regen_delay_seconds)){state.shield.charge=Math.min(this.#rules.mirror.shield,state.shield.charge+this.#rules.mirror.shield/this.#rules.mirror.recharge_seconds*seconds);if(state.shield.charge>=this.#rules.mirror.shield-1e-8){state.shield.charge=this.#rules.mirror.shield;state.shield.spent=false;}}
   const q=state.quick_draw;if(q){
@@ -81,11 +81,11 @@ export class weaponSystem{
    collision_mask:BODY_GROUP.STATIC|BODY_GROUP.CHARACTER|BODY_GROUP.PROP|BODY_GROUP.VEHICLE,
    penetration_count:stats.penetrating?R.projectile.penetration_count:0,penetration_loss:stats.penetrating?R.projectile.penetration_loss:0,
    impact_strength:punch?(hay?R.knuckles.haymaker_impulse:R.knuckles.jab_impulse):R.projectile.impact_strength,
-   data:{role:'projectile',weapon_instance_id:weapon?.instance_id??null,definition_id:weapon?.definition_id??null,source_id:player.entity_id,damage:Math.round(damage*crit),crit:crit>1,melee:punch,knuckles:mode==='fists',haymaker:hay,color:punch?'transparent':stats.projectileColor??'#00f3ff',penetrating:!!stats.penetrating,sticky:!!stats.sticky,dot_damage:Math.round((stats.dotDamage??5)*damage*crit/(stats.damage??35)),dot_interval:(stats.dotInterval??10)/R.authoring_hz,dot_ticks:stats.dotTicks??12,max_orbs:stats.maxOrbs??4}});
+   data:{role:'projectile',weapon_instance_id:weapon?.instance_id??null,definition_id:weapon?.definition_id??null,source_id:player.entity_id,source_alliance:player.alliance??player.data.alliance??null,damage:Math.round(damage*crit),crit:crit>1,melee:punch,knuckles:mode==='fists',haymaker:hay,color:punch?'transparent':stats.projectileColor??'#00f3ff',penetrating:!!stats.penetrating,sticky:!!stats.sticky,dot_damage:Math.round((stats.dotDamage??5)*damage*crit/(stats.damage??35)),dot_interval:(stats.dotInterval??10)/R.authoring_hz,dot_ticks:stats.dotTicks??12,max_orbs:stats.maxOrbs??4}});
   if(consumeDrawBonus)state.draw_shot_used=true;
   if(punch){state.combo=nextCombo;state.last_punch_at=state.elapsed;state.haymaker=hay;state.punch_side=state.punch_side==='right'?'left':'right';}
   state.cooldown=punch&&mode==='none'?R.bare_punch.duration_ticks/R.authoring_hz:this.#cooldown(stats,punch?15:20);if(punch)state.punch_duration=state.cooldown;
-  this.#emit('weapon:fired',{entity_id:player.entity_id,projectile_id:projectile.entity_id,definition_id:weapon?.definition_id??null,mode,haymaker:hay,crit:crit>1});return projectile;
+  this.#emit('weapon:fired',{entity_id:player.entity_id,projectile_id:projectile.entity_id,definition_id:weapon?.definition_id??null,mode,haymaker:hay,crit:crit>1});this.#policy.on_fired?.(projectile);return projectile;
  }
  #stepIn(player,profile){const world=this.#context.api.physics;const hits=world.sweepAttachedShape(player,{collision_shape:profile.blade_shape,from_local_position:[20,0],to_local_position:[46,0],include_groups:BODY_GROUP.CHARACTER,line_of_sight:true});if(hits.some(hit=>this.#combat.canDamage(player,hit.entity)))world.advanceBody(player,{distance:this.#rules.blade.step_distance});}
  #startSwing(player,state,weapon,stats,flit){
@@ -111,12 +111,13 @@ export class weaponSystem{
   }
   if(age>swing.seconds)state.swing=null;
  }
- #contactPolicy({projectile,target_entity}){
+ #contactPolicy(event){const child=this.#controllers.get(event.target_entity?.entity_id)?.controller;return child?child.#applyContactPolicy(event):this.#applyContactPolicy(event);}
+ #applyContactPolicy({projectile,target_entity}){
   if(!projectile)return null;const player=this.#player(),data=projectile.data,source=this.#context.api.elements.fetchEntity(data.source_id);
-  if(target_entity&&source&&!this.#combat.canDamage(source,target_entity)&&target_entity.collision_group&BODY_GROUP.CHARACTER)return {action:'ignore'};
+  if(target_entity&&!this.#combat.canDamage(source,target_entity,{source_alliance:data.source_alliance})&&target_entity.collision_group&BODY_GROUP.CHARACTER)return {action:'ignore'};
   if(target_entity===player&&source!==player&&this.#glass()&&!this.state.shield.spent){
    const shield=this.state.shield;shield.charge=Math.max(0,shield.charge-(data.damage??0));shield.spent=shield.charge<=0;shield.since_hit=0;
-   data.source_id=player.entity_id;data.deflected='glass';this.#emit('weapon:deflected',{projectile_id:projectile.entity_id,by:'glass'});
+   data.source_id=player.entity_id;data.source_alliance=player.alliance??player.data.alliance??null;data.deflected='glass';this.#emit('weapon:deflected',{projectile_id:projectile.entity_id,by:'glass'});
    return {action:'redirect',...(source&&!isCombatDead(source)?{target:source}:{}),owner_id:player.entity_id,min_lifetime:this.#rules.mirror.minimum_projectile_lifetime};
   }if(data.penetrating&&target_entity?.data.role==='door')return {action:'hit',penetration_loss:.5};return null;
  }
@@ -126,9 +127,10 @@ export class weaponSystem{
   projectile.redirectProjectile(undefined,{...(source&&!isCombatDead(source)?{target:source}:{reverse:true}),owner_id:player.entity_id,at_fraction:fraction,min_lifetime:this.#rules.mirror.minimum_projectile_lifetime});projectile.data.pending_deflection=by;
   return true;
  }
- #projectileHit(event){
+ #projectileHit(event){const child=this.#controllers.get(event.projectile?.data.source_id)?.controller;return child?child.#applyProjectileHit(event):this.#applyProjectileHit(event);}
+ #applyProjectileHit(event){
   if(event.sensor_only)return;const data=event.projectile?.data,target=event.target_entity;if(!data||!target||!Number.isFinite(data.damage))return;
-  const source=this.#context.api.elements.fetchEntity(data.source_id);if(!this.#combat.canDamage(source,target))return;
+  const source=this.#context.api.elements.fetchEntity(data.source_id);if(!this.#combat.canDamage(source,target,{source_alliance:data.source_alliance}))return;
   const damage=Math.round(data.damage*event.impact_scale);if(!this.#combat.damage(target,damage,{source_id:data.source_id,type:data.melee?'melee':'ballistic',crit:data.crit,bypass_invulnerability:!!data.melee}))return;
   if(data.sticky)this.#combat.attachOrb(target,{damage:data.dot_damage,interval_seconds:data.dot_interval,ticks:data.dot_ticks,max_orbs:data.max_orbs,source_id:data.source_id});
   if(data.knuckles&&data.haymaker)this.#combat.haymaker(target,{damage,source_id:data.source_id});
@@ -136,6 +138,15 @@ export class weaponSystem{
    const vamp=this.#effect('vampiric_fists');if(vamp){source.heal?.(Math.max(1,Math.round(damage*(data.haymaker?vamp.haymakerLifesteal:vamp.lifesteal))));if(data.haymaker)this.#combat.applyBleed(target,{dps:vamp.bleedDps*this.#multiplier(),seconds:vamp.bleedSecs,source_id:data.source_id});}
   }
  }
+ registerActor(actor,{items=actor.items,policy={}}={}){
+  if(!this.#projectileEvents)throw new Error('Register actors through the world weapon service');if(actor===this.#player())throw new Error('The controlled player already has a weapon controller');
+  if(!this.#context||!actor||actor.destroyed||actor.physics_system!==this.#context.api.physics)throw new TypeError('Register an actor in this weapon world');
+  if(this.#controllers.has(actor.entity_id))throw new Error('Actor already has a weapon controller');
+  const controller=new weaponSystem({items,combat:this.#combat,get_player:()=>actor,rules:this.#rules,policy:{random:this.#policy.random,...policy},projectile_events:false});controller.attach(this.#context);this.#controllers.set(actor.entity_id,{actor,controller});return controller;
+ }
+ unregisterActor(id){const entry=this.#controllers.get(id);if(!entry)return false;entry.controller.detach();this.#controllers.delete(id);return true;}
+ getActorController(actor){return this.#controllers.get(typeof actor==='number'?actor:actor.entity_id)?.controller??null;}
+ requestActorFire(actor,aim={}){const controller=this.getActorController(actor);if(!controller)return false;return controller.requestFire(aim);}
  reconnectGameplay(){
   const player=this.#player();if(player){const state=stateFor(player,this.#rules);jsonCopy(state);if(state.format_version!==1)throw new TypeError('Unsupported weapon state');
    for(const key of ['elapsed','cooldown','combo'])nonnegative(state[key],key);nonnegative(state.shield.charge,'shield charge');nonnegative(state.shield.since_hit,'shield timer');
@@ -143,6 +154,6 @@ export class weaponSystem{
    if(state.swing){nonnegative(state.swing.started,'swing start');nonnegative(state.swing.seconds,'swing duration');if(!state.swing.seconds||!Array.isArray(state.swing.struck)||!Number.isSafeInteger(state.swing.next_sample)||state.swing.next_sample<0)throw new TypeError('Invalid swing state');}
   }this.#pending=false;
  }
- gameplayPaused(){this.#pending=false;this.interruptQuickDraw();}
- levelLeaving(){this.#pending=false;if(this.state){this.state.swing=null;this.cancelQuickDraw();}}
+ gameplayPaused(){this.#pending=false;this.interruptQuickDraw();for(const entry of this.#controllers.values())entry.controller.gameplayPaused();}
+ levelLeaving(){for(const entry of this.#controllers.values())entry.controller.levelLeaving();this.#pending=false;if(this.state){this.state.swing=null;this.cancelQuickDraw();}}
 }

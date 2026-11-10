@@ -1,3 +1,4 @@
+import {bodyActive} from '../core/state.mjs';
 /** Entity metadata/lifecycle only. Physical state lives exclusively in the engine body. */
 const records = new WeakMap();
 const legacyFields = Object.fromEntries(['angle', 'angularVelocity', 'lastX', 'lastY', 'x', 'y', 'vx', 'vy', 'velX', 'velY', 'angularVel', 'collisionMask'].map(key => [key, {
@@ -44,7 +45,7 @@ export class gameEntity {
     get registered() { return entityRecord(this).registered; }
     get pending() { const r = entityRecord(this); return !r.registered && !r.destroyed; }
     get destroyed() { return entityRecord(this).destroyed; }
-    get active() { const r = entityRecord(this); return r.registered && !r.destroyed && r.body.getState().active; }
+    get active() { const r = entityRecord(this); return r.registered && !r.destroyed && bodyActive(r.elements.world._record(r.body)); }
     get position() { return this.body.position; }
     get rotation() { return this.body.rotation; }
     get linear_velocity() { return this.body.linear_velocity; }

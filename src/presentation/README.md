@@ -45,4 +45,6 @@ Verification: `node --test tools/test-weapon-appearance.mjs` and `python tools/t
 
 ## Combat presentation
 
-`combatPresentation({weapon_art,owns_art=false})` uses `render(context,blend,frame)` to read visible official projectiles, loot and status records, plus the player's held weapon pose. It submits shape/text/sprite packets; `detach()` disposes owned art. `await installCombatPresentation(engine)` prepares assets and installs the lifecycle system with ownership cleanup. The shared runtime example uses it now. Collision, damage, projectile motion and item ownership remain in the documented native services.
+`combatPresentation({weapon_art,owns_art=false})` uses `render(context,blend,frame)` to read visible official projectiles, loot and status records, plus the player and registered actors' held weapon poses. It submits shape/text/sprite packets; `detach()` disposes owned art. `await installCombatPresentation(engine)` prepares assets and installs the lifecycle system with ownership cleanup. The shared runtime example uses it now. Collision, damage, projectile motion and item ownership remain in the documented native services.
+
+`actorPresentation` submits visible NPC names/speech and Ganger detection/telegraph labels. It uses the renderer’s shared visible-entity query and native interpolated anchor points. The example’s separate generic body artist remains responsible for actor shapes; full procedural humanoid animation is still pending. Rendering never advances actor or weapon policy.

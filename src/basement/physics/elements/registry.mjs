@@ -82,7 +82,7 @@ export class gameElements {
         this.world._mutate(() => {
             if (record.destroyed) return;
             if (this.#entities.has(record.body.body_id)) throw new Error('Duplicate entity identity');
-            record.registered = true; this.#entities.set(record.body.body_id, entity);
+            record.registered = true; this.#entities.set(record.body.body_id, entity);this.world._emit('entityRegistered',{entity,body:record.body});
         });
         return record;
     }
@@ -107,7 +107,7 @@ export class gameElements {
     _bodyRemoved(body_id) {
         const entity = this.#entities.get(body_id); if (!entity) return;
         const r = entityRecord(entity); r.destroyed = true; r.registered = false;
-        for (const drop of [...r.subscriptions]) drop(); this.#entities.delete(body_id);
+        for (const drop of [...r.subscriptions]) drop();this.world._emit('entityRemoved',{entity,body:r.body}); this.#entities.delete(body_id);
     }
     _bodyUpdated(body_id, config) {
         const entity = this.#entities.get(body_id); if (!entity) return;

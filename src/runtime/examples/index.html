@@ -10,6 +10,7 @@
 <div id="touch-aim" style="width:110px;height:110px;border:1px solid #64748b;touch-action:none;display:inline-block">Aim</div>
 <button id="touch-fire" style="touch-action:none">Fire input</button>
 <script type="module">
+import {actorPresentation} from '../../presentation/actor-presentation.mjs';
 import {installCombatPresentation} from '../../presentation/combat-presentation.mjs';
 import { createRuntimeExample } from '../../directory/runtime-example.mjs';
 const status=document.getElementById('status');
@@ -31,6 +32,7 @@ const report=()=>{status.textContent=JSON.stringify({level:engine.active_level?.
 engine.registerSystem('status',{render:report});
 document.getElementById('switch').onclick=async()=>{try{await engine.loadLevel(engine.active_level.level_id==='room_a'?'room_b':'room_a');}catch(error){status.textContent=error.stack;console.error(error);}};
 let resume;document.getElementById('pause').onclick=()=>{if(resume){resume();resume=null;}else resume=engine.pause('example');report();};
+engine.registerSystem('actor-presentation',new actorPresentation());
 await installCombatPresentation(engine);
 await engine.loadLevel('room_a');engine.start();
 // Inspection for the browser acceptance check; never used by the production boot.

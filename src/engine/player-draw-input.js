@@ -131,10 +131,8 @@
                 this.renderSidebarPortrait();
 
                 if(this.activeLevel){
-                    const hit=this.physics_system.peruseNearbyEntities(this.player,{near_range:180}).find(h=>h.entity?.entity_type==='df_apartment_companion'&&h.entity.recruited&&NPC_EMOTE_REACTIONS[h.entity.name]);
-                    if(hit){const e=hit.entity,category={smile:'reactSmile',zany:'reactZany',cry:'reactCry',frown:'reactFrown'}[key];
-                        const lines=resolveEmoteLines(NPC_EMOTE_REACTIONS[e.name],category,this.bonding.getTier(e.relationship??0));
-                        if(lines?.length){e.data.quip=lines[0];e.data.quip_start=this.physics_system.simulation_tick+24;e.data.quip_end=e.data.quip_start+120;}}
+                    const hit=this.physics_system.peruseNearbyEntities(this.player,{near_range:180}).find(h=>h.entity?.entity_type==='df_npc'&&h.entity.recruited&&NPC_EMOTE_REACTIONS[h.entity.name]);
+                    if(hit)hit.entity.reactToEmote(key,{tier:this.bonding.getTier(hit.entity.relationship??0)});
                     return;
                 }
                 // Trigger nearest reactor's response within range — slight delay

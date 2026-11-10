@@ -81,7 +81,9 @@ export class spatialGrid {
         if (Math.abs(ex - x) + Math.abs(ey - y) > 1e6) throw new RangeError('Segment crosses over one million cells');
         visit(x, y);
         while (x !== ex || y !== ey) {
-            if (Math.abs(nx - ny) < 1e-12) { visit(x + sx, y); visit(x, y + sy); x += sx; y += sy; nx += tx; ny += ty; }
+            if (x === ex) { y += sy; ny += ty; }
+            else if (y === ey) { x += sx; nx += tx; }
+            else if (Math.abs(nx - ny) < 1e-12) { visit(x + sx, y); visit(x, y + sy); x += sx; y += sy; nx += tx; ny += ty; }
             else if (nx < ny) { x += sx; nx += tx; } else { y += sy; ny += ty; }
             visit(x, y);
         }

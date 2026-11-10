@@ -13,7 +13,7 @@ export class combatSystem{
  attach(context){if(this.#context)throw new Error('Combat is already attached');this.#context=context;context.defer(context.api.physics.on('contactBegin',event=>this.#contact(event)));this.reconnectGameplay();}
  detach(){this.#targets.clear();this.#context=null;}
  emit(event,detail){this.#session?.emit(event,detail);this.#policy.on_event?.(event,detail);}
- canDamage(source,target){if(!target||isCombatDead(target)||source===target)return false;if(this.#policy.can_damage)return !!this.#policy.can_damage(source,target);const a=team(source),b=team(target);return !(a&&b&&a===b)&& (typeof target.takeDamage==='function'||typeof target.data?.health==='number');}
+ canDamage(source,target,{source_alliance}={}){if(!target||isCombatDead(target)||source===target)return false;if(this.#policy.can_damage)return !!this.#policy.can_damage(source,target);const a=team(source)??source_alliance,b=team(target);if(target.data?.player_protected&&a==='friendly')return false;return !(a&&b&&a===b)&& (typeof target.takeDamage==='function'||typeof target.data?.health==='number');}
  damage(target,amount,{source_id=null,type='ballistic',crit=false,bypass_invulnerability=false,...detail}={}){
   if(this.#context?.engine?.phase==='render')throw new Error('Rendering cannot deal damage');
   nonnegative(amount,'damage');if(isCombatDead(target)||!amount)return false;
@@ -22,7 +22,7 @@ export class combatSystem{
   let applied;if(typeof target.takeDamage==='function')applied=target.takeDamage(amount,{source:source_id,type,crit,bypass_invulnerability});else if(typeof target.data.health==='number'){target.data.health=Math.max(0,target.data.health-amount);applied=true;}else return false;
   if(applied===false)return false;target.data.last_hit={source_id,type,crit};
   this.emit('combat:hit',{target_id:target.entity_id,source_id,amount,type,crit,...detail});
-  if(isCombatDead(target))this.emit('combat:killed',{target_id:target.entity_id,source_id,type});return true;
+  if(isCombatDead(target))this.emit(target.downed?'combat:downed':'combat:killed',{target_id:target.entity_id,source_id,type});return true;
  }
  applyBleed(target,{dps,seconds=3,max_stacks=this.#rules.bleed.max_stacks,source_id=null}={}){
   nonnegative(dps,'bleed DPS');nonnegative(seconds,'bleed duration');if(!Number.isSafeInteger(max_stacks)||max_stacks<1)throw new TypeError('Invalid bleed stack limit');if(isCombatDead(target))return false;

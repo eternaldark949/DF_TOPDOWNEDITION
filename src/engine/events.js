@@ -62,7 +62,7 @@
                         this.enterCar(car);
                     } else if(this.activeInteraction.type === 'hijack') {
                         this.hijackVehicle(this.activeInteraction.target);
-                    } else if(this.activeInteraction instanceof NPC || this.activeInteraction.entity_type==='df_apartment_companion') {
+                    } else if(this.activeInteraction instanceof NPC || this.activeInteraction instanceof DFNative.NPC) {
                         this.startDialogue(this.activeInteraction);
                     }
                 } else if (this.isDriving) {

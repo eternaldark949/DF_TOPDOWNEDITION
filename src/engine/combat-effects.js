@@ -503,7 +503,7 @@
                 
                 const nativeApartment = !!this.activeLevel;
                 const allies = nativeApartment
-                    ? this.physics_system.peruseNearbyEntities(this.player, {near_range: 200}).map(hit => hit.entity).filter(tm => tm?.entity_type === 'df_apartment_companion')
+                    ? this.physics_system.peruseNearbyEntities(this.player, {near_range: 200}).map(hit => hit.entity).filter(tm => tm?.entity_type === 'df_npc')
                     : this.teammates;
                 for (let tm of allies) {
                     if (!tm.recruited || tm.dead || tm.inCar) continue;

@@ -149,3 +149,11 @@ test('spatial budget errors leave creation, body updates and transform commands 
  assert.throws(()=>p.updateBody(a,{collision_shape:{shape_type:'box',dimensions:[1e8,1e8]}}),/million/);assert.deepEqual(p.savePhysicsState(),state);
  assert.deepEqual(a.position,before.bodies[0].position);steps(p);assert.ok(p.spatial_grid.queryBounds(bounds(9,9,11,11)).includes(a));
 });
+
+test('segments ending at grid corners never step beyond an axis that already reached its final cell',()=>{
+ const grid=new spatialGrid({cell_size:10}),body={body_id:1};grid.registerInstance(1,bounds(-1,-1,1,1),body);
+ for(const [from,to] of [[[8,-8],[0,0]],[[0,0],[8,-8]],[[-8,8],[0,0]],[[0,0],[-8,8]]]){
+  const before=grid.getStatistics().query_cells;assert.ok(grid.querySegment(from,to).includes(body));assert.ok(grid.getStatistics().query_cells-before<10);
+  assert.ok(grid.querySweep({from,to,radius:1}).includes(body));
+ }
+});

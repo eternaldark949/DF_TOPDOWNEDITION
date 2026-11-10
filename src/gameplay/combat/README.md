@@ -24,7 +24,7 @@ Raw native snapshots save those JSON records and the original physical entities.
 
 ## weaponSystem
 
-One canonical weapon service handles world projectile hit policy and the controlled player's inventory. Construct with `{items,combat,session?,get_player?,rules?,policy?}`. `get_player` defaults to the supplied session's player. The native apartment supplies its official player lookup directly; it does not fabricate a session or a surrogate player.
+One canonical weapon service handles world projectile hit policy, the controlled player's inventory and registered actor execution components. Construct with `{items,combat,session?,get_player?,rules?,policy?}`. `get_player` defaults to the supplied session's player. The native apartment supplies its official player lookup directly; it does not fabricate a session or a surrogate player.
 
 | API | Contract |
 |---|---|
@@ -107,3 +107,7 @@ Remaining classic city callers are **still executable**, so deleting them now wo
 These are caller/class conversion blockers. More generic scaffolding is not required before continuing removal; delete each branch when its last live legacy caller is converted. No shadow native world, mirrored actor or private combat grid is used to bypass that dependency.
 
 Verification: `tools/test-combat-systems.mjs`, `src/basement/physics/tests/native-combat.test.mjs`, `tools/test-native-combat-callers.cjs`, and `tools/test-combat-browser.py`, plus the existing gameplay, apartment and rendering regressions.
+
+## Actor execution update
+
+`registerActor(actor,{items=actor.items,policy={}})`, `unregisterActor(id)`, `getActorController(actorOrId)` and `requestActorFire(actor,aim)` now route NPC/Ganger weapons through the same execution code and one global impact/contact subscription. Records remain on each official actor. `combat.canDamage(source,target,{source_alliance}={})` preserves projectile team policy after source removal; protected civilians reject friendly fire. Downed permanent companions emit `combat:downed`. See [actor API and remaining specialized conversions](../actors/README.md).

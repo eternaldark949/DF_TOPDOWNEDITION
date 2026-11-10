@@ -126,11 +126,15 @@ export class gameEngine {
     }
     retainEntity(entity) {
         this.#live();
-        if(!['idle','registration'].includes(this.#phase))throw new Error('Retain entities at a runtime or registration boundary');
+        if(!['idle','registration','input','beforePhysics','afterPhysics','transition'].includes(this.#phase))throw new Error('Retain entities at a runtime or registration boundary');
         if (!entity || this.api.elements.fetchEntity(entity.entity_id) !== entity) throw new Error('Retain an official entity belonging to this runtime');
         this.#persistent.add(entity); return entity;
     }
-    releaseEntity(entity) { this.#idle(); return this.#persistent.delete(entity); }
+    releaseEntity(entity) {
+        this.#live();
+        if(!['idle','registration','input','beforePhysics','afterPhysics','transition'].includes(this.#phase))throw new Error('Release entities at a runtime or registration boundary');
+        return this.#persistent.delete(entity);
+    }
     async loadLevel(level_id, options = {}) {
         this.#live();
         if (!['idle', 'input', 'beforePhysics', 'physics', 'afterPhysics'].includes(this.#phase)) throw new Error('Level loading is not allowed during rendering or lifecycle hooks');

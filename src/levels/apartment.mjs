@@ -2,7 +2,8 @@ import {registerGameEntityTypes} from '../directory/game-entity-types.mjs';
 import { physicsSystem } from '../basement/physics/index.mjs';
 import { createApartmentAssetLibrary } from '../directory/apartment-assets.mjs';
 import { resolveApartmentDefinition, resolveApartmentDyer } from '../directory/apartment-definition.mjs';
-import { ApartmentCompanion, rosterRecord } from '../entities/apartment-companion.mjs';
+import {NPC,rosterRecord} from '../entities/npc.mjs';
+import {createActorPacket} from '../directory/game-actor-factory.mjs';
 import { gameProp } from '../basement/physics/index.mjs';
 class ApartmentDoor extends gameProp { static entity_type = 'df_apartment_door'; }
 
@@ -23,7 +24,7 @@ export class ApartmentLevel {
         this.player=this.physics.elements.getEntities({entity_type:'df_player'})[0];
         this.props=this.entities.filter(e=>e.data.role==='prop'); this.doors=this.entities.filter(e=>e.data.role==='door');
         this.curtains=this.entities.filter(e=>e.data.role==='curtain');
-        this.companions=this.entities.filter(e=>e.entity_type===ApartmentCompanion.entity_type);
+        this.companions=this.entities.filter(e=>e.entity_type===NPC.entity_type);
         this.lamps=this.entities.filter(e=>e.data.role==='lamp'); this.transitions=this.entities.filter(e=>e.data.role==='transition');
     }
     restoreLayout(layout) {
@@ -35,13 +36,14 @@ export class ApartmentLevel {
         for(const c of this.companions??[])c.destroy();
         this.companions=roster.map(r=>{
             const spot=game_db.cast.apartment_idle[r.name]??{x:700,y:600};
-            return this.physics.createEntity({template:'df:npc',entity_type:ApartmentCompanion.entity_type,name:r.name,position:[spot.x,spot.y],active:!!r.recruited,
-                data:{...r,downed:false,hp:r.downed?(r.maxHp??100):(r.hp??r.maxHp??100),maxHp:r.maxHp??100,appearance:game_db.cast.appearances[r.name]??game_db.cast.appearances['949'],pose:spot.pose??null}});
+            const {hp,maxHp,equippedWeaponId,weaponId,inventory,...data}=r;
+            return this.physics.createEntity(createActorPacket(this.physics,{kind:'npc',name:r.name,role:r.role??'teammate',position:[spot.x,spot.y],active:!!r.recruited,
+                data:{...data,...(inventory?{inventory}:{}),downed:false,health:r.downed?(maxHp??100):(hp??maxHp??100),max_health:maxHp??100,weapon_definition_id:equippedWeaponId??weaponId??null,appearance:game_db.cast.appearances[r.name]??game_db.cast.appearances['949'],pose:spot.pose??null}}));
         });
     }
     getRoster(){return this.companions.map(rosterRecord);}
     updateState() {
-        for(const c of this.companions)if(c.active!==!!c.recruited){if(c.recruited)c.activate();else c.deactivate();}
+        for(const c of this.companions)if(c.active!==!!(c.recruited&&!c.dead)){if(c.recruited&&!c.dead)c.activate();else c.deactivate();}
         for(const door of this.doors){
             const near=this.physics.peruseNearbyEntities(door,{near_range:door.data.appearance.triggerRadius??90,include_groups:2,include_ghosts:false}).length>0;
             if(near!==door.data.open){door.data.open=near;this.physics.motion.moveBodyTo(door,{position:near?door.data.open_position:door.data.closed_position,rotation:near?door.data.open_rotation:door.data.closed_rotation,duration:this.definition.rules.DOOR_DURATION,easing:'smooth'});}
@@ -49,6 +51,13 @@ export class ApartmentLevel {
         this.physics.updateState();
     }
     saveState() { return this.physics.savePhysicsState(); }
-    loadState(snapshot) { this.physics.loadPhysicsState(snapshot); this.reconnect(); }
+    loadState(snapshot) {
+        const migrated=structuredClone(snapshot);
+        for(const record of migrated.entities??[])if(record.entity_type==='df_apartment_companion'){
+            record.entity_type=NPC.entity_type;const data=record.data;data.health=data.hp??100;data.max_health=data.maxHp??100;data.role??='teammate';data.alliance??='friendly';data.weapon_definition_id=data.equippedWeaponId??data.weaponId??null;delete data.hp;delete data.maxHp;delete data.equippedWeaponId;delete data.weaponId;
+            record.assets={...record.assets,actor_rules:'df:actor_rules',items:'df:actor_items',appearances:'df:actor_appearances'};
+        }
+        this.physics.loadPhysicsState(migrated); this.reconnect();
+    }
     destroy() { this.physics.clearWorld(); }
 }

@@ -4,6 +4,9 @@ import { EPS, vector, number, length, sub, scale, add, unit, clamp, angleDelta, 
 import { shapeReach } from '../collision/shape.mjs';
 import { referencePosition, referenceBody } from '../spatial/queries.mjs';
 
+const equalData=(a,b)=>a===b||Array.isArray(a)&&Array.isArray(b)&&a.length===b.length&&a.every((value,i)=>equalData(value,b[i]))||!!a&&!!b&&Object.getPrototypeOf(a)===Object.prototype&&Object.getPrototypeOf(b)===Object.prototype&&Object.keys(a).length===Object.keys(b).length&&Object.keys(a).every(key=>equalData(a[key],b[key]));
+const sameRequest=(prior,mode,target,options)=>prior?.mode===mode&&(prior.target===target||Array.isArray(target)&&equalData(prior.target,target))&&Object.keys(prior).length===Object.keys(options).length+2&&Object.keys(options).every(key=>equalData(prior[key],options[key]));
+
 export class characterMotor {
     constructor(body, config = {}) {
         this.body = body;
@@ -15,9 +18,9 @@ export class characterMotor {
     _request(fn) { const r = bodyRecord(this.body); r.world._mutate(() => { r.sleeping = false; r.sleep_time = 0; fn(); }); return this; }
     setMovement(direction, options = {}) { const v = vector(direction); if (options.speed !== undefined) number(options.speed, 'speed', 0); return this._request(() => { this.intent = { ...clone(options), mode: 'direction', direction: v }; this.path = null; }); }
     setRotation(angle, options = {}) { this.body.setRotation(angle, { preserve_velocity: true, ...options }); return this; }
-    moveTo(position, options = {}) { const target = vector(position); return this._request(() => { this.intent = { ...clone(options), mode: 'move', target }; this.path = null; this.replan = 0; }); }
-    followTarget(target, options = {}) { referencePosition(bodyRecord(this.body).world, target); return this._request(() => { this.intent = { ...clone(options), mode: 'follow', target }; this.path = null; this.replan = 0; }); }
-    fleeTarget(target, options = {}) { referencePosition(bodyRecord(this.body).world, target); return this._request(() => { this.intent = { ...clone(options), mode: 'flee', target }; }); }
+    moveTo(position, options = {}) { const target=vector(position),world=bodyRecord(this.body).world;if(world._canReuseMotorRequest()&&sameRequest(this.intent,'move',target,options))return this;return this._request(()=>{this.intent={...clone(options),mode:'move',target};this.path=null;this.replan=0;}); }
+    followTarget(target, options = {}) {const world=bodyRecord(this.body).world;referencePosition(world,target);if(world._canReuseMotorRequest()&&sameRequest(this.intent,'follow',target,options))return this;return this._request(()=>{this.intent={...clone(options),mode:'follow',target};this.path=null;this.replan=0;});}
+    fleeTarget(target, options = {}) {const world=bodyRecord(this.body).world;referencePosition(world,target);if(world._canReuseMotorRequest()&&sameRequest(this.intent,'flee',target,options))return this;return this._request(()=>{this.intent={...clone(options),mode:'flee',target};});}
     lookAtTarget(target, options = {}) { referencePosition(bodyRecord(this.body).world, target); return this._request(() => { this.facing = { ...clone(options), target }; }); }
     clearFacing(){return this._request(()=>{this.facing=null;});}
     lookInDirection(direction, options = {}) { const d = vector(direction); return this._request(() => { this.facing = { ...clone(options), direction:d }; }); }
@@ -40,7 +43,7 @@ export class characterMotor {
         return this;
     }
     stopMovement() { return this._request(() => { this.intent = null; this.path = null; if (!bodyRecord(this.body).parent_mount) this.body.stopMovement(); }); }
-    cancelMovement() { return this._request(() => { this.intent = null; this.path = null; }); }
+    cancelMovement() {if(!this.intent&&!this.path&&bodyRecord(this.body).world._canReuseMotorRequest())return this;return this._request(() => { this.intent = null; this.path = null; }); }
     suspendMovement(seconds) { number(seconds, 'seconds', 0); return this._request(() => { this.suspended_for = seconds; }); }
     evadeBody(threat, { distance = 50, speed = this.config.max_speed * 2, min_distance = 4 } = {}) {
         number(distance, 'distance', 0); number(speed, 'speed', EPS); number(min_distance, 'min_distance', 0);
@@ -83,7 +86,7 @@ export class characterMotor {
                     if (distance < (intent.safety_distance ?? 200)) desired = scale(unit(scale(delta, -1)), speed);
                 } else if (distance > arrive + EPS) {
                     this.replan -= dt;
-                    if (!intent.direct && (!this.path || this.replan <= 0)) {
+                    if (!intent.direct && this.replan <= 0) {
                         this.path = world.findPath({ ...intent, body: this.body, to: approach }); this.replan = 0.25;
                         this.path_index = 1;
                     }

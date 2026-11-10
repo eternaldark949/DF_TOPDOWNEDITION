@@ -50,6 +50,7 @@ export class physicsSystem {
         return r;
     }
     _syncBody(body) { this.#sync(this._record(body)); }
+    _canReuseMotorRequest(){return !this.#stepping&&!this.#dispatching&&!this.#committing&&!this.#queue.length;}
     _mutate(fn) { if (!this.#committing && (this.#stepping || this.#dispatching || this.#queue.length)) this.#queue.push(fn); else fn(); }
     _emit(type, packet) {
         const entityFor = body => body?.body_id ? this.elements.fetchEntity(body.body_id) : null;
@@ -569,6 +570,9 @@ export class physicsSystem {
     updateSpatialInstance(id, bounds) { this._mutate(() => this.spatial_grid.updateInstance(`spatial:${id}`, bounds)); }
     removeSpatialInstance(id) { this._mutate(() => this.spatial_grid.removeInstance(`spatial:${id}`)); }
     getStatistics() { return { ...this.#stats, bodies: this.#bodies.size, entities: this.elements.getStatistics().entities, constraints: this.#constraints.size, spatial: this.spatial_grid.getStatistics() }; }
+    observeTarget(observer,target,options){return this.#queries.observeTarget(observer,target,options);}
+    predictTargetPosition(observer,target,options){return this.#queries.predictTargetPosition(observer,target,options);}
+    findWanderPlacement(body,options){return this.#queries.findWanderPlacement(body,options);}
     peruseNearbyEntities(reference, options, results) { return this.#queries.peruseNearbyEntities(reference, options, results); }
     findNearestEntity(reference, options = {}) { return this.peruseNearbyEntities(reference, { ...options, max_results: 1 })[0] ?? null; }
     raycast(packet, result) { return this.#queries.raycast(packet, result); }

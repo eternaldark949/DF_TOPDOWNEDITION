@@ -46,7 +46,7 @@ class ApartmentRenderer {
                 const appearance=entity.data.appearance,outfit=appearance.outfit??{};ctx.save();ctx.translate(packet.x,packet.y);ctx.rotate(packet.angle);
                 drawProceduralHumanoid(ctx,packet,{...appearance,stance:'idle',top:outfit.top,bottom:outfit.bottom,shoes:outfit.shoes,pose:entity.data.pose??null});ctx.restore();
             }
-            if(entity.data.quip&&world.simulation_tick>=entity.data.quip_start&&world.simulation_tick<entity.data.quip_end)drawSpeechBubble(ctx,packet.x,packet.y-34,entity.data.quip,1);
+            if(entity.npc_state?.quip&&entity.npc_state.quip_delay<=0&&entity.npc_state.quip_remaining>0)drawSpeechBubble(ctx,packet.x,packet.y-34,entity.npc_state.quip,1);
         }
         for(const owner of level.curtains){
             const state=world.getClothState(owner.data.cloth_id),left=[],right=[];

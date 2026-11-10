@@ -427,6 +427,7 @@ engineMixin({
                     recruited: t.recruited,
                     downed: t.downed || false,
                     equippedWeaponId: t.equippedWeaponId || null,
+                    inventory:t.items?.snapshot(),
                     hp: t.hp || 100,
                     teammateStims: t.teammateStims ?? 3,
                     relationship: t.relationship ?? 0,
@@ -568,6 +569,7 @@ engineMixin({
                             npc.hireTime = savedTm.hireTime || 0;
                             npc.hireCost = savedTm.hireCost || CONFIG.COMPANION.DEFAULT_HIRE_COST;
                             npc.alliance = 'friendly';
+                            if(savedTm.inventory)npc.inventory=savedTm.inventory;
                             npc.recruited = true;
                             if (!this.teammates.includes(npc)) this.teammates.push(npc);
                             const npcIdx = this.npcs.indexOf(npc);
@@ -577,6 +579,7 @@ engineMixin({
                             const tm = this.teammates.find(t => t.name === savedTm.name);
                             if (tm) {
                                 tm.recruited = savedTm.recruited;
+                                if(savedTm.inventory)tm.inventory=savedTm.inventory;
                                 if (savedTm.equippedWeaponId && ITEM_REGISTRY[savedTm.equippedWeaponId]) {
                                     tm.equippedWeaponId = savedTm.equippedWeaponId;
                                 }

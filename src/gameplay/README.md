@@ -48,7 +48,7 @@ const unsubscribe = session.on('player:damaged', ({health}) => updateHealthDispl
 
 ## Player
 
-`Player extends gameCharacter`, registered as `df_player`. Construct it through native factories. All inherited motor/body methods are the actual Basement APIs.
+`Player extends gameActor extends gameCharacter`, registered as `df_player`. Construct it through native factories. All inherited motor/body methods are the actual Basement APIs.
 
 | Method/property | Contract |
 |---|---|
@@ -138,3 +138,7 @@ Both runtimes use this one timer implementation. PlayerStateSystem calls it thro
 Run `node --test tools/test-player-systems.mjs tools/test-player-vitals.mjs` for ownership, session mutation, native input, mounting, damage/impulses, timers/pause, Flit, checked respawn, saved identity reconnection and invalid-state rejection. Shared engine placement tests cover minimum travel and zero headings. Browser runtime and controls checks use these classes and verify health/inventory/equipment persistence across levels, actual mouse fire intents and simultaneous device input.
 
 `node tools/test-player-state-callers.cjs` exercises the actual generated production build: absent host ledgers, stims/HUD, clinics, recovery, Last Stand grace, Stellar Lemonade, native/legacy transitions, single ticking, saves, upgraded old-save health, native death, invalid snapshot rejection and reset. The vitals suite also scans every production JS/ESM source for retired ledger names and synchronization methods. Both suites run in CI.
+
+## Shared actors
+
+`Player`, `NPC` and `Ganger` now inherit native `gameActor`. `playerVitals extends actorVitals` shares canonical health operations with native and remaining legacy actors. `api.actors` connects their behavior and owned weapon execution to the existing runtime. See [the actor API, ownership contracts and removal ledger](actors/README.md). Specialized actor subclasses and the classic city callers remain conversion work.
