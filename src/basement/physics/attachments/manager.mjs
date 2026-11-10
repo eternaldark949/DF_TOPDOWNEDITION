@@ -119,12 +119,19 @@ export class attachmentManager {
         const children = this.#children.get(e.parent.id); children?.delete(e.child.id); if (!children?.size) this.#children.delete(e.parent.id);
     }
     #place(e, snap) {
+        const parent=e.parent,cache=e.placement_cache,active=bodyActive(e.child);
+        if(!snap&&cache&&cache.x===parent.position[0]&&cache.y===parent.position[1]&&cache.rotation===parent.rotation&&cache.local_position===e.local_position&&cache.local_rotation===e.local_rotation
+            &&cache.child_x===e.child.position[0]&&cache.child_y===e.child.position[1]&&cache.child_rotation===e.child.rotation&&cache.vx===parent.velocity[0]&&cache.vy===parent.velocity[1]&&cache.spin===parent.angular_velocity&&cache.active===active)return;
+        e.placement_cache={x:parent.position[0],y:parent.position[1],rotation:parent.rotation,local_position:e.local_position,local_rotation:e.local_rotation,
+            vx:parent.velocity[0],vy:parent.velocity[1],spin:parent.angular_velocity,active};
+        e.child.metrics.attachment_placements++;
         const pose = pathGeometry.transformPose({ position: e.parent.position, rotation: e.parent.rotation }, e);
         e.child.position = pose.position; e.child.rotation = pose.rotation;
         const offset = rotate(e.local_position, e.parent.rotation);
         e.child.velocity = add(e.parent.velocity, [-e.parent.angular_velocity * offset[1], e.parent.angular_velocity * offset[0]]);
         e.child.angular_velocity = e.parent.angular_velocity;
         if (snap) { e.child.previous_position = [...pose.position]; e.child.previous_rotation = pose.rotation; }
+        e.placement_cache.child_x=e.child.position[0];e.placement_cache.child_y=e.child.position[1];e.placement_cache.child_rotation=e.child.rotation;
         this.world._syncBody(e.child.handle);
     }
     _syncDescendants(parent, snap = false) {
@@ -134,7 +141,10 @@ export class attachmentManager {
         }
     }
     _capturePrevious() {
-        for (const e of this.#entries.values()) if (!e.pending) { e.child.previous_position = [...e.child.position]; e.child.previous_rotation = e.child.rotation; }
+        for(const e of this.#entries.values())if(!e.pending){
+            const r=e.child;
+            if(r.previous_position[0]!==r.position[0]||r.previous_position[1]!==r.position[1]||r.previous_rotation!==r.rotation){r.previous_position=[...r.position];r.previous_rotation=r.rotation;}
+        }
     }
     _syncAll(snap = false) {
         const done = new Set();

@@ -67,6 +67,11 @@ export function pieces(shape, position, rotation = 0, out = []) {
 }
 
 export function shapeBounds(shape, position, rotation = 0) {
+    const packet=shape.packet??shape;
+    if(packet.shape_type==='circle'){
+        const local=packet.local_position,center=local&&(local[0]||local[1])?add(position,rotate(local,rotation)):position;
+        return {left:center[0]-packet.radius,right:center[0]+packet.radius,top:center[1]-packet.radius,bottom:center[1]+packet.radius};
+    }
     const b = { left: Infinity, right: -Infinity, top: Infinity, bottom: -Infinity };
     for (const p of pieces(shape, position, rotation)) {
         if (p.radius !== undefined) {
@@ -76,7 +81,12 @@ export function shapeBounds(shape, position, rotation = 0) {
     }
     return b;
 }
+const reaches=new WeakMap();
 export function shapeReach(shape) {
+    const cached=shape instanceof collisionShape?reaches.get(shape):undefined;
+    if(cached!==undefined)return cached;
     const b = shapeBounds(shape, [0, 0]);
-    return Math.hypot(Math.max(Math.abs(b.left), Math.abs(b.right)), Math.max(Math.abs(b.top), Math.abs(b.bottom)));
+    const reach=Math.hypot(Math.max(Math.abs(b.left), Math.abs(b.right)), Math.max(Math.abs(b.top), Math.abs(b.bottom)));
+    if(shape instanceof collisionShape)reaches.set(shape,reach);
+    return reach;
 }

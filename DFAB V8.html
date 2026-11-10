@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '662e8260f8bd';
+        const DFAB_BUILD = '076f0f7af64a';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="6098">
+    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="6190">
 const DFNative = (()=>{
 'use strict';
 // src/basement/physics/core/values.mjs
@@ -9481,6 +9481,11 @@ function pieces(shape, position, rotation = 0, out = []) {
 }
 
 function shapeBounds(shape, position, rotation = 0) {
+    const packet=shape.packet??shape;
+    if(packet.shape_type==='circle'){
+        const local=packet.local_position,center=local&&(local[0]||local[1])?add(position,rotate(local,rotation)):position;
+        return {left:center[0]-packet.radius,right:center[0]+packet.radius,top:center[1]-packet.radius,bottom:center[1]+packet.radius};
+    }
     const b = { left: Infinity, right: -Infinity, top: Infinity, bottom: -Infinity };
     for (const p of pieces(shape, position, rotation)) {
         if (p.radius !== undefined) {
@@ -9490,9 +9495,14 @@ function shapeBounds(shape, position, rotation = 0) {
     }
     return b;
 }
+const reaches=new WeakMap();
 function shapeReach(shape) {
+    const cached=shape instanceof collisionShape?reaches.get(shape):undefined;
+    if(cached!==undefined)return cached;
     const b = shapeBounds(shape, [0, 0]);
-    return Math.hypot(Math.max(Math.abs(b.left), Math.abs(b.right)), Math.max(Math.abs(b.top), Math.abs(b.bottom)));
+    const reach=Math.hypot(Math.max(Math.abs(b.left), Math.abs(b.right)), Math.max(Math.abs(b.top), Math.abs(b.bottom)));
+    if(shape instanceof collisionShape)reaches.set(shape,reach);
+    return reach;
 }
 
 return Object.freeze({get collisionShape(){return collisionShape;},get pieces(){return pieces;},get shapeBounds(){return shapeBounds;},get shapeReach(){return shapeReach;}});
@@ -9572,7 +9582,7 @@ return Object.freeze({get invalidateMass(){return invalidateMass;},get ownInerti
 // src/basement/physics/core/state.mjs
 const m6 = (()=>{
 const {PHYSICS_TYPES,BODY_GROUP,vector,number,mask,clone,freeze} = m5;
-const {collisionShape,shapeBounds} = m4;
+const {collisionShape,shapeBounds,shapeReach} = m4;
 const {massProperties,massCenter,impulseCenter,supportedInertia,centerVelocity,setCenterVelocity} = m3;
 
 const bodies = new WeakMap();
@@ -9615,7 +9625,32 @@ function snapshot(r) {
 }
 const pose = r => ({ position: r.position, rotation: r.rotation });
 const previousPose = r => ({ position: r.previous_position, rotation: r.previous_rotation });
-const liveBounds = r => shapeBounds(r.shape, r.position, r.rotation);
+// Derived geometry stays on the official record. It is not another spatial index,
+// and is never serialized or exposed by reference to callers.
+function bodyBounds(r, type = 'collision') {
+    if(type!=='collision'&&!r.config[`${type}_shape`])return bodyBounds(r);
+    const shape=type==='collision'?r.shape:r.config[`${type}_shape`]??r.shape;
+    const cache=(r.bounds_cache??=Object.create(null)),prior=cache[type],x=r.position[0],y=r.position[1],rotation=r.rotation;
+    if(prior&&prior.shape===shape&&prior.x===x&&prior.y===y&&prior.rotation===rotation)return prior.bounds;
+    const bounds=shapeBounds(shape,r.position,rotation);
+    if(prior){prior.shape=shape;prior.x=x;prior.y=y;prior.rotation=rotation;prior.bounds=bounds;}
+    else cache[type]={shape,x,y,rotation,bounds};
+    r.metrics.bounds_calculations++;return bounds;
+}
+const liveBounds = r => bodyBounds(r);
+function sweptBounds(r) {
+    const bounds=liveBounds(r),x=r.position[0],y=r.position[1],px=r.previous_position[0],py=r.previous_position[1];
+    if(x===px&&y===py&&r.rotation===r.previous_rotation)return bounds;
+    const prior=r.sweep_cache;
+    if(prior&&prior.bounds===bounds&&prior.px===px&&prior.py===py&&prior.previous_rotation===r.previous_rotation)return prior.value;
+    const reach=shapeReach(r.shape);
+    const value=prior?.value??{};
+    value.left=Math.min(bounds.left,Math.min(x,px)-reach);value.right=Math.max(bounds.right,Math.max(x,px)+reach);
+    value.top=Math.min(bounds.top,Math.min(y,py)-reach);value.bottom=Math.max(bounds.bottom,Math.max(y,py)+reach);
+    if(prior){prior.bounds=bounds;prior.px=px;prior.py=py;prior.previous_rotation=r.previous_rotation;}
+    else r.sweep_cache={bounds,px,py,previous_rotation:r.previous_rotation,value};
+    r.metrics.swept_bounds_calculations++;return value;
+}
 const physical = r => bodyActive(r) && !r.parent_mount && r.config.physics_type !== 'no_collision';
 const movable = r => !r.parent_mount && ['rigid', 'character', 'no_collision'].includes(r.config.physics_type);
 function inverseMass(r, axis) {
@@ -9646,7 +9681,7 @@ function changeVelocity(r, impulse, point = null) {
 function readonlyState(r, result) { Object.assign(result, snapshot(r)); return result; }
 function immutableState(r) { return freeze(snapshot(r)); }
 
-return Object.freeze({get bodyRecord(){return bodyRecord;},get bindBody(){return bindBody;},get bodyConfig(){return bodyConfig;},get bodyActive(){return bodyActive;},get snapshot(){return snapshot;},get pose(){return pose;},get previousPose(){return previousPose;},get liveBounds(){return liveBounds;},get physical(){return physical;},get movable(){return movable;},get inverseMass(){return inverseMass;},get inverseInertia(){return inverseInertia;},get enforceLocks(){return enforceLocks;},get changeVelocity(){return changeVelocity;},get readonlyState(){return readonlyState;},get immutableState(){return immutableState;}});
+return Object.freeze({get bodyRecord(){return bodyRecord;},get bindBody(){return bindBody;},get bodyConfig(){return bodyConfig;},get bodyActive(){return bodyActive;},get snapshot(){return snapshot;},get pose(){return pose;},get previousPose(){return previousPose;},get bodyBounds(){return bodyBounds;},get liveBounds(){return liveBounds;},get sweptBounds(){return sweptBounds;},get physical(){return physical;},get movable(){return movable;},get inverseMass(){return inverseMass;},get inverseInertia(){return inverseInertia;},get enforceLocks(){return enforceLocks;},get changeVelocity(){return changeVelocity;},get readonlyState(){return readonlyState;},get immutableState(){return immutableState;}});
 })();
 // src/basement/physics/core/body.mjs
 const m7 = (()=>{
@@ -9888,45 +9923,66 @@ const {validBounds,boundsMeet,number,vector} = m5;
 
 /** One incremental hash for physical and nonphysical instances. No per-consumer copies. */
 class spatialGrid {
-    #cells = new Map(); #entries = new Map(); #stamp = 0;
-    #stats = { updates: 0, membership_changes: 0, queries: 0, candidate_visits: 0, pairs: 0 };
+    #cells = new Map(); #entries = new Map(); #stamp = 0; #revision = 0;
+    #stats = { updates: 0, membership_changes: 0, queries: 0, candidate_visits: 0, pairs: 0, cell_additions: 0, cell_removals: 0, query_cells: 0 };
     constructor({ cell_size = 128 } = {}) { this.cell_size = number(cell_size, 'cell_size', 1); Object.freeze(this); }
-    #keys(b) {
-        const keys = [], s = this.cell_size;
-        const x0 = Math.floor(b.left / s), x1 = Math.floor(b.right / s), y0 = Math.floor(b.top / s), y1 = Math.floor(b.bottom / s);
-        if ((x1 - x0 + 1) * (y1 - y0 + 1) > 1e6) throw new RangeError('Instance/query covers over one million cells');
-        for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) keys.push(`${x},${y}`);
-        return keys;
+    get revision() { return this.#revision; }
+    #range(b) {
+        const s=this.cell_size, x0=Math.floor(b.left/s), x1=Math.floor(b.right/s), y0=Math.floor(b.top/s), y1=Math.floor(b.bottom/s);
+        if(!Number.isSafeInteger(x0)||!Number.isSafeInteger(x1)||!Number.isSafeInteger(y0)||!Number.isSafeInteger(y1))throw new RangeError('Cell coordinates must be safe integers');
+        if((x1-x0+1)*(y1-y0+1)>1e6)throw new RangeError('Instance/query covers over one million cells');
+        return {x0,x1,y0,y1};
+    }
+    #visit(x0,x1,y0,y1,visit) {
+        if(x0>x1||y0>y1)return;
+        for(let x=x0;x<=x1;x++)for(let y=y0;y<=y1;y++)visit(`${x},${y}`);
+    }
+    #difference(a,b,visit) {
+        const x0=Math.max(a.x0,b.x0),x1=Math.min(a.x1,b.x1),y0=Math.max(a.y0,b.y0),y1=Math.min(a.y1,b.y1);
+        if(x0>x1||y0>y1){this.#visit(a.x0,a.x1,a.y0,a.y1,visit);return;}
+        // Visit only the four nonoverlapping strips outside the intersection.
+        this.#visit(a.x0,x0-1,a.y0,a.y1,visit);
+        this.#visit(x1+1,a.x1,a.y0,a.y1,visit);
+        this.#visit(x0,x1,a.y0,y0-1,visit);
+        this.#visit(x0,x1,y1+1,a.y1,visit);
+    }
+    #add(key,e) {
+        let cell=this.#cells.get(key);if(!cell)this.#cells.set(key,cell=new Set());cell.add(e);this.#stats.cell_additions++;
+    }
+    #remove(key,e) {
+        const cell=this.#cells.get(key);cell.delete(e);if(!cell.size)this.#cells.delete(key);this.#stats.cell_removals++;
     }
     registerInstance(id, bounds, value) {
-        if (this.#entries.has(id)) throw new Error(`Duplicate spatial id: ${id}`);
-        const b = validBounds(bounds), keys = this.#keys(b), e = { id, bounds: b, value, keys, stamp: 0 };
-        this.#entries.set(id, e);
-        for (const k of keys) { let c = this.#cells.get(k); if (!c) this.#cells.set(k, c = new Set()); c.add(e); }
-        this.#stats.membership_changes++;
+        if(this.#entries.has(id))throw new Error(`Duplicate spatial id: ${id}`);
+        const b=validBounds(bounds),range=this.#range(b),e={id,bounds:b,value,range,stamp:0};
+        this.#entries.set(id,e);this.#visit(range.x0,range.x1,range.y0,range.y1,key=>this.#add(key,e));
+        this.#stats.membership_changes++;this.#revision++;
     }
     updateInstance(id, bounds) {
-        const e = this.#entries.get(id); if (!e) throw new Error(`Unknown spatial id: ${id}`);
-        if (e.bounds.left === bounds.left && e.bounds.right === bounds.right && e.bounds.top === bounds.top && e.bounds.bottom === bounds.bottom) return;
-        const b = validBounds(bounds), keys = this.#keys(b); this.#stats.updates++;
-        if (e.keys.length !== keys.length || e.keys.some((k, i) => k !== keys[i])) {
-            for (const k of e.keys) { const c = this.#cells.get(k); c.delete(e); if (!c.size) this.#cells.delete(k); }
-            for (const k of keys) { let c = this.#cells.get(k); if (!c) this.#cells.set(k, c = new Set()); c.add(e); }
-            e.keys = keys; this.#stats.membership_changes++;
+        const e=this.#entries.get(id);if(!e)throw new Error(`Unknown spatial id: ${id}`);
+        if(e.bounds.left===bounds.left&&e.bounds.right===bounds.right&&e.bounds.top===bounds.top&&e.bounds.bottom===bounds.bottom)return;
+        const b=validBounds(bounds),range=this.#range(b),old=e.range;
+        if(old.x0!==range.x0||old.x1!==range.x1||old.y0!==range.y0||old.y1!==range.y1){
+            this.#difference(old,range,key=>this.#remove(key,e));
+            this.#difference(range,old,key=>this.#add(key,e));
+            e.range=range;this.#stats.membership_changes++;
         }
-        e.bounds = b;
+        e.bounds=b;this.#stats.updates++;this.#revision++;
     }
     removeInstance(id) {
-        const e = this.#entries.get(id); if (!e) return false;
-        for (const k of e.keys) { const c = this.#cells.get(k); c.delete(e); if (!c.size) this.#cells.delete(k); }
-        this.#entries.delete(id); this.#stats.membership_changes++; return true;
+        const e=this.#entries.get(id);if(!e)return false;
+        const r=e.range;this.#visit(r.x0,r.x1,r.y0,r.y1,key=>this.#remove(key,e));
+        this.#entries.delete(id);this.#stats.membership_changes++;this.#revision++;return true;
     }
     queryBounds(bounds, results = []) {
-        const b = validBounds(bounds); results.length = 0; const stamp = ++this.#stamp; this.#stats.queries++;
-        for (const k of this.#keys(b)) for (const e of this.#cells.get(k) ?? []) {
-            if (e.stamp === stamp) continue; e.stamp = stamp; this.#stats.candidate_visits++;
-            if (boundsMeet(b, e.bounds)) results.push(e.value);
-        }
+        const b=validBounds(bounds),range=this.#range(b);results.length=0;const stamp=++this.#stamp;this.#stats.queries++;
+        this.#visit(range.x0,range.x1,range.y0,range.y1,key=>{
+            this.#stats.query_cells++;
+            for(const e of this.#cells.get(key)??[]){
+                if(e.stamp===stamp)continue;e.stamp=stamp;this.#stats.candidate_visits++;
+                if(boundsMeet(b,e.bounds))results.push(e.value);
+            }
+        });
         return results;
     }
     queryRadius(position, radius, results = []) {
@@ -9939,6 +9995,7 @@ class spatialGrid {
         const s = this.cell_size;
         let x = Math.floor(from[0] / s), y = Math.floor(from[1] / s);
         const ex = Math.floor(to[0] / s), ey = Math.floor(to[1] / s), dx = to[0] - from[0], dy = to[1] - from[1];
+        if(!Number.isSafeInteger(x)||!Number.isSafeInteger(y)||!Number.isSafeInteger(ex)||!Number.isSafeInteger(ey))throw new RangeError('Cell coordinates must be safe integers');
         const sx = Math.sign(dx), sy = Math.sign(dy), tx = dx ? s / Math.abs(dx) : Infinity, ty = dy ? s / Math.abs(dy) : Infinity;
         let nx = dx ? ((sx > 0 ? x + 1 : x) * s - from[0]) / dx : Infinity;
         let ny = dy ? ((sy > 0 ? y + 1 : y) * s - from[1]) / dy : Infinity;
@@ -9953,6 +10010,7 @@ class spatialGrid {
     querySegment(from, to, results = []) {
         results.length = 0; const stamp = ++this.#stamp; this.#stats.queries++;
         this.#segmentCells(from, to, (x, y) => {
+            this.#stats.query_cells++;
             for (const e of this.#cells.get(`${x},${y}`) ?? []) if (e.stamp !== stamp) { e.stamp = stamp; this.#stats.candidate_visits++; results.push(e.value); }
         });
         return results;
@@ -9967,6 +10025,7 @@ class spatialGrid {
             for (let dx = -cells; dx <= cells; dx++) for (let dy = -cells; dy <= cells; dy++) {
                 const k = `${x + dx},${y + dy}`; if (seen.has(k)) continue; seen.add(k);
                 if (seen.size > 1e6) throw new RangeError('Sweep covers over one million cells');
+                this.#stats.query_cells++;
                 for (const e of this.#cells.get(k) ?? []) if (e.stamp !== stamp) { e.stamp = stamp; this.#stats.candidate_visits++; results.push(e.value); }
             }
         });
@@ -9979,23 +10038,22 @@ class spatialGrid {
             this.queryBounds(bounds ?? a.bounds, nearby);
             for (const b of nearby) {
                 if (a.value === b || !b.body_id) continue;
-                if (!accepts(a.value, b)) continue;
                 const lo = Math.min(id, b.body_id), hi = Math.max(id, b.body_id), key = `${lo}:${hi}`;
-                if (seen.has(key)) continue; seen.add(key); results.push(id === lo ? [a.value, b] : [b, a.value]);
+                if (seen.has(key) || !accepts(a.value,b)) continue; seen.add(key); results.push(id === lo ? [a.value, b] : [b, a.value]);
             }
         }
         this.#stats.pairs += results.length; return results;
     }
     getStatistics() { return { ...this.#stats, instances: this.#entries.size, cells: this.#cells.size }; }
     exportInstances() { return [...this.#entries.values()].map(e => ({ id: e.id, bounds: { ...e.bounds }, value: e.value })); }
-    clear() { this.#entries.clear(); this.#cells.clear(); }
+    clear() { this.#revision++;this.#entries.clear(); this.#cells.clear();this.#stats.cell_removals=this.#stats.cell_additions; }
 }
 
 return Object.freeze({get spatialGrid(){return spatialGrid;}});
 })();
 // src/basement/physics/spatial/queries.mjs
 const m11 = (()=>{
-const {pose,physical} = m6;
+const {pose,physical,bodyBounds} = m6;
 const {collisionShape,shapeBounds,shapeReach,pieces} = m4;
 const {collisionDetector} = m8;
 const {vector,number,sub,add,scale,unit,length,BODY_GROUP,EPS,validBounds,boundsMeet,unionBounds} = m5;
@@ -10030,8 +10088,7 @@ class physicsQueries {
     getBodyBounds(body, { bounds_type = 'collision' } = {}) {
         const r = this.world._record(referenceBody(body));
         if (!['collision', 'render', 'light'].includes(bounds_type)) throw new TypeError('Invalid bounds_type');
-        const shape = bounds_type === 'collision' ? r.shape : r.config[`${bounds_type}_shape`] ?? r.shape;
-        return shapeBounds(shape, r.position, r.rotation);
+        return {...bodyBounds(r,bounds_type)};
     }
     queryEntitiesInBounds(packet, results = []) {
         const bounds = validBounds(packet.bounds), hits = [], seen = new Set();
@@ -11472,12 +11529,19 @@ class attachmentManager {
         const children = this.#children.get(e.parent.id); children?.delete(e.child.id); if (!children?.size) this.#children.delete(e.parent.id);
     }
     #place(e, snap) {
+        const parent=e.parent,cache=e.placement_cache,active=bodyActive(e.child);
+        if(!snap&&cache&&cache.x===parent.position[0]&&cache.y===parent.position[1]&&cache.rotation===parent.rotation&&cache.local_position===e.local_position&&cache.local_rotation===e.local_rotation
+            &&cache.child_x===e.child.position[0]&&cache.child_y===e.child.position[1]&&cache.child_rotation===e.child.rotation&&cache.vx===parent.velocity[0]&&cache.vy===parent.velocity[1]&&cache.spin===parent.angular_velocity&&cache.active===active)return;
+        e.placement_cache={x:parent.position[0],y:parent.position[1],rotation:parent.rotation,local_position:e.local_position,local_rotation:e.local_rotation,
+            vx:parent.velocity[0],vy:parent.velocity[1],spin:parent.angular_velocity,active};
+        e.child.metrics.attachment_placements++;
         const pose = pathGeometry.transformPose({ position: e.parent.position, rotation: e.parent.rotation }, e);
         e.child.position = pose.position; e.child.rotation = pose.rotation;
         const offset = rotate(e.local_position, e.parent.rotation);
         e.child.velocity = add(e.parent.velocity, [-e.parent.angular_velocity * offset[1], e.parent.angular_velocity * offset[0]]);
         e.child.angular_velocity = e.parent.angular_velocity;
         if (snap) { e.child.previous_position = [...pose.position]; e.child.previous_rotation = pose.rotation; }
+        e.placement_cache.child_x=e.child.position[0];e.placement_cache.child_y=e.child.position[1];e.placement_cache.child_rotation=e.child.rotation;
         this.world._syncBody(e.child.handle);
     }
     _syncDescendants(parent, snap = false) {
@@ -11487,7 +11551,10 @@ class attachmentManager {
         }
     }
     _capturePrevious() {
-        for (const e of this.#entries.values()) if (!e.pending) { e.child.previous_position = [...e.child.position]; e.child.previous_rotation = e.child.rotation; }
+        for(const e of this.#entries.values())if(!e.pending){
+            const r=e.child;
+            if(r.previous_position[0]!==r.position[0]||r.previous_position[1]!==r.position[1]||r.previous_rotation!==r.rotation){r.previous_position=[...r.position];r.previous_rotation=r.rotation;}
+        }
     }
     _syncAll(snap = false) {
         const done = new Set();
@@ -11741,7 +11808,7 @@ return Object.freeze({get particlePhysics(){return particlePhysics;}});
 const m2 = (()=>{
 const {massProperties,massCenter,invalidateMass,integrateAtCenter,changeAngularSpeed,centerVelocity,setCenterVelocity} = m3;
 const {BODY_GROUP,EPS,vector,number,clone,freeze,validBounds,boundsMeet,sub,add,scale,length,unit,rotate,unionBounds} = m5;
-const {bodyConfig,bodyRecord,pose,previousPose,liveBounds,snapshot,bodyActive,movable,physical,changeVelocity,enforceLocks,inverseInertia} = m6;
+const {bodyConfig,bodyRecord,pose,previousPose,liveBounds,bodyBounds,sweptBounds,snapshot,bodyActive,movable,physical,changeVelocity,enforceLocks,inverseInertia} = m6;
 const {physicsBody} = m7;
 const {collisionShape,shapeReach,shapeBounds} = m4;
 const {collisionDetector} = m8;
@@ -11768,9 +11835,9 @@ class physicsSystem {
     #nextId = 1; #nextConstraint = 1;
     #stepping = false; #dispatching = false; #committing = false;
     #tick = 0; #motionEnvelope = null;
-    #stepAuthority;
+    #stepAuthority; #broadphaseEpoch=0; #candidateCache=null;
     #queries; #particles; #attachments;
-    #stats = { steps: 0, narrow_checks: 0, candidate_pairs: 0, active_movers: 0 };
+    #stats = { steps: 0, narrow_checks: 0, candidate_pairs: 0, active_movers: 0, spatial_sync_requests: 0, spatial_sync_skips: 0, bounds_calculations: 0, swept_bounds_calculations: 0, attachment_placements: 0, broadphase_builds: 0, broadphase_reuses: 0 };
     constructor({ cell_size = 128, fixed_step = 1 / 60, gravity = [0, 0], solver_iterations = 6, sleep_speed = 0.05, sleep_delay = 0.5, asset_library, step_authority } = {}) {
         if (step_authority !== undefined && typeof step_authority !== 'symbol') throw new TypeError('step_authority must be a private Symbol');
         this.#stepAuthority = step_authority;
@@ -11808,28 +11875,51 @@ class physicsSystem {
         return this.#motionEnvelope;
     }
     #sync(r, swept = false) {
-        this.#motionEnvelope = null;
-        if (r.removed) return;
-        if (!bodyActive(r)) { if (r.indexed) this.spatial_grid.removeInstance(r.id); r.indexed = false; this.#moving.delete(r); return; }
-        let b = liveBounds(r);
-        for (const extent of [r.config.render_shape, r.config.light_shape]) if (extent) b = unionBounds(b, shapeBounds(extent, r.position, r.rotation));
-        if (swept) {
-            const reach = shapeReach(r.shape);
-            b = unionBounds(b, { left: Math.min(r.position[0], r.previous_position[0]) - reach, right: Math.max(r.position[0], r.previous_position[0]) + reach,
-                top: Math.min(r.position[1], r.previous_position[1]) - reach, bottom: Math.max(r.position[1], r.previous_position[1]) + reach });
+        this.#motionEnvelope=null;this.#stats.spatial_sync_requests++;
+        if(r.removed)return;
+        if(r.broadphase_config!==r.config||r.broadphase_mount!==r.parent_mount){
+            const old=r.broadphase_config,next=r.config;
+            if(!old||old.physics_type!==next.physics_type||old.active!==next.active||old.collision_group!==next.collision_group||old.collision_mask!==next.collision_mask
+                ||old.collision_exclusions!==next.collision_exclusions||r.broadphase_mount!==r.parent_mount)this.#broadphaseEpoch++;
+            r.broadphase_config=next;r.broadphase_mount=r.parent_mount;
         }
-        if (r.indexed) this.spatial_grid.updateInstance(r.id, b);
-        else { this.spatial_grid.registerInstance(r.id, b, r.handle); r.indexed = true; }
-        if (r.config.physics_type !== 'static') this.#moving.add(r); else this.#moving.delete(r);
+        if(!bodyActive(r)){
+            if(r.indexed)this.spatial_grid.removeInstance(r.id);
+            r.indexed=false;r.spatial_cache=null;this.#moving.delete(r);r.moving_member=false;return;
+        }
+        const moving=r.config.physics_type!=='static';
+        if(moving!==r.moving_member){if(moving)this.#moving.add(r);else this.#moving.delete(r);r.moving_member=moving;}
+        const x=r.position[0],y=r.position[1],rotation=r.rotation,px=r.previous_position[0],py=r.previous_position[1];
+        // Zero travel must not expand a stationary body's entry to its circumradius.
+        swept=swept&&(x!==px||y!==py||rotation!==r.previous_rotation);
+        const cache=r.spatial_cache,render=r.config.render_shape,light=r.config.light_shape;
+        // A broad render/light extent can keep the grid AABB constant while the
+        // collision shape moves inside it. Physical candidate validity must track
+        // the collision pose/sweep as well as the shared grid's revision.
+        if(!cache||cache.x!==x||cache.y!==y||cache.rotation!==rotation||cache.shape!==r.shape||cache.swept!==swept
+            ||swept&&(cache.px!==px||cache.py!==py||cache.previous_rotation!==r.previous_rotation))this.#broadphaseEpoch++;
+        if(r.indexed&&cache&&cache.x===x&&cache.y===y&&cache.rotation===rotation&&cache.shape===r.shape&&cache.render===render&&cache.light===light
+            &&cache.swept===swept&&(!swept||cache.px===px&&cache.py===py&&cache.previous_rotation===r.previous_rotation)){
+            this.#stats.spatial_sync_skips++;return;
+        }
+        let bounds=swept?sweptBounds(r):liveBounds(r);
+        if(render)bounds=unionBounds(bounds,bodyBounds(r,'render'));
+        if(light)bounds=unionBounds(bounds,bodyBounds(r,'light'));
+        if(r.indexed)this.spatial_grid.updateInstance(r.id,bounds);
+        else{this.spatial_grid.registerInstance(r.id,bounds,r.handle);r.indexed=true;}
+        if(cache){cache.x=x;cache.y=y;cache.rotation=rotation;cache.shape=r.shape;cache.render=render;cache.light=light;cache.swept=swept;cache.px=px;cache.py=py;cache.previous_rotation=r.previous_rotation;}
+        else r.spatial_cache={x,y,rotation,shape:r.shape,render,light,swept,px,py,previous_rotation:r.previous_rotation};
     }
     createBody(packet = {}) {
         const config = bodyConfig(packet), id = this.#nextId++;
-        const r = { world: this, id, config, shape: new collisionShape(config.collision_shape), position: [...config.position], rotation: config.rotation,
+        const r = { world: this, metrics:this.#stats, id, config, shape: new collisionShape(config.collision_shape), position: [...config.position], rotation: config.rotation,
             previous_position: [...config.position], previous_rotation: config.rotation, velocity: [...config.linear_velocity], angular_velocity: config.angular_velocity,
             force: [0, 0], torque: 0, sleeping: false, sleep_time: 0, removed: false, indexed: false, motor: null };
         r.handle = new physicsBody(r);
         enforceLocks(r);
-        this._mutate(() => { this.#nextId = Math.max(this.#nextId, id + 1); this.#bodies.set(id, r); this.#sync(r); });
+        this._mutate(() => { this.#nextId = Math.max(this.#nextId, id + 1); this.#bodies.set(id,r);
+            try{this.#sync(r);}catch(error){this.#bodies.delete(id);this.#moving.delete(r);this.spatial_grid.removeInstance(id);r.indexed=false;r.removed=true;throw error;}
+        });
         return r.handle;
     }
     createEntity(packet = {}) { return this.elements.createEntity(packet); }
@@ -11897,7 +11987,7 @@ class physicsSystem {
         const r = this._record(value);
         this._mutate(() => {
             if (r.removed) return;
-            this.#motionEnvelope = null; this.spatial_grid.removeInstance(r.id); r.indexed = false; r.removed = true; this.#bodies.delete(r.id); this.#moving.delete(r);
+            this.#motionEnvelope = null;this.#candidateCache=null; this.spatial_grid.removeInstance(r.id); r.indexed = false; r.removed = true; this.#bodies.delete(r.id); this.#moving.delete(r);
             this.#attachments._bodyRemoved(r); this.elements._bodyRemoved(r.id); this.traffic.removeVehicle(r.id); this.motion._remove(r.id); this.#particles._bodyRemoved(r.id);
             for (const [id, c] of this.#constraints) { const cr = constraintRecord(c); if (cr.a === r || cr.b === r) this.#constraints.delete(id); }
         });
@@ -11914,9 +12004,19 @@ class physicsSystem {
         this._mutate(() => {
             if (r.removed) return;
             checkMountedChanges();
-            const next = bodyConfig({ ...snapshot(r), active: r.config.active, ...change }); r.config = next; invalidateMass(r); r.shape = new collisionShape(next.collision_shape);
+            const previous={config:r.config,shape:r.shape,position:r.position,rotation:r.rotation,velocity:r.velocity,angular_velocity:r.angular_velocity,
+                previous_position:r.previous_position,previous_rotation:r.previous_rotation,sleeping:r.sleeping};
+            const next=bodyConfig({...snapshot(r),active:r.config.active,...change});
+            if(!Object.hasOwn(change,'collision_shape'))next.collision_shape=r.config.collision_shape;
+            if(!Object.hasOwn(change,'render_shape'))next.render_shape=r.config.render_shape;
+            if(!Object.hasOwn(change,'light_shape'))next.light_shape=r.config.light_shape;
+            if(!Object.hasOwn(change,'collision_exclusions'))next.collision_exclusions=r.config.collision_exclusions;
+            r.config=next;invalidateMass(r);
+            if(Object.hasOwn(change,'collision_shape'))r.shape=new collisionShape(next.collision_shape);
             r.position = [...next.position]; r.rotation = next.rotation; r.velocity = [...next.linear_velocity]; r.angular_velocity = next.angular_velocity;
-            r.previous_position = [...r.position]; r.previous_rotation = r.rotation; r.sleeping = false; enforceLocks(r); this.#sync(r);
+            if(r.previous_position[0]!==r.position[0]||r.previous_position[1]!==r.position[1]||r.previous_rotation!==r.rotation)this.#broadphaseEpoch++;
+            r.previous_position=[...r.position];r.previous_rotation=r.rotation;r.sleeping=false;enforceLocks(r);
+            try{this.#sync(r);}catch(error){Object.assign(r,previous);invalidateMass(r);this.#sync(r);throw error;}
             this.elements._bodyUpdated(r.id, next); this.#attachments._syncDescendants(r, true);
         }); return r.handle;
     }
@@ -11954,10 +12054,14 @@ class physicsSystem {
                 case 'position':
                 case 'rotation': {
                     const position = p.position ?? r.position, rotation = p.rotation ?? r.rotation;
+                    const previous={position:r.position,rotation:r.rotation,velocity:r.velocity,angular_velocity:r.angular_velocity,previous_position:r.previous_position,previous_rotation:r.previous_rotation};
                     if (p.placement_mode === 'clear' && !this.isPlacementClear(b, position, { rotation, include_ghosts: false, placement_bounds:p.placement_bounds })) { this._emit('movementBlocked', { body: b, reason: 'occupied_placement' }); break; }
                     r.position = [...position]; r.rotation = rotation;
                     if (!p.preserve_velocity) { r.velocity = [0, 0]; r.angular_velocity = 0; }
-                    r.previous_position = [...r.position]; r.previous_rotation = r.rotation; this.#sync(r); break;
+                    if(r.previous_position[0]!==r.position[0]||r.previous_position[1]!==r.position[1]||r.previous_rotation!==r.rotation)this.#broadphaseEpoch++;
+                    r.previous_position=[...r.position];r.previous_rotation=r.rotation;
+                    try{this.#sync(r);}catch(error){Object.assign(r,previous);this.#sync(r);throw error;}
+                    break;
                 }
                 case 'velocity': if (r.config.physics_type !== 'static') r.velocity = local(p.velocity); break;
                 case 'angular_velocity': if (r.config.physics_type !== 'static') r.angular_velocity = p.angular_velocity; break;
@@ -12025,15 +12129,17 @@ class physicsSystem {
             if (!r.config.active) this.removeBody(r.handle);
         }
     }
-    #collisionBounds(r) {
-        const reach = shapeReach(r.shape);
-        return unionBounds(liveBounds(r), { left: Math.min(r.position[0], r.previous_position[0]) - reach, right: Math.max(r.position[0], r.previous_position[0]) + reach,
-            top: Math.min(r.position[1], r.previous_position[1]) - reach, bottom: Math.max(r.position[1], r.previous_position[1]) + reach });
-    }
+    #collisionBounds(r) { return sweptBounds(r); }
     #collide(moving, iteration) {
-        const sources = moving.filter(r => physical(r) && r.config.collision_mask && !(r.motor instanceof projectileMotor));
-        const candidates = this.spatial_grid.collectCandidatePairs(sources.map(r => ({ id: r.id, bounds: this.#collisionBounds(r) })), [],
-            (a, b) => boundsMeet(this.#collisionBounds(this._record(a)), this.#collisionBounds(this._record(b))) && this.#meets(this._record(a), this._record(b)) && !(this._record(b).motor instanceof projectileMotor));
+        let candidates;
+        const revision=this.spatial_grid.revision,cache=this.#candidateCache;
+        if(cache&&cache.revision===revision&&cache.epoch===this.#broadphaseEpoch){candidates=cache.pairs;this.#stats.broadphase_reuses++;}
+        else{
+            const sources=moving.filter(r=>physical(r)&&r.config.collision_mask&&!(r.motor instanceof projectileMotor));
+            candidates=this.spatial_grid.collectCandidatePairs(sources.map(r=>({id:r.id,bounds:this.#collisionBounds(r)})),[],
+                (a,b)=>boundsMeet(this.#collisionBounds(this._record(a)),this.#collisionBounds(this._record(b)))&&this.#meets(this._record(a),this._record(b))&&!(this._record(b).motor instanceof projectileMotor));
+            this.#candidateCache={revision,epoch:this.#broadphaseEpoch,pairs:candidates};this.#stats.broadphase_builds++;
+        }
         this.#stats.candidate_pairs += candidates.length;
         const contacts = [];
         for (const [ha, hb] of candidates) {
@@ -12092,25 +12198,33 @@ class physicsSystem {
         try {
             const moving = [...this.#moving].filter(r => bodyActive(r));
             this.#stats.active_movers = moving.length;
-            for (const r of moving) { r.previous_position = [...r.position]; r.previous_rotation = r.rotation; }
+            for(const r of moving){
+                // Previous poses affect swept candidate bounds even when the current
+                // index is already tight, so dropping an old sweep invalidates pairs.
+                if(r.previous_position[0]!==r.position[0]||r.previous_position[1]!==r.position[1]||r.previous_rotation!==r.rotation){
+                    this.#broadphaseEpoch++;r.previous_position=[...r.position];r.previous_rotation=r.rotation;
+                }
+            }
             this.#attachments._capturePrevious();
             this.traffic._update();
             this.#particles._beforeStep(step_seconds);
             for (const r of moving) {
                 r.motion_step = r.motor instanceof projectileMotor ? Math.min(step_seconds, Math.max(0, r.motor.remaining)) : step_seconds;
-                if (r.parent_mount) { r.force = [0, 0]; r.torque = 0; continue; }
+                if (r.parent_mount) { r.force[0]=r.force[1]=0;r.torque=0;continue; }
                 if (r.sleeping) continue;
                 const scripted = this.motion._controls(r, step_seconds); r.prescribed_step = scripted || r.config.physics_type === 'kinematic';
                 if (!scripted) r.motor?._update(step_seconds);
                 if (movable(r) && !scripted) {
                     if (r.force[0] || r.force[1]) changeVelocity(r, scale(r.force, step_seconds));
                     if (this.config.gravity[0] || this.config.gravity[1]) changeVelocity(r, scale(this.config.gravity, massProperties(r).mass * step_seconds), massCenter(r));
-                    changeAngularSpeed(r, r.torque * inverseInertia(r) * step_seconds);
-                    const velocity = scale(centerVelocity(r), Math.exp(-r.config.linear_damping * step_seconds));
-                    r.angular_velocity *= Math.exp(-r.config.angular_damping * step_seconds); setCenterVelocity(r, velocity);
+                    if(r.torque)changeAngularSpeed(r,r.torque*inverseInertia(r)*step_seconds);
+                    if((r.config.linear_damping||r.config.angular_damping)&&(r.velocity[0]||r.velocity[1]||r.angular_velocity)){
+                        const velocity=scale(centerVelocity(r),Math.exp(-r.config.linear_damping*step_seconds));
+                        r.angular_velocity*=Math.exp(-r.config.angular_damping*step_seconds);setCenterVelocity(r,velocity);
+                    }
                 }
                 enforceLocks(r);
-                r.force = [0, 0]; r.torque = 0; this.#sync(r);
+                r.force[0]=r.force[1]=0;r.torque=0;this.#sync(r);
             }
             // Resolve existing contacts after motors/forces but before travel. Otherwise
             // a requested inward component can repeatedly clip the whole CCD step at
@@ -12119,8 +12233,10 @@ class physicsSystem {
             for (const r of moving) {
                 if (r.sleeping || r.parent_mount) continue;
                 enforceLocks(r);
-                if (r.prescribed_step) { r.position = add(r.position, scale(r.velocity, r.motion_step)); r.rotation += r.angular_velocity * r.motion_step; }
-                else integrateAtCenter(r, r.motion_step);
+                if(r.velocity[0]||r.velocity[1]||r.angular_velocity){
+                    if(r.prescribed_step){r.position=add(r.position,scale(r.velocity,r.motion_step));r.rotation+=r.angular_velocity*r.motion_step;}
+                    else integrateAtCenter(r,r.motion_step);
+                }
                 this.#sync(r, true);
             }
             this.#attachments._syncAll();
@@ -12244,7 +12360,7 @@ class physicsSystem {
     removeChain(chain) { return this.#particles.removeChain(chain); }
     clearWorld() {
         this._mutate(() => { for (const r of this.#bodies.values()) r.removed = true; this.#bodies.clear(); this.#moving.clear(); this.#constraints.clear(); this.#contacts.clear(); this.#stepContacts.clear();
-            this.#attachments._clear(); this.elements._clear(); this.traffic._clear(); this.motion._clear(); this.spatial_grid.clear(); this.#particles._clear(); this.#events = []; this.#nextId = 1; this.#nextConstraint = 1; this.#tick = 0; this.#motionEnvelope = null; });
+            this.#attachments._clear(); this.elements._clear(); this.traffic._clear(); this.motion._clear(); this.spatial_grid.clear(); this.#particles._clear(); this.#events = []; this.#nextId = 1; this.#nextConstraint = 1; this.#tick = 0; this.#motionEnvelope = null;this.#candidateCache=null;this.#broadphaseEpoch++; });
     }
     // Versioned exchange; validate a replacement before changing the live registry.
     _exportState() {

@@ -1,4 +1,4 @@
-import { pose, physical } from '../core/state.mjs';
+import { pose, physical, bodyBounds } from '../core/state.mjs';
 import { collisionShape, shapeBounds, shapeReach, pieces } from '../collision/shape.mjs';
 import { collisionDetector } from '../collision/detector.mjs';
 import { vector, number, sub, add, scale, unit, length, BODY_GROUP, EPS, validBounds, boundsMeet, unionBounds } from '../core/values.mjs';
@@ -33,8 +33,7 @@ export class physicsQueries {
     getBodyBounds(body, { bounds_type = 'collision' } = {}) {
         const r = this.world._record(referenceBody(body));
         if (!['collision', 'render', 'light'].includes(bounds_type)) throw new TypeError('Invalid bounds_type');
-        const shape = bounds_type === 'collision' ? r.shape : r.config[`${bounds_type}_shape`] ?? r.shape;
-        return shapeBounds(shape, r.position, r.rotation);
+        return {...bodyBounds(r,bounds_type)};
     }
     queryEntitiesInBounds(packet, results = []) {
         const bounds = validBounds(packet.bounds), hits = [], seen = new Set();

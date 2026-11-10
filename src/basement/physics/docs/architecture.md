@@ -48,16 +48,18 @@ Prescribed mounts retain the child's canonical body record and configured mass/f
 
 ## Shared index
 
-Membership changes incrementally when bounds cross cell boundaries. Static geometry is not rebuilt every frame. Rotated shapes use actual transformed bounds, including compound children. During prediction, moving bodies have conservative swept bounds so two objects crossing between endpoints can be found. Final bounds are restored after solving.
+Membership changes incrementally when bounds cross cell boundaries, retaining shared cells and updating only the entering/leaving strips. Unchanged collision/render/light bounds are cached by canonical pose/shape; idle records skip grid synchronization work. Static geometry is not rebuilt every frame. Rotated shapes use actual transformed bounds, including compound children. During prediction, moving bodies have conservative swept bounds so two objects crossing between endpoints can be found. Final bounds are restored after solving.
 
 Queries reuse one index. Radius/bounds queries visit relevant cells; segment and thick sweep queries traverse a corridor using DDA instead of scanning a diagonal bounding rectangle. Result buffers can be supplied by callers. The index returns conservative candidates; exact geometry and masks are evaluated in the query/detection layer.
 
 Nonphysical objects can register spatial metadata through `registerSpatialInstance`. Rendering/culling can query these and body handles through the same index. A navigation search temporarily stores routing nodes and costs, and queries geometry through the shared index. It never stores another obstacle grid.
 
-Body integration is O(moving bodies), not a collision test. Pair generation visits nearby candidates and deduplicates unordered pairs. Genuine dense overlaps still have a quadratic number of pairs; no index can make actual pairwise interactions disappear. Iteration stops early when neither contacts nor constraints require another pass. See `benchmarks/spatial.mjs` for candidate counts and local timings; no game/device FPS improvement is claimed before migration measurements.
+Body integration is O(moving bodies), not a collision test. Pair generation visits nearby candidates and deduplicates unordered pairs. Candidate lists are reused until shared-grid, collision pose/sweep, filter or attachment inputs change. This remains correct when a large light/render extent hides physical motion from the index AABB. Exact contact response and contact lifecycle events still run for the valid candidate pairs. Genuine dense overlaps still have a quadratic number of pairs; no index can make actual pairwise interactions disappear. Iteration stops early when neither contacts nor constraints require another pass. See `benchmarks/spatial.mjs` for candidate counts and local timings; no game/device FPS improvement is claimed before migration measurements.
 
 ## Simulation and frontend boundary
 
 The Lobby will call `updateState` at its fixed timestep. The world commits queued requests, evaluates motors/forces, resolves existing contacts before travel, predicts motion, processes ordered projectile sweeps, generates contacts, solves contacts/constraints, updates sleeping/lifetimes and then delivers events. Callback requests take effect at the next step boundary. Rendering reads `getRenderState`; interpolation never overwrites live physical state.
 
 Gameplay selects targets, routes, damage and effects. The engine calculates directions, clearance, stopping, separation, impulse, torque and integration. Rendering can perform drawing/camera arithmetic; it cannot change body positions to resolve a physical situation.
+
+[Incremental spatial diagnostics, verification and measurements](spatial-performance.md) describe invalidation and the remaining simulation costs.

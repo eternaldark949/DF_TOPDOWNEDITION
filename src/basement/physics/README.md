@@ -49,3 +49,5 @@ From this directory, `python3 -m http.server 8080` serves the [browser sandbox](
 For another project, copy this entire directory and import `index.mjs`. The runtime uses standard ECMAScript modules and has no references to this game, its assets, DOM, audio, global configuration or rendering APIs. The examples and Node tests have their own explicit environment dependencies.
 
 Inside a copied package directory, run `node --test tests/*.test.mjs`, `node examples/headless.mjs` and `node benchmarks/spatial.mjs`.
+
+[Incremental spatial performance](docs/spatial-performance.md) covers pose/shape caching, entering/leaving cell updates, candidate invalidation, diagnostics and reproducible local benchmarks.

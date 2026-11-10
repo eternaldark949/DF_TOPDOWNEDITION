@@ -1,5 +1,5 @@
 import { PHYSICS_TYPES, BODY_GROUP, vector, number, mask, clone, freeze } from './values.mjs';
-import { collisionShape, shapeBounds } from '../collision/shape.mjs';
+import { collisionShape, shapeBounds, shapeReach } from '../collision/shape.mjs';
 import { massProperties, massCenter, impulseCenter, supportedInertia, centerVelocity, setCenterVelocity } from './mass.mjs';
 
 const bodies = new WeakMap();
@@ -42,7 +42,32 @@ export function snapshot(r) {
 }
 export const pose = r => ({ position: r.position, rotation: r.rotation });
 export const previousPose = r => ({ position: r.previous_position, rotation: r.previous_rotation });
-export const liveBounds = r => shapeBounds(r.shape, r.position, r.rotation);
+// Derived geometry stays on the official record. It is not another spatial index,
+// and is never serialized or exposed by reference to callers.
+export function bodyBounds(r, type = 'collision') {
+    if(type!=='collision'&&!r.config[`${type}_shape`])return bodyBounds(r);
+    const shape=type==='collision'?r.shape:r.config[`${type}_shape`]??r.shape;
+    const cache=(r.bounds_cache??=Object.create(null)),prior=cache[type],x=r.position[0],y=r.position[1],rotation=r.rotation;
+    if(prior&&prior.shape===shape&&prior.x===x&&prior.y===y&&prior.rotation===rotation)return prior.bounds;
+    const bounds=shapeBounds(shape,r.position,rotation);
+    if(prior){prior.shape=shape;prior.x=x;prior.y=y;prior.rotation=rotation;prior.bounds=bounds;}
+    else cache[type]={shape,x,y,rotation,bounds};
+    r.metrics.bounds_calculations++;return bounds;
+}
+export const liveBounds = r => bodyBounds(r);
+export function sweptBounds(r) {
+    const bounds=liveBounds(r),x=r.position[0],y=r.position[1],px=r.previous_position[0],py=r.previous_position[1];
+    if(x===px&&y===py&&r.rotation===r.previous_rotation)return bounds;
+    const prior=r.sweep_cache;
+    if(prior&&prior.bounds===bounds&&prior.px===px&&prior.py===py&&prior.previous_rotation===r.previous_rotation)return prior.value;
+    const reach=shapeReach(r.shape);
+    const value=prior?.value??{};
+    value.left=Math.min(bounds.left,Math.min(x,px)-reach);value.right=Math.max(bounds.right,Math.max(x,px)+reach);
+    value.top=Math.min(bounds.top,Math.min(y,py)-reach);value.bottom=Math.max(bounds.bottom,Math.max(y,py)+reach);
+    if(prior){prior.bounds=bounds;prior.px=px;prior.py=py;prior.previous_rotation=r.previous_rotation;}
+    else r.sweep_cache={bounds,px,py,previous_rotation:r.previous_rotation,value};
+    r.metrics.swept_bounds_calculations++;return value;
+}
 export const physical = r => bodyActive(r) && !r.parent_mount && r.config.physics_type !== 'no_collision';
 export const movable = r => !r.parent_mount && ['rigid', 'character', 'no_collision'].includes(r.config.physics_type);
 export function inverseMass(r, axis) {

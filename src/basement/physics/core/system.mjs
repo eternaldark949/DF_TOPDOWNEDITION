@@ -1,6 +1,6 @@
 import { massProperties, massCenter, invalidateMass, integrateAtCenter, changeAngularSpeed, centerVelocity, setCenterVelocity } from './mass.mjs';
 import { BODY_GROUP, EPS, vector, number, clone, freeze, validBounds, boundsMeet, sub, add, scale, length, unit, rotate, unionBounds } from './values.mjs';
-import { bodyConfig, bodyRecord, pose, previousPose, liveBounds, snapshot, bodyActive, movable, physical, changeVelocity, enforceLocks, inverseInertia } from './state.mjs';
+import { bodyConfig, bodyRecord, pose, previousPose, liveBounds, bodyBounds, sweptBounds, snapshot, bodyActive, movable, physical, changeVelocity, enforceLocks, inverseInertia } from './state.mjs';
 import { physicsBody } from './body.mjs';
 import { collisionShape, shapeReach, shapeBounds } from '../collision/shape.mjs';
 import { collisionDetector } from '../collision/detector.mjs';
@@ -27,9 +27,9 @@ export class physicsSystem {
     #nextId = 1; #nextConstraint = 1;
     #stepping = false; #dispatching = false; #committing = false;
     #tick = 0; #motionEnvelope = null;
-    #stepAuthority;
+    #stepAuthority; #broadphaseEpoch=0; #candidateCache=null;
     #queries; #particles; #attachments;
-    #stats = { steps: 0, narrow_checks: 0, candidate_pairs: 0, active_movers: 0 };
+    #stats = { steps: 0, narrow_checks: 0, candidate_pairs: 0, active_movers: 0, spatial_sync_requests: 0, spatial_sync_skips: 0, bounds_calculations: 0, swept_bounds_calculations: 0, attachment_placements: 0, broadphase_builds: 0, broadphase_reuses: 0 };
     constructor({ cell_size = 128, fixed_step = 1 / 60, gravity = [0, 0], solver_iterations = 6, sleep_speed = 0.05, sleep_delay = 0.5, asset_library, step_authority } = {}) {
         if (step_authority !== undefined && typeof step_authority !== 'symbol') throw new TypeError('step_authority must be a private Symbol');
         this.#stepAuthority = step_authority;
@@ -67,28 +67,51 @@ export class physicsSystem {
         return this.#motionEnvelope;
     }
     #sync(r, swept = false) {
-        this.#motionEnvelope = null;
-        if (r.removed) return;
-        if (!bodyActive(r)) { if (r.indexed) this.spatial_grid.removeInstance(r.id); r.indexed = false; this.#moving.delete(r); return; }
-        let b = liveBounds(r);
-        for (const extent of [r.config.render_shape, r.config.light_shape]) if (extent) b = unionBounds(b, shapeBounds(extent, r.position, r.rotation));
-        if (swept) {
-            const reach = shapeReach(r.shape);
-            b = unionBounds(b, { left: Math.min(r.position[0], r.previous_position[0]) - reach, right: Math.max(r.position[0], r.previous_position[0]) + reach,
-                top: Math.min(r.position[1], r.previous_position[1]) - reach, bottom: Math.max(r.position[1], r.previous_position[1]) + reach });
+        this.#motionEnvelope=null;this.#stats.spatial_sync_requests++;
+        if(r.removed)return;
+        if(r.broadphase_config!==r.config||r.broadphase_mount!==r.parent_mount){
+            const old=r.broadphase_config,next=r.config;
+            if(!old||old.physics_type!==next.physics_type||old.active!==next.active||old.collision_group!==next.collision_group||old.collision_mask!==next.collision_mask
+                ||old.collision_exclusions!==next.collision_exclusions||r.broadphase_mount!==r.parent_mount)this.#broadphaseEpoch++;
+            r.broadphase_config=next;r.broadphase_mount=r.parent_mount;
         }
-        if (r.indexed) this.spatial_grid.updateInstance(r.id, b);
-        else { this.spatial_grid.registerInstance(r.id, b, r.handle); r.indexed = true; }
-        if (r.config.physics_type !== 'static') this.#moving.add(r); else this.#moving.delete(r);
+        if(!bodyActive(r)){
+            if(r.indexed)this.spatial_grid.removeInstance(r.id);
+            r.indexed=false;r.spatial_cache=null;this.#moving.delete(r);r.moving_member=false;return;
+        }
+        const moving=r.config.physics_type!=='static';
+        if(moving!==r.moving_member){if(moving)this.#moving.add(r);else this.#moving.delete(r);r.moving_member=moving;}
+        const x=r.position[0],y=r.position[1],rotation=r.rotation,px=r.previous_position[0],py=r.previous_position[1];
+        // Zero travel must not expand a stationary body's entry to its circumradius.
+        swept=swept&&(x!==px||y!==py||rotation!==r.previous_rotation);
+        const cache=r.spatial_cache,render=r.config.render_shape,light=r.config.light_shape;
+        // A broad render/light extent can keep the grid AABB constant while the
+        // collision shape moves inside it. Physical candidate validity must track
+        // the collision pose/sweep as well as the shared grid's revision.
+        if(!cache||cache.x!==x||cache.y!==y||cache.rotation!==rotation||cache.shape!==r.shape||cache.swept!==swept
+            ||swept&&(cache.px!==px||cache.py!==py||cache.previous_rotation!==r.previous_rotation))this.#broadphaseEpoch++;
+        if(r.indexed&&cache&&cache.x===x&&cache.y===y&&cache.rotation===rotation&&cache.shape===r.shape&&cache.render===render&&cache.light===light
+            &&cache.swept===swept&&(!swept||cache.px===px&&cache.py===py&&cache.previous_rotation===r.previous_rotation)){
+            this.#stats.spatial_sync_skips++;return;
+        }
+        let bounds=swept?sweptBounds(r):liveBounds(r);
+        if(render)bounds=unionBounds(bounds,bodyBounds(r,'render'));
+        if(light)bounds=unionBounds(bounds,bodyBounds(r,'light'));
+        if(r.indexed)this.spatial_grid.updateInstance(r.id,bounds);
+        else{this.spatial_grid.registerInstance(r.id,bounds,r.handle);r.indexed=true;}
+        if(cache){cache.x=x;cache.y=y;cache.rotation=rotation;cache.shape=r.shape;cache.render=render;cache.light=light;cache.swept=swept;cache.px=px;cache.py=py;cache.previous_rotation=r.previous_rotation;}
+        else r.spatial_cache={x,y,rotation,shape:r.shape,render,light,swept,px,py,previous_rotation:r.previous_rotation};
     }
     createBody(packet = {}) {
         const config = bodyConfig(packet), id = this.#nextId++;
-        const r = { world: this, id, config, shape: new collisionShape(config.collision_shape), position: [...config.position], rotation: config.rotation,
+        const r = { world: this, metrics:this.#stats, id, config, shape: new collisionShape(config.collision_shape), position: [...config.position], rotation: config.rotation,
             previous_position: [...config.position], previous_rotation: config.rotation, velocity: [...config.linear_velocity], angular_velocity: config.angular_velocity,
             force: [0, 0], torque: 0, sleeping: false, sleep_time: 0, removed: false, indexed: false, motor: null };
         r.handle = new physicsBody(r);
         enforceLocks(r);
-        this._mutate(() => { this.#nextId = Math.max(this.#nextId, id + 1); this.#bodies.set(id, r); this.#sync(r); });
+        this._mutate(() => { this.#nextId = Math.max(this.#nextId, id + 1); this.#bodies.set(id,r);
+            try{this.#sync(r);}catch(error){this.#bodies.delete(id);this.#moving.delete(r);this.spatial_grid.removeInstance(id);r.indexed=false;r.removed=true;throw error;}
+        });
         return r.handle;
     }
     createEntity(packet = {}) { return this.elements.createEntity(packet); }
@@ -156,7 +179,7 @@ export class physicsSystem {
         const r = this._record(value);
         this._mutate(() => {
             if (r.removed) return;
-            this.#motionEnvelope = null; this.spatial_grid.removeInstance(r.id); r.indexed = false; r.removed = true; this.#bodies.delete(r.id); this.#moving.delete(r);
+            this.#motionEnvelope = null;this.#candidateCache=null; this.spatial_grid.removeInstance(r.id); r.indexed = false; r.removed = true; this.#bodies.delete(r.id); this.#moving.delete(r);
             this.#attachments._bodyRemoved(r); this.elements._bodyRemoved(r.id); this.traffic.removeVehicle(r.id); this.motion._remove(r.id); this.#particles._bodyRemoved(r.id);
             for (const [id, c] of this.#constraints) { const cr = constraintRecord(c); if (cr.a === r || cr.b === r) this.#constraints.delete(id); }
         });
@@ -173,9 +196,19 @@ export class physicsSystem {
         this._mutate(() => {
             if (r.removed) return;
             checkMountedChanges();
-            const next = bodyConfig({ ...snapshot(r), active: r.config.active, ...change }); r.config = next; invalidateMass(r); r.shape = new collisionShape(next.collision_shape);
+            const previous={config:r.config,shape:r.shape,position:r.position,rotation:r.rotation,velocity:r.velocity,angular_velocity:r.angular_velocity,
+                previous_position:r.previous_position,previous_rotation:r.previous_rotation,sleeping:r.sleeping};
+            const next=bodyConfig({...snapshot(r),active:r.config.active,...change});
+            if(!Object.hasOwn(change,'collision_shape'))next.collision_shape=r.config.collision_shape;
+            if(!Object.hasOwn(change,'render_shape'))next.render_shape=r.config.render_shape;
+            if(!Object.hasOwn(change,'light_shape'))next.light_shape=r.config.light_shape;
+            if(!Object.hasOwn(change,'collision_exclusions'))next.collision_exclusions=r.config.collision_exclusions;
+            r.config=next;invalidateMass(r);
+            if(Object.hasOwn(change,'collision_shape'))r.shape=new collisionShape(next.collision_shape);
             r.position = [...next.position]; r.rotation = next.rotation; r.velocity = [...next.linear_velocity]; r.angular_velocity = next.angular_velocity;
-            r.previous_position = [...r.position]; r.previous_rotation = r.rotation; r.sleeping = false; enforceLocks(r); this.#sync(r);
+            if(r.previous_position[0]!==r.position[0]||r.previous_position[1]!==r.position[1]||r.previous_rotation!==r.rotation)this.#broadphaseEpoch++;
+            r.previous_position=[...r.position];r.previous_rotation=r.rotation;r.sleeping=false;enforceLocks(r);
+            try{this.#sync(r);}catch(error){Object.assign(r,previous);invalidateMass(r);this.#sync(r);throw error;}
             this.elements._bodyUpdated(r.id, next); this.#attachments._syncDescendants(r, true);
         }); return r.handle;
     }
@@ -213,10 +246,14 @@ export class physicsSystem {
                 case 'position':
                 case 'rotation': {
                     const position = p.position ?? r.position, rotation = p.rotation ?? r.rotation;
+                    const previous={position:r.position,rotation:r.rotation,velocity:r.velocity,angular_velocity:r.angular_velocity,previous_position:r.previous_position,previous_rotation:r.previous_rotation};
                     if (p.placement_mode === 'clear' && !this.isPlacementClear(b, position, { rotation, include_ghosts: false, placement_bounds:p.placement_bounds })) { this._emit('movementBlocked', { body: b, reason: 'occupied_placement' }); break; }
                     r.position = [...position]; r.rotation = rotation;
                     if (!p.preserve_velocity) { r.velocity = [0, 0]; r.angular_velocity = 0; }
-                    r.previous_position = [...r.position]; r.previous_rotation = r.rotation; this.#sync(r); break;
+                    if(r.previous_position[0]!==r.position[0]||r.previous_position[1]!==r.position[1]||r.previous_rotation!==r.rotation)this.#broadphaseEpoch++;
+                    r.previous_position=[...r.position];r.previous_rotation=r.rotation;
+                    try{this.#sync(r);}catch(error){Object.assign(r,previous);this.#sync(r);throw error;}
+                    break;
                 }
                 case 'velocity': if (r.config.physics_type !== 'static') r.velocity = local(p.velocity); break;
                 case 'angular_velocity': if (r.config.physics_type !== 'static') r.angular_velocity = p.angular_velocity; break;
@@ -284,15 +321,17 @@ export class physicsSystem {
             if (!r.config.active) this.removeBody(r.handle);
         }
     }
-    #collisionBounds(r) {
-        const reach = shapeReach(r.shape);
-        return unionBounds(liveBounds(r), { left: Math.min(r.position[0], r.previous_position[0]) - reach, right: Math.max(r.position[0], r.previous_position[0]) + reach,
-            top: Math.min(r.position[1], r.previous_position[1]) - reach, bottom: Math.max(r.position[1], r.previous_position[1]) + reach });
-    }
+    #collisionBounds(r) { return sweptBounds(r); }
     #collide(moving, iteration) {
-        const sources = moving.filter(r => physical(r) && r.config.collision_mask && !(r.motor instanceof projectileMotor));
-        const candidates = this.spatial_grid.collectCandidatePairs(sources.map(r => ({ id: r.id, bounds: this.#collisionBounds(r) })), [],
-            (a, b) => boundsMeet(this.#collisionBounds(this._record(a)), this.#collisionBounds(this._record(b))) && this.#meets(this._record(a), this._record(b)) && !(this._record(b).motor instanceof projectileMotor));
+        let candidates;
+        const revision=this.spatial_grid.revision,cache=this.#candidateCache;
+        if(cache&&cache.revision===revision&&cache.epoch===this.#broadphaseEpoch){candidates=cache.pairs;this.#stats.broadphase_reuses++;}
+        else{
+            const sources=moving.filter(r=>physical(r)&&r.config.collision_mask&&!(r.motor instanceof projectileMotor));
+            candidates=this.spatial_grid.collectCandidatePairs(sources.map(r=>({id:r.id,bounds:this.#collisionBounds(r)})),[],
+                (a,b)=>boundsMeet(this.#collisionBounds(this._record(a)),this.#collisionBounds(this._record(b)))&&this.#meets(this._record(a),this._record(b))&&!(this._record(b).motor instanceof projectileMotor));
+            this.#candidateCache={revision,epoch:this.#broadphaseEpoch,pairs:candidates};this.#stats.broadphase_builds++;
+        }
         this.#stats.candidate_pairs += candidates.length;
         const contacts = [];
         for (const [ha, hb] of candidates) {
@@ -351,25 +390,33 @@ export class physicsSystem {
         try {
             const moving = [...this.#moving].filter(r => bodyActive(r));
             this.#stats.active_movers = moving.length;
-            for (const r of moving) { r.previous_position = [...r.position]; r.previous_rotation = r.rotation; }
+            for(const r of moving){
+                // Previous poses affect swept candidate bounds even when the current
+                // index is already tight, so dropping an old sweep invalidates pairs.
+                if(r.previous_position[0]!==r.position[0]||r.previous_position[1]!==r.position[1]||r.previous_rotation!==r.rotation){
+                    this.#broadphaseEpoch++;r.previous_position=[...r.position];r.previous_rotation=r.rotation;
+                }
+            }
             this.#attachments._capturePrevious();
             this.traffic._update();
             this.#particles._beforeStep(step_seconds);
             for (const r of moving) {
                 r.motion_step = r.motor instanceof projectileMotor ? Math.min(step_seconds, Math.max(0, r.motor.remaining)) : step_seconds;
-                if (r.parent_mount) { r.force = [0, 0]; r.torque = 0; continue; }
+                if (r.parent_mount) { r.force[0]=r.force[1]=0;r.torque=0;continue; }
                 if (r.sleeping) continue;
                 const scripted = this.motion._controls(r, step_seconds); r.prescribed_step = scripted || r.config.physics_type === 'kinematic';
                 if (!scripted) r.motor?._update(step_seconds);
                 if (movable(r) && !scripted) {
                     if (r.force[0] || r.force[1]) changeVelocity(r, scale(r.force, step_seconds));
                     if (this.config.gravity[0] || this.config.gravity[1]) changeVelocity(r, scale(this.config.gravity, massProperties(r).mass * step_seconds), massCenter(r));
-                    changeAngularSpeed(r, r.torque * inverseInertia(r) * step_seconds);
-                    const velocity = scale(centerVelocity(r), Math.exp(-r.config.linear_damping * step_seconds));
-                    r.angular_velocity *= Math.exp(-r.config.angular_damping * step_seconds); setCenterVelocity(r, velocity);
+                    if(r.torque)changeAngularSpeed(r,r.torque*inverseInertia(r)*step_seconds);
+                    if((r.config.linear_damping||r.config.angular_damping)&&(r.velocity[0]||r.velocity[1]||r.angular_velocity)){
+                        const velocity=scale(centerVelocity(r),Math.exp(-r.config.linear_damping*step_seconds));
+                        r.angular_velocity*=Math.exp(-r.config.angular_damping*step_seconds);setCenterVelocity(r,velocity);
+                    }
                 }
                 enforceLocks(r);
-                r.force = [0, 0]; r.torque = 0; this.#sync(r);
+                r.force[0]=r.force[1]=0;r.torque=0;this.#sync(r);
             }
             // Resolve existing contacts after motors/forces but before travel. Otherwise
             // a requested inward component can repeatedly clip the whole CCD step at
@@ -378,8 +425,10 @@ export class physicsSystem {
             for (const r of moving) {
                 if (r.sleeping || r.parent_mount) continue;
                 enforceLocks(r);
-                if (r.prescribed_step) { r.position = add(r.position, scale(r.velocity, r.motion_step)); r.rotation += r.angular_velocity * r.motion_step; }
-                else integrateAtCenter(r, r.motion_step);
+                if(r.velocity[0]||r.velocity[1]||r.angular_velocity){
+                    if(r.prescribed_step){r.position=add(r.position,scale(r.velocity,r.motion_step));r.rotation+=r.angular_velocity*r.motion_step;}
+                    else integrateAtCenter(r,r.motion_step);
+                }
                 this.#sync(r, true);
             }
             this.#attachments._syncAll();
@@ -503,7 +552,7 @@ export class physicsSystem {
     removeChain(chain) { return this.#particles.removeChain(chain); }
     clearWorld() {
         this._mutate(() => { for (const r of this.#bodies.values()) r.removed = true; this.#bodies.clear(); this.#moving.clear(); this.#constraints.clear(); this.#contacts.clear(); this.#stepContacts.clear();
-            this.#attachments._clear(); this.elements._clear(); this.traffic._clear(); this.motion._clear(); this.spatial_grid.clear(); this.#particles._clear(); this.#events = []; this.#nextId = 1; this.#nextConstraint = 1; this.#tick = 0; this.#motionEnvelope = null; });
+            this.#attachments._clear(); this.elements._clear(); this.traffic._clear(); this.motion._clear(); this.spatial_grid.clear(); this.#particles._clear(); this.#events = []; this.#nextId = 1; this.#nextConstraint = 1; this.#tick = 0; this.#motionEnvelope = null;this.#candidateCache=null;this.#broadphaseEpoch++; });
     }
     // Versioned exchange; validate a replacement before changing the live registry.
     _exportState() {
