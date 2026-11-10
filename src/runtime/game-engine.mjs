@@ -1,6 +1,7 @@
 import { physicsSystem, assetLibrary } from '../basement/physics/index.mjs';
 import { levelLobby } from '../lobby/level-lobby.mjs';
 import { gameLevel } from './game-level.mjs';
+import { controlSystem } from '../basement/controls/index.mjs';
 
 const hooks = ['attach', 'detach', 'beforePhysics', 'afterPhysics', 'render', 'levelEntered', 'levelLeaving'];
 function synchronous(fn, receiver, args) {
@@ -19,26 +20,29 @@ function failures(errors, message) { if (errors.length) throw new AggregateError
 
 /** Application coordinator. Basement supplies all physical behavior; the Lobby supplies time. */
 export class gameEngine {
-    #world; #authority = Symbol('runtime simulation clock'); #api; #lobby;
+    #world; #authority = Symbol('runtime simulation clock'); #api; #lobby; #controls;
     #levels = new Map(); #systems = new Map(); #active = null; #persistent = new Set();
     #running = false; #destroyed = false; #phase = 'idle'; #loading = false; #pauses = new Map();
     #schedule; #cancel; #frame = null; #generation = 0; #renderTarget;
 
-    constructor({ asset_library = new assetLibrary(), physics = {}, clock = {}, frame_clock,
+    constructor({ asset_library = new assetLibrary(), physics = {}, controls = {}, clock = {}, frame_clock,
         schedule_frame = typeof requestAnimationFrame === 'function' ? callback => requestAnimationFrame(callback) : null,
         cancel_frame = typeof cancelAnimationFrame === 'function' ? handle => cancelAnimationFrame(handle) : null,
         render_target = null } = {}) {
         if (Object.hasOwn(physics, 'step_authority') || Object.hasOwn(physics, 'asset_library')) throw new TypeError('The runtime owns physics authority and its asset library');
         if (schedule_frame !== null && typeof schedule_frame !== 'function' || cancel_frame !== null && typeof cancel_frame !== 'function') throw new TypeError('Frame scheduling requires functions');
         this.#world = new physicsSystem({ ...physics, asset_library, step_authority: this.#authority });
-        this.#api = Object.freeze({ physics: this.#world, elements: this.#world.elements, assets: asset_library,
-            motion: this.#world.motion, traffic: this.#world.traffic });
-        this.#schedule = schedule_frame; this.#cancel = cancel_frame; this.#renderTarget = render_target;
         const config = { STEP_MS: this.#world.config.fixed_step * 1000, MAX_FRAME_MS: 100, MAX_STEPS: 6, GAME_SPEED: 1, ...clock };
         if (config.STEP_MS !== this.#world.config.fixed_step * 1000) throw new TypeError('Lobby and physics fixed steps must match');
         if (![config.MAX_FRAME_MS, config.MAX_STEPS, config.GAME_SPEED].every(v => Number.isFinite(v) && v > 0) || !Number.isInteger(config.MAX_STEPS)) throw new TypeError('Invalid Lobby clock configuration');
+        if(controls.auto_update)throw new TypeError('The runtime owns control polling');
+        this.#controls = new controlSystem({ ...controls, auto_update:false });
+        this.#api = Object.freeze({ physics: this.#world, elements: this.#world.elements, assets: asset_library,
+            motion: this.#world.motion, traffic: this.#world.traffic, controls:this.#controls });
+        this.#schedule = schedule_frame; this.#cancel = cancel_frame; this.#renderTarget = render_target;
         this.#lobby = new levelLobby(Object.freeze(config), frame_clock);
         this.#lobby.plugIn({ isRunning: () => this.running, isPaused: () => this.paused || !this.active_level,
+            beginFrame: () => { if(this.paused || !this.active_level)this.#pollControls(); },
             simulateStep: () => this.updateState(), renderFrame: blend => this.render(blend),
             scheduleNextFrame: () => this.#queueFrame() });
     }
@@ -123,7 +127,7 @@ export class gameEngine {
     releaseEntity(entity) { this.#idle(); return this.#persistent.delete(entity); }
     async loadLevel(level_id, options = {}) {
         this.#live();
-        if (!['idle', 'beforePhysics', 'physics', 'afterPhysics'].includes(this.#phase)) throw new Error('Level loading is not allowed during rendering or lifecycle hooks');
+        if (!['idle', 'input', 'beforePhysics', 'physics', 'afterPhysics'].includes(this.#phase)) throw new Error('Level loading is not allowed during rendering or lifecycle hooks');
         if (this.#loading) throw new Error('A level load is already in progress');
         const Level = this.#levels.get(level_id); if (!Level) throw new Error(`Unknown level: ${level_id}`);
         this.#loading = true; let candidate, prepared, entered = false;
@@ -132,6 +136,7 @@ export class gameEngine {
             if (candidate.level_id !== level_id) throw new Error('Level identity does not match registration');
             prepared = await candidate.prepare(Object.freeze({ assets: this.api.assets }), options);
             this.#idle(); this.#phase = 'transition';
+            this.#controls.clear();
             this.#world.commitCommands();
             this.#unload();
             const cleanups = [], context = this.#context(cleanups);
@@ -169,10 +174,13 @@ export class gameEngine {
     pause(reason = 'manual') {
         this.#live(); if (typeof reason !== 'string' || !reason) throw new TypeError('Pause requires a reason');
         const token = Symbol(reason); this.#pauses.set(token, reason);
-        return () => this.#pauses.delete(token);
+        try { this.#controls.clear(); } catch(error) { this.#pauses.delete(token); throw error; }
+        return () => { const released=this.#pauses.delete(token);if(released&&!this.paused)this.#controls.clear();return released; };
     }
     updateState() {
-        this.#idle(); if (!this.running || this.paused || !this.#active) return false;
+        this.#idle(); if (!this.running) return false;
+        this.#pollControls();
+        if (this.paused || !this.#active) return false;
         const { level, context } = this.#active, seconds = this.#world.config.fixed_step;
         try {
             this.#phase = 'beforePhysics';
@@ -182,7 +190,13 @@ export class gameEngine {
             synchronous(level.afterPhysics, level, [context, seconds]); this.#callSystems('afterPhysics', seconds);
             return true;
         } catch (error) { this.stop(); throw error; }
-        finally { this.#phase = 'idle'; }
+        finally { this.#controls.generateGhostImage();this.#phase = 'idle'; }
+    }
+    #pollControls() {
+        this.#phase='input';
+        try { this.#controls.updateState(); }
+        catch(error){this.stop();throw error;}
+        finally{this.#phase='idle';}
     }
     render(blend = 1, target = this.#renderTarget) {
         this.#idle(); if (!Number.isFinite(blend) || blend < 0 || blend > 1) throw new TypeError('Render blend must be between 0 and 1');
@@ -207,17 +221,18 @@ export class gameEngine {
     }
     stop() {
         this.#running = false; this.#generation++;
-        if (this.#frame !== null && this.#cancel) this.#cancel(this.#frame);
-        this.#frame = null;
+        try { this.#controls.clear(); }
+        finally { try { if (this.#frame !== null && this.#cancel) this.#cancel(this.#frame); } finally { this.#frame = null; } }
     }
     dispose() {
-        this.#idle(); this.stop(); this.#phase = 'disposal'; const errors = [];
+        this.#idle(); const errors = []; attempt(errors,()=>this.stop());this.#phase = 'disposal';
         try {
             attempt(errors, () => this.#unload());
             for (const entry of [...this.#systems.values()].reverse()) {
                 attempt(errors, () => synchronous(entry.system.detach, entry.system, [entry.context])); this.#clean(entry.cleanups, errors);
             }
             this.#systems.clear(); this.#persistent.clear(); this.#pauses.clear();
+            attempt(errors, () => this.#controls.dispose());
             attempt(errors, () => this.#world.clearWorld()); this.#levels.clear();
         } finally { this.#destroyed = true; this.#phase = 'disposed'; }
         failures(errors, 'Runtime disposal failed');

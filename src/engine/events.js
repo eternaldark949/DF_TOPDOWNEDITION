@@ -207,11 +207,11 @@
                         gameUi.classList.add('emote-active');   // one class: the utility buttons fade out, the emote overlays in
                     },
                     onMove: (S) => { E.highlighted = S.slot; },
-                    onEnd: (S) => {
+                    onEnd: (S, event) => {
                         gameUi.classList.remove('emote-active');
                         this.emoteBtn.classList.remove('dragging');   // the knob eases home (CSS transition)
                         Object.assign(E, { active: false, touchId: null, highlighted: null });
-                        if (S.slot) this.firePlayerEmote(S.slot);
+                        if (S.slot && event.type !== 'touchcancel') this.firePlayerEmote(S.slot);
                     },
                 });
 

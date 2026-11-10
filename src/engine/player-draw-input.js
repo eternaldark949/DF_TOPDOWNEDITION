@@ -399,7 +399,8 @@
                             if (this._quickDraw) this.requestQuickDraw(Math.atan2(F.dy, F.dx));
                             else this._releaseShot = Math.atan2(F.dy, F.dx);
                         }   // sniper: lifting the thumb takes the shot (update.js)
-                        if (F.aimed && Math.hypot(F.dx, F.dy) > 0.2) this._aimMemory = { angle: Math.atan2(F.dy, F.dx), at: performance.now() / 1000, firing: F.firing || F.armed };   // real time, not game time
+                        if (e.type !== 'touchcancel' && F.aimed && Math.hypot(F.dx, F.dy) > 0.2) this._aimMemory = { angle: Math.atan2(F.dy, F.dx), at: performance.now() / 1000, firing: F.firing || F.armed };   // real time, not game time
+                        if (e.type === 'touchcancel') { this._aimMemory = null; this._releaseShot = null; }
                         Object.assign(F, { active: false, dx: 0, dy: 0, remembered: false, aimed: false, firing: false, armed: false });
                         if (gameUI) gameUI.classList.remove('aiming');
                         showRing();

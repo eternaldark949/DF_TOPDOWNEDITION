@@ -5,11 +5,16 @@
 <h1>Shared runtime example</h1><p>WASD moves the player. Change rooms to keep the same player body and physics world. Pause holds simulation.</p>
 <canvas id="scene" width="640" height="360"></canvas>
 <button id="switch">Change room</button><button id="pause">Pause</button><pre id="status"></pre>
+<div id="touch-move" style="width:110px;height:110px;border:1px solid #64748b;touch-action:none;display:inline-block">Move</div>
+<div id="touch-aim" style="width:110px;height:110px;border:1px solid #64748b;touch-action:none;display:inline-block">Aim</div>
+<button id="touch-fire" style="touch-action:none">Fire input</button>
 <script type="module">
 import { createRuntimeExample } from '../../directory/runtime-example.mjs';
-const keys=new Set(),status=document.getElementById('status');
-addEventListener('keydown',event=>keys.add(event.key.toLowerCase()));addEventListener('keyup',event=>keys.delete(event.key.toLowerCase()));addEventListener('blur',()=>keys.clear());
-const {engine,player}=createRuntimeExample({render_target:document.getElementById('scene'),direction:()=>[(keys.has('d')?1:0)-(keys.has('a')?1:0),(keys.has('s')?1:0)-(keys.has('w')?1:0)]});
+const status=document.getElementById('status');
+const {engine,player}=createRuntimeExample({render_target:document.getElementById('scene')});
+engine.api.controls.touch.stick('move',{zone:'touch-move',anchor:'centre',travel:40,mouse:true});
+engine.api.controls.touch.stick('aim',{zone:'touch-aim',anchor:'centre',travel:40,mouse:true});
+engine.api.controls.touch.button('touch-fire','touchFire');
 const report=()=>{status.textContent=JSON.stringify({level:engine.active_level?.level_id,player_id:player.entity_id,tick:engine.api.physics.simulation_tick,bodies:engine.api.physics.getStatistics().bodies,paused:engine.paused},null,2);};
 engine.registerSystem('status',{render:report});
 document.getElementById('switch').onclick=async()=>{try{await engine.loadLevel(engine.active_level.level_id==='room_a'?'room_b':'room_a');}catch(error){status.textContent=error.stack;console.error(error);}};

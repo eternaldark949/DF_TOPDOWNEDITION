@@ -35,7 +35,7 @@ test('Touch quick draw forces release firing even when ordinary aim/release sett
 test('Dragging back inside the ring and touch cancellation never fire',`
  game.armQuickDraw();touch('touchstart',0);touch('touchmove',90);touch('touchmove',10);touch('touchend',10);tick(20);
  touch('touchstart',0);touch('touchmove',90);touch('touchcancel',90);tick(20);
- return {count:game.projectiles.length,phase:game._quickDraw.phase,release:game._releaseShot};`,r=>{assert.deepEqual(r,{count:0,phase:'ready',release:null});});
+ return {count:game.projectiles.length,phase:game._quickDraw.phase,release:game._releaseShot,active:game.fireJoystick.active,firing:game.fireJoystick.firing};`,r=>{assert.deepEqual(r,{count:0,phase:'ready',release:null,active:false,firing:false});});
 test('Pause cancels the pending shot but preserves quick draw mode and flit charge',`
  game.armQuickDraw();const charge=game.flitState.attunement;game.requestQuickDraw(0);tick(3);
  game.pauseSystem.acquire('test');game.pauseSystem.release('test');tick(20);

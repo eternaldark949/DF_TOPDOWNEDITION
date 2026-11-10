@@ -109,7 +109,7 @@
             ['btn-nv', 'touchNightVision'], ['btn-pause', 'touchPause'], ['btn-grab', 'touchGrab'], ['btn-rot-l', 'touchTurnLeft'], ['btn-rot-r', 'touchTurnRight'], ['btn-holster', 'touchHolster'],
         ];
 
-        const controls = new controlsSystem({ keymap: dfKeyMap, actions: dfActions, context: () => typeof game !== 'undefined' ? game : null });
+        const controls = new controlsSystem({ auto_update: true, query_actions: false, keymap: dfKeyMap, actions: dfActions, context: () => typeof game !== 'undefined' ? game : null });
 
         /** The game's recorder (basement/recorder-kit.js): the sticks and the mouse aim ride along with the held inputs;
          *  her, her car and her crew are the recorded things. game_recorder.startRecording() … stopRecording() → a recording. */

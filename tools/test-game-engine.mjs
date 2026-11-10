@@ -125,3 +125,16 @@ test('asynchronous lifecycle hooks reject before executing and render-time entit
  e.registerSystem('bad-render',{render(c){c.createEntity({entity_type:'prop'});}});e.start();
  assert.throws(()=>e.render(),/Render hooks/);assert.equal(e.running,false);assert.equal(e.api.physics.getStatistics().entities,1);e.dispose();
 });
+
+test('the runtime owns one input service and input edges are visible to every policy system exactly once',async()=>{
+ const e=await ready({controls:{keymap:{use:['e']}}}),seen=[];e.registerSystem('reader-a',{beforePhysics(c){seen.push(['a',c.api.controls.justActivated('use')]);}});
+ e.registerSystem('reader-b',{afterPhysics(c){seen.push(['b',c.api.controls.justActivated('use')]);}});e.start();e.api.controls.setInput('keyboard','e',true);e.updateState();e.updateState();
+ assert.deepEqual(seen,[['a',true],['b',true],['a',false],['b',false]]);assert.equal(e.api.controls.active('use'),true);e.dispose();assert.equal(e.api.controls.disposed,true);
+});
+
+test('pause, resume and level changes cannot carry a held action into a new gameplay context',async()=>{
+ const e=await ready({controls:{keymap:{fire:['space']}}});e.start();e.api.controls.setInput('keyboard','space',true);
+ const resume=e.pause('menu');assert.equal(e.api.controls.active('fire'),false);resume();e.updateState();assert.equal(e.api.controls.active('fire'),false);
+ e.api.controls.setInput('keyboard','space',false);e.api.controls.setInput('keyboard','space',true);assert.equal(e.api.controls.active('fire'),true);
+ await e.loadLevel('two');assert.equal(e.api.controls.active('fire'),false);assert.equal(e.api.controls.readQueue('fire'),false);e.dispose();
+});

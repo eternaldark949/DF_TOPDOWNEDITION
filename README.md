@@ -27,6 +27,8 @@ Plug in or pair any standard controller (Xbox, PlayStation, most Bluetooth pads)
 
 The [new gameEngine runtime](src/runtime/README.md) owns the native physics API, shared clock, level lifecycle and composed systems. Its [browser example](src/runtime/examples/index.html) runs two Directory-authored levels in one world. The playable boot still uses the original `GameEngine` while shared classes and their callers are converted; importing the new runtime does not start another world.
 
+The [Basement controlSystem API](src/basement/controls/README.md) centralizes keyboard, mouse, gamepad and multi-touch input. The new runtime exposes it as `engine.api.controls`; bindings remain in the Directory.
+
 ## Adding your own images or sounds (works from the phone)
 1. On GitHub, open `assets/images` (or `assets/audio`), then choose **Add file → Upload files**.
 2. Give the file a simple name, like `portrait_949.png`.

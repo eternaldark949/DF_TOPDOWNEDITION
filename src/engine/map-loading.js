@@ -296,10 +296,10 @@ engineMixin({
             },
 
             _doLoadMap(mapId, spawnAt) {
+                this._cancelQuickDrawHold?.(); this.cancelQuickDraw();
                 if(mapId==='apt_949')return this._enterApartment(spawnAt);
                 if(this.activeLevel)this._leaveApartment();
                 if (mapId === 'hub_949') mapId = 'sdc';
-                this._cancelQuickDrawHold?.(); this.cancelQuickDraw();
                 const previousMapId = this.activeMap?.id;
                 // The map screen can still show the place she's leaving: keep its finished plan (and the city's roads and lamps)
                 if (this.activeMap) (this._mapSnaps ||= {})[this.activeMap.id] = { map: this.activeMap, network: this.activeMap.type !== 'indoor' ? this.traffic?.network : null, lamps: this.lamps };

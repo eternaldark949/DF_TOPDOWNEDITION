@@ -52,14 +52,14 @@ const SCRIPTS = [
     'basement/life-kit.js',        // LV0 Basement: lifeKit (lists of short-lived things)
     'basement/sound-kit.js',       // LV0 Basement: soundKit (Web Audio building blocks)
     'basement/sound-system.js',    // LV0 Basement: soundSystem (context, channels, volume dial, reverb, sounds by packet)
-    'basement/controls-system.js', // LV0 Basement: controlsSystem (keyboard, mouse, touch and gamepad instances, touch sticks, keymap, action table)
-    'basement/recorder-kit.js',    // LV0 Basement: gRecorder (inputs recorded per tick, played back through the controls)
     'basement/entity-base.js',     // LV0 Basement: GameEntity (the base of everything that moves or collides)
     'basement/shape-kit.js',       // LV0 Basement: shapeKit (collision geometry)
     'basement/spatial-grid.js',    // LV0 Basement: SpatialHashGrid and the render / transition grids
     'basement/collision-kit.js',   // LV0 Basement: collisionKit and collisionWorld (the collision step, game-free: layers, grid, passes, solver)
     'basement/vehicle-kit.js',     // LV0 Basement: vehicleKit (driving, out of walls, car-to-car contact: game-free)
     '@native',                    // Native ESM engine/Directory graph, linked from the original sources
+    'basement/controls-system.js', // LV0 Basement: controlsSystem (keyboard, mouse, touch and gamepad instances, touch sticks, keymap, action table)
+    'basement/recorder-kit.js',    // LV0 Basement: gRecorder (inputs recorded per tick, played back through the controls)
     'basement/lane-rail-kit.js',   // LV0 Basement: railKit (things that run along a line: sampled curves, pedals, following)
     'basement/ui-kit.js',          // LV0 Basement: uiKit (making, showing and hiding DOM panels)
     'basement/draw-list.js',       // LV0 Basement: drawList and canvasRenderer (what to draw, apart from how)

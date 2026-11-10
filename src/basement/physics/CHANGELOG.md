@@ -1,5 +1,10 @@
 # Changelog
 
+## Shared controls service — 2026-11-10
+
+- The game runtime now owns the canonical Basement `controlSystem` through `api.controls`; the controls package is separate from physical simulation. Its API is documented in `src/basement/controls/README.md` in the game checkout.
+- Classic callers use the same class under the existing name. New runtime polling, edge lifetime, focus/cancellation, touch ownership and held-input suppression are centralized; old game-specific input policy conversion remains pending.
+
 ## Runtime coordinator — 2026-11-10
 
 - Added optional private `step_authority` for runtime-owned worlds; direct unauthorized stepping rejects before commands or time advance. Standalone callers remain unchanged, and physical saves do not serialize or release clock authority.

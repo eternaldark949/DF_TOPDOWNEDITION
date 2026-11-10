@@ -320,3 +320,7 @@ The new [gameEngine API and ownership decisions](runtime/README.md) describe the
 | `tools/test-game-engine.mjs`, `tools/test-game-engine-browser.py` | Ownership, lifecycle, failures, timing and actual multi-level browser acceptance. |
 
 The playable boot still uses the original `GameEngine`; importing the new coordinator does not start a second world. The earlier apartment host also remains pending conversion to the shared level contract.
+
+## Canonical controls
+
+`basement/controls/index.mjs` exports the standalone `controlSystem`, documented in [the controls API](basement/controls/README.md). `system.mjs` owns named actions/queries/timing, `devices.mjs` owns keyboard/mouse/touch-button/gamepad adapters, and `touch-stick.mjs` owns gesture geometry and finger lifetimes. The classic `basement/controls-system.js` references these same exports. `directory/game-control-profile.json` defines the new runtime's logical actions and vectors. `tools/test-controls-browser.py` covers real DOM keyboard/mouse/multi-touch plus supplied standard gamepad samples.

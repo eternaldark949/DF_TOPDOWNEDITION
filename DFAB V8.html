@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '5d37d3f9c98d';
+        const DFAB_BUILD = '892d8e6b77de';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -6564,514 +6564,6 @@
                 for (let c = 0; c < 2; c++) { const d = buf.getChannelData(c); for (let i = 0; i < len; i++) d[i] *= norm; }
                 this.impulses.set(key, buf);
                 return buf;
-            }
-        }
-    </script>
-    <script type="text/dfab" data-src="basement/controls-system.js" data-cost="298">
-        // ===== LV0 BASEMENT =====
-        // The controls system: every key, mouse button and gamepad button goes through one place. It knows
-        // nothing about any game: the game hands it a keymap (action -> the inputs bound to it) and an
-        // action table (action -> when it may fire, what it does), both in the Directory.
-        // (The terms are from the g7 engine: base game script 2.0's controlsSystem and V1's controlSystem.)
-        //
-        //   keyboardInstance ┐
-        //   mouseInstance    │
-        //   touchInstance    ├── press / release ── keymap ── action table ── run(game, ev)
-        //   gamepadInstance  ┘        (polled each frame)            └── queue (readQueue: buffered inputs)
-        //
-        // Each instance keeps input_active (held now), input_just_activated and input_just_released (this
-        // frame), and ghost_image (what was held last frame: generateGhostImage, at the end of a frame).
-        //
-        // INPUT NAMES:   keys by e.key, letters in lower case ('w', 'space', 'Escape', 'ArrowUp', 'Enter');
-        //                'mouseLeft' | 'mouseMiddle' | 'mouseRight';  'touch…' (on-screen buttons, named by the game);
-        //                'gamepadA' 'gamepadB' 'gamepadX' 'gamepadY' 'gamepadLBumper' 'gamepadRBumper'
-        //                'gamepadLTrigger' 'gamepadRTrigger' 'gamepadBack' 'gamepadStart' 'gamepadLStickButton'
-        //                'gamepadRStickButton' 'gamepadDUp' 'gamepadDDown' 'gamepadDLeft' 'gamepadDRight'
-        // KEYMAP:        { action: [binding, binding, ...] }
-        //   BINDING:     'input'  (PRESS)  or  [input, type, hold]
-        //     PRESS      on the press (a held key's auto-repeat doesn't fire it again)
-        //     REPEAT     on the press and on every auto-repeat of a held key
-        //     RELEASE    on the release
-        //     TAP        on the release of a short press: under tap_threshold, or, when the input also
-        //                has a HELD binding, before that hold fired. With a DOUBLETAP binding on the same
-        //                input it waits tap_wait_time for a second press first
-        //     DOUBLETAP  on a second press within tap_wait_time of a tap (that tap is then not fired)
-        //     HELD       once, when the input has been held for `hold` s (or hold_wait_time)
-        // ACTION ROW:    [action, when, run]
-        //   when(game, ev)  may it fire now? (null: always). A TAP, HELD or RELEASE also needs it to
-        //                   have been true at the press: a button held from a menu into play stays quiet
-        //   run(game, ev)   what it does
-        //   EV:          { device, input, type, time, repeat, typing, shift, ctrl, preventDefault(), stop() }
-        //                (typing: a keystroke into a text field; only actions that allow it should fire)
-        // Actions with no row are only asked about: active('move_up'), direction('move'), held(...).
-        const TAP = 0, DOUBLETAP = 1, HELD = 2, PRESS = 3, REPEAT = 4, RELEASE = 5;
-
-        class inputInstance {
-            constructor(system, device) {
-                this.system = system; this.device = device;
-                this.input_active = new Set();
-                this.input_just_activated = new Set();
-                this.input_just_released = new Set();
-                this.ghost_image = new Set();
-                this.input_time = {};      // input -> when it went down (s)
-                this.armed = {};           // input -> the actions whose `when` was true at the press
-                this.spent = new Set();    // held through clear(): ignored until released
-            }
-            isActive(input) { return this.input_active.has(input) && !this.spent.has(input); }
-            getActiveInputs() { return [...this.input_active].filter(i => !this.spent.has(i)); }
-            /** The end of a frame: this frame's held inputs become the ghost image; the just-sets empty. */
-            generateGhostImage() {
-                this.ghost_image = new Set(this.input_active);
-                this.input_just_activated.clear(); this.input_just_released.clear();
-            }
-            /** Scripted input (tests, demos, replays): exactly these inputs are held now. Nothing fires. */
-            setInputs(inputs) {
-                for (const i of [...this.input_active]) if (!inputs.includes(i)) { this.input_active.delete(i); this.spent.delete(i); delete this.armed[i]; }
-                for (const i of inputs) if (!this.input_active.has(i)) { this.input_active.add(i); this.input_time[i] = controlsSystem.now(); }
-            }
-            releaseAll() { for (const i of [...this.input_active]) this.system.release(this, i, this.system.ev(this.device, i)); }
-        }
-
-        class keyboardInstance extends inputInstance {
-            /** Keys go down on the window (made early, so it hears them before the window's later listeners
-             *  and ev.stop() keeps them from those) and come up on its capture phase, ahead of anything that
-             *  swallows keyups. */
-            constructor(system) {
-                super(system, 'keyboard');
-                if (typeof window === 'undefined') return;
-                window.addEventListener('keydown', e => this.event(e, true));
-                window.addEventListener('keyup', e => this.event(e, false), true);
-                window.addEventListener('blur', () => this.releaseAll());
-            }
-            static keyName(k) { return k === ' ' ? 'space' : k && k.length === 1 ? k.toLowerCase() : k; }
-            static editable(t) { return t instanceof Element && !!t.closest('input, textarea, select, [contenteditable="true"]'); }
-            event(e, down) {
-                const input = keyboardInstance.keyName(e.key);
-                if (!input) return;
-                const ev = this.system.ev('keyboard', input, e);
-                down ? this.system.press(this, input, ev) : this.system.release(this, input, ev);
-            }
-        }
-
-        class mouseInstance extends inputInstance {
-            constructor(system, target) {
-                super(system, 'mouse');
-                this.x = 0; this.y = 0;
-                if (typeof window === 'undefined') return;
-                target = target || window;
-                const B = ['mouseLeft', 'mouseMiddle', 'mouseRight'];
-                target.addEventListener('mousemove', e => { this.x = e.clientX; this.y = e.clientY; }, { passive: true });
-                target.addEventListener('mousedown', e => B[e.button] && this.system.press(this, B[e.button], this.system.ev('mouse', B[e.button], e)));
-                window.addEventListener('mouseup', e => B[e.button] && this.system.release(this, B[e.button], this.system.ev('mouse', B[e.button], e)));
-            }
-        }
-
-        class touchInstance extends inputInstance {
-            /** On-screen buttons as inputs: a finger (or the mouse) down on one presses it, lifting it, sliding
-             *  off it or losing it releases it, so a HUD button can tap, hold or double tap like a key. While
-             *  pressed the button wears the `held` class. (The sticks and gestures keep their own code.) */
-            constructor(system) { super(system, 'touch'); this.elements = {}; this.sticks = {}; }
-            /** A touch stick (STICK PACKET, below): controls.touch.sticks[name]; its value is [x, y], -1..1. */
-            stick(name, packet) { return this.sticks[name] = new touchStick(this.system, name, packet); }
-            /** BUTTON PACKETS: [[element or id, input], ...]  e.g. [['btn-heal', 'touchHeal']] */
-            buttons(list) { for (const [el, input] of list) this.button(el, input); }
-            button(el, input) {
-                el = typeof el === 'string' ? document.getElementById(el) : el;
-                if (!el || this.elements[input] === el) return;
-                this.elements[input] = el;
-                const down = e => {
-                    e.preventDefault();
-                    if (e.button > 0) return;                     // a mouse's right or middle button
-                    try { e.pointerId !== undefined && el.setPointerCapture(e.pointerId); } catch (_) { /* not capturable */ }
-                    el.classList.add('held');
-                    this.system.press(this, input, this.system.ev('touch', input, e));
-                };
-                const up = e => { el.classList.remove('held'); if (this.input_active.has(input)) this.system.release(this, input, this.system.ev('touch', input, e)); };
-                el.addEventListener('pointerdown', down);
-                for (const t of ['pointerup', 'pointercancel', 'lostpointercapture']) el.addEventListener(t, up);
-                el.addEventListener('touchstart', e => e.preventDefault(), { passive: false });   // no scroll, no copied mouse events
-            }
-            /** Let go of one button (its finger is still down, but it no longer counts). */
-            drop(input) { if (this.input_active.has(input)) { this.spent.add(input); if (this.armed[input]) this.armed[input] = new Set(); } this.elements[input]?.classList.remove('held'); }
-        }
-
-        /* A touch stick: one finger on a zone drives a knob. It does the parts every stick shares (which
-           finger is its own, where its centre is, the knob's travel, the ring, the slots) and hands each
-           sample to the game, which decides what the stick means (walk, aim, pick an emote).
-           STICK PACKET: {
-             zone       the element (or id) a finger lands on
-             knob       the element that moves, or null: it is set the CSS variables --lx / --ly (px from the
-                        centre; the shared .df-stick-knob style turns them into its transform)
-             base       an element shown under the thumb while held (anchor 'touch'; base_radius: half its size), or null
-             anchor     'touch': the centre is where the thumb lands (kept `edge` px in from the screen's
-                        sides) and drags count from the landing point; 'centre': the zone's centre
-             travel     px the knob may go (a number, or a function: it can change with a setting)
-             scale      () => the zone's zoom (drags are divided by it: the stick's own pixels)
-             ring       [in, out]: past `in` it is out, back inside `out` it is in again (hysteresis)
-             input      a touch input pressed while the stick is past the ring (e.g. 'touchFireRing')
-             slots      { key: element }: the slot under the finger is `highlighted`; onEnd gets it
-             mouse      true: a mouse can drag it too (desktop testing)
-             free       () => may a new finger take it? (default: not already held; a stick sharing its
-                        state with another device asks that state)
-             onStart(s, e), onMove(s, e) (false: leave the knob where it is), onEnd(s, e)
-           }
-           SAMPLE s: { id, x0, y0 (centre), dx, dy (from the centre or landing), far, angle,
-                       kx, ky (the knob, clamped to travel), out (past the ring), slot } */
-        class touchStick {
-            constructor(system, name, packet) {
-                Object.assign(this, { anchor: 'centre', base_radius: 0, travel: 40, scale: () => 1, edge: 0, ring: null, input: null, slots: null, mouse: false, free: () => !this.s.active, onStart() {}, onMove() {}, onEnd() {} }, packet);
-                this.system = system; this.name = name;
-                const el = x => typeof x === 'string' ? document.getElementById(x) : x;
-                this.zone = el(this.zone); this.knob = el(this.knob); this.base = el(this.base);
-                this.s = { id: null, active: false, x0: 0, y0: 0, lx: 0, ly: 0, dx: 0, dy: 0, far: 0, angle: 0, kx: 0, ky: 0, out: false, slot: null, rects: null };
-                this.value = [0, 0];
-                if (!this.zone) return;
-                const z = this.zone, own = (e, fn) => { for (let i = 0; i < e.changedTouches.length; i++) if (e.changedTouches[i].identifier === this.s.id) return fn(e.changedTouches[i]), true; return false; };
-                z.addEventListener('touchstart', e => { e.preventDefault(); if (this.free() && !system.muted) this.start(e.changedTouches[0], e); }, { passive: false });
-                z.addEventListener('touchmove', e => { e.preventDefault(); if (this.s.active) own(e, t => this.move(t, e)); }, { passive: false });
-                const end = e => { e.preventDefault(); if (this.s.active) own(e, () => this.end(e)); };
-                z.addEventListener('touchend', end); z.addEventListener('touchcancel', end);
-                if (this.mouse) {
-                    const m = e => ({ identifier: 'mouse', clientX: e.clientX, clientY: e.clientY });
-                    z.addEventListener('mousedown', e => { e.preventDefault(); if (this.free() && !system.muted) this.start(m(e), e); });
-                    window.addEventListener('mousemove', e => { if (this.s.active && this.s.id === 'mouse') this.move(m(e), e); });
-                    window.addEventListener('mouseup', e => { if (this.s.active && this.s.id === 'mouse') this.end(e); });
-                }
-            }
-            get maxTravel() { return typeof this.travel === 'function' ? this.travel() : this.travel; }
-            start(t, e) {
-                const s = this.s;
-                if (this.anchor === 'touch') {
-                    const W = window.innerWidth, H = window.innerHeight, ey = Math.min(this.edge, H * 0.24);   // a short screen: less margin top and bottom
-                    s.x0 = Math.max(this.edge, Math.min(W - this.edge, t.clientX)); s.y0 = Math.max(ey, Math.min(H - ey, t.clientY));
-                    s.lx = t.clientX; s.ly = t.clientY;
-                    if (this.base) Object.assign(this.base.style, { display: 'block', left: (s.x0 - this.base_radius) + 'px', top: (s.y0 - this.base_radius) + 'px' });
-                } else {
-                    const r = this.zone.getBoundingClientRect();
-                    s.x0 = s.lx = r.left + r.width / 2; s.y0 = s.ly = r.top + r.height / 2;
-                }
-                Object.assign(s, { id: t.identifier, active: true, dx: 0, dy: 0, far: 0, angle: 0, kx: 0, ky: 0, out: false, slot: null, landX: t.clientX, landY: t.clientY });
-                this.setKnob(0, 0);
-                this.onStart(s, e);
-                if (this.slots) s.rects = Object.entries(this.slots).map(([key, el]) => [key, el.getBoundingClientRect()]);   // after onStart: it may show them
-            }
-            move(t, e) {
-                const s = this.s, k = this.scale() || 1, T = this.maxTravel;
-                s.dx = (t.clientX - s.lx) / k; s.dy = (t.clientY - s.ly) / k; s.far = Math.hypot(s.dx, s.dy); s.angle = Math.atan2(s.dy, s.dx);
-                const d = Math.min(s.far, T); s.kx = Math.cos(s.angle) * d; s.ky = Math.sin(s.angle) * d;
-                this.value = [s.kx / T, s.ky / T];
-                if (this.ring) this.setOut(s.far >= this.ring[0] || (s.out && s.far > this.ring[1]));
-                if (s.rects) {
-                    const hit = s.rects.find(([, r]) => t.clientX >= r.left && t.clientX <= r.right && t.clientY >= r.top && t.clientY <= r.bottom);
-                    const key = hit ? hit[0] : null;
-                    if (key !== s.slot) { s.slot && this.slots[s.slot].classList.remove('highlighted'); key && this.slots[key].classList.add('highlighted'); s.slot = key; }
-                }
-                if (this.onMove(s, e) !== false) this.setKnob(s.kx, s.ky);
-            }
-            setOut(out) {
-                const s = this.s; if (out === s.out) return; s.out = out;
-                if (!this.input) return;
-                const T = this.system.touch, ev = this.system.ev('touch', this.input);
-                out ? this.system.press(T, this.input, ev) : this.system.release(T, this.input, ev);
-            }
-            end(e) {
-                const s = this.s;
-                this.onEnd(s, e);
-                this.release();
-            }
-            /** Let go: back to rest, nothing more is sent (a lost finger, a menu opening). */
-            release() {
-                const s = this.s;
-                this.setOut(false);
-                if (s.slot) this.slots[s.slot].classList.remove('highlighted');
-                Object.assign(s, { id: null, active: false, dx: 0, dy: 0, far: 0, kx: 0, ky: 0, slot: null, rects: null });
-                this.value = [0, 0];
-                this.setKnob(0, 0);
-                if (this.base && this.anchor === 'touch') this.base.style.display = 'none';
-            }
-            setKnob(x, y) {
-                if (!this.knob) return;
-                this.knob.style.setProperty('--lx', x + 'px'); this.knob.style.setProperty('--ly', y + 'px');
-            }
-        }
-
-        class gamepadInstance extends inputInstance {
-            /** Standard mapping: button index -> name. */
-            static BUTTONS = ['gamepadA', 'gamepadB', 'gamepadX', 'gamepadY', 'gamepadLBumper', 'gamepadRBumper', 'gamepadLTrigger', 'gamepadRTrigger',
-                'gamepadBack', 'gamepadStart', 'gamepadLStickButton', 'gamepadRStickButton', 'gamepadDUp', 'gamepadDDown', 'gamepadDLeft', 'gamepadDRight'];
-            constructor(system) {
-                super(system, 'gamepad');
-                this.index = null; this.pad = null;
-                this.trigger_threshold = 0.4;               // a trigger past this counts as pressed
-                this.left_stick_value = [0, 0]; this.right_stick_value = [0, 0];
-                this.left_trigger_value = 0; this.right_trigger_value = 0;
-            }
-            get connected() { return !!this.pad; }
-            /** Read the pad (the first connected one): its sticks and triggers, and press / release its buttons. */
-            updateGamepads() {
-                const pads = typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : [];
-                let pad = this.index !== null ? pads[this.index] : null;
-                if (!pad || !pad.connected) { pad = [...pads].find(p => p && p.connected) || null; this.index = pad ? pad.index : null; }
-                if (!pad) { if (this.pad) { this.pad = null; this.releaseAll(); this.left_stick_value = [0, 0]; this.right_stick_value = [0, 0]; this.left_trigger_value = this.right_trigger_value = 0; } return; }
-                this.pad = pad;
-                const A = pad.axes, Bt = pad.buttons;
-                this.left_stick_value = [A[0] || 0, A[1] || 0]; this.right_stick_value = [A[2] || 0, A[3] || 0];
-                this.left_trigger_value = Bt[6] ? Bt[6].value : 0; this.right_trigger_value = Bt[7] ? Bt[7].value : 0;
-                gamepadInstance.BUTTONS.forEach((name, i) => {
-                    const b = Bt[i], on = !!b && (b.pressed || b.value > this.trigger_threshold);
-                    if (on !== this.input_active.has(name)) on ? this.system.press(this, name, this.system.ev('gamepad', name)) : this.system.release(this, name, this.system.ev('gamepad', name));
-                });
-            }
-            /** A stick ('left' | 'right') with a radial dead zone, rescaled so the edge of the dead zone is 0: { x, y, m }. */
-            stick(which, dead = 0.15) {
-                const [x, y] = which === 'left' ? this.left_stick_value : this.right_stick_value, m = Math.hypot(x, y);
-                if (m < dead) return { x: 0, y: 0, m: 0 };
-                const k = Math.min(1, (m - dead) / (1 - dead)) / m;
-                return { x: x * k, y: y * k, m: Math.min(1, (m - dead) / (1 - dead)) };
-            }
-            rumble(ms, strength) {
-                try { this.pad?.vibrationActuator?.playEffect('dual-rumble', { duration: ms, strongMagnitude: strength, weakMagnitude: strength }); } catch (e) { /* no rumble */ }
-            }
-        }
-
-        class controlsSystem {
-            /** { keymap, actions: [ACTION ROW...], context: () => the game (handed to when / run), timing } */
-            constructor({ keymap = {}, actions = [], context = () => null, timing = {} } = {}) {
-                Object.assign(this, {
-                    tap_threshold: 0.195,   // s: a press shorter than this is a tap
-                    tap_wait_time: 0.25,    // s: after a tap, how long a second press makes it a double tap
-                    hold_wait_time: 1.0,    // s: held this long, it is a hold
-                    queue_wait_time: 0.8,   // s: how long a fired action waits in the queue to be read
-                }, timing);
-                this.context = context;
-                this.actions = {};
-                this.queue = [];            // [action, type, time]
-                this.pending = [];          // taps waiting to see if a second press comes: [input, action, ev]
-                this.hooks = [];            // run each frame after the pad is read: fn(system, now)
-                this.on_fire = [];          // told of every fired action: fn(action, type, ev)
-                this.before_fire = [];      // told just before an action runs (a recorder reseeding the dice)
-                this.muted = false;         // true: devices are not heard (a playback), except the inputs in unmuted
-                this.unmuted = ['Escape'];
-                for (const [name, when, run] of actions) this.actions[name] = [when, run];
-                this.setKeymap(keymap);
-                this.keyboard = new keyboardInstance(this);
-                this.mouse = new mouseInstance(this);
-                this.touch = new touchInstance(this);
-                this.gamepad = new gamepadInstance(this);
-                this.frame = this.frame.bind(this);
-                if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(this.frame);
-            }
-
-            // ── The keymap ──────────────────────────────────────────────────────
-            setKeymap(keymap) {
-                this.keymap = keymap; this.bindings = {}; this.inputs = {};
-                for (const action in keymap) for (const b of keymap[action]) {
-                    const [input, type = PRESS, hold] = Array.isArray(b) ? b : [b];
-                    (this.bindings[input] ||= []).push([action, type, hold]);
-                    (this.inputs[action] ||= []).push(input);
-                }
-            }
-            bind(action, ...bindings) { this.setKeymap({ ...this.keymap, [action]: bindings }); }
-            bound(action, input) { return !!this.inputs[action]?.includes(input); }
-            instanceOf(input) { return input.startsWith('gamepad') ? this.gamepad : input.startsWith('mouse') ? this.mouse : input.startsWith('touch') ? this.touch : this.keyboard; }
-
-            // ── Asking ──────────────────────────────────────────────────────────
-            active(action) { return !!this.inputs[action]?.some(i => this.instanceOf(i).isActive(i)); }
-            justActivated(action) { return !!this.inputs[action]?.some(i => this.instanceOf(i).input_just_activated.has(i)); }
-            justReleased(action) { return !!this.inputs[action]?.some(i => this.instanceOf(i).input_just_released.has(i)); }
-            /** How long (s) the action's input has been held (0: not held). */
-            held(action) { const t = Math.min(...(this.inputs[action] || []).filter(i => this.instanceOf(i).isActive(i)).map(i => this.instanceOf(i).input_time[i])); return isFinite(t) ? controlsSystem.now() - t : 0; }
-            axis(neg, pos) { return (this.active(pos) ? 1 : 0) - (this.active(neg) ? 1 : 0); }
-            /** [x, y] from `${name}_left/_right/_up/_down` (screen y: up is -1). */
-            direction(name) { return [this.axis(name + '_left', name + '_right'), this.axis(name + '_up', name + '_down')]; }
-            /** Was `action` fired (of `type`, or any) within queue_wait_time? Reading it takes it out of the queue. */
-            readQueue(action, type = null) {
-                const i = this.queue.findIndex(q => q[0] === action && (type === null || q[1] === type));
-                return i >= 0 ? !!this.queue.splice(i, 1) : false;
-            }
-            /** Let go of everything held: nothing fires or reads as held until it is pressed again. */
-            clear() {
-                for (const k in this.touch.sticks) this.touch.sticks[k].release();
-                for (const i of this.touch.input_active) this.touch.elements[i]?.classList.remove('held');
-                for (const inst of [this.keyboard, this.mouse, this.touch, this.gamepad]) { for (const i of inst.input_active) inst.spent.add(i); inst.armed = {}; }
-                this.pending.length = 0;
-            }
-
-            // ── Firing ──────────────────────────────────────────────────────────
-            static now() { return (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000; }
-            ev(device, input, e = null) {
-                return { device, input, type: null, time: controlsSystem.now(), event: e, repeat: !!e?.repeat,
-                    typing: device === 'keyboard' && !!e && keyboardInstance.editable(e.target), shift: !!e?.shiftKey, ctrl: !!(e?.ctrlKey || e?.metaKey),
-                    preventDefault: () => e?.cancelable && e.preventDefault(), stop: () => { e?.stopPropagation?.(); e?.stopImmediatePropagation?.(); } };
-            }
-            can(action, ev) { const a = this.actions[action]; return !!a && (!a[0] || !!a[0](this.context(), ev)); }
-            fire(action, type, ev) {
-                if (!this.can(action, ev)) return false;
-                ev.type = type;
-                for (const fn of this.before_fire) fn(action, type, ev);
-                this.queue.push([action, type, ev.time]);
-                this.actions[action][1]?.(this.context(), ev);
-                for (const fn of this.on_fire) fn(action, type, ev);   // a recorder listening (basement/recorder-kit.js)
-                return true;
-            }
-            press(inst, input, ev) {
-                if (this.muted && !this.unmuted.includes(input)) return;   // a playback has the controls
-                const list = this.bindings[input] || [];
-                if (inst.input_active.has(input)) { for (const [a, t] of list) if (t === REPEAT) this.fire(a, t, { ...ev, repeat: true }); return; }
-                if (!ev.typing) { inst.input_active.add(input); inst.input_just_activated.add(input); inst.input_time[input] = ev.time; inst.armed[input] = new Set(list.filter(b => this.can(b[0], ev)).map(b => b[0])); }
-                // A second press soon after a tap: a double tap (and that tap is dropped)
-                const p = this.pending.findIndex(q => q[0] === input && ev.time - q[2].time <= this.tap_wait_time);
-                if (p >= 0) { this.pending = this.pending.filter(q => q[0] !== input); inst.armed[input] && (inst.armed[input].double = true); for (const [a, t] of list) if (t === DOUBLETAP) this.fire(a, t, ev); }
-                for (const [a, t] of list) if (t === PRESS || t === REPEAT) this.fire(a, t, ev);
-            }
-            release(inst, input, ev) {
-                if (this.muted && !this.unmuted.includes(input)) return;
-                const armed = inst.armed[input], since = inst.input_time[input];
-                const was = inst.input_active.delete(input);
-                inst.spent.delete(input); delete inst.armed[input];
-                if (!was) return;
-                inst.input_just_released.add(input);
-                if (!armed) return;
-                const list = this.bindings[input] || [], dur = ev.time - since;
-                for (const [a, t, hold] of list) if (t === HELD && armed.has(a) && !armed['held_' + a] && dur >= (hold ?? this.hold_wait_time)) { armed['held_' + a] = armed.held = true; this.fire(a, t, ev); }   // a hold that ended between two frames
-                const hold = list.filter(b => b[1] === HELD).map(b => b[2] ?? this.hold_wait_time), short = dur <= (hold.length ? Math.min(...hold) : this.tap_threshold);
-                const double = list.some(b => b[1] === DOUBLETAP);
-                for (const [a, t] of list) {
-                    if (!armed.has(a)) continue;
-                    if (t === RELEASE) this.fire(a, t, ev);
-                    if (t === TAP && short && !armed.held && !armed.double) double ? this.pending.push([input, a, ev]) : this.fire(a, t, ev);
-                }
-            }
-
-            // ── The frame ───────────────────────────────────────────────────────
-            update(now = controlsSystem.now()) {
-                if (this.muted) { this.generateAll(); return; }   // a playback holds the inputs; the pad and menus wait
-                this.gamepad.updateGamepads();
-                for (const inst of [this.keyboard, this.mouse, this.touch, this.gamepad]) for (const input in inst.armed) {
-                    const armed = inst.armed[input], since = inst.input_time[input];
-                    for (const [a, t, hold] of this.bindings[input] || []) {
-                        if (t !== HELD || !armed.has(a) || armed['held_' + a] || now - since < (hold ?? this.hold_wait_time)) continue;
-                        armed['held_' + a] = armed.held = true;
-                        this.fire(a, t, this.ev(inst.device, input));
-                    }
-                }
-                this.pending = this.pending.filter(([, a, ev]) => now - ev.time <= this.tap_wait_time || (this.fire(a, TAP, ev), false));
-                this.queue = this.queue.filter(q => now - q[2] <= this.queue_wait_time);
-                for (const fn of this.hooks) fn(this, now);
-                this.generateAll();
-            }
-            generateAll() { for (const inst of [this.keyboard, this.mouse, this.touch, this.gamepad]) inst.generateGhostImage(); }
-            frame() { requestAnimationFrame(this.frame); this.update(); }
-        }
-    </script>
-    <script type="text/dfab" data-src="basement/recorder-kit.js" data-cost="84">
-        // ===== LV0 BASEMENT =====
-        // The recorder: what the player did, tick by tick, so it can be played back through the controls
-        // system as if they were doing it again (a replay test, a demo, a bug to watch happen twice). It also
-        // keeps where the things near the centre were (recording_radius), so a playback can be checked
-        // against the recording, or drawn as a ghost.
-        // (The terms are from the g7 engine: base game script 2.0's gRecorder.)
-        //
-        // It knows nothing about any game: the game hands it
-        //   sources   { name: [get, set] }  state the controls don't hold, read and written each tick
-        //             (a touch stick's dx/dy, the mouse's aim): get() -> a packet, set(packet)
-        //   objects   () -> [[id, x, y, angle], ...]   things that may be recorded
-        //   centre    () -> [x, y]                     the middle of the recorded circle
-        //   world     [get, set]   the world's start: what a run reads besides the dice (its clocks, id counters, the
-        //             camera, a street to empty): got before the setup, set again before the playback's setup
-        //
-        // RECORDING: { frames: [FRAME...], actions: [ACTION...], step, seed, world }   plain data (JSON)
-        //   seed     the dice: while recording or playing, Math.random is reseeded from it at the start of every
-        //            tick and before every action, so whatever the drawing used in between (it draws a different
-        //            number of frames each time) can't change what the world does: a playback is the same run
-        //   FRAME    [held, sources, objects]
-        //            held     { keyboard: [...], touch: [...], gamepad: [...] }   the inputs held that tick
-        //            sources  { name: packet }
-        //            objects  [[id, x, y, angle], ...] within recording_radius of the centre
-        //   ACTION   [frame, action, type, device, input, shift]   an action fired after that frame
-        //
-        // gRecorder(controls, { sources, objects, centre, recording_radius })
-        //   startRecording(setup), stopRecording() -> RECORDING
-        //   startPlayback(recording, on_end, setup), stopPlayback()   while playing, the devices are muted (Escape still works)
-        //   setup     optional: what puts the world where it starts (a map load), run on the recording's dice; give the
-        //             same one to the playback and it starts from the same world (pedestrians and all)
-        //   recording, playing, frame (the frame index now)
-        //   createFrame() / prepareFrameData() / recordFrame(): one tick's frame, its objects, kept
-        class gRecorder {
-            constructor(controls, { sources = {}, objects = () => [], centre = () => [0, 0], recording_radius = 600, world = null } = {}) {
-                Object.assign(this, { controls, sources, objects, centre, recording_radius, world, recording: false, playing: false, frame: 0, data: null, timer: null, on_end: null });
-                controls.on_fire.push((action, type, ev) => { if (this.recording && ev.device !== 'replay') this.data.actions.push([this.frame - 1, action, type, ev.device, ev.input, !!ev.shift]); });
-                controls.before_fire.push(() => { if (this.recording || this.playing) this.reseed(this.frame - 1, 1 + this._fired++); });
-                game_timers.before.push(() => { if (this.recording || this.playing) { this.reseed(this.frame, 0); this._fired = 0; } });
-                this.real_random = Math.random; this._fired = 0;
-            }
-            /** The dice for (frame, n): the same numbers every time this run reaches that point. */
-            reseed(frame, n) {
-                let a = (this.data.seed ^ Math.imul(frame + 1, 0x9E3779B1) ^ Math.imul(n + 1, 0x85EBCA6B)) >>> 0;
-                Math.random = () => { a = (a + 0x6D2B79F5) >>> 0; let t = Math.imul(a ^ (a >>> 15), a | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };   // mulberry32
-            }
-            _dice(on) { if (!on) Math.random = this.real_random; }
-            _setup(setup) { if (!setup) return; this.reseed(-1, 0); try { setup(); } finally { this._dice(false); } }
-            /** Each sim tick (game_timers: the recorder runs in game time, so a pause is not recorded). */
-            _everyTick(fn) { this.timer?.stopTimer(); this.timer = game_timers.every(game_timers.step, fn, 'recorder'); this.timer.keep = true; }
-
-            // ── Recording ──────────────────────────────────────────────────────
-            /** setup(): what puts the world where it starts (a map load); it runs on the recording's own dice, so a
-             *  playback that runs it again starts from the same world, pedestrians and all. Without one, a playback
-             *  starts from whatever world is there, and only her own part is sure to repeat. */
-            startRecording(setup = null) {
-                this.stopPlayback();
-                this.data = { frames: [], actions: [], step: game_timers.step, seed: (this.real_random() * 4294967296) >>> 0, world: this.world ? this.world[0]() : null };
-                if (this.world) this.world[1](this.data.world);   // the same way the playback will start: the street emptied, the clocks set
-                this._setup(setup);
-                this.recording = true; this.frame = 0;
-                this.recordFrame();
-                this._everyTick(() => this.recordFrame());
-            }
-            stopRecording() { if (this.recording) this._dice(false); this.recording = false; this.timer?.stopTimer(); return this.data; }
-            createFrame() {
-                const C = this.controls, held = {};
-                for (const d of ['keyboard', 'touch', 'gamepad']) held[d] = C[d].getActiveInputs();
-                const src = {};
-                for (const k in this.sources) src[k] = this.sources[k][0]();
-                return [held, src, this.prepareFrameData()];
-            }
-            prepareFrameData() {
-                const [cx, cy] = this.centre(), r2 = this.recording_radius ** 2, r = v => Math.round(v * 100) / 100;
-                return this.objects().filter(o => (o[1] - cx) ** 2 + (o[2] - cy) ** 2 <= r2).map(([id, x, y, a]) => [id, r(x), r(y), r(a || 0)]);
-            }
-            recordFrame() { this.data.frames.push(this.createFrame()); this.frame++; }
-
-            // ── Playback ───────────────────────────────────────────────────────
-            startPlayback(recording, on_end = null, setup = null) {
-                this.stopRecording(); this.stopPlayback();
-                Object.assign(this, { data: recording, frame: 0, on_end });
-                if (this.world && recording.world) this.world[1](recording.world);
-                this._setup(setup);
-                this.playing = true;
-                this.controls.clear(); this.controls.muted = true;
-                this.playFrame();
-                this._everyTick(() => this.playFrame());
-            }
-            playFrame() {
-                const d = this.data, C = this.controls;
-                // the actions fired after the last frame, then this frame's held inputs and sources
-                for (const [f, action, type, device, input, shift] of d.actions) if (f === this.frame - 1)
-                    C.fire(action, type, { device: 'replay', from: device, input, type, shift, time: controlsSystem.now(), repeat: false, typing: false, ctrl: false, preventDefault() {}, stop() {} });
-                if (this.frame >= d.frames.length) return this.stopPlayback(true);
-                this.reseed(this.frame, 0);   // the tick's own dice again, after those actions (they ran between ticks when recorded)
-                const [held, src] = d.frames[this.frame];
-                for (const dv of ['keyboard', 'touch', 'gamepad']) C[dv].setInputs(held[dv] || []);
-                for (const k in src) this.sources[k]?.[1](src[k]);
-                this.frame++;
-            }
-            stopPlayback(ended = false) {
-                if (!this.playing) return;
-                this.playing = false; this.timer?.stopTimer(); this._dice(false);
-                const C = this.controls;
-                for (const dv of ['keyboard', 'touch', 'gamepad']) C[dv].setInputs([]);
-                C.muted = false;
-                if (ended) this.on_end?.(this);
             }
         }
     </script>
@@ -9874,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="5070">
+    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="5457">
 const DFNative = (()=>{
 'use strict';
 // src/basement/physics/core/values.mjs
@@ -20141,11 +19633,504 @@ class gameLevel {
 
 return Object.freeze({get gameLevel(){return gameLevel;}});
 })();
+// src/basement/controls/values.mjs
+const m46 = (()=>{
+const TAP = 0;
+const DOUBLETAP = 1;
+const HELD = 2;
+const PRESS = 3;
+const REPEAT = 4;
+const RELEASE = 5;
+
+function cleanupAll(tasks,message) {
+    const errors=[];for(const task of tasks)try{task();}catch(error){errors.push(error);}
+    if(errors.length)throw new AggregateError(errors,message);
+}
+
+function radialStick(value, dead_zone = 0.15) {
+    if (!Number.isFinite(dead_zone) || dead_zone < 0 || dead_zone >= 1) throw new TypeError('dead_zone must be in [0,1)');
+    const [x,y] = value, magnitude = Math.hypot(x,y);
+    if (!Number.isFinite(magnitude) || magnitude <= dead_zone) return {x:0,y:0,m:0};
+    const m = Math.min(1,(magnitude-dead_zone)/(1-dead_zone));
+    return {x:x/magnitude*m,y:y/magnitude*m,m};
+}
+
+return Object.freeze({get TAP(){return TAP;},get DOUBLETAP(){return DOUBLETAP;},get HELD(){return HELD;},get PRESS(){return PRESS;},get REPEAT(){return REPEAT;},get RELEASE(){return RELEASE;},get cleanupAll(){return cleanupAll;},get radialStick(){return radialStick;}});
+})();
+// src/basement/controls/touch-stick.mjs
+const m48 = (()=>{
+class touchStick {
+    constructor(system, name, packet) {
+        Object.assign(this, { anchor: 'centre', base_radius: 0, travel: 40, scale: () => 1, edge: 0, ring: null, input: null, slots: null, mouse: false, free: () => !this.s.active, onStart() {}, onMove() {}, onEnd() {} }, packet);
+        this.system = system; this.name = name;
+        this.disposed = false;
+        this.disposers = [];
+        const listen = (target,type,handler,options) => this.disposers.push(system.listen(target,type,handler,options));
+        const el = x => typeof x === 'string' ? system.document?.getElementById(x) : x;
+        this.zone = el(this.zone); this.knob = el(this.knob); this.base = el(this.base);
+        this.s = { id: null, active: false, x0: 0, y0: 0, lx: 0, ly: 0, dx: 0, dy: 0, far: 0, angle: 0, kx: 0, ky: 0, out: false, slot: null, rects: null };
+        this.value = [0, 0];
+        if (!this.zone) return;
+        const touchAction=this.zone.style?.touchAction;
+        if(this.zone.style){this.zone.style.touchAction='none';this.disposers.push(()=>{this.zone.style.touchAction=touchAction??'';});}
+        const z = this.zone, own = (e, fn) => { for (let i = 0; i < e.changedTouches.length; i++) if (e.changedTouches[i].identifier === this.s.id) return fn(e.changedTouches[i]), true; return false; };
+        listen(z, 'touchstart', e => { if(e.cancelable)e.preventDefault(); if (this.free() && !system.muted) this.start(e.changedTouches[0], e); }, { passive: false });
+        listen(z, 'touchmove', e => { if(e.cancelable)e.preventDefault(); if (this.s.active) own(e, t => this.move(t, e)); }, { passive: false });
+        const end = e => { if(e.cancelable)e.preventDefault(); if (this.s.active) own(e, () => this.end(e)); };
+        listen(z, 'touchend', end); listen(z, 'touchcancel', e => { if(e.cancelable)e.preventDefault(); if(this.s.active) own(e, () => this.cancel(e)); });
+        if (this.mouse) {
+            const m = e => ({ identifier: 'mouse', clientX: e.clientX, clientY: e.clientY });
+            listen(z, 'mousedown', e => { if(e.cancelable)e.preventDefault(); if (this.free() && !system.muted) this.start(m(e), e); });
+            listen(system.event_target, 'mousemove', e => { if (this.s.active && this.s.id === 'mouse') this.move(m(e), e); });
+            listen(system.event_target, 'mouseup', e => { if (this.s.active && this.s.id === 'mouse') this.end(e); });
+        }
+    }
+    get maxTravel() { return typeof this.travel === 'function' ? this.travel() : this.travel; }
+    start(t, e) {
+        if(this.disposed)return;
+        const s = this.s;
+        if (this.anchor === 'touch') {
+            const W = this.system.event_target?.innerWidth ?? 1280, H = this.system.event_target?.innerHeight ?? 720, ey = Math.min(this.edge, H * 0.24);   // a short screen: less margin top and bottom
+            s.x0 = Math.max(this.edge, Math.min(W - this.edge, t.clientX)); s.y0 = Math.max(ey, Math.min(H - ey, t.clientY));
+            s.lx = t.clientX; s.ly = t.clientY;
+            if (this.base) Object.assign(this.base.style, { display: 'block', left: (s.x0 - this.base_radius) + 'px', top: (s.y0 - this.base_radius) + 'px' });
+        } else {
+            const r = this.zone.getBoundingClientRect();
+            s.x0 = s.lx = r.left + r.width / 2; s.y0 = s.ly = r.top + r.height / 2;
+        }
+        Object.assign(s, { id: t.identifier, active: true, dx: 0, dy: 0, far: 0, angle: 0, kx: 0, ky: 0, out: false, slot: null, landX: t.clientX, landY: t.clientY });
+        this.setKnob(0, 0);
+        this.system.active_device = 'touch';
+        this.onStart(s, e);
+        if (this.slots) s.rects = Object.entries(this.slots).map(([key, el]) => [key, el.getBoundingClientRect()]);   // after onStart: it may show them
+    }
+    move(t, e) {
+        const s = this.s, k = this.scale() || 1, T = this.maxTravel;
+        if(!s.active || !Number.isFinite(T) || T<=0)return;
+        s.dx = (t.clientX - s.lx) / k; s.dy = (t.clientY - s.ly) / k; s.far = Math.hypot(s.dx, s.dy); s.angle = Math.atan2(s.dy, s.dx);
+        const gain = s.far > 0 ? Math.min(s.far,T)/s.far : 0; s.kx = s.dx * gain; s.ky = s.dy * gain;
+        this.value = [s.kx / T, s.ky / T];
+        this.system.active_device = 'touch';
+        this.system.refreshVectors();
+        if (this.ring) this.setOut(s.far >= this.ring[0] || (s.out && s.far > this.ring[1]));
+        if (s.rects) {
+            const hit = s.rects.find(([, r]) => t.clientX >= r.left && t.clientX <= r.right && t.clientY >= r.top && t.clientY <= r.bottom);
+            const key = hit ? hit[0] : null;
+            if (key !== s.slot) { s.slot && this.slots[s.slot].classList.remove('highlighted'); key && this.slots[key].classList.add('highlighted'); s.slot = key; }
+        }
+        if (this.onMove(s, e) !== false) this.setKnob(s.kx, s.ky);
+    }
+    setOut(out) {
+        const s = this.s; if (out === s.out) return; s.out = out;
+        if (!this.input) return;
+        const T = this.system.touch, ev = this.system.ev('touch', this.input);
+        out ? this.system.press(T, this.input, ev) : this.system.release(T, this.input, ev);
+    }
+    end(e) {
+        const s = this.s;
+        try { this.onEnd(s,e);this.setOut(false); }
+        finally { this.release(); }
+    }
+    cancel(event) {
+        try { if(this.s.active)this.onEnd(this.s,{type:'touchcancel',cancelled:true,event}); }
+        finally { this.release(); }
+    }
+    /** Let go: back to rest, nothing more is sent (a lost finger, a menu opening). */
+    release() {
+        const s = this.s;
+        if(this.input)this.system.cancelInput(this.system.touch,this.input);
+        s.out = false;
+        if (s.slot) this.slots[s.slot].classList.remove('highlighted');
+        Object.assign(s, { id: null, active: false, dx: 0, dy: 0, far: 0, kx: 0, ky: 0, slot: null, rects: null });
+        this.value = [0, 0];
+        this.system.refreshVectors();
+        this.setKnob(0, 0);
+        if (this.base && this.anchor === 'touch') this.base.style.display = 'none';
+    }
+    dispose() { if(this.disposed)return;try{this.cancel();}finally{this.disposers.splice(0).forEach(drop => drop());this.disposed=true;} }
+    setKnob(x, y) {
+        if (!this.knob) return;
+        this.knob.style.setProperty('--lx', x + 'px'); this.knob.style.setProperty('--ly', y + 'px');
+    }
+}
+
+return Object.freeze({get touchStick(){return touchStick;}});
+})();
+// src/basement/controls/devices.mjs
+const m47 = (()=>{
+const {touchStick} = m48;
+const {radialStick,cleanupAll} = m46;
+
+/** Device state uses the terminology from the original Python input instances. */
+class inputInstance {
+    constructor(system, device) {
+        this.system=system;this.device=device;
+        this.input_active=new Set();this.input_just_activated=new Set();this.input_just_released=new Set();this.ghost_image=new Set();
+        this.input_time=Object.create(null);this.armed=Object.create(null);this.spent=new Set();
+    }
+    isActive(input){return this.input_active.has(input)&&!this.spent.has(input);}
+    getActiveInputs(){return [...this.input_active].filter(input=>!this.spent.has(input));}
+    generateGhostImage(){this.ghost_image=new Set(this.input_active);this.input_just_activated.clear();this.input_just_released.clear();}
+    /** Replay injection changes held state without invoking action callbacks. */
+    setInputs(inputs){
+        for(const input of [...this.input_active])if(!inputs.includes(input))this.system.changeInput(input,()=>{this.input_active.delete(input);this.spent.delete(input);delete this.armed[input];this.input_just_released.add(input);});
+        for(const input of inputs)if(!this.input_active.has(input))this.system.changeInput(input,()=>{this.input_active.add(input);this.input_time[input]=this.system.now();this.input_just_activated.add(input);});
+    }
+    releaseAll(){for(const input of [...this.input_active])this.system.cancelInput(this,input);}
+}
+
+class keyboardInstance extends inputInstance {
+    constructor(system){
+        super(system,'keyboard');const target=system.event_target;
+        system.listen(target,'keydown',event=>this.event(event,true));system.listen(target,'keyup',event=>this.event(event,false),true);
+    }
+    static keyName(key){return key===' '?'space':key?.length===1?key.toLowerCase():key;}
+    static editable(target){return !!target&&(!!target.isContentEditable||typeof target.closest==='function'&&!!target.closest('input, textarea, select, [contenteditable="true"]'));}
+    event(event,down){const input=keyboardInstance.keyName(event.key);if(!input||down&&event.repeat&&!this.input_active.has(input))return;const ev=this.system.ev('keyboard',input,event);down?this.system.press(this,input,ev):this.system.release(this,input,ev);}
+}
+
+class mouseInstance extends inputInstance {
+    constructor(system,target=system.event_target){
+        super(system,'mouse');this.x=0;this.y=0;this.delta=[0,0];this.wheel=[0,0];this.known=false;
+        const buttons=['mouseLeft','mouseMiddle','mouseRight'];
+        const sample=event=>{
+            if(event.sourceCapabilities?.firesTouchEvents||!Number.isFinite(event.clientX)||!Number.isFinite(event.clientY))return;
+            if(this.known){this.delta[0]+=event.clientX-this.x;this.delta[1]+=event.clientY-this.y;}
+            this.x=event.clientX;this.y=event.clientY;this.known=true;system.active_device='mouse';
+        };
+        system.listen(target,'mousemove',sample,{passive:true});
+        if(target!==system.event_target)system.listen(system.event_target,'mousemove',event=>{if(this.input_active.size)sample(event);},{passive:true});
+        system.listen(target,'mousedown',event=>{if(event.sourceCapabilities?.firesTouchEvents)return;const input=buttons[event.button];if(input){sample(event);system.press(this,input,system.ev('mouse',input,event));}});
+        system.listen(system.event_target,'mouseup',event=>{const input=buttons[event.button];if(input){if(this.input_active.has(input))sample(event);system.release(this,input,system.ev('mouse',input,event));}});
+        system.listen(target,'wheel',event=>{const unit=event.deltaMode===1?16:event.deltaMode===2?(target.innerHeight||800):1;this.wheel[0]+=event.deltaX*unit;this.wheel[1]+=event.deltaY*unit;system.active_device='mouse';},{passive:true});
+    }
+    generateGhostImage(){super.generateGhostImage();this.delta=[0,0];this.wheel=[0,0];}
+}
+
+class touchInstance extends inputInstance {
+    constructor(system){super(system,'touch');this.elements=Object.create(null);this.sticks=Object.create(null);this.bindings=new Map();}
+    stick(name,packet){this.sticks[name]?.dispose();return this.sticks[name]=new touchStick(this.system,name,packet);}
+    buttons(list){for(const [element,input]of list)this.button(element,input);}
+    button(element,input){
+        if(typeof input!=='string'||!input.startsWith('touch'))throw new TypeError('Touch button inputs must start with touch');
+        const el=typeof element==='string'?this.system.document?.getElementById(element):element;
+        if(!el)return;if(this.elements[input]===el)return this.bindings.get(input).dispose;
+        this.bindings.get(input)?.dispose();this.elements[input]=el;const pointers=new Set(),drops=[];
+        const touchAction=el.style?.touchAction;if(el.style)el.style.touchAction='none';
+        const down=event=>{
+            if(event.button>0||this.system.muted)return;if(event.cancelable)event.preventDefault();const id=event.pointerId??'pointer';pointers.add(id);
+            try{if(event.pointerId!==undefined)el.setPointerCapture(event.pointerId);}catch{}
+            el.classList.add('held');if(pointers.size===1)this.system.press(this,input,this.system.ev('touch',input,event));
+        };
+        const up=(event,cancel=false)=>{
+            if(!pointers.delete(event.pointerId??'pointer')||pointers.size)return;el.classList.remove('held');
+            if(cancel)this.system.cancelInput(this,input);else this.system.release(this,input,this.system.ev('touch',input,event));
+        };
+        const listen=(type,handler,options)=>drops.push(this.system.listen(el,type,handler,options));
+        listen('pointerdown',down);listen('pointerup',event=>up(event));listen('pointercancel',event=>up(event,true));listen('lostpointercapture',event=>up(event,true));
+        listen('touchstart',event=>{if(event.cancelable)event.preventDefault();},{passive:false});
+        let disposed=false;
+        const dispose=()=>{if(disposed)return;disposed=true;drops.splice(0).forEach(drop=>drop());pointers.clear();el.classList.remove('held');if(el.style)el.style.touchAction=touchAction??'';this.system.cancelInput(this,input);delete this.elements[input];this.bindings.delete(input);};
+        this.bindings.set(input,{dispose,pointers});return dispose;
+    }
+    drop(input){if(this.input_active.has(input)){this.spent.add(input);this.armed[input]=new Set();}this.elements[input]?.classList.remove('held');}
+    cancel(){for(const binding of this.bindings.values())binding.pointers.clear();for(const el of Object.values(this.elements))el.classList.remove('held');cleanupAll([...Object.values(this.sticks).map(stick=>()=>stick.cancel()),()=>this.releaseAll()],'Touch cancellation failed');}
+    dispose(){try{cleanupAll([()=>this.cancel(),...[...this.bindings.values()].map(binding=>()=>binding.dispose()),...Object.values(this.sticks).map(stick=>()=>stick.dispose())],'Touch disposal failed');}finally{this.sticks=Object.create(null);}}
+}
+
+class gamepadInstance extends inputInstance {
+    static BUTTONS=['gamepadA','gamepadB','gamepadX','gamepadY','gamepadLBumper','gamepadRBumper','gamepadLTrigger','gamepadRTrigger','gamepadBack','gamepadStart','gamepadLStickButton','gamepadRStickButton','gamepadDUp','gamepadDDown','gamepadDLeft','gamepadDRight'];
+    constructor(system){super(system,'gamepad');this.index=null;this.pad=null;this.trigger_threshold=.4;this.left_stick_value=[0,0];this.right_stick_value=[0,0];this.left_trigger_value=0;this.right_trigger_value=0;this.suppressed=new Set();this.suppressed_buttons=new Set();}
+    get connected(){return !!this.pad;}
+    updateGamepads(){
+        const previous=[...this.left_stick_value,...this.right_stick_value,this.left_trigger_value,this.right_trigger_value];
+        const pads=this.system.read_gamepads()??[];let pad=this.index!==null?pads[this.index]:null;
+        if(!pad?.connected)pad=[...pads].find(p=>p?.connected)??null;
+        if(this.pad&&(!pad||pad.index!==this.pad.index)){this.releaseAll();this.suppressAnalog();this.suppressButtons();}
+        if(!pad){this.pad=null;this.index=null;this.left_stick_value=[0,0];this.right_stick_value=[0,0];this.left_trigger_value=this.right_trigger_value=0;return;}
+        this.pad=pad;this.index=pad.index;const A=pad.axes??[],B=pad.buttons??[];
+        const finite=value=>Number.isFinite(value)?Math.max(-1,Math.min(1,value)):0;
+        this.left_stick_value=[finite(A[0]),finite(A[1])];this.right_stick_value=[finite(A[2]),finite(A[3])];
+        this.left_trigger_value=Math.max(0,finite(B[6]?.value));this.right_trigger_value=Math.max(0,finite(B[7]?.value));
+        for(const side of ['left','right'])if(this.suppressed.has(side+'_trigger')){
+            if(this[side+'_trigger_value']<=.05)this.suppressed.delete(side+'_trigger');
+            this[side+'_trigger_value']=0;
+        }
+        for(const side of ['left','right'])if(this.suppressed.has(side)){
+            if(Math.hypot(...this[side+'_stick_value'])<=.15)this.suppressed.delete(side);
+            this[side+'_stick_value']=[0,0];
+        }
+        const current=[...this.left_stick_value,...this.right_stick_value,this.left_trigger_value,this.right_trigger_value];
+        if(current.some((value,index)=>Math.abs(value)>.15&&Math.abs(value-previous[index])>1e-4))this.system.active_device='gamepad';
+        gamepadInstance.BUTTONS.forEach((name,index)=>{
+            const button=B[index],on=!!button&&(button.pressed||button.value>this.trigger_threshold);
+            if(this.suppressed_buttons.has(name)){if(!on){this.suppressed_buttons.delete(name);if(this.input_active.has(name))this.system.cancelInput(this,name);}return;}
+            if(on!==this.input_active.has(name))on?this.system.press(this,name,this.system.ev('gamepad',name)):this.system.release(this,name,this.system.ev('gamepad',name));
+        });
+    }
+    stick(which,dead_zone=.15){if(!['left','right'].includes(which))throw new TypeError('Stick must be left or right');return radialStick(this[which+'_stick_value'],dead_zone);}
+    suppressAnalog(){for(const side of ['left','right']){this.suppressed.add(side);this.suppressed.add(side+'_trigger');this[side+'_stick_value']=[0,0];this[side+'_trigger_value']=0;}}
+    suppressButtons(){for(const name of gamepadInstance.BUTTONS)this.suppressed_buttons.add(name);}
+    rumble(ms,strength){try{const result=this.pad?.vibrationActuator?.playEffect('dual-rumble',{duration:ms,strongMagnitude:strength,weakMagnitude:strength});result?.catch(()=>{});}catch{}}
+}
+
+return Object.freeze({get inputInstance(){return inputInstance;},get keyboardInstance(){return keyboardInstance;},get mouseInstance(){return mouseInstance;},get touchInstance(){return touchInstance;},get gamepadInstance(){return gamepadInstance;}});
+})();
+// src/basement/controls/system.mjs
+const m45 = (()=>{
+const {TAP,DOUBLETAP,HELD,PRESS,REPEAT,RELEASE} = m46;
+const {radialStick,cleanupAll} = m46;
+const {keyboardInstance,mouseInstance,touchInstance,gamepadInstance} = m47;
+
+class controlSystem {
+    #listeners = new Set();
+    #frameHandle = null;
+    #activated = new Set(); #released = new Set();
+    #vectorActive = new Map(); #vectorTime = new Map();
+    #disposed = false;
+    /** { keymap, actions: [ACTION ROW...], context: () => the game (handed to when / run), timing } */
+    constructor({ keymap = {}, actions = [], context = () => null, timing = {}, vectors = {},
+        now = controlSystem.now, auto_update = false, query_actions = true,
+        event_target = typeof window === 'undefined' ? null : window,
+        document: document_target = typeof document === 'undefined' ? null : document,
+        mouse_target = event_target,
+        read_gamepads = () => typeof navigator !== 'undefined' && navigator.getGamepads ? navigator.getGamepads() : [] } = {}) {
+        if (typeof now !== 'function' || typeof read_gamepads !== 'function') throw new TypeError('Input clock and gamepad provider must be functions');
+        this.now=now;this.auto_update=!!auto_update;this.query_actions=!!query_actions;this.event_target=event_target;this.document=document_target;
+        this.read_gamepads=read_gamepads;this.active_device=null;this.vectors=structuredClone(vectors);
+        for(const config of Object.values(this.vectors)){
+            if(!config||typeof config!=='object'||config.gamepad!==undefined&&!['left','right'].includes(config.gamepad))throw new TypeError('Invalid direction binding');
+            radialStick([0,0],config.dead_zone??.15);
+        }
+        const defaults = {
+            tap_threshold: 0.195,   // s: a press shorter than this is a tap
+            tap_wait_time: 0.25,    // s: after a tap, how long a second press makes it a double tap
+            hold_wait_time: 1.0,    // s: held this long, it is a hold
+            queue_wait_time: 0.8,   // s: how long a fired action waits in the queue to be read
+        };
+        for(const [name,value] of Object.entries(timing))if(!Object.hasOwn(defaults,name)||!Number.isFinite(value)||value<0)throw new TypeError('Invalid input timing');
+        Object.assign(this,defaults,timing);
+        this.context = context;
+        this.actions = Object.create(null);
+        this.queue = [];            // [action, type, time]
+        this.pending = [];          // taps waiting to see if a second press comes: [input, action, ev]
+        this.hooks = [];            // run each frame after the pad is read: fn(system, now)
+        this.on_fire = [];          // told of every fired action: fn(action, type, ev)
+        this.before_fire = [];      // told just before an action runs (a recorder reseeding the dice)
+        this.muted = false;         // true: devices are not heard (a playback), except the inputs in unmuted
+        this.unmuted = ['Escape'];
+        for (const [name, when, run] of actions) this.actions[name] = [when, run];
+        this.setKeymap(keymap);
+        this.keyboard = new keyboardInstance(this);
+        this.mouse = new mouseInstance(this, mouse_target);
+        this.touch = new touchInstance(this);
+        this.gamepad = new gamepadInstance(this);
+        this.listen(event_target,'blur',()=>this.cancel());
+        this.listen(document_target,'visibilitychange',()=>{if(document_target.hidden)this.cancel();});
+        this.frame = this.frame.bind(this);
+        if (this.auto_update && typeof requestAnimationFrame !== 'undefined') this.#frameHandle=requestAnimationFrame(this.frame);
+    }
+    get disposed() { return this.#disposed; }
+    /** Browser subscriptions are owned and released by this input system. */
+    listen(target,type,handler,options) {
+        if(this.#disposed)throw new Error('controlSystem is disposed');
+        if(!target?.addEventListener)return ()=>{};
+        target.addEventListener(type,handler,options);
+        const drop=()=>{target.removeEventListener(type,handler,options);this.#listeners.delete(drop);};
+        this.#listeners.add(drop);return drop;
+    }
+
+    // ── The keymap ──────────────────────────────────────────────────────
+    setKeymap(keymap) {
+        if(!keymap||typeof keymap!=='object'||Array.isArray(keymap))throw new TypeError('keymap must be an object');
+        const next=structuredClone(keymap),bindings=Object.create(null),inputs=Object.create(null);
+        for (const action of Object.keys(next)) {
+          if(!Array.isArray(next[action]))throw new TypeError('Action bindings must be arrays');
+          for (const b of next[action]) {
+            const [input, type = PRESS, hold] = Array.isArray(b) ? b : [b];
+            if(typeof input!=='string'||!input||![TAP,DOUBLETAP,HELD,PRESS,REPEAT,RELEASE].includes(type)||hold!==undefined&&(!Number.isFinite(hold)||hold<0))throw new TypeError('Invalid input binding');
+            (bindings[input] ||= []).push([action, type, hold]);
+            (inputs[action] ||= []).push(input);
+          }
+        }
+        if(this.keyboard)this.clear();
+        this.keymap=next;this.bindings=bindings;this.inputs=inputs;
+    }
+    bind(action, ...bindings) { this.setKeymap({ ...this.keymap, [action]: bindings }); }
+    bound(action, input) { return !!this.inputs[action]?.includes(input); }
+    instanceOf(input) { return input.startsWith('gamepad') ? this.gamepad : input.startsWith('mouse') ? this.mouse : input.startsWith('touch') ? this.touch : this.keyboard; }
+
+    // ── Asking ──────────────────────────────────────────────────────────
+    active(action) { return this.vectors[action] ? Math.hypot(...this.direction(action))>0 : !!this.inputs[action]?.some(i => this.instanceOf(i).isActive(i)); }
+    justActivated(action) { return this.#activated.has(action); }
+    justReleased(action) { return this.#released.has(action); }
+    /** How long (s) the action's input has been held (0: not held). */
+    held(action) { if(this.vectors[action])return this.active(action)?Math.max(0,this.now()-(this.#vectorTime.get(action)??this.now())):0;const t = Math.min(...(this.inputs[action] || []).filter(i => this.instanceOf(i).isActive(i)).map(i => this.instanceOf(i).input_time[i])); return isFinite(t) ? Math.max(0,this.now() - t) : 0; }
+    axis(neg, pos) { return (this.active(pos) ? 1 : 0) - (this.active(neg) ? 1 : 0); }
+    /** [x, y] from `${name}_left/_right/_up/_down` (screen y: up is -1). */
+    direction(name) {
+        const config=this.vectors[name],prefix=config?.digital_prefix??name;
+        const digital=[this.axis(prefix+'_left',prefix+'_right'),this.axis(prefix+'_up',prefix+'_down')];
+        if(!config)return digital; // Preserve classic digital-only bindings until their callers convert.
+        const candidates=[radialStick(digital,0)];
+        if(config.touch)candidates.push(radialStick(this.touch.sticks[config.touch]?.value??[0,0],config.dead_zone??.15));
+        if(config.gamepad)candidates.push(this.gamepad.stick(config.gamepad,config.dead_zone??.15));
+        const chosen=candidates.reduce((best,value)=>value.m>best.m?value:best);
+        return [chosen.x,chosen.y];
+    }
+    value(action) {
+        if(this.vectors[action])return Math.hypot(...this.direction(action));
+        let value=0;
+        for(const input of this.inputs[action]??[]){
+            const device=this.instanceOf(input);if(device.spent.has(input))continue;
+            const analog=input==='gamepadLTrigger'?this.gamepad.left_trigger_value:input==='gamepadRTrigger'?this.gamepad.right_trigger_value:null;
+            value=Math.max(value,analog??(device.isActive(input)?1:0));
+        }
+        return value;
+    }
+    getState(action) { return Object.freeze({active:this.active(action),just_activated:this.justActivated(action),just_released:this.justReleased(action),value:this.value(action),held:this.held(action),...(this.vectors[action]?{direction:Object.freeze(this.direction(action))}:{})}); }
+    getActiveInputs(device) {
+        const instances=device?[this[device]]:[this.keyboard,this.mouse,this.touch,this.gamepad];
+        if(instances.some(instance=>!(instance instanceof Object)||typeof instance.getActiveInputs!=='function'))throw new TypeError('Unknown input device');
+        return instances.flatMap(instance=>instance.getActiveInputs());
+    }
+    getActiveActions() { return [...new Set([...Object.keys(this.inputs),...Object.keys(this.vectors)])].filter(action=>this.active(action)); }
+    setInput(device,input,pressed) {
+        const instance=this[device];if(!instance||this.instanceOf(input)!==instance)throw new TypeError('Input does not belong to that device');
+        const event=this.ev(device,input);pressed?this.press(instance,input,event):this.release(instance,input,event);
+    }
+    pointer() { return Object.freeze({position:Object.freeze([this.mouse.x,this.mouse.y]),delta:Object.freeze([...this.mouse.delta]),wheel:Object.freeze([...this.mouse.wheel]),known:this.mouse.known}); }
+    changeInput(input,change) {
+        const actions=[...new Set((this.bindings[input]??[]).map(binding=>binding[0]))],before=actions.map(action=>this.active(action));
+        change();actions.forEach((action,index)=>{const active=this.active(action);if(active&&!before[index])this.#activated.add(action);if(!active&&before[index])this.#released.add(action);});this.refreshVectors();
+    }
+    refreshVectors() {
+        if(!this.keyboard||!this.gamepad||!this.touch)return;
+        for(const name of Object.keys(this.vectors)){
+            const active=this.active(name),before=this.#vectorActive.get(name)??false;
+            if(active&&!before){this.#activated.add(name);this.#vectorTime.set(name,this.now());}
+            if(!active&&before)this.#released.add(name);this.#vectorActive.set(name,active);
+        }
+    }
+    /** Was `action` fired (of `type`, or any) within queue_wait_time? Reading it takes it out of the queue. */
+    readQueue(action, type = null) {
+        this.queue=this.queue.filter(row=>this.now()-row[2]<=this.queue_wait_time);
+        const i = this.queue.findIndex(q => q[0] === action && (type === null || q[1] === type));
+        return i >= 0 ? !!this.queue.splice(i, 1) : false;
+    }
+    /** Let go of everything held: nothing fires or reads as held until it is pressed again. */
+    clear() {
+        cleanupAll([...Object.values(this.touch.sticks).map(stick=>()=>stick.cancel()),()=>{
+        for (const i of this.touch.input_active) this.touch.elements[i]?.classList.remove('held');
+        for (const inst of [this.keyboard, this.mouse, this.touch, this.gamepad]) { for (const i of inst.input_active) inst.spent.add(i); inst.armed = Object.create(null); }
+        this.pending.length = 0;
+        this.queue.length = 0;this.gamepad.suppressAnalog();this.gamepad.suppressButtons();this.refreshVectors();this.generateAll();
+        }],'Input clearing failed');
+    }
+    /** Focus loss/cancellation is not a tap, release action, or completed hold. */
+    cancelInput(instance,input) {
+        const active=instance.isActive(input);
+        this.changeInput(input,()=>{instance.input_active.delete(input);instance.spent.delete(input);delete instance.armed[input];if(active)instance.input_just_released.add(input);});
+        this.pending=this.pending.filter(row=>row[0]!==input);
+    }
+    cancel() { cleanupAll([()=>this.touch.cancel(),...[this.keyboard,this.mouse,this.gamepad].map(instance=>()=>instance.releaseAll()),()=>{this.gamepad.suppressAnalog();this.gamepad.suppressButtons();this.refreshVectors();this.mouse.delta=[0,0];this.mouse.wheel=[0,0];this.pending.length=0;this.queue.length=0;}],'Input cancellation failed'); }
+    dispose() {
+        if(this.#disposed)return;
+        try{cleanupAll([()=>this.cancel(),()=>this.touch.dispose(),()=>{if(this.#frameHandle!==null&&typeof cancelAnimationFrame!=='undefined')cancelAnimationFrame(this.#frameHandle);},...[...this.#listeners].map(drop=>()=>drop())],'Input disposal failed');}
+        finally{this.hooks.length=this.on_fire.length=this.before_fire.length=0;this.generateAll();this.#disposed=true;}
+    }
+
+    // ── Firing ──────────────────────────────────────────────────────────
+    static now() { return (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000; }
+    ev(device, input, e = null) {
+        return { device, input, type: null, time: this.now(), event: e, repeat: !!e?.repeat,
+            typing: device === 'keyboard' && !!e && keyboardInstance.editable(e.target), shift: !!e?.shiftKey, ctrl: !!(e?.ctrlKey || e?.metaKey),
+            preventDefault: () => e?.cancelable && e.preventDefault(), stop: () => { e?.stopPropagation?.(); e?.stopImmediatePropagation?.(); } };
+    }
+    can(action, ev) { const a = this.actions[action]; return a ? (!a[0] || !!a[0](this.context(), ev)) : this.query_actions && Object.hasOwn(this.inputs,action); }
+    fire(action, type, ev) {
+        if (!this.can(action, ev)) return false;
+        ev.type = type;
+        for (const fn of this.before_fire) fn(action, type, ev);
+        this.queue.push([action, type, ev.time]);
+        this.actions[action]?.[1]?.(this.context(), ev);
+        for (const fn of this.on_fire) fn(action, type, ev);   // a recorder listening (basement/recorder-kit.js)
+        return true;
+    }
+    press(inst, input, ev) {
+        if(this.#disposed || inst.spent.has(input))return;
+        if (this.muted && !this.unmuted.includes(input)) return;   // a playback has the controls
+        const list = this.bindings[input] || [];
+        if (inst.input_active.has(input)) { for (const [a, t] of list) if (t === REPEAT) this.fire(a, t, { ...ev, repeat: true }); return; }
+        if (!ev.typing) this.changeInput(input,()=>{inst.input_active.add(input); inst.input_just_activated.add(input); inst.input_time[input] = ev.time; inst.armed[input] = new Set(list.filter(b => this.can(b[0], ev)).map(b => b[0]));});
+        this.active_device=inst.device;
+        // A second press soon after a tap: a double tap (and that tap is dropped)
+        const p = this.pending.findIndex(q => q[0] === input && ev.time - q[2].time <= this.tap_wait_time);
+        if (p >= 0) { this.pending = this.pending.filter(q => q[0] !== input); inst.armed[input] && (inst.armed[input].double = true); for (const [a, t] of list) if (t === DOUBLETAP) this.fire(a, t, ev); }
+        for (const [a, t] of list) if (t === PRESS || t === REPEAT) this.fire(a, t, ev);
+    }
+    release(inst, input, ev) {
+        if (this.muted && !this.unmuted.includes(input)) return;
+        const armed = inst.armed[input], since = inst.input_time[input];
+        let was;const spent=inst.spent.has(input);
+        this.changeInput(input,()=>{was=inst.input_active.delete(input);inst.spent.delete(input);delete inst.armed[input];});
+        if (!was) return;
+        if(spent)return;
+        inst.input_just_released.add(input);
+        if (!armed) return;
+        const list = this.bindings[input] || [], dur = ev.time - since;
+        for (const [a, t, hold] of list) if (t === HELD && armed.has(a) && !armed['held_' + a] && dur >= (hold ?? this.hold_wait_time)) { armed['held_' + a] = armed.held = true; this.fire(a, t, ev); }   // a hold that ended between two frames
+        const hold = list.filter(b => b[1] === HELD).map(b => b[2] ?? this.hold_wait_time), short = dur <= (hold.length ? Math.min(...hold) : this.tap_threshold);
+        const double = list.some(b => b[1] === DOUBLETAP);
+        for (const [a, t] of list) {
+            if (!armed.has(a)) continue;
+            if (t === RELEASE) this.fire(a, t, ev);
+            if (t === TAP && short && !armed.held && !armed.double) double ? this.pending.push([input, a, ev]) : this.fire(a, t, ev);
+        }
+    }
+
+    // ── The frame ───────────────────────────────────────────────────────
+    update(now = this.now(), { advance = this.auto_update } = {}) {
+        if(this.#disposed)throw new Error('controlSystem is disposed');
+        if (this.muted) { if(advance)this.generateAll(); return; }   // playback owns injected state
+        this.gamepad.updateGamepads();
+        this.refreshVectors();
+        for (const inst of [this.keyboard, this.mouse, this.touch, this.gamepad]) for (const input in inst.armed) {
+            const armed = inst.armed[input], since = inst.input_time[input];
+            for (const [a, t, hold] of this.bindings[input] || []) {
+                if (t !== HELD || !armed.has(a) || armed['held_' + a] || now - since < (hold ?? this.hold_wait_time)) continue;
+                armed['held_' + a] = armed.held = true;
+                this.fire(a, t, {...this.ev(inst.device, input),time:now});
+            }
+        }
+        this.pending = this.pending.filter(([, a, ev]) => now - ev.time <= this.tap_wait_time || (this.fire(a, TAP, ev), false));
+        this.queue = this.queue.filter(q => now - q[2] <= this.queue_wait_time);
+        for (const fn of this.hooks) fn(this, now);
+        if(advance)this.generateAll();
+    }
+    updateState(now = this.now()) { this.update(now,{advance:false}); }
+    generateAll() { for (const inst of [this.keyboard, this.mouse, this.touch, this.gamepad]) inst.generateGhostImage();this.#activated.clear();this.#released.clear(); }
+    generateGhostImage() { this.generateAll(); }
+    frame() { if(this.#disposed)return;this.update();if(!this.#disposed)this.#frameHandle=requestAnimationFrame(this.frame); }
+}
+
+return Object.freeze({get controlSystem(){return controlSystem;}});
+})();
+// src/basement/controls/index.mjs
+const m44 = (()=>{
+
+
+
+
+
+return Object.freeze({get controlSystem(){return m45.controlSystem;},get controlsSystem(){return m45.controlSystem;},get inputInstance(){return m47.inputInstance;},get keyboardInstance(){return m47.keyboardInstance;},get mouseInstance(){return m47.mouseInstance;},get touchInstance(){return m47.touchInstance;},get gamepadInstance(){return m47.gamepadInstance;},get touchStick(){return m48.touchStick;},get TAP(){return m46.TAP;},get DOUBLETAP(){return m46.DOUBLETAP;},get HELD(){return m46.HELD;},get PRESS(){return m46.PRESS;},get REPEAT(){return m46.REPEAT;},get RELEASE(){return m46.RELEASE;}});
+})();
 // src/runtime/game-engine.mjs
 const m41 = (()=>{
 const {physicsSystem,assetLibrary} = m1;
 const {levelLobby} = m42;
 const {gameLevel} = m43;
+const {controlSystem} = m44;
 
 const hooks = ['attach', 'detach', 'beforePhysics', 'afterPhysics', 'render', 'levelEntered', 'levelLeaving'];
 function synchronous(fn, receiver, args) {
@@ -20164,26 +20149,29 @@ function failures(errors, message) { if (errors.length) throw new AggregateError
 
 /** Application coordinator. Basement supplies all physical behavior; the Lobby supplies time. */
 class gameEngine {
-    #world; #authority = Symbol('runtime simulation clock'); #api; #lobby;
+    #world; #authority = Symbol('runtime simulation clock'); #api; #lobby; #controls;
     #levels = new Map(); #systems = new Map(); #active = null; #persistent = new Set();
     #running = false; #destroyed = false; #phase = 'idle'; #loading = false; #pauses = new Map();
     #schedule; #cancel; #frame = null; #generation = 0; #renderTarget;
 
-    constructor({ asset_library = new assetLibrary(), physics = {}, clock = {}, frame_clock,
+    constructor({ asset_library = new assetLibrary(), physics = {}, controls = {}, clock = {}, frame_clock,
         schedule_frame = typeof requestAnimationFrame === 'function' ? callback => requestAnimationFrame(callback) : null,
         cancel_frame = typeof cancelAnimationFrame === 'function' ? handle => cancelAnimationFrame(handle) : null,
         render_target = null } = {}) {
         if (Object.hasOwn(physics, 'step_authority') || Object.hasOwn(physics, 'asset_library')) throw new TypeError('The runtime owns physics authority and its asset library');
         if (schedule_frame !== null && typeof schedule_frame !== 'function' || cancel_frame !== null && typeof cancel_frame !== 'function') throw new TypeError('Frame scheduling requires functions');
         this.#world = new physicsSystem({ ...physics, asset_library, step_authority: this.#authority });
-        this.#api = Object.freeze({ physics: this.#world, elements: this.#world.elements, assets: asset_library,
-            motion: this.#world.motion, traffic: this.#world.traffic });
-        this.#schedule = schedule_frame; this.#cancel = cancel_frame; this.#renderTarget = render_target;
         const config = { STEP_MS: this.#world.config.fixed_step * 1000, MAX_FRAME_MS: 100, MAX_STEPS: 6, GAME_SPEED: 1, ...clock };
         if (config.STEP_MS !== this.#world.config.fixed_step * 1000) throw new TypeError('Lobby and physics fixed steps must match');
         if (![config.MAX_FRAME_MS, config.MAX_STEPS, config.GAME_SPEED].every(v => Number.isFinite(v) && v > 0) || !Number.isInteger(config.MAX_STEPS)) throw new TypeError('Invalid Lobby clock configuration');
+        if(controls.auto_update)throw new TypeError('The runtime owns control polling');
+        this.#controls = new controlSystem({ ...controls, auto_update:false });
+        this.#api = Object.freeze({ physics: this.#world, elements: this.#world.elements, assets: asset_library,
+            motion: this.#world.motion, traffic: this.#world.traffic, controls:this.#controls });
+        this.#schedule = schedule_frame; this.#cancel = cancel_frame; this.#renderTarget = render_target;
         this.#lobby = new levelLobby(Object.freeze(config), frame_clock);
         this.#lobby.plugIn({ isRunning: () => this.running, isPaused: () => this.paused || !this.active_level,
+            beginFrame: () => { if(this.paused || !this.active_level)this.#pollControls(); },
             simulateStep: () => this.updateState(), renderFrame: blend => this.render(blend),
             scheduleNextFrame: () => this.#queueFrame() });
     }
@@ -20268,7 +20256,7 @@ class gameEngine {
     releaseEntity(entity) { this.#idle(); return this.#persistent.delete(entity); }
     async loadLevel(level_id, options = {}) {
         this.#live();
-        if (!['idle', 'beforePhysics', 'physics', 'afterPhysics'].includes(this.#phase)) throw new Error('Level loading is not allowed during rendering or lifecycle hooks');
+        if (!['idle', 'input', 'beforePhysics', 'physics', 'afterPhysics'].includes(this.#phase)) throw new Error('Level loading is not allowed during rendering or lifecycle hooks');
         if (this.#loading) throw new Error('A level load is already in progress');
         const Level = this.#levels.get(level_id); if (!Level) throw new Error(`Unknown level: ${level_id}`);
         this.#loading = true; let candidate, prepared, entered = false;
@@ -20277,6 +20265,7 @@ class gameEngine {
             if (candidate.level_id !== level_id) throw new Error('Level identity does not match registration');
             prepared = await candidate.prepare(Object.freeze({ assets: this.api.assets }), options);
             this.#idle(); this.#phase = 'transition';
+            this.#controls.clear();
             this.#world.commitCommands();
             this.#unload();
             const cleanups = [], context = this.#context(cleanups);
@@ -20314,10 +20303,13 @@ class gameEngine {
     pause(reason = 'manual') {
         this.#live(); if (typeof reason !== 'string' || !reason) throw new TypeError('Pause requires a reason');
         const token = Symbol(reason); this.#pauses.set(token, reason);
-        return () => this.#pauses.delete(token);
+        try { this.#controls.clear(); } catch(error) { this.#pauses.delete(token); throw error; }
+        return () => { const released=this.#pauses.delete(token);if(released&&!this.paused)this.#controls.clear();return released; };
     }
     updateState() {
-        this.#idle(); if (!this.running || this.paused || !this.#active) return false;
+        this.#idle(); if (!this.running) return false;
+        this.#pollControls();
+        if (this.paused || !this.#active) return false;
         const { level, context } = this.#active, seconds = this.#world.config.fixed_step;
         try {
             this.#phase = 'beforePhysics';
@@ -20327,7 +20319,13 @@ class gameEngine {
             synchronous(level.afterPhysics, level, [context, seconds]); this.#callSystems('afterPhysics', seconds);
             return true;
         } catch (error) { this.stop(); throw error; }
-        finally { this.#phase = 'idle'; }
+        finally { this.#controls.generateGhostImage();this.#phase = 'idle'; }
+    }
+    #pollControls() {
+        this.#phase='input';
+        try { this.#controls.updateState(); }
+        catch(error){this.stop();throw error;}
+        finally{this.#phase='idle';}
     }
     render(blend = 1, target = this.#renderTarget) {
         this.#idle(); if (!Number.isFinite(blend) || blend < 0 || blend > 1) throw new TypeError('Render blend must be between 0 and 1');
@@ -20352,17 +20350,18 @@ class gameEngine {
     }
     stop() {
         this.#running = false; this.#generation++;
-        if (this.#frame !== null && this.#cancel) this.#cancel(this.#frame);
-        this.#frame = null;
+        try { this.#controls.clear(); }
+        finally { try { if (this.#frame !== null && this.#cancel) this.#cancel(this.#frame); } finally { this.#frame = null; } }
     }
     dispose() {
-        this.#idle(); this.stop(); this.#phase = 'disposal'; const errors = [];
+        this.#idle(); const errors = []; attempt(errors,()=>this.stop());this.#phase = 'disposal';
         try {
             attempt(errors, () => this.#unload());
             for (const entry of [...this.#systems.values()].reverse()) {
                 attempt(errors, () => synchronous(entry.system.detach, entry.system, [entry.context])); this.#clean(entry.cleanups, errors);
             }
             this.#systems.clear(); this.#persistent.clear(); this.#pauses.clear();
+            attempt(errors, () => this.#controls.dispose());
             attempt(errors, () => this.#world.clearWorld()); this.#levels.clear();
         } finally { this.#destroyed = true; this.#phase = 'disposed'; }
         failures(errors, 'Runtime disposal failed');
@@ -20372,7 +20371,7 @@ class gameEngine {
 return Object.freeze({get gameEngine(){return gameEngine;}});
 })();
 // src/directory/street-definitions.mjs
-const m47 = (()=>{
+const m52 = (()=>{
 /** Directory authoring only: convert immutable catalog units once, never during simulation. */
 const vehicleDefinitions = new WeakMap();
 function resolveStreetVehicle(library, { brand, model, control_mode = 'AI', color } = {}) {
@@ -20439,8 +20438,8 @@ function resolveVehicleSeats(library, { brand, model }) {
 return Object.freeze({get resolveStreetVehicle(){return resolveStreetVehicle;},get resolveVehicleSeats(){return resolveVehicleSeats;}});
 })();
 // src/traffic/traffic-vehicle.mjs
-const m46 = (()=>{
-const {resolveStreetVehicle,resolveVehicleSeats} = m47;
+const m51 = (()=>{
+const {resolveStreetVehicle,resolveVehicleSeats} = m52;
 const {gameVehicle} = m1;
 const bindings = new WeakMap();
 /** Official gameplay entity. Body state and driving calculations belong to Basement. */
@@ -20528,10 +20527,10 @@ class TrafficVehicle extends gameVehicle {
 return Object.freeze({get TrafficVehicle(){return TrafficVehicle;}});
 })();
 // src/directory/game-vehicle-factory.mjs
-const m49 = (()=>{
-const {TrafficVehicle} = m46;
+const m54 = (()=>{
+const {TrafficVehicle} = m51;
 const {pathGeometry} = m1;
-const {resolveStreetVehicle} = m47;
+const {resolveStreetVehicle} = m52;
 
 const purposes = new Set(['ambient', 'owned', 'mission', 'taxi']);
 /** Shared official creation. Population limits belong to the requesting population manager. */
@@ -20571,9 +20570,9 @@ function createGameVehicle(world, packet = {}, { hooks = {} } = {}) {
 return Object.freeze({get createGameVehicle(){return createGameVehicle;}});
 })();
 // src/traffic/traffic-manager.mjs
-const m48 = (()=>{
-const {TrafficVehicle} = m46;
-const {createGameVehicle} = m49;
+const m53 = (()=>{
+const {TrafficVehicle} = m51;
+const {createGameVehicle} = m54;
 /** Spawn, ownership and driver policy. The physics world owns every spatial/physical operation. */
 class TrafficManager {
     #pendingSpawns = new Set();
@@ -20618,7 +20617,7 @@ class TrafficManager {
 return Object.freeze({get TrafficManager(){return TrafficManager;}});
 })();
 // src/entities/pedestrians.mjs
-const m50 = (()=>{
+const m55 = (()=>{
 const {gameCharacter,gameVehicle,BODY_GROUP} = m1;
 const bindings = new WeakMap();
 /** Civilian decisions and reactions. Movement, prediction and impacts stay in Basement. */
@@ -20699,8 +20698,8 @@ class Pedestrian extends gameCharacter {
 return Object.freeze({get Pedestrian(){return Pedestrian;}});
 })();
 // src/entities/pedestrian-manager.mjs
-const m51 = (()=>{
-const {Pedestrian} = m50;
+const m56 = (()=>{
+const {Pedestrian} = m55;
 /** Population and waypoint policy only. No positions, obstacle cache or sensing grid. */
 class PedestrianManager {
     #network = new Map();
@@ -20772,11 +20771,11 @@ class PedestrianManager {
 return Object.freeze({get PedestrianManager(){return PedestrianManager;}});
 })();
 // src/directory/game-street.mjs
-const m45 = (()=>{
-const {TrafficVehicle} = m46;
-const {TrafficManager} = m48;
-const {Pedestrian} = m50;
-const {PedestrianManager} = m51;
+const m50 = (()=>{
+const {TrafficVehicle} = m51;
+const {TrafficManager} = m53;
+const {Pedestrian} = m55;
+const {PedestrianManager} = m56;
 
 
 function registerStreetEntityTypes(world) {
@@ -20796,20 +20795,33 @@ class StreetPopulation {
     clearStreet() { this.traffic.clearStreet(); this.pedestrians.clearStreet(); }
 }
 
-return Object.freeze({get TrafficVehicle(){return TrafficVehicle;},get TrafficManager(){return TrafficManager;},get Pedestrian(){return Pedestrian;},get PedestrianManager(){return PedestrianManager;},get createGameVehicle(){return m49.createGameVehicle;},get registerStreetEntityTypes(){return registerStreetEntityTypes;},get StreetPopulation(){return StreetPopulation;}});
+return Object.freeze({get TrafficVehicle(){return TrafficVehicle;},get TrafficManager(){return TrafficManager;},get Pedestrian(){return Pedestrian;},get PedestrianManager(){return PedestrianManager;},get createGameVehicle(){return m54.createGameVehicle;},get registerStreetEntityTypes(){return registerStreetEntityTypes;},get StreetPopulation(){return StreetPopulation;}});
 })();
+const m57 = Object.freeze({default:{
+  "keymap": {
+    "move_up":["w","ArrowUp"],"move_down":["s","ArrowDown"],"move_left":["a","ArrowLeft"],"move_right":["d","ArrowRight"],
+    "fire":["mouseLeft","space","gamepadRTrigger","touchFire"],
+    "interact":["e","gamepadA","touchInteract"],"flit":["gamepadB","touchFlit"],
+    "pause":["Escape","gamepadStart","touchPause"],"back":["Escape","gamepadB","touchBack"]
+  },
+  "vectors": {
+    "move":{"gamepad":"left","touch":"move","dead_zone":0.15},
+    "aim":{"gamepad":"right","touch":"aim","dead_zone":0.15}
+  }
+}});
 // src/directory/game-runtime.mjs
-const m44 = (()=>{
+const m49 = (()=>{
 const {gameEngine} = m41;
 const {createApartmentAssetLibrary} = m35;
 const {Player} = m38;
 const {ApartmentProp} = m39;
 const {ApartmentCompanion} = m40;
-const {registerStreetEntityTypes} = m45;
+const {registerStreetEntityTypes} = m50;
+const controlProfile = m57.default;
 
 /** Explicit game composition. Importing this file never starts a second runtime. */
 function createGameRuntime({ game_db, ...options } = {}) {
-    const engine = new gameEngine({ ...options, asset_library: createApartmentAssetLibrary({ game_db }) });
+    const engine = new gameEngine({ ...options, controls:{...controlProfile,...(options.render_target?.addEventListener?{mouse_target:options.render_target}:{}),...options.controls}, asset_library: createApartmentAssetLibrary({ game_db }) });
     for (const Class of [Player, ApartmentProp, ApartmentCompanion]) engine.api.elements.registerEntityType(Class.entity_type, Class);
     registerStreetEntityTypes(engine.api.physics);
     return engine;
@@ -20829,12 +20841,129 @@ const m0 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get assetLibrary(){return m1.assetLibrary;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get createGameAssetLibrary(){return m26.createGameAssetLibrary;},get ApartmentLevel(){return m34.ApartmentLevel;},get APARTMENT_RULES(){return m35.APARTMENT_RULES;},get gameEngine(){return m41.gameEngine;},get gameLevel(){return m43.gameLevel;},get levelLobby(){return m42.levelLobby;},get createGameRuntime(){return m44.createGameRuntime;}});
+
+return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get assetLibrary(){return m1.assetLibrary;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get createGameAssetLibrary(){return m26.createGameAssetLibrary;},get ApartmentLevel(){return m34.ApartmentLevel;},get APARTMENT_RULES(){return m35.APARTMENT_RULES;},get gameEngine(){return m41.gameEngine;},get gameLevel(){return m43.gameLevel;},get levelLobby(){return m42.levelLobby;},get createGameRuntime(){return m49.createGameRuntime;},get controlSystem(){return m44.controlSystem;},get controlsSystem(){return m44.controlsSystem;},get inputInstance(){return m44.inputInstance;},get keyboardInstance(){return m44.keyboardInstance;},get mouseInstance(){return m44.mouseInstance;},get touchInstance(){return m44.touchInstance;},get touchStick(){return m44.touchStick;},get gamepadInstance(){return m44.gamepadInstance;},get TAP(){return m44.TAP;},get DOUBLETAP(){return m44.DOUBLETAP;},get HELD(){return m44.HELD;},get PRESS(){return m44.PRESS;},get REPEAT(){return m44.REPEAT;},get RELEASE(){return m44.RELEASE;}});
 })();
 return m0;
 })();
 
 const pathGeometry = DFNative.pathGeometry;    </script>
+    <script type="text/dfab" data-src="basement/controls-system.js" data-cost="3">
+// Classic callers use the same canonical Basement implementation as the native runtime.
+const { controlSystem, controlsSystem, inputInstance, keyboardInstance, mouseInstance,
+    touchInstance, touchStick, gamepadInstance, TAP, DOUBLETAP, HELD, PRESS, REPEAT, RELEASE } = DFNative;
+    </script>
+    <script type="text/dfab" data-src="basement/recorder-kit.js" data-cost="84">
+        // ===== LV0 BASEMENT =====
+        // The recorder: what the player did, tick by tick, so it can be played back through the controls
+        // system as if they were doing it again (a replay test, a demo, a bug to watch happen twice). It also
+        // keeps where the things near the centre were (recording_radius), so a playback can be checked
+        // against the recording, or drawn as a ghost.
+        // (The terms are from the g7 engine: base game script 2.0's gRecorder.)
+        //
+        // It knows nothing about any game: the game hands it
+        //   sources   { name: [get, set] }  state the controls don't hold, read and written each tick
+        //             (a touch stick's dx/dy, the mouse's aim): get() -> a packet, set(packet)
+        //   objects   () -> [[id, x, y, angle], ...]   things that may be recorded
+        //   centre    () -> [x, y]                     the middle of the recorded circle
+        //   world     [get, set]   the world's start: what a run reads besides the dice (its clocks, id counters, the
+        //             camera, a street to empty): got before the setup, set again before the playback's setup
+        //
+        // RECORDING: { frames: [FRAME...], actions: [ACTION...], step, seed, world }   plain data (JSON)
+        //   seed     the dice: while recording or playing, Math.random is reseeded from it at the start of every
+        //            tick and before every action, so whatever the drawing used in between (it draws a different
+        //            number of frames each time) can't change what the world does: a playback is the same run
+        //   FRAME    [held, sources, objects]
+        //            held     { keyboard: [...], touch: [...], gamepad: [...] }   the inputs held that tick
+        //            sources  { name: packet }
+        //            objects  [[id, x, y, angle], ...] within recording_radius of the centre
+        //   ACTION   [frame, action, type, device, input, shift]   an action fired after that frame
+        //
+        // gRecorder(controls, { sources, objects, centre, recording_radius })
+        //   startRecording(setup), stopRecording() -> RECORDING
+        //   startPlayback(recording, on_end, setup), stopPlayback()   while playing, the devices are muted (Escape still works)
+        //   setup     optional: what puts the world where it starts (a map load), run on the recording's dice; give the
+        //             same one to the playback and it starts from the same world (pedestrians and all)
+        //   recording, playing, frame (the frame index now)
+        //   createFrame() / prepareFrameData() / recordFrame(): one tick's frame, its objects, kept
+        class gRecorder {
+            constructor(controls, { sources = {}, objects = () => [], centre = () => [0, 0], recording_radius = 600, world = null } = {}) {
+                Object.assign(this, { controls, sources, objects, centre, recording_radius, world, recording: false, playing: false, frame: 0, data: null, timer: null, on_end: null });
+                controls.on_fire.push((action, type, ev) => { if (this.recording && ev.device !== 'replay') this.data.actions.push([this.frame - 1, action, type, ev.device, ev.input, !!ev.shift]); });
+                controls.before_fire.push(() => { if (this.recording || this.playing) this.reseed(this.frame - 1, 1 + this._fired++); });
+                game_timers.before.push(() => { if (this.recording || this.playing) { this.reseed(this.frame, 0); this._fired = 0; } });
+                this.real_random = Math.random; this._fired = 0;
+            }
+            /** The dice for (frame, n): the same numbers every time this run reaches that point. */
+            reseed(frame, n) {
+                let a = (this.data.seed ^ Math.imul(frame + 1, 0x9E3779B1) ^ Math.imul(n + 1, 0x85EBCA6B)) >>> 0;
+                Math.random = () => { a = (a + 0x6D2B79F5) >>> 0; let t = Math.imul(a ^ (a >>> 15), a | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };   // mulberry32
+            }
+            _dice(on) { if (!on) Math.random = this.real_random; }
+            _setup(setup) { if (!setup) return; this.reseed(-1, 0); try { setup(); } finally { this._dice(false); } }
+            /** Each sim tick (game_timers: the recorder runs in game time, so a pause is not recorded). */
+            _everyTick(fn) { this.timer?.stopTimer(); this.timer = game_timers.every(game_timers.step, fn, 'recorder'); this.timer.keep = true; }
+
+            // ── Recording ──────────────────────────────────────────────────────
+            /** setup(): what puts the world where it starts (a map load); it runs on the recording's own dice, so a
+             *  playback that runs it again starts from the same world, pedestrians and all. Without one, a playback
+             *  starts from whatever world is there, and only her own part is sure to repeat. */
+            startRecording(setup = null) {
+                this.stopPlayback();
+                this.data = { frames: [], actions: [], step: game_timers.step, seed: (this.real_random() * 4294967296) >>> 0, world: this.world ? this.world[0]() : null };
+                if (this.world) this.world[1](this.data.world);   // the same way the playback will start: the street emptied, the clocks set
+                this._setup(setup);
+                this.recording = true; this.frame = 0;
+                this.recordFrame();
+                this._everyTick(() => this.recordFrame());
+            }
+            stopRecording() { if (this.recording) this._dice(false); this.recording = false; this.timer?.stopTimer(); return this.data; }
+            createFrame() {
+                const C = this.controls, held = {};
+                for (const d of ['keyboard', 'touch', 'gamepad']) held[d] = C[d].getActiveInputs();
+                const src = {};
+                for (const k in this.sources) src[k] = this.sources[k][0]();
+                return [held, src, this.prepareFrameData()];
+            }
+            prepareFrameData() {
+                const [cx, cy] = this.centre(), r2 = this.recording_radius ** 2, r = v => Math.round(v * 100) / 100;
+                return this.objects().filter(o => (o[1] - cx) ** 2 + (o[2] - cy) ** 2 <= r2).map(([id, x, y, a]) => [id, r(x), r(y), r(a || 0)]);
+            }
+            recordFrame() { this.data.frames.push(this.createFrame()); this.frame++; }
+
+            // ── Playback ───────────────────────────────────────────────────────
+            startPlayback(recording, on_end = null, setup = null) {
+                this.stopRecording(); this.stopPlayback();
+                Object.assign(this, { data: recording, frame: 0, on_end });
+                if (this.world && recording.world) this.world[1](recording.world);
+                this._setup(setup);
+                this.playing = true;
+                this.controls.clear(); this.controls.muted = true;
+                this.playFrame();
+                this._everyTick(() => this.playFrame());
+            }
+            playFrame() {
+                const d = this.data, C = this.controls;
+                // the actions fired after the last frame, then this frame's held inputs and sources
+                for (const [f, action, type, device, input, shift] of d.actions) if (f === this.frame - 1)
+                    C.fire(action, type, { device: 'replay', from: device, input, type, shift, time: controlsSystem.now(), repeat: false, typing: false, ctrl: false, preventDefault() {}, stop() {} });
+                if (this.frame >= d.frames.length) return this.stopPlayback(true);
+                this.reseed(this.frame, 0);   // the tick's own dice again, after those actions (they ran between ticks when recorded)
+                const [held, src] = d.frames[this.frame];
+                for (const dv of ['keyboard', 'touch', 'gamepad']) C[dv].setInputs(held[dv] || []);
+                for (const k in src) this.sources[k]?.[1](src[k]);
+                this.frame++;
+            }
+            stopPlayback(ended = false) {
+                if (!this.playing) return;
+                this.playing = false; this.timer?.stopTimer(); this._dice(false);
+                const C = this.controls;
+                for (const dv of ['keyboard', 'touch', 'gamepad']) C[dv].setInputs([]);
+                C.muted = false;
+                if (ended) this.on_end?.(this);
+            }
+        }
+    </script>
     <script type="text/dfab" data-src="basement/lane-rail-kit.js" data-cost="40">
         // ===== LV0 BASEMENT =====
         // The rail kit: things that run along a fixed line (a lane, a curve through a junction), knowing nothing about any
@@ -26888,7 +27017,7 @@ const pathGeometry = DFNative.pathGeometry;    </script>
             ['btn-nv', 'touchNightVision'], ['btn-pause', 'touchPause'], ['btn-grab', 'touchGrab'], ['btn-rot-l', 'touchTurnLeft'], ['btn-rot-r', 'touchTurnRight'], ['btn-holster', 'touchHolster'],
         ];
 
-        const controls = new controlsSystem({ keymap: dfKeyMap, actions: dfActions, context: () => typeof game !== 'undefined' ? game : null });
+        const controls = new controlsSystem({ auto_update: true, query_actions: false, keymap: dfKeyMap, actions: dfActions, context: () => typeof game !== 'undefined' ? game : null });
 
         /** The game's recorder (basement/recorder-kit.js): the sticks and the mouse aim ride along with the held inputs;
          *  her, her car and her crew are the recorded things. game_recorder.startRecording() … stopRecording() → a recording. */
@@ -85180,7 +85309,7 @@ const levelLobby = DFNative.levelLobby;
         }
 
     </script>
-    <script type="text/dfab" data-src="engine/events.js" data-cost="170">
+    <script type="text/dfab" data-src="engine/events.js" data-cost="171">
         // GameEngine — Input and UI event wiring (keyboard, touch, buttons).
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -85390,11 +85519,11 @@ const levelLobby = DFNative.levelLobby;
                         gameUi.classList.add('emote-active');   // one class: the utility buttons fade out, the emote overlays in
                     },
                     onMove: (S) => { E.highlighted = S.slot; },
-                    onEnd: (S) => {
+                    onEnd: (S, event) => {
                         gameUi.classList.remove('emote-active');
                         this.emoteBtn.classList.remove('dragging');   // the knob eases home (CSS transition)
                         Object.assign(E, { active: false, touchId: null, highlighted: null });
-                        if (S.slot) this.firePlayerEmote(S.slot);
+                        if (S.slot && event.type !== 'touchcancel') this.firePlayerEmote(S.slot);
                     },
                 });
 
@@ -95219,10 +95348,10 @@ engineMixin({
             },
 
             _doLoadMap(mapId, spawnAt) {
+                this._cancelQuickDrawHold?.(); this.cancelQuickDraw();
                 if(mapId==='apt_949')return this._enterApartment(spawnAt);
                 if(this.activeLevel)this._leaveApartment();
                 if (mapId === 'hub_949') mapId = 'sdc';
-                this._cancelQuickDrawHold?.(); this.cancelQuickDraw();
                 const previousMapId = this.activeMap?.id;
                 // The map screen can still show the place she's leaving: keep its finished plan (and the city's roads and lamps)
                 if (this.activeMap) (this._mapSnaps ||= {})[this.activeMap.id] = { map: this.activeMap, network: this.activeMap.type !== 'indoor' ? this.traffic?.network : null, lamps: this.lamps };
@@ -105234,7 +105363,7 @@ engineMixin({
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/player-draw-input.js" data-cost="325">
+    <script type="text/dfab" data-src="engine/player-draw-input.js" data-cost="327">
         // GameEngine — Drawing the player, emotes, pausable timers, sidebar portrait, joysticks.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -105636,7 +105765,8 @@ engineMixin({
                             if (this._quickDraw) this.requestQuickDraw(Math.atan2(F.dy, F.dx));
                             else this._releaseShot = Math.atan2(F.dy, F.dx);
                         }   // sniper: lifting the thumb takes the shot (update.js)
-                        if (F.aimed && Math.hypot(F.dx, F.dy) > 0.2) this._aimMemory = { angle: Math.atan2(F.dy, F.dx), at: performance.now() / 1000, firing: F.firing || F.armed };   // real time, not game time
+                        if (e.type !== 'touchcancel' && F.aimed && Math.hypot(F.dx, F.dy) > 0.2) this._aimMemory = { angle: Math.atan2(F.dy, F.dx), at: performance.now() / 1000, firing: F.firing || F.armed };   // real time, not game time
+                        if (e.type === 'touchcancel') { this._aimMemory = null; this._releaseShot = null; }
                         Object.assign(F, { active: false, dx: 0, dy: 0, remembered: false, aimed: false, firing: false, armed: false });
                         if (gameUI) gameUI.classList.remove('aiming');
                         showRing();
