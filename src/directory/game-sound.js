@@ -371,7 +371,8 @@
                     const rs = game.roomSystem, room = rs && rs.active ? rs.currentRoom : null;
                     if (room && spec.room && room.id !== spec.room) {
                         let open = 0;                                        // an open door straight to the speakers' room
-                        for (const d of rs.doors) if (d.rooms.includes(room.id) && d.rooms.includes(spec.room)) open = Math.max(open, d.openAmount);
+                        if (rs.openingBetween) open = rs.openingBetween(room.id, spec.room);
+                        else for (const d of rs.doors) if (d.rooms.includes(room.id) && d.rooms.includes(spec.room)) open = Math.max(open, d.openAmount);
                         if (room.type === 'outdoor') { level *= 0.35 + 0.45 * open; cut = 550 + 5000 * open; }
                         else { level *= 0.55 + 0.35 * open; cut = 900 + 6000 * open; }
                     }

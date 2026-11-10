@@ -56,10 +56,12 @@
             /** A foot landed (core/utils.js syncHumanoidGait) */
             onStep(e, speed) {
                 if (this.paused || !this.player || this.isDriving && e === this.player) return;
-                const pl = this.player, isHer = e === pl;
-                const d = Math.hypot(e.x - pl.x, e.y - pl.y);
+                const pl = this.player, isHer = e === pl || !!(e.enginePresentation && e.entity_id === pl.entity_id);
+                const [px, py] = this.playerPosition;
+                const [x, y] = e.physics_system ? e.position : [e.x, e.y];
+                const d = Math.hypot(x - px, y - py);
                 if (!isHer && d > 520) return;
-                const mat = this.materialAt(e.x, e.y);
+                const mat = this.materialAt(x, y);
                 let shoe;
                 if (isHer) { const cc = this.cosmetics && this.cosmetics.getRenderConfig ? this.cosmetics.getRenderConfig() : null; shoe = cc && cc.outfit && cc.outfit.shoes && cc.outfit.shoes.type; }
                 else { const L = e.look || e.appearance; shoe = L && L.shoes && L.shoes.type; }
@@ -69,22 +71,22 @@
                 const pace = Math.min(1, speed / 3);
                 if (typeof ambience !== 'undefined' && ambience.footstep) {
                     const z = this.camera.zoom || 1, hw = this.canvas.width / 2 / z;
-                    ambience.footstep(shoe, mat, { gain: isHer ? (this.sneaking ? 0.2 : 0.4 + 0.6 * pace) : (0.3 + 0.4 * pace) * (this.sneaking && this.teammates && this.teammates.includes(e) ? 0.4 : 1), wet, near: isHer ? 1 : Math.max(0, 1 - d / 520) * 0.75, pan: isHer ? 0 : (e.x - pl.x) / Math.max(200, hw) });
+                    ambience.footstep(shoe, mat, { gain: isHer ? (this.sneaking ? 0.2 : 0.4 + 0.6 * pace) : (0.3 + 0.4 * pace) * (this.sneaking && this.teammates && this.teammates.includes(e) ? 0.4 : 1), wet, near: isHer ? 1 : Math.max(0, 1 - d / 520) * 0.75, pan: isHer ? 0 : (x - px) / Math.max(200, hw) });
                 }
                 if (isHer) {
                     // her steps carry: shoe × floor × pace; a puddle gives her away (with a small ring)
                     const N = CONFIG.NOISE;
                     const sneak = this.sneaking;
-                    if (mat === 'water' && this.poolAt(e.x, e.y)) this.poolRipple(e.x, e.y, sneak ? 0.5 : 1);   // a step rings the pool
-                    if (mat === 'water') { this.emitNoise(e.x, e.y, Math.round(N.puddleStep * (sneak ? SNEAK.PUDDLE_NOISE : 1)), 'puddle', true, { ring: true }); return; }
+                    if (mat === 'water' && this.poolAt(x, y)) this.poolRipple(x, y, sneak ? 0.5 : 1);   // a step rings the pool
+                    if (mat === 'water') { this.emitNoise(x, y, Math.round(N.puddleStep * (sneak ? SNEAK.PUDDLE_NOISE : 1)), 'puddle', true, { ring: true }); return; }
                     let reach = shoe === 'heels' ? N.stepHeels : shoe === 'boots' ? N.stepBoots : N.stepSoft;
                     reach *= mat === 'carpet' || mat === 'grass' ? 0.5 : mat === 'marble' ? 1.3 : mat === 'metal' ? 1.4 : 1;
                     reach *= speed < 1.4 ? 0.5 : speed > 3.2 ? 1.3 : 1;
                     if (sneak) reach *= SNEAK.STEP_NOISE;
-                    this.emitNoise(e.x, e.y, Math.round(reach), 'step', true, { ring: false });
+                    this.emitNoise(x, y, Math.round(reach), 'step', true, { ring: false });
                 } else if (e instanceof Ganger && (mat === 'marble' || mat === 'metal' || mat === 'wood') && (shoe === 'boots' || shoe === 'heels') && (e._stepN = (e._stepN || 0) + 1) % 2 === 0) {
                     // a guard's hard steps: a faint ember ring where you can hear them (nobody else is alerted)
-                    this.emitNoise(e.x, e.y, 120, 'enemyStep', false, { hear: false, src: e });
+                    this.emitNoise(x, y, 120, 'enemyStep', false, { hear: false, src: e });
                 }
             }
         });

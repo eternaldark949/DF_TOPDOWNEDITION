@@ -46,8 +46,12 @@ Legacy classes remain loaded for those other scenes. The global audit and global
 ## Verification
 
 - `node tools/test-native-apartment.cjs`: generated-game ownership, one-step clock, legacy-path spies, movement/doors/walls, pause, bounded Flit, furniture, save/load, old saves, crafted station and scene re-entry.
-- `python tools/test-apartment-browser.py`: actual generated game in Chromium, unchanged physics during drawing and no page errors.
+- `python tools/test-apartment-browser.py`: public initial loading, faded exit/re-entry including sprite warmup, keyboard movement through the actual Lobby, unchanged physics during drawing, inventory/map/save/load and no page or console errors.
 - `node --test src/basement/physics/tests/*.test.mjs tools/test-entity-assets.mjs tools/test-game-physics-scenarios.mjs tools/test-street-population.mjs tools/test-native-bundle.mjs`.
 - Existing generated-game regression, GameDB, vehicle-construction and deterministic build checks.
 
 The full API remains in [Basement's API reference](../basement/physics/docs/api-reference.md).
+
+### Loading regression follow-up
+
+The original acceptance fixture called `_doLoadMap` directly and missed the public loader's legacy lighting bake. Normal entry threw on native `lamp.x`; the native scene now bypasses that old cache, and texture warmup consumes render packets. Real Lobby movement also exposed the footstep callback reading the native player's legacy coordinates; footsteps now read the authoritative player pose and recognize native presentation identity. Once the apartment music decoded, room attenuation also expected legacy door records; it now reads the native room connection policy. The browser check exercises these public loading and moving paths, including music playback and console errors caught by the Lobby.

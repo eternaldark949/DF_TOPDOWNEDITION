@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '32ed35510231';
+        const DFAB_BUILD = 'b72891e45d24';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -25289,7 +25289,7 @@ const pathGeometry = DFNative.pathGeometry;    </script>
         captionSystem.init();
 
     </script>
-    <script type="text/dfab" data-src="directory/game-sound.js" data-cost="467">
+    <script type="text/dfab" data-src="directory/game-sound.js" data-cost="468">
         /* =====================================================================
            AUDIO SYSTEM
            ---------------------------------------------------------------------
@@ -25663,7 +25663,8 @@ const pathGeometry = DFNative.pathGeometry;    </script>
                     const rs = game.roomSystem, room = rs && rs.active ? rs.currentRoom : null;
                     if (room && spec.room && room.id !== spec.room) {
                         let open = 0;                                        // an open door straight to the speakers' room
-                        for (const d of rs.doors) if (d.rooms.includes(room.id) && d.rooms.includes(spec.room)) open = Math.max(open, d.openAmount);
+                        if (rs.openingBetween) open = rs.openingBetween(room.id, spec.room);
+                        else for (const d of rs.doors) if (d.rooms.includes(room.id) && d.rooms.includes(spec.room)) open = Math.max(open, d.openAmount);
                         if (room.type === 'outdoor') { level *= 0.35 + 0.45 * open; cut = 550 + 5000 * open; }
                         else { level *= 0.55 + 0.35 * open; cut = 900 + 6000 * open; }
                     }
@@ -88526,7 +88527,7 @@ engineMixin({
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/footsteps.js" data-cost="71">
+    <script type="text/dfab" data-src="engine/footsteps.js" data-cost="73">
         // GameEngine — Footsteps. Methods are added to GameEngine.prototype (see engineMixin in
         // game-engine.js).
         //
@@ -88585,10 +88586,12 @@ engineMixin({
             /** A foot landed (core/utils.js syncHumanoidGait) */
             onStep(e, speed) {
                 if (this.paused || !this.player || this.isDriving && e === this.player) return;
-                const pl = this.player, isHer = e === pl;
-                const d = Math.hypot(e.x - pl.x, e.y - pl.y);
+                const pl = this.player, isHer = e === pl || !!(e.enginePresentation && e.entity_id === pl.entity_id);
+                const [px, py] = this.playerPosition;
+                const [x, y] = e.physics_system ? e.position : [e.x, e.y];
+                const d = Math.hypot(x - px, y - py);
                 if (!isHer && d > 520) return;
-                const mat = this.materialAt(e.x, e.y);
+                const mat = this.materialAt(x, y);
                 let shoe;
                 if (isHer) { const cc = this.cosmetics && this.cosmetics.getRenderConfig ? this.cosmetics.getRenderConfig() : null; shoe = cc && cc.outfit && cc.outfit.shoes && cc.outfit.shoes.type; }
                 else { const L = e.look || e.appearance; shoe = L && L.shoes && L.shoes.type; }
@@ -88598,22 +88601,22 @@ engineMixin({
                 const pace = Math.min(1, speed / 3);
                 if (typeof ambience !== 'undefined' && ambience.footstep) {
                     const z = this.camera.zoom || 1, hw = this.canvas.width / 2 / z;
-                    ambience.footstep(shoe, mat, { gain: isHer ? (this.sneaking ? 0.2 : 0.4 + 0.6 * pace) : (0.3 + 0.4 * pace) * (this.sneaking && this.teammates && this.teammates.includes(e) ? 0.4 : 1), wet, near: isHer ? 1 : Math.max(0, 1 - d / 520) * 0.75, pan: isHer ? 0 : (e.x - pl.x) / Math.max(200, hw) });
+                    ambience.footstep(shoe, mat, { gain: isHer ? (this.sneaking ? 0.2 : 0.4 + 0.6 * pace) : (0.3 + 0.4 * pace) * (this.sneaking && this.teammates && this.teammates.includes(e) ? 0.4 : 1), wet, near: isHer ? 1 : Math.max(0, 1 - d / 520) * 0.75, pan: isHer ? 0 : (x - px) / Math.max(200, hw) });
                 }
                 if (isHer) {
                     // her steps carry: shoe × floor × pace; a puddle gives her away (with a small ring)
                     const N = CONFIG.NOISE;
                     const sneak = this.sneaking;
-                    if (mat === 'water' && this.poolAt(e.x, e.y)) this.poolRipple(e.x, e.y, sneak ? 0.5 : 1);   // a step rings the pool
-                    if (mat === 'water') { this.emitNoise(e.x, e.y, Math.round(N.puddleStep * (sneak ? SNEAK.PUDDLE_NOISE : 1)), 'puddle', true, { ring: true }); return; }
+                    if (mat === 'water' && this.poolAt(x, y)) this.poolRipple(x, y, sneak ? 0.5 : 1);   // a step rings the pool
+                    if (mat === 'water') { this.emitNoise(x, y, Math.round(N.puddleStep * (sneak ? SNEAK.PUDDLE_NOISE : 1)), 'puddle', true, { ring: true }); return; }
                     let reach = shoe === 'heels' ? N.stepHeels : shoe === 'boots' ? N.stepBoots : N.stepSoft;
                     reach *= mat === 'carpet' || mat === 'grass' ? 0.5 : mat === 'marble' ? 1.3 : mat === 'metal' ? 1.4 : 1;
                     reach *= speed < 1.4 ? 0.5 : speed > 3.2 ? 1.3 : 1;
                     if (sneak) reach *= SNEAK.STEP_NOISE;
-                    this.emitNoise(e.x, e.y, Math.round(reach), 'step', true, { ring: false });
+                    this.emitNoise(x, y, Math.round(reach), 'step', true, { ring: false });
                 } else if (e instanceof Ganger && (mat === 'marble' || mat === 'metal' || mat === 'wood') && (shoe === 'boots' || shoe === 'heels') && (e._stepN = (e._stepN || 0) + 1) % 2 === 0) {
                     // a guard's hard steps: a faint ember ring where you can hear them (nobody else is alerted)
-                    this.emitNoise(e.x, e.y, 120, 'enemyStep', false, { hear: false, src: e });
+                    this.emitNoise(x, y, 120, 'enemyStep', false, { hear: false, src: e });
                 }
             }
         });
@@ -94206,7 +94209,7 @@ engineMixin({
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/map-loading.js" data-cost="1100">
+    <script type="text/dfab" data-src="engine/map-loading.js" data-cost="1104">
         // GameEngine — loadMap / _doLoadMap (building every map), baked lighting.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
                 /* Each interior's painted floor (or backdrop) is a big canvas — 2–11 MB apiece. They're painted from
@@ -94360,7 +94363,10 @@ engineMixin({
                     this._cityView.bakeGround();
                 }, () => { if (this._cityView) this._cityView.bakeTops(); }, () => { if (this._cityView && !this._cityView.glow) this._cityView.bakeGlow(); }, () => { if (this._cityView) this._cityView.warm(); });
                 // The furniture's sprites (entities/prop-sprites.js), a handful a job, at the zoom the map opens at
-                const props = (this.props || []).filter(p => p && PropSprites.kindOf(p));
+                const presentationProps = this.activeLevel
+                    ? this.props.map(p => this.apartmentRenderer.propPacket(p, 1))
+                    : this.props || [];
+                const props = presentationProps.filter(p => p && PropSprites.kindOf(p));
                 for (let i = 0; i < props.length; i += 8) jobs.push(() => PropSprites.prepare(props.slice(i, i + 8), this.camera.zoom));
                 // Prepare ordinary sign glows one job at a time behind the map-entry fade.
                 // Readiness stays in _signSprites, so a pending font never freezes fallback art.
@@ -95904,6 +95910,9 @@ engineMixin({
              */
             bakeStaticLighting() {
                 if (!this.activeMap) return;
+                // Native scenes render their engine-owned lights directly. The old
+                // polygon cache accepts legacy lamp objects only.
+                if (this.activeLevel) { this.debugLightData = []; this.lightingBaked = true; return; }
             
                 // 1. RESET DEBUG DATA
                 this.debugLightData = []; 
@@ -105413,7 +105422,7 @@ engineMixin({
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/apartment-rooms.js" data-cost="12">
+    <script type="text/dfab" data-src="engine/apartment-rooms.js" data-cost="13">
 // Room lighting/door policy reads registered room volumes through the shared spatial service.
 class ApartmentRooms {
     constructor(level,game){this.level=level;this.game=game;this.active=true;this.rooms={};this.doors=level.doors;this.windows=[];this.linens=[];
@@ -105422,6 +105431,7 @@ class ApartmentRooms {
     getRoomAt(x,y){return this.level.physics.queryEntitiesInBounds({bounds:{left:x,right:x,top:y,bottom:y},include_ghosts:true}).map(h=>h.entity).filter(e=>e?.data.role==='room').map(e=>this.rooms[e.data.room_id])[0]??null;}
     update(){const p=this.level.player.position;this.currentRoom=this.getRoomAt(...p);this.outdoorness=this.currentRoom?.type==='outdoor'?1:0;}
     isPlayerOutdoor(){return this.outdoorness>0;}
+    openingBetween(a,b){return this.doors.some(d=>d.data.open&&d.data.appearance.rooms.includes(a)&&d.data.appearance.rooms.includes(b))?1:0;}
     lightAt(x,y){return this.getRoomAt(x,y)?.lightsOff?0:1;}
     toggleRoomLights(id){const room=this.rooms[id];if(!room)return false;room.lightsOff=!room.lightsOff;(this.game.questState.apartmentLights??={})[id]=room.lightsOff;return room.lightsOff;}
     clear(){this.active=false;this.rooms={};this.doors=[];}

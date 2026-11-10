@@ -6,7 +6,7 @@ const env=runtime(resolve(__dirname,'../DFAB V8.html'),{affine:true});
 const run=code=>structuredClone(env.run(`(()=>{${code}})()`));
 let passed=0;
 function check(name,code,verify){const result=run(code);verify(result);passed++;console.log('Passed: '+name);}
-env.run("game.story.update=()=>{};game._doLoadMap('apt_949');game.running=true;game.paused=false;");
+env.run("game.story.update=()=>{};game.loadMap('apt_949');game.running=true;game.paused=false;");
 check('official apartment identities and one authoritative world',`
  return {native:game.player instanceof DFNative.gameCharacter,props:game.props.every(p=>p.physics_system===game.physics_system&&game.physics_system.elements.fetchEntity(p.entity_id)===p),
  count:game.props.length,doors:game.activeLevel.doors.length,lamps:game.lamps.length,curtains:game.activeLevel.curtains.length,

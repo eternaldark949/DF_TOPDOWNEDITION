@@ -151,7 +151,10 @@ engineMixin({
                     this._cityView.bakeGround();
                 }, () => { if (this._cityView) this._cityView.bakeTops(); }, () => { if (this._cityView && !this._cityView.glow) this._cityView.bakeGlow(); }, () => { if (this._cityView) this._cityView.warm(); });
                 // The furniture's sprites (entities/prop-sprites.js), a handful a job, at the zoom the map opens at
-                const props = (this.props || []).filter(p => p && PropSprites.kindOf(p));
+                const presentationProps = this.activeLevel
+                    ? this.props.map(p => this.apartmentRenderer.propPacket(p, 1))
+                    : this.props || [];
+                const props = presentationProps.filter(p => p && PropSprites.kindOf(p));
                 for (let i = 0; i < props.length; i += 8) jobs.push(() => PropSprites.prepare(props.slice(i, i + 8), this.camera.zoom));
                 // Prepare ordinary sign glows one job at a time behind the map-entry fade.
                 // Readiness stays in _signSprites, so a pending font never freezes fallback art.
@@ -1695,6 +1698,9 @@ engineMixin({
              */
             bakeStaticLighting() {
                 if (!this.activeMap) return;
+                // Native scenes render their engine-owned lights directly. The old
+                // polygon cache accepts legacy lamp objects only.
+                if (this.activeLevel) { this.debugLightData = []; this.lightingBaked = true; return; }
             
                 // 1. RESET DEBUG DATA
                 this.debugLightData = []; 
