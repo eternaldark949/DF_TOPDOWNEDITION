@@ -10,6 +10,6 @@ export function createAttackCatalog({items=createItemCatalog(),abilities=createA
   const melee=['melee','fists'].includes(item.weaponMode),stats=item.stats??{};
   catalog[`weapon:${id}`]={attack_id:`weapon:${id}`,attack_type:melee?'melee':'firearm',item_id:id,name:item.name,range:melee?rules.melee_range:rules.firearm_range,projectile_speed:(stats.projectileSpeed??25)*combatRules.authoring_hz,cooldown_seconds:(stats.fireRate??20)/combatRules.authoring_hz,penetrating:!!stats.penetrating};
  }
- for(const [id,ability] of Object.entries(abilities))catalog[`ability:${id}`]={attack_id:`ability:${id}`,attack_type:'ability',ability_id:id,name:ability.name,range:ability.range,projectile_speed:ability.speed,cooldown_seconds:ability.cooldown_seconds,penetrating:false};
+ for(const [id,ability] of Object.entries(abilities))catalog[`ability:${id}`]={attack_id:`ability:${id}`,attack_type:'ability',ability_id:id,...(ability.required_weapon_id?{required_weapon_id:ability.required_weapon_id}:{}),name:ability.name,range:ability.range,projectile_speed:ability.speed,cooldown_seconds:ability.cooldown_seconds,penetrating:false};
  return catalog;
 }

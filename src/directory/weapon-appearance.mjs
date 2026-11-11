@@ -16,7 +16,8 @@
      glow     live lights [x, y, r, colour], breathing slowly in a wave down the gun
      run      a spark that glides down a light line [x0, x1, y, colour]
    ===================================================================== */
-export const GUN_MATERIALS = {             // base, edge (the dark facet: a deep shade of its own hue, never black), hi (the bright bevel)
+export const GUN_MATERIALS = {
+    steel: ['#36363a','#202024','#969ba4'],             // base, edge (the dark facet: a deep shade of its own hue, never black), hi (the bright bevel)
     abyss:      ['#1a1436', '#0e0926', '#5c4fa0'],      // obsidian glass, violet in its depths
     midnight:   ['#172a86', '#0c1858', '#6f8cff'],
     lavender:   ['#a891ec', '#4a3790', '#f0e8ff'],
@@ -49,6 +50,7 @@ const _hole = (x, y, r) => ({ dot: [x, y, r], c: '#020104' });
 const _slots = (x0, x1, cy, c) => [-1.3, 0, 1.3].map(o => _e(x0, x1, cy + o, 0.42, c));
 
 export const WEAPON_MODELS = {
+    gatling_gunner:{stance:'sniper',muzzle:[35,0],rail:[10,8],brass:'#c99c62',parts:[_r(-5,8,0,17,'steel',2),...[-8,-4.8,-1.6,1.6,4.8,8].map(y=>_r(5,35,y,3.2,'steel')),_r(25,28,0,20,'steel',.5)],glow:[]},
     pistol_fpx: {                                                                       // obsidian glass with deep-blue light (catalog sketch)
         stance: 'pistol', muzzle: [13.4, 1], rail: [10.5, 4.3], brass: '#6f8cff',
         parts: [

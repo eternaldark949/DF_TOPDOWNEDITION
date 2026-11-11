@@ -1,0 +1,30 @@
+{
+  "weapon_id": "gatling_gunner",
+  "ability_id": "gatling_burst",
+  "range": 900,
+  "gun": {
+    "damage": 10,
+    "speed": 24,
+    "spread": 0.15,
+    "color": "#ffaa00",
+    "life": 60
+  },
+  "movement": {
+    "ideal_range": 240,
+    "retreat_range": 180,
+    "approach_range": 300,
+    "formation_speed": 90,
+    "strafe_speed": 120,
+    "approach_speed": 150,
+    "separation": 60,
+    "angular_speed": 0.5
+  },
+  "visual": {
+    "max_speed": 19.2,
+    "acceleration": 43.2,
+    "deceleration": 14.4,
+    "heat_per_second": 1.11,
+    "cool_per_second": 0.42,
+    "windup_seconds": 0.6
+  }
+}

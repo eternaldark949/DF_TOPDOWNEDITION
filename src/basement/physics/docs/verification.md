@@ -61,3 +61,5 @@ The new `node tools/test-live-body-ownership.cjs` gate runs the generated playab
 Hunter-support verification adds four standalone motor cases for target-relative standoff/grid updates, thin-wall rejection, invalid/minimum-distance/mounted commands and instant evasion with checked side clearance. The full isolated physics/controls/rendering suite now passes 212 cases outside the game checkout. No game assets or globals are required.
 
 Marionette support adds four standalone engine cases for shared aim/projectile resolution, angle movement against a thin wall, target-frame follow offsets across snapshots, and optional impulses respecting noncombining versus combined attachment ownership. The copied-out physics/controls/rendering suite now contains 216 tests; native Marionette/gameplay tests remain outside Basement.
+
+Gunner support adds three standalone orbit-target regressions for stable slot/phase behavior, cached repeated requests, snapshots, validation and thin-wall movement. The full copied-out physics/controls/rendering suite now contains 219 cases. Squad membership and firing policy tests stay outside Basement.

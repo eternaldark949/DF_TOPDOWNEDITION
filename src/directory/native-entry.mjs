@@ -57,3 +57,5 @@ export {createHunterAppearance} from './game-hunters.mjs';
 export {Marionette} from '../entities/marionette.mjs';
 export {MARIONETTE_RULES} from './game-marionettes.mjs';
 export {validateAbilityAction} from '../gameplay/abilities/lunge-actions.mjs';
+
+export {GatlingGunner} from '../entities/gatling-gunner.mjs';

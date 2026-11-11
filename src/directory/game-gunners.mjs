@@ -1,0 +1,4 @@
+import enemies from './game-db/enemies.json' with {type:'json'};
+import rules from './game-gunner-rules.json' with {type:'json'};
+export function createGunnerRules(kind=enemies.kinds.gatling_gunner){return {...structuredClone(rules),burst_count:kind.burst_count,round_seconds:kind.burst_delay/60,reload_seconds:kind.reload/60,tell_seconds:kind.telegraph_frames/60};}
+export function createGunnerAbilities(kind=enemies.kinds.gatling_gunner){const r=createGunnerRules(kind);return {[r.ability_id]:{name:'Gatling burst',description:'Wind up, fire an owned rotary weapon, then reload.',delivery:'burst',required_weapon_id:r.weapon_id,range:r.range,speed:r.gun.speed*60,cooldown_seconds:r.reload_seconds,tell_seconds:r.tell_seconds,reload_seconds:r.reload_seconds,burst_count:r.burst_count,allow_mounted:false,require_sight:true}};}

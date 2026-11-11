@@ -127,3 +127,5 @@ Verification: `tools/test-attack-systems.mjs`, `tools/test-attack-callers.cjs`, 
 ## Mounted execution
 
 Emitter-equipped native seats now support the same firearm/ability API with shared-clock preparation. `canTarget`, `getMountedAttackState` and `getMountedAttackPose` expose target eligibility and renderer data without game-side geometry or body copies. See [mounted attack ownership, engine APIs, lifecycle and remaining legacy work](MOUNTED-ATTACKS.md).
+
+A learned attack may declare `required_weapon_id`. Availability requires an actual owned weapon; selection equips a matching owned instance, honoring `instance_id` when provided. Missing ownership rejects before changing the learned/equipped ability. `ability:gatling_burst` uses this contract and the same underlying firearm executor/clock for player, NPC and gunner sources; its pinned cycle is described in [burst actions](../abilities/README.md#owned-weapon-burst-actions).

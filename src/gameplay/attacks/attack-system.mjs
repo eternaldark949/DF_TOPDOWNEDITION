@@ -17,7 +17,7 @@ export class attackSystem{
   const weaponType={validateDefinition:definition=>{if(definition.attack_id==='unarmed:punch'){if(definition.attack_type!=='melee'||definition.item_id)throw new TypeError('Invalid unarmed attack');}else {if(typeof definition.item_id!=='string'||!definition.item_id)throw new TypeError('Weapon attacks require item_id');const item=this.#items.getDefinition(definition.item_id),type=['melee','fists'].includes(item.weaponMode)?'melee':'firearm';if(item.type!=='weapon'||definition.attack_type!==type)throw new TypeError('Attack type must match its weapon definition');}},canUse:({definition,items})=>definition.item_id?items.getEquippedWeapon()?.definition_id===definition.item_id:!items.getEquippedWeapon(),execute:({controller,aim})=>controller.fire(aim)};
   this.registry.registerAttackType('firearm',weaponType).registerAttackType('melee',weaponType).registerAttackType('ability',{
    validateDefinition:definition=>{if(typeof definition.ability_id!=='string'||!definition.ability_id)throw new TypeError('Ability attacks require ability_id');if(this.#context&&!Object.hasOwn(this.#context.api.physics.elements.asset_library.getResource('df:abilities').data,definition.ability_id))throw new TypeError('Unknown ability attack definition');},
-   canUse:({actor,definition})=>this.#abilities.getLoadout(actor).hasAbility(definition.ability_id),
+   canUse:({actor,definition,items})=>this.#abilities.getLoadout(actor).hasAbility(definition.ability_id)&&(!definition.required_weapon_id||items.getEquippedWeapon()?.definition_id===definition.required_weapon_id),
    execute:({actor,definition,aim})=>this.#abilities.cast(actor,definition.ability_id,aim)
   });
   for(const definition of Object.values(definitions))this.registry.registerAttack(definition);
@@ -34,8 +34,8 @@ export class attackSystem{
   if(previous)this.unregisterActor(actor.entity_id);
   const owned=this.getItems(actor);if(items&&items!==owned)throw new Error('Register the character’s canonical inventory');let controller;
   controller=this.#weapons.registerActor(actor,{items:owned,policy:{roll_crit:()=>1,stat:(name,base)=>name==='spread'?base*(actor.data.accuracy_mod??1):base,
-   can_fire:()=>actor.active&&!actor.dead&&!(actor.data.combat_state?.stagger_remaining>0)&&!(actor.data.ganger_state?.interrupt_remaining>0),
-   on_fired:()=>actor.onWeaponFired?.(controller),...policy}});
+   can_fire:()=>actor.active&&!actor.dead&&!actor.data.dormant&&!(actor.data.combat_state?.stagger_remaining>0)&&!(actor.data.ganger_state?.interrupt_remaining>0),
+   on_fired:(projectile,execution)=>{if(!execution?.action)actor.onWeaponFired?.(controller);},...policy}});
   this.#actors.set(actor.entity_id,{actor,controller,items,policy});return controller;
  }
  unregisterActor(actor){const id=typeof actor==='number'?actor:actor.entity_id;this.cancelAttack(id);this.#lastAim.delete(id);this.#abilities.cancelCast(id);this.#weapons.unregisterActor(id);return this.#actors.delete(id);}
@@ -45,7 +45,7 @@ export class attackSystem{
  #execution(actor,definition,aim={}){if(!Object.keys(aim).length&&this.#context.api.physics.getAttachmentState(actor)){const mounted=this.getMountedAttackState(actor);if(mounted.aiming&&mounted.attack_id===definition.attack_id)aim=mounted.aim;}return {actor,definition,aim,items:this.getItems(actor),controller:this.getController(actor),api:this.#context.api};}
  #available(actor,definition){const execution=this.#execution(actor,definition);return !!this.registry.getAttackType(definition.attack_type).canUse(execution);}
  getAvailableAttacks(actor){this.#official(actor);const owned=this.getItems(actor),loadout=this.#abilities.getLoadout(actor);
-  return this.registry.listAttacks().filter(definition=>definition.item_id?owned.hasItem(definition.item_id):definition.ability_id?loadout.hasAbility(definition.ability_id):true);
+  return this.registry.listAttacks().filter(definition=>definition.item_id?owned.hasItem(definition.item_id):definition.ability_id?loadout.hasAbility(definition.ability_id)&&(!definition.required_weapon_id||owned.hasItem(definition.required_weapon_id)):true);
  }
  getSelectedAttack(actor){
   this.#official(actor);const state=this.#state(actor);
@@ -74,7 +74,7 @@ export class attackSystem{
  selectAttack(actor,attack_id,{instance_id}={}){
   this.#writable();this.#official(actor);const definition=this.registry.getAttack(attack_id),owned=this.getItems(actor),controller=this.getController(actor),hadQuickDraw=!!controller.quick_draw;
   if(definition.item_id){const item=instance_id?owned.getItem(instance_id):owned.getEquippedWeapon()?.definition_id===definition.item_id?owned.getEquippedWeapon():owned.findItem(definition.item_id);if(!item||item.definition_id!==definition.item_id)throw new Error('Select an owned instance of this attack weapon');owned.equipItem(item.instance_id);}
-  else if(definition.ability_id){const loadout=this.#abilities.getLoadout(actor);if(!loadout.hasAbility(definition.ability_id))throw new Error('Learn this attack ability before selecting it');loadout.equipAbility(definition.ability_id);}
+  else if(definition.ability_id){const loadout=this.#abilities.getLoadout(actor);if(!loadout.hasAbility(definition.ability_id))throw new Error('Learn this attack ability before selecting it');if(definition.required_weapon_id){const weapon=instance_id?owned.getItem(instance_id):owned.getEquippedWeapon()?.definition_id===definition.required_weapon_id?owned.getEquippedWeapon():owned.findItem(definition.required_weapon_id);if(weapon?.definition_id!==definition.required_weapon_id)throw new Error('Select an owned weapon for this ability');owned.equipItem(weapon.instance_id);}loadout.equipAbility(definition.ability_id);}
   else if(attack_id==='unarmed:punch')owned.unequipSlot('weapon');
   if(!this.#available(actor,definition))throw new Error('Attack is unavailable to this character');
   if(hadQuickDraw){controller.cancelQuickDraw();controller.setHolstered(false);}

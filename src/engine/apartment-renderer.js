@@ -26,7 +26,7 @@ class ApartmentRenderer {
         ctx.save();ctx.translate(canvas.width/2,canvas.height/2);ctx.scale(zoom,zoom);ctx.translate(-cam.x,-cam.y);
         game.drawApartmentBackdrop(ctx);game.drawApartmentInterior(ctx);
         const bounds={left:cam.x-canvas.width/(2*zoom)-180,right:cam.x+canvas.width/(2*zoom)+180,top:cam.y-canvas.height/(2*zoom)-180,bottom:cam.y+canvas.height/(2*zoom)+180};
-        const visible=world.queryEntitiesInBounds({bounds}),props=[],marionettes=[],drawnDoors=new Set();PropSprites.frame(zoom);
+        const visible=world.queryEntitiesInBounds({bounds}),props=[],marionettes=[],gunners=[],drawnDoors=new Set();PropSprites.frame(zoom);
         for(const{entity:e}of visible){
             if(!e)continue;
             if(e.data.role==='wall'){const p=e.getRenderState(blend),[w,h]=e.collision_shape.dimensions;ctx.fillStyle='#291d2d';ctx.fillRect(p.position[0]-w/2,p.position[1]-h/2,w,h);}
@@ -58,6 +58,12 @@ class ApartmentRenderer {
             const packet={x:pose.position[0],y:pose.position[1],angle:pose.rotation,dead:entity.dead,invincibleTimer:Math.round((entity.data.actor_state?.invulnerable_remaining??0)*60),state:entity.state,phase_age:action?clock-action.phase_started_at:0,render_time:_frameTime/1000,_seed:entity.data.appearance_seed,cloth:entity.data.cloth,_yank:entity.marionette_state.yank_remaining>.4?1:0};
             drawMarionetteAppearance(ctx,packet);marionettes.push(packet);
         }
+        for(const {entity}of visible)if(entity?.entity_type==='df_gatling_gunner'&&entity.active){
+            const pose=entity.getRenderState(blend),state=entity.gunner_state,action=entity.data.ability_action_state,clock=entity.data.weapon_state?.elapsed??0,rules=entity.getAsset('actor_rules').data.gunner;
+            const cooldown=action?.phase==='tell'?Math.max(0,rules.tell_seconds-(clock-action.phase_started_at)):action?.phase==='reload'?Math.max(0,action.reload_seconds-(clock-action.phase_started_at)):0;
+            const packet={x:pose.position[0],y:pose.position[1],angle:pose.rotation,dead:entity.dead,visible:entity.visible,persona:null,invincibleTimer:Math.round((entity.data.actor_state?.invulnerable_remaining??0)*60),_barrelPhase:state.barrel_phase,_barrelHeat:state.barrel_heat,burstCount:action?.phase==='burst'?action.shots_fired:0,burstCooldown:cooldown*60,burstTimer:(entity.data.weapon_state?.cooldown??0)*60,isTelegraphing:entity.isTelegraphing,telegraphAngle:action?.heading??pose.rotation,telegraphThreshold:rules.tell_seconds*60};
+            drawGunnerAppearance(ctx,packet);gunners.push(packet);
+        }
         for(const owner of level.curtains){
             const state=world.getClothState(owner.data.cloth_id),left=[],right=[];
             state.forEach((point,i)=>{const p=world.fetchBody(point.body_id).getRenderState(blend).position;(i%2?right:left).push(p);});
@@ -70,7 +76,7 @@ class ApartmentRenderer {
         }
         game.drawNoiseRipples(ctx);
         if(game.flitVFX.length)game.drawFlitVFX(ctx);
-        game.drawPlayerGlow(ctx);game.drawApartmentGlow(ctx,props);for(const packet of marionettes)drawMarionetteAppearance(ctx,packet,true);
+        game.drawPlayerGlow(ctx);game.drawApartmentGlow(ctx,props);for(const packet of marionettes)drawMarionetteAppearance(ctx,packet,true);for(const packet of gunners)drawGunnerAppearance(ctx,packet,true);
         for(const{entity:e}of visible)if(e?.data.role==='lamp'){
             const a=e.data.appearance,p=e.getRenderState(blend);if(a.visible!==false)drawLampFixtureLit(ctx,a.fixture??'shade_rose',...p.position,a.color,game.roomSystem.lightAt(...p.position),{angle:a.angle??0});
         }

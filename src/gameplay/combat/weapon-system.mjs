@@ -8,8 +8,9 @@ import {jsonCopy,nonnegative} from '../values.mjs';
 const stateFor=(player,settings=rules)=>player.data.weapon_state??={format_version:1,elapsed:0,cooldown:0,holstered:false,drawn_at:null,draw_shot_used:false,quick_draw:null,punch_side:'right',haymaker:false,combo:0,last_punch_at:-99,swing:null,side:1,shield:{charge:settings.mirror.shield,spent:false,since_hit:999}};
 /** One executable weapon policy. Native physics owns every trajectory, sweep, contact and impulse. */
 export class weaponSystem{
- #items;#combat;#session;#player;#rules;#policy;#context=null;#pending=false;#lastAim={};#quickFiring=false;#unsubscribes=[];#controllers=new Map();#projectileEvents;#inputEvents;
+ #items;#combat;#session;#player;#rules;#policy;#context=null;#pending=false;#lastAim={};#quickFiring=false;#actionFiring=false;#unsubscribes=[];#controllers=new Map();#projectileEvents;#inputEvents;
  constructor({items,combat,session,get_player=()=>session?.player,rules:settings=rules,policy={},projectile_events=true,input_events=true}={}){if(!items||!combat)throw new TypeError('Weapons require item and combat services');this.#items=items;this.#combat=combat;this.#session=session;this.#player=get_player;this.#rules=jsonCopy(settings);this.#policy=policy;this.#projectileEvents=projectile_events;this.#inputEvents=input_events;}
+ get items(){return this.#items;}
  get state(){return this.#player()?.data.weapon_state??null;}
  get quick_draw(){return this.state?.quick_draw??null;}
  get cooldown_seconds(){return this.state?.cooldown??0;}
@@ -56,7 +57,11 @@ export class weaponSystem{
  }
  canExecute(){
   const actor=this.#player(),state=this.state,context=this.#context;
-  return !!context&&context.engine?.running!==false&&context.engine?.active_level!==null&&(!state?.quick_draw||this.#quickFiring)&&!!actor&&!isCombatDead(actor)&&!actor.data.ability_action_state&&actor.active!==false&&actor.visible!==false&&state.cooldown<=1e-9&&!state.holstered&&!context.engine?.paused&&this.#policy.can_fire?.()!==false&&(!context.api.physics.getAttachmentState(actor)||context.api.physics.getMountedLaunchState(actor,{check_clearance:false}).allowed);
+  return !!context&&context.engine?.running!==false&&context.engine?.active_level!==null&&(!state?.quick_draw||this.#quickFiring)&&!!actor&&!isCombatDead(actor)&&(!actor.data.ability_action_state||this.#actionFiring)&&actor.active!==false&&actor.visible!==false&&state.cooldown<=1e-9&&!state.holstered&&!context.engine?.paused&&this.#policy.can_fire?.()!==false&&(!context.api.physics.getAttachmentState(actor)||context.api.physics.getMountedLaunchState(actor,{check_clearance:false}).allowed);
+ }
+ fireActionRound(action,aim={}){
+  const actor=this.#player();if(!action||actor?.data.ability_action_state!==action||action.phase!=='burst'||this.#items.getEquippedWeapon()?.instance_id!==action.weapon_instance_id)return false;
+  this.#actionFiring=true;try{return this.fire(aim);}finally{this.#actionFiring=false;}
  }
  fire(aim={}){
   if(this.#context?.engine?.phase==='render')throw new Error('Rendering cannot fire weapons');
@@ -92,7 +97,7 @@ export class weaponSystem{
   if(consumeDrawBonus)state.draw_shot_used=true;
   if(punch){state.combo=nextCombo;state.last_punch_at=state.elapsed;state.haymaker=hay;state.punch_side=state.punch_side==='right'?'left':'right';}
   state.cooldown=punch&&mode==='none'?R.bare_punch.duration_ticks/R.authoring_hz:this.#cooldown(stats,punch?15:20);if(punch)state.punch_duration=state.cooldown;
-  this.#emit('weapon:fired',{entity_id:player.entity_id,projectile_id:projectile.entity_id,definition_id:weapon?.definition_id??null,mode,haymaker:hay,crit:crit>1});this.#policy.on_fired?.(projectile);return projectile;
+  this.#emit('weapon:fired',{entity_id:player.entity_id,projectile_id:projectile.entity_id,definition_id:weapon?.definition_id??null,mode,haymaker:hay,crit:crit>1});this.#policy.on_fired?.(projectile,{action:this.#actionFiring});return projectile;
  }
  #stepIn(player,profile){const world=this.#context.api.physics;const hits=world.sweepAttachedShape(player,{collision_shape:profile.blade_shape,from_local_position:[20,0],to_local_position:[46,0],include_groups:BODY_GROUP.CHARACTER,line_of_sight:true});if(hits.some(hit=>this.#combat.canDamage(player,hit.entity)))world.advanceBody(player,{distance:this.#rules.blade.step_distance});}
  #startSwing(player,state,weapon,stats,flit){

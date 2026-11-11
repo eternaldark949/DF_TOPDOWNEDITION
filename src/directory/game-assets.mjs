@@ -1,3 +1,4 @@
+import {createGunnerRules} from './game-gunners.mjs';
 import {createMarionetteRules} from './game-marionettes.mjs';
 import {createHunterRules} from './game-hunters.mjs';
 import {createAttackCatalog} from './game-attacks.mjs';
@@ -27,8 +28,8 @@ export function createGameAssetLibrary({ game_db = { cast, vehicles, enemies, pl
         }
         resource.data = data;
     }
-    definition.resources.abilities={kind:'ability_catalog',data:createAbilityCatalog(game_db.progression?.abilities??progression.abilities,{hunter_kind:game_db.enemies.kinds.hunter})};
-    definition.resources.actor_rules={kind:'actor_rules',data:{...actorRules,hunter:createHunterRules(game_db.enemies.kinds.hunter),marionette:createMarionetteRules()}};
+    definition.resources.abilities={kind:'ability_catalog',data:createAbilityCatalog(game_db.progression?.abilities??progression.abilities,{hunter_kind:game_db.enemies.kinds.hunter,gunner_kind:game_db.enemies.kinds.gatling_gunner})};
+    definition.resources.actor_rules={kind:'actor_rules',data:{...actorRules,hunter:createHunterRules(game_db.enemies.kinds.hunter),marionette:createMarionetteRules(),gunner:createGunnerRules(game_db.enemies.kinds.gatling_gunner)}};
     definition.resources.actor_items={kind:'item_catalog',data:createItemCatalog(game_db.items,{enemy_kinds:game_db.enemies.kinds})};
     definition.resources.actor_appearances={kind:'appearance_catalog',data:game_db.cast.appearances};
     definition.resources.attacks={kind:'attack_catalog',data:createAttackCatalog({items:definition.resources.actor_items.data,abilities:definition.resources.abilities.data})};
@@ -38,5 +39,7 @@ export function createGameAssetLibrary({ game_db = { cast, vehicles, enemies, pl
     definition.templates.hunter={extends:'ganger',entity_type:'df_hunter',tags:['enemy','hunter'],data:{health:hunter.hp,max_health:hunter.hp,move_speed:hunter.speed*60,vision_range:hunter.vision_range,weapon_definition_id:hunter.weapon,dash_max:hunter.dashes,dash_cooldown:hunter.dash_cd/60,abilities:{format_version:1,known_ids:['hunter_claw'],equipped_id:null}}};
     const marionette=createMarionetteRules();
     definition.templates.marionette={extends:'actor',entity_type:'df_marionette',tags:['enemy','marionette'],mass:marionette.mass,collision_shape:{shape_type:'circle',radius:marionette.radius},render_shape:{shape_type:'box',dimensions:[80,160],local_position:[0,-55]},data:{health:marionette.health,max_health:marionette.health,damage_grace_seconds:marionette.damage_grace_seconds,alliance:'hostile',flank_offset:marionette.flank_offsets[0],cloth:marionette.cloth[0],appearance_seed:0,abilities:{format_version:1,known_ids:['marionette_lunge'],equipped_id:'marionette_lunge'}}};
+    const gunner=game_db.enemies.kinds.gatling_gunner;
+    definition.templates.gatling_gunner={extends:'actor',entity_type:'df_gatling_gunner',mass:gunner.mass,collision_shape:{shape_type:'circle',radius:gunner.radius},render_shape:{shape_type:'circle',radius:65},data:{health:gunner.hp,max_health:gunner.hp,damage_grace_seconds:gunner.invincible_frames/60,alliance:'hostile',weapon_definition_id:'gatling_gunner',squad_id:'default',formation_order:0,dormant:false,abilities:{format_version:1,known_ids:['gatling_burst'],equipped_id:null}}};
     return new assetLibrary({ libraries: [definition, streetDefinitions] });
 }

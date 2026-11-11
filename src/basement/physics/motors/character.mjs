@@ -20,6 +20,17 @@ export class characterMotor {
     setRotation(angle, options = {}) { this.body.setRotation(angle, { preserve_velocity: true, ...options }); return this; }
     moveTo(position, options = {}) { const target=vector(position),world=bodyRecord(this.body).world;if(world._canReuseMotorRequest()&&sameRequest(this.intent,'move',target,options))return this;return this._request(()=>{this.intent={...clone(options),mode:'move',target};this.path=null;this.replan=0;}); }
     followTarget(target, options = {}) {const world=bodyRecord(this.body).world;referencePosition(world,target);if(options.target_offset!==undefined)vector(options.target_offset,'target_offset');if(world._canReuseMotorRequest()&&sameRequest(this.intent,'follow',target,options))return this;return this._request(()=>{this.intent={...clone(options),mode:'follow',target};this.path=null;this.replan=0;});}
+    static _validateOrbit(options){
+        number(options.radius,'radius',0);number(options.angular_speed??.5,'angular_speed');number(options.phase??0,'phase');
+        const count=number(options.slot_count??1,'slot_count',1,4096),index=number(options.slot_index??0,'slot_index',0,count-1);if(!Number.isInteger(count)||!Number.isInteger(index))throw new TypeError('Orbit slots must be integral');
+    }
+    orbitTarget(target,options={}){
+        const world=bodyRecord(this.body).world;referencePosition(world,target);
+        characterMotor._validateOrbit(options);
+        const prior=this.intent?{...this.intent}:null;if(prior)delete prior.orbit_time;
+        if(world._canReuseMotorRequest()&&sameRequest(prior,'orbit',target,options))return this;
+        return this._request(()=>{this.intent={...clone(options),mode:'orbit',target,orbit_time:world.simulation_tick*world.config.fixed_step};this.path=null;this.replan=0;});
+    }
     fleeTarget(target, options = {}) {const world=bodyRecord(this.body).world;referencePosition(world,target);if(world._canReuseMotorRequest()&&sameRequest(this.intent,'flee',target,options))return this;return this._request(()=>{this.intent={...clone(options),mode:'flee',target};});}
     lookAtTarget(target, options = {}) { referencePosition(bodyRecord(this.body).world, target); return this._request(() => { this.facing = { ...clone(options), target }; }); }
     clearFacing(){return this._request(()=>{this.facing=null;});}
@@ -86,7 +97,7 @@ export class characterMotor {
                 const a = intent.space === 'local' ? r.rotation : 0;
                 desired = [v[0] * Math.cos(a) - v[1] * Math.sin(a), v[0] * Math.sin(a) + v[1] * Math.cos(a)]; desired = scale(desired, speed);
             } else {
-                try { target = referencePosition(world, intent.target);if(intent.mode==='follow'&&intent.target_offset)target=Array.isArray(intent.target)?add(target,intent.target_offset):world.getBodyPoint(intent.target,intent.target_offset).position; }
+                try { target = referencePosition(world, intent.target);if(intent.mode==='orbit'){intent.orbit_time+=dt;const a=(intent.phase??0)+intent.orbit_time*(intent.angular_speed??.5)+Math.PI*2*(intent.slot_index??0)/(intent.slot_count??1);target=add(target,[Math.cos(a)*intent.radius,Math.sin(a)*intent.radius]);}if(intent.mode==='follow'&&intent.target_offset)target=Array.isArray(intent.target)?add(target,intent.target_offset):world.getBodyPoint(intent.target,intent.target_offset).position; }
                 catch { this.intent = null; this.path = null; world._emit('movementBlocked', { body: this.body, reason: 'missing_target' }); target = [...r.position]; }
                 const delta = sub(target, r.position), distance = length(delta);
                 let arrive = intent.arrival_distance ?? this.config.arrival_distance;

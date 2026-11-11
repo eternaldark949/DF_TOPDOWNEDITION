@@ -679,6 +679,7 @@ export class physicsSystem {
                 r.motor = new characterMotor(r.handle, m.config);
                 const target = t => t?.position ?? (t ? this._record(t.body_id).handle : null);
                 r.motor.intent = m.intent ? { ...m.intent, target: target(m.intent.target) } : null;
+                if(r.motor.intent?.mode==='orbit'){characterMotor._validateOrbit(r.motor.intent);r.motor.intent.orbit_time=number(r.motor.intent.orbit_time??0,'orbit_time',0);}
                 r.motor.facing = m.facing ? { ...m.facing, target: target(m.facing.target) } : null;
                 r.motor.suspended_for = number(m.suspended_for ?? 0, 'suspended_for', 0);
                 r.motor.path = clone(m.path ?? null); r.motor.path_index = m.path_index ?? 1; r.motor.replan = number(m.replan ?? 0, 'replan');

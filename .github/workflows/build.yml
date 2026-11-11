@@ -48,7 +48,7 @@ jobs:
           tools/test-street-population.mjs tools/test-player-systems.mjs tools/test-player-vitals.mjs
           tools/test-game-engine.mjs tools/test-native-bundle.mjs
           tools/test-item-system.mjs tools/test-weapon-appearance.mjs tools/test-combat-systems.mjs
-          tools/test-actor-systems.mjs tools/test-ability-systems.mjs tools/test-attack-systems.mjs tools/test-mounted-attacks.mjs tools/test-hunter-systems.mjs tools/test-marionette-systems.mjs
+          tools/test-actor-systems.mjs tools/test-ability-systems.mjs tools/test-attack-systems.mjs tools/test-mounted-attacks.mjs tools/test-hunter-systems.mjs tools/test-marionette-systems.mjs tools/test-gunner-systems.mjs
 
       - name: Check player-state callers in the playable build
         run: |
@@ -58,6 +58,7 @@ jobs:
           node tools/test-actor-callers.cjs
           node tools/test-hunter-callers.cjs
           node tools/test-marionette-callers.cjs
+          node tools/test-gunner-callers.cjs
           node tools/test-apartment-parity.cjs
           node tools/test-ability-callers.cjs
           node tools/test-attack-callers.cjs
