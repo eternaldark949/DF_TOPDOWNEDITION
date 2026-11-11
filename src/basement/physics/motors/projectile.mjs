@@ -1,5 +1,5 @@
 import { bodyRecord } from '../core/state.mjs';
-import { number, vector, unit, scale, length, rotate, sub, add, EPS } from '../core/values.mjs';
+import { number, vector, scale, length, add } from '../core/values.mjs';
 import { referencePosition } from '../spatial/queries.mjs';
 
 export class projectileMotor {
@@ -16,9 +16,9 @@ export class projectileMotor {
     }
     launchProjectile(direction, options = {}) {
         const r = bodyRecord(this.body);
-        const v = options.target !== undefined ? sub(referencePosition(r.world,options.target),r.position) : options.reverse ? scale(r.velocity,-1) : options.angle!==undefined ? [Math.cos(number(options.angle,'angle')),Math.sin(options.angle)] : vector(direction);
-        if(length(v)<EPS)throw new TypeError('Projectile heading must be nonzero');
-        const d = rotate(unit(v),number(options.angle_offset??0,'angle_offset')), speed = number(options.speed ?? this.config.speed, 'speed', 0);
+        if(options.target===undefined&&!options.reverse&&options.angle===undefined&&direction===undefined)throw new TypeError('Projectile heading is required');
+        const {direction:d}=r.world.resolveAim(this.body,{target:options.target,direction:options.reverse?scale(r.velocity,-1):direction,angle:options.reverse?undefined:options.angle,angle_offset:options.angle_offset??0});
+        const speed=number(options.speed??this.config.speed,'speed',0);
         const inherited=vector(options.inherited_velocity??[0,0],'inherited_velocity');
         this.body.setLinearVelocity(add(scale(d, speed),inherited)); return this;
     }

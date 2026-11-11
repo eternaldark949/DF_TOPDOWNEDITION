@@ -16,10 +16,10 @@ export class characterMotor {
         this.suspended_for = 0; this.intent = null; this.path = null; this.replan = 0; this.facing = null;
     }
     _request(fn) { const r = bodyRecord(this.body); r.world._mutate(() => { r.sleeping = false; r.sleep_time = 0; fn(); }); return this; }
-    setMovement(direction, options = {}) { const v = vector(direction); if (options.speed !== undefined) number(options.speed, 'speed', 0); return this._request(() => { this.intent = { ...clone(options), mode: 'direction', direction: v }; this.path = null; }); }
+    setMovement(direction, options = {}) { const v = direction===undefined?bodyRecord(this.body).world.resolveAim(this.body,{angle:options.angle}).direction:vector(direction); if (options.speed !== undefined) number(options.speed, 'speed', 0); return this._request(() => { this.intent = { ...clone(options), mode: 'direction', direction: v }; this.path = null; }); }
     setRotation(angle, options = {}) { this.body.setRotation(angle, { preserve_velocity: true, ...options }); return this; }
     moveTo(position, options = {}) { const target=vector(position),world=bodyRecord(this.body).world;if(world._canReuseMotorRequest()&&sameRequest(this.intent,'move',target,options))return this;return this._request(()=>{this.intent={...clone(options),mode:'move',target};this.path=null;this.replan=0;}); }
-    followTarget(target, options = {}) {const world=bodyRecord(this.body).world;referencePosition(world,target);if(world._canReuseMotorRequest()&&sameRequest(this.intent,'follow',target,options))return this;return this._request(()=>{this.intent={...clone(options),mode:'follow',target};this.path=null;this.replan=0;});}
+    followTarget(target, options = {}) {const world=bodyRecord(this.body).world;referencePosition(world,target);if(options.target_offset!==undefined)vector(options.target_offset,'target_offset');if(world._canReuseMotorRequest()&&sameRequest(this.intent,'follow',target,options))return this;return this._request(()=>{this.intent={...clone(options),mode:'follow',target};this.path=null;this.replan=0;});}
     fleeTarget(target, options = {}) {const world=bodyRecord(this.body).world;referencePosition(world,target);if(world._canReuseMotorRequest()&&sameRequest(this.intent,'flee',target,options))return this;return this._request(()=>{this.intent={...clone(options),mode:'flee',target};});}
     lookAtTarget(target, options = {}) { referencePosition(bodyRecord(this.body).world, target); return this._request(() => { this.facing = { ...clone(options), target }; }); }
     clearFacing(){return this._request(()=>{this.facing=null;});}
@@ -86,7 +86,7 @@ export class characterMotor {
                 const a = intent.space === 'local' ? r.rotation : 0;
                 desired = [v[0] * Math.cos(a) - v[1] * Math.sin(a), v[0] * Math.sin(a) + v[1] * Math.cos(a)]; desired = scale(desired, speed);
             } else {
-                try { target = referencePosition(world, intent.target); }
+                try { target = referencePosition(world, intent.target);if(intent.mode==='follow'&&intent.target_offset)target=Array.isArray(intent.target)?add(target,intent.target_offset):world.getBodyPoint(intent.target,intent.target_offset).position; }
                 catch { this.intent = null; this.path = null; world._emit('movementBlocked', { body: this.body, reason: 'missing_target' }); target = [...r.position]; }
                 const delta = sub(target, r.position), distance = length(delta);
                 let arrive = intent.arrival_distance ?? this.config.arrival_distance;

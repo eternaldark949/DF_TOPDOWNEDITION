@@ -504,9 +504,10 @@ engineMixin({
                     // Preflight companion capability records before changing currency, inventory or the live map.
                     const abilityCatalog=DFNative.createAbilityCatalog(GAME_DB.progression.abilities);
                     const attackCatalog=DFNative.createAttackCatalog({items:DFNative.createItemCatalog(GAME_DB.items),abilities:abilityCatalog});
-                    for(const record of [playerData,...(save.teammates??[]),...(worldData.nativeLevel?.physics?.entities??[]).filter(entry=>entry.entity_type==='df_npc'||entry.entity_type==='df_player'||entry.data?.attack_state||entry.data?.abilities).map(entry=>entry.data)]){
+                    for(const record of [playerData,...(save.teammates??[]),...(worldData.nativeLevel?.physics?.entities??[]).filter(entry=>entry.entity_type==='df_npc'||entry.entity_type==='df_player'||entry.data?.attack_state||entry.data?.abilities||entry.data?.ability_action_state).map(entry=>entry.data)]){
                         DFNative.importActorAbilities(structuredClone(record),abilityCatalog,{default_id:record.role==='red_demon_dancer'?'fireball':null});
                         DFNative.validateMountedAttack(record.mounted_attack_state);
+                        DFNative.validateAbilityAction(record.ability_action_state,abilityCatalog,{clock:record.weapon_state?.elapsed??-1});
                         if(record.attackSelection??record.attack_state)DFNative.validateAttackState(record.attackSelection??record.attack_state,id=>this.attacks?.registry.hasAttack(id)??!!attackCatalog[id]);
                     }
 

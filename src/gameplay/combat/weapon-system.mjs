@@ -56,7 +56,7 @@ export class weaponSystem{
  }
  canExecute(){
   const actor=this.#player(),state=this.state,context=this.#context;
-  return !!context&&context.engine?.running!==false&&context.engine?.active_level!==null&&(!state?.quick_draw||this.#quickFiring)&&!!actor&&!isCombatDead(actor)&&actor.active!==false&&actor.visible!==false&&state.cooldown<=1e-9&&!state.holstered&&!context.engine?.paused&&this.#policy.can_fire?.()!==false&&(!context.api.physics.getAttachmentState(actor)||context.api.physics.getMountedLaunchState(actor,{check_clearance:false}).allowed);
+  return !!context&&context.engine?.running!==false&&context.engine?.active_level!==null&&(!state?.quick_draw||this.#quickFiring)&&!!actor&&!isCombatDead(actor)&&!actor.data.ability_action_state&&actor.active!==false&&actor.visible!==false&&state.cooldown<=1e-9&&!state.holstered&&!context.engine?.paused&&this.#policy.can_fire?.()!==false&&(!context.api.physics.getAttachmentState(actor)||context.api.physics.getMountedLaunchState(actor,{check_clearance:false}).allowed);
  }
  fire(aim={}){
   if(this.#context?.engine?.phase==='render')throw new Error('Rendering cannot fire weapons');

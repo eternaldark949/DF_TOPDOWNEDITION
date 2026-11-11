@@ -28,7 +28,7 @@ export class attackSystem{
  #state(actor){return actor.data.attack_state??{format_version:1,selected_id:null};}
  getItems(actor){this.#official(actor);return actor===this.#player?.()?this.#items:actor.items??actorItems(actor.data,`actor:${actor.entity_id}`,this.#context.api.physics.elements.asset_library.getResource('df:actor_items').data);}
  registerActor(actor,{items,policy={}}={}){
-  this.#writable();this.#official(actor);validateMountedAttack(actor.data.mounted_attack_state);if(actor.data.mounted_attack_state&&!this.registry.hasAttack(actor.data.mounted_attack_state.attack_id))throw new TypeError('Unknown mounted attack');validateAttackState(this.#state(actor),id=>this.registry.hasAttack(id));actor.data.attack_state??={format_version:1,selected_id:null};this.#abilities.getLoadout(actor);
+  this.#writable();this.#official(actor);validateMountedAttack(actor.data.mounted_attack_state);if(actor.data.mounted_attack_state&&!this.registry.hasAttack(actor.data.mounted_attack_state.attack_id))throw new TypeError('Unknown mounted attack');validateAttackState(this.#state(actor),id=>this.registry.hasAttack(id));actor.data.attack_state??={format_version:1,selected_id:null};this.#abilities.getLoadout(actor);this.#abilities.reconnectActor(actor);
   if(actor===this.#player?.())return this.#weapons;
   const previous=this.#actors.get(actor.entity_id);if(previous?.actor===actor)return previous.controller;
   if(previous)this.unregisterActor(actor.entity_id);

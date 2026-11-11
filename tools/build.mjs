@@ -124,6 +124,7 @@ const SCRIPTS = [
     'entities/enemies.js',
     'entities/hunters.js',
     'entities/drones.js',
+    'presentation/marionette.js',
     'entities/marionettes.js',
     'buildings/building-v1.js',
     'buildings/building-v2.js',

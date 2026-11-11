@@ -1,3 +1,4 @@
+import {validateAbilityAction} from '../gameplay/abilities/lunge-actions.mjs';
 import {validateMountedAttack} from '../gameplay/attacks/mounted-attacks.mjs';
 import {validateAttackState} from '../gameplay/attacks/attack-registry.mjs';
 import {abilityLoadout} from '../gameplay/abilities/ability-loadout.mjs';
@@ -65,7 +66,7 @@ export class ApartmentLevel {
             record.assets={...record.assets,actor_rules:'df:actor_rules',items:'df:actor_items',appearances:'df:actor_appearances',abilities:'df:abilities'};
         }
         for(const record of migrated.entities??[])if(record.entity_type===NPC.entity_type)importActorAbilities(record.data,this.physics.elements.asset_library.getResource('df:abilities').data,{default_id:record.data.role==='red_demon_dancer'?'fireball':null});
-        for(const record of migrated.entities??[]){validateMountedAttack(record.data.mounted_attack_state);if(record.data.attack_state)validateAttackState(record.data.attack_state,id=>!!this.physics.elements.asset_library.getResource('df:attacks').data[id]);if(record.data.abilities)new abilityLoadout(record.data.abilities,this.physics.elements.asset_library.getResource('df:abilities').data);}
+        for(const record of migrated.entities??[]){validateAbilityAction(record.data.ability_action_state,this.physics.elements.asset_library.getResource('df:abilities').data,{clock:record.data.weapon_state?.elapsed??-1});validateMountedAttack(record.data.mounted_attack_state);if(record.data.attack_state)validateAttackState(record.data.attack_state,id=>!!this.physics.elements.asset_library.getResource('df:attacks').data[id]);if(record.data.abilities)new abilityLoadout(record.data.abilities,this.physics.elements.asset_library.getResource('df:abilities').data);}
         this.physics.loadPhysicsState(migrated); this.reconnect();
         let upgraded=false;
         for(const door of this.doors)if(door.data.appearance.type==='sliding'&&!door.data.panel_version){

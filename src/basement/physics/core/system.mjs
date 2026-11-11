@@ -566,8 +566,10 @@ export class physicsSystem {
         r.handle.setPosition(position,{preserve_velocity:true});return traveled;
     }
     onProjectileContact(handler){if(typeof handler!=='function')throw new TypeError('Projectile policy must be a function');this.#projectilePolicies.add(handler);return ()=>this.#projectilePolicies.delete(handler);}
-    applyImpulseBetween(source,target,{strength,world_point}={}){
+    applyImpulseBetween(source,target,{strength,world_point,if_supported=false}={}){
         const a=this._record(referenceBody(source)),b=this._record(referenceBody(target));number(strength,'strength',0);
+        if(typeof if_supported!=='boolean')throw new TypeError('if_supported must be boolean');
+        if(if_supported)for(let r=b;r.parent_mount;r=r.parent_mount.parent)if(!r.parent_mount.combine_mass)return null;
         const direction=unit(sub(b.position,a.position));b.handle.applyImpulse(scale(direction,strength),world_point?{world_point}:{});return b.handle;
     }
     sweepAttachedShape(source,{collision_shape,from_local_position=[0,0],to_local_position=from_local_position,from_local_rotation=0,to_local_rotation=from_local_rotation,line_of_sight=false,occlusion_groups=BODY_GROUP.STATIC|BODY_GROUP.PROP|BODY_GROUP.VEHICLE,...options}={},results=[]){
@@ -589,6 +591,7 @@ export class physicsSystem {
     updateSpatialInstance(id, bounds) { this._mutate(() => this.spatial_grid.updateInstance(`spatial:${id}`, bounds)); }
     removeSpatialInstance(id) { this._mutate(() => this.spatial_grid.removeInstance(`spatial:${id}`)); }
     getStatistics() { return { ...this.#stats, bodies: this.#bodies.size, entities: this.elements.getStatistics().entities, constraints: this.#constraints.size, spatial: this.spatial_grid.getStatistics() }; }
+    resolveAim(source,options){return this.#queries.resolveAim(source,options);}
     observeTarget(observer,target,options){return this.#queries.observeTarget(observer,target,options);}
     predictTargetPosition(observer,target,options){return this.#queries.predictTargetPosition(observer,target,options);}
     findWanderPlacement(body,options){return this.#queries.findWanderPlacement(body,options);}

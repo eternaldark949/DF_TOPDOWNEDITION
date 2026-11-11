@@ -1,3 +1,4 @@
+import {createMarionetteAbilities} from './game-marionettes.mjs';
 import enemies from './game-db/enemies.json' with {type:'json'};
 import {createHunterAbilities} from './game-hunters.mjs';
 import {abilityLoadout} from '../gameplay/abilities/ability-loadout.mjs';
@@ -14,7 +15,7 @@ export function createAbilityCatalog(definitions=progression.abilities,{hunter_k
   if(!stats.fireRate||!stats.projectileSpeed||!stats.projectileLife)throw new TypeError('Ability rate, speed and lifetime must be positive');
   catalog[id]={name:definition.name,description:definition.desc??'',cooldown_seconds:stats.fireRate/rules.authoring_hz,damage:stats.damage,speed:stats.projectileSpeed*rules.authoring_hz,lifetime:stats.projectileLife/rules.authoring_hz,spread:stats.spread,range:stats.range,color:stats.projectileColor,flash_color:stats.flashColor??stats.projectileColor,flash_radius:stats.flashRadius??0,local_position:[...rules.local_position],radius:rules.radius_overrides[id]??rules.projectile_radius,impact_strength:rules.impact_strength,damage_type:rules.damage_type};
  }
- Object.assign(catalog,createHunterAbilities(hunter_kind));
+ Object.assign(catalog,createHunterAbilities(hunter_kind),createMarionetteAbilities());
  const copy=jsonCopy(catalog);const freeze=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))freeze(child);Object.freeze(value);}return value;};return freeze(copy);
 }
 

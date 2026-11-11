@@ -26,7 +26,7 @@ class ApartmentRenderer {
         ctx.save();ctx.translate(canvas.width/2,canvas.height/2);ctx.scale(zoom,zoom);ctx.translate(-cam.x,-cam.y);
         game.drawApartmentBackdrop(ctx);game.drawApartmentInterior(ctx);
         const bounds={left:cam.x-canvas.width/(2*zoom)-180,right:cam.x+canvas.width/(2*zoom)+180,top:cam.y-canvas.height/(2*zoom)-180,bottom:cam.y+canvas.height/(2*zoom)+180};
-        const visible=world.queryEntitiesInBounds({bounds}),props=[],drawnDoors=new Set();PropSprites.frame(zoom);
+        const visible=world.queryEntitiesInBounds({bounds}),props=[],marionettes=[],drawnDoors=new Set();PropSprites.frame(zoom);
         for(const{entity:e}of visible){
             if(!e)continue;
             if(e.data.role==='wall'){const p=e.getRenderState(blend),[w,h]=e.collision_shape.dimensions;ctx.fillStyle='#291d2d';ctx.fillRect(p.position[0]-w/2,p.position[1]-h/2,w,h);}
@@ -53,6 +53,11 @@ class ApartmentRenderer {
             }
             if(entity.npc_state?.quip&&entity.npc_state.quip_delay<=0&&entity.npc_state.quip_remaining>0)drawSpeechBubble(ctx,packet.x,packet.y-34,entity.npc_state.quip,1);
         }
+        for(const {entity}of visible)if(entity?.entity_type==='df_marionette'&&entity.active){
+            const pose=entity.getRenderState(blend),action=entity.data.ability_action_state,clock=entity.data.weapon_state?.elapsed??0;
+            const packet={x:pose.position[0],y:pose.position[1],angle:pose.rotation,dead:entity.dead,invincibleTimer:Math.round((entity.data.actor_state?.invulnerable_remaining??0)*60),state:entity.state,phase_age:action?clock-action.phase_started_at:0,render_time:_frameTime/1000,_seed:entity.data.appearance_seed,cloth:entity.data.cloth,_yank:entity.marionette_state.yank_remaining>.4?1:0};
+            drawMarionetteAppearance(ctx,packet);marionettes.push(packet);
+        }
         for(const owner of level.curtains){
             const state=world.getClothState(owner.data.cloth_id),left=[],right=[];
             state.forEach((point,i)=>{const p=world.fetchBody(point.body_id).getRenderState(blend).position;(i%2?right:left).push(p);});
@@ -65,7 +70,7 @@ class ApartmentRenderer {
         }
         game.drawNoiseRipples(ctx);
         if(game.flitVFX.length)game.drawFlitVFX(ctx);
-        game.drawPlayerGlow(ctx);game.drawApartmentGlow(ctx,props);
+        game.drawPlayerGlow(ctx);game.drawApartmentGlow(ctx,props);for(const packet of marionettes)drawMarionetteAppearance(ctx,packet,true);
         for(const{entity:e}of visible)if(e?.data.role==='lamp'){
             const a=e.data.appearance,p=e.getRenderState(blend);if(a.visible!==false)drawLampFixtureLit(ctx,a.fixture??'shade_rose',...p.position,a.color,game.roomSystem.lightAt(...p.position),{angle:a.angle??0});
         }

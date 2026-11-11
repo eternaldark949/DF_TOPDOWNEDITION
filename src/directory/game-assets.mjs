@@ -1,3 +1,4 @@
+import {createMarionetteRules} from './game-marionettes.mjs';
 import {createHunterRules} from './game-hunters.mjs';
 import {createAttackCatalog} from './game-attacks.mjs';
 import progression from './game-db/progression.json' with {type:'json'};
@@ -27,7 +28,7 @@ export function createGameAssetLibrary({ game_db = { cast, vehicles, enemies, pl
         resource.data = data;
     }
     definition.resources.abilities={kind:'ability_catalog',data:createAbilityCatalog(game_db.progression?.abilities??progression.abilities,{hunter_kind:game_db.enemies.kinds.hunter})};
-    definition.resources.actor_rules={kind:'actor_rules',data:{...actorRules,hunter:createHunterRules(game_db.enemies.kinds.hunter)}};
+    definition.resources.actor_rules={kind:'actor_rules',data:{...actorRules,hunter:createHunterRules(game_db.enemies.kinds.hunter),marionette:createMarionetteRules()}};
     definition.resources.actor_items={kind:'item_catalog',data:createItemCatalog(game_db.items,{enemy_kinds:game_db.enemies.kinds})};
     definition.resources.actor_appearances={kind:'appearance_catalog',data:game_db.cast.appearances};
     definition.resources.attacks={kind:'attack_catalog',data:createAttackCatalog({items:definition.resources.actor_items.data,abilities:definition.resources.abilities.data})};
@@ -35,5 +36,7 @@ export function createGameAssetLibrary({ game_db = { cast, vehicles, enemies, pl
     Object.assign(definition.templates.ganger.data,{health:ganger.hp,max_health:ganger.hp,move_speed:ganger.speed*60,damage_grace_seconds:ganger.invincible_frames/60,vision_range:ganger.vision_range,telegraph_seconds:ganger.telegraph_frames/60});
     const hunter=game_db.enemies.kinds.hunter;
     definition.templates.hunter={extends:'ganger',entity_type:'df_hunter',tags:['enemy','hunter'],data:{health:hunter.hp,max_health:hunter.hp,move_speed:hunter.speed*60,vision_range:hunter.vision_range,weapon_definition_id:hunter.weapon,dash_max:hunter.dashes,dash_cooldown:hunter.dash_cd/60,abilities:{format_version:1,known_ids:['hunter_claw'],equipped_id:null}}};
+    const marionette=createMarionetteRules();
+    definition.templates.marionette={extends:'actor',entity_type:'df_marionette',tags:['enemy','marionette'],mass:marionette.mass,collision_shape:{shape_type:'circle',radius:marionette.radius},render_shape:{shape_type:'box',dimensions:[80,160],local_position:[0,-55]},data:{health:marionette.health,max_health:marionette.health,damage_grace_seconds:marionette.damage_grace_seconds,alliance:'hostile',flank_offset:marionette.flank_offsets[0],cloth:marionette.cloth[0],appearance_seed:0,abilities:{format_version:1,known_ids:['marionette_lunge'],equipped_id:'marionette_lunge'}}};
     return new assetLibrary({ libraries: [definition, streetDefinitions] });
 }

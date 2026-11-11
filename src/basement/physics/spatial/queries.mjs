@@ -1,7 +1,7 @@
 import { pose, physical, bodyBounds } from '../core/state.mjs';
 import { collisionShape, shapeBounds, shapeReach, pieces } from '../collision/shape.mjs';
 import { collisionDetector } from '../collision/detector.mjs';
-import { vector, number, sub, add, scale, unit, length, BODY_GROUP, EPS, validBounds, boundsMeet, unionBounds, angleDelta } from '../core/values.mjs';
+import { vector, number, sub, add, scale, unit, length, BODY_GROUP, EPS, validBounds, boundsMeet, unionBounds, angleDelta, rotate } from '../core/values.mjs';
 
 export function referenceBody(value) { return value?.physics_controller?.body ?? value?.body ?? value; }
 export function referencePosition(world, value) {
@@ -30,6 +30,13 @@ function finish(hits, options, results) {
 }
 export class physicsQueries {
     constructor(world) { this.world = world; }
+    resolveAim(source,{target,direction,angle,angle_offset=0}={}){
+        const r=this.world._record(referenceBody(source));
+        const v=target!==undefined?sub(referencePosition(this.world,target),r.position):angle!==undefined?[Math.cos(number(angle,'angle')),Math.sin(angle)]:direction!==undefined?vector(direction):[Math.cos(r.rotation),Math.sin(r.rotation)];
+        if(length(v)<EPS)throw new TypeError('Aim heading must be nonzero');
+        const heading=rotate(unit(v),number(angle_offset,'angle_offset'));
+        return {direction:heading,rotation:Math.atan2(heading[1],heading[0])};
+    }
     observeTarget(observer,target,{near_range=400,fov=Math.PI*2,personal_space=0,touch_distance=0,occlusion_groups=BODY_GROUP.STATIC|BODY_GROUP.PROP|BODY_GROUP.VEHICLE}={}){
         const r=this.world._record(referenceBody(observer)),at=referencePosition(this.world,target),delta=sub(at,r.position),distance=length(delta);
         number(near_range,'near_range',0);number(fov,'fov',0,Math.PI*2);number(personal_space,'personal_space',0);number(touch_distance,'touch_distance',0);

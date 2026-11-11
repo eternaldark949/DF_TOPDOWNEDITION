@@ -1,3 +1,4 @@
+import {Marionette} from '../../entities/marionette.mjs';
 import {gameActor} from '../../entities/game-actor.mjs';
 import {NPC} from '../../entities/npc.mjs';
 import {Hunter} from '../../entities/hunter.mjs';
@@ -19,6 +20,7 @@ export class actorSystem{
   if(actor instanceof NPC||actor instanceof Ganger){
    if(!actor.data.inventory?.order.length&&actor.data.weapon_definition_id){const item=actor.items.grantItem(actor.data.weapon_definition_id);actor.items.equipItem(item.instance_id);}
   }
+  if(actor instanceof Marionette)actor.validateMarionette();
   this.#attacks.registerActor(actor);
   if(actor.data.weapon_cooldown_seconds!==undefined){this.#attacks.getController(actor)?.setCooldown(actor.data.weapon_cooldown_seconds);delete actor.data.weapon_cooldown_seconds;}
   this.#actors.set(actor.entity_id,actor);
@@ -36,7 +38,7 @@ export class actorSystem{
    if(actor.dead||!actor.active)continue;
    if(actor instanceof NPC){const targets=world.peruseNearbyEntities(actor,{near_range:this.#attacks.getSelectedAttack(actor).range,include_groups:BODY_GROUP.CHARACTER}).filter(hit=>hit.entity?.alliance==='hostile'&&this.#combat.canDamage(actor,hit.entity));
     actor.updateBehavior(seconds,{player,targets,attacks:this.#attacks,stationary:!!this.#policy.stationary?.(actor,context),world_minutes_delta:this.#policy.world_minutes_delta?.(seconds)??seconds/60,may_engage:this.#policy.may_engage??(()=>true),aura_interval:this.#policy.aura_interval?.(actor)});
-   }else if(actor instanceof Ganger)actor.updateBehavior(seconds,{player,attacks:this.#attacks,random:this.#policy.random??Math.random,visibility:this.#policy.visibility?.(player)??player?.data.visibility??1,search_points:this.#policy.search_points?.(actor)??[]});
+   }else if(actor instanceof Ganger||actor instanceof Marionette)actor.updateBehavior(seconds,{player,attacks:this.#attacks,random:this.#policy.random??Math.random,visibility:this.#policy.visibility?.(player)??player?.data.visibility??1,search_points:this.#policy.search_points?.(actor)??[]});
   }
  }
  #flushLifetimes(){for(const [id,retain] of this.#pendingLifetime){const actor=this.#actors.get(id);if(actor&&!actor.destroyed)this.#lifetime(actor,retain);}this.#pendingLifetime.clear();}
