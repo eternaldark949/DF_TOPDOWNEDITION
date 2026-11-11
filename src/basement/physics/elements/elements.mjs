@@ -8,7 +8,7 @@ export class gameProp extends gameEntity { static entity_type = 'prop'; static p
 export class gameStatic extends gameEntity { static entity_type = 'static'; static physics_role = 'static'; }
 export class gameTrigger extends gameEntity { static entity_type = 'trigger'; static physics_role = 'trigger'; }
 export class gameDecoration extends gameEntity { static entity_type = 'decoration'; static physics_role = 'decoration'; }
-for (const method of ['suspendMovement', 'evadeBody', 'setMovement', 'setRotation', 'moveTo', 'followTarget', 'fleeTarget', 'lookAtTarget', 'lookInDirection', 'clearFacing', 'teleportInDirection', 'dashTo', 'teleportTo', 'stopMovement', 'cancelMovement', 'getMovementState']) {
+for (const method of ['suspendMovement', 'evadeBody', 'setMovement', 'setRotation', 'moveTo', 'followTarget', 'fleeTarget', 'lookAtTarget', 'lookInDirection', 'clearFacing', 'teleportInDirection', 'teleportToward', 'dashTo', 'teleportTo', 'stopMovement', 'cancelMovement', 'getMovementState']) {
     Object.defineProperty(gameCharacter.prototype, method, { value: function (...args) { return this.physics_controller[method](...args); } });
 }
 for (const method of ['assembleVehicle', 'setSurface', 'accelerateVehicle', 'brakeVehicle', 'reverseVehicle', 'steerVehicle', 'realignSteering', 'setHandbrake', 'followPath', 'driveTo', 'stopVehicle', 'parkVehicle', 'getSpeed', 'getVehicleState']) {

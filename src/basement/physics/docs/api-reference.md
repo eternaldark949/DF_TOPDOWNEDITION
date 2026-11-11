@@ -103,6 +103,7 @@ Both `gameCharacter` and `characterMotor` expose these methods; body access is `
 | `followTarget(target, options={})` | Replans toward a moving target. |
 | `fleeTarget(target, options={})` | Moves away until `safety_distance` (default 200). |
 | `lookAtTarget(target, {turn_speed=12})` | Engine-calculated facing, radians/s. Respects rotational lock. |
+| `teleportToward(target, {stop_distance=0,min_distance=0,...options}={})` | Resolve a target-relative landing, require a clear swept path and checked placement; return the motor or null. Mounted sources and insufficient travel reject. |
 | `dashTo(position, options={})` | Direct swept motion, speed defaults to 3× max speed. |
 | `teleportTo(position, options={})` | Clear endpoint search by default; exact placement if requested. Returns controller or `null`. |
 | `stopMovement()`, `cancelMovement()` | Stop intention and motion; or cancel intention and brake naturally. |
@@ -291,7 +292,7 @@ Bodies must be nonstatic. Scripts suspend the normal motor/force integration whi
 
 `predictMovementContacts({body,to?,speed?,seconds=1,...filters},results=[])` forecasts shape contacts along the body's current velocity, or a proposed path toward `to` at positive `speed`. Horizon is bounded to 0–10 seconds and clipped to proposed arrival. Hits contain `seconds` to contact, body/entity and contact geometry. Shared-grid candidates include approaching bodies outside the proposed corridor, using a cached world motion envelope; no private sensing index is created. Predictions assume constant velocities/angular velocities and do not forecast future control changes.
 
-`characterMotor.suspendMovement(seconds)` / `gameCharacter.suspendMovement` temporarily suspend motor control while the normal engine force/damping/contact pipeline retains knockback. The suspension timer survives save/load. `evadeBody(threat,{distance=50,speed=2*max_speed,min_distance=4})` chooses and checks a perpendicular dodge inside the engine; it tries both sides and returns the motor or null. Neither command asks game code to calculate a direction or displacement.
+`characterMotor.suspendMovement(seconds)` / `gameCharacter.suspendMovement` temporarily suspend motor control while the normal engine force/damping/contact pipeline retains knockback. The suspension timer survives save/load. `evadeBody(threat,{distance=50,speed=2*max_speed,min_distance=4,teleport=false})` chooses and checks a perpendicular dodge inside the engine; it tries both sides and returns the motor or null. `teleport:true` performs an immediate checked evasion instead of installing a dash intent. Neither command asks game code to calculate a direction or displacement.
 
 `trafficController.getSignal(signal_id)` returns the world signal state (`stop` if uninitialized). `getRouteStart(route_id)` returns an engine-calculated `{position,rotation}` for a registered route, suitable for entity creation. Contact events additionally expose `relative_speed`, computed by the shared collision pipeline so gameplay can apply damage thresholds without reconstructing velocity math.
 

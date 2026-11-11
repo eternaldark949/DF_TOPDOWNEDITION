@@ -28,3 +28,5 @@ See [six-group migration ledger](six-groups.md) for the explicit cutover status.
 - Saves are validated in a disposable world before replacing the live state. Cross-version migration and hardening for hostile save files remain outside this release.
 
 Missing behavior must be added inside the engine before its game consumer is switched over. No game-owned fallback solver or replacement grid is authorized by these limits.
+
+Target-relative `teleportToward` and optional instant `evadeBody(...,{teleport:true})` now support specialized clients without moving dash destination math or shape clearance back into game code. Both use existing shared-grid queries and checked native placement.

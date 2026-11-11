@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '7874d678583a';
+        const DFAB_BUILD = '69c0ead1e47d';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="8222">
+    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="8298">
 const DFNative = (()=>{
 'use strict';
 // src/basement/physics/core/values.mjs
@@ -10464,6 +10464,18 @@ class characterMotor {
         if(length(heading)<=EPS)return null;
         return this.teleportTo(add(r.position, scale(unit(heading), distance)), options);
     }
+    /** Target-relative blink with a swept path and checked landing, all in engine space. */
+    teleportToward(target, { stop_distance = 0, min_distance = 0, ...options } = {}) {
+        number(stop_distance, 'stop_distance', 0); number(min_distance, 'min_distance', 0);
+        const r = bodyRecord(this.body), delta = sub(referencePosition(r.world, target), r.position);
+        const travel = length(delta) - stop_distance;
+        if (travel <= EPS || travel < min_distance || r.parent_mount) return null;
+        const to = add(r.position, scale(unit(delta), travel));
+        const path = r.world.getPathClearance({ ...options, body:this.body, from:r.position, to, include_ghosts:false });
+        if (!path.clear) return null;
+        // A clear endpoint alone must never allow blinking through a wall.
+        return this.teleportTo(to, { ...options, placement_mode:'clear', min_distance });
+    }
     dashTo(position, options = {}) { return this.moveTo(position, { ...options, speed: options.speed ?? this.config.max_speed * 3, direct: true }); }
     teleportTo(position, options = {}) {
         const world = bodyRecord(this.body).world;
@@ -10478,8 +10490,9 @@ class characterMotor {
     stopMovement() { return this._request(() => { this.intent = null; this.path = null; if (!bodyRecord(this.body).parent_mount) this.body.stopMovement(); }); }
     cancelMovement() {if(!this.intent&&!this.path&&bodyRecord(this.body).world._canReuseMotorRequest())return this;return this._request(() => { this.intent = null; this.path = null; }); }
     suspendMovement(seconds) { number(seconds, 'seconds', 0); return this._request(() => { this.suspended_for = seconds; }); }
-    evadeBody(threat, { distance = 50, speed = this.config.max_speed * 2, min_distance = 4 } = {}) {
+    evadeBody(threat, { distance = 50, speed = this.config.max_speed * 2, min_distance = 4, teleport = false } = {}) {
         number(distance, 'distance', 0); number(speed, 'speed', EPS); number(min_distance, 'min_distance', 0);
+        if (typeof teleport !== 'boolean') throw new TypeError('teleport must be boolean');
         const r = bodyRecord(this.body), other = r.world._record(referenceBody(threat));
         const forward = length(other.velocity) > EPS ? unit(other.velocity) : [Math.cos(other.rotation), Math.sin(other.rotation)];
         const side = [-forward[1], forward[0]], delta = sub(r.position, other.position), sign = delta[0] * side[0] + delta[1] * side[1] >= 0 ? 1 : -1;
@@ -10488,7 +10501,8 @@ class characterMotor {
             const clearance = r.world.getPathClearance({ body: this.body, from: r.position, to, include_ghosts: false });
             const travel = Math.min(distance, Math.max(0, clearance.distance - 1e-3));
             if (travel < min_distance) continue;
-            return this.dashTo(add(r.position, scale(side, travel * direction)), { speed });
+            const landing = add(r.position, scale(side, travel * direction));
+            return teleport ? this.teleportTo(landing) : this.dashTo(landing, { speed });
         }
         return null;
     }
@@ -10832,7 +10846,7 @@ class gameProp extends gameEntity { static entity_type = 'prop'; static physics_
 class gameStatic extends gameEntity { static entity_type = 'static'; static physics_role = 'static'; }
 class gameTrigger extends gameEntity { static entity_type = 'trigger'; static physics_role = 'trigger'; }
 class gameDecoration extends gameEntity { static entity_type = 'decoration'; static physics_role = 'decoration'; }
-for (const method of ['suspendMovement', 'evadeBody', 'setMovement', 'setRotation', 'moveTo', 'followTarget', 'fleeTarget', 'lookAtTarget', 'lookInDirection', 'clearFacing', 'teleportInDirection', 'dashTo', 'teleportTo', 'stopMovement', 'cancelMovement', 'getMovementState']) {
+for (const method of ['suspendMovement', 'evadeBody', 'setMovement', 'setRotation', 'moveTo', 'followTarget', 'fleeTarget', 'lookAtTarget', 'lookInDirection', 'clearFacing', 'teleportInDirection', 'teleportToward', 'dashTo', 'teleportTo', 'stopMovement', 'cancelMovement', 'getMovementState']) {
     Object.defineProperty(gameCharacter.prototype, method, { value: function (...args) { return this.physics_controller[method](...args); } });
 }
 for (const method of ['assembleVehicle', 'setSurface', 'accelerateVehicle', 'brakeVehicle', 'reverseVehicle', 'steerVehicle', 'realignSteering', 'setHandbrake', 'followPath', 'driveTo', 'stopVehicle', 'parkVehicle', 'getSpeed', 'getVehicleState']) {
@@ -12637,7 +12651,26 @@ const m1 = (()=>{
 
 return Object.freeze({get physicsSystem(){return m2.physicsSystem;},get physicsBody(){return m11.physicsBody;},get collisionShape(){return m6.collisionShape;},get collisionDetector(){return m9.collisionDetector;},get contactSolver(){return m12.contactSolver;},get spatialGrid(){return m13.spatialGrid;},get physicsConstraint(){return m21.physicsConstraint;},get constraintSolver(){return m21.constraintSolver;},get characterMotor(){return m14.characterMotor;},get vehicleMotor(){return m15.vehicleMotor;},get pathMotor(){return m15.pathMotor;},get projectileMotor(){return m16.projectileMotor;},get particlePhysics(){return m26.particlePhysics;},get gameEntity(){return m18.gameEntity;},get gameElements(){return m19.gameElements;},get assetLibrary(){return m20.assetLibrary;},get gameCharacter(){return m17.gameCharacter;},get gameVehicle(){return m17.gameVehicle;},get gameProjectile(){return m17.gameProjectile;},get gameProp(){return m17.gameProp;},get gameStatic(){return m17.gameStatic;},get gameTrigger(){return m17.gameTrigger;},get gameDecoration(){return m17.gameDecoration;},get awarenessMatrix(){return m17.awarenessMatrix;},get BODY_GROUP(){return m4.BODY_GROUP;},get QUERY_GROUP(){return m4.QUERY_GROUP;},get PHYSICS_TYPES(){return m4.PHYSICS_TYPES;},get trafficController(){return m23.trafficController;},get motionController(){return m22.motionController;},get pathGeometry(){return m10.pathGeometry;},get layoutGeometry(){return m25.layoutGeometry;}});
 })();
-const m30 = Object.freeze({default:{
+// src/directory/game-hunters.mjs
+const m28 = (()=>{
+/** Normalize existing Hunter authoring once; gameplay and Basement receive engine units. */
+function createHunterRules(kind,{authoring_hz=60}={}){
+ return {dash_max:kind.dashes,dash_cooldown:kind.dash_cd/authoring_hz,dash_initial:90/authoring_hz,dash_chain_delay:22/authoring_hz,dash_retry:30/authoring_hz,dash_min_range:150,dash_max_range:420,dash_stop_distance:70,evade_min_cooldown:40/authoring_hz,evade_distance:90,evade_speed:540,evade_chance:.5,evade_cooldown:120/authoring_hz,minimum_visibility:.55,claw_range:kind.claw_reach};
+}
+/** A learned close-contact capability, using the shared native projectile sweep, not a target-position hit. */
+function createHunterAbilities(kind){
+ const radius=18,lifetime=.05;
+ return {hunter_claw:{name:'Hunter claw',description:'A short forward claw strike.',cooldown_seconds:.75,damage:kind.claw,speed:(kind.claw_reach-radius)/lifetime,lifetime,spread:0,range:kind.claw_reach,color:'rgba(0,0,0,0)',flash_color:'rgba(0,0,0,0)',flash_radius:0,local_position:[0,0],radius,impact_strength:0,damage_type:'melee',allow_mounted:false}};
+}
+
+/** Shared appearance authoring; rendering consumes the resulting record separately. */
+function createHunterAppearance({alpha=false,random=Math.random}={}){
+ return {gender:random()<.5?'female':'male',skinColor:['#3a1a1a','#5a2a24','#2a1414','#6a3a30'][Math.floor(random()*4)],eyeColor:'#ff5a1a',blood:'ink',build:alpha?'broad':random()<.5?'athletic':'slim',height:alpha?1.08:.98+random()*.06,top:{type:'coat',color:alpha?'#2a0610':'#120a0e',inner:'#2a0a12',trim:alpha?'#e3a64a':'#7a0618'},bottom:{type:'leggings',color:'#0c0608'},shoes:{type:'boots',color:'#0a0406'},hat:{type:'hood_up',color:alpha?'#3a0614':'#1a0a10'}};
+}
+
+return Object.freeze({get createHunterRules(){return createHunterRules;},get createHunterAbilities(){return createHunterAbilities;},get createHunterAppearance(){return createHunterAppearance;}});
+})();
+const m31 = Object.freeze({default:{
   "_about": {
     "chapter": "Enemies and encounters: what each enemy kind starts with, the drones, the Triumvirate and Lilitu, their hazards, and the Horde Gauntlet.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.enemies and checked by tools/test-game-db.cjs. Times are seconds unless a name says frames (60 a second); distances px; damage HP. Keys in UPPER_SNAKE are read by the code under those names. Gauntlet ids and kind ids are in save files: never rename one.",
@@ -13179,7 +13212,7 @@ const m30 = Object.freeze({default:{
     }
   }
 }});
-const m31 = Object.freeze({default:{
+const m32 = Object.freeze({default:{
   "_about": {
     "chapter": "Items and gear: everything she can carry, drink, read, craft or own.",
     "how_to_edit": "Plain JSON. tools/build.mjs inlines this file as GAME_DB.items when it builds the game, and tools/test-game-db.cjs checks it. Entry field names stay camelCase because the game code reads them by those names. A \"note\" field is for people and is never read by the game.",
@@ -13964,9 +13997,9 @@ const m31 = Object.freeze({default:{
   ]
 }});
 // src/directory/game-items.mjs
-const m29 = (()=>{
-const enemies = m30.default;
-const definitions = m31.default;
+const m30 = (()=>{
+const enemies = m31.default;
+const definitions = m32.default;
 
 /** Concrete item definitions stay in the Directory; gameplay receives plain catalog data. */
 function createItemCatalog(items=definitions,{enemy_kinds=enemies.kinds}={}) {
@@ -13986,7 +14019,7 @@ function createItemCatalog(items=definitions,{enemy_kinds=enemies.kinds}={}) {
 return Object.freeze({get createItemCatalog(){return createItemCatalog;}});
 })();
 // src/gameplay/values.mjs
-const m34 = (()=>{
+const m35 = (()=>{
 // Gameplay validation, deliberately unrelated to physical vectors or integration.
 function nonnegative(value, name) {
     if (!Number.isFinite(value) || value < 0) throw new TypeError(`${name} must be finite and nonnegative`);
@@ -14023,8 +14056,8 @@ function validateModifiers(modifiers) {
 return Object.freeze({get nonnegative(){return nonnegative;},get identifier(){return identifier;},get jsonCopy(){return jsonCopy;},get validateModifiers(){return validateModifiers;}});
 })();
 // src/gameplay/abilities/ability-loadout.mjs
-const m33 = (()=>{
-const {identifier,jsonCopy} = m34;
+const m34 = (()=>{
+const {identifier,jsonCopy} = m35;
 const components=new WeakMap();
 /** Learned capabilities, separate from carried items and physical/attack state. */
 class abilityLoadout{
@@ -14045,7 +14078,7 @@ function actorAbilities(data,catalog){const previous=components.get(data);if(pre
 
 return Object.freeze({get abilityLoadout(){return abilityLoadout;},get actorAbilities(){return actorAbilities;}});
 })();
-const m35 = Object.freeze({default:{
+const m36 = Object.freeze({default:{
   "_about": {
     "chapter": "Progression: Resonance (949's levels), the three tuning trees, castable abilities, and the perks closeness unlocks.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.progression and checked by tools/test-game-db.cjs. Node ids, tree ids and ability ids are in save files: never rename one. A \"note\" is for people only.",
@@ -14319,7 +14352,7 @@ const m35 = Object.freeze({default:{
     }
   }
 }});
-const m36 = Object.freeze({default:{
+const m37 = Object.freeze({default:{
   "authoring_hz": 60,
   "local_position": [20, 0],
   "projectile_radius": 5,
@@ -14328,14 +14361,16 @@ const m36 = Object.freeze({default:{
   "damage_type": "energy"
 }});
 // src/directory/game-abilities.mjs
-const m32 = (()=>{
-const {abilityLoadout} = m33;
-const progression = m35.default;
-const rules = m36.default;
-const {identifier,nonnegative,jsonCopy} = m34;
+const m33 = (()=>{
+const enemies = m31.default;
+const {createHunterAbilities} = m28;
+const {abilityLoadout} = m34;
+const progression = m36.default;
+const rules = m37.default;
+const {identifier,nonnegative,jsonCopy} = m35;
 
 /** Existing authored balance becomes engine units once at the Directory boundary. */
-function createAbilityCatalog(definitions=progression.abilities){
+function createAbilityCatalog(definitions=progression.abilities,{hunter_kind=enemies.kinds.hunter}={}){
  const catalog={};
  for(const [id,definition] of Object.entries(definitions)){
   identifier(id);const stats=definition.stats;
@@ -14343,6 +14378,7 @@ function createAbilityCatalog(definitions=progression.abilities){
   if(!stats.fireRate||!stats.projectileSpeed||!stats.projectileLife)throw new TypeError('Ability rate, speed and lifetime must be positive');
   catalog[id]={name:definition.name,description:definition.desc??'',cooldown_seconds:stats.fireRate/rules.authoring_hz,damage:stats.damage,speed:stats.projectileSpeed*rules.authoring_hz,lifetime:stats.projectileLife/rules.authoring_hz,spread:stats.spread,range:stats.range,color:stats.projectileColor,flash_color:stats.flashColor??stats.projectileColor,flash_radius:stats.flashRadius??0,local_position:[...rules.local_position],radius:rules.radius_overrides[id]??rules.projectile_radius,impact_strength:rules.impact_strength,damage_type:rules.damage_type};
  }
+ Object.assign(catalog,createHunterAbilities(hunter_kind));
  const copy=jsonCopy(catalog);const freeze=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))freeze(child);Object.freeze(value);}return value;};return freeze(copy);
 }
 
@@ -14358,7 +14394,7 @@ function importActorAbilities(data,catalog,{default_id=null}={}){
 
 return Object.freeze({get createAbilityCatalog(){return createAbilityCatalog;},get importActorAbilities(){return importActorAbilities;}});
 })();
-const m37 = Object.freeze({default:{
+const m38 = Object.freeze({default:{
   "authoring_hz": 60,
   "crit_chance": 0.1,
   "crit_multiplier": 2,
@@ -14437,7 +14473,7 @@ const m37 = Object.freeze({default:{
     "minimum_cooldown_seconds": 0.6
   }
 }});
-const m38 = Object.freeze({default:{
+const m39 = Object.freeze({default:{
   "firearm_range": 400,
   "melee_range": 65,
   "unarmed_range": 65,
@@ -14448,11 +14484,11 @@ const m38 = Object.freeze({default:{
   }
 }});
 // src/directory/game-attacks.mjs
-const m28 = (()=>{
-const {createItemCatalog} = m29;
-const {createAbilityCatalog} = m32;
-const combatRules = m37.default;
-const rules = m38.default;
+const m29 = (()=>{
+const {createItemCatalog} = m30;
+const {createAbilityCatalog} = m33;
+const combatRules = m38.default;
+const rules = m39.default;
 
 /** References to existing item/capability definitions, not a second balance/ownership ledger. */
 function createAttackCatalog({items=createItemCatalog(),abilities=createAbilityCatalog()}={}){
@@ -14467,12 +14503,12 @@ function createAttackCatalog({items=createItemCatalog(),abilities=createAbilityC
 
 return Object.freeze({get createAttackCatalog(){return createAttackCatalog;}});
 })();
-const m39 = Object.freeze({default:{
+const m40 = Object.freeze({default:{
  "health":100,"authoring_hz":60,"damage_grace_seconds":0,
  "npc":{"follow_distance":60,"recover_distance":300,"cruise_speed":210,"match_speed":312,"catchup_speed":420,"match_distance":30,"catchup_distance":100,"combat_range":400,"recovery_delay":3,"regeneration_interval":0.5,"regeneration_amount":1,"stim_threshold":0.3,"stim_heal":50,"stim_cooldown":2,"stim_count":3,"aura_range":120,"aura_interval":1,"hire_cost":400,"hire_minutes":480},
  "ganger":{"vision_fov":1.2566370614359172,"personal_space":50,"touch_distance":32,"suspicion_near_per_second":300,"suspicion_sight_per_second":150,"suspicion_idle_drain_per_second":30,"suspicion_search_drain_per_second":6,"suspicion_decay_delay":2,"noise_decay_delay":3,"suppression_seconds":1.5,"suppression_cooldown":0.25,"search_speed":90,"retreat_speed":90,"engage_distance":150,"retreat_distance":80,"search_arrival":40,"wander_speed":30,"wander_radius":200,"wander_min_seconds":2,"wander_random_seconds":3.3333333333333335,"search_look_seconds":0.75,"search_timeout":5,"interrupt_seconds":0.2,"interrupt_resistance":0.65,"shot_jitter_seconds":0.3333333333333333}
 }});
-const m40 = Object.freeze({default:{
+const m41 = Object.freeze({default:{
   "max_health": 100,
   "movement_speed": 312,
   "sneak_speed_factor": 0.55,
@@ -14490,7 +14526,7 @@ const m40 = Object.freeze({default:{
     "minimum_distance": 1
   }
 }});
-const m41 = Object.freeze({default:{
+const m42 = Object.freeze({default:{
   "library_id": "df",
   "description": "Directory-owned entity definitions for the standalone engine. Existing game classes migrate to these contracts in the next phase. Units: world pixels, seconds, radians and kilograms.",
   "resources": {
@@ -15044,7 +15080,7 @@ const m41 = Object.freeze({default:{
     }
   }
 }});
-const m42 = Object.freeze({default:{
+const m43 = Object.freeze({default:{
   "library_id": "df_street",
   "resources": {
     "rules": {
@@ -15111,7 +15147,7 @@ const m42 = Object.freeze({default:{
     }
   }
 }});
-const m43 = Object.freeze({default:{
+const m44 = Object.freeze({default:{
   "_about": {
     "chapter": "Cast and looks: every speaker's colour, who stands where in a cinematic scene, where the crew idles at home, how every named character looks, the colours looks share, the Double Nights android finishes, the wardrobe Stella can buy and wear, and the finishes and named materials it is drawn with.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.cast and checked by tools/test-game-db.cjs. Colours are '#rrggbb' (or '#rgb'). In appearances, { \"palette\": \"<name>\" } stands for that colour from palette, so a colour several looks share is changed once. Crowds (ROLE_LOOKS) and the field mask are code and stay in core/appearances.js. _about.notes keeps the explanations that were comments in the code, keyed by path.",
@@ -16581,7 +16617,7 @@ const m43 = Object.freeze({default:{
     }
   ]
 }});
-const m44 = Object.freeze({default:{
+const m45 = Object.freeze({default:{
   "_about": {
     "chapter": "Vehicles and traffic: the car brands and models, BlackMark's factory look, the Zib cabs and where they go, how traffic treats people in the road, and the driving feel every car shares.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.vehicles and checked by tools/test-game-db.cjs. Speeds are px a tick (60 ticks a second), accelerations px a tick², times in ticks unless a name says ms, distances px, angles radians. Keys in camelCase or UPPER_SNAKE are read by the code under those names. Brand and model keys are in save files: never rename one. _about.fields explains each field of the tuning tables.",
@@ -17313,7 +17349,7 @@ const m44 = Object.freeze({default:{
     }
   }
 }});
-const m45 = Object.freeze({default:{
+const m46 = Object.freeze({default:{
   "_about": {
     "chapter": "Places: every map's size, floors, walls, zones, landmarks and ways in and out; the rooms and doors inside them; where the city's landmark blocks are; the fireplaces; and where the dyer stands.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.places and checked by tools/test-game-db.cjs. Positions and sizes are world px, from the map's top-left; angles radians. Keys in camelCase or UPPER_SNAKE are read by the code under those names. Map ids and room ids are in save files and story steps: never rename one. _about.notes keeps the explanations that were comments in the code, keyed by where they apply (maps.apt_949.cameraBounds, rooms.apt_949.doors[0], …); they're for people only.",
@@ -19054,20 +19090,21 @@ const m45 = Object.freeze({default:{
 }});
 // src/directory/game-assets.mjs
 const m27 = (()=>{
-const {createAttackCatalog} = m28;
-const progression = m35.default;
-const {createAbilityCatalog} = m32;
-const actorRules = m39.default;
-const {createItemCatalog} = m29;
+const {createHunterRules} = m28;
+const {createAttackCatalog} = m29;
+const progression = m36.default;
+const {createAbilityCatalog} = m33;
+const actorRules = m40.default;
+const {createItemCatalog} = m30;
 const {assetLibrary} = m1;
-const playerRules = m40.default;
-const definitions = m41.default;
-const streetDefinitions = m42.default;
-const cast = m43.default;
-const vehicles = m44.default;
-const enemies = m30.default;
-const places = m45.default;
-const items = m31.default;
+const playerRules = m41.default;
+const definitions = m42.default;
+const streetDefinitions = m43.default;
+const cast = m44.default;
+const vehicles = m45.default;
+const enemies = m31.default;
+const places = m46.default;
+const items = m32.default;
 
 /** Game data is wired here, never imported by the reusable Basement package. */
 function createGameAssetLibrary({ game_db = { cast, vehicles, enemies, places, items } } = {}) {
@@ -19081,21 +19118,23 @@ function createGameAssetLibrary({ game_db = { cast, vehicles, enemies, places, i
         }
         resource.data = data;
     }
-    definition.resources.abilities={kind:'ability_catalog',data:createAbilityCatalog(game_db.progression?.abilities??progression.abilities)};
-    definition.resources.actor_rules={kind:'actor_rules',data:actorRules};
+    definition.resources.abilities={kind:'ability_catalog',data:createAbilityCatalog(game_db.progression?.abilities??progression.abilities,{hunter_kind:game_db.enemies.kinds.hunter})};
+    definition.resources.actor_rules={kind:'actor_rules',data:{...actorRules,hunter:createHunterRules(game_db.enemies.kinds.hunter)}};
     definition.resources.actor_items={kind:'item_catalog',data:createItemCatalog(game_db.items,{enemy_kinds:game_db.enemies.kinds})};
     definition.resources.actor_appearances={kind:'appearance_catalog',data:game_db.cast.appearances};
     definition.resources.attacks={kind:'attack_catalog',data:createAttackCatalog({items:definition.resources.actor_items.data,abilities:definition.resources.abilities.data})};
     const ganger=game_db.enemies.kinds.ganger;Object.assign(definition.templates.ganger,{mass:ganger.mass,collision_shape:{shape_type:'circle',radius:ganger.radius}});
     Object.assign(definition.templates.ganger.data,{health:ganger.hp,max_health:ganger.hp,move_speed:ganger.speed*60,damage_grace_seconds:ganger.invincible_frames/60,vision_range:ganger.vision_range,telegraph_seconds:ganger.telegraph_frames/60});
+    const hunter=game_db.enemies.kinds.hunter;
+    definition.templates.hunter={extends:'ganger',entity_type:'df_hunter',tags:['enemy','hunter'],data:{health:hunter.hp,max_health:hunter.hp,move_speed:hunter.speed*60,vision_range:hunter.vision_range,weapon_definition_id:hunter.weapon,dash_max:hunter.dashes,dash_cooldown:hunter.dash_cd/60,abilities:{format_version:1,known_ids:['hunter_claw'],equipped_id:null}}};
     return new assetLibrary({ libraries: [definition, streetDefinitions] });
 }
 
 return Object.freeze({get createGameAssetLibrary(){return createGameAssetLibrary;}});
 })();
 // src/gameplay/attacks/mounted-attacks.mjs
-const m47 = (()=>{
-const {jsonCopy,nonnegative,identifier} = m34;
+const m48 = (()=>{
+const {jsonCopy,nonnegative,identifier} = m35;
 
 function validateMountedAttack(state){
  if(state==null)return;jsonCopy(state);if(Object.keys(state).some(key=>!['format_version','attachment_id','revision','attack_id','aim','started_at','ready_at','expires_at'].includes(key)))throw new TypeError('Invalid mounted attack fields');identifier(state.attack_id);if(state.format_version!==1||!Number.isSafeInteger(state.attachment_id)||state.attachment_id<1||!Number.isSafeInteger(state.revision)||state.revision<0||typeof state.attack_id!=='string')throw new TypeError('Invalid mounted attack state');
@@ -19117,8 +19156,8 @@ function mountedAttackState(actor,controller,mount){
 return Object.freeze({get validateMountedAttack(){return validateMountedAttack;},get prepareMountedAttack(){return prepareMountedAttack;},get mountedAttackState(){return mountedAttackState;}});
 })();
 // src/gameplay/attacks/attack-registry.mjs
-const m48 = (()=>{
-const {identifier,jsonCopy} = m34;
+const m49 = (()=>{
+const {identifier,jsonCopy} = m35;
 const freeze=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))freeze(child);Object.freeze(value);}return value;};
 
 const synchronous=callback=>(...args)=>{const result=callback(...args);if(result&&typeof result.then==='function')throw new TypeError('Attack callbacks must be synchronous');return result;};
@@ -19155,9 +19194,9 @@ function validateAttackState(state,hasAttack){
 return Object.freeze({get attackRegistry(){return attackRegistry;},get validateAttackState(){return validateAttackState;}});
 })();
 // src/gameplay/actors/actor-vitals.mjs
-const m52 = (()=>{
-const rules = m39.default;
-const {nonnegative,jsonCopy} = m34;
+const m53 = (()=>{
+const rules = m40.default;
+const {nonnegative,jsonCopy} = m35;
 function validate(data){nonnegative(data.health,'health');nonnegative(data.max_health,'max_health');if(!data.max_health||data.health>data.max_health)throw new TypeError('Invalid actor health');}
 /** Shared health operations over the owner's canonical data, with no physical or UI state. */
 class actorVitals{
@@ -19180,11 +19219,11 @@ class actorVitals{
 return Object.freeze({get actorVitals(){return actorVitals;}});
 })();
 // src/entities/game-actor.mjs
-const m51 = (()=>{
-const {validateAttackState} = m48;
+const m52 = (()=>{
+const {validateAttackState} = m49;
 const {gameCharacter} = m1;
-const {actorVitals} = m52;
-const {nonnegative,jsonCopy} = m34;
+const {actorVitals} = m53;
+const {nonnegative,jsonCopy} = m35;
 const health=new WeakMap(),hooks=new WeakMap();
 const stateFor=actor=>actor.data.actor_state??={format_version:1,defeated:false,invulnerable_remaining:0,elapsed:0};
 /** Common actor gameplay over a real gameCharacter. No velocity, geometry or body mirrors. */
@@ -19228,10 +19267,10 @@ class gameActor extends gameCharacter{
 return Object.freeze({get gameActor(){return gameActor;}});
 })();
 // src/gameplay/player-vitals.mjs
-const m53 = (()=>{
-const {actorVitals} = m52;
-const defaults = m40.default;
-const {nonnegative,jsonCopy,identifier,validateModifiers} = m34;
+const m54 = (()=>{
+const {actorVitals} = m53;
+const defaults = m41.default;
+const {nonnegative,jsonCopy,identifier,validateModifiers} = m35;
 
 /** Shared gameplay component. It references its owner's data; it never owns or mirrors a body. */
 class playerVitals extends actorVitals {
@@ -19315,10 +19354,10 @@ class playerVitals extends actorVitals {
 return Object.freeze({get playerVitals(){return playerVitals;}});
 })();
 // src/entities/player.mjs
-const m50 = (()=>{
-const {gameActor} = m51;
-const {playerVitals} = m53;
-const {identifier,validateModifiers,nonnegative} = m34;
+const m51 = (()=>{
+const {gameActor} = m52;
+const {playerVitals} = m54;
+const {identifier,validateModifiers,nonnegative} = m35;
 const services = new WeakMap();
 const components = new WeakMap();
 function vitalsFor(player,rules) {
@@ -19407,7 +19446,7 @@ class Player extends gameActor {
 return Object.freeze({get Player(){return Player;}});
 })();
 // src/entities/apartment-prop.mjs
-const m54 = (()=>{
+const m55 = (()=>{
 const {gameProp} = m1;
 
 /** Furniture/fixture gameplay metadata; no local transform or integration. */
@@ -19422,7 +19461,7 @@ class ApartmentProp extends gameProp {
 return Object.freeze({get ApartmentProp(){return ApartmentProp;}});
 })();
 // src/directory/npc-reactions.mjs
-const m56 = (()=>{
+const m57 = (()=>{
 // Authored character reactions, shared by native and remaining classic NPCs.
 function resolveEmoteLines(reactions, cat, tier) {
     const pool = reactions && reactions[cat];
@@ -19586,11 +19625,11 @@ const NPC_EMOTE_REACTIONS = {
 
 return Object.freeze({get resolveEmoteLines(){return resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return NPC_EMOTE_REACTIONS;}});
 })();
-const m59 = Object.freeze({default:{"capacity":10,"max_attachments":2,"owner_id":"player"}});
+const m60 = Object.freeze({default:{"capacity":10,"max_attachments":2,"owner_id":"player"}});
 // src/gameplay/items/item-system.mjs
-const m58 = (()=>{
-const itemRules = m59.default;
-const {identifier,jsonCopy,validateModifiers} = m34;
+const m59 = (()=>{
+const itemRules = m60.default;
+const {identifier,jsonCopy,validateModifiers} = m35;
 
 const modes=['normal','sniper','melee','fists'];
 const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
@@ -19771,10 +19810,10 @@ class itemSystem {
 return Object.freeze({get itemSystem(){return itemSystem;}});
 })();
 // src/gameplay/actors/actor-inventory.mjs
-const m57 = (()=>{
-const {itemSystem} = m58;
-const itemRules = m59.default;
-const {jsonCopy} = m34;
+const m58 = (()=>{
+const {itemSystem} = m59;
+const itemRules = m60.default;
+const {jsonCopy} = m35;
 const components=new WeakMap();
 function actorItems(data,owner_id,catalog){
  const prior=components.get(data);if(prior&&prior.root===data.inventory)return prior.items;
@@ -19787,13 +19826,13 @@ function restoreActorItems(data,snapshot,catalog){
 return Object.freeze({get actorItems(){return actorItems;},get restoreActorItems(){return restoreActorItems;}});
 })();
 // src/entities/npc.mjs
-const m55 = (()=>{
-const {importActorAbilities} = m32;
-const {actorAbilities} = m33;
-const {resolveEmoteLines,NPC_EMOTE_REACTIONS} = m56;
-const {gameActor} = m51;
-const {actorItems,restoreActorItems} = m57;
-const {nonnegative,jsonCopy} = m34;
+const m56 = (()=>{
+const {importActorAbilities} = m33;
+const {actorAbilities} = m34;
+const {resolveEmoteLines,NPC_EMOTE_REACTIONS} = m57;
+const {gameActor} = m52;
+const {actorItems,restoreActorItems} = m58;
+const {nonnegative,jsonCopy} = m35;
 const actorContract=npc=>npc.data.hireType==='contract'?(npc.data.contract_remaining??npc.data.hireDuration??0):0;
 const stateFor=npc=>npc.data.npc_state??={format_version:1,stim_remaining:0,out_of_combat:0,regen_elapsed:0,aura_elapsed:0,quip:null,quip_remaining:0,quip_delay:0,contract_remaining:actorContract(npc)};
 const ROSTER_FIELDS=['recruited','downed','teammateStims','maxTeammateStims','relationship','hireType','hireDuration','hireTime','hireCost','hired','role','bio','alliance','burstSize','burstDelay','accuracyMod','equippedAbilityId','cooldown','shotsLeftInBurst','abilitiesSnapshot','attackSelection'];
@@ -19868,15 +19907,17 @@ for(const [key,field] of Object.entries({burstSize:'burst_size',burstDelay:'burs
 return Object.freeze({get ROSTER_FIELDS(){return ROSTER_FIELDS;},get NPC(){return NPC;},get rosterRecord(){return rosterRecord;}});
 })();
 // src/entities/ganger.mjs
-const m60 = (()=>{
-const {gameActor} = m51;
-const {actorItems,restoreActorItems} = m57;
-const {nonnegative,jsonCopy} = m34;
+const m62 = (()=>{
+const {gameActor} = m52;
+const {actorItems,restoreActorItems} = m58;
+const {nonnegative,jsonCopy} = m35;
 const states=['IDLE','SUSPICIOUS','ALERT','SUPPRESSING','SEARCHING'];
 const stateFor=actor=>actor.data.ganger_state??={format_version:1,state:'IDLE',suspicion:0,drain_remaining:0,suppression_remaining:0,look_elapsed:0,wander_remaining:0,investigate_position:null,wander_position:null,origin:[...actor.position],search_positions:[],search_elapsed:0,interrupt_remaining:0,resistance_remaining:0,telegraphing:false,aim_position:null,shot_delay:actor.data.telegraph_seconds??.15,bumped:false};
 /** Native stealth/combat policy. Awareness, leading, pathing and contact response stay in Basement. */
 class Ganger extends gameActor{
  static entity_type='df_ganger';
+ get ignoresConcealment(){return false;}
+ get minimumVisibility(){return 0;}
  get items(){return actorItems(this.data,`actor:${this.entity_id}`,this.getAsset('items').data);}
  get state(){return stateFor(this).state;}
  get suspicion(){return stateFor(this).suspicion;}
@@ -19892,10 +19933,10 @@ class Ganger extends gameActor{
   const state=stateFor(this),rules=this.getAsset('actor_rules').data.ganger,world=this.physics_system;
   for(const key of ['drain_remaining','suppression_remaining','wander_remaining','interrupt_remaining','resistance_remaining','shot_delay'])state[key]=Math.max(0,state[key]-seconds);
   const view=player&&!player.dead?world.observeTarget(this,player,{near_range:this.data.vision_range,fov:rules.vision_fov,personal_space:rules.personal_space,touch_distance:rules.touch_distance}):null;
-  const hidden=!player||player.visible===false||player.isHidden;const sneaking=view?.behind&&!!player?.sneaking;
+  const hidden=!player||player.visible===false||player.isHidden&&!this.ignoresConcealment;const sneaking=view?.behind&&!!player?.sneaking;
   const sees=!!view&&!hidden&&view.line_clear&&(view.touching||view.close&&!sneaking||view.in_range&&view.in_cone);
   const previous=state.state;
-  if(sees){state.investigate_position=[...view.position];state.search_positions=[];state.search_elapsed=0;state.drain_remaining=rules.suspicion_decay_delay;state.suspicion=Math.min(100,state.suspicion+(view.close?rules.suspicion_near_per_second:Math.max(.1,1-view.distance/this.data.vision_range)*Math.max(.1,visibility)*rules.suspicion_sight_per_second)*seconds);if(view.touching&&!state.bumped){state.suspicion=Math.max(state.suspicion,70);state.bumped=true;this.emitActor('ganger:bumped');}}
+  if(sees){state.investigate_position=[...view.position];state.search_positions=[];state.search_elapsed=0;state.drain_remaining=rules.suspicion_decay_delay;state.suspicion=Math.min(100,state.suspicion+(view.close?rules.suspicion_near_per_second:Math.max(.1,1-view.distance/this.data.vision_range)*Math.max(.1,this.minimumVisibility,visibility)*rules.suspicion_sight_per_second)*seconds);if(view.touching&&!state.bumped){state.suspicion=Math.max(state.suspicion,70);state.bumped=true;this.emitActor('ganger:bumped');}}
   else{if(!view?.touching)state.bumped=false;if(!state.drain_remaining&&state.state!=='SUPPRESSING')state.suspicion=Math.max(0,state.suspicion-(state.state==='SEARCHING'?rules.suspicion_search_drain_per_second:rules.suspicion_idle_drain_per_second)*seconds);}
   if(sees&&state.suspicion>=100)this.setBehavior('ALERT');else if(previous==='ALERT'&&!sees&&state.investigate_position){this.setBehavior('SUPPRESSING');state.suppression_remaining=rules.suppression_seconds;this.emitActor('ganger:last-known',{position:state.investigate_position});}
   else if(!['ALERT','SUPPRESSING','SEARCHING'].includes(state.state))this.setBehavior(state.suspicion>0?'SUSPICIOUS':'IDLE');
@@ -19925,8 +19966,50 @@ class Ganger extends gameActor{
 
 return Object.freeze({get Ganger(){return Ganger;}});
 })();
-// src/entities/world-loot.mjs
+// src/entities/hunter.mjs
 const m61 = (()=>{
+const {Ganger} = m62;
+const {nonnegative,jsonCopy} = m35;
+const stateFor=actor=>actor.data.hunter_state??={format_version:1,dash_remaining:actor.getAsset('actor_rules').data.hunter.dash_initial,chain:0,evade_requested:false};
+/** Hunter decisions only. Native motors own blink clearance, evasion and all motion. */
+class Hunter extends Ganger{
+ static entity_type='df_hunter';
+ get ignoresConcealment(){return true;}
+ get minimumVisibility(){return this.getAsset('actor_rules').data.hunter.minimum_visibility;}
+ get hunter_state(){return stateFor(this);}
+ onDamaged(detail){super.onDamaged(detail);stateFor(this).evade_requested=true;}
+ updateBehavior(seconds,options={}){
+  super.updateBehavior(seconds,options);
+  if(this.dead||!this.active||this.physics_system.getAttachmentState(this))return;
+  const state=stateFor(this),rules=this.getAsset('actor_rules').data.hunter,{player,attacks,random=Math.random}=options;
+  state.dash_remaining=Math.max(0,state.dash_remaining-seconds);
+  const evade=state.evade_requested;state.evade_requested=false;
+  if(!player||player.dead||player.visible===false||this.ganger_state.interrupt_remaining||this.data.combat_state?.stagger_remaining>0)return;
+  const world=this.physics_system,view=world.observeTarget(this,player,{near_range:rules.claw_range});
+  if(evade&&state.dash_remaining>rules.evade_min_cooldown&&state.dash_remaining<(this.data.dash_cooldown??rules.dash_cooldown)&&random()<rules.evade_chance){
+   if(this.evadeBody(player,{distance:rules.evade_distance,speed:rules.evade_speed,teleport:true})){state.dash_remaining=Math.max(state.dash_remaining,rules.evade_cooldown);this.emitActor('hunter:evaded');return;}
+  }
+  if(!['ALERT','SUPPRESSING'].includes(this.state))return;
+  if(!state.dash_remaining&&view.distance>rules.dash_min_range&&view.distance<rules.dash_max_range){
+   const from=[...this.position];
+   if(this.teleportToward(player,{stop_distance:rules.dash_stop_distance})){
+    state.chain++;const maximum=this.data.dash_max??rules.dash_max;
+    state.dash_remaining=state.chain<maximum?rules.dash_chain_delay:(this.data.dash_cooldown??rules.dash_cooldown)*(.8+random()*.4);
+    if(state.chain>=maximum)state.chain=0;
+    this.emitActor('hunter:dashed',{from,position:[...this.position]});
+   }else state.dash_remaining=rules.dash_retry;
+  }
+  // The common attack queue replaces a pending sidearm intent; there is still one cooldown owner.
+  const close=world.observeTarget(this,player,{near_range:rules.claw_range});
+  if(close.in_range&&close.line_clear&&attacks.canAttack(this,{attack_id:'ability:hunter_claw'}))attacks.requestAttack(this,{attack_id:'ability:hunter_claw',target:close.position});
+ }
+ validateHunter(){this.validateGanger();const state=stateFor(this),maximum=this.data.dash_max??this.getAsset('actor_rules').data.hunter.dash_max;jsonCopy(state);if(state.format_version!==1||!Number.isInteger(maximum)||maximum<1||!Number.isInteger(state.chain)||state.chain<0||state.chain>=maximum||typeof state.evade_requested!=='boolean')throw new TypeError('Invalid saved Hunter state');nonnegative(state.dash_remaining,'dash_remaining');if(this.data.dash_cooldown!==undefined)nonnegative(this.data.dash_cooldown,'dash_cooldown');return this;}
+}
+
+return Object.freeze({get Hunter(){return Hunter;}});
+})();
+// src/entities/world-loot.mjs
+const m63 = (()=>{
 const {gameProp} = m1;
 /** The dropped bundle is owned here until pickup; the inherited body is the only live pose. */
 class WorldLoot extends gameProp{
@@ -19938,7 +20021,7 @@ class WorldLoot extends gameProp{
 return Object.freeze({get WorldLoot(){return WorldLoot;}});
 })();
 // src/directory/street-definitions.mjs
-const m64 = (()=>{
+const m66 = (()=>{
 /** Directory authoring only: convert immutable catalog units once, never during simulation. */
 const vehicleDefinitions = new WeakMap();
 function resolveStreetVehicle(library, { brand, model, control_mode = 'AI', color } = {}) {
@@ -20009,8 +20092,8 @@ function resolveVehicleSeats(library, { brand, model }) {
 return Object.freeze({get resolveStreetVehicle(){return resolveStreetVehicle;},get resolveVehicleSeats(){return resolveVehicleSeats;}});
 })();
 // src/traffic/traffic-vehicle.mjs
-const m63 = (()=>{
-const {resolveStreetVehicle,resolveVehicleSeats} = m64;
+const m65 = (()=>{
+const {resolveStreetVehicle,resolveVehicleSeats} = m66;
 const {gameVehicle} = m1;
 const bindings = new WeakMap();
 /** Official gameplay entity. Body state and driving calculations belong to Basement. */
@@ -20105,10 +20188,10 @@ class TrafficVehicle extends gameVehicle {
 return Object.freeze({get TrafficVehicle(){return TrafficVehicle;}});
 })();
 // src/directory/game-vehicle-factory.mjs
-const m66 = (()=>{
-const {TrafficVehicle} = m63;
+const m68 = (()=>{
+const {TrafficVehicle} = m65;
 const {pathGeometry} = m1;
-const {resolveStreetVehicle} = m64;
+const {resolveStreetVehicle} = m66;
 
 const purposes = new Set(['ambient', 'owned', 'mission', 'taxi']);
 /** Shared official creation. Population limits belong to the requesting population manager. */
@@ -20148,9 +20231,9 @@ function createGameVehicle(world, packet = {}, { hooks = {} } = {}) {
 return Object.freeze({get createGameVehicle(){return createGameVehicle;}});
 })();
 // src/traffic/traffic-manager.mjs
-const m65 = (()=>{
-const {TrafficVehicle} = m63;
-const {createGameVehicle} = m66;
+const m67 = (()=>{
+const {TrafficVehicle} = m65;
+const {createGameVehicle} = m68;
 /** Spawn, ownership and driver policy. The physics world owns every spatial/physical operation. */
 class TrafficManager {
     #pendingSpawns = new Set();
@@ -20195,7 +20278,7 @@ class TrafficManager {
 return Object.freeze({get TrafficManager(){return TrafficManager;}});
 })();
 // src/entities/pedestrians.mjs
-const m67 = (()=>{
+const m69 = (()=>{
 const {gameCharacter,gameVehicle,BODY_GROUP} = m1;
 const bindings = new WeakMap();
 /** Civilian decisions and reactions. Movement, prediction and impacts stay in Basement. */
@@ -20276,8 +20359,8 @@ class Pedestrian extends gameCharacter {
 return Object.freeze({get Pedestrian(){return Pedestrian;}});
 })();
 // src/entities/pedestrian-manager.mjs
-const m68 = (()=>{
-const {Pedestrian} = m67;
+const m70 = (()=>{
+const {Pedestrian} = m69;
 /** Population and waypoint policy only. No positions, obstacle cache or sensing grid. */
 class PedestrianManager {
     #network = new Map();
@@ -20349,11 +20432,11 @@ class PedestrianManager {
 return Object.freeze({get PedestrianManager(){return PedestrianManager;}});
 })();
 // src/directory/game-street.mjs
-const m62 = (()=>{
-const {TrafficVehicle} = m63;
-const {TrafficManager} = m65;
-const {Pedestrian} = m67;
-const {PedestrianManager} = m68;
+const m64 = (()=>{
+const {TrafficVehicle} = m65;
+const {TrafficManager} = m67;
+const {Pedestrian} = m69;
+const {PedestrianManager} = m70;
 
 
 function registerStreetEntityTypes(world) {
@@ -20373,26 +20456,27 @@ class StreetPopulation {
     clearStreet() { this.traffic.clearStreet(); this.pedestrians.clearStreet(); }
 }
 
-return Object.freeze({get TrafficVehicle(){return TrafficVehicle;},get TrafficManager(){return TrafficManager;},get Pedestrian(){return Pedestrian;},get PedestrianManager(){return PedestrianManager;},get createGameVehicle(){return m66.createGameVehicle;},get registerStreetEntityTypes(){return registerStreetEntityTypes;},get StreetPopulation(){return StreetPopulation;}});
+return Object.freeze({get TrafficVehicle(){return TrafficVehicle;},get TrafficManager(){return TrafficManager;},get Pedestrian(){return Pedestrian;},get PedestrianManager(){return PedestrianManager;},get createGameVehicle(){return m68.createGameVehicle;},get registerStreetEntityTypes(){return registerStreetEntityTypes;},get StreetPopulation(){return StreetPopulation;}});
 })();
 // src/directory/game-entity-types.mjs
-const m49 = (()=>{
-const {Player} = m50;
-const {ApartmentProp} = m54;
-const {gameActor} = m51;
-const {NPC} = m55;
-const {Ganger} = m60;
-const {WorldLoot} = m61;
-const {registerStreetEntityTypes} = m62;
+const m50 = (()=>{
+const {Player} = m51;
+const {ApartmentProp} = m55;
+const {gameActor} = m52;
+const {NPC} = m56;
+const {Hunter} = m61;
+const {Ganger} = m62;
+const {WorldLoot} = m63;
+const {registerStreetEntityTypes} = m64;
 /** The Directory registers concrete classes before any level or saved identity is constructed. */
 function registerGameEntityTypes(world){
- for(const Class of [gameActor,Player,ApartmentProp,NPC,Ganger,WorldLoot])if(!world.elements.listEntityTypes().includes(Class.entity_type))world.elements.registerEntityType(Class.entity_type,Class);
+ for(const Class of [gameActor,Player,ApartmentProp,NPC,Ganger,Hunter,WorldLoot])if(!world.elements.listEntityTypes().includes(Class.entity_type))world.elements.registerEntityType(Class.entity_type,Class);
  registerStreetEntityTypes(world);
 }
 
 return Object.freeze({get registerGameEntityTypes(){return registerGameEntityTypes;}});
 })();
-const m70 = Object.freeze({default:{
+const m72 = Object.freeze({default:{
   "library_id": "df_apartment",
   "description": "Authored Silver Queen apartment assets. Furniture order preserves existing questState.aptLayout indices. Physics state is held only by Basement bodies.",
   "resources": {
@@ -21478,9 +21562,9 @@ const m70 = Object.freeze({default:{
   }
 }});
 // src/directory/apartment-assets.mjs
-const m69 = (()=>{
+const m71 = (()=>{
 const {createGameAssetLibrary} = m27;
-const definition = m70.default;
+const definition = m72.default;
 
 function createApartmentAssetLibrary(options = {}) {
     const library = createGameAssetLibrary(options);
@@ -21493,7 +21577,7 @@ const APARTMENT_RULES = Object.freeze(definition.resources.rules.data);
 return Object.freeze({get createApartmentAssetLibrary(){return createApartmentAssetLibrary;},get APARTMENT_RULES(){return APARTMENT_RULES;}});
 })();
 // src/directory/apartment-definition.mjs
-const m71 = (()=>{
+const m73 = (()=>{
 const {layoutGeometry,BODY_GROUP} = m1;
 const MOVABLE = new Set(['apt_sofa','apt_coffee','apt_chair','apt_console','apt_plant','apt_planter','apt_stool','apt_bed','apt_side','apt_lounger','apt_bistro','apt_telescope','apt_dining','apt_bench','apt_chaise','apt_patio_sofa']);
 const rectangle = (r, template, data = {}) => ({ template, position: [r.x + r.w / 2, r.y + r.h / 2], collision_shape: { shape_type: 'box', dimensions: [r.w, r.h] }, data });
@@ -21551,14 +21635,16 @@ function resolveApartmentDyer(game_db){
 return Object.freeze({get resolveApartmentDefinition(){return resolveApartmentDefinition;},get resolveApartmentDyer(){return resolveApartmentDyer;}});
 })();
 // src/directory/game-actor-factory.mjs
-const m72 = (()=>{
-const {validateAttackState} = m48;
-const {importActorAbilities} = m32;
-const {jsonCopy} = m34;
+const m74 = (()=>{
+const {createHunterAppearance} = m28;
+const {validateAttackState} = m49;
+const {importActorAbilities} = m33;
+const {jsonCopy} = m35;
 /** Definitions and explicit old-roster import live in Directory, never in physics. */
 function createActorPacket(world,{kind='npc',name='',role='civilian',position=[0,0],rotation=0,data={},...packet}={}){
- if(!['npc','ganger','actor'].includes(kind))throw new TypeError('Unknown actor kind');const record=jsonCopy(data);
+ if(!['npc','ganger','hunter','actor'].includes(kind))throw new TypeError('Unknown actor kind');const record=jsonCopy(data);
  if(record.attackSelection!=null)record.attack_state=validateAttackState(record.attackSelection,()=>true);delete record.attackSelection;
+ if(kind==='hunter'){if(record.alpha&&record.dash_max===undefined)record.dash_max=2;record.appearance??=createHunterAppearance({alpha:!!record.alpha});}
  if(kind==='npc'){
   importActorAbilities(record,world.elements.asset_library.getResource('df:abilities').data,{default_id:role==='red_demon_dancer'?'fireball':null});
   for(const [old,key] of Object.entries({burstSize:'burst_size',burstDelay:'burst_delay_ticks',accuracyMod:'accuracy_mod'}))if(record[old]!=null){record[key]=record[old];delete record[old];}
@@ -21578,17 +21664,17 @@ function createActorPacket(world,{kind='npc',name='',role='civilian',position=[0
 return Object.freeze({get createActorPacket(){return createActorPacket;}});
 })();
 // src/levels/apartment.mjs
-const m46 = (()=>{
-const {validateMountedAttack} = m47;
-const {validateAttackState} = m48;
-const {abilityLoadout} = m33;
-const {importActorAbilities} = m32;
-const {registerGameEntityTypes} = m49;
+const m47 = (()=>{
+const {validateMountedAttack} = m48;
+const {validateAttackState} = m49;
+const {abilityLoadout} = m34;
+const {importActorAbilities} = m33;
+const {registerGameEntityTypes} = m50;
 const {physicsSystem} = m1;
-const {createApartmentAssetLibrary} = m69;
-const {resolveApartmentDefinition,resolveApartmentDyer} = m71;
-const {NPC,rosterRecord} = m55;
-const {createActorPacket} = m72;
+const {createApartmentAssetLibrary} = m71;
+const {resolveApartmentDefinition,resolveApartmentDyer} = m73;
+const {NPC,rosterRecord} = m56;
+const {createActorPacket} = m74;
 const {gameProp} = m1;
 class ApartmentDoor extends gameProp { static entity_type = 'df_apartment_door'; }
 
@@ -21652,7 +21738,7 @@ class ApartmentLevel {
 return Object.freeze({get ApartmentLevel(){return ApartmentLevel;}});
 })();
 // src/lobby/level-lobby.mjs
-const m74 = (()=>{
+const m76 = (()=>{
 // ===== LV1 LOBBY =====
 // The engine's game loop. The Lobby keeps the clock and nothing else: it knows when a frame is due,
 // how many fixed simulation steps that frame owes, and how far the drawn frame sits between two steps.
@@ -21789,7 +21875,7 @@ class levelLobby {
 return Object.freeze({get levelLobby(){return levelLobby;}});
 })();
 // src/runtime/game-level.mjs
-const m75 = (()=>{
+const m77 = (()=>{
 /** Content/lifecycle contract. A level never owns a world, clock or collision solver. */
 class gameLevel {
     constructor({ level_id } = {}) {
@@ -21809,7 +21895,7 @@ class gameLevel {
 return Object.freeze({get gameLevel(){return gameLevel;}});
 })();
 // src/basement/controls/values.mjs
-const m78 = (()=>{
+const m80 = (()=>{
 const TAP = 0;
 const DOUBLETAP = 1;
 const HELD = 2;
@@ -21833,7 +21919,7 @@ function radialStick(value, dead_zone = 0.15) {
 return Object.freeze({get TAP(){return TAP;},get DOUBLETAP(){return DOUBLETAP;},get HELD(){return HELD;},get PRESS(){return PRESS;},get REPEAT(){return REPEAT;},get RELEASE(){return RELEASE;},get cleanupAll(){return cleanupAll;},get radialStick(){return radialStick;}});
 })();
 // src/basement/controls/touch-stick.mjs
-const m80 = (()=>{
+const m82 = (()=>{
 class touchStick {
     constructor(system, name, packet) {
         Object.assign(this, { anchor: 'centre', base_radius: 0, travel: 40, scale: () => 1, edge: 0, ring: null, input: null, slots: null, mouse: false, free: () => !this.s.active, onStart() {}, onMove() {}, onEnd() {} }, packet);
@@ -21932,9 +22018,9 @@ class touchStick {
 return Object.freeze({get touchStick(){return touchStick;}});
 })();
 // src/basement/controls/devices.mjs
-const m79 = (()=>{
-const {touchStick} = m80;
-const {radialStick,cleanupAll} = m78;
+const m81 = (()=>{
+const {touchStick} = m82;
+const {radialStick,cleanupAll} = m80;
 
 /** Device state uses the terminology from the original Python input instances. */
 class inputInstance {
@@ -22053,10 +22139,10 @@ class gamepadInstance extends inputInstance {
 return Object.freeze({get inputInstance(){return inputInstance;},get keyboardInstance(){return keyboardInstance;},get mouseInstance(){return mouseInstance;},get touchInstance(){return touchInstance;},get gamepadInstance(){return gamepadInstance;}});
 })();
 // src/basement/controls/system.mjs
-const m77 = (()=>{
-const {TAP,DOUBLETAP,HELD,PRESS,REPEAT,RELEASE} = m78;
-const {radialStick,cleanupAll} = m78;
-const {keyboardInstance,mouseInstance,touchInstance,gamepadInstance} = m79;
+const m79 = (()=>{
+const {TAP,DOUBLETAP,HELD,PRESS,REPEAT,RELEASE} = m80;
+const {radialStick,cleanupAll} = m80;
+const {keyboardInstance,mouseInstance,touchInstance,gamepadInstance} = m81;
 
 class controlSystem {
     #listeners = new Set();
@@ -22294,16 +22380,16 @@ class controlSystem {
 return Object.freeze({get controlSystem(){return controlSystem;}});
 })();
 // src/basement/controls/index.mjs
-const m76 = (()=>{
+const m78 = (()=>{
 
 
 
 
 
-return Object.freeze({get controlSystem(){return m77.controlSystem;},get controlsSystem(){return m77.controlSystem;},get inputInstance(){return m79.inputInstance;},get keyboardInstance(){return m79.keyboardInstance;},get mouseInstance(){return m79.mouseInstance;},get touchInstance(){return m79.touchInstance;},get gamepadInstance(){return m79.gamepadInstance;},get touchStick(){return m80.touchStick;},get TAP(){return m78.TAP;},get DOUBLETAP(){return m78.DOUBLETAP;},get HELD(){return m78.HELD;},get PRESS(){return m78.PRESS;},get REPEAT(){return m78.REPEAT;},get RELEASE(){return m78.RELEASE;}});
+return Object.freeze({get controlSystem(){return m79.controlSystem;},get controlsSystem(){return m79.controlSystem;},get inputInstance(){return m81.inputInstance;},get keyboardInstance(){return m81.keyboardInstance;},get mouseInstance(){return m81.mouseInstance;},get touchInstance(){return m81.touchInstance;},get gamepadInstance(){return m81.gamepadInstance;},get touchStick(){return m82.touchStick;},get TAP(){return m80.TAP;},get DOUBLETAP(){return m80.DOUBLETAP;},get HELD(){return m80.HELD;},get PRESS(){return m80.PRESS;},get REPEAT(){return m80.REPEAT;},get RELEASE(){return m80.RELEASE;}});
 })();
 // src/basement/rendering/values.mjs
-const m83 = (()=>{
+const m85 = (()=>{
 function finite(value,name,min=-Infinity){if(!Number.isFinite(value)||value<min)throw new TypeError(`Invalid ${name}`);return value;}
 function vector(value,name='vector',out=[]){if(!Array.isArray(value)||value.length!==2)throw new TypeError(`Invalid ${name}`);out[0]=finite(value[0],name);out[1]=finite(value[1],name);return out;}
 function identifier(value){if(typeof value!=='string'||!value||value==='screen')throw new TypeError('A nonempty resource/renderer ID is required (screen is reserved)');return value;}
@@ -22320,8 +22406,8 @@ const BLENDS = Object.freeze({normal:'source-over',add:'lighter',multiply:'multi
 return Object.freeze({get finite(){return finite;},get vector(){return vector;},get identifier(){return identifier;},get matrix(){return matrix;},get inverse(){return inverse;},get point(){return point;},get transform(){return transform;},get viewport(){return viewport;},get freezeData(){return freezeData;},get color(){return color;},get BLENDS(){return BLENDS;}});
 })();
 // src/basement/rendering/camera.mjs
-const m82 = (()=>{
-const {finite,vector,viewport,inverse,point,freezeData} = m83;
+const m84 = (()=>{
+const {finite,vector,viewport,inverse,point,freezeData} = m85;
 
 /** View state only. Following reads native poses; this class never moves a body. */
 class cameraSystem {
@@ -22375,8 +22461,8 @@ class cameraSystem {
 return Object.freeze({get cameraSystem(){return cameraSystem;}});
 })();
 // src/basement/rendering/packets.mjs
-const m85 = (()=>{
-const {finite,vector,matrix,inverse,transform,color,identifier,BLENDS} = m83;
+const m87 = (()=>{
+const {finite,vector,matrix,inverse,transform,color,identifier,BLENDS} = m85;
 
 const geometryBuffers = new WeakMap();
 
@@ -22446,9 +22532,9 @@ function requirements(draw,resolve,result=[]){
 return Object.freeze({get geometry(){return geometry;},get material(){return material;},get packet(){return packet;},get requirements(){return requirements;}});
 })();
 // src/basement/rendering/frame.mjs
-const m84 = (()=>{
-const {packet} = m85;
-const {color,finite,freezeData} = m83;
+const m86 = (()=>{
+const {packet} = m87;
+const {color,finite,freezeData} = m85;
 
 /** Reused command buffers. Producers submit data; a backend borrows a completed frame. */
 class renderFrame {
@@ -22486,10 +22572,10 @@ class renderFrame {
 return Object.freeze({get renderFrame(){return renderFrame;}});
 })();
 // src/basement/rendering/system.mjs
-const m86 = (()=>{
-const {renderFrame} = m84;
-const {geometry,material,requirements} = m85;
-const {finite,identifier,freezeData} = m83;
+const m88 = (()=>{
+const {renderFrame} = m86;
+const {geometry,material,requirements} = m87;
+const {finite,identifier,freezeData} = m85;
 
 function normalizeResource(description){
     if(!description||typeof description!=='object')throw new TypeError('A data resource descriptor is required');
@@ -22578,8 +22664,8 @@ class renderSystem {
 return Object.freeze({get renderSystem(){return renderSystem;}});
 })();
 // src/basement/rendering/canvas.mjs
-const m87 = (()=>{
-const {BLENDS} = m83;
+const m89 = (()=>{
+const {BLENDS} = m85;
 
 function createSurface(width,height){
     if(typeof OffscreenCanvas!=='undefined')return new OffscreenCanvas(width,height);
@@ -22690,21 +22776,21 @@ class canvasRenderer {
 return Object.freeze({get canvasRenderer(){return canvasRenderer;}});
 })();
 // src/basement/rendering/index.mjs
-const m81 = (()=>{
+const m83 = (()=>{
 
 
 
 
 
-return Object.freeze({get cameraSystem(){return m82.cameraSystem;},get renderFrame(){return m84.renderFrame;},get renderSystem(){return m86.renderSystem;},get canvasRenderer(){return m87.canvasRenderer;}});
+return Object.freeze({get cameraSystem(){return m84.cameraSystem;},get renderFrame(){return m86.renderFrame;},get renderSystem(){return m88.renderSystem;},get canvasRenderer(){return m89.canvasRenderer;}});
 })();
 // src/runtime/game-engine.mjs
-const m73 = (()=>{
+const m75 = (()=>{
 const {physicsSystem,assetLibrary} = m1;
-const {levelLobby} = m74;
-const {gameLevel} = m75;
-const {controlSystem} = m76;
-const {cameraSystem,renderSystem} = m81;
+const {levelLobby} = m76;
+const {gameLevel} = m77;
+const {controlSystem} = m78;
+const {cameraSystem,renderSystem} = m83;
 
 const hooks = ['attach', 'detach', 'beforePhysics', 'afterPhysics', 'render', 'levelEntered', 'levelLeaving','gameplayPaused'];
 function synchronous(fn, receiver, args) {
@@ -22959,7 +23045,7 @@ class gameEngine {
 return Object.freeze({get gameEngine(){return gameEngine;}});
 })();
 // src/directory/weapon-appearance.mjs
-const m91 = (()=>{
+const m93 = (()=>{
 /* =====================================================================
    WEAPON MODELS — every gun as data: parts in the gun's own frame (+x down
    the barrel, the grip hand near 0,0, +y to the holder's right), each in a
@@ -23183,8 +23269,8 @@ function weaponModel(id) {
 return Object.freeze({get GUN_MATERIALS(){return GUN_MATERIALS;},get WEAPON_MODELS(){return WEAPON_MODELS;},get LASER_MODULE(){return LASER_MODULE;},get weaponModel(){return weaponModel;}});
 })();
 // src/directory/combat-profiles.mjs
-const m90 = (()=>{
-const {weaponModel} = m91;
+const m92 = (()=>{
+const {weaponModel} = m93;
 /** Shape authoring belongs with the visual assets. Runtime collision calculations stay in Basement. */
 function getCombatProfile(definition_id){
  const model=weaponModel(definition_id),edge=model.edge??[19.4,2.6];
@@ -23194,15 +23280,15 @@ function getCombatProfile(definition_id){
 return Object.freeze({get getCombatProfile(){return getCombatProfile;}});
 })();
 // src/gameplay/attacks/attack-system.mjs
-const m89 = (()=>{
-const attackRules = m38.default;
-const {getCombatProfile} = m90;
-const {prepareMountedAttack,mountedAttackState,validateMountedAttack} = m47;
-const combatRules = m37.default;
+const m91 = (()=>{
+const attackRules = m39.default;
+const {getCombatProfile} = m92;
+const {prepareMountedAttack,mountedAttackState,validateMountedAttack} = m48;
+const combatRules = m38.default;
 const {gameCharacter} = m1;
-const {actorItems} = m57;
-const {attackRegistry,validateAttackState} = m48;
-const {jsonCopy} = m34;
+const {actorItems} = m58;
+const {attackRegistry,validateAttackState} = m49;
+const {jsonCopy} = m35;
 
 /** Universal character attack entry point. Reuses existing execution, ownership and physics. */
 class attackSystem{
@@ -23255,6 +23341,7 @@ class attackSystem{
  #mountedLaunch(actor,definition,aim,options={}){
   if(!['firearm','ability'].includes(definition.attack_type))return {allowed:false,reason:'unsupported_mounted_attack'};
   const spell=definition.ability_id?this.#abilities.getLoadout(actor).getDefinition(definition.ability_id):null;
+  if(spell?.allow_mounted===false)return {allowed:false,reason:'unsupported_mounted_attack'};
   return this.#context.api.physics.getMountedLaunchState(actor,{...aim,local_position:spell?.local_position??getCombatProfile(definition.item_id).local_muzzle,collision_shape:{shape_type:'circle',radius:spell?.radius??combatRules.projectile.radius},...options});
  }
  getMountedAttackState(actor){this.#official(actor);return mountedAttackState(actor,this.getController(actor),this.#context.api.physics.getAttachmentState(actor));}
@@ -23317,10 +23404,10 @@ class attackSystem{
 return Object.freeze({get attackSystem(){return attackSystem;}});
 })();
 // src/gameplay/abilities/ability-system.mjs
-const m92 = (()=>{
+const m94 = (()=>{
 const {BODY_GROUP} = m1;
-const {actorAbilities} = m33;
-const {jsonCopy,nonnegative} = m34;
+const {actorAbilities} = m34;
+const {jsonCopy,nonnegative} = m35;
 
 /** Shared spell requests. The existing attack controller owns the single cooldown clock. */
 class abilitySystem{
@@ -23342,7 +23429,7 @@ class abilitySystem{
   if(context.engine?.phase==='render')throw new Error('Rendering cannot cast abilities');
   const loadout=this.getLoadout(actor);if(ability_id===undefined)ability_id=loadout.equipped_id;const controller=this.getAttackController(actor);
   if(!controller?.canExecute()||controller.quick_draw||actor.data.combat_state?.stagger_remaining>0||this.#policy.can_cast?.(actor,ability_id)===false||!ability_id||!loadout.hasAbility(ability_id))return false;
-  const definition=loadout.getDefinition(ability_id),spread=this.#policy.spread?.(actor,definition.spread)??definition.spread;nonnegative(spread,'ability spread');
+  const definition=loadout.getDefinition(ability_id);if(definition.allow_mounted===false&&context.api.physics.getAttachmentState(actor))return false;const spread=this.#policy.spread?.(actor,definition.spread)??definition.spread;nonnegative(spread,'ability spread');
   // Allow only aim keywords, never a caller-supplied physical packet or source/owner override.
   const {target,direction,angle}=jsonCopy(aim),projectile=context.api.physics.createProjectileFrom(actor,{template:'df:projectile',local_position:definition.local_position,...(target===undefined?{}:{target}),...(direction===undefined?{}:{direction}),...(angle===undefined?{}:{angle}),angle_offset:spread?((this.#policy.random??Math.random)()-.5)*spread:0,speed:definition.speed,lifetime:definition.lifetime,collision_shape:{shape_type:'circle',radius:definition.radius},collision_mask:BODY_GROUP.STATIC|BODY_GROUP.CHARACTER|BODY_GROUP.PROP|BODY_GROUP.VEHICLE,penetration_count:0,impact_strength:definition.impact_strength,data:{role:'projectile',ability_id,source_id:actor.entity_id,source_alliance:actor.alliance??actor.data.alliance??null,damage:definition.damage,damage_type:definition.damage_type,color:definition.color,flash_color:definition.flash_color,flash_radius:definition.flash_radius,visual_radius:definition.radius}});
   if(!projectile)return false;
@@ -23357,12 +23444,13 @@ class abilitySystem{
 return Object.freeze({get abilitySystem(){return abilitySystem;}});
 })();
 // src/gameplay/actors/actor-system.mjs
-const m93 = (()=>{
-const {gameActor} = m51;
-const {NPC} = m55;
-const {Ganger} = m60;
+const m95 = (()=>{
+const {gameActor} = m52;
+const {NPC} = m56;
+const {Hunter} = m61;
+const {Ganger} = m62;
 const {BODY_GROUP} = m1;
-const {createActorPacket} = m72;
+const {createActorPacket} = m74;
 
 /** Registered actor lifetimes and policy updates in the existing fixed step. No second world or index. */
 class actorSystem{
@@ -23374,7 +23462,7 @@ class actorSystem{
  #event(event,detail){const actor=this.#actors.get(detail.entity_id);if(event==='npc:hired'&&actor)this.#lifetime(actor,true);if(event==='npc:released'&&actor)this.#lifetime(actor,false);if(event==='actor:cooldown-requested'&&actor){this.#attacks.getController(actor)?.setCooldown(detail.seconds);delete actor.data.weapon_cooldown_seconds;}this.#session?.emit(event,detail);this.#policy.on_event?.(event,detail);if(event==='actor:inventory-loaded'){const actor=this.#actors.get(detail.entity_id);if(actor)this.#attacks.reconnectActor(actor);}}
  #track(actor){if(!(actor instanceof gameActor)||actor.entity_type==='df_player'||actor.destroyed||this.#actors.get(actor.entity_id)===actor)return;
   actor.connectActor({emit:(event,detail)=>this.#event(event,detail)});
-  if(actor instanceof NPC)actor.validateNPC();if(actor instanceof Ganger)actor.validateGanger();
+  if(actor instanceof NPC)actor.validateNPC();if(actor instanceof Hunter)actor.validateHunter();else if(actor instanceof Ganger)actor.validateGanger();
   if(actor instanceof NPC||actor instanceof Ganger){
    if(!actor.data.inventory?.order.length&&actor.data.weapon_definition_id){const item=actor.items.grantItem(actor.data.weapon_definition_id);actor.items.equipItem(item.instance_id);}
   }
@@ -23408,7 +23496,7 @@ class actorSystem{
 
 return Object.freeze({get actorSystem(){return actorSystem;}});
 })();
-const m94 = Object.freeze({default:{
+const m96 = Object.freeze({default:{
   "keymap": {
     "move_up":["w","ArrowUp"],"move_down":["s","ArrowDown"],"move_left":["a","ArrowLeft"],"move_right":["d","ArrowRight"],
     "fire":["mouseLeft","space","gamepadRTrigger","touchFire"],
@@ -23422,11 +23510,11 @@ const m94 = Object.freeze({default:{
   }
 }});
 // src/gameplay/game-session.mjs
-const m95 = (()=>{
-const {itemSystem} = m58;
-const {createItemCatalog} = m29;
-const itemRules = m59.default;
-const {identifier,jsonCopy,nonnegative} = m34;
+const m97 = (()=>{
+const {itemSystem} = m59;
+const {createItemCatalog} = m30;
+const itemRules = m60.default;
+const {identifier,jsonCopy,nonnegative} = m35;
 
 const recordNames = ['quests', 'roster', 'progression'];
 
@@ -23499,8 +23587,8 @@ class gameSession {
 return Object.freeze({get gameSession(){return gameSession;}});
 })();
 // src/gameplay/player-state-system.mjs
-const m96 = (()=>{
-const {nonnegative,jsonCopy} = m34;
+const m98 = (()=>{
+const {nonnegative,jsonCopy} = m35;
 
 /** Game rules only. The native entity/body remains the sole owner of physical state. */
 class PlayerStateSystem {
@@ -23555,7 +23643,7 @@ class PlayerStateSystem {
 return Object.freeze({get PlayerStateSystem(){return PlayerStateSystem;}});
 })();
 // src/gameplay/player-control-system.mjs
-const m97 = (()=>{
+const m99 = (()=>{
 /** Turns input terminology into native motor requests and gameplay intents. No physical math. */
 class PlayerControlSystem {
     #session; #state; #blocked = new Set(); #placement; #context = null;
@@ -23595,10 +23683,10 @@ class PlayerControlSystem {
 return Object.freeze({get PlayerControlSystem(){return PlayerControlSystem;}});
 })();
 // src/gameplay/combat/combat-system.mjs
-const m98 = (()=>{
-const rules = m37.default;
+const m100 = (()=>{
+const rules = m38.default;
 const {BODY_GROUP} = m1;
-const {nonnegative,jsonCopy} = m34;
+const {nonnegative,jsonCopy} = m35;
 
 const isCombatDead=entity=>!entity||entity.destroyed||entity.dead===true||entity.data?.state==='dead'||typeof entity.data?.health==='number'&&entity.data.health<=0;
 const stateFor=entity=>entity.data.combat_state??=( {bleed:null,orbs:[],stagger_remaining:0,boss_resist_remaining:0,slam:null} );
@@ -23662,9 +23750,9 @@ class combatSystem{
 return Object.freeze({get isCombatDead(){return isCombatDead;},get combatSystem(){return combatSystem;}});
 })();
 // src/gameplay/combat/melee-poses.mjs
-const m100 = (()=>{
+const m102 = (()=>{
 // Authored local animation poses, shared by presentation and native swept queries.
-const rules = m37.default;
+const rules = m38.default;
 const MELEE_SWING={duration:rules.blade.duration_seconds,windup:rules.blade.windup_seconds,cutEnd:rules.blade.cut_end_seconds};
 /* A long blade's swing (a model with swing: 'wide', Blood Pact): two hands on the grip, she
    winds the blade far back to one side, then sweeps it round in front of her in one wide arc
@@ -23738,13 +23826,13 @@ function sampleMeleeSwing(age, side, out = {}, secs = MELEE_SWING.duration, styl
 return Object.freeze({get MELEE_SWING(){return MELEE_SWING;},get WIDE_SWING(){return WIDE_SWING;},get sampleWideSwing(){return sampleWideSwing;},get wideGrip(){return wideGrip;},get swingPhases(){return swingPhases;},get sampleMeleeSwing(){return sampleMeleeSwing;}});
 })();
 // src/gameplay/combat/weapon-system.mjs
-const m99 = (()=>{
-const rules = m37.default;
-const {getCombatProfile} = m90;
+const m101 = (()=>{
+const rules = m38.default;
+const {getCombatProfile} = m92;
 const {BODY_GROUP} = m1;
-const {sampleMeleeSwing,swingPhases} = m100;
-const {isCombatDead} = m98;
-const {jsonCopy,nonnegative} = m34;
+const {sampleMeleeSwing,swingPhases} = m102;
+const {isCombatDead} = m100;
+const {jsonCopy,nonnegative} = m35;
 
 const stateFor=(player,settings=rules)=>player.data.weapon_state??={format_version:1,elapsed:0,cooldown:0,holstered:false,drawn_at:null,draw_shot_used:false,quick_draw:null,punch_side:'right',haymaker:false,combo:0,last_punch_at:-99,swing:null,side:1,shield:{charge:settings.mirror.shield,spent:false,since_hit:999}};
 /** One executable weapon policy. Native physics owns every trajectory, sweep, contact and impulse. */
@@ -23909,11 +23997,11 @@ class weaponSystem{
 return Object.freeze({get weaponSystem(){return weaponSystem;}});
 })();
 // src/gameplay/items/loot-system.mjs
-const m101 = (()=>{
-const {WorldLoot} = m61;
-const rules = m37.default;
+const m103 = (()=>{
+const {WorldLoot} = m63;
+const rules = m38.default;
 const {BODY_GROUP} = m1;
-const {jsonCopy,nonnegative} = m34;
+const {jsonCopy,nonnegative} = m35;
 
 /** World ownership and pickup policy. Placement, motion, bounds and proximity use the existing engine. */
 class lootSystem{
@@ -23963,39 +24051,37 @@ class lootSystem{
 return Object.freeze({get lootSystem(){return lootSystem;}});
 })();
 // src/directory/game-runtime.mjs
-const m88 = (()=>{
-const {attackSystem} = m89;
-const {createAttackCatalog} = m28;
-const {createAbilityCatalog} = m32;
-const {abilitySystem} = m92;
-const {actorSystem} = m93;
-const {registerGameEntityTypes} = m49;
-const {gameEngine} = m73;
-const {createApartmentAssetLibrary} = m69;
-const controlProfile = m94.default;
-const {gameSession} = m95;
-const {PlayerStateSystem} = m96;
-const {PlayerControlSystem} = m97;
-const {createItemCatalog} = m29;
-const playerRules = m40.default;
-const {combatSystem} = m98;
-const {weaponSystem} = m99;
-const {lootSystem} = m101;
-const {canvasRenderer} = m81;
+const m90 = (()=>{
+const {attackSystem} = m91;
+const {abilitySystem} = m94;
+const {actorSystem} = m95;
+const {registerGameEntityTypes} = m50;
+const {gameEngine} = m75;
+const {createApartmentAssetLibrary} = m71;
+const controlProfile = m96.default;
+const {gameSession} = m97;
+const {PlayerStateSystem} = m98;
+const {PlayerControlSystem} = m99;
+const playerRules = m41.default;
+const {combatSystem} = m100;
+const {weaponSystem} = m101;
+const {lootSystem} = m103;
+const {canvasRenderer} = m83;
 
 /** Explicit game composition. Importing this file never starts a second runtime. */
 function createGameRuntime({ game_db, surface, session_state, player, weapon_policy={}, combat_policy={}, actor_policy={}, ability_policy={}, ...options } = {}) {
-    const session=new gameSession({state:session_state,player,item_catalog:createItemCatalog(game_db?.items,{enemy_kinds:game_db?.enemies?.kinds})});
+    const asset_library=createApartmentAssetLibrary({game_db});
+    const session=new gameSession({state:session_state,player,item_catalog:asset_library.getResource('df:actor_items').data});
     const player_state=new PlayerStateSystem({session,rules:playerRules});
     const player_controls=new PlayerControlSystem({session,player_state,placement_bounds:context=>context.engine.active_level?.player_placement_bounds});
     const combat=new combatSystem({session,policy:{...combat_policy,incoming_multiplier:(target,type)=>(target===session.player&&weapons.guarding?.75:1)*(combat_policy.incoming_multiplier?.(target,type)??1)}});
     const weapons=new weaponSystem({session,items:session.items,combat,policy:weapon_policy,input_events:false});
     const abilities=new abilitySystem({weapons,combat,get_player:()=>session.player,policy:ability_policy});
-    const attacks=new attackSystem({weapons,abilities,combat,session,definitions:createAttackCatalog({items:createItemCatalog(game_db?.items,{enemy_kinds:game_db?.enemies?.kinds}),abilities:createAbilityCatalog(game_db?.progression?.abilities)})});
+    const attacks=new attackSystem({weapons,abilities,combat,session,definitions:asset_library.getResource('df:attacks').data});
     const actors=new actorSystem({attacks,combat,session,policy:actor_policy});
     const loot=new lootSystem({items:session.items,get_player:()=>session.player,on_event:(event,detail)=>session.emit(event,detail)});
     if(options.services && ['session','items','player_state','player_controls','combat','weapons','loot','actors','abilities','attacks'].some(key=>Object.hasOwn(options.services,key)))throw new TypeError('Directory owns player services');
-    const engine = new gameEngine({ ...options, services:{...options.services,session,items:session.items,player_state,player_controls,combat,weapons,loot,actors,abilities,attacks}, controls:{...controlProfile,...(surface?.addEventListener?{mouse_target:surface}:{}),...options.controls}, asset_library: createApartmentAssetLibrary({ game_db }) });
+    const engine = new gameEngine({ ...options, services:{...options.services,session,items:session.items,player_state,player_controls,combat,weapons,loot,actors,abilities,attacks}, controls:{...controlProfile,...(surface?.addEventListener?{mouse_target:surface}:{}),...options.controls}, asset_library });
     engine.api.render.registerRenderer('canvas',canvasRenderer);
     engine.registerSystem('surface-input',{
         attach(context){context.defer(context.api.render.onSurfaceChanged(({surface})=>context.api.controls.setMouseTarget(options.controls?.mouse_target??surface)));}
@@ -24014,8 +24100,8 @@ function createGameRuntime({ game_db, surface, session_state, player, weapon_pol
 return Object.freeze({get createGameRuntime(){return createGameRuntime;}});
 })();
 // src/presentation/weapon-appearance.mjs
-const m102 = (()=>{
-const {GUN_MATERIALS,WEAPON_MODELS,LASER_MODULE,weaponModel} = m91;
+const m104 = (()=>{
+const {GUN_MATERIALS,WEAPON_MODELS,LASER_MODULE,weaponModel} = m93;
 
 const polygon=points=>({type:'path',commands:[...points.map(([x,y],i)=>[i?'line':'move',x,y]),['close']]});
 function shape(part){
@@ -24098,8 +24184,8 @@ class weaponAppearance {
 return Object.freeze({get weaponAppearance(){return weaponAppearance;}});
 })();
 // src/directory/game-combat.mjs
-const m103 = (()=>{
-const data = m37.default;
+const m105 = (()=>{
+const data = m38.default;
 const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
 const COMBAT_RULES=freeze(structuredClone(data));
 
@@ -24160,7 +24246,10 @@ const m0 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get assetLibrary(){return m1.assetLibrary;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get createGameAssetLibrary(){return m27.createGameAssetLibrary;},get ApartmentLevel(){return m46.ApartmentLevel;},get APARTMENT_RULES(){return m69.APARTMENT_RULES;},get gameEngine(){return m73.gameEngine;},get gameLevel(){return m75.gameLevel;},get levelLobby(){return m74.levelLobby;},get createGameRuntime(){return m88.createGameRuntime;},get controlSystem(){return m76.controlSystem;},get controlsSystem(){return m76.controlsSystem;},get inputInstance(){return m76.inputInstance;},get keyboardInstance(){return m76.keyboardInstance;},get mouseInstance(){return m76.mouseInstance;},get touchInstance(){return m76.touchInstance;},get touchStick(){return m76.touchStick;},get gamepadInstance(){return m76.gamepadInstance;},get TAP(){return m76.TAP;},get DOUBLETAP(){return m76.DOUBLETAP;},get HELD(){return m76.HELD;},get PRESS(){return m76.PRESS;},get REPEAT(){return m76.REPEAT;},get RELEASE(){return m76.RELEASE;},get renderSystem(){return m81.renderSystem;},get renderFrame(){return m81.renderFrame;},get canvasRenderer(){return m81.canvasRenderer;},get cameraSystem(){return m81.cameraSystem;},get gameSession(){return m95.gameSession;},get PlayerStateSystem(){return m96.PlayerStateSystem;},get PlayerControlSystem(){return m97.PlayerControlSystem;},get Player(){return m50.Player;},get playerVitals(){return m53.playerVitals;},get itemSystem(){return m58.itemSystem;},get createItemCatalog(){return m29.createItemCatalog;},get GUN_MATERIALS(){return m91.GUN_MATERIALS;},get WEAPON_MODELS(){return m91.WEAPON_MODELS;},get LASER_MODULE(){return m91.LASER_MODULE;},get weaponModel(){return m91.weaponModel;},get weaponAppearance(){return m102.weaponAppearance;},get combatSystem(){return m98.combatSystem;},get weaponSystem(){return m99.weaponSystem;},get lootSystem(){return m101.lootSystem;},get WorldLoot(){return m61.WorldLoot;},get MELEE_SWING(){return m100.MELEE_SWING;},get WIDE_SWING(){return m100.WIDE_SWING;},get sampleMeleeSwing(){return m100.sampleMeleeSwing;},get sampleWideSwing(){return m100.sampleWideSwing;},get swingPhases(){return m100.swingPhases;},get wideGrip(){return m100.wideGrip;},get COMBAT_RULES(){return m103.COMBAT_RULES;},get registerGameEntityTypes(){return m49.registerGameEntityTypes;},get actorVitals(){return m52.actorVitals;},get gameActor(){return m51.gameActor;},get NPC(){return m55.NPC;},get rosterRecord(){return m55.rosterRecord;},get ROSTER_FIELDS(){return m55.ROSTER_FIELDS;},get Ganger(){return m60.Ganger;},get actorSystem(){return m93.actorSystem;},get actorItems(){return m57.actorItems;},get restoreActorItems(){return m57.restoreActorItems;},get resolveEmoteLines(){return m56.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m56.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m33.abilityLoadout;},get actorAbilities(){return m33.actorAbilities;},get abilitySystem(){return m92.abilitySystem;},get createAbilityCatalog(){return m32.createAbilityCatalog;},get importActorAbilities(){return m32.importActorAbilities;},get attackRegistry(){return m48.attackRegistry;},get validateAttackState(){return m48.validateAttackState;},get attackSystem(){return m89.attackSystem;},get createAttackCatalog(){return m28.createAttackCatalog;},get validateMountedAttack(){return m47.validateMountedAttack;},get TrafficVehicle(){return m62.TrafficVehicle;},get createGameVehicle(){return m62.createGameVehicle;}});
+
+
+
+return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get assetLibrary(){return m1.assetLibrary;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get createGameAssetLibrary(){return m27.createGameAssetLibrary;},get ApartmentLevel(){return m47.ApartmentLevel;},get APARTMENT_RULES(){return m71.APARTMENT_RULES;},get gameEngine(){return m75.gameEngine;},get gameLevel(){return m77.gameLevel;},get levelLobby(){return m76.levelLobby;},get createGameRuntime(){return m90.createGameRuntime;},get controlSystem(){return m78.controlSystem;},get controlsSystem(){return m78.controlsSystem;},get inputInstance(){return m78.inputInstance;},get keyboardInstance(){return m78.keyboardInstance;},get mouseInstance(){return m78.mouseInstance;},get touchInstance(){return m78.touchInstance;},get touchStick(){return m78.touchStick;},get gamepadInstance(){return m78.gamepadInstance;},get TAP(){return m78.TAP;},get DOUBLETAP(){return m78.DOUBLETAP;},get HELD(){return m78.HELD;},get PRESS(){return m78.PRESS;},get REPEAT(){return m78.REPEAT;},get RELEASE(){return m78.RELEASE;},get renderSystem(){return m83.renderSystem;},get renderFrame(){return m83.renderFrame;},get canvasRenderer(){return m83.canvasRenderer;},get cameraSystem(){return m83.cameraSystem;},get gameSession(){return m97.gameSession;},get PlayerStateSystem(){return m98.PlayerStateSystem;},get PlayerControlSystem(){return m99.PlayerControlSystem;},get Player(){return m51.Player;},get playerVitals(){return m54.playerVitals;},get itemSystem(){return m59.itemSystem;},get createItemCatalog(){return m30.createItemCatalog;},get GUN_MATERIALS(){return m93.GUN_MATERIALS;},get WEAPON_MODELS(){return m93.WEAPON_MODELS;},get LASER_MODULE(){return m93.LASER_MODULE;},get weaponModel(){return m93.weaponModel;},get weaponAppearance(){return m104.weaponAppearance;},get combatSystem(){return m100.combatSystem;},get weaponSystem(){return m101.weaponSystem;},get lootSystem(){return m103.lootSystem;},get WorldLoot(){return m63.WorldLoot;},get MELEE_SWING(){return m102.MELEE_SWING;},get WIDE_SWING(){return m102.WIDE_SWING;},get sampleMeleeSwing(){return m102.sampleMeleeSwing;},get sampleWideSwing(){return m102.sampleWideSwing;},get swingPhases(){return m102.swingPhases;},get wideGrip(){return m102.wideGrip;},get COMBAT_RULES(){return m105.COMBAT_RULES;},get registerGameEntityTypes(){return m50.registerGameEntityTypes;},get actorVitals(){return m53.actorVitals;},get gameActor(){return m52.gameActor;},get NPC(){return m56.NPC;},get rosterRecord(){return m56.rosterRecord;},get ROSTER_FIELDS(){return m56.ROSTER_FIELDS;},get Ganger(){return m62.Ganger;},get actorSystem(){return m95.actorSystem;},get actorItems(){return m58.actorItems;},get restoreActorItems(){return m58.restoreActorItems;},get resolveEmoteLines(){return m57.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m57.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m34.abilityLoadout;},get actorAbilities(){return m34.actorAbilities;},get abilitySystem(){return m94.abilitySystem;},get createAbilityCatalog(){return m33.createAbilityCatalog;},get importActorAbilities(){return m33.importActorAbilities;},get attackRegistry(){return m49.attackRegistry;},get validateAttackState(){return m49.validateAttackState;},get attackSystem(){return m91.attackSystem;},get createAttackCatalog(){return m29.createAttackCatalog;},get validateMountedAttack(){return m48.validateMountedAttack;},get TrafficVehicle(){return m64.TrafficVehicle;},get createGameVehicle(){return m64.createGameVehicle;},get Hunter(){return m61.Hunter;},get createHunterAppearance(){return m28.createHunterAppearance;}});
 })();
 return m0;
 })();
@@ -48126,7 +48215,7 @@ class FurnitureSystem {
         }
 
     </script>
-    <script type="text/dfab" data-src="entities/hunters.js" data-cost="291">
+    <script type="text/dfab" data-src="entities/hunters.js" data-cost="284">
         /* =====================================================================
            HUNTERS — the Demoness's own (the Demoness Palace gauntlet)
            ---------------------------------------------------------------------
@@ -48170,14 +48259,7 @@ class FurnitureSystem {
             }
 
             static makeLook(alpha) {
-                const r = Math.random;
-                return {
-                    gender: r() < 0.5 ? 'female' : 'male', skinColor: ['#3a1a1a', '#5a2a24', '#2a1414', '#6a3a30'][r() * 4 | 0], eyeColor: '#ff5a1a', blood: 'ink',
-                    build: alpha ? 'broad' : r() < 0.5 ? 'athletic' : 'slim', height: alpha ? 1.08 : 0.98 + r() * 0.06,
-                    top: { type: 'coat', color: alpha ? '#2a0610' : '#120a0e', inner: '#2a0a12', trim: alpha ? '#e3a64a' : '#7a0618' },
-                    bottom: { type: 'leggings', color: '#0c0608' }, shoes: { type: 'boots', color: '#0a0406' },
-                    hat: { type: 'hood_up', color: alpha ? '#3a0614' : '#1a0a10' }
-                };
+                return DFNative.createHunterAppearance({ alpha });
             }
 
             update(player, walls, buildings, markers, traffic, map, enemies) {

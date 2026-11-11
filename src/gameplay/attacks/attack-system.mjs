@@ -58,6 +58,7 @@ export class attackSystem{
  #mountedLaunch(actor,definition,aim,options={}){
   if(!['firearm','ability'].includes(definition.attack_type))return {allowed:false,reason:'unsupported_mounted_attack'};
   const spell=definition.ability_id?this.#abilities.getLoadout(actor).getDefinition(definition.ability_id):null;
+  if(spell?.allow_mounted===false)return {allowed:false,reason:'unsupported_mounted_attack'};
   return this.#context.api.physics.getMountedLaunchState(actor,{...aim,local_position:spell?.local_position??getCombatProfile(definition.item_id).local_muzzle,collision_shape:{shape_type:'circle',radius:spell?.radius??combatRules.projectile.radius},...options});
  }
  getMountedAttackState(actor){this.#official(actor);return mountedAttackState(actor,this.getController(actor),this.#context.api.physics.getAttachmentState(actor));}

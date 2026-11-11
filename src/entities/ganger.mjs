@@ -6,6 +6,8 @@ const stateFor=actor=>actor.data.ganger_state??={format_version:1,state:'IDLE',s
 /** Native stealth/combat policy. Awareness, leading, pathing and contact response stay in Basement. */
 export class Ganger extends gameActor{
  static entity_type='df_ganger';
+ get ignoresConcealment(){return false;}
+ get minimumVisibility(){return 0;}
  get items(){return actorItems(this.data,`actor:${this.entity_id}`,this.getAsset('items').data);}
  get state(){return stateFor(this).state;}
  get suspicion(){return stateFor(this).suspicion;}
@@ -21,10 +23,10 @@ export class Ganger extends gameActor{
   const state=stateFor(this),rules=this.getAsset('actor_rules').data.ganger,world=this.physics_system;
   for(const key of ['drain_remaining','suppression_remaining','wander_remaining','interrupt_remaining','resistance_remaining','shot_delay'])state[key]=Math.max(0,state[key]-seconds);
   const view=player&&!player.dead?world.observeTarget(this,player,{near_range:this.data.vision_range,fov:rules.vision_fov,personal_space:rules.personal_space,touch_distance:rules.touch_distance}):null;
-  const hidden=!player||player.visible===false||player.isHidden;const sneaking=view?.behind&&!!player?.sneaking;
+  const hidden=!player||player.visible===false||player.isHidden&&!this.ignoresConcealment;const sneaking=view?.behind&&!!player?.sneaking;
   const sees=!!view&&!hidden&&view.line_clear&&(view.touching||view.close&&!sneaking||view.in_range&&view.in_cone);
   const previous=state.state;
-  if(sees){state.investigate_position=[...view.position];state.search_positions=[];state.search_elapsed=0;state.drain_remaining=rules.suspicion_decay_delay;state.suspicion=Math.min(100,state.suspicion+(view.close?rules.suspicion_near_per_second:Math.max(.1,1-view.distance/this.data.vision_range)*Math.max(.1,visibility)*rules.suspicion_sight_per_second)*seconds);if(view.touching&&!state.bumped){state.suspicion=Math.max(state.suspicion,70);state.bumped=true;this.emitActor('ganger:bumped');}}
+  if(sees){state.investigate_position=[...view.position];state.search_positions=[];state.search_elapsed=0;state.drain_remaining=rules.suspicion_decay_delay;state.suspicion=Math.min(100,state.suspicion+(view.close?rules.suspicion_near_per_second:Math.max(.1,1-view.distance/this.data.vision_range)*Math.max(.1,this.minimumVisibility,visibility)*rules.suspicion_sight_per_second)*seconds);if(view.touching&&!state.bumped){state.suspicion=Math.max(state.suspicion,70);state.bumped=true;this.emitActor('ganger:bumped');}}
   else{if(!view?.touching)state.bumped=false;if(!state.drain_remaining&&state.state!=='SUPPRESSING')state.suspicion=Math.max(0,state.suspicion-(state.state==='SEARCHING'?rules.suspicion_search_drain_per_second:rules.suspicion_idle_drain_per_second)*seconds);}
   if(sees&&state.suspicion>=100)this.setBehavior('ALERT');else if(previous==='ALERT'&&!sees&&state.investigate_position){this.setBehavior('SUPPRESSING');state.suppression_remaining=rules.suppression_seconds;this.emitActor('ganger:last-known',{position:state.investigate_position});}
   else if(!['ALERT','SUPPRESSING','SEARCHING'].includes(state.state))this.setBehavior(state.suspicion>0?'SUSPICIOUS':'IDLE');

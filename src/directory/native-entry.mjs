@@ -50,3 +50,6 @@ export {createAttackCatalog} from './game-attacks.mjs';
 export {validateMountedAttack} from '../gameplay/attacks/mounted-attacks.mjs';
 
 export {TrafficVehicle,createGameVehicle} from './game-street.mjs';
+
+export {Hunter} from '../entities/hunter.mjs';
+export {createHunterAppearance} from './game-hunters.mjs';

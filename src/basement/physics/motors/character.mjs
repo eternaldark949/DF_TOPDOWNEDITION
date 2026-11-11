@@ -31,6 +31,18 @@ export class characterMotor {
         if(length(heading)<=EPS)return null;
         return this.teleportTo(add(r.position, scale(unit(heading), distance)), options);
     }
+    /** Target-relative blink with a swept path and checked landing, all in engine space. */
+    teleportToward(target, { stop_distance = 0, min_distance = 0, ...options } = {}) {
+        number(stop_distance, 'stop_distance', 0); number(min_distance, 'min_distance', 0);
+        const r = bodyRecord(this.body), delta = sub(referencePosition(r.world, target), r.position);
+        const travel = length(delta) - stop_distance;
+        if (travel <= EPS || travel < min_distance || r.parent_mount) return null;
+        const to = add(r.position, scale(unit(delta), travel));
+        const path = r.world.getPathClearance({ ...options, body:this.body, from:r.position, to, include_ghosts:false });
+        if (!path.clear) return null;
+        // A clear endpoint alone must never allow blinking through a wall.
+        return this.teleportTo(to, { ...options, placement_mode:'clear', min_distance });
+    }
     dashTo(position, options = {}) { return this.moveTo(position, { ...options, speed: options.speed ?? this.config.max_speed * 3, direct: true }); }
     teleportTo(position, options = {}) {
         const world = bodyRecord(this.body).world;
@@ -45,8 +57,9 @@ export class characterMotor {
     stopMovement() { return this._request(() => { this.intent = null; this.path = null; if (!bodyRecord(this.body).parent_mount) this.body.stopMovement(); }); }
     cancelMovement() {if(!this.intent&&!this.path&&bodyRecord(this.body).world._canReuseMotorRequest())return this;return this._request(() => { this.intent = null; this.path = null; }); }
     suspendMovement(seconds) { number(seconds, 'seconds', 0); return this._request(() => { this.suspended_for = seconds; }); }
-    evadeBody(threat, { distance = 50, speed = this.config.max_speed * 2, min_distance = 4 } = {}) {
+    evadeBody(threat, { distance = 50, speed = this.config.max_speed * 2, min_distance = 4, teleport = false } = {}) {
         number(distance, 'distance', 0); number(speed, 'speed', EPS); number(min_distance, 'min_distance', 0);
+        if (typeof teleport !== 'boolean') throw new TypeError('teleport must be boolean');
         const r = bodyRecord(this.body), other = r.world._record(referenceBody(threat));
         const forward = length(other.velocity) > EPS ? unit(other.velocity) : [Math.cos(other.rotation), Math.sin(other.rotation)];
         const side = [-forward[1], forward[0]], delta = sub(r.position, other.position), sign = delta[0] * side[0] + delta[1] * side[1] >= 0 ? 1 : -1;
@@ -55,7 +68,8 @@ export class characterMotor {
             const clearance = r.world.getPathClearance({ body: this.body, from: r.position, to, include_ghosts: false });
             const travel = Math.min(distance, Math.max(0, clearance.distance - 1e-3));
             if (travel < min_distance) continue;
-            return this.dashTo(add(r.position, scale(side, travel * direction)), { speed });
+            const landing = add(r.position, scale(side, travel * direction));
+            return teleport ? this.teleportTo(landing) : this.dashTo(landing, { speed });
         }
         return null;
     }

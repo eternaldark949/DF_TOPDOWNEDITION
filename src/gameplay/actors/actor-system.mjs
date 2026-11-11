@@ -1,5 +1,6 @@
 import {gameActor} from '../../entities/game-actor.mjs';
 import {NPC} from '../../entities/npc.mjs';
+import {Hunter} from '../../entities/hunter.mjs';
 import {Ganger} from '../../entities/ganger.mjs';
 import {BODY_GROUP} from '../../basement/physics/index.mjs';
 import {createActorPacket} from '../../directory/game-actor-factory.mjs';
@@ -14,7 +15,7 @@ export class actorSystem{
  #event(event,detail){const actor=this.#actors.get(detail.entity_id);if(event==='npc:hired'&&actor)this.#lifetime(actor,true);if(event==='npc:released'&&actor)this.#lifetime(actor,false);if(event==='actor:cooldown-requested'&&actor){this.#attacks.getController(actor)?.setCooldown(detail.seconds);delete actor.data.weapon_cooldown_seconds;}this.#session?.emit(event,detail);this.#policy.on_event?.(event,detail);if(event==='actor:inventory-loaded'){const actor=this.#actors.get(detail.entity_id);if(actor)this.#attacks.reconnectActor(actor);}}
  #track(actor){if(!(actor instanceof gameActor)||actor.entity_type==='df_player'||actor.destroyed||this.#actors.get(actor.entity_id)===actor)return;
   actor.connectActor({emit:(event,detail)=>this.#event(event,detail)});
-  if(actor instanceof NPC)actor.validateNPC();if(actor instanceof Ganger)actor.validateGanger();
+  if(actor instanceof NPC)actor.validateNPC();if(actor instanceof Hunter)actor.validateHunter();else if(actor instanceof Ganger)actor.validateGanger();
   if(actor instanceof NPC||actor instanceof Ganger){
    if(!actor.data.inventory?.order.length&&actor.data.weapon_definition_id){const item=actor.items.grantItem(actor.data.weapon_definition_id);actor.items.equipItem(item.instance_id);}
   }

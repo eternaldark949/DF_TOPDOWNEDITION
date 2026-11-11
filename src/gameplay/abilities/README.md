@@ -100,10 +100,16 @@ Remaining companion work: broader tactical formation/room policy; full humanoid 
 
 `abilityPresentation.render(context,blend,frame)` reads visible official spell projectiles through the renderer's shared query and submits shape/glow packets. The runtime example installs it. `combatPresentation` skips these spell bodies to prevent double drawing. The classic apartment's existing separate projectile artist reads the same color/radius metadata; its full Canvas-to-packet conversion is still tracked separately. Entity and ability classes contain no Canvas calls.
 
-Tests: `node --test tools/test-ability-systems.mjs`, `node tools/test-ability-callers.cjs`, `python tools/test-abilities-browser.py`. They cover all three definitions, ownership/invalid saves, native targeting, single damage, readiness/cooldown sharing, queue cancellation, snapshots, real production save/transitions and actual Chromium pixels with stable physics during drawing. Basement's actor-support suite also covers saving immediately after removal of a motor's target: snapshots drop stale references without mutating live motor commands.
+Tests: `node --test tools/test-ability-systems.mjs`, `node tools/test-ability-callers.cjs`, `python tools/test-abilities-browser.py`. They cover the three progression definitions, ownership/invalid saves, native targeting, single damage, readiness/cooldown sharing, queue cancellation, snapshots, real production save/transitions and actual Chromium pixels with stable physics during drawing. Basement's actor-support suite also covers saving immediately after removal of a motor's target: snapshots drop stale references without mutating live motor commands.
 
 ## Universal attack registration
 
 Abilities are now registered alongside firearm and melee attacks through [attackRegistry and attackSystem](../attacks/README.md). For ordinary player/actor input, select `ability:fireball` and call `api.attacks.requestAttack(actor, aim)`. Player input and native NPC/Ganger callers use that shared entry point. The lower `abilitySystem` remains the executor and compatibility API. Plain gameCharacter subclasses are connected automatically; the service no longer requires a particular actor subclass to provide an items property.
 
 Mounted firearms and abilities now share native aperture/arc/clearance and velocity-inheritance requests. Preparation uses the existing attack clock. See [mounted attacks](../attacks/MOUNTED-ATTACKS.md). Direct lower-level casting remains an execution API and does not run the universal service’s aim-preparation policy.
+
+## Learned Hunter claw
+
+The catalog also contains `hunter_claw`, normalized from `game-db/enemies.json` by `game-hunters.mjs`. This is a close-contact capability available to every character that learns it, including Player. It uses the same native projectile sweep/contact path with melee damage, a transparent radius-18 forward hit volume, .05-second lifetime and .75-second shared cooldown. `allow_mounted:false` is checked by both shared attacks and direct ability casting. Damage/reach come from Hunter authoring; hits never spawn at a chosen target position. See [Hunter ownership and pending classic callers](../actors/README.md#hunter-the-first-specialized-hostile-conversion).
+
+`createAbilityCatalog(definitions=progression.abilities,{hunter_kind=enemies.kinds.hunter}={})` accepts an explicit Hunter authoring record when composing a custom Directory. The runtime consumes its resolved `df:abilities` / `df:attacks` resources rather than reconstructing a separate catalog.

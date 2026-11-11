@@ -41,14 +41,7 @@
             }
 
             static makeLook(alpha) {
-                const r = Math.random;
-                return {
-                    gender: r() < 0.5 ? 'female' : 'male', skinColor: ['#3a1a1a', '#5a2a24', '#2a1414', '#6a3a30'][r() * 4 | 0], eyeColor: '#ff5a1a', blood: 'ink',
-                    build: alpha ? 'broad' : r() < 0.5 ? 'athletic' : 'slim', height: alpha ? 1.08 : 0.98 + r() * 0.06,
-                    top: { type: 'coat', color: alpha ? '#2a0610' : '#120a0e', inner: '#2a0a12', trim: alpha ? '#e3a64a' : '#7a0618' },
-                    bottom: { type: 'leggings', color: '#0c0608' }, shoes: { type: 'boots', color: '#0a0406' },
-                    hat: { type: 'hood_up', color: alpha ? '#3a0614' : '#1a0a10' }
-                };
+                return DFNative.createHunterAppearance({ alpha });
             }
 
             update(player, walls, buildings, markers, traffic, map, enemies) {

@@ -1,3 +1,4 @@
+import {createHunterRules} from './game-hunters.mjs';
 import {createAttackCatalog} from './game-attacks.mjs';
 import progression from './game-db/progression.json' with {type:'json'};
 import {createAbilityCatalog} from './game-abilities.mjs';
@@ -25,12 +26,14 @@ export function createGameAssetLibrary({ game_db = { cast, vehicles, enemies, pl
         }
         resource.data = data;
     }
-    definition.resources.abilities={kind:'ability_catalog',data:createAbilityCatalog(game_db.progression?.abilities??progression.abilities)};
-    definition.resources.actor_rules={kind:'actor_rules',data:actorRules};
+    definition.resources.abilities={kind:'ability_catalog',data:createAbilityCatalog(game_db.progression?.abilities??progression.abilities,{hunter_kind:game_db.enemies.kinds.hunter})};
+    definition.resources.actor_rules={kind:'actor_rules',data:{...actorRules,hunter:createHunterRules(game_db.enemies.kinds.hunter)}};
     definition.resources.actor_items={kind:'item_catalog',data:createItemCatalog(game_db.items,{enemy_kinds:game_db.enemies.kinds})};
     definition.resources.actor_appearances={kind:'appearance_catalog',data:game_db.cast.appearances};
     definition.resources.attacks={kind:'attack_catalog',data:createAttackCatalog({items:definition.resources.actor_items.data,abilities:definition.resources.abilities.data})};
     const ganger=game_db.enemies.kinds.ganger;Object.assign(definition.templates.ganger,{mass:ganger.mass,collision_shape:{shape_type:'circle',radius:ganger.radius}});
     Object.assign(definition.templates.ganger.data,{health:ganger.hp,max_health:ganger.hp,move_speed:ganger.speed*60,damage_grace_seconds:ganger.invincible_frames/60,vision_range:ganger.vision_range,telegraph_seconds:ganger.telegraph_frames/60});
+    const hunter=game_db.enemies.kinds.hunter;
+    definition.templates.hunter={extends:'ganger',entity_type:'df_hunter',tags:['enemy','hunter'],data:{health:hunter.hp,max_health:hunter.hp,move_speed:hunter.speed*60,vision_range:hunter.vision_range,weapon_definition_id:hunter.weapon,dash_max:hunter.dashes,dash_cooldown:hunter.dash_cd/60,abilities:{format_version:1,known_ids:['hunter_claw'],equipped_id:null}}};
     return new assetLibrary({ libraries: [definition, streetDefinitions] });
 }

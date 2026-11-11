@@ -26,10 +26,12 @@ try:
   }''')
   assert report=={'actors':2,'body':True,'weapon':'pistol_fpx'},report
   page.wait_for_function("actorCheck.enemy.hp<10000 && actorCheck.enemy.state==='ALERT'")
+  page.evaluate('''()=>{const api=runtimeExample.engine.api,p=runtimeExample.player;const hunter=api.actors.spawn({kind:'hunter',name:'Hunter Alpha',position:[p.position[0],p.position[1]+250],rotation:-Math.PI/2,data:{alpha:true,health:10000,max_health:10000}});hunter.setBehavior('ALERT');hunter.hunter_state.dash_remaining=0;actorCheck.hunter=hunter;actorCheck.hunterDashes=0;api.session.on('hunter:dashed',()=>actorCheck.hunterDashes++);}''')
+  page.wait_for_function('actorCheck.hunterDashes>0')
   stable=page.evaluate('''()=>{const e=runtimeExample.engine;globalThis.resumeActors=e.pause('actor-test');const before=JSON.stringify(e.api.physics.savePhysicsState());for(let i=0;i<4;i++)e.render(.5);return before===JSON.stringify(e.api.physics.savePhysicsState());}''')
   assert stable
-  result=page.evaluate('''async()=>{resumeActors();const e=runtimeExample.engine;await e.loadLevel('room_b');return {retained:e.api.elements.fetchEntity(actorCheck.ally.entity_id)===actorCheck.ally,sameBody:actorCheck.ally.body===actorCheck.body,sameGrid:e.api.physics.spatial_grid===actorCheck.grid,enemyRetired:actorCheck.enemy.destroyed,controllers:e.api.actors.getActors().length};}''')
-  assert result=={'retained':True,'sameBody':True,'sameGrid':True,'enemyRetired':True,'controllers':1},result
+  result=page.evaluate('''async()=>{resumeActors();const e=runtimeExample.engine;await e.loadLevel('room_b');return {retained:e.api.elements.fetchEntity(actorCheck.ally.entity_id)===actorCheck.ally,sameBody:actorCheck.ally.body===actorCheck.body,sameGrid:e.api.physics.spatial_grid===actorCheck.grid,enemyRetired:actorCheck.enemy.destroyed,hunterRetired:actorCheck.hunter.destroyed,controllers:e.api.actors.getActors().length};}''')
+  assert result=={'retained':True,'sameBody':True,'sameGrid':True,'enemyRetired':True,'hunterRetired':True,'controllers':1},result
   page.evaluate('runtimeExample.engine.dispose()');assert not errors,errors
   print(json.dumps({'initial':report,'renderStable':stable,'transition':result,'errors':errors},indent=2));browser.close()
 finally:server.shutdown();server.server_close()

@@ -1,10 +1,12 @@
+import {createHunterAppearance} from './game-hunters.mjs';
 import {validateAttackState} from '../gameplay/attacks/attack-registry.mjs';
 import {importActorAbilities} from './game-abilities.mjs';
 import {jsonCopy} from '../gameplay/values.mjs';
 /** Definitions and explicit old-roster import live in Directory, never in physics. */
 export function createActorPacket(world,{kind='npc',name='',role='civilian',position=[0,0],rotation=0,data={},...packet}={}){
- if(!['npc','ganger','actor'].includes(kind))throw new TypeError('Unknown actor kind');const record=jsonCopy(data);
+ if(!['npc','ganger','hunter','actor'].includes(kind))throw new TypeError('Unknown actor kind');const record=jsonCopy(data);
  if(record.attackSelection!=null)record.attack_state=validateAttackState(record.attackSelection,()=>true);delete record.attackSelection;
+ if(kind==='hunter'){if(record.alpha&&record.dash_max===undefined)record.dash_max=2;record.appearance??=createHunterAppearance({alpha:!!record.alpha});}
  if(kind==='npc'){
   importActorAbilities(record,world.elements.asset_library.getResource('df:abilities').data,{default_id:role==='red_demon_dancer'?'fireball':null});
   for(const [old,key] of Object.entries({burstSize:'burst_size',burstDelay:'burst_delay_ticks',accuracyMod:'accuracy_mod'}))if(record[old]!=null){record[key]=record[old];delete record[old];}
