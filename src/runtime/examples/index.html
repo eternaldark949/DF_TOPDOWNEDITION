@@ -6,6 +6,7 @@
 <canvas id="scene" width="640" height="360"></canvas>
 <label>Weapon <select id="weapon"><option value="">Bare hands</option></select></label> <button id="drop">Drop equipped weapon</button><button id="quick">Quick draw</button>
 <button id="learn-abilities">Learn demo abilities</button><label>Attack <select id="attack"><option value="">Automatic</option></select></label>
+<button id="mounted-demo">Mounted combat demo</button><button id="leave-seat">Exit seat</button>
 <button id="switch">Change room</button><button id="pause">Pause</button><pre id="status"></pre>
 <div id="touch-move" style="width:110px;height:110px;border:1px solid #64748b;touch-action:none;display:inline-block">Move</div>
 <div id="touch-aim" style="width:110px;height:110px;border:1px solid #64748b;touch-action:none;display:inline-block">Aim</div>
@@ -14,6 +15,7 @@
 import {abilityPresentation} from '../../presentation/ability-presentation.mjs';
 import {actorPresentation} from '../../presentation/actor-presentation.mjs';
 import {installCombatPresentation} from '../../presentation/combat-presentation.mjs';
+import {createGameVehicle} from '../../directory/game-vehicle-factory.mjs';
 import { createRuntimeExample } from '../../directory/runtime-example.mjs';
 const status=document.getElementById('status');
 const surface=document.getElementById('scene');
@@ -36,6 +38,9 @@ for(const event of ['items:acquired','items:removed','items:equipped','items:une
 refreshAttacks();
 document.getElementById('drop').onclick=()=>{const item=engine.api.items.getEquippedWeapon();if(item)engine.api.loot.dropItem(item.instance_id);};
 document.getElementById('quick').onclick=()=>engine.api.weapons.armQuickDraw();
+let mountedDemo=null;
+document.getElementById('mounted-demo').onclick=()=>{if(mountedDemo&&!mountedDemo.destroyed)return;const car=createGameVehicle(engine.api.physics,{purpose:'owned',control_mode:'PLAYER',position:[220,120]});if(!car){status.textContent='Move away from the demo parking space and try again.';return;}const companion=engine.api.actors.spawn({kind:'npc',name:'Victoria',role:'teammate',position:[160,120],data:{recruited:true,hireType:'permanent',weapon_definition_id:'pistol_fpx',accuracy_mod:0}});engine.api.actors.spawn({kind:'actor',name:'Practice target',position:[240,310],data:{health:1000,max_health:1000,alliance:'hostile'}});car.assignDriver(player);car.assignPassenger(companion,{combine_mass:true});mountedDemo=car;};
+document.getElementById('leave-seat').onclick=()=>mountedDemo&&!mountedDemo.destroyed&&mountedDemo.releasePassenger(player);
 const report=()=>{status.textContent=JSON.stringify({level:engine.active_level?.level_id,player_id:player.entity_id,tick:engine.api.physics.simulation_tick,bodies:engine.api.physics.getStatistics().bodies,paused:engine.paused},null,2);};
 engine.registerSystem('status',{render:report});
 document.getElementById('switch').onclick=async()=>{try{await engine.loadLevel(engine.active_level.level_id==='room_a'?'room_b':'room_a');}catch(error){status.textContent=error.stack;console.error(error);}};

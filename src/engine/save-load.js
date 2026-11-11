@@ -506,6 +506,7 @@ engineMixin({
                     const attackCatalog=DFNative.createAttackCatalog({items:DFNative.createItemCatalog(GAME_DB.items),abilities:abilityCatalog});
                     for(const record of [playerData,...(save.teammates??[]),...(worldData.nativeLevel?.physics?.entities??[]).filter(entry=>entry.entity_type==='df_npc'||entry.entity_type==='df_player'||entry.data?.attack_state||entry.data?.abilities).map(entry=>entry.data)]){
                         DFNative.importActorAbilities(structuredClone(record),abilityCatalog,{default_id:record.role==='red_demon_dancer'?'fireball':null});
+                        DFNative.validateMountedAttack(record.mounted_attack_state);
                         if(record.attackSelection??record.attack_state)DFNative.validateAttackState(record.attackSelection??record.attack_state,id=>this.attacks?.registry.hasAttack(id)??!!attackCatalog[id]);
                     }
 

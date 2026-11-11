@@ -56,13 +56,14 @@ export class weaponSystem{
  }
  canExecute(){
   const actor=this.#player(),state=this.state,context=this.#context;
-  return !!context&&context.engine?.running!==false&&context.engine?.active_level!==null&&(!state?.quick_draw||this.#quickFiring)&&!!actor&&!isCombatDead(actor)&&actor.active!==false&&actor.visible!==false&&state.cooldown<=1e-9&&!state.holstered&&!context.engine?.paused&&this.#policy.can_fire?.()!==false&&!context.api.physics.getAttachmentState(actor);
+  return !!context&&context.engine?.running!==false&&context.engine?.active_level!==null&&(!state?.quick_draw||this.#quickFiring)&&!!actor&&!isCombatDead(actor)&&actor.active!==false&&actor.visible!==false&&state.cooldown<=1e-9&&!state.holstered&&!context.engine?.paused&&this.#policy.can_fire?.()!==false&&(!context.api.physics.getAttachmentState(actor)||context.api.physics.getMountedLaunchState(actor,{check_clearance:false}).allowed);
  }
  fire(aim={}){
   if(this.#context?.engine?.phase==='render')throw new Error('Rendering cannot fire weapons');
   const player=this.#player(),state=this.state,context=this.#context;
   if(!this.canExecute())return false;
   const weapon=this.#items.getEquippedWeapon(),stats=weapon?.stats??{},mode=weapon?.weaponMode??'none',flit=this.#flit(player);
+  if(context.api.physics.getAttachmentState(player)&&['melee','none','fists'].includes(mode))return false;
   if(mode==='melee')return this.#startSwing(player,state,weapon,stats,flit);
   const punch=mode==='none'||mode==='fists',R=this.#rules,world=context.api.physics;
   let hay=false,damage,crit,nextCombo=state.combo,consumeDrawBonus=false;
@@ -87,6 +88,7 @@ export class weaponSystem{
    penetration_count:stats.penetrating?R.projectile.penetration_count:0,penetration_loss:stats.penetrating?R.projectile.penetration_loss:0,
    impact_strength:punch?(hay?R.knuckles.haymaker_impulse:R.knuckles.jab_impulse):R.projectile.impact_strength,
    data:{role:'projectile',weapon_instance_id:weapon?.instance_id??null,definition_id:weapon?.definition_id??null,source_id:player.entity_id,source_alliance:player.alliance??player.data.alliance??null,damage:Math.round(damage*crit),crit:crit>1,melee:punch,knuckles:mode==='fists',haymaker:hay,color:punch?'transparent':stats.projectileColor??'#00f3ff',penetrating:!!stats.penetrating,sticky:!!stats.sticky,dot_damage:Math.round((stats.dotDamage??5)*damage*crit/(stats.damage??35)),dot_interval:(stats.dotInterval??10)/R.authoring_hz,dot_ticks:stats.dotTicks??12,max_orbs:stats.maxOrbs??4}});
+  if(!projectile)return false;
   if(consumeDrawBonus)state.draw_shot_used=true;
   if(punch){state.combo=nextCombo;state.last_punch_at=state.elapsed;state.haymaker=hay;state.punch_side=state.punch_side==='right'?'left':'right';}
   state.cooldown=punch&&mode==='none'?R.bare_punch.duration_ticks/R.authoring_hz:this.#cooldown(stats,punch?15:20);if(punch)state.punch_duration=state.cooldown;
@@ -100,7 +102,7 @@ export class weaponSystem{
  }
  #updateSwing(player,state,seconds){
   const swing=state.swing;if(!swing)return;
-  if(isCombatDead(player)||state.holstered||this.#items.equipped_weapon_id!==swing.weapon_instance_id){state.swing=null;return;}
+  if(isCombatDead(player)||state.holstered||this.#items.equipped_weapon_id!==swing.weapon_instance_id||this.#context.api.physics.getAttachmentState(player)){state.swing=null;return;}
   const ph=swingPhases(swing.style),age=state.elapsed-swing.started,progress=(age/swing.seconds-ph.windup)/(ph.cutEnd-ph.windup),samples=this.#rules.blade.samples,world=this.#context.api.physics,profile=getCombatProfile(swing.definition_id);
   for(;swing.next_sample<=samples&&swing.next_sample<=progress*samples+1e-9;swing.next_sample++){
    const k=swing.next_sample,sample=index=>sampleMeleeSwing((ph.windup+(ph.cutEnd-ph.windup)*index/samples)*swing.seconds,swing.side,{},swing.seconds,swing.style),from=sample(Math.max(0,k-1)),to=sample(k);

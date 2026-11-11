@@ -59,11 +59,10 @@ export class NPC extends gameActor{
   if(state.out_of_combat>=rules.recovery_delay&&this.hp<this.maxHp){state.regen_elapsed+=seconds;while(state.regen_elapsed+1e-9>=rules.regeneration_interval){state.regen_elapsed-=rules.regeneration_interval;this.heal(rules.regeneration_amount);}}else state.regen_elapsed=0;
   if(this.hp<this.maxHp*rules.stim_threshold&&(this.data.teammateStims??0)>0&&!state.stim_remaining){this.data.teammateStims--;state.stim_remaining=rules.stim_cooldown;this.heal(rules.stim_heal);this.say('Still breathing.');}
   if(view&&view.distance<rules.aura_range&&this.hp<this.maxHp){state.aura_elapsed+=seconds;const interval=aura_interval??rules.aura_interval;while(state.aura_elapsed+1e-9>=interval){state.aura_elapsed-=interval;this.heal(1);}}else state.aura_elapsed=0;
-  // Seating remains owned by the attachment system. Cabin/window firing is a separate vehicle contract.
-  if(this.inCar)return;
-  const attack=attacks.getAttackProfile(this);
-  const nearest=threats.find(hit=>{const sight=world.observeTarget(this,hit.entity,{near_range:attack.range});return sight.in_range&&(sight.line_clear||attack.penetrating);});
-  if(nearest){this.lookAtTarget(nearest.entity);attacks.requestAttack(this,{target:nearest.entity.position});}else this.clearFacing();
+  const mounted=this.inCar;
+  const nearest=threats.find(hit=>attacks.canTarget(this,hit.entity));
+  if(nearest){if(!mounted)this.lookAtTarget(nearest.entity);attacks.requestAttack(this,{target:nearest.entity.position});}else{this.clearFacing();attacks.cancelAttack(this);}
+  if(mounted)return;
   if(stationary||!player){this.cancelMovement();return;}
   if(view.distance>rules.recover_distance){const spot=world.findNearbyPlacement(player,{near_range:rules.follow_distance,spacing:20,include_ghosts:false,ignore_body:[player,this]});if(spot&&world.isPlacementClear(this.collision_shape,spot.position,{ignore_body:[this,player],include_ghosts:false}))this.teleportTo(spot.position,{placement_mode:'clear'});}
   const speed=view.distance>rules.catchup_distance?rules.catchup_speed:view.distance>rules.match_distance?rules.match_speed:rules.cruise_speed;

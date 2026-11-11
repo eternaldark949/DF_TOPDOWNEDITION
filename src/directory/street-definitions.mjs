@@ -55,7 +55,11 @@ export function resolveVehicleSeats(library, { brand, model }) {
         const rotation = seat.local_rotation ?? 0, combine_mass = seat.combine_mass ?? rules.combine_mass ?? false;
         if (typeof combine_mass !== 'boolean') throw new TypeError('Invalid seat combine_mass');
         if (!Number.isFinite(rotation) || !Array.isArray(seat.exit_points) || !seat.exit_points.length || seat.exit_points.length > 64) throw new TypeError('Invalid seat configuration');
-        return Object.freeze({ seat_index: index, role: index ? 'passenger' : 'driver', combine_mass, local_position: point(seat.local_position), local_rotation: rotation,
+        const side=seat.local_position[1]<0?-1:1,attack=rules.attacks;
+        const authored=seat.emitter===undefined?(attack?{enabled:index===0?attack.driver_enabled:attack.passenger_enabled,local_position:[seat.local_position[0],side*(spec.width/2+attack.window_clearance)],local_rotation:side*attack.outward_rotation,half_angle:attack.half_angle,inherit_velocity:attack.inherit_velocity}:null):seat.emitter;
+        if(authored&&(typeof authored.enabled!=='boolean'||typeof authored.inherit_velocity!=='boolean'||!Number.isFinite(authored.local_rotation)||!Number.isFinite(authored.half_angle)||authored.half_angle<0||authored.half_angle>Math.PI))throw new TypeError('Invalid seat emitter');
+        const emitter=authored?Object.freeze({...authored,local_position:point(authored.local_position)}):null;
+        return Object.freeze({ seat_index: index, role: index ? 'passenger' : 'driver', emitter,combine_mass, local_position: point(seat.local_position), local_rotation: rotation,
             exit_points: Object.freeze(seat.exit_points.map(point)) });
     }));
     cache.set(key, resolved); return resolved;

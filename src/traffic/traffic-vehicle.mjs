@@ -7,6 +7,7 @@ export class TrafficVehicle extends gameVehicle {
     constructor(elements, packet) { super(elements, packet); this.connectGameplay(); }
     connectGameplay(hooks = {}) {
         if (Number.isInteger(this.data.seats) && this.data.seats > 0 && !this.data.occupants?.length) this.data.occupants = Array(this.data.seats).fill(null);
+        if(!this.data.seat_emitter_version){if(this.data.occupants?.some(id=>id!=null))for(const seat of this.getSeatLayout()){const occupant=this.physics_system.elements.fetchEntity(this.data.occupants[seat.seat_index]),mount=occupant&&this.physics_system.getAttachmentState(occupant);if(mount?.parent_body_id===this.body_id&&!mount.emitter)this.physics_system.setAttachmentEmitter(occupant,seat.emitter);}this.data.seat_emitter_version=1;}
         const previous = bindings.get(this); previous?.forEach(drop => drop());
         bindings.set(this, [
             this.on('contactBegin', event => hooks.onContact?.(this, event)),
@@ -31,8 +32,14 @@ export class TrafficVehicle extends gameVehicle {
         if (!entity || entity.destroyed || entity.physics_system !== this.physics_system || entity === this) throw new TypeError('Passenger must be a live entity in the same world');
         if (this.data.occupants[seat_index] != null || this.physics_system.getAttachmentState(entity)) return -1;
         entity.cancelMovement?.();
-        this.physics_system.attachBody(entity, { parent_body: this, local_position: seat.local_position, local_rotation: seat.local_rotation, combine_mass: combine_mass ?? seat.combine_mass });
+        this.physics_system.attachBody(entity, { parent_body: this, local_position: seat.local_position, local_rotation: seat.local_rotation, combine_mass: combine_mass ?? seat.combine_mass,emitter:seat.emitter });
         this.data.occupants[seat_index] = entity.entity_id; return seat_index;
+    }
+    setSeatAttackEnabled(seat_index,enabled){
+        if(typeof enabled!=='boolean')throw new TypeError('Seat attack enabled must be boolean');const seat=this.getSeatLayout()[seat_index];if(!seat)throw new RangeError('Unknown seat');
+        const occupant=this.physics_system.elements.fetchEntity(this.data.occupants[seat_index]),mount=occupant&&this.physics_system.getAttachmentState(occupant);
+        if(!seat.emitter||mount?.parent_body_id!==this.body_id)return false;
+        this.physics_system.setAttachmentEmitter(occupant,{...seat.emitter,enabled});return true;
     }
     assignDriver(entity, options) { return this.assignSeat(entity, 0, options); }
     assignPassenger(entity, options) {

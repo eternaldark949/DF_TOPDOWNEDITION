@@ -26,8 +26,9 @@ export class combatPresentation{
  #held(frame,api,actor,items,weapons,blend){
   const weapon=items.getEquippedWeapon();
   if(actor.visible!==false&&weapon&&!weapons.holstered&&['normal','sniper','melee'].includes(weapon.weaponMode)){
-   const swing=weapons.getSwingPose(),pose=api.physics.getBodyPoint(actor,swing?[swing.handX,swing.handY]:[8,9],{blend,local_rotation:swing?.a??0});
-   this.#art.draw(frame,weapon.definition_id,{position:pose.position,rotation:pose.rotation,laser:items.hasAttachment('laser_sight'),layer:25});
+   const mounted=api.physics.getAttachmentState(actor)?api.attacks.getMountedAttackPose(actor,{blend}):null;if(api.physics.getAttachmentState(actor)&&!mounted)return;
+   const swing=weapons.getSwingPose(),pose=mounted?{position:mounted.grip_position,rotation:mounted.rotation}:api.physics.getBodyPoint(actor,swing?[swing.handX,swing.handY]:[8,9],{blend,local_rotation:swing?.a??0});
+   this.#art.draw(frame,weapon.definition_id,{position:pose.position,rotation:pose.rotation,laser:items.hasAttachment('laser_sight'),opacity:mounted?.lean??1,layer:25});
   }
  }
  detach(){if(this.#owns)this.#art.dispose();}

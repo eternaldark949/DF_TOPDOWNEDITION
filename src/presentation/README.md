@@ -52,3 +52,5 @@ Verification: `node --test tools/test-weapon-appearance.mjs` and `python tools/t
 `abilityPresentation` submits spell color/shape/glow packets from visible official projectiles. It is installed in the native runtime example; combatPresentation skips those bodies to prevent duplicate drawing. Authored definitions remain in Directory, and entity/ability classes contain no Canvas instructions. Full classic casting animation, fire trails and audio remain presentation work.
 
 Shared held-weapon presentation now reads inventory through `api.attacks.getItems(entity)`. Plain native characters and custom subclasses need no items-property wrapper to use the same artist. The runtime example’s Attack menu routes ordinary player fire through the selected registered attack, including learned abilities.
+
+For seated characters, held-weapon packets use `api.attacks.getMountedAttackPose(actor,{blend})`: interpolated native grip/heading plus shared-clock lean opacity. The body remains in its authoritative seat. Full humanoid/cabin/window art is still pending; these packets add no physical transforms or simulation clock.

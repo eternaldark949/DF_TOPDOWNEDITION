@@ -719,6 +719,14 @@
     "front_fraction": 0.175,
     "rear_fraction": -0.2,
     "side_fraction": 0.36,
-    "exit_clearance": 24
+    "exit_clearance": 24,
+    "attacks": {
+      "driver_enabled": true,
+      "passenger_enabled": true,
+      "window_clearance": 12,
+      "outward_rotation": 1.5707963267948966,
+      "half_angle": 1.4835298641951802,
+      "inherit_velocity": true
+    }
   }
 }

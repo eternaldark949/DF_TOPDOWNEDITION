@@ -1,3 +1,4 @@
+import {normalizeEmitter} from './emitter.mjs';
 import { invalidateMass, massProperties, massCenter, impulseCenter, centerVelocity, setCenterVelocity } from '../core/mass.mjs';
 import { vector, number, rotate, add } from '../core/values.mjs';
 import { enforceLocks, movable, bodyActive, inverseInertia } from '../core/state.mjs';
@@ -6,7 +7,7 @@ import { pathGeometry } from '../motion/path-geometry.mjs';
 
 /** Prescribed mounts link existing authoritative body records; they store no copied body state. */
 export class attachmentManager {
-    #entries = new Map(); #children = new Map(); #restoring = false;
+    #entries = new Map(); #children = new Map(); #restoring = false; #nextId = 1;
     constructor(world) { this.world = world; }
     _hasReservation(record) { return this.#entries.has(record.id); }
     #entry(body) { return this.#entries.get(this.world._record(referenceBody(body)).id) ?? null; }
@@ -26,12 +27,13 @@ export class attachmentManager {
             for (const next of this.#children.get(id) ?? []) descendants.push([next, below + 1]);
         }
     }
-    attachBody(body, { parent_body, local_position = [0, 0], local_rotation = 0, combine_mass = false } = {}) {
+    attachBody(body, { parent_body, local_position = [0, 0], local_rotation = 0, combine_mass = false, emitter = null } = {}) {
         const child = this.world._record(referenceBody(body)), parent = this.world._record(referenceBody(parent_body));
         if (typeof combine_mass !== 'boolean') throw new TypeError('combine_mass must be boolean');
+        const launchEmitter=normalizeEmitter(emitter);
         const position = vector(local_position), rotation = number(local_rotation, 'local_rotation'); this.#validate(child, parent);
         pathGeometry.transformPose({ position: parent.position, rotation: parent.rotation }, { local_position: position, local_rotation: rotation });
-        const entry = { child, parent, local_position: position, local_rotation: rotation, combine_mass, pending: true, detaching: false };
+        const entry = { attachment_id:this.#nextId++,revision:0,emitter:launchEmitter,child, parent, local_position: position, local_rotation: rotation, combine_mass, pending: true, detaching: false };
         // Reservation prevents event-time double attachment and cycles before commands commit.
         this.#entries.set(child.id, entry);
         let children = this.#children.get(parent.id); if (!children) this.#children.set(parent.id, children = new Set()); children.add(child.id);
@@ -66,7 +68,11 @@ export class attachmentManager {
     }
     getAttachmentState(body) {
         const e = this.#entry(body); return e ? { body_id: e.child.id, parent_body_id: e.parent.id,
-            local_position: [...e.local_position], local_rotation: e.local_rotation, combine_mass: e.combine_mass, pending: e.pending, detaching: e.detaching } : null;
+            attachment_id:e.attachment_id,revision:e.revision,emitter:e.emitter?structuredClone(e.emitter):null,local_position: [...e.local_position], local_rotation: e.local_rotation, combine_mass: e.combine_mass, pending: e.pending, detaching: e.detaching } : null;
+    }
+    setAttachmentEmitter(body, emitter) {
+        const e=this.#entry(body);if(!e)throw new Error('Body is not attached');const normalized=normalizeEmitter(emitter);
+        this.world._mutate(()=>{if(this.#entries.get(e.child.id)===e){e.emitter=normalized;e.revision++;}});return e.child.handle;
     }
     setAttachmentPose(body, changes = {}) {
         const e = this.#entry(body); if (!e) throw new Error('Body is not attached');
@@ -75,6 +81,7 @@ export class attachmentManager {
         pathGeometry.transformPose({ position: e.parent.position, rotation: e.parent.rotation }, { local_position: position ?? e.local_position, local_rotation: rotation ?? e.local_rotation });
         this.world._mutate(() => {
             if (this.#entries.get(e.child.id) !== e) return;
+            e.revision++;
             if (position) e.local_position = position; if (rotation !== undefined) e.local_rotation = rotation;
             invalidateMass(e.parent);
             if (!e.pending) { this.#place(e, true); this._syncDescendants(e.child, true); }
@@ -112,7 +119,7 @@ export class attachmentManager {
     }
     #event(type, e, extra = {}) {
         if (this.#restoring) return;
-        this.world._emit(type, { body: e.child.handle, parent_body: e.parent.handle, parent_entity: this.world.elements.fetchEntity(e.parent.id), ...extra });
+        this.world._emit(type, { attachment_id:e.attachment_id,body: e.child.handle, parent_body: e.parent.handle, parent_entity: this.world.elements.fetchEntity(e.parent.id), ...extra });
     }
     #forget(e) {
         this.#entries.delete(e.child.id); e.parent.mass_children?.delete(e); invalidateMass(e.parent); e.child.parent_mount = null;
@@ -168,11 +175,15 @@ export class attachmentManager {
         }
     }
     _clear() { for (const e of this.#entries.values()) { e.child.parent_mount = null; e.parent.mass_children?.clear(); invalidateMass(e.parent); } this.#entries.clear(); this.#children.clear(); }
-    _saveState() { return [...this.#entries.values()].map(e => ({ body_id: e.child.id, parent_body_id: e.parent.id, local_position: [...e.local_position], local_rotation: e.local_rotation, combine_mass: e.combine_mass })); }
+    _saveState() { return [...this.#entries.values()].map(e => ({ attachment_id:e.attachment_id,revision:e.revision,emitter:e.emitter?structuredClone(e.emitter):null,body_id: e.child.id, parent_body_id: e.parent.id, local_position: [...e.local_position], local_rotation: e.local_rotation, combine_mass: e.combine_mass })); }
     _loadState(entries = []) {
         if (!Array.isArray(entries)) throw new TypeError('Invalid attachment state');
         this.#restoring = true;
-        try { for (const e of entries) this.attachBody(e.body_id, { parent_body: e.parent_body_id, local_position: e.local_position, local_rotation: e.local_rotation, combine_mass: e.combine_mass }); }
+        try { const seen=new Set();for (const e of entries) {
+            this.attachBody(e.body_id, { parent_body: e.parent_body_id, local_position: e.local_position, local_rotation: e.local_rotation, combine_mass: e.combine_mass,emitter:e.emitter });
+            const entry=this.#entry(e.body_id);if(e.attachment_id!==undefined){number(e.attachment_id,'attachment_id',1);if(!Number.isSafeInteger(e.attachment_id)||seen.has(e.attachment_id))throw new TypeError('Invalid attachment identity');entry.attachment_id=e.attachment_id;}seen.add(entry.attachment_id);
+            entry.revision=number(e.revision??0,'attachment revision',0);if(!Number.isSafeInteger(entry.revision))throw new TypeError('Invalid attachment revision');this.#nextId=Math.max(this.#nextId,entry.attachment_id+1);
+        } }
         finally { this.#restoring = false; }
     }
 }

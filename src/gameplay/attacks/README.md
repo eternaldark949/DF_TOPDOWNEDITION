@@ -66,7 +66,7 @@ Requests accept only `{attack_id?, target?, direction?, angle?}`. Target/directi
 
 Selecting an ability can retain a held gun: ordinary player fire now casts the selected ability. Selecting bare hands unequips the weapon through the item model. Changing attack selection never resets cooldown. Choosing an attack cancels an armed quick draw and leaves it unholstered while retaining its cooldown. Advanced quick-draw configuration and weapon poses remain specialized execution APIs; their existing state machine remains the authority.
 
-The readiness contract reuses `weaponSystem.canExecute()`: native runtime/world ownership, source life/activity/visibility, holster, shared cooldown, quick draw, mounting and actor attack policy. Stagger and Ganger interruption remain centrally enforced. Type `canUse` checks capability/game policy, not another cooldown clock.
+The readiness contract reuses `weaponSystem.canExecute()`: native runtime/world ownership, source life/activity/visibility, holster, shared cooldown, quick draw, attachment/emitter eligibility and actor attack policy. Stagger and Ganger interruption remain centrally enforced. Type `canUse` checks capability/game policy, not another cooldown clock.
 
 ## One attack queue and clock
 
@@ -123,3 +123,7 @@ Registry execution applies to official native characters. Legacy city `ActorEnti
 Presentation remains separate. The runtime example now has a selectable Attack menu and an explicit Learn demo abilities action. Its ordinary fire control demonstrates player casting. Shared held-weapon presentation requests inventory through `api.attacks.getItems(entity)`, so custom characters need no `.items` property or actor-specific artist wrapper. Rendering does not execute attacks or advance cooldowns.
 
 Verification: `tools/test-attack-systems.mjs`, `tools/test-attack-callers.cjs`, `tools/test-attacks-browser.py`, plus the actor, ability, combat, player, rendering, apartment and gameplay regression suites. Tests cover universal source classes, actual owned copies, custom types, one input/one attack, cooldown and stale-input rules, saves/lifetimes, generic-character presentation, quick-draw selection and real player keyboard casting through the example UI.
+
+## Mounted execution
+
+Emitter-equipped native seats now support the same firearm/ability API with shared-clock preparation. `canTarget`, `getMountedAttackState` and `getMountedAttackPose` expose target eligibility and renderer data without game-side geometry or body copies. See [mounted attack ownership, engine APIs, lifecycle and remaining legacy work](MOUNTED-ATTACKS.md).

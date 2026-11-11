@@ -46,3 +46,7 @@ export {createAbilityCatalog,importActorAbilities} from './game-abilities.mjs';
 export {attackRegistry,validateAttackState} from '../gameplay/attacks/attack-registry.mjs';
 export {attackSystem} from '../gameplay/attacks/attack-system.mjs';
 export {createAttackCatalog} from './game-attacks.mjs';
+
+export {validateMountedAttack} from '../gameplay/attacks/mounted-attacks.mjs';
+
+export {TrafficVehicle,createGameVehicle} from './game-street.mjs';

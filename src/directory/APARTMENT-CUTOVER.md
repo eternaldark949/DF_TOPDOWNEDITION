@@ -36,7 +36,7 @@ New saves contain the official native world snapshot. Old apartment saves retain
 ## Remaining work and parity limits
 
 - City streets, traffic, pedestrians, vehicles, enemies, other maps and minigames still use legacy physical ownership. Their official ESM clients exist but production callers still need migration.
-- Apartment companions are actual native NPCs with shared health, typed owned weapons, recovery/stims, speech and baseline AI. Mounted attacks, specialized companion tactics, optional cat behavior and the broader NPC ecosystem still need conversion.
+- Apartment companions are actual native NPCs with shared health, typed owned weapons, recovery/stims, speech and baseline AI. Specialized companion tactics, optional cat behavior and the broader NPC ecosystem still need conversion.
 - The native host uses shared firearms, punches, swept blades, bonuses, deflection and physical loot. Specialized attacks, encounter-specific rules and broader damage/death consequences remain to be ported.
 - Story scene actors and special scripted movement still need native scene integration.
 - Wardrobe/hair fitting and animation physics, full lighting/reflection/weather/VFX parity remain. Native curtains and shared-index lamp sensing are connected; that does not complete cosmetic migration.
@@ -71,3 +71,5 @@ The apartment-only `ApartmentCompanion` class is deleted. Directory creates actu
 The native apartment now installs the same `abilitySystem` as the shared runtime. NPCs cast all three existing abilities using canonical learned/equipped loadouts and the shared attack cooldown. Learned state and cooldown survive saves and the explicit classic scene boundary. See [ability API and remaining mounted/presentation work](../gameplay/abilities/README.md).
 
 The native host also installs the shared [attackSystem/registry](../gameplay/attacks/README.md). Its player fire branch and actor intents use the universal selected attack. Player learned capabilities/selection and NPC choice now survive native saves and the classic boundary as one-time record transfers. Classic city execution remains legacy despite retaining those portable records.
+
+The shared native attack service now supports real seated player/companion firearms and abilities, including engine-owned window arcs, aperture clearance and inherited velocity. Native snapshots preserve their attachment/emitter/preparation records. The apartment still has no production vehicle/driver cutover; its legacy city boundary and vehicle artists remain separate work. [Mounted API](../gameplay/attacks/MOUNTED-ATTACKS.md).

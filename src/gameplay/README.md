@@ -150,3 +150,5 @@ Directory now also installs `api.abilities`. `abilityLoadout` owns learned/equip
 ## Universal attacks
 
 `api.attacks` now exposes the common registered firearm/melee/ability interface for Player, NPC, Ganger and arbitrary native gameCharacter subclasses. `selectAttack`, `canAttack`, `requestAttack` and `executeAttack` use canonical inventory/capability ownership and the existing cooldown. Normal input and native AI use this path. See [attack API, extensibility, persistence and boundaries](attacks/README.md).
+
+Native mounted attacks now run through that same API. Directory supplies seat emitters; Basement computes all launch geometry and inherited motion; gameplay uses its existing attack clock for preparation. [Mounted attack API and remaining work](attacks/MOUNTED-ATTACKS.md).

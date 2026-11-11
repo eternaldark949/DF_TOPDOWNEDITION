@@ -14,19 +14,20 @@ export class PlayerControlSystem {
     beforePhysics(context) {
         const player=this.#session.player, input=context.api.controls;
         if(!player)return;
-        if(player.dead || player.isHidden || this.#blocked.size || context.api.physics.getAttachmentState(player.body)) {player.cancelMovement();return;}
-        if(input.justActivated('sneak'))player.sneaking=!player.sneaking;
+        const mount=context.api.physics.getAttachmentState(player.body);
+        if(player.dead || player.isHidden || this.#blocked.size || mount&&!mount.emitter?.enabled) {player.cancelMovement();return;}
+        if(!mount&&input.justActivated('sneak'))player.sneaking=!player.sneaking;
         const aim=input.direction('aim');
         let facing=false,shotAim={};
-        if(aim[0] || aim[1]) {player.lookInDirection(aim);shotAim={direction:aim};facing=true;}
+        if(aim[0] || aim[1]) {if(!mount)player.lookInDirection(aim);shotAim={direction:aim};facing=true;}
         else if(input.active_device==='mouse' && input.pointer().known) {
             const bounds=context.api.render.getSurfaceBounds();
-            if(bounds) {const target=context.api.camera.clientToWorld(input.pointer().position,bounds);player.lookAtTarget(target);shotAim={target};facing=true;}
+            if(bounds) {const target=context.api.camera.clientToWorld(input.pointer().position,bounds);if(!mount)player.lookAtTarget(target);shotAim={target};facing=true;}
         }
-        if(!facing)player.clearFacing();
-        player.setMovement(input.direction('move'),{speed:this.#state.movement_speed,face_movement:!facing});
-        if(input.justActivated('flit'))this.#state.tryFlit({placement_bounds:this.#placement?.(context)});
-        for(const action of ['fire','interact'])if(action==='fire'?input.active(action):input.justActivated(action))this.#session.emit(`player:${action}`,{entity_id:player.entity_id,...(action==='fire'?{aim:shotAim}:{})});
+        if(!facing&&!mount)player.clearFacing();
+        if(mount)player.cancelMovement();else player.setMovement(input.direction('move'),{speed:this.#state.movement_speed,face_movement:!facing});
+        if(!mount&&input.justActivated('flit'))this.#state.tryFlit({placement_bounds:this.#placement?.(context)});
+        for(const action of mount?['fire']:['fire','interact'])if(action==='fire'?input.active(action):input.justActivated(action))this.#session.emit(`player:${action}`,{entity_id:player.entity_id,...(action==='fire'?{aim:shotAim}:{})});
         if(input.justReleased('fire'))this.#session.emit('player:fire-released',{entity_id:player.entity_id,aim:shotAim});
     }
     levelLeaving(context) { this.#session.player?.cancelMovement(); context.api.controls.clear(); }

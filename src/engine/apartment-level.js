@@ -105,7 +105,7 @@ engineMixin({
         this.actors?.detach();this.actors=null;this._nativeActorContext=null;this.attacks?.detach();this.attacks=null;this.abilities?.detach();this.abilities=null;this.weapons?.detach();this.combat?.detach();this.worldLoot?.detach();for(const fn of this._nativeCombatCleanups??[])fn();this._nativeCombatCleanups=[];this.weapons=null;this.combat=null;this.worldLoot=null;
     },
     _flitApartment(angle){
-        if(this.paused||this.player.dead||this.isDriving||this.furniture.busy()||this.hud&&!this.hud.has('flit'))return false;
+        if(this.paused||this.player.dead||this.isDriving||this.physics_system.getAttachmentState(this.player)||this.furniture.busy()||this.hud&&!this.hud.has('flit'))return false;
         const cost=this.flitCost();
         if(this.player.vitals.attunement<cost)return false;
         const result=this.player.teleportInDirection(undefined,{angle,distance:this.flitDistance(),placement_bounds:{left:8,top:8,right:this.activeMap.width-8,bottom:this.activeMap.height-8},placement_mode:'clear',min_distance:this.player.vitals.flit_minimum_distance});

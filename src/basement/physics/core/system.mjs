@@ -1,3 +1,4 @@
+import {mountedLaunchState} from '../attachments/emitter.mjs';
 import { massProperties, massCenter, invalidateMass, integrateAtCenter, changeAngularSpeed, centerVelocity, setCenterVelocity } from './mass.mjs';
 import { BODY_GROUP, EPS, vector, number, clone, freeze, validBounds, boundsMeet, sub, add, scale, length, unit, rotate, unionBounds } from './values.mjs';
 import { bodyConfig, bodyRecord, pose, previousPose, liveBounds, bodyBounds, sweptBounds, snapshot, bodyActive, movable, physical, changeVelocity, enforceLocks, inverseInertia } from './state.mjs';
@@ -119,7 +120,23 @@ export class physicsSystem {
     createCharacter(packet = {}) { return this.elements.createCharacter(packet); }
     createVehicle(packet = {}) { return this.elements.createVehicle(packet); }
     createProjectileFrom(source, { local_position = [0,0], target, direction, angle, angle_offset=0, ...packet } = {}) {
-        const r = this._record(referenceBody(source)), pose = this.getBodyPoint(source, local_position);
+        const r = this._record(referenceBody(source));
+        if(this.getAttachmentState(source)){
+            const resolved=this.elements.asset_library.resolveTemplate(packet.template,packet),state=this.getMountedLaunchState(source,{local_position,target,direction,angle,angle_offset,collision_shape:resolved.collision_shape});
+            if(!state.allowed)return null;
+            const deferred=this.#stepping||this.#dispatching||this.#queue.length>0;
+            const projectile=this.createProjectile({...packet,position:state.position,rotation:state.launch_rotation,owner_id:r.id});
+            if(deferred){this._mutate(()=>{
+                if(!this.fetchBody(projectile.body_id))return;
+                const targetId=target!==undefined&&!Array.isArray(target)?(typeof target==='number'?target:referenceBody(target)?.body_id):null;
+                const current=!this.fetchBody(r.id)?{allowed:false,reason:'source_removed'}:targetId!==null&&!this.fetchBody(targetId)?{allowed:false,reason:'target_removed'}:this.getMountedLaunchState(source,{local_position,target,direction,angle,angle_offset,collision_shape:resolved.collision_shape});
+                if(current.allowed&&(current.attachment_id!==state.attachment_id||current.revision!==state.revision)){current.allowed=false;current.reason='attachment_changed';}
+                if(!current.allowed){this._emit('projectileLaunchBlocked',{body:projectile.body,source_body:r.handle,reason:current.reason});this.removeBody(projectile);return;}
+                projectile.updateBody({position:current.position,rotation:current.launch_rotation});projectile.launchProjectile(current.direction,{inherited_velocity:current.carrier_velocity});
+            });return projectile;}
+            try{projectile.launchProjectile(state.direction,{inherited_velocity:state.carrier_velocity});return projectile;}catch(error){this.removeBody(projectile);throw error;}
+        }
+        const pose = this.getBodyPoint(source, local_position);
         const projectile = this.createProjectile({ ...packet, position:r.position, owner_id:r.id });
         try {
             const path = this.getPathClearance({body:projectile,from:r.position,to:pose.position,ignore_body:[r.handle,projectile],include_ghosts:false});
@@ -128,6 +145,8 @@ export class physicsSystem {
             return projectile;
         } catch(error) { this.removeBody(projectile); throw error; }
     }
+    getMountedLaunchState(source, options) { return mountedLaunchState(this,source,options); }
+    setAttachmentEmitter(body, emitter) { return this.#attachments.setAttachmentEmitter(body,emitter); }
     createProjectile(packet = {}) { return this.elements.createProjectile(packet); }
     _createEntityComponents(role, packet) {
         // Mechanical roles only. Concrete shapes, tuning, assets and gameplay data come from definitions.

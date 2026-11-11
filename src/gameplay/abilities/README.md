@@ -74,7 +74,7 @@ engine.api.abilities.requestCast(ally, 'shadow_bolt', {target:[300,180]});
 
 Aim accepts JSON `target:[x,y]`, `direction:[x,y]`, or `angle`. Physical packet fields, owner IDs and damage supplied inside aim are not forwarded. The engine determines the muzzle transform, launch clearance and trajectory. Spread is an authored/random policy offset passed to the native launch request. A rejected launch spends no cooldown and emits no cast event.
 
-`weaponSystem.canExecute()` is the common readiness check: world/runtime state, actor life/visibility/activity, holster, cooldown, quick draw, attachment and per-actor attack policy. Abilities additionally check learned ownership, stagger and optional cast policy. A successful cast sets that **same** attack cooldown to the ability rate. Equipping another ability or switching to a weapon cannot bypass it. Quick-draw readiness cannot bypass this check. Mounted casts remain blocked pending the vehicle cabin/window attack contract.
+`weaponSystem.canExecute()` is the common readiness check: world/runtime state, actor life/visibility/activity, holster, cooldown, quick draw, attachment and per-actor attack policy. Abilities additionally check learned ownership, stagger and optional cast policy. A successful cast sets that **same** attack cooldown to the ability rate. Equipping another ability or switching to a weapon cannot bypass it. Quick-draw readiness cannot bypass this check. Mounted casts now use emitter-equipped attachments through the shared attack API; ordinary attachments still block them.
 
 NPC policy preserves weapon-first selection, falling back to the equipped ability. It queries the shared grid using the selected attack's range, respects engagement policy and native line of sight, and requests facing/casting. Penetrating weapons may retain their existing through-wall targeting; abilities stop at obstacles. The low-level `cast` method accepts logical aim without choosing a target or enforcing an AI range cutoff; lifetime and contacts govern the actual projectile, just as for weapons.
 
@@ -94,7 +94,7 @@ Directory's `importActorAbilities` converts old `equippedAbilityId`/`abilitiesSn
 
 The production city still owns legacy NPC/projectile bodies. `legacy-ability-launch.js` is the explicit remaining boundary for those actors: it reads the same shared loadout/normalized definitions and creates a legacy projectile. The old helper and stat/spread defaults are removed from the inventory UI. This boundary remains necessary until city actors and their world are native; moving it does not retire the city physics or count as native casting. Native casting never calls it.
 
-Remaining companion work: vehicle cabin arcs, checked exit/muzzle placement and mounted attacks; broader tactical formation/room policy; full humanoid casting animation, particles, fire trails/audio and other presentation parity. Specialized hostile subclasses and their factory/caller conversions follow. No new map-specific ability implementation is needed.
+Remaining companion work: broader tactical formation/room policy; full humanoid casting animation, particles, fire trails/audio and other presentation parity. Specialized hostile subclasses and their factory/caller conversions follow. No new map-specific ability implementation is needed.
 
 ## Presentation and verification
 
@@ -105,3 +105,5 @@ Tests: `node --test tools/test-ability-systems.mjs`, `node tools/test-ability-ca
 ## Universal attack registration
 
 Abilities are now registered alongside firearm and melee attacks through [attackRegistry and attackSystem](../attacks/README.md). For ordinary player/actor input, select `ability:fireball` and call `api.attacks.requestAttack(actor, aim)`. Player input and native NPC/Ganger callers use that shared entry point. The lower `abilitySystem` remains the executor and compatibility API. Plain gameCharacter subclasses are connected automatically; the service no longer requires a particular actor subclass to provide an items property.
+
+Mounted firearms and abilities now share native aperture/arc/clearance and velocity-inheritance requests. Preparation uses the existing attack clock. See [mounted attacks](../attacks/MOUNTED-ATTACKS.md). Direct lower-level casting remains an execution API and does not run the universal service’s aim-preparation policy.

@@ -60,7 +60,7 @@ Events: `actor:damaged`, `actor:defeated`, `actor:healed`, `actor:revived`, `act
 
 `NPC` (`df_npc`) handles civilian and teammate roles. Teammates use native follow/flee/placement facilities; self stims, out-of-combat regeneration and proximity healing use shared health. Permanent teammates down and revive. `hire({kind='contract',cost,minutes,world_minutes=0})` configures a contract/permanent recruitment; payment remains the caller's responsibility. `release()` ends it. `say(text,seconds=2,delay=0)` and `reactToEmote(emote,{tier=0,random=Math.random})` share authored reaction content with existing NPCs.
 
-`inCar` and `seatIndex` read real attachments and vehicle occupants. No seat coordinates are copied. Mounted NPCs currently hold fire pending cabin/window attack policy. On foot, Fireball, Shadow Bolt and Ember Burst use the shared abilitySystem and the same attack cooldown as weapons. See [ability ownership, casting and remaining work](../abilities/README.md).
+`inCar` and `seatIndex` read real attachments and vehicle occupants. No seat coordinates are copied. Mounted NPCs now target and fire through authored seat emitters and the shared attack API; all arc, muzzle, clearance and inherited-velocity work is in Basement. On foot, Fireball, Shadow Bolt and Ember Burst use the shared abilitySystem and the same attack cooldown as weapons. See [ability ownership, casting and remaining work](../abilities/README.md).
 
 Equipment setters grant/equip real instances. `onWeaponFired` manages authored burst delays through the shared weapon controller. Roster import/export preserves burst size/delay/accuracy, cooldown and remaining burst count. Aliases are converted once at Directory/host boundaries. `rosterRecord(npc)` exports game metadata and a detached typed inventory; it is not another live owner.
 
@@ -90,7 +90,7 @@ Removed: the apartment-only `ApartmentCompanion` class; duplicate common health 
 
 Still executable: classic `ActorEntity`, `NPC`, `Ganger`, specialized descendants, legacy city projectile/collision loops and classic mixins. Shared health and typed NPC inventories are now used there, but their physical ownership remains legacy. Their deletion depends on converting the city world/callers and specialized classes to native identities. No native body is created alongside a legacy actor to pretend that conversion is complete.
 
-Next class conversions: mounted companion attacks, specialized companion tactics and hostile subclasses; their factories/room coordinators; native city population consumers and level composition; remaining legacy collision/combat branches; production boot/mixins and full presentation/save coordination. [Combat removal ledger](../combat/README.md) tracks the corresponding executable branches.
+Next class conversions: specialized companion tactics and hostile subclasses; their factories/room coordinators; native city population consumers and level composition; remaining legacy collision/combat branches; production boot/mixins and full presentation/save coordination. [Combat removal ledger](../combat/README.md) tracks the corresponding executable branches.
 
 Verification: `tools/test-actor-systems.mjs`, `tools/test-actor-callers.cjs`, `tools/test-actors-browser.py`, Basement `actor-support.test.mjs`, and the existing player/combat/apartment suites. Repeated identical movement requests retain path plans, failed paths respect the native retry interval, and grid-corner traversal has a regression test.
 
@@ -99,3 +99,5 @@ Ability loadouts now live in `data.abilities`; `NPC.equippedAbilityId` derives f
 ## Unified attack interface
 
 Native Player, NPC and Ganger requests now pass through [attackSystem and attackRegistry](../attacks/README.md). They use the same registered firearm, melee and ability definitions as plain gameCharacter subclasses. Actor policy selects a target and requests an attack; it no longer chooses separate fire/cast APIs or privately creates weapon controllers. The attack service binds each actual character and handles owned inventories, queued input and selection. Lower execution classes and their shared physics remain unchanged authorities.
+
+Native mounted companion attacks are now implemented. See [the mounted API and exact city/presentation boundaries](../attacks/MOUNTED-ATTACKS.md).
