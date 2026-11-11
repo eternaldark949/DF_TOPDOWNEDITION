@@ -59,3 +59,9 @@ export {MARIONETTE_RULES} from './game-marionettes.mjs';
 export {validateAbilityAction} from '../gameplay/abilities/lunge-actions.mjs';
 
 export {GatlingGunner} from '../entities/gatling-gunner.mjs';
+
+export {Drone} from '../entities/drone.mjs';
+export {VelvetCat} from '../entities/velvet-cat.mjs';
+export {velvetCatAppearance,createVelvetAnimation,velvetPresentation} from '../presentation/velvet-cat.mjs';
+export {droneAppearance,dronePresentation} from '../presentation/drone.mjs';
+export {VELVET_CAT_PALETTES,VELVET_T,VELVET_PROFILES,VELVET_GAITS,VELVET_TAIL_SEGS} from './game-velvet-appearance.mjs';

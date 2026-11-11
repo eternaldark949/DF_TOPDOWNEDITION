@@ -16,7 +16,7 @@ export class characterMotor {
         this.suspended_for = 0; this.intent = null; this.path = null; this.replan = 0; this.facing = null;
     }
     _request(fn) { const r = bodyRecord(this.body); r.world._mutate(() => { r.sleeping = false; r.sleep_time = 0; fn(); }); return this; }
-    setMovement(direction, options = {}) { const v = direction===undefined?bodyRecord(this.body).world.resolveAim(this.body,{angle:options.angle}).direction:vector(direction); if (options.speed !== undefined) number(options.speed, 'speed', 0); return this._request(() => { this.intent = { ...clone(options), mode: 'direction', direction: v }; this.path = null; }); }
+    setMovement(direction, options = {}) { const v = direction===undefined?bodyRecord(this.body).world.resolveAim(this.body,{angle:options.angle}).direction:vector(direction); if (options.speed !== undefined) number(options.speed, 'speed', 0); if(options.acceleration!==undefined)number(options.acceleration,'acceleration',0); return this._request(() => { this.intent = { ...clone(options), mode: 'direction', direction: v }; this.path = null; }); }
     setRotation(angle, options = {}) { this.body.setRotation(angle, { preserve_velocity: true, ...options }); return this; }
     moveTo(position, options = {}) { const target=vector(position),world=bodyRecord(this.body).world;if(world._canReuseMotorRequest()&&sameRequest(this.intent,'move',target,options))return this;return this._request(()=>{this.intent={...clone(options),mode:'move',target};this.path=null;this.replan=0;}); }
     followTarget(target, options = {}) {const world=bodyRecord(this.body).world;referencePosition(world,target);if(options.target_offset!==undefined)vector(options.target_offset,'target_offset');if(world._canReuseMotorRequest()&&sameRequest(this.intent,'follow',target,options))return this;return this._request(()=>{this.intent={...clone(options),mode:'follow',target};this.path=null;this.replan=0;});}
@@ -145,7 +145,7 @@ export class characterMotor {
             if (intent.face_movement && length(desired) > 0.01 && !r.config.axis_lock.rotation) heading = Math.atan2(desired[1], desired[0]);
         }
         const difference = sub(desired, r.velocity), d = length(difference);
-        const accel = length(desired) > length(r.velocity) ? this.config.acceleration : this.config.braking;
+        const accel = length(desired) > length(r.velocity) ? this.intent?.acceleration??this.config.acceleration : this.config.braking;
         if (d) changeVelocity(r, scale(difference, Math.min(1, accel * dt / d) * r.config.mass), r.position);
         if (this.facing && !r.config.axis_lock.rotation) {
             let target;

@@ -75,7 +75,7 @@ engineMixin({
         this.actors.beforePhysics(this._nativeActorContext,world.config.fixed_step);this.weapons.beforePhysics(this._nativeActorContext);this.abilities.beforePhysics(this._nativeActorContext);this.attacks.beforePhysics(this._nativeActorContext);this.updateQuickDraw();
         if(!blocked&&(releasing||this.mouseDown||F.active&&F.firing)&&this.shootCooldown<=0){const fired=this.fireWeapon();if(releasing&&fired){this._releaseShot=null;this._releaseWait=0;}}
         if(releasing&&this._releaseShot!==null&&(this._releaseWait=(this._releaseWait??0)+1)>30){this._releaseShot=null;this._releaseWait=0;}
-        level.updateState();this.combat.advance(world.config.fixed_step);this.worldLoot.advance(world.config.fixed_step);world.commitCommands();this.roomSystem.update();this.updateScope();this.updatePlayerRecovery();this.updateFlitRing();this.updateNoiseRipples();if(this.flitVFX.length)this.updateFlitVFX();
+        level.updateState();this.actors.afterPhysics(this._nativeActorContext,world.config.fixed_step);this.combat.advance(world.config.fixed_step);this.worldLoot.advance(world.config.fixed_step);world.commitCommands();this.roomSystem.update();this.updateScope();this.updatePlayerRecovery();this.updateFlitRing();this.updateNoiseRipples();if(this.flitVFX.length)this.updateFlitVFX();
         this.weather.setIndoorSuppressed(!this.roomSystem.isPlayerOutdoor());
         this.updateTime();this.updateUI();this.story.update();if(this.activeLevel!==level)return;
         this._apartmentInteraction();this._apartmentBlend=1;
@@ -100,7 +100,7 @@ engineMixin({
         const restored=!!this.player.data.weapon_state;this.combat.attach(context);this.weapons.attach(context);this.worldLoot.attach(context);
         this.abilities=new DFNative.abilitySystem({weapons:this.weapons,combat:this.combat,get_player:()=>this.player});this.abilities.attach(context);
         this.attacks=new DFNative.attackSystem({weapons:this.weapons,abilities:this.abilities,combat:this.combat,get_player:()=>this.player,items:this.items,definitions:this.physics_system.elements.asset_library.getResource('df:attacks').data});this.attacks.attach(context);
-        this._nativeActorContext=context;this.actors=new DFNative.actorSystem({attacks:this.attacks,combat:this.combat,get_player:()=>this.player,policy:{stationary:()=>true,on_event:(event,detail)=>{if(event==='npc:downed')showMessage('COMPANION DOWNED');}}});this.actors.attach(context);
+        this._nativeActorContext=context;this.actors=new DFNative.actorSystem({attacks:this.attacks,abilities:this.abilities,combat:this.combat,get_player:()=>this.player,policy:{stationary:()=>true,on_event:(event,detail)=>{if(event==='npc:downed')showMessage('COMPANION DOWNED');}}});this.actors.attach(context);
         if(!restored){this.weapons.setHolstered(previous.holstered);this.weapons.setCooldown(previous.cooldown/60);if(previous.shield)this.weapons.state.shield={...previous.shield};this.weapons.state.combo=previous.combo;this.weapons.state.last_punch_at=this.weapons.state.elapsed-previous.punch_age;}
         for(const key of ['_legacyShootCooldown','_legacyWeaponHolstered','_legacyQuickDraw','_drawnAt','_drawShotUsed','_swing','_slashT','_slashSecs','_slashSide','_slashStyle','_punchDur','_punchCombo','_punchAt','_mirrorShield','_mirrorFlashT'])delete this[key];
     },

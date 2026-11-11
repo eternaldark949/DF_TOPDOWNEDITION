@@ -413,3 +413,17 @@ Event-time accepted launches are pending native commands. They revalidate emitte
 `applyImpulseBetween(...,{if_supported:true})` returns null for targets behind any noncombining attachment link, without applying an impulse. The default retains strict rejection. Combined links still route impulse through the native composite mass/inertia calculation. This lets a confirmed hit request optional physical knockback without duplicating attachment traversal in gameplay.
 
 `characterMotor.orbitTarget(target,{radius,angular_speed=.5,phase=0,slot_index=0,slot_count=1,...movement_options})` / `gameCharacter.orbitTarget` follows a moving world-space circular goal using ordinary native pathing, braking, collision and personal-space queries. Slot geometry and trigonometry stay in Basement. Phase starts from the world's simulation time and persists with the motor; identical requests reuse the current path and phase. Slot counts/indices must be integral and in range. A logical squad coordinator may assign slots without calculating physical goal positions or maintaining another spatial index.
+
+### Native impact regions, beams and motion samples
+
+`physicsSystem.testBodyRegion(body, { collision_shape, point, radius = 0 })` tests an authored local shape against a world impact footprint. This uses the same collision detector as physical contacts, without creating a hit body.
+
+`physicsSystem.castBeamFrom(source, { local_position = [0,0], range, width = 1, penetrating = false, include_groups, target, direction, angle })` resolves aim and endpoints and sweeps the shared grid. Returns `{ from, to, rotation, hits }`. Width is the sweep radius. Cover clips the endpoint unless `penetrating` is true; that flag deliberately permits attacks through cover. Hits use the normal query filters and ordering.
+
+`physicsSystem.getBodyMotion(body)` returns detached `{ distance, previous_rotation }` from the most recent fixed step. Animation may read actual travel without owning a second position or velocity history.
+
+`physicsSystem.getConstraint(constraintOrId)` returns the existing immutable handle or null with direct ID lookup. It does not enumerate constraints.
+
+`findWanderPlacement` additionally accepts `inner_range = 0`, bounded by `near_range`. Uniform area sampling chooses an annulus; checked fallback placements inside its inner radius return null.
+
+`characterMotor.setMovement(direction, { angle, speed, acceleration })` optionally overrides acceleration for that request only. Values must be finite and nonnegative. The engine applies the force/velocity change, contacts and locks. Saved overrides are validated before replacement of a live world.

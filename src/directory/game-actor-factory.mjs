@@ -4,7 +4,7 @@ import {importActorAbilities} from './game-abilities.mjs';
 import {jsonCopy} from '../gameplay/values.mjs';
 /** Definitions and explicit old-roster import live in Directory, never in physics. */
 export function createActorPacket(world,{kind='npc',name='',role='civilian',position=[0,0],rotation=0,data={},...packet}={}){
- if(!['npc','ganger','hunter','marionette','gatling_gunner','actor'].includes(kind))throw new TypeError('Unknown actor kind');const record=jsonCopy(data);if(['npc','ganger','hunter','gatling_gunner'].includes(kind))record.actor_loadout_initialized??=record.inventory!=null;
+ if(!['npc','ganger','hunter','marionette','gatling_gunner','drone','velvet_cat','actor'].includes(kind))throw new TypeError('Unknown actor kind');const record=jsonCopy(data);if(['npc','ganger','hunter','gatling_gunner'].includes(kind))record.actor_loadout_initialized??=record.inventory!=null;
  if(record.attackSelection!=null)record.attack_state=validateAttackState(record.attackSelection,()=>true);delete record.attackSelection;
  if(kind==='hunter'){if(record.alpha&&record.dash_max===undefined)record.dash_max=2;record.appearance??=createHunterAppearance({alpha:!!record.alpha});}
  if(kind==='marionette'){const rules=world.elements.asset_library.getResource('df:actor_rules').data.marionette;record.flank_offset??=rules.flank_offsets[Math.floor(Math.random()*rules.flank_offsets.length)];record.cloth??=rules.cloth[Math.floor(Math.random()*rules.cloth.length)];record.appearance_seed??=Math.random()*1000;}

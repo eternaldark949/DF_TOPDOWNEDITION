@@ -19,7 +19,7 @@ export class combatSystem{
   nonnegative(amount,'damage');if(isCombatDead(target)||!amount)return false;
   amount*=this.#policy.incoming_multiplier?.(target,type)??1;nonnegative(amount,'modified damage');
   const source=source_id===null?null:this.#context.api.elements.fetchEntity(source_id);
-  let applied;if(typeof target.takeDamage==='function')applied=target.takeDamage(amount,{source:source_id,type,crit,bypass_invulnerability});else if(typeof target.data.health==='number'){target.data.health=Math.max(0,target.data.health-amount);applied=true;}else return false;
+  let applied;if(typeof target.takeDamage==='function')applied=target.takeDamage(amount,{...detail,source:source_id,type,crit,bypass_invulnerability});else if(typeof target.data.health==='number'){target.data.health=Math.max(0,target.data.health-amount);applied=true;}else return false;
   if(applied===false)return false;target.data.last_hit={source_id,type,crit};
   this.emit('combat:hit',{target_id:target.entity_id,source_id,amount,type,crit,...detail});
   if(isCombatDead(target))this.emit(target.downed?'combat:downed':'combat:killed',{target_id:target.entity_id,source_id,type});return true;

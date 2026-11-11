@@ -143,7 +143,7 @@ export class weaponSystem{
  #applyProjectileHit(event){
   if(event.sensor_only)return;const data=event.projectile?.data,target=event.target_entity;if(!data||!target||!Number.isFinite(data.damage))return;
   const source=this.#context.api.elements.fetchEntity(data.source_id);if(!this.#combat.canDamage(source,target,{source_alliance:data.source_alliance}))return;
-  const damage=Math.round(data.damage*event.impact_scale);if(!this.#combat.damage(target,damage,{source_id:data.source_id,type:data.damage_type??(data.melee?'melee':'ballistic'),crit:data.crit,bypass_invulnerability:!!data.melee,...(data.ability_id?{ability_id:data.ability_id}:{})}))return;
+  const damage=Math.round(data.damage*event.impact_scale);if(!this.#combat.damage(target,damage,{hit_position:event.world_point,hit_radius:event.projectile.collision_shape.radius??0,source_id:data.source_id,type:data.damage_type??(data.melee?'melee':'ballistic'),crit:data.crit,bypass_invulnerability:!!data.melee,...(data.ability_id?{ability_id:data.ability_id}:{})}))return;
   if(data.sticky)this.#combat.attachOrb(target,{damage:data.dot_damage,interval_seconds:data.dot_interval,ticks:data.dot_ticks,max_orbs:data.max_orbs,source_id:data.source_id});
   if(data.knuckles&&data.haymaker)this.#combat.haymaker(target,{damage,source_id:data.source_id});
   if(data.melee&&source===this.#player()){

@@ -48,10 +48,10 @@ export class physicsQueries {
         const r=this.world._record(referenceBody(target)),from=referencePosition(this.world,observer);number(projectile_speed,'projectile_speed',EPS);number(max_seconds,'max_seconds',0);
         const seconds=Math.min(max_seconds,length(sub(r.position,from))/projectile_speed);return {position:add(r.position,scale(r.velocity,seconds)),seconds};
     }
-    findWanderPlacement(body,{origin,near_range=200,angle_sample=.5,radius_sample=.5,...options}={}){
-        number(near_range,'near_range',0);number(angle_sample,'angle_sample',0,1);number(radius_sample,'radius_sample',0,1);
-        const at=origin?vector(origin):referencePosition(this.world,body),radius=Math.sqrt(radius_sample)*near_range,angle=angle_sample*Math.PI*2;
-        return this.findClearPlacement({...options,body,from:at,to:add(at,[Math.cos(angle)*radius,Math.sin(angle)*radius]),query_unmounted:true});
+    findWanderPlacement(body,{origin,near_range=200,inner_range=0,angle_sample=.5,radius_sample=.5,...options}={}){
+        number(near_range,'near_range',0);number(inner_range,'inner_range',0,near_range);number(angle_sample,'angle_sample',0,1);number(radius_sample,'radius_sample',0,1);
+        const at=origin?vector(origin):referencePosition(this.world,body),radius=Math.sqrt(inner_range**2+radius_sample*(near_range**2-inner_range**2)),angle=angle_sample*Math.PI*2;
+        const result=this.findClearPlacement({...options,body,from:at,to:add(at,[Math.cos(angle)*radius,Math.sin(angle)*radius]),query_unmounted:true});return result&&length(sub(result.position,at))+EPS>=inner_range?result:null;
     }
     getBodyBounds(body, { bounds_type = 'collision' } = {}) {
         const r = this.world._record(referenceBody(body));

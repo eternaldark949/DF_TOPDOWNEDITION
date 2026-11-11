@@ -1,0 +1,16 @@
+{
+  "radius": 8,
+  "mass": 3,
+  "follow_offset": [
+    -60,
+    22
+  ],
+  "start_distance": 125,
+  "stop_distance": 90,
+  "sprint_start": 210,
+  "sprint_stop": 105,
+  "walk_speed": 138,
+  "trot_speed": 246,
+  "sprint_speed": 390,
+  "rest_after": 2.5
+}

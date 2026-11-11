@@ -24,7 +24,7 @@ export function createGameRuntime({ game_db, surface, session_state, player, wea
     const weapons=new weaponSystem({session,items:session.items,combat,policy:weapon_policy,input_events:false});
     const abilities=new abilitySystem({weapons,combat,get_player:()=>session.player,policy:ability_policy});
     const attacks=new attackSystem({weapons,abilities,combat,session,definitions:asset_library.getResource('df:attacks').data});
-    const actors=new actorSystem({attacks,combat,session,policy:actor_policy});
+    const actors=new actorSystem({attacks,abilities,combat,session,policy:actor_policy});
     const loot=new lootSystem({items:session.items,get_player:()=>session.player,on_event:(event,detail)=>session.emit(event,detail)});
     if(options.services && ['session','items','player_state','player_controls','combat','weapons','loot','actors','abilities','attacks'].some(key=>Object.hasOwn(options.services,key)))throw new TypeError('Directory owns player services');
     const engine = new gameEngine({ ...options, services:{...options.services,session,items:session.items,player_state,player_controls,combat,weapons,loot,actors,abilities,attacks}, controls:{...controlProfile,...(surface?.addEventListener?{mouse_target:surface}:{}),...options.controls}, asset_library });

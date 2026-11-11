@@ -540,6 +540,19 @@ export class physicsSystem {
     getBodyPoint(body, local_position, { blend = 1, local_rotation = 0 } = {}) {
         return pathGeometry.transformPose(this._renderBody(body, blend, {}), { local_position, local_rotation });
     }
+    /** Detached motion sample from the last fixed step, for presentation and telemetry. */
+    getBodyMotion(body) { const r=this._record(referenceBody(body)); return {distance:length(sub(r.position,r.previous_position)),previous_rotation:r.previous_rotation}; }
+    /** Test an authored local hit region against a world-space impact footprint. */
+    testBodyRegion(body,{collision_shape,point,radius=0}={}) { const r=this._record(referenceBody(body));number(radius,'radius',0);return !!collisionDetector.contact(new collisionShape(collision_shape),pose(r),new collisionShape({shape_type:'circle',radius:Math.max(EPS,radius)}),{position:vector(point),rotation:0}); }
+    /** A finite-width beam uses the shared sweep index; optional cover clipping is native. */
+    castBeamFrom(source,{local_position=[0,0],range,width=1,penetrating=false,include_groups=BODY_GROUP.CHARACTER,...aim}={}) {
+        number(range,'range',0);number(width,'width',EPS);if(typeof penetrating!=='boolean')throw new TypeError('penetrating must be boolean');
+        const r=this._record(referenceBody(source)),from=this.getBodyPoint(source,local_position).position,heading=this.resolveAim(source,aim),end=add(from,scale(heading.direction,range));
+        const blocker=penetrating?null:this.shapeCast({from,to:end,collision_shape:{shape_type:'circle',radius:width},include_groups:BODY_GROUP.STATIC|BODY_GROUP.PROP|BODY_GROUP.VEHICLE,include_ghosts:false,ignore_body:r.handle,max_results:1})[0]??null;
+        const to=blocker?add(from,scale(sub(end,from),blocker.fraction)):end;
+        return {from,to,rotation:heading.rotation,hits:this.shapeCast({from,to,collision_shape:{shape_type:'circle',radius:width},include_groups,include_ghosts:false,ignore_body:r.handle})};
+    }
+    getConstraint(value) { return this.#constraints.get(value?.constraint_id??value)??null; }
     createConstraint(packet) { const id = this.#nextConstraint++, c = new physicsConstraint(this, id, packet); this._mutate(() => this.#constraints.set(id, c)); return c; }
     getBodyConstraints(body, results = []) {
         const r = this._record(body); results.length = 0;
@@ -679,6 +692,7 @@ export class physicsSystem {
                 r.motor = new characterMotor(r.handle, m.config);
                 const target = t => t?.position ?? (t ? this._record(t.body_id).handle : null);
                 r.motor.intent = m.intent ? { ...m.intent, target: target(m.intent.target) } : null;
+                if(r.motor.intent?.acceleration!==undefined)number(r.motor.intent.acceleration,'acceleration',0);
                 if(r.motor.intent?.mode==='orbit'){characterMotor._validateOrbit(r.motor.intent);r.motor.intent.orbit_time=number(r.motor.intent.orbit_time??0,'orbit_time',0);}
                 r.motor.facing = m.facing ? { ...m.facing, target: target(m.facing.target) } : null;
                 r.motor.suspended_for = number(m.suspended_for ?? 0, 'suspended_for', 0);
