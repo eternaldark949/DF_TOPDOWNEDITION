@@ -50,7 +50,7 @@ export function advanceTimedAction(actor,definition,controller,api,combat,{known
  else if(state.phase==='flash'){actor.cancelMovement();if(now-state.phase_started_at>=definition.fire_seconds)return finish();}
  else if(state.phase==='held'){
   const owned=ownedGrapple(world,actor,state),target=owned?.target;
-  if(!target||target.dead||!target.active||target.data.player_state?.flit_remaining>0||(target.data.player_state?.last_flit_at??null)!==state.flit_stamp||world.getAttachmentState(target)||now-state.phase_started_at>=definition.hold_seconds)return finish();
+  if(!target||target.dead||!target.active||definition.stop_when_close&&world.observeTarget(actor,target,{near_range:definition.rest_length}).in_range||target.data.player_state?.flit_remaining>0||(target.data.player_state?.last_flit_at??null)!==state.flit_stamp||world.getAttachmentState(target)||now-state.phase_started_at>=definition.hold_seconds)return finish();
   actor.fleeTarget(target,{speed:40,safety_distance:definition.rest_length*2});target.suspendMovement?.(api.physics.config.fixed_step*2);
   while(now>=state.next_tick_at){state.next_tick_at+=definition.tick_seconds;combat.damage(target,definition.tick_damage,{source_id:actor.entity_id,type:definition.damage_type,bypass_invulnerability:true});if(actor.destroyed||target.destroyed||target.dead)return finish();}
  }

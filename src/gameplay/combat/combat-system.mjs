@@ -28,12 +28,14 @@ export class combatSystem{
   nonnegative(dps,'bleed DPS');nonnegative(seconds,'bleed duration');if(!Number.isSafeInteger(max_stacks)||max_stacks<1)throw new TypeError('Invalid bleed stack limit');if(isCombatDead(target))return false;
   const state=stateFor(target),prior=state.bleed;state.bleed={dps:Math.max(dps,prior?.dps??0),remaining:seconds,next:prior?.next??this.#rules.bleed.interval_seconds,stacks:Math.min(max_stacks,(prior?.stacks??0)+1),source_id:source_id??prior?.source_id??null};this.#targets.add(target.entity_id);return true;
  }
- attachOrb(target,{damage,interval_seconds,ticks=12,max_orbs=4,source_id=null}={}){
+ attachOrb(target,{damage,interval_seconds,ticks=12,max_orbs=4,source_id=null,extinguish_on_flit=false}={}){
   nonnegative(damage,'orb damage');nonnegative(interval_seconds,'orb interval');if(!interval_seconds||!Number.isSafeInteger(ticks)||ticks<1||!Number.isSafeInteger(max_orbs)||max_orbs<1)throw new TypeError('Invalid orb timing/limit');if(isCombatDead(target))return false;
   const state=stateFor(target);let next=interval_seconds;
   if(state.orbs.length>=max_orbs){const oldest=state.orbs.shift();next=oldest.next/oldest.interval_seconds*interval_seconds;}
-  state.orbs.push({damage,interval_seconds,next,ticks,source_id});this.#targets.add(target.entity_id);return true;
+  state.orbs.push({damage,interval_seconds,next,ticks,source_id,...(extinguish_on_flit?{extinguish_on_flit:true,flit_stamp:target.data.player_state?.last_flit_at??null}:{})});this.#targets.add(target.entity_id);return true;
  }
+ reveal(target,seconds){if(this.#context?.engine?.phase==='render')throw new Error('Rendering cannot reveal actors');nonnegative(seconds,'reveal duration');const state=stateFor(target);state.revealed_remaining=Math.max(state.revealed_remaining??0,seconds);this.#targets.add(target.entity_id);this.emit('combat:revealed',{target_id:target.entity_id,seconds});}
+ breakGuard(target,seconds){if(this.#context?.engine?.phase==='render')throw new Error('Rendering cannot break guards');nonnegative(seconds,'guard break duration');const state=stateFor(target);state.guard_remaining=Math.max(state.guard_remaining??0,seconds);if(target.data.weapon_state)target.data.weapon_state.swing=null;this.#targets.add(target.entity_id);this.emit('combat:guard-broken',{target_id:target.entity_id,seconds});}
  haymaker(target,{damage,source_id,boss=!!target.data.boss}={}){
   if(isCombatDead(target))return;const state=stateFor(target),R=this.#rules.knuckles;
   if(!boss||state.boss_resist_remaining<=0){const seconds=boss?R.boss_stagger_seconds:R.stagger_seconds;state.stagger_remaining=Math.max(state.stagger_remaining,seconds);target.cancelMovement?.();target.suspendMovement?.(seconds);if(boss)state.boss_resist_remaining=R.boss_resist_seconds;this.emit('combat:stagger',{target_id:target.entity_id,seconds});}
@@ -47,12 +49,13 @@ export class combatSystem{
  afterPhysics(context){this.advance(context.api.physics.config.fixed_step);}
  advance(seconds){nonnegative(seconds,'combat step');if(this.#context?.engine?.phase==='render')throw new Error('Rendering cannot advance combat');if(this.#context?.engine?.paused)return;for(const id of this.#targets){const target=this.#context.api.elements.fetchEntity(id);if(isCombatDead(target)){this.#targets.delete(id);continue;}const state=stateFor(target),b=state.bleed;
   if(b){b.remaining-=seconds;b.next-=seconds;while(b.next<=1e-9&&b.remaining-b.next>=-1e-9){b.next+=this.#rules.bleed.interval_seconds;this.damage(target,b.dps*this.#rules.bleed.interval_seconds*b.stacks,{source_id:b.source_id,type:'bleed',bypass_invulnerability:true});if(isCombatDead(target))break;}if(b.remaining<=1e-9)state.bleed=null;}
-  for(const orb of state.orbs){orb.next-=seconds;while(orb.next<=1e-9&&orb.ticks>0&&!isCombatDead(target)){orb.next+=orb.interval_seconds;orb.ticks--;this.damage(target,orb.damage,{source_id:orb.source_id,type:'burn',bypass_invulnerability:true});}}state.orbs=state.orbs.filter(orb=>orb.ticks>0);
+  for(const orb of state.orbs){if(orb.extinguish_on_flit&&(target.data.player_state?.flit_remaining>0||(target.data.player_state?.last_flit_at??null)!==orb.flit_stamp)){orb.ticks=0;continue;}orb.next-=seconds;while(orb.next<=1e-9&&orb.ticks>0&&!isCombatDead(target)){orb.next+=orb.interval_seconds;orb.ticks--;this.damage(target,orb.damage,{source_id:orb.source_id,type:'burn',bypass_invulnerability:true});}}state.orbs=state.orbs.filter(orb=>orb.ticks>0);
+  if(state.revealed_remaining!==undefined)state.revealed_remaining=Math.max(0,state.revealed_remaining-seconds);if(state.guard_remaining!==undefined)state.guard_remaining=Math.max(0,state.guard_remaining-seconds);
   state.stagger_remaining=Math.max(0,state.stagger_remaining-seconds);state.boss_resist_remaining=Math.max(0,state.boss_resist_remaining-seconds);if(state.slam){state.slam.remaining-=seconds;if(state.slam.remaining<=0)state.slam=null;}
-  if(!state.bleed&&!state.orbs.length&&!state.stagger_remaining&&!state.boss_resist_remaining&&!state.slam)this.#targets.delete(id);
+  if(!state.bleed&&!state.orbs.length&&!state.stagger_remaining&&!state.boss_resist_remaining&&!state.slam&&!state.revealed_remaining&&!state.guard_remaining)this.#targets.delete(id);
  }}
  reconnectGameplay(){this.#targets.clear();for(const entity of this.#context.api.elements.getEntities())if(entity.data.combat_state){const state=entity.data.combat_state;jsonCopy(state);if(!Array.isArray(state.orbs))throw new TypeError('Invalid orb state');
-  for(const key of ['stagger_remaining','boss_resist_remaining'])nonnegative(state[key],key);
+  for(const key of ['stagger_remaining','boss_resist_remaining'])nonnegative(state[key],key);for(const key of ['revealed_remaining','guard_remaining'])if(state[key]!==undefined)nonnegative(state[key],key);
   if(state.bleed){nonnegative(state.bleed.dps,'bleed DPS');nonnegative(state.bleed.remaining,'bleed duration');if(!Number.isSafeInteger(state.bleed.stacks)||state.bleed.stacks<1||!Number.isFinite(state.bleed.next))throw new TypeError('Invalid bleed state');}
   for(const orb of state.orbs){nonnegative(orb.damage,'orb damage');nonnegative(orb.interval_seconds,'orb interval');if(!orb.interval_seconds||!Number.isSafeInteger(orb.ticks)||orb.ticks<1||!Number.isFinite(orb.next))throw new TypeError('Invalid orb state');}
   if(state.slam){nonnegative(state.slam.damage,'slam damage');nonnegative(state.slam.remaining,'slam timer');}this.#targets.add(entity.entity_id);

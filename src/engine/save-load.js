@@ -506,11 +506,13 @@ engineMixin({
                     const attackCatalog=DFNative.createAttackCatalog({items:DFNative.createItemCatalog(GAME_DB.items),abilities:abilityCatalog});
                     for(const record of [playerData,...(save.teammates??[]),...(worldData.nativeLevel?.physics?.entities??[]).filter(entry=>entry.entity_type==='df_npc'||entry.entity_type==='df_player'||entry.data?.attack_state||entry.data?.abilities||entry.data?.ability_action_state).map(entry=>entry.data)]){
                         DFNative.importActorAbilities(structuredClone(record),abilityCatalog,{default_id:record.role==='red_demon_dancer'?'fireball':null});
+                        DFNative.validateAbilityAction(record.ability_secondary_state,abilityCatalog,{clock:record.weapon_state?.elapsed??-1});if(record.ability_secondary_ready_at!==undefined&&(!Number.isFinite(record.ability_secondary_ready_at)||record.ability_secondary_ready_at<0))throw new TypeError('Invalid secondary ready time');
                         DFNative.validateMountedAttack(record.mounted_attack_state);
                         DFNative.validateAbilityAction(record.ability_action_state,abilityCatalog,{clock:record.weapon_state?.elapsed??-1});
                         if(record.attackSelection??record.attack_state)DFNative.validateAttackState(record.attackSelection??record.attack_state,id=>this.attacks?.registry.hasAttack(id)??!!attackCatalog[id]);
                     }
 
+                    for(const record of worldData.nativeLevel?.physics?.entities??[])DFNative.validateBossRecord(record,abilityCatalog);
                     const loadedVitals=new DFNative.playerVitals();
                     if(playerData.vitals)loadedVitals.load(playerData.vitals);
                     else {

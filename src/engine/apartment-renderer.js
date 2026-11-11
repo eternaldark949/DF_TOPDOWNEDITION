@@ -26,7 +26,7 @@ class ApartmentRenderer {
         ctx.save();ctx.translate(canvas.width/2,canvas.height/2);ctx.scale(zoom,zoom);ctx.translate(-cam.x,-cam.y);
         game.drawApartmentBackdrop(ctx);game.drawApartmentInterior(ctx);
         const bounds={left:cam.x-canvas.width/(2*zoom)-180,right:cam.x+canvas.width/(2*zoom)+180,top:cam.y-canvas.height/(2*zoom)-180,bottom:cam.y+canvas.height/(2*zoom)+180};
-        const visible=world.queryEntitiesInBounds({bounds}),props=[],marionettes=[],gunners=[],drones=[],cats=[],drawnDoors=new Set();PropSprites.frame(zoom);
+        const visible=world.queryEntitiesInBounds({bounds}),props=[],marionettes=[],gunners=[],drones=[],cats=[],demonesses=[],drawnDoors=new Set();PropSprites.frame(zoom);
         for(const{entity:e}of visible){
             if(!e)continue;
             if(e.data.role==='wall'){const p=e.getRenderState(blend),[w,h]=e.collision_shape.dimensions;ctx.fillStyle='#291d2d';ctx.fillRect(p.position[0]-w/2,p.position[1]-h/2,w,h);}
@@ -53,6 +53,9 @@ class ApartmentRenderer {
             }
             if(entity.npc_state?.quip&&entity.npc_state.quip_delay<=0&&entity.npc_state.quip_remaining>0)drawSpeechBubble(ctx,packet.x,packet.y-34,entity.npc_state.quip,1);
         }
+        for(const {entity}of visible)if(entity?.active&&entity.entity_type==='df_demoness'){
+            const packet=DFNative.demonessPresentation(entity,blend);DFNative.demonessAppearance.draw.call(packet,ctx,ctx=>{ctx.save();ctx.translate(packet.x,packet.y);ctx.rotate(packet.angle);drawProceduralHumanoid(ctx,packet,{...packet.look,stance:'idle'});ctx.restore();});demonesses.push(packet);
+        }
         for(const {entity}of visible)if(entity?.active&&entity.entity_type==='df_drone'){const packet=DFNative.dronePresentation(entity,blend);packet.draw(ctx);drones.push(packet);}
         for(const {entity}of visible)if(entity?.active&&entity.entity_type==='df_velvet_cat'){const packet=DFNative.velvetPresentation(entity,blend);packet.draw(ctx);cats.push(packet);}
         for(const {entity}of visible)if(entity?.entity_type==='df_marionette'&&entity.active){
@@ -60,10 +63,10 @@ class ApartmentRenderer {
             const packet={x:pose.position[0],y:pose.position[1],angle:pose.rotation,dead:entity.dead,invincibleTimer:Math.round((entity.data.actor_state?.invulnerable_remaining??0)*60),state:entity.state,phase_age:action?clock-action.phase_started_at:0,render_time:_frameTime/1000,_seed:entity.data.appearance_seed,cloth:entity.data.cloth,_yank:entity.marionette_state.yank_remaining>.4?1:0};
             drawMarionetteAppearance(ctx,packet);marionettes.push(packet);
         }
-        for(const {entity}of visible)if(entity?.entity_type==='df_gatling_gunner'&&entity.active){
+        for(const {entity}of visible)if(['df_gatling_gunner','df_warden','df_vesper','df_matins','df_compline'].includes(entity?.entity_type)&&entity.active){
             const pose=entity.getRenderState(blend),state=entity.gunner_state,action=entity.data.ability_action_state,clock=entity.data.weapon_state?.elapsed??0,rules=entity.getAsset('actor_rules').data.gunner;
             const cooldown=action?.phase==='tell'?Math.max(0,rules.tell_seconds-(clock-action.phase_started_at)):action?.phase==='reload'?Math.max(0,action.reload_seconds-(clock-action.phase_started_at)):0;
-            const packet={x:pose.position[0],y:pose.position[1],angle:pose.rotation,dead:entity.dead,visible:entity.visible,persona:null,invincibleTimer:Math.round((entity.data.actor_state?.invulnerable_remaining??0)*60),_barrelPhase:state.barrel_phase,_barrelHeat:state.barrel_heat,burstCount:action?.phase==='burst'?action.shots_fired:0,burstCooldown:cooldown*60,burstTimer:(entity.data.weapon_state?.cooldown??0)*60,isTelegraphing:entity.isTelegraphing,telegraphAngle:action?.heading??pose.rotation,telegraphThreshold:rules.tell_seconds*60};
+            const packet={x:pose.position[0],y:pose.position[1],angle:pose.rotation,dead:entity.dead,visible:entity.visible,persona:entity.data.persona??null,artScale:entity.data.persona?1.7:1,_eyeK:entity.warden_state?.eye??1,_riseK:entity.warden_state?.rise??1,_heat:entity.gunner_state.barrel_heat,invincibleTimer:Math.round((entity.data.actor_state?.invulnerable_remaining??0)*60),_barrelPhase:state.barrel_phase,_barrelHeat:state.barrel_heat,burstCount:action?.phase==='burst'?action.shots_fired:0,burstCooldown:cooldown*60,burstTimer:(entity.data.weapon_state?.cooldown??0)*60,isTelegraphing:entity.isTelegraphing,telegraphAngle:action?.heading??pose.rotation,telegraphThreshold:rules.tell_seconds*60};
             drawGunnerAppearance(ctx,packet);gunners.push(packet);
         }
         for(const owner of level.curtains){
@@ -78,7 +81,7 @@ class ApartmentRenderer {
         }
         game.drawNoiseRipples(ctx);
         if(game.flitVFX.length)game.drawFlitVFX(ctx);
-        for(const packet of drones)packet.drawLights(ctx);for(const packet of cats){const room=game.roomSystem.getRoomAt(packet.x,packet.y);packet.drawEyeShine(ctx,room?.type==='outdoor'?game.getAmbientDarkness():(room?.lightsOff ? .85 : .18));}game.drawPlayerGlow(ctx);game.drawApartmentGlow(ctx,props);for(const packet of marionettes)drawMarionetteAppearance(ctx,packet,true);for(const packet of gunners)drawGunnerAppearance(ctx,packet,true);
+        for(const packet of demonesses)DFNative.demonessAppearance.drawDuelTells.call(packet,ctx);DFNative.bossEffectAppearance.draw.call({render_clock:level.player.data.weapon_state?.elapsed??0,render_time:_frameTime/1000,_hazards:DFNative.bossEffectPresentation(game.encounters.getEffects(),level.player.data.weapon_state?.elapsed??0),_playerBurn:null,player:null,_smokeK:DFNative.bossEffectAppearance._smokeK},ctx);for(const packet of drones)packet.drawLights(ctx);for(const packet of cats){const room=game.roomSystem.getRoomAt(packet.x,packet.y);packet.drawEyeShine(ctx,room?.type==='outdoor'?game.getAmbientDarkness():(room?.lightsOff ? .85 : .18));}game.drawPlayerGlow(ctx);game.drawApartmentGlow(ctx,props);for(const packet of marionettes)drawMarionetteAppearance(ctx,packet,true);for(const packet of gunners)drawGunnerAppearance(ctx,packet,true);
         for(const{entity:e}of visible)if(e?.data.role==='lamp'){
             const a=e.data.appearance,p=e.getRenderState(blend);if(a.visible!==false)drawLampFixtureLit(ctx,a.fixture??'shade_rose',...p.position,a.color,game.roomSystem.lightAt(...p.position),{angle:a.angle??0});
         }

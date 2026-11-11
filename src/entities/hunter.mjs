@@ -4,6 +4,8 @@ const stateFor=actor=>actor.data.hunter_state??={format_version:1,dash_remaining
 /** Hunter decisions only. Native motors own blink clearance, evasion and all motion. */
 export class Hunter extends Ganger{
  static entity_type='df_hunter';
+ get hunterRules(){return this.getAsset('actor_rules').data.hunter;}
+ get clawAttackId(){return 'hunter_claw';}
  get ignoresConcealment(){return true;}
  get minimumVisibility(){return this.getAsset('actor_rules').data.hunter.minimum_visibility;}
  get hunter_state(){return stateFor(this);}
@@ -11,7 +13,7 @@ export class Hunter extends Ganger{
  updateBehavior(seconds,options={}){
   super.updateBehavior(seconds,options);
   if(this.dead||!this.active||this.physics_system.getAttachmentState(this))return;
-  const state=stateFor(this),rules=this.getAsset('actor_rules').data.hunter,{player,attacks,random=Math.random}=options;
+  const state=stateFor(this),rules=this.hunterRules,{player,attacks,random=Math.random}=options;
   state.dash_remaining=Math.max(0,state.dash_remaining-seconds);
   const evade=state.evade_requested;state.evade_requested=false;
   if(!player||player.dead||player.visible===false||this.ganger_state.interrupt_remaining||this.data.combat_state?.stagger_remaining>0)return;
@@ -31,7 +33,7 @@ export class Hunter extends Ganger{
   }
   // The common attack queue replaces a pending sidearm intent; there is still one cooldown owner.
   const close=world.observeTarget(this,player,{near_range:rules.claw_range});
-  if(close.in_range&&close.line_clear&&attacks.canAttack(this,{attack_id:'ability:hunter_claw'}))attacks.requestAttack(this,{attack_id:'ability:hunter_claw',target:close.position});
+  if(close.in_range&&close.line_clear&&attacks.canAttack(this,{attack_id:`ability:${this.clawAttackId}`}))attacks.requestAttack(this,{attack_id:`ability:${this.clawAttackId}`,target:close.position});
  }
  validateHunter(){this.validateGanger();const state=stateFor(this),maximum=this.data.dash_max??this.getAsset('actor_rules').data.hunter.dash_max;jsonCopy(state);if(state.format_version!==1||!Number.isInteger(maximum)||maximum<1||!Number.isInteger(state.chain)||state.chain<0||state.chain>=maximum||typeof state.evade_requested!=='boolean')throw new TypeError('Invalid saved Hunter state');nonnegative(state.dash_remaining,'dash_remaining');if(this.data.dash_cooldown!==undefined)nonnegative(this.data.dash_cooldown,'dash_cooldown');return this;}
 }

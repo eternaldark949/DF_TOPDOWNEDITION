@@ -1,3 +1,4 @@
+import {createBossRules,createDemonessAppearance} from './game-bosses.mjs';
 import velvetRules from './game-velvet-rules.json' with {type:'json'};
 import {createDroneRules} from './game-drones.mjs';
 import {createGunnerRules} from './game-gunners.mjs';
@@ -30,8 +31,8 @@ export function createGameAssetLibrary({ game_db = { cast, vehicles, enemies, pl
         }
         resource.data = data;
     }
-    definition.resources.abilities={kind:'ability_catalog',data:createAbilityCatalog(game_db.progression?.abilities??progression.abilities,{hunter_kind:game_db.enemies.kinds.hunter,gunner_kind:game_db.enemies.kinds.gatling_gunner,drone_definition:game_db.enemies.drone})};
-    definition.resources.actor_rules={kind:'actor_rules',data:{...actorRules,hunter:createHunterRules(game_db.enemies.kinds.hunter),marionette:createMarionetteRules(),gunner:createGunnerRules(game_db.enemies.kinds.gatling_gunner),drone:createDroneRules(game_db.enemies.drone,game_db.enemies.kinds.drone),velvet_cat:velvetRules}};
+    definition.resources.abilities={kind:'ability_catalog',data:createAbilityCatalog(game_db.progression?.abilities??progression.abilities,{hunter_kind:game_db.enemies.kinds.hunter,gunner_kind:game_db.enemies.kinds.gatling_gunner,drone_definition:game_db.enemies.drone,boss_definitions:game_db.enemies})};
+    definition.resources.actor_rules={kind:'actor_rules',data:{...actorRules,hunter:createHunterRules(game_db.enemies.kinds.hunter),marionette:createMarionetteRules(),gunner:createGunnerRules(game_db.enemies.kinds.gatling_gunner),drone:createDroneRules(game_db.enemies.drone,game_db.enemies.kinds.drone),velvet_cat:velvetRules,bosses:createBossRules(game_db.enemies),elites:game_db.enemies.elites,demoness_hunter:createHunterRules(game_db.enemies.kinds.demoness)}};
     definition.resources.actor_items={kind:'item_catalog',data:createItemCatalog(game_db.items,{enemy_kinds:game_db.enemies.kinds})};
     definition.resources.actor_appearances={kind:'appearance_catalog',data:game_db.cast.appearances};
     definition.resources.attacks={kind:'attack_catalog',data:createAttackCatalog({items:definition.resources.actor_items.data,abilities:definition.resources.abilities.data})};
@@ -46,5 +47,10 @@ export function createGameAssetLibrary({ game_db = { cast, vehicles, enemies, pl
     const drone=createDroneRules(game_db.enemies.drone,game_db.enemies.kinds.drone);
     definition.templates.drone={extends:'actor',entity_type:'df_drone',mass:drone.mass,collision_shape:{shape_type:'circle',radius:drone.radius},render_shape:{shape_type:'box',dimensions:[160,700],local_position:[0,-100]},data:{health:drone.health,max_health:drone.health,damage_grace_seconds:drone.damage_grace_seconds,alliance:'hostile',drone_kind:'lancer',appearance_seed:0,abilities:{format_version:1,known_ids:['drone_lance','drone_grapple','drone_beam','drone_bolt','drone_landing'],equipped_id:null}}};
     definition.templates.velvet_cat={extends:'actor',entity_type:'df_velvet_cat',mass:3,collision_shape:{shape_type:'circle',radius:8},render_shape:{shape_type:'circle',radius:45},data:{health:999999,max_health:999999,damage_grace_seconds:999/60,alliance:'friendly',adopted:false,coat_palette:'default'}};
+    const boss=game_db.enemies.kinds.demoness;
+    definition.templates.demoness={extends:'hunter',entity_type:'df_demoness',render_shape:{shape_type:'circle',radius:90},data:{boss:true,boss_name:'Lilitu, the Demoness',health:boss.hp,max_health:boss.hp,move_speed:boss.speed*60,vision_range:boss.vision_range,dash_max:boss.dashes,dash_cooldown:boss.dash_cd/60,telegraph_seconds:boss.telegraph_frames/60,weapon_definition_id:null,appearance:createDemonessAppearance(),solo:false,decoy:false,dormant:false,abilities:{format_version:1,known_ids:['demoness_claw','demoness_whip','demoness_whip_double','demoness_bolts','demoness_sigils','demoness_step','demoness_gale','demoness_mirror','demoness_rite'],equipped_id:null}}};
+    definition.templates.warden={extends:'gatling_gunner',entity_type:'df_warden',mass:gunner.mass,collision_shape:{shape_type:'circle',radius:30},render_shape:{shape_type:'circle',radius:120},data:{boss:true,health:game_db.enemies.warden.HP,max_health:game_db.enemies.warden.HP,persona:'vesper',squad_id:'sanctum',abilities:{format_version:1,known_ids:['warden_burst','warden_censer','warden_hymn','warden_hook'],equipped_id:null}}};
+    for(const persona of ['vesper','matins','compline'])definition.templates[persona]={extends:'warden',entity_type:`df_${persona}`,data:{persona,boss_name:game_db.enemies.wardens[persona].name,formation_order:['vesper','matins','compline'].indexOf(persona)}};
+    definition.templates.boss_effect={entity_type:'df_boss_effect',physics_type:'kinematic',ghost:true,mass:1,collision_group:32,collision_mask:0,collision_shape:{shape_type:'circle',radius:1},data:{role:'boss_effect'}};
     return new assetLibrary({ libraries: [definition, streetDefinitions] });
 }

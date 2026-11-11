@@ -427,3 +427,13 @@ Event-time accepted launches are pending native commands. They revalidate emitte
 `findWanderPlacement` additionally accepts `inner_range = 0`, bounded by `near_range`. Uniform area sampling chooses an annulus; checked fallback placements inside its inner radius return null.
 
 `characterMotor.setMovement(direction, { angle, speed, acceleration })` optionally overrides acceleration for that request only. Values must be finite and nonnegative. The engine applies the force/velocity change, contacts and locks. Saved overrides are validated before replacement of a live world.
+
+### Encounter geometry requests
+
+`isDirectionInArc(body, direction, { half_angle = Math.PI })` tests a world direction against native body facing. Projectile hit events include the engine-produced `incoming_direction` (toward the projectile's origin), allowing directional shields without gameplay angle/vector calculations.
+
+`queryRadialRegion(source, { radius, radius_to = radius, progress = 0, previous_progress = progress, thickness = null, outside = false, limit_radius, include_groups, ...filters })` returns `{ radius, hits }` using the existing spatial grid. A thickness requests a radial band swept between previous/current progress, so an expanding pulse does not skip crossed targets. `outside:true` queries outside the interpolated safe radius but inside a required finite `limit_radius`. Body extents are included. No unbounded world scan occurs.
+
+`findRelativePlacement(body, anchor, { distance, angle_offsets = [Math.PI], ...options })` tests authored angles in the anchor's frame. A full candidate must have a clear landing and anchor-to-candidate sweep; blocked fallbacks return null. The caller can recheck the committed destination with `isPlacementClear` before teleporting.
+
+`findFiringPlacement(body, target, { near_range = 420, inner_range = 140, max_candidates = 24 })` searches a bounded native candidate sequence for a clear landing, line of fire and path from the source. It reuses shared-grid placement, ray and path queries; it creates no actor-owned navigation index.

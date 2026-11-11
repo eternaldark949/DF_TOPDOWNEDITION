@@ -65,3 +65,13 @@ export {VelvetCat} from '../entities/velvet-cat.mjs';
 export {velvetCatAppearance,createVelvetAnimation,velvetPresentation} from '../presentation/velvet-cat.mjs';
 export {droneAppearance,dronePresentation} from '../presentation/drone.mjs';
 export {VELVET_CAT_PALETTES,VELVET_T,VELVET_PROFILES,VELVET_GAITS,VELVET_TAIL_SEGS} from './game-velvet-appearance.mjs';
+
+export {Demoness} from '../entities/demoness.mjs';
+export {Warden,Vesper,Matins,Compline} from '../entities/warden.mjs';
+export {BossEffect} from '../entities/boss-effect.mjs';
+export {encounterSystem} from '../gameplay/encounters/encounter-system.mjs';
+export {createBossAbilities,createDemonessAppearance} from './game-bosses.mjs';
+export {demonessAppearance,demonessPresentation} from '../presentation/demoness.mjs';
+export {bossEffectAppearance,bossEffectPresentation} from '../presentation/boss-effects.mjs';
+
+export {validateBossRecord} from './validate-boss-records.mjs';

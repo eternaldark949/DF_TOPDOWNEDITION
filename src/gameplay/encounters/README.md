@@ -1,0 +1,26 @@
+# Native encounter API
+
+`encounterSystem` coordinates logical boss rules over the same runtime, clock and registered entities as ordinary actors. Directory constructs it as `api.encounters`; the native apartment host uses the same class as `game.encounters`. It imports no legacy game engine or physics helper. `setActors(actors)` binds the official actor factory for summoned actors.
+
+| Request | Behavior |
+| --- | --- |
+| `addEffect(owner,kind,position,options)` | Register an actual `BossEffect` (`df_boss_effect`) for `sigil`, `fire`, `smoke`, `censer`, `hymn` or `rite`. The record stores its real owner ID, age, duration and hit IDs. Authored overrides can adjust radius, duration, damage, burn DPS and flight-origin presentation. |
+| `getEffects()` | Return the active registered effect entities. Presentation must create detached packets before drawing. |
+| `clearOwner(ownerOrId)` | Retire the owner's effects through the normal world lifetime. |
+| `smokeBlocks(source,targetOrPosition)` | Ask the shared spatial grid for smoke intersecting the line. It creates no private smoke index. |
+| `getWardenOrders(actor)` | Read the current shared squad decision: sight, reveal, cover, aim and flanker assignment. |
+| `getBurstPolicy(actor)` | Supply native burst execution with cover/reveal permission and bounded extension policy. Ordinary actors receive null. |
+| `trackActor`, `untrackActor`, `actorDefeated` | Actor-system lifetime hooks, including squad membership, survivor enrage and decoy/effect cleanup. |
+| `executePattern` | Shared ability executor entry point for Directory-authored patterns. Normal clients learn/request an ability through the ability API. |
+
+`beforePhysics` advances only active effect records and registered Warden squads. A member's range/sight comes from Basement; a smoke query uses that same grid. One squad pass collects observations and firing/reload counts; one follow-up pass assigns orders. Each squad chooses at most one flanker. That actor asks Basement for a bounded, path-reachable firing placement at most once per second. Death enrage and mirror-owner cleanup use logical owner/squad maps. There is no per-frame registry discovery, pairwise separation loop or second navigation grid.
+
+Sigils arm and hit once, then leave fire. Censers have a telegraphed landing followed by fire and smoke. Hymns query a swept radial band, hit each eligible target once and apply the shared reveal status through walls. Rites query the shrinking safe region's outside within the authored finite encounter radius (currently 1,800 pixels). Effects respect allegiance, Flit and mounted-target exclusion. Their damage/status policy is gameplay; all hit geometry and movement/impulses are Basement requests. Censer flight is presentation of a timed landing effect, not a colliding ballistic body.
+
+Effects use real sensor entities in the engine grid. Smoke deliberately affects sensing rather than becoming a solid wall. `combatSystem.reveal(target,seconds)` and `breakGuard(target,seconds)` own their saved countdowns. `attachOrb(...,{extinguish_on_flit:true})` shares the existing burn executor and clears when a native Flit occurs. Guard breaking clears a current blade swing; the common readiness check blocks melee during recovery. No item is deleted by a guard break.
+
+Pattern abilities use the existing weapon clock. `delivery:'pattern'` supports the ember fan, whip/repeated whip, shadow step, sigils, gale, mirror summons, rite, censer and hymn. Shadow Step commits an engine-selected target-relative landing during its tell and checks that exact landing again before teleporting. Its blink has a checked destination; this teleport intentionally does not require a clear path from Lilitu's old position. Gale uses a native cone query and impulse, briefly suspends the target's motor and applies guard break. Mirror asks for checked placements and creates real one-hit Demoness decoys through `api.actors.spawn`; a shuffled logical slot assignment can place the real actor in any available slot.
+
+`abilities.cast(actor,id,aim,{channel:'secondary'})` is available to every native character for definitions explicitly marked `allow_secondary` (currently censer and hymn). It does not replace the primary action or weapon cooldown. Its ready-at timestamp and tell use the same existing clock, with no independent simulation timer. This preserves Vesper/Matins specials alongside their owned-weapon burst. Compline's physical grapple occupies the primary action. `getActionState(actor,{channel:'secondary'})` returns a detached record; `cancelAction(actor,{channel:'primary'|'secondary'|'all'})` defaults to cancelling both. Pause freezes both channels; departure clears both and retires effects. Both channels and effect records have data-only save preflight before live replacement.
+
+`demonessAppearance`, `bossEffectAppearance` and the existing gunner artist retain the Canvas art separately from actor behavior. Both native and classic callers share it. Drawing does not advance effects or change entity state. Renderer-neutral artwork conversion, full humanoid animation/lighting parity, scripted intros, arena/quest progression, death rewards and production wave factories remain separate integration work.

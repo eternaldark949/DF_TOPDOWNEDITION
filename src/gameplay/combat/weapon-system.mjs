@@ -16,7 +16,7 @@ export class weaponSystem{
  get cooldown_seconds(){return this.state?.cooldown??0;}
  get holstered(){return this.state?.holstered??false;}
  get active_swing(){return this.state?.swing??null;}
- get guarding(){const state=this.state;return !!state?.swing&&!state.holstered&&state.elapsed-state.swing.started<=state.swing.seconds;}
+ get guarding(){const state=this.state;return !(this.#player()?.data.combat_state?.guard_remaining>0)&&!!state?.swing&&!state.holstered&&state.elapsed-state.swing.started<=state.swing.seconds;}
  attach(context){if(this.#context)throw new Error('Weapons already attached');this.#context=context;this.reconnectGameplay();
   if(this.#projectileEvents)this.#unsubscribes.push(context.api.physics.on('projectileHit',event=>this.#projectileHit(event)),context.api.physics.on('projectileRedirected',event=>{const data=event.projectile?.data;if(!data)return;data.source_id=event.owner_id;const owner=context.api.elements.fetchEntity(event.owner_id);data.source_alliance=owner?.alliance??owner?.data.alliance??null;if(data.pending_deflection){data.deflected=data.pending_deflection;delete data.pending_deflection;this.#emit('weapon:deflected',{projectile_id:event.projectile.entity_id,by:data.deflected});}}),context.api.physics.onProjectileContact(event=>this.#contactPolicy(event)));
   if(this.#session&&this.#inputEvents)this.#unsubscribes.push(this.#session.on('player:fire',event=>this.requestFire(event.aim??{})),this.#session.on('player:fire-released',event=>{if(this.quick_draw)this.requestQuickDraw(Object.keys(event.aim??{}).length?event.aim:this.#lastAim);}));
@@ -55,9 +55,9 @@ export class weaponSystem{
   }
   this.#updateSwing(player,state,seconds);
  }
- canExecute(){
+ canExecute({ignore_action=false,ignore_cooldown=false}={}){
   const actor=this.#player(),state=this.state,context=this.#context;
-  return !!context&&context.engine?.running!==false&&context.engine?.active_level!==null&&(!state?.quick_draw||this.#quickFiring)&&!!actor&&!isCombatDead(actor)&&(!actor.data.ability_action_state||this.#actionFiring)&&actor.active!==false&&actor.visible!==false&&state.cooldown<=1e-9&&!state.holstered&&!context.engine?.paused&&this.#policy.can_fire?.()!==false&&(!context.api.physics.getAttachmentState(actor)||context.api.physics.getMountedLaunchState(actor,{check_clearance:false}).allowed);
+  return !!context&&context.engine?.running!==false&&context.engine?.active_level!==null&&(!state?.quick_draw||this.#quickFiring)&&!!actor&&!isCombatDead(actor)&&(!actor.data.ability_action_state||this.#actionFiring||ignore_action)&&actor.active!==false&&actor.visible!==false&&(ignore_cooldown||state.cooldown<=1e-9)&&!state.holstered&&!context.engine?.paused&&(!(actor.data.combat_state?.guard_remaining>0)||!['melee','fists'].includes(this.#items.getEquippedWeapon()?.weaponMode??'fists'))&&this.#policy.can_fire?.()!==false&&(!context.api.physics.getAttachmentState(actor)||context.api.physics.getMountedLaunchState(actor,{check_clearance:false}).allowed);
  }
  fireActionRound(action,aim={}){
   const actor=this.#player();if(!action||actor?.data.ability_action_state!==action||action.phase!=='burst'||this.#items.getEquippedWeapon()?.instance_id!==action.weapon_instance_id)return false;
@@ -143,6 +143,7 @@ export class weaponSystem{
  #applyProjectileHit(event){
   if(event.sensor_only)return;const data=event.projectile?.data,target=event.target_entity;if(!data||!target||!Number.isFinite(data.damage))return;
   const source=this.#context.api.elements.fetchEntity(data.source_id);if(!this.#combat.canDamage(source,target,{source_alliance:data.source_alliance}))return;
+  if(target.interceptProjectile?.(event))return;
   const damage=Math.round(data.damage*event.impact_scale);if(!this.#combat.damage(target,damage,{hit_position:event.world_point,hit_radius:event.projectile.collision_shape.radius??0,source_id:data.source_id,type:data.damage_type??(data.melee?'melee':'ballistic'),crit:data.crit,bypass_invulnerability:!!data.melee,...(data.ability_id?{ability_id:data.ability_id}:{})}))return;
   if(data.sticky)this.#combat.attachOrb(target,{damage:data.dot_damage,interval_seconds:data.dot_interval,ticks:data.dot_ticks,max_orbs:data.max_orbs,source_id:data.source_id});
   if(data.knuckles&&data.haymaker)this.#combat.haymaker(target,{damage,source_id:data.source_id});

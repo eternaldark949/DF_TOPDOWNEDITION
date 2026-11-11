@@ -6,6 +6,7 @@ const stateFor=actor=>actor.data.ganger_state??={format_version:1,state:'IDLE',s
 /** Native stealth/combat policy. Awareness, leading, pathing and contact response stay in Basement. */
 export class Ganger extends gameActor{
  static entity_type='df_ganger';
+ get usesSidearm(){return true;}
  get ignoresConcealment(){return false;}
  get minimumVisibility(){return 0;}
  get items(){return actorItems(this.data,`actor:${this.entity_id}`,this.getAsset('items').data);}
@@ -35,10 +36,10 @@ export class Ganger extends gameActor{
    this.lookAtTarget(player);if(view.distance>rules.engage_distance)this.followTarget(player,{speed:this.data.move_speed,arrival_distance:rules.engage_distance,face_movement:false});else if(view.distance<rules.retreat_distance)this.fleeTarget(player,{speed:rules.retreat_speed,safety_distance:rules.retreat_distance});else this.cancelMovement();
    const stats=this.items.getEquippedWeapon()?.stats??{},attack=attacks.getAttackProfile(this),lead=world.predictTargetPosition(this,player,{projectile_speed:attack.projectile_speed??(stats.projectileSpeed??24)*60});
    state.telegraphing=sees&&state.shot_delay>0&&state.shot_delay<=this.data.telegraph_seconds&&!state.interrupt_remaining;state.aim_position=state.telegraphing?lead.position:state.aim_position;
-   if(sees&&!state.shot_delay&&!state.interrupt_remaining){attacks.requestAttack(this,{target:state.aim_position??lead.position});state.shot_delay=(attack.cooldown_seconds??(stats.fireRate??45)/60)+random()*rules.shot_jitter_seconds;state.telegraphing=false;}
+   if(this.usesSidearm&&sees&&!state.shot_delay&&!state.interrupt_remaining){attacks.requestAttack(this,{target:state.aim_position??lead.position});state.shot_delay=(attack.cooldown_seconds??(stats.fireRate??45)/60)+random()*rules.shot_jitter_seconds;state.telegraphing=false;}
   }else if(state.state==='SUPPRESSING'){
    this.cancelMovement();state.telegraphing=false;
-   if(state.investigate_position){this.lookAtTarget(state.investigate_position);const clear=world.observeTarget(this,state.investigate_position).line_clear;if((clear||attacks.getAttackProfile(this).penetrating)&&!state.shot_delay&&!state.interrupt_remaining){attacks.requestAttack(this,{target:state.investigate_position});state.shot_delay=rules.suppression_cooldown;}}
+   if(state.investigate_position){this.lookAtTarget(state.investigate_position);const clear=world.observeTarget(this,state.investigate_position).line_clear;if(this.usesSidearm&&(clear||attacks.getAttackProfile(this).penetrating)&&!state.shot_delay&&!state.interrupt_remaining){attacks.requestAttack(this,{target:state.investigate_position});state.shot_delay=rules.suppression_cooldown;}}
    if(!state.suppression_remaining){this.setBehavior('SEARCHING');state.search_elapsed=0;state.search_positions=jsonCopy(search_points);}
   }else if(state.state==='SEARCHING'){
    state.telegraphing=false;state.search_elapsed+=seconds;
@@ -51,5 +52,5 @@ export class Ganger extends gameActor{
    if(state.wander_position)this.moveTo(state.wander_position,{speed:rules.wander_speed,face_movement:true});else this.cancelMovement();
   }
  }
- validateGanger(){for(const key of ['vision_range','move_speed','telegraph_seconds'])nonnegative(this.data[key],key);const state=stateFor(this);jsonCopy(state);if(state.format_version!==1||!states.includes(state.state))throw new TypeError('Invalid saved ganger state');for(const key of ['suspicion','drain_remaining','suppression_remaining','look_elapsed','wander_remaining','search_elapsed','interrupt_remaining','resistance_remaining','shot_delay'])nonnegative(state[key],key);if(state.suspicion>100)throw new TypeError('Invalid suspicion');this.items;return this;}
+ validateGanger(){if(this.data.elite){const state=this.data.elite_state;if(!Object.hasOwn(this.getAsset('actor_rules').data.elites.marks,this.data.elite)||state?.format_version!==1)throw new TypeError('Invalid elite state');nonnegative(state.ward,'elite ward');}for(const key of ['vision_range','move_speed','telegraph_seconds'])nonnegative(this.data[key],key);const state=stateFor(this);jsonCopy(state);if(state.format_version!==1||!states.includes(state.state))throw new TypeError('Invalid saved ganger state');for(const key of ['suspicion','drain_remaining','suppression_remaining','look_elapsed','wander_remaining','search_elapsed','interrupt_remaining','resistance_remaining','shot_delay'])nonnegative(state[key],key);if(state.suspicion>100)throw new TypeError('Invalid suspicion');this.items;return this;}
 }

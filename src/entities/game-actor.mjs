@@ -27,9 +27,11 @@ export class gameActor extends gameCharacter{
  takeDamage(amount,{source=null,type='contact',bypass_invulnerability=false,impulse}={}){
   nonnegative(amount,'damage');if(this.dead||!amount)return false;const state=stateFor(this),bypass=bypass_invulnerability||['ballistic','energy','melee','bleed','burn','slam'].includes(type);
   if(!bypass&&state.invulnerable_remaining>0)return false;if(impulse)this.body.applyImpulse(impulse);
+  if(this.data.elite==='armored'&&['burn','bleed'].includes(type))amount*=.5;
   const applied=this.vitals.damage(amount);this.data.last_hit={source_id:source,type};if(!bypass)state.invulnerable_remaining=this.data.damage_grace_seconds??0;
   this.onDamaged({amount:applied,source,type});this.emitActor('actor:damaged',{amount:applied,source,type,health:this.hp});if(this.hp===0)this.die({source,type});return true;
  }
+ interceptProjectile(event){const state=this.data.elite_state;if(this.data.elite!=='warded'||!state||state.ward<=0||event.projectile.data.damage_type==='melee'||event.projectile.data.melee)return false;const arc=this.getAsset('actor_rules').data.elites.ward.ARC;if(!event.incoming_direction||!this.physics_system.isDirectionInArc(this,event.incoming_direction,{half_angle:arc}))return false;state.ward=Math.max(0,state.ward-event.projectile.data.damage*event.impact_scale);this.emitActor(state.ward?'elite:ward-hit':'elite:ward-broken');return true;}
  onDamaged(){}
  die({source=null,type='contact'}={}){const state=stateFor(this);if(state.defeated)return false;state.defeated=true;this.cancelMovement();this.deactivate();this.onDefeated();this.emitActor('actor:defeated',{source,type});return true;}
  onDefeated(){}

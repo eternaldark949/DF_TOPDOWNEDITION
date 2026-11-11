@@ -350,7 +350,7 @@ export class physicsSystem {
                 const sensor = r.config.ghost || target.config.ghost;
                 if (!sensor && motor.config.impact_strength) changeVelocity(target, scale(unit(r.velocity), motor.config.impact_strength * motor.impact_scale), contact.world_point);
                 this.#report(r, target, contact);
-                this._emit('projectileHit', { projectile: this.elements.fetchEntity(r.id) ?? motor, body: r.handle, target_body: target.handle, world_point: [...contact.world_point], normal: [...contact.normal], fraction: contact.fraction, impact_scale: motor.impact_scale, sensor_only: sensor });
+                this._emit('projectileHit', { projectile: this.elements.fetchEntity(r.id) ?? motor, body: r.handle, target_body: target.handle, world_point: [...contact.world_point], incoming_direction:scale(unit(r.velocity),-1),normal: [...contact.normal], fraction: contact.fraction, impact_scale: motor.impact_scale, sensor_only: sensor });
                 if (!sensor) {
                     motor.physical_hits++;
                     if (motor.physical_hits > motor.config.penetration_count) {
@@ -541,6 +541,28 @@ export class physicsSystem {
         return pathGeometry.transformPose(this._renderBody(body, blend, {}), { local_position, local_rotation });
     }
     /** Detached motion sample from the last fixed step, for presentation and telemetry. */
+    /** Shared-grid radial region, including swept expanding rings and bounded outside-safe zones. */
+    isDirectionInArc(body,direction,{half_angle=Math.PI}={}){const r=this._record(referenceBody(body)),v=vector(direction);number(half_angle,'half_angle',0,Math.PI);return length(v)>EPS&&Math.abs(Math.atan2(Math.sin(Math.atan2(v[1],v[0])-r.rotation),Math.cos(Math.atan2(v[1],v[0])-r.rotation)))<=half_angle;}
+    queryRadialRegion(source,{radius,radius_to=radius,progress=0,previous_progress=progress,thickness=null,outside=false,limit_radius,include_groups=BODY_GROUP.CHARACTER,...filters}={}) {
+        number(radius,'radius',0);number(radius_to,'radius_to',0);number(progress,'progress',0,1);number(previous_progress,'previous_progress',0,1);
+        if(thickness!==null)number(thickness,'thickness',0);if(typeof outside!=='boolean')throw new TypeError('outside must be boolean');
+        const r=this._record(referenceBody(source)),current=radius+(radius_to-radius)*progress,prior=radius+(radius_to-radius)*previous_progress;
+        let inner=outside?current:thickness===null?0:Math.max(0,Math.min(prior,current)-thickness),outer=outside?number(limit_radius,'limit_radius',current):thickness===null?current:Math.max(prior,current)+thickness;
+        const hits=this.overlapShape({...filters,collision_shape:{shape_type:'circle',radius:Math.max(EPS,outer)},position:r.position,include_groups,include_ghosts:false,ignore_body:r.handle}).filter(hit=>{const target=this._record(hit.body),distance=length(sub(target.position,r.position)),reach=shapeReach(target.shape);return distance+reach>=inner&&distance-reach<=outer;});
+        return {radius:current,hits};
+    }
+    /** Native authored-frame placement, checked from the anchor to each candidate. */
+    findRelativePlacement(body,anchor,{distance,angle_offsets=[Math.PI],...options}={}) {
+        number(distance,'distance',0);if(!Array.isArray(angle_offsets)||!angle_offsets.length)throw new TypeError('Expected relative angles');
+        const origin=referencePosition(this,anchor),rotation=Array.isArray(anchor)?0:this._record(referenceBody(anchor)).rotation;
+        for(const angle of angle_offsets){number(angle,'angle offset');const to=add(origin,scale([Math.cos(rotation+angle),Math.sin(rotation+angle)],distance)),landing=this.findClearPlacement({...options,body,from:origin,to,query_unmounted:true,include_ghosts:false});if(landing&&landing.fraction>=1-EPS&&this.getPathClearance({body,from:origin,to:landing.position,include_ghosts:false,ignore_body:[referenceBody(body),...(Array.isArray(anchor)?[]:[referenceBody(anchor)])]}).clear)return landing;}
+        return null;
+    }
+    /** Ranged tactical placement uses native path/sight queries with a bounded candidate budget. */
+    findFiringPlacement(body,target,{near_range=420,inner_range=140,max_candidates=24}={}) {
+        number(max_candidates,'max_candidates',1,256);if(!Number.isInteger(max_candidates))throw new TypeError('Candidate count must be integral');const at=referencePosition(this,target);
+        for(let i=0;i<max_candidates;i++){const spot=this.findWanderPlacement(body,{origin:at,near_range,inner_range,angle_sample:i/max_candidates,radius_sample:(i%3)/2,include_ghosts:false});if(!spot)continue;if(this.raycast({from:spot.position,to:at,include_groups:BODY_GROUP.STATIC|BODY_GROUP.PROP|BODY_GROUP.VEHICLE,ignore_body:[referenceBody(body),...(Array.isArray(target)?[]:[referenceBody(target)])],include_ghosts:false}))continue;const path=this.findPath({body,to:spot.position});if(path)return spot;}return null;
+    }
     getBodyMotion(body) { const r=this._record(referenceBody(body)); return {distance:length(sub(r.position,r.previous_position)),previous_rotation:r.previous_rotation}; }
     /** Test an authored local hit region against a world-space impact footprint. */
     testBodyRegion(body,{collision_shape,point,radius=0}={}) { const r=this._record(referenceBody(body));number(radius,'radius',0);return !!collisionDetector.contact(new collisionShape(collision_shape),pose(r),new collisionShape({shape_type:'circle',radius:Math.max(EPS,radius)}),{position:vector(point),rotation:0}); }

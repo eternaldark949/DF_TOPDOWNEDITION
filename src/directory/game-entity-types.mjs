@@ -1,3 +1,6 @@
+import {Demoness} from '../entities/demoness.mjs';
+import {Warden,Vesper,Matins,Compline} from '../entities/warden.mjs';
+import {BossEffect} from '../entities/boss-effect.mjs';
 import {Drone} from '../entities/drone.mjs';
 import {VelvetCat} from '../entities/velvet-cat.mjs';
 import {GatlingGunner} from '../entities/gatling-gunner.mjs';
@@ -12,6 +15,6 @@ import {WorldLoot} from '../entities/world-loot.mjs';
 import {registerStreetEntityTypes} from './game-street.mjs';
 /** The Directory registers concrete classes before any level or saved identity is constructed. */
 export function registerGameEntityTypes(world){
- for(const Class of [gameActor,Player,ApartmentProp,NPC,Ganger,Hunter,Marionette,GatlingGunner,Drone,VelvetCat,WorldLoot])if(!world.elements.listEntityTypes().includes(Class.entity_type))world.elements.registerEntityType(Class.entity_type,Class);
+ for(const Class of [gameActor,Player,ApartmentProp,NPC,Ganger,Hunter,Marionette,GatlingGunner,Demoness,Warden,Vesper,Matins,Compline,BossEffect,Drone,VelvetCat,WorldLoot])if(!world.elements.listEntityTypes().includes(Class.entity_type))world.elements.registerEntityType(Class.entity_type,Class);
  registerStreetEntityTypes(world);
 }
