@@ -1,0 +1,5 @@
+{
+ "health":100,"authoring_hz":60,"damage_grace_seconds":0,
+ "npc":{"follow_distance":60,"recover_distance":300,"cruise_speed":210,"match_speed":312,"catchup_speed":420,"match_distance":30,"catchup_distance":100,"combat_range":400,"recovery_delay":3,"regeneration_interval":0.5,"regeneration_amount":1,"stim_threshold":0.3,"stim_heal":50,"stim_cooldown":2,"stim_count":3,"aura_range":120,"aura_interval":1,"hire_cost":400,"hire_minutes":480},
+ "ganger":{"vision_fov":1.2566370614359172,"personal_space":50,"touch_distance":32,"suspicion_near_per_second":300,"suspicion_sight_per_second":150,"suspicion_idle_drain_per_second":30,"suspicion_search_drain_per_second":6,"suspicion_decay_delay":2,"noise_decay_delay":3,"suppression_seconds":1.5,"suppression_cooldown":0.25,"search_speed":90,"retreat_speed":90,"engage_distance":150,"retreat_distance":80,"search_arrival":40,"wander_speed":30,"wander_radius":200,"wander_min_seconds":2,"wander_random_seconds":3.3333333333333335,"search_look_seconds":0.75,"search_timeout":5,"interrupt_seconds":0.2,"interrupt_resistance":0.65,"shot_jitter_seconds":0.3333333333333333}
+}

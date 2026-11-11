@@ -40,6 +40,33 @@ jobs:
       - name: Check the render system and the frame's canvas-call budget
         run: node tools/test-render-system.cjs
 
+      - name: Check native systems, runtime and player ownership
+        run: >-
+          node --test src/basement/physics/tests/*.test.mjs
+          src/basement/controls/tests/*.test.mjs src/basement/rendering/tests/*.test.mjs
+          tools/test-game-physics-scenarios.mjs tools/test-entity-assets.mjs
+          tools/test-street-population.mjs tools/test-player-systems.mjs tools/test-player-vitals.mjs
+          tools/test-game-engine.mjs tools/test-native-bundle.mjs
+          tools/test-item-system.mjs tools/test-weapon-appearance.mjs tools/test-combat-systems.mjs
+          tools/test-actor-systems.mjs tools/test-ability-systems.mjs tools/test-attack-systems.mjs tools/test-mounted-attacks.mjs tools/test-hunter-systems.mjs tools/test-marionette-systems.mjs tools/test-gunner-systems.mjs tools/test-drone-cat-systems.mjs tools/test-boss-systems.mjs tools/test-actor-art-packets.mjs tools/test-humanoid-system.mjs
+
+      - name: Check player-state callers in the playable build
+        run: |
+          node tools/test-player-state-callers.cjs
+          node tools/test-item-callers.cjs
+          node tools/test-native-combat-callers.cjs
+          node tools/test-actor-callers.cjs
+          node tools/test-hunter-callers.cjs
+          node tools/test-marionette-callers.cjs
+          node tools/test-gunner-callers.cjs
+          node tools/test-drone-cat-callers.cjs
+          node tools/test-boss-callers.cjs
+          node tools/test-humanoid-callers.cjs
+          node tools/test-apartment-parity.cjs
+          node tools/test-ability-callers.cjs
+          node tools/test-attack-callers.cjs
+          node tools/test-mounted-attack-callers.cjs
+
       - name: Check gameplay and rendering regressions
         run: node tools/test-game-regressions.cjs
 

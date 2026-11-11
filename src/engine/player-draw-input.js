@@ -2,8 +2,8 @@
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
             /** An unanimated ivory diamond below the player, sized in CSS pixels rather than world units. */
-            drawPlayerMarker(ctx) {
-                const p = this.player;
+            drawPlayerMarker(ctx, presentation = this.player) {
+                const p = presentation;
                 if (!this.running || !p || !p.visible || p.isHidden || p.dead || this.isDriving || p.inCar ||
                     (this.scenes && this.scenes.running) || (this.cutscene && this.cutscene.active) ||
                     this.cineCam || this.finisher || this.finCam) return;
@@ -28,16 +28,16 @@
                 ctx.restore();
             },
 
-            drawPlayer() {
+            drawPlayer(presentation = this.player) {
                 this.ctx.save();
                 const vehiclePose = this.isDriving && this.car
-                    ? this.car.occupantPose(0, this.player.angle, this.player._vehicleLean || 0, this.currentWeapon?.id) : null;
+                    ? this.car.occupantPose(0, presentation.angle, presentation._vehicleLean || 0, this.currentWeapon?.id) : null;
                 if (vehiclePose) this.car.clipOccupant(this.ctx,0,vehiclePose.lean>.05);
-                this.ctx.translate(this.player.x, this.player.y);
-                this.ctx.rotate(vehiclePose ? this.car.angle : this.player.angle);
+                this.ctx.translate(presentation.x, presentation.y);
+                this.ctx.rotate(vehiclePose ? this.car.angle : presentation.angle);
                 
                 // Stealth/Flit Ghosting
-                if (this.player.isHidden || this.flitState.active) this.ctx.globalAlpha = 0.5;
+                if (presentation.isHidden || this.player.flitting) this.ctx.globalAlpha = 0.5;
             
                 // ── Fully cosmetics-driven appearance ──
                 const cosmeticConfig = this.cosmetics.getRenderConfig();
@@ -64,10 +64,10 @@
 
                 // Outfit from equipped cosmetic
                 const outfit = cosmeticConfig.outfit;
-                const wx = weatherAt(this.player), rainOn = !!(wx && wx.rain > 0.05);
+                const wx = weatherAt(presentation), rainOn = !!(wx && wx.rain > 0.05);
 
                 SilhouetteFX.glow = this._playerGlowOn();   // her halo (ui/silhouette-fx.js; drawn after the light)
-                drawProceduralHumanoid(this.ctx, this.player, {
+                drawProceduralHumanoid(this.ctx, presentation, {
                     skinColor: cosmeticConfig.skinColor,
                     hair: cosmeticConfig.hair,
                     gender: APPEARANCES['949'].gender,
@@ -130,6 +130,11 @@
                 this.playerExpression = faces[key];
                 this.renderSidebarPortrait();
 
+                if(this.activeLevel){
+                    const hit=this.physics_system.peruseNearbyEntities(this.player,{near_range:180}).find(h=>h.entity?.entity_type==='df_npc'&&h.entity.recruited&&NPC_EMOTE_REACTIONS[h.entity.name]);
+                    if(hit)hit.entity.reactToEmote(key,{tier:this.bonding.getTier(hit.entity.relationship??0)});
+                    return;
+                }
                 // Trigger nearest reactor's response within range — slight delay
                 // so it feels like processing rather than reflex. Eligible
                 // reactors: pedestrians (always) + named NPCs that have an
@@ -137,7 +142,7 @@
                 // pick the nearest across both pools so a bubble doesn't
                 // double-fire.
                 const REACT_RANGE = 180;
-                const px = this.player.x, py = this.player.y;
+                const px = this.playerPosition[0], py = this.playerPosition[1];
                 let nearest = null;
                 let nearestDistSq = REACT_RANGE * REACT_RANGE;
                 
@@ -211,7 +216,7 @@
                 // update()) so the bubble doesn't keep counting down during pause.
                 if (this.playerEmote.age >= this.playerEmote.duration) return;
                 // Her bubble wears deep bronze-gold; passersby wear smoky silver (drawSpeechBubble: entities/npc.js)
-                drawSpeechBubble(this.ctx, this.player.x, this.player.y - 34, this.playerEmote.text,
+                drawSpeechBubble(this.ctx, this.playerPosition[0], this.playerPosition[1] - 34, this.playerEmote.text,
                     speechBubbleScale(this.playerEmote.age, this.playerEmote.duration), { metal: 'bronzeDeep', emoji: true });
             },
             
@@ -392,7 +397,8 @@
                             if (this._quickDraw) this.requestQuickDraw(Math.atan2(F.dy, F.dx));
                             else this._releaseShot = Math.atan2(F.dy, F.dx);
                         }   // sniper: lifting the thumb takes the shot (update.js)
-                        if (F.aimed && Math.hypot(F.dx, F.dy) > 0.2) this._aimMemory = { angle: Math.atan2(F.dy, F.dx), at: performance.now() / 1000, firing: F.firing || F.armed };   // real time, not game time
+                        if (e.type !== 'touchcancel' && F.aimed && Math.hypot(F.dx, F.dy) > 0.2) this._aimMemory = { angle: Math.atan2(F.dy, F.dx), at: performance.now() / 1000, firing: F.firing || F.armed };   // real time, not game time
+                        if (e.type === 'touchcancel') { this._aimMemory = null; this._releaseShot = null; }
                         Object.assign(F, { active: false, dx: 0, dy: 0, remembered: false, aimed: false, firing: false, armed: false });
                         if (gameUI) gameUI.classList.remove('aiming');
                         showRing();
@@ -437,7 +443,7 @@
             /** The flit ring's charge (fill, ready pulse, dim when unaffordable) — only touched when it changes. */
             updateFlitRing() {
                 const el = this.flitRingEl; if (!el) return;
-                const fs = this.flitState, fill = Math.round(100 * fs.attunement / fs.maxAttunement), ready = fs.attunement >= this.flitCost();
+                const vitals = this.player.vitals, fill = Math.round(100 * vitals.attunement / vitals.max_attunement), ready = vitals.attunement >= this.flitCost();
                 if (fill !== this._ringFill) { this._ringFill = fill; el.style.setProperty('--fill', fill + '%'); }
                 if (ready !== this._ringReady) {
                     this._ringReady = ready; el.classList.toggle('dim', !ready);

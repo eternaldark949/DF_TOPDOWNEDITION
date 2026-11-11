@@ -15,14 +15,7 @@
            the soft gold of sunlight on the moon, or — a select few — Blood Moon
            rose red. Their mark is two overlapping crescent moons.
            ===================================================================== */
-        const BUILDS = {
-            //         breadth  depth   head   hips (extra, curvy)  shoulders (extra)
-            slim:     { w: 0.88, d: 0.92, head: 0.98 },
-            athletic: { w: 1.05, d: 1.02, head: 1.0, shoulder: 1.08 },
-            curvy:    { w: 1.04, d: 1.04, head: 1.0, hip: 1.25 },
-            broad:    { w: 1.15, d: 1.08, head: 1.02, shoulder: 1.1 },
-            heavy:    { w: 1.2,  d: 1.22, head: 1.05, hip: 1.1 },
-        };
+        const BUILDS = DFNative.humanoidBuilds;
 
         /** Scale for a character's body frame, or null for the classic shape. */
         function bodyScale(config) {
@@ -49,20 +42,7 @@
            deltoids are caps drawn over the torso's edge: seen from above, the
            shoulders are the highest thing after the head.
            ───────────────────────────────────────────────────────────────────── */
-        const BODY_CANON = {
-            female:      { sh: 10.5, del: 4.0, tf: 6.0, tb: -7.2, chest: 7.8, back: 8.8, bust: { x: 5.4, y: 4.9, r: 3.3 },
-                           hf: 3.0, hb: -9.0, hw: 12.0, cleft: 0.8, leg: 5.4,
-                           thigh: [4.7, 4.5, 0.28, 3.3], calf: [3.3, 3.6, 0.3, 2.05],
-                           upper: [3.5, 3.35, 0.35, 2.55], fore: [2.55, 2.7, 0.22, 1.8], hand: 1.0, foot: 1.0 },
-            androgynous: { sh: 11.0, del: 4.3, tf: 6.3, tb: -7.8, chest: 8.8, back: 9.4, bust: null,
-                           hf: 2.6, hb: -8.0, hw: 11.2, cleft: 0.6, leg: 5.0,
-                           thigh: [4.75, 4.55, 0.28, 3.45], calf: [3.45, 3.75, 0.3, 2.2],
-                           upper: [3.8, 3.6, 0.35, 2.75], fore: [2.75, 2.9, 0.22, 1.95], hand: 1.04, foot: 1.02 },
-            male:        { sh: 12.5, del: 4.8, tf: 6.6, tb: -8.0, chest: 10.0, back: 10.8, bust: null,
-                           hf: 2.5, hb: -7.5, hw: 10.8, cleft: 0.4, leg: 4.9,
-                           thigh: [4.85, 4.65, 0.28, 3.6], calf: [3.6, 3.95, 0.3, 2.35],
-                           upper: [4.2, 4.0, 0.35, 3.0], fore: [3.0, 3.2, 0.22, 2.1], hand: 1.1, foot: 1.05 },
-        };
+        const BODY_CANON = DFNative.humanoidBodyCanon;
         const BOOT_SHAFT = [2.7, 3.05, 0.5, 3.7];                            // a boot, ankle → top of the shaft
 
         /** The body for a gender and build: shoulders follow `shoulder`, the pelvis and legs `hip`. Cached. */

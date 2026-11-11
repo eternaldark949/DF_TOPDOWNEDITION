@@ -1,0 +1,18 @@
+{
+  "max_health": 100,
+  "movement_speed": 312,
+  "sneak_speed_factor": 0.55,
+  "regeneration": {
+    "delay_seconds": 10,
+    "interval_seconds": 1,
+    "amount": 5
+  },
+  "flit": {
+    "capacity": 120,
+    "cost": 40,
+    "recharge_per_second": 120,
+    "distance": 120,
+    "invulnerability_seconds": 0.25,
+    "minimum_distance": 1
+  }
+}

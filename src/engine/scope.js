@@ -38,7 +38,7 @@
                 if (this.scopeK < 0.002) this.scopeK = 0;
                 this._scopeHeld = on ? (this._scopeHeld || 0) + dt : 0;
                 // Camera lean down the line (eased with the scope)
-                const a = this.player.angle, half = Math.min(this.canvas.width, this.canvas.height) / 2 / (this.camera.zoom || 1);
+                const a = this.playerRotation, half = Math.min(this.canvas.width, this.canvas.height) / 2 / (this.camera.zoom || 1);
                 this.scopeLeanX = Math.cos(a) * half * SCOPE.LEAN * this.scopeK;
                 this.scopeLeanY = Math.sin(a) * half * SCOPE.LEAN * this.scopeK;
             },
@@ -61,7 +61,7 @@
             /** The focus arc round her while she's scoped (world space): lavender, draining clockwise */
             _drawFocusArc(ctx, k) {
                 if (GameSettings.scopeSlow === false || this._focus === undefined) return;
-                const f = this._focus / SCOPE.FOCUS, p = this.player;
+                const f = this._focus / SCOPE.FOCUS, p = {x:this.playerPosition[0],y:this.playerPosition[1]};
                 if (f >= 0.999 && (this._scopeScale ?? 1) >= 0.999) return;
                 ctx.save(); ctx.lineCap = 'round';
                 ctx.strokeStyle = `rgba(202, 176, 250, ${0.16 * k})`; ctx.lineWidth = 2;
@@ -98,7 +98,7 @@
                 const shot = this.getPlayerShotGeometry();
                 const a = shot.angle + (Math.sin(t * 1.7) * 0.7 + Math.sin(t * 3.1) * 0.3) * SCOPE.SWAY * (1 - steady);
                 const ex = shot.x, ey = shot.y;
-                const far = collisionWorld.rayNearest(ex, ey, ex + Math.cos(a) * SCOPE.RANGE, ey + Math.sin(a) * SCOPE.RANGE,
+                const far = this.activeLevel ? (this.physics_system.raycast({from:[ex,ey],to:[ex+Math.cos(a)*SCOPE.RANGE,ey+Math.sin(a)*SCOPE.RANGE],ignore_body:this.player,include_ghosts:false})?.distance??SCOPE.RANGE) : collisionWorld.rayNearest(ex, ey, ex + Math.cos(a) * SCOPE.RANGE, ey + Math.sin(a) * SCOPE.RANGE,
                     [...(this.activeMap.walls || []), ...getColliders(this.activeMap)], SCOPE.RANGE);
                 // The veil on its own half-resolution layer (it's all soft), with the lane cut out of it
                 const R = 0.5, W = Math.ceil(this.canvas.width * R), H = Math.ceil(this.canvas.height * R);

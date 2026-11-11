@@ -249,7 +249,7 @@
                 g._doLoadMap(id, at || null);
                 g.bakeStaticLighting();
                 g.player.visible = false;                   // she isn't in the story's frame yet
-                g.player.x = at ? at.x : g.player.x; g.player.y = at ? at.y : g.player.y;
+                g.player.x = at ? at.x : g.playerPosition[0]; g.player.y = at ? at.y : g.playerPosition[1];
             }
 
             _landmark(t) {
@@ -284,7 +284,7 @@
                     map(id, opts = {}) {
                         if (g.activeMap && g.activeMap.id !== id) self.actors = [];
                         if (!g.activeMap || g.activeMap.id !== id) self._loadMap(id, opts.at);
-                        const L = opts.cam ? self._landmark(opts.cam) : { x: g.player.x, y: g.player.y };
+                        const L = opts.cam ? self._landmark(opts.cam) : { x: g.playerPosition[0], y: g.playerPosition[1] };
                         g.camera.x = L.x; g.camera.y = L.y; g.camera.zoom = opts.zoom || 1; self.active.cam = null;
                         return null;
                     },

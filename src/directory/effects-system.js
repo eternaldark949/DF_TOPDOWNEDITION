@@ -218,7 +218,7 @@
                         if (age > life || age < windT) continue;
                         // The newest cut rides the moving wielder; recovery paints no second, backward slash
                         if (s.t0 === game._slashT && age <= MELEE_SWING.duration * q && game.weaponMode === 'melee' && !game.weaponHolstered) {
-                            s.drawX = game.player.x; s.drawY = game.player.y; s.drawA = game.player.angle;
+                            s.drawX = game.playerPosition[0]; s.drawY = game.playerPosition[1]; s.drawA = game.playerRotation;
                         }
                         const k = 1 - age / life;
                         // a wide sweep leaves a longer crescent: three quarters of its cut

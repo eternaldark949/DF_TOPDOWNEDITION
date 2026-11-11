@@ -274,7 +274,7 @@
                 let key = '';
                 if (show) {
                     const parts = this.missions.getObjectiveParts(), t = this.jobTarget();
-                    const dist = t ? Math.round(Math.hypot(t.x - this.player.x, t.y - this.player.y) / 10) * 10 + 'm' : '';
+                    const dist = t ? Math.round(Math.hypot(t.x - this.playerPosition[0], t.y - this.playerPosition[1]) / 10) * 10 + 'm' : '';
                     key = parts.title + '|' + parts.step + '|' + dist;
                     if (key !== this._objKey) {
                         if (!el.firstChild) el.innerHTML = '<div class="o-line"><span class="o-ico"></span><span class="o-title"></span><span class="o-sep">◆</span><span class="o-dist"></span></div><div class="o-step"></div>';

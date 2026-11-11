@@ -28,6 +28,7 @@ import { dirname, join, extname, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { inlineLoadingArt } from './loading-art.mjs';
+import { bundleNative } from './bundle-native.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUTPUT = 'DFAB V8.html';
@@ -51,13 +52,14 @@ const SCRIPTS = [
     'basement/life-kit.js',        // LV0 Basement: lifeKit (lists of short-lived things)
     'basement/sound-kit.js',       // LV0 Basement: soundKit (Web Audio building blocks)
     'basement/sound-system.js',    // LV0 Basement: soundSystem (context, channels, volume dial, reverb, sounds by packet)
-    'basement/controls-system.js', // LV0 Basement: controlsSystem (keyboard, mouse, touch and gamepad instances, touch sticks, keymap, action table)
-    'basement/recorder-kit.js',    // LV0 Basement: gRecorder (inputs recorded per tick, played back through the controls)
     'basement/entity-base.js',     // LV0 Basement: GameEntity (the base of everything that moves or collides)
     'basement/shape-kit.js',       // LV0 Basement: shapeKit (collision geometry)
     'basement/spatial-grid.js',    // LV0 Basement: SpatialHashGrid and the render / transition grids
     'basement/collision-kit.js',   // LV0 Basement: collisionKit and collisionWorld (the collision step, game-free: layers, grid, passes, solver)
     'basement/vehicle-kit.js',     // LV0 Basement: vehicleKit (driving, out of walls, car-to-car contact: game-free)
+    '@native',                    // Native ESM engine/Directory graph, linked from the original sources
+    'basement/controls-system.js', // LV0 Basement: controlsSystem (keyboard, mouse, touch and gamepad instances, touch sticks, keymap, action table)
+    'basement/recorder-kit.js',    // LV0 Basement: gRecorder (inputs recorded per tick, played back through the controls)
     'basement/lane-rail-kit.js',   // LV0 Basement: railKit (things that run along a line: sampled curves, pedals, following)
     'basement/ui-kit.js',          // LV0 Basement: uiKit (making, showing and hiding DOM panels)
     'basement/draw-list.js',       // LV0 Basement: drawList and canvasRenderer (what to draw, apart from how)
@@ -98,6 +100,7 @@ const SCRIPTS = [
     'world/weather.js',
     'world/weather-response.js',
     'world/particles-decals.js',
+    'presentation/indoor-door.js',
     'world/rooms.js',
     'world/maps.js',
     'world/map-entities.js',
@@ -118,9 +121,12 @@ const SCRIPTS = [
     'directory/cafe-life.js',
     'directory/world-query.js',    // LV2 Directory: worldQuery (rooms, seats, NPCs, loot, doors, landmarks, buildings as packets)
     'engine/furniture.js',
+    'presentation/gatling-gunner.js',
+    'presentation/classic-actor-packets.js',
     'entities/enemies.js',
     'entities/hunters.js',
     'entities/drones.js',
+    'presentation/marionette.js',
     'entities/marionettes.js',
     'buildings/building-v1.js',
     'buildings/building-v2.js',
@@ -155,6 +161,7 @@ const SCRIPTS = [
     'traffic/zen-art.js',
     'traffic/car-art.js',
     'traffic/traffic-vehicle.js',
+    'directory/game-vehicles.js', // One classic-client vehicle construction boundary
     'traffic/vehicle-occupants.js',
     'traffic/traffic-people.js',
     'traffic/traffic-signals.js',
@@ -186,6 +193,7 @@ const SCRIPTS = [
     'world/scrapyard.js',
     'world/billboards.js',
     'ui/inventory-augments.js',
+    'gameplay/abilities/legacy-ability-launch.js',
     'ui/action-dock.js',
     'world/bokeh.js',
     'story/missions.js',
@@ -257,6 +265,9 @@ const SCRIPTS = [
     'directory/new-game-state.js',   // LV2 Directory: resetGameState, the game's new-game defaults
     'directory/world-session.js',    // LV2 Directory: menu <-> world (enterWorld, the loading screen, stop)
     'engine/loop.js',
+    'engine/apartment-rooms.js',
+    'engine/apartment-renderer.js',
+    'engine/apartment-level.js',
     'app/menu-wiring.js',
     'ui/phone.js',
     'ui/app-launch.js',
@@ -348,7 +359,14 @@ const escapeAttr = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 function scriptBlocks() {
     const blocks = [];
     for (const p of SCRIPTS) {
-        if (p === '@assets') assetPieces().forEach((code, i) => blocks.push([`assets#${i}`, code]));
+        if (p === '@native') blocks.push(['directory/native-entry.mjs', bundleNative(ROOT, 'src/directory/native-entry.mjs') + '\nconst pathGeometry = DFNative.pathGeometry;']);
+        else if (p === '@assets') assetPieces().forEach((code, i) => blocks.push([`assets#${i}`, code]));
+        else if (p.endsWith('.mjs')) {
+            // Explicit bridge for import-free engine modules; this is not a general ESM bundler.
+            const source = read(p);
+            if (/^\s*import\s|^\s*export\s+(?!class\s)/m.test(source)) throw new Error(`src/${p} needs a full module bundle`);
+            blocks.push([p, source.replace(/^export class /gm, 'class ')]);
+        }
         else if (p.endsWith('.json')) blocks.push([p, chapterScript(p)]);
         else blocks.push([p, read(p)]);
     }

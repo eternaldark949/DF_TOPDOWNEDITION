@@ -27,6 +27,15 @@
                ===================================================================== */
             /** One tick, called directly (tests, tools): skipped while stopped or paused, like a Lobby step.
              *  The Lobby itself advances the tick and calls stepWorld() (engine/loop.js). */
+            updatePlayerRecovery(){
+                // Shared gameplay timers; this is the sole vitals tick in the classic host.
+                const healed=this.player.vitals.advance(1/60,{
+                    regeneration_delay:this.resonance.stat('regenDelay',600)/60,
+                    regeneration_amount:this.resonance.stat('regenAmount',5)*(this.augments.isEquipped('health_regen')?2:1)
+                });
+                if(healed)this.updateUI();
+                this.flitBtn.classList.toggle('cooldown',this.player.attunement<this.flitCost());
+            },
             update() {
                 if (!this.running || this.paused) return;
                 // Gait clock — advances only when the world actually steps, so
@@ -37,16 +46,17 @@
 
             /** The world's simulation for one tick. The tick (_simTick) has already advanced. */
             stepWorld() {
+                if(this.activeLevel)return this._stepApartment();
                 this._syncProfiler();
                 CollisionSystem.beginProjectileStep(this);
-                
+
                 if (this.scenes && this.scenes.running) this.scenes._lockInput();   // a scene has the stage: no walking or firing
                 this.tickPlayerEmote();
-                
+
                 // PERFORMANCE: Use globally cached frame time (set once in loop())
                 this.frameTime = _frameTime;
                 this.frameTimeSec = _frameTimeSec;
-            
+
                 // --- 1. SYSTEM UPDATES ---
                 /* Simulation step counter — drives subsystem decimation (CONFIG.SIM).
                    Increments once per fixed 1/60s step, NOT per rendered frame,
@@ -56,7 +66,7 @@
                 this.profiler.start('Update:Total');
                 this.profiler.markWrapper('Update:Total');
                 this.profiler.start('Logic:Systems');
-                
+
                 // Cleanup old muzzle flashes
                 this.effects.update('muzzle');
                 this.effects.update('casing');                          // spent brass and glitter (directory/effects-system.js)
@@ -71,17 +81,17 @@
                 this.effects.update('breach');                         // a wall blown in
                 this.effects.update('slash'); this.effects.update('knuckle'); this.effects.update('spill'); this.effects.update('number');
                 this.effects.update('barrel');
-            
+
                 this.updateTime();
                 this.updateUI();
                 this.weather.update(this.camera);
                 if (this.puddles) this.puddles.update();
                 if (this.leafParticles) this.leafParticles.update();
-                
+
                 // Indoor V2: Room system update + per-room weather
                 if (this.roomSystem.active) {
-                    this.roomSystem.update(this.player.x, this.player.y);
-                    
+                    this.roomSystem.update(this.playerPosition[0], this.playerPosition[1]);
+
                     // Per-room rain: suppress weather under a roof, restore outdoors.
                     // This sets a SEPARATE flag rather than writing isRaining —
                     // the scheduler owns that now, and two systems assigning the
@@ -92,10 +102,10 @@
                     this.weather.setIndoorSuppressed(this.activeMap.type === 'indoor' && out < 0.02);
                     if (out !== this._lastOutdoorness) { this._lastOutdoorness = out; this.updateDaytimeExposure(); }
                 }
-                
+
                 // Check if player reached navigation destination
                 this.checkNavArrival();
-            
+
                 // --- CAMERA SHAKE & DRIFT FX ---
                 // 1. Reset or Apply Explosion Shake (Random Jitter)
                 if (this.camera.shake > 0) {
@@ -107,7 +117,7 @@
                     this.camera.shakeX = 0;
                     this.camera.shakeY = 0;
                 }
-            
+
                 // 2. Add Drift "Wobble" (Smooth Sine Wave)
                 if (this.isDriving && this.car) {
                     // Calculate lateral velocity (How fast are we sliding sideways?)
@@ -115,26 +125,26 @@
                     const rightY = Math.cos(this.car.angle);
                     const slideVelocity = this.car.vx * rightX + this.car.vy * rightY;
                     const driftIntensity = Math.abs(slideVelocity);
-            
+
                     // Threshold: Only shake if drifting noticeably (speed > 2.0)
                     if (driftIntensity > 1.0) {
                         // Initialize wave timer if needed
                         if (this.camera.driftTime === undefined) this.camera.driftTime = 0;
-                        
+
                         // Advance the wave (0.2 = frequency/speed of the wobble)
-                        this.camera.driftTime += 2.0; 
-            
+                        this.camera.driftTime += 2.0;
+
                         // Calculate Amplitude: Scales with drift intensity
                         // (driftIntensity - 2.0) ensures it starts at 0 when threshold is hit
-                        const waveAmp = (driftIntensity - 1.0) * 1.5; 
-            
+                        const waveAmp = (driftIntensity - 1.0) * 1.5;
+
                         // Apply Sine/Cosine offsets to existing shake
                         // Using different multipliers (1.0 vs 0.8) prevents a perfect circle motion
                         this.camera.shakeX += Math.sin(this.camera.driftTime) * waveAmp;
                         this.camera.shakeY += Math.cos(this.camera.driftTime * 0.8) * waveAmp;
                     }
                 }
-            
+
                 // 3. A scene's road sway (story/scene-runner.js: s.sway) — slow, uneven, like a van on a city street
                 if (this.camera.sway) {
                     const t = _gameTimeSec, k = this.camera.sway;
@@ -143,14 +153,6 @@
                 }
 
                 // Ability & Regen Timers
-                // Flit Attunement recharge
-                if (this.flitState.attunement < this.flitState.maxAttunement) {
-                    this.flitState.attunement = Math.min(
-                        this.flitState.attunement + this.flitState.rechargeRate,
-                        this.flitState.maxAttunement
-                    );
-                    if (this.flitState.attunement >= this.flitCost()) this.flitBtn.classList.remove('cooldown');
-                }
                 // At the wheel the Flit button goes and the handbrake takes its place (styles/panels-phone.css)
                 if (this._uiDriving !== !!this.isDriving) {
                     this._uiDriving = !!this.isDriving;
@@ -159,33 +161,18 @@
                 this.updateFlitRing();
                 this.updateNoiseRipples();
                 this.updateScope();
-                if (this.flitState.active) { 
-                    this.flitState.duration--; 
-                    if (this.flitState.duration <= 0) this.flitState.active = false; 
-                }
                 // Update flit visual effects (ghost afterimages, lightning trails)
                 if (this.flitVFX.length > 0) this.updateFlitVFX();
-                
-                // Passive Health Regen (5 HP/sec after 10s no damage)
-                if (this.playerHealth < this.maxPlayerHealth) {
-                    this.healthRegenTimer++;
-                    const regenDelay = this.resonance.stat('regenDelay', 600);                       // Frame: Idle Mend
-                    if (this.healthRegenTimer >= regenDelay && (this.healthRegenTimer - regenDelay) % 60 === 0) {
-                        const heal = this.resonance.stat('regenAmount', 5) * (this.augments.isEquipped('health_regen') ? 2 : 1);
-                        this.playerHealth = Math.min(this.playerHealth + heal, this.maxPlayerHealth);
-                        this.player.syncHealth(this.playerHealth, this.maxPlayerHealth);  // Sync with entity
-                    }
-                } else {
-                    this.healthRegenTimer = 0;
-                }
+
+                this.updatePlayerRecovery();
                 this.profiler.stop('Logic:Systems');
-            
+
                 // --- 2. AI & TRAFFIC ---
                 this.profiler.start('AI:Traffic');
                 // her cars standing about (the owned car, Amber's van, the one she got out of): traffic bumps them, they roll to a stop
                 const parked = this.parkedCars(this._parkedCars || (this._parkedCars = []));
                 this.traffic.update(this.player, this.activeMap, this.car, this.weather, parked, this.decals, this.teammates, this.pedestrians.pedestrians);
-                
+
                 // Zib taxi system — spawn, arrival check, cleanup
                 if (this.zibSystem && this.activeMap.type !== 'indoor') {
                     this.zibSystem.trySpawn(this.traffic);
@@ -193,7 +180,7 @@
                     this.zibSystem.cleanup();
                 }
                 this.profiler.stop('AI:Traffic');
-                
+
                 // --- PEDESTRIANS ---
                 this.profiler.start('AI:Pedestrians');
                 // Build the list of cars peds should react to. While the player
@@ -214,12 +201,12 @@
                 for (const t of this.teammates) if (t && (t.recruited || t.hired) && !t.inCar && !t.downed && !t.dead) this._makeWay.push(t);
                 this.pedestrians.update(this.player, this.activeMap, reactionVehicles, this.weaponMode !== 'none' && this.weaponMode !== 'fists' && !this.weaponHolstered, this.enemies);
                 this.profiler.stop('AI:Pedestrians');
-                
+
                 // Velvet Cat AI
                 if (this.velvetCat && this.velvetCat.visible && !this.velvetCat.inCar) {
                     this.velvetCat.update(this.player, 1, this.activeMap, !!this.questState.hasVelvetCat);
                 }
-            
+
                 this.profiler.start('Logic:Stealth');
                 // Visibility is a solve over lights and occluders whose result
                 // changes slowly. Skipped steps keep the previous value.
@@ -227,27 +214,27 @@
                     this.calculatePlayerVisibility();
                 }
                 this.profiler.stop('Logic:Stealth');
-            
+
                 this.profiler.start('Logic:Story');
                 this.cutscene.update();
                 if (this.scenes && this.scenes.running) this.scenes.update();                     // story/scene-runner.js
                 if (this._bossIntros && this._bossIntros.length) this.updateBossIntro();          // engine/boss-intro.js
                 this.story.update();
                 this.profiler.stop('Logic:Story');
-                
+
                 // Larissa loadout hint — triggers when approaching apt exit for the first time
                 if (!this.questState.larissa_loadout_hint && this.activeMap && this.activeMap.id === 'apt_949'
-                    && this.player.y > 780 && this.player.x > 500 && this.player.x < 900
+                    && this.playerPosition[1] > 780 && this.playerPosition[0] > 500 && this.playerPosition[0] < 900
                     && this.story && !this.cutscene.active) {
                     this.questState.larissa_loadout_hint = true;
                     this.story.triggerComms("LARISSA", "Your loadout is on the wall, 949. Equip before you leave. Pause if you need the full inventory.", 6000);
                 }
-                
+
                 // --- 1. WEAPON COOLDOWN & FIRING ---
                 // Decrement the timer every frame
                 if (this.shootCooldown > 0) this.shootCooldown--;
                 this.updateQuickDraw();
-            
+
                 // Aimed firing (the fire joystick, or the mouse once it has a position)
                 // happens in the walking/driving code in step 7, after this tick's aim
                 // angle is set. Only fire here for input those branches don't handle
@@ -258,16 +245,16 @@
                         && (stickFiring || (this.mouseDown && this.mouseX));
                     if (!aimedBelow) this.fireWeapon();
                 }
-            
+
                 // --- 3. GAME EVENTS (SPAWNING & TRIGGERS) ---
                 this.profiler.start('Logic:Events');
-                
+
                 // Ganger Spawning (Hub Only)
                 if (this.activeMap.id === 'sdc' && this.enemies.length < 6 && Math.random() < 0.02) {
                     const ex = Math.random() * this.activeMap.width;
                     const ey = Math.random() * this.activeMap.height;
                     let hitObstacle = false;
-                    
+
                     // Safety check to ensure they don't spawn in walls (the static broadphase: only the rects near the spot)
                     const spot = { left: ex - 20, right: ex + 20, top: ey - 20, bottom: ey + 20 };
                     for (const list of [this.activeMap.walls || [], getColliders(this.activeMap)]) {
@@ -276,18 +263,18 @@
                         }
                         if (hitObstacle) break;
                     }
-                    const d = Math.hypot(this.player.x - ex, this.player.y - ey);
+                    const d = Math.hypot(this.playerPosition[0] - ex, this.playerPosition[1] - ey);
                     // Exclude restricted zone bounds
                     if (!hitObstacle && this.restrictedZone) {
                         const rz = this.restrictedZone;
                         if (ex > rz.x && ex < rz.x + rz.w && ey > rz.y && ey < rz.y + rz.h) hitObstacle = true;
                     }
-                    if (!hitObstacle && d > 600 && d < 1200) { 
-                        this.enemies.push(new Ganger(ex, ey)); 
+                    if (!hitObstacle && d > 600 && d < 1200) {
+                        this.enemies.push(new Ganger(ex, ey));
                         captionSystem.gangerAggro();
                     }
                 }
-            
+
                 // The Double Nights lobby: guests and staff come and go; searched cases refill daily
                 this.lobbyLife.update(this);
                 this.clubLife.update(this);
@@ -304,8 +291,8 @@
 
                 // Graveyard Humanoid Ghosts (the cemetery, HUB_GRAVEYARD, and a little round it)
                 const G = HUB_GRAVEYARD, inGraveyard = this.activeMap.id === 'sdc' &&
-                    this.player.x > G.x - 100 && this.player.x < G.x + G.w + 100 &&
-                    this.player.y > G.y - 200 && this.player.y < G.y + G.h + 200;
+                    this.playerPosition[0] > G.x - 100 && this.playerPosition[0] < G.x + G.w + 100 &&
+                    this.playerPosition[1] > G.y - 200 && this.playerPosition[1] < G.y + G.h + 200;
                 if (inGraveyard) {
                     // Spawn new ghosts periodically (max 5 at once)
                     if (this.graveyardGhosts.length < 15 && Math.random() < 0.02) {
@@ -363,7 +350,7 @@
                     // Clear ghosts when leaving the area
                     if (this.graveyardGhosts.length > 0) this.graveyardGhosts = [];
                 }
-                
+
                 // Boss Logic (Church Lightning)
                 if (this.activeMap.id === 'church_boss' && this.weather.isRaining && !this.questState.churchBossDefeated) {
                     if (this.weather.lightningCooldown <= 0) {
@@ -372,7 +359,7 @@
                         game_timers.after(0.05, () => audioSys.sfx('explode'));
                     }
                 }
-            
+
                 // Restricted Zone (Hostile farming area)
                 if (this.restrictedZone) {
                     this.restrictedZone.update(this);
@@ -391,14 +378,14 @@
                         }
                     }
                 }
-                
+
                 // Horde Gauntlet (Wave-based arena)
                 if (this.hordeGauntlet) {
                     this.hordeGauntlet.update(this);
                 }
-                
+
                 this.profiler.stop('Logic:Events');
-            
+
                 // --- 4. INPUT HANDLING ---
                 this.profiler.start('Input:Process');
                 let [inputX, inputY] = controls.direction('move');
@@ -411,13 +398,13 @@
                     else { const s = Walker.stepPlayer(this); if (s) { inputX = s.x; inputY = s.y; } }
                 }
                 this.profiler.stop('Input:Process');
-            
+
                 // --- 5. ENTITY UPDATES ---
                 this.profiler.start('AI:Enemies');
-                
+
                 // Ferris wheel animation
                 if (this.activeMap.ferrisWheel) this.activeMap.ferrisWheel.update();
-                
+
                 // Teammates & Companions (Unified loop)
                 // Skip during bumper car minigame — teammates are in bumper cars
                 // (and while a scene plays the crew with its own actors: meta.hideCrew)
@@ -438,7 +425,7 @@
                 this._formR = (this._formR ?? CONFIG.COMPANION.FORMATION_RADIUS) + ((this.crewSneaking() ? 48 : CONFIG.COMPANION.FORMATION_RADIUS) - (this._formR ?? CONFIG.COMPANION.FORMATION_RADIUS)) * 0.08;
                 const formationRadius = this._formR;
                 const baseAngle = CONFIG.COMPANION.FORMATION_FOLLOW_FACING
-                    ? (this.player.angle + Math.PI)  // +π = behind player
+                    ? (this.playerRotation + Math.PI)  // +π = behind player
                     : 0;
                 // Distribute slots around a 240° arc behind the player when N>1, so
                 // they spread to the rear and sides without crowding directly in front.
@@ -448,8 +435,8 @@
                     const t = formationN <= 1 ? 0.5 : i / (formationN - 1);
                     const angle = baseAngle + (t - 0.5) * arc;
                     tm._formationSlot = {
-                        x: this.player.x + Math.cos(angle) * formationRadius,
-                        y: this.player.y + Math.sin(angle) * formationRadius
+                        x: this.playerPosition[0] + Math.cos(angle) * formationRadius,
+                        y: this.playerPosition[1] + Math.sin(angle) * formationRadius
                     };
                 });
 
@@ -490,9 +477,9 @@
                             sepY += Math.sin(pushAngle) * CONFIG.COMPANION.SEPARATION_FORCE;
                         }
                     }
-                    const distToP = Math.hypot(tm.x - this.player.x, tm.y - this.player.y);
+                    const distToP = Math.hypot(tm.x - this.playerPosition[0], tm.y - this.playerPosition[1]);
                     if (distToP < CONFIG.COMPANION.PLAYER_SEPARATION_RADIUS && distToP > 0.1) {
-                        const pushAngle = Math.atan2(tm.y - this.player.y, tm.x - this.player.x);
+                        const pushAngle = Math.atan2(tm.y - this.playerPosition[1], tm.x - this.playerPosition[0]);
                         sepX += Math.cos(pushAngle) * CONFIG.COMPANION.PLAYER_SEPARATION_FORCE;
                         sepY += Math.sin(pushAngle) * CONFIG.COMPANION.PLAYER_SEPARATION_FORCE;
                     }
@@ -521,7 +508,7 @@
 
                     // ── ON FOOT: Permanent teammates use built-in follow via updateCombat ──
                     if (tm.hireType === 'permanent') {
-                        processShot(tm.updateCombat(this.player.x, this.player.y, this.enemies, this, eyelineSpot || tm._formationSlot));
+                        processShot(tm.updateCombat(this.playerPosition[0], this.playerPosition[1], this.enemies, this, eyelineSpot || tm._formationSlot));
                         return;
                     }
 
@@ -532,12 +519,12 @@
                         // Teleport recovery still uses player distance — if a contract
                         // companion is truly lost, snap them to the player rather than
                         // their slot (slot may also be far if they were left across map).
-                        const dx = this.player.x - tm.x;
-                        const dy = this.player.y - tm.y;
+                        const dx = this.playerPosition[0] - tm.x;
+                        const dy = this.playerPosition[1] - tm.y;
                         const distToPlayer = Math.hypot(dx, dy);
                         if (distToPlayer > CONFIG.COMPANION.FOLLOW_TELEPORT_DIST) {
-                            tm.x = this.player.x + (Math.random() - 0.5) * 40;
-                            tm.y = this.player.y + (Math.random() - 0.5) * 40;
+                            tm.x = this.playerPosition[0] + (Math.random() - 0.5) * 40;
+                            tm.y = this.playerPosition[1] + (Math.random() - 0.5) * 40;
                             resetHumanoidAnim(tm);
                         } else if (eyelineSpot) {
                             // Repositioning for a clear shot — nav-grid path to the spot
@@ -564,19 +551,19 @@
                         // skipFollow=true: we already did slot-aware follow above, so
                         // updateCombat must not move us again (otherwise we'd move
                         // twice per frame and run circles around permanent teammates).
-                        processShot(tm.updateCombat(this.player.x, this.player.y, this.enemies, this, tm._formationSlot, true));
+                        processShot(tm.updateCombat(this.playerPosition[0], this.playerPosition[1], this.enemies, this, tm._formationSlot, true));
                     }
                 });
                 } // end bumper minigame guard
                 // Ghosts/Markers
                 lifeKit.sweep(this.lastKnownMarkers, (m) => { m.update(); return !m.active; });
-            
+
                 // Enemies (Gangers, Bosses)
                 let trafficCars = null;                                         // the cars they dodge: one list a tick, shared (read only)
                 for(let i=this.enemies.length-1; i>=0; i--) {
                     let enemy = this.enemies[i];
                     let result = null;
-                    
+
                     if (enemy instanceof Ganger) {
                         if (!trafficCars) {
                             trafficCars = this.traffic ? [...this.traffic.vehicles] : [];
@@ -584,11 +571,11 @@
                         }
                         result = enemy.update(this.player, this.activeMap.walls, getColliders(this.activeMap), this.lastKnownMarkers, trafficCars, this.activeMap, this.enemies);
                     } else if (enemy instanceof GatlingGunner) {
-                        result = enemy.update(this.player.x, this.player.y, this.enemies, this.activeMap.walls);
+                        result = enemy.update(this.playerPosition[0], this.playerPosition[1], this.enemies, this.activeMap.walls);
                     } else {
-                        result = enemy.update(this.player.x, this.player.y, this.activeMap.walls); 
+                        result = enemy.update(this.playerPosition[0], this.playerPosition[1], this.activeMap.walls);
                     }
-                    
+
                     // Unified projectile collection — handles single shots, arrays, or null
                     if (result) {
                         const shots = Array.isArray(result) ? result : [result];
@@ -604,27 +591,27 @@
                             }
                         }
                     }
-                    
+
                     if (enemy.dead && enemy.decoy) {                              // a Blood Mirror decoy: a crimson puff, nothing more
                         this.weather.spawnExplosion(enemy.x, enemy.y, '#7a0618', 6, 1.6);
                         this.enemies.splice(i, 1);
                         continue;
                     }
-                    if (enemy.dead) { 
+                    if (enemy.dead) {
                         this.awardKill(enemy);                                    // Resonance for the kill (core/resonance.js)
-                        audioSys.sfx('explode'); 
+                        audioSys.sfx('explode');
                         this.weather.spawnExplosion(enemy.x, enemy.y, '#a469ff', 7, 2.4);   // a soft violet puff: the body stays
-                        this.triggerShake(10); 
+                        this.triggerShake(10);
                         this.addCorpse(enemy);                                    // the body falls and stays a while (engine/finisher.js)
                         if (typeof Demoness !== 'undefined' && enemy instanceof Demoness) {
                             // The Demoness falls: dark element, and the first time, the Maiden's Kukri (if she hasn't one)
                             const qs = this.questState || (this.questState = {}), first = !qs.demonessDefeated;
                             qs.demonessDefeated = (qs.demonessDefeated || 0) + 1;
                             this.loot.push(new Loot(enemy.x + 14, enemy.y, 'dark_element'));
-                            if (first && !this.inventory.items.some(i => i.id === 'maiden_kukri')) {
-                                const k = createItemFromRegistry('maiden_kukri', this);
+                            if (first && !this.items.listItems().some(i => i.id === 'maiden_kukri')) {
+                                const k = this.items.createItem('maiden_kukri');
                                 this.loot.push({ x: enemy.x - 12, y: enemy.y + 6, type: 'weapon_drop', item: k, angle: 0.6, dropTime: 0,
-                                                 draw(ctx) { ctx.save(); ctx.translate(this.x, this.y); ctx.save(); ctx.translate(0, 10); ctx.scale(1, 0.36); ctx.globalAlpha = 0.75; drawGlow(ctx, 0, 0, 22, '#ffd76a', 0.3); ctx.restore(); drawWeapon(ctx, this.item.id, 0, Math.sin(_frameTime / 500) * 3, this.angle, 0.9); ctx.restore(); } });
+                                                 draw(ctx) { ctx.save(); ctx.translate(this.x, this.y); ctx.save(); ctx.translate(0, 10); ctx.scale(1, 0.36); ctx.globalAlpha = 0.75; drawGlow(ctx, 0, 0, 22, '#ffd76a', 0.3); ctx.restore(); drawWeapon(ctx, this.item.definition_id, 0, Math.sin(_frameTime / 500) * 3, this.angle, 0.9); ctx.restore(); } });
                                 showMessage("THE DEMONESS FALLS — SHE LEAVES THE MAIDEN'S KUKRI");
                             } else showMessage('THE DEMONESS FALLS');
                             if (enemy.solo) this.lilituDuelWon(enemy);            // her duel: a second Dark Element, the schematic (engine/boss-hazards.js)
@@ -633,13 +620,13 @@
                         }
                         const finReason = this.finisherReason(enemy);
                         this.spawnLoot(enemy.x, enemy.y);
-                        
+
                         // Bounty target killed — complete mission with bonus loot
-                        if (enemy.isBountyTarget && this.missions.activeMission 
+                        if (enemy.isBountyTarget && this.missions.activeMission
                             && this.missions.activeMission.targetEntity === enemy) {
                             this.missions.completeMission(this);
                         }
-                        
+
                         if (enemy instanceof GatlingGunner) {
                             // Count remaining gunners (excluding this one)
                             let remainingGunners = 0;
@@ -654,7 +641,7 @@
                                 this.clearHazards(enemy);
                                 if (!remainingGunners) this.triumvirateFallen(enemy);   // the Blood Pact, the first time (engine/boss-hazards.js)
                             }
-                            
+
                             if (remainingGunners > 0) {
                                 showMessage(enemy.persona ? `${WARDENS[enemy.persona].name.toUpperCase()} FALLS — THE OTHERS BURN HOTTER` : "REMAINING GUNNERS ENRAGED!");
                             } else if (!finReason) {
@@ -663,10 +650,10 @@
                             }
                         }
                         if (finReason) this.startFinisher(enemy, finReason);     // earned: slow motion, the body, then her twirl
-                        this.enemies.splice(i, 1); 
+                        this.enemies.splice(i, 1);
                     }
                 }
-                
+
                 // ── LARISSA COMBAT TUTORIAL COMMS ──
                 // One-shot dialogue triggers that teach the player about combat systems.
                 // Uses Larissa's cold, professional handler voice.
@@ -696,17 +683,17 @@
                         }
                     }
                 }
-                
+
                 this.profiler.stop('AI:Enemies');
-            
+
                 // --- 6. PROJECTILES (Entity System + Actor Collision) ---
                 // Wall/building/prop collisions handled by CollisionSystem.
                 // Actor collisions (player/enemies) use onProjectileHit() callbacks.
                 this.profiler.start('Physics:Proj');
                 this.deflectShots();                                   // the Mirror Blade's cut, the Mirrored Glass's shield (engine/status-effects.js)
-                
+
                 // ── ORPHAN SWEEP ──
-                // Catch any ProjectileEntity stuck in the GameEntity registry that isn't 
+                // Catch any ProjectileEntity stuck in the GameEntity registry that isn't
                 // in this.projectiles. These are ghost entities that can deal invisible damage.
                 // (Twice a second is enough to catch a ghost; it was a full registry scan every tick.)
                 const registeredProjectiles = this.simStep % 30 ? [] : GameEntity.getByLayer('PROJECTILE').filter(e => e.active);
@@ -721,11 +708,11 @@
                         rp._finalDestroy();
                     }
                 }
-                
+
                 // Update all projectiles and check for actor collisions
                 for (let i = this.projectiles.length - 1; i >= 0; i--) {
                     let p = this.projectiles[i];
-                    
+
                     // Skip if already destroyed by entity system
                     if (!p.active || p.markedForDestroy) {
                         // Ensure destroy() was called (triggers registry cleanup)
@@ -733,34 +720,34 @@
                         this.projectiles.splice(i, 1);
                         continue;
                     }
-                    
+
                     p.update(1, true);
-                    
+
                     // ── NEURAL LOCK AIM ASSIST ──
                     // Steer friendly projectiles toward nearest enemy on trajectory path
                     if (p.alliance === 'friendly' && this.augments && this.augments.isEquipped('auto_aim')) {
                         const STEER_RATE = 0.052;   // ~3° per frame — strong but not homing
                         const DETECT_RANGE = 350;   // px detection radius from projectile
                         const CONE_HALF = Math.PI / 3; // 60° half-cone (120° total forward arc)
-                        
+
                         const projAngle = Math.atan2(p.vy, p.vx);
                         let bestTarget = null;
                         let bestPathDist = Infinity;
-                        
+
                         for (const e of this.enemies) {
                             if (e.dead || !e.active) continue;
                             const dx = e.x - p.x;
                             const dy = e.y - p.y;
                             const dist = Math.hypot(dx, dy);
                             if (dist > DETECT_RANGE || dist < 5) continue;
-                            
+
                             // Must be within forward cone
                             const angleToEnemy = Math.atan2(dy, dx);
                             let angleDiff = angleToEnemy - projAngle;
                             while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
                             while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
                             if (Math.abs(angleDiff) > CONE_HALF) continue;
-                            
+
                             // Perpendicular distance to projectile path — closest to trajectory wins
                             const pathDist = Math.abs(Math.sin(angleDiff) * dist);
                             if (pathDist < bestPathDist) {
@@ -768,7 +755,7 @@
                                 bestTarget = e;
                             }
                         }
-                        
+
                         if (bestTarget) {
                             const desired = Math.atan2(bestTarget.y - p.y, bestTarget.x - p.x);
                             let steer = desired - projAngle;
@@ -781,23 +768,23 @@
                             p.vy = Math.sin(newAngle) * speed;
                         }
                     }
-                    
+
                     // If update() destroyed the projectile (life expired), remove immediately
                     if (!p.active || p.markedForDestroy) {
                         if (!p.markedForDestroy) p.destroy();
                         this.projectiles.splice(i, 1);
                         continue;
                     }
-                    
+
                     // ── DEFENSIVE GUARDS (eliminate ghost projectiles) ──
-                    
+
                     // Hard age cap: no projectile survives beyond 5 seconds
                     if (_gameTimeMs() - p.spawnTime > 5000) {
                         p.destroy();
                         this.projectiles.splice(i, 1);
                         continue;
                     }
-                    
+
                     // Zero-velocity kill: a non-sticky projectile with no momentum is dead
                     // (Normal projectiles should NEVER have zero velocity mid-flight)
                     if (!p.sticky && p.vx === 0 && p.vy === 0) {
@@ -805,31 +792,31 @@
                         this.projectiles.splice(i, 1);
                         continue;
                     }
-                    
+
                 }
 
                 // Loot Collection
                 for(let i=this.loot.length-1; i>=0; i--) {
                     let l = this.loot[i];
-                    let d = Math.hypot(this.player.x - l.x, this.player.y - l.y);
+                    let d = Math.hypot(this.playerPosition[0] - l.x, this.playerPosition[1] - l.y);
                     // Scrap Magnet augment: small pickups drift in from three times the range
                     if (d >= 35 && d < 105 && this.augments.isEquipped('scrap_magnet') && (l.type === 'pp' || l.type === 'scrap' || l.type === 'stim' || l.type === 'dark_element')) {
                         const k = Math.min(1, 4 / d);
-                        l.x += (this.player.x - l.x) * k; l.y += (this.player.y - l.y) * k;
-                        d = Math.hypot(this.player.x - l.x, this.player.y - l.y);
+                        l.x += (this.playerPosition[0] - l.x) * k; l.y += (this.playerPosition[1] - l.y) * k;
+                        d = Math.hypot(this.playerPosition[0] - l.x, this.playerPosition[1] - l.y);
                     }
-                    
+
                     // Check pickup range
                     if (d < 35) {
                         // --- WEAPON PICKUP WITH DELAY ---
                         if (l.type === 'weapon_drop') {
-                            
+
                             // CHECK: Has it been 1.5 seconds (1500ms) since it was dropped?
                             // If dropTime doesn't exist (generated by map), default to 0 (allow pickup)
                             const timeSinceDrop = Date.now() - (l.dropTime || 0);
-                            
-                            if (timeSinceDrop > 1500) { 
-                                const added = this.inventory.addItem(l.item);
+
+                            if (timeSinceDrop > 1500) {
+                                const added = this.inventory.receiveItem(l.item);
                                 if (added) {
                                     audioSys.sfx('ui');
                                     this.loot.splice(i, 1);
@@ -837,17 +824,17 @@
                             }
                             // Skip the generic splice below - weapon_drop handles its own removal
                             continue;
-                        } 
-                        else if (l.type === 'pp') { this.currency += 20; showMessage("+PERSONICS"); } 
+                        }
+                        else if (l.type === 'pp') { this.currency += 20; showMessage("+PERSONICS"); }
                         else if (l.type === 'dark_element') {
                             this.darkElement = (this.darkElement || 0) + 1;
                             showMessage('DARK ELEMENT SHARD — THE CORPORATIONS WOULD WANT THIS BACK');
                             audioSys.sfx('ui');
                         }
-                        else if (l.type === 'scrap') { 
+                        else if (l.type === 'scrap') {
                             const amount = 2 + Math.floor(Math.random() * 2); // 2-3 scrap
-                            this.scrap += amount; 
-                            showMessage(`+${amount} SCRAP`); 
+                            this.scrap += amount;
+                            showMessage(`+${amount} SCRAP`);
                         }
                         else if (l.type === 'salvage_crate') {
                             // Salvage mission crate — big scrap payout
@@ -856,20 +843,20 @@
                                 showMessage('SCRAP CRATE RECOVERED.');
                                 audioSys.sfx('ui');
                             }
-                        } 
-                        else if (l.type === 'stim') { 
-                            if (this.boosterCount < this.getEffectiveMaxBoosters()) { 
-                                this.boosterCount++; 
-                                showMessage("+STIM"); 
-                            } else { 
-                                showMessage("STIMS FULL"); 
+                        }
+                        else if (l.type === 'stim') {
+                            if (this.boosterCount < this.getEffectiveMaxBoosters()) {
+                                this.boosterCount++;
+                                showMessage("+STIM");
+                            } else {
+                                showMessage("STIMS FULL");
                                 continue; // Don't remove if stims are full
-                            } 
+                            }
                         }
                         this.loot.splice(i, 1);
                     }
                 }
-            
+
                 // Props Physics (Entity System)
                 // NOTE: All prop collisions (prop-prop, prop-wall, actor-prop) are handled
                 // by CollisionSystem._processDynamics and _processActors (circle vs OBB).
@@ -877,12 +864,12 @@
                 for (let prop of this.props) {
                     prop.update();
                 }
-                
+
                 this.profiler.stop('Physics:Proj');
-            
+
                 // --- 7. PLAYER PHYSICS ---
                 this.profiler.start('Physics:Player');
-                
+
                 // Bumper Car Minigame takes over driving when active
                 if (this.bumperMinigame && this.bumperMinigame.active) {
                     this.bumperMinigame.update(this);
@@ -928,7 +915,7 @@
                     // Player sits at seat 0, not car center
                     const driverSeatPos = this.car.getSeatWorldPos(0);
                     this.player.x = driverSeatPos.x; this.player.y = driverSeatPos.y;
-            
+
                     if (!this.updatePlayerFireInput()) this.player.angle = this.car.angle;
 
                 } else {
@@ -938,8 +925,8 @@
                     // Analog stick input already inside the unit circle passes through.
                     const walkInputMag = Math.hypot(inputX, inputY);
                     if (walkInputMag > 1) { inputX /= walkInputMag; inputY /= walkInputMag; }
-                    this.player.velX = inputX; this.player.velY = inputY; 
-                    
+                    this.player.velX = inputX; this.player.velY = inputY;
+
                     if (!this.updatePlayerFireInput() && (inputX !== 0 || inputY !== 0))
                         this.player.angle = Math.atan2(inputY, inputX);
 
@@ -947,27 +934,27 @@
                     // push her out along their side in resolveTrafficCollisions, so she slides along them
                     this.player.applyMovement(inputX, inputY);
                     this.updateSpills();                     // a hard turn slops her drink (engine/spills.js)
-                    
+
                     collisionWorld.keepInside(this.player, this.activeMap.width, this.activeMap.height, 15);   // within the map
-                    
+
                     // Wall/Building/Prop collisions now handled by CollisionSystem
                     // (runs after this in the update loop)
-                    
+
                     // --- BLOOD TRAIL LOGIC (PLAYER) ---
-                    if (this.playerHealth < 50) {
+                    if (this.player.hp < 50) {
                         const isMoving = (Math.abs(inputX) > 0 || Math.abs(inputY) > 0);
-                        const bleedChance = this.playerHealth < 20 ? 0.3 : 0.1;
-                        
+                        const bleedChance = this.player.hp < 20 ? 0.3 : 0.1;
+
                         // Drops as she moves (now and then when still), more often when badly hurt
                         if ((isMoving || Math.random() < 0.05) && Math.random() < bleedChance) {
-                            this.decals.addBlood(this.player.x, this.player.y, 3 + Math.random() * 2, BLOOD_KINDS.wine.decal);   // Stella's own
+                            this.decals.addBlood(this.playerPosition[0], this.playerPosition[1], 3 + Math.random() * 2, BLOOD_KINDS.wine.decal);   // Stella's own
                         }
                     }
                 }
-                
+
                 // Update PlayerEntity (knockback decay, animation phase)
                 this.player.update();
-                
+
                 // Clamp player within map bounds after knockback
                 if (!this.isDriving) collisionWorld.keepInside(this.player, this.activeMap.width, this.activeMap.height, 15);
                 this.profiler.stop('Physics:Player');
@@ -984,7 +971,7 @@
                     for (const enemy of this.enemies) clampEntity(enemy);
                     if (this.velvetCat && this.velvetCat.visible) clampEntity(this.velvetCat);
                 }
-            
+
                 // --- 8. COLLISIONS & INTERACTION UI ---
                 this.profiler.start('Physics:Collisions');
                 // Runs every step. This call contains the player-vs-traffic
@@ -994,7 +981,7 @@
                 if (this.simDue(CONFIG.SIM.TRAFFIC_COLLIDE_INTERVAL)) {
                     this.resolveTrafficCollisions();
                 }
-                
+
                 CollisionSystem.resolveProjectiles(this);
                 this.updateStickyOrbs();
 
@@ -1002,67 +989,67 @@
                 if (this.furniture) this.furniture.afterCollision(this);   // a held piece follows her (or holds her back)
                 this.updateCarLightTrails();
                 this.profiler.stop('Physics:Collisions');
-            
+
                 this.profiler.start('Logic:UI_Interact');
                 // Interaction UI Checks
                 let inTransition = false;
-                if (this.activeMap.transitions && !this.isDriving) { 
-                    const t = this._transitionGrid.query(this.player.x, this.player.y); 
-                    if (t) { inTransition = true; const [v, n] = transitionAction(t.label); setActionPill(this.transitionBtn, v, n, 'F'); uiKit.show(this.transitionBtn, 'flex'); } 
+                if (this.activeMap.transitions && !this.isDriving) {
+                    const t = this._transitionGrid.query(this.playerPosition[0], this.playerPosition[1]);
+                    if (t) { inTransition = true; const [v, n] = transitionAction(t.label); setActionPill(this.transitionBtn, v, n, 'F'); uiKit.show(this.transitionBtn, 'flex'); }
                 }
                 if (!inTransition) uiKit.hide(this.transitionBtn);
-            
+
                 let nearInteractable = null;
-                
+
                 // Find Interactables
-                for(let npc of this.npcs) { let d = Math.hypot(this.player.x - npc.x, this.player.y - npc.y); if (d < 50) { nearInteractable = npc; } }
-                for(let tm of this.teammates) { 
+                for(let npc of this.npcs) { let d = Math.hypot(this.playerPosition[0] - npc.x, this.playerPosition[1] - npc.y); if (d < 50) { nearInteractable = npc; } }
+                for(let tm of this.teammates) {
                     if (tm.inCar) continue;
                     // In apartment: recruited teammates are interactable for bonding
                     const inApt = this.activeMap && this.activeMap.id === 'apt_949';
                     if (tm.recruited && !inApt) continue;
                     if (!tm.recruited && inApt) continue; // Skip unrecruited in apartment
-                    let d = Math.hypot(this.player.x - tm.x, this.player.y - tm.y); if(d < 50) { nearInteractable = tm; } 
+                    let d = Math.hypot(this.playerPosition[0] - tm.x, this.playerPosition[1] - tm.y); if(d < 50) { nearInteractable = tm; }
                 }
-                for(let p of this.props) { if (PROP_ACTIONS[p.interactionType]) { let d = Math.hypot(this.player.x - (p.x + p.w/2), this.player.y - (p.y + p.h/2)); if (d < 60) nearInteractable = p; } }   // only props that do something
-                
+                for(let p of this.props) { if (PROP_ACTIONS[p.interactionType]) { let d = Math.hypot(this.playerPosition[0] - (p.x + p.w/2), this.playerPosition[1] - (p.y + p.h/2)); if (d < 60) nearInteractable = p; } }   // only props that do something
+
                 // Discoverable Velvet Cat
                 if (this.velvetCat && this.velvetCat._discoverable && !this.questState.hasVelvetCat) {
-                    const catDist = Math.hypot(this.player.x - this.velvetCat.x, this.player.y - this.velvetCat.y);
+                    const catDist = Math.hypot(this.playerPosition[0] - this.velvetCat.x, this.playerPosition[1] - this.velvetCat.y);
                     if (catDist < 50) nearInteractable = { interactionType: 'adopt_cat', entity: this.velvetCat };
                 }
-                
+
                 // The job's package by the van (engine/markers.js): beside it, or the van
                 const pkg = this.isDriving ? null : this.deliveryPackageSpot();
-                if (pkg && (Math.hypot(this.player.x - pkg.x, this.player.y - pkg.y) < 70 ||
-                            Math.hypot(this.player.x - this.deliveryVehicle.x, this.player.y - this.deliveryVehicle.y) < 80)) {
+                if (pkg && (Math.hypot(this.playerPosition[0] - pkg.x, this.playerPosition[1] - pkg.y) < 70 ||
+                            Math.hypot(this.playerPosition[0] - this.deliveryVehicle.x, this.playerPosition[1] - this.deliveryVehicle.y) < 80)) {
                     nearInteractable = { interactionType: 'delivery_pickup' };
                 }
-                
+
                 captionSystem.checkProximityGreetings(this.player, this.npcs, this.teammates);
-                
+
                 // The nearest of her cars in reach (the owned car, Amber's van, the one she got out of: engine/cars.js)
                 let nearMine = null;
                 if (!this.isDriving) {
                     let best = 80;
                     for (const c of this.parkedCars(this._parkedCars || (this._parkedCars = []))) {
-                        const d = Math.hypot(this.player.x - c.x, this.player.y - c.y);
+                        const d = Math.hypot(this.playerPosition[0] - c.x, this.playerPosition[1] - c.y);
                         if (d < best) { best = d; nearMine = c; }
                     }
                 }
-                let nearTraffic = this.traffic.getNearest(this.player.x, this.player.y, 80);
-            
+                let nearTraffic = this.traffic.getNearest(this.playerPosition[0], this.playerPosition[1], 80);
+
                 // Update Button State
                 const execT = this._execTarget = this.executionTarget();             // an unaware back, in reach (engine/executions.js)
-                if (this.isDriving) { 
-                    this.setInteract('Exit', 'Vehicle'); uiKit.show(this.interactBtn, 'flex'); this.activeInteraction = null; 
-                } 
+                if (this.isDriving) {
+                    this.setInteract('Exit', 'Vehicle'); uiKit.show(this.interactBtn, 'flex'); this.activeInteraction = null;
+                }
                 else if (execT) {
                     this.setInteract('Execute', this.weaponMode === 'melee' ? 'Blade' : 'Quietly'); uiKit.show(this.interactBtn, 'flex');
                     this.activeInteraction = { type: 'execute', target: execT };
                 }
-                else if (nearInteractable) { 
-                    uiKit.show(this.interactBtn, 'flex'); this.activeInteraction = nearInteractable; 
+                else if (nearInteractable) {
+                    uiKit.show(this.interactBtn, 'flex'); this.activeInteraction = nearInteractable;
                     if (nearInteractable instanceof PropEntity) {
                         const [verb, name, useLabel] = PROP_ACTIONS[nearInteractable.interactionType];
                         this.setInteract(verb, (useLabel && nearInteractable.label) || name);
@@ -1089,14 +1076,14 @@
                 else if (nearTraffic) {
                     this.setInteract('Hijack', 'Vehicle'); uiKit.show(this.interactBtn, 'flex'); this.activeInteraction = { type: 'hijack', target: nearTraffic };
                 }
-                else { 
-                    uiKit.hide(this.interactBtn); this.activeInteraction = null; 
+                else {
+                    uiKit.hide(this.interactBtn); this.activeInteraction = null;
                 }
-            
+
                 // Camera Zoom Logic (skip during cutscene — cutscene manager owns zoom)
                 if (!this.cutscene || !this.cutscene.active) {
                 let targetZoom = 1.0;
-                if (this.isDriving) { 
+                if (this.isDriving) {
                     // Pulls back with speed, down to a floor: the look-ahead already shows the road in front
                     const speedRatio = Math.abs(this.car.speed) / (this.car.drivenTop || this.car.maxSpeed), CZ = CONFIG.VEHICLE_DRIVE.CAM_ZOOM;
                     targetZoom = Math.max(CZ.FLOOR, 1.0 - speedRatio * CZ.SPAN);
@@ -1110,20 +1097,20 @@
                 }
                 if (this.isLandscape) targetZoom *= 0.9;          // a short screen: a little more ground above and below her
                 targetZoom *= GameSettings.baseZoom || 1;         // Settings → Base Zoom: the player's own step back (100/90/75/60%)
-                
+
                 const diff = targetZoom - this.camera.zoom;
                 if (Math.abs(diff) > 0.005) this.camera.zoom += diff * 0.05;
                 else this.camera.zoom = targetZoom;
                 }
-                
+
                 // Mission System: check objective completion
                 if (this.missions) this.missions.checkCompletion(this);
-                
+
                 this.profiler.stop('Logic:UI_Interact');
                 this.profiler.stop('Update:Total');
             },
 
-            
+
             resolveTrafficCollisions() {
                 // 1. HER AND HER CREW ON FOOT vs TRAFFIC (CollisionSystem._footRules / _footVsCar, through collisionWorld.streetFeet)
                 if (this._carHitCd > 0) this._carHitCd--;

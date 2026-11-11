@@ -48,7 +48,7 @@
             if (!g.activeMap || g.activeMap.id !== 'sdc') { g._doLoadMap('sdc', { x: VAN_DROP['949'].x, y: VAN_DROP['949'].y }); g.bakeStaticLighting(); }
             g.player.x = VAN_DROP['949'].x; g.player.y = VAN_DROP['949'].y; g.player.angle = -Math.PI / 2; g.player.visible = true;
             for (const t of g.teammates || []) { const p = VAN_DROP[t.name]; if (p) { t.x = p.x; t.y = p.y; } }
-            g.camera.x = g.player.x; g.camera.y = g.player.y; g.camera.zoom = 1.6;
+            g.camera.x = g.playerPosition[0]; g.camera.y = g.playerPosition[1]; g.camera.zoom = 1.6;
             if (g.updateUI) g.updateUI();
             qs.vanDone = true;
         }

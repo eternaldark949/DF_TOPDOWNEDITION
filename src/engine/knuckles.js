@@ -28,6 +28,7 @@
         engineMixin({
             /** Ticks into the punch for the body's strike curve: a quicker punch runs the same 15-tick curve faster */
             punchStanceTicks() {
+                if(this.activeLevel){const duration=this.weapons.state.punch_duration??.25;return Math.max(0,(duration-this.weapons.cooldown_seconds-1/60+RenderInterp.alpha/60)*CONFIG.PUNCH.DURATION_TICKS/duration);}
                 const D = CONFIG.PUNCH.DURATION_TICKS, dur = this._punchDur || D;
                 return Math.max(0, (dur - this.shootCooldown - 1 + RenderInterp.alpha) * D / dur);
             },
@@ -41,7 +42,7 @@
                 if (now - (this._punchAt ?? -99) > KNUCKLES.COMBO_RESET) this._punchCombo = 0;
                 this._punchAt = now;
                 this._punchCombo = (this._punchCombo || 0) + 1;
-                const flit = _gameTimeSec - this.flitState.lastFlitAt <= this.resonance.flitStrikeWindow();
+                const flit = _gameTimeSec - this.player.vitals.last_flit_at <= this.resonance.flitStrikeWindow();
                 const hay = flit || this._punchCombo % (st.haymakerEvery || KNUCKLES.EVERY) === 0;
                 if (hay) this._punchCombo = 0;
                 const ang = pl.angle;
@@ -89,7 +90,7 @@
             },
 
             /** Vampiric Fists worn? */
-            vampiricFists() { return !!(this.inventory && this.inventory.hasAttachment(VAMPIRIC.ID)); },
+            vampiricFists() { return !!(this.inventory && this.items.hasAttachment(VAMPIRIC.ID)); },
 
             /** One of her punches landed (CollisionSystem.resolveProjectile): with Vampiric Fists, she drinks */
             onPunchLanded(e, p) {

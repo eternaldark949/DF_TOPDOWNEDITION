@@ -55,7 +55,7 @@
                 this.animationFrameId = null;
         
                 // (the map's Back is the menu's: it closes every screen, the map among them)
-                // close-menu button is handled by InventorySystem.toggleMenu()
+                // close-menu button is handled by InventoryView.toggleMenu()
                 
                 window.addEventListener('resize', () => {
                     this.resizeMap();
@@ -262,7 +262,11 @@
                     return;
                 }
                 
-                const player = this.game.player;
+                if(this.game.activeLevel){
+                    const route=this.game.physics_system.findPath({body:this.game.player,to:[this.navMarker.x,this.navMarker.y]});
+                    this.navPath=route?route.points.map(([x,y])=>({x,y})):[];this.roadLevelPath=[];this.precisePath=null;return;
+                }
+                const player = {x:this.game.playerPosition[0],y:this.game.playerPosition[1]};
                 const network = this.game.traffic?.network;
                 
                 if (!network || !network.roads || network.roads.length === 0) {
@@ -600,8 +604,8 @@
             drawDistanceLine(ctx) {
                 // Screen space (device px): a fine dashed line from you to the destination, its distance in a violet pill
                 if (!this.navMarker || !this._toScreen) return;
-                const D = this.dpr, a = this._toScreen(this.game.player.x, this.game.player.y), b = this._toScreen(this.navMarker.x, this.navMarker.y);
-                const distM = Math.round(Math.hypot(this.navMarker.x - this.game.player.x, this.navMarker.y - this.game.player.y) / 10);
+                const D = this.dpr, a = this._toScreen(this.game.playerPosition[0], this.game.playerPosition[1]), b = this._toScreen(this.navMarker.x, this.navMarker.y);
+                const distM = Math.round(Math.hypot(this.navMarker.x - this.game.playerPosition[0], this.navMarker.y - this.game.playerPosition[1]) / 10);
                 const text = distM >= 1000 ? (distM / 1000).toFixed(1) + ' km' : distM + ' m';
                 ctx.save();
                 ctx.strokeStyle = 'rgba(255, 243, 207, 0.55)'; ctx.lineWidth = 1.5 * D; ctx.lineCap = 'round';
@@ -1008,7 +1012,7 @@
                 this.drawNavMarker(ctx);
                 if (this.game.deliveryVehicle && this.game.deliveryVehicle.visible) { const c = this.game.deliveryVehicle, p = S(c.x, c.y); if (on(p)) MapIcons.draw(ctx, 'car:amber', p.x, p.y, { dpr: D, css: MapIcons.SIZE.car * k, rot: c.angle }); }   // Amber's van
                 if (this.game.ownedCar && this.game.ownedCar.visible) { const c = this.game.ownedCar, p = S(c.x, c.y); if (on(p)) MapIcons.draw(ctx, 'car', p.x, p.y, { dpr: D, css: MapIcons.SIZE.car * k, rot: c.angle }); }
-                const pl = this.game.player, pp = S(pl.x, pl.y);                // you, on top
+                const pl = {x:this.game.playerPosition[0],y:this.game.playerPosition[1],angle:this.game.playerRotation}, pp = S(pl.x, pl.y);                // you, on top
                 MapIcons.drawMagic(ctx, 'player', pp.x, pp.y, { dpr: D, css: MapIcons.SIZE.player * k, rot: pl.angle, scale: 0.94 + Math.sin(_frameTime / 350) * 0.06, t: T, seed: 0 });
             }
             
@@ -1039,7 +1043,7 @@
             ownedMaps() {
                 const g = this.game, ids = new Set(g.visitedMaps || []);
                 if (g.activeMap) ids.add(g.activeMap.id);
-                for (const it of (g.inventory && g.inventory.items) || []) if (it && it.mapId && MAP_DATA[it.mapId]) ids.add(it.mapId);
+                for (const it of (g.inventory && g.items.listItems()) || []) if (it && it.state.mapId && MAP_DATA[it.state.mapId]) ids.add(it.state.mapId);
                 ids.delete('van_interior');                                 // a ride, not a place
                 const order = Object.keys(MAP_DATA);
                 return [...ids].filter(id => MAP_DATA[id]).sort((a, b) => order.indexOf(a) - order.indexOf(b))
@@ -1114,7 +1118,7 @@
 
             centerOnPlayer() {
                 const mapData = this.mapData();
-                const player = this.game.player;
+                const player = {x:this.game.playerPosition[0],y:this.game.playerPosition[1]};
                 const w = this.mapCanvas.width;
                 const h = this.mapCanvas.height;
                 

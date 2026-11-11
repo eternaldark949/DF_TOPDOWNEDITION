@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Standalone Basement Physics</title>
+<style>body{margin:24px;background:#121820;color:#e3eaf2;font:16px system-ui}main{max-width:800px;margin:auto}canvas{width:100%;background:#1b2633;display:block;border:1px solid #637186}button{padding:8px 16px}p{line-height:1.5}pre{white-space:pre-wrap;font-size:13px}</style>
+<main><h1>Basement physics sandbox</h1><p>WASD moves the circle. Arrow keys drive and steer the car; Space brakes. Click to fire toward a point. All movement and contact response run inside the standalone engine.</p><canvas id="scene" width="800" height="500" aria-label="Physics simulation with a character, car, crates and walls"></canvas><p><button id="reset">Reset scene</button></p><pre id="stats"></pre></main>
+<script type="module">
+import { createSandbox } from './scene.mjs';
+let scene = createSandbox();
+const canvas = document.querySelector('canvas'), ctx = canvas.getContext('2d'), keys = new Set(), visible = [];
+window.addEventListener('keydown', e => { if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault(); keys.add(e.code); });
+window.addEventListener('keyup', e => keys.delete(e.code));
+window.addEventListener('blur', () => keys.clear());
+document.querySelector('#reset').onclick = () => { scene = createSandbox(); keys.clear(); };
+canvas.addEventListener('pointerdown', e => scene.shoot([e.offsetX * canvas.width / canvas.clientWidth, e.offsetY * canvas.height / canvas.clientHeight]));
+setInterval(() => {
+    scene.walk([keys.has('KeyD') ? 1 : keys.has('KeyA') ? -1 : 0, keys.has('KeyS') ? 1 : keys.has('KeyW') ? -1 : 0]);
+    scene.drive({ throttle: keys.has('ArrowUp') ? 1 : 0, steer: keys.has('ArrowLeft') ? -1 : keys.has('ArrowRight') ? 1 : 0, brake: keys.has('Space') || keys.has('ArrowDown') ? 1 : 0 });
+    scene.step();
+}, 1000 / 60);
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    scene.physics.spatial_grid.queryBounds({left:0,right:canvas.width,top:0,bottom:canvas.height}, visible);
+    for (const item of visible) {
+        if (!item.body_id) continue;
+        const s = item.getState(), shape = s.collision_shape;
+        ctx.save(); ctx.translate(...s.position); ctx.rotate(s.rotation);
+        ctx.fillStyle = s.physics_type === 'static' ? '#687b8f' : s.name === 'Walker' ? '#71e1b8' : s.name === 'Car' ? '#dfb86b' : '#b5a1dc';
+        if (shape.shape_type === 'circle') { ctx.beginPath(); ctx.arc(0,0,shape.radius,0,Math.PI*2); ctx.fill(); }
+        if (shape.shape_type === 'box') ctx.fillRect(-shape.dimensions[0]/2,-shape.dimensions[1]/2,...shape.dimensions);
+        ctx.restore();
+    }
+    document.querySelector('#stats').textContent = JSON.stringify(scene.physics.getStatistics(), null, 2);
+    requestAnimationFrame(draw);
+}
+draw();
+</script></html>

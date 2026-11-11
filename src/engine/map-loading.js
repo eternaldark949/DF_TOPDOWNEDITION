@@ -111,8 +111,8 @@ engineMixin({
                     const drv = this.isDriving && this.car, LA = CONFIG.VEHICLE_DRIVE.CAM_LOOK_AHEAD, k = 1 - Math.exp(-dt / LA.TAU_MS);
                     const dx = (this.driveLeanX || 0) + ((drv ? (this.car.vx || 0) * LA.PER_SPEED : 0) - (this.driveLeanX || 0)) * k;
                     const dy = (this.driveLeanY || 0) + ((drv ? (this.car.vy || 0) * LA.PER_SPEED : 0) - (this.driveLeanY || 0)) * k;
-                    x = this.player.x + (this.scopeLeanX || 0) + dx;
-                    y = this.player.y + (this.scopeLeanY || 0) + dy;
+                    x = this.playerPosition[0] + (this.scopeLeanX || 0) + dx;
+                    y = this.playerPosition[1] + (this.scopeLeanY || 0) + dy;
                 }
                 if (this.cineCam) { x += this.cineCam.dx; y += this.cineCam.dy; }
                 if (this.finCam) { x += this.finCam.dx; y += this.finCam.dy; }
@@ -151,7 +151,10 @@ engineMixin({
                     this._cityView.bakeGround();
                 }, () => { if (this._cityView) this._cityView.bakeTops(); }, () => { if (this._cityView && !this._cityView.glow) this._cityView.bakeGlow(); }, () => { if (this._cityView) this._cityView.warm(); });
                 // The furniture's sprites (entities/prop-sprites.js), a handful a job, at the zoom the map opens at
-                const props = (this.props || []).filter(p => p && PropSprites.kindOf(p));
+                const presentationProps = this.activeLevel
+                    ? this.props.map(p => this.apartmentRenderer.propPacket(p, 1))
+                    : this.props || [];
+                const props = presentationProps.filter(p => p && PropSprites.kindOf(p));
                 for (let i = 0; i < props.length; i += 8) jobs.push(() => PropSprites.prepare(props.slice(i, i + 8), this.camera.zoom));
                 // Prepare ordinary sign glows one job at a time behind the map-entry fade.
                 // Readiness stays in _signSprites, so a pending font never freezes fallback art.
@@ -293,8 +296,10 @@ engineMixin({
             },
 
             _doLoadMap(mapId, spawnAt) {
-                if (mapId === 'hub_949') mapId = 'sdc';
                 this._cancelQuickDrawHold?.(); this.cancelQuickDraw();
+                if(mapId==='apt_949')return this._enterApartment(spawnAt);
+                if(this.activeLevel)this._leaveApartment();
+                if (mapId === 'hub_949') mapId = 'sdc';
                 const previousMapId = this.activeMap?.id;
                 // The map screen can still show the place she's leaving: keep its finished plan (and the city's roads and lamps)
                 if (this.activeMap) (this._mapSnaps ||= {})[this.activeMap.id] = { map: this.activeMap, network: this.activeMap.type !== 'indoor' ? this.traffic?.network : null, lamps: this.lamps };
@@ -1518,9 +1523,9 @@ engineMixin({
             
                 const occupiedSpots = [];
                 const map = this.activeMap;
-                const pX = this.player.x;
-                const pY = this.player.y;
-                const pAngle = this.player.angle || 0; // Direction player is looking
+                const pX = this.playerPosition[0];
+                const pY = this.playerPosition[1];
+                const pAngle = this.playerRotation || 0; // Direction player is looking
             
                 // 1. Helper: Collision Check (includes Door Override)
                 const isSpotValid = (x, y) => {
@@ -1693,6 +1698,9 @@ engineMixin({
              */
             bakeStaticLighting() {
                 if (!this.activeMap) return;
+                // Native scenes render their engine-owned lights directly. The old
+                // polygon cache accepts legacy lamp objects only.
+                if (this.activeLevel) { this.debugLightData = []; this.lightingBaked = true; return; }
             
                 // 1. RESET DEBUG DATA
                 this.debugLightData = []; 

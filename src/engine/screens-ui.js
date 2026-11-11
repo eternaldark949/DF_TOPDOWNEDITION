@@ -22,13 +22,13 @@
 
                 // --- 1. HEALTH BAR (Red gradient) ---
                 // Displays player's current HP as percentage of max
-                const healthPercent = Math.max(0, (this.playerHealth / this.maxPlayerHealth) * 100);
+                const healthPercent = Math.max(0, (this.player.hp / this.player.maxHp) * 100);
                 set('hp', healthPercent.toFixed(1), v => { this.healthBar.style.width = `${v}%`; });
                 
                 // --- 2. FLIT ATTUNEMENT BAR (Champagne/Gold) ---
                 // Shows current attunement pool. Full bar = max charges available.
                 const flitPercent = Math.max(0, Math.min(100, 
-                    (this.flitState.attunement / this.flitState.maxAttunement) * 100));
+                    (this.player.vitals.attunement / this.player.vitals.max_attunement) * 100));
                 if (U.flit) set('flit', flitPercent.toFixed(1), v => { U.flit.style.width = `${v}%`; });
 
                 // --- 3. ECONOMY DISPLAY ---
@@ -960,8 +960,8 @@
                 // ══════════════════════════════════════════════════
                 html += `<div class="df-section"><span>Stats</span></div><div class="df-card">`;
 
-                const hp = this.playerHealth ?? 0;
-                const maxHp = this.maxPlayerHealth ?? 100;
+                const hp = this.player.hp ?? 0;
+                const maxHp = this.player.maxHp ?? 100;
                 const hpPct = Math.max(0, Math.round((hp / maxHp) * 100));
                 html += `<div class="df-bar-label" style="margin-top:0;"><span>Vitals</span><span>${hp} / ${maxHp}</span></div><div class="df-bar crimson${hpPct ? '' : ' zero'}"><i style="--v:${hpPct}%"></i></div>`;
 
@@ -969,10 +969,8 @@
                 const baseSpeed = this.player?.speed ?? 5.2;
                 const finalSpeed = this.player?.buffSystem?.getStat('speed', baseSpeed) ?? baseSpeed;
                 const baseFlitDist = 120;
-                let finalFlitDist = this.player?.buffSystem?.getStat('flitDistance', baseFlitDist) ?? baseFlitDist;
-                if (this.augments && this.augments.isEquipped('flit_ext')) finalFlitDist *= 1.3;
-                if (this.resonance) finalFlitDist = this.resonance.stat('flitDistance', finalFlitDist);
-                const baseFlitCost = this.flitState?.dashCost ?? 40;
+                const finalFlitDist=this.flitDistance();
+                const baseFlitCost = this.player?.vitals.flit_cost ?? 40;
                 const finalFlitCost = this.flitCost ? this.flitCost() : baseFlitCost;
                 const baseDetect = 1.0;
                 const finalDetect = this.player?.buffSystem?.getStat('detectionRange', baseDetect) ?? baseDetect;
@@ -985,9 +983,9 @@
                     return `<div class="df-row"><span class="k">${label}</span><span class="v${modified ? (better ? ' up' : ' down') : ''}">${v}</span></div>`;
                 };
 
-                const weapId = this.inventory?.equippedWeaponId;
+                const weapId = this.items?.getEquippedWeapon()?.definition_id;
                 const weapName = weapId && typeof ITEM_REGISTRY !== 'undefined' && ITEM_REGISTRY[weapId] ? ITEM_REGISTRY[weapId].name : 'Unarmed';
-                const attIds = this.inventory?.equippedAttachments || [];
+                const attIds = this.items?.getEquippedAttachments().map(item=>item.definition_id) || [];
                 const attName = attIds.map(id => typeof ITEM_REGISTRY !== 'undefined' && ITEM_REGISTRY[id] ? ITEM_REGISTRY[id].name : null).filter(Boolean).join(', ') || 'None';
 
                 html += `<div class="df-rows" style="margin-top:8px;">`;
@@ -1396,7 +1394,7 @@
                 const KINDS = [['attachment', 'Attachments', 'Attachment', '#cab0fa'], ['weapon', 'Weapons', 'Weapon', '#e8a688'], ['accessory', 'Accessories', 'Accessory', '#ffc248'], ['home', 'For the Apartment', 'Furniture', '#f19ab0']];
                 const made = SCHEMATICS.filter(s => this.schematicOwned(s)).length;
                 const pct = SCHEMATICS.length ? Math.round(made / SCHEMATICS.length * 100) : 0;
-                const worn = this.inventory ? this.inventory.equippedAttachments.length : 0, maxWorn = this.inventory ? this.inventory.maxAttachments : 2;
+                const worn = this.inventory ? this.items.getEquippedAttachments().length : 0, maxWorn = this.inventory ? this.items.max_attachments : 2;
                 let html = `<div class="sk-head cr-head"><div class="sk-dial cr-dial" style="--v:${pct}"><div class="sk-dial-in"><div class="sk-level">${this.scrap}</div><div class="sk-pct">Scrap</div></div></div>`;
                 html += `<div class="sk-meta"><div class="sk-next">${made} of ${SCHEMATICS.length} schematics crafted</div>`;
                 html += `<div class="sk-caps"><span class="sk-cap lav">Attachments ${worn} / ${maxWorn} worn</span></div>`;
@@ -1457,7 +1455,7 @@
             /** A schematic is made: an item carried, or (cosmetic) a piece owned to wear */
             schematicOwned(sch) {
                 if (sch.furniture) return !!(this.questState && this.questState[sch.furniture]);
-                return sch.cosmetic ? !!(this.cosmetics && this.cosmetics.isOwned(sch.id)) : this.inventory.items.some(i => i.id === sch.id);
+                return sch.cosmetic ? !!(this.cosmetics && this.cosmetics.isOwned(sch.id)) : this.items.listItems().some(i => i.id === sch.id);
             },
 
             /** What a schematic still needs first (its `requires`, by name), or null */
@@ -1478,8 +1476,8 @@
                     if (!this.cosmetics || !COSMETICS_REGISTRY[sch.id]) return false;
                     this.cosmetics.owned.push(sch.id);
                 } else {
-                    const craftedItem = createItemFromRegistry(sch.id, this);
-                    if (!craftedItem || !this.inventory.addItem(craftedItem)) return false;   // (inventory full: the scrap stays)
+                    const craftedItem=this.items.grantItem(sch.id);
+                    if(!craftedItem){showMessage('INVENTORY FULL');return false;}   // (inventory full: the scrap stays)
                 }
                 this.scrap -= sch.scrapCost;
                 this.updateUI();

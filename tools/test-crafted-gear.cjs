@@ -12,9 +12,9 @@ const setup=`game._doLoadMap('ollo_test');game.running=true;game.paused=false;ga
  game.activeMap={id:'gear_test',width:3000,height:3000,walls:[],buildings:[],buildingColliders:[]};
  game.player._game=game;game.player.x=1000;game.player.y=1000;game.player.angle=0;game.isDriving=false;
  game.weaponHolstered=false;game.projectiles=[];game.enemies=[];game.effects.of('number').length=0;_gameTimeSec=10;
- game.inventory.items=[];game.inventory.equippedAttachments=[];game.cosmetics.equippedAccessory=null;
- const give=id=>{const it=createItemFromRegistry(id,game);game.inventory.items.push(it);return it;};
- const wield=id=>{game.currentWeapon=give(id);game.weaponMode=ITEM_REGISTRY[id].weaponMode;game.shootCooldown=0;};
+ game.items.clear();game.cosmetics.equippedAccessory=null;
+ const give=id=>game.items.grantItem(id);
+ const wield=id=>{game.items.equipItem(give(id).instance_id);game.shootCooldown=0;};
  const ganger=(x,y)=>{const g=new Ganger(x,y,{hp:5000});g.state='IDLE';game.enemies.push(g);return g;};
  const rnd=Math.random;const withRandom=(v,f)=>{Math.random=()=>v;try{return f();}finally{Math.random=rnd;}};
  const shot=(x,y,ang,owner)=>{const p=new ProjectileEntity({x,y,angle:ang,isEnemy:true,owner,damage:30});game.projectiles.push(p);return p;};
@@ -27,12 +27,12 @@ test('Three new schematics at the workbench, with the agreed costs',e=>{
 
 test('Two attachments at most; unequipping one leaves the other',e=>{
  const r=value(e,setup+`for(const id of ['laser_sight','blood_muzzle','mirror_blade'])give(id);
-  for(const id of ['laser_sight','blood_muzzle','mirror_blade'])game.inventory.equipItem(id);
-  const two=game.inventory.equippedAttachments.slice();
-  game.inventory.unequip('laser_sight');const after=game.inventory.equippedAttachments.slice();
-  game.inventory.equipItem('mirror_blade');
-  const saved=game.inventory.equippedAttachments.slice();
-  return {two,after,saved,laser:game.inventory.hasAttachment('laser_sight'),muzzle:game.inventory.hasAttachment('blood_muzzle'),first:game.inventory.equippedAttachmentId};`);
+  for(const id of ['laser_sight','blood_muzzle','mirror_blade'])game.inventory.equipItem(game.items.findItem(id).instance_id);
+  const two=game.items.getEquippedAttachments().map(i=>i.definition_id);
+  game.items.unequipItem(game.items.findItem('laser_sight').instance_id);const after=game.items.getEquippedAttachments().map(i=>i.definition_id);
+  game.inventory.equipItem(game.items.findItem('mirror_blade').instance_id);
+  const saved=game.items.getEquippedAttachments().map(i=>i.definition_id);
+  return {two,after,saved,laser:game.items.hasAttachment('laser_sight'),muzzle:game.items.hasAttachment('blood_muzzle'),first:game.items.getEquippedAttachments()[0]?.definition_id};`);
  assert.deepEqual(r.two,['laser_sight','blood_muzzle']);assert.deepEqual(r.after,['blood_muzzle']);
  assert.deepEqual(r.saved,['blood_muzzle','mirror_blade']);assert.equal(r.laser,false);assert.equal(r.muzzle,true);assert.equal(r.first,'blood_muzzle');
 });
@@ -41,7 +41,7 @@ test('Crafting spends scrap, a cosmetic schematic grants the piece, and the glas
  const r=value(e,setup+`game.scrap=2000;const out={};
   out.made=['mirror_blade','blood_muzzle','acc_mirror_glass'].map(id=>game.craftSchematic(id));
   out.again=game.craftSchematic('mirror_blade');
-  out.items=game.inventory.items.map(i=>i.id);out.glass=game.cosmetics.isOwned('acc_mirror_glass');out.scrap=game.scrap;
+  out.items=game.items.listItems().map(i=>i.definition_id);out.glass=game.cosmetics.isOwned('acc_mirror_glass');out.scrap=game.scrap;
   game.cosmetics.owned=game.cosmetics.owned.filter(id=>id!=='acc_glass'&&id!=='acc_mirror_glass');game.scrap=2000;
   out.withoutGlass=game.craftSchematic('acc_mirror_glass');out.scrapKept=game.scrap;
   game.openCraftingTable();
@@ -52,11 +52,11 @@ test('Crafting spends scrap, a cosmetic schematic grants the piece, and the glas
 });
 
 test('Every attachment can be crafted even with a full bag; only two are worn',e=>{
- const r=value(e,setup+`game.scrap=5000;for(let i=0;i<game.inventory.capacity;i++)give('pistol_fpx');
+ const r=value(e,setup+`game.scrap=5000;for(let i=0;i<game.items.capacity;i++)give('pistol_fpx');
   const made=['laser_sight','mirror_blade','blood_muzzle'].map(id=>game.craftSchematic(id));
   const gun=game.craftSchematic('golden_child');
-  for(const id of ['laser_sight','mirror_blade','blood_muzzle'])game.inventory.equipItem(id);
-  return {made,gun,worn:game.inventory.equippedAttachments.length};`);
+  for(const id of ['laser_sight','mirror_blade','blood_muzzle'])game.inventory.equipItem(game.items.findItem(id).instance_id);
+  return {made,gun,worn:game.items.getEquippedAttachments().length};`);
  assert.deepEqual(r.made,[true,true,true]);assert.equal(r.gun,false);assert.equal(r.worn,2);
 });
 
@@ -64,7 +64,7 @@ test('The Muzzle: bullets ×1.75; the Mirrored Glass: all damage ×1.35, stackin
  const r=value(e,setup+`game.player._muzzleLocal={x:20,y:3};game.player._muzzleReady=true;
   const fire=()=>{game.shootCooldown=0;withRandom(.99,()=>game.fireWeapon());return game.projectiles.at(-1).damage;};
   wield('pistol_fpx');const base=fire();
-  give('blood_muzzle');game.inventory.equipItem('blood_muzzle');const muzzle=fire();
+  give('blood_muzzle');game.inventory.equipItem(game.items.findItem('blood_muzzle').instance_id);const muzzle=fire();
   game.cosmetics.owned.push('acc_mirror_glass');game.cosmetics.equip('acc_mirror_glass');const both=fire();
   return {base,muzzle,both,mult:game.playerDamageMult()};`);
  assert.equal(r.muzzle,Math.round(r.base*1.75));assert.equal(r.both,Math.round(r.base*1.75*1.35));assert.equal(r.mult,1.35);
@@ -72,8 +72,8 @@ test('The Muzzle: bullets ×1.75; the Mirrored Glass: all damage ×1.35, stackin
 
 test('The Mirror Blade turns a shot its cut meets back at the shooter; without it the shot flies on',e=>{
  const r=value(e,setup+`const out={};
-  for(const mirror of [false,true]){game.projectiles=[];game.enemies=[];game.inventory.items=[];game.inventory.equippedAttachments=[];
-   wield('blood_pact');if(mirror){give('mirror_blade');game.inventory.equipItem('mirror_blade');}
+  for(const mirror of [false,true]){game.projectiles=[];game.enemies=[];game.items.clear();
+   wield('blood_pact');if(mirror){give('mirror_blade');game.inventory.equipItem(game.items.findItem('mirror_blade').instance_id);}
    const g=ganger(1300,1000);game._slashSide=1;withRandom(.99,()=>game.meleeSlash());
    while(_gameTimeSec-game._slashT<WIDE_SWING.windup*game._slashSecs)tick();   // into the cut, then a shot comes in
    const p=shot(1120,1000,Math.PI,g);
@@ -106,7 +106,7 @@ test('Golden Child: burn 8 a tick, scaled with the shot and its crit; burn ticks
  const r=value(e,setup+`game.player._muzzleLocal={x:20,y:3};game.player._muzzleReady=true;
   const fire=v=>{game.shootCooldown=0;withRandom(v,()=>game.fireWeapon());return game.projectiles.at(-1);};
   wield('golden_child');const base=fire(.99).dotDamage;
-  give('blood_muzzle');game.inventory.equipItem('blood_muzzle');const muzzle=fire(.99).dotDamage,crit=fire(.01).dotDamage;
+  give('blood_muzzle');game.inventory.equipItem(game.items.findItem('blood_muzzle').instance_id);const muzzle=fire(.99).dotDamage,crit=fire(.01).dotDamage;
   const g=ganger(1300,1000);g.invincibleTimer=20;const hp=g.hp;
   const a=g.takeDamage(8,0,0,{type:'burn'}),b=g.takeDamage(8,0,0,{type:'burn'});
   return {base,muzzle,crit,landed:[a,b],lost:hp-g.hp,frames:g.invincibleTimer,maxOrbs:game.projectiles.at(-1).maxOrbs};`);
@@ -148,8 +148,8 @@ test('Golden Child: every Quick Hands rank and Reflex Sync improve sustained DPS
   for(const boost of [false,true])for(const crit of [1,2])for(const reflex of [false,true])for(let rank=0;rank<=3;rank++){
    game.resonance.ranks={quick_hands:rank,hollow_points:boost?3:0};
    game.augments.equipped=reflex?['fast_reload']:[];game.rollCrit=()=>crit;
-   game.inventory.items=boost?[createItemFromRegistry('blood_muzzle',game)]:[];
-   game.inventory.equippedAttachments=boost?['blood_muzzle']:[];
+   game.items.unequipSlot('attachment');
+   if(boost)game.items.equipItem((game.items.findItem('blood_muzzle')??give('blood_muzzle')).instance_id);
    game.cosmetics.equippedAccessory=boost?'acc_mirror_glass':null;
    game.stickyOrbs=[];game.projectiles=[];game.shootCooldown=0;game._drawnAt=undefined;
    let damage=0,maxOrbs=0;
@@ -182,7 +182,7 @@ test('Blades: Crimson Edge cuts ×1.5 and bleeds five deep; Quick Hands and Refl
  const r=value(e,setup+`const g=ganger(1030,1000);wield('maiden_kukri');
   const swing=()=>{const s=withRandom(.99,()=>game.meleeSlash());const cd=game.shootCooldown;while(game._swing===s)tick();return cd;};
   const hp0=g.hp;const cd0=swing();const plain=hp0-g.hp;
-  give('crimson_edge');game.inventory.equipItem('crimson_edge');const hp1=g.hp;swing();const edged=hp1-g.hp;
+  give('crimson_edge');game.inventory.equipItem(game.items.findItem('crimson_edge').instance_id);const hp1=g.hp;swing();const edged=hp1-g.hp;
   for(let i=0;i<6;i++){game.shootCooldown=0;swing();}
   game.resonance.ranks.quick_hands=3;game.augments.equipped.push('fast_reload');const cd1=swing();
   return {plain,edged,stacks:g._status.bleed.stacks,cd0,cd1};`);
@@ -192,12 +192,12 @@ test('Blades: Crimson Edge cuts ×1.5 and bleeds five deep; Quick Hands and Refl
 
 test('Blades: a cut heals 4% of its damage; mid-swing she takes 25% less; a Flit-cut always crits',e=>{
  const r=value(e,setup+`const g=ganger(1030,1000);wield('blood_pact');
-  game.playerHealth=50;game.player.hp=50;game.player.maxHp=game.maxPlayerHealth=100;
+  game.player.vitals.importHealth(50,100);
   const s=withRandom(.99,()=>game.meleeSlash());
   const before=game.player.hp;game.player.invincibleTimer=0;game.player.takeDamage(20);const guarded=before-game.player.hp;
   while(game._swing===s)tick();const healedTo=game.player.hp;
   _gameTimeSec+=2;game.player.invincibleTimer=0;const b2=game.player.hp;game.player.takeDamage(20);const open=b2-game.player.hp;
-  game.flitState.lastFlitAt=_gameTimeSec;const hp=g.hp;game.shootCooldown=0;const s2=withRandom(.99,()=>game.meleeSlash());while(game._swing===s2)tick();
+  game.player.vitals.state.last_flit_at=_gameTimeSec;const hp=g.hp;game.shootCooldown=0;const s2=withRandom(.99,()=>game.meleeSlash());while(game._swing===s2)tick();
   return {guarded,healed:healedTo-(before-guarded),open,flit:hp-g.hp};`);
  assert.equal(r.guarded,15);assert.equal(r.healed,2);assert.equal(r.open,20);assert.equal(r.flit,90);
 });

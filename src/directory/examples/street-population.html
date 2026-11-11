@@ -1,0 +1,58 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>DF street population — engine client</title>
+<style>body{background:#10121b;color:#d6deed;font:16px system-ui;max-width:1000px;margin:24px auto}canvas{background:#202735;max-width:100%}button{padding:8px 16px}pre{font-size:12px}</style>
+<h1>Traffic and pedestrian engine client</h1>
+<p>The official ESM game classes share one physics world. This preview is separate from the legacy single-file game.</p>
+<label><input id="combine-mass" type="checkbox"> Include rider mass</label> <button id="ride">Mount test rider</button> <button id="signal">Walk signal: stop</button> <button id="reset">Reset</button>
+<canvas width="960" height="600"></canvas><pre id="stats"></pre>
+<script type="module">
+import { physicsSystem } from '../../basement/physics/index.mjs';
+import { createGameAssetLibrary } from '../game-assets.mjs';
+import { StreetPopulation } from '../game-street.mjs';
+const canvas = document.querySelector('canvas'), ctx = canvas.getContext('2d');
+let physics, street, walkSignal = 'stop';
+function reset() {
+    physics = new physicsSystem({ asset_library: createGameAssetLibrary() });
+    street = new StreetPopulation(physics, { pedestrians: { random: () => 0 }, traffic: { despawn_on_completion: false } });
+    street.pedestrians.setNetwork({nodes:[
+        {id:0,position:[480,80],connections:[1],crosswalk_id:'cross',signal_id:'walk'},
+        {id:1,position:[480,520],connections:[0],crosswalk_id:'cross',signal_id:'walk'},
+        {id:2,position:[120,80],connections:[3]}, {id:3,position:[840,80],connections:[2]}
+    ]});
+    street.pedestrians.spawnAtNode(0); street.pedestrians.spawnAtNode(1); street.pedestrians.spawnAtNode(2);
+    street.traffic.registerRoute('east',{points:[[80,270],[880,270]],speed_limit:130});
+    street.traffic.registerRoute('west',{points:[[880,330],[80,330]],speed_limit:130});
+    street.traffic.spawn({route_id:'east'}); street.traffic.spawn({route_id:'west'});
+    document.querySelector('#ride').textContent='Mount test rider';
+    walkSignal = 'stop'; street.pedestrians.setSignal('walk',walkSignal); document.querySelector('#signal').textContent='Walk signal: stop';
+}
+reset();
+document.querySelector('#signal').onclick=()=>{walkSignal=walkSignal==='go'?'stop':'go';street.pedestrians.setSignal('walk',walkSignal);document.querySelector('#signal').textContent=`Walk signal: ${walkSignal}`;};
+document.querySelector('#reset').onclick=reset;
+document.querySelector('#ride').onclick=()=>{
+    const person=street.pedestrians.getPedestrians()[0], car=street.traffic.getVehicles()[0];
+    if(physics.getAttachmentState(person)) {
+        document.querySelector('#ride').textContent=car.releasePassenger(person)?'Mount test rider':'Exit blocked';
+    } else {
+        document.querySelector('#ride').textContent=car.assignPassenger(person,{combine_mass:document.querySelector('#combine-mass').checked})>=0?'Exit test rider':'Seat unavailable';
+    }
+};
+// Fixed-step preview scheduling; the full game will let Lobby own this step.
+setInterval(()=>{street.updateState();physics.updateState();},1000/60);
+function draw() {
+    ctx.clearRect(0,0,960,600); ctx.fillStyle='#141921'; ctx.fillRect(0,230,960,140);
+    ctx.fillStyle='#606979';for(let y=235;y<360;y+=22)ctx.fillRect(460,y,40,10);
+    const visible=physics.queryEntitiesInBounds({bounds:{left:0,right:960,top:0,bottom:600}});
+    visible.sort((a,b)=>Number(b.entity?.entity_type==='df_traffic_vehicle')-Number(a.entity?.entity_type==='df_traffic_vehicle'));
+    for(const hit of visible) {
+        const e=hit.entity;if(!e)continue;const pose=e.getRenderState(1);ctx.save();ctx.translate(...pose.position);ctx.rotate(pose.rotation);
+        if(e.entity_type==='df_traffic_vehicle') { const [w,h]=e.collision_shape.dimensions;ctx.fillStyle=e.data.color;ctx.fillRect(-w/2,-h/2,w,h);ctx.fillStyle='#dbe8ef';ctx.fillRect(w/4,-h/3,6,h*2/3); }
+        else {const look=e.getAsset('appearance_catalog').data.find(a=>a.name===e.data.appearance_id);ctx.fillStyle=e.data.state==='sprawled'?'#e97864':look?.bodyColor??'#9dc6ee';ctx.beginPath();ctx.arc(0,0,12,0,Math.PI*2);ctx.fill();ctx.fillStyle='#fff';ctx.fillRect(6,-2,7,4);}
+        ctx.restore();
+    }
+    document.querySelector('#stats').textContent=JSON.stringify({physics:physics.getStatistics(),vehicles:street.traffic.getVehicles().map(v=>({id:v.entity_id,configured_mass:v.mass,mass:physics.getMassProperties(v)})),pedestrians:street.pedestrians.getPedestrians().map(p=>({id:p.entity_id,state:p.data.state,health:p.data.health,parent_body_id:physics.getAttachmentState(p)?.parent_body_id??null,position:p.position}))},null,2);
+    requestAnimationFrame(draw);
+}
+draw();
+</script>

@@ -26,7 +26,7 @@
                     // Lobby runs it in fixed steps and every constant means the same thing on every display.
                     // Every step slot, held or not: interpolation blends from here, so while paused the
                     // drawn frame rests on the latest state.
-                    beforeStep: () => { if (CONFIG.LOOP.INTERPOLATE) RenderInterp.snapshot(this); },
+                    beforeStep: () => { if (CONFIG.LOOP.INTERPOLATE && !this.activeLevel) RenderInterp.snapshot(this); },
                     // Pause is the game's pause registry (engine/pause-system.js), mirrored to game.paused
                     isPaused: () => this.paused,
                     simulateStep: () => this.stepWorld(),
@@ -36,7 +36,8 @@
                     },
                     // Always draw for smooth visuals, blended between the last two ticks
                     renderFrame: (blend) => {
-                        const interp = CONFIG.LOOP.INTERPOLATE;
+                        const interp = CONFIG.LOOP.INTERPOLATE && !this.activeLevel;
+                        if(this.activeLevel)this._apartmentBlend=this.paused?1:blend;
                         if (interp) RenderInterp.apply(this, blend);
                         const tickSec = CONFIG.LOOP.STEP_MS / 1000;
                         frame_clock.setGameTime((interp && RenderInterp.stepAdvanced)

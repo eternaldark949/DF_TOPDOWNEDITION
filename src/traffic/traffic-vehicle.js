@@ -350,12 +350,8 @@
                 this.occupantWindows();
                 const seat = this.seatLayout[seatIndex];
                 if (!seat) return { x: this.x, y: this.y };
-                const cos = Math.cos(this.angle);
-                const sin = Math.sin(this.angle);
-                return {
-                    x: this.x + seat.localX * cos - seat.localY * sin,
-                    y: this.y + seat.localX * sin + seat.localY * cos
-                };
+                const pose = pathGeometry.transformPose({ position: [this.x, this.y], rotation: this.angle }, { local_position: [seat.localX, seat.localY] });
+                return { x: pose.position[0], y: pose.position[1] };
             }
 
             /**

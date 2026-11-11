@@ -57,7 +57,7 @@
                 }
                 const onHub = g.activeMap && g.activeMap.id === 'sdc';
                 this.sendBrief('Barista Ren', 'delivery', REN_AGAIN[(n - 1) % REN_AGAIN.length],
-                    { source: 'ren', handed: true, from: onHub ? { x: g.player.x, y: g.player.y } : null });
+                    { source: 'ren', handed: true, from: onHub ? { x: g.playerPosition[0], y: g.playerPosition[1] } : null });
             },
 
             /* ───────────────────────── the app ───────────────────────── */
@@ -91,7 +91,7 @@
             /** Where she is, for an order's distance: herself in the city, the cafe from anywhere else */
             _amberFrom() {
                 const g = game;
-                if (g.activeMap && g.activeMap.id === 'sdc') return { x: g.player.x, y: g.player.y };
+                if (g.activeMap && g.activeMap.id === 'sdc') return { x: g.playerPosition[0], y: g.playerPosition[1] };
                 const P = this._place('cozy_cafe');
                 return P ? { x: P.tx, y: P.ty } : null;
             },

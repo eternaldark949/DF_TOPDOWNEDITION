@@ -1,4 +1,12 @@
         class GameEngine {
+            get currentWeapon(){return this.items?.getEquippedWeapon()??null;}
+            get weaponMode(){return this.items?.getWeaponMode()??'none';}
+            get _quickDraw(){return this.activeLevel&&this.weapons?this.weapons.quick_draw:this._legacyQuickDraw??null;}
+            set _quickDraw(value){if(this.activeLevel&&this.weapons){if(value!==null)throw new Error('Use the weapon quick draw API');this.weapons.cancelQuickDraw();}else this._legacyQuickDraw=value;}
+            get shootCooldown(){return this.activeLevel&&this.weapons?this.weapons.cooldown_seconds*60:this._legacyShootCooldown??0;}
+            set shootCooldown(ticks){if(this.activeLevel&&this.weapons)this.weapons.setCooldown(ticks/60);else this._legacyShootCooldown=ticks;}
+            get weaponHolstered(){return this.activeLevel&&this.weapons?this.weapons.holstered:this._legacyWeaponHolstered??false;}
+            set weaponHolstered(value){if(this.activeLevel&&this.weapons)this.weapons.setHolstered(value);else this._legacyWeaponHolstered=!!value;}
             constructor() {
                 
                 // Pause registry — every subsystem that needs the world paused
@@ -13,7 +21,11 @@
                 
                 this.ui = new UISystem(this);
                 this.musicWidget = new MusicWidgetSystem(this);
-                this.inventory = new InventorySystem(this);
+                this.items=new DFNative.itemSystem({catalog:DFNative.createItemCatalog(GAME_DB.items)});
+                this.items.reset(DEFAULT_LOADOUT);
+                this.items.on('items:equipped',event=>{if(event.slot==='weapon'){this.cancelQuickDraw();if(!this.activeLevel){this._drawnAt=_gameTimeSec;this._drawShotUsed=false;}}});
+                this.items.on('items:unequipped',event=>{if(event.slot==='weapon')this.cancelQuickDraw();});
+                this.inventory = new InventoryView(this);
                 
                 this.cutscene = new CutsceneManager(this);
                 this.story = new StoryManager(this);
@@ -76,11 +88,6 @@
                     larissa_loadout_hint: false
                 };
                 this.velvetCat = null; // Active VelvetCat entity
-                this.flitState = { 
-                    active: false, duration: 0, maxDuration: 15,
-                    attunement: 120, maxAttunement: 120, 
-                    dashCost: 40, rechargeRate: 2 // 2/frame = full in 1s
-                };
                 this.flitVFX = []; // Active flit visual effects (ghost afterimages, lightning trails)
                 this.graveyardGhosts = []; // Procedural humanoid ghosts in the cemetery
                 this.lobbyLife = new LobbyLife(); // The Double Nights lobby's guests and staff (directory/lobby-life.js)
@@ -97,11 +104,8 @@
                     transitionSpeed: 0.05 // How fast we lerp between scales
                 };
                 
-                this.currency = 100; this.scrap = 0; this.playerHealth = 100; this.maxPlayerHealth = 100; this.boosterCount = 4; this.maxBoosters = 4; this.debugMode = false; this.showProfiler = false;
-                this.healthRegenTimer = 0; // Frames since health was not full (for passive regen)
-                this.weaponMode = 'none';  // 'normal' or 'sniper' - sniper shots penetrate everything
+                this.currency = 100; this.scrap = 0; this.boosterCount = 4; this.maxBoosters = 4; this.debugMode = false; this.showProfiler = false;
                 this.shootCooldown = 0;    // Tracks timing between shots
-                this.currentWeapon = null; // Stores the currently active weapon object
 
                 this.interactBtn = document.getElementById('btn-interact');
                 this.transitionBtn = document.getElementById('btn-transition');
@@ -153,13 +157,9 @@
                 this.isDriving = false;
                 this.player = new PlayerEntity({ x: 0, y: 0 });
                 this.player.setGame(this);  // Link player to game for damage callbacks
-                this.player.syncHealth(this.playerHealth, this.maxPlayerHealth);  // Initial sync
                 
                 // Player's OWNED car: LADY Blackmark V1 (Luxury SUV) - This is YOUR car
-                this.ownedCar = new TrafficVehicle(null, 'LADY', 'suv', 'PLAYER');
-                this.ownedCar.color = '#1a1a1a'; // Consistent dark color for player's car
-                this.ownedCar.isOwnedCar = true; // Mark as player's owned vehicle
-                Object.assign(this.ownedCar, CAR_START);  // parked on the hub where a new game starts (engine/cars.js)
+                this.ownedCar = gameVehicles.create({ purpose: 'owned', control_mode: 'PLAYER', position: [CAR_START.x, CAR_START.y], rotation: CAR_START.angle });
                 
                 // Garage system — multi-car ownership & customization
                 this.garage = new PlayerGarage();
@@ -175,7 +175,6 @@
                 this.augments = new AugmentSystem();
                 this.resonance = new ResonanceSystem();      // 949's progression (core/resonance.js)
                 this.darkElement = 0;                        // premium shards (off-market goods)
-                this.lastHurtAt = -99; this.flitState.lastFlitAt = -99;
                 this.bumperMinigame = new BumperCarMinigame();
                 this.bonding = new BondingSystem();
                 this.dialogueSeq = new DialogueSequence(this);

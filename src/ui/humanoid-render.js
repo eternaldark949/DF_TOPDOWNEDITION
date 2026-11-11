@@ -67,7 +67,7 @@
             const layout = HAIR_LAYOUTS[hair.type];
             if (!layout) return { strands: [], jig: { x: 0, y: 0 }, lod: 0 };
             const owner = dyn && dyn.owner, sway = (dyn && dyn.sway) || 0;
-            const T = owner && !_crowdLite ? _simTransform(ctx) : null;       // head frame → world (see ui/cloth.js); a lighter crowd: at rest
+            const T = owner && !owner.enginePresentation && !_crowdLite ? _simTransform(ctx) : null;       // head frame → world (see ui/cloth.js); a lighter crowd: at rest
             if (!T) {
                 _hairRest(layout, headX, sway * 0.5);
                 const rest = _hairRestCache.get(layout); rest.lod = _hairDrawLOD(ctx);
@@ -1537,7 +1537,14 @@
             }
             return _lampGrid.cells;
         }
+        // Native scenes query the same engine index as contacts and culling.
+        function _nativeLampsNear(x,y,R){
+            return game.physics_system.peruseNearbyEntities([x,y],{near_range:R,spatial_entities:true})
+                .filter(h=>h.entity?.data.role==='lamp'||h.entity?.data.emission).map(h=>{const a=h.entity.data.appearance,emission=h.entity.data.emission,p=game.physics_system.getBodyPoint(h.entity,emission?.position??[0,0]).position;
+                    return {l:{...a,x:p[0],y:p[1],color:emission?.color??a.color,radius:emission?.radius??a.lightRadius,animOffset:0,_forcedOff:!game.roomSystem.lightAt(...p)},d:h.distance};});
+        }
         function _lampNear(x, y, R) {
+            if(typeof game!=='undefined'&&game.activeLevel)return _nativeLampsNear(x,y,R)[0]??null;
             const cells = _lampCells();
             if (!cells) return null;
             const cx = Math.floor(x / 200), cy = Math.floor(y / 200);
@@ -1552,6 +1559,7 @@
         const _lampPair = [{ l: null, d: 0 }, { l: null, d: 0 }];
         let _lampPairN = 0;
         function _lampsNear2(x, y, R) {
+            if(typeof game!=='undefined'&&game.activeLevel){const hits=_nativeLampsNear(x,y,R).slice(0,2);hits.forEach((h,i)=>Object.assign(_lampPair[i],h));return hits.length;}
             _lampPairN = 0;
             const cells = _lampCells();
             if (!cells) return 0;

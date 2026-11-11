@@ -275,7 +275,7 @@
                 const rain = w && w.intensity > thresh ? Math.min(1, w.intensity) : 0;
                 const wind = w ? Math.min(1, w.wind || 0) : 0;
                 const hour = ((game.worldMinutes || 0) % 1440) / 60, day = Math.max(0, 1 - Math.abs(13 - hour) / 7);
-                const p = game.player, cam = game.camera;
+                const p = {x:game.playerPosition[0],y:game.playerPosition[1]}, cam = game.camera;
                 const H = HEARTHS[map.id], fireD = !H ? 1e9 : apt ? (p ? Math.hypot(p.x - H.x, p.y - H.y) : 1e9) : Math.hypot(cam.x - H.x, cam.y - H.y) * 0.6, fire = Math.pow(Math.max(0, 1 - fireD / 420), 2);
                 const paused = !!game.paused;
                 const vol = GameSettings.ambienceVolume ?? 0.7;
@@ -371,7 +371,8 @@
                     const rs = game.roomSystem, room = rs && rs.active ? rs.currentRoom : null;
                     if (room && spec.room && room.id !== spec.room) {
                         let open = 0;                                        // an open door straight to the speakers' room
-                        for (const d of rs.doors) if (d.rooms.includes(room.id) && d.rooms.includes(spec.room)) open = Math.max(open, d.openAmount);
+                        if (rs.openingBetween) open = rs.openingBetween(room.id, spec.room);
+                        else for (const d of rs.doors) if (d.rooms.includes(room.id) && d.rooms.includes(spec.room)) open = Math.max(open, d.openAmount);
                         if (room.type === 'outdoor') { level *= 0.35 + 0.45 * open; cut = 550 + 5000 * open; }
                         else { level *= 0.55 + 0.35 * open; cut = 900 + 6000 * open; }
                     }
@@ -541,7 +542,7 @@
             /** Door sounds: 'creak' | 'latch' | 'whoosh', quieter with distance from the player. */
             doorEvent(kind, door) {
                 if (!this.ready || typeof game === 'undefined' || game.paused) return;
-                const p = game.player, cx = door.x + door.w / 2, cy = door.y + door.h / 2;
+                const p = {x:game.playerPosition[0],y:game.playerPosition[1]}, cx = door.x + door.w / 2, cy = door.y + door.h / 2;
                 const near = p ? Math.max(0, 1 - Math.hypot(p.x - cx, p.y - cy) / 500) : 1;
                 if (near <= 0.02) return;
                 this.eventCounts = this.eventCounts || {}; this.eventCounts[kind] = (this.eventCounts[kind] || 0) + 1;

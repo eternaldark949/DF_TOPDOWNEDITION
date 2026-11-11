@@ -192,13 +192,13 @@
                 }
                 if ((g.scenes && g.scenes.running) || (g.pauseSystem && g.pauseSystem.tokens && g.pauseSystem.tokens.size)) return;
                 const V = CREW_VENUES[plan.venue], who = plan.solo ? plan.host : 'The crew';
-                const there = g.activeMap.id === V.map && (!V.park || Math.hypot((g.isDriving && g.car ? g.car.x : g.player.x) - V.park.x, (g.isDriving && g.car ? g.car.y : g.player.y) - V.park.y) <= V.park.r);
+                const there = g.activeMap.id === V.map && (!V.park || Math.hypot((g.isDriving && g.car ? g.car.x : g.playerPosition[0]) - V.park.x, (g.isDriving && g.car ? g.car.y : g.playerPosition[1]) - V.park.y) <= V.park.r);
                 // Turned up and nothing would happen: say why, once each (too early, still in the car, gone inside)
                 if (now < plan.from) { if (there) this._hint(plan, 'early', `${who} gets here at ${phoneSystem._clock(plan.from)}.`); this._arrived = 0; return; }
                 if (V.inside && g.activeMap.id === V.inside) { this._hint(plan, 'inside', `${who}'s waiting out front.`); this._arrived = 0; return; }
                 if (!there) { this._arrived = 0; return; }
                 if (V.park && g.isDriving) { this._hint(plan, 'car', `${who}'s here. Park and step out.`); this._arrived = 0; return; }
-                if (g.missions && g.missions.activeMission && g.missions.activeMission.type !== 'delivery' && (g.enemies || []).some(e => !e.dead && Math.hypot(e.x - g.player.x, e.y - g.player.y) < 500)) return;
+                if (g.missions && g.missions.activeMission && g.missions.activeMission.type !== 'delivery' && (g.enemies || []).some(e => !e.dead && Math.hypot(e.x - g.playerPosition[0], e.y - g.playerPosition[1]) < 500)) return;
                 if (++this._arrived < 2) return;          // a beat inside the door first
                 this._arrived = 0;
                 this.play(plan);
@@ -232,7 +232,7 @@
                 for (const n of plan.who) { const v = this.bond(g, n, R.gains[n] || 0); if (v) parts.push(`${n.toUpperCase()} +${v}`); }
                 if (at && g.activeMap.id === V.map) { g.player.x = at.x; g.player.y = at.y; }
                 g.player.visible = true;
-                g.camera.x = g.player.x; g.camera.y = g.player.y;
+                g.camera.x = g.playerPosition[0]; g.camera.y = g.playerPosition[1];
                 if (parts.length) game_timers.after(0.6, () => { showMessage(`♡ ${parts.join(' · ')}`); audioSys.sfx('ui'); }, 'world');
                 // The thread remembers it
                 game_timers.after(4, () => phoneSystem.sendText(plan.chat, plan.solo ? CREW_SOLO[plan.host].close[0][1] : 'Best night in a while. Same time next week?', true, 2000,
@@ -264,7 +264,7 @@
             },
             /** A Trusted friend leaves her a stim after a job that went badly */
             onJobDone(g) {
-                if (!this._freeOk() || g.playerHealth > g.maxPlayerHealth * 0.35) return;
+                if (!this._freeOk() || g.player.hp > g.player.maxHp * 0.35) return;
                 if (!g.getEffectiveMaxBoosters || g.boosterCount >= g.getEffectiveMaxBoosters()) return;
                 const close = this._crewHere(g).filter(n => this._tier(g, n) >= 2);
                 if (!close.length) return;

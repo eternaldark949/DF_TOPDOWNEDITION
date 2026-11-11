@@ -315,7 +315,7 @@
                             }
                             if (clear) {
                                 // Spawn new vehicle - it auto-registers via GameEntity queue
-                                const newVehicle = new TrafficVehicle(spawnLane, brand, model, 'AI', spawnOffset);
+                                const newVehicle = gameVehicles.create({ purpose: 'ambient', lane: spawnLane, brand, model, control_mode: 'AI', along: spawnOffset });
                                 newVehicle.fade = 0;
                                 this.vehicles.push(newVehicle);
                                 break; 

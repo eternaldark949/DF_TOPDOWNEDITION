@@ -30,19 +30,27 @@
 
             /** What a flit costs right now: augment, buffs, and Resonance (Quick Return; Double Step's quick second flit). */
             flitCost() {
-                let cost = this.flitState.dashCost;
+                let cost = this.player.vitals.flit_cost;
                 if (this.augments && this.augments.isEquipped('flit_ext')) cost = Math.floor(cost * 0.7); // 30% cost reduction
                 cost = this.player.buffSystem.getStat('flitCooldown', cost);
                 if (this.resonance) {
                     cost = this.resonance.stat('flitCost', cost);
                     const R = this.resonance, half = R.value('double_step', 'half_cost_window');
-                    if (R.rank('double_step') >= R.value('double_step', 'half_cost_rank') && _gameTimeSec - this.flitState.lastFlitAt <= half) cost *= R.value('double_step', 'half_cost');
+                    if (R.rank('double_step') >= R.value('double_step', 'half_cost_rank') && _gameTimeSec - this.player.vitals.last_flit_at <= half) cost *= R.value('double_step', 'half_cost');
                 }
                 return Math.floor(cost);
             },
 
+            /** Range policy shared by the legacy and native physical clients and the stats screen. */
+            flitDistance() {
+                let distance=this.player.buffSystem.getStat('flitDistance',this.player.vitals.flit_distance);
+                if(this.augments?.isEquipped('flit_ext'))distance*=1.3;
+                return this.resonance?this.resonance.stat('flitDistance',distance):distance;
+            },
+
             /** Event-only landing search: teleport through obstacles, but finish with a clear player circle. */
             findFlitLanding(angle, distance) {
+                if(this.activeLevel){const hit=this.physics_system.findDirectionalPlacement(this.player,{angle,distance,min_distance:this.player.vitals.flit_minimum_distance,placement_bounds:{left:8,top:8,right:this.activeMap.width-8,bottom:this.activeMap.height-8}});return hit?{x:hit.position[0],y:hit.position[1],distance:hit.distance}:null;}
                 const p = this.player, map = this.activeMap, margin = 20, minTravel = 1;
                 if (!p || !map || ![p.x, p.y, angle, distance, map.width, map.height].every(Number.isFinite) || distance < minTravel || map.width < margin * 2 || map.height < margin * 2) return null;
                 const sx = p.x, sy = p.y, ux = Math.cos(angle), uy = Math.sin(angle);
@@ -159,24 +167,23 @@
             },
 
             triggerFlit(angleOverride, source) {
+                if(this.activeLevel&&(this.player.dead||this.physics_system.getAttachmentState(this.player)||this.furniture.busy()))return false;
                 if (this.isDriving || this.paused) return false;
                 if (this.hud && !this.hud.has('flit')) return false;   // not introduced yet (ui/hud-reveal.js)
                 
                 const cost = this.flitCost();
                 
                 // Check attunement pool
-                if (this.flitState.attunement < cost) return false;
+                if (this.player.vitals.attunement < cost) return false;
                 // --- Capture start state for VFX ---
-                const startX = this.player.x;
-                const startY = this.player.y;
-                const startAngle = this.player.angle;
+                const startX = this.playerPosition[0];
+                const startY = this.playerPosition[1];
+                const startAngle = this.playerRotation;
                 
-                let flitDist = this.player.buffSystem.getStat('flitDistance', 120);
-                if (this.augments && this.augments.isEquipped('flit_ext')) flitDist *= 1.3; // 30% more range
-                if (this.resonance) flitDist = this.resonance.stat('flitDistance', flitDist);   // Flit: Reach
+                const flitDist=this.flitDistance();
 
                 // Flit direction: use movement keys (WASD) or joystick if active, otherwise fall back to facing angle
-                let flitAngle = this.player.angle;
+                let flitAngle = this.playerRotation;
                 let [moveX, moveY] = controls.direction('move');
                 if (this.joystick && this.joystick.active) {
                     moveX = this.joystick.dx;
@@ -194,6 +201,7 @@
                     return false;
                 }
                 const targetX = landing.x, targetY = landing.y;
+                if(this.activeLevel&&!this.player.teleportTo([targetX,targetY],{placement_mode:'clear'})){this._signalFlitLanding('blocked',flitAngle);return false;}
                 const traveled = Math.hypot(targetX - startX, targetY - startY);
                 if (flitDist - traveled > Math.max(6, flitDist * .05)) this._signalFlitLanding('short', flitAngle);
                 else this._flitFeedback = null;
@@ -201,18 +209,16 @@
                 this._restartRingAnim('flash');
                 
                 // Spend attunement
-                this.flitState.attunement -= cost;
-                this.flitState.active = true;
-                this.flitState.duration = this.flitState.maxDuration;
-                if (this.flitState.attunement < cost) this.flitBtn.classList.add('cooldown');
+                this.player.vitals.beginFlit(cost,undefined,_gameTimeSec);
+                if (this.player.vitals.attunement < cost) this.flitBtn.classList.add('cooldown');
                 
-                this.flitState.lastFlitAt = _gameTimeSec;
                 // Flit: Afterimage — gangers keep seeing you where you left
                 const ai = this.resonance ? this.resonance.rank('afterimage') : 0;
                 this._afterimage = ai ? { x: startX, y: startY, until: _gameTimeSec + this.resonance.value('afterimage', 'secs') * ai } : null;
 
                 if (traveled > 1) this.spillDrink(SPILL.FLIT_COST, (startX - targetX) / traveled, (startY - targetY) / traveled, startX, startY);   // the drink stays behind a moment (engine/spills.js)
-                this.player.x = targetX; this.player.y = targetY; resetHumanoidAnim(this.player); showMessage("FLIT!"); this.triggerShake(4);
+                if(!this.activeLevel){this.player.x = targetX; this.player.y = targetY; resetHumanoidAnim(this.player);}
+                showMessage("FLIT!"); this.triggerShake(4);
 
                 // --- Spawn Flit VFX ---
                 const cosmeticConfig = this.cosmetics.getRenderConfig();
@@ -367,7 +373,8 @@
                 if (age < 0 || age >= life) { this._flitFeedback = null; return; }
                 if (!this.player.visible || this.player.dead || this.isDriving) return;
                 const m = ctx.getTransform(), p = this.player, w = ctx.canvas.width, h = ctx.canvas.height;
-                const x = m.a * p.x + m.c * p.y + m.e, y = m.b * p.x + m.d * p.y + m.f;
+                const [px,py]=this.playerPosition;
+                const x = m.a * px + m.c * py + m.e, y = m.b * px + m.d * py + m.f;
                 if (x < -64 || x > w + 64 || y < -64 || y > h + 64) return;
                 const a = cue.angle, ux = Math.cos(a), uy = Math.sin(a);
                 const screenA = Math.atan2(m.b * ux + m.d * uy, m.a * ux + m.c * uy);

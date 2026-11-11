@@ -1,0 +1,11 @@
+{
+  "library_id": "df_runtime_example",
+  "templates": {
+    "wall": {"entity_type":"static","collision_shape":{"shape_type":"box","dimensions":[20,240]},"data":{"color":"#687b9c"}},
+    "crate": {"entity_type":"prop","mass":20,"collision_shape":{"shape_type":"box","dimensions":[38,38]},"data":{"color":"#e8b568"}}
+  },
+  "resources": {
+    "room_a": {"kind":"runtime_example_level","data":{"label":"Runtime room A","background":"#111b30","spawn":[100,180],"entities":[{"template":"df_runtime_example:wall","position":[450,180]},{"template":"df_runtime_example:crate","position":[300,180]}]}},
+    "room_b": {"kind":"runtime_example_level","data":{"label":"Runtime room B","background":"#27172d","spawn":[120,180],"entities":[{"template":"df_runtime_example:wall","position":[490,180]},{"template":"df_runtime_example:crate","position":[330,190]},{"template":"df_runtime_example:crate","position":[330,150]}]}}
+  }
+}

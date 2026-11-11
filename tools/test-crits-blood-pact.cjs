@@ -11,7 +11,7 @@ const setup=`game._doLoadMap('ollo_test');game.running=true;game.paused=false;ga
  game.activeMap={id:'crit_test',width:3000,height:3000,walls:[],buildings:[],buildingColliders:[]};
  game.player._game=game;game.player.x=1000;game.player.y=1000;game.player.angle=0;game.isDriving=false;
  game.weaponHolstered=false;game.projectiles=[];game.enemies=[];game.effects.of('number').length=0;_gameTimeSec=10;
- const wield=id=>{game.currentWeapon=createItemFromRegistry(id,game);game.weaponMode=ITEM_REGISTRY[id].weaponMode;game.shootCooldown=0;};
+ const wield=id=>{game.items.equipItem((game.items.findItem(id)??game.items.grantItem(id)).instance_id);game.items.setFireMode(ITEM_REGISTRY[id].weaponMode);game.shootCooldown=0;};
  const ganger=(x,y)=>{const g=new Ganger(x,y,{hp:500});g.state='IDLE';game.enemies.push(g);return g;};
  const rnd=Math.random;const withRandom=(v,f)=>{Math.random=()=>v;try{return f();}finally{Math.random=rnd;}};
  const tick=()=>{_gameTimeSec+=1/60;game.updateStatuses();game.updateMeleeSwing();for(const e of game.enemies)if(e.invincibleTimer>0)e.invincibleTimer--;};

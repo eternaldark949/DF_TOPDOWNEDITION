@@ -14,7 +14,7 @@ function test(name, source, check) {
 const setup = (map) => `game.story.update=()=>{}; game._doLoadMap('${map}'); game.running=true; game.paused=false; game.player.visible=true;
  game.loadMap=function(id,at){this._doLoadMap(id,at);};
  const step=(n=1)=>{for(let i=0;i<n;i++){game.update(); _gameTimeSec=_simTick*CONFIG.LOOP.STEP_MS/1000;}};
- const heal=()=>{game.player.hp=game.playerHealth=game.player.maxHp;};`;
+ const heal=()=>{game.player.vitals.restoreHealth();};`;
 
 test('Wave scaling: HP ×1.04 and damage +2% a wave from 15, elites from 12, scrap 5w (+100 each 5th)', setup('sdc') + `
   const hg=game.hordeGauntlet, out={};
@@ -85,7 +85,7 @@ test('A solo duel saves and restores as a duel (decoys are not saved)', setup('s
 
 test('The Triumvirate: 1500 HP each, 2 s reloads, censer, hymn and hook, enrage, and the Blood Pact', setup('church_boss') + `
   game.questState.sanctumIntroSeen=true; game.player.maxHp=100000; heal();
-  game.inventory.items=game.inventory.items.filter(i=>i.id!=='blood_pact');
+  for(const item of game.items.listItems())if(item.definition_id==='blood_pact')game.items.removeItem(item.instance_id);
   game.spawnTriumvirate({short:true}); const W=game.enemies.filter(e=>e.persona);
   const kinds=new Set(); let revealed=0;
   for(let i=0;i<2400;i++){ step(); heal(); game.player.x=600; game.player.y=640;
@@ -96,7 +96,7 @@ test('The Triumvirate: 1500 HP each, 2 s reloads, censer, hymn and hook, enrage,
   const enraged=W.slice(1).map(w=>[w.burstDelay,w.reloadTime]);
   for(const w of W.slice(1)){ w.hp=1; w.takeDamage(5,0,0,{shot:true}); step(2); }
   return {hp, reload, kinds:[...kinds].sort(), revealed:revealed>0, enraged,
-    drop:game.loot.filter(l=>l.type==='weapon_drop').map(l=>l.item.id), defeats:game.questState.triumvirateDefeats};`, r => {
+    drop:game.loot.filter(l=>l.type==='weapon_drop').map(l=>l.item.definition_id), defeats:game.questState.triumvirateDefeats};`, r => {
   assert.deepEqual(r.hp, [1500,1500,1500]); assert.deepEqual(r.reload, [120,120,120]);
   for (const k of ['censer','fire','smoke','hymn','hook']) assert.ok(r.kinds.includes(k), k);
   assert.equal(r.revealed, true);
@@ -132,8 +132,8 @@ test('Drones: three kinds drop in and use their moves; the shell resists, the ey
 test('Hazards: a flit dodges the hymn; fire sets her burning, and it burns out', setup('church_boss') + `
   game.player.maxHp=1000; heal(); game.player.x=600; game.player.y=600;
   const m=new GatlingGunner(600,300,1,{persona:'matins'});
-  game.flitState.active=true; game.flitState.duration=999; game.addHazard({kind:'hymn',x:600,y:300,owner:m}); step(80); const dodged=game.player.hp===game.player.maxHp && !(game._revealedUntil>_gameTimeSec);
-  game.flitState.active=false; game.flitState.duration=0; game.addHazard({kind:'hymn',x:600,y:300,owner:m}); step(80); const hitHymn=game.player.maxHp-game.player.hp; heal();
+  game.player.vitals.beginFlit(0,999/60); game.addHazard({kind:'hymn',x:600,y:300,owner:m}); step(80); const dodged=game.player.hp===game.player.maxHp && !(game._revealedUntil>_gameTimeSec);
+  game.player.vitals.state.flit_remaining=0; game.addHazard({kind:'hymn',x:600,y:300,owner:m}); step(80); const hitHymn=game.player.maxHp-game.player.hp; heal();
   game.addHazard({kind:'fire',x:600,y:600,r:50,until:_gameTimeSec+0.3,dps:8}); step(20); const burning=!!game._playerBurn;
   step(120); const burned=game.player.maxHp-game.player.hp;
   return {dodged, hitHymn, burning, burned, gone:!game._playerBurn};`, r => {

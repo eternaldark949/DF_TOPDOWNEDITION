@@ -29,12 +29,12 @@ test('Passenger ignores a closer enemy through the wrong door and fires from the
  const expected=c.occupantShot(n.seatIndex,n.combatTargetAngle,n._vehicleLean,n.equippedWeaponId);
  return {shot:shot&&{x:shot.x,y:shot.y},expected:{x:expected.x,y:expected.y},seat:p,actor:{x:n.x,y:n.y},angle:n.combatTargetAngle};`,r=>{assert.ok(r.shot);assert.deepEqual(r.shot,r.expected);assert.deepEqual(r.actor,r.seat);assert.ok(r.angle>0);});
 test('A fresh driver shot waits for the lean while release remains a single queued shot',`
- game.isDriving=true;game.player._vehicleLean=0;game.currentWeapon=createItemFromRegistry('sniper_sara',game);game.weaponMode='sniper';game.weaponHolstered=false;game.shootCooldown=0;game.projectiles=[];
+ game.isDriving=true;game.player._vehicleLean=0;game.items.equipItem((game.items.findItem('sniper_sara')??game.items.grantItem('sniper_sara')).instance_id);game.items.setFireMode('sniper');game.weaponHolstered=false;game.shootCooldown=0;game.projectiles=[];
  game._releaseShot=game.car.angle-Math.PI/2;let before;
  for(let i=0;i<7;i++){if(i===6)before=game.projectiles.length;game.updatePlayerFireInput();}
  return {before,count:game.projectiles.length,release:game._releaseShot,lean:game.player._vehicleLean};`,r=>{assert.equal(r.before,0);assert.equal(r.count,1);assert.equal(r.release,null);assert.ok(r.lean>.7);});
 test('Player and crew seated drawing use valid Canvas state, with both windows and equipped weapons',`
- const c=game.car;c.hasDriver=true;c.visible=true;game.isDriving=true;game.player._vehicleLean=1;game.currentWeapon=createItemFromRegistry('sniper_sara',game);game.weaponMode='sniper';
+ const c=game.car;c.hasDriver=true;c.visible=true;game.isDriving=true;game.player._vehicleLean=1;game.items.equipItem((game.items.findItem('sniper_sara')??game.items.grantItem('sniper_sara')).instance_id);game.items.setFireMode('sniper');
  game.player.angle=c.angle-Math.PI/2;Object.assign(game.player,c.getSeatWorldPos(0));
  const before=game.ctx.getTransform();c.draw(game.ctx);game.drawPlayer();
  const n=new NPC(0,0,'Seat test','teammate');c.assignPassenger(n);n._vehicleLean=1;n.equippedWeaponId='rifle_rb98';

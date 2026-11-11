@@ -5,6 +5,7 @@ engineMixin({
         return this.car.seatAim(0, angle);
     },
     getPlayerShotGeometry() {
+        if(this.activeLevel){const pose=this.physics_system.getBodyPoint(this.player,[15,5]);return {x:pose.position[0],y:pose.position[1],angle:pose.rotation};}
         const p = this.player, angle = this.clampPlayerFireAngle(p.angle);
         const driving = this.isDriving && this.car, ap = p._aimPoint;
         const shot = driving ? this.car.occupantShot(0, angle, p._vehicleLean || 0, this.currentWeapon?.id)
@@ -57,7 +58,7 @@ engineMixin({
             if (stickAim) angle = Math.atan2(F.dy, F.dx);
             else {
                 const point = this.viewToWorld(this.mouseX, this.mouseY);
-                angle = Math.atan2(point.y - this.player.y, point.x - this.player.x);
+                angle = Math.atan2(point.y - this.playerPosition[1], point.x - this.playerPosition[0]);
                 if (!driving) this.player._aimPoint = point;
             }
             this.player.angle = resolve(angle);
@@ -75,7 +76,7 @@ engineMixin({
         ctx.strokeStyle=this._vehicleAimLimited?'#ffb16b':'rgba(255,225,174,.65)';ctx.lineWidth=1;
         ctx.beginPath();ctx.arc(w.x,-w.outer,r,start,end);ctx.stroke();
         for(const a of [start,end]){ctx.beginPath();ctx.moveTo(w.x+Math.cos(a)*(r-3),-w.outer+Math.sin(a)*(r-3));ctx.lineTo(w.x+Math.cos(a)*(r+3),-w.outer+Math.sin(a)*(r+3));ctx.stroke();}
-        const a=this.player.angle-car.angle,x=w.x+Math.cos(a)*r,y=-w.outer+Math.sin(a)*r;
+        const a=this.playerRotation-car.angle,x=w.x+Math.cos(a)*r,y=-w.outer+Math.sin(a)*r;
         ctx.fillStyle=this._vehicleAimLimited?'#ffb16b':'#fff0c5';ctx.beginPath();ctx.arc(x,y,2,0,Math.PI*2);ctx.fill();
         if(this._vehicleAimLimited){ctx.beginPath();ctx.moveTo(x-3,y-3);ctx.lineTo(x+3,y+3);ctx.moveTo(x+3,y-3);ctx.lineTo(x-3,y+3);ctx.stroke();}
         ctx.restore();

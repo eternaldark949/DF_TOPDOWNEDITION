@@ -41,7 +41,7 @@
            the weapon's stats.critChance; a crit deals stats.critMult (CRIT.mult) times the damage.
            Shown as a bigger gold number with a '!', a burst of sparks and a bright ping. Bleeds,
            burns, executions and anyone else's hits never crit. */
-        const CRIT = { chance: 0.1, mult: 2 };
+        const CRIT={chance:DFNative.COMBAT_RULES.crit_chance,mult:DFNative.COMBAT_RULES.crit_multiplier};
 
         engineMixin({
             /** Roll a crit for her weapon's stats: the multiplier to apply (1 when it isn't one). */
@@ -57,7 +57,7 @@
                 const byPlayer = by === this.player, byTeammate = !!(by && by.role === 'teammate');
                 const { amount, tags } = this.resonance.scoreKill(enemy, {
                     byPlayer, byTeammate, melee: !!enemy.lastHitMelee, now: _gameTimeSec,
-                    lastFlitAt: this.flitState.lastFlitAt ?? -99, lastHurtAt: this.lastHurtAt ?? -99,
+                    lastFlitAt: this.player.vitals.last_flit_at ?? -99, lastHurtAt: this.player.vitals.last_hurt_at ?? -99,
                     drinkLevel: this.heldDrink() ? this.cosmetics.drinkLevel : -1 });
                 if (amount > 0) this.earnResonance(amount, tags.join(' '), enemy.x, enemy.y - 26);
                 // Dark Element: rare shards from the toughest foes
@@ -69,7 +69,7 @@
             earnResonance(amount, label, x, y) {
                 if (!this.resonance || !(amount > 0)) return;
                 this.resonance.earn(amount);
-                this.effects.spawn('number', { target: null, x: x ?? this.player.x, y: y ?? this.player.y - 30, value: 0, text: `+${Math.round(amount)} ◈${label ? ' ' + label : ''}`,
+                this.effects.spawn('number', { target: null, x: x ?? this.playerPosition[0], y: y ?? this.playerPosition[1] - 30, value: 0, text: `+${Math.round(amount)} ◈${label ? ' ' + label : ''}`,
                              color: '#c9a6ff', t0: _gameTimeSec, pop: _gameTimeSec, drift: 0, big: true });
                 this._resPulse = _gameTimeSec;
                 if (this.updateUI) this.updateUI();

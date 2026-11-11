@@ -83,7 +83,7 @@
                     // it falls forward, the way it was facing
                     const killed = e.takeDamage(e.hp + 1, Math.cos(e.angle) * 5, Math.sin(e.angle) * 5, { type: X.blade ? 'melee' : 'blunt' }) && e.dead;
                     if (killed) {
-                        const maxHP = this.maxPlayerHealth || pl.maxHp;
+                        const maxHP = this.player.maxHp || pl.maxHp;
                         const healed = pl.heal(Math.min(maxHP * 0.15, Math.max(0, maxHP - pl.hp)));
                         if (healed > 0) {
                             const bar = this.healthBar && this.healthBar.parentElement;

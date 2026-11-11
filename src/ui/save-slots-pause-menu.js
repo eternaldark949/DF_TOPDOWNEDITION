@@ -1322,7 +1322,7 @@
 
                 } else if (key === 'devWeaponMode') {
                     // Sniper mode: penetrating rounds
-                    game.weaponMode = game.weaponMode === 'sniper' ? 'normal' : 'sniper';
+                    if(!game.items.setFireMode(game.weaponMode==='sniper'?'normal':'sniper')){showMessage('EQUIP A WEAPON FIRST');return;}
                     showMessage(game.weaponMode === 'sniper' ? 'SNIPER MODE: PENETRATING ROUNDS ACTIVE' : 'NORMAL MODE: STANDARD ROUNDS ACTIVE');
                     this._updateValueEl(el.id, game.weaponMode);
 

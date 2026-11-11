@@ -279,15 +279,27 @@
                 if (!lane || !lane.start) return;
                 if (trafficManager.network.laneHasExit && !trafficManager.network.laneHasExit(lane)) return;   // a dead end to the map's edge: no ride could start here
 
-                const zib = new TrafficVehicle(lane, ZIB_CONFIG.brand, ZIB_CONFIG.model, 'AI');
-                zib.color = ZIB_CONFIG.paintColor;
-                zib.glowColor = ZIB_CONFIG.underglowColor;
-                zib.headlightColor = ZIB_CONFIG.headlightColor;
-                zib.isZib = true;
-                zib.driverType = 'traffic';
-                zib.hasDriver = false;
-                trafficManager.vehicles.push(zib);
-                this.activeZibs.push(zib);
+                this.spawnOnLane(trafficManager, lane);
+            }
+
+            /** Shared taxi creation for ambient service and explicit pickup requests. */
+            spawnOnLane(trafficManager, lane, { along = null } = {}) {
+                if (!lane?.start || !lane?.end || !(lane.length > 0)) return null;
+                if (trafficManager.network.laneHasExit && !trafficManager.network.laneHasExit(lane)) return null;
+                const zib = gameVehicles.create({ purpose: 'taxi', lane, along });
+                trafficManager.vehicles.push(zib); this.activeZibs.push(zib);
+                return zib;
+            }
+
+            summonNearest(trafficManager, position) {
+                const network = trafficManager.network, lanes = network?.allLanes;
+                if (!lanes?.length) return { vehicle: null, reason: 'no_roads' };
+                // Topology packets only. Projection and endpoint placement are engine geometry.
+                const paths = lanes.filter(lane => lane.start && lane.end && lane.length > 0 && (!network.laneHasExit || network.laneHasExit(lane)))
+                    .map(lane => ({ lane, points: [[lane.start.x, lane.start.y], [lane.end.x, lane.end.y]] }));
+                const location = pathGeometry.nearestPath(paths, { position, near_range: ZIB_CONFIG.pickupRange, end_clearance: ZIB_CONFIG.pickupEndClearance });
+                if (!location) return { vehicle: null, reason: 'out_of_range' };
+                return { vehicle: this.spawnOnLane(trafficManager, location.path.lane, { along: location.distance_along }), reason: null };
             }
 
             cleanup() {
@@ -502,11 +514,11 @@
                 game.player.x = zib.x + Math.sin(zib.angle) * exitDist;
                 game.player.y = zib.y - Math.cos(zib.angle) * exitDist;
 
-                if (game.teammates) game.teammates.forEach(tm => { if (tm.inCar) { tm.inCar = false; tm.seatIndex = -1; tm.x = game.player.x + (Math.random() - 0.5) * 30; tm.y = game.player.y + (Math.random() - 0.5) * 30; }});
+                if (game.teammates) game.teammates.forEach(tm => { if (tm.inCar) { tm.inCar = false; tm.seatIndex = -1; tm.x = game.playerPosition[0] + (Math.random() - 0.5) * 30; tm.y = game.playerPosition[1] + (Math.random() - 0.5) * 30; }});
                 zib.clearSeats();
                 if (game.velvetCat && game.questState.hasVelvetCat) {
                     game.velvetCat.inCar = false;
-                    game.velvetCat.x = game.player.x - 25; game.velvetCat.y = game.player.y + 20;
+                    game.velvetCat.x = game.playerPosition[0] - 25; game.velvetCat.y = game.playerPosition[1] + 20;
                 }
             }
 

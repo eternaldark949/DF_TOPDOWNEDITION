@@ -8,11 +8,11 @@ function test(name,code,check){const e=runtime(join(__dirname,'..','DFAB V8.html
 const setup=`game._doLoadMap('ollo_test');game.running=true;game.paused=false;game.player.visible=true;
  game.activeMap={id:'fire_test',width:3000,height:3000,walls:[],buildings:[],buildingColliders:[]};
  game.player.x=1000;game.player.y=1000;game.player.angle=-.5;game.player._muzzleLocal={x:20,y:3};game.player._muzzleReady=true;
- game.currentWeapon=createItemFromRegistry('sniper_sara',game);game.weaponMode='sniper';game.shootCooldown=0;
+ game.items.equipItem((game.items.findItem('sniper_sara')??game.items.grantItem('sniper_sara')).instance_id);game.items.setFireMode('sniper');game.shootCooldown=0;
  game.rollCrit=()=>1;// crits are random (engine/combat-fx.js); these compare exact damage
  game.car.x=1000;game.car.y=1000;game.car.angle=0;game.car.length=100;
  _zoomLOD=0;game.weaponHolstered=false;game.projectiles=[];game.effects.clear();
- const fire=(id,drive)=>{game.currentWeapon=createItemFromRegistry(id,game);game.weaponMode=id.startsWith('sniper')?'sniper':'normal';
+ const fire=(id,drive)=>{game.items.equipItem((game.items.findItem(id)??game.items.grantItem(id)).instance_id);game.items.setFireMode(id.startsWith('sniper')?'sniper':'normal');
  game.isDriving=drive;game.shootCooldown=0;game.fireWeapon();const p=game.projectiles.at(-1);
  return {damage:p.damage,life:p.life,color:p.color,speed:Math.hypot(p.vx,p.vy),sniper:p.isSniper,trail:p.fxTrail?.trail,flash:game.effects.of('muzzle').at(-1).color};};
 `;
@@ -36,7 +36,7 @@ test('Scope engages while driving, even if the on-foot gun was holstered',`
  assert.equal(r.on,true);assert.ok(r.k>0);assert.equal(r.off,false);
 });
 test('Laser sight uses the same vehicle muzzle and direction as a projectile',`
- game.isDriving=true;game.inventory.hasAttachment=e=>e==='laser_sight';game._laserKey=null;
+ game.isDriving=true;game.items.hasAttachment=e=>e==='laser_sight';game._laserKey=null;
  const g=game.getPlayerShotGeometry(),laser=game.getLaserSight();return {g,laser};`,r=>{
  assert.equal(r.laser.x0,r.g.x);assert.equal(r.laser.y0,r.g.y);assert.equal(r.laser.angle,r.g.angle);
 });
@@ -54,7 +54,7 @@ test('A barrel against a wall cannot spawn a drive-by shot on the far side',`
 });
 test('Consecutive punches land at their normal cadence and each hitbox hits only once',`
  game.story.update=()=>{};
- game.weaponMode='none';game.currentWeapon=null;game.isDriving=false;game.player.angle=0;game._execTarget=null;
+ game.items.unequipSlot('weapon');game.isDriving=false;game.player.angle=0;game._execTarget=null;
  game.mouseDown=false;game._releaseShot=null;game.fireJoystick.active=false;game.enemies=[];
  const target=new Ganger(1040,1000,{hp:5000});game.enemies.push(target);
  target.update=()=>{if(target.invincibleTimer>0)target.invincibleTimer--;};
@@ -72,7 +72,7 @@ test('Consecutive punches land at their normal cadence and each hitbox hits only
  assert.equal(r.frames,0);assert.equal(r.projectiles,0);
 });
 test('Enemy projectile callbacks accept normal and critical punches inside existing i-frames',`
- game.weaponMode='none';game.currentWeapon=null;game.isDriving=false;game.player.angle=0;
+ game.items.unequipSlot('weapon');game.isDriving=false;game.player.angle=0;
  const out=[];
  for(const Enemy of [Ganger,Drone,GatlingGunner])for(const speed of [0,10]){
   const target=new Enemy(1300,1000);target.hp=target.maxHp=5000;target.invincibleTimer=20;

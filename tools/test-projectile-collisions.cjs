@@ -12,7 +12,7 @@ const setup=`game._doLoadMap('ollo_test');game.story.update=()=>{};game.running=
  game.camera.x=1000;game.camera.y=1000;game.camera.zoom=1;game.isDriving=false;
  game.mouseDown=false;game.fireJoystick.active=false;game._releaseShot=null;game._execTarget=null;game.weaponHolstered=true;
  game.traffic.vehicles=[];game.ownedCar.visible=false;game.rollCrit=()=>1;Math.random=()=>.5;
- game.cosmetics.equippedAccessory=null;game.augments.equipped=[];game.resonance.ranks={};game.flitState.lastFlitAt=-99;
+ game.cosmetics.equippedAccessory=null;game.augments.equipped=[];game.resonance.ranks={};game.player.vitals.state.last_flit_at=-99;
  const enemy=(x,y=1000)=>{const g=new Ganger(x,y,{hp:5000});g.update=()=>{};game.enemies.push(g);return g;};
  const bullet=(x=1000,y=1000,opts={})=>{const p=new ProjectileEntity({x,y,angle:0,speed:80,damage:100,owner:game.player,...opts});game.projectiles.push(p);return p;};
  const tick=()=>{_gameTimeSec+=1/60;game.update();};
@@ -30,7 +30,7 @@ function run(){
   const rows=[];
   for(const [id,w]of Object.entries(ITEM_REGISTRY).filter(([,w])=>w.type==='weapon'&&w.weaponMode!=='melee'&&w.weaponMode!=='fists'))
    for(const offset of [0,110,150,190,210])for(const fraction of [.25,.5,.9]){
-    clear();game.weaponHolstered=false;game.currentWeapon=createItemFromRegistry(id,game);game.weaponMode=w.weaponMode;
+    clear();game.weaponHolstered=false;game.items.equipItem((game.items.findItem(id)??game.items.grantItem(id)).instance_id);game.items.setFireMode(w.weaponMode);
     game.shootCooldown=0;game._drawnAt=undefined;game.fireWeapon();game.weaponHolstered=true;
     const p=game.projectiles.at(-1);p.x=1000+offset;p.y=1000;const g=enemy(p.x+w.stats.projectileSpeed*fraction);
     tick();rows.push({id,offset,fraction,lost:5000-g.hp,expected:w.stats.damage});
@@ -41,12 +41,12 @@ function run(){
   return {first,after:g.hp,hits:p.hitTargets.size,active:p.active};`,r=>assert.deepEqual(r,{first:4900,after:4900,hits:1,active:true}));
  test('A long sniper barrel cannot spawn its shot beyond a point-blank enemy',`
   const g=enemy(1035);game.player._muzzleLocal={x:75,y:0};game.weaponHolstered=false;
-  game.currentWeapon=createItemFromRegistry('sniper_sara',game);game.weaponMode='sniper';game.fireWeapon();
+  game.items.equipItem((game.items.findItem('sniper_sara')??game.items.grantItem('sniper_sara')).instance_id);game.items.setFireMode('sniper');game.fireWeapon();
   const x=game.projectiles[0].x;tick();return {x,hp:g.hp};`,r=>assert.deepEqual(r,{x:1000,hp:4900}));
  test('A long sniper barrel cannot spawn beyond a solid prop',`
   new GameEntity({x:1040,y:1000,width:4,height:60,hasCollision:true,collisionShape:GameEntity.SHAPE.OBB,collisionLayer:GameEntity.LAYER.DYNAMIC});
   const g=enemy(1130);game.player._muzzleLocal={x:75,y:0};game.weaponHolstered=false;
-  game.currentWeapon=createItemFromRegistry('sniper_sara',game);game.weaponMode='sniper';game.fireWeapon();
+  game.items.equipItem((game.items.findItem('sniper_sara')??game.items.grantItem('sniper_sara')).instance_id);game.items.setFireMode('sniper');game.fireWeapon();
   const x=game.projectiles[0].x;tick();return {x,hp:g.hp};`,r=>assert.deepEqual(r,{x:1000,hp:5000}));
  test('Sniper hits remain reliable over long ranges, diagonals, and reversed directions',`
   const rows=[];
@@ -82,7 +82,7 @@ function run(){
   const g=enemy(1040);g._projectileStartTick=_simTick;g._projectileStartX=960;g._projectileStartY=1000;
   const p=bullet();CollisionSystem.resolveProjectile(p,game);return g.hp;`,r=>assert.equal(r,5000));
  test('An enemy round hits a player crossing its path during the same tick',`
-  game.player.syncHealth(100,100);game.player.invincibleTimer=0;game.player.x=1040;game.player.y=970;
+  game.player.vitals.importHealth(100,100);game.player.vitals.makeInvulnerable(0);game.player.x=1040;game.player.y=970;
   game.player.applyMovement=()=>{game.player.y=1030;};const owner=enemy(1600,1600);
   bullet(1000,1000,{isEnemy:true,owner,damage:10});tick();return game.player.hp;`,r=>assert.equal(r,90));
  test('A shot can hit on its last lifetime tick',`

@@ -20,9 +20,12 @@ engineMixin({
                     
                     // --- PLAYER DATA ---
                     player: {
-                        x: this.player?.x ?? 500,
-                        y: this.player?.y ?? 500,
-                        health: this.playerHealth ?? 100,
+                        x: this.player ? this.playerPosition[0] : 500,
+                        y: this.player ? this.playerPosition[1] : 500,
+                        health: this.player?.hp ?? 100,
+                        vitals: this.player?.vitals.snapshot() ?? null,
+                        abilitiesSnapshot:this.player?.data.abilities?structuredClone(this.player.data.abilities):null,
+                        attackSelection:this.player?.data.attack_state?structuredClone(this.player.data.attack_state):null,
                         currency: this.currency ?? 500,
                         scrap: this.scrap ?? 0,
                         boosters: this.boosterCount ?? 0,
@@ -31,6 +34,7 @@ engineMixin({
                     
                     // --- WORLD STATE ---
                     world: {
+                        nativeLevel: this.activeLevel ? {id:'apt_949',physics:this.activeLevel.saveState()} : null,
                         mapId: this.activeMap?.id ?? 'sdc',
                         worldMinutes: this.worldMinutes ?? 480,
                         questState: this.questState ?? {},
@@ -45,9 +49,9 @@ engineMixin({
                     // Her own car, where it's parked on the hub (cars live there: engine/cars.js). A hijacked car
                     // or a Zib ride isn't kept: the load finds her on foot where she was.
                     car: {
-                        x: this.ownedCar?.x ?? CAR_START.x,
-                        y: this.ownedCar?.y ?? CAR_START.y,
-                        angle: this.ownedCar?.angle ?? CAR_START.angle,
+                        x: this.ownedCar?.x ?? this._parkedCar?.x ?? CAR_START.x,
+                        y: this.ownedCar?.y ?? this._parkedCar?.y ?? CAR_START.y,
+                        angle: this.ownedCar?.angle ?? this._parkedCar?.angle ?? CAR_START.angle,
                         mapId: 'sdc',
                         visible: true
                     },
@@ -59,15 +63,8 @@ engineMixin({
                     teammates: [],    // Populated dynamically
                     
                     // --- INVENTORY & EQUIPMENT ---
-                    inventory: {
-                        items: this.inventory?.items?.map(i => i.id) ?? [],
-                        equippedWeaponId: this.inventory?.equippedWeaponId ?? null,
-                        equippedAttachmentId: this.inventory?.equippedAttachmentId ?? null,   // (the first, for older builds)
-                        equippedAttachments: this.inventory?.equippedAttachments?.slice() ?? [],
-                        order: this.inventory?.entryOrder ?? [],
-                        weaponMode: this.weaponMode ?? 'normal'
-                    },
-                    
+                    inventory:{model:this.items.snapshot(),order:this.inventory?.entryOrder??[]},
+
                     // --- PHONE DATA ---
                     phone: {
                         messageHistory: (typeof phoneSystem !== 'undefined') ? phoneSystem.messageHistory : {},
@@ -168,6 +165,7 @@ engineMixin({
                         x: 500,
                         y: 500,
                         health: 100,
+                        vitals: null,
                         currency: 500,
                         scrap: 0,
                         boosters: 0,
@@ -419,6 +417,7 @@ engineMixin({
                 screen's Autosave card), never the player's, no message or sound. */
             saveGame(opts = {}) {
                 const auto = !!opts.auto;
+                if(this.activeLevel){if(this.furniture.busy())this.furniture.release();this.physics_system.commitCommands();}
                 if (this.scenes && this.scenes.running) { if (!auto) showMessage("Can't save during a scene"); return; }
                 // Build save data from schema (captures current game state)
                 const saveData = this.getSaveSchema();
@@ -430,6 +429,11 @@ engineMixin({
                     recruited: t.recruited,
                     downed: t.downed || false,
                     equippedWeaponId: t.equippedWeaponId || null,
+                    inventory:t.items?.snapshot(),
+                    abilitiesSnapshot:t.abilities?.snapshot(),
+                    attackSelection:t.attackSelection,
+                    equippedAbilityId:t.equippedAbilityId??null,
+                    cooldown:t.cooldown??0,
                     hp: t.hp || 100,
                     teammateStims: t.teammateStims ?? 3,
                     relationship: t.relationship ?? 0,
@@ -488,23 +492,46 @@ engineMixin({
                     
                     console.log(`[LOAD] Loading save (v${fromVersion} → v${save.version}), merged with defaults`);
         
+                    // Validate inventory and vitals before changing live player/session records.
+                    const loadedItems=new DFNative.itemSystem({catalog:DFNative.createItemCatalog(GAME_DB.items)});
+                    if(save.inventory?.model!==undefined&&save.inventory.model!==null)loadedItems.load(save.inventory.model);
+                    else {
+                        const legacy=save.inventory??{};
+                        loadedItems.importLegacy({...legacy,items:legacy.items?.length?legacy.items:DEFAULT_LOADOUT});
+                        if(GameSettings.kukriFromArmory!==false)for(const id of ['maiden_kukri','blood_pact'])if(!loadedItems.hasItem(id))loadedItems.grantItem(id);
+                    }
+
+                    // Preflight companion capability records before changing currency, inventory or the live map.
+                    const abilityCatalog=DFNative.createAbilityCatalog(GAME_DB.progression.abilities);
+                    const attackCatalog=DFNative.createAttackCatalog({items:DFNative.createItemCatalog(GAME_DB.items),abilities:abilityCatalog});
+                    for(const record of [playerData,...(save.teammates??[]),...(worldData.nativeLevel?.physics?.entities??[]).filter(entry=>entry.entity_type==='df_npc'||entry.entity_type==='df_player'||entry.data?.attack_state||entry.data?.abilities||entry.data?.ability_action_state).map(entry=>entry.data)]){
+                        DFNative.importActorAbilities(structuredClone(record),abilityCatalog,{default_id:record.role==='red_demon_dancer'?'fireball':null});
+                        DFNative.validateAbilityAction(record.ability_secondary_state,abilityCatalog,{clock:record.weapon_state?.elapsed??-1});if(record.ability_secondary_ready_at!==undefined&&(!Number.isFinite(record.ability_secondary_ready_at)||record.ability_secondary_ready_at<0))throw new TypeError('Invalid secondary ready time');
+                        DFNative.validateMountedAttack(record.mounted_attack_state);
+                        DFNative.validateAbilityAction(record.ability_action_state,abilityCatalog,{clock:record.weapon_state?.elapsed??-1});
+                        if(record.attackSelection??record.attack_state)DFNative.validateAttackState(record.attackSelection??record.attack_state,id=>this.attacks?.registry.hasAttack(id)??!!attackCatalog[id]);
+                    }
+
+                    for(const record of worldData.nativeLevel?.physics?.entities??[])DFNative.validateBossRecord(record,abilityCatalog);
+                    const loadedVitals=new DFNative.playerVitals();
+                    if(playerData.vitals)loadedVitals.load(playerData.vitals);
+                    else {
+                        const restoredRanks=new ResonanceSystem();restoredRanks.deserialize(save.resonance);
+                        const shield=playerData.buffs?.stellarLemonade;
+                        const maximum=Math.round(restoredRanks.stat('maxHealth',100));
+                        loadedVitals.importHealth(playerData.health ?? defaults.player.health,shield?.active?Math.floor(maximum/2):maximum);
+                    }
                     // 1. Load Player Data
+                    if(playerData.abilitiesSnapshot)this.player.data.abilities=structuredClone(playerData.abilitiesSnapshot);else delete this.player.data.abilities;
+                    if(playerData.attackSelection)this.player.data.attack_state=structuredClone(playerData.attackSelection);else delete this.player.data.attack_state;
                     this.currency = playerData.currency ?? defaults.player.currency;
                     this.scrap = playerData.scrap ?? defaults.player.scrap;
-                    this.playerHealth = playerData.health ?? defaults.player.health;
+                    this.player.vitals.load(loadedVitals.snapshot());
                     this.boosterCount = playerData.boosters ?? defaults.player.boosters;
                     
                     // Restore buff system from save data
                     this.player.buffSystem.active = {};                 // only the save's buffs: none carried in from the run before
                     this.player.buffSystem.deserialize(playerData.buffs || {});
-                    
-                    // Re-apply persistent buff side-effects (e.g. Stellar Lemonade halved maxHP)
-                    const slBuff = this.player.buffSystem.active.stellarLemonade;
-                    if (slBuff && slBuff.active && slBuff.savedMaxHp > 0) {
-                        this.maxPlayerHealth = Math.floor(slBuff.savedMaxHp / 2);
-                    }
-                    
-                    this.player.syncHealth(this.playerHealth, this.maxPlayerHealth);
                     
                     // 2. Load World State
                     this.worldMinutes = worldData.worldMinutes ?? defaults.world.worldMinutes;
@@ -516,6 +543,8 @@ engineMixin({
                     if (worldData.weather) this.weather.deserialize(worldData.weather);
                     this.visitedMaps = new Set(worldData.visitedMaps || []); this._mapSnaps = {};
                     
+                    this._pendingApartmentState = worldData.mapId==='apt_949'&&worldData.nativeLevel?.id==='apt_949' ? worldData.nativeLevel.physics : null;
+                    this._pendingApartmentRoster = worldData.mapId==='apt_949'&&save.teammates?.length ? save.teammates : null;
                     // 3. Load Map & Player Position
                     // (her own car again: whatever she'd taken in this session isn't in the save)
                     this._endDrive();
@@ -528,15 +557,17 @@ engineMixin({
                     // Consumed by _doLoadMap after entities exist, not while the previous map fades out.
                     this._pendingGauntletLoad = { data: save.hordeGauntlet };
                     // Saved in Grum's old arena: it's the House of Death now — start at its door
-                    if (mapId === 'grum_arena') { mapId = 'house_of_death'; this.loadMap(mapId); }
-                    else if (mapId === 'road_test') { mapId = 'sdc'; this.loadMap(mapId); }   // the old road test zone is gone: back to the city's spawn
-                    else this.loadMap(mapId, { x: playerX, y: playerY });
+                    if (mapId === 'grum_arena') { mapId = 'house_of_death'; this._doLoadMap(mapId); }
+                    else if (mapId === 'road_test') { mapId = 'sdc'; this._doLoadMap(mapId); }   // the old road test zone is gone: back to the city's spawn
+                    else this._doLoadMap(mapId, { x: playerX, y: playerY });
+                    if(!this.activeLevel)this.bakeStaticLighting();
                     // The city's layout changes now and then (it grew four times over): a spot saved where a building stands now
                     // goes back to the city's spawn, and her car (below) to where it waits in a new game
                     const hubCols = this.activeMap.id === 'sdc' ? this.activeMap.buildingColliders : this._hubCache && this._hubCache.buildingColliders;
                     const inBuilding = (x, y) => (hubCols || []).some(b => x > b.x && x < b.x + b.w && y > b.y && y < b.y + b.h);
-                    if (this.activeMap.id === 'sdc' && inBuilding(this.player.x, this.player.y)) { this.player.x = this.activeMap.spawn.x; this.player.y = this.activeMap.spawn.y; }
+                    if (this.activeMap.id === 'sdc' && inBuilding(this.playerPosition[0], this.playerPosition[1])) { this.player.x = this.activeMap.spawn.x; this.player.y = this.activeMap.spawn.y; }
         
+                    if(!this.activeLevel){
                     // 4. Restore Teammates (unified — permanent + contract)
                     const savedTeammates = save.teammates || rawSave.teammates || [];
                     
@@ -550,7 +581,7 @@ engineMixin({
                                 ? 'red_demon_dancer' : 'dancer');
                             let npc = this.npcs.find(n => n.name === savedTm.name);
                             if (!npc) {
-                                npc = new NPC(this.player.x, this.player.y, savedTm.name, role);
+                                npc = new NPC(this.playerPosition[0], this.playerPosition[1], savedTm.name, role);
                             }
                             npc.hired = true;
                             npc.hireType = 'contract';
@@ -558,6 +589,11 @@ engineMixin({
                             npc.hireTime = savedTm.hireTime || 0;
                             npc.hireCost = savedTm.hireCost || CONFIG.COMPANION.DEFAULT_HIRE_COST;
                             npc.alliance = 'friendly';
+                            if(savedTm.inventory)npc.inventory=savedTm.inventory;
+                            if(savedTm.abilitiesSnapshot)npc.abilitiesSnapshot=savedTm.abilitiesSnapshot;
+                            else if(savedTm.equippedAbilityId!==undefined)npc.equippedAbilityId=savedTm.equippedAbilityId;
+                            if(savedTm.cooldown!==undefined)npc.cooldown=savedTm.cooldown;
+                            if(savedTm.attackSelection)npc.attackSelection=savedTm.attackSelection;
                             npc.recruited = true;
                             if (!this.teammates.includes(npc)) this.teammates.push(npc);
                             const npcIdx = this.npcs.indexOf(npc);
@@ -567,6 +603,11 @@ engineMixin({
                             const tm = this.teammates.find(t => t.name === savedTm.name);
                             if (tm) {
                                 tm.recruited = savedTm.recruited;
+                                if(savedTm.inventory)tm.inventory=savedTm.inventory;
+                                if(savedTm.abilitiesSnapshot)tm.abilitiesSnapshot=savedTm.abilitiesSnapshot;
+                                else if(savedTm.equippedAbilityId!==undefined)tm.equippedAbilityId=savedTm.equippedAbilityId;
+                                if(savedTm.cooldown!==undefined)tm.cooldown=savedTm.cooldown;
+                                if(savedTm.attackSelection)tm.attackSelection=savedTm.attackSelection;
                                 if (savedTm.equippedWeaponId && ITEM_REGISTRY[savedTm.equippedWeaponId]) {
                                     tm.equippedWeaponId = savedTm.equippedWeaponId;
                                 }
@@ -594,7 +635,7 @@ engineMixin({
                             ? 'red_demon_dancer' : 'dancer';
                         let npc = this.npcs.find(n => n.name === savedDancer.name);
                         if (!npc) {
-                            npc = new NPC(this.player.x, this.player.y, savedDancer.name, role);
+                            npc = new NPC(this.playerPosition[0], this.playerPosition[1], savedDancer.name, role);
                         }
                         npc.hired = true;
                         npc.hireType = 'contract';
@@ -607,6 +648,12 @@ engineMixin({
                         if (npcIdx > -1) this.npcs.splice(npcIdx, 1);
                     });
         
+                    }
+                    if(this.activeLevel){
+                        if(save.garage)this.garage.deserialize(save.garage);
+                        const active=this.garage.getActive();
+                        this._parkedCar={...active,x:carData.x??defaults.car.x,y:carData.y??defaults.car.y,angle:carData.angle??defaults.car.angle};
+                    }else{
                     // 6. Restore Garage & Car
                     if (save.garage) {
                         this.garage.deserialize(save.garage);
@@ -637,45 +684,14 @@ engineMixin({
                         this.toggleVehicle();
                     }
         
-                    // 8. Restore Inventory & Equipped Weapon
-                    const invData = save.inventory || rawSave.inventory || defaults.inventory;
-                    if (invData && this.inventory) {
-                        this.inventory.entryOrder = Array.isArray(invData.order) ? invData.order.filter(key => typeof key === 'string') : [];
-                        // Restore weapon mode
-                        this.weaponMode = invData.weaponMode ?? 'normal';
-                        
-                        // Rebuild inventory from saved item IDs (if save has items)
-                        if (invData.items && invData.items.length > 0) {
-                            this.inventory.loadItemsFromIds(invData.items);
-                            // The Maiden's Kukri waits in the armory for now (GameSettings.kukriFromArmory); later only the Demoness gives it
-                            if (GameSettings.kukriFromArmory !== false && !invData.items.includes('maiden_kukri')) { const k = createItemFromRegistry('maiden_kukri', this); if (k) this.inventory.items.push(k); }
-                            // Blood Pact waits beside it (older saves get it too)
-                            if (GameSettings.kukriFromArmory !== false && !invData.items.includes('blood_pact')) { const k = createItemFromRegistry('blood_pact', this); if (k) this.inventory.items.push(k); }
-                            console.log(`[LOAD] Rebuilt inventory: ${invData.items.length} items (${invData.items.join(', ')})`);
-                        }
-                        // If save had empty items array, keep the default loadout from constructor
-                        
-                        // Restore equipped weapon (with legacy equippedId fallback)
-                        const wId = invData.equippedWeaponId || invData.equippedId || null;
-                        if (wId) {
-                            const equippedItem = this.inventory.items.find(i => i.id === wId);
-                            if (equippedItem) {
-                                this.inventory.equippedWeaponId = wId;
-                                this.currentWeapon = equippedItem;
-                                if (equippedItem.action) equippedItem.action(equippedItem);
-                                console.log(`[LOAD] Equipped weapon: ${equippedItem.name}`);
-                            }
-                        }
-                        
-                        // Restore equipped attachments (up to two; older saves name one)
-                        const attachIds = Array.isArray(invData.equippedAttachments) ? invData.equippedAttachments
-                            : invData.equippedAttachmentId ? [invData.equippedAttachmentId] : [];
-                        this.inventory.equippedAttachments = [...new Set(attachIds)]
-                            .filter(id => this.inventory.items.some(i => i.id === id && i.type === 'attachment'))
-                            .slice(0, this.inventory.maxAttachments);
-                        
-                        // Render once after cosmetics and all ownership data restore below.
                     }
+                    // 8. Restore the validated authoritative item model and UI ordering.
+                    this.items.load(loadedItems.snapshot());this.cancelQuickDraw();
+                    if(!this.activeLevel){this._drawnAt=_gameTimeSec;this._drawShotUsed=false;}
+                    this.inventory.entryOrder=Array.isArray(save.inventory?.order)?save.inventory.order.filter(key=>typeof key==='string'):[];
+                    if(!save.inventory?.model)this.inventory.entryOrder=this.inventory.entryOrder.map(key=>{
+                        if(!key.startsWith('carried:'))return key;const item=this.items.findItem(key.slice(8));return item?'carried:'+item.instance_id:key;
+                    });
 
                     // 9. Restore Phone Data (Message History)
                     const phoneData = save.phone || rawSave.phone || defaults.phone;

@@ -10,6 +10,12 @@
              */
             emitNoise(x, y, reach, kind, fromPlayer = true, opts = {}) {
                 if (!reach || !this.activeMap) return 0;
+                if(this.activeLevel){
+                    const heard=opts.hear===false?0:this.actors.hearNoise([x,y],{near_range:reach});
+                    if(fromPlayer&&heard)this._lastContactAt=_gameTimeSec;
+                    if(opts.ring!==false&&(fromPlayer||GameSettings.enemyRings!==false&&this.physics_system.observeTarget(this.player,[x,y],{near_range:reach}).in_range))this._spawnRing(x,y,reach,!fromPlayer,opts.src);
+                    return heard;
+                }
                 const N = CONFIG.NOISE, walls = this.activeMap.walls, cols = getColliders(this.activeMap), rs = this.roomSystem;
                 let heard = 0;
                 // opts.hear === false: a sound only she can hear (a guard's own footsteps don't alert the others)
@@ -40,7 +46,7 @@
                     // opts.ring === false: no ripple (her footsteps; a puddle step keeps one, small)
                     if (opts.ring !== false) this._spawnRing(x, y, reach, false, opts.src);
                 } else if (opts.ring !== false && GameSettings.enemyRings !== false && this.player
-                           && Math.hypot(this.player.x - x, this.player.y - y) <= reach) {
+                           && Math.hypot(this.playerPosition[0] - x, this.playerPosition[1] - y) <= reach) {
                     // theirs, in ember, when it reaches her: gunfire, a dash, a guard's hard steps
                     this._spawnRing(x, y, Math.min(reach, 260), true, opts.src);
                 }
@@ -56,7 +62,8 @@
             _spawnRing(x, y, reach, enemy, src) {
                 const R = this.noiseRipples || (this.noiseRipples = []);
                 const P = this.player, RING_GAP = 0.18, RING_PER_SRC = 2;
-                const key = src || (!enemy && P && Math.abs(x - P.x) + Math.abs(y - P.y) < 60 ? P : null);
+                const [px,py]=P?this.playerPosition:[0,0];
+                const key = src || (!enemy && P && Math.abs(x - px) + Math.abs(y - py) < 60 ? P : null);
                 const patch = key ? null : ((x / 90) | 0) * 100003 + ((y / 90) | 0);
                 let young = null, mine = 0, oldest = -1, side = 0;
                 for (let i = 0; i < R.length; i++) {

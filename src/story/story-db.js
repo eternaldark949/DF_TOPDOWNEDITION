@@ -21,10 +21,10 @@
                 onStart: (game) => {
                     const H = game.hud, S = game.story;
                     H.reveal('health'); H.reveal('location');
-                    const x0 = game.player.x, y0 = game.player.y;
+                    const x0 = game.playerPosition[0], y0 = game.playerPosition[1];
                     if (game.activeMap.id === 'sdc' && !game.coach.taught.has('move'))
                         H.reveal('move', { title: 'Move', text: 'Drag anywhere here to move.', ghost: 'drag', timeout: 12000,
-                                           until: g => Math.hypot(g.player.x - x0, g.player.y - y0) > 40 });
+                                           until: g => Math.hypot(g.playerPosition[0] - x0, g.playerPosition[1] - y0) > 40 });
                     else H.reveal('move');
                     S.watch(g => {                                            // the first pill she meets: the door
                         if (H.has('action') || g.coach.cur) return H.has('action');
@@ -44,7 +44,7 @@
             },
             SEARCH_SUITE: {
                 onStart: (game) => {
-                    if (game.inventory && game.inventory.items.some(i => i.id === 'pistol_fpx')) { game.inventory.equipItem('pistol_fpx'); game.weaponHolstered = false; }
+                    if (game.inventory && game.items.listItems().some(i => i.id === 'pistol_fpx')) { game.inventory.equipItem(game.items.findItem('pistol_fpx').instance_id); game.weaponHolstered = false; }
                     game.hud.reveal('holster');
                     game_timers.after(0.6, () => {
                         game.hud.reveal('fire', { title: 'Your FP-X', text: 'Hold to aim. Push past the gold line to fire.', timeout: 14000, until: g => g.fireJoystick.active || g.mouseDown });
@@ -81,13 +81,13 @@
                     // A stim after the first hit; the flit once they start telegraphing (or she's hit)
                     S.watch(g => {
                         if (g.coach.cur) return false;
-                        if (g.playerHealth < g.maxPlayerHealth) { H.reveal('heal', { title: 'Stims', text: 'Hurt? Tap to heal.', mode: 'ring', timeout: 5000 }); return true; }
+                        if (g.player.hp < g.player.maxHp) { H.reveal('heal', { title: 'Stims', text: 'Hurt? Tap to heal.', mode: 'ring', timeout: 5000 }); return true; }
                         return false;
                     });
                     S.watch(g => {
                         if (g.coach.cur) return false;
                         const tele = (g.enemies || []).some(e => e.telegraph || e.isTelegraphing || e._telegraph);
-                        if (tele || g.playerHealth < g.maxPlayerHealth * 0.8) {
+                        if (tele || g.player.hp < g.player.maxHp * 0.8) {
                             H.reveal('flit', { title: 'Flit', text: 'Tap ⚡ (or drag past the ring) to blink out of the line.', mode: 'ring', timeout: 6000 });
                             return true;
                         }
@@ -106,7 +106,7 @@
                     S.watch(g => {
                         const note = (g.props || []).find(p => p.noteId === 'dark_maker_letter' || (p.interactionType === 'read_note' && /dark/i.test(p.noteId || p.label || '')));
                         if (!note || g.activeMap.id !== 'hotel_suite') return false;
-                        if (Math.hypot(g.player.x - (note.x + (note.w || 0) / 2), g.player.y - (note.y + (note.h || 0) / 2)) > 150) return false;
+                        if (Math.hypot(g.playerPosition[0] - (note.x + (note.w || 0) / 2), g.playerPosition[1] - (note.y + (note.h || 0) / 2)) > 150) return false;
                         S.triggerComms("Yenna", "What's that?", 2400);
                         game_timers.after(2.6, () => S.triggerComms("949", "Yenna, you really are a sniper.", 2600), 'world');
                         return true;

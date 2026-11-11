@@ -62,7 +62,7 @@
                         this.enterCar(car);
                     } else if(this.activeInteraction.type === 'hijack') {
                         this.hijackVehicle(this.activeInteraction.target);
-                    } else if(this.activeInteraction instanceof NPC) {
+                    } else if(this.activeInteraction instanceof NPC || this.activeInteraction instanceof DFNative.NPC) {
                         this.startDialogue(this.activeInteraction);
                     }
                 } else if (this.isDriving) {
@@ -83,10 +83,10 @@
                 let side = -1, [dx, dy] = W(hl * 0.2, -(hw + 20));                                   // the driver's door
                 if (nav && !nav.walkable(dx, dy)) { side = 1; [dx, dy] = W(hl * 0.2, hw + 20); }      // blocked: in from the other side
                 const door = { x: dx, y: dy };
-                if (Math.hypot(door.x - this.player.x, door.y - this.player.y) < 30) return false;
+                if (Math.hypot(door.x - this.playerPosition[0], door.y - this.playerPosition[1]) < 30) return false;
                 // On the far side? Round the nose or the tail (the nav grid doesn't know about cars): the nearer, unless
                 // it's against a wall (Amber's van has the cafe at its back) and the other end is open
-                const [plx, ply] = L(this.player.x, this.player.y), via = [], ew = hw + 32;
+                const [plx, ply] = L(this.playerPosition[0], this.playerPosition[1]), via = [], ew = hw + 32;
                 if (Math.sign(ply) !== side && Math.abs(plx) < hl + 20) {
                     let ex = plx >= 0 ? hl + 30 : -(hl + 30);
                     const open = e => !nav || (nav.walkable(...W(e, Math.sign(ply || 1) * ew)) && nav.walkable(...W(e, side * ew)));
@@ -98,7 +98,7 @@
                     via.push(W(Math.sign(plx || -1) * (hl + 30), side * ew));
                 }
                 // Arrived, or stuck on the way but still beside it: in either way (the walk is how she gets in, not whether)
-                const getIn = () => { if (!this.isDriving && car.visible && Math.hypot(car.x - this.player.x, car.y - this.player.y) < 90) this.enterCar(car); };
+                const getIn = () => { if (!this.isDriving && car.visible && Math.hypot(car.x - this.playerPosition[0], car.y - this.playerPosition[1]) < 90) this.enterCar(car); };
                 const h = Walker.goTo(this.player, door.x, door.y, { face: [car.x, car.y], arrive: 7, timeout: 240, via, onArrive: getIn, onFail: getIn });
                 if (this.player._walk) this.player._walk.toCar = true;
                 return !!h;
@@ -159,7 +159,7 @@
                     if (e.button === 0 && this.mouseDown && this._quickDraw) {
                         aimMouse(e);
                         const p = this.viewToWorld(this.mouseX, this.mouseY);
-                        this.requestQuickDraw(Math.atan2(p.y - this.player.y, p.x - this.player.x), p);
+                        this.requestQuickDraw(Math.atan2(p.y - this.playerPosition[1], p.x - this.playerPosition[0]), p);
                     }
                     this.mouseDown = false;
                 });
@@ -207,11 +207,11 @@
                         gameUi.classList.add('emote-active');   // one class: the utility buttons fade out, the emote overlays in
                     },
                     onMove: (S) => { E.highlighted = S.slot; },
-                    onEnd: (S) => {
+                    onEnd: (S, event) => {
                         gameUi.classList.remove('emote-active');
                         this.emoteBtn.classList.remove('dragging');   // the knob eases home (CSS transition)
                         Object.assign(E, { active: false, touchId: null, highlighted: null });
-                        if (S.slot) this.firePlayerEmote(S.slot);
+                        if (S.slot && event.type !== 'touchcancel') this.firePlayerEmote(S.slot);
                     },
                 });
 

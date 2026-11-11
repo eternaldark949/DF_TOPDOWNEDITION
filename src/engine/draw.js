@@ -159,9 +159,63 @@
                Layers: Floor -> Roads -> Buildings -> Walls -> Entities -> Light -> UI
                Instrumented with Profiler.
                ===================================================================== */
+            /** Presentation-only camera calculation, shared by native scenes and the remaining classic renderer. */
+            resolveCameraView(viewZoom, player = this.player) {
+                const fc=this.finCam, [px,py]=player.physics_system?player.position:[player.x,player.y];
+                // Camera Logic: Cutscene Director vs Player Tracking
+                let camX, camY;
+                if (this.cutscene && this.cutscene.active) {
+                    const c = this._clampView(this.camera.x, this.camera.y, viewZoom);   // pans and cuts stop at the map's edge
+                    camX = this.camera.x = c.x;
+                    camY = this.camera.y = c.y;
+                    this.lookPanX = this.lookPanY = 0;
+                    this.lmDriftX = this.lmDriftY = 0;
+                } else {
+                    /* Behind the wheel the camera looks a little down the road, easing after the
+                       car's velocity (per frame, so it glides between ticks); on foot it drifts home. */
+                    const dtCam = Math.min(100, Math.max(0, _frameTime - (this._camLeanT || _frameTime)));
+                    this._camLeanT = _frameTime;
+                    const drv = this.isDriving && this.car, LA = CONFIG.VEHICLE_DRIVE.CAM_LOOK_AHEAD;
+                    const kCam = 1 - Math.exp(-dtCam / LA.TAU_MS);
+                    this.driveLeanX = (this.driveLeanX || 0) + ((drv ? (this.car.vx || 0) * LA.PER_SPEED : 0) - (this.driveLeanX || 0)) * kCam;
+                    this.driveLeanY = (this.driveLeanY || 0) + ((drv ? (this.car.vy || 0) * LA.PER_SPEED : 0) - (this.driveLeanY || 0)) * kCam;
+                    // At a window's edge the camera leans out over the city beyond it (a CityView's lookout: buildings/city-view.js)
+                    const cityV = this._cityView, look = cityV && !drv ? cityV.lookoutLean(player, this.camera.zoom) : 0;
+                    this.lookLeanY = cityV ? (this.lookLeanY || 0) + (look - (this.lookLeanY || 0)) * (1 - Math.exp(-dtCam / 450)) : 0;
+                    // Drag-to-look (engine/player-draw-input.js initLookZone): the view follows the thumb within reach of her, and glides home on release
+                    const LK = CONFIG.CAMERA.LOOK, ld = this.lookDrag;
+                    if (this._lookMap !== this.activeMap) { this._lookMap = this.activeMap; this.lookPanX = this.lookPanY = 0; }
+                    let lx = 0, ly = 0;
+                    if (ld && ld.active) {
+                        const rx = LK.REACH * this.canvas.width / 2 / viewZoom, ry = LK.REACH * this.canvas.height / 2 / viewZoom;
+                        lx = -ld.dx * ld.sx / viewZoom; ly = -ld.dy * ld.sy / viewZoom;   // the world moves with the finger
+                        const e = Math.hypot(lx / rx, ly / ry); if (e > 1) { lx /= e; ly /= e; }
+                    }
+                    const kLook = 1 - Math.exp(-dtCam / (ld && ld.active ? LK.FOLLOW_MS : LK.RETURN_MS));
+                    this.lookPanX = (this.lookPanX || 0) + (lx - (this.lookPanX || 0)) * kLook;
+                    this.lookPanY = (this.lookPanY || 0) + (ly - (this.lookPanY || 0)) * kLook;
+                    if (!(ld && ld.active) && Math.abs(this.lookPanX) < 0.05 && Math.abs(this.lookPanY) < 0.05) this.lookPanX = this.lookPanY = 0;
+                    // Scoped with a sniper, the camera leans down her line (engine/scope.js)
+                    const c = this._clampView(px + (this.scopeLeanX || 0) + this.driveLeanX + this.lookPanX, py + (this.scopeLeanY || 0) + this.driveLeanY + this.lookLeanY + this.lookPanY, viewZoom);
+                    camX = c.x; camY = c.y;
+                    this.camera.x = camX; // Sync for smooth handoff
+                    this.camera.y = camY;
+                    // Near a landmark the view drifts toward it (_landmarkDriftTarget); the lean still looks from her
+                    const lm = this._landmarkDriftTarget(viewZoom), kLm = 1 - Math.exp(-dtCam / CONFIG.CAMERA.LANDMARK_DRIFT.TAU_MS);
+                    this.lmDriftX = (this.lmDriftX || 0) + (lm.x - (this.lmDriftX || 0)) * kLm;
+                    this.lmDriftY = (this.lmDriftY || 0) + (lm.y - (this.lmDriftY || 0)) * kLm;
+                    if (Math.abs(this.lmDriftX) < 0.05 && Math.abs(this.lmDriftY) < 0.05) this.lmDriftX = this.lmDriftY = 0;
+                    if (this.lmDriftX || this.lmDriftY) { const c2 = this._clampView(camX + this.lmDriftX, camY + this.lmDriftY, viewZoom); camX = c2.x; camY = c2.y; }
+                }
+                if (this.cineCam) { camX += this.cineCam.dx; camY += this.cineCam.dy; }   // Cinematic View's pan
+                if (fc) { camX += fc.dx; camY += fc.dy; }
+                if (this.cineCam || fc) { const c = this._clampView(camX, camY, viewZoom); camX = c.x; camY = c.y; }
+                return {x:camX,y:camY,zoom:viewZoom,shakeX:this.camera.shakeX||0,shakeY:this.camera.shakeY||0};
+            },
             draw() {
+                if(this.activeLevel)return this.apartmentRenderer.draw(this,this._apartmentBlend??1);
                 if (!this.running || (this.paused && !this.cineCam)) return;   // (Cinematic View keeps drawing the held world: ui/save-slots-pause-menu.js)
-            
+
                 this._renderDrawId = (this._renderDrawId || 0) + 1;
                 Overhead.clear();                                   // (a frame cut short leaves nothing queued for the next)
                 // Baseline's layer panel (ui/render-layers.js): RL.at(layer) says whether a layer draws, and
@@ -184,73 +238,27 @@
                    precisely what resolution scaling targets) was invisible in the
                    breakdown. */
                 this.profiler.start('Render:Setup');
-            
+
                 // 1. CLEAR & CAMERA SETUP
                 this.ctx.fillStyle = '#000';
                 this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-            
+
                 this.ctx.save();
                 this.ctx.translate(this.canvas.width/2, this.canvas.height/2);
                 const fc = this.finCam;                                   // the finisher's camera (engine/finisher.js): offset and push-in
                 const viewZoom = this.camera.zoom * (fc ? fc.z : 1);
                 this.ctx.scale(viewZoom, viewZoom);
-            
-                // Camera Logic: Cutscene Director vs Player Tracking
-                let camX, camY;
-                if (this.cutscene && this.cutscene.active) {
-                    const c = this._clampView(this.camera.x, this.camera.y, viewZoom);   // pans and cuts stop at the map's edge
-                    camX = this.camera.x = c.x;
-                    camY = this.camera.y = c.y;
-                    this.lookPanX = this.lookPanY = 0;
-                    this.lmDriftX = this.lmDriftY = 0;
-                } else {
-                    /* Behind the wheel the camera looks a little down the road, easing after the
-                       car's velocity (per frame, so it glides between ticks); on foot it drifts home. */
-                    const dtCam = Math.min(100, Math.max(0, _frameTime - (this._camLeanT || _frameTime)));
-                    this._camLeanT = _frameTime;
-                    const drv = this.isDriving && this.car, LA = CONFIG.VEHICLE_DRIVE.CAM_LOOK_AHEAD;
-                    const kCam = 1 - Math.exp(-dtCam / LA.TAU_MS);
-                    this.driveLeanX = (this.driveLeanX || 0) + ((drv ? (this.car.vx || 0) * LA.PER_SPEED : 0) - (this.driveLeanX || 0)) * kCam;
-                    this.driveLeanY = (this.driveLeanY || 0) + ((drv ? (this.car.vy || 0) * LA.PER_SPEED : 0) - (this.driveLeanY || 0)) * kCam;
-                    // At a window's edge the camera leans out over the city beyond it (a CityView's lookout: buildings/city-view.js)
-                    const cityV = this._cityView, look = cityV && !drv ? cityV.lookoutLean(this.player, this.camera.zoom) : 0;
-                    this.lookLeanY = cityV ? (this.lookLeanY || 0) + (look - (this.lookLeanY || 0)) * (1 - Math.exp(-dtCam / 450)) : 0;
-                    // Drag-to-look (engine/player-draw-input.js initLookZone): the view follows the thumb within reach of her, and glides home on release
-                    const LK = CONFIG.CAMERA.LOOK, ld = this.lookDrag;
-                    if (this._lookMap !== this.activeMap) { this._lookMap = this.activeMap; this.lookPanX = this.lookPanY = 0; }
-                    let lx = 0, ly = 0;
-                    if (ld && ld.active) {
-                        const rx = LK.REACH * this.canvas.width / 2 / viewZoom, ry = LK.REACH * this.canvas.height / 2 / viewZoom;
-                        lx = -ld.dx * ld.sx / viewZoom; ly = -ld.dy * ld.sy / viewZoom;   // the world moves with the finger
-                        const e = Math.hypot(lx / rx, ly / ry); if (e > 1) { lx /= e; ly /= e; }
-                    }
-                    const kLook = 1 - Math.exp(-dtCam / (ld && ld.active ? LK.FOLLOW_MS : LK.RETURN_MS));
-                    this.lookPanX = (this.lookPanX || 0) + (lx - (this.lookPanX || 0)) * kLook;
-                    this.lookPanY = (this.lookPanY || 0) + (ly - (this.lookPanY || 0)) * kLook;
-                    if (!(ld && ld.active) && Math.abs(this.lookPanX) < 0.05 && Math.abs(this.lookPanY) < 0.05) this.lookPanX = this.lookPanY = 0;
-                    // Scoped with a sniper, the camera leans down her line (engine/scope.js)
-                    const c = this._clampView(this.player.x + (this.scopeLeanX || 0) + this.driveLeanX + this.lookPanX, this.player.y + (this.scopeLeanY || 0) + this.driveLeanY + this.lookLeanY + this.lookPanY, viewZoom);
-                    camX = c.x; camY = c.y;
-                    this.camera.x = camX; // Sync for smooth handoff
-                    this.camera.y = camY;
-                    // Near a landmark the view drifts toward it (_landmarkDriftTarget); the lean still looks from her
-                    const lm = this._landmarkDriftTarget(viewZoom), kLm = 1 - Math.exp(-dtCam / CONFIG.CAMERA.LANDMARK_DRIFT.TAU_MS);
-                    this.lmDriftX = (this.lmDriftX || 0) + (lm.x - (this.lmDriftX || 0)) * kLm;
-                    this.lmDriftY = (this.lmDriftY || 0) + (lm.y - (this.lmDriftY || 0)) * kLm;
-                    if (Math.abs(this.lmDriftX) < 0.05 && Math.abs(this.lmDriftY) < 0.05) this.lmDriftX = this.lmDriftY = 0;
-                    if (this.lmDriftX || this.lmDriftY) { const c2 = this._clampView(camX + this.lmDriftX, camY + this.lmDriftY, viewZoom); camX = c2.x; camY = c2.y; }
-                }
-                if (this.cineCam) { camX += this.cineCam.dx; camY += this.cineCam.dy; }   // Cinematic View's pan
-                if (fc) { camX += fc.dx; camY += fc.dy; }
-                if (this.cineCam || fc) { const c = this._clampView(camX, camY, viewZoom); camX = c.x; camY = c.y; }
+
+                const cameraView=this.resolveCameraView(viewZoom);
+                const camX=cameraView.x,camY=cameraView.y;
                 this.view = { x: camX, y: camY, zoom: viewZoom, shakeX: this.camera.shakeX, shakeY: this.camera.shakeY };
-                
+
                 this.ctx.translate(-camX + this.camera.shakeX, -camY + this.camera.shakeY);
                 // World → screen matrix for this frame: lets the hair physics work out any
                 // character's head position in world space, whatever transforms drew it
                 _worldMatrix = this.ctx.getTransform();
                 _worldCanvas = this.canvas;
-                
+
                 // PERFORMANCE: Pre-calculate viewport culling bounds once per frame
                 // Uses AABB (rectangular) instead of radial distance for better screen coverage
                 // cullZoom clamps the zoom used for cull bounds, preventing the cull rect from
@@ -280,7 +288,7 @@
                     cullBounds.cars = { left: camX - vw - C, right: camX + vw + C, top: camY - vh - C, bottom: camY + vh + C };
                 }
                 this._cullBounds = cullBounds;
-            
+
                 // --- DYNAMIC LOD (Zoom-Aware) ---
                 // Progressive quality reduction as camera zooms out.
                 // zoomLOD 0 = full quality, 1 = reduced, 2 = minimal. Each step has a band
@@ -293,26 +301,26 @@
                 while (lodNow < 2 && lodZoom < LZ[lodNow].in) lodNow++;
                 while (lodNow > 0 && lodZoom > LZ[lodNow - 1].out) lodNow--;
                 _zoomLOD = lodNow;
-                
+
                 // Vehicle LOD threshold scales with zoom — entities that are small on screen skip effects
                 const _vehicleLODThreshSq = Math.pow(300 / Math.max(0.35, zoom), 2);
-                
+
                 // Max shadow polygons drawn per frame in lighting pass (prevents zoom-out bomb)
                 const _maxLitLamps = _zoomLOD === 2 ? 10 : (_zoomLOD === 1 ? 18 : 40);
-                
+
                 // Max neon sign layers (5 = full glow, 2 = core only, 1 = flat text)
                 const _maxSignLayers = _zoomLOD === 2 ? 1 : (_zoomLOD === 1 ? 2 : 5);
-                
+
                 // Store on engine for access by sub-systems
                 this._zoomLOD = _zoomLOD;
                 this._maxLitLamps = _maxLitLamps;
                 this._maxSignLayers = _maxSignLayers;
-            
+
                 this.profiler.stop('Render:Setup');
 
                 // 2. WORLD GEOMETRY (BOTTOM LAYERS)
                 this.profiler.start('Render:World');
-                
+
                 // Pre-calculate daylight factor for windows, lamps, and lighting
                 // Indoor V2: If room system is active, use room type; otherwise use map type
                 // worldMinutes is monotonic — derive hour-of-day with % 1440.
@@ -376,7 +384,7 @@
                         this.ctx.lineDashOffset = (borderNow % 800) / 40; // 0..20: exactly one dash-plus-gap cycle
                         this.ctx.strokeRect(rz.x, rz.y, rz.w, rz.h);
                         this.ctx.setLineDash([]);
-                        
+
                         // Corner hazard chevrons
                         const cs = 20; // chevron size
                         this.ctx.strokeStyle = `rgba(255, 60, 0, ${alpha * 0.8})`;
@@ -389,11 +397,11 @@
                         this.ctx.beginPath(); this.ctx.moveTo(rz.x, rz.y + rz.h - cs); this.ctx.lineTo(rz.x, rz.y + rz.h); this.ctx.lineTo(rz.x + cs, rz.y + rz.h); this.ctx.stroke();
                         // Bottom-right
                         this.ctx.beginPath(); this.ctx.moveTo(rz.x + rz.w - cs, rz.y + rz.h); this.ctx.lineTo(rz.x + rz.w, rz.y + rz.h); this.ctx.lineTo(rz.x + rz.w, rz.y + rz.h - cs); this.ctx.stroke();
-                        
+
                         this.ctx.restore();
                     }
                 }
-                
+
                 // Roads (Asphalt) — baked with the ground in the city; the debug overlay still draws live
                 if (RL.at('ground') && (!bakedGround || this.dbg('traffic'))) this.traffic.drawNetwork(this.ctx, this.dbg('traffic'));
 
@@ -435,11 +443,11 @@
 
                 // Walls & Indoor Zones (WITH BAKED TEXTURES)
                 if (RL.at('floors') && this.activeMap.zones) {
-                    this.activeMap.zones.forEach(z => { 
+                    this.activeMap.zones.forEach(z => {
                         // Base color fill
-                        this.ctx.fillStyle = z.color; 
-                        this.ctx.fillRect(z.x, z.y, z.w, z.h); 
-                        
+                        this.ctx.fillStyle = z.color;
+                        this.ctx.fillRect(z.x, z.y, z.w, z.h);
+
                         // PERFORMANCE: Use pre-baked texture patterns instead of per-frame procedural
                         if (z.texture === 'wood') {
                             // Simple baked wood effect - just lines, no loops
@@ -451,7 +459,7 @@
                             // Single polish overlay
                             this.ctx.fillStyle = 'rgba(255,255,255,0.03)';
                             this.ctx.fillRect(z.x, z.y, z.w, z.h);
-                            
+
                         } else if (z.texture === 'carpet') {
                             // Simple carpet overlay - single fill, no loops
                             this.ctx.fillStyle = 'rgba(0,0,0,0.06)';
@@ -460,9 +468,9 @@
                             this.ctx.fillRect(z.x, z.y, 4, z.h);
                             this.ctx.fillRect(z.x + z.w - 4, z.y, 4, z.h);
                         }
-                    }); 
+                    });
                 }
-                
+
                 // Painted interiors (after the zones, so e.g. the apartment's city backdrop covers its veranda zone)
                 const art = INTERIOR_ART[this.activeMap.id];
                 if (RL.at('floors') && art && art.floor) art.floor(this, this.ctx);
@@ -482,7 +490,7 @@
                         p.draw(this.ctx);
                     }
                 }
-                
+
                 // Crosswalks
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
                 if (RL.at('floors') && this._renderGridCrosswalks && !bakedGround) {
@@ -498,12 +506,12 @@
                         }
                         this.ctx.fillStyle = '#1a1a20';
                         this.ctx.fillRect(cw.x, cw.y, cw.w, cw.h);
-                        
+
                         // Zebra stripes
                         this.ctx.fillStyle = '#ddd';
                         const stripeWidth = 12;
                         const stripeGap = 18;
-                        
+
                         if (cw.orientation === 'H') {
                             for (let sy = cw.y + 8; sy < cw.y + cw.h - 8; sy += stripeGap) {
                                 this.ctx.fillRect(cw.x + 8, sy, cw.w - 16, stripeWidth);
@@ -544,11 +552,11 @@
                 if (RL.at('shadows')) this.drawCastShadows(this.ctx, cullBounds.world);
                 // The junction lights: stop bars, demand gauges, heads, walk strips (traffic/traffic-signals.js)
                 if (RL.at('signals') && this.activeMap.type === 'outdoor' && this.traffic) this.traffic.drawSignals(this.ctx, cullBounds.world, this.activeMap.crosswalks);
-                
+
                 if (RenderStats.timed) this.profiler.add('Buildings: People', RenderStats.peopleMs - this._buildingPeopleBase, true);
                 this.profiler.stop('Render:Buildings');
                 if (RenderStats.timed) WorldRenderProfiler.end(this.profiler);
-                
+
                 // Entrance Markers (Holo-Zones) - Periwinkle/Lavender Glow
                 this.profiler.start('Render:Entities');
                 if (RenderStats.timed) {
@@ -564,11 +572,11 @@
                     this.activeMap.transitions.forEach(t => {
                         if (t.quiet) return;                           // marked by the map's own art (the lobby's gilded lifts)
                         if (t.x + t.w < cbW.left || t.x > cbW.right || t.y + t.h < cbW.top || t.y > cbW.bottom) return;
-                        
+
                         const cx = t.x + t.w / 2;
                         const cy = t.y + t.h / 2;
                         const maxR = Math.max(t.w, t.h) * 0.8;
-                        
+
                         // Radial glow gradient floor mat
                         const grad = this.ctx.createRadialGradient(cx, cy, 0, cx, cy, maxR);
                         grad.addColorStop(0, `rgba(180, 170, 255, ${0.2 + pulse * 0.12})`);
@@ -576,11 +584,11 @@
                         grad.addColorStop(1, `rgba(220, 210, 255, 0)`);
                         this.ctx.fillStyle = grad;
                         this.ctx.fillRect(t.x - 20, t.y - 20, t.w + 40, t.h + 40);
-                
+
                         // Inner floor fill
                         this.ctx.fillStyle = `rgba(200, 190, 255, ${0.08 + pulse * 0.06})`;
                         this.ctx.fillRect(t.x, t.y, t.w, t.h);
-                
+
                         // Glowing border with shadowBlur
                         this.ctx.shadowColor = 'rgba(180, 170, 255, 0.8)';
                         this.ctx.shadowBlur = 12 + pulse * 6;
@@ -588,45 +596,45 @@
                         this.ctx.lineWidth = 2;
                         this.ctx.strokeRect(t.x, t.y, t.w, t.h);
                         this.ctx.shadowBlur = 0;
-                
+
                         // Corner markers - brighter periwinkle
                         this.ctx.strokeStyle = `rgba(210, 200, 255, ${0.7 + pulse * 0.3})`;
                         this.ctx.lineWidth = 2;
                         const cornerSize = 10;
-                
+
                         // Top-left
                         this.ctx.beginPath();
                         this.ctx.moveTo(t.x, t.y + cornerSize);
                         this.ctx.lineTo(t.x, t.y);
                         this.ctx.lineTo(t.x + cornerSize, t.y);
                         this.ctx.stroke();
-                
+
                         // Top-right
                         this.ctx.beginPath();
                         this.ctx.moveTo(t.x + t.w - cornerSize, t.y);
                         this.ctx.lineTo(t.x + t.w, t.y);
                         this.ctx.lineTo(t.x + t.w, t.y + cornerSize);
                         this.ctx.stroke();
-                
+
                         // Bottom-left
                         this.ctx.beginPath();
                         this.ctx.moveTo(t.x, t.y + t.h - cornerSize);
                         this.ctx.lineTo(t.x, t.y + t.h);
                         this.ctx.lineTo(t.x + cornerSize, t.y + t.h);
                         this.ctx.stroke();
-                
+
                         // Bottom-right
                         this.ctx.beginPath();
                         this.ctx.moveTo(t.x + t.w - cornerSize, t.y + t.h);
                         this.ctx.lineTo(t.x + t.w, t.y + t.h);
                         this.ctx.lineTo(t.x + t.w, t.y + t.h - cornerSize);
                         this.ctx.stroke();
-                
+
                         // "ENTRANCE" text
                         // Outdoor maps: place BELOW the rect (the area above is occluded
                         // by the building's art). Indoor maps: place ABOVE the rect (the
                         // doorway sits against a wall and the label belongs over it).
-                        if (Math.hypot(this.player.x - cx, this.player.y - cy) < 150) {
+                        if (Math.hypot(this.playerPosition[0] - cx, this.playerPosition[1] - cy) < 150) {
                             const isIndoor = this.activeMap.type === 'indoor';
                             this.ctx.fillStyle = '#ddd8ff';
                             this.ctx.font = '12px Orbitron';
@@ -642,17 +650,17 @@
                     });
                     this.ctx.restore();
                 }
-                
+
                 // The delivery's drop-off: the zone to reach, ringed in gold (engine/markers.js; the pins are drawn over the HUD)
                 if (RL.at('markers')) this.drawDropZone(this.ctx, cullBounds.world);
-            
+
                 if (RenderStats.timed) this._entLap('Entities: Effects');
                 // Painted floors can supply their own material seams instead of the fallback grid.
                 if (RL.at('floors') && !bakedGround && !this.activeMap.paintedGrid) {
-                this.ctx.strokeStyle = 'rgba(164, 105, 255, 0.1)'; 
+                this.ctx.strokeStyle = 'rgba(164, 105, 255, 0.1)';
                 this.ctx.lineWidth = 1;
-                const gridSize = 100; 
-                
+                const gridSize = 100;
+
                 // Calculate visible area
                 const halfW = (this.canvas.width / this.camera.zoom) / 2 + gridSize;
                 const halfH = (this.canvas.height / this.camera.zoom) / 2 + gridSize;
@@ -660,19 +668,19 @@
                 const gridMaxX = Math.min(this.activeMap.width, Math.ceil((camX + halfW) / gridSize) * gridSize);
                 const gridMinY = Math.max(0, Math.floor((camY - halfH) / gridSize) * gridSize);
                 const gridMaxY = Math.min(this.activeMap.height, Math.ceil((camY + halfH) / gridSize) * gridSize);
-                
-                this.ctx.beginPath(); 
-                for(let x = gridMinX; x <= gridMaxX; x += gridSize) { 
-                    this.ctx.moveTo(x, gridMinY); 
-                    this.ctx.lineTo(x, gridMaxY); 
-                } 
-                for(let y = gridMinY; y <= gridMaxY; y += gridSize) { 
-                    this.ctx.moveTo(gridMinX, y); 
-                    this.ctx.lineTo(gridMaxX, y); 
-                } 
+
+                this.ctx.beginPath();
+                for(let x = gridMinX; x <= gridMaxX; x += gridSize) {
+                    this.ctx.moveTo(x, gridMinY);
+                    this.ctx.lineTo(x, gridMaxY);
+                }
+                for(let y = gridMinY; y <= gridMaxY; y += gridSize) {
+                    this.ctx.moveTo(gridMinX, y);
+                    this.ctx.lineTo(gridMaxX, y);
+                }
                 this.ctx.stroke();
                 }
-                
+
                 // Map Walls
                 // PERFORMANCE: RenderGrid spatial query — O(visible cells) not O(N)
                 if (RL.at('walls')) {
@@ -684,18 +692,18 @@
                         if (w.style === 'gy_wall') { drawGraveyardWall(this.ctx, w); continue; }
                         if (w.style === 'gy_pillar') { pillars.push(w); continue; }
                         this.ctx.fillStyle = ws ? ws.fill : '#222';
-                        this.ctx.fillRect(w.x, w.y, w.w, w.h); 
-                        this.ctx.strokeStyle = ws ? ws.stroke : 'rgba(0, 243, 255, 0.3)'; 
+                        this.ctx.fillRect(w.x, w.y, w.w, w.h);
+                        this.ctx.strokeStyle = ws ? ws.stroke : 'rgba(0, 243, 255, 0.3)';
                         this.ctx.strokeRect(w.x, w.y, w.w, w.h);
                     }
                     for (const p of pillars) drawGraveyardPillar(this.ctx, p);
                 }
-            
+
                 // Indoor V2: Doors (drawn OVER walls so they're visible in wall gaps)
                 if (RL.at('walls') && this.roomSystem.active) {
                     this.roomSystem.drawDoors(this.ctx);
                 }
-            
+
                 if (RenderStats.timed) this._entLap('Entities: Ground');
                 // 3. DYNAMIC ENTITIES & CARS
                 // PERFORMANCE: AABB viewport culling for props
@@ -709,7 +717,7 @@
                         if (p.tall) Overhead.add(p, c => p.draw(c)); else p.draw(this.ctx);   // taller than a person: over the people (engine/overhead.js)
                     });
                 }
-                
+
                 if (RL.at('props')) Overhead.drawUnder(this.ctx, this);   // tall things that hide no one: under the people
                 if (RenderStats.timed) this._entLap('Entities: Props');
                 // Draw Traffic Cars
@@ -729,12 +737,12 @@
                         else v.draw(this.ctx);
                     });
                 }
-                
+
                 // Draw Owned Car (if parked/separate)
                 if (RL.at('cars') && this.ownedCar && this.ownedCar !== this.car && this.ownedCar.visible) {
                     this.ownedCar.draw(this.ctx);
                 }
-                
+
                 // Draw Delivery Vehicle (persistent, never despawns; drawn as the active car below when it's hers right now)
                 if (RL.at('cars') && this.deliveryVehicle && this.deliveryVehicle.visible) {
                     const cbV = cullBounds.vehicles;
@@ -744,17 +752,17 @@
                         if (dv !== this.car) dv.draw(this.ctx);
                     }
                 }
-            
+
                 // The job's package by the van: a parcel and its pickup ring (engine/markers.js)
                 if (RL.at('markers')) this.drawDeliveryPackage(this.ctx, cullBounds.world);
-            
+
                 if (RenderStats.timed) this._entLap('Entities: Vehicles');
                 if (RL.at('markers')) this.lastKnownMarkers.forEach(m => m.draw(this.ctx));
                 if (RL.at('rings')) this.drawNoiseRipples(this.ctx);
                 if (RL.at('characters')) this.drawCorpses(this.ctx, cullBounds.bodies);   // the fallen, under the living (engine/finisher.js)
                 if (RL.at('combat')) this.drawHunterDashes(this.ctx);   // crimson flits (engine/palace-art.js)
                 if (RL.at('markers')) this.drawExecuteCue(this.ctx);    // a gold reticle under an unaware back (engine/executions.js)
-                
+
                 // Lamp shadows: their own layer, under every person (ui/humanoid-render.js)
                 if (RL.at('characters')) drawLampShadowsUnder(this.ctx);
 
@@ -806,7 +814,7 @@
                         // Smooth shrink as ticks deplete
                         const lifeRatio = orb.ticksLeft / orb.maxTicks;
                         const r = Math.max(orb.maxRadius * lifeRatio, 1);
-                        
+
                         // Outer pulse glow
                         const pulse = 0.4 + 0.3 * Math.sin(_frameTime / 150);
                         this.ctx.shadowColor = '#FFD700';
@@ -815,13 +823,13 @@
                         this.ctx.beginPath();
                         this.ctx.arc(ox, oy, r + 2, 0, Math.PI * 2);
                         this.ctx.fill();
-                        
+
                         // Core orb
                         this.ctx.fillStyle = '#FFD700';
                         this.ctx.beginPath();
                         this.ctx.arc(ox, oy, r, 0, Math.PI * 2);
                         this.ctx.fill();
-                        
+
                         // White hot center
                         this.ctx.fillStyle = '#fffbe6';
                         this.ctx.beginPath();
@@ -830,41 +838,41 @@
                         this.ctx.shadowBlur = 0;
                     }
                 }
-                
+
                 if (RenderStats.timed) this._entLap('Entities: People extras');
                 // Active Car (The one player is driving)
                 if (RL.at('cars') && this.car.visible) this.car.draw(this.ctx);
-                
+
                 // Bumper Car Minigame — draw all bumper cars
                 if (RL.at('cars') && this.bumperMinigame && this.bumperMinigame.active) {
                     this.bumperMinigame.draw(this.ctx, this.camera);
                 }
-                
+
                 if (RenderStats.timed) this._entLap('Entities: Vehicles');
                 // Rooms she isn't in sit in a soft violet shadow (RoomSystem.drawVeil). On a dark map
                 // the light layer carries the veil (lighting.js); in bright light it goes on the scene.
                 if (RL.at('walls') && this.roomSystem.active && this.getAmbientDarkness() < 0.5) {
                     this.roomSystem.drawVeil(this.ctx);
                 }
-                
+
                 // Flit VFX (ghost afterimage, lightning trails — drawn behind player)
                 if (RL.at('stella') && this.flitVFX.length > 0) this.drawFlitVFX(this.ctx);
 
                 if (RenderStats.timed) this._entLap('Entities: Effects');
                 // Player
-                if (RL.at('stella') && this.player.visible) { 
-                    if (this.flitState.active) this.ctx.globalAlpha = 0.5; 
-                    this.drawPlayer(); 
-                    this.ctx.globalAlpha = 1.0; 
+                if (RL.at('stella') && this.player.visible) {
+                    if (this.player.flitting) this.ctx.globalAlpha = 0.5;
+                    this.drawPlayer();
+                    this.ctx.globalAlpha = 1.0;
                 }
-                
+
                 if (RenderStats.timed) this._entLap('Entities: People extras');
                 // Laser Sight beam (drawn after player, in world space) — from the gun's muzzle
                 // along the exact line the next shot takes (see getLaserSight / fireWeapon)
                 const laser = RL.at('combat') && (this.scopeK || 0) < 0.5 ? this.getLaserSight() : null;   // scoped, the hairline in the lane takes over
                 if (laser) {
                     const muzzleX = laser.x0, muzzleY = laser.y0, hitX = laser.x1, hitY = laser.y1;
-                    
+
                     // Red laser beam
                     this.ctx.save();
                     this.ctx.strokeStyle = 'rgba(255, 20, 0, 0.35)';
@@ -875,7 +883,7 @@
                     this.ctx.lineTo(hitX, hitY);
                     this.ctx.stroke();
                     this.ctx.setLineDash([]);
-                    
+
                     // Bright dot at hit point
                     const dotPulse = 0.6 + 0.35 * Math.sin(_frameTime / 200);
                     this.ctx.fillStyle = `rgba(255, 0, 0, ${dotPulse})`;
@@ -887,7 +895,7 @@
                     this.ctx.shadowBlur = 0;
                     this.ctx.restore();
                 }
-                
+
                 if (RL.at('combat')) {
                     this.effects.draw('muzzle', this.ctx);                   // the flash's star at each muzzle
                     this.effects.draw('barrel', this.ctx, cullBounds.world);  // barrel smoke, embers, golden wisps (directory/effects-system.js)
@@ -904,18 +912,18 @@
                     for (let i = 1; i < this.car.seatLayout.length; i++) {
                         const occ = this.car.seatOccupants[i];
                         if (!occ || occ === true || !occ.inCar) continue;
-                        
+
                         const seat = this.car.seatLayout[i];
                         const seatPos = this.car.getSeatWorldPos(i);
-                        
+
                         // Draw at seat position (no lean offset)
                         const drawX = seatPos.x;
                         const drawY = seatPos.y;
-                        
+
                         // Their look is the same as on foot (core/appearances.js), minus any dance
                         const isShooting = occ.cooldown !== undefined && occ.cooldown > 0;
                         const { pose, idleAngle, ...look } = lookFor(occ) || {};
-                        
+
                         // Set up canvas context — translate to seat position, rotate
                         // In combat: face target. Otherwise: face car forward.
                         const occAngle = (occ.combatTargetTimer > 0 && occ.combatTargetAngle !== undefined)
@@ -926,7 +934,7 @@
                         this.car.clipOccupant(this.ctx,i,vehiclePose.lean>.05);
                         this.ctx.translate(drawX, drawY);
                         this.ctx.rotate(this.car.angle);
-                        
+
                         drawProceduralHumanoid(this.ctx, occ, {
                             ...look,
                             gender: look.gender || occ.gender || 'female',
@@ -938,17 +946,17 @@
                             stance: isShooting ? 'pistol' : 'idle',
                             held: null
                         });
-                        
+
                         this.ctx.restore();
                     }
                 }
-                
+
                 // Car Door Frame Overlay (creates "leaning out" illusion)
                 // Drawn AFTER player/occupants to make them appear INSIDE the car
                 if (RL.at('cars') && this.isDriving && this.car.visible && this.car.drawOccupantOverlay) {
                     this.car.drawOccupantOverlay(this.ctx);
                 }
-                
+
                 // DEBUG: Draw red center dots for in-car occupants ON TOP of the car overlay
                 if (RL.at('debug') && this.dbg('traffic') && this.isDriving && this.car && this.car.seatLayout) {
                     for (let i = 1; i < this.car.seatLayout.length; i++) {
@@ -970,7 +978,7 @@
                         this.ctx.fill();
                     }
                 }
-                
+
                 if (RenderStats.timed) this._entLap('Entities: Vehicles');
                 // Tall things (aisles, hanging signs, tall props) over the people, farthest first (engine/overhead.js)
                 if (RL.at('props')) Overhead.flush(this.ctx, this);
@@ -979,7 +987,7 @@
                 if (RL.at('roofs') && this.activeMap.ferrisWheel && ferrisPaintInView(this.activeMap.ferrisWheel, this.ctx, cullBounds.view, viewZoom, false)) {
                     this.activeMap.ferrisWheel.drawBase(this.ctx);
                 }
-                
+
                 // Buildings - TOP LAYER (roofs, upper floors) - drawn OVER player for occlusion
                 // PERFORMANCE: AABB viewport culling
                 const roofs = RL.at('roofs');
@@ -994,7 +1002,7 @@
                         }
                     }
                 }
-                
+
                 // Billboards — tilted panels standing up from the ground, drawn over the player like roofs
                 if (roofs && this.activeMap.billboards) {
                     for (const bb of this.activeMap.billboards) if (bb.inView(cullBounds.buildingTops)) bb.drawTop(this.ctx);
@@ -1006,7 +1014,7 @@
                         b.draw(this.ctx, performance.now());
                     });
                 }
-                
+
                 // Buildings - SIGN LAYER (neon signs above entrance) - drawn OVER building tops
                 // PERFORMANCE: AABB viewport culling
                 if (roofs && this.activeMap.buildings) {
@@ -1019,7 +1027,7 @@
                         }
                     }
                 }
-                
+
                 // Foliage (trees and bushes) - drawn AFTER player so canopy appears overhead
                 // PERFORMANCE: AABB viewport culling + cached frameTime
                 const trees = RL.at('trees');
@@ -1045,19 +1053,19 @@
                         }
                     }
                 }
-                
+
                 // Indoor V2: Silk linens (atmospheric cloth with pooled light)
                 if (RL.at('walls') && this.roomSystem.active && this.roomSystem.linens.length > 0) {
                     const wind = this.weather ? this.weather.wind : 0.3;
                     const windDir = this.weather ? this.weather.windDirection : 1;
                     this.roomSystem.drawLinens(this.ctx, wind, windDir, _gameTimeSec);
                 }
-                
+
                 // Top Layer Props (Lamps/Weather)
-                
+
                 // 1. Calculate daylight intensity (pre-calculated above)
                 // Lamps turn OFF when daylight value is > 0.2
-            
+
                 // 2. Draw lamps passing the calculated daylight factor
                 // PERFORMANCE: AABB viewport culling
                 const cbLamps = cullBounds.lamps;
@@ -1079,7 +1087,7 @@
                         l._bulbDay = lampDay; l._bulbPaintFrame = this._renderDrawId;
                     }
                 }
-            
+
                 FoliageLampDepth.flush(this.ctx);
 
                 // Floating leaf particles - drawn after foliage, before weather
@@ -1096,7 +1104,7 @@
                 if (RenderStats.timed) WorldRenderProfiler.end(this.profiler);
                 // 3. Draw projectiles and weather effects
                 if (RL.at('combat')) this.projectiles.forEach(p => { if (!p.isFireball) p.draw(this.ctx); });
-                
+
                 // Debug: nav grid, companion paths and eyeline spots
                 // (with the debug overlay, or on its own via `game.navDebug = true`)
                 RL.at('debug');
@@ -1113,7 +1121,7 @@
                         this.ctx.fill();
                     }
                     // Show registry projectiles as red dots (orphans would be red WITHOUT green)
-                    const regProjs = GameEntity.registry.collidable.filter(e => 
+                    const regProjs = GameEntity.registry.collidable.filter(e =>
                         e.collisionLayer === GameEntity.LAYER.PROJECTILE
                     );
                     for (const rp of regProjs) {
@@ -1123,7 +1131,7 @@
                         this.ctx.fill();
                     }
                     this.ctx.restore();
-                    
+
                     // Debug: Seat positions on player's car and nearby vehicles
                     if (this.isDriving && this.car && this.car.seatLayout) {
                         this.ctx.save();
@@ -1132,14 +1140,14 @@
                             const seat = car.seatLayout[i];
                             const pos = car.getSeatWorldPos(i);
                             const occupied = car.seatOccupants[i] != null;
-                            
+
                             // Seat dot
-                            this.ctx.fillStyle = seat.isDriver ? 'rgba(255,215,0,0.8)' : 
+                            this.ctx.fillStyle = seat.isDriver ? 'rgba(255,215,0,0.8)' :
                                 occupied ? 'rgba(0,255,136,0.8)' : 'rgba(255,255,255,0.3)';
                             this.ctx.beginPath();
                             this.ctx.arc(pos.x, pos.y, 4, 0, Math.PI * 2);
                             this.ctx.fill();
-                            
+
                             // Firing arc (180° hemisphere) — only for non-driver seats
                             if (!seat.isDriver) {
                                 const arcCenter = car.angle + seat.fireAngle;
@@ -1148,7 +1156,7 @@
                                 this.ctx.beginPath();
                                 this.ctx.arc(pos.x, pos.y, 30, arcCenter - Math.PI / 2, arcCenter + Math.PI / 2);
                                 this.ctx.stroke();
-                                
+
                                 // Arc direction line
                                 this.ctx.strokeStyle = occupied ? 'rgba(0,255,136,0.5)' : 'rgba(255,255,255,0.15)';
                                 this.ctx.beginPath();
@@ -1156,7 +1164,7 @@
                                 this.ctx.lineTo(pos.x + Math.cos(arcCenter) * 25, pos.y + Math.sin(arcCenter) * 25);
                                 this.ctx.stroke();
                             }
-                            
+
                             // Seat label
                             this.ctx.fillStyle = '#fff';
                             this.ctx.font = '8px monospace';
@@ -1166,21 +1174,21 @@
                         this.ctx.restore();
                     }
                 }
-                
+
                 if (RenderStats.timed) this._entLap('Entities: Effects');
                 if (RL.at('particles')) this.weather.draw(this.ctx, cullBounds.view, viewZoom);
                 if (RL.at('combat')) this.effects.draw('breach', this.ctx, cullBounds.view, 'under');   // scorch, debris, smoke (directory/effects-system.js)
                 if (RenderStats.timed) this._entLap('Entities: Weather');
-                
+
                 // Graveyard humanoid ghosts
                 if (RL.at('characters') && this.graveyardGhosts.length > 0) this.drawGraveyardGhosts(this.ctx);
-                
+
                 if (RenderStats.timed) {
                     this._entLap('Entities: Effects');
                     PeopleProfiler.endEntities(this.profiler, RenderStats.peopleMs - this._entityPeopleBase); // bodies drawn in this pass only
                 }
                 this.profiler.stop('Render:Entities');
-                
+
                 // 4. LIGHTING SYSTEM & DEBUG
                 this.profiler.start('Render:Lighting');
                 if (RL.at('lighting')) {
@@ -1240,21 +1248,21 @@
                     this.drawStatusMarks(this.ctx, cullBounds.entities);
                     this.drawHunterEyes(this.ctx);
                 }
-                
+
                 // Debug view (ui/dev-overlay.js): lamp rays, then rooms, vision, hearing, colliders, labels
                 if (RL.at('debug') && this.debugMode) {
                     if (this.dbg('lights')) this.drawDebugLighting(this.ctx);
                     this.drawDebugLayers(this.ctx);
                 }
-            
+
                 RL.at('frame');
                 this.ctx.restore();
-                
+
                 this.profiler.stop('Render:Lighting');
-                
+
                 // 5. SCREEN SPACE UI (Overlays)
                 this.profiler.start('Render:PostFX');
-                
+
                 // Sound rings as a mirage over the lit scene (engine/noise.js)
                 if (RL.at('rings')) this.drawMirageRings(this.ctx);
 
@@ -1262,7 +1270,7 @@
                 const ambient = this.getAmbientDarkness();
                 if (RL.at('bloom') && ambient > 0.2) this.drawBloomPass(this.ctx);
                 if (RL.at('atmosphere')) this.drawAtmospherePass(this.ctx);
-                
+
                 // Rain on screen: outdoors, or fading in as she steps out onto a veranda
                 const rainK = this.activeMap.type === 'outdoor' ? 1 : (this.roomSystem.active ? this.roomSystem.outdoorness : 0);
                 if (RL.at('rain') && rainK > 0.01 && this.weather.isRaining) {
@@ -1276,7 +1284,7 @@
                     this.weather.drawRainOverlay(this.ctx, this.view, rainLamps);   // the view, so Cinematic View's pan carries the rain too
                     this.ctx.restore();
                 }
-                
+
                 // Dynamic Bokeh (Screen-space dreampunk depth-of-field)
                 if (this.bokeh) {
                     this.bokeh.update(this.deltaTime || 16);
@@ -1286,27 +1294,27 @@
                 // A small player cue stays legible above the light, refraction and weather.
                 const hud = RL.at('hud');
                 if (hud) this.drawPlayerMarker(this.ctx);
-                
+
                 // Pins over her cars, the package and the job's target; the compass round her for what's off screen (engine/markers.js)
                 if (hud) this.drawMarkers(this.ctx);
-                
+
                 // The objective readout (top centre, #ui-objective: engine/markers.js)
                 this._objectiveHud();
-                
+
                 // The ride tag (bottom left, #ui-ride): what she's driving, and where her own car is
                 this._rideHud();
-                
+
                 // 6. CSS FILTERS (Night Vision / Grayscale / Color Grade)
                 const targetNV = this.nightVision ? 1.0 : 0.0;
                 this.nvIntensity += (targetNV - this.nvIntensity) * 0.08;
-                
+
                 // Color grade multipliers (from custom grade panel)
                 const _gg = (typeof _gameGrade !== 'undefined') ? _gameGrade : null;
                 const ggBright = _gg ? _gg.brightness / 100 : 1;
                 const ggContrast = _gg ? _gg.contrast / 100 : 1;
                 const ggSaturate = _gg ? _gg.saturate / 100 : 1;
                 const ggExposure = _gg ? (1 + _gg.exposure / 200) : 1;
-            
+
                 let filterChain;
                 if (this.nvIntensity > 0.98) {
                     filterChain = `grayscale(100%) brightness(${(1.4 * ggBright * ggExposure).toFixed(2)}) contrast(${(1.2 * ggContrast).toFixed(2)})`;
@@ -1325,8 +1333,8 @@
                     }
                     // The grade follows the hour: the night's rich contrast, the day's softer, clearer light
                     const dayG = this.sunState().k * this._sunReach();
-                    const sat = (1.4 - 0.1 * dayG) * (1.0 - this.nvIntensity) * ggSaturate; 
-                    const con = (1.35 - 0.08 * dayG + (0.15 * this.nvIntensity)) * ggContrast; 
+                    const sat = (1.4 - 0.1 * dayG) * (1.0 - this.nvIntensity) * ggSaturate;
+                    const con = (1.35 - 0.08 * dayG + (0.15 * this.nvIntensity)) * ggContrast;
                     const sepia = (0.18 - 0.12 * dayG) * (1.0 - this.nvIntensity);
                     const bright = (1.1 + 0.2 * dayG + (1.4 * this.nvIntensity)) * ggBright * ggExposure;
                     // Cinematic View's "Full colour" chip lifts the stealth grey for the photo (night vision stays)
@@ -1338,35 +1346,35 @@
                         filterChain += ` hue-rotate(8deg)`;
                     }
                 }
-                
+
                 // A flashback (story/scene-runner.js s.memory): cooler, softer, a little faded
                 const memK = this.scenes && this.scenes.ui ? (this.scenes.ui.memK || 0) : 0;
                 if (memK > 0.001) filterChain += ` saturate(${(1 - 0.5 * memK).toFixed(3)}) sepia(${(0.14 * memK).toFixed(3)}) hue-rotate(${(-22 * memK).toFixed(1)}deg) contrast(${(1 - 0.08 * memK).toFixed(3)})`;
                 if (this.canvas.style.filter !== filterChain) {
                     this.canvas.style.filter = filterChain;
                 }
-                
+
                 // ── ECHO PULSE TACTICAL RADAR ──
                 if (hud && this.augments && this.augments.isEquipped('radar_ext') && !this.paused) {
                     this.ctx.save();
                     this.ctx.setTransform(1, 0, 0, 1, 0, 0);
-                    
+
                     const RADAR_RADIUS = 60;
                     const RADAR_RANGE = 600;  // world-px detection radius
                     // Landscape: top-left under the bars, clear of the fire cluster
                     const cx = this.isLandscape ? RADAR_RADIUS + 16 : this.canvas.width - RADAR_RADIUS - 16;
                     const cy = this.isLandscape ? RADAR_RADIUS + 150 : this.canvas.height - RADAR_RADIUS - 60;
-                    const playerX = this.isDriving && this.car ? this.car.x : this.player.x;
-                    const playerY = this.isDriving && this.car ? this.car.y : this.player.y;
+                    const playerX = this.isDriving && this.car ? this.car.x : this.playerPosition[0];
+                    const playerY = this.isDriving && this.car ? this.car.y : this.playerPosition[1];
                     const scale = RADAR_RADIUS / RADAR_RANGE;
-                    
+
                     // Background disc
                     this.ctx.globalAlpha = 0.35;
                     this.ctx.fillStyle = '#0a0a18';
                     this.ctx.beginPath();
                     this.ctx.arc(cx, cy, RADAR_RADIUS, 0, Math.PI * 2);
                     this.ctx.fill();
-                    
+
                     // Concentric rings
                     this.ctx.globalAlpha = 0.2;
                     this.ctx.strokeStyle = '#00f3ff';
@@ -1376,7 +1384,7 @@
                         this.ctx.arc(cx, cy, RADAR_RADIUS * r / 3, 0, Math.PI * 2);
                         this.ctx.stroke();
                     }
-                    
+
                     // Sweep line
                     this.ctx.globalAlpha = 0.25;
                     this.ctx.strokeStyle = '#00f3ff';
@@ -1386,7 +1394,7 @@
                     this.ctx.moveTo(cx, cy);
                     this.ctx.lineTo(cx + Math.cos(sweepAngle) * RADAR_RADIUS, cy + Math.sin(sweepAngle) * RADAR_RADIUS);
                     this.ctx.stroke();
-                    
+
                     // Sweep trail (fading arc behind sweep line)
                     this.ctx.globalAlpha = 1.0;
                     if (this.ctx.createConicGradient) {
@@ -1405,7 +1413,7 @@
                             this.ctx.beginPath(); this.ctx.moveTo(cx, cy); this.ctx.arc(cx, cy, RADAR_RADIUS, a0, a0 + 0.13); this.ctx.closePath(); this.ctx.fill();
                         }
                     }
-                    
+
                     // Enemy blips (crimson)
                     this.ctx.globalAlpha = 0.9;
                     for (const e of this.enemies) {
@@ -1420,7 +1428,7 @@
                         this.ctx.arc(cx + dx, cy + dy, 2.5, 0, Math.PI * 2);
                         this.ctx.fill();
                     }
-                    
+
                     // Friendly NPC blips (teal) — teammates
                     for (const n of this.npcs) {
                         if (!n.active || n.dead || n.alliance === 'hostile') continue;
@@ -1436,7 +1444,7 @@
                         this.ctx.fill();
                     }
                     this.ctx.shadowBlur = 0;
-                    
+
                     // Player dot (gold center)
                     this.ctx.globalAlpha = 1.0;
                     this.ctx.fillStyle = '#ffd700';
@@ -1446,7 +1454,7 @@
                     this.ctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
                     this.ctx.fill();
                     this.ctx.shadowBlur = 0;
-                    
+
                     // Border ring
                     this.ctx.globalAlpha = 0.5;
                     this.ctx.strokeStyle = '#00f3ff';
@@ -1454,19 +1462,19 @@
                     this.ctx.beginPath();
                     this.ctx.arc(cx, cy, RADAR_RADIUS, 0, Math.PI * 2);
                     this.ctx.stroke();
-                    
+
                     // Label
                     this.ctx.globalAlpha = 0.4;
                     this.ctx.fillStyle = '#00f3ff';
                     this.ctx.font = 'bold 7px Courier New';
                     this.ctx.textAlign = 'center';
                     this.ctx.fillText('ECHO PULSE', cx, cy - RADAR_RADIUS - 4);
-                    
+
                     this.ctx.restore();
                 }
-            
+
                 this.profiler.stop('Render:PostFX');
-                
+
                 // --- PROFILER END ---
                 this.profiler.stop('Render:Total');
                 if (PerfBench.active) PerfBench.sample(this.profiler.frameDeltas());
@@ -1476,7 +1484,7 @@
                 RL.at('frame');
                 PerfBench.draw(this.ctx, 20, this.canvas.height - 110);
                 RL.endFrame();                            // Baseline's layer panel: the frame's calls billed
-                this.profiler.tick(); 
+                this.profiler.tick();
                 DevOverlay.frame(this);                   // the profiler pill and debug counts (DOM)
             },
 
@@ -1508,7 +1516,7 @@
                 const away = !own && !zib && this.ownedCar && this.ownedCar.visible;
                 if (!!away !== R.away) { el.classList.toggle('away', !!away); R.away = !!away; }
                 if (away) {
-                    const dx = this.ownedCar.x - this.player.x, dy = this.ownedCar.y - this.player.y;
+                    const dx = this.ownedCar.x - this.playerPosition[0], dy = this.ownedCar.y - this.playerPosition[1];
                     const dist = 'Your car · ' + Math.round(Math.hypot(dx, dy) / 10) * 10 + 'm';
                     if (dist !== R.dist) { P.dist.textContent = dist; R.dist = dist; }
                     const rot = Math.round(Math.atan2(dy, dx) * 180 / Math.PI / 10) * 10;   // 10° steps

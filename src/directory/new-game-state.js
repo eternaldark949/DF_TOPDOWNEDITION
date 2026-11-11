@@ -10,6 +10,8 @@
              * Resets: inventory, quest progress, health, currency, driving, entities.
              */
             resetGameState() {
+                if(this.activeLevel)this._leaveApartment();
+                this._pendingApartmentState=this._pendingApartmentRoster=null;
                 game_timers.cancel();   // nothing pending from the last game (basement/timer-kit.js; standing timers stay)
                 this._cancelQuickDrawHold?.(); this.cancelQuickDraw();
                 this._pendingGauntletLoad = null;
@@ -47,16 +49,13 @@
                 // --- PLAYER STATE ---
                 this.currency = 100;
                 this.scrap = 0;
-                this.playerHealth = 100;
-                this.maxPlayerHealth = 100;
+                this.player.buffSystem.active={};
+                this.player.vitals.reset();
                 this.boosterCount = 4;
                 this.maxBoosters = 4;
-                this.healthRegenTimer = 0;
-                this.weaponMode = 'none';
                 this.setWeaponHolstered(false); this.holsterAnim = 1;
                 this._drawnAt = undefined; this._drawShotUsed = false;
                 this.shootCooldown = 0;
-                this.currentWeapon = null;
                 this.nightVision = false;
                 this.nvIntensity = 0;
                 
@@ -77,13 +76,9 @@
                 };
                 
                 // --- INVENTORY (rebuild from defaults) ---
-                if (this.inventory) {
-                    this.inventory.items = [];
-                    this.inventory.equippedWeaponId = null;
-                    this.inventory.equippedAttachmentId = null;
-                    this.inventory.loadDefaultLoadout();
-                }
-                
+                this.items.reset(DEFAULT_LOADOUT);
+                if(this.inventory)this.inventory.entryOrder=[];
+
                 // --- AUGMENTS ---
                 if (this.augments) {
                     this.augments.owned = [];
@@ -93,8 +88,6 @@
                 // --- RESONANCE & DARK ELEMENT ---
                 if (this.resonance) { this.resonance.reset(); this.applyResonanceStats(); }
                 this.darkElement = 0;
-                if (this.flitState) this.flitState.lastFlitAt = -99;
-                this.lastHurtAt = -99;
 
                 // --- COSMETICS ---
                 if (this.cosmetics) {
@@ -115,7 +108,6 @@
                 // --- NOTES, THE TRANSCRIPT, BUFFS ---
                 this.foundNotes = [];
                 if (typeof DialogueTranscript !== 'undefined') this.transcript = new DialogueTranscript();   // the last run's lines aren't this run's
-                if (this.player && this.player.buffSystem) this.player.buffSystem.active = {};          // nor its drinks (maxHP is reset above)
                 
                 // --- BONDING ---
                 if (this.bonding) {
@@ -163,11 +155,6 @@
                 }
                 
                 // --- FLIT / TIME SLOW ---
-                this.flitState = { 
-                    active: false, duration: 0, maxDuration: 15,
-                    attunement: 120, maxAttunement: 120, 
-                    dashCost: 40, rechargeRate: 2
-                };
                 this.flitVFX = []; this._resetFlitFeedback();
                 this.graveyardGhosts = [];
                 this.timeSlowState = { active: false, scale: 1.0, targetScale: 1.0, duration: 0, transitionSpeed: 0.05 };
@@ -210,7 +197,7 @@
                 if (this.player) {
                     this.player.x = 0;
                     this.player.y = 0;
-                    this.player.hp = this.maxPlayerHealth;
+                    this.player.vitals.restoreHealth();
                     this.player.visible = true;
                     this.player.isHidden = false;
                 }

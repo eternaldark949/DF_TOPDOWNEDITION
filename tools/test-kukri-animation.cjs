@@ -6,8 +6,8 @@ const {runtime}=require('./test-game-runtime.cjs');
 const tests=[];
 const value=(e,s)=>structuredClone(e.run(`(()=>{${s}})()`));
 function test(name,fn){const e=runtime(join(__dirname,'..','DFAB V8.html'),{affine:true});fn(e);assert.deepEqual(e.errors,[]);tests.push(name);}
-const setup=`game._doLoadMap('apt_949');game.currentWeapon=createItemFromRegistry('maiden_kukri',game);
- game.weaponMode='melee';game.weaponHolstered=false;game.holsterAnim=game.holsterAnimTarget=1;
+const setup=`game._doLoadMap('ollo_test');game.items.equipItem((game.items.findItem('maiden_kukri')??game.items.grantItem('maiden_kukri')).instance_id);
+ game.items.setFireMode('melee');game.weaponHolstered=false;game.holsterAnim=game.holsterAnimTarget=1;
  game.player._game=game;game.player.x=game.player.y=0;game.player.angle=0;GameSettings.playerGlow=false;
  game.player.walkCycle=0;game.player.speed=0;game.sneaking=false;_gameTimeSec=10;
  const config={gender:'female',stance:'idle',pose:'none',noShadow:true};`;

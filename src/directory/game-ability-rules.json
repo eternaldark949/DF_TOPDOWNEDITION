@@ -1,0 +1,8 @@
+{
+  "authoring_hz": 60,
+  "local_position": [20, 0],
+  "projectile_radius": 5,
+  "radius_overrides": {"fireball": 8},
+  "impact_strength": 20,
+  "damage_type": "energy"
+}

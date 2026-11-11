@@ -122,13 +122,13 @@
                 if (isGunner && (e.persona || !others.some(o => o instanceof GatlingGunner))) return 'boss';
                 // a stylish execution: hers, the last alerted foe near her
                 if (e.lastHitBy !== this.player) return null;
-                const near = others.some(o => Math.hypot(o.x - this.player.x, o.y - this.player.y) < 900
+                const near = others.some(o => Math.hypot(o.x - this.playerPosition[0], o.y - this.playerPosition[1]) < 900
                     && (o.state === 'ALERT' || o.state === 'SUPPRESSING' || o.state === 'SEARCHING'));
                 if (near) return null;
-                if (_gameTimeSec - (this.flitState.lastFlitAt ?? -99) <= 1) return 'flit';
+                if (_gameTimeSec - (this.player.vitals.last_flit_at ?? -99) <= 1) return 'flit';
                 if (e.lastHitMelee) return 'punch';
                 if ((e._hits || 0) <= 1 && this.currentWeapon && /sniper/.test(this.currentWeapon.id)) return 'one shot';
-                if (this.playerHealth >= (this.maxPlayerHealth || 100) && _gameTimeSec - (this.lastHurtAt ?? -99) > 30 && e._engaged) return 'untouched';
+                if (this.player.hp >= (this.player.maxHp || 100) && _gameTimeSec - (this.player.vitals.last_hurt_at ?? -99) > 30 && e._engaged) return 'untouched';
                 return null;
             },
 
@@ -160,13 +160,13 @@
                 if (this.paused) return;
                 F.ms += elapsedMs;
                 // cut short: she fires again, flits, or something takes the stage
-                if ((this.shotsFired || 0) > this._finShot || _gameTimeSec - (this.flitState.lastFlitAt ?? -99) < 0.05 && F.ms > 200
+                if ((this.shotsFired || 0) > this._finShot || _gameTimeSec - (this.player.vitals.last_flit_at ?? -99) < 0.05 && F.ms > 200
                     || (this.scenes && this.scenes.running) || this.isDriving) { this.endFinisher(true); return; }
                 const onStella = F.ms > F.tBody;
                 if (onStella && !F.burst) { F.burst = true; this.finisherBurst(F); }
                 F.twirl = onStella ? Math.min(1, (F.ms - F.tBody) / (F.tStella * 0.85)) : 0;
                 if (!F.subtle) {
-                    const tx = onStella ? 0 : F.x - this.player.x, ty = onStella ? 0 : F.y - this.player.y;
+                    const tx = onStella ? 0 : F.x - this.playerPosition[0], ty = onStella ? 0 : F.y - this.playerPosition[1];
                     const tz = onStella ? FINISHER.ZOOM_STELLA : FINISHER.ZOOM_BODY;
                     const k = 1 - Math.exp(-elapsedMs / (onStella ? 220 : 150));
                     const c = this.finCam;
@@ -180,7 +180,7 @@
                 this.finisher = null;
                 if (cut) this.endTimeSlow(FINISHER.CUT_OUT);
                 else if (typeof pauseMenuController !== 'undefined' && pauseMenuController.capturePrompt)
-                    pauseMenuController.capturePrompt({ x: (F.x + this.player.x) / 2, y: (F.y + this.player.y) / 2, zoom: 1.5 });
+                    pauseMenuController.capturePrompt({ x: (F.x + this.playerPosition[0]) / 2, y: (F.y + this.playerPosition[1]) / 2, zoom: 1.5 });
             },
 
             /** The kill's glitter rises from the body and settles as lamp-catching flecks */

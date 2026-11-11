@@ -13,7 +13,9 @@
       "traffic_flow": "How the street fills and empties (CONFIG.TRAFFIC_FLOW, traffic/traffic-manager.js): spawning out of sight, despawning at dead ends, far away or stuck out of view, fading in and out, the cap trim, and the sparks, debris and crunch of car-to-car hits. See _about.fields.traffic_flow.",
       "traffic_signals": "Junction lights, gauged by demand (SIGNAL, traffic/traffic-signals.js): how long greens, ambers, all-reds, turn arrows and walk phases run, how far out cars are seen, and when turn paths count as crossing. See _about.fields.traffic_signals.",
       "traffic_runner": "Lane runners (CONFIG.TRAFFIC_RUNNER, traffic/lane-runner.js): ordinary traffic runs along its lane or turn instead of driving its tyres, and hands itself to the full driver whenever something touches it or is in its way. See _about.fields.traffic_runner.",
-      "drive": "The driving feel every car shares (CONFIG.VEHICLE_DRIVE): steering curve, grip, the weight of the wheel, pedals and body, the handbrake, the camera, and the rigid body. A car's own numbers are in brands. See _about.fields.drive."
+      "drive": "The driving feel every car shares (CONFIG.VEHICLE_DRIVE): steering curve, grip, the weight of the wheel, pedals and body, the handbrake, the camera, and the rigid body. A car's own numbers are in brands. See _about.fields.drive.",
+      "mission_vehicles": "Mission vehicle presets and authored local spawn offsets. amber_delivery defines the cafe delivery van.",
+      "seating": "Normalized cabin seat layout and exit clearance, resolved once per model by Directory. Explicit model seat_layout data can override it."
     },
     "fields": {
       "drive_feel": {
@@ -465,7 +467,9 @@
     "fareBase": 25,
     "farePerUnit": 0.025,
     "maxActive": 3,
-    "spawnChance": 0.008
+    "spawnChance": 0.008,
+    "pickupRange": 500,
+    "pickupEndClearance": 50
   },
   "zib_destinations": [
     {
@@ -694,5 +698,35 @@
     "PARKED_HOLD": 0.6,
     "PARKED_HOLD_SPIN": 0.01,
     "COAST_DRAG": 0.3
+  },
+  "mission_vehicles": {
+    "amber_delivery": {
+      "brand": "LADY",
+      "model": "suv2",
+      "paintColor": "#58391C",
+      "underglowColor": "#a469ff",
+      "headlightColor": "#a469ff",
+      "spawn": {
+        "local_position": [
+          -80,
+          20
+        ],
+        "local_rotation": 1.5707963267948966
+      }
+    }
+  },
+  "seating": {
+    "front_fraction": 0.175,
+    "rear_fraction": -0.2,
+    "side_fraction": 0.36,
+    "exit_clearance": 24,
+    "attacks": {
+      "driver_enabled": true,
+      "passenger_enabled": true,
+      "window_clearance": 12,
+      "outward_rotation": 1.5707963267948966,
+      "half_angle": 1.4835298641951802,
+      "inherit_velocity": true
+    }
   }
 }

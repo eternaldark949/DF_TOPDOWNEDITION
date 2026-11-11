@@ -22,6 +22,7 @@
         class BuildingV2 {
             constructor(config) {
                 this.isV2 = true;
+                this.worldAttachments = config.worldAttachments !== false;
                 
                 // Position & Identity
                 this.x = config.x || 0;
@@ -101,7 +102,7 @@
                 }
                 
                 // Generate perimeter and accent lights
-                this._generateLights();
+                if(this.worldAttachments)this._generateLights();
                 
                 // Cache window states for performance
                 this._windowStates = null;
@@ -292,6 +293,7 @@
             }
             
             regenerateLights() {
+                if(!this.worldAttachments)return;
                 this.attachedLights = [];
                 this._generateLights();
                 // Recreate door light if applicable (Silver Queen has its own entrance rig)

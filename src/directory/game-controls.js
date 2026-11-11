@@ -78,7 +78,7 @@
             ['move_up', CHOOSING, dfSide(0, -1)], ['move_down', CHOOSING, dfSide(0, 1)], ['move_left', CHOOSING, dfSide(-1, 0)], ['move_right', CHOOSING, dfSide(1, 0)],
             ['fire', PLAY, (g, ev) => { ev.preventDefault(); if (!g.isDriving && g.shootCooldown <= 0 && g.player.visible) g.fireWeapon(); }],   // driving, Space is the handbrake
             ['interact', LIVE, g => g.interact()],
-            ['doors', LIVE, g => (dfShown(g.transitionBtn) || !g.isDriving && g.activeMap.transitions && g._transitionGrid.query(g.player.x, g.player.y)) && g.triggerTransition()],
+            ['doors', LIVE, g => g.activeLevel ? g.triggerTransition() : (dfShown(g.transitionBtn) || !g.isDriving && g.activeMap.transitions && g._transitionGrid.query(g.playerPosition[0], g.playerPosition[1])) && g.triggerTransition()],
             ['flit', (g, ev) => PLAY(g, ev) && !g.isDriving, (g, ev) => ev.device === 'gamepad' ? g.triggerFlit(undefined, 'pad') && controls.gamepad.rumble(90, 0.5) : g.triggerFlit()],
             ['holster', (g, ev) => PLAY(g, ev) && !g.isDriving, g => g._quickDraw ? (g.cancelQuickDraw(), g.setWeaponHolstered(false)) : g.setWeaponHolstered(!g.weaponHolstered)],
             ['quick_draw', (g, ev) => PLAY(g, ev) && !g.isDriving, g => g.armQuickDraw()],
@@ -109,7 +109,7 @@
             ['btn-nv', 'touchNightVision'], ['btn-pause', 'touchPause'], ['btn-grab', 'touchGrab'], ['btn-rot-l', 'touchTurnLeft'], ['btn-rot-r', 'touchTurnRight'], ['btn-holster', 'touchHolster'],
         ];
 
-        const controls = new controlsSystem({ keymap: dfKeyMap, actions: dfActions, context: () => typeof game !== 'undefined' ? game : null });
+        const controls = new controlsSystem({ auto_update: true, query_actions: false, keymap: dfKeyMap, actions: dfActions, context: () => typeof game !== 'undefined' ? game : null });
 
         /** The game's recorder (basement/recorder-kit.js): the sticks and the mouse aim ride along with the held inputs;
          *  her, her car and her crew are the recorded things. game_recorder.startRecording() … stopRecording() → a recording. */
@@ -122,9 +122,9 @@
                     ([a, dx, dy, firing, armed, aimed]) => Object.assign(game.fireJoystick, { active: !!a, id: a ? 'replay' : null, dx, dy, firing: !!firing, armed: !!armed, aimed: !!aimed })],
                 mouse: [() => [game.mouseX, game.mouseY, +game.mouseDown], ([x, y, down]) => Object.assign(game, { mouseX: x, mouseY: y, mouseDown: !!down })],
             },
-            objects: () => [['player', game.player.x, game.player.y, game.player.angle], ...(game.isDriving && game.car ? [['car', game.car.x, game.car.y, game.car.angle]] : []),
+            objects: () => [['player', game.playerPosition[0], game.playerPosition[1], game.playerRotation], ...(game.isDriving && game.car ? [['car', game.car.x, game.car.y, game.car.angle]] : []),
                 ...(game.teammates || []).map((t, i) => ['crew' + i, t.x, t.y, t.angle])],
-            centre: () => [game.player.x, game.player.y],
+            centre: () => [game.playerPosition[0], game.playerPosition[1]],
             // Where a run starts: the clocks, the id counters (a car's id staggers its thinking), the time of day, the camera,
             // her own plain state (where she is, her pace, sneaking), the sky and its forecast; setting it also empties the street, so the crowd and
             // the traffic come from the recording's dice

@@ -1,0 +1,10 @@
+{
+  "firearm_range": 400,
+  "melee_range": 65,
+  "unarmed_range": 65,
+  "mounted": {
+    "aim_seconds": 0.1,
+    "hold_seconds": 0.2,
+    "firearm_range": 500
+  }
+}

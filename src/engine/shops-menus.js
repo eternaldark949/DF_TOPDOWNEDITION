@@ -463,8 +463,7 @@
                     this.worldMinutes += diff;
                     
                     // 3. Heal Player & Refill Boosters
-                    this.playerHealth = this.maxPlayerHealth;
-                    this.player.syncHealth(this.playerHealth);
+                    this.player.vitals.restoreHealth();
                     this.boosterCount = this.getEffectiveMaxBoosters();
                     
                     // 4. Save Game

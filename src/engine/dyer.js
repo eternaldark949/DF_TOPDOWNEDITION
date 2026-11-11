@@ -23,6 +23,9 @@
                 if (!this.hasDyer() || !this.activeMap || this.activeMap.id !== 'apt_949') return;
                 const props = this.activeMap.props || (this.activeMap.props = []);
                 if (props.some(p => p.interactionType === 'clothing_dyer')) return;
+                if(this.activeLevel){
+                    const p=this.activeLevel.addDyerStation(GAME_DB);props.push(p);return;
+                }
                 const p = new PropEntity({ ...DYER.STATION, mass: 1e7, color: '#3a2430', interactionType: 'clothing_dyer', decorType: 'apt_dyer' });
                 props.push(p);
                 if (this.props !== props) this.props = props;

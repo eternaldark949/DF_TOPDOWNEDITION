@@ -1,0 +1,27 @@
+{
+  "library_id":"df_rendering_example",
+  "resources":{
+    "board":{"kind":"rendering_example","data":{
+      "resources":{
+        "board:box":{"type":"geometry","geometry":{"type":"rect","size":[20,20]}},
+        "board:red":{"type":"material","material":{"fill":"#ff0000"}},
+        "board:checker":{"type":"image","width":2,"height":1,"pixels":[255,0,0,255,0,255,0,255]},
+        "board:layer":{"type":"target","width":32,"height":32},
+        "board:path":{"type":"geometry","geometry":{"type":"path","commands":[["move",-12,12],["line",12,12],["quadratic",16,0,0,-12],["cubic",-4,-8,-12,-4,-12,12],["close"]]}}
+      },
+      "base":[
+        {"type":"shape","space":"screen","position":[30,30],"geometry_id":"board:box","material_id":"board:red","layer":1},
+        {"type":"shape","space":"screen","position":[30,30],"geometry_id":"board:box","material":{"fill":"#0000ff"},"clips":[{"geometry":{"type":"ellipse","radii":[5,5]}}],"layer":2},
+        {"type":"shape","space":"screen","position":[30,80],"geometry":{"type":"rect","size":[20,20]},"material":{"fill":{"type":"linear","from":[-10,0],"to":[10,0],"stops":[[0,"#ff0000"],[1,"#0000ff"]]}}},
+        {"type":"sprite","space":"screen","position":[85,30],"size":[40,20],"resource_id":"board:checker"},
+        {"type":"shape","position":[30,0],"geometry":{"type":"rect","size":[10,10]},"material":{"fill":"#00ffff"}},
+        {"type":"shape","space":"screen","position":[220,60],"geometry_id":"board:path","material":{"fill":"#ffcc00","stroke":"#ffffff","stroke_width":1}},
+        {"type":"shape","space":"screen","position":[220,160],"geometry":{"type":"ellipse","radii":[12,12]},"material":{"fill":{"type":"radial","from":[0,0],"to":[0,0],"inner_radius":0,"outer_radius":12,"stops":[[0,"#ffffff"],[1,"#000000"]]}}},
+        {"type":"shape","space":"screen","position":[270,160],"geometry":{"type":"rect","size":[10,10]},"material":{"fill":"#ffffff","shadow":{"color":"#ff0000","blur":4,"offset":[8,0]}}},
+        {"type":"text","space":"screen","position":[10,125],"text":"Renderer contract","font":{"family":"sans-serif","size":16},"material":{"fill":"#ffffff"}}
+      ],
+      "offscreen":[{"type":"shape","space":"screen","position":[16,16],"geometry":{"type":"rect","size":[32,32]},"material":{"fill":"#00ff00"}}],
+      "composite":[{"type":"sprite","space":"screen","position":[120,30],"size":[32,32],"resource_id":"board:layer"}]
+    }}
+  }
+}

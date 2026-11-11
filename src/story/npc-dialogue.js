@@ -99,8 +99,8 @@
                     if (!g.questState.etherealUnlocked) {
                         g.questState.etherealUnlocked = true;
                         showMessage("ETHEREAL PLANE UNLOCKED.");
-                        g.weather.spawnGhost(g.player.x + 50, g.player.y, 0);
-                        g.weather.spawnGhost(g.player.x - 50, g.player.y, Math.PI);
+                        g.weather.spawnGhost(g.playerPosition[0] + 50, g.playerPosition[1], 0);
+                        g.weather.spawnGhost(g.playerPosition[0] - 50, g.playerPosition[1], Math.PI);
                     } else { showMessage("CROSSING OVER..."); g.loadMap('ethereal_plane'); }
                 }
             },

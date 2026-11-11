@@ -11,11 +11,11 @@
              * no weapon drawn). Cached per frame for the world and light passes.
              */
             getLaserSight() {
-                const key = _simTick + ':' + RenderInterp.alpha + ':' + this.player.x + ':' + this.player.y + ':' + this.player.angle;
+                const key = _simTick + ':' + RenderInterp.alpha + ':' + this.playerPosition[0] + ':' + this.playerPosition[1] + ':' + this.playerRotation;
                 if (this._laserKey === key) return this._laserGeom;
                 this._laserKey = key;
                 this._laserGeom = null;
-                if (!this.inventory.hasAttachment('laser_sight') || !this.player.visible) return null;
+                if (!this.items.hasAttachment('laser_sight') || !this.player.visible) return null;
                 if (!(this.weaponMode === 'normal' || this.weaponMode === 'sniper') || (this.weaponHolstered && !this._quickDraw && !this.isDriving)) return null;
                 if (!this.isDriving && (!this.player._muzzleLocal || !this.player._muzzleReady)) return null;
                 const shot = this.getPlayerShotGeometry();
@@ -387,10 +387,11 @@
             },
 
             triggerTransition() {
+                if(this.activeLevel){this._apartmentInteraction();if(this._apartmentExit)this.loadMap(this._apartmentExit.data.target,{linkFrom:'apt_949'});return;}
                 if (!this.activeMap.transitions) return;
                 
                 // Find which transition zone the player is standing in
-                const t = this._transitionGrid.query(this.player.x, this.player.y);
+                const t = this._transitionGrid.query(this.playerPosition[0], this.playerPosition[1]);
                 
                 if (t && t.target) {
                     const displayNames = {
@@ -608,19 +609,19 @@
                 // Indoors (Dark): Ambient 0.95 -> 1.0 - (0.95 * 1.3) = -0.235 (Clamped to 0.0)
                 // (in a room-system map, the room she's in: lit-through rooms and outdoor rooms are lighter: RoomSystem.darknessAt)
                 const amb = this.getAmbientDarkness(), rs = this.roomSystem;
-                let visibility = 1.0 - ((rs && rs.active ? rs.darknessAt(this.player.x, this.player.y, amb, this.dayCycle().darkness) : amb) * 1.3);
+                let visibility = 1.0 - ((rs && rs.active ? rs.darknessAt(this.playerPosition[0], this.playerPosition[1], amb, this.dayCycle().darkness) : amb) * 1.3);
                 
                 // 2. STATIC LIGHTS (Lamps)
-                for (const entry of this._queryLampCandidates({ left: this.player.x, right: this.player.x, top: this.player.y, bottom: this.player.y }, 'lampVisibility')) {
+                for (const entry of this._queryLampCandidates({ left: this.playerPosition[0], right: this.playerPosition[0], top: this.playerPosition[1], bottom: this.playerPosition[1] }, 'lampVisibility')) {
                     const lamp = entry.item;
                     // Skip lamps in rooms with lights switched off
                     if (this.roomSystem.isLampRoomDark(lamp)) continue;
                     
-                    const dist = Math.hypot(this.player.x - lamp.x, this.player.y - lamp.y);
+                    const dist = Math.hypot(this.playerPosition[0] - lamp.x, this.playerPosition[1] - lamp.y);
                     if (dist < lamp.radius) {
                         // Shadow Check (Raycast)
                         const lampY = (lamp.type === 4 || lamp.type === 3) ? lamp.y : lamp.y - 60;
-                        if (this.checkLineOfSight(this.player.x, this.player.y, lamp.x, lampY)) {
+                        if (this.checkLineOfSight(this.playerPosition[0], this.playerPosition[1], lamp.x, lampY)) {
                             // Intensity fades over distance
                             const intensity = (1.0 - (dist / lamp.radius));
                             visibility += intensity * 0.8; 
@@ -665,10 +666,10 @@
                         // Dynamic range based on the pulse
                         const currentLightRadius = 160 * radiusMod; 
 
-                        const dist = Math.hypot(this.player.x - px, this.player.y - py);
+                        const dist = Math.hypot(this.playerPosition[0] - px, this.playerPosition[1] - py);
                         
                         if (dist < currentLightRadius) {
-                            if (this.checkLineOfSight(this.player.x, this.player.y, px, py)) {
+                            if (this.checkLineOfSight(this.playerPosition[0], this.playerPosition[1], px, py)) {
                                 // Calculate base intensity from distance
                                 let lightLevel = (1.0 - (dist / currentLightRadius));
                                 
@@ -686,7 +687,7 @@
             
                 // Muzzle Flashes (High Intensity, Instant)
                 for (let flash of this.effects.of('muzzle')) {
-                    const dist = Math.hypot(this.player.x - flash.x, this.player.y - flash.y);
+                    const dist = Math.hypot(this.playerPosition[0] - flash.x, this.playerPosition[1] - flash.y);
                     if (dist < flash.radius) {
                         const intensity = (1.0 - (dist / flash.radius));
                         visibility += intensity * 1.0; 
@@ -695,7 +696,7 @@
             
                 // Projectiles (Glowing Bullets/Magic)
                 for (let proj of this.projectiles) {
-                    const dist = Math.hypot(this.player.x - proj.x, this.player.y - proj.y);
+                    const dist = Math.hypot(this.playerPosition[0] - proj.x, this.playerPosition[1] - proj.y);
                     // Visual radius is roughly 30px for glow
                     const glowRadius = 40; 
                     if (dist < glowRadius) {
@@ -706,8 +707,8 @@
             
                 // Car Headlights (Cone Check)
                 if (this.car && this.car.visible && !this.isDriving) {
-                    const dx = this.player.x - this.car.x;
-                    const dy = this.player.y - this.car.y;
+                    const dx = this.playerPosition[0] - this.car.x;
+                    const dy = this.playerPosition[1] - this.car.y;
                     const cos = Math.cos(-this.car.angle);
                     const sin = Math.sin(-this.car.angle);
                     
@@ -718,7 +719,7 @@
                     if (localX > 0 && localX < 400) {
                         const coneWidthAtDist = localX * 0.4; 
                         if (Math.abs(localY) < coneWidthAtDist) {
-                             if (this.checkLineOfSight(this.player.x, this.player.y, this.car.x, this.car.y)) {
+                             if (this.checkLineOfSight(this.playerPosition[0], this.playerPosition[1], this.car.x, this.car.y)) {
                                  const intensity = (1.0 - (localX / 400));
                                  visibility += intensity * 0.9;
                              }
@@ -847,8 +848,8 @@
              */
             getLandmark(id) {
                 // 1. Dynamic Entities (Moving targets)
-                if (id === 'player') return { x: this.player.x, y: this.player.y };
-                if (id === 'player_car' || id === 'blackmark') return this.ownedCar ? { x: this.ownedCar.x, y: this.ownedCar.y } : { x: this.player.x, y: this.player.y };
+                if (id === 'player') return { x: this.playerPosition[0], y: this.playerPosition[1] };
+                if (id === 'player_car' || id === 'blackmark') return this.ownedCar ? { x: this.ownedCar.x, y: this.ownedCar.y } : { x: this.playerPosition[0], y: this.playerPosition[1] };
                 if (id === 'boss') return this.boss ? { x: this.boss.x, y: this.boss.y } : null;
                 
                 // 2. Check the landmark registry (populated by loadMap)
@@ -858,7 +859,7 @@
                 
                 // 3. Fallback - warn and return player position
                 console.warn(`Landmark ID not found: '${id}' - Available: [${Object.keys(this.landmarkRegistry).join(', ')}]`);
-                return { x: this.player.x, y: this.player.y };
+                return { x: this.playerPosition[0], y: this.playerPosition[1] };
             },
             
             /**

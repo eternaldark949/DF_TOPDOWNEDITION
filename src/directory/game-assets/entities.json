@@ -1,0 +1,554 @@
+{
+  "library_id": "df",
+  "description": "Directory-owned entity definitions for the standalone engine. Existing game classes migrate to these contracts in the next phase. Units: world pixels, seconds, radians and kilograms.",
+  "resources": {
+    "player_appearance": {
+      "kind": "appearance",
+      "source": [
+        "cast",
+        "appearances",
+        "949"
+      ]
+    },
+    "vehicle_brands": {
+      "kind": "vehicle_catalog",
+      "source": [
+        "vehicles",
+        "brands"
+      ]
+    },
+    "enemy_kinds": {
+      "kind": "enemy_catalog",
+      "source": [
+        "enemies",
+        "kinds"
+      ]
+    },
+    "map_definitions": {
+      "kind": "map_catalog",
+      "source": [
+        "places",
+        "maps"
+      ]
+    },
+    "item_definitions": {
+      "kind": "item_catalog",
+      "source": [
+        "items",
+        "gear"
+      ]
+    },
+    "owned_vehicle_defaults": {
+      "kind": "vehicle_preset",
+      "source": [
+        "vehicles",
+        "blackmark_defaults"
+      ]
+    },
+    "taxi_vehicle_defaults": {
+      "kind": "vehicle_preset",
+      "source": [
+        "vehicles",
+        "zib"
+      ]
+    },
+    "mission_vehicle_defaults": {
+      "kind": "vehicle_catalog",
+      "source": [
+        "vehicles",
+        "mission_vehicles"
+      ]
+    },
+    "pedestrian_appearances": {
+      "kind": "appearance_catalog",
+      "source": [
+        "cast",
+        "pedestrian_appearances"
+      ]
+    },
+    "vehicle_seating": {
+      "kind": "layout_rules",
+      "source": [
+        "vehicles",
+        "seating"
+      ]
+    }
+  },
+  "templates": {
+    "entity": {
+      "entity_type": "entity",
+      "tags": [],
+      "assets": {},
+      "data": {}
+    },
+    "character": {
+      "extends": "entity",
+      "entity_type": "character",
+      "physics_type": "character",
+      "collision_group": 2,
+      "collision_mask": 2147483647,
+      "collision_shape": {
+        "shape_type": "circle",
+        "radius": 12
+      },
+      "mass": 15,
+      "movement": {
+        "max_speed": 180,
+        "acceleration": 900,
+        "braking": 1200,
+        "arrival_distance": 2
+      }
+    },
+    "player_949": {
+      "extends": "character",
+      "name": "949",
+      "tags": [
+        "player"
+      ],
+      "assets": {
+        "appearance": "player_appearance"
+      },
+      "contact_priority": 10
+    },
+    "npc": {
+      "extends": "actor",
+      "entity_type": "df_npc",
+      "tags": [
+        "npc"
+      ],
+      "data": {
+        "role": "civilian",
+        "health": 5000000,
+        "max_health": 5000000,
+        "damage_grace_seconds": 0.5,
+        "recruited": false,
+        "downed": false,
+        "hired": false,
+        "hireType": "none",
+        "teammateStims": 3,
+        "maxTeammateStims": 3,
+        "weapon_definition_id": null,
+        "player_protected": true
+      }
+    },
+    "enemy": {
+      "extends": "character",
+      "tags": [
+        "enemy"
+      ],
+      "assets": {
+        "kinds": "enemy_kinds"
+      }
+    },
+    "vehicle": {
+      "extends": "entity",
+      "entity_type": "vehicle",
+      "physics_type": "rigid",
+      "collision_group": 4,
+      "collision_mask": 2147483647,
+      "collision_shape": {
+        "shape_type": "box",
+        "dimensions": [
+          64,
+          34
+        ]
+      },
+      "mass": 1200,
+      "vehicle_template": {
+        "max_speed": 180,
+        "reverse_speed": 60,
+        "acceleration": 100,
+        "braking": 240,
+        "wheel_base": 40
+      },
+      "assets": {
+        "catalog": "vehicle_brands"
+      }
+    },
+    "prop": {
+      "extends": "entity",
+      "entity_type": "prop",
+      "physics_type": "rigid",
+      "collision_group": 8,
+      "collision_mask": 2147483647,
+      "collision_shape": {
+        "shape_type": "box",
+        "dimensions": [
+          20,
+          20
+        ]
+      },
+      "mass": 5
+    },
+    "wall": {
+      "extends": "entity",
+      "entity_type": "static",
+      "physics_type": "static",
+      "collision_group": 1,
+      "collision_mask": 2147483647,
+      "collision_shape": {
+        "shape_type": "box",
+        "dimensions": [
+          100,
+          10
+        ]
+      }
+    },
+    "projectile": {
+      "extends": "entity",
+      "entity_type": "projectile",
+      "physics_type": "rigid",
+      "collision_group": 16,
+      "collision_mask": 15,
+      "collision_shape": {
+        "shape_type": "circle",
+        "radius": 2
+      },
+      "speed": 600,
+      "lifetime": 3,
+      "impact_strength": 120
+    },
+    "trigger": {
+      "extends": "entity",
+      "entity_type": "trigger",
+      "physics_type": "static",
+      "ghost": true,
+      "collision_group": 32,
+      "collision_mask": 14,
+      "collision_shape": {
+        "shape_type": "box",
+        "dimensions": [
+          40,
+          40
+        ]
+      }
+    },
+    "decoration": {
+      "extends": "entity",
+      "entity_type": "decoration",
+      "physics_type": "static",
+      "collision_group": 0,
+      "collision_mask": 0,
+      "query_mask": 0,
+      "collision_shape": {
+        "shape_type": "box",
+        "dimensions": [
+          20,
+          20
+        ]
+      }
+    },
+    "building": {
+      "extends": "wall",
+      "tags": [
+        "building"
+      ],
+      "assets": {
+        "catalog": "map_definitions"
+      }
+    },
+    "billboard": {
+      "extends": "wall",
+      "tags": [
+        "billboard"
+      ],
+      "collision_shape": {
+        "shape_type": "compound",
+        "children": [
+          {
+            "shape_type": "box",
+            "dimensions": [
+              6,
+              6
+            ],
+            "local_position": [
+              -25,
+              0
+            ]
+          },
+          {
+            "shape_type": "box",
+            "dimensions": [
+              6,
+              6
+            ],
+            "local_position": [
+              25,
+              0
+            ]
+          }
+        ]
+      },
+      "render_shape": {
+        "shape_type": "box",
+        "dimensions": [
+          80,
+          90
+        ],
+        "local_position": [
+          0,
+          -40
+        ]
+      }
+    },
+    "pavement": {
+      "extends": "trigger",
+      "tags": [
+        "terrain"
+      ],
+      "collision_mask": 0
+    },
+    "furniture": {
+      "extends": "prop",
+      "tags": [
+        "furniture"
+      ]
+    },
+    "loot": {
+      "extends": "trigger",
+      "tags": [
+        "pickup"
+      ],
+      "collision_shape": {
+        "shape_type": "circle",
+        "radius": 12
+      },
+      "data": {
+        "collected": false
+      }
+    },
+    "crowd_walker": {
+      "extends": "character",
+      "tags": [
+        "crowd"
+      ]
+    },
+    "companion": {
+      "extends": "npc",
+      "tags": [
+        "npc",
+        "companion"
+      ],
+      "contact_priority": 0
+    },
+    "traffic_vehicle": {
+      "extends": "vehicle",
+      "tags": [
+        "traffic"
+      ]
+    },
+    "driven_vehicle": {
+      "extends": "vehicle",
+      "vehicle_template": {
+        "tyre_model": "two_axle",
+        "front_grip": 1,
+        "rear_grip": 1,
+        "cornering_stiffness": 12,
+        "max_lateral_acceleration": 500
+      }
+    },
+    "bumper_car": {
+      "extends": "vehicle",
+      "tags": [
+        "bumper_car"
+      ],
+      "mass": 150,
+      "restitution": 0.8,
+      "friction": 0.1,
+      "collision_shape": {
+        "shape_type": "box",
+        "dimensions": [
+          32,
+          24
+        ]
+      },
+      "vehicle_template": {
+        "max_speed": 90,
+        "acceleration": 120,
+        "braking": 180,
+        "wheel_base": 20
+      }
+    },
+    "hinged_door": {
+      "extends": "prop",
+      "tags": [
+        "door"
+      ],
+      "collision_shape": {
+        "shape_type": "box",
+        "dimensions": [
+          40,
+          4
+        ],
+        "local_position": [
+          20,
+          0
+        ]
+      },
+      "mass": 20,
+      "constraints": [
+        {
+          "constraint_type": "hinge",
+          "min_rotation": -1.57,
+          "max_rotation": 1.57
+        }
+      ]
+    },
+    "sliding_door": {
+      "extends": "prop",
+      "tags": [
+        "door"
+      ],
+      "collision_shape": {
+        "shape_type": "box",
+        "dimensions": [
+          40,
+          4
+        ]
+      },
+      "mass": 20,
+      "constraints": [
+        {
+          "constraint_type": "slider",
+          "local_axis": [
+            1,
+            0
+          ],
+          "min_translation": 0,
+          "max_translation": 40,
+          "max_force": 200,
+          "motor_speed": 0
+        }
+      ]
+    },
+    "window": {
+      "extends": "wall",
+      "tags": [
+        "glass"
+      ],
+      "collision_shape": {
+        "shape_type": "box",
+        "dimensions": [
+          40,
+          2
+        ]
+      },
+      "data": {
+        "shattered": false
+      }
+    },
+    "scene_actor": {
+      "extends": "character",
+      "tags": [
+        "scene_actor"
+      ]
+    },
+    "scene_prop": {
+      "extends": "decoration",
+      "tags": [
+        "scene_prop"
+      ],
+      "physics_type": "kinematic"
+    },
+    "gondola": {
+      "extends": "scene_prop",
+      "tags": [
+        "ride"
+      ]
+    },
+    "lamp": {
+      "extends": "decoration",
+      "tags": [
+        "lamp"
+      ],
+      "render_shape": {
+        "shape_type": "box",
+        "dimensions": [
+          12,
+          70
+        ],
+        "local_position": [
+          0,
+          -30
+        ]
+      },
+      "light_shape": {
+        "shape_type": "circle",
+        "radius": 160
+      }
+    },
+    "foliage": {
+      "extends": "decoration",
+      "tags": [
+        "foliage"
+      ],
+      "render_shape": {
+        "shape_type": "box",
+        "dimensions": [
+          60,
+          90
+        ]
+      }
+    },
+    "marker": {
+      "extends": "decoration",
+      "tags": [
+        "marker"
+      ]
+    },
+    "hazard": {
+      "extends": "trigger",
+      "tags": [
+        "hazard"
+      ],
+      "physics_type": "kinematic"
+    },
+    "world_loot": {
+      "extends": "prop",
+      "entity_type": "df_world_loot",
+      "physics_type": "rigid",
+      "mass": 0.25,
+      "linear_damping": 8,
+      "collision_group": 8,
+      "collision_mask": 9,
+      "collision_shape": {
+        "shape_type": "circle",
+        "radius": 6
+      },
+      "render_shape": {
+        "shape_type": "circle",
+        "radius": 28
+      },
+      "data": {
+        "role": "world_loot"
+      }
+    },
+    "actor": {
+      "extends": "character",
+      "entity_type": "df_actor",
+      "assets": {
+        "actor_rules": "actor_rules",
+        "items": "actor_items",
+        "appearances": "actor_appearances",
+        "abilities": "abilities"
+      },
+      "data": {
+        "health": 100,
+        "max_health": 100,
+        "alliance": "neutral"
+      }
+    },
+    "ganger": {
+      "extends": "actor",
+      "entity_type": "df_ganger",
+      "tags": [
+        "enemy",
+        "ganger"
+      ],
+      "data": {
+        "alliance": "hostile",
+        "weapon_definition_id": "pistol_ganger"
+      }
+    }
+  }
+}

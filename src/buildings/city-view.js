@@ -64,7 +64,7 @@
                 this.buildings = [];
                 const make = (k, x, y, w, d) => {
                     const f = k === 'apt' ? createGenericApartment : k === 'shop' ? createGenericShop : createGenericWarehouse;
-                    const b = f(Math.round(x), Math.round(y), { id: 'city_view_' + this.buildings.length, sections: [{ x: 0, y: 0, w: Math.round(w), h: Math.round(d) }] });
+                    const b = f(Math.round(x), Math.round(y), { worldAttachments:false, id: 'city_view_' + this.buildings.length, sections: [{ x: 0, y: 0, w: Math.round(w), h: Math.round(d) }] });
                     this.buildings.push(b);
                 };
                 const fill = (x0, x1, front, maxD) => {

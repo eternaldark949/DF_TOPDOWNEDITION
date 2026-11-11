@@ -12,8 +12,8 @@ function test(name,fn){const e=runtime(join(__dirname,'..','DFAB V8.html'),{affi
 const setup=`game._doLoadMap('ollo_test');game.running=true;game.paused=false;game.player.visible=true;
  game.activeMap={id:'gr_test',width:3000,height:3000,walls:[],buildings:[],buildingColliders:[]};
  game.player._game=game;game.player.x=1000;game.player.y=1000;game.player.angle=0;game.isDriving=false;
- game.weaponHolstered=false;game.projectiles=[];game.enemies=[];game.effects.of('number').length=0;_gameTimeSec=10;game.flitState.lastFlitAt=-99;
- const wield=id=>{game.currentWeapon=createItemFromRegistry(id,game);game.weaponMode=ITEM_REGISTRY[id].weaponMode;game.shootCooldown=0;};
+ game.weaponHolstered=false;game.projectiles=[];game.enemies=[];game.effects.of('number').length=0;_gameTimeSec=10;game.player.vitals.state.last_flit_at=-99;
+ const wield=id=>{game.items.equipItem((game.items.findItem(id)??game.items.grantItem(id)).instance_id);game.items.setFireMode(ITEM_REGISTRY[id].weaponMode);game.shootCooldown=0;};
  const ganger=(x,y,hp=5000)=>{const g=new Ganger(x,y,{hp});g.hp=g.maxHp=hp;g.state='IDLE';game.enemies.push(g);return g;};
  const rnd=Math.random;const withRandom=(v,f)=>{Math.random=()=>v;try{return f();}finally{Math.random=rnd;}};
  const land=()=>{for(let i=0;i<6&&game.projectiles.length;i++){_simTick++;CollisionSystem.beginProjectileStep(game);
@@ -23,8 +23,8 @@ const setup=`game._doLoadMap('ollo_test');game.running=true;game.paused=false;ga
 test('The schematic stays locked until Lilitu falls to her alone; then 400 scrap makes the knuckles, worn as fists',e=>{
  const r=value(e,setup+`const sch=SCHEMATICS.find(s=>s.id==='golden_retribution');game.scrap=400;game.questState=game.questState||{};
   game.questState.goldenRetributionUnlocked=false;const locked=game.craftSchematic('golden_retribution'),hint=game.schematicNeeds(sch);game.questState.goldenRetributionUnlocked=true;
-  const made=game.craftSchematic('golden_retribution');const it=game.inventory.items.find(i=>i.id==='golden_retribution');
-  if(it&&it.action)it.action(it);
+  const made=game.craftSchematic('golden_retribution');const it=game.items.listItems().find(i=>i.id==='golden_retribution');
+  if(it)game.items.equipItem(it.instance_id);
   return {locked,hint,cost:sch.scrapCost,made,scrap:game.scrap,mode:game.weaponMode,name:ITEM_REGISTRY.golden_retribution.name};`);
  assert.deepEqual(r,{locked:false,hint:'Defeat Lilitu alone in the palace',cost:400,made:true,scrap:0,mode:'fists',name:'Golden Retribution'});
 });
@@ -64,7 +64,7 @@ test("Driven into a wall, a haymaker's target takes half the hit again; in the o
 
 test('A punch inside the Flit-Strike window is always a haymaker, with Flit-Strike on top',e=>{
  const r=value(e,setup+`wield('golden_retribution');game.resonance.ranks=game.resonance.ranks||{};
-  const g=ganger(1036,1000);game.flitState.lastFlitAt=_gameTimeSec;punch();
+  const g=ganger(1036,1000);game.player.vitals.state.last_flit_at=_gameTimeSec;punch();
   return {dmg:5000-g.hp,stag:!!g._staggerUntil,combo:game._punchCombo};`);
  assert.equal(r.stag,true);
  assert.ok(r.dmg>=40,`${r.dmg}`);
