@@ -7,7 +7,7 @@ The classic playable boot still constructs `GameEngine`. Loading the new class i
 ## Ownership decisions
 
 1. **One world per runtime lifetime.** `physicsSystem` constructs the only spatial grid. Levels neither construct a world nor step it. A private Symbol authorizes only the runtime's simulation call. Independent standalone worlds remain supported.
-2. **The API points to the real engine services.** `api.physics`, `api.elements`, `api.assets`, `api.motion`, `api.traffic`, `api.controls`, `api.render` and `api.camera` are stable references, not copied implementations or per-method forwarding wrappers. Basement's handles, registration, queries and events remain authoritative.
+2. **The API points to the real engine services.** `api.physics`, `api.elements`, `api.assets`, `api.motion`, `api.traffic`, `api.rigs`, `api.controls`, `api.render` and `api.camera` are stable references, not copied implementations or per-method forwarding wrappers. Basement's handles, registration, queries and events remain authoritative.
 3. **Explicit composition replaces mixins.** Systems are normal instances with named lifecycle hooks, called in registration order. No `Object.assign`/prototype injection or legacy fallback is used. Directory composition passes dependencies between game systems explicitly instead of making the coordinator a service locator for old mixin methods. Removing the old production mixins is part of the following class conversions.
 4. **Levels own content and policy.** `gameLevel` supplies prepare/enter/leave and optional policy/presentation hooks. Asynchronous `prepare` receives assets only. It cannot obtain the runtime's live world through its supplied context.
 5. **Default entity lifetime is the active level.** Level exit enumerates the official native registry and retires nonpersistent entities, including entities made by direct native factories. This is lifecycle filtering, not a second entity or spatial registry. Session lifetime is explicit and preserves the original entity/body across level changes.
@@ -38,7 +38,7 @@ new gameEngine({
 
 | Member | Contract |
 |---|---|
-| `api` | Frozen service-reference object: `physics`, `elements`, `assets`, `motion`, `traffic`, `controls`, `render`, `camera`, plus explicitly supplied game services. |
+| `api` | Frozen service-reference object: `physics`, `elements`, `assets`, `motion`, `traffic`, `rigs`, `controls`, `render`, `camera`, plus explicitly supplied game services. |
 | `physics_system`, `lobby` | Canonical owned world and Lobby; no writable replacement setters. |
 | `active_level`, `running`, `loading`, `paused`, `pause_reasons`, `phase`, `destroyed` | Lifecycle observations. |
 | `registerLevel(level_id, LevelClass)` | Register a `gameLevel` subclass. Duplicate IDs reject. |
@@ -143,3 +143,5 @@ Systems can implement `gameplayPaused(context)`. The runtime calls it after clea
 Recruited native NPCs are automatically retained by `actorSystem`; released contracts return to level lifetime. The same entity and body survive native level changes. See [actor lifetime and API contracts](../gameplay/actors/README.md).
 
 Directory now installs `api.attacks`: the shared registry and character-facing dispatch for firearm, melee and ability attacks. Native Player/NPC/Ganger and arbitrary gameCharacter subclasses share it. Automatic connections use official registration events; selection persists on the character and normal input has one queue. See [attack API](../gameplay/attacks/README.md).
+
+`api.rigs` is the native world rig service: body-owned animation shares the same fixed step and persistence. Render hooks may read resolved poses/anchors, but animation mutations and manual advances are rejected. Directory installs `humanoidSystem` as the first game-specific client; authored rigs/clips remain in Directory.

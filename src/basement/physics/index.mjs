@@ -18,3 +18,9 @@ export { trafficController } from './traffic/controller.mjs';
 export { motionController } from './motion/controller.mjs';
 export { pathGeometry } from './motion/path-geometry.mjs';
 export { layoutGeometry } from './motion/layout-geometry.mjs';
+
+export {rigDefinition} from './animation/rig-definition.mjs';
+export {rigPose} from './animation/rig-pose.mjs';
+export {animationClip} from './animation/animation-clip.mjs';
+export {animationController} from './animation/animation-controller.mjs';
+export {rigSystem} from './animation/rig-system.mjs';

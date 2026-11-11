@@ -98,3 +98,17 @@ restored.loadPhysicsState(state);
 - [browser sandbox](../examples/index.html): standalone canvas renderer and keyboard/pointer controls. The renderer may do drawing/input-coordinate arithmetic; it contains no collision response or physics integration. Its simple interval is demonstration scaffolding; the real game will use its Lobby.
 
 The Node example is exercised by the contract tests. An optional Playwright browser smoke test lives in `tests/browser-smoke.py` and starts its own temporary HTTP server.
+
+## A generic rig with a physical load
+
+The executable [crane example](../examples/rig.mjs) defines three lightweight joints and a named hook. Only its base and mounted load are physical bodies. The same `rigDefinition` / `animationClip` / `physics.rigs` API serves a humanoid, machine or creature:
+
+```js
+import {createRigExample} from '../examples/rig.mjs';
+const {world,base,load} = createRigExample();
+world.updateState(); // the existing application clock normally calls this
+console.log(world.rigs.getAnchor(base,'hook')); // world-space transform
+console.log(load.body_id); // the original mounted body, never a proxy
+```
+
+Game-specific proportions, clips and marker meanings stay with game assets/policy. See the [rig API](api-reference.md#rigs-and-animation) for clip channels, blending, root motion and attachment semantics.

@@ -63,3 +63,14 @@ Hunter-support verification adds four standalone motor cases for target-relative
 Marionette support adds four standalone engine cases for shared aim/projectile resolution, angle movement against a thin wall, target-frame follow offsets across snapshots, and optional impulses respecting noncombining versus combined attachment ownership. The copied-out physics/controls/rendering suite now contains 216 tests; native Marionette/gameplay tests remain outside Basement.
 
 Gunner support adds three standalone orbit-target regressions for stable slot/phase behavior, cached repeated requests, snapshots, validation and thin-wall movement. The full copied-out physics/controls/rendering suite now contains 219 cases. Squad membership and firing policy tests stay outside Basement.
+
+## Rig and animation foundation — 2026-11-11
+
+- 496 combined native/runtime/Directory cases pass, including 23 generic rig/animation cases and six humanoid-client cases.
+- Copying physics, controls and rendering outside the checkout passes all 251 Basement tests.
+- Generated game regression run: 118 cases / 1,456 assertions, zero failures. Native caller checks, player/item ownership checks, world queries and render budgets pass.
+- Six Chromium suites pass: humanoid, apartment parity, specialized bosses, actor artwork, rendering and shared runtime. Humanoid and apartment parity were repeated against the final generated build. The humanoid check draws actual Canvas pixels while legacy joint stages throw if entered; repeated drawings leave physical state unchanged.
+- Contracts cover hierarchy validation, limits, affine transforms, shortest-arc interpolation, key types, layers/masks/additive crossfades, marker boundaries/order, numeric layer order through snapshots, cache invalidation, actual-travel playback, motor-driven root translation, wall/axis-lock behavior, mount suspension, body identity, combined inertia, moving-anchor velocity, interpolation, snapshot preflight and ownership cleanup.
+- A non-humanoid crane example uses the same API with three lightweight joints, one physical base and one existing physical load. The grid contains two bodies, rather than bodies for each bone.
+
+These are correctness/ownership checks, not a claim of full humanoid artwork/gesture parity or whole-game performance improvements. Retained Canvas clothing/hair and the legacy city path remain separate conversion work.

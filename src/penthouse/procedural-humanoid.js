@@ -3,7 +3,10 @@
         // One instance per person (proceduralHumanoid.of(entity)), kept for as long as the person is,
         // so its packets and buffers are reused frame to frame.
         //
-        // A FRAME runs in stages, each a method, in this order:
+        // Native packets carry a simulation-resolved rigPose. Their artist reads those joints;
+        // the gait/pose/settling stages below remain for classic city callers.
+        //
+        // A CLASSIC FRAME runs in stages, each a method, in this order:
         //   SET UP     configure (look, stance, held, weather, shading, build) → dress (wardrobe pieces)
         //              → stride (gait) → strikePose (ui/poses.js) → placeHands (joint targets)
         //              → settle (ease the joints, then the walk swing, hits, kicks, punches, blades)
@@ -92,10 +95,13 @@
             /** Draw this person: ctx is translated and rotated to them; S the build's scale frame (or null), A the android look (or null). */
             draw (ctx, entity, config, S, A) {
                 this.configure(ctx, entity, config, S, A);
-                this.stride();
-                this.strikePose();
-                this.placeHands();
-                this.settle();
+                if(entity.rigPose)this.readNativePose();
+                else {
+                    this.stride();
+                    this.strikePose();
+                    this.placeHands();
+                    this.settle();
+                }
                 this.drawWeapons();
                 if (this.drawSeated()) return;
                 this.rig();
@@ -111,24 +117,57 @@
              *  (penthouse/gl-humanoid.js). Reads back from fists, elbows, geometry and the pose fields. */
             skeleton (entity, config) {
                 this.configure(null, entity, config, null, null);
-                this.stride();
-                this.strikePose();
-                this.placeHands();
-                this.settle();
+                if(entity.rigPose)this.readNativePose();
+                else {
+                    this.stride();
+                    this.strikePose();
+                    this.placeHands();
+                    this.settle();
+                }
                 this.rig();
                 return this;
             }
 
-            /** An attachment point on this person as a virtualChild (basement/virtual-child.js), placed from
+            /** Native packets return detached rig anchor data; physical users request physics.rigs.getAnchor.
+             *  Classic callers retain an attachment point on this person as a virtualChild (basement/virtual-child.js), placed from
              *  this frame's skeleton: 'hand_l', 'hand_r', 'head', or 'muzzle' (null while no gun is drawn).
              *    body.point('hand_r').updatePosition()   → world_x, world_y: her right hand in the world */
             point (name) {
+                if(this.entity.rigPose)return this.entity.rigPose.anchors[name]?structuredClone(this.entity.rigPose.anchors[name]):null;
                 const S = this.scale, kx = S ? S.x : 1, ky = S ? S.y : 1, F = this.fists, m = this.entity._muzzleLocal;
                 const local = name === 'hand_l' ? [F[0] * kx, F[1] * ky] : name === 'hand_r' ? [F[2] * kx, F[3] * ky]
                     : name === 'head' ? [this.head_x * kx, 0] : name === 'muzzle' ? (m && [m.x, m.y]) : null;
                 if (!local) return null;
                 const P = this.points || (this.points = {}), child = P[name] || (P[name] = new virtualChild(this.entity, local));
                 child.init_position = local; return child;
+            }
+
+            /** Native simulation supplies the complete resolved skeleton. */
+            readNativePose () {
+                const j=this.entity.rigPose.joints;
+                for(const [i,side] of [[0,'l'],[2,'r']]){
+                    this.fists[i]=j['hand_'+side].position[0];this.fists[i+1]=j['hand_'+side].position[1];
+                    this.elbows[i]=j['elbow_'+side].position[0];this.elbows[i+1]=j['elbow_'+side].position[1];
+                }
+                this.hip_anchor_x=j.pelvis.position[0];this.hip_rotation=j.pelvis.rotation;
+                this.shoulder_x=j.torso.position[0];this.torso_rotation=j.torso.rotation;
+                this.head_x=j.head.position[0];this.bounce=j.head.position[0];
+                this.walk_cycle=0;this.walk_sin=0;this.walk_opp_sin=0;this.gait_speed=0;
+                this.pose=null;this.pose_w=0;this.body_recoil=0;this.hit_k=0;this.hook=null;
+            }
+
+            nativeGeometry () {
+                const j=this.entity.rigPose.joints,BC=this.body,clothes=this.clothes,WD=typeof WARDROBE!=='undefined'?WARDROBE:null;
+                const pair=name=>[j[name+'_l'].position.slice(),j[name+'_r'].position.slice()];
+                const g=this.geometry={darken:this.darken,skin:this.skin,gender:this.gender,walkCycle:0,android:this.android,body:BC,
+                    torso:{x:BC.tb,w:BC.tf-BC.tb},hip:{x:BC.hb,w:BC.hf-BC.hb},headX:j.head.position[0],headInTorso:j.head.position[0]-j.pelvis.position[0],
+                    feet:pair('foot'),knees:pair('knee'),hipPt:pair('hip'),fists:pair('hand'),elbows:pair('elbow'),
+                    cloth:(key,spec)=>clothGeometry(this.ctx,this.entity,key,spec,this.cloth_dyn)};
+                this.bottom_piece=WD&&clothes.bottom?WD.bottoms[clothes.bottom.type]:null;
+                this.shoe_piece=WD&&clothes.shoes?WD.shoes[clothes.shoes.type]:null;
+                this.leg_color=clothes.bottom?(clothes.bottom.under||clothes.bottom.color):null;
+                this.top_gloss=_glossy(this.top_piece,clothes.top);this.bottom_gloss=_glossy(this.bottom_piece,clothes.bottom);
+                return g;
             }
 
             // --- HELPERS ---
@@ -630,6 +669,12 @@
             // --- DRAW ---
             /** The weapon in hand, behind the hands: the player's (with the holster animation) or an NPC's. */
             drawWeapons () {
+                if(this.entity.rigPose){
+                    const game=this.entity.type==='player'?this.entity._game:null,weapon=game?(!game.weaponHolstered?game.currentWeapon:null):this.config.weapon;
+                    this.gun_hand=!!weapon;
+                    if(weapon?.id&&(!game||['normal','sniper','melee'].includes(game.weaponMode)))drawWeapon(this.ctx,weapon.id,this.fists[2],this.fists[3],0,1,false);
+                    return;
+                }
                 const entity = this.entity, config = this.config, ctx = this.ctx, isDriving = this.driving, bladeSwing = this.blade_swing, bladeWide = this.blade_wide, rFistX = this.fists[2], rFistY = this.fists[3];
                 let gunHand = false;                                            // the right hand closes round a drawn weapon
 
@@ -834,6 +879,7 @@
 
             /** The skeleton: hips, knees and feet from the gait and pose, and the geometry packet the wardrobe draws from (ui/wardrobe.js `g`). */
             rig () {
+                if(this.entity.rigPose)return this.nativeGeometry();
                 const entity = this.entity, A = this.android, skinColor = this.skin, gender = this.gender, W = this.weather, clothes = this.clothes, darken = this.darken, BC = this.body, strideLen = this.stride_len, strafeLen = this.strafe_len, fwdAmt = this.fwd_amt, sideAmt = this.side_amt, walkCycle = this.walk_cycle, walkSin = this.walk_sin, walkOppSin = this.walk_opp_sin, bounce = this.bounce, bodyRecoil = this.body_recoil, hipAnchorX = this.hip_anchor_x, hipRotation = this.hip_rotation, lFistX = this.fists[0], lFistY = this.fists[1], rFistX = this.fists[2], rFistY = this.fists[3], lElbowX = this.elbows[0], lElbowY = this.elbows[1], rElbowX = this.elbows[2], rElbowY = this.elbows[3], WD = (typeof WARDROBE !== 'undefined' ? WARDROBE : null), topP = this.top_piece;
                 // --- 4. CALCULATE POSITIONS ---
                 // Feet stand under the leg roots; the legs hang from the pelvis, so their roots turn with it
@@ -961,7 +1007,7 @@
             drawHips () {
                 const ctx = this.ctx, skinColor = this.skin, clothes = this.clothes, darken = this.darken, BC = this.body, hipAnchorX = this.hip_anchor_x, hipRotation = this.hip_rotation, torsoRotation = this.torso_rotation, topP = this.top_piece, botP = this.bottom_piece, g = this.geometry, groundTrain = this.ground_train;
                 // 4. Hips & Skirt
-                ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(hipRotation);
+                ctx.save(); ctx.translate(...(this.entity.rigPose?this.entity.rigPose.joints.pelvis.position:[hipAnchorX,0])); ctx.rotate(hipRotation);
 
                 // Base Hips
                 ctx.fillStyle = darken(clothes.bottom ? clothes.bottom.color : skinColor, 0.2);
@@ -1028,7 +1074,8 @@
                 const foreColor = sleeve === 'long' ? darken(sleeveCol, 0.3) : darken(skinColor, 0.3);
                 const upperColor = sleeve !== 'none' ? darken(sleeveCol, 0.15) : darken(skinColor, 0.15);
                 const torC = Math.cos(torsoRotation), torS = Math.sin(torsoRotation);
-                const lShX = shoulderX - lShoulderY * torS, lShY = lShoulderY * torC, rShX = shoulderX - rShoulderY * torS, rShY = rShoulderY * torC;
+                const nativeJoints=this.entity.rigPose?.joints;
+                const lShX = nativeJoints?nativeJoints.shoulder_l.position[0]:shoulderX - lShoulderY * torS, lShY = nativeJoints?nativeJoints.shoulder_l.position[1]:lShoulderY * torC, rShX = nativeJoints?nativeJoints.shoulder_r.position[0]:shoulderX - rShoulderY * torS, rShY = nativeJoints?nativeJoints.shoulder_r.position[1]:rShoulderY * torC;
                 const skinned = BODY_SKIN.arms;
                 if (skinned) {                                                  // each arm as one skinned outline (ui/bodies.js)
                     this.drawSkinnedArm(lShX, lShY, lElbowX, lElbowY, lFistX, lFistY, upperColor, foreColor, sleeve !== 'none' && topGloss, sleeve === 'long' && topGloss);
@@ -1079,7 +1126,7 @@
                 const torC = Math.cos(this.torso_rotation), torS = Math.sin(this.torso_rotation);
                 const ctx = this.ctx, A = this.android, skinColor = this.skin, clothes = this.clothes, SH = this.shade, darken = this.darken, BC = this.body, hipAnchorX = this.hip_anchor_x, torsoRotation = this.torso_rotation, lElbowX = this.elbows[0], lElbowY = this.elbows[1], rElbowX = this.elbows[2], rElbowY = this.elbows[3], WD = (typeof WARDROBE !== 'undefined' ? WARDROBE : null), topP = this.top_piece, sleeve = this.sleeve, sleeveCol = this.sleeve_color, topGloss = this.top_gloss, g = this.geometry;
                 // 9. Torso
-                ctx.save(); ctx.translate(hipAnchorX, 0); ctx.rotate(torsoRotation);
+                ctx.save(); ctx.translate(...(this.entity.rigPose?this.entity.rigPose.joints.torso.position:[hipAnchorX,0])); ctx.rotate(torsoRotation);
 
                 ctx.fillStyle = darken(skinColor, 0.1);
                 ctx.fill(bodyTorsoPath(BC));
@@ -1131,8 +1178,8 @@
                 const windLocal = W ? W.dir - (entity.angle || 0) : 0, dip = W ? W.strong * 1.3 : 0;
                 // Scoped (engine/scope.js): cheek down to the stock, head tipped toward the sight
                 const scopeK = config.scopeK || 0;
-                const headX = 0 + bounce - bodyRecoil + this.pf('head', 0) - Math.cos(windLocal) * dip + scopeK * 3.5;
-                const headY = this.pf('head', 1) - Math.sin(windLocal) * dip + scopeK * 3, headTurn = (pose ? (pose.turn || 0) * poseW : 0) + scopeK * 0.18;   // looking around
+                const headX = this.entity.rigPose?this.entity.rigPose.joints.head.position[0]:0 + bounce - bodyRecoil + this.pf('head', 0) - Math.cos(windLocal) * dip + scopeK * 3.5;
+                const headY = this.entity.rigPose?this.entity.rigPose.joints.head.position[1]:this.pf('head', 1) - Math.sin(windLocal) * dip + scopeK * 3, headTurn = this.entity.rigPose?this.entity.rigPose.joints.head.rotation:(pose ? (pose.turn || 0) * poseW : 0) + scopeK * 0.18;   // looking around
                 // 1.0 at the player's base walk speed — keeps the old player hair tuning, now shared by everyone
                 const hairMove = gaitSpeed / 5.2;
                 // Hair motion comes from the strand physics (hairGeometry): the owner's head

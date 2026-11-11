@@ -78,3 +78,7 @@ export {validateBossRecord} from './validate-boss-records.mjs';
 
 export {createDronePackets} from '../presentation/drone.mjs';
 export {createVelvetCatArt,createVelvetCatPackets,createVelvetEyePackets} from '../presentation/velvet-cat.mjs';
+
+export {rigDefinition,rigPose,animationClip,animationController,rigSystem} from '../basement/physics/index.mjs';
+export {humanoidSystem,humanoidPresentation} from '../gameplay/animation/humanoid-system.mjs';
+export {humanoidBodyCanon,humanoidBuilds,getHumanoidRigAssets} from './humanoid/rig-assets.mjs';

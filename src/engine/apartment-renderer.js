@@ -11,7 +11,7 @@ class ApartmentRenderer {
     personPacket(entity,blend){
         let packet=this.people.get(entity.entity_id);if(!packet){packet={enginePresentation:true,entity_id:entity.entity_id,type:entity===this.game.player?'player':'npc',_game:this.game};this.people.set(entity.entity_id,packet);}
         const pose=entity.getRenderState(blend),velocity=entity.linear_velocity;
-        Object.assign(packet,{punchSide:entity.data.weapon_state?.punch_side,punchHay:!!entity.data.weapon_state?.haymaker,x:pose.position[0],y:pose.position[1],angle:pose.rotation,velX:velocity[0]/60,velY:velocity[1]/60,vx:velocity[0]/60,vy:velocity[1]/60,radius:12,visible:entity.visible!==false&&entity.active,isHidden:!!entity.isHidden,dead:!!entity.dead,walkPhase:packet.walkPhase??0});
+        Object.assign(packet,{rigPose:DFNative.humanoidPresentation(entity,blend),punchSide:entity.data.weapon_state?.punch_side,punchHay:!!entity.data.weapon_state?.haymaker,x:pose.position[0],y:pose.position[1],angle:pose.rotation,velX:velocity[0]/60,velY:velocity[1]/60,vx:velocity[0]/60,vy:velocity[1]/60,radius:12,visible:entity.visible!==false&&entity.active,isHidden:!!entity.isHidden,dead:!!entity.dead,walkPhase:packet.walkPhase??0});
         return packet;
     }
     destroy(){PropSprites.clear([...this.props.values()]);this.props.clear();this.people.clear();}
@@ -54,7 +54,7 @@ class ApartmentRenderer {
             if(entity.npc_state?.quip&&entity.npc_state.quip_delay<=0&&entity.npc_state.quip_remaining>0)drawSpeechBubble(ctx,packet.x,packet.y-34,entity.npc_state.quip,1);
         }
         for(const {entity}of visible)if(entity?.active&&entity.entity_type==='df_demoness'){
-            const packet=DFNative.demonessPresentation(entity,blend);DFNative.demonessAppearance.draw.call(packet,ctx,ctx=>{ctx.save();ctx.translate(packet.x,packet.y);ctx.rotate(packet.angle);drawProceduralHumanoid(ctx,packet,{...packet.look,stance:'idle'});ctx.restore();});demonesses.push(packet);
+            const packet=DFNative.demonessPresentation(entity,blend);packet.rigPose=DFNative.humanoidPresentation(entity,blend);DFNative.demonessAppearance.draw.call(packet,ctx,ctx=>{ctx.save();ctx.translate(packet.x,packet.y);ctx.rotate(packet.angle);drawProceduralHumanoid(ctx,packet,{...packet.look,stance:'idle'});ctx.restore();});demonesses.push(packet);
         }
         for(const {entity}of visible)if(entity?.active&&entity.entity_type==='df_drone'){const packet=DFNative.dronePresentation(entity,blend);DFNative.canvasRenderer.drawPackets(ctx,DFNative.createDronePackets(packet));drones.push(packet);}
         for(const {entity}of visible)if(entity?.active&&entity.entity_type==='df_velvet_cat'){const packet=DFNative.velvetPresentation(entity,blend);const art=DFNative.createVelvetCatArt(packet);DFNative.canvasRenderer.drawPackets(ctx,art.body);cats.push({packet,eyes:art.eyes});}

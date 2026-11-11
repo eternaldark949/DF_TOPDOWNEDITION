@@ -1,3 +1,4 @@
+import {humanoidSystem} from '../gameplay/animation/humanoid-system.mjs';
 import {encounterSystem} from '../gameplay/encounters/encounter-system.mjs';
 import {attackSystem} from '../gameplay/attacks/attack-system.mjs';
 import {abilitySystem} from '../gameplay/abilities/ability-system.mjs';
@@ -28,9 +29,10 @@ export function createGameRuntime({ game_db, surface, session_state, player, wea
     const attacks=new attackSystem({weapons,abilities,combat,session,definitions:asset_library.getResource('df:attacks').data});
     const actors=new actorSystem({attacks,abilities,encounters,combat,session,policy:actor_policy});
     encounters.setActors(actors);
+    const humanoids=new humanoidSystem({get_stance:actor=>{if(actor===session.player){if(weapons.state?.holstered)return 'idle';const weapon=session.items.getEquippedWeapon();return weapon?.weaponMode==='melee'?'knife':weapon?.weaponMode==='normal'||weapon?.weaponMode==='sniper'?'pistol':weapons.state?.cooldown>0?'punch':'idle';}return actor.data.humanoid_stance??'idle';}});
     const loot=new lootSystem({items:session.items,get_player:()=>session.player,on_event:(event,detail)=>session.emit(event,detail)});
-    if(options.services && ['session','items','player_state','player_controls','combat','weapons','loot','actors','abilities','attacks','encounters'].some(key=>Object.hasOwn(options.services,key)))throw new TypeError('Directory owns player services');
-    const engine = new gameEngine({ ...options, services:{...options.services,session,items:session.items,player_state,player_controls,combat,weapons,loot,actors,abilities,attacks,encounters}, controls:{...controlProfile,...(surface?.addEventListener?{mouse_target:surface}:{}),...options.controls}, asset_library });
+    if(options.services && ['session','items','player_state','player_controls','combat','weapons','loot','actors','abilities','attacks','encounters','humanoids'].some(key=>Object.hasOwn(options.services,key)))throw new TypeError('Directory owns player services');
+    const engine = new gameEngine({ ...options, services:{...options.services,session,items:session.items,player_state,player_controls,combat,weapons,loot,actors,abilities,attacks,encounters,humanoids}, controls:{...controlProfile,...(surface?.addEventListener?{mouse_target:surface}:{}),...options.controls}, asset_library });
     engine.api.render.registerRenderer('canvas',canvasRenderer);
     engine.registerSystem('surface-input',{
         attach(context){context.defer(context.api.render.onSurfaceChanged(({surface})=>context.api.controls.setMouseTarget(options.controls?.mouse_target??surface)));}
@@ -41,7 +43,7 @@ export function createGameRuntime({ game_db, surface, session_state, player, wea
         engine.registerSystem('items',session.items);
         engine.registerSystem('player-state',player_state);
         engine.registerSystem('player-controls',player_controls);
-        engine.registerSystem('combat',combat);engine.registerSystem('weapons',weapons);engine.registerSystem('encounters',encounters);engine.registerSystem('abilities',abilities);engine.registerSystem('attacks',attacks);engine.registerSystem('actors',actors);engine.registerSystem('loot',loot);
+        engine.registerSystem('combat',combat);engine.registerSystem('weapons',weapons);engine.registerSystem('encounters',encounters);engine.registerSystem('abilities',abilities);engine.registerSystem('attacks',attacks);engine.registerSystem('actors',actors);engine.registerSystem('loot',loot);engine.registerSystem('humanoids',humanoids);
         return engine;
     } catch(error) { engine.dispose();throw error; }
 }

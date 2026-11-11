@@ -1,3 +1,4 @@
+import {rigSystem} from '../animation/rig-system.mjs';
 import {mountedLaunchState} from '../attachments/emitter.mjs';
 import { massProperties, massCenter, invalidateMass, integrateAtCenter, changeAngularSpeed, centerVelocity, setCenterVelocity } from './mass.mjs';
 import { BODY_GROUP, EPS, vector, number, clone, freeze, validBounds, boundsMeet, sub, add, scale, length, unit, rotate, unionBounds } from './values.mjs';
@@ -40,6 +41,7 @@ export class physicsSystem {
         Object.defineProperty(this, 'spatial_grid', { value: new spatialGrid({ cell_size }), enumerable: true });
         Object.defineProperty(this, 'elements', { value: new gameElements(this, { asset_library }), enumerable: true });
         Object.defineProperty(this, 'motion', { value: new motionController(this), enumerable: true });
+        Object.defineProperty(this, 'rigs', { value: new rigSystem(this), enumerable: true });
         Object.defineProperty(this, 'traffic', { value: new trafficController(this), enumerable: true });
         this.#attachments = new attachmentManager(this); this.#queries = new physicsQueries(this); this.#particles = new particlePhysics(this);
     }
@@ -200,7 +202,7 @@ export class physicsSystem {
         this._mutate(() => {
             if (r.removed) return;
             this.#motionEnvelope = null;this.#candidateCache=null; this.spatial_grid.removeInstance(r.id); r.indexed = false; r.removed = true; this.#bodies.delete(r.id); this.#moving.delete(r);
-            this.#attachments._bodyRemoved(r); this.elements._bodyRemoved(r.id); this.traffic.removeVehicle(r.id); this.motion._remove(r.id); this.#particles._bodyRemoved(r.id);
+            this.#attachments._bodyRemoved(r); this.rigs._bodyRemoved(r.id); this.elements._bodyRemoved(r.id); this.traffic.removeVehicle(r.id); this.motion._remove(r.id); this.#particles._bodyRemoved(r.id);
             for (const [id, c] of this.#constraints) { const cr = constraintRecord(c); if (cr.a === r || cr.b === r) this.#constraints.delete(id); }
         });
     }
@@ -430,6 +432,7 @@ export class physicsSystem {
         number(step_seconds, 'step_seconds', EPS, 0.1);
         if (this.#stepping || this.#dispatching) throw new Error('Physics updates are not reentrant');
         this.commitCommands();
+        this.rigs._beforeStep(step_seconds);
         this.#stepping = true; this.#tick++; this.#stepContacts.clear(); this.#stats.steps++;
         try {
             const moving = [...this.#moving].filter(r => bodyActive(r));
@@ -441,7 +444,7 @@ export class physicsSystem {
                     this.#broadphaseEpoch++;r.previous_position=[...r.position];r.previous_rotation=r.rotation;
                 }
             }
-            this.#attachments._capturePrevious();
+            this.#attachments._capturePrevious(step_seconds); this.rigs._capturePrevious();
             this.traffic._update();
             this.#particles._beforeStep(step_seconds);
             for (const r of moving) {
@@ -496,6 +499,7 @@ export class physicsSystem {
                 } else r.sleep_time = 0;
                 this.#sync(r);
             }
+            this.rigs._update(step_seconds);
             this.#attachments._syncAll();
             this.#particles._update(step_seconds);
             for (const [key, packet] of this.#stepContacts) this._emit(this.#contacts.has(key) ? 'contactStay' : 'contactBegin', packet);
@@ -659,13 +663,13 @@ export class physicsSystem {
     removeChain(chain) { return this.#particles.removeChain(chain); }
     clearWorld() {
         this._mutate(() => { for (const r of this.#bodies.values()) r.removed = true; this.#bodies.clear(); this.#moving.clear(); this.#constraints.clear(); this.#contacts.clear(); this.#stepContacts.clear();
-            this.#attachments._clear(); this.elements._clear(); this.traffic._clear(); this.motion._clear(); this.spatial_grid.clear(); this.#particles._clear(); this.#events = []; this.#nextId = 1; this.#nextConstraint = 1; this.#tick = 0; this.#motionEnvelope = null;this.#candidateCache=null;this.#broadphaseEpoch++; });
+            this.#attachments._clear(); this.rigs._clear(); this.elements._clear(); this.traffic._clear(); this.motion._clear(); this.spatial_grid.clear(); this.#particles._clear(); this.#events = []; this.#nextId = 1; this.#nextConstraint = 1; this.#tick = 0; this.#motionEnvelope = null;this.#candidateCache=null;this.#broadphaseEpoch++; });
     }
     // Versioned exchange; validate a replacement before changing the live registry.
     _exportState() {
         if (this.#stepping || this.#dispatching || this.#committing || this.#queue.length) throw new Error('Save physics between steps with no pending commands');
         return { format_version: 2, config: clone(this.config), simulation_tick: this.simulation_tick, entities: this.elements._saveState(),
-            attachments: this.#attachments._saveState(),
+            attachments: this.#attachments._saveState(), rigs:this.rigs._saveState(),
             bodies: [...this.#bodies.values()].map(r => ({ ...snapshot(r), active: r.config.active, force: [...r.force], torque: r.torque, sleep_time: r.sleep_time, motor: this._saveMotor(r.motor) })),
             constraints: [...this.#constraints.values()].map(c => c.getState()), particles: this.#particles._saveState(), traffic: this.traffic._saveState(), motion: this.motion._saveState(),
             spatial_instances: this.spatial_grid.exportInstances().filter(e => typeof e.id === 'string'),
@@ -742,6 +746,7 @@ export class physicsSystem {
         for (const e of saved.spatial_instances ?? []) this.registerSpatialInstance(e.value.instance_id, e.bounds, e.value);
         this.elements._restoreState(saved.entities);
         this.traffic._loadState(saved.traffic); this.motion._loadState(saved.motion);
+        this.rigs._loadState(saved.rigs);
         this.#attachments._loadState(saved.attachments);
     }
 }

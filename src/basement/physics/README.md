@@ -22,6 +22,8 @@ console.log(character.physics_controller.body.getState());
 
 Methods/classes use lower camel case; properties and packet keywords use snake_case. All positions are centres. Units are world units, seconds, kilograms and radians. Gameplay defines objects and sends intentions; the engine owns spatial membership and physical outcomes.
 
+Rigs and keyframe animation are included in `physics.rigs`: lightweight joint hierarchies, clip blending, named anchors and native body attachments share the existing fixed step. See the [rig and animation API](docs/api-reference.md#rigs-and-animation).
+
 ## Documentation
 
 - [Architecture and ownership](docs/architecture.md)

@@ -437,3 +437,71 @@ Event-time accepted launches are pending native commands. They revalidate emitte
 `findRelativePlacement(body, anchor, { distance, angle_offsets = [Math.PI], ...options })` tests authored angles in the anchor's frame. A full candidate must have a clear landing and anchor-to-candidate sweep; blocked fallbacks return null. The caller can recheck the committed destination with `isPlacementClear` before teleporting.
 
 `findFiringPlacement(body, target, { near_range = 420, inner_range = 140, max_candidates = 24 })` searches a bounded native candidate sequence for a clear landing, line of fire and path from the source. It reuses shared-grid placement, ray and path queries; it creates no actor-owned navigation index.
+
+## Rigs and animation
+
+`physics.rigs` is the world's `rigSystem`; the application runtime also exposes the same instance as `api.rigs`. It shares the world's fixed step, body registry, persistence and spatial grid. Ordinary joints and anchors create **zero physics bodies**. Animation data is in `animation/`; this folder remains usable when copied out of the game.
+
+### `rigDefinition`
+
+`new rigDefinition({rig_id, joints, anchors})` compiles an immutable hierarchy. `joints` contains `{name, parent:null, position:[0,0], rotation:0, scale:[1,1], limits:null}`. `limits`, when present, is `{min_rotation,max_rotation}` in radians. Parents may appear after children. Duplicate names, missing references, cycles and singular local scales are rejected. `anchors` is a dictionary of `{joint,position,rotation,scale}` offsets. The hierarchy supports multiple roots and non-humanoid forms.
+
+- `rig_id`: authored identifier.
+- `getJointNames()` / `getAnchorNames()`: detached name arrays.
+- `toJSON()`: detached portable definition.
+
+### `rigPose`
+
+`new rigPose(definition)` creates mutable local transforms from a definition or its descriptor.
+
+- `definition` / `revision`: compiled definition and changed-pose revision.
+- `resetPose()`: restore authored rest transforms.
+- `setJoint(name,{position?,rotation?,scale?})`: update one local transform.
+- `setPose(joints,{weight:1,additive:false,mask:null})`: atomically update/blend named local transforms; limits clamp rotation. Additive positions/rotations are offsets; additive scale is a factor. Rotation blends take the shortest arc. `mask` is an array of joint names.
+- `getLocalPose()`: detached local transform dictionary.
+- `getJoint(name,{root?})` / `getAnchor(name,{root?})`: resolved `{position,rotation,scale,matrix}`. Optional `root` is a transform. `matrix` is the complete affine `[a,b,c,d,x,y]` transform, preserving shear from scaled hierarchies. Resolution is cached until the pose changes.
+- `getSnapshot()` / `load(snapshot)`: versioned pose exchange; invalid loads leave the pose intact.
+
+### `animationClip`
+
+`new animationClip({clip_id,duration,loop:true,tracks:[],markers:[],root_motion:null})` compiles immutable authored data. Times are seconds. Each track is `{joint,channel,keys}`. `channel` is `position`, `rotation` or `scale`; keys are `{time,value,interpolation:'linear'}`. Vector channels use two numbers; rotation uses radians. `interpolation` can also be `hold` or `smooth` and applies from that key to the next. Key times must strictly increase within the duration. Channels hold their first/last authored values outside their keyed interval; non-looping clips hold at the end. Animation scale keys must be positive.
+
+Markers are `{name,time,data:null}` with portable JSON payloads. A separate translation-only `root_motion` track uses `{time,value:[x,y],interpolation?}` keys in body-local space. It never writes a joint or teleports a body.
+
+- `clip_id`, `duration`, `loop`: read-only authored properties.
+- `sample(time)`: detached partial local pose. Looping samples wrap; non-looping samples clamp.
+- `getRootMotion(from,to)`: accumulated local displacement, including crossed loops.
+- `toJSON()`: detached descriptor suitable for reconstruction.
+
+### `animationController`
+
+`new animationController({definition,clips:[]})` combines clips and procedural poses. Standalone controllers have no automatic clock; callers explicitly advance them. Controllers returned by `physics.rigs.createRig` are owned and advanced exclusively by that world.
+
+- `definition`, `revision`: current definition and resolved-pose revision.
+- `addClip(clip)`: register an immutable clip or descriptor; unknown joints and duplicate IDs reject.
+- `play(clip_id,{layer:'base',fade:0,weight:1,speed:1,additive:false,mask:null,restart:false,distance_per_cycle:null,root_motion:false})`: select a clip on a named layer. Repeating the same selection preserves playback; use `restart:true` to reapply options and restart. Layer order is insertion order. A fade crossfades the current layer contribution into the selected clip; masks select affected joints. Additive layers fade their offsets from neutral when first introduced.
+- `stop(layer='base')`: remove a layer and reevaluate remaining layers.
+- `pause()` / `resume()`: pause/resume this controller, including distance playback.
+- `seek(time,{layer:'base'})`: set an absolute clip clock, suppressing skipped markers.
+- `setProceduralPose(joints={})`: replace the final partial local-pose overlay; other joints remain clip controlled. No callback or render-time evaluator is stored.
+- `advance(seconds,{distance:0})`: evaluate a standalone controller and return crossed marker packets. Owned controllers reject direct calls. Steps are 0..0.1 seconds; speed is 0..16. Non-looping end markers emit once. Markers at zero emit on the first positive advance; endpoint and next-loop zero markers are separate authored crossings. Pathological crossings over the marker budget reject before advancing any layer.
+- `getRootMotion(seconds)`: preview the base layer's requested local displacement, or `null` when root motion is disabled/paused.
+- `getJoint(name,options)` / `getAnchor(name,options)`: detached resolved transforms.
+- `getPose()` / `getState()`: detached local transforms / playback state (`paused`, `layers`, `layer_order`).
+- `getSnapshot()` / `load(snapshot)`: portable definition, clips, clocks, fades, marker cursors and procedural pose. Validation is atomic. An owned controller cannot replace its definition through `load`.
+
+`distance_per_cycle` advances the clip by actual body travel after collision resolution, divided by the authored stride distance. A blocked character does not walk in place. `root_motion:true` requires an authored root track on the time-driven base layer and an unmounted native character motor. Before physics, the world converts that displacement into motor intent. Native acceleration, combined mass, axis locks and collisions determine actual travel. This is a desired velocity, not a promise to reach an exact animation endpoint. Mounting a character suspends root translation while its local animation can continue. Disabling/stopping/removing root motion cancels only the motor intent it owns; a subsequent independent movement command is preserved. Root rotation, automatic ragdolls and skeletal collision capsules are not part of this initial API.
+
+### `rigSystem`
+
+- `createRig(body,{definition,clips:[]})`: bind one controller to an existing authoritative body/entity. A body may own one rig. It creates no additional bodies or spatial grid.
+- `getRig(body)`: controller or `null`.
+- `removeRig(body)`: remove a rig; detach bodies bound to its anchors first. Removed-body/rig controllers reject further mutations.
+- `getPose(body,{blend:1,world_space:false,relative_to:null})`: detached resolved `joints` and `anchors`. Blend interpolates previous/current **local** transforms before hierarchy resolution. `relative_to` returns transforms relative to a named joint, e.g. an unscaled authored root; it cannot combine with `world_space:true`.
+- `getAnchor(body,name,{blend:1,world_space:true})`: detached anchor transform, using the body's render interpolation when returning world space.
+
+The world emits `animationMarker` after simulation with `{body,entity,layer,clip_id,name,time,data,simulation_tick}`. Gameplay decides whether a marker produces sound, effects or an attack. Animation does not implicitly apply damage.
+
+Existing `attachBody(child,{parent_body,rig_anchor:'hand_r',local_position:[0,0],local_rotation:0,combine_mass:false})` can bind a real body to a named rig anchor. `local_position`/`local_rotation` are offsets from that anchor. `setAttachmentPose` changes those offsets. `getAttachmentState` includes `rig_anchor`, `anchor_offset_position`, `anchor_offset_rotation` and the currently resolved body-relative local transform. The native attachment manager places, interpolates and carries the existing child body, including anchor translation/angular velocity. Optional combined mass uses existing compound mass/inertia calculations; changing the anchor invalidates the parent mass cache. This is a prescribed mount, not a simulated joint chain or a motor-work/reaction-torque solver.
+
+`savePhysicsState` includes rigs; `loadPhysicsState` validates rigs before replacing the live world and restores them before named-anchor mounts. Older snapshots without rigs continue to load. Removing bodies and clearing the world remove their rigs. Render reads do not advance playback; the application runtime rejects animation mutations from render hooks.
