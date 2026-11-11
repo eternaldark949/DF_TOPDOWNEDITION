@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '69c0ead1e47d';
+        const DFAB_BUILD = '37a91fce3fca';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="8298">
+    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="8320">
 const DFNative = (()=>{
 'use strict';
 // src/basement/physics/core/values.mjs
@@ -21607,10 +21607,20 @@ function resolveApartmentDefinition(library, game_db) {
     Object.entries(rooms.rooms).forEach(([id,r])=>entities.push(rectangle(r,'df_apartment:transition',{role:'room',room_id:id,...r})));
     rooms.doors.forEach((d,index)=>{
         const horizontal=d.orientation==='H', hinged=d.type==='hinged';
+        if(d.type==='sliding'){
+            // Two real kinematic leaves. The artwork and collision bodies share these authored dimensions.
+            const length=(horizontal?d.w:d.h)/2-2,travel=(horizontal?d.w:d.h)/2+4;
+            for(const side of [-1,1]){
+                const position=horizontal?[d.x+d.w/2+side*(length/2+2),d.y+d.h/2]:[d.x+d.w/2,d.y+d.h/2+side*(length/2+2)];
+                entities.push({template:'df_apartment:door',position,collision_shape:{shape_type:'box',dimensions:horizontal?[length,d.h]:[d.w,length]},collision_mask:BODY_GROUP.CHARACTER|BODY_GROUP.PROP|BODY_GROUP.PROJECTILE,
+                    data:{role:side===-1?'door':'door_panel',authored_id:side===-1?`door_${index}`:`door_${index}_right`,door_key:`door_${index}`,panel_version:2,panel_side:side,appearance:d,trigger_position:[d.x+d.w/2,d.y+d.h/2],closed_position:position,open_position:[position[0]+(horizontal?side*travel:0),position[1]+(horizontal?0:side*travel)],closed_rotation:0,open_rotation:0,open:false}});
+            }
+        }else{
         const position=hinged?(horizontal?[d.x,d.y+d.h/2]:[d.x+d.w/2,d.y]):[d.x+d.w/2,d.y+d.h/2];
         entities.push({template:'df_apartment:door',position,collision_shape:{shape_type:'box',dimensions:[d.w,d.h],local_position:hinged?(horizontal?[d.w/2,0]:[0,d.h/2]):[0,0]},
             collision_mask:BODY_GROUP.CHARACTER|BODY_GROUP.PROP|BODY_GROUP.PROJECTILE,data:{role:'door',authored_id:`door_${index}`,appearance:d,closed_position:position,
                 open_position:hinged?position:[position[0]+(horizontal?d.w:0),position[1]+(horizontal?0:d.h)],closed_rotation:0,open_rotation:hinged?Math.PI/2:0,open:false}});
+        }
     });
     for(const [index,l]of rooms.linens.entries()){
         const n=l.segments??5,points=[],edges=[];
@@ -21694,6 +21704,9 @@ class ApartmentLevel {
         this.entities=this.physics.elements.getEntities().filter(e=>e.entity_type!=='df_player');
         this.player=this.physics.elements.getEntities({entity_type:'df_player'})[0];
         this.props=this.entities.filter(e=>e.data.role==='prop'); this.doors=this.entities.filter(e=>e.data.role==='door');
+        this.doorByKey=new Map(this.doors.map(door=>[door.data.authored_id,door]));
+        const panels=new Map(this.entities.filter(e=>e.data.role==='door_panel').map(e=>[e.data.door_key,e]));
+        this.doorPanels=new Map(this.doors.map(door=>[door.entity_id,[door,...(panels.has(door.data.authored_id)?[panels.get(door.data.authored_id)]:[])]]));
         this.curtains=this.entities.filter(e=>e.data.role==='curtain');
         this.companions=this.entities.filter(e=>e.entity_type===NPC.entity_type);
         this.lamps=this.entities.filter(e=>e.data.role==='lamp'); this.transitions=this.entities.filter(e=>e.data.role==='transition');
@@ -21716,8 +21729,8 @@ class ApartmentLevel {
     updateState() {
         for(const c of this.companions)if(c.active!==!!(c.recruited&&!c.dead)){if(c.recruited&&!c.dead)c.activate();else c.deactivate();}
         for(const door of this.doors){
-            const near=this.physics.peruseNearbyEntities(door,{near_range:door.data.appearance.triggerRadius??90,include_groups:2,include_ghosts:false}).length>0;
-            if(near!==door.data.open){door.data.open=near;this.physics.motion.moveBodyTo(door,{position:near?door.data.open_position:door.data.closed_position,rotation:near?door.data.open_rotation:door.data.closed_rotation,duration:this.definition.rules.DOOR_DURATION,easing:'smooth'});}
+            const near=this.physics.peruseNearbyEntities(door.data.trigger_position??door,{near_range:door.data.appearance.triggerRadius??90,include_groups:2,include_ghosts:false}).length>0;
+            if(near!==door.data.open)for(const panel of this.doorPanels.get(door.entity_id)){panel.data.open=near;this.physics.motion.moveBodyTo(panel,{position:near?panel.data.open_position:panel.data.closed_position,rotation:near?panel.data.open_rotation:panel.data.closed_rotation,duration:this.definition.rules.DOOR_DURATION,easing:'smooth'});}
         }
         this.physics.updateState();
     }
@@ -21731,6 +21744,14 @@ class ApartmentLevel {
         for(const record of migrated.entities??[])if(record.entity_type===NPC.entity_type)importActorAbilities(record.data,this.physics.elements.asset_library.getResource('df:abilities').data,{default_id:record.data.role==='red_demon_dancer'?'fireball':null});
         for(const record of migrated.entities??[]){validateMountedAttack(record.data.mounted_attack_state);if(record.data.attack_state)validateAttackState(record.data.attack_state,id=>!!this.physics.elements.asset_library.getResource('df:attacks').data[id]);if(record.data.abilities)new abilityLoadout(record.data.abilities,this.physics.elements.asset_library.getResource('df:abilities').data);}
         this.physics.loadPhysicsState(migrated); this.reconnect();
+        let upgraded=false;
+        for(const door of this.doors)if(door.data.appearance.type==='sliding'&&!door.data.panel_version){
+            const packets=this.definition.entities.filter(p=>p.data.door_key===door.data.authored_id),primary=packets.find(p=>p.data.role==='door');
+            this.physics.motion.stopBodyMotion(door);
+            door.updateBody({position:primary.position,rotation:0,collision_shape:primary.collision_shape});Object.assign(door.data,structuredClone(primary.data));
+            this.physics.createEntity(packets.find(p=>p.data.role==='door_panel'));upgraded=true;
+        }
+        if(upgraded)this.reconnect();
     }
     destroy() { this.physics.clearWorld(); }
 }
@@ -32405,7 +32426,77 @@ const { controlSystem, controlsSystem, inputInstance, keyboardInstance, mouseIns
 
         
     </script>
-    <script type="text/dfab" data-src="world/rooms.js" data-cost="618">
+    <script type="text/dfab" data-src="presentation/indoor-door.js" data-cost="49">
+/** Shared door artwork over presentation records. No body, motor or collision ownership. */
+const indoorDoorAppearance = {
+            draw(ctx) {
+                ctx.save();
+                if (this.type === 'sliding') indoorDoorAppearance.drawSliding.call(this,ctx);
+                else if (this.type === 'arch') indoorDoorAppearance.drawArch.call(this,ctx);
+                else indoorDoorAppearance.drawHinged.call(this,ctx);
+                ctx.restore();
+            },
+
+            drawSliding(ctx) {
+                const slideOffset = this.openAmount * ((this.orientation === 'H' ? this.w : this.h) / 2 + 4);
+                if (this.jolt) ctx.translate(this.orientation === 'H' ? 0 : this.jolt, this.orientation === 'H' ? this.jolt : 0);
+
+                if(this.panels)for(const p of this.panels){ctx.save();ctx.translate(...p.position);ctx.rotate(p.rotation);ctx.fillStyle=this.color;ctx.fillRect(p.local_position[0]-p.dimensions[0]/2,p.local_position[1]-p.dimensions[1]/2,...p.dimensions);ctx.restore();}
+                if (this.orientation === 'H') {
+                    const midX = this.x + this.w / 2;
+                    ctx.fillStyle = this.color;
+                    if(!this.panels)ctx.fillRect(this.x - slideOffset, this.y, this.w / 2 - 2, this.h);
+                    if(!this.panels)ctx.fillRect(midX + 2 + slideOffset, this.y, this.w / 2 - 2, this.h);
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+                    ctx.fillRect(this.x - this.w / 2, this.y - 1, this.w * 2, 1);
+                    ctx.fillRect(this.x - this.w / 2, this.y + this.h, this.w * 2, 1);
+                } else {
+                    const midY = this.y + this.h / 2;
+                    ctx.fillStyle = this.color;
+                    if(!this.panels)ctx.fillRect(this.x, this.y - slideOffset, this.w, this.h / 2 - 2);
+                    if(!this.panels)ctx.fillRect(this.x, midY + 2 + slideOffset, this.w, this.h / 2 - 2);
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
+                    ctx.fillRect(this.x - 1, this.y - this.h / 2, 1, this.h * 2);
+                    ctx.fillRect(this.x + this.w, this.y - this.h / 2, 1, this.h * 2);
+                }
+            },
+
+            /** An open doorway: two stone jambs, a threshold, a gold keystone mark. */
+            drawArch(ctx) {
+                const H = this.orientation === 'H', len = H ? this.w : this.h, th = H ? this.h : this.w;
+                ctx.translate(this.x + this.w / 2, this.y + this.h / 2);
+                if (!H) ctx.rotate(Math.PI / 2);
+                ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(-len / 2, -th / 2, len, th);          // threshold
+                ctx.fillStyle = 'rgba(201,164,106,0.35)'; ctx.fillRect(-len / 2 + 4, -0.5, len - 8, 1);  // brass inlay
+                for (const sx of [-1, 1]) {                                                           // jambs
+                    ctx.fillStyle = '#2a2230'; ctx.fillRect(sx * len / 2 - 5, -th / 2 - 3, 10, th + 6);
+                    ctx.fillStyle = 'rgba(255,230,200,0.10)'; ctx.fillRect(sx * len / 2 - 5, -th / 2 - 3, 10, 1.5);
+                }
+                ctx.fillStyle = '#c9a46a'; ctx.beginPath();                                            // keystone
+                ctx.moveTo(0, -th / 2 - 4); ctx.lineTo(3, -th / 2); ctx.lineTo(0, -th / 2 + 2); ctx.lineTo(-3, -th / 2); ctx.closePath(); ctx.fill();
+            },
+
+            drawHinged(ctx) {
+                const L = this.length, t = this.thickness;
+                ctx.translate(this.hx, this.hy);
+                if (Math.abs(this.angle) > 0.17) {                                  // faint sweep on the floor
+                    ctx.strokeStyle = 'rgba(255,217,176,0.12)'; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+                    ctx.beginPath(); ctx.arc(0, 0, L, this.baseAngle, this.baseAngle + this.angle, this.angle < 0); ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+                ctx.rotate(this.baseAngle + this.angle);
+                ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(2, -t / 2 + 2, L - 2, t);        // shadow
+                ctx.fillStyle = this.color; ctx.fillRect(0, -t / 2, L, t);
+                ctx.fillStyle = 'rgba(255,220,190,0.12)'; ctx.fillRect(3, -t / 2 + 1, L - 6, 1.2); // panel sheen
+                ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 0.8; ctx.strokeRect(0, -t / 2, L, t);
+                ctx.fillStyle = '#c9a46a';                                           // brass handles on both faces
+                ctx.fillRect(L * 0.82, -t / 2 - 2, 5, 2); ctx.fillRect(L * 0.82, t / 2, 5, 2);
+                ctx.fillStyle = '#8a7048'; ctx.beginPath(); ctx.arc(0, 0, 2.4, 0, Math.PI * 2); ctx.fill();   // hinge pin
+            },
+};
+function drawIndoorDoorAppearance(ctx,door){return indoorDoorAppearance.draw.call(door,ctx);}
+    </script>
+    <script type="text/dfab" data-src="world/rooms.js" data-cost="576">
         // ============================================================================
         //  ROOM SYSTEM — the standard for every indoor map
         //  Gives indoor maps the same depth as outdoor: rooms, doors, windows, linens.
@@ -32837,69 +32928,8 @@ const { controlSystem, controlsSystem, inputInstance, keyboardInstance, mouseIns
                 this.openAmount = Math.min(1, Math.abs(this.angle) / (Math.PI / 2));
             }
             
-            draw(ctx) {
-                ctx.save();
-                if (this.type === 'sliding') this.drawSliding(ctx);
-                else if (this.type === 'arch') this.drawArch(ctx);
-                else this.drawHinged(ctx);
-                ctx.restore();
-            }
-            
-            drawSliding(ctx) {
-                const slideOffset = this.openAmount * ((this.orientation === 'H' ? this.w : this.h) / 2 + 4);
-                if (this.jolt) ctx.translate(this.orientation === 'H' ? 0 : this.jolt, this.orientation === 'H' ? this.jolt : 0);
-                
-                if (this.orientation === 'H') {
-                    const midX = this.x + this.w / 2;
-                    ctx.fillStyle = this.color;
-                    ctx.fillRect(this.x - slideOffset, this.y, this.w / 2 - 2, this.h);
-                    ctx.fillRect(midX + 2 + slideOffset, this.y, this.w / 2 - 2, this.h);
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-                    ctx.fillRect(this.x - this.w / 2, this.y - 1, this.w * 2, 1);
-                    ctx.fillRect(this.x - this.w / 2, this.y + this.h, this.w * 2, 1);
-                } else {
-                    const midY = this.y + this.h / 2;
-                    ctx.fillStyle = this.color;
-                    ctx.fillRect(this.x, this.y - slideOffset, this.w, this.h / 2 - 2);
-                    ctx.fillRect(this.x, midY + 2 + slideOffset, this.w, this.h / 2 - 2);
-                    ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-                    ctx.fillRect(this.x - 1, this.y - this.h / 2, 1, this.h * 2);
-                    ctx.fillRect(this.x + this.w, this.y - this.h / 2, 1, this.h * 2);
-                }
-            }
-            
-            /** An open doorway: two stone jambs, a threshold, a gold keystone mark. */
-            drawArch(ctx) {
-                const H = this.orientation === 'H', len = H ? this.w : this.h, th = H ? this.h : this.w;
-                ctx.translate(this.x + this.w / 2, this.y + this.h / 2);
-                if (!H) ctx.rotate(Math.PI / 2);
-                ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.fillRect(-len / 2, -th / 2, len, th);          // threshold
-                ctx.fillStyle = 'rgba(201,164,106,0.35)'; ctx.fillRect(-len / 2 + 4, -0.5, len - 8, 1);  // brass inlay
-                for (const sx of [-1, 1]) {                                                           // jambs
-                    ctx.fillStyle = '#2a2230'; ctx.fillRect(sx * len / 2 - 5, -th / 2 - 3, 10, th + 6);
-                    ctx.fillStyle = 'rgba(255,230,200,0.10)'; ctx.fillRect(sx * len / 2 - 5, -th / 2 - 3, 10, 1.5);
-                }
-                ctx.fillStyle = '#c9a46a'; ctx.beginPath();                                            // keystone
-                ctx.moveTo(0, -th / 2 - 4); ctx.lineTo(3, -th / 2); ctx.lineTo(0, -th / 2 + 2); ctx.lineTo(-3, -th / 2); ctx.closePath(); ctx.fill();
-            }
+            draw(ctx) { return drawIndoorDoorAppearance(ctx,this); }
 
-            drawHinged(ctx) {
-                const L = this.length, t = this.thickness;
-                ctx.translate(this.hx, this.hy);
-                if (Math.abs(this.angle) > 0.17) {                                  // faint sweep on the floor
-                    ctx.strokeStyle = 'rgba(255,217,176,0.12)'; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
-                    ctx.beginPath(); ctx.arc(0, 0, L, this.baseAngle, this.baseAngle + this.angle, this.angle < 0); ctx.stroke();
-                    ctx.setLineDash([]);
-                }
-                ctx.rotate(this.baseAngle + this.angle);
-                ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fillRect(2, -t / 2 + 2, L - 2, t);        // shadow
-                ctx.fillStyle = this.color; ctx.fillRect(0, -t / 2, L, t);
-                ctx.fillStyle = 'rgba(255,220,190,0.12)'; ctx.fillRect(3, -t / 2 + 1, L - 6, 1.2); // panel sheen
-                ctx.strokeStyle = 'rgba(0,0,0,0.35)'; ctx.lineWidth = 0.8; ctx.strokeRect(0, -t / 2, L, t);
-                ctx.fillStyle = '#c9a46a';                                           // brass handles on both faces
-                ctx.fillRect(L * 0.82, -t / 2 - 2, 5, 2); ctx.fillRect(L * 0.82, t / 2, 5, 2);
-                ctx.fillStyle = '#8a7048'; ctx.beginPath(); ctx.arc(0, 0, 2.4, 0, Math.PI * 2); ctx.fill();   // hinge pin
-            }
         }
         
         /**
@@ -89939,7 +89969,7 @@ engineMixin({
             }
         });
     </script>
-    <script type="text/dfab" data-src="engine/noise.js" data-cost="130">
+    <script type="text/dfab" data-src="engine/noise.js" data-cost="135">
         // GameEngine — Noise: sounds that give 949 (and fights) away. Methods are added to
         // GameEngine.prototype (see engineMixin in game-engine.js). Enemies hear by sound and
         // see by light (calculatePlayerVisibility); there's no radar. See CONFIG.NOISE.
@@ -89952,6 +89982,12 @@ engineMixin({
              */
             emitNoise(x, y, reach, kind, fromPlayer = true, opts = {}) {
                 if (!reach || !this.activeMap) return 0;
+                if(this.activeLevel){
+                    const heard=opts.hear===false?0:this.actors.hearNoise([x,y],{near_range:reach});
+                    if(fromPlayer&&heard)this._lastContactAt=_gameTimeSec;
+                    if(opts.ring!==false&&(fromPlayer||GameSettings.enemyRings!==false&&this.physics_system.observeTarget(this.player,[x,y],{near_range:reach}).in_range))this._spawnRing(x,y,reach,!fromPlayer,opts.src);
+                    return heard;
+                }
                 const N = CONFIG.NOISE, walls = this.activeMap.walls, cols = getColliders(this.activeMap), rs = this.roomSystem;
                 let heard = 0;
                 // opts.hear === false: a sound only she can hear (a guard's own footsteps don't alert the others)
@@ -89998,7 +90034,8 @@ engineMixin({
             _spawnRing(x, y, reach, enemy, src) {
                 const R = this.noiseRipples || (this.noiseRipples = []);
                 const P = this.player, RING_GAP = 0.18, RING_PER_SRC = 2;
-                const key = src || (!enemy && P && Math.abs(x - P.x) + Math.abs(y - P.y) < 60 ? P : null);
+                const [px,py]=P?this.playerPosition:[0,0];
+                const key = src || (!enemy && P && Math.abs(x - px) + Math.abs(y - py) < 60 ? P : null);
                 const patch = key ? null : ((x / 90) | 0) * 100003 + ((y / 90) | 0);
                 let young = null, mine = 0, oldest = -1, side = 0;
                 for (let i = 0; i < R.length; i++) {
@@ -94906,7 +94943,7 @@ engineMixin({
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/daytime-flit.js" data-cost="347">
+    <script type="text/dfab" data-src="engine/daytime-flit.js" data-cost="350">
         // GameEngine — Daytime exposure, flit teleport effects, graveyard ghosts.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -95076,7 +95113,7 @@ engineMixin({
             },
 
             triggerFlit(angleOverride, source) {
-                if(this.activeLevel)return this._flitApartment(arguments[0]);
+                if(this.activeLevel&&(this.player.dead||this.physics_system.getAttachmentState(this.player)||this.furniture.busy()))return false;
                 if (this.isDriving || this.paused) return false;
                 if (this.hud && !this.hud.has('flit')) return false;   // not introduced yet (ui/hud-reveal.js)
                 
@@ -95110,6 +95147,7 @@ engineMixin({
                     return false;
                 }
                 const targetX = landing.x, targetY = landing.y;
+                if(this.activeLevel&&!this.player.teleportTo([targetX,targetY],{placement_mode:'clear'})){this._signalFlitLanding('blocked',flitAngle);return false;}
                 const traveled = Math.hypot(targetX - startX, targetY - startY);
                 if (flitDist - traveled > Math.max(6, flitDist * .05)) this._signalFlitLanding('short', flitAngle);
                 else this._flitFeedback = null;
@@ -95125,7 +95163,8 @@ engineMixin({
                 this._afterimage = ai ? { x: startX, y: startY, until: _gameTimeSec + this.resonance.value('afterimage', 'secs') * ai } : null;
 
                 if (traveled > 1) this.spillDrink(SPILL.FLIT_COST, (startX - targetX) / traveled, (startY - targetY) / traveled, startX, startY);   // the drink stays behind a moment (engine/spills.js)
-                this.player.x = targetX; this.player.y = targetY; resetHumanoidAnim(this.player); showMessage("FLIT!"); this.triggerShake(4);
+                if(!this.activeLevel){this.player.x = targetX; this.player.y = targetY; resetHumanoidAnim(this.player);}
+                showMessage("FLIT!"); this.triggerShake(4);
 
                 // --- Spawn Flit VFX ---
                 const cosmeticConfig = this.cosmetics.getRenderConfig();
@@ -95280,7 +95319,8 @@ engineMixin({
                 if (age < 0 || age >= life) { this._flitFeedback = null; return; }
                 if (!this.player.visible || this.player.dead || this.isDriving) return;
                 const m = ctx.getTransform(), p = this.player, w = ctx.canvas.width, h = ctx.canvas.height;
-                const x = m.a * p.x + m.c * p.y + m.e, y = m.b * p.x + m.d * p.y + m.f;
+                const [px,py]=this.playerPosition;
+                const x = m.a * px + m.c * py + m.e, y = m.b * px + m.d * py + m.f;
                 if (x < -64 || x > w + 64 || y < -64 || y > h + 64) return;
                 const a = cue.angle, ux = Math.cos(a), uy = Math.sin(a);
                 const screenA = Math.atan2(m.b * ux + m.d * uy, m.a * ux + m.c * uy);
@@ -109050,7 +109090,7 @@ class ApartmentRooms {
     tagLamps(){}
 }
     </script>
-    <script type="text/dfab" data-src="engine/apartment-renderer.js" data-cost="73">
+    <script type="text/dfab" data-src="engine/apartment-renderer.js" data-cost="80">
 /** Native scene presentation. Packets below are drawing inputs, never entities or body owners. */
 class ApartmentRenderer {
     constructor(game){this.game=game;this.people=new Map();this.props=new Map();}
@@ -109073,18 +109113,23 @@ class ApartmentRenderer {
         const player=this.personPacket(level.player,blend),zoom=game.camera.zoom;
         if(!game._cityView)game._cityView=game._makeAptCityView();
         const cam=game.resolveCameraView(zoom,player);game.view=cam;
+        const view={left:cam.x-canvas.width/(2*zoom),right:cam.x+canvas.width/(2*zoom),top:cam.y-canvas.height/(2*zoom),bottom:cam.y+canvas.height/(2*zoom)};
+        game._cullBounds={view,props:view,lamps:view,lampGlow:view};
         ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#0a0810';ctx.fillRect(0,0,canvas.width,canvas.height);
         ctx.save();ctx.translate(canvas.width/2,canvas.height/2);ctx.scale(zoom,zoom);ctx.translate(-cam.x,-cam.y);
         game.drawApartmentBackdrop(ctx);game.drawApartmentInterior(ctx);
         const bounds={left:cam.x-canvas.width/(2*zoom)-180,right:cam.x+canvas.width/(2*zoom)+180,top:cam.y-canvas.height/(2*zoom)-180,bottom:cam.y+canvas.height/(2*zoom)+180};
-        const visible=world.queryEntitiesInBounds({bounds}),props=[];PropSprites.frame(zoom);
+        const visible=world.queryEntitiesInBounds({bounds}),props=[],drawnDoors=new Set();PropSprites.frame(zoom);
         for(const{entity:e}of visible){
             if(!e)continue;
             if(e.data.role==='wall'){const p=e.getRenderState(blend),[w,h]=e.collision_shape.dimensions;ctx.fillStyle='#291d2d';ctx.fillRect(p.position[0]-w/2,p.position[1]-h/2,w,h);}
             if(e.data.role==='prop'){const p=this.propPacket(e,blend);props.push(p);p.draw(ctx);}
-            if(e.data.role==='door'){
-                const pose=e.getRenderState(blend),shape=e.collision_shape;ctx.save();ctx.translate(...pose.position);ctx.rotate(pose.rotation);ctx.fillStyle=e.data.appearance.color;
-                ctx.fillRect(shape.local_position[0]-shape.dimensions[0]/2,shape.local_position[1]-shape.dimensions[1]/2,...shape.dimensions);ctx.strokeStyle='#9f92a8';ctx.strokeRect(shape.local_position[0]-shape.dimensions[0]/2,shape.local_position[1]-shape.dimensions[1]/2,...shape.dimensions);ctx.restore();
+            if(e.data.role==='door'||e.data.role==='door_panel'){
+                const door=e.data.role==='door'?e:level.doorByKey.get(e.data.door_key);if(drawnDoors.has(door.entity_id))continue;drawnDoors.add(door.entity_id);
+                const a=door.data.appearance,pose=door.getRenderState(blend),shape=door.collision_shape;
+                const packet={...a,hx:pose.position[0],hy:pose.position[1],length:a.orientation==='H'?a.w:a.h,baseAngle:a.orientation==='H'?0:Math.PI/2,angle:pose.rotation,thickness:a.orientation==='H'?shape.dimensions[1]:shape.dimensions[0]};
+                if(a.type==='sliding')packet.panels=level.doorPanels.get(door.entity_id).map(panel=>({...panel.getRenderState(blend),dimensions:panel.collision_shape.dimensions,local_position:panel.collision_shape.local_position??[0,0]}));
+                drawIndoorDoorAppearance(ctx,packet);
             }
         }
         for(const{entity:e}of visible)if(e?.data.role==='lamp'){
@@ -109111,6 +109156,8 @@ class ApartmentRenderer {
         for(const r of Object.values(game.roomSystem.rooms))if(r.type!=='outdoor'){
             ctx.fillStyle=`rgba(7,5,14,${r.lightsOff ? 0.85 : 0.18})`;ctx.fillRect(r.x,r.y,r.w,r.h);
         }
+        game.drawNoiseRipples(ctx);
+        if(game.flitVFX.length)game.drawFlitVFX(ctx);
         game.drawPlayerGlow(ctx);game.drawApartmentGlow(ctx,props);
         for(const{entity:e}of visible)if(e?.data.role==='lamp'){
             const a=e.data.appearance,p=e.getRenderState(blend);if(a.visible!==false)drawLampFixtureLit(ctx,a.fixture??'shade_rose',...p.position,a.color,game.roomSystem.lightAt(...p.position),{angle:a.angle??0});
@@ -109120,12 +109167,12 @@ class ApartmentRenderer {
         const target=game.furniture.target??game.furniture.cand;
         if(target){const p=target.getRenderState(blend),[w,h]=target.collision_shape.dimensions;ctx.save();ctx.translate(...p.position);ctx.rotate(p.rotation);ctx.strokeStyle='#ead49c';ctx.lineWidth=1.5;ctx.strokeRect(-w/2-3,-h/2-3,w+6,h+6);ctx.restore();}
         if(game.playerEmote.text&&game.playerEmote.age<game.playerEmote.duration)drawSpeechBubble(ctx,player.x,player.y-34,game.playerEmote.text,1);
-        game.drawScopeView(ctx);
+        game.drawFlitFeedback(ctx);game.drawScopeView(ctx);
         ctx.restore();game.drawPlayerMarker(ctx,player);
     }
 }
     </script>
-    <script type="text/dfab" data-src="engine/apartment-level.js" data-cost="143">
+    <script type="text/dfab" data-src="engine/apartment-level.js" data-cost="141">
 // Native apartment host: scene lifecycle and game policy, separate from Basement simulation.
 const APARTMENT_ROSTER_FIELDS=[...DFNative.ROSTER_FIELDS,'equippedWeaponId','weaponId','hp','maxHp','inventory'];
 const apartmentRosterRecord=t=>({name:t.name,...Object.fromEntries(APARTMENT_ROSTER_FIELDS.map(k=>[k,t[k]??null]))});
@@ -109191,7 +109238,9 @@ engineMixin({
         const blocked=hudInputBlocked()||this.scenes?.running||this.furniture.state==='choose';
         if(blocked)direction=[0,0];
         const F=this.fireJoystick,quickLocked=this._quickDraw&&this._quickDraw.phase!=='ready';let aiming=!!quickLocked;
-        if(!quickLocked&&!blocked&&!this.furniture.holding&&F.active&&(F.dx||F.dy)){this.player.lookInDirection([F.dx,F.dy]);this._apartmentAim={direction:[F.dx,F.dy]};aiming=true;}
+        const releasing=Number.isFinite(this._releaseShot);
+        if(!quickLocked&&!blocked&&!this.furniture.holding&&releasing){this.player.setRotation(this._releaseShot);this._apartmentAim={angle:this._releaseShot};aiming=true;}
+        else if(!quickLocked&&!blocked&&!this.furniture.holding&&F.active&&(F.dx||F.dy)){this.player.lookInDirection([F.dx,F.dy]);this._apartmentAim={direction:[F.dx,F.dy]};aiming=true;}
         else if(!quickLocked&&!blocked&&!this.furniture.holding&&this.mouseDown){const p=this.viewToWorld(this.mouseX,this.mouseY);this.player.lookAtTarget([p.x,p.y]);this._apartmentAim={target:[p.x,p.y]};aiming=true;}
         else {this._apartmentAim=null;if(this.furniture.holding)this.player.lookAtTarget(this.furniture.target);else this.player.clearFacing();}
         if(this.furniture.state!=='walk'){
@@ -109199,8 +109248,9 @@ engineMixin({
             this.player.setMovement(direction,{speed,face_movement:!aiming&&!this.furniture.holding});
         }else if(direction[0]||direction[1])this.furniture.release();
         this.actors.beforePhysics(this._nativeActorContext,world.config.fixed_step);this.weapons.beforePhysics(this._nativeActorContext);this.abilities.beforePhysics(this._nativeActorContext);this.attacks.beforePhysics(this._nativeActorContext);this.updateQuickDraw();
-        if(!blocked&&(this.mouseDown||F.active&&F.firing)&&this.shootCooldown<=0)this.fireWeapon();
-        level.updateState();this.combat.advance(world.config.fixed_step);this.worldLoot.advance(world.config.fixed_step);world.commitCommands();this.roomSystem.update();this.updateScope();this.updatePlayerRecovery();this.updateFlitRing();
+        if(!blocked&&(releasing||this.mouseDown||F.active&&F.firing)&&this.shootCooldown<=0){const fired=this.fireWeapon();if(releasing&&fired){this._releaseShot=null;this._releaseWait=0;}}
+        if(releasing&&this._releaseShot!==null&&(this._releaseWait=(this._releaseWait??0)+1)>30){this._releaseShot=null;this._releaseWait=0;}
+        level.updateState();this.combat.advance(world.config.fixed_step);this.worldLoot.advance(world.config.fixed_step);world.commitCommands();this.roomSystem.update();this.updateScope();this.updatePlayerRecovery();this.updateFlitRing();this.updateNoiseRipples();if(this.flitVFX.length)this.updateFlitVFX();
         this.weather.setIndoorSuppressed(!this.roomSystem.isPlayerOutdoor());
         this.updateTime();this.updateUI();this.story.update();if(this.activeLevel!==level)return;
         this._apartmentInteraction();this._apartmentBlend=1;
@@ -109231,13 +109281,6 @@ engineMixin({
     },
     _disposeNativeCombat(){
         this.actors?.detach();this.actors=null;this._nativeActorContext=null;this.attacks?.detach();this.attacks=null;this.abilities?.detach();this.abilities=null;this.weapons?.detach();this.combat?.detach();this.worldLoot?.detach();for(const fn of this._nativeCombatCleanups??[])fn();this._nativeCombatCleanups=[];this.weapons=null;this.combat=null;this.worldLoot=null;
-    },
-    _flitApartment(angle){
-        if(this.paused||this.player.dead||this.isDriving||this.physics_system.getAttachmentState(this.player)||this.furniture.busy()||this.hud&&!this.hud.has('flit'))return false;
-        const cost=this.flitCost();
-        if(this.player.vitals.attunement<cost)return false;
-        const result=this.player.teleportInDirection(undefined,{angle,distance:this.flitDistance(),placement_bounds:{left:8,top:8,right:this.activeMap.width-8,bottom:this.activeMap.height-8},placement_mode:'clear',min_distance:this.player.vitals.flit_minimum_distance});
-        if(!result)return false;this.player.vitals.beginFlit(cost,undefined,_gameTimeSec);showMessage('FLIT!');return true;
     }
 });
     </script>

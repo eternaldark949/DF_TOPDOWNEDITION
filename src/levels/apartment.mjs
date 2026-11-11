@@ -27,6 +27,9 @@ export class ApartmentLevel {
         this.entities=this.physics.elements.getEntities().filter(e=>e.entity_type!=='df_player');
         this.player=this.physics.elements.getEntities({entity_type:'df_player'})[0];
         this.props=this.entities.filter(e=>e.data.role==='prop'); this.doors=this.entities.filter(e=>e.data.role==='door');
+        this.doorByKey=new Map(this.doors.map(door=>[door.data.authored_id,door]));
+        const panels=new Map(this.entities.filter(e=>e.data.role==='door_panel').map(e=>[e.data.door_key,e]));
+        this.doorPanels=new Map(this.doors.map(door=>[door.entity_id,[door,...(panels.has(door.data.authored_id)?[panels.get(door.data.authored_id)]:[])]]));
         this.curtains=this.entities.filter(e=>e.data.role==='curtain');
         this.companions=this.entities.filter(e=>e.entity_type===NPC.entity_type);
         this.lamps=this.entities.filter(e=>e.data.role==='lamp'); this.transitions=this.entities.filter(e=>e.data.role==='transition');
@@ -49,8 +52,8 @@ export class ApartmentLevel {
     updateState() {
         for(const c of this.companions)if(c.active!==!!(c.recruited&&!c.dead)){if(c.recruited&&!c.dead)c.activate();else c.deactivate();}
         for(const door of this.doors){
-            const near=this.physics.peruseNearbyEntities(door,{near_range:door.data.appearance.triggerRadius??90,include_groups:2,include_ghosts:false}).length>0;
-            if(near!==door.data.open){door.data.open=near;this.physics.motion.moveBodyTo(door,{position:near?door.data.open_position:door.data.closed_position,rotation:near?door.data.open_rotation:door.data.closed_rotation,duration:this.definition.rules.DOOR_DURATION,easing:'smooth'});}
+            const near=this.physics.peruseNearbyEntities(door.data.trigger_position??door,{near_range:door.data.appearance.triggerRadius??90,include_groups:2,include_ghosts:false}).length>0;
+            if(near!==door.data.open)for(const panel of this.doorPanels.get(door.entity_id)){panel.data.open=near;this.physics.motion.moveBodyTo(panel,{position:near?panel.data.open_position:panel.data.closed_position,rotation:near?panel.data.open_rotation:panel.data.closed_rotation,duration:this.definition.rules.DOOR_DURATION,easing:'smooth'});}
         }
         this.physics.updateState();
     }
@@ -64,6 +67,14 @@ export class ApartmentLevel {
         for(const record of migrated.entities??[])if(record.entity_type===NPC.entity_type)importActorAbilities(record.data,this.physics.elements.asset_library.getResource('df:abilities').data,{default_id:record.data.role==='red_demon_dancer'?'fireball':null});
         for(const record of migrated.entities??[]){validateMountedAttack(record.data.mounted_attack_state);if(record.data.attack_state)validateAttackState(record.data.attack_state,id=>!!this.physics.elements.asset_library.getResource('df:attacks').data[id]);if(record.data.abilities)new abilityLoadout(record.data.abilities,this.physics.elements.asset_library.getResource('df:abilities').data);}
         this.physics.loadPhysicsState(migrated); this.reconnect();
+        let upgraded=false;
+        for(const door of this.doors)if(door.data.appearance.type==='sliding'&&!door.data.panel_version){
+            const packets=this.definition.entities.filter(p=>p.data.door_key===door.data.authored_id),primary=packets.find(p=>p.data.role==='door');
+            this.physics.motion.stopBodyMotion(door);
+            door.updateBody({position:primary.position,rotation:0,collision_shape:primary.collision_shape});Object.assign(door.data,structuredClone(primary.data));
+            this.physics.createEntity(packets.find(p=>p.data.role==='door_panel'));upgraded=true;
+        }
+        if(upgraded)this.reconnect();
     }
     destroy() { this.physics.clearWorld(); }
 }

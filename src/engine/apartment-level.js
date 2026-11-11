@@ -63,7 +63,9 @@ engineMixin({
         const blocked=hudInputBlocked()||this.scenes?.running||this.furniture.state==='choose';
         if(blocked)direction=[0,0];
         const F=this.fireJoystick,quickLocked=this._quickDraw&&this._quickDraw.phase!=='ready';let aiming=!!quickLocked;
-        if(!quickLocked&&!blocked&&!this.furniture.holding&&F.active&&(F.dx||F.dy)){this.player.lookInDirection([F.dx,F.dy]);this._apartmentAim={direction:[F.dx,F.dy]};aiming=true;}
+        const releasing=Number.isFinite(this._releaseShot);
+        if(!quickLocked&&!blocked&&!this.furniture.holding&&releasing){this.player.setRotation(this._releaseShot);this._apartmentAim={angle:this._releaseShot};aiming=true;}
+        else if(!quickLocked&&!blocked&&!this.furniture.holding&&F.active&&(F.dx||F.dy)){this.player.lookInDirection([F.dx,F.dy]);this._apartmentAim={direction:[F.dx,F.dy]};aiming=true;}
         else if(!quickLocked&&!blocked&&!this.furniture.holding&&this.mouseDown){const p=this.viewToWorld(this.mouseX,this.mouseY);this.player.lookAtTarget([p.x,p.y]);this._apartmentAim={target:[p.x,p.y]};aiming=true;}
         else {this._apartmentAim=null;if(this.furniture.holding)this.player.lookAtTarget(this.furniture.target);else this.player.clearFacing();}
         if(this.furniture.state!=='walk'){
@@ -71,8 +73,9 @@ engineMixin({
             this.player.setMovement(direction,{speed,face_movement:!aiming&&!this.furniture.holding});
         }else if(direction[0]||direction[1])this.furniture.release();
         this.actors.beforePhysics(this._nativeActorContext,world.config.fixed_step);this.weapons.beforePhysics(this._nativeActorContext);this.abilities.beforePhysics(this._nativeActorContext);this.attacks.beforePhysics(this._nativeActorContext);this.updateQuickDraw();
-        if(!blocked&&(this.mouseDown||F.active&&F.firing)&&this.shootCooldown<=0)this.fireWeapon();
-        level.updateState();this.combat.advance(world.config.fixed_step);this.worldLoot.advance(world.config.fixed_step);world.commitCommands();this.roomSystem.update();this.updateScope();this.updatePlayerRecovery();this.updateFlitRing();
+        if(!blocked&&(releasing||this.mouseDown||F.active&&F.firing)&&this.shootCooldown<=0){const fired=this.fireWeapon();if(releasing&&fired){this._releaseShot=null;this._releaseWait=0;}}
+        if(releasing&&this._releaseShot!==null&&(this._releaseWait=(this._releaseWait??0)+1)>30){this._releaseShot=null;this._releaseWait=0;}
+        level.updateState();this.combat.advance(world.config.fixed_step);this.worldLoot.advance(world.config.fixed_step);world.commitCommands();this.roomSystem.update();this.updateScope();this.updatePlayerRecovery();this.updateFlitRing();this.updateNoiseRipples();if(this.flitVFX.length)this.updateFlitVFX();
         this.weather.setIndoorSuppressed(!this.roomSystem.isPlayerOutdoor());
         this.updateTime();this.updateUI();this.story.update();if(this.activeLevel!==level)return;
         this._apartmentInteraction();this._apartmentBlend=1;
@@ -103,12 +106,5 @@ engineMixin({
     },
     _disposeNativeCombat(){
         this.actors?.detach();this.actors=null;this._nativeActorContext=null;this.attacks?.detach();this.attacks=null;this.abilities?.detach();this.abilities=null;this.weapons?.detach();this.combat?.detach();this.worldLoot?.detach();for(const fn of this._nativeCombatCleanups??[])fn();this._nativeCombatCleanups=[];this.weapons=null;this.combat=null;this.worldLoot=null;
-    },
-    _flitApartment(angle){
-        if(this.paused||this.player.dead||this.isDriving||this.physics_system.getAttachmentState(this.player)||this.furniture.busy()||this.hud&&!this.hud.has('flit'))return false;
-        const cost=this.flitCost();
-        if(this.player.vitals.attunement<cost)return false;
-        const result=this.player.teleportInDirection(undefined,{angle,distance:this.flitDistance(),placement_bounds:{left:8,top:8,right:this.activeMap.width-8,bottom:this.activeMap.height-8},placement_mode:'clear',min_distance:this.player.vitals.flit_minimum_distance});
-        if(!result)return false;this.player.vitals.beginFlit(cost,undefined,_gameTimeSec);showMessage('FLIT!');return true;
     }
 });

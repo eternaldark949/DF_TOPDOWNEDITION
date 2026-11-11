@@ -20,18 +20,23 @@ class ApartmentRenderer {
         const player=this.personPacket(level.player,blend),zoom=game.camera.zoom;
         if(!game._cityView)game._cityView=game._makeAptCityView();
         const cam=game.resolveCameraView(zoom,player);game.view=cam;
+        const view={left:cam.x-canvas.width/(2*zoom),right:cam.x+canvas.width/(2*zoom),top:cam.y-canvas.height/(2*zoom),bottom:cam.y+canvas.height/(2*zoom)};
+        game._cullBounds={view,props:view,lamps:view,lampGlow:view};
         ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#0a0810';ctx.fillRect(0,0,canvas.width,canvas.height);
         ctx.save();ctx.translate(canvas.width/2,canvas.height/2);ctx.scale(zoom,zoom);ctx.translate(-cam.x,-cam.y);
         game.drawApartmentBackdrop(ctx);game.drawApartmentInterior(ctx);
         const bounds={left:cam.x-canvas.width/(2*zoom)-180,right:cam.x+canvas.width/(2*zoom)+180,top:cam.y-canvas.height/(2*zoom)-180,bottom:cam.y+canvas.height/(2*zoom)+180};
-        const visible=world.queryEntitiesInBounds({bounds}),props=[];PropSprites.frame(zoom);
+        const visible=world.queryEntitiesInBounds({bounds}),props=[],drawnDoors=new Set();PropSprites.frame(zoom);
         for(const{entity:e}of visible){
             if(!e)continue;
             if(e.data.role==='wall'){const p=e.getRenderState(blend),[w,h]=e.collision_shape.dimensions;ctx.fillStyle='#291d2d';ctx.fillRect(p.position[0]-w/2,p.position[1]-h/2,w,h);}
             if(e.data.role==='prop'){const p=this.propPacket(e,blend);props.push(p);p.draw(ctx);}
-            if(e.data.role==='door'){
-                const pose=e.getRenderState(blend),shape=e.collision_shape;ctx.save();ctx.translate(...pose.position);ctx.rotate(pose.rotation);ctx.fillStyle=e.data.appearance.color;
-                ctx.fillRect(shape.local_position[0]-shape.dimensions[0]/2,shape.local_position[1]-shape.dimensions[1]/2,...shape.dimensions);ctx.strokeStyle='#9f92a8';ctx.strokeRect(shape.local_position[0]-shape.dimensions[0]/2,shape.local_position[1]-shape.dimensions[1]/2,...shape.dimensions);ctx.restore();
+            if(e.data.role==='door'||e.data.role==='door_panel'){
+                const door=e.data.role==='door'?e:level.doorByKey.get(e.data.door_key);if(drawnDoors.has(door.entity_id))continue;drawnDoors.add(door.entity_id);
+                const a=door.data.appearance,pose=door.getRenderState(blend),shape=door.collision_shape;
+                const packet={...a,hx:pose.position[0],hy:pose.position[1],length:a.orientation==='H'?a.w:a.h,baseAngle:a.orientation==='H'?0:Math.PI/2,angle:pose.rotation,thickness:a.orientation==='H'?shape.dimensions[1]:shape.dimensions[0]};
+                if(a.type==='sliding')packet.panels=level.doorPanels.get(door.entity_id).map(panel=>({...panel.getRenderState(blend),dimensions:panel.collision_shape.dimensions,local_position:panel.collision_shape.local_position??[0,0]}));
+                drawIndoorDoorAppearance(ctx,packet);
             }
         }
         for(const{entity:e}of visible)if(e?.data.role==='lamp'){
@@ -58,6 +63,8 @@ class ApartmentRenderer {
         for(const r of Object.values(game.roomSystem.rooms))if(r.type!=='outdoor'){
             ctx.fillStyle=`rgba(7,5,14,${r.lightsOff ? 0.85 : 0.18})`;ctx.fillRect(r.x,r.y,r.w,r.h);
         }
+        game.drawNoiseRipples(ctx);
+        if(game.flitVFX.length)game.drawFlitVFX(ctx);
         game.drawPlayerGlow(ctx);game.drawApartmentGlow(ctx,props);
         for(const{entity:e}of visible)if(e?.data.role==='lamp'){
             const a=e.data.appearance,p=e.getRenderState(blend);if(a.visible!==false)drawLampFixtureLit(ctx,a.fixture??'shade_rose',...p.position,a.color,game.roomSystem.lightAt(...p.position),{angle:a.angle??0});
@@ -67,7 +74,7 @@ class ApartmentRenderer {
         const target=game.furniture.target??game.furniture.cand;
         if(target){const p=target.getRenderState(blend),[w,h]=target.collision_shape.dimensions;ctx.save();ctx.translate(...p.position);ctx.rotate(p.rotation);ctx.strokeStyle='#ead49c';ctx.lineWidth=1.5;ctx.strokeRect(-w/2-3,-h/2-3,w+6,h+6);ctx.restore();}
         if(game.playerEmote.text&&game.playerEmote.age<game.playerEmote.duration)drawSpeechBubble(ctx,player.x,player.y-34,game.playerEmote.text,1);
-        game.drawScopeView(ctx);
+        game.drawFlitFeedback(ctx);game.drawScopeView(ctx);
         ctx.restore();game.drawPlayerMarker(ctx,player);
     }
 }

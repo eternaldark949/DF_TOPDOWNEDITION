@@ -27,10 +27,20 @@ export function resolveApartmentDefinition(library, game_db) {
     Object.entries(rooms.rooms).forEach(([id,r])=>entities.push(rectangle(r,'df_apartment:transition',{role:'room',room_id:id,...r})));
     rooms.doors.forEach((d,index)=>{
         const horizontal=d.orientation==='H', hinged=d.type==='hinged';
+        if(d.type==='sliding'){
+            // Two real kinematic leaves. The artwork and collision bodies share these authored dimensions.
+            const length=(horizontal?d.w:d.h)/2-2,travel=(horizontal?d.w:d.h)/2+4;
+            for(const side of [-1,1]){
+                const position=horizontal?[d.x+d.w/2+side*(length/2+2),d.y+d.h/2]:[d.x+d.w/2,d.y+d.h/2+side*(length/2+2)];
+                entities.push({template:'df_apartment:door',position,collision_shape:{shape_type:'box',dimensions:horizontal?[length,d.h]:[d.w,length]},collision_mask:BODY_GROUP.CHARACTER|BODY_GROUP.PROP|BODY_GROUP.PROJECTILE,
+                    data:{role:side===-1?'door':'door_panel',authored_id:side===-1?`door_${index}`:`door_${index}_right`,door_key:`door_${index}`,panel_version:2,panel_side:side,appearance:d,trigger_position:[d.x+d.w/2,d.y+d.h/2],closed_position:position,open_position:[position[0]+(horizontal?side*travel:0),position[1]+(horizontal?0:side*travel)],closed_rotation:0,open_rotation:0,open:false}});
+            }
+        }else{
         const position=hinged?(horizontal?[d.x,d.y+d.h/2]:[d.x+d.w/2,d.y]):[d.x+d.w/2,d.y+d.h/2];
         entities.push({template:'df_apartment:door',position,collision_shape:{shape_type:'box',dimensions:[d.w,d.h],local_position:hinged?(horizontal?[d.w/2,0]:[0,d.h/2]):[0,0]},
             collision_mask:BODY_GROUP.CHARACTER|BODY_GROUP.PROP|BODY_GROUP.PROJECTILE,data:{role:'door',authored_id:`door_${index}`,appearance:d,closed_position:position,
                 open_position:hinged?position:[position[0]+(horizontal?d.w:0),position[1]+(horizontal?0:d.h)],closed_rotation:0,open_rotation:hinged?Math.PI/2:0,open:false}});
+        }
     });
     for(const [index,l]of rooms.linens.entries()){
         const n=l.segments??5,points=[],edges=[];

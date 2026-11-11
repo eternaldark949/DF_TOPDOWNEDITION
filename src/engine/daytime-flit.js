@@ -167,7 +167,7 @@
             },
 
             triggerFlit(angleOverride, source) {
-                if(this.activeLevel)return this._flitApartment(arguments[0]);
+                if(this.activeLevel&&(this.player.dead||this.physics_system.getAttachmentState(this.player)||this.furniture.busy()))return false;
                 if (this.isDriving || this.paused) return false;
                 if (this.hud && !this.hud.has('flit')) return false;   // not introduced yet (ui/hud-reveal.js)
                 
@@ -201,6 +201,7 @@
                     return false;
                 }
                 const targetX = landing.x, targetY = landing.y;
+                if(this.activeLevel&&!this.player.teleportTo([targetX,targetY],{placement_mode:'clear'})){this._signalFlitLanding('blocked',flitAngle);return false;}
                 const traveled = Math.hypot(targetX - startX, targetY - startY);
                 if (flitDist - traveled > Math.max(6, flitDist * .05)) this._signalFlitLanding('short', flitAngle);
                 else this._flitFeedback = null;
@@ -216,7 +217,8 @@
                 this._afterimage = ai ? { x: startX, y: startY, until: _gameTimeSec + this.resonance.value('afterimage', 'secs') * ai } : null;
 
                 if (traveled > 1) this.spillDrink(SPILL.FLIT_COST, (startX - targetX) / traveled, (startY - targetY) / traveled, startX, startY);   // the drink stays behind a moment (engine/spills.js)
-                this.player.x = targetX; this.player.y = targetY; resetHumanoidAnim(this.player); showMessage("FLIT!"); this.triggerShake(4);
+                if(!this.activeLevel){this.player.x = targetX; this.player.y = targetY; resetHumanoidAnim(this.player);}
+                showMessage("FLIT!"); this.triggerShake(4);
 
                 // --- Spawn Flit VFX ---
                 const cosmeticConfig = this.cosmetics.getRenderConfig();
@@ -371,7 +373,8 @@
                 if (age < 0 || age >= life) { this._flitFeedback = null; return; }
                 if (!this.player.visible || this.player.dead || this.isDriving) return;
                 const m = ctx.getTransform(), p = this.player, w = ctx.canvas.width, h = ctx.canvas.height;
-                const x = m.a * p.x + m.c * p.y + m.e, y = m.b * p.x + m.d * p.y + m.f;
+                const [px,py]=this.playerPosition;
+                const x = m.a * px + m.c * py + m.e, y = m.b * px + m.d * py + m.f;
                 if (x < -64 || x > w + 64 || y < -64 || y > h + 64) return;
                 const a = cue.angle, ux = Math.cos(a), uy = Math.sin(a);
                 const screenA = Math.atan2(m.b * ux + m.d * uy, m.a * ux + m.c * uy);

@@ -10,7 +10,7 @@ The classic build includes the native ESM graph through `tools/bundle-native.mjs
 
 `engine/apartment-level.js` commits the actual scene, routes controls and steps its world once per playable tick. Old entity registries and pending queues are emptied on entry. Legacy collision, integration, interpolation and spatial queries are bypassed in this scene. No old body is adopted or synchronized into a second world. An unstepped replacement is prepared and validated before retiring the current scene.
 
-An outside car is a plain parking checkpoint while indoors, not a live legacy body. Leaving destroys the apartment world and reconstructs the still-legacy destination scene from gameplay/save data. Other levels still need their own cutover.
+An outside car is a plain parking checkpoint while indoors, not a live legacy body. Leaving destroys the apartment world and reconstructs the still-legacy destination scene from gameplay/save data. Other levels remain on the classic host. Their classes and callers still need conversion to the shared runtime; this is not a requirement to add more apartment-style scene handlers.
 
 ## Engine requests used by the frontend
 
@@ -20,7 +20,7 @@ An outside car is a plain parking checkpoint while indoors, not a live legacy bo
 | Grip selection | `peruseNearbyEntities`, `getBodyGrip` |
 | Furniture coupling | `createConstraint` with a force-limited spring; same prop body switches static/rigid |
 | Furniture turning and doors | `motion.rotateBodyBy`, collision-aware motion timelines |
-| Flit and rescue | `teleportInDirection`, bounded clear placement, `findNearbyPlacement` |
+| Flit and rescue | `findDirectionalPlacement`, `teleportTo`, `findNearbyPlacement` |
 | Standard projectiles | `createProjectileFrom` with engine barrel clearance |
 | Rendering | Engine render snapshots and cloth point snapshots |
 | Save/load | `commitCommands`, `savePhysicsState`, `loadPhysicsState` |
@@ -73,3 +73,13 @@ The native apartment now installs the same `abilitySystem` as the shared runtime
 The native host also installs the shared [attackSystem/registry](../gameplay/attacks/README.md). Its player fire branch and actor intents use the universal selected attack. Player learned capabilities/selection and NPC choice now survive native saves and the classic boundary as one-time record transfers. Classic city execution remains legacy despite retaining those portable records.
 
 The shared native attack service now supports real seated player/companion firearms and abilities, including engine-owned window arcs, aperture clearance and inherited velocity. Native snapshots preserve their attachment/emitter/preparation records. The apartment still has no production vehicle/driver cutover; its legacy city boundary and vehicle artists remain separate work. [Mounted API](../gameplay/attacks/MOUNTED-ATTACKS.md).
+
+## Reported apartment regressions: veranda, doors, Flit and firing
+
+Earlier acceptance checks established native ownership, loading and movement, but did not establish complete gameplay/visual parity. The reported missing city view, changed doors, missing Flit lightning and release-to-fire failure were regressions, not expected consequences of the unfinished engine restructure.
+
+The apartment renderer now refreshes its viewport bounds before calling the shared city backdrop artists, instead of retaining a previous scene's culling rectangle. Door artwork is extracted to `presentation/indoor-door.js` and used by both classic and native doors. Native sliding glass uses two real registered leaves with symmetric motion; artwork reads their interpolated poses. Native snapshots retain each leaf's ID. Old single-panel snapshots upgrade once on load, preserving the original primary ID and cancelling its obsolete motion timeline.
+
+`triggerFlit` now shares its effects, feedback, sound and policy path across native and classic players. Native placement continues to use Basement queries/teleport requests. The apartment host advances/draws those effects and native noise uses the shared actor hearing query. The simplified `_flitApartment` method is removed. Native release-to-fire now consumes the existing input release request even after the fire stick becomes inactive, with one shot and the existing cooldown.
+
+`tools/test-apartment-parity.cjs` exercises stale veranda bounds, successful/blocked Flit effects and feedback, release-to-fire, actual paired bodies/save identities, secondary-leaf culling and old snapshot migration (seven checks). `tools/test-apartment-parity-browser.py` uses real keyboard, mouse and touch events against the generated build, checks city stamps and Flit render stability, and captures review screenshots. These targeted repairs do not establish full lighting/weather/wardrobe/story parity; the remaining limits above still apply.

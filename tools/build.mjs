@@ -100,6 +100,7 @@ const SCRIPTS = [
     'world/weather.js',
     'world/weather-response.js',
     'world/particles-decals.js',
+    'presentation/indoor-door.js',
     'world/rooms.js',
     'world/maps.js',
     'world/map-entities.js',
