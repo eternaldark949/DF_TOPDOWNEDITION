@@ -657,8 +657,8 @@ test('Contact shadows stay on the ground across rotation, bobbing, vector and sp
     game._doLoadMap('apt_949'); const ctx=game.ctx, original=ctx.drawImage, shots=[];
     drawGroundContactShadow(ctx,0,0,1,1);
     ctx.drawImage=function(cv,...args){if(cv===drawGroundContactShadow.sprite){const m=this.getTransform();shots.push({args,m:[m.a,m.b,m.c,m.d,m.e,m.f]});}return original.call(this,cv,...args);};
-    const cat=new VelvetCat(150,180);cat.angle=0;cat.draw(ctx);cat.angle=2;cat.draw(ctx);
-    const catFixed=JSON.stringify(shots[0])===JSON.stringify(shots[1]);
+    const cat=new VelvetCat(150,180);cat.angle=0;const firstShadow=DFNative.createVelvetCatArt(cat).body[0];cat.draw(ctx);cat.angle=2;const nextShadow=DFNative.createVelvetCatArt(cat).body[0];cat.draw(ctx);
+    const catFixed=!!firstShadow.geometry && firstShadow.matrix[4]===150 && firstShadow.matrix[5]===180 && JSON.stringify(firstShadow)===JSON.stringify(nextShadow);
     const balanced=ctx._stack.length===0;
     shots.length=0; const loot=new Loot(100,120,'scrap');_gameTimeSec=0;loot.draw(ctx);_gameTimeSec=1;loot.draw(ctx);
     const lootFixed=JSON.stringify(shots[0])===JSON.stringify(shots[1]);

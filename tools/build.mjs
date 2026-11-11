@@ -122,6 +122,7 @@ const SCRIPTS = [
     'directory/world-query.js',    // LV2 Directory: worldQuery (rooms, seats, NPCs, loot, doors, landmarks, buildings as packets)
     'engine/furniture.js',
     'presentation/gatling-gunner.js',
+    'presentation/classic-actor-packets.js',
     'entities/enemies.js',
     'entities/hunters.js',
     'entities/drones.js',

@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '3b09d9be4a0b';
+        const DFAB_BUILD = '03993ac1dd92';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="10230">
+    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="10318">
 const DFNative = (()=>{
 'use strict';
 // src/basement/physics/core/values.mjs
@@ -20338,11 +20338,11 @@ const VELVET_TAIL_SEGS = 9;
 
 return Object.freeze({get VELVET_CAT_PALETTES(){return VELVET_CAT_PALETTES;},get VELVET_T(){return VELVET_T;},get VELVET_PROFILES(){return VELVET_PROFILES;},get VELVET_GAITS(){return VELVET_GAITS;},get VELVET_TAIL_SEGS(){return VELVET_TAIL_SEGS;}});
 })();
-// src/presentation/velvet-cat.mjs
+// src/presentation/velvet-cat-animation.mjs
 const m76 = (()=>{
-const {VELVET_CAT_PALETTES,VELVET_T,VELVET_PROFILES,VELVET_GAITS,VELVET_TAIL_SEGS} = m77;
-/** Cosmetic springs and retained Canvas artwork. No body ownership or movement. */
-const velvetCatAppearance={
+const {VELVET_GAITS,VELVET_TAIL_SEGS} = m77;
+/** Fixed-step cosmetic animation only. No draw backend or physical movement. */
+const velvetCatAnimation={
 _random() {
                 let n = this._randomSeed;
                 n ^= n << 13; n ^= n >>> 17; n ^= n << 5;
@@ -20435,345 +20435,13 @@ _animate(player, dt, moved, prevAngle, blocked, dist) {
                     : Math.sin(this._blinkT * Math.PI);
                 this._blink = Math.max(b, P.sleep > 0.5 ? 1 : 0);
             },
-drawEyeShine(ctx, darkness) {
-                if (!this.visible || this.inCar || !this._eyeWorld) return;
-                const shine = Math.max(0, Math.min(1, (darkness - 0.25) / 0.45)) * (1 - (this._blink || 0));
-                if (shine < 0.03) return;
-                // brighter as she turns her face toward the light; a lowered head (grooming) dims it
-                const a = shine * (0.8 + 0.2 * Math.cos((this._headYaw || 0) * 2)) * (1 - ((this._poses && this._poses.groom) || 0) * 0.5);
-                ctx.save();
-                ctx.globalCompositeOperation = 'lighter';
-                for (const e of this._eyeWorld) {
-                    const g = ctx.createRadialGradient(e.x, e.y, 0, e.x, e.y, 3.6);
-                    g.addColorStop(0, `rgba(236,222,255,${0.95 * a})`);
-                    g.addColorStop(0.25, `rgba(190,150,255,${0.55 * a})`);
-                    g.addColorStop(1, 'rgba(120,70,220,0)');
-                    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(e.x, e.y, 3.6, 0, Math.PI * 2); ctx.fill();
-                }
-                ctx.restore();
-            },
 _gaitParams() {
                 const gi = Math.max(0, Math.min(2, this._gaitMix || 0)), i0 = Math.min(1, Math.floor(gi)), u = gi - i0;
                 const a = VELVET_GAITS[i0], b = VELVET_GAITS[i0 + 1], mix = (p, q) => p + (q - p) * u;
                 return { off: a.off.map((o, i) => mix(o, b.off[i])), duty: mix(a.duty, b.duty), stride: mix(a.stride, b.stride), gallop: Math.max(0, gi - 1) };
-            },
-draw(ctx) {
-                if (!this.visible || this.inCar) return;
-
-                // A missing/unrecognized selector uses the default coat.
-                const C = Object.prototype.hasOwnProperty.call(VELVET_CAT_PALETTES, this.coatPalette)
-                    ? VELVET_CAT_PALETTES[this.coatPalette].colors : VELVET_CAT_PALETTES.default.colors;
-                const P = this._poses || { sit: 0, loaf: 0, sleep: 0, stretch: 0, groom: 0 };
-                const moving = (this.animationSpeed || 0) > 0.05;
-                const g = this._gaitParams();
-                const TAU = Math.PI * 2, frac = v => v - Math.floor(v);
-                const stand = Math.max(0, 1 - P.sit - P.loaf - P.sleep - P.stretch);
-                const breathe = 1 + Math.sin(this._breath || 0) * 0.025 * (1 - stand);
-
-                // Ground contact is independent of body facing, gait and tail movement.
-                drawGroundContactShadow(ctx, this.x, this.y, P.sleep > 0.5 ? 13 : 15, P.sleep > 0.5 ? 11 : 9);
-                ctx.save();
-                ctx.translate(this.x, this.y);
-                ctx.rotate(this.angle);
-                ctx.lineCap = 'round';
-                ctx.lineJoin = 'round';
-                ctx.shadowBlur = 0;
-                // The world's light (upper left) in her own frame, so her shading doesn't turn with her.
-                const lx = Math.cos(-this.angle) * -0.6 - Math.sin(-this.angle) * -0.8;
-                const ly = Math.sin(-this.angle) * -0.6 + Math.cos(-this.angle) * -0.8;
-
-                // --- Spine: an arc from rump (t = 0) to neck (t = 1), the neck facing +X ---
-                const cyc = this.walkPhase / TAU;
-                const flex = moving ? Math.sin((cyc + .3) * TAU) * g.gallop : 0;   // a galloping cat gathers and stretches
-                const L = 23.5 * (1 - 0.36 * P.sit - 0.12 * P.loaf + 0.03 * P.sleep + 0.2 * P.stretch) * (1 + flex * 0.13);
-                const bend = (this._bend || 0) * (1 - P.sleep) + P.sleep * 4.3 * (this._curlSide || 1);
-                const S = 12, pts = [];
-                let px = 0, py = 0;
-                for (let i = S; i >= 0; i--) {
-                    const t = i / S, th = bend * (t - 1);
-                    pts[i] = { x: px, y: py, th };
-                    px -= Math.cos(th) * L / S; py -= Math.sin(th) * L / S;
-                }
-                let cx = 0, cy = 0;
-                for (const p of pts) { cx += p.x; cy += p.y; }
-                cx = cx / pts.length - 1.5 - P.sit * 2; cy /= pts.length;
-                for (const p of pts) { p.x -= cx; p.y -= cy; }
-                const width = (t) => {
-                    let j = 0; while (j < VELVET_T.length - 2 && t > VELVET_T[j + 1]) j++;
-                    const u = (t - VELVET_T[j]) / (VELVET_T[j + 1] - VELVET_T[j]);
-                    let w = 0;
-                    for (const [name, wt] of [['stand', stand], ['sit', P.sit], ['loaf', P.loaf], ['sleep', P.sleep], ['stretch', P.stretch]]) {
-                        if (wt <= 0) continue;
-                        const pr = VELVET_PROFILES[name];
-                        w += (pr[j] + (pr[j + 1] - pr[j]) * u) * wt;
-                    }
-                    return w * breathe;
-                };
-                const at = (t) => {
-                    const f = Math.max(0, Math.min(S - 1e-6, t * S)), i = Math.floor(f), u = f - i;
-                    const a = pts[i], b = pts[Math.min(S, i + 1)];
-                    return { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, th: a.th + (b.th - a.th) * u };
-                };
-                // Shoulder blades and hips roll up on the side of the leg that's bearing weight.
-                const legU = (j) => frac(cyc + g.off[j]);
-                const roll = (j) => moving && legU(j) < g.duty ? Math.sin(legU(j) / g.duty * Math.PI) * 0.7 * stand : 0;
-                const left = [], right = [];
-                for (let i = 0; i <= S; i++) {
-                    const p = pts[i], t = i / S, w = width(t), nx = -Math.sin(p.th), ny = Math.cos(p.th);
-                    const sh = Math.max(0, 1 - Math.abs(t - .74) / .14), hp = Math.max(0, 1 - Math.abs(t - .2) / .14);
-                    const wl = w + sh * roll(1) + hp * roll(0), wr = w + sh * roll(3) + hp * roll(2);
-                    left.push({ x: p.x - nx * wl, y: p.y - ny * wl });
-                    right.push({ x: p.x + nx * wr, y: p.y + ny * wr });
-                }
-                const rump = pts[0], neck = pts[S];
-                const ring = [{ x: rump.x - Math.cos(rump.th) * width(0) * .9, y: rump.y - Math.sin(rump.th) * width(0) * .9 },
-                    ...left, { x: neck.x + 1.6, y: neck.y }, ...right.reverse()];
-                // A closed curve through the midpoints of a point ring (open: starts and ends on its first and last points).
-                const smoothRing = (path, ring, open = false) => {
-                    const n = ring.length, mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
-                    const m0 = open ? ring[0] : mid(ring[n - 1], ring[0]);
-                    path.moveTo(m0.x, m0.y);
-                    for (let i = open ? 1 : 0; i < n; i++) { const a = ring[i], m = mid(a, ring[(i + 1) % n]); path.quadraticCurveTo(a.x, a.y, m.x, m.y); }
-                    path.closePath();
-                };
-                const outline = new Path2D();
-                smoothRing(outline, ring);
-
-                // --- Paw positions: gait, blended toward each rest pose ---
-                const legs = [];
-                for (let j = 0; j < 4; j++) {
-                    const hind = j % 2 === 0, sideY = j < 2 ? -1 : 1;
-                    const anchorT = hind ? .2 : .78, a = at(anchorT), w = width(anchorT);
-                    const nx = -Math.sin(a.th), ny = Math.cos(a.th), ux = Math.cos(a.th), uy = Math.sin(a.th);
-                    // gait: planted feet slide back under her, lifted feet swing forward
-                    const u = legU(j);
-                    let along = 0, lift = 0;
-                    if (moving) {
-                        if (u < g.duty) along = g.stride * (0.5 - u / g.duty);
-                        else { const s = (u - g.duty) / (1 - g.duty); along = g.stride * (-0.5 + (s * s * (3 - 2 * s))); lift = Math.sin(s * Math.PI); }
-                    }
-                    const out = (hind ? 1 : 1.02) * w * (0.85 + lift * 0.12);
-                    let fx = a.x + ux * ((hind ? -1.5 : 4.6) + along) + nx * out * sideY;
-                    let fy = a.y + uy * ((hind ? -1.5 : 4.6) + along) + ny * out * sideY;
-                    let vis = stand;
-                    // sit: fore paws together before the chest, hind paws peeking at the haunches
-                    const sx = hind ? pts[3].x + 3.5 : neck.x + 6.8, sy = hind ? pts[3].y + sideY * (width(.25) + .4) : neck.y + sideY * 2;
-                    // stretch: fore paws reach far ahead
-                    const tx = hind ? fx : neck.x + 12.5, ty = hind ? fy : neck.y + sideY * 3.3;
-                    fx = fx * stand + sx * P.sit + tx * P.stretch + (hind ? pts[3].x : neck.x) * (P.loaf + P.sleep);
-                    fy = fy * stand + sy * P.sit + ty * P.stretch + (hind ? pts[3].y : neck.y) * (P.loaf + P.sleep);
-                    vis += P.sit + P.stretch;
-                    const groomPaw = !hind && sideY < 0 && P.groom > 0.5;
-                    legs.push({ hind, sideY, ax: a.x + nx * w * .45 * sideY, ay: a.y + ny * w * .45 * sideY, fx, fy, lift: lift * stand, vis: groomPaw ? 0 : vis, th: a.th });
-                }
-                const paw = (x, y, th, s, raised) => {
-                    ctx.save(); ctx.translate(x, y); ctx.rotate(th); ctx.scale(s, s);
-                    ctx.fillStyle = raised ? C.raisedPaw : C.pawTop;
-                    ctx.beginPath(); ctx.ellipse(0, 0, 2.5, 1.85, 0, 0, TAU); ctx.fill();
-                    ctx.fillStyle = C.pawShadow; ctx.beginPath(); ctx.ellipse(-.5, .35, 1.9, 1.3, 0, 0, TAU); ctx.fill();
-                    ctx.fillStyle = raised ? C.raisedPaw : C.pawTop; ctx.beginPath(); ctx.ellipse(.25, -.15, 2.1, 1.5, 0, 0, TAU); ctx.fill();
-                    // three toe creases at the front of the foot
-                    ctx.strokeStyle = C.pawShadow; ctx.lineWidth = .35; ctx.beginPath();
-                    ctx.moveTo(1.5, -.8); ctx.lineTo(2.3, -.75); ctx.moveTo(1.7, 0); ctx.lineTo(2.5, 0); ctx.moveTo(1.5, .8); ctx.lineTo(2.3, .75);
-                    ctx.stroke(); ctx.restore();
-                };
-
-                // --- Tail: nine springy segments from the rump, foreshortened as it rises ---
-                const tail = [];
-                {
-                    // Resting, it leaves the rump already turned along her side, to wrap round toward the fore paws.
-                    let th = rump.th + Math.PI - (this._curlSide || 1) * (P.sit * 1.75 + P.loaf * 1.75 + P.sleep * 1.1), x = rump.x - Math.cos(rump.th) * width(0) * .6, y = rump.y - Math.sin(rump.th) * width(0) * .6;
-                    tail.push({ x, y });
-                    const lift = this._tailLift || 0;
-                    for (let i = 0; i < VELVET_TAIL_SEGS; i++) {
-                        th += -(this._tail ? this._tail[i] : 0);
-                        const len = 3.4 * (1 - lift * (i < 5 ? .62 : .22)) * (1 - P.loaf * .12);
-                        x += Math.cos(th) * len; y += Math.sin(th) * len;
-                        tail.push({ x, y });
-                    }
-                }
-                // One tapering filled shape (no overlapping strokes to bead at the joints), rounded at the tip.
-                const tailPath = new Path2D();
-                {
-                    const l = [], r = [], n = tail.length;
-                    for (let i = 0; i < n; i++) {
-                        const a = tail[Math.max(0, i - 1)], b = tail[Math.min(n - 1, i + 1)];
-                        const d = Math.hypot(b.x - a.x, b.y - a.y) || 1, nx = -(b.y - a.y) / d, ny = (b.x - a.x) / d;
-                        const w = 1.85 - (i / (n - 1)) * .95;
-                        l.push({ x: tail[i].x + nx * w, y: tail[i].y + ny * w }); r.push({ x: tail[i].x - nx * w, y: tail[i].y - ny * w });
-                    }
-                    const e = tail[n - 1], q = tail[n - 2], d = Math.hypot(e.x - q.x, e.y - q.y) || 1;
-                    smoothRing(tailPath, [...l, { x: e.x + (e.x - q.x) / d * 1.1, y: e.y + (e.y - q.y) / d * 1.1 }, ...r.reverse()], true);
-                }
-
-                // Soft cast shadow of the whole silhouette, away from the light; a raised tail throws its own further off.
-                ctx.save();
-                ctx.globalAlpha = 0.22;
-                ctx.translate(-lx * 1.8, -ly * 1.8);
-                ctx.fillStyle = '#000'; ctx.fill(outline);
-                ctx.translate(-lx * (this._tailLift || 0) * 5, -ly * (this._tailLift || 0) * 5); ctx.fill(tailPath);
-                ctx.restore();
-
-                // Tail, then legs, under the body.
-                const drawTail = () => {
-                    const tailCoat = ctx.createLinearGradient(tail[0].x, tail[0].y, tail[tail.length - 1].x, tail[tail.length - 1].y);
-                    tailCoat.addColorStop(0, C.tailBase); tailCoat.addColorStop(.5, C.tailMiddle); tailCoat.addColorStop(1, C.tailTip);
-                    ctx.fillStyle = tailCoat; ctx.fill(tailPath);
-                    ctx.strokeStyle = 'rgba(8,3,12,.5)'; ctx.lineWidth = .5; ctx.stroke(tailPath);
-                    ctx.strokeStyle = C.tailNap; ctx.lineWidth = .9; ctx.beginPath();
-                    ctx.moveTo(tail[0].x + lx * .7, tail[0].y + ly * .7);
-                    for (let i = 1; i < tail.length - 1; i++) ctx.lineTo(tail[i].x + lx * .7, tail[i].y + ly * .7);
-                    ctx.stroke();
-                };
-                // Trailing, the tail starts under the rump; wrapped round her at rest it lies over the haunch.
-                const tailOver = P.sit + P.loaf + P.sleep > 0.5;
-                if (!tailOver) drawTail();
-
-                for (const leg of legs) {
-                    if (leg.vis < 0.05) continue;
-                    ctx.globalAlpha = Math.min(1, leg.vis);
-                    ctx.strokeStyle = C.legShade; ctx.lineWidth = leg.hind ? 3.6 : 3.1;
-                    ctx.beginPath(); ctx.moveTo(leg.ax, leg.ay); ctx.lineTo(leg.fx, leg.fy); ctx.stroke();
-                    paw(leg.fx, leg.fy, leg.th, (leg.hind ? 1.05 : .95) * (1 + leg.lift * .14), leg.lift > .3);
-                }
-                ctx.globalAlpha = 1;
-
-                // --- Body ---
-                const coat = ctx.createLinearGradient(lx * 7, ly * 7, -lx * 7, -ly * 7);
-                coat.addColorStop(0, C.bodyTop);
-                coat.addColorStop(.4, C.bodyMiddle);
-                coat.addColorStop(.75, C.bodyShade);
-                coat.addColorStop(1, C.bodyDeep);
-                ctx.fillStyle = coat; ctx.fill(outline);
-                ctx.save(); ctx.clip(outline);
-                // Velvet sheen down the spine, rounded masses over the haunches and shoulders
-                ctx.strokeStyle = C.napHighlight; ctx.lineWidth = 4.2; ctx.beginPath();
-                for (let i = 1; i < S; i++) { const p = pts[i]; i === 1 ? ctx.moveTo(p.x + lx, p.y + ly) : ctx.lineTo(p.x + lx, p.y + ly); }
-                ctx.stroke();
-                for (const t of [.2, .74]) {
-                    const p = at(t), r = width(t) * 1.05;
-                    const hl = ctx.createRadialGradient(p.x + lx * 2.2, p.y + ly * 2.2, 0, p.x + lx * 2.2, p.y + ly * 2.2, r);
-                    hl.addColorStop(0, C.bodyRim); hl.addColorStop(1, C.napEnd);
-                    ctx.fillStyle = hl; ctx.beginPath(); ctx.arc(p.x + lx * 2.2, p.y + ly * 2.2, r, 0, TAU); ctx.fill();
-                }
-                // Fur lies back from the head: short strands scattered without a visible pattern or RNG
-                ctx.strokeStyle = C.furStroke; ctx.lineWidth = .3; ctx.beginPath();
-                for (let i = 0; i < 26; i++) {
-                    const t = .06 + ((i * .61803398875 + .19) % 1) * .9, p = at(t), w = width(t);
-                    const o = (((i * .41421356237 + .36) % 1) - .5) * 1.7 * w;
-                    const x = p.x - Math.sin(p.th) * o, y = p.y + Math.cos(p.th) * o, l = 1 + (Math.sin(i * 2.41) + 1) * .35;
-                    ctx.moveTo(x, y); ctx.lineTo(x - Math.cos(p.th) * l, y - Math.sin(p.th) * l);
-                }
-                ctx.stroke();
-                ctx.restore();
-                ctx.strokeStyle = 'rgba(8,3,12,.5)'; ctx.lineWidth = .55; ctx.stroke(outline);
-                if (tailOver) drawTail();
-
-                // --- Head ---
-                const headScale = 1 + P.sit * .07 - P.sleep * .04 - P.stretch * .05;
-                const hx = neck.x + 2.6 - P.sit * 1.2 + P.stretch * 1.5, hy = neck.y;
-                // Where her eyes are in the world, for the eyeshine drawn above the darkness (drawEyeShine)
-                {
-                    const yaw = this._headYaw || 0, ca = Math.cos(this.angle), sa = Math.sin(this.angle);
-                    const eyes = this._eyeWorld || (this._eyeWorld = [{ x: 0, y: 0 }, { x: 0, y: 0 }]);
-                    for (let e = 0; e < 2; e++) {
-                        const ex = 2.9 * headScale, ey = (e ? 1 : -1) * 2.05 * headScale;
-                        const lx2 = hx + ex * Math.cos(yaw) - ey * Math.sin(yaw), ly2 = hy + ex * Math.sin(yaw) + ey * Math.cos(yaw);
-                        eyes[e].x = this.x + lx2 * ca - ly2 * sa; eyes[e].y = this.y + lx2 * sa + ly2 * ca;
-                    }
-                }
-                ctx.save();
-                ctx.translate(hx, hy); ctx.rotate(this._headYaw || 0); ctx.scale(headScale, headScale);
-                // the head shades the shoulders under it
-                ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.beginPath(); ctx.ellipse(-lx * 1.4, -ly * 1.4, 5.2, 5, 0, 0, TAU); ctx.fill();
-                const skull = new Path2D();
-                skull.moveTo(-4.3, 0);
-                skull.bezierCurveTo(-4.3, -3.5, -2.2, -5, .6, -4.95);
-                skull.bezierCurveTo(2.9, -4.9, 4.2, -3.1, 5.1, -1.85);
-                skull.quadraticCurveTo(6.1, -1, 6.1, 0);
-                skull.quadraticCurveTo(6.1, 1, 5.1, 1.85);
-                skull.bezierCurveTo(4.2, 3.1, 2.9, 4.9, .6, 4.95);
-                skull.bezierCurveTo(-2.2, 5, -4.3, 3.5, -4.3, 0);
-                skull.closePath();
-                const hlx = Math.cos(-(this._headYaw || 0)) * lx - Math.sin(-(this._headYaw || 0)) * ly;
-                const hly = Math.sin(-(this._headYaw || 0)) * lx + Math.cos(-(this._headYaw || 0)) * ly;
-                const face = ctx.createRadialGradient(hlx * 2 + .5, hly * 2, .5, .5, 0, 6.5);
-                face.addColorStop(0, C.headTop); face.addColorStop(.55, C.headMiddle); face.addColorStop(1, C.headShadow);
-                ctx.fillStyle = face; ctx.fill(skull);
-                ctx.strokeStyle = 'rgba(8,3,12,.5)'; ctx.lineWidth = .5; ctx.stroke(skull);
-                // cheek tufts
-                ctx.strokeStyle = C.cheekFur; ctx.lineWidth = .45; ctx.beginPath();
-                for (const sd of [-1, 1]) {
-                    ctx.moveTo(1.2, sd * 4.6); ctx.lineTo(.2, sd * 5.4);
-                    ctx.moveTo(2.4, sd * 4.1); ctx.lineTo(1.6, sd * 5.0);
-                }
-                ctx.stroke();
-                // Eyes on the front of the face: almond, slit pupils, lids that close from above
-                const blink = this._blink || 0;
-                for (const sd of [-1, 1]) {
-                    ctx.save(); ctx.translate(2.9, sd * 2.05); ctx.rotate(sd * .38);
-                    const open = 1 - blink;
-                    if (open < .12) {
-                        ctx.strokeStyle = 'rgba(20,10,26,.9)'; ctx.lineWidth = .5;
-                        ctx.beginPath(); ctx.moveTo(-1.3, 0); ctx.quadraticCurveTo(0, .5 * sd, 1.3, 0); ctx.stroke();
-                    } else {
-                        ctx.beginPath(); ctx.moveTo(-1.5, 0); ctx.quadraticCurveTo(0, -1 * open, 1.5, 0); ctx.quadraticCurveTo(0, 1 * open, -1.5, 0);
-                        ctx.fillStyle = '#ac7fc4'; ctx.fill(); ctx.strokeStyle = '#120918'; ctx.lineWidth = .42; ctx.stroke();
-                        ctx.save(); ctx.clip();
-                        ctx.fillStyle = '#170d20'; ctx.beginPath(); ctx.ellipse(.15, 0, .22 + (this._pupil || .5) * .5, .9, 0, 0, TAU); ctx.fill();
-                        ctx.fillStyle = '#efe2f3'; ctx.beginPath(); ctx.arc(-.45, -.28 * sd, .28, 0, TAU); ctx.fill();
-                        ctx.restore();
-                    }
-                    ctx.restore();
-                }
-                // Muzzle pads, nose, mouth line
-                ctx.fillStyle = '#3c2540'; ctx.beginPath();
-                ctx.ellipse(4.6, -1.05, 1.3, 1.15, -.2, 0, TAU); ctx.ellipse(4.6, 1.05, 1.3, 1.15, .2, 0, TAU); ctx.fill();
-                ctx.fillStyle = '#b38c9c'; ctx.beginPath(); ctx.moveTo(6.25, 0); ctx.lineTo(5.3, -.7); ctx.lineTo(5.3, .7); ctx.closePath(); ctx.fill();
-                // Whiskers sweep forward when she's alert, droop sideways at rest
-                const fwd = moving ? .55 : P.sleep > .5 ? -.25 : P.sit > .5 ? .1 : .3;
-                ctx.strokeStyle = 'rgba(214,196,226,.38)'; ctx.lineWidth = .28; ctx.beginPath();
-                for (const sd of [-1, 1]) for (let w = 0; w < 3; w++) {
-                    const a0 = sd * (1.25 - w * .28 - fwd), r = 6.5 - w * .4;
-                    ctx.moveTo(4.8, sd * 1.4); ctx.quadraticCurveTo(4.8 + Math.cos(a0) * r * .5, sd * 1.4 + Math.sin(a0) * r * .5, 4.8 + Math.cos(a0 + sd * .25) * r, sd * 1.4 + Math.sin(a0 + sd * .25) * r);
-                }
-                ctx.stroke();
-                // Ears stand above the skull at its back corners: seen from above, triangles opening forward
-                for (const sd of [-1, 1]) {
-                    const e = this._ears ? this._ears[sd < 0 ? 0 : 1] : 0;
-                    ctx.save(); ctx.translate(-.9, sd * 2.9); ctx.rotate(sd * (e + .35));
-                    // a cup of fur: the back of the ear, then the pink inside showing at its open front
-                    ctx.fillStyle = C.earBase; ctx.beginPath();
-                    ctx.moveTo(-2.5, -sd * .5); ctx.quadraticCurveTo(-2.9, sd * 2, -2.6, sd * 3.9);
-                    ctx.quadraticCurveTo(.2, sd * 2.2, 1.9, sd * .1); ctx.quadraticCurveTo(-.2, -sd * .9, -2.5, -sd * .5); ctx.closePath(); ctx.fill();
-                    ctx.strokeStyle = 'rgba(8,3,12,.55)'; ctx.lineWidth = .4; ctx.stroke();
-                    ctx.fillStyle = '#5e3150'; ctx.beginPath();
-                    ctx.moveTo(-1.3, sd * .35); ctx.quadraticCurveTo(-1.9, sd * 2, -2.2, sd * 3.2); ctx.quadraticCurveTo(-.2, sd * 1.9, 1.2, sd * .35); ctx.closePath(); ctx.fill();
-                    ctx.strokeStyle = C.earRim; ctx.lineWidth = .35; ctx.beginPath(); ctx.moveTo(-1.6, sd * .6); ctx.quadraticCurveTo(-2.1, sd * 2, -2.3, sd * 3.1); ctx.stroke();
-                    ctx.restore();
-                }
-                ctx.restore();
-
-                // Grooming: a fore paw lifts to the mouth for a few licks, then wipes back over the ear.
-                if (P.groom > 0.5) {
-                    const ph = this._groomPhase || 0, wipe = Math.max(0, Math.sin(ph * .35)) ** 2, lick = Math.sin(ph * 3);
-                    const yaw = this._headYaw || 0;
-                    const mx = hx + Math.cos(yaw) * 4.2 - Math.sin(yaw) * -2.2, my = hy + Math.sin(yaw) * 4.2 + Math.cos(yaw) * -2.2;
-                    const ex = hx - 1, ey = hy - 4.5;
-                    const px2 = mx + (ex - mx) * wipe, py2 = my + (ey - my) * wipe + lick * .25 * (1 - wipe);
-                    const sh = legs[1];
-                    ctx.strokeStyle = C.groomArm; ctx.lineWidth = 3;
-                    ctx.beginPath(); ctx.moveTo(sh.ax, sh.ay); ctx.quadraticCurveTo(neck.x + 2, neck.y - 4, px2, py2); ctx.stroke();
-                    paw(px2, py2, yaw + Math.PI * .25, .85, true);
-                    if (lick > .4 && wipe < .2) {
-                        ctx.strokeStyle = '#b27f97'; ctx.lineWidth = .8;
-                        ctx.beginPath(); ctx.moveTo(mx + 1.2, my + 1.6); ctx.lineTo(mx + .6, my + .9); ctx.stroke();
-                    }
-                }
-                ctx.restore();
             }
 };
-function createVelvetAnimation(seed=1){const record=Object.create(velvetCatAppearance);(function(){this.walkPhase = 0;
+function createVelvetAnimation(seed=1){const record=Object.create(velvetCatAnimation);(function(){this.walkPhase = 0;
                 this.tailPhase = (seed>>>0)/4294967296 * Math.PI * 2;
                 this._randomSeed = (this.tailPhase * 1e8) | 0 || 1;
                 this.idleTimer = 0;
@@ -20810,10 +20478,11 @@ function createVelvetAnimation(seed=1){const record=Object.create(velvetCatAppea
                 this._groomPhase = 0;
 
                 }).call(record);return structuredClone({...record});}
-function velvetPresentation(entity,blend=1){const pose=entity.getRenderState(blend);return Object.assign(Object.create(velvetCatAppearance),structuredClone(entity.data.velvet_animation),{x:pose.position[0],y:pose.position[1],angle:pose.rotation,state:entity.state,visible:entity.visible,inCar:entity.inCar,coatPalette:entity.data.coat_palette});}
-function advanceVelvetAnimation(entity,player,seconds){const record=entity.data.velvet_animation,packet=velvetPresentation(entity),motion=entity.physics_system.getBodyMotion(entity),position=player?.position??entity.position;packet.animationSpeed=motion.distance/(seconds*60);packet._dash=entity.cat_state.dash;packet.idleBehavior=entity.cat_state.rest;packet._animate({x:position[0],y:position[1]},seconds*60,motion.distance,motion.previous_rotation,entity.state==='following'&&motion.distance<.001,player?entity.physics_system.observeTarget(entity,player).distance:0);for(const key of Object.keys(record))record[key]=structuredClone(packet[key]);}
+function velvetPresentation(entity,blend=1){const pose=entity.getRenderState(blend);return Object.assign({},structuredClone(entity.data.velvet_animation),{x:pose.position[0],y:pose.position[1],angle:pose.rotation,state:entity.state,visible:entity.visible,inCar:entity.inCar,coatPalette:entity.data.coat_palette});}
+function advanceVelvetAnimation(entity,player,seconds){const record=entity.data.velvet_animation,packet=Object.assign(Object.create(velvetCatAnimation),velvetPresentation(entity)),motion=entity.physics_system.getBodyMotion(entity),position=player?.position??entity.position;packet.animationSpeed=motion.distance/(seconds*60);packet._dash=entity.cat_state.dash;packet.idleBehavior=entity.cat_state.rest;packet._animate({x:position[0],y:position[1]},seconds*60,motion.distance,motion.previous_rotation,entity.state==='following'&&motion.distance<.001,player?entity.physics_system.observeTarget(entity,player).distance:0);for(const key of Object.keys(record))record[key]=structuredClone(packet[key]);}
 
-return Object.freeze({get velvetCatAppearance(){return velvetCatAppearance;},get createVelvetAnimation(){return createVelvetAnimation;},get velvetPresentation(){return velvetPresentation;},get advanceVelvetAnimation(){return advanceVelvetAnimation;}});
+
+return Object.freeze({get velvetCatAnimation(){return velvetCatAnimation;},get createVelvetAnimation(){return createVelvetAnimation;},get velvetPresentation(){return velvetPresentation;},get advanceVelvetAnimation(){return advanceVelvetAnimation;}});
 })();
 // src/entities/velvet-cat.mjs
 const m75 = (()=>{
@@ -24011,6 +23680,7 @@ return Object.freeze({get renderSystem(){return renderSystem;}});
 })();
 // src/basement/rendering/canvas.mjs
 const m110 = (()=>{
+const {renderFrame} = m107;
 const {BLENDS} = m106;
 
 function createSurface(width,height){
@@ -24031,12 +23701,23 @@ function buildPath(target,g){
         if(op==='move')target.moveTo(...v);else if(op==='line')target.lineTo(...v);else if(op==='quadratic')target.quadraticCurveTo(...v);else if(op==='cubic')target.bezierCurveTo(...v);else if(op==='ellipse')target.ellipse(...v.slice(0,7),!!v[7]);else target.closePath();
     }
 }
+const overlays=new WeakMap();
 const capabilities=Object.freeze(['shape','sprite','text','geometry:rect','geometry:ellipse','geometry:path','gradient:linear','gradient:radial','clip','shadow','dash','target',...Object.keys(BLENDS).map(name=>`blend:${name}`)]);
 
 /** Canvas implementation of the packet contract. Contexts and Canvas/GPU-like handles stay private. */
 class canvasRenderer {
     #surface;#context;#viewport;#resources=new Map();#createSurface;#decodeImage;#createPath;#disposed=false;#generation=0;
     constructor({create_surface=createSurface,decode_image=decodeImage,create_path=()=>typeof Path2D==='undefined'?null:new Path2D()}={}){this.#createSurface=create_surface;this.#decodeImage=decode_image;this.#createPath=create_path;}
+    /** Migration boundary for hosts which already own a Canvas pass. Artists still supply only data. */
+    static drawPackets(context,packets){
+        if(!context?.canvas||typeof context.getTransform!=='function')throw new TypeError('A host Canvas context is required');
+        let entry=overlays.get(context);
+        if(!entry){const renderer=new canvasRenderer();renderer.initialize(context.canvas,{viewport:{width:context.canvas.width,height:context.canvas.height,pixel_ratio:1}});entry={renderer,frame:new renderFrame()};overlays.set(context,entry);}
+        const m=context.getTransform(),view={width:Math.max(1,context.canvas.width),height:Math.max(1,context.canvas.height),world_to_screen:[m.a,m.b,m.c,m.d,m.e,m.f]},opacity=context.globalAlpha;
+        entry.frame.begin(view,{clear_color:false});
+        try{for(const packet of packets){if(packet.resource_id||packet.geometry_id||packet.material_id||(packet.clips??[]).some(clip=>clip.geometry_id))throw new Error('Canvas overlay accepts inline packets; use renderSystem for resources');entry.frame.submit({...packet,opacity:(packet.opacity??1)*opacity});}entry.renderer.render(entry.frame.finish());}catch(error){entry.frame.abort();throw error;}
+        return entry.frame.getStatistics().packets;
+    }
     get capabilities(){return capabilities;}
     initialize(surface,{viewport}){
         if(this.#disposed||this.#context)throw new Error('Renderer cannot initialize twice');
@@ -25672,186 +25353,218 @@ const COMBAT_RULES=freeze(structuredClone(data));
 
 return Object.freeze({get COMBAT_RULES(){return COMBAT_RULES;}});
 })();
+// src/presentation/art-packets.mjs
+const m129 = (()=>{
+const {transform,inverse} = m106;
+const identity=()=>[1,0,0,1,0,0];
+const multiply=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
+const geometry=commands=>Array.isArray(commands)?{type:'path',commands:commands.map(command=>[...command])}:structuredClone(commands);
+const ellipse=(x,y,rx,ry,rotation=0,start=0,end=Math.PI*2,reverse=0)=>['ellipse',x,y,rx,ry,rotation,start,end,Number(reverse)];
+const circle=(x,y,r,start=0,end=Math.PI*2)=>ellipse(x,y,r,r,0,start,end);
+const linear=(from,to,stops)=>({type:'linear',from,to,stops});
+const radial=(from,inner_radius,to,outer_radius,stops)=>({type:'radial',from,inner_radius,to,outer_radius,stops});
+/** Small data-only scene builder. There is no Canvas interface, device handle or command replay here. */
+class artScene{
+ packets=[];matrix=identity();style={fill:'#000',stroke:'#000',stroke_width:1,line_cap:'butt',line_join:'miter',dash:[],opacity:1,blend:'normal'};clips=[];#stack=[];
+ enter(pose={}){this.#stack.push({matrix:this.matrix,style:this.style,clips:this.clips});this.matrix=multiply(this.matrix,transform(pose));this.style={...this.style};this.clips=[...this.clips];return this;}
+ leave(){const state=this.#stack.pop();if(!state)throw new Error('Unbalanced art group');Object.assign(this,state);return this;}
+ place(pose){this.matrix=multiply(this.matrix,transform(pose));return this;}
+ clip(commands){this.clips.push({geometry:geometry(commands),matrix:[...this.matrix]});return this;}
+ paint(commands,material){const {stroke_width,line_cap,line_join,dash}=this.style,inv=this.clips.length?inverse(this.matrix):null;
+  this.packets.push({type:'shape',matrix:[...this.matrix],geometry:geometry(commands),material:{fill:null,stroke:null,stroke_width,line_cap,line_join,dash:[...dash],...structuredClone(material)},opacity:this.style.opacity,blend:this.style.blend,clips:this.clips.map(clip=>({geometry:clip.geometry,transform:multiply(inv,clip.matrix)}))});return this;
+ }
+ finish(){if(this.#stack.length)throw new Error('Unclosed art group');return this.packets;}
+}
+function glow(scene,x,y,r,rgb,core=.35){const stops=[[0,`rgba(${rgb},1)`]];if(core>0)stops.push([core,`rgba(${rgb},.45)`]);stops.push([1,`rgba(${rgb},0)`]);scene.paint([circle(x,y,r)],{fill:radial([x,y],0,[x,y],r,stops)});}
+function groundShadow(scene,x,y,rx,ry){scene.enter({position:[x,y],scale:[rx,ry]});scene.paint([circle(0,0,1)],{fill:radial([0,0],0,[0,0],1,[[0,'rgba(0,0,0,.30)'],[.65,'rgba(0,0,0,.24)'],[.85,'rgba(0,0,0,.12)'],[1,'rgba(0,0,0,0)']])});scene.leave();}
+
+return Object.freeze({get ellipse(){return ellipse;},get circle(){return circle;},get linear(){return linear;},get radial(){return radial;},get artScene(){return artScene;},get glow(){return glow;},get groundShadow(){return groundShadow;}});
+})();
 // src/presentation/drone.mjs
 const m128 = (()=>{
 const enemies = m29.default;
+const {artScene,circle,ellipse,radial,glow} = m129;
 const DRONE=enemies.drone;
-const droneAppearance={
-_lift() { return DRONE.HOVER_PX + Math.sin(this.hoverOffset) * 3 + this.alt * 240; },
-draw(ctx) {
-                if (this.dead) return;
-                if (this.invincibleTimer > 0 && this.invincibleTimer % 6 < 3) return;
-                const t = this.render_time ?? _frameTime / 1000, lift = this._lift(), A = this.angle, TAU = Math.PI * 2;
+function droneLift(state){return DRONE.HOVER_PX+Math.sin(state.hoverOffset)*3+state.alt*240;}
+function droneArmPose(diving,stuck,s){
+ if(diving)return [5,12*s,18,24*s,30,13*s,64,3*s];
+ if(stuck)return [5,12*s,13,29*s,28,24*s,50,13*s];
+ return [5,12*s,13,30*s,28,25*s,58,11*s];
+}
+function draw(state,scene){let path=[];
+                if (state.dead) return;
+                if (state.invincibleTimer > 0 && state.invincibleTimer % 6 < 3) return;
+                const t = state.render_time ?? 0, lift = droneLift(state), A = state.angle, TAU = Math.PI * 2;
                 // Its shadow on the floor: wide and faint while it's high, then tightening as it lands
-                ctx.save();
-                const sh = 0.25 + 0.4 * (1 - this.alt);
-                ctx.fillStyle = `rgba(0,0,0,${sh})`; ctx.beginPath(); ctx.ellipse(this.x, this.y + 4, 24 + 20 * this.alt, 16 + 12 * this.alt, 0, 0, TAU); ctx.fill();
-                if (this.alt > 0.02 && this.state === 'descend') {                // where it'll land
-                    ctx.strokeStyle = `rgba(164,105,255,${0.4 + 0.4 * Math.sin(t * 14)})`; ctx.lineWidth = 1.5; ctx.setLineDash([5, 5]);
-                    ctx.beginPath(); ctx.arc(this.x, this.y, DRONE.LAND_R, 0, TAU); ctx.stroke(); ctx.setLineDash([]);
+                scene.enter();
+                const sh = 0.25 + 0.4 * (1 - state.alt);
+                scene.style.fill = `rgba(0,0,0,${sh})`; path=[]; path.push(ellipse(state.x, state.y + 4, 24 + 20 * state.alt, 16 + 12 * state.alt, 0, 0, TAU)); scene.paint(path,{fill:scene.style.fill});
+                if (state.alt > 0.02 && state.state === 'descend') {                // where it'll land
+                    scene.style.stroke = `rgba(164,105,255,${0.4 + 0.4 * Math.sin(t * 14)})`; scene.style.stroke_width = 1.5; scene.style.dash=[5, 5];
+                    path=[]; path.push(circle(state.x, state.y, DRONE.LAND_R, 0, TAU)); scene.paint(path,{stroke:scene.style.stroke}); scene.style.dash=[];
                 }
-                ctx.restore();
-                ctx.save();
-                ctx.translate(this.x, this.y - lift);
-                const S = 1 + this.alt * 0.5;                                      // nearer the camera while it's high
-                ctx.scale(S, S);
-                ctx.rotate(A);
-                this._drawTendrils(ctx, t);
-                this._drawArms(ctx, t);
-                this._drawShell(ctx, t);
-                ctx.restore();
-            },
-_drawTendrils(ctx, t) {
-                ctx.save(); ctx.lineCap = 'round';
+                scene.leave();
+                scene.enter();
+                scene.place({position:[state.x, state.y - lift]});
+                const S = 1 + state.alt * 0.5;                                      // nearer the camera while it's high
+                scene.place({scale:[S, S]});
+                scene.place({rotation:A});
+                _drawTendrils(state,scene,t);
+                _drawArms(state,scene,t);
+                _drawShell(state,scene,t);
+                scene.leave();
+            }
+
+function _drawTendrils(state,scene,t){let path=[];
+                scene.enter(); scene.style.line_cap = 'round';
                 for (let i = 0; i < 13; i++) {
                     const side = (i / 12 - 0.5) * 2, x0 = -4 + Math.abs(side) * 5, y0 = side * 15;
-                    const len = 30 + (i * 7 % 5) * 6, sw = Math.sin(t * 2.2 + i * 1.3 + this._seed) * 6;
-                    ctx.strokeStyle = i % 2 ? '#14111b' : '#26202f'; ctx.lineWidth = i % 3 ? 1.7 : 2.8;
-                    ctx.beginPath(); ctx.moveTo(x0, y0);
-                    ctx.bezierCurveTo(x0 - len * 0.4, y0 + sw, x0 - len * 0.7, y0 * 1.1 - sw, x0 - len, y0 * 1.15 + sw * 0.6);
-                    ctx.stroke();
+                    const len = 30 + (i * 7 % 5) * 6, sw = Math.sin(t * 2.2 + i * 1.3 + state._seed) * 6;
+                    scene.style.stroke = i % 2 ? '#14111b' : '#26202f'; scene.style.stroke_width = i % 3 ? 1.7 : 2.8;
+                    path=[]; path.push(['move',x0, y0]);
+                    path.push(['cubic',x0 - len * 0.4, y0 + sw, x0 - len * 0.7, y0 * 1.1 - sw, x0 - len, y0 * 1.15 + sw * 0.6]);
+                    scene.paint(path,{stroke:scene.style.stroke});
                     if (i % 3 === 1) {                                              // a node light along it
-                        ctx.fillStyle = `rgba(190,140,255,${0.5 + 0.5 * Math.sin(t * 5 + i)})`;
-                        ctx.beginPath(); ctx.arc(x0 - len * 0.62, y0 * 1.08, 1.1, 0, Math.PI * 2); ctx.fill();
+                        scene.style.fill = `rgba(190,140,255,${0.5 + 0.5 * Math.sin(t * 5 + i)})`;
+                        path=[]; path.push(circle(x0 - len * 0.62, y0 * 1.08, 1.1, 0, Math.PI * 2)); scene.paint(path,{fill:scene.style.fill});
                     }
                 }
-                ctx.restore();
-            },
-armPose(diving, stuck, s) {
-                if (diving) return [5, 12 * s, 18, 24 * s, 30, 13 * s, 64, 3 * s];
-                if (stuck) return [5, 12 * s, 13, 29 * s, 28, 24 * s, 50, 13 * s];
-                return [5, 12 * s, 13, 30 * s, 28, 25 * s, 58, 11 * s];
-            },
-_drawArms(ctx, t) {
-                const st = this.state, tl = st === 'tell' ? this._tell : null;
+                scene.leave();
+            }
+
+function _drawArms(state,scene,t){let path=[];
+                const st = state.state, tl = st === 'tell' ? state._tell : null;
                 const diving = st === 'dive' || (tl && tl.kind === 'lance'), stuck = st === 'recover';
-                const reach = st === 'tether' && this._tether ? 1 : 0;
+                const reach = st === 'tether' && state._tether ? 1 : 0;
                 for (const s of [-1, 1]) {
                     // shoulder → elbow → wrist → lance tip; a dive folds both lances forward together
-                    const [sx, sy, ex, ey, wx, wy, tx, ty] = droneAppearance.armPose(diving, stuck, s);
-                    ctx.lineCap = 'round';
-                    ctx.strokeStyle = '#08070b'; ctx.lineWidth = 7;
-                    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.lineTo(wx, wy); ctx.stroke();
-                    ctx.strokeStyle = '#2a2436'; ctx.lineWidth = 4;
-                    ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.lineTo(wx, wy); ctx.stroke();
-                    ctx.strokeStyle = 'rgba(200,190,230,0.18)'; ctx.lineWidth = 1;          // a glint along the plating
-                    ctx.beginPath(); ctx.moveTo(sx, sy - 1); ctx.lineTo(ex, ey - 1); ctx.lineTo(wx, wy - 1); ctx.stroke();
+                    const [sx, sy, ex, ey, wx, wy, tx, ty] = droneArmPose(diving, stuck, s);
+                    scene.style.line_cap = 'round';
+                    scene.style.stroke = '#08070b'; scene.style.stroke_width = 7;
+                    path=[]; path.push(['move',sx, sy]); path.push(['line',ex, ey]); path.push(['line',wx, wy]); scene.paint(path,{stroke:scene.style.stroke});
+                    scene.style.stroke = '#2a2436'; scene.style.stroke_width = 4;
+                    path=[]; path.push(['move',sx, sy]); path.push(['line',ex, ey]); path.push(['line',wx, wy]); scene.paint(path,{stroke:scene.style.stroke});
+                    scene.style.stroke = 'rgba(200,190,230,0.18)'; scene.style.stroke_width = 1;          // a glint along the plating
+                    path=[]; path.push(['move',sx, sy - 1]); path.push(['line',ex, ey - 1]); path.push(['line',wx, wy - 1]); scene.paint(path,{stroke:scene.style.stroke});
                     for (const [jx, jy] of [[ex, ey], [wx, wy]]) {                  // the joints
-                        ctx.fillStyle = '#17131f'; ctx.beginPath(); ctx.arc(jx, jy, 3.2, 0, Math.PI * 2); ctx.fill();
-                        ctx.fillStyle = 'rgba(180,120,255,0.8)'; ctx.beginPath(); ctx.arc(jx, jy, 1, 0, Math.PI * 2); ctx.fill();
+                        scene.style.fill = '#17131f'; path=[]; path.push(circle(jx, jy, 3.2, 0, Math.PI * 2)); scene.paint(path,{fill:scene.style.fill});
+                        scene.style.fill = 'rgba(180,120,255,0.8)'; path=[]; path.push(circle(jx, jy, 1, 0, Math.PI * 2)); scene.paint(path,{fill:scene.style.fill});
                     }
                     if (reach && s === 1) continue;                                 // its lance is the tether (drawn in the glow pass)
                     // the lance: a long dark blade, a violet core burning down its length
                     const la = Math.atan2(ty - wy, tx - wx), nx = -Math.sin(la), ny = Math.cos(la);
-                    ctx.fillStyle = '#15101e';
-                    ctx.beginPath(); ctx.moveTo(wx + nx * 3.4, wy + ny * 3.4); ctx.lineTo(tx, ty); ctx.lineTo(wx - nx * 3.4, wy - ny * 3.4); ctx.closePath(); ctx.fill();
-                    ctx.strokeStyle = '#7a4cd8'; ctx.lineWidth = 0.8; ctx.stroke();
-                    ctx.strokeStyle = '#e2ccff'; ctx.lineWidth = 1.2;
-                    ctx.beginPath(); ctx.moveTo(wx + (tx - wx) * 0.1, wy + (ty - wy) * 0.1); ctx.lineTo(tx, ty); ctx.stroke();
+                    scene.style.fill = '#15101e';
+                    path=[]; path.push(['move',wx + nx * 3.4, wy + ny * 3.4]); path.push(['line',tx, ty]); path.push(['line',wx - nx * 3.4, wy - ny * 3.4]); path.push(['close']); scene.paint(path,{fill:scene.style.fill});
+                    scene.style.stroke = '#7a4cd8'; scene.style.stroke_width = 0.8; scene.paint(path,{stroke:scene.style.stroke});
+                    scene.style.stroke = '#e2ccff'; scene.style.stroke_width = 1.2;
+                    path=[]; path.push(['move',wx + (tx - wx) * 0.1, wy + (ty - wy) * 0.1]); path.push(['line',tx, ty]); scene.paint(path,{stroke:scene.style.stroke});
                 }
-            },
-_drawShell(ctx, t) {
-                const tele = this.isTelegraphing, open = this.state === 'recover';
+            }
+
+function _drawShell(state,scene,t){let path=[];
+                const tele = state.isTelegraphing, open = state.state === 'recover';
                 // under-rim shadow, then the bell
-                ctx.fillStyle = '#050407'; ctx.beginPath(); ctx.ellipse(-1, 0, 23, 21, 0, 0, Math.PI * 2); ctx.fill();
-                const gr = ctx.createRadialGradient(-6, -6, 2, 0, 0, 24);
-                gr.addColorStop(0, '#3a3446'); gr.addColorStop(0.5, '#17141e'); gr.addColorStop(1, '#09080c');
-                ctx.fillStyle = gr; ctx.beginPath(); ctx.ellipse(-2, 0, 21, 19, 0, 0, Math.PI * 2); ctx.fill();
+                scene.style.fill = '#050407'; path=[]; path.push(ellipse(-1, 0, 23, 21, 0, 0, Math.PI * 2)); scene.paint(path,{fill:scene.style.fill});
+                const gr = radial([-6,-6],2,[0,0],24,[]);
+                gr.stops.push([0, '#3a3446']); gr.stops.push([0.5, '#17141e']); gr.stops.push([1, '#09080c']);
+                scene.style.fill = gr; path=[]; path.push(ellipse(-2, 0, 21, 19, 0, 0, Math.PI * 2)); scene.paint(path,{fill:scene.style.fill});
                 // plates: concentric bands and radial seams (they part when it's open)
-                ctx.strokeStyle = open ? 'rgba(190,140,255,0.7)' : '#04030a'; ctx.lineWidth = open ? 1.2 : 1;
-                for (const r of [8, 14]) { ctx.beginPath(); ctx.ellipse(-3, 0, r * 1.05, r, 0, 0, Math.PI * 2); ctx.stroke(); }
+                scene.style.stroke = open ? 'rgba(190,140,255,0.7)' : '#04030a'; scene.style.stroke_width = open ? 1.2 : 1;
+                for (const r of [8, 14]) { path=[]; path.push(ellipse(-3, 0, r * 1.05, r, 0, 0, Math.PI * 2)); scene.paint(path,{stroke:scene.style.stroke}); }
                 for (let i = 0; i < 8; i++) {
                     const a = i * Math.PI / 4 + 0.2;
-                    ctx.beginPath(); ctx.moveTo(-3 + Math.cos(a) * 8, Math.sin(a) * 8); ctx.lineTo(-2 + Math.cos(a) * 20, Math.sin(a) * 18); ctx.stroke();
+                    path=[]; path.push(['move',-3 + Math.cos(a) * 8, Math.sin(a) * 8]); path.push(['line',-2 + Math.cos(a) * 20, Math.sin(a) * 18]); scene.paint(path,{stroke:scene.style.stroke});
                 }
                 // violet light slits along the plate edges
-                ctx.strokeStyle = `rgba(170,110,255,${0.55 + 0.25 * Math.sin(t * 3 + this._seed)})`; ctx.lineWidth = 1.3; ctx.lineCap = 'round';
+                scene.style.stroke = `rgba(170,110,255,${0.55 + 0.25 * Math.sin(t * 3 + state._seed)})`; scene.style.stroke_width = 1.3; scene.style.line_cap = 'round';
                 for (const [a0, a1, r] of [[-2.4, -1.7, 17], [1.7, 2.4, 17], [-0.9, -0.5, 11], [0.5, 0.9, 11], [2.9, 3.4, 15]]) {
-                    ctx.beginPath(); ctx.ellipse(-2, 0, r * 1.05, r, 0, a0, a1); ctx.stroke();
+                    path=[]; path.push(ellipse(-2, 0, r * 1.05, r, 0, a0, a1)); scene.paint(path,{stroke:scene.style.stroke});
                 }
                 // a sheen on the crown, and the hood's brow plates arching over the eye
-                ctx.fillStyle = 'rgba(200,190,230,0.12)'; ctx.beginPath(); ctx.ellipse(-8, -6, 7, 4, -0.5, 0, Math.PI * 2); ctx.fill();
+                scene.style.fill = 'rgba(200,190,230,0.12)'; path=[]; path.push(ellipse(-8, -6, 7, 4, -0.5, 0, Math.PI * 2)); scene.paint(path,{fill:scene.style.fill});
                 for (const s of [-1, 1]) {
-                    ctx.fillStyle = '#1d1926'; ctx.strokeStyle = '#05040a'; ctx.lineWidth = 0.8;
-                    ctx.beginPath(); ctx.moveTo(6, 2 * s); ctx.quadraticCurveTo(14, 13 * s, 2, 18 * s); ctx.quadraticCurveTo(-1, 9 * s, 6, 2 * s); ctx.fill(); ctx.stroke();
-                    ctx.strokeStyle = `rgba(170,110,255,${0.6 + 0.3 * Math.sin(t * 4 + s)})`; ctx.lineWidth = 0.9;
-                    ctx.beginPath(); ctx.moveTo(8, 6 * s); ctx.quadraticCurveTo(11, 12 * s, 4, 15 * s); ctx.stroke();
+                    scene.style.fill = '#1d1926'; scene.style.stroke = '#05040a'; scene.style.stroke_width = 0.8;
+                    path=[]; path.push(['move',6, 2 * s]); path.push(['quadratic',14, 13 * s, 2, 18 * s]); path.push(['quadratic',-1, 9 * s, 6, 2 * s]); scene.paint(path,{fill:scene.style.fill}); scene.paint(path,{stroke:scene.style.stroke});
+                    scene.style.stroke = `rgba(170,110,255,${0.6 + 0.3 * Math.sin(t * 4 + s)})`; scene.style.stroke_width = 0.9;
+                    path=[]; path.push(['move',8, 6 * s]); path.push(['quadratic',11, 12 * s, 4, 15 * s]); scene.paint(path,{stroke:scene.style.stroke});
                 }
                 // the eye: rings round a hot core
-                const ex = DRONE.EYE_FWD, hit = this._eyeHitT ? Math.max(0, 1 - (_gameTimeSec - this._eyeHitT) / 0.2) : 0;
-                ctx.fillStyle = '#0a0710'; ctx.beginPath(); ctx.arc(ex, 0, 7.5, 0, Math.PI * 2); ctx.fill();
-                ctx.strokeStyle = tele ? '#f0e0ff' : '#9a62ff'; ctx.lineWidth = 1;
-                for (const r of [6.5, 4.5]) { ctx.beginPath(); ctx.arc(ex, 0, r, 0, Math.PI * 2); ctx.stroke(); }
-                ctx.fillStyle = hit > 0 ? '#ffffff' : tele ? '#f6eaff' : '#c9a2ff';
-                ctx.beginPath(); ctx.arc(ex, 0, 2.6 + (tele ? 0.8 * Math.sin(t * 30) : 0), 0, Math.PI * 2); ctx.fill();
-            },
-drawLights(ctx) {
-                if (this.dead) return;
-                const t = this.render_time ?? _frameTime / 1000, now = this.render_clock ?? _gameTimeSec, lift = this._lift(), S = 1 + this.alt * 0.5;
-                const ca = Math.cos(this.angle), sa = Math.sin(this.angle);
-                const W = (lx, ly) => ({ x: this.x + (lx * ca - ly * sa) * S, y: this.y - lift + (lx * sa + ly * ca) * S });
-                const tl = this.state === 'tell' ? this._tell : null, k = tl ? Math.min(1, (now - this._stateT) / tl.secs) : 0;
-                ctx.save(); ctx.globalCompositeOperation = 'lighter';
+                const ex = DRONE.EYE_FWD, hit = state._eyeHitT ? Math.max(0, 1 - ((state.render_clock??0) - state._eyeHitT) / 0.2) : 0;
+                scene.style.fill = '#0a0710'; path=[]; path.push(circle(ex, 0, 7.5, 0, Math.PI * 2)); scene.paint(path,{fill:scene.style.fill});
+                scene.style.stroke = tele ? '#f0e0ff' : '#9a62ff'; scene.style.stroke_width = 1;
+                for (const r of [6.5, 4.5]) { path=[]; path.push(circle(ex, 0, r, 0, Math.PI * 2)); scene.paint(path,{stroke:scene.style.stroke}); }
+                scene.style.fill = hit > 0 ? '#ffffff' : tele ? '#f6eaff' : '#c9a2ff';
+                path=[]; path.push(circle(ex, 0, 2.6 + (tele ? 0.8 * Math.sin(t * 30) : 0), 0, Math.PI * 2)); scene.paint(path,{fill:scene.style.fill});
+            }
+
+function drawLights(state,scene){let path=[];
+                if (state.dead) return;
+                const t = state.render_time ?? 0, now = state.render_clock ?? (state.render_clock??0), lift = droneLift(state), S = 1 + state.alt * 0.5;
+                const ca = Math.cos(state.angle), sa = Math.sin(state.angle);
+                const W = (lx, ly) => ({ x: state.x + (lx * ca - ly * sa) * S, y: state.y - lift + (lx * sa + ly * ca) * S });
+                const tl = state.state === 'tell' ? state._tell : null, k = tl ? Math.min(1, (now - state._stateT) / tl.secs) : 0;
+                scene.enter(); scene.style.blend = 'add';
                 // the sensor core
                 const e = W(DRONE.EYE_FWD, 0);
-                ctx.globalAlpha = 0.55 + 0.45 * k; drawGlow(ctx, e.x, e.y, (18 + 22 * k) * S, k > 0 ? '235, 200, 255' : '164, 105, 255', 0.35);
+                scene.style.opacity = 0.55 + 0.45 * k; glow(scene, e.x, e.y, (18 + 22 * k) * S, k > 0 ? '235, 200, 255' : '164, 105, 255', 0.35);
                 // the lances crackle (brighter while it winds up or dives)
-                const diving = this.state === 'dive' || (tl && tl.kind === 'lance');
+                const diving = state.state === 'dive' || (tl && tl.kind === 'lance');
                 const hot = diving || (tl && tl.kind === 'lance') ? 1 : 0.45;
                 for (const s of [-1, 1]) {
-                    if (this.state === 'tether' && s === 1) continue;
-                    const P = droneAppearance.armPose(diving, this.state === 'recover', s), w = W(P[4], P[5]), tip = W(P[6], P[7]);
-                    ctx.globalAlpha = 0.35 * hot; drawGlow(ctx, tip.x, tip.y, 12 * S, '170, 110, 255', 0.3);
-                    ctx.strokeStyle = `rgba(210,170,255,${0.5 * hot + 0.3})`; ctx.lineWidth = 1;
-                    ctx.beginPath(); ctx.moveTo(w.x, w.y);
+                    if (state.state === 'tether' && s === 1) continue;
+                    const P = droneArmPose(diving, state.state === 'recover', s), w = W(P[4], P[5]), tip = W(P[6], P[7]);
+                    scene.style.opacity = 0.35 * hot; glow(scene, tip.x, tip.y, 12 * S, '170, 110, 255', 0.3);
+                    scene.style.stroke = `rgba(210,170,255,${0.5 * hot + 0.3})`; scene.style.stroke_width = 1;
+                    path=[]; path.push(['move',w.x, w.y]);
                     const n = 5, seed = Math.floor(t * 18) + s * 7;
                     for (let i = 1; i <= n; i++) {
                         const u = i / n, j = i < n ? (Math.sin(seed * 12.9898 + i * 78.233) * 43758.5453 % 1) * 5 * hot : 0;
-                        ctx.lineTo(w.x + (tip.x - w.x) * u - sa * j, w.y + (tip.y - w.y) * u + ca * j);
+                        path.push(['line',w.x + (tip.x - w.x) * u - sa * j, w.y + (tip.y - w.y) * u + ca * j]);
                     }
-                    ctx.stroke();
+                    scene.paint(path,{stroke:scene.style.stroke});
                 }
                 // tells: the lance line it'll dive along, the beam it's charging
                 if (tl && tl.kind === 'lance') {
-                    ctx.globalAlpha = 0.3 + 0.6 * k; ctx.strokeStyle = '#c9a2ff'; ctx.lineWidth = 1 + 3 * k; ctx.setLineDash([8, 6]);
-                    ctx.beginPath(); ctx.moveTo(this.x, this.y); ctx.lineTo(this.x + Math.cos(tl.a) * DRONE.LANCE.DIST, this.y + Math.sin(tl.a) * DRONE.LANCE.DIST); ctx.stroke(); ctx.setLineDash([]);
+                    scene.style.opacity = 0.3 + 0.6 * k; scene.style.stroke = '#c9a2ff'; scene.style.stroke_width = 1 + 3 * k; scene.style.dash=[8, 6];
+                    path=[]; path.push(['move',state.x, state.y]); path.push(['line',state.x + Math.cos(tl.a) * DRONE.LANCE.DIST, state.y + Math.sin(tl.a) * DRONE.LANCE.DIST]); scene.paint(path,{stroke:scene.style.stroke}); scene.style.dash=[];
                 } else if (tl && tl.kind === 'beam') {
                     const R = DRONE.BEAM.RANGE;
-                    ctx.globalAlpha = 0.15 + 0.5 * k; ctx.strokeStyle = '#d8b8ff'; ctx.lineWidth = 0.6 + 2.4 * k;
-                    ctx.beginPath(); ctx.moveTo(e.x, e.y); ctx.lineTo(e.x + Math.cos(tl.a) * R, e.y + Math.sin(tl.a) * R); ctx.stroke();
+                    scene.style.opacity = 0.15 + 0.5 * k; scene.style.stroke = '#d8b8ff'; scene.style.stroke_width = 0.6 + 2.4 * k;
+                    path=[]; path.push(['move',e.x, e.y]); path.push(['line',e.x + Math.cos(tl.a) * R, e.y + Math.sin(tl.a) * R]); scene.paint(path,{stroke:scene.style.stroke});
                 } else if (tl && tl.kind === 'grapple') {
-                    const tip = W(58, 11); ctx.globalAlpha = 0.4 + 0.5 * k; drawGlow(ctx, tip.x, tip.y, (10 + 12 * k) * S, '200, 150, 255', 0.3);
+                    const tip = W(58, 11); scene.style.opacity = 0.4 + 0.5 * k; glow(scene, tip.x, tip.y, (10 + 12 * k) * S, '200, 150, 255', 0.3);
                 }
                 // the tether: its lance flung out on a crackling line
-                const T = this._tether;
+                const T = state._tether;
                 if (T) {
                     const w = W(28, 25);
-                    ctx.globalAlpha = 0.9; ctx.strokeStyle = '#cfa8ff'; ctx.lineWidth = 1.5;
-                    ctx.beginPath(); ctx.moveTo(w.x, w.y);
+                    scene.style.opacity = 0.9; scene.style.stroke = '#cfa8ff'; scene.style.stroke_width = 1.5;
+                    path=[]; path.push(['move',w.x, w.y]);
                     const n = 8, dx = T.x - w.x, dy = T.y - w.y, L = Math.hypot(dx, dy) || 1;
-                    for (let i = 1; i <= n; i++) { const u = i / n, j = i < n ? Math.sin(t * 40 + i * 2.1) * 3 : 0; ctx.lineTo(w.x + dx * u - dy / L * j, w.y + dy * u + dx / L * j); }
-                    ctx.stroke();
-                    ctx.globalAlpha = 0.8; drawGlow(ctx, T.x, T.y, T.state === 'held' ? 26 : 14, '190, 130, 255', 0.3);
+                    for (let i = 1; i <= n; i++) { const u = i / n, j = i < n ? Math.sin(t * 40 + i * 2.1) * 3 : 0; path.push(['line',w.x + dx * u - dy / L * j, w.y + dy * u + dx / L * j]); }
+                    scene.paint(path,{stroke:scene.style.stroke});
+                    scene.style.opacity = 0.8; glow(scene, T.x, T.y, T.state === 'held' ? 26 : 14, '190, 130, 255', 0.3);
                 }
                 // the beam itself: a white-violet line through everything
-                const B = this._beam;
+                const B = state._beam;
                 if (B && now - B.t0 < DRONE.BEAM.FIRE) {
                     const u = (now - B.t0) / DRONE.BEAM.FIRE;
                     for (const [w, a] of [[14, 0.18], [6, 0.45], [2, 0.95]]) {
-                        ctx.globalAlpha = a * (1 - u); ctx.strokeStyle = w > 4 ? '#a469ff' : '#ffffff'; ctx.lineWidth = w;
-                        ctx.beginPath(); ctx.moveTo(B.x0, B.y0 - lift); ctx.lineTo(B.x1, B.y1); ctx.stroke();
+                        scene.style.opacity = a * (1 - u); scene.style.stroke = w > 4 ? '#a469ff' : '#ffffff'; scene.style.stroke_width = w;
+                        path=[]; path.push(['move',B.x0, B.y0 - lift]); path.push(['line',B.x1, B.y1]); scene.paint(path,{stroke:scene.style.stroke});
                     }
                 }
-                ctx.restore();
+                scene.leave();
             }
-};
-function dronePresentation(entity,blend=1){const pose=entity.getRenderState(blend),action=entity.data.ability_action_state,state=entity.drone_state,clock=entity.data.weapon_state?.elapsed??0,definition=action?entity.physics_system.elements.asset_library.getResource('df:abilities').data[action.ability_id]:null,projectile=action?.projectile_id?entity.physics_system.elements.fetchEntity(action.projectile_id):null,target=action?.target_id?entity.physics_system.elements.fetchEntity(action.target_id):null,end=(target??projectile)?.getRenderState(blend).position;
-return Object.assign(Object.create(droneAppearance),{x:pose.position[0],y:pose.position[1],angle:pose.rotation,dead:entity.dead,kind:entity.data.drone_kind,alt:state.alt,hoverOffset:entity.data.actor_state.elapsed*4.8,_seed:entity.data.appearance_seed,state:entity.state,invincibleTimer:Math.round(entity.data.actor_state.invulnerable_remaining*60),render_time:entity.data.actor_state.elapsed,render_clock:clock,_stateT:action?.phase_started_at??clock,_tell:action?.phase==='tell'?{kind:action.ability_id.replace('drone_',''),secs:definition.tell_seconds,lock:definition.lock_seconds,a:action.heading}:null,_tether:end?{x:end[0],y:end[1],state:target?'held':'out'}:null,_beam:action?.beam?{x0:action.beam.from[0],y0:action.beam.from[1],x1:action.beam.to[0],y1:action.beam.to[1],t0:action.phase_started_at}:null});}
+function createDronePackets(state,{pass='body'}={}){if(!['body','lights'].includes(pass))throw new TypeError('Unknown Drone art pass');const scene=new artScene();(pass==='lights'?drawLights:draw)(state,scene);return scene.finish();}
 
-return Object.freeze({get droneAppearance(){return droneAppearance;},get dronePresentation(){return dronePresentation;}});
+function dronePresentation(entity,blend=1){const pose=entity.getRenderState(blend),action=entity.data.ability_action_state,state=entity.drone_state,clock=entity.data.weapon_state?.elapsed??0,definition=action?entity.physics_system.elements.asset_library.getResource('df:abilities').data[action.ability_id]:null,projectile=action?.projectile_id?entity.physics_system.elements.fetchEntity(action.projectile_id):null,target=action?.target_id?entity.physics_system.elements.fetchEntity(action.target_id):null,end=(target??projectile)?.getRenderState(blend).position;
+return Object.assign({},{x:pose.position[0],y:pose.position[1],angle:pose.rotation,dead:entity.dead,kind:entity.data.drone_kind,alt:state.alt,hoverOffset:entity.data.actor_state.elapsed*4.8,_seed:entity.data.appearance_seed,state:entity.state,invincibleTimer:Math.round(entity.data.actor_state.invulnerable_remaining*60),render_time:entity.data.actor_state.elapsed,render_clock:clock,_stateT:action?.phase_started_at??clock,_tell:action?.phase==='tell'?{kind:action.ability_id.replace('drone_',''),secs:definition.tell_seconds,lock:definition.lock_seconds,a:action.heading}:null,_tether:end?{x:end[0],y:end[1],state:target?'held':'out'}:null,_beam:action?.beam?{x0:action.beam.from[0],y0:action.beam.from[1],x1:action.beam.to[0],y1:action.beam.to[1],t0:action.phase_started_at}:null});}
+
+return Object.freeze({get droneLift(){return droneLift;},get droneArmPose(){return droneArmPose;},get createDronePackets(){return createDronePackets;},get dronePresentation(){return dronePresentation;}});
 })();
 // src/presentation/demoness.mjs
-const m129 = (()=>{
+const m130 = (()=>{
 const enemies = m29.default;
 const DUEL=enemies.duel;
 /** Retained Canvas art over a detached record; body art is supplied by the host. */
@@ -25916,7 +25629,7 @@ function demonessPresentation(entity,blend=1){const pose=entity.getRenderState(b
 return Object.freeze({get demonessAppearance(){return demonessAppearance;},get demonessPresentation(){return demonessPresentation;}});
 })();
 // src/presentation/boss-effects.mjs
-const m130 = (()=>{
+const m131 = (()=>{
 const enemies = m29.default;
 const HAZARD=enemies.hazards;
 const bossEffectAppearance={
@@ -26053,6 +25766,352 @@ function bossEffectPresentation(effects,clock){return effects.filter(effect=>!ef
 
 return Object.freeze({get bossEffectAppearance(){return bossEffectAppearance;},get bossEffectPresentation(){return bossEffectPresentation;}});
 })();
+// src/presentation/velvet-cat.mjs
+const m132 = (()=>{
+const {artScene,circle,ellipse,radial,linear,groundShadow} = m129;
+const {velvetCatAnimation} = m76;
+const {VELVET_CAT_PALETTES,VELVET_T,VELVET_PROFILES,VELVET_TAIL_SEGS} = m77;
+/** Renderer-neutral feline geometry/material packets over detached animation state. */
+
+function createVelvetCatArt(state){const scene=new artScene(),eyes=[];let path=[];
+                if (!state.visible || state.inCar) return {body:[],eyes:[]};
+
+                // A missing/unrecognized selector uses the default coat.
+                const C = Object.prototype.hasOwnProperty.call(VELVET_CAT_PALETTES, state.coatPalette)
+                    ? VELVET_CAT_PALETTES[state.coatPalette].colors : VELVET_CAT_PALETTES.default.colors;
+                const P = state._poses || { sit: 0, loaf: 0, sleep: 0, stretch: 0, groom: 0 };
+                const moving = (state.animationSpeed || 0) > 0.05;
+                const g = velvetCatAnimation._gaitParams.call(state);
+                const TAU = Math.PI * 2, frac = v => v - Math.floor(v);
+                const stand = Math.max(0, 1 - P.sit - P.loaf - P.sleep - P.stretch);
+                const breathe = 1 + Math.sin(state._breath || 0) * 0.025 * (1 - stand);
+
+                // Ground contact is independent of body facing, gait and tail movement.
+                groundShadow(scene, state.x, state.y, P.sleep > 0.5 ? 13 : 15, P.sleep > 0.5 ? 11 : 9);
+                scene.enter();
+                scene.place({position:[state.x, state.y]});
+                scene.place({rotation:state.angle});
+                scene.style.line_cap = 'round';
+                scene.style.line_join = 'round';
+
+                // The world's light (upper left) in her own frame, so her shading doesn't turn with her.
+                const lx = Math.cos(-state.angle) * -0.6 - Math.sin(-state.angle) * -0.8;
+                const ly = Math.sin(-state.angle) * -0.6 + Math.cos(-state.angle) * -0.8;
+
+                // --- Spine: an arc from rump (t = 0) to neck (t = 1), the neck facing +X ---
+                const cyc = state.walkPhase / TAU;
+                const flex = moving ? Math.sin((cyc + .3) * TAU) * g.gallop : 0;   // a galloping cat gathers and stretches
+                const L = 23.5 * (1 - 0.36 * P.sit - 0.12 * P.loaf + 0.03 * P.sleep + 0.2 * P.stretch) * (1 + flex * 0.13);
+                const bend = (state._bend || 0) * (1 - P.sleep) + P.sleep * 4.3 * (state._curlSide || 1);
+                const S = 12, pts = [];
+                let px = 0, py = 0;
+                for (let i = S; i >= 0; i--) {
+                    const t = i / S, th = bend * (t - 1);
+                    pts[i] = { x: px, y: py, th };
+                    px -= Math.cos(th) * L / S; py -= Math.sin(th) * L / S;
+                }
+                let cx = 0, cy = 0;
+                for (const p of pts) { cx += p.x; cy += p.y; }
+                cx = cx / pts.length - 1.5 - P.sit * 2; cy /= pts.length;
+                for (const p of pts) { p.x -= cx; p.y -= cy; }
+                const width = (t) => {
+                    let j = 0; while (j < VELVET_T.length - 2 && t > VELVET_T[j + 1]) j++;
+                    const u = (t - VELVET_T[j]) / (VELVET_T[j + 1] - VELVET_T[j]);
+                    let w = 0;
+                    for (const [name, wt] of [['stand', stand], ['sit', P.sit], ['loaf', P.loaf], ['sleep', P.sleep], ['stretch', P.stretch]]) {
+                        if (wt <= 0) continue;
+                        const pr = VELVET_PROFILES[name];
+                        w += (pr[j] + (pr[j + 1] - pr[j]) * u) * wt;
+                    }
+                    return w * breathe;
+                };
+                const at = (t) => {
+                    const f = Math.max(0, Math.min(S - 1e-6, t * S)), i = Math.floor(f), u = f - i;
+                    const a = pts[i], b = pts[Math.min(S, i + 1)];
+                    return { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, th: a.th + (b.th - a.th) * u };
+                };
+                // Shoulder blades and hips roll up on the side of the leg that's bearing weight.
+                const legU = (j) => frac(cyc + g.off[j]);
+                const roll = (j) => moving && legU(j) < g.duty ? Math.sin(legU(j) / g.duty * Math.PI) * 0.7 * stand : 0;
+                const left = [], right = [];
+                for (let i = 0; i <= S; i++) {
+                    const p = pts[i], t = i / S, w = width(t), nx = -Math.sin(p.th), ny = Math.cos(p.th);
+                    const sh = Math.max(0, 1 - Math.abs(t - .74) / .14), hp = Math.max(0, 1 - Math.abs(t - .2) / .14);
+                    const wl = w + sh * roll(1) + hp * roll(0), wr = w + sh * roll(3) + hp * roll(2);
+                    left.push({ x: p.x - nx * wl, y: p.y - ny * wl });
+                    right.push({ x: p.x + nx * wr, y: p.y + ny * wr });
+                }
+                const rump = pts[0], neck = pts[S];
+                const ring = [{ x: rump.x - Math.cos(rump.th) * width(0) * .9, y: rump.y - Math.sin(rump.th) * width(0) * .9 },
+                    ...left, { x: neck.x + 1.6, y: neck.y }, ...right.reverse()];
+                // A closed curve through the midpoints of a point ring (open: starts and ends on its first and last points).
+                const smoothRing = (path, ring, open = false) => {
+                    const n = ring.length, mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+                    const m0 = open ? ring[0] : mid(ring[n - 1], ring[0]);
+                    path.push(['move',m0.x, m0.y]);
+                    for (let i = open ? 1 : 0; i < n; i++) { const a = ring[i], m = mid(a, ring[(i + 1) % n]); path.push(['quadratic',a.x, a.y, m.x, m.y]); }
+                    path.push(['close']);
+                };
+                const outline = [];
+                smoothRing(outline, ring);
+
+                // --- Paw positions: gait, blended toward each rest pose ---
+                const legs = [];
+                for (let j = 0; j < 4; j++) {
+                    const hind = j % 2 === 0, sideY = j < 2 ? -1 : 1;
+                    const anchorT = hind ? .2 : .78, a = at(anchorT), w = width(anchorT);
+                    const nx = -Math.sin(a.th), ny = Math.cos(a.th), ux = Math.cos(a.th), uy = Math.sin(a.th);
+                    // gait: planted feet slide back under her, lifted feet swing forward
+                    const u = legU(j);
+                    let along = 0, lift = 0;
+                    if (moving) {
+                        if (u < g.duty) along = g.stride * (0.5 - u / g.duty);
+                        else { const s = (u - g.duty) / (1 - g.duty); along = g.stride * (-0.5 + (s * s * (3 - 2 * s))); lift = Math.sin(s * Math.PI); }
+                    }
+                    const out = (hind ? 1 : 1.02) * w * (0.85 + lift * 0.12);
+                    let fx = a.x + ux * ((hind ? -1.5 : 4.6) + along) + nx * out * sideY;
+                    let fy = a.y + uy * ((hind ? -1.5 : 4.6) + along) + ny * out * sideY;
+                    let vis = stand;
+                    // sit: fore paws together before the chest, hind paws peeking at the haunches
+                    const sx = hind ? pts[3].x + 3.5 : neck.x + 6.8, sy = hind ? pts[3].y + sideY * (width(.25) + .4) : neck.y + sideY * 2;
+                    // stretch: fore paws reach far ahead
+                    const tx = hind ? fx : neck.x + 12.5, ty = hind ? fy : neck.y + sideY * 3.3;
+                    fx = fx * stand + sx * P.sit + tx * P.stretch + (hind ? pts[3].x : neck.x) * (P.loaf + P.sleep);
+                    fy = fy * stand + sy * P.sit + ty * P.stretch + (hind ? pts[3].y : neck.y) * (P.loaf + P.sleep);
+                    vis += P.sit + P.stretch;
+                    const groomPaw = !hind && sideY < 0 && P.groom > 0.5;
+                    legs.push({ hind, sideY, ax: a.x + nx * w * .45 * sideY, ay: a.y + ny * w * .45 * sideY, fx, fy, lift: lift * stand, vis: groomPaw ? 0 : vis, th: a.th });
+                }
+                const paw = (x, y, th, s, raised) => {
+                    scene.enter(); scene.place({position:[x, y]}); scene.place({rotation:th}); scene.place({scale:[s, s]});
+                    scene.style.fill = raised ? C.raisedPaw : C.pawTop;
+                    path=[]; path.push(ellipse(0, 0, 2.5, 1.85, 0, 0, TAU)); scene.paint(path,{fill:scene.style.fill});
+                    scene.style.fill = C.pawShadow; path=[]; path.push(ellipse(-.5, .35, 1.9, 1.3, 0, 0, TAU)); scene.paint(path,{fill:scene.style.fill});
+                    scene.style.fill = raised ? C.raisedPaw : C.pawTop; path=[]; path.push(ellipse(.25, -.15, 2.1, 1.5, 0, 0, TAU)); scene.paint(path,{fill:scene.style.fill});
+                    // three toe creases at the front of the foot
+                    scene.style.stroke = C.pawShadow; scene.style.stroke_width = .35; path=[];
+                    path.push(['move',1.5, -.8]); path.push(['line',2.3, -.75]); path.push(['move',1.7, 0]); path.push(['line',2.5, 0]); path.push(['move',1.5, .8]); path.push(['line',2.3, .75]);
+                    scene.paint(path,{stroke:scene.style.stroke}); scene.leave();
+                };
+
+                // --- Tail: nine springy segments from the rump, foreshortened as it rises ---
+                const tail = [];
+                {
+                    // Resting, it leaves the rump already turned along her side, to wrap round toward the fore paws.
+                    let th = rump.th + Math.PI - (state._curlSide || 1) * (P.sit * 1.75 + P.loaf * 1.75 + P.sleep * 1.1), x = rump.x - Math.cos(rump.th) * width(0) * .6, y = rump.y - Math.sin(rump.th) * width(0) * .6;
+                    tail.push({ x, y });
+                    const lift = state._tailLift || 0;
+                    for (let i = 0; i < VELVET_TAIL_SEGS; i++) {
+                        th += -(state._tail ? state._tail[i] : 0);
+                        const len = 3.4 * (1 - lift * (i < 5 ? .62 : .22)) * (1 - P.loaf * .12);
+                        x += Math.cos(th) * len; y += Math.sin(th) * len;
+                        tail.push({ x, y });
+                    }
+                }
+                // One tapering filled shape (no overlapping strokes to bead at the joints), rounded at the tip.
+                const tailPath = [];
+                {
+                    const l = [], r = [], n = tail.length;
+                    for (let i = 0; i < n; i++) {
+                        const a = tail[Math.max(0, i - 1)], b = tail[Math.min(n - 1, i + 1)];
+                        const d = Math.hypot(b.x - a.x, b.y - a.y) || 1, nx = -(b.y - a.y) / d, ny = (b.x - a.x) / d;
+                        const w = 1.85 - (i / (n - 1)) * .95;
+                        l.push({ x: tail[i].x + nx * w, y: tail[i].y + ny * w }); r.push({ x: tail[i].x - nx * w, y: tail[i].y - ny * w });
+                    }
+                    const e = tail[n - 1], q = tail[n - 2], d = Math.hypot(e.x - q.x, e.y - q.y) || 1;
+                    smoothRing(tailPath, [...l, { x: e.x + (e.x - q.x) / d * 1.1, y: e.y + (e.y - q.y) / d * 1.1 }, ...r.reverse()], true);
+                }
+
+                // Soft cast shadow of the whole silhouette, away from the light; a raised tail throws its own further off.
+                scene.enter();
+                scene.style.opacity = 0.22;
+                scene.place({position:[-lx * 1.8, -ly * 1.8]});
+                scene.style.fill = '#000'; scene.paint(outline,{fill:scene.style.fill});
+                scene.place({position:[-lx * (state._tailLift || 0) * 5, -ly * (state._tailLift || 0) * 5]}); scene.paint(tailPath,{fill:scene.style.fill});
+                scene.leave();
+
+                // Tail, then legs, under the body.
+                const drawTail = () => {
+                    const tailCoat = linear([tail[0].x,tail[0].y],[tail[tail.length - 1].x,tail[tail.length - 1].y],[]);
+                    tailCoat.stops.push([0, C.tailBase]); tailCoat.stops.push([.5, C.tailMiddle]); tailCoat.stops.push([1, C.tailTip]);
+                    scene.style.fill = tailCoat; scene.paint(tailPath,{fill:scene.style.fill});
+                    scene.style.stroke = 'rgba(8,3,12,.5)'; scene.style.stroke_width = .5; scene.paint(tailPath,{stroke:scene.style.stroke});
+                    scene.style.stroke = C.tailNap; scene.style.stroke_width = .9; path=[];
+                    path.push(['move',tail[0].x + lx * .7, tail[0].y + ly * .7]);
+                    for (let i = 1; i < tail.length - 1; i++) path.push(['line',tail[i].x + lx * .7, tail[i].y + ly * .7]);
+                    scene.paint(path,{stroke:scene.style.stroke});
+                };
+                // Trailing, the tail starts under the rump; wrapped round her at rest it lies over the haunch.
+                const tailOver = P.sit + P.loaf + P.sleep > 0.5;
+                if (!tailOver) drawTail();
+
+                for (const leg of legs) {
+                    if (leg.vis < 0.05) continue;
+                    scene.style.opacity = Math.min(1, leg.vis);
+                    scene.style.stroke = C.legShade; scene.style.stroke_width = leg.hind ? 3.6 : 3.1;
+                    path=[]; path.push(['move',leg.ax, leg.ay]); path.push(['line',leg.fx, leg.fy]); scene.paint(path,{stroke:scene.style.stroke});
+                    paw(leg.fx, leg.fy, leg.th, (leg.hind ? 1.05 : .95) * (1 + leg.lift * .14), leg.lift > .3);
+                }
+                scene.style.opacity = 1;
+
+                // --- Body ---
+                const coat = linear([lx * 7,ly * 7],[-lx * 7,-ly * 7],[]);
+                coat.stops.push([0, C.bodyTop]);
+                coat.stops.push([.4, C.bodyMiddle]);
+                coat.stops.push([.75, C.bodyShade]);
+                coat.stops.push([1, C.bodyDeep]);
+                scene.style.fill = coat; scene.paint(outline,{fill:scene.style.fill});
+                scene.enter(); scene.clip(outline);
+                // Velvet sheen down the spine, rounded masses over the haunches and shoulders
+                scene.style.stroke = C.napHighlight; scene.style.stroke_width = 4.2; path=[];
+                for (let i = 1; i < S; i++) { const p = pts[i]; i === 1 ? path.push(['move',p.x + lx, p.y + ly]) : path.push(['line',p.x + lx, p.y + ly]); }
+                scene.paint(path,{stroke:scene.style.stroke});
+                for (const t of [.2, .74]) {
+                    const p = at(t), r = width(t) * 1.05;
+                    const hl = radial([p.x + lx * 2.2,p.y + ly * 2.2],0,[p.x + lx * 2.2,p.y + ly * 2.2],r,[]);
+                    hl.stops.push([0, C.bodyRim]); hl.stops.push([1, C.napEnd]);
+                    scene.style.fill = hl; path=[]; path.push(circle(p.x + lx * 2.2, p.y + ly * 2.2, r, 0, TAU)); scene.paint(path,{fill:scene.style.fill});
+                }
+                // Fur lies back from the head: short strands scattered without a visible pattern or RNG
+                scene.style.stroke = C.furStroke; scene.style.stroke_width = .3; path=[];
+                for (let i = 0; i < 26; i++) {
+                    const t = .06 + ((i * .61803398875 + .19) % 1) * .9, p = at(t), w = width(t);
+                    const o = (((i * .41421356237 + .36) % 1) - .5) * 1.7 * w;
+                    const x = p.x - Math.sin(p.th) * o, y = p.y + Math.cos(p.th) * o, l = 1 + (Math.sin(i * 2.41) + 1) * .35;
+                    path.push(['move',x, y]); path.push(['line',x - Math.cos(p.th) * l, y - Math.sin(p.th) * l]);
+                }
+                scene.paint(path,{stroke:scene.style.stroke});
+                scene.leave();
+                scene.style.stroke = 'rgba(8,3,12,.5)'; scene.style.stroke_width = .55; scene.paint(outline,{stroke:scene.style.stroke});
+                if (tailOver) drawTail();
+
+                // --- Head ---
+                const headScale = 1 + P.sit * .07 - P.sleep * .04 - P.stretch * .05;
+                const hx = neck.x + 2.6 - P.sit * 1.2 + P.stretch * 1.5, hy = neck.y;
+                // Return eye anchors for the later glow pass; presentation never writes to the actor.
+                {
+                    const yaw = state._headYaw || 0, ca = Math.cos(state.angle), sa = Math.sin(state.angle);
+
+                    for (let e = 0; e < 2; e++) {
+                        const ex = 2.9 * headScale, ey = (e ? 1 : -1) * 2.05 * headScale;
+                        const lx2 = hx + ex * Math.cos(yaw) - ey * Math.sin(yaw), ly2 = hy + ex * Math.sin(yaw) + ey * Math.cos(yaw);
+                        eyes.push({x:state.x + lx2 * ca - ly2 * sa,y:state.y + lx2 * sa + ly2 * ca});
+                    }
+                }
+                scene.enter();
+                scene.place({position:[hx, hy]}); scene.place({rotation:state._headYaw || 0}); scene.place({scale:[headScale, headScale]});
+                // the head shades the shoulders under it
+                scene.style.fill = 'rgba(0,0,0,.2)'; path=[]; path.push(ellipse(-lx * 1.4, -ly * 1.4, 5.2, 5, 0, 0, TAU)); scene.paint(path,{fill:scene.style.fill});
+                const skull = [];
+                skull.push(['move',-4.3, 0]);
+                skull.push(['cubic',-4.3, -3.5, -2.2, -5, .6, -4.95]);
+                skull.push(['cubic',2.9, -4.9, 4.2, -3.1, 5.1, -1.85]);
+                skull.push(['quadratic',6.1, -1, 6.1, 0]);
+                skull.push(['quadratic',6.1, 1, 5.1, 1.85]);
+                skull.push(['cubic',4.2, 3.1, 2.9, 4.9, .6, 4.95]);
+                skull.push(['cubic',-2.2, 5, -4.3, 3.5, -4.3, 0]);
+                skull.push(['close']);
+                const hlx = Math.cos(-(state._headYaw || 0)) * lx - Math.sin(-(state._headYaw || 0)) * ly;
+                const hly = Math.sin(-(state._headYaw || 0)) * lx + Math.cos(-(state._headYaw || 0)) * ly;
+                const face = radial([hlx * 2 + .5,hly * 2],.5,[.5,0],6.5,[]);
+                face.stops.push([0, C.headTop]); face.stops.push([.55, C.headMiddle]); face.stops.push([1, C.headShadow]);
+                scene.style.fill = face; scene.paint(skull,{fill:scene.style.fill});
+                scene.style.stroke = 'rgba(8,3,12,.5)'; scene.style.stroke_width = .5; scene.paint(skull,{stroke:scene.style.stroke});
+                // cheek tufts
+                scene.style.stroke = C.cheekFur; scene.style.stroke_width = .45; path=[];
+                for (const sd of [-1, 1]) {
+                    path.push(['move',1.2, sd * 4.6]); path.push(['line',.2, sd * 5.4]);
+                    path.push(['move',2.4, sd * 4.1]); path.push(['line',1.6, sd * 5.0]);
+                }
+                scene.paint(path,{stroke:scene.style.stroke});
+                // Eyes on the front of the face: almond, slit pupils, lids that close from above
+                const blink = state._blink || 0;
+                for (const sd of [-1, 1]) {
+                    scene.enter(); scene.place({position:[2.9, sd * 2.05]}); scene.place({rotation:sd * .38});
+                    const open = 1 - blink;
+                    if (open < .12) {
+                        scene.style.stroke = 'rgba(20,10,26,.9)'; scene.style.stroke_width = .5;
+                        path=[]; path.push(['move',-1.3, 0]); path.push(['quadratic',0, .5 * sd, 1.3, 0]); scene.paint(path,{stroke:scene.style.stroke});
+                    } else {
+                        path=[]; path.push(['move',-1.5, 0]); path.push(['quadratic',0, -1 * open, 1.5, 0]); path.push(['quadratic',0, 1 * open, -1.5, 0]);
+                        scene.style.fill = '#ac7fc4'; scene.paint(path,{fill:scene.style.fill}); scene.style.stroke = '#120918'; scene.style.stroke_width = .42; scene.paint(path,{stroke:scene.style.stroke});
+                        scene.enter(); scene.clip(path);
+                        scene.style.fill = '#170d20'; path=[]; path.push(ellipse(.15, 0, .22 + (state._pupil || .5) * .5, .9, 0, 0, TAU)); scene.paint(path,{fill:scene.style.fill});
+                        scene.style.fill = '#efe2f3'; path=[]; path.push(circle(-.45, -.28 * sd, .28, 0, TAU)); scene.paint(path,{fill:scene.style.fill});
+                        scene.leave();
+                    }
+                    scene.leave();
+                }
+                // Muzzle pads, nose, mouth line
+                scene.style.fill = '#3c2540'; path=[];
+                path.push(ellipse(4.6, -1.05, 1.3, 1.15, -.2, 0, TAU)); path.push(ellipse(4.6, 1.05, 1.3, 1.15, .2, 0, TAU)); scene.paint(path,{fill:scene.style.fill});
+                scene.style.fill = '#b38c9c'; path=[]; path.push(['move',6.25, 0]); path.push(['line',5.3, -.7]); path.push(['line',5.3, .7]); path.push(['close']); scene.paint(path,{fill:scene.style.fill});
+                // Whiskers sweep forward when she's alert, droop sideways at rest
+                const fwd = moving ? .55 : P.sleep > .5 ? -.25 : P.sit > .5 ? .1 : .3;
+                scene.style.stroke = 'rgba(214,196,226,.38)'; scene.style.stroke_width = .28; path=[];
+                for (const sd of [-1, 1]) for (let w = 0; w < 3; w++) {
+                    const a0 = sd * (1.25 - w * .28 - fwd), r = 6.5 - w * .4;
+                    path.push(['move',4.8, sd * 1.4]); path.push(['quadratic',4.8 + Math.cos(a0) * r * .5, sd * 1.4 + Math.sin(a0) * r * .5, 4.8 + Math.cos(a0 + sd * .25) * r, sd * 1.4 + Math.sin(a0 + sd * .25) * r]);
+                }
+                scene.paint(path,{stroke:scene.style.stroke});
+                // Ears stand above the skull at its back corners: seen from above, triangles opening forward
+                for (const sd of [-1, 1]) {
+                    const e = state._ears ? state._ears[sd < 0 ? 0 : 1] : 0;
+                    scene.enter(); scene.place({position:[-.9, sd * 2.9]}); scene.place({rotation:sd * (e + .35)});
+                    // a cup of fur: the back of the ear, then the pink inside showing at its open front
+                    scene.style.fill = C.earBase; path=[];
+                    path.push(['move',-2.5, -sd * .5]); path.push(['quadratic',-2.9, sd * 2, -2.6, sd * 3.9]);
+                    path.push(['quadratic',.2, sd * 2.2, 1.9, sd * .1]); path.push(['quadratic',-.2, -sd * .9, -2.5, -sd * .5]); path.push(['close']); scene.paint(path,{fill:scene.style.fill});
+                    scene.style.stroke = 'rgba(8,3,12,.55)'; scene.style.stroke_width = .4; scene.paint(path,{stroke:scene.style.stroke});
+                    scene.style.fill = '#5e3150'; path=[];
+                    path.push(['move',-1.3, sd * .35]); path.push(['quadratic',-1.9, sd * 2, -2.2, sd * 3.2]); path.push(['quadratic',-.2, sd * 1.9, 1.2, sd * .35]); path.push(['close']); scene.paint(path,{fill:scene.style.fill});
+                    scene.style.stroke = C.earRim; scene.style.stroke_width = .35; path=[]; path.push(['move',-1.6, sd * .6]); path.push(['quadratic',-2.1, sd * 2, -2.3, sd * 3.1]); scene.paint(path,{stroke:scene.style.stroke});
+                    scene.leave();
+                }
+                scene.leave();
+
+                // Grooming: a fore paw lifts to the mouth for a few licks, then wipes back over the ear.
+                if (P.groom > 0.5) {
+                    const ph = state._groomPhase || 0, wipe = Math.max(0, Math.sin(ph * .35)) ** 2, lick = Math.sin(ph * 3);
+                    const yaw = state._headYaw || 0;
+                    const mx = hx + Math.cos(yaw) * 4.2 - Math.sin(yaw) * -2.2, my = hy + Math.sin(yaw) * 4.2 + Math.cos(yaw) * -2.2;
+                    const ex = hx - 1, ey = hy - 4.5;
+                    const px2 = mx + (ex - mx) * wipe, py2 = my + (ey - my) * wipe + lick * .25 * (1 - wipe);
+                    const sh = legs[1];
+                    scene.style.stroke = C.groomArm; scene.style.stroke_width = 3;
+                    path=[]; path.push(['move',sh.ax, sh.ay]); path.push(['quadratic',neck.x + 2, neck.y - 4, px2, py2]); scene.paint(path,{stroke:scene.style.stroke});
+                    paw(px2, py2, yaw + Math.PI * .25, .85, true);
+                    if (lick > .4 && wipe < .2) {
+                        scene.style.stroke = '#b27f97'; scene.style.stroke_width = .8;
+                        path=[]; path.push(['move',mx + 1.2, my + 1.6]); path.push(['line',mx + .6, my + .9]); scene.paint(path,{stroke:scene.style.stroke});
+                    }
+                }
+                scene.leave();
+
+return {body:scene.finish(),eyes};}
+
+function createVelvetEyePackets(state,{eyes,darkness=.8}={}){const scene=new artScene();let path=[];
+                if (!state.visible || state.inCar) return [];
+                const shine = Math.max(0, Math.min(1, (darkness - 0.25) / 0.45)) * (1 - (state._blink || 0));
+                if (shine < 0.03) return [];
+                // brighter as she turns her face toward the light; a lowered head (grooming) dims it
+                const a = shine * (0.8 + 0.2 * Math.cos((state._headYaw || 0) * 2)) * (1 - ((state._poses && state._poses.groom) || 0) * 0.5);
+                scene.enter();
+                scene.style.blend = 'add';
+                for (const e of eyes??createVelvetCatArt(state).eyes) {
+                    const g = radial([e.x,e.y],0,[e.x,e.y],3.6,[]);
+                    g.stops.push([0, `rgba(236,222,255,${0.95 * a})`]);
+                    g.stops.push([0.25, `rgba(190,150,255,${0.55 * a})`]);
+                    g.stops.push([1, 'rgba(120,70,220,0)']);
+                    scene.style.fill = g; path=[]; path.push(circle(e.x, e.y, 3.6, 0, Math.PI * 2)); scene.paint(path,{fill:scene.style.fill});
+                }
+                scene.leave();
+
+return scene.finish();}
+function createVelvetCatPackets(state,{pass='body',darkness=.8}={}){if(!['body','eyes'].includes(pass))throw new TypeError('Unknown Velvet art pass');return pass==='eyes'?createVelvetEyePackets(state,{darkness}):createVelvetCatArt(state).body;}
+
+return Object.freeze({get createVelvetCatArt(){return createVelvetCatArt;},get createVelvetEyePackets(){return createVelvetEyePackets;},get createVelvetCatPackets(){return createVelvetCatPackets;}});
+})();
 // src/directory/native-entry.mjs
 const m0 = (()=>{
 // The classic playable build links this entry. Browser/module clients use the same sources.
@@ -26133,7 +26192,10 @@ const m0 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get assetLibrary(){return m1.assetLibrary;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get createGameAssetLibrary(){return m27.createGameAssetLibrary;},get ApartmentLevel(){return m54.ApartmentLevel;},get APARTMENT_RULES(){return m92.APARTMENT_RULES;},get gameEngine(){return m96.gameEngine;},get gameLevel(){return m98.gameLevel;},get levelLobby(){return m97.levelLobby;},get createGameRuntime(){return m111.createGameRuntime;},get controlSystem(){return m99.controlSystem;},get controlsSystem(){return m99.controlsSystem;},get inputInstance(){return m99.inputInstance;},get keyboardInstance(){return m99.keyboardInstance;},get mouseInstance(){return m99.mouseInstance;},get touchInstance(){return m99.touchInstance;},get touchStick(){return m99.touchStick;},get gamepadInstance(){return m99.gamepadInstance;},get TAP(){return m99.TAP;},get DOUBLETAP(){return m99.DOUBLETAP;},get HELD(){return m99.HELD;},get PRESS(){return m99.PRESS;},get REPEAT(){return m99.REPEAT;},get RELEASE(){return m99.RELEASE;},get renderSystem(){return m104.renderSystem;},get renderFrame(){return m104.renderFrame;},get canvasRenderer(){return m104.canvasRenderer;},get cameraSystem(){return m104.cameraSystem;},get gameSession(){return m119.gameSession;},get PlayerStateSystem(){return m120.PlayerStateSystem;},get PlayerControlSystem(){return m121.PlayerControlSystem;},get Player(){return m79.Player;},get playerVitals(){return m80.playerVitals;},get itemSystem(){return m63.itemSystem;},get createItemCatalog(){return m38.createItemCatalog;},get GUN_MATERIALS(){return m115.GUN_MATERIALS;},get WEAPON_MODELS(){return m115.WEAPON_MODELS;},get LASER_MODULE(){return m115.LASER_MODULE;},get weaponModel(){return m115.weaponModel;},get weaponAppearance(){return m126.weaponAppearance;},get combatSystem(){return m122.combatSystem;},get weaponSystem(){return m123.weaponSystem;},get lootSystem(){return m125.lootSystem;},get WorldLoot(){return m84.WorldLoot;},get MELEE_SWING(){return m124.MELEE_SWING;},get WIDE_SWING(){return m124.WIDE_SWING;},get sampleMeleeSwing(){return m124.sampleMeleeSwing;},get sampleWideSwing(){return m124.sampleWideSwing;},get swingPhases(){return m124.swingPhases;},get wideGrip(){return m124.wideGrip;},get COMBAT_RULES(){return m127.COMBAT_RULES;},get registerGameEntityTypes(){return m73.registerGameEntityTypes;},get actorVitals(){return m61.actorVitals;},get gameActor(){return m59.gameActor;},get NPC(){return m82.NPC;},get rosterRecord(){return m82.rosterRecord;},get ROSTER_FIELDS(){return m82.ROSTER_FIELDS;},get Ganger(){return m58.Ganger;},get actorSystem(){return m117.actorSystem;},get actorItems(){return m62.actorItems;},get restoreActorItems(){return m62.restoreActorItems;},get resolveEmoteLines(){return m83.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m83.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m41.abilityLoadout;},get actorAbilities(){return m41.actorAbilities;},get abilitySystem(){return m116.abilitySystem;},get createAbilityCatalog(){return m40.createAbilityCatalog;},get importActorAbilities(){return m40.importActorAbilities;},get attackRegistry(){return m60.attackRegistry;},get validateAttackState(){return m60.validateAttackState;},get attackSystem(){return m113.attackSystem;},get createAttackCatalog(){return m37.createAttackCatalog;},get validateMountedAttack(){return m72.validateMountedAttack;},get TrafficVehicle(){return m85.TrafficVehicle;},get createGameVehicle(){return m85.createGameVehicle;},get Hunter(){return m57.Hunter;},get createHunterAppearance(){return m36.createHunterAppearance;},get Marionette(){return m78.Marionette;},get MARIONETTE_RULES(){return m34.MARIONETTE_RULES;},get validateAbilityAction(){return m69.validateAbilityAction;},get GatlingGunner(){return m66.GatlingGunner;},get Drone(){return m74.Drone;},get VelvetCat(){return m75.VelvetCat;},get velvetCatAppearance(){return m76.velvetCatAppearance;},get createVelvetAnimation(){return m76.createVelvetAnimation;},get velvetPresentation(){return m76.velvetPresentation;},get droneAppearance(){return m128.droneAppearance;},get dronePresentation(){return m128.dronePresentation;},get VELVET_CAT_PALETTES(){return m77.VELVET_CAT_PALETTES;},get VELVET_T(){return m77.VELVET_T;},get VELVET_PROFILES(){return m77.VELVET_PROFILES;},get VELVET_GAITS(){return m77.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m77.VELVET_TAIL_SEGS;},get Demoness(){return m56.Demoness;},get Warden(){return m65.Warden;},get Vesper(){return m65.Vesper;},get Matins(){return m65.Matins;},get Compline(){return m65.Compline;},get BossEffect(){return m67.BossEffect;},get encounterSystem(){return m112.encounterSystem;},get createBossAbilities(){return m28.createBossAbilities;},get createDemonessAppearance(){return m28.createDemonessAppearance;},get demonessAppearance(){return m129.demonessAppearance;},get demonessPresentation(){return m129.demonessPresentation;},get bossEffectAppearance(){return m130.bossEffectAppearance;},get bossEffectPresentation(){return m130.bossEffectPresentation;},get validateBossRecord(){return m55.validateBossRecord;}});
+
+
+
+return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get assetLibrary(){return m1.assetLibrary;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get createGameAssetLibrary(){return m27.createGameAssetLibrary;},get ApartmentLevel(){return m54.ApartmentLevel;},get APARTMENT_RULES(){return m92.APARTMENT_RULES;},get gameEngine(){return m96.gameEngine;},get gameLevel(){return m98.gameLevel;},get levelLobby(){return m97.levelLobby;},get createGameRuntime(){return m111.createGameRuntime;},get controlSystem(){return m99.controlSystem;},get controlsSystem(){return m99.controlsSystem;},get inputInstance(){return m99.inputInstance;},get keyboardInstance(){return m99.keyboardInstance;},get mouseInstance(){return m99.mouseInstance;},get touchInstance(){return m99.touchInstance;},get touchStick(){return m99.touchStick;},get gamepadInstance(){return m99.gamepadInstance;},get TAP(){return m99.TAP;},get DOUBLETAP(){return m99.DOUBLETAP;},get HELD(){return m99.HELD;},get PRESS(){return m99.PRESS;},get REPEAT(){return m99.REPEAT;},get RELEASE(){return m99.RELEASE;},get renderSystem(){return m104.renderSystem;},get renderFrame(){return m104.renderFrame;},get canvasRenderer(){return m104.canvasRenderer;},get cameraSystem(){return m104.cameraSystem;},get gameSession(){return m119.gameSession;},get PlayerStateSystem(){return m120.PlayerStateSystem;},get PlayerControlSystem(){return m121.PlayerControlSystem;},get Player(){return m79.Player;},get playerVitals(){return m80.playerVitals;},get itemSystem(){return m63.itemSystem;},get createItemCatalog(){return m38.createItemCatalog;},get GUN_MATERIALS(){return m115.GUN_MATERIALS;},get WEAPON_MODELS(){return m115.WEAPON_MODELS;},get LASER_MODULE(){return m115.LASER_MODULE;},get weaponModel(){return m115.weaponModel;},get weaponAppearance(){return m126.weaponAppearance;},get combatSystem(){return m122.combatSystem;},get weaponSystem(){return m123.weaponSystem;},get lootSystem(){return m125.lootSystem;},get WorldLoot(){return m84.WorldLoot;},get MELEE_SWING(){return m124.MELEE_SWING;},get WIDE_SWING(){return m124.WIDE_SWING;},get sampleMeleeSwing(){return m124.sampleMeleeSwing;},get sampleWideSwing(){return m124.sampleWideSwing;},get swingPhases(){return m124.swingPhases;},get wideGrip(){return m124.wideGrip;},get COMBAT_RULES(){return m127.COMBAT_RULES;},get registerGameEntityTypes(){return m73.registerGameEntityTypes;},get actorVitals(){return m61.actorVitals;},get gameActor(){return m59.gameActor;},get NPC(){return m82.NPC;},get rosterRecord(){return m82.rosterRecord;},get ROSTER_FIELDS(){return m82.ROSTER_FIELDS;},get Ganger(){return m58.Ganger;},get actorSystem(){return m117.actorSystem;},get actorItems(){return m62.actorItems;},get restoreActorItems(){return m62.restoreActorItems;},get resolveEmoteLines(){return m83.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m83.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m41.abilityLoadout;},get actorAbilities(){return m41.actorAbilities;},get abilitySystem(){return m116.abilitySystem;},get createAbilityCatalog(){return m40.createAbilityCatalog;},get importActorAbilities(){return m40.importActorAbilities;},get attackRegistry(){return m60.attackRegistry;},get validateAttackState(){return m60.validateAttackState;},get attackSystem(){return m113.attackSystem;},get createAttackCatalog(){return m37.createAttackCatalog;},get validateMountedAttack(){return m72.validateMountedAttack;},get TrafficVehicle(){return m85.TrafficVehicle;},get createGameVehicle(){return m85.createGameVehicle;},get Hunter(){return m57.Hunter;},get createHunterAppearance(){return m36.createHunterAppearance;},get Marionette(){return m78.Marionette;},get MARIONETTE_RULES(){return m34.MARIONETTE_RULES;},get validateAbilityAction(){return m69.validateAbilityAction;},get GatlingGunner(){return m66.GatlingGunner;},get Drone(){return m74.Drone;},get VelvetCat(){return m75.VelvetCat;},get velvetCatAnimation(){return m76.velvetCatAnimation;},get createVelvetAnimation(){return m76.createVelvetAnimation;},get velvetPresentation(){return m76.velvetPresentation;},get droneLift(){return m128.droneLift;},get droneArmPose(){return m128.droneArmPose;},get dronePresentation(){return m128.dronePresentation;},get VELVET_CAT_PALETTES(){return m77.VELVET_CAT_PALETTES;},get VELVET_T(){return m77.VELVET_T;},get VELVET_PROFILES(){return m77.VELVET_PROFILES;},get VELVET_GAITS(){return m77.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m77.VELVET_TAIL_SEGS;},get Demoness(){return m56.Demoness;},get Warden(){return m65.Warden;},get Vesper(){return m65.Vesper;},get Matins(){return m65.Matins;},get Compline(){return m65.Compline;},get BossEffect(){return m67.BossEffect;},get encounterSystem(){return m112.encounterSystem;},get createBossAbilities(){return m28.createBossAbilities;},get createDemonessAppearance(){return m28.createDemonessAppearance;},get demonessAppearance(){return m130.demonessAppearance;},get demonessPresentation(){return m130.demonessPresentation;},get bossEffectAppearance(){return m131.bossEffectAppearance;},get bossEffectPresentation(){return m131.bossEffectPresentation;},get validateBossRecord(){return m55.validateBossRecord;},get createDronePackets(){return m128.createDronePackets;},get createVelvetCatArt(){return m132.createVelvetCatArt;},get createVelvetCatPackets(){return m132.createVelvetCatPackets;},get createVelvetEyePackets(){return m132.createVelvetEyePackets;}});
 })();
 return m0;
 })();
@@ -47686,6 +47748,16 @@ const gunnerAppearance={
 };
 function drawGunnerAppearance(ctx,packet,heat=false){return gunnerAppearance[heat?'drawHeat':'draw'].call(packet,ctx);}
     </script>
+    <script type="text/dfab" data-src="presentation/classic-actor-packets.js" data-cost="13">
+/** Transitional host calls only: both native and classic actors use the same portable art. */
+const classicActorPackets={
+    velvet:new WeakMap(),
+    droneState(actor){return {x:actor.x,y:actor.y,angle:actor.angle,dead:actor.dead,invincibleTimer:actor.invincibleTimer,state:actor.state,alt:actor.alt,hoverOffset:actor.hoverOffset,_seed:actor._seed,isTelegraphing:actor.isTelegraphing,render_time:_frameTime/1000,render_clock:_gameTimeSec,_stateT:actor._stateT,_eyeHitT:actor._eyeHitT??null,_tell:actor._tell?{kind:actor._tell.kind,secs:actor._tell.secs,lock:actor._tell.lock,a:actor._tell.a}:null,_tether:actor._tether?{x:actor._tether.x,y:actor._tether.y,state:actor._tether.state}:null,_beam:actor._beam?{x0:actor._beam.x0,y0:actor._beam.y0,x1:actor._beam.x1,y1:actor._beam.y1,t0:actor._beam.t0}:null};},
+    drawDrone(context,actor,pass='body'){return DFNative.canvasRenderer.drawPackets(context,DFNative.createDronePackets(this.droneState(actor),{pass}));},
+    drawVelvet(context,actor){const art=DFNative.createVelvetCatArt(actor);this.velvet.set(actor,art.eyes);return DFNative.canvasRenderer.drawPackets(context,art.body);},
+    drawVelvetEyes(context,actor,darkness){return DFNative.canvasRenderer.drawPackets(context,DFNative.createVelvetEyePackets(actor,{eyes:this.velvet.get(actor),darkness}));}
+};
+    </script>
     <script type="text/dfab" data-src="entities/enemies.js" data-cost="1148">
         const {VELVET_CAT_PALETTES,VELVET_T,VELVET_PROFILES,VELVET_GAITS,VELVET_TAIL_SEGS}=DFNative;
         class VelvetCat extends ActorEntity {
@@ -47751,10 +47823,10 @@ function drawGunnerAppearance(ctx,packet,heat=false){return gunnerAppearance[hea
             }
 
             // Cosmetic choices must not change the traffic / loot simulation's RNG stream.
-            _random(...args){return DFNative.velvetCatAppearance._random.apply(this,args);}
+            _random(...args){return DFNative.velvetCatAnimation._random.apply(this,args);}
 
             /** The rest pose asked for: an explicit state wins over an idle behaviour. */
-            _restBehavior(...args){return DFNative.velvetCatAppearance._restBehavior.apply(this,args);}
+            _restBehavior(...args){return DFNative.velvetCatAnimation._restBehavior.apply(this,args);}
 
             /** A car (CollisionSystem's people-vs-cars pass has put her just outside it): she leaps clear of it */
             hitByCar(car, contact, speed) {
@@ -47845,19 +47917,19 @@ function drawGunnerAppearance(ctx,packet,heat=false){return gunnerAppearance[hea
             }
 
             /** Everything cosmetic: gait, spine, tail, head, ears and eyes. Never moves her. */
-            _animate(...args){return DFNative.velvetCatAppearance._animate.apply(this,args);}
+            _animate(...args){return DFNative.velvetCatAnimation._animate.apply(this,args);}
 
             /**
              * Eyeshine: in the dark her eyes catch the light, two small violet-silver points drawn after the darkness
              * layer (engine/draw.js) so they read where her coat doesn't. They fade with the dark, close with
              * her lids and are gone while she sleeps. `darkness` is the scene's ambient darkness, 0..1.
              */
-            drawEyeShine(...args){return DFNative.velvetCatAppearance.drawEyeShine.apply(this,args);}
+            drawEyeShine(ctx,darkness){return classicActorPackets.drawVelvetEyes(ctx,this,darkness);}
 
             /** The gait's offsets, duty and stride, blended between walk, trot and gallop. */
-            _gaitParams(...args){return DFNative.velvetCatAppearance._gaitParams.apply(this,args);}
+            _gaitParams(...args){return DFNative.velvetCatAnimation._gaitParams.apply(this,args);}
 
-            draw(...args){return DFNative.velvetCatAppearance.draw.apply(this,args);}
+            draw(ctx){return classicActorPackets.drawVelvet(ctx,this);}
         }
 
         // (The Double Nights drones: entities/drones.js)
@@ -49906,7 +49978,7 @@ function drawGunnerAppearance(ctx,packet,heat=false){return gunnerAppearance[hea
         }
 
     </script>
-    <script type="text/dfab" data-src="entities/drones.js" data-cost="177">
+    <script type="text/dfab" data-src="entities/drones.js" data-cost="173">
         /* =====================================================================
            DRONES — the hunter-killers that come for the Dark Maker (the Double
            Nights ambush, story/story-db.js), after ETERNAL's concept sheet
@@ -50159,13 +50231,10 @@ function drawGunnerAppearance(ctx,packet,heat=false){return gunnerAppearance[hea
             takeDamageOld(amount, bulletAngle) { this.takeDamage(amount, Math.cos(bulletAngle) * 8, Math.sin(bulletAngle) * 8); }
 
             /** How high it hangs (px, drawn upward) */
-            _lift(...args){return DFNative.droneAppearance._lift.apply(this,args);}
-            draw(...args){return DFNative.droneAppearance.draw.apply(this,args);}
-            _drawTendrils(...args){return DFNative.droneAppearance._drawTendrils.apply(this,args);}
-            static armPose(...args){return DFNative.droneAppearance.armPose.apply(this,args);}
-            _drawArms(...args){return DFNative.droneAppearance._drawArms.apply(this,args);}
-            _drawShell(...args){return DFNative.droneAppearance._drawShell.apply(this,args);}
-            drawLights(...args){return DFNative.droneAppearance.drawLights.apply(this,args);}
+            _lift(){return DFNative.droneLift(this);}
+            draw(ctx){return classicActorPackets.drawDrone(ctx,this);}
+            static armPose(...args){return DFNative.droneArmPose(...args);}
+            drawLights(ctx){return classicActorPackets.drawDrone(ctx,this,'lights');}
         }
     </script>
     <script type="text/dfab" data-src="presentation/marionette.js" data-cost="92">
@@ -110056,7 +110125,7 @@ class ApartmentRooms {
     tagLamps(){}
 }
     </script>
-    <script type="text/dfab" data-src="engine/apartment-renderer.js" data-cost="117">
+    <script type="text/dfab" data-src="engine/apartment-renderer.js" data-cost="120">
 /** Native scene presentation. Packets below are drawing inputs, never entities or body owners. */
 class ApartmentRenderer {
     constructor(game){this.game=game;this.people=new Map();this.props=new Map();}
@@ -110115,8 +110184,8 @@ class ApartmentRenderer {
         for(const {entity}of visible)if(entity?.active&&entity.entity_type==='df_demoness'){
             const packet=DFNative.demonessPresentation(entity,blend);DFNative.demonessAppearance.draw.call(packet,ctx,ctx=>{ctx.save();ctx.translate(packet.x,packet.y);ctx.rotate(packet.angle);drawProceduralHumanoid(ctx,packet,{...packet.look,stance:'idle'});ctx.restore();});demonesses.push(packet);
         }
-        for(const {entity}of visible)if(entity?.active&&entity.entity_type==='df_drone'){const packet=DFNative.dronePresentation(entity,blend);packet.draw(ctx);drones.push(packet);}
-        for(const {entity}of visible)if(entity?.active&&entity.entity_type==='df_velvet_cat'){const packet=DFNative.velvetPresentation(entity,blend);packet.draw(ctx);cats.push(packet);}
+        for(const {entity}of visible)if(entity?.active&&entity.entity_type==='df_drone'){const packet=DFNative.dronePresentation(entity,blend);DFNative.canvasRenderer.drawPackets(ctx,DFNative.createDronePackets(packet));drones.push(packet);}
+        for(const {entity}of visible)if(entity?.active&&entity.entity_type==='df_velvet_cat'){const packet=DFNative.velvetPresentation(entity,blend);const art=DFNative.createVelvetCatArt(packet);DFNative.canvasRenderer.drawPackets(ctx,art.body);cats.push({packet,eyes:art.eyes});}
         for(const {entity}of visible)if(entity?.entity_type==='df_marionette'&&entity.active){
             const pose=entity.getRenderState(blend),action=entity.data.ability_action_state,clock=entity.data.weapon_state?.elapsed??0;
             const packet={x:pose.position[0],y:pose.position[1],angle:pose.rotation,dead:entity.dead,invincibleTimer:Math.round((entity.data.actor_state?.invulnerable_remaining??0)*60),state:entity.state,phase_age:action?clock-action.phase_started_at:0,render_time:_frameTime/1000,_seed:entity.data.appearance_seed,cloth:entity.data.cloth,_yank:entity.marionette_state.yank_remaining>.4?1:0};
@@ -110140,7 +110209,7 @@ class ApartmentRenderer {
         }
         game.drawNoiseRipples(ctx);
         if(game.flitVFX.length)game.drawFlitVFX(ctx);
-        for(const packet of demonesses)DFNative.demonessAppearance.drawDuelTells.call(packet,ctx);DFNative.bossEffectAppearance.draw.call({render_clock:level.player.data.weapon_state?.elapsed??0,render_time:_frameTime/1000,_hazards:DFNative.bossEffectPresentation(game.encounters.getEffects(),level.player.data.weapon_state?.elapsed??0),_playerBurn:null,player:null,_smokeK:DFNative.bossEffectAppearance._smokeK},ctx);for(const packet of drones)packet.drawLights(ctx);for(const packet of cats){const room=game.roomSystem.getRoomAt(packet.x,packet.y);packet.drawEyeShine(ctx,room?.type==='outdoor'?game.getAmbientDarkness():(room?.lightsOff ? .85 : .18));}game.drawPlayerGlow(ctx);game.drawApartmentGlow(ctx,props);for(const packet of marionettes)drawMarionetteAppearance(ctx,packet,true);for(const packet of gunners)drawGunnerAppearance(ctx,packet,true);
+        for(const packet of demonesses)DFNative.demonessAppearance.drawDuelTells.call(packet,ctx);DFNative.bossEffectAppearance.draw.call({render_clock:level.player.data.weapon_state?.elapsed??0,render_time:_frameTime/1000,_hazards:DFNative.bossEffectPresentation(game.encounters.getEffects(),level.player.data.weapon_state?.elapsed??0),_playerBurn:null,player:null,_smokeK:DFNative.bossEffectAppearance._smokeK},ctx);for(const packet of drones)DFNative.canvasRenderer.drawPackets(ctx,DFNative.createDronePackets(packet,{pass:'lights'}));for(const {packet,eyes} of cats){const room=game.roomSystem.getRoomAt(packet.x,packet.y);DFNative.canvasRenderer.drawPackets(ctx,DFNative.createVelvetEyePackets(packet,{eyes,darkness:room?.type==='outdoor'?game.getAmbientDarkness():(room?.lightsOff ? .85 : .18)}));}game.drawPlayerGlow(ctx);game.drawApartmentGlow(ctx,props);for(const packet of marionettes)drawMarionetteAppearance(ctx,packet,true);for(const packet of gunners)drawGunnerAppearance(ctx,packet,true);
         for(const{entity:e}of visible)if(e?.data.role==='lamp'){
             const a=e.data.appearance,p=e.getRenderState(blend);if(a.visible!==false)drawLampFixtureLit(ctx,a.fixture??'shade_rose',...p.position,a.color,game.roomSystem.lightAt(...p.position),{angle:a.angle??0});
         }

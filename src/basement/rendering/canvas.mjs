@@ -1,3 +1,4 @@
+import {renderFrame} from './frame.mjs';
 import {BLENDS} from './values.mjs';
 
 function createSurface(width,height){
@@ -18,12 +19,23 @@ function buildPath(target,g){
         if(op==='move')target.moveTo(...v);else if(op==='line')target.lineTo(...v);else if(op==='quadratic')target.quadraticCurveTo(...v);else if(op==='cubic')target.bezierCurveTo(...v);else if(op==='ellipse')target.ellipse(...v.slice(0,7),!!v[7]);else target.closePath();
     }
 }
+const overlays=new WeakMap();
 const capabilities=Object.freeze(['shape','sprite','text','geometry:rect','geometry:ellipse','geometry:path','gradient:linear','gradient:radial','clip','shadow','dash','target',...Object.keys(BLENDS).map(name=>`blend:${name}`)]);
 
 /** Canvas implementation of the packet contract. Contexts and Canvas/GPU-like handles stay private. */
 export class canvasRenderer {
     #surface;#context;#viewport;#resources=new Map();#createSurface;#decodeImage;#createPath;#disposed=false;#generation=0;
     constructor({create_surface=createSurface,decode_image=decodeImage,create_path=()=>typeof Path2D==='undefined'?null:new Path2D()}={}){this.#createSurface=create_surface;this.#decodeImage=decode_image;this.#createPath=create_path;}
+    /** Migration boundary for hosts which already own a Canvas pass. Artists still supply only data. */
+    static drawPackets(context,packets){
+        if(!context?.canvas||typeof context.getTransform!=='function')throw new TypeError('A host Canvas context is required');
+        let entry=overlays.get(context);
+        if(!entry){const renderer=new canvasRenderer();renderer.initialize(context.canvas,{viewport:{width:context.canvas.width,height:context.canvas.height,pixel_ratio:1}});entry={renderer,frame:new renderFrame()};overlays.set(context,entry);}
+        const m=context.getTransform(),view={width:Math.max(1,context.canvas.width),height:Math.max(1,context.canvas.height),world_to_screen:[m.a,m.b,m.c,m.d,m.e,m.f]},opacity=context.globalAlpha;
+        entry.frame.begin(view,{clear_color:false});
+        try{for(const packet of packets){if(packet.resource_id||packet.geometry_id||packet.material_id||(packet.clips??[]).some(clip=>clip.geometry_id))throw new Error('Canvas overlay accepts inline packets; use renderSystem for resources');entry.frame.submit({...packet,opacity:(packet.opacity??1)*opacity});}entry.renderer.render(entry.frame.finish());}catch(error){entry.frame.abort();throw error;}
+        return entry.frame.getStatistics().packets;
+    }
     get capabilities(){return capabilities;}
     initialize(surface,{viewport}){
         if(this.#disposed||this.#context)throw new Error('Renderer cannot initialize twice');

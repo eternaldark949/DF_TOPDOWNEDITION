@@ -62,10 +62,10 @@
             }
 
             // Cosmetic choices must not change the traffic / loot simulation's RNG stream.
-            _random(...args){return DFNative.velvetCatAppearance._random.apply(this,args);}
+            _random(...args){return DFNative.velvetCatAnimation._random.apply(this,args);}
 
             /** The rest pose asked for: an explicit state wins over an idle behaviour. */
-            _restBehavior(...args){return DFNative.velvetCatAppearance._restBehavior.apply(this,args);}
+            _restBehavior(...args){return DFNative.velvetCatAnimation._restBehavior.apply(this,args);}
 
             /** A car (CollisionSystem's people-vs-cars pass has put her just outside it): she leaps clear of it */
             hitByCar(car, contact, speed) {
@@ -156,19 +156,19 @@
             }
 
             /** Everything cosmetic: gait, spine, tail, head, ears and eyes. Never moves her. */
-            _animate(...args){return DFNative.velvetCatAppearance._animate.apply(this,args);}
+            _animate(...args){return DFNative.velvetCatAnimation._animate.apply(this,args);}
 
             /**
              * Eyeshine: in the dark her eyes catch the light, two small violet-silver points drawn after the darkness
              * layer (engine/draw.js) so they read where her coat doesn't. They fade with the dark, close with
              * her lids and are gone while she sleeps. `darkness` is the scene's ambient darkness, 0..1.
              */
-            drawEyeShine(...args){return DFNative.velvetCatAppearance.drawEyeShine.apply(this,args);}
+            drawEyeShine(ctx,darkness){return classicActorPackets.drawVelvetEyes(ctx,this,darkness);}
 
             /** The gait's offsets, duty and stride, blended between walk, trot and gallop. */
-            _gaitParams(...args){return DFNative.velvetCatAppearance._gaitParams.apply(this,args);}
+            _gaitParams(...args){return DFNative.velvetCatAnimation._gaitParams.apply(this,args);}
 
-            draw(...args){return DFNative.velvetCatAppearance.draw.apply(this,args);}
+            draw(ctx){return classicActorPackets.drawVelvet(ctx,this);}
         }
 
         // (The Double Nights drones: entities/drones.js)

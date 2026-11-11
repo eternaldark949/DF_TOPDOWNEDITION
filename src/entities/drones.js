@@ -250,11 +250,8 @@
             takeDamageOld(amount, bulletAngle) { this.takeDamage(amount, Math.cos(bulletAngle) * 8, Math.sin(bulletAngle) * 8); }
 
             /** How high it hangs (px, drawn upward) */
-            _lift(...args){return DFNative.droneAppearance._lift.apply(this,args);}
-            draw(...args){return DFNative.droneAppearance.draw.apply(this,args);}
-            _drawTendrils(...args){return DFNative.droneAppearance._drawTendrils.apply(this,args);}
-            static armPose(...args){return DFNative.droneAppearance.armPose.apply(this,args);}
-            _drawArms(...args){return DFNative.droneAppearance._drawArms.apply(this,args);}
-            _drawShell(...args){return DFNative.droneAppearance._drawShell.apply(this,args);}
-            drawLights(...args){return DFNative.droneAppearance.drawLights.apply(this,args);}
+            _lift(){return DFNative.droneLift(this);}
+            draw(ctx){return classicActorPackets.drawDrone(ctx,this);}
+            static armPose(...args){return DFNative.droneArmPose(...args);}
+            drawLights(ctx){return classicActorPackets.drawDrone(ctx,this,'lights');}
         }

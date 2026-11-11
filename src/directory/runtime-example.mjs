@@ -21,7 +21,7 @@ export function createRuntimeExample(options = {}) {
             frame.clear(context.engine.active_level.definition.background);
             const hits = context.api.render.getVisibleEntities({blend});
             for (const { entity } of hits) {
-                if(entity.data.role==='projectile'||entity.data.role==='world_loot')continue;
+                if(entity.data.role==='projectile'||entity.data.role==='world_loot'||['df_drone','df_velvet_cat'].includes(entity.entity_type))continue;
                 const pose = entity.getRenderState(blend), shape = entity.collision_shape;
                 frame.submit({type:'shape',position:pose.position,rotation:pose.rotation,
                     geometry:shape.shape_type==='circle'?{type:'ellipse',radii:[shape.radius,shape.radius]}:{type:'rect',size:shape.dimensions},

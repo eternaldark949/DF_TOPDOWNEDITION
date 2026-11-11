@@ -47,7 +47,7 @@ Verification: `node --test tools/test-weapon-appearance.mjs` and `python tools/t
 
 `combatPresentation({weapon_art,owns_art=false})` uses `render(context,blend,frame)` to read visible official projectiles, loot and status records, plus the player and registered actors' held weapon poses. It submits shape/text/sprite packets; `detach()` disposes owned art. `await installCombatPresentation(engine)` prepares assets and installs the lifecycle system with ownership cleanup. The shared runtime example uses it now. Collision, damage, projectile motion and item ownership remain in the documented native services.
 
-`actorPresentation` submits visible NPC names/speech and Ganger detection/telegraph labels. It uses the renderer’s shared visible-entity query and native interpolated anchor points. The example’s separate generic body artist remains responsible for actor shapes; full procedural humanoid animation is still pending. Rendering never advances actor or weapon policy.
+`actorPresentation` submits visible NPC names/speech and Ganger detection/telegraph labels. It uses the renderer’s shared visible-entity query and native interpolated anchor points. The example’s separate generic body artist remains responsible for unconverted actor shapes; Drone and VelvetCat use the packet artists below. Full procedural humanoid animation is still pending. Rendering never advances actor or weapon policy.
 
 `abilityPresentation` submits spell color/shape/glow packets from visible official projectiles. It is installed in the native runtime example; combatPresentation skips those bodies to prevent duplicate drawing. Authored definitions remain in Directory, and entity/ability classes contain no Canvas instructions. Full classic casting animation, fire trails and audio remain presentation work.
 
@@ -60,3 +60,40 @@ The classic build's `indoor-door.js` is the shared retained Canvas artist for cl
 `marionette.js` extracts the existing Canvas strings/body/blade-glint artwork from the classic physical entity. `drawMarionetteAppearance(ctx,packet,lights=false)` consumes pose, phase age, appearance seed/cloth and render time only; native actor classes contain no drawing calls. The native apartment renderer builds these records from actual interpolated native state. The classic preview uses the same artist without acquiring a second body. A portable frame-packet/WebGL version remains future work.
 
 `gatling-gunner.js` owns retained ordinary gunner and Warden Canvas artwork. `drawGunnerAppearance(ctx,packet,heat=false)` consumes interpolated pose, telegraph/cycle fields and simulation-owned barrel phase/heat. The classic `_drawGunnerBody` hook still delegates to this artist, preserving silhouette capture callers. The native host draws barrel glow after room dimming without moving bodies or advancing visual clocks. Its inventory/held rotary model is separately defined as portable paths/materials in Directory. No native Warden encounter or portable whole-body artist is claimed.
+
+## Drone and VelvetCat packet artists
+
+These two artists now produce ordinary render packets. Their former direct Canvas methods, `Path2D` objects, baked legacy glow/shadow calls and draw-time eye writes have been removed. They work without a Canvas, DOM, native entity handle or callback in the output. Gameplay, fixed-step animation and presentation remain distinct.
+
+| API | Result |
+| --- | --- |
+| `dronePresentation(entity,blend=1)` | Detached plain view record from the real native pose/action. |
+| `createDronePackets(state,{pass:'body'})` | Ordered shadow, landing tell, tendril, arm, shell and eye geometry/material packets. |
+| `createDronePackets(state,{pass:'lights'})` | Additive eye/lance glow, attack tells, tether and beam packets. |
+| `velvetPresentation(entity,blend=1)` | Detached plain pose/cosmetic record. |
+| `createVelvetCatArt(state)` | `{body,eyes}`: ordered silhouette, gait/pose, coat, clipped shading, head/paw/tail packets and world-space eye anchors. |
+| `createVelvetEyePackets(state,{eyes,darkness})` | Later eyeshine packets; reuse the body's returned eye anchors to avoid rebuilding its geometry. |
+| `createVelvetCatPackets(state,{pass:'body'|'eyes',darkness})` | Convenience API for a single pass; the eye-only call can derive its own anchors without requiring an earlier draw. |
+
+```js
+const state=velvetPresentation(cat,blend);
+const art=createVelvetCatArt(state);
+for(const packet of art.body)frame.submit({...packet,layer:20,depth:cat.position[1]});
+// Submit after the scene's darkness pass, using the same view record and anchors.
+for(const packet of createVelvetEyePackets(state,{eyes:art.eyes,darkness:.8}))
+    frame.submit({...packet,layer:60,depth:cat.position[1]});
+```
+
+`art-packets.mjs` is a small game-presentation data builder, not a virtual Canvas context. Artists directly construct portable path arrays and material descriptors. Groups compose affine packet transforms; clip geometry keeps its creation frame relative to each emitted shape. No Canvas operation is recorded for later replay. Geometry never changes simulation state.
+
+`velvet-cat-animation.mjs` owns the existing `velvetCatAnimation`, `createVelvetAnimation` and `advanceVelvetAnimation` cosmetic APIs. The entity imports that module independently of drawing. Animation still advances on the fixed step using actual native travel and its separate cosmetic RNG. Drawing neither advances animation nor adds `_eyeWorld` fields to entities.
+
+`actorPresentation` now submits Drone/Velvet body and light packets in addition to NPC/enemy HUD text. It accepts `{get_darkness:(entity,context)=>number}` for scene lighting policy (default .8 in the dark runtime example). The runtime example's generic body painter skips these two concrete types, avoiding duplicate circle bodies. Its “Velvet & Drone” button creates actual registered actors to demonstrate the normal frame/backend path.
+
+The playable apartment host submits the same data at its existing body and lighting boundaries. Its other artwork remains classic. The remaining classic Drone/Velvet callers use `classic-actor-packets.js`, a thin host adapter that passes packets to `canvasRenderer.drawPackets`. Its weak eye-anchor cache belongs to presentation, not an actor or physics world. The adapter does not retain the former artists. No new physics system, renderer clock or per-actor Canvas is introduced.
+
+Eleven pre-conversion Chromium captures in `tools/fixtures/actor-art` cover five feline poses and six Drone/effect states. The browser acceptance test compares pixels to these originals, checks classic callers without the old glow/shadow helpers, and exercises native frame rendering with the Canvas migration adapter deliberately disabled. Unit tests also run the packet stream through a separate backend and verify frozen inputs, clip transforms, deterministic geometry and unchanged physics snapshots. This establishes the converted artists' coverage; it does not claim full scene parity or an FPS improvement.
+
+Marionette, gunners/Wardens, Demoness, humanoids and the broader world/UI artists still need renderer-neutral artwork conversion. A WebGL backend remains future work.
+
+The former `droneAppearance.draw/drawLights` and `velvetCatAppearance.draw/drawEyeShine` Canvas artists are no longer exported. Use the packet APIs above. Numeric Drone helpers are `droneLift(state)` and `droneArmPose(diving,stuck,side)`; the classic public `Drone.armPose` hook delegates to the same helper. Cosmetic animation now uses the explicitly named `velvetCatAnimation` object.

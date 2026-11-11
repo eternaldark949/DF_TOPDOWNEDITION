@@ -121,3 +121,14 @@ test('target caches receive only successful backend frames and unsubscribe clean
  const backend=Capture.instances.at(-1),draw=backend.render;backend.render=()=>{throw new Error('GPU failure');};frame=render.beginFrame();frame.beginPass({target_id:'cache'});frame.endPass();assert.throws(()=>render.endFrame(),/GPU/);assert.equal(events.length,0);
  backend.render=draw;frame=render.beginFrame();frame.beginPass({target_id:'cache'});frame.endPass();render.endFrame();assert.deepEqual(events[0].targets,['cache']);assert.ok(Object.isFrozen(events[0].targets));off();render.beginFrame();render.endFrame();assert.equal(events.length,1);render.dispose();
 });
+
+test('Canvas migration overlay preserves host transform, opacity, surface size and state without clearing',()=>{
+ const ctx=context(),cv=surface(ctx);cv.width=100;cv.height=80;ctx.canvas=cv;ctx.globalAlpha=.4;ctx.globalCompositeOperation='screen';ctx.fillStyle='#123456';ctx.getTransform=()=>({a:2,b:0,c:0,d:3,e:11,f:17});
+ const saved=[],save=ctx.save,restore=ctx.restore;ctx.save=()=>{saved.push({globalAlpha:ctx.globalAlpha,globalCompositeOperation:ctx.globalCompositeOperation,fillStyle:ctx.fillStyle});save();};ctx.restore=()=>{restore();Object.assign(ctx,saved.pop());};
+ const drawnOpacity=[],fill=ctx.fill;ctx.fill=(...args)=>{drawnOpacity.push(ctx.globalAlpha);fill(...args);};
+ const original=rect('#ff0000',{opacity:.5});assert.equal(canvasRenderer.drawPackets(ctx,[original]),1);assert.equal(original.opacity,.5);assert.deepEqual(drawnOpacity,[.2]);assert.ok(ctx.calls.some(c=>c[0]==='setTransform'&&c.slice(1).join(',')==='2,0,0,3,11,17'));assert.equal(ctx.calls.some(c=>c[0]==='clearRect'),false);assert.equal(ctx.globalAlpha,.4);assert.equal(ctx.globalCompositeOperation,'screen');assert.equal(ctx.fillStyle,'#123456');assert.equal(ctx.stack,0);assert.deepEqual([cv.width,cv.height],[100,80]);
+});
+test('Canvas overlay validates a complete inline batch before painting and recovers after rejection',()=>{
+ const ctx=context(),cv=surface(ctx);cv.width=cv.height=100;ctx.canvas=cv;ctx.globalAlpha=1;ctx.getTransform=()=>({a:1,b:0,c:0,d:1,e:0,f:0});
+ assert.throws(()=>canvasRenderer.drawPackets(ctx,[rect(),{type:'sprite',resource_id:'unregistered',size:[1,1]}]),/inline packets/);assert.equal(ctx.calls.some(c=>c[0]==='fill'),false);assert.equal(canvasRenderer.drawPackets(ctx,[rect()]),1);assert.equal(ctx.stack,0);
+});

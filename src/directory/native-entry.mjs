@@ -62,8 +62,8 @@ export {GatlingGunner} from '../entities/gatling-gunner.mjs';
 
 export {Drone} from '../entities/drone.mjs';
 export {VelvetCat} from '../entities/velvet-cat.mjs';
-export {velvetCatAppearance,createVelvetAnimation,velvetPresentation} from '../presentation/velvet-cat.mjs';
-export {droneAppearance,dronePresentation} from '../presentation/drone.mjs';
+export {velvetCatAnimation,createVelvetAnimation,velvetPresentation} from '../presentation/velvet-cat-animation.mjs';
+export {droneLift,droneArmPose,dronePresentation} from '../presentation/drone.mjs';
 export {VELVET_CAT_PALETTES,VELVET_T,VELVET_PROFILES,VELVET_GAITS,VELVET_TAIL_SEGS} from './game-velvet-appearance.mjs';
 
 export {Demoness} from '../entities/demoness.mjs';
@@ -75,3 +75,6 @@ export {demonessAppearance,demonessPresentation} from '../presentation/demoness.
 export {bossEffectAppearance,bossEffectPresentation} from '../presentation/boss-effects.mjs';
 
 export {validateBossRecord} from './validate-boss-records.mjs';
+
+export {createDronePackets} from '../presentation/drone.mjs';
+export {createVelvetCatArt,createVelvetCatPackets,createVelvetEyePackets} from '../presentation/velvet-cat.mjs';

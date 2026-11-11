@@ -2,7 +2,7 @@
 
 `renderSystem` owns the active backend and rendering resources. `cameraSystem` owns the view and coordinate conversions. `renderFrame` collects data packets. `canvasRenderer` is the first real backend. These live in Basement and are exposed as `engine.api.render` and `engine.api.camera`.
 
-The new runtime and its appearance example use this contract now. The classic playable game and its existing procedural artists still draw through their old Canvas paths; their class conversions remain to be done. This batch establishes and verifies the destination. It does not claim all game drawing has migrated or that a WebGL backend exists.
+The new runtime and its appearance example use this contract now. The classic playable game still draws most procedural artwork through old Canvas paths. Drone and VelvetCat have now moved to portable packets through this backend; other artist conversions remain. This batch establishes and verifies the destination. It does not claim all game drawing has migrated or that a WebGL backend exists.
 
 ## Decisions and boundaries
 
@@ -179,3 +179,11 @@ The Directory fixture is `src/directory/game-assets/rendering-example.json` and 
 Next convert shared appearance/animation and game drawing classes to this contract, including the player, humanoids, props/buildings, lighting/reflection passes and effects. The old `drawList`/`renderQueue`/Canvas artists remain until their callers are converted and visual/performance parity is checked. Session/player gameplay and persistence conversions remain separate pending work.
 
 Verified batch: **217 combined engine/controls/rendering/Directory/runtime tests**, including 14 rendering contracts, 17 controls contracts and 19 runtime contracts. The three Basement packages pass **165 tests** together after copying them outside the checkout. Existing game regressions and four Chromium acceptance scripts remain separate gates.
+
+## Existing Canvas host migration
+
+`canvasRenderer.drawPackets(context, packets)` is a synchronous compatibility boundary for a host already inside a Canvas drawing pass. It accepts inline packet data, validates the complete batch, then uses the same Canvas backend as `renderSystem`. It preserves the host's current transform, clip, opacity, drawing state and backing dimensions; it never clears the surface or installs a simulation clock. Buffers/backend instances are reused per context through weak ownership. Resource-ID packets reject before drawing: registered images/targets/geometry/materials belong to `renderSystem`.
+
+The context parameter exists only at this transitional host/backend boundary. Artists never receive it. They emit normal geometry/material/transform/clip packets, and a native `renderSystem` backend can consume the exact same packets directly. New native render hooks should call `frame.submit`, not this adapter. Renderer replacement still requires the ordinary fresh-surface lifecycle.
+
+Drone and VelvetCat now use the packet contract in both the playable host and native runtime presentation. Other classic artists remain on their original direct Canvas paths. This does not claim a whole-game renderer cutover or a WebGL implementation.
