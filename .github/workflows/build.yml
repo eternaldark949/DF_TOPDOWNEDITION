@@ -70,6 +70,20 @@ jobs:
       - name: Check gameplay and rendering regressions
         run: node tools/test-game-regressions.cjs
 
+      # Every other suite in tools/ against the playable build, so a suite nobody listed above can't go red unseen.
+      # test-live-body-ownership.cjs is left out: it is the retirement gate and fails by design until the legacy
+      # classes are gone. The regressions have their own step above.
+      - name: Check every remaining game suite
+        run: |
+          failed=0
+          for suite in tools/test-*.cjs tools/check-*.cjs; do
+            case "$suite" in
+              tools/test-game-regressions.cjs|tools/test-live-body-ownership.cjs|tools/test-game-runtime.cjs) continue ;;
+            esac
+            node "$suite" > /dev/null || { echo "::error::$suite failed"; failed=1; }
+          done
+          exit $failed
+
       - name: Commit rebuilt game (main)
         if: github.event_name != 'pull_request'
         run: |

@@ -1,5 +1,11 @@
 # Changelog
 
+## Exact raycast — 2026-11-11
+
+- `raycast` now solves the segment against each candidate shape directly (circle, box, polygon, capsule, segment, compound) instead of sweeping a thin circle through the general solver, and asks the grid only for the cells the segment crosses. Results are unchanged: `tests/raycast.test.mjs` holds it to the thin swept circle across every shape type, including starts inside or exactly on a body.
+- `node benchmarks/raycast.mjs`: 4,000 static boxes, 400-unit rays. About 180 µs a ray through the thin sweep, about 8 µs exact, on the same machine and run. `observeTarget`'s line of sight and every other `raycast` caller get this without changes.
+- `predict_seconds` casts, where bodies move during the cast, keep the swept thin circle.
+
 ## Shared renderer/camera boundary — 2026-11-10
 
 - Added the separate Basement rendering package and exposed `api.render` / `api.camera` in the new runtime. Only the Canvas backend owns contexts; appearance producers submit pooled data packets and ordered passes.

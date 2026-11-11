@@ -131,7 +131,7 @@ Filter options: `include_groups=ALL`, `exclude_groups=0`, `query_bit=ALL`, `igno
 |---|---|
 | `peruseNearbyEntities(reference, options={}, results=[])` | `near_range:400` default, centre-distance filter. Hits contain `body`, `body_id`, `distance`, `direction`. Self is ignored by default. |
 | `findNearestEntity(reference, options={})` | Nearest hit or `null`. |
-| `raycast({from,to,...filters}, result={})` | Nearest thin-cast contact or `null`. |
+| `raycast({from,to,...filters}, result={})` | The nearest surface the segment meets, or `null`: `fraction`, `distance`, `world_point`, `normal` (pointing from the ray into the body), `body`, `body_id`, `entity`. Exact segment geometry against every shape type at the bodies' current poses; a ray starting inside or on a body meets it at `fraction` 0. With `predict_seconds` the bodies move during the cast and a thin swept circle is used instead. |
 | `shapeCast({collision_shape,from,to,from_rotation=0,to_rotation=from_rotation,...filters}, results=[])` | Contacts with `fraction`, `distance`, `normal`, `world_point`, `penetration_depth`, `body`, `body_id`. |
 | `overlapShape({collision_shape,position,rotation=0,...filters}, results=[])` | Exact overlap contacts. |
 | `isPlacementClear(body_or_shape, position, options={})` | Boolean. Touching counts as occupied within tolerance. |
