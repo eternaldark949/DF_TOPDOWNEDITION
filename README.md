@@ -39,6 +39,9 @@ The [session/player API](src/gameplay/README.md) documents the shared session, n
 3. Commit. GitHub rebuilds `DFAB V8.html` for you within a minute or two.
 4. In code, use it by name: `drawAsset(ctx, 'portrait_949', x, y)` or `playSound('door_bell')`.
 
+## Moving to the new engine
+The [migration inventory](docs/migration/README.md) lists every classic script, where it goes on the Basement engine and what is still missing. CI checks that every new classic script gets a row.
+
 ## Building by hand (optional, needs Node 18+)
 ```
 node tools/build.mjs          # rebuild DFAB V8.html

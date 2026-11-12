@@ -67,6 +67,9 @@ jobs:
           node tools/test-attack-callers.cjs
           node tools/test-mounted-attack-callers.cjs
 
+      - name: Check the migration inventory covers every classic script
+        run: node tools/migration-inventory.mjs --check
+
       - name: Check the city's lane network routes on Basement navigation
         run: node tools/test-road-navigation.cjs
 

@@ -27,6 +27,7 @@ flowchart TD
 | `core/` | World lifecycle, validation, authoritative body state, integration, events and save/load. |
 | `core/mass.mjs` | Cached aggregate mass/center/inertia, center-based integration and impulse/rotation helpers shared by contacts, joints and motors. |
 | `spatial/` | Incremental spatial membership and shared spatial/clearance queries. |
+| (sibling package) `../maps/` | Map definitions to entities, exterior region streaming, door control and the room graph. Uses this package's public API only. |
 | `navigation/` | Clearance field, grid path planning with reuse, road lane graph and travel profiles. |
 | `collision/` | Immutable shapes, contact/sweep geometry and mass-aware contact solving. |
 | `constraints/` | Hinges, distance/spring/attachment/drag constraints. |
