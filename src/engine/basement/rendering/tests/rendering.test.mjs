@@ -112,7 +112,7 @@ test('generic rendering and camera have no Canvas calls or private physical/spat
 
 test('public rendering and camera members have a shareable API reference',async()=>{
  const {readFileSync}=await import('node:fs'),api=await import('../index.mjs'),reference=readFileSync(new URL('../README.md',import.meta.url),'utf8');
- for(const [name,Class]of Object.entries(api)){assert.ok(reference.includes(name),name);for(const member of Object.getOwnPropertyNames(Class.prototype))if(member!=='constructor')assert.ok(reference.includes(member),`${name}.${member}`);}
+ for(const [name,Class]of Object.entries(api)){assert.ok(reference.includes(name),name);for(const member of Object.getOwnPropertyNames(Class.prototype??{}))if(member!=='constructor')assert.ok(reference.includes(member),`${name}.${member}`);}
 });
 
 test('target caches receive only successful backend frames and unsubscribe cleanly',async()=>{

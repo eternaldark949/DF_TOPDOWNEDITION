@@ -1,5 +1,5 @@
 import enemies from '../data/game-db/enemies.json' with {type:'json'};
-import {artScene,circle,ellipse,radial,glow} from './art-packets.mjs';
+import {artScene,circle,ellipse,radial,glow} from '../../engine/basement/rendering/index.mjs';
 const DRONE=enemies.drone;
 export function droneLift(state){return DRONE.HOVER_PX+Math.sin(state.hoverOffset)*3+state.alt*240;}
 export function droneArmPose(diving,stuck,s){

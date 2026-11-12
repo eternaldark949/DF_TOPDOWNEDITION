@@ -56,7 +56,7 @@ Common packet fields:
 | `position`, `rotation`, `scale` | Local-to-world/screen transform; centers, radians, `[1,1]` default scale. |
 | `matrix` | Optional six-number affine transform overriding position/rotation/scale. |
 | `opacity` | 0..1; default 1. |
-| `blend` | `normal`, `add`, `multiply`, `screen`, `source-in`, `source-out`, `destination-in`, `destination-out`. |
+| `blend` | `normal`, `add`, `multiply`, `screen`, `overlay`, `soft-light`, `lighten`, `darken`, `source-in`, `source-out`, `source-atop`, `destination-in`, `destination-out`, `destination-over`. Canvas `copy` is not a packet blend: it would wipe everything under the layer; clear a pass or target instead. |
 | `material_id` / `material` | Resource reference or inline paint/stroke settings; reference takes precedence. |
 | `clips` | Intersecting local clip geometries/resource IDs, optional affine transforms, `nonzero`/`evenodd` rules. |
 
@@ -95,6 +95,39 @@ frame.submit({type:'sprite',space:'screen',resource_id:'lighting:buffer',
 `endPass` creates a continuation of the previous pass without clearing it. Default pass viewport dimensions inherit from the enclosing pass; supply dimensions explicitly when using a cache-sized coordinate system. Targets have fixed physical pixel dimensions, while pass viewport dimensions define logical coordinates. Scaling is handled by the backend. A pass cannot sample the target it is currently writing.
 
 `beginFrame`/`endFrame`/`abortFrame` belong to the runtime's render lifecycle. Producers only clear/submit/open/close passes on the supplied frame. A producer failure aborts the partial frame and stops scheduling. Rendering is synchronous once resources are prepared.
+
+## Art toolkit (`art.mjs`)
+
+The shapes, effects and helpers the game's art repeats, as packets. Artists build in an `artScene` and submit what `finish()` returns; nothing here touches a canvas.
+
+```js
+const art = new artScene();
+groundShadow(art, 0, 12, 14, 5);
+art.enter({ position: pose.position, rotation: pose.rotation });          // like save + translate + rotate
+art.outlined(roundRect(-10, -6, 20, 12, 3), '#6a4c93', '#1a1020', 1.5);    // fill and outline in one packet
+art.fill(capsule([0, 0], [12, 4], 2.5), shade('#6a4c93', -0.3));
+art.enter({}, { blend: 'add' }); glow(art, 0, 0, 30, '255,200,120'); art.leave();
+art.leave();                                                               // like restore
+for (const packet of art.finish()) frame.submit({ ...packet, layer: 20, depth: pose.position[1] });
+```
+
+| Member | Contract |
+|---|---|
+| `new artScene()` | An empty scene with the identity transform and style `{stroke_width:1, line_cap:'butt', line_join:'miter', dash:[], opacity:1, blend:'normal'}`. |
+| `enter(pose, style)` / `leave()` | Open a group: the pose (`position`, `rotation`, `scale` or `matrix`) composes onto the current transform, and `style` overrides any style field. `leave` restores the transform, style and clips. Unbalanced groups throw. |
+| `place(pose)` | Compose a pose onto the current group without opening a new one. |
+| `clip(shape)` | Everything painted later in this group is limited to the shape. |
+| `paint(shape, material)` | One shape packet: the group's transform, style and clips, with `material` over a default of no fill and no stroke. |
+| `fill(shape, colour)` / `stroke(shape, colour, width)` / `outlined(shape, fill, stroke, width)` | The common materials in one call. |
+| `finish()` | The packets, in paint order. Throws if a group is still open. |
+
+Shapes are arrays of path commands, so several can go in one paint call: `circle(x, y, r, start?, end?)`, `ellipse(x, y, rx, ry, rotation?, start?, end?, reverse?)`, `rect(x, y, w, h)` and `roundRect(x, y, w, h, r)` (top-left corner, as on a canvas; the radius is clamped to half the shorter side), `polygon(points)` (closed), `polyline(points)` (open, for strokes), `capsule(from, to, r)` (round-ended limb, cable or pipe), and `smoothShape(points)` (a closed blob through rounded corners). `linear(from, to, stops)` and `radial(from, inner_radius, to, outer_radius, stops)` make gradient paint.
+
+Effects: `glow(scene, x, y, r, 'r,g,b', core = .35, {blend, alpha = 1})` is a soft round light that fades out at `r`, in the group's blend unless given one; `groundShadow(scene, x, y, rx, ry, {strength = 1})` is the soft dark ellipse that sets an object on the floor.
+
+Colour: `hexToRgb(hex)` gives `[r, g, b]`; `rgbToHex(rgb)`; `rgba(hex or rgb, a)` gives a CSS string; `mix(a, b, k)` blends two hex colours; `shade(hex, k)` darkens toward black (k < 0) or lightens toward white (k > 0).
+
+Seeded randomness, for procedural detail that is the same every frame: `seededRandom(seed)` returns a function giving numbers in [0, 1); `hash2(x, y, seed)` is a repeatable number in [0, 1) for a grid cell.
 
 ## Rendering resources
 

@@ -1,4 +1,4 @@
-import {artScene,circle,ellipse,radial,linear,groundShadow} from './art-packets.mjs';
+import {artScene,circle,ellipse,radial,linear,groundShadow} from '../../engine/basement/rendering/index.mjs';
 import {velvetCatAnimation} from './velvet-cat-animation.mjs';
 import {VELVET_CAT_PALETTES,VELVET_T,VELVET_PROFILES,VELVET_TAIL_SEGS} from '../data/game-velvet-appearance.mjs';
 /** Renderer-neutral feline geometry/material packets over detached animation state. */

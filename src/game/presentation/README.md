@@ -84,7 +84,7 @@ for(const packet of createVelvetEyePackets(state,{eyes:art.eyes,darkness:.8}))
     frame.submit({...packet,layer:60,depth:cat.position[1]});
 ```
 
-`art-packets.mjs` is a small game-presentation data builder, not a virtual Canvas context. Artists directly construct portable path arrays and material descriptors. Groups compose affine packet transforms; clip geometry keeps its creation frame relative to each emitted shape. No Canvas operation is recorded for later replay. Geometry never changes simulation state.
+The art toolkit (`artScene`, shapes, `glow`, `groundShadow`, colour and seeded-random helpers) now lives in the engine: `engine/basement/rendering/art.mjs`. It is a data builder, not a virtual Canvas context. Artists directly construct portable path arrays and material descriptors. Groups compose affine packet transforms; clip geometry keeps its creation frame relative to each emitted shape. No Canvas operation is recorded for later replay. Geometry never changes simulation state.
 
 `velvet-cat-animation.mjs` owns the existing `velvetCatAnimation`, `createVelvetAnimation` and `advanceVelvetAnimation` cosmetic APIs. The entity imports that module independently of drawing. Animation still advances on the fixed step using actual native travel and its separate cosmetic RNG. Drawing neither advances animation nor adds `_eyeWorld` fields to entities.
 

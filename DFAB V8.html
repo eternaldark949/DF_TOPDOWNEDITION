@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '835fed760ef0';
+        const DFAB_BUILD = '600bbcb84043';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="13116">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="13186">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -26978,7 +26978,7 @@ function transform(packet={},out=[]){if(packet.matrix)return matrix(packet.matri
 function viewport(packet){return Object.freeze({width:finite(packet.width,'viewport width',1),height:finite(packet.height,'viewport height',1),pixel_ratio:finite(packet.pixel_ratio??1,'pixel ratio',.01)});}
 function freezeData(value){if(value&&typeof value==='object'&&!ArrayBuffer.isView(value)){for(const entry of Object.values(value))freezeData(entry);Object.freeze(value);}return value;}
 function color(value){if(typeof value!=='string'||!value.trim())throw new TypeError('A color string is required');return value;}
-const BLENDS = Object.freeze({normal:'source-over',add:'lighter',multiply:'multiply',screen:'screen','source-in':'source-in','source-out':'source-out','destination-in':'destination-in','destination-out':'destination-out'});
+const BLENDS = Object.freeze({normal:'source-over',add:'lighter',multiply:'multiply',screen:'screen','source-in':'source-in','source-out':'source-out','destination-in':'destination-in','destination-out':'destination-out','source-atop':'source-atop','destination-over':'destination-over',overlay:'overlay','soft-light':'soft-light',lighten:'lighten',darken:'darken'});
 
 return Object.freeze({get finite(){return finite;},get vector(){return vector;},get identifier(){return identifier;},get matrix(){return matrix;},get inverse(){return inverse;},get point(){return point;},get transform(){return transform;},get viewport(){return viewport;},get freezeData(){return freezeData;},get color(){return color;},get BLENDS(){return BLENDS;}});
 })();
@@ -27369,6 +27369,107 @@ class canvasRenderer {
 
 return Object.freeze({get canvasRenderer(){return canvasRenderer;}});
 })();
+// src/engine/basement/rendering/art.mjs
+const m159 = (()=>{
+// ===== LV0 BASEMENT =====
+// THE ART TOOLKIT: the shapes, effects and helpers every artist repeats, as frame packets. An artist
+// builds a picture in an `artScene` (move, rotate, scale and paint inside nested groups, as with a
+// canvas save/restore) and hands `finish()` to the frame. Nothing here touches a canvas: every
+// result is plain data that any backend can draw.
+const {transform,inverse} = m154;
+
+const identity=()=>[1,0,0,1,0,0];
+const multiply=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
+const geometry=commands=>Array.isArray(commands)?{type:'path',commands:commands.map(command=>[...command])}:structuredClone(commands);
+const finite=(value,name)=>{if(!Number.isFinite(value))throw new TypeError(`Art ${name} must be a finite number`);return value;};
+
+// ----- Shapes: path commands, composable in one paint call ---------------------------------------
+const ellipse=(x,y,rx,ry,rotation=0,start=0,end=Math.PI*2,reverse=0)=>['ellipse',x,y,rx,ry,rotation,start,end,Number(reverse)];
+const circle=(x,y,r,start=0,end=Math.PI*2)=>ellipse(x,y,r,r,0,start,end);
+/** An open run of straight lines through `points` ([x, y] each). Stroke it; filling closes it implicitly. */
+function polyline(points){if(!Array.isArray(points)||points.length<2)throw new TypeError('A polyline needs two points or more');return points.map(([x,y],i)=>[i?'line':'move',finite(x,'x'),finite(y,'y')]);}
+/** A closed polygon through `points`. */
+function polygon(points){if(points?.length<3)throw new TypeError('A polygon needs three points or more');return [...polyline(points),['close']];}
+/** A box from its top-left corner, the classic canvas convention. */
+const rect=(x,y,w,h)=>polygon([[x,y],[x+w,y],[x+w,y+h],[x,y+h]]);
+/** A box from its top-left corner with rounded corners; `r` is clamped to half the shorter side. */
+function roundRect(x,y,w,h,r){
+    r=Math.max(0,Math.min(finite(r,'corner radius'),Math.abs(w)/2,Math.abs(h)/2));if(!r)return rect(x,y,w,h);
+    return [['move',x+r,y],['line',x+w-r,y],['quadratic',x+w,y,x+w,y+r],['line',x+w,y+h-r],['quadratic',x+w,y+h,x+w-r,y+h],['line',x+r,y+h],['quadratic',x,y+h,x,y+h-r],['line',x,y+r],['quadratic',x,y,x+r,y],['close']];
+}
+/** A stadium from `from` to `to` with round ends: a limb, a cable, a pipe. Fill it. */
+function capsule([ax,ay],[bx,by],r){
+    finite(r,'capsule radius');const angle=Math.atan2(by-ay,bx-ax),turn=Math.PI/2;
+    return [ellipse(ax,ay,r,r,0,angle+turn,angle-turn+Math.PI*2),ellipse(bx,by,r,r,0,angle-turn,angle+turn),['close']];
+}
+/** A closed shape through `points` with corners rounded by quadratic curves (a blob, a cushion). */
+function smoothShape(points){
+    if(points?.length<3)throw new TypeError('A smooth shape needs three points or more');
+    const mid=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2],n=points.length,start=mid(points[n-1],points[0]),out=[['move',...start]];
+    for(let i=0;i<n;i++){const end=mid(points[i],points[(i+1)%n]);out.push(['quadratic',...points[i],...end]);}
+    out.push(['close']);return out;
+}
+
+// ----- Paint ---------------------------------------------------------------------------------------
+const linear=(from,to,stops)=>({type:'linear',from,to,stops});
+const radial=(from,inner_radius,to,outer_radius,stops)=>({type:'radial',from,inner_radius,to,outer_radius,stops});
+
+/**
+ * A data-only scene builder, the packet form of canvas save/translate/rotate/restore. `enter(pose)`
+ * opens a group (position, rotation, scale or matrix, and optional style overrides), `leave()` closes
+ * it; `paint(shape, material)` emits one shape packet with the group's transform, style and clips.
+ */
+class artScene{
+    packets=[];matrix=identity();style={stroke_width:1,line_cap:'butt',line_join:'miter',dash:[],opacity:1,blend:'normal'};clips=[];#stack=[];
+    enter(pose={},style={}){this.#stack.push({matrix:this.matrix,style:this.style,clips:this.clips});this.matrix=multiply(this.matrix,transform(pose));this.style={...this.style,...style};this.clips=[...this.clips];return this;}
+    leave(){const state=this.#stack.pop();if(!state)throw new Error('Unbalanced art group');Object.assign(this,state);return this;}
+    place(pose){this.matrix=multiply(this.matrix,transform(pose));return this;}
+    /** Limits everything painted later in this group to the shape. */
+    clip(commands){this.clips.push({geometry:geometry(commands),matrix:[...this.matrix]});return this;}
+    paint(commands,material){const {stroke_width,line_cap,line_join,dash}=this.style,inv=this.clips.length?inverse(this.matrix):null;
+        this.packets.push({type:'shape',matrix:[...this.matrix],geometry:geometry(commands),material:{fill:null,stroke:null,stroke_width,line_cap,line_join,dash:[...dash],...structuredClone(material)},opacity:this.style.opacity,blend:this.style.blend,clips:this.clips.map(clip=>({geometry:clip.geometry,transform:multiply(inv,clip.matrix)}))});return this;
+    }
+    fill(commands,color){return this.paint(commands,{fill:color});}
+    stroke(commands,color,stroke_width=this.style.stroke_width){return this.paint(commands,{stroke:color,stroke_width});}
+    /** The fill-then-outline pair the classic art draws for nearly every part. */
+    outlined(commands,fill,stroke,stroke_width=this.style.stroke_width){return this.paint(commands,{fill,stroke,stroke_width});}
+    finish(){if(this.#stack.length)throw new Error('Unclosed art group');return this.packets;}
+}
+
+// ----- Effects -------------------------------------------------------------------------------------
+/** A soft round light: `rgb` as 'r,g,b', bright at the centre, gone at `r`. It takes the group's blend unless given one (`'add'` brightens). */
+function glow(scene,x,y,r,rgb,core=.35,{blend=scene.style.blend,alpha=1}={}){
+    const stops=[[0,`rgba(${rgb},${alpha})`]];if(core>0)stops.push([core,`rgba(${rgb},${.45*alpha})`]);stops.push([1,`rgba(${rgb},0)`]);
+    scene.enter({},{blend});scene.paint([circle(x,y,r)],{fill:radial([x,y],0,[x,y],r,stops)});scene.leave();
+}
+/** The soft dark ellipse that sets an object on the floor. */
+function groundShadow(scene,x,y,rx,ry,{strength=1}={}){
+    const a=k=>`rgba(0,0,0,${+(k*strength).toFixed(4)})`;
+    scene.enter({position:[x,y],scale:[rx,ry]});scene.paint([circle(0,0,1)],{fill:radial([0,0],0,[0,0],1,[[0,a(.30)],[.65,a(.24)],[.85,a(.12)],[1,a(0)]])});scene.leave();
+}
+
+// ----- Colour --------------------------------------------------------------------------------------
+/** '#rgb' or '#rrggbb' -> [r, g, b] (0..255). */
+function hexToRgb(hex){
+    if(typeof hex!=='string'||!/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(hex))throw new TypeError(`Not a hex colour: ${hex}`);
+    const h=hex.length===4?[...hex.slice(1)].map(c=>c+c).join(''):hex.slice(1);return [0,2,4].map(i=>parseInt(h.slice(i,i+2),16));
+}
+const rgbToHex=rgb=>'#'+rgb.map(v=>Math.round(Math.max(0,Math.min(255,v))).toString(16).padStart(2,'0')).join('');
+/** A CSS rgba() string from a hex colour or an [r, g, b] triple. */
+function rgba(colour,a=1){const [r,g,b]=Array.isArray(colour)?colour:hexToRgb(colour);return `rgba(${Math.round(r)},${Math.round(g)},${Math.round(b)},${a})`;}
+/** Between two hex colours: k 0 is `a`, 1 is `b`. */
+function mix(a,b,k){const x=hexToRgb(a),y=hexToRgb(b);return rgbToHex(x.map((v,i)=>v+(y[i]-v)*k));}
+/** Darker (k < 0, toward black) or lighter (k > 0, toward white), k in -1..1. */
+const shade=(hex,k)=>mix(hex,k<0?'#000000':'#ffffff',Math.min(1,Math.abs(k)));
+
+// ----- Seeded randomness, for procedural detail that is the same every frame -----------------------
+/** A repeatable random source: returns a function giving numbers in [0, 1). */
+function seededRandom(seed){let s=(finite(seed,'seed')>>>0)||0x9e3779b9;return ()=>{s=(s+0x6d2b79f5)>>>0;let t=s;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
+/** A repeatable number in [0, 1) for a grid cell (x, y) and a seed: the same cell always gets the same value. */
+function hash2(x,y,seed=0){let h=Math.imul((x|0)^0x27d4eb2d,0x85ebca6b)^Math.imul((y|0)+0x165667b1,0xc2b2ae35)^Math.imul(seed|0,0x9e3779b1);h=Math.imul(h^(h>>>15),0x2c1b3c6d);h=Math.imul(h^(h>>>12),0x297a2d39);return ((h^(h>>>15))>>>0)/4294967296;}
+
+return Object.freeze({get ellipse(){return ellipse;},get circle(){return circle;},get polyline(){return polyline;},get polygon(){return polygon;},get rect(){return rect;},get roundRect(){return roundRect;},get capsule(){return capsule;},get smoothShape(){return smoothShape;},get linear(){return linear;},get radial(){return radial;},get artScene(){return artScene;},get glow(){return glow;},get groundShadow(){return groundShadow;},get hexToRgb(){return hexToRgb;},get rgbToHex(){return rgbToHex;},get rgba(){return rgba;},get mix(){return mix;},get shade(){return shade;},get seededRandom(){return seededRandom;},get hash2(){return hash2;}});
+})();
 // src/engine/basement/rendering/index.mjs
 const m152 = (()=>{
 // ===== LV0 BASEMENT =====
@@ -27377,7 +27478,8 @@ const m152 = (()=>{
 
 
 
-return Object.freeze({get cameraSystem(){return m153.cameraSystem;},get renderFrame(){return m155.renderFrame;},get renderSystem(){return m157.renderSystem;},get canvasRenderer(){return m158.canvasRenderer;}});
+
+return Object.freeze({get cameraSystem(){return m153.cameraSystem;},get renderFrame(){return m155.renderFrame;},get renderSystem(){return m157.renderSystem;},get canvasRenderer(){return m158.canvasRenderer;},get artScene(){return m159.artScene;},get circle(){return m159.circle;},get ellipse(){return m159.ellipse;},get polyline(){return m159.polyline;},get polygon(){return m159.polygon;},get rect(){return m159.rect;},get roundRect(){return m159.roundRect;},get capsule(){return m159.capsule;},get smoothShape(){return m159.smoothShape;},get linear(){return m159.linear;},get radial(){return m159.radial;},get glow(){return m159.glow;},get groundShadow(){return m159.groundShadow;},get hexToRgb(){return m159.hexToRgb;},get rgbToHex(){return m159.rgbToHex;},get rgba(){return m159.rgba;},get mix(){return m159.mix;},get shade(){return m159.shade;},get seededRandom(){return m159.seededRandom;},get hash2(){return m159.hash2;}});
 })();
 // src/engine/lobby/runtime/game-engine.mjs
 const m144 = (()=>{
@@ -27641,7 +27743,7 @@ class gameEngine {
 
 return Object.freeze({get gameEngine(){return gameEngine;}});
 })();
-const m162 = Object.freeze({default:{
+const m163 = Object.freeze({default:{
   "slim": {
     "w": 0.88,
     "d": 0.92,
@@ -27672,7 +27774,7 @@ const m162 = Object.freeze({default:{
     "hip": 1.1
   }
 }});
-const m163 = Object.freeze({default:{
+const m164 = Object.freeze({default:{
   "female": {
     "sh": 10.5,
     "del": 4,
@@ -27799,9 +27901,9 @@ const m163 = Object.freeze({default:{
   }
 }});
 // src/game/data/humanoid/rig-assets.mjs
-const m161 = (()=>{
-const builds = m162.default;
-const bodyCanon = m163.default;
+const m162 = (()=>{
+const builds = m163.default;
+const bodyCanon = m164.default;
 const {rigDefinition,animationClip} = m1;
 const immutable=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))immutable(child);Object.freeze(value);}return value;};
 const humanoidBodyCanon=immutable(bodyCanon);
@@ -27848,8 +27950,8 @@ function getHumanoidRigAssets(gender='androgynous',{build=null,height=1}={}){
 return Object.freeze({get humanoidBodyCanon(){return humanoidBodyCanon;},get humanoidBuilds(){return humanoidBuilds;},get getHumanoidRigAssets(){return getHumanoidRigAssets;}});
 })();
 // src/game/mechanics/animation/humanoid-system.mjs
-const m160 = (()=>{
-const {getHumanoidRigAssets} = m161;
+const m161 = (()=>{
+const {getHumanoidRigAssets} = m162;
 const humanoids=new Set(['df_player','df_npc','df_ganger','df_hunter','df_demoness']);
 /** Game policy chooses authored poses; Basement resolves and advances every joint. */
 class humanoidSystem {
@@ -27897,7 +27999,7 @@ function humanoidPresentation(actor,blend=1){
 return Object.freeze({get humanoidSystem(){return humanoidSystem;},get humanoidPresentation(){return humanoidPresentation;}});
 })();
 // src/game/mechanics/encounters/encounter-system.mjs
-const m164 = (()=>{
+const m165 = (()=>{
 const {BossEffect} = m109;
 const {BODY_GROUP} = m1;
 const {jsonCopy} = m40;
@@ -27978,7 +28080,7 @@ class encounterSystem{
 return Object.freeze({get encounterSystem(){return encounterSystem;}});
 })();
 // src/game/data/weapon-models.mjs
-const m167 = (()=>{
+const m168 = (()=>{
 /* =====================================================================
    WEAPON MODELS — every gun as data: parts in the gun's own frame (+x down
    the barrel, the grip hand near 0,0, +y to the holder's right), each in a
@@ -28204,8 +28306,8 @@ function weaponModel(id) {
 return Object.freeze({get GUN_MATERIALS(){return GUN_MATERIALS;},get WEAPON_MODELS(){return WEAPON_MODELS;},get LASER_MODULE(){return LASER_MODULE;},get weaponModel(){return weaponModel;}});
 })();
 // src/game/data/combat-profiles.mjs
-const m166 = (()=>{
-const {weaponModel} = m167;
+const m167 = (()=>{
+const {weaponModel} = m168;
 /** Shape authoring belongs with the visual assets. Runtime collision calculations stay in Basement. */
 function getCombatProfile(definition_id){
  const model=weaponModel(definition_id),edge=model.edge??[19.4,2.6];
@@ -28215,9 +28317,9 @@ function getCombatProfile(definition_id){
 return Object.freeze({get getCombatProfile(){return getCombatProfile;}});
 })();
 // src/game/mechanics/attacks/attack-system.mjs
-const m165 = (()=>{
+const m166 = (()=>{
 const attackRules = m64.default;
-const {getCombatProfile} = m166;
+const {getCombatProfile} = m167;
 const {prepareMountedAttack,mountedAttackState,validateMountedAttack} = m114;
 const combatRules = m63.default;
 const {gameCharacter} = m1;
@@ -28339,7 +28441,7 @@ class attackSystem{
 return Object.freeze({get attackSystem(){return attackSystem;}});
 })();
 // src/game/mechanics/abilities/ability-system.mjs
-const m168 = (()=>{
+const m169 = (()=>{
 const {beginPattern,advancePattern,clearPattern} = m110;
 const {beginTimedAction,advanceTimedAction,hitGrapple,clearTimedAction} = m112;
 const {beginBurst,advanceBurst} = m113;
@@ -28401,7 +28503,7 @@ class abilitySystem{
 return Object.freeze({get abilitySystem(){return abilitySystem;}});
 })();
 // src/game/mechanics/actors/actor-system.mjs
-const m169 = (()=>{
+const m170 = (()=>{
 const {Demoness} = m97;
 const {Warden} = m107;
 const {Drone} = m117;
@@ -28471,7 +28573,7 @@ class actorSystem{
 
 return Object.freeze({get actorSystem(){return actorSystem;}});
 })();
-const m170 = Object.freeze({default:{
+const m171 = Object.freeze({default:{
   "keymap": {
     "move_up":["w","ArrowUp"],"move_down":["s","ArrowDown"],"move_left":["a","ArrowLeft"],"move_right":["d","ArrowRight"],
     "fire":["mouseLeft","space","gamepadRTrigger","touchFire"],
@@ -28485,7 +28587,7 @@ const m170 = Object.freeze({default:{
   }
 }});
 // src/game/mechanics/game-session.mjs
-const m171 = (()=>{
+const m172 = (()=>{
 const {itemSystem} = m104;
 const {createItemCatalog} = m58;
 const itemRules = m105.default;
@@ -28562,7 +28664,7 @@ class gameSession {
 return Object.freeze({get gameSession(){return gameSession;}});
 })();
 // src/game/mechanics/player-state-system.mjs
-const m172 = (()=>{
+const m173 = (()=>{
 const {nonnegative,jsonCopy} = m40;
 
 /** Game rules only. The native entity/body remains the sole owner of physical state. */
@@ -28618,7 +28720,7 @@ class PlayerStateSystem {
 return Object.freeze({get PlayerStateSystem(){return PlayerStateSystem;}});
 })();
 // src/game/mechanics/player-control-system.mjs
-const m173 = (()=>{
+const m174 = (()=>{
 /** Turns input terminology into native motor requests and gameplay intents. No physical math. */
 class PlayerControlSystem {
     #session; #state; #blocked = new Set(); #placement; #context = null;
@@ -28658,7 +28760,7 @@ class PlayerControlSystem {
 return Object.freeze({get PlayerControlSystem(){return PlayerControlSystem;}});
 })();
 // src/game/mechanics/combat/combat-system.mjs
-const m174 = (()=>{
+const m175 = (()=>{
 const rules = m63.default;
 const {BODY_GROUP} = m1;
 const {nonnegative,jsonCopy} = m40;
@@ -28728,7 +28830,7 @@ class combatSystem{
 return Object.freeze({get isCombatDead(){return isCombatDead;},get combatSystem(){return combatSystem;}});
 })();
 // src/game/mechanics/combat/melee-poses.mjs
-const m176 = (()=>{
+const m177 = (()=>{
 // Authored local animation poses, shared by presentation and native swept queries.
 const rules = m63.default;
 const MELEE_SWING={duration:rules.blade.duration_seconds,windup:rules.blade.windup_seconds,cutEnd:rules.blade.cut_end_seconds};
@@ -28804,12 +28906,12 @@ function sampleMeleeSwing(age, side, out = {}, secs = MELEE_SWING.duration, styl
 return Object.freeze({get MELEE_SWING(){return MELEE_SWING;},get WIDE_SWING(){return WIDE_SWING;},get sampleWideSwing(){return sampleWideSwing;},get wideGrip(){return wideGrip;},get swingPhases(){return swingPhases;},get sampleMeleeSwing(){return sampleMeleeSwing;}});
 })();
 // src/game/mechanics/combat/weapon-system.mjs
-const m175 = (()=>{
+const m176 = (()=>{
 const rules = m63.default;
-const {getCombatProfile} = m166;
+const {getCombatProfile} = m167;
 const {BODY_GROUP} = m1;
-const {sampleMeleeSwing,swingPhases} = m176;
-const {isCombatDead} = m174;
+const {sampleMeleeSwing,swingPhases} = m177;
+const {isCombatDead} = m175;
 const {jsonCopy,nonnegative} = m40;
 
 const stateFor=(player,settings=rules)=>player.data.weapon_state??={format_version:1,elapsed:0,cooldown:0,holstered:false,drawn_at:null,draw_shot_used:false,quick_draw:null,punch_side:'right',haymaker:false,combo:0,last_punch_at:-99,swing:null,side:1,shield:{charge:settings.mirror.shield,spent:false,since_hit:999}};
@@ -28981,7 +29083,7 @@ class weaponSystem{
 return Object.freeze({get weaponSystem(){return weaponSystem;}});
 })();
 // src/game/mechanics/items/loot-system.mjs
-const m177 = (()=>{
+const m178 = (()=>{
 const {WorldLoot} = m127;
 const rules = m63.default;
 const {BODY_GROUP} = m1;
@@ -29035,23 +29137,23 @@ class lootSystem{
 return Object.freeze({get lootSystem(){return lootSystem;}});
 })();
 // src/game/boot/game-runtime.mjs
-const m159 = (()=>{
-const {humanoidSystem} = m160;
-const {encounterSystem} = m164;
-const {attackSystem} = m165;
-const {abilitySystem} = m168;
-const {actorSystem} = m169;
+const m160 = (()=>{
+const {humanoidSystem} = m161;
+const {encounterSystem} = m165;
+const {attackSystem} = m166;
+const {abilitySystem} = m169;
+const {actorSystem} = m170;
 const {registerGameEntityTypes} = m116;
 const {gameEngine} = m144;
 const {createApartmentAssetLibrary} = m135;
-const controlProfile = m170.default;
-const {gameSession} = m171;
-const {PlayerStateSystem} = m172;
-const {PlayerControlSystem} = m173;
+const controlProfile = m171.default;
+const {gameSession} = m172;
+const {PlayerStateSystem} = m173;
+const {PlayerControlSystem} = m174;
 const playerRules = m66.default;
-const {combatSystem} = m174;
-const {weaponSystem} = m175;
-const {lootSystem} = m177;
+const {combatSystem} = m175;
+const {weaponSystem} = m176;
+const {lootSystem} = m178;
 const {canvasRenderer} = m152;
 
 /** Explicit game composition. Importing this file never starts a second runtime. */
@@ -29089,8 +29191,8 @@ function createGameRuntime({ game_db, surface, session_state, player, weapon_pol
 return Object.freeze({get createGameRuntime(){return createGameRuntime;}});
 })();
 // src/game/presentation/weapon-appearance.mjs
-const m178 = (()=>{
-const {GUN_MATERIALS,WEAPON_MODELS,LASER_MODULE,weaponModel} = m167;
+const m179 = (()=>{
+const {GUN_MATERIALS,WEAPON_MODELS,LASER_MODULE,weaponModel} = m168;
 
 const polygon=points=>({type:'path',commands:[...points.map(([x,y],i)=>[i?'line':'move',x,y]),['close']]});
 function shape(part){
@@ -29173,44 +29275,17 @@ class weaponAppearance {
 return Object.freeze({get weaponAppearance(){return weaponAppearance;}});
 })();
 // src/game/data/game-combat.mjs
-const m179 = (()=>{
+const m180 = (()=>{
 const data = m63.default;
 const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
 const COMBAT_RULES=freeze(structuredClone(data));
 
 return Object.freeze({get COMBAT_RULES(){return COMBAT_RULES;}});
 })();
-// src/game/presentation/art-packets.mjs
-const m181 = (()=>{
-const {transform,inverse} = m154;
-const identity=()=>[1,0,0,1,0,0];
-const multiply=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
-const geometry=commands=>Array.isArray(commands)?{type:'path',commands:commands.map(command=>[...command])}:structuredClone(commands);
-const ellipse=(x,y,rx,ry,rotation=0,start=0,end=Math.PI*2,reverse=0)=>['ellipse',x,y,rx,ry,rotation,start,end,Number(reverse)];
-const circle=(x,y,r,start=0,end=Math.PI*2)=>ellipse(x,y,r,r,0,start,end);
-const linear=(from,to,stops)=>({type:'linear',from,to,stops});
-const radial=(from,inner_radius,to,outer_radius,stops)=>({type:'radial',from,inner_radius,to,outer_radius,stops});
-/** Small data-only scene builder. There is no Canvas interface, device handle or command replay here. */
-class artScene{
- packets=[];matrix=identity();style={fill:'#000',stroke:'#000',stroke_width:1,line_cap:'butt',line_join:'miter',dash:[],opacity:1,blend:'normal'};clips=[];#stack=[];
- enter(pose={}){this.#stack.push({matrix:this.matrix,style:this.style,clips:this.clips});this.matrix=multiply(this.matrix,transform(pose));this.style={...this.style};this.clips=[...this.clips];return this;}
- leave(){const state=this.#stack.pop();if(!state)throw new Error('Unbalanced art group');Object.assign(this,state);return this;}
- place(pose){this.matrix=multiply(this.matrix,transform(pose));return this;}
- clip(commands){this.clips.push({geometry:geometry(commands),matrix:[...this.matrix]});return this;}
- paint(commands,material){const {stroke_width,line_cap,line_join,dash}=this.style,inv=this.clips.length?inverse(this.matrix):null;
-  this.packets.push({type:'shape',matrix:[...this.matrix],geometry:geometry(commands),material:{fill:null,stroke:null,stroke_width,line_cap,line_join,dash:[...dash],...structuredClone(material)},opacity:this.style.opacity,blend:this.style.blend,clips:this.clips.map(clip=>({geometry:clip.geometry,transform:multiply(inv,clip.matrix)}))});return this;
- }
- finish(){if(this.#stack.length)throw new Error('Unclosed art group');return this.packets;}
-}
-function glow(scene,x,y,r,rgb,core=.35){const stops=[[0,`rgba(${rgb},1)`]];if(core>0)stops.push([core,`rgba(${rgb},.45)`]);stops.push([1,`rgba(${rgb},0)`]);scene.paint([circle(x,y,r)],{fill:radial([x,y],0,[x,y],r,stops)});}
-function groundShadow(scene,x,y,rx,ry){scene.enter({position:[x,y],scale:[rx,ry]});scene.paint([circle(0,0,1)],{fill:radial([0,0],0,[0,0],1,[[0,'rgba(0,0,0,.30)'],[.65,'rgba(0,0,0,.24)'],[.85,'rgba(0,0,0,.12)'],[1,'rgba(0,0,0,0)']])});scene.leave();}
-
-return Object.freeze({get ellipse(){return ellipse;},get circle(){return circle;},get linear(){return linear;},get radial(){return radial;},get artScene(){return artScene;},get glow(){return glow;},get groundShadow(){return groundShadow;}});
-})();
 // src/game/presentation/drone.mjs
-const m180 = (()=>{
+const m181 = (()=>{
 const enemies = m49.default;
-const {artScene,circle,ellipse,radial,glow} = m181;
+const {artScene,circle,ellipse,radial,glow} = m152;
 const DRONE=enemies.drone;
 function droneLift(state){return DRONE.HOVER_PX+Math.sin(state.hoverOffset)*3+state.alt*240;}
 function droneArmPose(diving,stuck,s){
@@ -29595,7 +29670,7 @@ return Object.freeze({get bossEffectAppearance(){return bossEffectAppearance;},g
 })();
 // src/game/presentation/velvet-cat.mjs
 const m184 = (()=>{
-const {artScene,circle,ellipse,radial,linear,groundShadow} = m181;
+const {artScene,circle,ellipse,radial,linear,groundShadow} = m152;
 const {velvetCatAnimation} = m119;
 const {VELVET_CAT_PALETTES,VELVET_T,VELVET_PROFILES,VELVET_TAIL_SEGS} = m120;
 /** Renderer-neutral feline geometry/material packets over detached animation state. */
@@ -30072,7 +30147,7 @@ const m0 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m40.assetLibrary;},get createGameAssetLibrary(){return m47.createGameAssetLibrary;},get resolveMapLayout(){return m69.resolveMapLayout;},get resolvePlacement(){return m69.resolvePlacement;},get isMovableProp(){return m69.isMovableProp;},get mapHost(){return m69.mapHost;},get createMapLibraries(){return m69.createMapLibraries;},get PROP_TYPES(){return m69.PROP_TYPES;},get MAP_IDS(){return m69.MAP_IDS;},get ApartmentLevel(){return m95.ApartmentLevel;},get APARTMENT_RULES(){return m135.APARTMENT_RULES;},get gameEngine(){return m144.gameEngine;},get gameLevel(){return m146.gameLevel;},get levelLobby(){return m145.levelLobby;},get createGameRuntime(){return m159.createGameRuntime;},get controlSystem(){return m147.controlSystem;},get controlsSystem(){return m147.controlsSystem;},get inputInstance(){return m147.inputInstance;},get keyboardInstance(){return m147.keyboardInstance;},get mouseInstance(){return m147.mouseInstance;},get touchInstance(){return m147.touchInstance;},get touchStick(){return m147.touchStick;},get gamepadInstance(){return m147.gamepadInstance;},get TAP(){return m147.TAP;},get DOUBLETAP(){return m147.DOUBLETAP;},get HELD(){return m147.HELD;},get PRESS(){return m147.PRESS;},get REPEAT(){return m147.REPEAT;},get RELEASE(){return m147.RELEASE;},get renderSystem(){return m152.renderSystem;},get renderFrame(){return m152.renderFrame;},get canvasRenderer(){return m152.canvasRenderer;},get cameraSystem(){return m152.cameraSystem;},get gameSession(){return m171.gameSession;},get PlayerStateSystem(){return m172.PlayerStateSystem;},get PlayerControlSystem(){return m173.PlayerControlSystem;},get Player(){return m122.Player;},get playerVitals(){return m123.playerVitals;},get itemSystem(){return m104.itemSystem;},get createItemCatalog(){return m58.createItemCatalog;},get GUN_MATERIALS(){return m167.GUN_MATERIALS;},get WEAPON_MODELS(){return m167.WEAPON_MODELS;},get LASER_MODULE(){return m167.LASER_MODULE;},get weaponModel(){return m167.weaponModel;},get weaponAppearance(){return m178.weaponAppearance;},get combatSystem(){return m174.combatSystem;},get weaponSystem(){return m175.weaponSystem;},get lootSystem(){return m177.lootSystem;},get WorldLoot(){return m127.WorldLoot;},get MELEE_SWING(){return m176.MELEE_SWING;},get WIDE_SWING(){return m176.WIDE_SWING;},get sampleMeleeSwing(){return m176.sampleMeleeSwing;},get sampleWideSwing(){return m176.sampleWideSwing;},get swingPhases(){return m176.swingPhases;},get wideGrip(){return m176.wideGrip;},get COMBAT_RULES(){return m179.COMBAT_RULES;},get registerGameEntityTypes(){return m116.registerGameEntityTypes;},get actorVitals(){return m102.actorVitals;},get gameActor(){return m100.gameActor;},get NPC(){return m125.NPC;},get rosterRecord(){return m125.rosterRecord;},get ROSTER_FIELDS(){return m125.ROSTER_FIELDS;},get Ganger(){return m99.Ganger;},get actorSystem(){return m169.actorSystem;},get actorItems(){return m103.actorItems;},get restoreActorItems(){return m103.restoreActorItems;},get resolveEmoteLines(){return m126.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m126.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m115.abilityLoadout;},get actorAbilities(){return m115.actorAbilities;},get importActorAbilities(){return m115.importActorAbilities;},get abilitySystem(){return m168.abilitySystem;},get createAbilityCatalog(){return m60.createAbilityCatalog;},get attackRegistry(){return m101.attackRegistry;},get validateAttackState(){return m101.validateAttackState;},get attackSystem(){return m165.attackSystem;},get createAttackCatalog(){return m57.createAttackCatalog;},get validateMountedAttack(){return m114.validateMountedAttack;},get TrafficVehicle(){return m128.TrafficVehicle;},get createGameVehicle(){return m128.createGameVehicle;},get Hunter(){return m98.Hunter;},get createHunterAppearance(){return m56.createHunterAppearance;},get Marionette(){return m121.Marionette;},get MARIONETTE_RULES(){return m54.MARIONETTE_RULES;},get validateAbilityAction(){return m111.validateAbilityAction;},get GatlingGunner(){return m108.GatlingGunner;},get Drone(){return m117.Drone;},get VelvetCat(){return m118.VelvetCat;},get velvetCatAnimation(){return m119.velvetCatAnimation;},get createVelvetAnimation(){return m119.createVelvetAnimation;},get velvetPresentation(){return m119.velvetPresentation;},get droneLift(){return m180.droneLift;},get droneArmPose(){return m180.droneArmPose;},get dronePresentation(){return m180.dronePresentation;},get VELVET_CAT_PALETTES(){return m120.VELVET_CAT_PALETTES;},get VELVET_T(){return m120.VELVET_T;},get VELVET_PROFILES(){return m120.VELVET_PROFILES;},get VELVET_GAITS(){return m120.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m120.VELVET_TAIL_SEGS;},get Demoness(){return m97.Demoness;},get Warden(){return m107.Warden;},get Vesper(){return m107.Vesper;},get Matins(){return m107.Matins;},get Compline(){return m107.Compline;},get BossEffect(){return m109.BossEffect;},get encounterSystem(){return m164.encounterSystem;},get createBossAbilities(){return m48.createBossAbilities;},get createDemonessAppearance(){return m48.createDemonessAppearance;},get demonessAppearance(){return m182.demonessAppearance;},get demonessPresentation(){return m182.demonessPresentation;},get bossEffectAppearance(){return m183.bossEffectAppearance;},get bossEffectPresentation(){return m183.bossEffectPresentation;},get validateBossRecord(){return m96.validateBossRecord;},get createDronePackets(){return m180.createDronePackets;},get createVelvetCatArt(){return m184.createVelvetCatArt;},get createVelvetCatPackets(){return m184.createVelvetCatPackets;},get createVelvetEyePackets(){return m184.createVelvetEyePackets;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m160.humanoidSystem;},get humanoidPresentation(){return m160.humanoidPresentation;},get humanoidBodyCanon(){return m161.humanoidBodyCanon;},get humanoidBuilds(){return m161.humanoidBuilds;},get getHumanoidRigAssets(){return m161.getHumanoidRigAssets;},get roadNavigationData(){return m185.roadNavigationData;},get loadRoadNavigation(){return m185.loadRoadNavigation;}});
+return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m40.assetLibrary;},get createGameAssetLibrary(){return m47.createGameAssetLibrary;},get resolveMapLayout(){return m69.resolveMapLayout;},get resolvePlacement(){return m69.resolvePlacement;},get isMovableProp(){return m69.isMovableProp;},get mapHost(){return m69.mapHost;},get createMapLibraries(){return m69.createMapLibraries;},get PROP_TYPES(){return m69.PROP_TYPES;},get MAP_IDS(){return m69.MAP_IDS;},get ApartmentLevel(){return m95.ApartmentLevel;},get APARTMENT_RULES(){return m135.APARTMENT_RULES;},get gameEngine(){return m144.gameEngine;},get gameLevel(){return m146.gameLevel;},get levelLobby(){return m145.levelLobby;},get createGameRuntime(){return m160.createGameRuntime;},get controlSystem(){return m147.controlSystem;},get controlsSystem(){return m147.controlsSystem;},get inputInstance(){return m147.inputInstance;},get keyboardInstance(){return m147.keyboardInstance;},get mouseInstance(){return m147.mouseInstance;},get touchInstance(){return m147.touchInstance;},get touchStick(){return m147.touchStick;},get gamepadInstance(){return m147.gamepadInstance;},get TAP(){return m147.TAP;},get DOUBLETAP(){return m147.DOUBLETAP;},get HELD(){return m147.HELD;},get PRESS(){return m147.PRESS;},get REPEAT(){return m147.REPEAT;},get RELEASE(){return m147.RELEASE;},get renderSystem(){return m152.renderSystem;},get renderFrame(){return m152.renderFrame;},get canvasRenderer(){return m152.canvasRenderer;},get cameraSystem(){return m152.cameraSystem;},get gameSession(){return m172.gameSession;},get PlayerStateSystem(){return m173.PlayerStateSystem;},get PlayerControlSystem(){return m174.PlayerControlSystem;},get Player(){return m122.Player;},get playerVitals(){return m123.playerVitals;},get itemSystem(){return m104.itemSystem;},get createItemCatalog(){return m58.createItemCatalog;},get GUN_MATERIALS(){return m168.GUN_MATERIALS;},get WEAPON_MODELS(){return m168.WEAPON_MODELS;},get LASER_MODULE(){return m168.LASER_MODULE;},get weaponModel(){return m168.weaponModel;},get weaponAppearance(){return m179.weaponAppearance;},get combatSystem(){return m175.combatSystem;},get weaponSystem(){return m176.weaponSystem;},get lootSystem(){return m178.lootSystem;},get WorldLoot(){return m127.WorldLoot;},get MELEE_SWING(){return m177.MELEE_SWING;},get WIDE_SWING(){return m177.WIDE_SWING;},get sampleMeleeSwing(){return m177.sampleMeleeSwing;},get sampleWideSwing(){return m177.sampleWideSwing;},get swingPhases(){return m177.swingPhases;},get wideGrip(){return m177.wideGrip;},get COMBAT_RULES(){return m180.COMBAT_RULES;},get registerGameEntityTypes(){return m116.registerGameEntityTypes;},get actorVitals(){return m102.actorVitals;},get gameActor(){return m100.gameActor;},get NPC(){return m125.NPC;},get rosterRecord(){return m125.rosterRecord;},get ROSTER_FIELDS(){return m125.ROSTER_FIELDS;},get Ganger(){return m99.Ganger;},get actorSystem(){return m170.actorSystem;},get actorItems(){return m103.actorItems;},get restoreActorItems(){return m103.restoreActorItems;},get resolveEmoteLines(){return m126.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m126.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m115.abilityLoadout;},get actorAbilities(){return m115.actorAbilities;},get importActorAbilities(){return m115.importActorAbilities;},get abilitySystem(){return m169.abilitySystem;},get createAbilityCatalog(){return m60.createAbilityCatalog;},get attackRegistry(){return m101.attackRegistry;},get validateAttackState(){return m101.validateAttackState;},get attackSystem(){return m166.attackSystem;},get createAttackCatalog(){return m57.createAttackCatalog;},get validateMountedAttack(){return m114.validateMountedAttack;},get TrafficVehicle(){return m128.TrafficVehicle;},get createGameVehicle(){return m128.createGameVehicle;},get Hunter(){return m98.Hunter;},get createHunterAppearance(){return m56.createHunterAppearance;},get Marionette(){return m121.Marionette;},get MARIONETTE_RULES(){return m54.MARIONETTE_RULES;},get validateAbilityAction(){return m111.validateAbilityAction;},get GatlingGunner(){return m108.GatlingGunner;},get Drone(){return m117.Drone;},get VelvetCat(){return m118.VelvetCat;},get velvetCatAnimation(){return m119.velvetCatAnimation;},get createVelvetAnimation(){return m119.createVelvetAnimation;},get velvetPresentation(){return m119.velvetPresentation;},get droneLift(){return m181.droneLift;},get droneArmPose(){return m181.droneArmPose;},get dronePresentation(){return m181.dronePresentation;},get VELVET_CAT_PALETTES(){return m120.VELVET_CAT_PALETTES;},get VELVET_T(){return m120.VELVET_T;},get VELVET_PROFILES(){return m120.VELVET_PROFILES;},get VELVET_GAITS(){return m120.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m120.VELVET_TAIL_SEGS;},get Demoness(){return m97.Demoness;},get Warden(){return m107.Warden;},get Vesper(){return m107.Vesper;},get Matins(){return m107.Matins;},get Compline(){return m107.Compline;},get BossEffect(){return m109.BossEffect;},get encounterSystem(){return m165.encounterSystem;},get createBossAbilities(){return m48.createBossAbilities;},get createDemonessAppearance(){return m48.createDemonessAppearance;},get demonessAppearance(){return m182.demonessAppearance;},get demonessPresentation(){return m182.demonessPresentation;},get bossEffectAppearance(){return m183.bossEffectAppearance;},get bossEffectPresentation(){return m183.bossEffectPresentation;},get validateBossRecord(){return m96.validateBossRecord;},get createDronePackets(){return m181.createDronePackets;},get createVelvetCatArt(){return m184.createVelvetCatArt;},get createVelvetCatPackets(){return m184.createVelvetCatPackets;},get createVelvetEyePackets(){return m184.createVelvetEyePackets;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m161.humanoidSystem;},get humanoidPresentation(){return m161.humanoidPresentation;},get humanoidBodyCanon(){return m162.humanoidBodyCanon;},get humanoidBuilds(){return m162.humanoidBuilds;},get getHumanoidRigAssets(){return m162.getHumanoidRigAssets;},get roadNavigationData(){return m185.roadNavigationData;},get loadRoadNavigation(){return m185.loadRoadNavigation;}});
 })();
 return m0;
 })();
