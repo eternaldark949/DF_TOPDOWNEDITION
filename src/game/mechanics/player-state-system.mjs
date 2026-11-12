@@ -1,4 +1,4 @@
-import { nonnegative, jsonCopy } from './values.mjs';
+import { nonnegative, jsonCopy } from '../../engine/directory/index.mjs';
 
 /** Game rules only. The native entity/body remains the sole owner of physical state. */
 export class PlayerStateSystem {

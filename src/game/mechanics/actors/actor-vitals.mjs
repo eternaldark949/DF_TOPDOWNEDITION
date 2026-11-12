@@ -1,5 +1,5 @@
 import rules from '../../data/game-actor-rules.json' with {type:'json'};
-import {nonnegative,jsonCopy} from '../values.mjs';
+import { nonnegative, jsonCopy } from '../../../engine/directory/index.mjs';
 function validate(data){nonnegative(data.health,'health');nonnegative(data.max_health,'max_health');if(!data.max_health||data.health>data.max_health)throw new TypeError('Invalid actor health');}
 /** Shared health operations over the owner's canonical data, with no physical or UI state. */
 export class actorVitals{

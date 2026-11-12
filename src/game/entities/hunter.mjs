@@ -1,5 +1,5 @@
 import {Ganger} from './ganger.mjs';
-import {nonnegative,jsonCopy} from '../mechanics/values.mjs';
+import { nonnegative, jsonCopy } from '../../engine/directory/index.mjs';
 const stateFor=actor=>actor.data.hunter_state??={format_version:1,dash_remaining:actor.getAsset('actor_rules').data.hunter.dash_initial,chain:0,evade_requested:false};
 /** Hunter decisions only. Native motors own blink clearance, evasion and all motion. */
 export class Hunter extends Ganger{

@@ -1,6 +1,6 @@
 import {gameActor} from './game-actor.mjs';
 import {createVelvetAnimation,advanceVelvetAnimation} from '../presentation/velvet-cat-animation.mjs';
-import {nonnegative,jsonCopy} from '../mechanics/values.mjs';
+import { nonnegative, jsonCopy } from '../../engine/directory/index.mjs';
 const stateFor=actor=>actor.data.cat_state??={format_version:1,mode:'idle',dash:false,idle_seconds:0,rest:null,rest_remaining:0};
 /** Official companion body; animation records contain cosmetic state only. */
 export class VelvetCat extends gameActor{

@@ -1,6 +1,6 @@
 import {itemSystem} from '../items/item-system.mjs';
 import itemRules from '../../data/game-item-rules.json' with {type:'json'};
-import {jsonCopy} from '../values.mjs';
+import { jsonCopy } from '../../../engine/directory/index.mjs';
 const components=new WeakMap();
 export function actorItems(data,owner_id,catalog){
  const prior=components.get(data);if(prior&&prior.root===data.inventory)return prior.items;

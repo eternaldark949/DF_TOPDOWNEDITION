@@ -1,4 +1,4 @@
-import { GUN_MATERIALS, WEAPON_MODELS, LASER_MODULE, weaponModel } from './weapon-models.mjs';
+import { GUN_MATERIALS, WEAPON_MODELS, LASER_MODULE, weaponModel } from '../data/weapon-models.mjs';
 
 const polygon=points=>({type:'path',commands:[...points.map(([x,y],i)=>[i?'line':'move',x,y]),['close']]});
 function shape(part){

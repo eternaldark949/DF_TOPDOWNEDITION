@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '9fc105a76d4f';
+        const DFAB_BUILD = '9eb8777896f6';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="12615">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="12619">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -13932,7 +13932,30 @@ function freeze(value) {
     return value;
 }
 
-return Object.freeze({get plain(){return plain;},get clone(){return clone;},get freeze(){return freeze;}});
+// Data checks shared by every library and every game: a safe id, a finite non-negative number, and a
+// copy that refuses anything JSON would silently drop or change (so it survives a save file).
+function nonnegative(value, name) {
+    if (!Number.isFinite(value) || value < 0) throw new TypeError(`${name} must be finite and nonnegative`);
+    return value;
+}
+function identifier(value) {
+    if (typeof value !== 'string' || !value.trim() || ['__proto__', 'prototype', 'constructor'].includes(value)) throw new TypeError('Expected a safe nonempty identifier');
+    return value;
+}
+function jsonCopy(value) {
+    // Reject values that JSON would silently discard or change in a save file.
+    const visit = (v, seen = new Set()) => {
+        if (v === null || typeof v === 'string' || typeof v === 'boolean' || typeof v === 'number' && Number.isFinite(v)) return;
+        if (!v || typeof v !== 'object' || seen.has(v) || !Array.isArray(v) && Object.getPrototypeOf(v) !== null && Object.getPrototypeOf(Object.getPrototypeOf(v)) !== null) throw new TypeError('Session data must contain only finite JSON values');
+        if(Array.isArray(v) && Object.keys(v).length!==v.length)throw new TypeError('Session arrays must be dense');
+        seen.add(v);
+        for (const [key, item] of Object.entries(v)) { identifier(key); visit(item, seen); }
+        seen.delete(v);
+    };
+    visit(value); return structuredClone(value);
+}
+
+return Object.freeze({get plain(){return plain;},get clone(){return clone;},get freeze(){return freeze;},get nonnegative(){return nonnegative;},get identifier(){return identifier;},get jsonCopy(){return jsonCopy;}});
 })();
 // src/engine/directory/registry.mjs
 const m39 = (()=>{
@@ -14122,7 +14145,8 @@ const m38 = (()=>{
 
 
 
-return Object.freeze({get assetLibrary(){return m39.assetLibrary;},get mergeDefinition(){return m39.mergeDefinition;},get STRUCTURES(){return m41.STRUCTURES;},get validatePropCatalog(){return m41.validatePropCatalog;},get validateMapLayout(){return m41.validateMapLayout;},get resolvePlacement(){return m42.resolvePlacement;},get resolveLayout(){return m42.resolveLayout;},get isMovable(){return m42.isMovable;}});
+
+return Object.freeze({get assetLibrary(){return m39.assetLibrary;},get mergeDefinition(){return m39.mergeDefinition;},get identifier(){return m40.identifier;},get nonnegative(){return m40.nonnegative;},get jsonCopy(){return m40.jsonCopy;},get STRUCTURES(){return m41.STRUCTURES;},get validatePropCatalog(){return m41.validatePropCatalog;},get validateMapLayout(){return m41.validateMapLayout;},get resolvePlacement(){return m42.resolvePlacement;},get resolveLayout(){return m42.resolveLayout;},get isMovable(){return m42.isMovable;}});
 })();
 const m45 = Object.freeze({default:{
   "_about": {
@@ -15646,67 +15670,7 @@ function createItemCatalog(items=definitions,{enemy_kinds=enemies.kinds}={}) {
 
 return Object.freeze({get createItemCatalog(){return createItemCatalog;}});
 })();
-// src/game/mechanics/values.mjs
-const m58 = (()=>{
-// Gameplay validation, deliberately unrelated to physical vectors or integration.
-function nonnegative(value, name) {
-    if (!Number.isFinite(value) || value < 0) throw new TypeError(`${name} must be finite and nonnegative`);
-    return value;
-}
-function identifier(value) {
-    if (typeof value !== 'string' || !value.trim() || ['__proto__', 'prototype', 'constructor'].includes(value)) throw new TypeError('Expected a safe nonempty identifier');
-    return value;
-}
-function jsonCopy(value) {
-    // Reject values that JSON would silently discard or change in a save file.
-    const visit = (v, seen = new Set()) => {
-        if (v === null || typeof v === 'string' || typeof v === 'boolean' || typeof v === 'number' && Number.isFinite(v)) return;
-        if (!v || typeof v !== 'object' || seen.has(v) || !Array.isArray(v) && Object.getPrototypeOf(v) !== null && Object.getPrototypeOf(Object.getPrototypeOf(v)) !== null) throw new TypeError('Session data must contain only finite JSON values');
-        if(Array.isArray(v) && Object.keys(v).length!==v.length)throw new TypeError('Session arrays must be dense');
-        seen.add(v);
-        for (const [key, item] of Object.entries(v)) { identifier(key); visit(item, seen); }
-        seen.delete(v);
-    };
-    visit(value); return structuredClone(value);
-}
-
-function validateModifiers(modifiers) {
-    const copy=jsonCopy(modifiers);
-    if(!copy || typeof copy!=='object' || Array.isArray(copy))throw new TypeError('Buff modifiers must be a record');
-    for(const modifier of Object.values(copy)) {
-        if(!modifier || typeof modifier!=='object' || Array.isArray(modifier) || Object.keys(modifier).some(key=>!['add','multiply'].includes(key)))throw new TypeError('Buff modifiers require add and/or multiply');
-        if(modifier.add!==undefined&&!Number.isFinite(modifier.add))throw new TypeError('Buff addition must be finite');
-        if(modifier.multiply!==undefined)nonnegative(modifier.multiply,'buff multiplier');
-    }
-    return copy;
-}
-
-return Object.freeze({get nonnegative(){return nonnegative;},get identifier(){return identifier;},get jsonCopy(){return jsonCopy;},get validateModifiers(){return validateModifiers;}});
-})();
-// src/game/mechanics/abilities/ability-loadout.mjs
-const m57 = (()=>{
-const {identifier,jsonCopy} = m58;
-const components=new WeakMap();
-/** Learned capabilities, separate from carried items and physical/attack state. */
-class abilityLoadout{
- #data;#catalog;
- constructor(data={},catalog){this.#data=data;this.#catalog=catalog;if(!Object.keys(data).length)Object.assign(data,{format_version:1,known_ids:[],equipped_id:null});this.validate();}
- get equipped_id(){return this.#data.equipped_id;}
- getDefinition(id){identifier(id);const definition=this.#catalog[id];if(!definition)throw new Error(`Unknown ability: ${id}`);return definition;}
- hasAbility(id){return this.#data.known_ids.includes(id);}
- learnAbility(id){this.getDefinition(id);if(this.hasAbility(id))return false;this.#data.known_ids.push(id);return true;}
- equipAbility(id){if(id!==null){this.getDefinition(id);if(!this.hasAbility(id))throw new Error('Learn an ability before equipping it');}this.#data.equipped_id=id;return this.getEquippedAbility();}
- forgetAbility(id){const index=this.#data.known_ids.indexOf(id);if(index<0)return false;this.#data.known_ids.splice(index,1);if(this.equipped_id===id)this.equipAbility(null);return true;}
- getEquippedAbility(){return this.equipped_id===null?null:this.getDefinition(this.equipped_id);}
- validate(){const data=this.#data;jsonCopy(data);if(data.format_version!==1||Object.keys(data).some(key=>!['format_version','known_ids','equipped_id'].includes(key))||!Array.isArray(data.known_ids)||new Set(data.known_ids).size!==data.known_ids.length)throw new TypeError('Invalid ability loadout');for(const id of data.known_ids)this.getDefinition(id);if(data.equipped_id!==null&&!this.hasAbility(data.equipped_id))throw new TypeError('Equipped ability must be learned');return this;}
- snapshot(){return jsonCopy(this.#data);}
- load(snapshot){const copy=jsonCopy(snapshot);if(copy?.format_version!==1)throw new TypeError('Invalid ability loadout');new abilityLoadout(copy,this.#catalog);for(const key of Object.keys(this.#data))delete this.#data[key];Object.assign(this.#data,copy);}
-}
-function actorAbilities(data,catalog){const previous=components.get(data);if(previous&&previous.root===data.abilities)return previous.component;data.abilities??={};const component=new abilityLoadout(data.abilities,catalog);components.set(data,{root:data.abilities,component});return component;}
-
-return Object.freeze({get abilityLoadout(){return abilityLoadout;},get actorAbilities(){return actorAbilities;}});
-})();
-const m59 = Object.freeze({default:{
+const m57 = Object.freeze({default:{
   "_about": {
     "chapter": "Progression: Resonance (949's levels), the three tuning trees, castable abilities, and the perks closeness unlocks.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.progression and checked by tools/test-game-db.cjs. Node ids, tree ids and ability ids are in save files: never rename one. A \"note\" is for people only.",
@@ -15980,7 +15944,7 @@ const m59 = Object.freeze({default:{
     }
   }
 }});
-const m60 = Object.freeze({default:{
+const m58 = Object.freeze({default:{
   "authoring_hz": 60,
   "local_position": [20, 0],
   "projectile_radius": 5,
@@ -15996,10 +15960,9 @@ const {createGunnerAbilities} = m48;
 const {createMarionetteAbilities} = m50;
 const enemies = m45.default;
 const {createHunterAbilities} = m52;
-const {abilityLoadout} = m57;
-const progression = m59.default;
-const rules = m60.default;
-const {identifier,nonnegative,jsonCopy} = m58;
+const progression = m57.default;
+const rules = m58.default;
+const {identifier,nonnegative,jsonCopy} = m38;
 
 /** Existing authored balance becomes engine units once at the Directory boundary. */
 function createAbilityCatalog(definitions=progression.abilities,{hunter_kind=enemies.kinds.hunter,gunner_kind=enemies.kinds.gatling_gunner,drone_definition=enemies.drone,boss_definitions=enemies}={}){
@@ -16014,19 +15977,9 @@ function createAbilityCatalog(definitions=progression.abilities,{hunter_kind=ene
  const copy=jsonCopy(catalog);const freeze=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))freeze(child);Object.freeze(value);}return value;};return freeze(copy);
 }
 
-/** One-time import of pre-loadout roster/snapshot fields. Explicit saved unequip wins over role defaults. */
-function importActorAbilities(data,catalog,{default_id=null}={}){
- const saved=data.abilities??data.abilitiesSnapshot;
- const alias=Object.hasOwn(data,'equippedAbilityId')?data.equippedAbilityId:saved?undefined:default_id;
- if(saved!==undefined&&saved!==null)data.abilities=saved;
- const loadout=new abilityLoadout(data.abilities??={},catalog);
- if(alias!==undefined){if(alias!==null)loadout.learnAbility(alias);loadout.equipAbility(alias);}
- delete data.equippedAbilityId;delete data.abilitiesSnapshot;return loadout;
-}
-
-return Object.freeze({get createAbilityCatalog(){return createAbilityCatalog;},get importActorAbilities(){return importActorAbilities;}});
+return Object.freeze({get createAbilityCatalog(){return createAbilityCatalog;}});
 })();
-const m61 = Object.freeze({default:{
+const m59 = Object.freeze({default:{
   "authoring_hz": 60,
   "crit_chance": 0.1,
   "crit_multiplier": 2,
@@ -16105,7 +16058,7 @@ const m61 = Object.freeze({default:{
     "minimum_cooldown_seconds": 0.6
   }
 }});
-const m62 = Object.freeze({default:{
+const m60 = Object.freeze({default:{
   "firearm_range": 400,
   "melee_range": 65,
   "unarmed_range": 65,
@@ -16119,8 +16072,8 @@ const m62 = Object.freeze({default:{
 const m53 = (()=>{
 const {createItemCatalog} = m54;
 const {createAbilityCatalog} = m56;
-const combatRules = m61.default;
-const rules = m62.default;
+const combatRules = m59.default;
+const rules = m60.default;
 
 /** References to existing item/capability definitions, not a second balance/ownership ledger. */
 function createAttackCatalog({items=createItemCatalog(),abilities=createAbilityCatalog()}={}){
@@ -16135,12 +16088,12 @@ function createAttackCatalog({items=createItemCatalog(),abilities=createAbilityC
 
 return Object.freeze({get createAttackCatalog(){return createAttackCatalog;}});
 })();
-const m63 = Object.freeze({default:{
+const m61 = Object.freeze({default:{
  "health":100,"authoring_hz":60,"damage_grace_seconds":0,
  "npc":{"follow_distance":60,"recover_distance":300,"cruise_speed":210,"match_speed":312,"catchup_speed":420,"match_distance":30,"catchup_distance":100,"combat_range":400,"recovery_delay":3,"regeneration_interval":0.5,"regeneration_amount":1,"stim_threshold":0.3,"stim_heal":50,"stim_cooldown":2,"stim_count":3,"aura_range":120,"aura_interval":1,"hire_cost":400,"hire_minutes":480},
  "ganger":{"vision_fov":1.2566370614359172,"personal_space":50,"touch_distance":32,"suspicion_near_per_second":300,"suspicion_sight_per_second":150,"suspicion_idle_drain_per_second":30,"suspicion_search_drain_per_second":6,"suspicion_decay_delay":2,"noise_decay_delay":3,"suppression_seconds":1.5,"suppression_cooldown":0.25,"search_speed":90,"retreat_speed":90,"engage_distance":150,"retreat_distance":80,"search_arrival":40,"wander_speed":30,"wander_radius":200,"wander_min_seconds":2,"wander_random_seconds":3.3333333333333335,"search_look_seconds":0.75,"search_timeout":5,"interrupt_seconds":0.2,"interrupt_resistance":0.65,"shot_jitter_seconds":0.3333333333333333}
 }});
-const m64 = Object.freeze({default:{
+const m62 = Object.freeze({default:{
   "max_health": 100,
   "movement_speed": 312,
   "sneak_speed_factor": 0.55,
@@ -16158,7 +16111,7 @@ const m64 = Object.freeze({default:{
     "minimum_distance": 1
   }
 }});
-const m65 = Object.freeze({default:{
+const m63 = Object.freeze({default:{
   "library_id": "df",
   "description": "Directory-owned entity definitions for the standalone engine. Existing game classes migrate to these contracts in the next phase. Units: world pixels, seconds, radians and kilograms.",
   "resources": {
@@ -16712,7 +16665,7 @@ const m65 = Object.freeze({default:{
     }
   }
 }});
-const m66 = Object.freeze({default:{
+const m64 = Object.freeze({default:{
   "library_id": "df_street",
   "resources": {
     "rules": {
@@ -16779,7 +16732,7 @@ const m66 = Object.freeze({default:{
     }
   }
 }});
-const m68 = Object.freeze({default:{
+const m66 = Object.freeze({default:{
   "library_id": "df_props",
   "description": "Every prop type any map can place. A type gives defaults; a placement in a map file gives its top-left x, y and only the fields that differ (null removes a default). Fields are the authored appearance options the prop artists read (decorType, color, interactionType, ...). movable: the player can grab and push it.",
   "templates": {},
@@ -17035,7 +16988,7 @@ const m68 = Object.freeze({default:{
     }
   }
 }});
-const m69 = Object.freeze({default:{
+const m67 = Object.freeze({default:{
   "map_id": "apt_949",
   "host": "native",
   "props": [
@@ -17154,7 +17107,7 @@ const m69 = Object.freeze({default:{
     {"x": 700, "y": 24, "w": 1370, "h": 70, "round": 35, "color": "#ffe2b8", "intensity": 0.75, "soft": true}
   ]
 }});
-const m70 = Object.freeze({default:{
+const m68 = Object.freeze({default:{
   "map_id": "auto_shop",
   "props": [
     {"type": "ta_lift", "x": 110, "y": 140},
@@ -17201,7 +17154,7 @@ const m70 = Object.freeze({default:{
     {"class": "NPC", "args": [1050, 200, "Torque", "mechanic"], "apply": {"angle": 1.5707963267948966}}
   ]
 }});
-const m71 = Object.freeze({default:{
+const m69 = Object.freeze({default:{
   "map_id": "biggs_arena",
   "props": [],
   "lamps": [
@@ -17219,7 +17172,7 @@ const m71 = Object.freeze({default:{
     {"class": "NPC", "args": [450, 780, "Biggs", "shopkeeper"]}
   ]
 }});
-const m72 = Object.freeze({default:{
+const m70 = Object.freeze({default:{
   "map_id": "church_boss",
   "props": [
     {"type": "sc_altar", "x": 530, "y": 140},
@@ -17271,7 +17224,7 @@ const m72 = Object.freeze({default:{
     {"x": 1091, "y": 309, "radius": 60, "color": "#ffc080", "intensity": 0.5, "flicker": 4}
   ]
 }});
-const m73 = Object.freeze({default:{
+const m71 = Object.freeze({default:{
   "map_id": "cozy_cafe_interior",
   "props": [
     {"type": "cc_counter", "x": 120, "y": 245},
@@ -17366,7 +17319,7 @@ const m73 = Object.freeze({default:{
     {"x": 1061, "y": 615, "radius": 46, "color": "#ffb46a", "intensity": 0.5, "flicker": 2}
   ]
 }});
-const m74 = Object.freeze({default:{
+const m72 = Object.freeze({default:{
   "map_id": "demoness_palace",
   "props": [
     {"type": "dp_throne", "x": 866, "y": 396},
@@ -17447,7 +17400,7 @@ const m74 = Object.freeze({default:{
   ],
   "npcs": []
 }});
-const m75 = Object.freeze({default:{
+const m73 = Object.freeze({default:{
   "map_id": "enni_cole_interior",
   "props": [
     {"type": "ec_balustrade", "x": 846, "y": 50},
@@ -17583,7 +17536,7 @@ const m75 = Object.freeze({default:{
     {"x": 3015, "y": 580, "radius": 230, "color": "#ffe6c2", "intensity": 0.24, "flicker": 0}
   ]
 }});
-const m76 = Object.freeze({default:{
+const m74 = Object.freeze({default:{
   "map_id": "enni_cole_upper",
   "props": [
     {"type": "ec_balustrade", "x": 854, "y": 50, "height": 150},
@@ -17659,7 +17612,7 @@ const m76 = Object.freeze({default:{
     {"x": 1800, "y": 190, "radius": 160, "color": "#ffe0c0", "intensity": 0.3, "flicker": 0}
   ]
 }});
-const m77 = Object.freeze({default:{
+const m75 = Object.freeze({default:{
   "map_id": "ethereal_plane",
   "props": [
     {"type": "block", "x": 300, "y": 300, "width": 60, "height": 150, "color": "#4b0082"},
@@ -17673,7 +17626,7 @@ const m77 = Object.freeze({default:{
     {"class": "NPC", "args": [600, 350, "Spirit Guide", "spirit"]}
   ]
 }});
-const m78 = Object.freeze({default:{
+const m76 = Object.freeze({default:{
   "map_id": "hotel_lobby",
   "props": [
     {"type": "dn_fountain", "x": 445, "y": 265},
@@ -17736,7 +17689,7 @@ const m78 = Object.freeze({default:{
     {"x": 900, "y": 750, "radius": 150, "color": "#ffc070", "intensity": 0.8, "flicker": 0}
   ]
 }});
-const m79 = Object.freeze({default:{
+const m77 = Object.freeze({default:{
   "map_id": "hotel_suite",
   "props": [
     {"type": "ps_console", "x": 58, "y": 290},
@@ -17791,7 +17744,7 @@ const m79 = Object.freeze({default:{
     {"x": 1180, "y": 150, "radius": 90, "color": "#c890ff", "intensity": 0.4, "flicker": 3}
   ]
 }});
-const m80 = Object.freeze({default:{
+const m78 = Object.freeze({default:{
   "map_id": "house_of_death",
   "props": [
     {"type": "hod_bookcase", "x": 30, "y": 22},
@@ -17942,7 +17895,7 @@ const m80 = Object.freeze({default:{
     {"x": 1558, "y": 1458, "radius": 50, "color": "#ff8a6a", "intensity": 0.7, "flicker": 10}
   ]
 }});
-const m81 = Object.freeze({default:{
+const m79 = Object.freeze({default:{
   "map_id": "keepers_hill",
   "props": [],
   "lamps": [],
@@ -17955,7 +17908,7 @@ const m81 = Object.freeze({default:{
     {"x": 1010, "y": 640, "radius": 80, "color": "#ffb070", "intensity": 0.5, "flicker": 0}
   ]
 }});
-const m82 = Object.freeze({default:{
+const m80 = Object.freeze({default:{
   "map_id": "keepers_parlor",
   "props": [],
   "lamps": [],
@@ -17970,7 +17923,7 @@ const m82 = Object.freeze({default:{
     {"x": 850, "y": 300, "radius": 150, "color": "#8898ff", "intensity": 0.2, "flicker": 0}
   ]
 }});
-const m83 = Object.freeze({default:{
+const m81 = Object.freeze({default:{
   "map_id": "medbay_sw",
   "props": [
     {"type": "medbay_refill", "x": 200, "y": 180},
@@ -18012,7 +17965,7 @@ const m83 = Object.freeze({default:{
     {"class": "NPC", "args": [400, 200, "Dr. Yin", "medic"]}
   ]
 }});
-const m84 = Object.freeze({default:{
+const m82 = Object.freeze({default:{
   "map_id": "moon_city_nightclub",
   "props": [
     {"type": "mc_stage", "x": 620, "y": 14},
@@ -18124,7 +18077,7 @@ const m84 = Object.freeze({default:{
     {"x": 800, "y": 370, "radius": 70, "color": "#e0a0ff", "intensity": 0.6, "flicker": 2}
   ]
 }});
-const m85 = Object.freeze({default:{
+const m83 = Object.freeze({default:{
   "map_id": "neural_sys_interior",
   "props": [
     {"type": "ns_counter", "x": 400, "y": 220},
@@ -18167,7 +18120,7 @@ const m85 = Object.freeze({default:{
     {"class": "NPC", "args": [500, 170, "Prisma", "shopkeeper"]}
   ]
 }});
-const m86 = Object.freeze({default:{
+const m84 = Object.freeze({default:{
   "map_id": "ollo_interior",
   "props": [],
   "lamps": [
@@ -18179,13 +18132,13 @@ const m86 = Object.freeze({default:{
   ],
   "npcs": []
 }});
-const m87 = Object.freeze({default:{
+const m85 = Object.freeze({default:{
   "map_id": "ollo_test",
   "props": [],
   "lamps": [],
   "npcs": []
 }});
-const m88 = Object.freeze({default:{
+const m86 = Object.freeze({default:{
   "map_id": "sdc",
   "props": [
     {"type": "block", "x": 1900, "y": 1330},
@@ -18194,7 +18147,7 @@ const m88 = Object.freeze({default:{
   "lamps": [],
   "npcs": []
 }});
-const m89 = Object.freeze({default:{
+const m87 = Object.freeze({default:{
   "map_id": "van_interior",
   "props": [],
   "lamps": [],
@@ -18207,34 +18160,34 @@ const m89 = Object.freeze({default:{
   ]
 }});
 // src/game/data/game-maps.mjs
-const m67 = (()=>{
+const m65 = (()=>{
 // The game's prop library and map layouts. Any map, native or classic, places props from the one
 // catalog (game-assets/props.json); each map file (game-assets/maps/<map_id>.json) lists only
 // placements, lamps, NPC spawns and soft lights. Geometry (walls, exits, rooms, doors) stays in
 // GAME_DB.places. This file holds the game's file list; the Directory resolves the data.
 const {resolvePlacement:directoryResolvePlacement,resolveLayout,isMovable} = m38;
-const props = m68.default;
-const apt_949 = m69.default;
-const auto_shop = m70.default;
-const biggs_arena = m71.default;
-const church_boss = m72.default;
-const cozy_cafe_interior = m73.default;
-const demoness_palace = m74.default;
-const enni_cole_interior = m75.default;
-const enni_cole_upper = m76.default;
-const ethereal_plane = m77.default;
-const hotel_lobby = m78.default;
-const hotel_suite = m79.default;
-const house_of_death = m80.default;
-const keepers_hill = m81.default;
-const keepers_parlor = m82.default;
-const medbay_sw = m83.default;
-const moon_city_nightclub = m84.default;
-const neural_sys_interior = m85.default;
-const ollo_interior = m86.default;
-const ollo_test = m87.default;
-const sdc = m88.default;
-const van_interior = m89.default;
+const props = m66.default;
+const apt_949 = m67.default;
+const auto_shop = m68.default;
+const biggs_arena = m69.default;
+const church_boss = m70.default;
+const cozy_cafe_interior = m71.default;
+const demoness_palace = m72.default;
+const enni_cole_interior = m73.default;
+const enni_cole_upper = m74.default;
+const ethereal_plane = m75.default;
+const hotel_lobby = m76.default;
+const hotel_suite = m77.default;
+const house_of_death = m78.default;
+const keepers_hill = m79.default;
+const keepers_parlor = m80.default;
+const medbay_sw = m81.default;
+const moon_city_nightclub = m82.default;
+const neural_sys_interior = m83.default;
+const ollo_interior = m84.default;
+const ollo_test = m85.default;
+const sdc = m86.default;
+const van_interior = m87.default;
 
 const LAYOUTS = { apt_949, auto_shop, biggs_arena, church_boss, cozy_cafe_interior, demoness_palace, enni_cole_interior, enni_cole_upper, ethereal_plane, hotel_lobby, hotel_suite, house_of_death, keepers_hill, keepers_parlor, medbay_sw, moon_city_nightclub, neural_sys_interior, ollo_interior, ollo_test, sdc, van_interior };
 
@@ -18268,7 +18221,7 @@ function resolveMapLayout(map_id, { layouts = LAYOUTS, types = PROP_TYPES } = {}
 
 return Object.freeze({get PROP_TYPES(){return PROP_TYPES;},get MAP_IDS(){return MAP_IDS;},get createMapLibraries(){return createMapLibraries;},get resolvePlacement(){return resolvePlacement;},get isMovableProp(){return isMovableProp;},get mapHost(){return mapHost;},get resolveMapLayout(){return resolveMapLayout;}});
 })();
-const m90 = Object.freeze({default:{
+const m88 = Object.freeze({default:{
   "_about": {
     "chapter": "Cast and looks: every speaker's colour, who stands where in a cinematic scene, where the crew idles at home, how every named character looks, the colours looks share, the Double Nights android finishes, the wardrobe Stella can buy and wear, and the finishes and named materials it is drawn with.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.cast and checked by tools/test-game-db.cjs. Colours are '#rrggbb' (or '#rgb'). In appearances, { \"palette\": \"<name>\" } stands for that colour from palette, so a colour several looks share is changed once. Crowds (ROLE_LOOKS) and the field mask are code and stay in core/appearances.js. _about.notes keeps the explanations that were comments in the code, keyed by path.",
@@ -19738,7 +19691,7 @@ const m90 = Object.freeze({default:{
     }
   ]
 }});
-const m91 = Object.freeze({default:{
+const m89 = Object.freeze({default:{
   "_about": {
     "chapter": "Vehicles and traffic: the car brands and models, BlackMark's factory look, the Zib cabs and where they go, how traffic treats people in the road, and the driving feel every car shares.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.vehicles and checked by tools/test-game-db.cjs. Speeds are px a tick (60 ticks a second), accelerations px a tick², times in ticks unless a name says ms, distances px, angles radians. Keys in camelCase or UPPER_SNAKE are read by the code under those names. Brand and model keys are in save files: never rename one. _about.fields explains each field of the tuning tables.",
@@ -20470,7 +20423,7 @@ const m91 = Object.freeze({default:{
     }
   }
 }});
-const m92 = Object.freeze({default:{
+const m90 = Object.freeze({default:{
   "_about": {
     "chapter": "Places: every map's size, floors, walls, zones, landmarks and ways in and out; the rooms and doors inside them; where the city's landmark blocks are; the fireplaces; and where the dyer stands.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.places and checked by tools/test-game-db.cjs. Positions and sizes are world px, from the map's top-left; angles radians. Keys in camelCase or UPPER_SNAKE are read by the code under those names. Map ids and room ids are in save files and story steps: never rename one. _about.notes keeps the explanations that were comments in the code, keyed by where they apply (maps.apt_949.cameraBounds, rooms.apt_949.doors[0], …); they're for people only.",
@@ -22218,19 +22171,19 @@ const {createGunnerRules} = m48;
 const {createMarionetteRules} = m50;
 const {createHunterRules} = m52;
 const {createAttackCatalog} = m53;
-const progression = m59.default;
+const progression = m57.default;
 const {createAbilityCatalog} = m56;
-const actorRules = m63.default;
+const actorRules = m61.default;
 const {createItemCatalog} = m54;
 const {assetLibrary} = m38;
-const playerRules = m64.default;
-const definitions = m65.default;
-const streetDefinitions = m66.default;
-const {createMapLibraries} = m67;
-const cast = m90.default;
-const vehicles = m91.default;
+const playerRules = m62.default;
+const definitions = m63.default;
+const streetDefinitions = m64.default;
+const {createMapLibraries} = m65;
+const cast = m88.default;
+const vehicles = m89.default;
 const enemies = m45.default;
-const places = m92.default;
+const places = m90.default;
 const items = m55.default;
 
 /** Game data is wired here, never imported by the reusable Basement package. */
@@ -22272,8 +22225,8 @@ function createGameAssetLibrary({ game_db = { cast, vehicles, enemies, places, i
 return Object.freeze({get createGameAssetLibrary(){return createGameAssetLibrary;}});
 })();
 // src/game/mechanics/attacks/attack-registry.mjs
-const m99 = (()=>{
-const {identifier,jsonCopy} = m58;
+const m97 = (()=>{
+const {identifier,jsonCopy} = m38;
 const freeze=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))freeze(child);Object.freeze(value);}return value;};
 
 const synchronous=callback=>(...args)=>{const result=callback(...args);if(result&&typeof result.then==='function')throw new TypeError('Attack callbacks must be synchronous');return result;};
@@ -22310,9 +22263,9 @@ function validateAttackState(state,hasAttack){
 return Object.freeze({get attackRegistry(){return attackRegistry;},get validateAttackState(){return validateAttackState;}});
 })();
 // src/game/mechanics/actors/actor-vitals.mjs
-const m100 = (()=>{
-const rules = m63.default;
-const {nonnegative,jsonCopy} = m58;
+const m98 = (()=>{
+const rules = m61.default;
+const {nonnegative,jsonCopy} = m38;
 function validate(data){nonnegative(data.health,'health');nonnegative(data.max_health,'max_health');if(!data.max_health||data.health>data.max_health)throw new TypeError('Invalid actor health');}
 /** Shared health operations over the owner's canonical data, with no physical or UI state. */
 class actorVitals{
@@ -22335,11 +22288,11 @@ class actorVitals{
 return Object.freeze({get actorVitals(){return actorVitals;}});
 })();
 // src/game/entities/game-actor.mjs
-const m98 = (()=>{
-const {validateAttackState} = m99;
+const m96 = (()=>{
+const {validateAttackState} = m97;
 const {gameCharacter} = m1;
-const {actorVitals} = m100;
-const {nonnegative,jsonCopy} = m58;
+const {actorVitals} = m98;
+const {nonnegative,jsonCopy} = m38;
 const health=new WeakMap(),hooks=new WeakMap();
 const stateFor=actor=>actor.data.actor_state??={format_version:1,defeated:false,invulnerable_remaining:0,elapsed:0};
 /** Common actor gameplay over a real gameCharacter. No velocity, geometry or body mirrors. */
@@ -22384,11 +22337,30 @@ class gameActor extends gameCharacter{
 
 return Object.freeze({get gameActor(){return gameActor;}});
 })();
-const m103 = Object.freeze({default:{"capacity":10,"max_attachments":2,"owner_id":"player"}});
-// src/game/mechanics/items/item-system.mjs
+const m101 = Object.freeze({default:{"capacity":10,"max_attachments":2,"owner_id":"player"}});
+// src/game/mechanics/values.mjs
 const m102 = (()=>{
-const itemRules = m103.default;
-const {identifier,jsonCopy,validateModifiers} = m58;
+// Gameplay validation, deliberately unrelated to physical vectors or integration. The generic data
+// checks (identifier, nonnegative, jsonCopy) are the Directory's: engine/directory/values.mjs.
+const {identifier,nonnegative,jsonCopy} = m38;
+function validateModifiers(modifiers) {
+    const copy=jsonCopy(modifiers);
+    if(!copy || typeof copy!=='object' || Array.isArray(copy))throw new TypeError('Buff modifiers must be a record');
+    for(const modifier of Object.values(copy)) {
+        if(!modifier || typeof modifier!=='object' || Array.isArray(modifier) || Object.keys(modifier).some(key=>!['add','multiply'].includes(key)))throw new TypeError('Buff modifiers require add and/or multiply');
+        if(modifier.add!==undefined&&!Number.isFinite(modifier.add))throw new TypeError('Buff addition must be finite');
+        if(modifier.multiply!==undefined)nonnegative(modifier.multiply,'buff multiplier');
+    }
+    return copy;
+}
+
+return Object.freeze({get validateModifiers(){return validateModifiers;}});
+})();
+// src/game/mechanics/items/item-system.mjs
+const m100 = (()=>{
+const itemRules = m101.default;
+const {identifier,jsonCopy} = m38;
+const {validateModifiers} = m102;
 
 const modes=['normal','sniper','melee','fists'];
 const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
@@ -22569,10 +22541,10 @@ class itemSystem {
 return Object.freeze({get itemSystem(){return itemSystem;}});
 })();
 // src/game/mechanics/actors/actor-inventory.mjs
-const m101 = (()=>{
-const {itemSystem} = m102;
-const itemRules = m103.default;
-const {jsonCopy} = m58;
+const m99 = (()=>{
+const {itemSystem} = m100;
+const itemRules = m101.default;
+const {jsonCopy} = m38;
 const components=new WeakMap();
 function actorItems(data,owner_id,catalog){
  const prior=components.get(data);if(prior&&prior.root===data.inventory)return prior.items;
@@ -22585,10 +22557,10 @@ function restoreActorItems(data,snapshot,catalog){
 return Object.freeze({get actorItems(){return actorItems;},get restoreActorItems(){return restoreActorItems;}});
 })();
 // src/game/entities/ganger.mjs
-const m97 = (()=>{
-const {gameActor} = m98;
-const {actorItems,restoreActorItems} = m101;
-const {nonnegative,jsonCopy} = m58;
+const m95 = (()=>{
+const {gameActor} = m96;
+const {actorItems,restoreActorItems} = m99;
+const {nonnegative,jsonCopy} = m38;
 const states=['IDLE','SUSPICIOUS','ALERT','SUPPRESSING','SEARCHING'];
 const stateFor=actor=>actor.data.ganger_state??={format_version:1,state:'IDLE',suspicion:0,drain_remaining:0,suppression_remaining:0,look_elapsed:0,wander_remaining:0,investigate_position:null,wander_position:null,origin:[...actor.position],search_positions:[],search_elapsed:0,interrupt_remaining:0,resistance_remaining:0,telegraphing:false,aim_position:null,shot_delay:actor.data.telegraph_seconds??.15,bumped:false};
 /** Native stealth/combat policy. Awareness, leading, pathing and contact response stay in Basement. */
@@ -22646,9 +22618,9 @@ class Ganger extends gameActor{
 return Object.freeze({get Ganger(){return Ganger;}});
 })();
 // src/game/entities/hunter.mjs
-const m96 = (()=>{
-const {Ganger} = m97;
-const {nonnegative,jsonCopy} = m58;
+const m94 = (()=>{
+const {Ganger} = m95;
+const {nonnegative,jsonCopy} = m38;
 const stateFor=actor=>actor.data.hunter_state??={format_version:1,dash_remaining:actor.getAsset('actor_rules').data.hunter.dash_initial,chain:0,evade_requested:false};
 /** Hunter decisions only. Native motors own blink clearance, evasion and all motion. */
 class Hunter extends Ganger{
@@ -22690,9 +22662,9 @@ class Hunter extends Ganger{
 return Object.freeze({get Hunter(){return Hunter;}});
 })();
 // src/game/entities/demoness.mjs
-const m95 = (()=>{
-const {Hunter} = m96;
-const {nonnegative,jsonCopy} = m58;
+const m93 = (()=>{
+const {Hunter} = m94;
+const {nonnegative,jsonCopy} = m38;
 const stateFor=actor=>actor.data.demoness_state??={format_version:1,phase:1,heard_position:null,heard_at:0,next_sigil:2,next_bolt:1.5,next_step:4,next_gale:3,next_mirror:2,next_rite:1,eye:1,rise:1,flash:0,last_strike:null,decoy_remaining:actor.data.decoy_remaining??9};
 function validateDemonessData(data){if(['solo','decoy','dormant'].some(key=>typeof data[key]!=='boolean')||data.decoy&&data.max_health!==1)throw new TypeError('Invalid Demoness flags/decoy health');const state=data.demoness_state;if(!state)return data;jsonCopy(state);if(state.format_version!==1||![1,2,3].includes(state.phase)||typeof data.solo!=='boolean'||typeof data.decoy!=='boolean'||typeof data.dormant!=='boolean')throw new TypeError('Invalid Demoness state');for(const key of ['heard_at','next_sigil','next_bolt','next_step','next_gale','next_mirror','next_rite','eye','rise','flash','decoy_remaining'])nonnegative(state[key],key);if(state.heard_at>(data.actor_state?.elapsed??0)||['eye','rise','flash'].some(key=>state[key]>1)||state.heard_position!==null&&(!Array.isArray(state.heard_position)||state.heard_position.length!==2||!state.heard_position.every(Number.isFinite)))throw new TypeError('Invalid Demoness clock/appearance');if(state.last_strike!==null&&(!state.last_strike||!Number.isFinite(state.last_strike.at)||state.last_strike.at<0||!Array.isArray(state.last_strike.position)||state.last_strike.position.length!==2||!state.last_strike.position.every(Number.isFinite)))throw new TypeError('Invalid Demoness strike record');return data;}
 /** Lilitu's policy and duel phases; every attack is a reusable registered capability. */
@@ -22742,10 +22714,10 @@ class Demoness extends Hunter{
 return Object.freeze({get validateDemonessData(){return validateDemonessData;},get Demoness(){return Demoness;}});
 })();
 // src/game/entities/gatling-gunner.mjs
-const m105 = (()=>{
-const {gameActor} = m98;
-const {actorItems} = m101;
-const {nonnegative,jsonCopy} = m58;
+const m104 = (()=>{
+const {gameActor} = m96;
+const {actorItems} = m99;
+const {nonnegative,jsonCopy} = m38;
 const stateFor=actor=>actor.data.gunner_state??={format_version:1,hold_until:0,enrage_count:0,barrel_phase:0,barrel_speed:0,barrel_heat:0};
 /** Ordinary gunner decisions over native motors and the common owned-weapon burst action. */
 class GatlingGunner extends gameActor{
@@ -22779,9 +22751,9 @@ class GatlingGunner extends gameActor{
 return Object.freeze({get GatlingGunner(){return GatlingGunner;}});
 })();
 // src/game/entities/warden.mjs
-const m104 = (()=>{
-const {GatlingGunner} = m105;
-const {nonnegative,jsonCopy} = m58;
+const m103 = (()=>{
+const {GatlingGunner} = m104;
+const {nonnegative,jsonCopy} = m38;
 const stateFor=actor=>actor.data.warden_state??={format_version:1,target_id:null,seen_position:null,hidden_seconds:0,next_special_at:2,flank_position:null,flank_retry:0,eye:1,rise:1};
 function validateWardenData(data,entity_type){if(!['vesper','matins','compline'].includes(data.persona))throw new TypeError('Invalid Warden persona');const expected={df_vesper:'vesper',df_matins:'matins',df_compline:'compline'}[entity_type];if(expected&&data.persona!==expected)throw new TypeError('Warden persona does not match its class');const state=data.warden_state;if(!state)return data;jsonCopy(state);if(!['vesper','matins','compline'].includes(data.persona)||state.format_version!==1||state.target_id!==null&&(!Number.isSafeInteger(state.target_id)||state.target_id<1))throw new TypeError('Invalid Warden state');for(const key of ['hidden_seconds','next_special_at','flank_retry','eye','rise'])nonnegative(state[key],key);for(const key of ['seen_position','flank_position'])if(state[key]!==null&&(!Array.isArray(state[key])||state[key].length!==2||!state[key].every(Number.isFinite)))throw new TypeError('Invalid Warden target point');return data;}
 /** The shared Sanctum actor. Persona selects registered attacks and authored presentation. */
@@ -22818,9 +22790,9 @@ class Compline extends Warden{static entity_type='df_compline';}
 return Object.freeze({get validateWardenData(){return validateWardenData;},get Warden(){return Warden;},get Vesper(){return Vesper;},get Matins(){return Matins;},get Compline(){return Compline;}});
 })();
 // src/game/entities/boss-effect.mjs
-const m106 = (()=>{
+const m105 = (()=>{
 const {gameTrigger} = m1;
-const {jsonCopy,nonnegative} = m58;
+const {jsonCopy,nonnegative} = m38;
 const BOSS_EFFECT_KINDS=Object.freeze(['sigil','fire','smoke','censer','hymn','rite']);
 function validateBossEffectData(d){jsonCopy(d);if(d.format_version!==1||!BOSS_EFFECT_KINDS.includes(d.kind)||!Number.isSafeInteger(d.owner_id)||d.owner_id<1||!Array.isArray(d.hit_ids)||d.hit_ids.some(id=>!Number.isSafeInteger(id)||id<1)||new Set(d.hit_ids).size!==d.hit_ids.length)throw new TypeError('Invalid boss effect');for(const key of ['age','duration','next_tick','radius','radius_to','damage','burn_dps'])nonnegative(d[key],`effect ${key}`);if(!d.duration||d.age>d.duration+1)throw new TypeError('Invalid boss effect lifetime');if(typeof d.owner_alliance!=='string')throw new TypeError('Invalid effect allegiance');if(d.from_position!==undefined&&(!Array.isArray(d.from_position)||d.from_position.length!==2||!d.from_position.every(Number.isFinite)))throw new TypeError('Invalid effect origin');return d;}
 /** A real registered area/tell in the shared world. Its service owns only logical timing. */
@@ -22832,8 +22804,8 @@ class BossEffect extends gameTrigger{
 return Object.freeze({get BOSS_EFFECT_KINDS(){return BOSS_EFFECT_KINDS;},get validateBossEffectData(){return validateBossEffectData;},get BossEffect(){return BossEffect;}});
 })();
 // src/game/mechanics/abilities/pattern-actions.mjs
-const m107 = (()=>{
-const {jsonCopy,nonnegative} = m58;
+const m106 = (()=>{
+const {jsonCopy,nonnegative} = m38;
 function validatePatternAction(state,catalog,{clock}={}){
  jsonCopy(state);const definition=catalog[state.ability_id];
  if(definition?.delivery!=='pattern'||state.format_version!==1||!['tell','repeat'].includes(state.phase)||typeof state.cancel_requested!=='boolean'||!Number.isFinite(state.heading)||Object.keys(state).some(key=>!['format_version','ability_id','phase','started_at','phase_started_at','heading','aim','planned_position','executions','cancel_requested'].includes(key)))throw new TypeError('Invalid pattern action');
@@ -22869,11 +22841,11 @@ function validateSecondaryAction(state,catalog,options){if(state==null)return st
 return Object.freeze({get validatePatternAction(){return validatePatternAction;},get beginPattern(){return beginPattern;},get clearPattern(){return clearPattern;},get advancePattern(){return advancePattern;},get validateSecondaryAction(){return validateSecondaryAction;}});
 })();
 // src/game/entities/validate-boss-records.mjs
-const m94 = (()=>{
-const {validateDemonessData} = m95;
-const {validateWardenData} = m104;
-const {validateBossEffectData} = m106;
-const {validateSecondaryAction} = m107;
+const m92 = (()=>{
+const {validateDemonessData} = m93;
+const {validateWardenData} = m103;
+const {validateBossEffectData} = m105;
+const {validateSecondaryAction} = m106;
 /** Data-only preflight runs before replacing a live map, inventory, currency or registry. */
 function validateBossRecord(record,catalog){
  const data=record.data;if(record.entity_type==='df_demoness')validateDemonessData(data);
@@ -22886,9 +22858,9 @@ function validateBossRecord(record,catalog){
 return Object.freeze({get validateBossRecord(){return validateBossRecord;}});
 })();
 // src/game/mechanics/abilities/timed-actions.mjs
-const m109 = (()=>{
+const m108 = (()=>{
 const {BODY_GROUP} = m1;
-const {jsonCopy,nonnegative} = m58;
+const {jsonCopy,nonnegative} = m38;
 const id=value=>Number.isSafeInteger(value)&&value>0;
 function validateTimedAction(state,catalog,{clock}={}){
  jsonCopy(state);const definition=catalog[state.ability_id];
@@ -22949,8 +22921,8 @@ function advanceTimedAction(actor,definition,controller,api,combat,{known=true}=
 return Object.freeze({get validateTimedAction(){return validateTimedAction;},get beginTimedAction(){return beginTimedAction;},get ownedGrapple(){return ownedGrapple;},get clearTimedAction(){return clearTimedAction;},get hitGrapple(){return hitGrapple;},get advanceTimedAction(){return advanceTimedAction;}});
 })();
 // src/game/mechanics/abilities/burst-actions.mjs
-const m110 = (()=>{
-const {jsonCopy,nonnegative} = m58;
+const m109 = (()=>{
+const {jsonCopy,nonnegative} = m38;
 /** Logical firing cycle over the same owned weapon, launch backend and cooldown clock. */
 function validateBurstAction(state,catalog,{clock}={}){
  jsonCopy(state);if(state.format_version!==1||catalog[state.ability_id]?.delivery!=='burst'||!['tell','burst','reload'].includes(state.phase)||typeof state.weapon_instance_id!=='string'||!state.weapon_instance_id||typeof state.cancel_requested!=='boolean')throw new TypeError('Invalid saved burst action');
@@ -22997,12 +22969,12 @@ function advanceBurst(actor,definition,controller,items,api,combat,{known=true,p
 return Object.freeze({get validateBurstAction(){return validateBurstAction;},get beginBurst(){return beginBurst;},get advanceBurst(){return advanceBurst;}});
 })();
 // src/game/mechanics/abilities/lunge-actions.mjs
-const m108 = (()=>{
-const {validatePatternAction} = m107;
-const {validateTimedAction} = m109;
-const {validateBurstAction} = m110;
+const m107 = (()=>{
+const {validatePatternAction} = m106;
+const {validateTimedAction} = m108;
+const {validateBurstAction} = m109;
 const {BODY_GROUP} = m1;
-const {jsonCopy,nonnegative} = m58;
+const {jsonCopy,nonnegative} = m38;
 /** Persistent logical action only. Native motors, sweeps and impulses own physical work. */
 function validateAbilityAction(state,catalog,{clock}={}){
  if(state==null)return state;if(catalog[state.ability_id]?.delivery==='pattern')return validatePatternAction(state,catalog,{clock});if(['beam','grapple','bolt'].includes(catalog[state.ability_id]?.delivery))return validateTimedAction(state,catalog,{clock});if(catalog[state.ability_id]?.delivery==='burst')return validateBurstAction(state,catalog,{clock});jsonCopy(state);
@@ -23043,8 +23015,8 @@ function advanceLunge(actor,definition,controller,api,combat,{known=true}={}){
 return Object.freeze({get validateAbilityAction(){return validateAbilityAction;},get beginLunge(){return beginLunge;},get clearLunge(){return clearLunge;},get advanceLunge(){return advanceLunge;}});
 })();
 // src/game/mechanics/attacks/mounted-attacks.mjs
-const m111 = (()=>{
-const {jsonCopy,nonnegative,identifier} = m58;
+const m110 = (()=>{
+const {jsonCopy,nonnegative,identifier} = m38;
 
 function validateMountedAttack(state){
  if(state==null)return;jsonCopy(state);if(Object.keys(state).some(key=>!['format_version','attachment_id','revision','attack_id','aim','started_at','ready_at','expires_at'].includes(key)))throw new TypeError('Invalid mounted attack fields');identifier(state.attack_id);if(state.format_version!==1||!Number.isSafeInteger(state.attachment_id)||state.attachment_id<1||!Number.isSafeInteger(state.revision)||state.revision<0||typeof state.attack_id!=='string')throw new TypeError('Invalid mounted attack state');
@@ -23065,10 +23037,42 @@ function mountedAttackState(actor,controller,mount){
 
 return Object.freeze({get validateMountedAttack(){return validateMountedAttack;},get prepareMountedAttack(){return prepareMountedAttack;},get mountedAttackState(){return mountedAttackState;}});
 })();
+// src/game/mechanics/abilities/ability-loadout.mjs
+const m111 = (()=>{
+const {identifier,jsonCopy} = m38;
+const components=new WeakMap();
+/** Learned capabilities, separate from carried items and physical/attack state. */
+class abilityLoadout{
+ #data;#catalog;
+ constructor(data={},catalog){this.#data=data;this.#catalog=catalog;if(!Object.keys(data).length)Object.assign(data,{format_version:1,known_ids:[],equipped_id:null});this.validate();}
+ get equipped_id(){return this.#data.equipped_id;}
+ getDefinition(id){identifier(id);const definition=this.#catalog[id];if(!definition)throw new Error(`Unknown ability: ${id}`);return definition;}
+ hasAbility(id){return this.#data.known_ids.includes(id);}
+ learnAbility(id){this.getDefinition(id);if(this.hasAbility(id))return false;this.#data.known_ids.push(id);return true;}
+ equipAbility(id){if(id!==null){this.getDefinition(id);if(!this.hasAbility(id))throw new Error('Learn an ability before equipping it');}this.#data.equipped_id=id;return this.getEquippedAbility();}
+ forgetAbility(id){const index=this.#data.known_ids.indexOf(id);if(index<0)return false;this.#data.known_ids.splice(index,1);if(this.equipped_id===id)this.equipAbility(null);return true;}
+ getEquippedAbility(){return this.equipped_id===null?null:this.getDefinition(this.equipped_id);}
+ validate(){const data=this.#data;jsonCopy(data);if(data.format_version!==1||Object.keys(data).some(key=>!['format_version','known_ids','equipped_id'].includes(key))||!Array.isArray(data.known_ids)||new Set(data.known_ids).size!==data.known_ids.length)throw new TypeError('Invalid ability loadout');for(const id of data.known_ids)this.getDefinition(id);if(data.equipped_id!==null&&!this.hasAbility(data.equipped_id))throw new TypeError('Equipped ability must be learned');return this;}
+ snapshot(){return jsonCopy(this.#data);}
+ load(snapshot){const copy=jsonCopy(snapshot);if(copy?.format_version!==1)throw new TypeError('Invalid ability loadout');new abilityLoadout(copy,this.#catalog);for(const key of Object.keys(this.#data))delete this.#data[key];Object.assign(this.#data,copy);}
+}
+function actorAbilities(data,catalog){const previous=components.get(data);if(previous&&previous.root===data.abilities)return previous.component;data.abilities??={};const component=new abilityLoadout(data.abilities,catalog);components.set(data,{root:data.abilities,component});return component;}
+/** One-time import of pre-loadout roster/snapshot fields. Explicit saved unequip wins over role defaults. */
+function importActorAbilities(data,catalog,{default_id=null}={}){
+ const saved=data.abilities??data.abilitiesSnapshot;
+ const alias=Object.hasOwn(data,'equippedAbilityId')?data.equippedAbilityId:saved?undefined:default_id;
+ if(saved!==undefined&&saved!==null)data.abilities=saved;
+ const loadout=new abilityLoadout(data.abilities??={},catalog);
+ if(alias!==undefined){if(alias!==null)loadout.learnAbility(alias);loadout.equipAbility(alias);}
+ delete data.equippedAbilityId;delete data.abilitiesSnapshot;return loadout;
+}
+
+return Object.freeze({get abilityLoadout(){return abilityLoadout;},get actorAbilities(){return actorAbilities;},get importActorAbilities(){return importActorAbilities;}});
+})();
 // src/game/entities/drone.mjs
 const m113 = (()=>{
-const {gameActor} = m98;
-const {nonnegative,jsonCopy} = m58;
+const {gameActor} = m96;
+const {nonnegative,jsonCopy} = m38;
 const stateFor=actor=>actor.data.drone_state??={format_version:1,flight:'descend',phase_started_at:actor.data.actor_state?.elapsed??0,alt:1,lost_seconds:0,next_bolt_at:2.2,next_special_at:3};
 /** Flight and attack decisions. Basement owns movement, impacts, eye geometry and tether forces. */
 class Drone extends gameActor{
@@ -23391,9 +23395,9 @@ return Object.freeze({get velvetCatAnimation(){return velvetCatAnimation;},get c
 })();
 // src/game/entities/velvet-cat.mjs
 const m114 = (()=>{
-const {gameActor} = m98;
+const {gameActor} = m96;
 const {createVelvetAnimation,advanceVelvetAnimation} = m115;
-const {nonnegative,jsonCopy} = m58;
+const {nonnegative,jsonCopy} = m38;
 const stateFor=actor=>actor.data.cat_state??={format_version:1,mode:'idle',dash:false,idle_seconds:0,rest:null,rest_remaining:0};
 /** Official companion body; animation records contain cosmetic state only. */
 class VelvetCat extends gameActor{
@@ -23425,8 +23429,8 @@ return Object.freeze({get VelvetCat(){return VelvetCat;}});
 })();
 // src/game/entities/marionette.mjs
 const m117 = (()=>{
-const {gameActor} = m98;
-const {nonnegative,jsonCopy} = m58;
+const {gameActor} = m96;
+const {nonnegative,jsonCopy} = m38;
 const stateFor=actor=>actor.data.marionette_state??={format_version:1,initial_delay:.6,yank_remaining:0};
 /** Silent puppet policy. Spacing, following, wall response and strikes use shared native services. */
 class Marionette extends gameActor{
@@ -23454,9 +23458,10 @@ return Object.freeze({get Marionette(){return Marionette;}});
 })();
 // src/game/mechanics/player-vitals.mjs
 const m119 = (()=>{
-const {actorVitals} = m100;
-const defaults = m64.default;
-const {nonnegative,jsonCopy,identifier,validateModifiers} = m58;
+const {actorVitals} = m98;
+const defaults = m62.default;
+const {nonnegative,jsonCopy,identifier} = m38;
+const {validateModifiers} = m102;
 
 /** Shared gameplay component. It references its owner's data; it never owns or mirrors a body. */
 class playerVitals extends actorVitals {
@@ -23541,9 +23546,10 @@ return Object.freeze({get playerVitals(){return playerVitals;}});
 })();
 // src/game/entities/player.mjs
 const m118 = (()=>{
-const {gameActor} = m98;
+const {gameActor} = m96;
 const {playerVitals} = m119;
-const {identifier,validateModifiers,nonnegative} = m58;
+const {identifier,nonnegative} = m38;
+const {validateModifiers} = m102;
 const services = new WeakMap();
 const components = new WeakMap();
 function vitalsFor(player,rules) {
@@ -23813,12 +23819,12 @@ return Object.freeze({get resolveEmoteLines(){return resolveEmoteLines;},get NPC
 })();
 // src/game/entities/npc.mjs
 const m121 = (()=>{
-const {importActorAbilities} = m56;
-const {actorAbilities} = m57;
+const {importActorAbilities} = m111;
+const {actorAbilities} = m111;
 const {resolveEmoteLines,NPC_EMOTE_REACTIONS} = m122;
-const {gameActor} = m98;
-const {actorItems,restoreActorItems} = m101;
-const {nonnegative,jsonCopy} = m58;
+const {gameActor} = m96;
+const {actorItems,restoreActorItems} = m99;
+const {nonnegative,jsonCopy} = m38;
 const actorContract=npc=>npc.data.hireType==='contract'?(npc.data.contract_remaining??npc.data.hireDuration??0):0;
 const stateFor=npc=>npc.data.npc_state??={format_version:1,stim_remaining:0,out_of_combat:0,regen_elapsed:0,aura_elapsed:0,quip:null,quip_remaining:0,quip_delay:0,contract_remaining:actorContract(npc)};
 const ROSTER_FIELDS=['recruited','downed','teammateStims','maxTeammateStims','relationship','hireType','hireDuration','hireTime','hireCost','hired','role','bio','alliance','burstSize','burstDelay','accuracyMod','equippedAbilityId','cooldown','shotsLeftInBurst','abilitiesSnapshot','attackSelection'];
@@ -24344,19 +24350,19 @@ return Object.freeze({get TrafficVehicle(){return TrafficVehicle;},get TrafficMa
 })();
 // src/game/boot/game-entity-types.mjs
 const m112 = (()=>{
-const {Demoness} = m95;
-const {Warden,Vesper,Matins,Compline} = m104;
-const {BossEffect} = m106;
+const {Demoness} = m93;
+const {Warden,Vesper,Matins,Compline} = m103;
+const {BossEffect} = m105;
 const {Drone} = m113;
 const {VelvetCat} = m114;
-const {GatlingGunner} = m105;
+const {GatlingGunner} = m104;
 const {Marionette} = m117;
 const {Player} = m118;
 const {ApartmentProp} = m120;
-const {gameActor} = m98;
+const {gameActor} = m96;
 const {NPC} = m121;
-const {Hunter} = m96;
-const {Ganger} = m97;
+const {Hunter} = m94;
+const {Ganger} = m95;
 const {WorldLoot} = m123;
 const {registerStreetEntityTypes} = m124;
 /** The Directory registers concrete classes before any level or saved identity is constructed. */
@@ -24880,7 +24886,7 @@ return Object.freeze({get buildMapPackets(){return m135.buildMapPackets;},get MA
 // src/game/levels/apartment-definition.mjs
 const m133 = (()=>{
 const {buildMapPackets} = m134;
-const {resolveMapLayout,PROP_TYPES} = m67;
+const {resolveMapLayout,PROP_TYPES} = m65;
 
 const TEMPLATES = { wall: 'df_apartment:wall', prop: 'df_apartment:furniture', light: 'df_apartment:lamp', trigger: 'df_apartment:transition', room: 'df_apartment:transition', door: 'df_apartment:door', cloth: 'df_apartment:curtain' };
 
@@ -24951,9 +24957,9 @@ return Object.freeze({get apartmentMapDefinition(){return apartmentMapDefinition
 const m138 = (()=>{
 const {createDemonessAppearance} = m44;
 const {createHunterAppearance} = m52;
-const {validateAttackState} = m99;
-const {importActorAbilities} = m56;
-const {jsonCopy} = m58;
+const {validateAttackState} = m97;
+const {importActorAbilities} = m111;
+const {jsonCopy} = m38;
 /** Definitions and explicit old-roster import live in Directory, never in physics. */
 function createActorPacket(world,{kind='npc',name='',role='civilian',position=[0,0],rotation=0,data={},...packet}={}){
  if(!['npc','ganger','hunter','marionette','gatling_gunner','demoness','warden','vesper','matins','compline','drone','velvet_cat','actor'].includes(kind))throw new TypeError('Unknown actor kind');const record=jsonCopy(data);if(['npc','ganger','hunter','gatling_gunner','demoness','warden','vesper','matins','compline'].includes(kind))record.actor_loadout_initialized??=record.inventory!=null;
@@ -24983,13 +24989,13 @@ function createActorPacket(world,{kind='npc',name='',role='civilian',position=[0
 return Object.freeze({get createActorPacket(){return createActorPacket;}});
 })();
 // src/game/levels/apartment.mjs
-const m93 = (()=>{
-const {validateBossRecord} = m94;
-const {validateAbilityAction} = m108;
-const {validateMountedAttack} = m111;
-const {validateAttackState} = m99;
-const {abilityLoadout} = m57;
-const {importActorAbilities} = m56;
+const m91 = (()=>{
+const {validateBossRecord} = m92;
+const {validateAbilityAction} = m107;
+const {validateMountedAttack} = m110;
+const {validateAttackState} = m97;
+const {abilityLoadout} = m111;
+const {importActorAbilities} = m111;
 const {registerGameEntityTypes} = m112;
 const {physicsSystem} = m1;
 const {createApartmentAssetLibrary} = m131;
@@ -26658,9 +26664,9 @@ return Object.freeze({get humanoidSystem(){return humanoidSystem;},get humanoidP
 })();
 // src/game/mechanics/encounters/encounter-system.mjs
 const m159 = (()=>{
-const {BossEffect} = m106;
+const {BossEffect} = m105;
 const {BODY_GROUP} = m1;
-const {jsonCopy} = m58;
+const {jsonCopy} = m38;
 /** Shared encounter policy over registered effects, native queries and one simulation clock. */
 class encounterSystem{
  #context=null;#combat;#random;#actors=null;#effects=new Map();#owners=new Map();#off=[];#wardens=new Map();#orders=new Map();#squads=new Map();#decoys=new Map();
@@ -26737,7 +26743,7 @@ class encounterSystem{
 
 return Object.freeze({get encounterSystem(){return encounterSystem;}});
 })();
-// src/game/presentation/weapon-models.mjs
+// src/game/data/weapon-models.mjs
 const m162 = (()=>{
 /* =====================================================================
    WEAPON MODELS — every gun as data: parts in the gun's own frame (+x down
@@ -26976,14 +26982,14 @@ return Object.freeze({get getCombatProfile(){return getCombatProfile;}});
 })();
 // src/game/mechanics/attacks/attack-system.mjs
 const m160 = (()=>{
-const attackRules = m62.default;
+const attackRules = m60.default;
 const {getCombatProfile} = m161;
-const {prepareMountedAttack,mountedAttackState,validateMountedAttack} = m111;
-const combatRules = m61.default;
+const {prepareMountedAttack,mountedAttackState,validateMountedAttack} = m110;
+const combatRules = m59.default;
 const {gameCharacter} = m1;
-const {actorItems} = m101;
-const {attackRegistry,validateAttackState} = m99;
-const {jsonCopy} = m58;
+const {actorItems} = m99;
+const {attackRegistry,validateAttackState} = m97;
+const {jsonCopy} = m38;
 
 /** Universal character attack entry point. Reuses existing execution, ownership and physics. */
 class attackSystem{
@@ -27100,13 +27106,13 @@ return Object.freeze({get attackSystem(){return attackSystem;}});
 })();
 // src/game/mechanics/abilities/ability-system.mjs
 const m163 = (()=>{
-const {beginPattern,advancePattern,clearPattern} = m107;
-const {beginTimedAction,advanceTimedAction,hitGrapple,clearTimedAction} = m109;
-const {beginBurst,advanceBurst} = m110;
-const {validateAbilityAction,beginLunge,advanceLunge,clearLunge} = m108;
+const {beginPattern,advancePattern,clearPattern} = m106;
+const {beginTimedAction,advanceTimedAction,hitGrapple,clearTimedAction} = m108;
+const {beginBurst,advanceBurst} = m109;
+const {validateAbilityAction,beginLunge,advanceLunge,clearLunge} = m107;
 const {BODY_GROUP,gameCharacter} = m1;
-const {actorAbilities} = m57;
-const {jsonCopy,nonnegative} = m58;
+const {actorAbilities} = m111;
+const {jsonCopy,nonnegative} = m38;
 
 /** Shared spell requests. The existing attack controller owns the single cooldown clock. */
 class abilitySystem{
@@ -27162,16 +27168,16 @@ return Object.freeze({get abilitySystem(){return abilitySystem;}});
 })();
 // src/game/mechanics/actors/actor-system.mjs
 const m164 = (()=>{
-const {Demoness} = m95;
-const {Warden} = m104;
+const {Demoness} = m93;
+const {Warden} = m103;
 const {Drone} = m113;
 const {VelvetCat} = m114;
-const {GatlingGunner} = m105;
+const {GatlingGunner} = m104;
 const {Marionette} = m117;
-const {gameActor} = m98;
+const {gameActor} = m96;
 const {NPC} = m121;
-const {Hunter} = m96;
-const {Ganger} = m97;
+const {Hunter} = m94;
+const {Ganger} = m95;
 const {BODY_GROUP} = m1;
 const {createActorPacket} = m138;
 
@@ -27246,10 +27252,10 @@ const m165 = Object.freeze({default:{
 }});
 // src/game/mechanics/game-session.mjs
 const m166 = (()=>{
-const {itemSystem} = m102;
+const {itemSystem} = m100;
 const {createItemCatalog} = m54;
-const itemRules = m103.default;
-const {identifier,jsonCopy,nonnegative} = m58;
+const itemRules = m101.default;
+const {identifier,jsonCopy,nonnegative} = m38;
 
 const recordNames = ['quests', 'roster', 'progression'];
 
@@ -27323,7 +27329,7 @@ return Object.freeze({get gameSession(){return gameSession;}});
 })();
 // src/game/mechanics/player-state-system.mjs
 const m167 = (()=>{
-const {nonnegative,jsonCopy} = m58;
+const {nonnegative,jsonCopy} = m38;
 
 /** Game rules only. The native entity/body remains the sole owner of physical state. */
 class PlayerStateSystem {
@@ -27419,9 +27425,9 @@ return Object.freeze({get PlayerControlSystem(){return PlayerControlSystem;}});
 })();
 // src/game/mechanics/combat/combat-system.mjs
 const m169 = (()=>{
-const rules = m61.default;
+const rules = m59.default;
 const {BODY_GROUP} = m1;
-const {nonnegative,jsonCopy} = m58;
+const {nonnegative,jsonCopy} = m38;
 
 const isCombatDead=entity=>!entity||entity.destroyed||entity.dead===true||entity.data?.state==='dead'||typeof entity.data?.health==='number'&&entity.data.health<=0;
 const stateFor=entity=>entity.data.combat_state??=( {bleed:null,orbs:[],stagger_remaining:0,boss_resist_remaining:0,slam:null} );
@@ -27490,7 +27496,7 @@ return Object.freeze({get isCombatDead(){return isCombatDead;},get combatSystem(
 // src/game/mechanics/combat/melee-poses.mjs
 const m171 = (()=>{
 // Authored local animation poses, shared by presentation and native swept queries.
-const rules = m61.default;
+const rules = m59.default;
 const MELEE_SWING={duration:rules.blade.duration_seconds,windup:rules.blade.windup_seconds,cutEnd:rules.blade.cut_end_seconds};
 /* A long blade's swing (a model with swing: 'wide', Blood Pact): two hands on the grip, she
    winds the blade far back to one side, then sweeps it round in front of her in one wide arc
@@ -27565,12 +27571,12 @@ return Object.freeze({get MELEE_SWING(){return MELEE_SWING;},get WIDE_SWING(){re
 })();
 // src/game/mechanics/combat/weapon-system.mjs
 const m170 = (()=>{
-const rules = m61.default;
+const rules = m59.default;
 const {getCombatProfile} = m161;
 const {BODY_GROUP} = m1;
 const {sampleMeleeSwing,swingPhases} = m171;
 const {isCombatDead} = m169;
-const {jsonCopy,nonnegative} = m58;
+const {jsonCopy,nonnegative} = m38;
 
 const stateFor=(player,settings=rules)=>player.data.weapon_state??={format_version:1,elapsed:0,cooldown:0,holstered:false,drawn_at:null,draw_shot_used:false,quick_draw:null,punch_side:'right',haymaker:false,combo:0,last_punch_at:-99,swing:null,side:1,shield:{charge:settings.mirror.shield,spent:false,since_hit:999}};
 /** One executable weapon policy. Native physics owns every trajectory, sweep, contact and impulse. */
@@ -27743,9 +27749,9 @@ return Object.freeze({get weaponSystem(){return weaponSystem;}});
 // src/game/mechanics/items/loot-system.mjs
 const m172 = (()=>{
 const {WorldLoot} = m123;
-const rules = m61.default;
+const rules = m59.default;
 const {BODY_GROUP} = m1;
-const {jsonCopy,nonnegative} = m58;
+const {jsonCopy,nonnegative} = m38;
 
 /** World ownership and pickup policy. Placement, motion, bounds and proximity use the existing engine. */
 class lootSystem{
@@ -27808,7 +27814,7 @@ const controlProfile = m165.default;
 const {gameSession} = m166;
 const {PlayerStateSystem} = m167;
 const {PlayerControlSystem} = m168;
-const playerRules = m64.default;
+const playerRules = m62.default;
 const {combatSystem} = m169;
 const {weaponSystem} = m170;
 const {lootSystem} = m172;
@@ -27934,7 +27940,7 @@ return Object.freeze({get weaponAppearance(){return weaponAppearance;}});
 })();
 // src/game/data/game-combat.mjs
 const m174 = (()=>{
-const data = m61.default;
+const data = m59.default;
 const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
 const COMBAT_RULES=freeze(structuredClone(data));
 
@@ -28832,7 +28838,7 @@ const m0 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m38.assetLibrary;},get createGameAssetLibrary(){return m43.createGameAssetLibrary;},get resolveMapLayout(){return m67.resolveMapLayout;},get resolvePlacement(){return m67.resolvePlacement;},get isMovableProp(){return m67.isMovableProp;},get mapHost(){return m67.mapHost;},get createMapLibraries(){return m67.createMapLibraries;},get PROP_TYPES(){return m67.PROP_TYPES;},get MAP_IDS(){return m67.MAP_IDS;},get ApartmentLevel(){return m93.ApartmentLevel;},get APARTMENT_RULES(){return m131.APARTMENT_RULES;},get gameEngine(){return m139.gameEngine;},get gameLevel(){return m141.gameLevel;},get levelLobby(){return m140.levelLobby;},get createGameRuntime(){return m154.createGameRuntime;},get controlSystem(){return m142.controlSystem;},get controlsSystem(){return m142.controlsSystem;},get inputInstance(){return m142.inputInstance;},get keyboardInstance(){return m142.keyboardInstance;},get mouseInstance(){return m142.mouseInstance;},get touchInstance(){return m142.touchInstance;},get touchStick(){return m142.touchStick;},get gamepadInstance(){return m142.gamepadInstance;},get TAP(){return m142.TAP;},get DOUBLETAP(){return m142.DOUBLETAP;},get HELD(){return m142.HELD;},get PRESS(){return m142.PRESS;},get REPEAT(){return m142.REPEAT;},get RELEASE(){return m142.RELEASE;},get renderSystem(){return m147.renderSystem;},get renderFrame(){return m147.renderFrame;},get canvasRenderer(){return m147.canvasRenderer;},get cameraSystem(){return m147.cameraSystem;},get gameSession(){return m166.gameSession;},get PlayerStateSystem(){return m167.PlayerStateSystem;},get PlayerControlSystem(){return m168.PlayerControlSystem;},get Player(){return m118.Player;},get playerVitals(){return m119.playerVitals;},get itemSystem(){return m102.itemSystem;},get createItemCatalog(){return m54.createItemCatalog;},get GUN_MATERIALS(){return m162.GUN_MATERIALS;},get WEAPON_MODELS(){return m162.WEAPON_MODELS;},get LASER_MODULE(){return m162.LASER_MODULE;},get weaponModel(){return m162.weaponModel;},get weaponAppearance(){return m173.weaponAppearance;},get combatSystem(){return m169.combatSystem;},get weaponSystem(){return m170.weaponSystem;},get lootSystem(){return m172.lootSystem;},get WorldLoot(){return m123.WorldLoot;},get MELEE_SWING(){return m171.MELEE_SWING;},get WIDE_SWING(){return m171.WIDE_SWING;},get sampleMeleeSwing(){return m171.sampleMeleeSwing;},get sampleWideSwing(){return m171.sampleWideSwing;},get swingPhases(){return m171.swingPhases;},get wideGrip(){return m171.wideGrip;},get COMBAT_RULES(){return m174.COMBAT_RULES;},get registerGameEntityTypes(){return m112.registerGameEntityTypes;},get actorVitals(){return m100.actorVitals;},get gameActor(){return m98.gameActor;},get NPC(){return m121.NPC;},get rosterRecord(){return m121.rosterRecord;},get ROSTER_FIELDS(){return m121.ROSTER_FIELDS;},get Ganger(){return m97.Ganger;},get actorSystem(){return m164.actorSystem;},get actorItems(){return m101.actorItems;},get restoreActorItems(){return m101.restoreActorItems;},get resolveEmoteLines(){return m122.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m122.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m57.abilityLoadout;},get actorAbilities(){return m57.actorAbilities;},get abilitySystem(){return m163.abilitySystem;},get createAbilityCatalog(){return m56.createAbilityCatalog;},get importActorAbilities(){return m56.importActorAbilities;},get attackRegistry(){return m99.attackRegistry;},get validateAttackState(){return m99.validateAttackState;},get attackSystem(){return m160.attackSystem;},get createAttackCatalog(){return m53.createAttackCatalog;},get validateMountedAttack(){return m111.validateMountedAttack;},get TrafficVehicle(){return m124.TrafficVehicle;},get createGameVehicle(){return m124.createGameVehicle;},get Hunter(){return m96.Hunter;},get createHunterAppearance(){return m52.createHunterAppearance;},get Marionette(){return m117.Marionette;},get MARIONETTE_RULES(){return m50.MARIONETTE_RULES;},get validateAbilityAction(){return m108.validateAbilityAction;},get GatlingGunner(){return m105.GatlingGunner;},get Drone(){return m113.Drone;},get VelvetCat(){return m114.VelvetCat;},get velvetCatAnimation(){return m115.velvetCatAnimation;},get createVelvetAnimation(){return m115.createVelvetAnimation;},get velvetPresentation(){return m115.velvetPresentation;},get droneLift(){return m175.droneLift;},get droneArmPose(){return m175.droneArmPose;},get dronePresentation(){return m175.dronePresentation;},get VELVET_CAT_PALETTES(){return m116.VELVET_CAT_PALETTES;},get VELVET_T(){return m116.VELVET_T;},get VELVET_PROFILES(){return m116.VELVET_PROFILES;},get VELVET_GAITS(){return m116.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m116.VELVET_TAIL_SEGS;},get Demoness(){return m95.Demoness;},get Warden(){return m104.Warden;},get Vesper(){return m104.Vesper;},get Matins(){return m104.Matins;},get Compline(){return m104.Compline;},get BossEffect(){return m106.BossEffect;},get encounterSystem(){return m159.encounterSystem;},get createBossAbilities(){return m44.createBossAbilities;},get createDemonessAppearance(){return m44.createDemonessAppearance;},get demonessAppearance(){return m177.demonessAppearance;},get demonessPresentation(){return m177.demonessPresentation;},get bossEffectAppearance(){return m178.bossEffectAppearance;},get bossEffectPresentation(){return m178.bossEffectPresentation;},get validateBossRecord(){return m94.validateBossRecord;},get createDronePackets(){return m175.createDronePackets;},get createVelvetCatArt(){return m179.createVelvetCatArt;},get createVelvetCatPackets(){return m179.createVelvetCatPackets;},get createVelvetEyePackets(){return m179.createVelvetEyePackets;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m155.humanoidSystem;},get humanoidPresentation(){return m155.humanoidPresentation;},get humanoidBodyCanon(){return m156.humanoidBodyCanon;},get humanoidBuilds(){return m156.humanoidBuilds;},get getHumanoidRigAssets(){return m156.getHumanoidRigAssets;},get roadNavigationData(){return m180.roadNavigationData;},get loadRoadNavigation(){return m180.loadRoadNavigation;}});
+return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m38.assetLibrary;},get createGameAssetLibrary(){return m43.createGameAssetLibrary;},get resolveMapLayout(){return m65.resolveMapLayout;},get resolvePlacement(){return m65.resolvePlacement;},get isMovableProp(){return m65.isMovableProp;},get mapHost(){return m65.mapHost;},get createMapLibraries(){return m65.createMapLibraries;},get PROP_TYPES(){return m65.PROP_TYPES;},get MAP_IDS(){return m65.MAP_IDS;},get ApartmentLevel(){return m91.ApartmentLevel;},get APARTMENT_RULES(){return m131.APARTMENT_RULES;},get gameEngine(){return m139.gameEngine;},get gameLevel(){return m141.gameLevel;},get levelLobby(){return m140.levelLobby;},get createGameRuntime(){return m154.createGameRuntime;},get controlSystem(){return m142.controlSystem;},get controlsSystem(){return m142.controlsSystem;},get inputInstance(){return m142.inputInstance;},get keyboardInstance(){return m142.keyboardInstance;},get mouseInstance(){return m142.mouseInstance;},get touchInstance(){return m142.touchInstance;},get touchStick(){return m142.touchStick;},get gamepadInstance(){return m142.gamepadInstance;},get TAP(){return m142.TAP;},get DOUBLETAP(){return m142.DOUBLETAP;},get HELD(){return m142.HELD;},get PRESS(){return m142.PRESS;},get REPEAT(){return m142.REPEAT;},get RELEASE(){return m142.RELEASE;},get renderSystem(){return m147.renderSystem;},get renderFrame(){return m147.renderFrame;},get canvasRenderer(){return m147.canvasRenderer;},get cameraSystem(){return m147.cameraSystem;},get gameSession(){return m166.gameSession;},get PlayerStateSystem(){return m167.PlayerStateSystem;},get PlayerControlSystem(){return m168.PlayerControlSystem;},get Player(){return m118.Player;},get playerVitals(){return m119.playerVitals;},get itemSystem(){return m100.itemSystem;},get createItemCatalog(){return m54.createItemCatalog;},get GUN_MATERIALS(){return m162.GUN_MATERIALS;},get WEAPON_MODELS(){return m162.WEAPON_MODELS;},get LASER_MODULE(){return m162.LASER_MODULE;},get weaponModel(){return m162.weaponModel;},get weaponAppearance(){return m173.weaponAppearance;},get combatSystem(){return m169.combatSystem;},get weaponSystem(){return m170.weaponSystem;},get lootSystem(){return m172.lootSystem;},get WorldLoot(){return m123.WorldLoot;},get MELEE_SWING(){return m171.MELEE_SWING;},get WIDE_SWING(){return m171.WIDE_SWING;},get sampleMeleeSwing(){return m171.sampleMeleeSwing;},get sampleWideSwing(){return m171.sampleWideSwing;},get swingPhases(){return m171.swingPhases;},get wideGrip(){return m171.wideGrip;},get COMBAT_RULES(){return m174.COMBAT_RULES;},get registerGameEntityTypes(){return m112.registerGameEntityTypes;},get actorVitals(){return m98.actorVitals;},get gameActor(){return m96.gameActor;},get NPC(){return m121.NPC;},get rosterRecord(){return m121.rosterRecord;},get ROSTER_FIELDS(){return m121.ROSTER_FIELDS;},get Ganger(){return m95.Ganger;},get actorSystem(){return m164.actorSystem;},get actorItems(){return m99.actorItems;},get restoreActorItems(){return m99.restoreActorItems;},get resolveEmoteLines(){return m122.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m122.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m111.abilityLoadout;},get actorAbilities(){return m111.actorAbilities;},get importActorAbilities(){return m111.importActorAbilities;},get abilitySystem(){return m163.abilitySystem;},get createAbilityCatalog(){return m56.createAbilityCatalog;},get attackRegistry(){return m97.attackRegistry;},get validateAttackState(){return m97.validateAttackState;},get attackSystem(){return m160.attackSystem;},get createAttackCatalog(){return m53.createAttackCatalog;},get validateMountedAttack(){return m110.validateMountedAttack;},get TrafficVehicle(){return m124.TrafficVehicle;},get createGameVehicle(){return m124.createGameVehicle;},get Hunter(){return m94.Hunter;},get createHunterAppearance(){return m52.createHunterAppearance;},get Marionette(){return m117.Marionette;},get MARIONETTE_RULES(){return m50.MARIONETTE_RULES;},get validateAbilityAction(){return m107.validateAbilityAction;},get GatlingGunner(){return m104.GatlingGunner;},get Drone(){return m113.Drone;},get VelvetCat(){return m114.VelvetCat;},get velvetCatAnimation(){return m115.velvetCatAnimation;},get createVelvetAnimation(){return m115.createVelvetAnimation;},get velvetPresentation(){return m115.velvetPresentation;},get droneLift(){return m175.droneLift;},get droneArmPose(){return m175.droneArmPose;},get dronePresentation(){return m175.dronePresentation;},get VELVET_CAT_PALETTES(){return m116.VELVET_CAT_PALETTES;},get VELVET_T(){return m116.VELVET_T;},get VELVET_PROFILES(){return m116.VELVET_PROFILES;},get VELVET_GAITS(){return m116.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m116.VELVET_TAIL_SEGS;},get Demoness(){return m93.Demoness;},get Warden(){return m103.Warden;},get Vesper(){return m103.Vesper;},get Matins(){return m103.Matins;},get Compline(){return m103.Compline;},get BossEffect(){return m105.BossEffect;},get encounterSystem(){return m159.encounterSystem;},get createBossAbilities(){return m44.createBossAbilities;},get createDemonessAppearance(){return m44.createDemonessAppearance;},get demonessAppearance(){return m177.demonessAppearance;},get demonessPresentation(){return m177.demonessPresentation;},get bossEffectAppearance(){return m178.bossEffectAppearance;},get bossEffectPresentation(){return m178.bossEffectPresentation;},get validateBossRecord(){return m92.validateBossRecord;},get createDronePackets(){return m175.createDronePackets;},get createVelvetCatArt(){return m179.createVelvetCatArt;},get createVelvetCatPackets(){return m179.createVelvetCatPackets;},get createVelvetEyePackets(){return m179.createVelvetEyePackets;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m155.humanoidSystem;},get humanoidPresentation(){return m155.humanoidPresentation;},get humanoidBodyCanon(){return m156.humanoidBodyCanon;},get humanoidBuilds(){return m156.humanoidBuilds;},get getHumanoidRigAssets(){return m156.getHumanoidRigAssets;},get roadNavigationData(){return m180.roadNavigationData;},get loadRoadNavigation(){return m180.loadRoadNavigation;}});
 })();
 return m0;
 })();

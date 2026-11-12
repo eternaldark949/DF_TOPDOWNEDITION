@@ -1,6 +1,6 @@
 import {gameActor} from './game-actor.mjs';
 import {actorItems,restoreActorItems} from '../mechanics/actors/actor-inventory.mjs';
-import {nonnegative,jsonCopy} from '../mechanics/values.mjs';
+import { nonnegative, jsonCopy } from '../../engine/directory/index.mjs';
 const states=['IDLE','SUSPICIOUS','ALERT','SUPPRESSING','SEARCHING'];
 const stateFor=actor=>actor.data.ganger_state??={format_version:1,state:'IDLE',suspicion:0,drain_remaining:0,suppression_remaining:0,look_elapsed:0,wander_remaining:0,investigate_position:null,wander_position:null,origin:[...actor.position],search_positions:[],search_elapsed:0,interrupt_remaining:0,resistance_remaining:0,telegraphing:false,aim_position:null,shot_delay:actor.data.telegraph_seconds??.15,bumped:false};
 /** Native stealth/combat policy. Awareness, leading, pathing and contact response stay in Basement. */

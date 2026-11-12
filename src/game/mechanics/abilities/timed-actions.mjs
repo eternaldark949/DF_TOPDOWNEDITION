@@ -1,5 +1,5 @@
 import {BODY_GROUP} from '../../../engine/basement/physics/index.mjs';
-import {jsonCopy,nonnegative} from '../values.mjs';
+import { jsonCopy, nonnegative } from '../../../engine/directory/index.mjs';
 const id=value=>Number.isSafeInteger(value)&&value>0;
 export function validateTimedAction(state,catalog,{clock}={}){
  jsonCopy(state);const definition=catalog[state.ability_id];

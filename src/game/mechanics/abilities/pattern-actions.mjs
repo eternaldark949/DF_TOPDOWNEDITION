@@ -1,4 +1,4 @@
-import {jsonCopy,nonnegative} from '../values.mjs';
+import { jsonCopy, nonnegative } from '../../../engine/directory/index.mjs';
 export function validatePatternAction(state,catalog,{clock}={}){
  jsonCopy(state);const definition=catalog[state.ability_id];
  if(definition?.delivery!=='pattern'||state.format_version!==1||!['tell','repeat'].includes(state.phase)||typeof state.cancel_requested!=='boolean'||!Number.isFinite(state.heading)||Object.keys(state).some(key=>!['format_version','ability_id','phase','started_at','phase_started_at','heading','aim','planned_position','executions','cancel_requested'].includes(key)))throw new TypeError('Invalid pattern action');

@@ -1,6 +1,6 @@
 import {BossEffect} from '../../entities/boss-effect.mjs';
 import {BODY_GROUP} from '../../../engine/basement/physics/index.mjs';
-import {jsonCopy} from '../values.mjs';
+import { jsonCopy } from '../../../engine/directory/index.mjs';
 /** Shared encounter policy over registered effects, native queries and one simulation clock. */
 export class encounterSystem{
  #context=null;#combat;#random;#actors=null;#effects=new Map();#owners=new Map();#off=[];#wardens=new Map();#orders=new Map();#squads=new Map();#decoys=new Map();

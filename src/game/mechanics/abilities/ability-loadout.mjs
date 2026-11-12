@@ -1,4 +1,4 @@
-import {identifier,jsonCopy} from '../values.mjs';
+import { identifier, jsonCopy } from '../../../engine/directory/index.mjs';
 const components=new WeakMap();
 /** Learned capabilities, separate from carried items and physical/attack state. */
 export class abilityLoadout{
@@ -16,3 +16,12 @@ export class abilityLoadout{
  load(snapshot){const copy=jsonCopy(snapshot);if(copy?.format_version!==1)throw new TypeError('Invalid ability loadout');new abilityLoadout(copy,this.#catalog);for(const key of Object.keys(this.#data))delete this.#data[key];Object.assign(this.#data,copy);}
 }
 export function actorAbilities(data,catalog){const previous=components.get(data);if(previous&&previous.root===data.abilities)return previous.component;data.abilities??={};const component=new abilityLoadout(data.abilities,catalog);components.set(data,{root:data.abilities,component});return component;}
+/** One-time import of pre-loadout roster/snapshot fields. Explicit saved unequip wins over role defaults. */
+export function importActorAbilities(data,catalog,{default_id=null}={}){
+ const saved=data.abilities??data.abilitiesSnapshot;
+ const alias=Object.hasOwn(data,'equippedAbilityId')?data.equippedAbilityId:saved?undefined:default_id;
+ if(saved!==undefined&&saved!==null)data.abilities=saved;
+ const loadout=new abilityLoadout(data.abilities??={},catalog);
+ if(alias!==undefined){if(alias!==null)loadout.learnAbility(alias);loadout.equipAbility(alias);}
+ delete data.equippedAbilityId;delete data.abilitiesSnapshot;return loadout;
+}

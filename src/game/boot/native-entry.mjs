@@ -22,7 +22,7 @@ export { playerVitals } from '../mechanics/player-vitals.mjs';
 export { itemSystem } from '../mechanics/items/item-system.mjs';
 export { createItemCatalog } from '../data/game-items.mjs';
 
-export { GUN_MATERIALS, WEAPON_MODELS, LASER_MODULE, weaponModel } from '../presentation/weapon-models.mjs';
+export { GUN_MATERIALS, WEAPON_MODELS, LASER_MODULE, weaponModel } from '../data/weapon-models.mjs';
 export { weaponAppearance } from '../presentation/weapon-appearance.mjs';
 
 export {combatSystem} from '../mechanics/combat/combat-system.mjs';
@@ -41,9 +41,9 @@ export {actorSystem} from '../mechanics/actors/actor-system.mjs';
 export {actorItems,restoreActorItems} from '../mechanics/actors/actor-inventory.mjs';
 export {resolveEmoteLines,NPC_EMOTE_REACTIONS} from '../data/npc-reactions.mjs';
 
-export {abilityLoadout,actorAbilities} from '../mechanics/abilities/ability-loadout.mjs';
+export {abilityLoadout,actorAbilities,importActorAbilities} from '../mechanics/abilities/ability-loadout.mjs';
 export {abilitySystem} from '../mechanics/abilities/ability-system.mjs';
-export {createAbilityCatalog,importActorAbilities} from '../data/game-abilities.mjs';
+export {createAbilityCatalog} from '../data/game-abilities.mjs';
 
 export {attackRegistry,validateAttackState} from '../mechanics/attacks/attack-registry.mjs';
 export {attackSystem} from '../mechanics/attacks/attack-system.mjs';

@@ -5,7 +5,7 @@ import combatRules from '../../data/game-combat-rules.json' with {type:'json'};
 import {gameCharacter} from '../../../engine/basement/physics/index.mjs';
 import {actorItems} from '../actors/actor-inventory.mjs';
 import {attackRegistry,validateAttackState} from './attack-registry.mjs';
-import {jsonCopy} from '../values.mjs';
+import { jsonCopy } from '../../../engine/directory/index.mjs';
 
 /** Universal character attack entry point. Reuses existing execution, ownership and physics. */
 export class attackSystem{

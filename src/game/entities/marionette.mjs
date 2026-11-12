@@ -1,5 +1,5 @@
 import {gameActor} from './game-actor.mjs';
-import {nonnegative,jsonCopy} from '../mechanics/values.mjs';
+import { nonnegative, jsonCopy } from '../../engine/directory/index.mjs';
 const stateFor=actor=>actor.data.marionette_state??={format_version:1,initial_delay:.6,yank_remaining:0};
 /** Silent puppet policy. Spacing, following, wall response and strikes use shared native services. */
 export class Marionette extends gameActor{

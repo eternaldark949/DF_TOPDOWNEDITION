@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {weaponAppearance} from '../src/game/presentation/weapon-appearance.mjs';
-import {WEAPON_MODELS} from '../src/game/presentation/weapon-models.mjs';
+import {WEAPON_MODELS} from '../src/game/data/weapon-models.mjs';
 import {physicsSystem} from '../src/engine/basement/physics/index.mjs';
 import {renderSystem,cameraSystem,canvasRenderer} from '../src/engine/basement/rendering/index.mjs';
 class Capture{

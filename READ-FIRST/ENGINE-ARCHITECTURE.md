@@ -281,10 +281,10 @@ src/
                                   encounters, items, player control and state, session, traffic manager
     entities/                     the game's entity classes (player, NPCs, bosses, drones, traffic vehicle)
     levels/                       one module per map: apartment.mjs and its map definition
-    presentation/                 appearance producers -> render packets; weapon models
+    presentation/                 appearance producers -> render packets
     audio/                        (empty) the game's sounds and music, through the Basement audio service
     data/                         the game's content: GAME_DB (game-db/), game-assets/ (props, maps,
-                                  libraries), humanoid builds, rules JSON, catalog modules
+                                  libraries), humanoid builds, weapon models, rules JSON, catalog modules
     examples/                     runnable pages that boot the game runtime in a browser
   legacy/                         quarantined classic code at its original paths (section 7)
 ```
@@ -295,15 +295,14 @@ Migration notes that described earlier cutovers are in `docs/migration/cutovers/
 
 Audited on 2026-11-12, after the native code was sorted into `src/engine/` and `src/game/`. `tools/check-layout.mjs` passes: every engine file carries its level banner, imports only what section 3 allows, and names no game. What remains is work that needs real changes, not moves. Each item is fixed by rewriting code at its level, never by adding an exception.
 
-1. **`game/data` holds code that depends on mechanics.** The catalog modules are pure one-time reshaping, which is allowed, but `game-abilities.mjs` imports `game/mechanics/abilities/ability-loadout.mjs` and `mechanics/values.mjs`. Data must not depend on mechanics: the shared value helpers belong with the Directory's structures, and the loadout conversion belongs to the mechanic.
-2. **The engine has no default libraries.** `engine/directory/` and `engine/penthouse/` are empty, so no prefab can boot without the game. The humanoid's skeleton and clips exist only as game data (`game/data/humanoid/`).
-3. **The humanoid is half migrated:**
+1. **The engine has no default libraries.** `engine/directory/` and `engine/penthouse/` are empty, so no prefab can boot without the game. The humanoid's skeleton and clips exist only as game data (`game/data/humanoid/`).
+2. **The humanoid is half migrated:**
    - Motion is native: the Basement rig, the game's data in `game/data/humanoid/`, and the game's clip choice in `game/mechanics/animation/humanoid-system.mjs`.
    - Drawing is classic: `legacy/penthouse/procedural-humanoid.js`, `gl-humanoid.js` and `garment-kit.js`, plus `legacy/ui/humanoid-render.js`, `bodies.js`, `wardrobe.js` and `poses.js`.
    - The Penthouse prefab (body, rig and artist, booting on Directory defaults) does not exist yet.
-4. **Behaviour still in classic code.** The classic Directory scripts that hold behaviour (`legacy/directory/venue-crowd.js`, `cafe-life.js`, `club-life.js`, `lobby-life.js`, `game-sound.js`, `effects-system.js`, `collision-system.js`, `world-session.js`, `world-query.js`, `game-controls.js`, `new-game-state.js`) are quarantined. They are rewritten as game mechanics, not moved.
-5. **Naming.** Some native systems use `update()` or `updateDoors()` instead of `updateState()`, for example `roomGraph.update()` and `mapInstance.updateDoors()`.
-6. **A behaviour regression from PR 178:** hinged doors. In `main`, every interior hinged door, including the apartment's, was a physical swinging leaf with a spring. PR 178 made them kinematic and auto-opening. Restore the swinging behaviour.
+3. **Behaviour still in classic code.** The classic Directory scripts that hold behaviour (`legacy/directory/venue-crowd.js`, `cafe-life.js`, `club-life.js`, `lobby-life.js`, `game-sound.js`, `effects-system.js`, `collision-system.js`, `world-session.js`, `world-query.js`, `game-controls.js`, `new-game-state.js`) are quarantined. They are rewritten as game mechanics, not moved.
+4. **Naming.** Some native systems use `update()` or `updateDoors()` instead of `updateState()`, for example `roomGraph.update()` and `mapInstance.updateDoors()`.
+5. **A behaviour regression from PR 178:** hinged doors. In `main`, every interior hinged door, including the apartment's, was a physical swinging leaf with a spring. PR 178 made them kinematic and auto-opening. Restore the swinging behaviour.
 
 When one of these is fixed, remove it from this list in the same commit.
 
@@ -319,6 +318,7 @@ In CI (`.github/workflows/build.yml`):
   - a classic `.js`, `.cjs` or `.css` file sits outside `src/legacy/`, or a page outside `src/legacy/` is not an example;
   - any file outside `src/legacy/` imports from it, or a legacy script imports a module;
   - a file in `src/engine/` imports outside `src/engine/`, or imports a level that section 3 forbids;
+  - a file in `src/game/data/` imports anything outside `src/game/data/` and the engine (data never depends on mechanics or presentation);
   - a `.mjs` file in `src/engine/` lacks its level banner on the first line, or names the game (`df_`, `apartment`, `GAME_DB`, `DFNative` and so on) outside its tests.
 
 Still to add: **a standalone check** that runs the engine's tests with `src/game/` and `src/legacy/` absent. Inside `src/game/`, reviewers apply sections 2 and 6 by hand: the check enforces only the engine's rules and the quarantine there.

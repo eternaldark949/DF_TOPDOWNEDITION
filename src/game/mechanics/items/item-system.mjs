@@ -1,5 +1,6 @@
 import itemRules from '../../data/game-item-rules.json' with {type:'json'};
-import { identifier, jsonCopy, validateModifiers } from '../values.mjs';
+import { identifier, jsonCopy } from '../../../engine/directory/index.mjs';
+import { validateModifiers } from '../values.mjs';
 
 const modes=['normal','sniper','melee','fists'];
 const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};

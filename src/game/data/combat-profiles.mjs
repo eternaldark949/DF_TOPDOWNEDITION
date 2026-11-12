@@ -1,4 +1,4 @@
-import {weaponModel} from '../presentation/weapon-models.mjs';
+import {weaponModel} from './weapon-models.mjs';
 /** Shape authoring belongs with the visual assets. Runtime collision calculations stay in Basement. */
 export function getCombatProfile(definition_id){
  const model=weaponModel(definition_id),edge=model.edge??[19.4,2.6];

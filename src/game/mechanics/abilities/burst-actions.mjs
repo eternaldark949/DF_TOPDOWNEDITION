@@ -1,4 +1,4 @@
-import {jsonCopy,nonnegative} from '../values.mjs';
+import { jsonCopy, nonnegative } from '../../../engine/directory/index.mjs';
 /** Logical firing cycle over the same owned weapon, launch backend and cooldown clock. */
 export function validateBurstAction(state,catalog,{clock}={}){
  jsonCopy(state);if(state.format_version!==1||catalog[state.ability_id]?.delivery!=='burst'||!['tell','burst','reload'].includes(state.phase)||typeof state.weapon_instance_id!=='string'||!state.weapon_instance_id||typeof state.cancel_requested!=='boolean')throw new TypeError('Invalid saved burst action');

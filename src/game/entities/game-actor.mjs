@@ -1,7 +1,7 @@
 import {validateAttackState} from '../mechanics/attacks/attack-registry.mjs';
 import {gameCharacter} from '../../engine/basement/physics/index.mjs';
 import {actorVitals} from '../mechanics/actors/actor-vitals.mjs';
-import {nonnegative,jsonCopy} from '../mechanics/values.mjs';
+import { nonnegative, jsonCopy } from '../../engine/directory/index.mjs';
 const health=new WeakMap(),hooks=new WeakMap();
 const stateFor=actor=>actor.data.actor_state??={format_version:1,defeated:false,invulnerable_remaining:0,elapsed:0};
 /** Common actor gameplay over a real gameCharacter. No velocity, geometry or body mirrors. */

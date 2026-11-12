@@ -1,6 +1,7 @@
 import {gameActor} from './game-actor.mjs';
 import { playerVitals } from '../mechanics/player-vitals.mjs';
-import { identifier, validateModifiers, nonnegative } from '../mechanics/values.mjs';
+import { identifier, nonnegative } from '../../engine/directory/index.mjs';
+import { validateModifiers } from '../mechanics/values.mjs';
 const services = new WeakMap();
 const components = new WeakMap();
 function vitalsFor(player,rules) {

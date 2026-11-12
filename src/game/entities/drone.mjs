@@ -1,5 +1,5 @@
 import {gameActor} from './game-actor.mjs';
-import {nonnegative,jsonCopy} from '../mechanics/values.mjs';
+import { nonnegative, jsonCopy } from '../../engine/directory/index.mjs';
 const stateFor=actor=>actor.data.drone_state??={format_version:1,flight:'descend',phase_started_at:actor.data.actor_state?.elapsed??0,alt:1,lost_seconds:0,next_bolt_at:2.2,next_special_at:3};
 /** Flight and attack decisions. Basement owns movement, impacts, eye geometry and tether forces. */
 export class Drone extends gameActor{

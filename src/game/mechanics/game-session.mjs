@@ -1,7 +1,7 @@
 import { itemSystem } from './items/item-system.mjs';
 import { createItemCatalog } from '../data/game-items.mjs';
 import itemRules from '../data/game-item-rules.json' with {type:'json'};
-import { identifier, jsonCopy, nonnegative } from './values.mjs';
+import { identifier, jsonCopy, nonnegative } from '../../engine/directory/index.mjs';
 
 const recordNames = ['quests', 'roster', 'progression'];
 

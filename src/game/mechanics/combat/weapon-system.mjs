@@ -3,7 +3,7 @@ import {getCombatProfile} from '../../data/combat-profiles.mjs';
 import {BODY_GROUP} from '../../../engine/basement/physics/index.mjs';
 import {sampleMeleeSwing,swingPhases} from './melee-poses.mjs';
 import {isCombatDead} from './combat-system.mjs';
-import {jsonCopy,nonnegative} from '../values.mjs';
+import { jsonCopy, nonnegative } from '../../../engine/directory/index.mjs';
 
 const stateFor=(player,settings=rules)=>player.data.weapon_state??={format_version:1,elapsed:0,cooldown:0,holstered:false,drawn_at:null,draw_shot_used:false,quick_draw:null,punch_side:'right',haymaker:false,combo:0,last_punch_at:-99,swing:null,side:1,shield:{charge:settings.mirror.shield,spent:false,since_hit:999}};
 /** One executable weapon policy. Native physics owns every trajectory, sweep, contact and impulse. */

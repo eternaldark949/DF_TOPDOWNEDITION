@@ -1,7 +1,7 @@
 import {WorldLoot} from '../../entities/world-loot.mjs';
 import rules from '../../data/game-combat-rules.json' with {type:'json'};
 import {BODY_GROUP} from '../../../engine/basement/physics/index.mjs';
-import {jsonCopy,nonnegative} from '../values.mjs';
+import { jsonCopy, nonnegative } from '../../../engine/directory/index.mjs';
 
 /** World ownership and pickup policy. Placement, motion, bounds and proximity use the existing engine. */
 export class lootSystem{

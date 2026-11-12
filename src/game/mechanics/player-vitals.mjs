@@ -1,6 +1,7 @@
 import {actorVitals} from './actors/actor-vitals.mjs';
 import defaults from '../data/game-player-rules.json' with { type:'json' };
-import { nonnegative, jsonCopy, identifier, validateModifiers } from './values.mjs';
+import { nonnegative, jsonCopy, identifier } from '../../engine/directory/index.mjs';
+import { validateModifiers } from './values.mjs';
 
 /** Shared gameplay component. It references its owner's data; it never owns or mirrors a body. */
 export class playerVitals extends actorVitals {

@@ -1,6 +1,6 @@
 import {gameActor} from './game-actor.mjs';
 import {actorItems} from '../mechanics/actors/actor-inventory.mjs';
-import {nonnegative,jsonCopy} from '../mechanics/values.mjs';
+import { nonnegative, jsonCopy } from '../../engine/directory/index.mjs';
 const stateFor=actor=>actor.data.gunner_state??={format_version:1,hold_until:0,enrage_count:0,barrel_phase:0,barrel_speed:0,barrel_heat:0};
 /** Ordinary gunner decisions over native motors and the common owned-weapon burst action. */
 export class GatlingGunner extends gameActor{

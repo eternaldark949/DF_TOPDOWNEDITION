@@ -3,6 +3,7 @@
 //   2. nothing outside src/legacy/ imports from it, and legacy scripts import nothing (they reach the
 //      new engine only through the bundled DFNative object)
 //   0. src/ holds only engine/, game/ and legacy/
+//   2a. src/game/data/ is data: it imports only src/game/data/ and the engine, never mechanics or presentation
 //   3. src/engine/ runs standalone: each level imports only the levels the dependency table allows,
 //      never src/game/, src/legacy/ or an unsorted folder, carries its level banner, and names no game
 //   node tools/check-layout.mjs
@@ -40,6 +41,7 @@ for (const f of files) {
         if (!spec.startsWith('.')) continue;
         const target = rel(resolve(dirname(f.path), spec));
         if (target.startsWith('legacy/')) problems.push(`${f.rel}: imports quarantined ${target}`);
+        if (f.rel.startsWith('game/data/') && !target.startsWith('game/data/') && !target.startsWith('engine/')) problems.push(`${f.rel}: game data may import only game/data and the engine, not ${target}`);
         const [root, level] = f.rel.split('/');
         if (root !== 'engine' || f.rel.includes('/tests/')) continue;
         const [troot, tlevel] = target.split('/');

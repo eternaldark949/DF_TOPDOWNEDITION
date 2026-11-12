@@ -1,6 +1,6 @@
 import rules from '../../data/game-combat-rules.json' with {type:'json'};
 import {BODY_GROUP} from '../../../engine/basement/physics/index.mjs';
-import {nonnegative,jsonCopy} from '../values.mjs';
+import { nonnegative, jsonCopy } from '../../../engine/directory/index.mjs';
 
 export const isCombatDead=entity=>!entity||entity.destroyed||entity.dead===true||entity.data?.state==='dead'||typeof entity.data?.health==='number'&&entity.data.health<=0;
 const stateFor=entity=>entity.data.combat_state??=( {bleed:null,orbs:[],stagger_remaining:0,boss_resist_remaining:0,slam:null} );

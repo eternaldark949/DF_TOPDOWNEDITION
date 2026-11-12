@@ -4,7 +4,7 @@ import {beginBurst,advanceBurst} from './burst-actions.mjs';
 import {validateAbilityAction,beginLunge,advanceLunge,clearLunge} from './lunge-actions.mjs';
 import {BODY_GROUP,gameCharacter} from '../../../engine/basement/physics/index.mjs';
 import {actorAbilities} from './ability-loadout.mjs';
-import {jsonCopy,nonnegative} from '../values.mjs';
+import { jsonCopy, nonnegative } from '../../../engine/directory/index.mjs';
 
 /** Shared spell requests. The existing attack controller owns the single cooldown clock. */
 export class abilitySystem{

@@ -3,7 +3,7 @@ import {validateAbilityAction} from '../mechanics/abilities/lunge-actions.mjs';
 import {validateMountedAttack} from '../mechanics/attacks/mounted-attacks.mjs';
 import {validateAttackState} from '../mechanics/attacks/attack-registry.mjs';
 import {abilityLoadout} from '../mechanics/abilities/ability-loadout.mjs';
-import {importActorAbilities} from '../data/game-abilities.mjs';
+import {importActorAbilities} from '../mechanics/abilities/ability-loadout.mjs';
 import {registerGameEntityTypes} from '../boot/game-entity-types.mjs';
 import { physicsSystem } from '../../engine/basement/physics/index.mjs';
 import { createApartmentAssetLibrary } from '../data/apartment-assets.mjs';

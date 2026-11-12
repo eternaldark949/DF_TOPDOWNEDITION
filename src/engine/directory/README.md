@@ -62,3 +62,11 @@ A template needs `entity_type`; its `assets` map slots to resource ids, qualifie
 | `isMovable(type, types)` | The catalog's `movable` flag for the type (false when unknown). |
 
 Every result is a detached copy. Loading keeps no state and never touches a world.
+
+## Data checks
+
+| Function | Result |
+|---|---|
+| `identifier(value)` | Returns `value` when it is a non-empty string other than `__proto__`, `prototype` or `constructor`; otherwise throws. |
+| `nonnegative(value, name)` | Returns `value` when it is a finite number of zero or more; otherwise throws, naming `name`. |
+| `jsonCopy(value)` | A deep copy that refuses anything JSON would drop or change (non-finite numbers, class instances, sparse arrays, cycles, unsafe keys), so the result survives a save file. |

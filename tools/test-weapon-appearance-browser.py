@@ -19,7 +19,7 @@ try:
   report=page.evaluate('''async () => {
    const e=runtimeExample.engine;e.pause('weapon-art');
    const {weaponAppearance}=await import('/src/game/presentation/weapon-appearance.mjs');
-   const {WEAPON_MODELS}=await import('/src/game/presentation/weapon-models.mjs');
+   const {WEAPON_MODELS}=await import('/src/game/data/weapon-models.mjs');
    const ids=Object.keys(WEAPON_MODELS),a=e.api,art=await new weaponAppearance({resource_prefix:'weapon-acceptance'}).prepare(a.render);
    a.render.resize({width:640,height:ids.length*45+20,pixel_ratio:1});e.removeSystem('appearance');
    e.registerSystem('weapon-board',{render(c,blend,frame){frame.clear('#101018');ids.forEach((id,i)=>{for(const laser of [false,true])art.draw(frame,id,{laser,space:'screen',position:[80+(laser?320:0),30+i*45],scale:[3,3]});});}});

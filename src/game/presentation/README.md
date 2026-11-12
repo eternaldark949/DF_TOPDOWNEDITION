@@ -4,7 +4,7 @@ Presentation reads gameplay/entity state and submits renderer-neutral packets. B
 
 ## weaponAppearance
 
-Authored weapon materials, parts, muzzle/rail metadata and visual signatures live in `src/game/presentation/weapon-models.mjs`. The classic artist reads these exact shared, immutable definitions. Gameplay stats stay in `src/game/data/game-db/items.json`.
+Authored weapon materials, parts, muzzle/rail metadata and visual signatures live in `src/game/data/weapon-models.mjs`. The classic artist reads these exact shared, immutable definitions. Gameplay stats stay in `src/game/data/game-db/items.json`.
 
 `weaponAppearance` compiles those parts to paths, gradients, clips and glow materials. It prepares offscreen target descriptors through `renderSystem`, then bakes a model/laser variant on first use. Warm frames submit one sprite per weapon. A successful renderer frame marks only targets actually drawn as complete. Aborted/failed frames retry; switching renderers invalidates the caches and reconstructs art from the definitions. It never creates a Canvas, context, Path2D, image handle or private graphics device.
 

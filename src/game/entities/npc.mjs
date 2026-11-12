@@ -1,9 +1,9 @@
-import {importActorAbilities} from '../data/game-abilities.mjs';
+import {importActorAbilities} from '../mechanics/abilities/ability-loadout.mjs';
 import {actorAbilities} from '../mechanics/abilities/ability-loadout.mjs';
 import {resolveEmoteLines,NPC_EMOTE_REACTIONS} from '../data/npc-reactions.mjs';
 import {gameActor} from './game-actor.mjs';
 import {actorItems,restoreActorItems} from '../mechanics/actors/actor-inventory.mjs';
-import {nonnegative,jsonCopy} from '../mechanics/values.mjs';
+import { nonnegative, jsonCopy } from '../../engine/directory/index.mjs';
 const actorContract=npc=>npc.data.hireType==='contract'?(npc.data.contract_remaining??npc.data.hireDuration??0):0;
 const stateFor=npc=>npc.data.npc_state??={format_version:1,stim_remaining:0,out_of_combat:0,regen_elapsed:0,aura_elapsed:0,quip:null,quip_remaining:0,quip_delay:0,contract_remaining:actorContract(npc)};
 export const ROSTER_FIELDS=['recruited','downed','teammateStims','maxTeammateStims','relationship','hireType','hireDuration','hireTime','hireCost','hired','role','bio','alliance','burstSize','burstDelay','accuracyMod','equippedAbilityId','cooldown','shotsLeftInBurst','abilitiesSnapshot','attackSelection'];

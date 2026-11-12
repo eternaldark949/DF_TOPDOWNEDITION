@@ -1,4 +1,4 @@
-import {identifier,jsonCopy} from '../values.mjs';
+import { identifier, jsonCopy } from '../../../engine/directory/index.mjs';
 const freeze=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))freeze(child);Object.freeze(value);}return value;};
 
 const synchronous=callback=>(...args)=>{const result=callback(...args);if(result&&typeof result.then==='function')throw new TypeError('Attack callbacks must be synchronous');return result;};

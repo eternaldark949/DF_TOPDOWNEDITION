@@ -2,7 +2,7 @@ import {validatePatternAction} from './pattern-actions.mjs';
 import {validateTimedAction} from './timed-actions.mjs';
 import {validateBurstAction} from './burst-actions.mjs';
 import {BODY_GROUP} from '../../../engine/basement/physics/index.mjs';
-import {jsonCopy,nonnegative} from '../values.mjs';
+import { jsonCopy, nonnegative } from '../../../engine/directory/index.mjs';
 /** Persistent logical action only. Native motors, sweeps and impulses own physical work. */
 export function validateAbilityAction(state,catalog,{clock}={}){
  if(state==null)return state;if(catalog[state.ability_id]?.delivery==='pattern')return validatePatternAction(state,catalog,{clock});if(['beam','grapple','bolt'].includes(catalog[state.ability_id]?.delivery))return validateTimedAction(state,catalog,{clock});if(catalog[state.ability_id]?.delivery==='burst')return validateBurstAction(state,catalog,{clock});jsonCopy(state);

@@ -1,8 +1,8 @@
 import {createDemonessAppearance} from '../data/game-bosses.mjs';
 import {createHunterAppearance} from '../data/game-hunters.mjs';
 import {validateAttackState} from '../mechanics/attacks/attack-registry.mjs';
-import {importActorAbilities} from '../data/game-abilities.mjs';
-import {jsonCopy} from '../mechanics/values.mjs';
+import {importActorAbilities} from '../mechanics/abilities/ability-loadout.mjs';
+import { jsonCopy } from '../../engine/directory/index.mjs';
 /** Definitions and explicit old-roster import live in Directory, never in physics. */
 export function createActorPacket(world,{kind='npc',name='',role='civilian',position=[0,0],rotation=0,data={},...packet}={}){
  if(!['npc','ganger','hunter','marionette','gatling_gunner','demoness','warden','vesper','matins','compline','drone','velvet_cat','actor'].includes(kind))throw new TypeError('Unknown actor kind');const record=jsonCopy(data);if(['npc','ganger','hunter','gatling_gunner','demoness','warden','vesper','matins','compline'].includes(kind))record.actor_loadout_initialized??=record.inventory!=null;
