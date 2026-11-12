@@ -15,22 +15,22 @@ This is a classic game-engine architecture with four engine levels and a game on
 
 1. **Basement (LV0)** holds the base engine systems: physics, forces, joints, rigs, maths, spatial queries, maps, rooms, rendering and controls.
 2. **Lobby (LV1)** is the game loop. It runs the clock. Nothing moves without the clock, so **the Lobby is responsible for updating everything**.
-3. **Directory (LV2)** holds the libraries: catalogs, data structures and parameters, with no behaviour. It plays the role of a `.blend` file, holding the databases, files and assets that build into the single-file game.
+3. **Directory (LV2)** is the engine's data layer: the libraries every engine level reads from. It defines what each kind of data looks like, keeps the registry where everything is looked up by id, loads library files, and ships the engine's own default libraries. It has no behaviour. In Blender terms it is `bpy.data`: how data blocks are typed, stored and found.
 4. **Penthouse (LV3)** holds prefab toys. Each one is built only from the levels below and proves that they work. Examples are the procedural humanoid and a future foliage system.
-5. **The game** is its own set of modules on top of the engine. Its mechanics define and run game-specific behaviour.
+5. **The game** is its own set of modules on top of the engine. Its mechanics define and run game-specific behaviour, and its content (`game/data`: catalogs, maps, `GAME_DB`) is the `.blend` file that it registers into the Directory at boot.
 
 The engine knows nothing about the game, and it runs standalone.
 
 ```
             ┌──────────────────────────────────────────────┐
-            │  GAME  (Dimensions Freelancer)               │  mechanics, levels, entities,
-            │  defines and executes game behaviour         │  presentation, UI, story, boot
+            │  GAME  (Dimensions Freelancer)  src/game/    │  mechanics, audio, data, levels,
+            │  defines and executes game behaviour         │  entities, presentation, UI, boot
             └───────────────┬──────────────────────────────┘
                             │ uses (imports) ↓    never the reverse
    ┌────────────────────────┴───────────────────────────────────────┐
-   │ ENGINE                                                          │
+   │ ENGINE  src/engine/                                             │
    │  LV3 PENTHOUSE  prefab toys built only from LV0 + LV2           │
-   │  LV2 DIRECTORY  libraries: data structures, catalogs, params    │
+   │  LV2 DIRECTORY  data layer: structures, registry, loading, defaults
    │  LV1 LOBBY      the game loop: the clock, which updates all     │
    │  LV0 BASEMENT   base systems: physics, rigs, maths, maps, render│
    └─────────────────────────────────────────────────────────────────┘
@@ -51,9 +51,9 @@ Each level below lists what it is, what it owns, what it may import, what it mus
 - The world's one spatial grid. There is no shadow index anywhere else.
 - Navigation and traffic primitives.
 - Rigs and keyframe animation (`basement/physics/animation/`).
-- Attachments, the asset library mechanism (`assetLibrary`: templates, `extends`, typed resources and qualified ids `library:local`), and snapshots.
+- Attachments and snapshots. The Basement *uses* data from the Directory's registry, which it is handed as an object (for example `new physicsSystem({asset_library})`); it never imports the Directory.
 - The map system and room graph (`basement/maps/`), rendering (`basement/rendering/`), controls (`basement/controls/`) and maths.
-- Services that are still missing are Basement work too: audio, a UI layer, lighting, timers, decals, the game-wide save envelope and generic asset loading. See `docs/migration/README.md`.
+- Services that are still missing are Basement work too: the audio service (channels, mixing, reverb, through-door muffling), a UI layer, lighting, timers, decals and the game-wide save envelope. See `docs/migration/README.md`. Data loading is not one of them: it is the Directory's job.
 
 **It may import:** only other Basement code. Each package should depend on as few of its neighbours as it can. For example, `maps` imports only `physics`.
 
@@ -96,35 +96,33 @@ Each level below lists what it is, what it owns, what it may import, what it mus
 
 **The rule that follows from it:** no system, level, mechanic or prefab may run its own loop, its own `requestAnimationFrame`, its own timer that moves the world, or its own call that advances a world. Physics enforces this: `physicsSystem.updateState()` refuses to step without the private authority held by the runtime. Anything that changes over time is a system with `updateState()` or a phase hook, and the Lobby calls it.
 
-### LV2 Directory: the libraries
+### LV2 Directory: the engine's data layer
 
-**What it is:** the game's databases, files and assets. Think of it as a `.blend` file holding data blocks: the game is built into a single HTML file (`DFAB V8.html`), and the Directory is where everything that gets packed into that file lives as data.
+**What it is:** the libraries accessible to every engine level, and the one place data is defined, registered, loaded and found. It contains data and the plumbing that makes data findable. It contains no behaviour. In Blender terms the Directory is `bpy.data` (how data blocks are typed, stored and looked up), and the game's content in `game/data` is the `.blend` file.
 
-**It owns:**
-- catalogs, such as the prop catalog `game-assets/props.json`, items, weapons and vehicles;
-- data structures and their parameters, such as the humanoid skeleton, proportions, builds and clips in `directory/humanoid/`;
-- map layouts (`game-assets/maps/<map_id>.json`) and `GAME_DB` (`game-db/`);
-- balance numbers, palettes, materials and authored reactions;
-- templates that Basement factories accept;
-- the list of libraries that make up the game.
+**Its four jobs:**
+
+1. **Data structures.** What each kind of data looks like, and the checks that a library entry is well formed: a prop type, a map layout, a room set, a skeleton, an animation clip, a material, a vehicle model, a sound bank, a plant species. A structure lists fields, units, defaults and allowed values. This is what "the Directory provides the data structure" means for a prefab: the humanoid prefab reads a skeleton, proportions and clips whose shape the Directory defines.
+2. **The registry.** The one place anything asks for data by its qualified id, `library:local` (for example `df_props:catalog`). It holds the loaded libraries, their typed resources (`{kind, data}`) and their templates, and resolves template `extends`. Today this is `assetLibrary` inside `basement/physics`; it moves here (see section 9). Engine systems receive the registry as an object, so no lower level imports the Directory.
+3. **Loading.** Reading library files and resolving them once, at load time: placements over their type's defaults (with `null` removing a default), template `extends`, authored units converted to engine units. Loading only reshapes data and holds no world state, so it does not break the no-behaviour rule. Today this logic sits in `directory/game-maps.mjs` and `game-assets.mjs`, mixed with game content.
+4. **The engine's own default libraries.** The data the engine needs to run with no game installed: the default entity kinds (static, prop, ghost trigger, decoration and so on), default materials, a default humanoid skeleton, builds and base clips, and later default plant species. These are what let the Penthouse prefabs boot standalone.
+
+**It does not hold the game's content.** Dimensions Freelancer's catalogs, maps, `GAME_DB`, character builds and balance numbers live in `game/data`. Game boot registers them into the Directory. The single-file build packs both the Directory and `game/data` into `DFAB V8.html`.
 
 **Mechanics versus libraries.** This is the most important distinction in the project.
 - **A library** is a catalog that can be used but does not define behaviour, only parameters. "A shotgun has 6 pellets, spread 0.3 and range 220" is a library entry.
 - **A mechanic** defines and runs game-specific behaviour. "When the player fires, spawn pellets, apply recoil and alert the room" is a mechanic, and mechanics belong to the game.
-- When data needs a behaviour, the data **names** it (for example `"behaviour": "vending_machine"`), and the game registers the mechanic under that name. This works the same way as the `entity_type` registry. The Directory never holds the code.
+- When data needs a behaviour, the data **names** it (for example `"behaviour": "vending_machine"`), and the game registers the mechanic under that name. This works the same way as the `entity_type` registry. Neither the Directory nor `game/data` holds the code.
 
-**It may import:**
-- its own JSON and data files;
-- **types and constants** from the Basement or the Penthouse, so its data matches their shapes. For example, `rigDefinition` and `animationClip` are used to describe a clip.
+**It may import:** its own data files, and **types and constants** from the Basement so that its structures match the shapes the Basement accepts (for example `rigDefinition` and `animationClip` for a clip).
 
 **It must never:**
-- contain behaviour, such as update functions, event handlers, AI, crowd logic, sound playback or drawing;
-- import the game (`gameplay/`, `entities/`, `levels/`, `presentation/`, `traffic/` or any classic folder);
-- create entities or worlds;
-- start or compose the runtime;
-- contain the generic loading machinery. Resolving `extends`, placements over type defaults, and templates is Basement work. The Directory supplies the files and the list of what to load.
+- contain behaviour: update functions, event handlers, AI, crowd logic, sound playback or drawing;
+- contain game content or a game name: no `df_` library, no map of this game, no `GAME_DB`;
+- import the Lobby, the Penthouse or the game;
+- create entities or worlds, or start or compose the runtime.
 
-**The belongs-here test:** could a designer edit this file without knowing JavaScript, because it is numbers, names, shapes and lists? Or is it a small pure function that only reshapes data once at load and holds no state, such as converting authored units to engine units? Then it belongs in the Directory. If it runs every frame, reacts to events or decides what happens, it doesn't.
+**The belongs-here test:** does it say what a kind of data looks like, where data is found, how a file becomes ready-to-use data, or is it a default any game could start from? Then it is the Directory. If it is this game's particular data, it is `game/data`. If it runs every frame, reacts to events or decides what happens, it is a mechanic.
 
 ### LV3 Penthouse: prefab toys
 
@@ -134,7 +132,7 @@ Each level below lists what it is, what it owns, what it may import, what it mus
 - **The procedural humanoid.** It boots with a physics body and a rig, ready to stand, walk and be posed. It reads its skeleton, proportions and clips from the Directory, and it turns rig poses into render packets.
 - **A future foliage system.** Complex plant life built from joints and forces for sway and wind, with plant data from the Directory.
 
-**It may import:** the Basement, and the Directory's data structures and data.
+**It may import:** the Basement, and the Directory (its structures, registry and default libraries). A prefab boots on the Directory's defaults; the game can hand it its own data instead.
 
 **It must never:**
 - import the game;
@@ -149,6 +147,8 @@ Each level below lists what it is, what it owns, what it may import, what it mus
 
 **It owns:**
 - mechanics: combat rules, abilities, AI, encounters, venue life, crowds, story, missions and the effects of every interaction;
+- audio: the game's use of the Basement audio service, meaning which music plays in which room, which sound a hit makes, and the dialogue lines;
+- data (`game/data`): the game's content, registered into the Directory at boot: the prop catalog, the map layouts, `GAME_DB`, builds, items, weapons, vehicles and balance numbers;
 - the game's entity classes and their registration;
 - levels, meaning which map is loaded with which systems and policies;
 - presentation: how the game's things look, written as appearance producers that submit render packets to the Basement renderer;
@@ -169,13 +169,15 @@ An arrow means "may import from". Every arrow points down. An import that points
 |---|---|---|---|---|---|
 | **Basement** | yes (prefer few cross-package links) | **no** | **no** | **no** | **no** |
 | **Lobby** | yes | yes | **no** | **no** | **no** |
-| **Directory** | types and constants only | **no** | yes | types and constants only | **no** |
+| **Directory** | types and constants only | **no** | yes | **no** | **no** |
 | **Penthouse** | yes | **no** (it gets stepped; it never steps) | yes | yes | **no** |
+
+The Basement and the Lobby use the Directory's registry without importing it: the boot code creates the registry and hands it to them as an object.
 | **Game** | yes | yes | yes | yes | yes |
 
 Two consequences:
-- **The engine runs standalone.** Basement, Lobby, Directory structures and Penthouse can be loaded, stepped and tested with no game code present. Their tests and examples must prove it: `basement/maps/tests/maps.test.mjs` already rejects imports from game code.
-- **The game is replaceable.** Deleting the game folders must leave a working engine, and the engine's tests must pass without them.
+- **The engine runs standalone.** Everything in `src/engine/` (Basement, Lobby, Directory with its default libraries, Penthouse) can be loaded, stepped and tested with no `src/game/` present. Their tests and examples must prove it: `basement/maps/tests/maps.test.mjs` already rejects imports from game code.
+- **The game is replaceable.** Deleting `src/game/` must leave a working engine, and the engine's tests must pass without it.
 
 ---
 
@@ -231,10 +233,11 @@ Ask these questions in order. The first "yes" decides.
 1. Does it advance time, own the frame or step order, or schedule updates? → **Lobby**.
 2. Would any game use it unchanged, and does it contain no game name? → **Basement**. If the folder it should live in doesn't exist yet, create the package; don't put it elsewhere "for now".
 3. Is it a ready-made, reusable thing built only from Basement parts and Directory data? → **Penthouse**.
-4. Is it only data, parameters, a catalog, or a pure one-time reshaping of data? → **Directory**.
-5. Otherwise it is **game** code: a mechanic, a game entity, a level, presentation, UI, story or boot.
+4. Does it define a kind of data, register or look data up, load and resolve data files, or provide a default any game could start from? → **Directory**.
+5. Is it this game's own data: a catalog entry, a map, a balance number? → **`game/data`**.
+6. Otherwise it is **game** code: a mechanic, audio use, a game entity, a level, presentation, UI, story or boot.
 
-A file that seems to fit two answers is really two files. Split it. Example: `directory/apartment-definition.mjs` holds the apartment's data, which belongs to the Directory, and a `decorate` behaviour plus a builder call, which belong to the game's apartment level.
+A file that seems to fit two answers is really two files. Split it. Example: `directory/apartment-definition.mjs` holds the apartment's data, which belongs in `game/data`, and a `decorate` behaviour plus a builder call, which belong to the game's apartment level.
 
 ---
 
@@ -249,34 +252,38 @@ A file that seems to fit two answers is really two files. Split it. Example: `di
 
 ## 8. Target folder structure
 
-The level folders already exist and keep their names. The game currently has no single root folder.
-
-> **Proposed, awaiting ETERNAL's confirmation:** gather all game code under one root, `src/game/`, so that the source tree reads engine | directory | game. Until that is confirmed, game code stays in `gameplay/`, `entities/`, `presentation/`, `levels/` and `traffic/`, and those folders count as "the game" for every rule above.
+ETERNAL's layout (2026-11-12): `src/` holds two roots, `engine/` and `game/`. The engine root holds the four levels; the game root holds the game's own modules. Folders marked *(proposed)* were suggested during planning and are not yet confirmed.
 
 ```
 src/
-  basement/                LV0  engine systems, one package per folder, each with README + tests
-    physics/               bodies, collision, constraints, motors, motion, particles, spatial,
-                           navigation, traffic primitives, animation (rigs), attachments
-    maps/                  map builder, mapInstance (interior/exterior streaming), roomGraph
-    rendering/             render system and canvas backend; consumes render packets
-    controls/              input devices and bindings
-    assets/                (to build) generic asset loading: libraries, extends, placements
-    audio/ ui/ lighting/ timers/ saves/   (to build) the services the migration still lacks
-  lobby/                   LV1  levelLobby (clock) + the runtime coordinator (now in src/runtime/)
-  directory/               LV2  data only: JSON, catalogs, parameters, data-structure modules
-    game-db/  game-assets/  humanoid/  ...
-  penthouse/               LV3  prefabs: humanoid/ (rig + body + artist), foliage/ (future)
-  game/                    (proposed) Dimensions Freelancer
-    boot/                  composes the runtime: registers entity types, systems, levels
-    mechanics/             combat, abilities, AI, encounters, venue life, crowds, story
-    entities/              the game's entity classes
-    levels/                one module per map: which data, which systems, which policies
-    presentation/          appearance producers -> render packets
-    ui/                    HUD, menus, phone, inventory, dialogue
+  engine/                         the engine: runs standalone, knows nothing about the game
+    basement/                     LV0  base systems, one package per folder, each with README + tests
+      physics/                    bodies, collision, constraints, motors, motion, particles, spatial,
+                                  navigation, traffic primitives, animation (rigs), attachments
+      maps/                       map builder, mapInstance (interior/exterior streaming), roomGraph
+      rendering/                  render system and canvas backend; consumes render packets
+      controls/                   input devices and bindings
+      audio/ ui/ lighting/ timers/ saves/   (to build) the services the migration still lacks
+    lobby/                        LV1  levelLobby (the clock) + the runtime coordinator (from src/runtime/)
+    directory/                    LV2  the data layer
+      structures/                 (proposed) what each kind of data looks like, with validation
+      registry                    the library registry (assetLibrary, moved from basement/physics)
+      loading                     reading files; resolving defaults, placements and extends
+      defaults/                   (proposed) the engine's default libraries: entity kinds, materials,
+                                  default humanoid skeleton and clips, default plant species
+    penthouse/                    LV3  prefabs: humanoid/ (body + rig + artist), foliage/ (future)
+  game/                           Dimensions Freelancer
+    mechanics/                    combat, abilities, AI, encounters, venue life, crowds, story, missions
+    audio/                        the game's sounds and music, played through the Basement audio service
+    data/                         (proposed) the game's content: props, maps, GAME_DB, builds, items,
+                                  weapons, vehicles, balance; registered into the Directory at boot
+    entities/  levels/  presentation/  ui/  boot/   (proposed) game classes, one module per map,
+                                  appearance producers, HUD and menus, and the runtime composition
 ```
 
----
+**Name clash to resolve first.** A classic folder `src/engine/` already exists and holds the old `GameEngine` scripts. It must be emptied or renamed (for example `src/classic/`, *proposed*) before the new `src/engine/` is created. The other classic folders (`app/`, `core/`, `world/`, `ui/`, `story/`, `buildings/`) follow their inventory rows in `docs/migration/inventory.json`.
+
+**Until the move happens,** the level folders sit directly under `src/` (`src/basement/` and so on), and `gameplay/`, `entities/`, `presentation/`, `levels/` and `traffic/` count as "the game" for every rule above.
 
 ## 9. Known mismatches today
 
@@ -303,16 +310,17 @@ Audited on 2026-11-12 by tracing every relative import of the new `.mjs` files. 
    - `game-sound.js`, `effects-system.js`, `collision-system.js`, `world-session.js` and `world-query.js`;
    - `game-controls.js` and `new-game-state.js`;
    - the `decorate` hook in `apartment-definition.mjs`.
-4. **Generic loading sits in the Directory.** The resolution logic in `game-maps.mjs` and `game-assets.mjs` should become a Basement asset system, leaving the Directory with the data and the list of files.
-5. **Drawing code sits in the Directory.** `directory/weapon-appearance.mjs` draws (and a file with the same name exists in `presentation/`). It belongs in presentation, or in a Penthouse prefab.
-6. **Tools and examples sit in the Directory:** `validate-boss-records.mjs`, `runtime-example.mjs` and `rendering-example.mjs`.
-7. **Classic kits sit loose in `basement/`:** 22 classic `.js` files at the top level (sound, ui, timer, canvas and others). Two classic files read game globals: `basement/controls-system.js` and `lobby/level-lobby.js`.
-8. **The humanoid is half migrated:**
+4. **Loading is mixed with game content, and the registry is in the wrong level.** `game-maps.mjs` and `game-assets.mjs` mix generic resolution (placements over type defaults, library registration) with this game's file list. The resolution belongs in the Directory's loading; the file list and the files belong in `game/data`. The registry itself, `assetLibrary`, sits in `basement/physics` and belongs in the Directory.
+5. **Game content sits in the Directory.** `game-db/`, `game-assets/` (props, maps, the `df_*` libraries), `humanoid/builds.json` and `body-canon.json`, combat, item, vehicle and street catalogs, palettes and reactions are this game's data and belong in `game/data`. The Directory keeps only their structures, plus engine defaults (a default skeleton and clips) so the humanoid prefab can boot without the game.
+6. **Drawing code sits in the Directory.** `directory/weapon-appearance.mjs` draws (and a file with the same name exists in `presentation/`). It belongs in presentation, or in a Penthouse prefab.
+7. **Tools and examples sit in the Directory:** `validate-boss-records.mjs`, `runtime-example.mjs` and `rendering-example.mjs`.
+8. **Classic code and folder names:** the classic `src/engine/` folder blocks the new `src/engine/` root (section 8). **Classic kits sit loose in `basement/`:** 22 classic `.js` files at the top level (sound, ui, timer, canvas and others). Two classic files read game globals: `basement/controls-system.js` and `lobby/level-lobby.js`.
+9. **The humanoid is half migrated:**
    - Motion is native: the Basement rig, Directory data in `directory/humanoid/`, and the game's clip choice in `gameplay/animation/humanoid-system.mjs`.
    - Drawing is classic: `penthouse/procedural-humanoid.js`, `gl-humanoid.js` and `garment-kit.js`, plus `ui/humanoid-render.js`, `bodies.js`, `wardrobe.js` and `poses.js`.
    - The Penthouse has no native module yet.
-9. **Naming.** Some native systems use `update()` or `updateDoors()` instead of `updateState()`, for example `roomGraph.update()` and `mapInstance.updateDoors()`. Most new files lack their level banner.
-10. **A behaviour regression from PR 178:** hinged doors. In `main`, every interior hinged door, including the apartment's, was a physical swinging leaf with a spring. PR 178 made them kinematic and auto-opening. Restore the swinging behaviour.
+10. **Naming.** Some native systems use `update()` or `updateDoors()` instead of `updateState()`, for example `roomGraph.update()` and `mapInstance.updateDoors()`. Most new files lack their level banner.
+11. **A behaviour regression from PR 178:** hinged doors. In `main`, every interior hinged door, including the apartment's, was a physical swinging leaf with a spring. PR 178 made them kinematic and auto-opening. Restore the swinging behaviour.
 
 When one of these is fixed, remove it from this list in the same commit.
 
@@ -341,7 +349,8 @@ Until those exist, reviewers apply sections 3 and 6 by hand.
 - **Tool:** a helper with no world state of its own, such as a timer, recorder or debugger.
 - **Packet:** a plain snake_case data object describing an entity or a frame.
 - **Template:** a named packet base that other packets and templates `extend`.
-- **Library:** a Directory catalog of parameters. It has no behaviour.
+- **Library:** a catalog of parameters registered in the Directory, from the engine's defaults or from `game/data`. It has no behaviour.
+- **Registry:** the Directory's lookup of loaded libraries by qualified id `library:local`.
 - **Mechanic:** game code that defines and runs behaviour.
 - **Prefab:** a Penthouse toy made only from Basement mechanisms and Directory data.
 - **Host:** which runtime owns a map today. A map file's `"host"` field says `native` or `classic`.
