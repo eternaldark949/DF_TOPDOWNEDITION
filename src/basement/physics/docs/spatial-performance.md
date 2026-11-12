@@ -8,6 +8,9 @@ The native world owns one persistent `spatialGrid`. Ordinary simulation steps pr
 - Index synchronization checks pose, shape and sweep state before requesting bounds or touching the grid. A stationary body is not expanded to its circumradius and then shrunk again each frame.
 - Entries retain integer cell ranges. Bounds changes inside the same range create no membership changes. Crossing a boundary updates only entering/leaving strips; cells shared by both ranges retain their existing membership.
 - Queries traverse cell coordinates directly, without allocating an array of every cell key. Segment/sweep queries retain corridor traversal and deduplication.
+- **Two levels.** An entry spanning more than 16 cells on either axis (a building, a road lane, a big light) is stored on a coarse level with cells 8× larger, so it occupies a handful of cells instead of hundreds. Every query reads both levels; the coarse level is skipped while empty. Entries switch levels when resized. This keeps dense small-object cells cheap without a tree.
+- Cells use numeric keys (small integers near the origin, a separate range far out) and array buckets with swap-remove. Query deduplication uses per-entry and per-cell stamps instead of sets, and pair generation needs a duplicate check only for pairs of two moving bodies.
+- `querySegment` and `querySweep` return only entries whose bounds actually meet the (padded) segment, not everything in the visited cells.
 - The native broadphase reuses its candidate-pair result while the shared index and physical candidate inputs remain valid. Exact contact detection/response and begin/stay/end events continue using current state.
 - Stationary mounts reuse their prescribed pose when parent pose, velocity, local placement and effective activity are unchanged. Parent movement, activity and local-pose changes propagate normally.
 - Identity operations on zero motion avoid needless force/damping/integration work and previous-pose array allocations. Motors, forces, gravity, nonzero damping, constraints, lifetime and gameplay clocks retain their normal behavior.
@@ -36,7 +39,7 @@ The simulation still visits bodies to advance controllers and physical policies.
 | `spatial.query_cells` | Cell lookups performed by queries |
 | `spatial.candidate_visits` | Deduplicated entries visited by queries |
 
-`spatialGrid.revision` changes on registration, actual bounds change, removal and clear. Queries and identical updates leave it unchanged. `cell_additions - cell_removals` counts current entry/cell memberships; `cells` counts nonempty cells. `spatial.pairs` counts generated pairs, while world `candidate_pairs` includes pairs processed through reused broadphase results.
+`spatialGrid.revision` changes on registration, actual bounds change, removal and clear. Queries and identical updates leave it unchanged. `cell_additions - cell_removals` counts current entry/cell memberships; `cells` counts nonempty cells on both levels and `coarse_instances` counts entries stored on the coarse level. `spatial.pairs` counts generated pairs, while world `candidate_pairs` includes pairs processed through reused broadphase results.
 
 ## Verification
 
@@ -68,3 +71,15 @@ The single-mover timing is effectively unchanged at this scale. Operation counts
 - Moving the 10,000-cell entry by one cell retains the overlap and performs 100 cell additions plus 100 removals. The previous algorithm removed/reinserted all 10,000 memberships.
 
 These are standalone engine workloads, not full-game FPS or device performance claims. The playable apartment and destination runtime exercise this implementation; the remaining legacy city physics uses its older paths until converted.
+
+### Grid rewrite (two levels)
+
+`node src/basement/physics/benchmarks/grid.mjs [other/grid.mjs]` drives the grid alone: crowds moving every step, buildings of 200–1100 units, pair generation and 200 radius, segment and sweep queries per step. Pass the path of another grid module to compare. On the development container (Node 22), against the previous single-level grid:
+
+| Grid workload | Before | After |
+|---|---:|---:|
+| Sparse crowd | 5.1 ms/step | 3.0 ms/step |
+| Dense crowd | 9.2 ms/step | 6.1 ms/step |
+| Crowd with large buildings | 7.2–9.3 ms/step | 4.8 ms/step |
+
+Segment and sweep queries also return fewer, exact candidates, so callers do less narrow-phase work. In the whole-world `benchmarks/spatial.mjs`, where the grid is only part of the step, 1,000 moving bodies went from 1.95 to 1.39 ms/step and 5,000 from 5.35 to 4.60 ms/step; idle scenarios are unchanged within noise.

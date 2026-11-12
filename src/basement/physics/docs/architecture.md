@@ -49,7 +49,7 @@ Prescribed mounts retain the child's canonical body record and configured mass/f
 
 ## Shared index
 
-Membership changes incrementally when bounds cross cell boundaries, retaining shared cells and updating only the entering/leaving strips. Unchanged collision/render/light bounds are cached by canonical pose/shape; idle records skip grid synchronization work. Static geometry is not rebuilt every frame. Rotated shapes use actual transformed bounds, including compound children. During prediction, moving bodies have conservative swept bounds so two objects crossing between endpoints can be found. Final bounds are restored after solving.
+The grid has two levels: ordinary cells and a coarse level (8× larger cells) for entries spanning more than 16 cells, so large scenery does not fill hundreds of cells. Membership changes incrementally when bounds cross cell boundaries, retaining shared cells and updating only the entering/leaving strips. Unchanged collision/render/light bounds are cached by canonical pose/shape; idle records skip grid synchronization work. Static geometry is not rebuilt every frame. Rotated shapes use actual transformed bounds, including compound children. During prediction, moving bodies have conservative swept bounds so two objects crossing between endpoints can be found. Final bounds are restored after solving.
 
 Queries reuse one index. Radius/bounds queries visit relevant cells; segment and thick sweep queries traverse a corridor using DDA instead of scanning a diagonal bounding rectangle. Result buffers can be supplied by callers. The index returns conservative candidates; exact geometry and masks are evaluated in the query/detection layer.
 

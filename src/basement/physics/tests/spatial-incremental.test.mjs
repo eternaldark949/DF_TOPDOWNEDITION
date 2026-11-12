@@ -12,12 +12,22 @@ test('bounds changes inside the same cell range create no cell memberships and u
  g.updateInstance(1,bounds(2,2,9,9));const after=g.getStatistics();assert.equal(delta(after,before,'updates'),1);assert.equal(delta(after,before,'cell_additions'),0);assert.equal(delta(after,before,'cell_removals'),0);assert.equal(g.revision,revision+1);
  g.updateInstance(1,bounds(2,2,9,9));assert.equal(g.revision,revision+1);assert.deepEqual(g.queryBounds(bounds(8.5,8.5,9,9)),[v]);
 });
-test('large entries move by updating only entering and leaving edge strips',()=>{
- const g=new spatialGrid({cell_size:10}),v={body_id:1};g.registerInstance(1,bounds(0,0,199,199),v);let before=g.getStatistics();assert.equal(before.cells,400);
- g.updateInstance(1,bounds(10,0,209,199));let after=g.getStatistics();assert.equal(delta(after,before,'cell_additions'),20);assert.equal(delta(after,before,'cell_removals'),20);assert.equal(after.cells,400);
- before=after;g.updateInstance(1,bounds(20,10,219,209));after=g.getStatistics();assert.equal(delta(after,before,'cell_additions'),39);assert.equal(delta(after,before,'cell_removals'),39);assert.equal(after.cells,400);
- assert.deepEqual(g.queryBounds(bounds(0,0,9,9)),[]);assert.deepEqual(g.queryBounds(bounds(215,205,219,209)),[v]);
+test('entries move by updating only entering and leaving edge strips',()=>{
+ const g=new spatialGrid({cell_size:10}),v={body_id:1};g.registerInstance(1,bounds(0,0,39,39),v);let before=g.getStatistics();assert.equal(before.cells,16);
+ g.updateInstance(1,bounds(10,0,49,39));let after=g.getStatistics();assert.equal(delta(after,before,'cell_additions'),4);assert.equal(delta(after,before,'cell_removals'),4);assert.equal(after.cells,16);
+ before=after;g.updateInstance(1,bounds(20,10,59,49));after=g.getStatistics();assert.equal(delta(after,before,'cell_additions'),7);assert.equal(delta(after,before,'cell_removals'),7);assert.equal(after.cells,16);
+ assert.deepEqual(g.queryBounds(bounds(0,0,9,9)),[]);assert.deepEqual(g.queryBounds(bounds(55,45,59,49)),[v]);
  g.removeInstance(1);assert.equal(g.getStatistics().cells,0);assert.equal(g.getStatistics().cell_additions,g.getStatistics().cell_removals);
+});
+test('large entries live on the coarse level, move by strips there and switch levels when resized',()=>{
+ const g=new spatialGrid({cell_size:10}),v={body_id:1};g.registerInstance(1,bounds(0,0,199,199),v);let s=g.getStatistics();
+ assert.equal(s.coarse_instances,1);assert.equal(s.cells,9);
+ assert.deepEqual(g.queryBounds(bounds(195,195,199,199)),[v]);assert.deepEqual(g.queryBounds(bounds(200,200,205,205)),[]);
+ assert.deepEqual(g.querySegment([-50,100],[250,100]),[v]);assert.deepEqual(g.querySegment([-50,230],[250,230]),[]);
+ assert.deepEqual(g.querySweep({from:[-50,230],to:[250,230],radius:40}),[v]);
+ g.updateInstance(1,bounds(0,0,29,29));s=g.getStatistics();assert.equal(s.coarse_instances,0);assert.equal(s.cells,9);
+ g.updateInstance(1,bounds(0,0,399,39));assert.equal(g.getStatistics().coarse_instances,1);
+ g.removeInstance(1);s=g.getStatistics();assert.equal(s.cells,0);assert.equal(s.cell_additions,s.cell_removals);
 });
 test('incremental range differences match a deterministic exhaustive oracle during resize, teleport and negative-coordinate moves',()=>{
  const g=new spatialGrid({cell_size:13}),entries=new Map();let seed=71;const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/2**32;};

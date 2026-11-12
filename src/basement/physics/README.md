@@ -46,6 +46,7 @@ node --test src/basement/physics/tests/*.test.mjs
 node src/basement/physics/examples/headless.mjs
 node src/basement/physics/benchmarks/spatial.mjs
 node src/basement/physics/benchmarks/navigation.mjs
+node src/basement/physics/benchmarks/grid.mjs
 ```
 
 From this directory, `python3 -m http.server 8080` serves the [browser sandbox](examples/index.html) at `http://localhost:8080/examples/`. Serve modules over HTTP rather than opening the HTML through `file://`.

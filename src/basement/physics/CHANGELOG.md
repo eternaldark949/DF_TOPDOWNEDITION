@@ -1,5 +1,11 @@
 # Changelog
 
+## Faster spatial grid — 2026-11-12
+
+- `spatialGrid` now has a coarse level for large entries (more than 16 cells across), numeric cell keys, array buckets and stamp-based deduplication. On the new `benchmarks/grid.mjs` it is about 1.5–1.9× faster than before; whole-world moving scenarios gain 15–30%.
+- `querySegment` and `querySweep` now return only entries whose bounds meet the padded segment, rather than every entry in the visited cells.
+- `getStatistics()` adds `coarse_instances`. The public API and the one-grid-per-world rule are unchanged.
+
 ## Navigation system — 2026-11-12
 
 - Added `physics.navigation`, one request API for travel from A to B. It has a field layer (open space, any agent radius) and a road layer (authored lanes for vehicles). `navigate(body, to)` plans and hands the route to the body's existing character or vehicle motor.
