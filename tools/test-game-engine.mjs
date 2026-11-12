@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { gameEngine } from '../src/runtime/game-engine.mjs';
-import { gameLevel } from '../src/runtime/game-level.mjs';
-import { createGameRuntime } from '../src/directory/game-runtime.mjs';
+import { gameEngine } from '../src/engine/lobby/runtime/game-engine.mjs';
+import { gameLevel } from '../src/engine/lobby/runtime/game-level.mjs';
+import { createGameRuntime } from '../src/game/boot/game-runtime.mjs';
 
 const runtime = options => new gameEngine({ schedule_frame:null, ...options });
 class Room extends gameLevel {
@@ -115,7 +115,7 @@ test('Directory composition installs real native types without booting legacy ga
 });
 
 test('runtime composition contains no mixins, legacy fallbacks, local collision solver or second index',()=>{
- const source=readFileSync(new URL('../src/runtime/game-engine.mjs',import.meta.url),'utf8');
+ const source=readFileSync(new URL('../src/engine/lobby/runtime/game-engine.mjs',import.meta.url),'utf8');
  assert.doesNotMatch(source,/engineMixin|Object\.defineProperties|CollisionSystem|collisionWorld|PlayerEntity|new spatialGrid|new Spatial/);
  assert.equal([...source.matchAll(/new physicsSystem\(/g)].length,1);
 });
@@ -153,5 +153,5 @@ test('failed render producers abort partial frames and stop the loop without inv
 
 
 test('the game appearance producer only submits packets and never touches a Canvas context',()=>{
- const producer=readFileSync(new URL('../src/directory/runtime-example.mjs',import.meta.url),'utf8');assert.doesNotMatch(producer,/getContext|ctx\.|\.drawImage|new physicsSystem|new spatialGrid/);
+ const producer=readFileSync(new URL('../src/game/examples/runtime-example.mjs',import.meta.url),'utf8');assert.doesNotMatch(producer,/getContext|ctx\.|\.drawImage|new physicsSystem|new spatialGrid/);
 });

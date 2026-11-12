@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 'use strict';
-// The city's real lane network, converted by directory/road-navigation.mjs, routes on Basement navigation.
+// The city's real lane network, converted by game/data/road-navigation.mjs, routes on Basement navigation.
 const assert=require('node:assert/strict');
 const {join}=require('node:path');
 const {runtime}=require('./test-game-runtime.cjs');

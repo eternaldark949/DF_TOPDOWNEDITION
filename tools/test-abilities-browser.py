@@ -15,11 +15,11 @@ try:
   page.route('**/favicon.ico',lambda route:route.fulfill(status=204))
   page.on('pageerror',lambda error:errors.append(str(error)))
   page.on('console',lambda message:errors.append(message.text) if message.type=='error' else None)
-  page.goto(f'http://127.0.0.1:{server.server_port}/src/runtime/examples/',wait_until='networkidle')
+  page.goto(f'http://127.0.0.1:{server.server_port}/src/game/examples/',wait_until='networkidle')
   page.wait_for_function('!!globalThis.runtimeExample?.engine.active_level')
   report=page.evaluate('''async()=>{
    const {engine}=runtimeExample,api=engine.api;
-   const {abilityPresentation}=await import('/src/presentation/ability-presentation.mjs');
+   const {abilityPresentation}=await import('/src/game/presentation/ability-presentation.mjs');
    const ally=api.actors.spawn({kind:'npc',name:'Scarlet',role:'red_demon_dancer',position:[150,180],data:{recruited:true,hireType:'permanent',alliance:'friendly'}});
    const target=api.actors.spawn({kind:'actor',position:[270,180],data:{health:1000,max_health:1000,alliance:'hostile'}});
    ally.abilities.learnAbility('shadow_bolt');const shot=api.abilities.cast(ally,'fireball',{direction:[1,0]});

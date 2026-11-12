@@ -8,7 +8,7 @@
  * Files in assets/images and assets/audio are embedded as data URIs in the
  * ASSETS table (see src/legacy/core/assets.js for getImage / drawAsset / playSound).
  * Files in assets/fonts become @font-face rules, named after the file.
- * A .json file in SCRIPTS is a GAME_DB chapter (src/directory/game-db/): it goes in as
+ * A .json file in SCRIPTS is a GAME_DB chapter (src/game/data/game-db/): it goes in as
  * `GAME_DB.<file name> = <its JSON>;`, so the data stays plain JSON that editors and tools can read.
  *
  * No dependencies. The game is plain classic <script> code sharing one global
@@ -70,16 +70,16 @@ const SCRIPTS = [
     'legacy/basement/render-system.js',   // LV0 Basement: renderQueue (shapes sorted by depth, same-style ones drawn in one call)
     'legacy/basement/awareness-kit.js',   // LV0 Basement: awarenessMatrix (what a character knows of what's around them)
     'legacy/directory/game-db/game-db.js',   // LV2 Directory: GAME_DB, the game's data; its chapters (JSON) follow
-    'directory/game-db/items.json',   // GAME_DB.items: gear, augments, furniture, consumables, drinks, notes, schematics
-    'directory/game-db/shops.json',   // GAME_DB.shops: the auto shop's prices and colours, the dyer's fee and palette
-    'directory/game-db/progression.json',   // GAME_DB.progression: Resonance, the three trees, abilities, talk perks
-    'directory/game-db/audio.json',   // GAME_DB.audio: music per map, reverb rooms, sound lengths and caps, motors, footstep floors
-    'directory/game-db/enemies.json',   // GAME_DB.enemies: enemy kinds, drones, the bosses and their hazards, the Horde Gauntlet
-    'directory/game-db/vehicles.json',  // GAME_DB.vehicles: car brands and models, the BlackMark's look, the Zibs, traffic tempers, the driving feel
-    'directory/game-db/places.json',    // GAME_DB.places: the maps, their rooms and doors, the city's landmark blocks, the fireplaces
-    'directory/game-db/story.json',     // GAME_DB.story: the story's parts and steps (code in STORY_STEP_HOOKS), mission kinds, crew nights, the van's drop
-    'directory/game-db/dialogue.json',  // GAME_DB.dialogue: the bonding talks and tiers, the crew's lines and texts, the prologue's poem
-    'directory/game-db/cast.json',      // GAME_DB.cast: speaker colours, the scene cast, the crew's spots at home, every named look, the wardrobe, finishes and materials
+    'game/data/game-db/items.json',   // GAME_DB.items: gear, augments, furniture, consumables, drinks, notes, schematics
+    'game/data/game-db/shops.json',   // GAME_DB.shops: the auto shop's prices and colours, the dyer's fee and palette
+    'game/data/game-db/progression.json',   // GAME_DB.progression: Resonance, the three trees, abilities, talk perks
+    'game/data/game-db/audio.json',   // GAME_DB.audio: music per map, reverb rooms, sound lengths and caps, motors, footstep floors
+    'game/data/game-db/enemies.json',   // GAME_DB.enemies: enemy kinds, drones, the bosses and their hazards, the Horde Gauntlet
+    'game/data/game-db/vehicles.json',  // GAME_DB.vehicles: car brands and models, the BlackMark's look, the Zibs, traffic tempers, the driving feel
+    'game/data/game-db/places.json',    // GAME_DB.places: the maps, their rooms and doors, the city's landmark blocks, the fireplaces
+    'game/data/game-db/story.json',     // GAME_DB.story: the story's parts and steps (code in STORY_STEP_HOOKS), mission kinds, crew nights, the van's drop
+    'game/data/game-db/dialogue.json',  // GAME_DB.dialogue: the bonding talks and tiers, the crew's lines and texts, the prologue's poem
+    'game/data/game-db/cast.json',      // GAME_DB.cast: speaker colours, the scene cast, the crew's spots at home, every named look, the wardrobe, finishes and materials
     'legacy/core/config.js',                   // reads GAME_DB.vehicles and .places, so it comes after the chapters
     '@assets',              // generated from the assets/ folder
     'legacy/core/assets.js',
@@ -340,7 +340,7 @@ function fontFaces() {
 
 const read = (p) => readFileSync(join(ROOT, 'src', p), 'utf8');
 
-/** A GAME_DB chapter: directory/game-db/items.json becomes `GAME_DB.items = {...};` (parsed first, so bad JSON fails the build). */
+/** A GAME_DB chapter: game/data/game-db/items.json becomes `GAME_DB.items = {...};` (parsed first, so bad JSON fails the build). */
 function chapterScript(p) {
     const chapter = p.split('/').pop().slice(0, -'.json'.length);
     if (!/^[a-z][a-z0-9_]*$/.test(chapter)) throw new Error(`src/${p}: a chapter's file name must be snake_case`);
@@ -359,7 +359,7 @@ const escapeAttr = (s) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 function scriptBlocks() {
     const blocks = [];
     for (const p of SCRIPTS) {
-        if (p === '@native') blocks.push(['directory/native-entry.mjs', bundleNative(ROOT, 'src/directory/native-entry.mjs') + '\nconst pathGeometry = DFNative.pathGeometry;']);
+        if (p === '@native') blocks.push(['game/boot/native-entry.mjs', bundleNative(ROOT, 'src/game/boot/native-entry.mjs') + '\nconst pathGeometry = DFNative.pathGeometry;']);
         else if (p === '@assets') assetPieces().forEach((code, i) => blocks.push([`assets#${i}`, code]));
         else if (p.endsWith('.mjs')) {
             // Explicit bridge for import-free engine modules; this is not a general ESM bundler.

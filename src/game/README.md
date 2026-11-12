@@ -4,8 +4,11 @@ The game's own modules, on top of the engine. The game may import any engine lev
 
 | Folder | Holds |
 |---|---|
-| [mechanics/](mechanics/) | Game behaviour: combat, abilities, AI, encounters, venue life, crowds, story, missions |
+| [boot/](boot/) | Composes the runtime: `native-entry.mjs` (the entry of the `DFNative` bundle), `game-runtime.mjs`, entity-type registration, actor and vehicle factories |
+| [mechanics/](mechanics/) | Game behaviour: abilities, actors, attacks, combat, encounters, items, player control and state, the session, traffic, animation choice |
+| [entities/](entities/) | The game's entity classes |
+| [levels/](levels/) | One module per map, with its map definition |
+| [presentation/](presentation/) | Appearance producers that submit render packets |
 | [audio/](audio/) | The game's sounds and music, played through the Basement audio service |
-| [data/](data/) | The game's content (props, maps, `GAME_DB`, builds, items, balance), registered into the Directory at boot |
-
-More folders (entities, levels, presentation, UI, boot) are proposed in section 8 of the architecture file and are added once confirmed.
+| [data/](data/) | The game's content (`GAME_DB`, props, maps, builds, rules, catalogs), registered into the Directory at boot |
+| [examples/](examples/) | Browser pages that boot the game runtime |

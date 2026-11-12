@@ -62,7 +62,7 @@ These have no Basement or Directory home yet, so the scripts that need them cann
 
 | Script | Lines | Area | Status | Goes to | Notes |
 |---|---:|---|---|---|---|
-| `legacy/basement/frame-clock.js` | 50 | runtime | `replaced` | lobby/level-lobby.mjs clock in runtime/game-engine.mjs |  |
+| `legacy/basement/frame-clock.js` | 50 | runtime | `replaced` | engine/lobby/level-lobby.mjs clock in engine/lobby/runtime/game-engine.mjs |  |
 | `legacy/basement/timer-kit.js` | 62 | runtime | `partly` | runtime lifecycle hooks | Gameplay timers need a runtime-owned timer service or level hooks. |
 | `legacy/basement/canvas-kit.js` | 76 | rendering | `replaced` | basement/rendering canvasRenderer |  |
 | `legacy/basement/life-kit.js` | 19 | runtime | `partly` | gameEntity lifetime / level scope |  |
@@ -86,16 +86,16 @@ These have no Basement or Directory home yet, so the scripts that need them cann
 | `legacy/basement/render-system.js` | 271 | rendering | `replaced` | basement/rendering renderSystem |  |
 | `legacy/basement/awareness-kit.js` | 110 | ai | `replaced` | basement/physics awareness |  |
 | `legacy/directory/game-db/game-db.js` | 36 | data | `data` | Directory GAME_DB chapters | Stays; native code reads the same JSON. |
-| `directory/game-db/items.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
-| `directory/game-db/shops.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
-| `directory/game-db/progression.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
-| `directory/game-db/audio.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
-| `directory/game-db/enemies.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
-| `directory/game-db/vehicles.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
-| `directory/game-db/places.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
-| `directory/game-db/story.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
-| `directory/game-db/dialogue.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
-| `directory/game-db/cast.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
+| `game/data/game-db/items.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
+| `game/data/game-db/shops.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
+| `game/data/game-db/progression.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
+| `game/data/game-db/audio.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
+| `game/data/game-db/enemies.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
+| `game/data/game-db/vehicles.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
+| `game/data/game-db/places.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
+| `game/data/game-db/story.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
+| `game/data/game-db/dialogue.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
+| `game/data/game-db/cast.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
 | `legacy/core/config.js` | 505 | data | `partly` | Directory rules JSON | Tuning constants should move to Directory data. |
 | `@assets` | 0 | assets | `data` | Directory assets |  |
 | `legacy/core/assets.js` | 56 | assets | `partly` | Directory asset libraries + renderSystem images |  |
@@ -129,8 +129,8 @@ These have no Basement or Directory home yet, so the scripts that need them cann
 | `legacy/entities/static-builders-profiler.js` | 510 | tools | `game_logic` | profiling |  |
 | `legacy/entities/performance-bench.js` | 218 | tools | `game_logic` | benchmarks |  |
 | `legacy/entities/street-objects.js` | 584 | entities | `partly` | Directory templates (signs, loot, pavement, foliage) |  |
-| `legacy/entities/npc.js` | 910 | entities | `replaced` | entities/npc.mjs |  |
-| `legacy/entities/pedestrians.js` | 1218 | entities | `replaced` | entities/pedestrians.mjs + pedestrian-manager.mjs | Production callers pending. |
+| `legacy/entities/npc.js` | 910 | entities | `replaced` | game/entities/npc.mjs |  |
+| `legacy/entities/pedestrians.js` | 1218 | entities | `replaced` | game/entities/pedestrians.mjs + pedestrian-manager.mjs | Production callers pending. |
 | `legacy/directory/venue-crowd.js` | 199 | gameplay | `game_logic` | venue life on native NPCs |  |
 | `legacy/directory/lobby-life.js` | 167 | gameplay | `game_logic` | venue life on native NPCs |  |
 | `legacy/directory/club-life.js` | 165 | gameplay | `game_logic` | venue life on native NPCs |  |
@@ -140,10 +140,10 @@ These have no Basement or Directory home yet, so the scripts that need them cann
 | `legacy/presentation/gatling-gunner.js` | 190 | art | `art` | actor appearance packets |  |
 | `legacy/presentation/classic-actor-packets.js` | 9 | art | `art` | actor appearance packets |  |
 | `legacy/entities/enemies.js` | 1878 | entities | `partly` | native enemy classes (ganger.mjs, gatling-gunner.mjs, velvet-cat.mjs ...) | RestrictedZone, HordeGauntlet, LastKnownMarker still classic. |
-| `legacy/entities/hunters.js` | 340 | entities | `replaced` | entities/hunter.mjs, demoness.mjs |  |
-| `legacy/entities/drones.js` | 258 | entities | `replaced` | entities/drone.mjs |  |
+| `legacy/entities/hunters.js` | 340 | entities | `replaced` | game/entities/hunter.mjs, demoness.mjs |  |
+| `legacy/entities/drones.js` | 258 | entities | `replaced` | game/entities/drone.mjs |  |
 | `legacy/presentation/marionette.js` | 107 | art | `art` | actor appearance packets |  |
-| `legacy/entities/marionettes.js` | 126 | entities | `replaced` | entities/marionette.mjs |  |
+| `legacy/entities/marionettes.js` | 126 | entities | `replaced` | game/entities/marionette.mjs |  |
 | `legacy/buildings/building-v1.js` | 229 | buildings | `art` | compound statics + building appearance packets |  |
 | `legacy/buildings/building-v2.js` | 1617 | buildings | `art` | compound statics + building appearance packets |  |
 | `legacy/buildings/landmark-kit.js` | 210 | buildings | `art` | compound statics + building appearance packets |  |
@@ -172,17 +172,17 @@ These have no Basement or Directory home yet, so the scripts that need them cann
 | `legacy/buildings/enni-cole.js` | 381 | buildings | `art` | compound statics + building appearance packets |  |
 | `legacy/buildings/silver-queen-deco.js` | 674 | buildings | `art` | compound statics + building appearance packets |  |
 | `legacy/buildings/moon-city-deco.js` | 827 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/traffic/roads.js` | 2396 | traffic | `partly` | navigation roadNetwork (+ directory/road-navigation.mjs) | Topology loads into roads; lanes, gates and intersections logic still classic. |
+| `legacy/traffic/roads.js` | 2396 | traffic | `partly` | navigation roadNetwork (+ game/data/road-navigation.mjs) | Topology loads into roads; lanes, gates and intersections logic still classic. |
 | `legacy/traffic/garage-zib.js` | 800 | vehicles | `game_logic` | garage/Zib gameplay on gameVehicle |  |
 | `legacy/traffic/zen-art.js` | 147 | art | `art` | vehicle appearance packets |  |
 | `legacy/traffic/car-art.js` | 679 | art | `art` | vehicle appearance packets |  |
-| `legacy/traffic/traffic-vehicle.js` | 2503 | traffic | `replaced` | traffic/traffic-vehicle.mjs |  |
+| `legacy/traffic/traffic-vehicle.js` | 2503 | traffic | `replaced` | game/entities/traffic-vehicle.mjs |  |
 | `legacy/directory/game-vehicles.js` | 30 | data | `data` | Directory |  |
 | `legacy/traffic/vehicle-occupants.js` | 107 | vehicles | `partly` | mounted bodies |  |
 | `legacy/traffic/traffic-people.js` | 250 | traffic | `partly` | pedestrians.mjs + traffic controller crossings |  |
 | `legacy/traffic/traffic-signals.js` | 437 | traffic | `partly` | trafficController signals |  |
 | `legacy/traffic/lane-runner.js` | 384 | traffic | `partly` | navigation roads + followPath |  |
-| `legacy/traffic/traffic-manager.js` | 420 | traffic | `replaced` | traffic/traffic-manager.mjs | Has its own SpatialGrid: retires with it. |
+| `legacy/traffic/traffic-manager.js` | 420 | traffic | `replaced` | game/mechanics/traffic-manager.mjs | Has its own SpatialGrid: retires with it. |
 | `legacy/traffic/traffic-profiler.js` | 61 | tools | `game_logic` | profiling |  |
 | `legacy/world/parks.js` | 108 | maps | `partly` | exterior map data |  |
 | `legacy/world/lot-grounds.js` | 177 | maps | `partly` | exterior map data + render |  |
@@ -223,12 +223,12 @@ These have no Basement or Directory home yet, so the scripts that need them cann
 | `legacy/story/scenes/cast.js` | 8 | story | `game_logic` | story logic on the new runtime |  |
 | `legacy/story/scenes/prologue.js` | 115 | story | `game_logic` | story logic on the new runtime |  |
 | `legacy/story/scenes/van.js` | 210 | story | `game_logic` | story logic on the new runtime |  |
-| `legacy/lobby/level-lobby.js` | 3 | runtime | `replaced` | lobby/level-lobby.mjs |  |
+| `legacy/lobby/level-lobby.js` | 3 | runtime | `replaced` | engine/lobby/level-lobby.mjs |  |
 | `legacy/lobby/level-pause.js` | 52 | runtime | `partly` | runtime pause |  |
 | `legacy/lobby/level-stages.js` | 40 | runtime | `partly` | runtime stages |  |
 | `legacy/engine/pause-system.js` | 21 | runtime | `partly` | runtime pause |  |
 | `legacy/directory/effects-system.js` | 464 | effects | `partly` | particles + render packets |  |
-| `legacy/engine/game-engine.js` | 309 | runtime | `glue` | runtime/game-engine.mjs | The classic GameEngine and its mixins go when the new runtime boots the game. |
+| `legacy/engine/game-engine.js` | 309 | runtime | `glue` | engine/lobby/runtime/game-engine.mjs | The classic GameEngine and its mixins go when the new runtime boots the game. |
 | `legacy/engine/events.js` | 252 | gameplay | `game_logic` | a runtime system | Classic GameEngine mixin; review |
 | `legacy/engine/combat-effects.js` | 609 | effects | `partly` | combat presentation + particles |  |
 | `legacy/engine/breach-fx.js` | 80 | art | `art` | map/effect appearance producers |  |

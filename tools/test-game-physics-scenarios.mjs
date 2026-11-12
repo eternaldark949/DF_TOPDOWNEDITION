@@ -1,8 +1,8 @@
-import {registerGameEntityTypes} from '../src/directory/game-entity-types.mjs';
+import {registerGameEntityTypes} from '../src/game/boot/game-entity-types.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { physicsSystem } from '../src/basement/physics/index.mjs';
-import { createGameAssetLibrary } from '../src/directory/game-assets.mjs';
+import { physicsSystem } from '../src/engine/basement/physics/index.mjs';
+import { createGameAssetLibrary } from '../src/game/data/game-assets.mjs';
 const world=()=>{const p=new physicsSystem({asset_library:createGameAssetLibrary()});registerGameEntityTypes(p);return p;};
 const step = (p, n) => { for (let i = 0; i < n; i++) p.updateState(); };
 // These exercise Directory definitions on the engine. They are not legacy game cutover tests.

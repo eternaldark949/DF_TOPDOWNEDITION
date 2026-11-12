@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>gameEngine runtime example</title>
+<style>body{background:#0b1020;color:#eef2ff;font:16px system-ui;max-width:720px;margin:32px auto}canvas{width:100%;border:1px solid #64748b}button{padding:10px;margin:8px 8px 8px 0}pre{white-space:pre-wrap}</style>
+<h1>Shared runtime example</h1><p>WASD moves the player. Change rooms to keep the same player body and physics world. Pause holds simulation. Choose a weapon, aim with the mouse or right stick, and hold fire. Quick draw fires when you release.</p>
+<canvas id="scene" width="640" height="360"></canvas>
+<label>Weapon <select id="weapon"><option value="">Bare hands</option></select></label> <button id="drop">Drop equipped weapon</button><button id="quick">Quick draw</button>
+<button id="learn-abilities">Learn demo abilities</button><label>Attack <select id="attack"><option value="">Automatic</option></select></label>
+<button id="actor-art">Velvet &amp; Drone</button><button id="mounted-demo">Mounted combat demo</button><button id="leave-seat">Exit seat</button>
+<button id="switch">Change room</button><button id="pause">Pause</button><pre id="status"></pre>
+<div id="touch-move" style="width:110px;height:110px;border:1px solid #64748b;touch-action:none;display:inline-block">Move</div>
+<div id="touch-aim" style="width:110px;height:110px;border:1px solid #64748b;touch-action:none;display:inline-block">Aim</div>
+<button id="touch-fire" style="touch-action:none">Fire input</button>
+<script type="module">
+import {abilityPresentation} from '../presentation/ability-presentation.mjs';
+import {actorPresentation} from '../presentation/actor-presentation.mjs';
+import {installCombatPresentation} from '../presentation/combat-presentation.mjs';
+import {createGameVehicle} from '../boot/game-vehicle-factory.mjs';
+import { createRuntimeExample } from './runtime-example.mjs';
+const status=document.getElementById('status');
+const surface=document.getElementById('scene');
+const {engine,player}=createRuntimeExample({surface});
+const rect=surface.getBoundingClientRect();
+engine.api.render.resize({width:rect.width,height:rect.height,pixel_ratio:devicePixelRatio});
+engine.api.camera.setView({position:[rect.width/2,rect.height/2]});
+await engine.api.render.setRenderer('canvas',{surface});
+engine.api.controls.touch.stick('move',{zone:'touch-move',anchor:'centre',travel:40,mouse:true});
+engine.api.controls.touch.stick('aim',{zone:'touch-aim',anchor:'centre',travel:40,mouse:true});
+engine.api.controls.touch.button('touch-fire','touchFire');
+const weaponSelect=document.getElementById('weapon');
+for(const [id,definition] of Object.entries((await import('../data/game-items.mjs')).createItemCatalog()))if(definition.type==='weapon'){const option=document.createElement('option');option.value=id;option.textContent=definition.name;weaponSelect.append(option);}
+const attackSelect=document.getElementById('attack');
+const refreshAttacks=()=>{attackSelect.replaceChildren();const automatic=document.createElement('option');automatic.value='';automatic.textContent='Automatic';attackSelect.append(automatic);for(const attack of engine.api.attacks.getAvailableAttacks(player)){const option=document.createElement('option');option.value=attack.attack_id;option.textContent=attack.name;attackSelect.append(option);}attackSelect.value=player.data.attack_state?.selected_id??'';};
+weaponSelect.onchange=()=>{const id=weaponSelect.value;if(!id)engine.api.attacks.selectAttack(player,'unarmed:punch');else {const item=engine.api.items.findItem(id)??engine.api.items.grantItem(id);if(item)engine.api.attacks.selectAttack(player,`weapon:${id}`,{instance_id:item.instance_id});}engine.api.weapons.setHolstered(false);refreshAttacks();};
+attackSelect.onchange=()=>{if(attackSelect.value)engine.api.attacks.selectAttack(player,attackSelect.value);else engine.api.attacks.useDefaultAttack(player);engine.api.weapons.setHolstered(false);refreshAttacks();};
+document.getElementById('learn-abilities').onclick=()=>{const loadout=engine.api.abilities.getLoadout(player);for(const id of Object.keys(engine.api.physics.elements.asset_library.getResource('df:abilities').data))loadout.learnAbility(id);refreshAttacks();};
+for(const event of ['items:acquired','items:removed','items:equipped','items:unequipped','items:changed','items:loaded'])engine.api.items.on(event,refreshAttacks);
+refreshAttacks();
+document.getElementById('drop').onclick=()=>{const item=engine.api.items.getEquippedWeapon();if(item)engine.api.loot.dropItem(item.instance_id);};
+document.getElementById('quick').onclick=()=>engine.api.weapons.armQuickDraw();
+let mountedDemo=null;
+document.getElementById('actor-art').onclick=()=>{if(engine.api.actors.getActors().some(actor=>actor.entity_type==='df_velvet_cat'&&!actor.destroyed))return;engine.api.actors.spawn({kind:'velvet_cat',name:'Velvet',position:[180,230],data:{adopted:true}});engine.api.actors.spawn({kind:'drone',position:[360,240],data:{alliance:'friendly',drone_kind:'seer',drone_state:{format_version:1,flight:'hover',phase_started_at:0,alt:0,lost_seconds:0,next_bolt_at:3600,next_special_at:3600}}});};
+document.getElementById('mounted-demo').onclick=()=>{if(mountedDemo&&!mountedDemo.destroyed)return;const car=createGameVehicle(engine.api.physics,{purpose:'owned',control_mode:'PLAYER',position:[220,120]});if(!car){status.textContent='Move away from the demo parking space and try again.';return;}const companion=engine.api.actors.spawn({kind:'npc',name:'Victoria',role:'teammate',position:[160,120],data:{recruited:true,hireType:'permanent',weapon_definition_id:'pistol_fpx',accuracy_mod:0}});engine.api.actors.spawn({kind:'actor',name:'Practice target',position:[240,310],data:{health:1000,max_health:1000,alliance:'hostile'}});car.assignDriver(player);car.assignPassenger(companion,{combine_mass:true});mountedDemo=car;};
+document.getElementById('leave-seat').onclick=()=>mountedDemo&&!mountedDemo.destroyed&&mountedDemo.releasePassenger(player);
+const report=()=>{status.textContent=JSON.stringify({level:engine.active_level?.level_id,player_id:player.entity_id,tick:engine.api.physics.simulation_tick,bodies:engine.api.physics.getStatistics().bodies,paused:engine.paused},null,2);};
+engine.registerSystem('status',{render:report});
+document.getElementById('switch').onclick=async()=>{try{await engine.loadLevel(engine.active_level.level_id==='room_a'?'room_b':'room_a');}catch(error){status.textContent=error.stack;console.error(error);}};
+let resume;document.getElementById('pause').onclick=()=>{if(resume){resume();resume=null;}else resume=engine.pause('example');report();};
+engine.registerSystem('actor-presentation',new actorPresentation());
+engine.registerSystem('ability-presentation',new abilityPresentation());
+await installCombatPresentation(engine);
+await engine.loadLevel('room_a');engine.start();
+// Inspection for the browser acceptance check; never used by the production boot.
+globalThis.runtimeExample={engine,player};
+</script></html>

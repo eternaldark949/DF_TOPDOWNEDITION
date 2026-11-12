@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { playerVitals } from '../src/gameplay/player-vitals.mjs';
+import { playerVitals } from '../src/game/mechanics/player-vitals.mjs';
 const step=(v,n)=>{for(let i=0;i<n;i++)v.advance(1/60);};
 
 test('vitals reference the owner data and never retain a second health/energy value',()=>{
@@ -38,5 +38,5 @@ test('production sources contain no retired host ledgers or health synchronizati
  const root=fileURLToPath(new URL('../src/',import.meta.url));
  const walk=dir=>readdirSync(dir,{withFileTypes:true}).flatMap(entry=>entry.isDirectory()?walk(resolve(dir,entry.name)):/\.(?:js|mjs)$/.test(entry.name)?[resolve(dir,entry.name)]:[]);
  for(const path of walk(root))assert.doesNotMatch(readFileSync(path,'utf8'),/\b(?:playerHealth|maxPlayerHealth|healthRegenTimer|flitState|syncHealth)\b/,path);
- const source=readFileSync(new URL('../src/gameplay/player-vitals.mjs',import.meta.url),'utf8');assert.doesNotMatch(source,/physicsSystem|spatialGrid|CollisionSystem|Math\.(?:atan2|hypot|cos|sin)|document\.|window\./);
+ const source=readFileSync(new URL('../src/game/mechanics/player-vitals.mjs',import.meta.url),'utf8');assert.doesNotMatch(source,/physicsSystem|spatialGrid|CollisionSystem|Math\.(?:atan2|hypot|cos|sin)|document\.|window\./);
 });

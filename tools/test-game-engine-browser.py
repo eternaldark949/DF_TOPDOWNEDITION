@@ -15,7 +15,7 @@ try:
   page.route('**/favicon.ico',lambda route:route.fulfill(status=204))
   page.on('pageerror',lambda error:errors.append(str(error)))
   page.on('console',lambda message:errors.append(message.text) if message.type=='error' else None)
-  page.goto(f'http://127.0.0.1:{server.server_port}/src/runtime/examples/',wait_until='networkidle')
+  page.goto(f'http://127.0.0.1:{server.server_port}/src/game/examples/',wait_until='networkidle')
   page.wait_for_function('!!globalThis.runtimeExample?.engine.active_level')
   initial=page.evaluate('''() => {const {engine,player}=runtimeExample;globalThis.runtimeBefore={world:engine.api.physics,grid:engine.api.physics.spatial_grid,body:player.body};return {x:player.position[0],id:player.entity_id,bodies:engine.api.physics.getStatistics().bodies};}''')
   page.evaluate('''() => {const {session}=runtimeExample.engine.api;session.player.takeDamage(20);const item=session.items.grantItem('pistol_fpx');session.items.equipItem(item.instance_id);session.items.grantItem('consumable:bubbleTea',{quantity:2});}''')

@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createGameRuntime} from '../src/directory/game-runtime.mjs';
-import {gameLevel} from '../src/runtime/game-level.mjs';
-import {Hunter} from '../src/entities/hunter.mjs';
-import {Ganger} from '../src/entities/ganger.mjs';
+import {createGameRuntime} from '../src/game/boot/game-runtime.mjs';
+import {gameLevel} from '../src/engine/lobby/runtime/game-level.mjs';
+import {Hunter} from '../src/game/entities/hunter.mjs';
+import {Ganger} from '../src/game/entities/ganger.mjs';
 class Room extends gameLevel{}
 async function setup(){const engine=createGameRuntime({schedule_frame:null,actor_policy:{random:()=>.5},player:{template:'df:player_949',entity_type:'df_player',position:[100,100]}});engine.registerLevel('a',Room).registerLevel('b',Room);await engine.loadLevel('a');engine.start();return {engine,api:engine.api,player:engine.api.session.player,tick:(n=1)=>{for(let i=0;i<n;i++)engine.updateState();}};}
 test('Hunter factory creates one official native identity with Directory tuning and owned sidearm/claw capability',async()=>{

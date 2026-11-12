@@ -31,7 +31,7 @@ jobs:
         if: github.event_name != 'pull_request'
         run: node tools/build.mjs
 
-      - name: Check the game data (src/directory/game-db)
+      - name: Check the game data (src/game/data/game-db)
         run: node tools/test-game-db.cjs
 
       - name: Check the world queries (rooms, seats, NPCs, buildings)
@@ -42,8 +42,8 @@ jobs:
 
       - name: Check native systems, runtime and player ownership
         run: >-
-          node --test src/basement/physics/tests/*.test.mjs src/basement/maps/tests/*.test.mjs tools/test-map-layouts.mjs
-          src/basement/controls/tests/*.test.mjs src/basement/rendering/tests/*.test.mjs
+          node --test src/engine/basement/physics/tests/*.test.mjs src/engine/basement/maps/tests/*.test.mjs tools/test-map-layouts.mjs
+          src/engine/basement/controls/tests/*.test.mjs src/engine/basement/rendering/tests/*.test.mjs
           tools/test-game-physics-scenarios.mjs tools/test-entity-assets.mjs
           tools/test-street-population.mjs tools/test-player-systems.mjs tools/test-player-vitals.mjs
           tools/test-game-engine.mjs tools/test-native-bundle.mjs

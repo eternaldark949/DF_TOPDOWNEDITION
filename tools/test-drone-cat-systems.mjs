@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createGameRuntime} from '../src/directory/game-runtime.mjs';
-import {createGameVehicle} from '../src/directory/game-vehicle-factory.mjs';
-import {gameLevel} from '../src/runtime/game-level.mjs';
-import {Drone} from '../src/entities/drone.mjs';
-import {VelvetCat} from '../src/entities/velvet-cat.mjs';
-import {dronePresentation} from '../src/presentation/drone.mjs';
-import {velvetPresentation} from '../src/presentation/velvet-cat-animation.mjs';
+import {createGameRuntime} from '../src/game/boot/game-runtime.mjs';
+import {createGameVehicle} from '../src/game/boot/game-vehicle-factory.mjs';
+import {gameLevel} from '../src/engine/lobby/runtime/game-level.mjs';
+import {Drone} from '../src/game/entities/drone.mjs';
+import {VelvetCat} from '../src/game/entities/velvet-cat.mjs';
+import {dronePresentation} from '../src/game/presentation/drone.mjs';
+import {velvetPresentation} from '../src/game/presentation/velvet-cat-animation.mjs';
 class Room extends gameLevel{}
 async function setup(){const engine=createGameRuntime({schedule_frame:null,player:{template:'df:player_949',entity_type:'df_player',position:[500,500]}});engine.registerLevel('a',Room).registerLevel('b',Room);await engine.loadLevel('a');engine.start();const api=engine.api;api.session.player.maxHp=10000;api.session.player.hp=10000;return {engine,api,player:api.session.player,tick:(n=1)=>{for(let i=0;i<n;i++)engine.updateState();}};}
 function drone(api,kind='lancer',position=[740,500]){return api.actors.spawn({kind:'drone',position,rotation:Math.PI,data:{drone_kind:kind}});}

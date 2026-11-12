@@ -15,7 +15,7 @@ try:
   page.route('**/favicon.ico',lambda route:route.fulfill(status=204))
   page.on('pageerror',lambda error:(errors.append(str(error)),print(str(error),flush=True)))
   page.on('console',lambda message:(errors.append(message.text),print(message.text,flush=True)) if message.type=='error' else None)
-  page.goto(f'http://127.0.0.1:{server.server_port}/src/runtime/examples/',wait_until='networkidle')
+  page.goto(f'http://127.0.0.1:{server.server_port}/src/game/examples/',wait_until='networkidle')
   page.wait_for_function('!!globalThis.runtimeExample?.engine.active_level')
   page.keyboard.down('d');page.wait_for_function('runtimeExample.engine.api.controls.active("move")');
   keyboard=page.evaluate('runtimeExample.engine.api.controls.direction("move")');page.keyboard.up('d');assert keyboard==[1,0],keyboard

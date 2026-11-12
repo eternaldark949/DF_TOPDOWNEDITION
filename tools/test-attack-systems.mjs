@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createGameRuntime} from '../src/directory/game-runtime.mjs';
-import {gameLevel} from '../src/runtime/game-level.mjs';
-import {gameCharacter} from '../src/basement/physics/index.mjs';
-import {attackRegistry} from '../src/gameplay/attacks/attack-registry.mjs';
+import {createGameRuntime} from '../src/game/boot/game-runtime.mjs';
+import {gameLevel} from '../src/engine/lobby/runtime/game-level.mjs';
+import {gameCharacter} from '../src/engine/basement/physics/index.mjs';
+import {attackRegistry} from '../src/game/mechanics/attacks/attack-registry.mjs';
 class Room extends gameLevel{}
 async function setup(){const engine=createGameRuntime({schedule_frame:null,actor_policy:{random:()=>.5},ability_policy:{random:()=>.5},player:{template:'df:player_949',entity_type:'df_player',position:[100,100]}});engine.registerLevel('a',Room).registerLevel('b',Room);await engine.loadLevel('a');engine.start();const api=engine.api;return {engine,api,player:api.session.player,tick:(n=1)=>{for(let i=0;i<n;i++)engine.updateState();}};}
 const soldier=(api,position=[50,100])=>api.actors.spawn({kind:'actor',position});
@@ -57,7 +57,7 @@ test('requests cannot inject physics/damage fields, registry changes cannot occu
 
 
 test('shared held-weapon presentation uses canonical inventory for plain characters without an items property',async()=>{
- const {combatPresentation}=await import('../src/presentation/combat-presentation.mjs');const {engine,api}=await setup(),custom=api.physics.createCharacter({position:[150,100]});const items=api.attacks.getItems(custom);items.grantItem('pistol_fpx');api.attacks.selectAttack(custom,'weapon:pistol_fpx');let drawn=0;const before=api.physics.savePhysicsState();new combatPresentation({weapon_art:{draw:()=>drawn++}}).render({api},1,{submit:()=>{}});assert.equal(custom.items,undefined);assert.equal(drawn,1);assert.deepEqual(api.physics.savePhysicsState(),before);engine.dispose();
+ const {combatPresentation}=await import('../src/game/presentation/combat-presentation.mjs');const {engine,api}=await setup(),custom=api.physics.createCharacter({position:[150,100]});const items=api.attacks.getItems(custom);items.grantItem('pistol_fpx');api.attacks.selectAttack(custom,'weapon:pistol_fpx');let drawn=0;const before=api.physics.savePhysicsState();new combatPresentation({weapon_art:{draw:()=>drawn++}}).render({api},1,{submit:()=>{}});assert.equal(custom.items,undefined);assert.equal(drawn,1);assert.deepEqual(api.physics.savePhysicsState(),before);engine.dispose();
 });
 
 

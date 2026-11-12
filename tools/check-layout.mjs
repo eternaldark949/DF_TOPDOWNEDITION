@@ -2,6 +2,7 @@
 //   1. classic code lives only in src/legacy/ (no .js, .cjs or .css elsewhere in src; .html only in examples/)
 //   2. nothing outside src/legacy/ imports from it, and legacy scripts import nothing (they reach the
 //      new engine only through the bundled DFNative object)
+//   0. src/ holds only engine/, game/ and legacy/
 //   3. src/engine/ runs standalone: each level imports only the levels the dependency table allows,
 //      never src/game/, src/legacy/ or an unsorted folder, carries its level banner, and names no game
 //   node tools/check-layout.mjs
@@ -25,6 +26,7 @@ const GAME_NAMES = /\bdf_|\bapartment|\bGAME_DB\b|\bDFNative\b|\bganger|\bvelvet
 const importsOf = source => [...source.matchAll(/(?:^|[\s;])(?:import|export)\s[^'"`]*?from\s*['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]\s*\)|^\s*import\s*['"]([^'"]+)['"]/gm)].map(m => m[1] ?? m[2] ?? m[3]);
 
 for (const f of files) {
+    if (!/^(engine|game|legacy)\//.test(f.rel) && f.rel !== 'README.md') problems.push(`${f.rel}: src/ holds only engine/, game/ and legacy/`);
     const legacy = f.rel.startsWith('legacy/');
     if (!legacy && /\.(js|cjs|css)$/.test(f.rel)) problems.push(`${f.rel}: classic file outside src/legacy/ (new code is .mjs; classic code is quarantined)`);
     if (!legacy && f.rel.endsWith('.html') && !f.rel.includes('/examples/')) problems.push(`${f.rel}: page outside src/legacy/ and not an example`);

@@ -3,7 +3,7 @@
   "file": "legacy/basement/frame-clock.js",
   "area": "runtime",
   "status": "replaced",
-  "target": "lobby/level-lobby.mjs clock in runtime/game-engine.mjs",
+  "target": "engine/lobby/level-lobby.mjs clock in engine/lobby/runtime/game-engine.mjs",
   "note": ""
  },
  {
@@ -168,70 +168,70 @@
   "note": "Stays; native code reads the same JSON."
  },
  {
-  "file": "directory/game-db/items.json",
+  "file": "game/data/game-db/items.json",
   "area": "data",
   "status": "data",
   "target": "Directory GAME_DB chapter",
   "note": "Read by native code too."
  },
  {
-  "file": "directory/game-db/shops.json",
+  "file": "game/data/game-db/shops.json",
   "area": "data",
   "status": "data",
   "target": "Directory GAME_DB chapter",
   "note": "Read by native code too."
  },
  {
-  "file": "directory/game-db/progression.json",
+  "file": "game/data/game-db/progression.json",
   "area": "data",
   "status": "data",
   "target": "Directory GAME_DB chapter",
   "note": "Read by native code too."
  },
  {
-  "file": "directory/game-db/audio.json",
+  "file": "game/data/game-db/audio.json",
   "area": "data",
   "status": "data",
   "target": "Directory GAME_DB chapter",
   "note": "Read by native code too."
  },
  {
-  "file": "directory/game-db/enemies.json",
+  "file": "game/data/game-db/enemies.json",
   "area": "data",
   "status": "data",
   "target": "Directory GAME_DB chapter",
   "note": "Read by native code too."
  },
  {
-  "file": "directory/game-db/vehicles.json",
+  "file": "game/data/game-db/vehicles.json",
   "area": "data",
   "status": "data",
   "target": "Directory GAME_DB chapter",
   "note": "Read by native code too."
  },
  {
-  "file": "directory/game-db/places.json",
+  "file": "game/data/game-db/places.json",
   "area": "data",
   "status": "data",
   "target": "Directory GAME_DB chapter",
   "note": "Read by native code too."
  },
  {
-  "file": "directory/game-db/story.json",
+  "file": "game/data/game-db/story.json",
   "area": "data",
   "status": "data",
   "target": "Directory GAME_DB chapter",
   "note": "Read by native code too."
  },
  {
-  "file": "directory/game-db/dialogue.json",
+  "file": "game/data/game-db/dialogue.json",
   "area": "data",
   "status": "data",
   "target": "Directory GAME_DB chapter",
   "note": "Read by native code too."
  },
  {
-  "file": "directory/game-db/cast.json",
+  "file": "game/data/game-db/cast.json",
   "area": "data",
   "status": "data",
   "target": "Directory GAME_DB chapter",
@@ -472,14 +472,14 @@
   "file": "legacy/entities/npc.js",
   "area": "entities",
   "status": "replaced",
-  "target": "entities/npc.mjs",
+  "target": "game/entities/npc.mjs",
   "note": ""
  },
  {
   "file": "legacy/entities/pedestrians.js",
   "area": "entities",
   "status": "replaced",
-  "target": "entities/pedestrians.mjs + pedestrian-manager.mjs",
+  "target": "game/entities/pedestrians.mjs + pedestrian-manager.mjs",
   "note": "Production callers pending."
  },
  {
@@ -549,14 +549,14 @@
   "file": "legacy/entities/hunters.js",
   "area": "entities",
   "status": "replaced",
-  "target": "entities/hunter.mjs, demoness.mjs",
+  "target": "game/entities/hunter.mjs, demoness.mjs",
   "note": ""
  },
  {
   "file": "legacy/entities/drones.js",
   "area": "entities",
   "status": "replaced",
-  "target": "entities/drone.mjs",
+  "target": "game/entities/drone.mjs",
   "note": ""
  },
  {
@@ -570,7 +570,7 @@
   "file": "legacy/entities/marionettes.js",
   "area": "entities",
   "status": "replaced",
-  "target": "entities/marionette.mjs",
+  "target": "game/entities/marionette.mjs",
   "note": ""
  },
  {
@@ -773,7 +773,7 @@
   "file": "legacy/traffic/roads.js",
   "area": "traffic",
   "status": "partly",
-  "target": "navigation roadNetwork (+ directory/road-navigation.mjs)",
+  "target": "navigation roadNetwork (+ game/data/road-navigation.mjs)",
   "note": "Topology loads into roads; lanes, gates and intersections logic still classic."
  },
  {
@@ -801,7 +801,7 @@
   "file": "legacy/traffic/traffic-vehicle.js",
   "area": "traffic",
   "status": "replaced",
-  "target": "traffic/traffic-vehicle.mjs",
+  "target": "game/entities/traffic-vehicle.mjs",
   "note": ""
  },
  {
@@ -843,7 +843,7 @@
   "file": "legacy/traffic/traffic-manager.js",
   "area": "traffic",
   "status": "replaced",
-  "target": "traffic/traffic-manager.mjs",
+  "target": "game/mechanics/traffic-manager.mjs",
   "note": "Has its own SpatialGrid: retires with it."
  },
  {
@@ -1130,7 +1130,7 @@
   "file": "legacy/lobby/level-lobby.js",
   "area": "runtime",
   "status": "replaced",
-  "target": "lobby/level-lobby.mjs",
+  "target": "engine/lobby/level-lobby.mjs",
   "note": ""
  },
  {
@@ -1165,7 +1165,7 @@
   "file": "legacy/engine/game-engine.js",
   "area": "runtime",
   "status": "glue",
-  "target": "runtime/game-engine.mjs",
+  "target": "engine/lobby/runtime/game-engine.mjs",
   "note": "The classic GameEngine and its mixins go when the new runtime boots the game."
  },
  {

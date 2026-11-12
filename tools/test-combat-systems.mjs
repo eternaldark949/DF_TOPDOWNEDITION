@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createGameRuntime} from '../src/directory/game-runtime.mjs';
-import {gameLevel} from '../src/runtime/game-level.mjs';
-import {BODY_GROUP} from '../src/basement/physics/index.mjs';
+import {createGameRuntime} from '../src/game/boot/game-runtime.mjs';
+import {gameLevel} from '../src/engine/lobby/runtime/game-level.mjs';
+import {BODY_GROUP} from '../src/engine/basement/physics/index.mjs';
 class Room extends gameLevel{}
 async function setup(policy={}){const e=createGameRuntime({schedule_frame:null,weapon_policy:{random:()=>.99,...policy},player:{template:'df:player_949',entity_type:'df_player',position:[100,100]}});e.registerLevel('a',Room);await e.loadLevel('a');e.start();const a=e.api,p=a.session.player;p.lookInDirection([1,0]);const target=(position=[180,100],data={})=>a.physics.createCharacter({template:'df:character',position,data:{health:5000,alliance:'hostile',...data},movement:{max_speed:0}});const equip=id=>{const item=a.items.findItem(id)??a.items.grantItem(id);a.items.equipItem(item.instance_id);a.weapons.setHolstered(false);a.weapons.setCooldown(0);return item;};return {e,a,p,target,equip,tick:(n=1)=>{for(let i=0;i<n;i++)e.updateState();}};}
 test('Directory installs executable combat and item services in the same world and snapshots store rule state on official entities',async()=>{const {e,a,p}=await setup();assert.equal(a.items,a.session.items);assert.equal(a.weapons.state,p.data.weapon_state);assert.equal(a.physics.getStatistics().bodies,1);assert.ok(e.listSystems().includes('loot'));e.dispose();});
@@ -68,5 +68,5 @@ test('failed native launch does not spend a first-shot damage bonus or cooldown'
  assert.throws(()=>a.weapons.fire({direction:[0,0]}));assert.deepEqual(a.weapons.state,before);assert.equal(a.physics.getStatistics().bodies,bodies);const shot=a.weapons.fire({direction:[1,0]});assert.equal(shot.data.damage,70);assert.equal(a.weapons.state.draw_shot_used,true);e.dispose();
 });
 test('short-lived gameplay lists and source files cannot hide alternate physical math or a second grid',async()=>{
- const {readFile}=await import('node:fs/promises');for(const file of ['combat/weapon-system.mjs','combat/combat-system.mjs','items/loot-system.mjs']){const source=await readFile(new URL('../src/gameplay/'+file,import.meta.url),'utf8');assert.doesNotMatch(source,/Math\.(?:atan2|hypot|cos|sin)\(|collisionDetector|shapeKit|new spatialGrid|\.linear_velocity\s*=|\.velocity\s*=|ProjectileEntity|GameEntity\.registry/);}
+ const {readFile}=await import('node:fs/promises');for(const file of ['combat/weapon-system.mjs','combat/combat-system.mjs','items/loot-system.mjs']){const source=await readFile(new URL('../src/game/mechanics/'+file,import.meta.url),'utf8');assert.doesNotMatch(source,/Math\.(?:atan2|hypot|cos|sin)\(|collisionDetector|shapeKit|new spatialGrid|\.linear_velocity\s*=|\.velocity\s*=|ProjectileEntity|GameEntity\.registry/);}
 });

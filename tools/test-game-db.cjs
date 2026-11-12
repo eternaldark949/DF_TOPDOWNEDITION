@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 'use strict';
-// The game database (src/directory/game-db/): each chapter is plain JSON that tools/build.mjs inlines as
+// The game database (src/game/data/game-db/): each chapter is plain JSON that tools/build.mjs inlines as
 // GAME_DB.<chapter>. Checks every chapter is valid, in the build, documented in its _about, that its ids
 // point at things that exist, and that the running game reads the same data under the old names.
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {join}=require('node:path');
 const {runtime}=require('./test-game-runtime.cjs');
-const ROOT=join(__dirname,'..'), DIR=join(ROOT,'src','directory','game-db');
+const ROOT=join(__dirname,'..'), DIR=join(ROOT,'src','game','data','game-db');
 const tests=[];
 function test(name,fn){fn();tests.push(name);}
 const chapters=fs.readdirSync(DIR).filter(f=>f.endsWith('.json')).sort();
@@ -19,7 +19,7 @@ test('Every chapter is valid JSON, listed in the build, and says what each of it
  assert.ok(chapters.length>0);
  for(const f of chapters){
   const db=load(f);
-  assert.ok(build.includes(`'directory/game-db/${f}'`),`${f} is not in tools/build.mjs SCRIPTS`);
+  assert.ok(build.includes(`'game/data/game-db/${f}'`),`${f} is not in tools/build.mjs SCRIPTS`);
   assert.ok(/^[a-z][a-z0-9_]*\.json$/.test(f),`${f}: chapter files are snake_case`);
   assert.ok(db._about&&db._about.tables,`${f} has no _about.tables`);
   const tables=Object.keys(db).filter(k=>k!=='_about');

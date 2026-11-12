@@ -3,11 +3,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import places from '../src/directory/game-db/places.json' with { type: 'json' };
-import { PROP_TYPES, MAP_IDS, resolveMapLayout, resolvePlacement, mapHost, createMapLibraries } from '../src/directory/game-maps.mjs';
-import { createGameAssetLibrary } from '../src/directory/game-assets.mjs';
-import { buildMapPackets } from '../src/basement/maps/index.mjs';
-import { physicsSystem } from '../src/basement/physics/index.mjs';
+import places from '../src/game/data/game-db/places.json' with { type: 'json' };
+import { PROP_TYPES, MAP_IDS, resolveMapLayout, resolvePlacement, mapHost, createMapLibraries } from '../src/game/data/game-maps.mjs';
+import { createGameAssetLibrary } from '../src/game/data/game-assets.mjs';
+import { buildMapPackets } from '../src/engine/basement/maps/index.mjs';
+import { physicsSystem } from '../src/engine/basement/physics/index.mjs';
 
 test('every map in GAME_DB has a layout file, and every placement names a catalog type', () => {
     assert.deepEqual([...MAP_IDS].sort(), Object.keys(places.maps).sort());
@@ -54,7 +54,7 @@ test('every map layout builds into a native world through the Basement map build
 });
 
 test('every map with rooms builds a room graph whose doors join known rooms', async () => {
-    const { mapInstance } = await import('../src/basement/maps/index.mjs');
+    const { mapInstance } = await import('../src/engine/basement/maps/index.mjs');
     for (const [id, def] of Object.entries(places.rooms)) {
         const map = places.maps[id], instance = new mapInstance(new physicsSystem(), { map_id: id, size: [map.width, map.height], rooms: def.rooms, doors: def.doors ?? [] });
         assert.equal(instance.rooms.rooms.length, Object.keys(def.rooms).length, id);

@@ -78,7 +78,7 @@ Each level below lists what it is, what it owns, what it may import, what it mus
 - the interpolation blend used for drawing;
 - the frame schedule;
 - the ordered list of update phases;
-- the application coordinator that registers levels and systems and runs their hooks in order. Today that coordinator is `runtime/game-engine.mjs`, which belongs in the Lobby (see section 9).
+- the application coordinator that registers levels and systems and runs their hooks in order. That coordinator is `engine/lobby/runtime/game-engine.mjs` (`gameEngine`).
 
 **The jacks:** `levelLobby.plugIn({...})` takes the following jacks:
 - `isRunning`, `beginFrame`, `frameRateLimit`, `acceptFrame`, `timeScale`, `isPaused`;
@@ -104,7 +104,7 @@ Each level below lists what it is, what it owns, what it may import, what it mus
 
 1. **Data structures.** What each kind of data looks like, and the checks that a library entry is well formed: a prop type, a map layout, a room set, a skeleton, an animation clip, a material, a vehicle model, a sound bank, a plant species. A structure lists fields, units, defaults and allowed values. This is what "the Directory provides the data structure" means for a prefab: the humanoid prefab reads a skeleton, proportions and clips whose shape the Directory defines.
 2. **The registry.** The one place anything asks for data by its qualified id, `library:local` (for example `df_props:catalog`). It holds the loaded libraries, their typed resources (`{kind, data}`) and their templates, and resolves template `extends`. Today this is `assetLibrary` inside `basement/physics`; it moves here (see section 9). Engine systems receive the registry as an object, so no lower level imports the Directory.
-3. **Loading.** Reading library files and resolving them once, at load time: placements over their type's defaults (with `null` removing a default), template `extends`, authored units converted to engine units. Loading only reshapes data and holds no world state, so it does not break the no-behaviour rule. Today this logic sits in `directory/game-maps.mjs` and `game-assets.mjs`, mixed with game content.
+3. **Loading.** Reading library files and resolving them once, at load time: placements over their type's defaults (with `null` removing a default), template `extends`, authored units converted to engine units. Loading only reshapes data and holds no world state, so it does not break the no-behaviour rule. Today this logic sits in `game/data/game-maps.mjs` and `game-assets.mjs`, mixed with game content (section 9).
 4. **The engine's own default libraries.** The data the engine needs to run with no game installed: the default entity kinds (static, prop, ghost trigger, decoration and so on), default materials, a default humanoid skeleton, builds and base clips, and later default plant species. These are what let the Penthouse prefabs boot standalone.
 
 **It does not hold the game's content.** Dimensions Freelancer's catalogs, maps, `GAME_DB`, character builds and balance numbers live in `game/data`. Game boot registers them into the Directory. The single-file build packs both the Directory and `game/data` into `DFAB V8.html`.
@@ -243,7 +243,7 @@ A file that seems to fit two answers is really two files. Split it. Example: `di
 
 ## 7. The single-file build, `main`, and the classic code
 
-- **Single-file build.** `node tools/build.mjs` builds `DFAB V8.html`, the whole game in one offline file. It concatenates the classic scripts listed in `SCRIPTS` and bundles the new modules through `@native` (`directory/native-entry.mjs`). CI runs `node tools/build.mjs --check`, so a change to `src` must be committed together with the rebuilt HTML.
+- **Single-file build.** `node tools/build.mjs` builds `DFAB V8.html`, the whole game in one offline file. It concatenates the classic scripts listed in `SCRIPTS` and bundles the new modules through `@native` (`game/boot/native-entry.mjs`). CI runs `node tools/build.mjs --check`, so a change to `src` must be committed together with the rebuilt HTML.
 - **`main` is the original.** `main` holds the original classic code. Compare against it whenever you need to know what the game did before, for example how hinged doors swung. Don't change behaviour silently: if the new engine changes how something feels, say so and get ETERNAL's agreement.
 - **Pull request 178 is intentionally unmerged.** It began the native engine, but parts of its layering break these rules (see section 9). Work stacked on it must fix those breaches, not copy them.
 - **Classic code is quarantined in `src/legacy/`.** Every classic script, stylesheet and the page shell (`legacy/index.html`) was moved there unchanged on 2026-11-12, at its original path: `legacy/engine/loop.js` is `src/engine/loop.js` on `main`. It runs on the old `GameEngine`. The quarantine rules:
@@ -256,9 +256,9 @@ A file that seems to fit two answers is really two files. Split it. Example: `di
 
 ---
 
-## 8. Target folder structure
+## 8. Folder structure
 
-ETERNAL's layout (2026-11-12): `src/` holds two roots, `engine/` and `game/`. The engine root holds the four levels; the game root holds the game's own modules. Folders marked *(proposed)* were suggested during planning and are not yet confirmed.
+ETERNAL's layout (2026-11-12): `src/` holds two roots, `engine/` and `game/`, plus the quarantine `legacy/`. Everything native now lives in `engine/` or `game/`. Entries marked *(to build)* do not exist yet.
 
 ```
 src/
@@ -270,67 +270,42 @@ src/
       rendering/                  render system and canvas backend; consumes render packets
       controls/                   input devices and bindings
       audio/ ui/ lighting/ timers/ saves/   (to build) the services the migration still lacks
-    lobby/                        LV1  levelLobby (the clock) + the runtime coordinator (from src/runtime/)
-    directory/                    LV2  the data layer
-      structures/                 (proposed) what each kind of data looks like, with validation
-      registry                    the library registry (assetLibrary, moved from basement/physics)
-      loading                     reading files; resolving defaults, placements and extends
-      defaults/                   (proposed) the engine's default libraries: entity kinds, materials,
-                                  default humanoid skeleton and clips, default plant species
-    penthouse/                    LV3  prefabs: humanoid/ (body + rig + artist), foliage/ (future)
+    lobby/                        LV1  level-lobby.mjs (the clock)
+      runtime/                         gameEngine and gameLevel: the coordinator that runs the phases
+    directory/                    LV2  the data layer (to build: structures, registry, loading, defaults)
+    penthouse/                    LV3  prefabs (to build: humanoid/, foliage/)
   game/                           Dimensions Freelancer
-    mechanics/                    combat, abilities, AI, encounters, venue life, crowds, story, missions
-    audio/                        the game's sounds and music, played through the Basement audio service
-    data/                         the game's content: props, maps, GAME_DB, builds, items,
-                                  weapons, vehicles, balance; registered into the Directory at boot
-    entities/  levels/  presentation/  ui/  boot/   (proposed) game classes, one module per map,
-                                  appearance producers, HUD and menus, and the runtime composition
+    boot/                         composes the runtime: native-entry.mjs (the DFNative bundle's entry),
+                                  game-runtime.mjs, entity-type registration, actor and vehicle factories
+    mechanics/                    game systems: abilities, actors, animation choice, attacks, combat,
+                                  encounters, items, player control and state, session, traffic manager
+    entities/                     the game's entity classes (player, NPCs, bosses, drones, traffic vehicle)
+    levels/                       one module per map: apartment.mjs and its map definition
+    presentation/                 appearance producers -> render packets; weapon models
+    audio/                        (empty) the game's sounds and music, through the Basement audio service
+    data/                         the game's content: GAME_DB (game-db/), game-assets/ (props, maps,
+                                  libraries), humanoid builds, rules JSON, catalog modules
+    examples/                     runnable pages that boot the game runtime in a browser
+  legacy/                         quarantined classic code at its original paths (section 7)
 ```
 
-**What exists today (2026-11-12).** `src/` has three kinds of folder:
-
-| Folder | State |
-|---|---|
-| `src/engine/` and `src/game/` | The new structure, created as a blank slate: one `README.md` per folder stating its rules. All new work goes here. |
-| `src/legacy/` | Quarantined classic code (section 7). |
-| `src/basement/`, `lobby/`, `runtime/`, `directory/`, `penthouse/`, `gameplay/`, `entities/`, `presentation/`, `levels/`, `traffic/` | Native code written before the new structure (PR 178 and its follow-ups). It is not legacy, but it is unsorted: each file moves into `src/engine/` or `src/game/` at its proper level, split where it mixes levels, following section 9. No new files are added to these folders. Until a file moves, `gameplay/`, `entities/`, `presentation/`, `levels/` and `traffic/` count as "the game" and the others as the level their name says. |
+Migration notes that described earlier cutovers are in `docs/migration/cutovers/`.
 
 ## 9. Known mismatches today
 
-Audited on 2026-11-12 by tracing every relative import of the new `.mjs` files. These are recorded so nobody copies them. Each one is to be fixed by moving code to its level, not by adding exceptions.
+Audited on 2026-11-12, after the native code was sorted into `src/engine/` and `src/game/`. `tools/check-layout.mjs` passes: every engine file carries its level banner, imports only what section 3 allows, and names no game. What remains is work that needs real changes, not moves. Each item is fixed by rewriting code at its level, never by adding an exception.
 
-**Correct and standalone:**
-- `basement/physics`, `basement/rendering` and `basement/controls` import nothing outside themselves.
-- `basement/maps` imports only `physics`.
-- `lobby/level-lobby.mjs` imports nothing.
-- `runtime/` imports only the Basement and the Lobby.
-- None of these files contain game names.
-
-**Mismatches:**
-1. `src/runtime/` (`game-engine.mjs`, `game-level.mjs`) is the Lobby's coordinator, but it lives in its own folder. It belongs in `lobby/`. Its example pages also import Directory files.
-2. **Game composition sits in the Directory:**
-   - `native-entry.mjs` imports every layer, including `gameplay`, `entities`, `levels` and `presentation`;
-   - `game-runtime.mjs` composes the runtime;
-   - `game-actor-factory.mjs` and `game-vehicle-factory.mjs` are factories;
-   - `game-entity-types.mjs`, `game-street.mjs` and `game-abilities.mjs` import game folders.
-
-   All of these belong in game boot or mechanics.
-3. **Behaviour sits in the Directory:**
-   - `venue-crowd.js`, `cafe-life.js`, `club-life.js` and `lobby-life.js`;
-   - `game-sound.js`, `effects-system.js`, `collision-system.js`, `world-session.js` and `world-query.js`;
-   - `game-controls.js` and `new-game-state.js`;
-   - the `decorate` hook in `apartment-definition.mjs`.
-4. **Loading is mixed with game content, and the registry is in the wrong level.** `game-maps.mjs` and `game-assets.mjs` mix generic resolution (placements over type defaults, library registration) with this game's file list. The resolution belongs in the Directory's loading; the file list and the files belong in `game/data`. The registry itself, `assetLibrary`, sits in `basement/physics` and belongs in the Directory.
-5. **Game content sits in the Directory.** `game-db/`, `game-assets/` (props, maps, the `df_*` libraries), `humanoid/builds.json` and `body-canon.json`, combat, item, vehicle and street catalogs, palettes and reactions are this game's data and belong in `game/data`. The Directory keeps only their structures, plus engine defaults (a default skeleton and clips) so the humanoid prefab can boot without the game.
-6. **Drawing code sits in the Directory.** `directory/weapon-appearance.mjs` draws (and a file with the same name exists in `presentation/`). It belongs in presentation, or in a Penthouse prefab.
-7. **Tools and examples sit in the Directory:** `validate-boss-records.mjs`, `runtime-example.mjs` and `rendering-example.mjs`.
-8. **Unsorted native code.** The native modules in `src/basement/`, `lobby/`, `runtime/`, `directory/`, `gameplay/`, `entities/`, `presentation/`, `levels/` and `traffic/` have not yet moved into `src/engine/` and `src/game/` (section 8). Their `README.md` files and tests move with them.
-9. **The humanoid is half migrated:**
-   - Motion is native: the Basement rig, Directory data in `directory/humanoid/`, and the game's clip choice in `gameplay/animation/humanoid-system.mjs`.
+1. **The registry is in the Basement.** `assetLibrary` lives in `engine/basement/physics/elements/asset-library.mjs`, and `elements/registry.mjs` and `lobby/runtime/game-engine.mjs` construct a default one. It belongs in `engine/directory/`; the Basement should only receive it (`new physicsSystem({asset_library})`), with the boot code creating it.
+2. **Loading is mixed with game content.** `game/data/game-maps.mjs` and `game/data/game-assets.mjs` mix generic resolution (placements over type defaults with `null` removing a default, library registration) with this game's file list. The resolution belongs in the Directory's loading; only the file list and the files stay in `game/data`.
+3. **`game/data` holds code that depends on mechanics.** The catalog modules are pure one-time reshaping, which is allowed, but `game-abilities.mjs` imports `game/mechanics/abilities/ability-loadout.mjs` and `mechanics/values.mjs`. Data must not depend on mechanics: the shared value helpers belong with the Directory's structures, and the loadout conversion belongs to the mechanic.
+4. **The engine has no default libraries.** `engine/directory/` and `engine/penthouse/` are empty, so no prefab can boot without the game. The humanoid's skeleton and clips exist only as game data (`game/data/humanoid/`).
+5. **The humanoid is half migrated:**
+   - Motion is native: the Basement rig, the game's data in `game/data/humanoid/`, and the game's clip choice in `game/mechanics/animation/humanoid-system.mjs`.
    - Drawing is classic: `legacy/penthouse/procedural-humanoid.js`, `gl-humanoid.js` and `garment-kit.js`, plus `legacy/ui/humanoid-render.js`, `bodies.js`, `wardrobe.js` and `poses.js`.
-   - The Penthouse has no native module yet.
-10. **Naming.** Some native systems use `update()` or `updateDoors()` instead of `updateState()`, for example `roomGraph.update()` and `mapInstance.updateDoors()`. Most new files lack their level banner.
-11. **A behaviour regression from PR 178:** hinged doors. In `main`, every interior hinged door, including the apartment's, was a physical swinging leaf with a spring. PR 178 made them kinematic and auto-opening. Restore the swinging behaviour.
+   - The Penthouse prefab (body, rig and artist, booting on Directory defaults) does not exist yet.
+6. **Behaviour still in classic code.** The classic Directory scripts that hold behaviour (`legacy/directory/venue-crowd.js`, `cafe-life.js`, `club-life.js`, `lobby-life.js`, `game-sound.js`, `effects-system.js`, `collision-system.js`, `world-session.js`, `world-query.js`, `game-controls.js`, `new-game-state.js`) are quarantined. They are rewritten as game mechanics, not moved.
+7. **Naming.** Some native systems use `update()` or `updateDoors()` instead of `updateState()`, for example `roomGraph.update()` and `mapInstance.updateDoors()`.
+8. **A behaviour regression from PR 178:** hinged doors. In `main`, every interior hinged door, including the apartment's, was a physical swinging leaf with a spring. PR 178 made them kinematic and auto-opening. Restore the swinging behaviour.
 
 When one of these is fixed, remove it from this list in the same commit.
 
@@ -348,7 +323,7 @@ In CI (`.github/workflows/build.yml`):
   - a file in `src/engine/` imports outside `src/engine/`, or imports a level that section 3 forbids;
   - a `.mjs` file in `src/engine/` lacks its level banner on the first line, or names the game (`df_`, `apartment`, `GAME_DB`, `DFNative` and so on) outside its tests.
 
-Still to add: **a standalone check** that runs the engine's tests with `src/game/` and `src/legacy/` absent. Until the unsorted native folders are moved, reviewers apply sections 3 and 6 to them by hand.
+Still to add: **a standalone check** that runs the engine's tests with `src/game/` and `src/legacy/` absent. Inside `src/game/`, reviewers apply sections 2 and 6 by hand: the check enforces only the engine's rules and the quarantine there.
 
 ---
 
