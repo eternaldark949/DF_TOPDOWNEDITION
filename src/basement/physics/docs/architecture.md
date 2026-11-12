@@ -26,7 +26,8 @@ flowchart TD
 |---|---|
 | `core/` | World lifecycle, validation, authoritative body state, integration, events and save/load. |
 | `core/mass.mjs` | Cached aggregate mass/center/inertia, center-based integration and impulse/rotation helpers shared by contacts, joints and motors. |
-| `spatial/` | Incremental spatial membership and shared spatial/clearance/path queries. |
+| `spatial/` | Incremental spatial membership and shared spatial/clearance queries. |
+| `navigation/` | Clearance field, grid path planning with reuse, road lane graph and travel profiles. |
 | `collision/` | Immutable shapes, contact/sweep geometry and mass-aware contact solving. |
 | `constraints/` | Hinges, distance/spring/attachment/drag constraints. |
 | `attachments/` | Prescribed parent-local mounts of existing bodies, checked exits and composed render interpolation. |
@@ -52,7 +53,7 @@ Membership changes incrementally when bounds cross cell boundaries, retaining sh
 
 Queries reuse one index. Radius/bounds queries visit relevant cells; segment and thick sweep queries traverse a corridor using DDA instead of scanning a diagonal bounding rectangle. Result buffers can be supplied by callers. The index returns conservative candidates; exact geometry and masks are evaluated in the query/detection layer.
 
-Nonphysical objects can register spatial metadata through `registerSpatialInstance`. Rendering/culling can query these and body handles through the same index. A navigation search temporarily stores routing nodes and costs, and queries geometry through the shared index. It never stores another obstacle grid.
+Nonphysical objects can register spatial metadata through `registerSpatialInstance`. Rendering/culling can query these and body handles through the same index. Navigation keeps a derived clearance field: per-chunk distances from cell centres to the nearest obstacle, built lazily from shared-index queries and marked dirty by the world's own body synchronisation. It stores no body references or memberships, and it is never used for collision candidates. Road lanes register their bounds as nonphysical entries in the same index. See [navigation](navigation.md).
 
 Body integration is O(moving bodies), not a collision test. Pair generation visits nearby candidates and deduplicates unordered pairs. Candidate lists are reused until shared-grid, collision pose/sweep, filter or attachment inputs change. This remains correct when a large light/render extent hides physical motion from the index AABB. Exact contact response and contact lifecycle events still run for the valid candidate pairs. Genuine dense overlaps still have a quadratic number of pairs; no index can make actual pairwise interactions disappear. Iteration stops early when neither contacts nor constraints require another pass. See `benchmarks/spatial.mjs` for candidate counts and local timings; no game/device FPS improvement is claimed before migration measurements.
 

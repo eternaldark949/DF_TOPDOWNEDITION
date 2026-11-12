@@ -21,6 +21,7 @@ import { attachmentManager } from '../attachments/manager.mjs';
 import { pathGeometry } from '../motion/path-geometry.mjs';
 import { layoutGeometry } from '../motion/layout-geometry.mjs';
 import { particlePhysics } from '../particles/particles.mjs';
+import { navigationSystem } from '../navigation/system.mjs';
 
 /** Standalone fixed-step world. Exactly one spatialGrid is constructed here. */
 export class physicsSystem {
@@ -32,7 +33,7 @@ export class physicsSystem {
     #stepAuthority; #broadphaseEpoch=0; #candidateCache=null;
     #queries; #particles; #attachments; #projectilePolicies=new Set();
     #stats = { steps: 0, narrow_checks: 0, candidate_pairs: 0, active_movers: 0, spatial_sync_requests: 0, spatial_sync_skips: 0, bounds_calculations: 0, swept_bounds_calculations: 0, attachment_placements: 0, broadphase_builds: 0, broadphase_reuses: 0 };
-    constructor({ cell_size = 128, fixed_step = 1 / 60, gravity = [0, 0], solver_iterations = 6, sleep_speed = 0.05, sleep_delay = 0.5, asset_library, step_authority } = {}) {
+    constructor({ cell_size = 128, fixed_step = 1 / 60, gravity = [0, 0], solver_iterations = 6, sleep_speed = 0.05, sleep_delay = 0.5, asset_library, step_authority, navigation } = {}) {
         if (step_authority !== undefined && typeof step_authority !== 'symbol') throw new TypeError('step_authority must be a private Symbol');
         this.#stepAuthority = step_authority;
         Object.defineProperty(this, 'config', { value: freeze({ cell_size: number(cell_size, 'cell_size', 1), fixed_step: number(fixed_step, 'fixed_step', EPS, 0.1), gravity: vector(gravity),
@@ -43,6 +44,7 @@ export class physicsSystem {
         Object.defineProperty(this, 'motion', { value: new motionController(this), enumerable: true });
         Object.defineProperty(this, 'rigs', { value: new rigSystem(this), enumerable: true });
         Object.defineProperty(this, 'traffic', { value: new trafficController(this), enumerable: true });
+        Object.defineProperty(this, 'navigation', { value: new navigationSystem(this, navigation), enumerable: true });
         this.#attachments = new attachmentManager(this); this.#queries = new physicsQueries(this); this.#particles = new particlePhysics(this);
     }
     get simulation_tick() { return this.#tick; }
@@ -79,6 +81,7 @@ export class physicsSystem {
                 ||old.collision_exclusions!==next.collision_exclusions||r.broadphase_mount!==r.parent_mount)this.#broadphaseEpoch++;
             r.broadphase_config=next;r.broadphase_mount=r.parent_mount;
         }
+        this.navigation._bodySynced(r);
         if(!bodyActive(r)){
             if(r.indexed)this.spatial_grid.removeInstance(r.id);
             r.indexed=false;r.spatial_cache=null;this.#moving.delete(r);r.moving_member=false;return;
@@ -202,7 +205,7 @@ export class physicsSystem {
         this._mutate(() => {
             if (r.removed) return;
             this.#motionEnvelope = null;this.#candidateCache=null; this.spatial_grid.removeInstance(r.id); r.indexed = false; r.removed = true; this.#bodies.delete(r.id); this.#moving.delete(r);
-            this.#attachments._bodyRemoved(r); this.rigs._bodyRemoved(r.id); this.elements._bodyRemoved(r.id); this.traffic.removeVehicle(r.id); this.motion._remove(r.id); this.#particles._bodyRemoved(r.id);
+            this.navigation._bodyRemoved(r); this.#attachments._bodyRemoved(r); this.rigs._bodyRemoved(r.id); this.elements._bodyRemoved(r.id); this.traffic.removeVehicle(r.id); this.motion._remove(r.id); this.#particles._bodyRemoved(r.id);
             for (const [id, c] of this.#constraints) { const cr = constraintRecord(c); if (cr.a === r || cr.b === r) this.#constraints.delete(id); }
         });
     }
@@ -641,7 +644,7 @@ export class physicsSystem {
     overlapShape(packet, results) { return this.#queries.overlapShape(packet, results); }
     isPlacementClear(body_or_shape, position, options) { return this.#queries.isPlacementClear(body_or_shape, position, options); }
     findClearPlacement(packet, result) { return this.#queries.findClearPlacement(packet, result); }
-    findPath(packet, result) { return this.#queries.findPath(packet, result); }
+    findPath(packet, result) { const path = this.navigation.findPath(packet); return path && result ? Object.assign(result, path) : path; }
     getPathClearance(packet, result) { return this.#queries.getPathClearance(packet, result); }
     queryEntitiesInBounds(packet, results) { return this.#queries.queryEntitiesInBounds(packet, results); }
     getBodyBounds(body, options) { return this.#queries.getBodyBounds(body, options); }
@@ -663,7 +666,7 @@ export class physicsSystem {
     removeChain(chain) { return this.#particles.removeChain(chain); }
     clearWorld() {
         this._mutate(() => { for (const r of this.#bodies.values()) r.removed = true; this.#bodies.clear(); this.#moving.clear(); this.#constraints.clear(); this.#contacts.clear(); this.#stepContacts.clear();
-            this.#attachments._clear(); this.rigs._clear(); this.elements._clear(); this.traffic._clear(); this.motion._clear(); this.spatial_grid.clear(); this.#particles._clear(); this.#events = []; this.#nextId = 1; this.#nextConstraint = 1; this.#tick = 0; this.#motionEnvelope = null;this.#candidateCache=null;this.#broadphaseEpoch++; });
+            this.#attachments._clear(); this.rigs._clear(); this.elements._clear(); this.traffic._clear(); this.motion._clear(); this.spatial_grid.clear(); this.navigation._clear(); this.#particles._clear(); this.#events = []; this.#nextId = 1; this.#nextConstraint = 1; this.#tick = 0; this.#motionEnvelope = null;this.#candidateCache=null;this.#broadphaseEpoch++; });
     }
     // Versioned exchange; validate a replacement before changing the live registry.
     _exportState() {
@@ -672,7 +675,7 @@ export class physicsSystem {
             attachments: this.#attachments._saveState(), rigs:this.rigs._saveState(),
             bodies: [...this.#bodies.values()].map(r => ({ ...snapshot(r), active: r.config.active, force: [...r.force], torque: r.torque, sleep_time: r.sleep_time, motor: this._saveMotor(r.motor) })),
             constraints: [...this.#constraints.values()].map(c => c.getState()), particles: this.#particles._saveState(), traffic: this.traffic._saveState(), motion: this.motion._saveState(),
-            spatial_instances: this.spatial_grid.exportInstances().filter(e => typeof e.id === 'string'),
+            spatial_instances: this.spatial_grid.exportInstances().filter(e => typeof e.id === 'string' && e.id.startsWith('spatial:')), navigation: this.navigation._saveState(),
             next_body_id: this.#nextId, next_constraint_id: this.#nextConstraint };
     }
     _saveMotor(m) {
@@ -745,7 +748,7 @@ export class physicsSystem {
         this.#particles._loadState(saved.particles);
         for (const e of saved.spatial_instances ?? []) this.registerSpatialInstance(e.value.instance_id, e.bounds, e.value);
         this.elements._restoreState(saved.entities);
-        this.traffic._loadState(saved.traffic); this.motion._loadState(saved.motion);
+        this.traffic._loadState(saved.traffic); this.motion._loadState(saved.motion); this.navigation._loadState(saved.navigation);
         this.rigs._loadState(saved.rigs);
         this.#attachments._loadState(saved.attachments);
     }

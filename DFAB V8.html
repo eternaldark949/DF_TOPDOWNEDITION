@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'a96664600ad5';
+        const DFAB_BUILD = 'e2e6fde1a4d9';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="10766">
+    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="11248">
 const DFNative = (()=>{
 'use strict';
 // src/basement/physics/core/values.mjs
@@ -10073,39 +10073,6 @@ class physicsQueries {
         const c = collisionDetector.sweep(a.shape, pose(a), end(a), b.shape, pose(b), end(b));
         return c ? Object.assign(result, c, { seconds: c.fraction * seconds, body_a: a.handle, body_b: b.handle }) : null;
     }
-    findPath(packet, result = {}) {
-        const from = referencePosition(this.world, packet.from ?? packet.body), to = vector(packet.to);
-        const r = packet.body ? this.world._record(referenceBody(packet.body)) : null;
-        const shape = packet.collision_shape ?? r?.config.collision_shape ?? { shape_type: 'circle', radius: 1 };
-        const opts = { ...packet, collision_shape: shape, ignore_body: packet.ignore_body ?? r?.handle, include_ghosts: false };
-        const clear = (a, b) => this.getPathClearance({ ...opts, from: a, to: b }).clear;
-        if (clear(from, to)) return Object.assign(result, { points: [from, to], visited_nodes: 0 });
-        const size = number(packet.node_spacing ?? Math.max(8, shapeReach(new collisionShape(shape))), 'node_spacing', 1);
-        const max = number(packet.max_nodes ?? 2048, 'max_nodes', 1, 100000), margin = packet.search_margin ?? size * 16;
-        const bounds = packet.search_bounds ?? { left: Math.min(from[0], to[0]) - margin, right: Math.max(from[0], to[0]) + margin, top: Math.min(from[1], to[1]) - margin, bottom: Math.max(from[1], to[1]) + margin };
-        const heap = [], nodes = new Map(), key = (x, y) => `${x},${y}`;
-        const point = (x, y) => [from[0] + x * size, from[1] + y * size];
-        const push = n => { let i = heap.length; heap.push(n); while (i) { const p = (i - 1) >> 1; if (heap[p].f <= n.f) break; heap[i] = heap[p]; i = p; } heap[i] = n; };
-        const pop = () => { const first = heap[0], last = heap.pop(); if (heap.length) { let i = 0; heap[0] = last; for (;;) { const l = i * 2 + 1, rr = l + 1; let m = i; if (l < heap.length && heap[l].f < heap[m].f) m = l; if (rr < heap.length && heap[rr].f < heap[m].f) m = rr; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return first; };
-        const first = { x: 0, y: 0, g: 0, f: length(sub(to, from)), parent: null }; nodes.set('0,0', first); push(first);
-        let visited = 0;
-        while (heap.length && visited < max) {
-            const n = pop(); if (n.closed) continue; n.closed = true; visited++;
-            const at = point(n.x, n.y);
-            if (length(sub(at, to)) <= size * 1.5 && clear(at, to)) {
-                const path = [to]; for (let cur = n; cur; cur = cur.parent) path.push(point(cur.x, cur.y)); path.reverse();
-                return Object.assign(result, { points: path, visited_nodes: visited });
-            }
-            for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
-                const x = n.x + dx, y = n.y + dy, p = point(x, y);
-                if (p[0] < bounds.left || p[0] > bounds.right || p[1] < bounds.top || p[1] > bounds.bottom) continue;
-                const k = key(x, y), old = nodes.get(k), g = n.g + size * Math.hypot(dx, dy);
-                if ((old && old.g <= g) || !clear(at, p)) continue;
-                const next = { x, y, g, f: g + length(sub(to, p)), parent: n }; nodes.set(k, next); push(next);
-            }
-        }
-        return null;
-    }
 }
 
 return Object.freeze({get referenceBody(){return referenceBody;},get referencePosition(){return referencePosition;},get physicsQueries(){return physicsQueries;}});
@@ -10226,8 +10193,10 @@ class characterMotor {
                 } else if (distance > arrive + EPS) {
                     this.replan -= dt;
                     if (!intent.direct && this.replan <= 0) {
-                        this.path = world.findPath({ ...intent, body: this.body, to: approach }); this.replan = 0.25;
-                        this.path_index = 1;
+                        // Navigation returns the same path object while it remains valid, so progress is kept.
+                        const path = world.findPath({ body: this.body, to: approach, reuse: this.path, max_nodes: intent.max_nodes, search_margin: intent.search_margin, radius: intent.navigation_radius }); this.replan = 0.25;
+                        if (!path || path !== this.path) this.path_index = 1;
+                        this.path = path;
                     }
                     let goal = approach;
                     if (!intent.direct) {
@@ -12304,6 +12273,786 @@ class particlePhysics {
 
 return Object.freeze({get particlePhysics(){return particlePhysics;}});
 })();
+// src/basement/physics/navigation/geometry.mjs
+const m35 = (()=>{
+const {EPS} = m7;
+
+/** Exact distances between segments and convex obstacle pieces from `pieces()`. */
+function pointSegmentDistance(px, py, ax, ay, bx, by) {
+    const ex = bx - ax, ey = by - ay, len = ex * ex + ey * ey;
+    const u = len > EPS ? Math.max(0, Math.min(1, ((px - ax) * ex + (py - ay) * ey) / len)) : 0;
+    return Math.hypot(px - ax - ex * u, py - ay - ey * u);
+}
+const orient = (ax, ay, bx, by, cx, cy) => (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+function segmentsCross(ax, ay, bx, by, cx, cy, dx, dy) {
+    const d1 = orient(cx, cy, dx, dy, ax, ay), d2 = orient(cx, cy, dx, dy, bx, by), d3 = orient(ax, ay, bx, by, cx, cy), d4 = orient(ax, ay, bx, by, dx, dy);
+    return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0));
+}
+function segmentSegmentDistance(ax, ay, bx, by, cx, cy, dx, dy) {
+    if (segmentsCross(ax, ay, bx, by, cx, cy, dx, dy)) return 0;
+    return Math.min(pointSegmentDistance(ax, ay, cx, cy, dx, dy), pointSegmentDistance(bx, by, cx, cy, dx, dy),
+        pointSegmentDistance(cx, cy, ax, ay, bx, by), pointSegmentDistance(dx, dy, ax, ay, bx, by));
+}
+function insideConvex(points, px, py) {
+    let sign = 0;
+    for (let e = 0; e < points.length; e++) {
+        const a = points[e], c = points[(e + 1) % points.length], s = orient(a[0], a[1], c[0], c[1], px, py);
+        if (Math.abs(s) <= EPS) continue;
+        if (!sign) sign = Math.sign(s); else if (sign !== Math.sign(s)) return false;
+    }
+    return true;
+}
+/** Distance from segment a→b to a piece; 0 when touching or overlapping. */
+function segmentPieceDistance(a, b, piece) {
+    if (piece.radius !== undefined) return Math.max(0, pointSegmentDistance(piece.center[0], piece.center[1], a[0], a[1], b[0], b[1]) - piece.radius);
+    const pts = piece.points;
+    if (insideConvex(pts, a[0], a[1]) || insideConvex(pts, b[0], b[1])) return 0;
+    let best = Infinity;
+    for (let e = 0; e < pts.length; e++) {
+        const p = pts[e], q = pts[(e + 1) % pts.length];
+        const d = segmentSegmentDistance(a[0], a[1], b[0], b[1], p[0], p[1], q[0], q[1]);
+        if (d < best) { best = d; if (!d) return 0; }
+    }
+    return best;
+}
+
+return Object.freeze({get pointSegmentDistance(){return pointSegmentDistance;},get segmentSegmentDistance(){return segmentSegmentDistance;},get segmentPieceDistance(){return segmentPieceDistance;}});
+})();
+// src/basement/physics/navigation/field.mjs
+const m34 = (()=>{
+const {BODY_GROUP,EPS,number,mask,validBounds} = m7;
+const {physical} = m8;
+const {pieces} = m6;
+const {segmentPieceDistance} = m35;
+
+/**
+ * Derived walkable-space clearance field.
+ *
+ * Each chunk caches, for every cell centre, the exact distance to the nearest
+ * obstacle piece (capped at max_clearance). Obstacles are read only from the
+ * world's one spatial grid when a chunk is (re)built. The field stores no body
+ * references or memberships, so it is a cache of geometry, not another index.
+ * Body changes mark the chunks they can influence as dirty; rebuilding is lazy,
+ * so many edits between two searches cost one rebuild.
+ */
+const OFFSET = 2 ** 20, SPAN = 2 ** 21;
+const chunkKey = (cx, cy) => (cx + OFFSET) * SPAN + (cy + OFFSET);
+
+class navigationField {
+    #world; #chunks = new Map(); #revision = 0; #found = [];
+    #stats = { chunk_builds: 0, chunk_reuses: 0, cells_built: 0, piece_cells: 0, dirty_marks: 0, obstacle_updates: 0, exact_checks: 0 };
+    constructor(world, { cell_size = 8, chunk_cells = 32, max_clearance = 64, obstacle_groups = BODY_GROUP.STATIC | BODY_GROUP.PROP } = {}) {
+        this.#world = world;
+        this.cell_size = number(cell_size, 'cell_size', 0.5, 1024);
+        this.chunk_cells = number(chunk_cells, 'chunk_cells', 4, 256);
+        if (!Number.isInteger(chunk_cells)) throw new TypeError('chunk_cells must be integral');
+        this.max_clearance = number(max_clearance, 'max_clearance', cell_size, cell_size * 64);
+        this.obstacle_groups = mask(obstacle_groups, 'obstacle_groups');
+        this.chunk_size = this.cell_size * this.chunk_cells;
+        Object.freeze(this);
+    }
+    get revision() { return this.#revision; }
+    getConfig() { return { cell_size: this.cell_size, chunk_cells: this.chunk_cells, max_clearance: this.max_clearance, obstacle_groups: this.obstacle_groups }; }
+    /** Characters, vehicles and projectiles are agents, never baked into walkable space. */
+    isObstacle(r) {
+        const c = r.config;
+        return !r.removed && physical(r) && !c.ghost && !!(c.collision_group & this.obstacle_groups) && c.physics_type !== 'character';
+    }
+    _bodySynced(r) {
+        const tracked = r.navigation_pose;
+        if (!this.isObstacle(r)) { if (tracked) { r.navigation_pose = null; this.#dirty(tracked.bounds); } return; }
+        if (tracked && tracked.x === r.position[0] && tracked.y === r.position[1] && tracked.rotation === r.rotation && tracked.shape === r.shape) return;
+        const bounds = this.#bounds(r);
+        if (tracked) this.#dirty(tracked.bounds);
+        this.#dirty(bounds);
+        r.navigation_pose = { x: r.position[0], y: r.position[1], rotation: r.rotation, shape: r.shape, bounds };
+        this.#stats.obstacle_updates++;
+    }
+    _bodyRemoved(r) { const tracked = r.navigation_pose; if (tracked) { r.navigation_pose = null; this.#dirty(tracked.bounds); } }
+    #bounds(r) {
+        const b = { left: Infinity, right: -Infinity, top: Infinity, bottom: -Infinity };
+        for (const p of pieces(r.shape, r.position, r.rotation)) {
+            if (p.radius !== undefined) {
+                b.left = Math.min(b.left, p.center[0] - p.radius); b.right = Math.max(b.right, p.center[0] + p.radius);
+                b.top = Math.min(b.top, p.center[1] - p.radius); b.bottom = Math.max(b.bottom, p.center[1] + p.radius);
+            } else for (const [x, y] of p.points) { b.left = Math.min(b.left, x); b.right = Math.max(b.right, x); b.top = Math.min(b.top, y); b.bottom = Math.max(b.bottom, y); }
+        }
+        return b;
+    }
+    /** Mark every built chunk whose cached clearance could change. */
+    #dirty(bounds) {
+        this.#revision++;
+        if (!this.#chunks.size) return;
+        const m = this.max_clearance, s = this.chunk_size;
+        const x0 = Math.floor((bounds.left - m) / s), x1 = Math.floor((bounds.right + m) / s);
+        const y0 = Math.floor((bounds.top - m) / s), y1 = Math.floor((bounds.bottom + m) / s);
+        if ((x1 - x0 + 1) * (y1 - y0 + 1) > this.#chunks.size) {
+            for (const chunk of this.#chunks.values()) if (chunk.cx >= x0 && chunk.cx <= x1 && chunk.cy >= y0 && chunk.cy <= y1) this.#mark(chunk);
+            return;
+        }
+        for (let cx = x0; cx <= x1; cx++) for (let cy = y0; cy <= y1; cy++) { const chunk = this.#chunks.get(chunkKey(cx, cy)); if (chunk) this.#mark(chunk); }
+    }
+    #mark(chunk) { if (!chunk.dirty) { chunk.dirty = true; this.#stats.dirty_marks++; } }
+    /** Explicit invalidation for clients that change obstacle filters or authored blockers. */
+    invalidateRegion(bounds) { this.#dirty(validBounds(bounds)); }
+    invalidateAll() { this.#revision++; for (const chunk of this.#chunks.values()) this.#mark(chunk); }
+    _clear() { this.#chunks.clear(); this.#revision++; }
+    /** Returns a built, current chunk. */
+    chunk(cx, cy) {
+        const key = chunkKey(cx, cy);
+        let chunk = this.#chunks.get(key);
+        if (!chunk) { chunk = { cx, cy, key, clearance: new Float32Array(this.chunk_cells * this.chunk_cells), dirty: true, revision: 0 }; this.#chunks.set(key, chunk); }
+        if (chunk.dirty) this.#build(chunk); else this.#stats.chunk_reuses++;
+        return chunk;
+    }
+    /** Revision of an already built chunk, or -1 when it is missing or must be rebuilt. */
+    chunkRevision(key) { const chunk = this.#chunks.get(key); return chunk && !chunk.dirty ? chunk.revision : -1; }
+    #build(chunk) {
+        const n = this.chunk_cells, cell = this.cell_size, cap = this.max_clearance, clearance = chunk.clearance;
+        const ox = chunk.cx * n, oy = chunk.cy * n, left = ox * cell, top = oy * cell, right = left + this.chunk_size, bottom = top + this.chunk_size;
+        clearance.fill(cap);
+        const world = this.#world, found = world.spatial_grid.queryBounds({ left: left - cap, right: right + cap, top: top - cap, bottom: bottom + cap }, this.#found);
+        for (const handle of found) {
+            if (!handle?.body_id) continue;
+            const r = world._record(handle);
+            if (!this.isObstacle(r)) continue;
+            for (const piece of pieces(r.shape, r.position, r.rotation)) this.#stamp(piece, clearance, ox, oy);
+        }
+        found.length = 0;
+        chunk.dirty = false; chunk.revision++;
+        this.#stats.chunk_builds++; this.#stats.cells_built += n * n;
+    }
+    /** Lowers the clearance of cells near one convex piece to their exact distance from it. */
+    #stamp(piece, clearance, ox, oy) {
+        const n = this.chunk_cells, cell = this.cell_size, cap = this.max_clearance;
+        let l, r, t, b;
+        if (piece.radius !== undefined) { l = piece.center[0] - piece.radius; r = piece.center[0] + piece.radius; t = piece.center[1] - piece.radius; b = piece.center[1] + piece.radius; }
+        else { l = t = Infinity; r = b = -Infinity; for (const [x, y] of piece.points) { if (x < l) l = x; if (x > r) r = x; if (y < t) t = y; if (y > b) b = y; } }
+        const i0 = Math.max(0, Math.floor((l - cap) / cell - 0.5) - ox), i1 = Math.min(n - 1, Math.ceil((r + cap) / cell - 0.5) - ox);
+        const j0 = Math.max(0, Math.floor((t - cap) / cell - 0.5) - oy), j1 = Math.min(n - 1, Math.ceil((b + cap) / cell - 0.5) - oy);
+        if (i0 > i1 || j0 > j1) return;
+        this.#stats.piece_cells += (i1 - i0 + 1) * (j1 - j0 + 1);
+        if (piece.radius !== undefined) {
+            const cx = piece.center[0], cy = piece.center[1], radius = piece.radius;
+            for (let j = j0; j <= j1; j++) {
+                const dy = (oy + j + 0.5) * cell - cy, row = j * n;
+                for (let i = i0; i <= i1; i++) {
+                    const d = Math.hypot((ox + i + 0.5) * cell - cx, dy) - radius, k = row + i;
+                    if (d < clearance[k]) clearance[k] = d > 0 ? d : 0;
+                }
+            }
+            return;
+        }
+        const pts = piece.points, count = pts.length;
+        // Orientation-independent inside test: all edge cross products share one sign.
+        let area = 0; for (let e = 0; e < count; e++) { const a = pts[e], c = pts[(e + 1) % count]; area += a[0] * c[1] - c[0] * a[1]; }
+        const sign = area >= 0 ? 1 : -1;
+        for (let j = j0; j <= j1; j++) {
+            const py = (oy + j + 0.5) * cell, row = j * n;
+            for (let i = i0; i <= i1; i++) {
+                const px = (ox + i + 0.5) * cell, k = row + i;
+                let inside = true, best = Infinity;
+                for (let e = 0; e < count; e++) {
+                    const a = pts[e], c = pts[(e + 1) % count], ex = c[0] - a[0], ey = c[1] - a[1], wx = px - a[0], wy = py - a[1];
+                    if ((ex * wy - ey * wx) * sign < 0) inside = false;
+                    const len = ex * ex + ey * ey, u = len > EPS ? Math.max(0, Math.min(1, (wx * ex + wy * ey) / len)) : 0;
+                    const dx = wx - ex * u, dy = wy - ey * u, d = dx * dx + dy * dy;
+                    if (d < best) best = d;
+                }
+                const d = inside ? 0 : Math.sqrt(best);
+                if (d < clearance[k]) clearance[k] = d;
+            }
+        }
+    }
+    cellOf(value) { return Math.floor(value / this.cell_size); }
+    cellCenter(g) { return (g + 0.5) * this.cell_size; }
+    /** Exact (capped) obstacle distance at a cell centre. */
+    clearanceAtCell(gx, gy) {
+        const n = this.chunk_cells, cx = Math.floor(gx / n), cy = Math.floor(gy / n);
+        return this.chunk(cx, cy).clearance[(gy - cy * n) * n + (gx - cx * n)];
+    }
+    /** Conservative lower bound at any point (clearance is 1-Lipschitz). */
+    clearanceAt(point) {
+        const gx = this.cellOf(point[0]), gy = this.cellOf(point[1]);
+        return this.clearanceAtCell(gx, gy) - Math.hypot(point[0] - this.cellCenter(gx), point[1] - this.cellCenter(gy));
+    }
+    /** Exact distance from a segment (or point) to field obstacles, capped at limit. Reads the shared grid. */
+    exactSegmentClearance(a, b, limit = this.max_clearance) {
+        const found = this.#world.spatial_grid.queryBounds({ left: Math.min(a[0], b[0]) - limit, right: Math.max(a[0], b[0]) + limit,
+            top: Math.min(a[1], b[1]) - limit, bottom: Math.max(a[1], b[1]) + limit }, this.#found);
+        let best = limit;
+        this.#stats.exact_checks++;
+        for (const handle of found) {
+            if (!handle?.body_id) continue;
+            const r = this.#world._record(handle);
+            if (!this.isObstacle(r)) continue;
+            for (const piece of pieces(r.shape, r.position, r.rotation)) {
+                const d = segmentPieceDistance(a, b, piece);
+                if (d < best) { best = d; if (!d) { found.length = 0; return 0; } }
+            }
+        }
+        found.length = 0;
+        return best;
+    }
+    getStatistics() { return { ...this.#stats, chunks: this.#chunks.size, revision: this.#revision }; }
+}
+
+return Object.freeze({get chunkKey(){return chunkKey;},get navigationField(){return navigationField;}});
+})();
+// src/basement/physics/navigation/planner.mjs
+const m36 = (()=>{
+const {number} = m7;
+const {chunkKey} = m34;
+
+const SQRT2 = Math.SQRT2;
+const NEIGHBOURS = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, SQRT2], [1, -1, SQRT2], [-1, 1, SQRT2], [-1, -1, SQRT2]];
+
+/**
+ * Grid A* over a navigationField, followed by string pulling. The default
+ * heuristic weight of 1.2 bounds raw-path cost at 1.2x optimal (string pulling
+ * then shortens it) and expands far fewer cells on long trips; pass 1 for optimal.
+ *
+ * Safety rule: a straight segment of length L whose two endpoints both have
+ * obstacle clearance >= sqrt(r^2 + (L/2)^2) keeps a circle of radius r clear of
+ * every obstacle. Cell-to-cell edges use that rule with exact centre
+ * clearances, so raw paths need no geometric checks at all. Smoothed segments
+ * first try a conservative field test and fall back to one exact segment test.
+ *
+ * Search scratch memory is pooled and stamped, so steady-state planning does
+ * not allocate per node.
+ */
+class fieldPlanner {
+    #field; #capacity = 0; #g; #parent; #seen; #closed; #heapNode; #heapCost; #stamp = 0;
+    #stats = { searches: 0, expanded_nodes: 0, smoothing_tests: 0, smoothing_rejections: 0, smoothing_exact_tests: 0, partial_results: 0, failed_searches: 0 };
+    constructor(field) { this.#field = field; }
+    getStatistics() { return { ...this.#stats }; }
+    #ensure(size) {
+        if (size <= this.#capacity) return;
+        const capacity = Math.max(size, Math.ceil(this.#capacity * 1.5), 4096);
+        this.#g = new Float64Array(capacity); this.#parent = new Int32Array(capacity);
+        this.#seen = new Uint32Array(capacity); this.#closed = new Uint32Array(capacity);
+        this.#heapNode = new Int32Array(capacity * 2); this.#heapCost = new Float64Array(capacity * 2);
+        this.#capacity = capacity; this.#stamp = 0;
+    }
+    /** Edge thresholds for an agent radius. */
+    thresholds(radius) {
+        const cell = this.#field.cell_size;
+        return { node: Math.sqrt(radius * radius + cell * cell / 4), diagonal: Math.sqrt(radius * radius + cell * cell / 2) };
+    }
+    /** True when a circle of `radius` can travel a→b without touching a field obstacle. */
+    segmentClear(a, b, radius) {
+        this.#stats.smoothing_tests++;
+        const f = this.#field, dx = b[0] - a[0], dy = b[1] - a[1], length = Math.hypot(dx, dy);
+        // Conservative test: samples h apart, each needing sqrt(r^2+(h/2)^2) of lower-bound clearance.
+        const h = f.cell_size / 2, need = Math.sqrt(radius * radius + h * h / 4), steps = Math.max(1, Math.ceil(length / h));
+        // Clearance is 1-Lipschitz, so a cell centre value c bounds every nearby point p
+        // within c ± |p - centre|: proven clear, proven blocked, or undecided (exact test).
+        let conservative = true;
+        for (let i = 0; i <= steps; i++) {
+            const t = i / steps, x = a[0] + dx * t, y = a[1] + dy * t, gx = f.cellOf(x), gy = f.cellOf(y);
+            const c = f.clearanceAtCell(gx, gy), offset = Math.hypot(x - f.cellCenter(gx), y - f.cellCenter(gy));
+            if (c + offset < radius) { this.#stats.smoothing_rejections++; return false; }
+            if (c - offset < need) conservative = false;
+        }
+        if (conservative) return true;
+        this.#stats.smoothing_exact_tests++;
+        return f.exactSegmentClearance(a, b, radius + 1) >= radius;
+    }
+    plan({ from, to, radius, max_nodes = 20000, search_margin, allow_partial = false, smooth = true, heuristic_weight = 1.2 }) {
+        const f = this.#field, cell = f.cell_size;
+        number(radius, 'radius', 0, f.max_clearance - cell);
+        number(max_nodes, 'max_nodes', 1, 1e6); number(heuristic_weight, 'heuristic_weight', 1, 10);
+        this.#stats.searches++;
+        const { node: nodeNeed, diagonal: diagonalNeed } = this.thresholds(radius);
+        let goalOpen = f.exactSegmentClearance(to, to, radius + 1) >= radius, adjusted = false;
+        if (!goalOpen && !allow_partial) { this.#stats.failed_searches++; return null; }
+        if (!goalOpen) {
+            // Blocked destination: aim for the nearest open cell centre around it instead.
+            const gx = f.cellOf(to[0]), gy = f.cellOf(to[1]), rings = Math.ceil((radius * 2 + cell * 4) / cell);
+            let pick = null, pickDistance = Infinity;
+            for (let ring = 1; ring <= rings && !pick; ring++) for (let dy = -ring; dy <= ring; dy++) for (let dx = -ring; dx <= ring; dx++) {
+                if (Math.max(Math.abs(dx), Math.abs(dy)) !== ring || f.clearanceAtCell(gx + dx, gy + dy) < nodeNeed) continue;
+                const c = [f.cellCenter(gx + dx), f.cellCenter(gy + dy)], d = Math.hypot(c[0] - to[0], c[1] - to[1]);
+                if (d < pickDistance) { pick = c; pickDistance = d; }
+            }
+            if (pick) { to = pick; goalOpen = true; adjusted = true; }
+        }
+        // Direct line of sight: no grid search needed.
+        if (goalOpen && this.segmentClear(from, to, radius)) return this.#finish([from, to], 0, adjusted);
+        const sx = f.cellOf(from[0]), sy = f.cellOf(from[1]), tx = f.cellOf(to[0]), ty = f.cellOf(to[1]);
+        const span = Math.max(Math.abs(tx - sx), Math.abs(ty - sy));
+        // Small searches stay small. If the area is exhausted without reaching the
+        // goal, the detour lies outside it: widen and search again within budget.
+        let margin = Math.ceil(search_margin !== undefined ? number(search_margin, 'search_margin', 0) / cell : Math.max(32, span * 0.5));
+        let found, visited = 0;
+        for (let attempt = 0; ; attempt++) {
+            found = this.#search({ from, to, radius, margin, max_nodes: max_nodes - visited, goalOpen, sx, sy, tx, ty, weight: heuristic_weight * 1.0001 });
+            visited += found.visited;
+            if (found.reached || !found.exhausted || search_margin !== undefined || attempt >= 3 || visited >= max_nodes) break;
+            margin *= 4;
+            if ((span + 2 * margin + 1) ** 2 > 4e6) break;
+        }
+        this.#stats.expanded_nodes += visited;
+        const cells = found.reached ? found.cells : allow_partial ? found.best : null;
+        if (!cells) { this.#stats.failed_searches++; return null; }
+        // Keep only turning cells; straight runs between them are already safe.
+        const raw = [from];
+        for (let i = 0; i < cells.length; i += 2) {
+            if (i > 0 && i < cells.length - 2 && cells[i] - cells[i - 2] === cells[i + 2] - cells[i] && cells[i + 1] - cells[i - 1] === cells[i + 3] - cells[i + 1]) continue;
+            raw.push([f.cellCenter(cells[i]), f.cellCenter(cells[i + 1])]);
+        }
+        if (found.reached) raw.push([...to]);
+        const points = smooth ? this.#pull(raw, radius) : raw;
+        if (!found.reached || adjusted) this.#stats.partial_results++;
+        return this.#finish(points, visited, !found.reached || adjusted);
+    }
+    /** One bounded A* pass. Returns path cells as flat global [gx, gy, ...] pairs. */
+    #search({ from, to, radius, margin, max_nodes, goalOpen, sx, sy, tx, ty, weight }) {
+        const f = this.#field, cell = f.cell_size, { node: nodeNeed, diagonal: diagonalNeed } = this.thresholds(radius);
+        const gx0 = Math.min(sx, tx) - margin, gy0 = Math.min(sy, ty) - margin, gx1 = Math.max(sx, tx) + margin, gy1 = Math.max(sy, ty) + margin;
+        const wx = gx1 - gx0 + 1, wy = gy1 - gy0 + 1, size = wx * wy;
+        if (size > 4e6) throw new RangeError('Navigation search area exceeds four million cells; lower search_margin');
+        this.#ensure(size);
+        if (++this.#stamp >= 0xffffffff) { this.#seen.fill(0); this.#closed.fill(0); this.#stamp = 1; }
+        const stamp = this.#stamp, g = this.#g, parent = this.#parent, seen = this.#seen, closed = this.#closed, hn = this.#heapNode, hc = this.#heapCost;
+        // Chunk references for the search area, fetched (and rebuilt if dirty) on first touch.
+        const n = f.chunk_cells, cx0 = Math.floor(gx0 / n), cy0 = Math.floor(gy0 / n), cwx = Math.floor(gx1 / n) - cx0 + 1;
+        const chunks = new Array(cwx * (Math.floor(gy1 / n) - cy0 + 1));
+        const clearance = (lx, ly) => {
+            const gx = gx0 + lx, gy = gy0 + ly, cx = Math.floor(gx / n), cy = Math.floor(gy / n), ci = (cy - cy0) * cwx + (cx - cx0);
+            const chunk = chunks[ci] ?? (chunks[ci] = f.chunk(cx, cy));
+            return chunk.clearance[(gy - cy * n) * n + (gx - cx * n)];
+        };
+        const center = (lx, ly) => [(gx0 + lx + 0.5) * cell, (gy0 + ly + 0.5) * cell];
+        let heapSize = 0;
+        const push = (node, cost) => {
+            let i = heapSize++;
+            while (i) { const p = (i - 1) >> 1; if (hc[p] <= cost) break; hn[i] = hn[p]; hc[i] = hc[p]; i = p; }
+            hn[i] = node; hc[i] = cost;
+        };
+        const pop = () => {
+            const top = hn[0], lastNode = hn[--heapSize], lastCost = hc[heapSize];
+            let i = 0;
+            for (;;) {
+                const l = i * 2 + 1; if (l >= heapSize) break;
+                const m = l + 1 < heapSize && hc[l + 1] < hc[l] ? l + 1 : l;
+                if (hc[m] >= lastCost) break;
+                hn[i] = hn[m]; hc[i] = hc[m]; i = m;
+            }
+            hn[i] = lastNode; hc[i] = lastCost;
+            return top;
+        };
+        const ltx = tx - gx0, lty = ty - gy0;
+        const heuristic = (lx, ly) => { const dx = Math.abs(lx - ltx), dy = Math.abs(ly - lty); return (dx + dy + (SQRT2 - 2) * Math.min(dx, dy)) * cell * weight; };
+        // Seeds: passable cells around the start, entered by a direct step.
+        const lsx = sx - gx0, lsy = sy - gy0;
+        for (let ring = 0; ring <= Math.ceil(radius / cell) + 2; ring++) {
+            for (let dy = -ring; dy <= ring; dy++) for (let dx = -ring; dx <= ring; dx++) {
+                if (Math.max(Math.abs(dx), Math.abs(dy)) !== ring) continue;
+                const lx = lsx + dx, ly = lsy + dy; if (lx < 0 || ly < 0 || lx >= wx || ly >= wy || clearance(lx, ly) < nodeNeed) continue;
+                const k = ly * wx + lx, c = center(lx, ly), cost = Math.hypot(c[0] - from[0], c[1] - from[1]);
+                if (seen[k] === stamp && g[k] <= cost) continue;
+                seen[k] = stamp; g[k] = cost; parent[k] = -1; push(k, cost + heuristic(lx, ly));
+            }
+            if (heapSize) break;
+        }
+        if (!heapSize) return { reached: false, exhausted: false, visited: 0, cells: null, best: null };
+        let visited = 0, reached = -1, best = -1, bestH = Infinity;
+        const goalReach = cell * 1.5 + 1e-9;
+        while (heapSize && visited < max_nodes) {
+            const k = pop();
+            if (closed[k] === stamp) continue;
+            closed[k] = stamp; visited++;
+            const lx = k % wx, ly = (k - lx) / wx, here = clearance(lx, ly);
+            const h = heuristic(lx, ly);
+            if (h < bestH) { bestH = h; best = k; }
+            if (goalOpen && Math.abs(lx - ltx) <= 1 && Math.abs(ly - lty) <= 1) {
+                const c = center(lx, ly);
+                if (Math.hypot(c[0] - to[0], c[1] - to[1]) <= goalReach && this.segmentClear(c, to, radius)) { reached = k; break; }
+            }
+            for (const [dx, dy, step] of NEIGHBOURS) {
+                const nx = lx + dx, ny = ly + dy;
+                if (nx < 0 || ny < 0 || nx >= wx || ny >= wy) continue;
+                const nk = ny * wx + nx;
+                if (closed[nk] === stamp) continue;
+                const there = clearance(nx, ny);
+                if (step === 1 ? there < nodeNeed : (there < diagonalNeed || here < diagonalNeed)) continue;
+                const cost = g[k] + step * cell;
+                if (seen[nk] === stamp && g[nk] <= cost) continue;
+                seen[nk] = stamp; g[nk] = cost; parent[nk] = k; push(nk, cost + heuristic(nx, ny));
+            }
+        }
+        const trace = end => { if (end < 0) return null; const out = []; for (let k = end; k >= 0; k = parent[k]) { const lx = k % wx; out.push(gy0 + (k - lx) / wx, gx0 + lx); } return out.reverse(); };
+        return { reached: reached >= 0, exhausted: !heapSize && reached < 0, visited, cells: trace(reached), best: trace(best) };
+    }
+    /** Greedy string pulling: keep the farthest safely visible point from each anchor. */
+    #pull(raw, radius) {
+        if (raw.length <= 2) return raw;
+        const out = [raw[0]];
+        let anchor = 0;
+        while (anchor < raw.length - 1) {
+            let next = anchor + 1;
+            for (let j = raw.length - 1; j > anchor + 1; j--) if (this.segmentClear(raw[anchor], raw[j], radius)) { next = j; break; }
+            out.push(raw[next]); anchor = next;
+        }
+        return out;
+    }
+    #finish(points, visited, partial) {
+        const f = this.#field, revisions = new Map();
+        let length = 0;
+        const note = p => { const n = f.chunk_cells, cx = Math.floor(f.cellOf(p[0]) / n), cy = Math.floor(f.cellOf(p[1]) / n), key = chunkKey(cx, cy); if (!revisions.has(key)) revisions.set(key, f.chunk(cx, cy).revision); };
+        for (let i = 0; i < points.length; i++) {
+            note(points[i]);
+            if (!i) continue;
+            const a = points[i - 1], b = points[i], d = Math.hypot(b[0] - a[0], b[1] - a[1]), steps = Math.ceil(d / (f.chunk_size / 2));
+            length += d;
+            for (let s = 1; s < steps; s++) note([a[0] + (b[0] - a[0]) * s / steps, a[1] + (b[1] - a[1]) * s / steps]);
+        }
+        return { points: points.map(p => [p[0], p[1]]), length, partial, visited_nodes: visited, dependencies: [...revisions] };
+    }
+}
+
+return Object.freeze({get fieldPlanner(){return fieldPlanner;}});
+})();
+// src/basement/physics/navigation/road-network.mjs
+const m37 = (()=>{
+const {number,vector,clone,freeze} = m7;
+const {pathGeometry} = m17;
+
+/**
+ * Authored lane graph for vehicles and any other lane-bound travellers.
+ *
+ * Nodes are junctions; lanes are directed polylines between them. Lane bounds
+ * live in the world's one spatial grid (as nonphysical entries), so snapping a
+ * position to the nearest lane is a shared-grid query, not a private index.
+ * Routes minimise travel time and are cached per (profile, node pair) until the
+ * network changes.
+ */
+const SPATIAL = 'navigation:lane:';
+class roadNetwork {
+    #world; #nodes = new Map(); #lanes = new Map(); #out = new Map(); #revision = 0; #cache = new Map(); #fastest = 0; #found = [];
+    #stats = { route_requests: 0, route_cache_hits: 0, route_searches: 0, expanded_nodes: 0, snaps: 0 };
+    constructor(world, { cache_size = 2048 } = {}) {
+        this.#world = world; this.cache_size = number(cache_size, 'cache_size', 0, 1e6);
+        Object.freeze(this);
+    }
+    get revision() { return this.#revision; }
+    #changed() { this.#revision++; this.#cache.clear(); }
+    addNode(node_id, { position }) {
+        if (typeof node_id !== 'string' || !node_id) throw new TypeError('Road node id must be a nonempty string');
+        if (this.#nodes.has(node_id)) throw new Error(`Duplicate road node: ${node_id}`);
+        this.#nodes.set(node_id, freeze({ node_id, position: vector(position, 'position') })); this.#out.set(node_id, []);
+        this.#changed(); return node_id;
+    }
+    /** Adds a directed lane, or two with `two_way:true` (the reverse id is `${lane_id}:reverse`). */
+    addLane(lane_id, { from, to, points = [], speed_limit = 180, cost_scale = 1, profiles = ['car'], two_way = false, open = true }) {
+        if (typeof lane_id !== 'string' || !lane_id) throw new TypeError('Lane id must be a nonempty string');
+        const ids = two_way ? [lane_id, `${lane_id}:reverse`] : [lane_id];
+        for (const id of ids) if (this.#lanes.has(id)) throw new Error(`Duplicate lane: ${id}`);
+        const a = this.#nodes.get(from), b = this.#nodes.get(to);
+        if (!a || !b) throw new TypeError('Lane endpoints must be registered road nodes');
+        if (from === to && !points.length) throw new TypeError('A loop lane needs intermediate points');
+        number(speed_limit, 'speed_limit', 1e-6); number(cost_scale, 'cost_scale', 1e-6);
+        if (!Array.isArray(profiles) || !profiles.length || profiles.some(p => typeof p !== 'string' || !p)) throw new TypeError('profiles must be nonempty strings');
+        const forward = [a.position, ...points.map(p => vector(p, 'lane point')), b.position];
+        this.#insert(ids[0], from, to, forward, { speed_limit, cost_scale, profiles, open: !!open });
+        if (two_way) this.#insert(ids[1], to, from, [...forward].reverse(), { speed_limit, cost_scale, profiles, open: !!open });
+        this.#changed(); return ids;
+    }
+    #insert(lane_id, from, to, points, { speed_limit, cost_scale, profiles, open }) {
+        let length = 0; for (let i = 1; i < points.length; i++) length += Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]);
+        pathGeometry.projectOnPath(points, points[0]); // validates segments
+        const lane = { lane_id, from, to, points: freeze(clone(points)), length, speed_limit, cost_scale, profiles: new Set(profiles), open, seconds: length / speed_limit * cost_scale };
+        this.#lanes.set(lane_id, lane); this.#out.get(from).push(lane);
+        this.#fastest = Math.max(this.#fastest, speed_limit / cost_scale);
+        const bounds = { left: Infinity, right: -Infinity, top: Infinity, bottom: -Infinity };
+        for (const [x, y] of points) { bounds.left = Math.min(bounds.left, x); bounds.right = Math.max(bounds.right, x); bounds.top = Math.min(bounds.top, y); bounds.bottom = Math.max(bounds.bottom, y); }
+        this.#world._mutate(() => this.#world.spatial_grid.registerInstance(SPATIAL + lane_id, bounds, freeze({ navigation_lane: lane_id })));
+    }
+    removeLane(lane_id) {
+        const lane = this.#lanes.get(lane_id); if (!lane) return false;
+        this.#lanes.delete(lane_id); const out = this.#out.get(lane.from); out.splice(out.indexOf(lane), 1);
+        this.#world._mutate(() => this.#world.spatial_grid.removeInstance(SPATIAL + lane_id));
+        this.#changed(); return true;
+    }
+    /** Closed lanes are skipped by routing (roadworks, a crash, a story block). */
+    setLaneOpen(lane_id, open) {
+        const lane = this.#lanes.get(lane_id); if (!lane) throw new TypeError(`Unknown lane: ${lane_id}`);
+        if (lane.open !== !!open) { lane.open = !!open; this.#changed(); }
+        return lane_id;
+    }
+    getLane(lane_id) { const l = this.#lanes.get(lane_id); return l ? { lane_id, from: l.from, to: l.to, points: clone(l.points), length: l.length, speed_limit: l.speed_limit, cost_scale: l.cost_scale, profiles: [...l.profiles], open: l.open } : null; }
+    getNode(node_id) { const n = this.#nodes.get(node_id); return n ? clone(n) : null; }
+    /** Nearest open lane usable by a profile, through the shared spatial grid. */
+    snapToLane(position, { profile = 'car', near_range = 200 } = {}, results = null) {
+        const at = vector(position, 'position'); number(near_range, 'near_range', 0);
+        this.#stats.snaps++;
+        const found = this.#world.spatial_grid.queryRadius(at, near_range, this.#found), hits = [];
+        for (const value of found) {
+            const lane = value?.navigation_lane !== undefined ? this.#lanes.get(value.navigation_lane) : null;
+            if (!lane || !lane.open || !lane.profiles.has(profile)) continue;
+            const p = pathGeometry.projectOnPath(lane.points, at);
+            if (p.distance <= near_range) hits.push({ lane, along: p.distance_along, position: p.position, distance: p.distance });
+        }
+        found.length = 0;
+        hits.sort((a, b) => a.distance - b.distance || (a.lane.lane_id < b.lane.lane_id ? -1 : 1));
+        if (results) { results.length = 0; results.push(...hits); return results; }
+        return hits[0] ?? null;
+    }
+    #nodePath(start, goal, profile) {
+        const key = `${profile}\u0000${start}\u0000${goal}`, cached = this.#cache.get(key);
+        if (cached !== undefined) { this.#stats.route_cache_hits++; this.#cache.delete(key); this.#cache.set(key, cached); return cached; }
+        this.#stats.route_searches++;
+        const target = this.#nodes.get(goal).position, fastest = this.#fastest || 1;
+        const h = id => { const p = this.#nodes.get(id).position; return Math.hypot(p[0] - target[0], p[1] - target[1]) / fastest; };
+        const g = new Map([[start, 0]]), via = new Map(), closed = new Set(), open = [];
+        const push = (cost, node) => { let i = open.length; open.push(null); while (i) { const p = (i - 1) >> 1; if (open[p][0] <= cost) break; open[i] = open[p]; i = p; } open[i] = [cost, node]; };
+        const pop = () => {
+            const top = open[0], last = open.pop();
+            if (open.length) { let i = 0; for (;;) { const l = i * 2 + 1; if (l >= open.length) break; const m = l + 1 < open.length && open[l + 1][0] < open[l][0] ? l + 1 : l; if (open[m][0] >= last[0]) break; open[i] = open[m]; i = m; } open[i] = last; }
+            return top;
+        };
+        push(h(start), start);
+        let result = null;
+        while (open.length) {
+            const [, node] = pop();
+            if (closed.has(node)) continue; closed.add(node); this.#stats.expanded_nodes++;
+            if (node === goal) {
+                const lanes = []; for (let n = goal; n !== start; n = via.get(n).from) lanes.push(via.get(n).lane_id);
+                result = { seconds: g.get(goal), lanes: lanes.reverse() }; break;
+            }
+            for (const lane of this.#out.get(node)) {
+                if (!lane.open || !lane.profiles.has(profile) || closed.has(lane.to)) continue;
+                const cost = g.get(node) + lane.seconds;
+                if (cost >= (g.get(lane.to) ?? Infinity)) continue;
+                g.set(lane.to, cost); via.set(lane.to, lane); push(cost + h(lane.to), lane.to);
+            }
+        }
+        if (this.cache_size) { this.#cache.set(key, result); if (this.#cache.size > this.cache_size) this.#cache.delete(this.#cache.keys().next().value); }
+        return result;
+    }
+    /**
+     * Fastest lane route between two positions (or node ids). Both ends snap to
+     * the nearest usable lanes; the result is a polyline ready for followPath.
+     */
+    findRoute({ from, to, profile = 'car', near_range = 200, max_candidates = 2 } = {}) {
+        this.#stats.route_requests++;
+        number(max_candidates, 'max_candidates', 1, 16);
+        const ends = (value, start) => {
+            if (typeof value === 'string') {
+                const node = this.#nodes.get(value); if (!node) throw new TypeError(`Unknown road node: ${value}`);
+                return [{ node_id: value, position: node.position }];
+            }
+            const snaps = this.snapToLane(value, { profile, near_range }, []);
+            return snaps.slice(0, max_candidates).map(s => ({ ...s, start }));
+        };
+        const starts = ends(from, true), goals = ends(to, false);
+        if (!starts.length || !goals.length) return null;
+        let best = null;
+        const consider = (seconds, build) => { if (!best || seconds < best.seconds) best = { seconds, build }; };
+        for (const s of starts) for (const t of goals) {
+            const prefix = s.lane ? (s.lane.length - s.along) / s.lane.speed_limit * s.lane.cost_scale : 0;
+            const suffix = t.lane ? t.along / t.lane.speed_limit * t.lane.cost_scale : 0;
+            if (s.lane && t.lane && s.lane === t.lane && s.along <= t.along) {
+                consider((t.along - s.along) / s.lane.speed_limit * s.lane.cost_scale, () => ({ lanes: [s.lane.lane_id], points: this.#slice(s.lane, s.along, t.along) }));
+                continue;
+            }
+            const a = s.lane ? s.lane.to : s.node_id, b = t.lane ? t.lane.from : t.node_id, middle = a === b ? { seconds: 0, lanes: [] } : this.#nodePath(a, b, profile);
+            if (!middle) continue;
+            consider(prefix + middle.seconds + suffix, () => {
+                const lanes = [], points = [];
+                const append = list => { for (const p of list) { const last = points.at(-1); if (!last || last[0] !== p[0] || last[1] !== p[1]) points.push([p[0], p[1]]); } };
+                if (s.lane) { lanes.push(s.lane.lane_id); append(this.#slice(s.lane, s.along, s.lane.length)); } else append([s.position]);
+                for (const id of middle.lanes) { lanes.push(id); append(this.#lanes.get(id).points); }
+                if (t.lane) { lanes.push(t.lane.lane_id); append(this.#slice(t.lane, 0, t.along)); } else append([t.position]);
+                return { lanes, points };
+            });
+        }
+        if (!best) return null;
+        const { lanes, points } = best.build();
+        if (points.length < 2) points.push([...points[0]]);
+        let length = 0; for (let i = 1; i < points.length; i++) length += Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]);
+        return { points, lanes, length, travel_seconds: best.seconds, revision: this.#revision };
+    }
+    #slice(lane, a, b) {
+        const out = [pathGeometry.pointOnPath(lane.points, a).position];
+        let walked = 0;
+        for (let i = 1; i < lane.points.length; i++) {
+            walked += Math.hypot(lane.points[i][0] - lane.points[i - 1][0], lane.points[i][1] - lane.points[i - 1][1]);
+            if (walked > a && walked < b) out.push([...lane.points[i]]);
+        }
+        out.push(pathGeometry.pointOnPath(lane.points, b).position);
+        return out;
+    }
+    getStatistics() { return { ...this.#stats, nodes: this.#nodes.size, lanes: this.#lanes.size, cached_routes: this.#cache.size, revision: this.#revision }; }
+    _saveState() {
+        const lanes = [...this.#lanes.values()].map(l => ({ lane_id: l.lane_id, from: l.from, to: l.to, points: clone(l.points.slice(1, -1)), speed_limit: l.speed_limit, cost_scale: l.cost_scale, profiles: [...l.profiles], open: l.open }));
+        return { nodes: [...this.#nodes.values()].map(n => clone(n)), lanes };
+    }
+    _loadState(packet) {
+        if (!packet) return;
+        for (const n of packet.nodes ?? []) this.addNode(n.node_id, n);
+        for (const l of packet.lanes ?? []) this.addLane(l.lane_id, { ...l, two_way: false });
+    }
+    _clear() { this.#nodes.clear(); this.#lanes.clear(); this.#out.clear(); this.#fastest = 0; this.#changed(); }
+}
+
+return Object.freeze({get roadNetwork(){return roadNetwork;}});
+})();
+// src/basement/physics/navigation/system.mjs
+const m33 = (()=>{
+const {number,vector,clone} = m7;
+const {collisionShape,shapeReach} = m6;
+const {referenceBody,referencePosition} = m9;
+const {characterMotor} = m4;
+const {vehicleMotor} = m21;
+const {navigationField} = m34;
+const {fieldPlanner} = m36;
+const {roadNetwork} = m37;
+
+const DEFAULT_PROFILES = { walker: { layer: 'field' }, car: { layer: 'road', near_range: 200 } };
+
+/**
+ * World navigation: one request API for travelling from A to B.
+ *
+ *  - `field` layer: open space around static scenery and props, for people,
+ *    animals, drones and off-road vehicles of any radius.
+ *  - `road` layer: an authored lane graph for cars and other lane-bound users.
+ *
+ * Navigation plans routes; the existing motors move bodies along them. It never
+ * writes positions. Field obstacles come from the world's one spatial grid.
+ */
+class navigationSystem {
+    #world; #field; #planner; #profiles = new Map(); #memo = new Map();
+    #stats = { path_requests: 0, path_reuses: 0, path_memo_hits: 0, goal_repairs: 0, navigate_requests: 0 };
+    constructor(world, { field, memo_size = 256 } = {}) {
+        if (!world || typeof world._mutate !== 'function') throw new TypeError('Navigation requires its physicsSystem owner');
+        if (world.navigation) throw new Error('The world already owns its navigation system');
+        this.#world = world;
+        this.memo_size = number(memo_size, 'memo_size', 0, 1e5);
+        Object.defineProperty(this, 'roads', { value: new roadNetwork(world), enumerable: true });
+        this.#install(field);
+        for (const [name, profile] of Object.entries(DEFAULT_PROFILES)) this.registerProfile(name, profile);
+    }
+    #install(options = {}) { this.#field = new navigationField(this.#world, options); this.#planner = new fieldPlanner(this.#field); this.#memo.clear(); }
+    get field() { return this.#field; }
+    /** Replace walkable-space settings. Cached chunks are discarded and rebuilt on demand. */
+    configureField(options = {}) { this.#install({ ...this.#field.getConfig(), ...options }); return this.#field.getConfig(); }
+    registerProfile(name, { layer, near_range = 200, radius } = {}) {
+        if (typeof name !== 'string' || !name) throw new TypeError('Profile name must be a nonempty string');
+        if (!['field', 'road'].includes(layer)) throw new TypeError("Profile layer must be 'field' or 'road'");
+        number(near_range, 'near_range', 0); if (radius !== undefined) number(radius, 'radius', 0);
+        this.#profiles.set(name, Object.freeze({ name, layer, near_range, radius })); return name;
+    }
+    getProfile(name) { const p = this.#profiles.get(name); if (!p) throw new TypeError(`Unknown navigation profile: ${name}`); return { ...p }; }
+    /** Agent radius for field planning: circle radius, else the shape's reach. */
+    agentRadius(body_or_shape) {
+        const b = referenceBody(body_or_shape), shape = b?.body_id ? this.#world._record(b).shape : new collisionShape(body_or_shape);
+        const p = shape.packet;
+        if (p.shape_type === 'circle') return p.radius + Math.hypot(p.local_position[0], p.local_position[1]);
+        return shapeReach(shape);
+    }
+    #valid(result) {
+        for (const [key, revision] of result.dependencies) if (this.#field.chunkRevision(key) !== revision) return false;
+        return true;
+    }
+    /**
+     * Field path for a body or shape. `reuse` takes a previous result and returns
+     * it unchanged (flagged `reused`) when its goal, radius and chunk revisions
+     * still hold, or with only its last leg repaired when the goal moved slightly.
+     */
+    findPath(packet = {}) {
+        this.#stats.path_requests++;
+        const world = this.#world, from = referencePosition(world, packet.from ?? packet.body), to = vector(packet.to, 'to');
+        const cell = this.#field.cell_size;
+        const radius = packet.radius !== undefined ? number(packet.radius, 'radius', 0)
+            : packet.collision_shape ? this.agentRadius(packet.collision_shape) : packet.body ? this.agentRadius(packet.body) : 1;
+        if (radius > this.#field.max_clearance - cell) throw new RangeError(`Agent radius ${radius} exceeds the field's max_clearance; call navigation.configureField({max_clearance})`);
+        const allow_partial = !!packet.allow_partial;
+        const prior = packet.reuse;
+        if (prior?.dependencies && prior.radius === radius && prior.allow_partial === allow_partial && this.#valid(prior)) {
+            const goal = prior.goal, moved = Math.hypot(goal[0] - to[0], goal[1] - to[1]);
+            if (moved <= 1e-9) { this.#stats.path_reuses++; prior.reused = true; return prior; }
+            const tail = prior.points.at(-2);
+            if (moved <= cell * 2 && !prior.partial && tail && this.#planner.segmentClear(tail, to, radius) && this.#field.exactSegmentClearance(to, to, radius + 1) >= radius) {
+                this.#stats.goal_repairs++;
+                const points = [...prior.points.slice(0, -1), [...to]];
+                return Object.assign(prior, { points, goal: [...to], reused: true, length: prior.length - Math.hypot(goal[0] - tail[0], goal[1] - tail[1]) + Math.hypot(to[0] - tail[0], to[1] - tail[1]) });
+            }
+        }
+        const key = this.memo_size ? `${this.#field.cellOf(from[0])},${this.#field.cellOf(from[1])}|${to[0]},${to[1]}|${radius}|${allow_partial}|${packet.max_nodes ?? ''}|${packet.search_margin ?? ''}|${packet.heuristic_weight ?? ''}` : null;
+        if (key) {
+            const memo = this.#memo.get(key);
+            // A memo starts elsewhere in this cell, so its first leg is rechecked from here.
+            if (memo && this.#valid(memo) && (memo.points.length < 2 || this.#planner.segmentClear(from, memo.points[1], radius))) {
+                this.#stats.path_memo_hits++; this.#memo.delete(key); this.#memo.set(key, memo);
+                return this.#copy(memo, from);
+            }
+        }
+        const result = this.#planner.plan({ from, to, radius, max_nodes: packet.max_nodes, search_margin: packet.search_margin, allow_partial, smooth: packet.smooth !== false, heuristic_weight: packet.heuristic_weight });
+        if (!result) return null;
+        Object.assign(result, { goal: [...to], radius, allow_partial, reused: false });
+        if (key) { this.#memo.set(key, result); if (this.#memo.size > this.memo_size) this.#memo.delete(this.#memo.keys().next().value); }
+        return this.#copy(result, from);
+    }
+    /** Memoized results are shared per start cell; each caller gets its own copy starting where it stands. */
+    #copy(result, from) {
+        const points = result.points.map(p => [p[0], p[1]]); points[0] = [from[0], from[1]];
+        return { ...result, points, dependencies: result.dependencies, goal: [...result.goal], reused: false };
+    }
+    /** Fastest lane route; see roadNetwork.findRoute. */
+    findRoute(packet = {}) {
+        const profile = this.getProfile(packet.profile ?? 'car');
+        if (profile.layer !== 'road') throw new TypeError(`Profile ${profile.name} does not use the road layer`);
+        const from = typeof packet.from === 'string' ? packet.from : referencePosition(this.#world, packet.from ?? packet.body);
+        return this.roads.findRoute({ ...packet, from, profile: profile.name, near_range: packet.near_range ?? profile.near_range });
+    }
+    /**
+     * Send a body to a destination. Characters walk the field through their own
+     * motor; vehicles follow a lane route (or a field path with a field profile).
+     */
+    navigate(body, to, { profile, ...options } = {}) {
+        this.#stats.navigate_requests++;
+        const world = this.#world, b = referenceBody(body), r = world._record(b), motor = r.motor;
+        if (!(motor instanceof characterMotor) && !(motor instanceof vehicleMotor)) throw new TypeError('navigate requires a character or vehicle motor');
+        const chosen = this.getProfile(profile ?? (motor instanceof vehicleMotor ? 'car' : 'walker'));
+        const target = Array.isArray(to) ? vector(to, 'to') : to;
+        if (chosen.layer === 'road') {
+            if (!(motor instanceof vehicleMotor)) throw new TypeError('Road profiles require a vehicle motor');
+            const route = this.findRoute({ ...options, body: b, to: target, profile: chosen.name });
+            if (!route) { world._emit('movementBlocked', { body: b, reason: 'no_route' }); return null; }
+            motor.followPath(route.points, { speed: options.speed, arrival_distance: options.arrival_distance, following_distance: options.following_distance });
+            return { layer: 'road', ...route };
+        }
+        const destination = Array.isArray(target) ? target : referencePosition(world, target);
+        if (motor instanceof characterMotor) {
+            const path = this.findPath({ ...options, body: b, to: destination, radius: options.radius ?? chosen.radius });
+            if (!path) { world._emit('movementBlocked', { body: b, reason: 'no_path' }); return null; }
+            motor.moveTo(destination, options);
+            return { layer: 'field', ...path };
+        }
+        const path = this.findPath({ ...options, body: b, to: destination, radius: options.radius ?? chosen.radius });
+        if (!path) { world._emit('movementBlocked', { body: b, reason: 'no_path' }); return null; }
+        motor.followPath(path.points, { speed: options.speed, arrival_distance: options.arrival_distance });
+        return { layer: 'field', ...path };
+    }
+    /** Mark a region's walkable space for rebuild (e.g. after changing authored blockers). */
+    invalidateRegion(bounds) { this.#field.invalidateRegion(bounds); }
+    getStatistics() { return { ...this.#stats, field: this.#field.getStatistics(), planner: this.#planner.getStatistics(), roads: this.roads.getStatistics(), memo: this.#memo.size }; }
+    _bodySynced(r) { this.#field._bodySynced(r); }
+    _bodyRemoved(r) { this.#field._bodyRemoved(r); }
+    _clear() { this.#field._clear(); this.#memo.clear(); this.roads._clear(); }
+    _saveState() { return { field: this.#field.getConfig(), roads: this.roads._saveState(), profiles: [...this.#profiles.values()].map(p => clone(p)) }; }
+    _loadState(packet) {
+        if (!packet) return;
+        if (packet.field) this.#install(packet.field);
+        for (const p of packet.profiles ?? []) this.registerProfile(p.name, p);
+        this.roads._loadState(packet.roads);
+    }
+}
+
+return Object.freeze({get navigationSystem(){return navigationSystem;}});
+})();
 // src/basement/physics/core/system.mjs
 const m2 = (()=>{
 const {rigSystem} = m3;
@@ -12329,6 +13078,7 @@ const {attachmentManager} = m30;
 const {pathGeometry} = m17;
 const {layoutGeometry} = m31;
 const {particlePhysics} = m32;
+const {navigationSystem} = m33;
 
 /** Standalone fixed-step world. Exactly one spatialGrid is constructed here. */
 class physicsSystem {
@@ -12340,7 +13090,7 @@ class physicsSystem {
     #stepAuthority; #broadphaseEpoch=0; #candidateCache=null;
     #queries; #particles; #attachments; #projectilePolicies=new Set();
     #stats = { steps: 0, narrow_checks: 0, candidate_pairs: 0, active_movers: 0, spatial_sync_requests: 0, spatial_sync_skips: 0, bounds_calculations: 0, swept_bounds_calculations: 0, attachment_placements: 0, broadphase_builds: 0, broadphase_reuses: 0 };
-    constructor({ cell_size = 128, fixed_step = 1 / 60, gravity = [0, 0], solver_iterations = 6, sleep_speed = 0.05, sleep_delay = 0.5, asset_library, step_authority } = {}) {
+    constructor({ cell_size = 128, fixed_step = 1 / 60, gravity = [0, 0], solver_iterations = 6, sleep_speed = 0.05, sleep_delay = 0.5, asset_library, step_authority, navigation } = {}) {
         if (step_authority !== undefined && typeof step_authority !== 'symbol') throw new TypeError('step_authority must be a private Symbol');
         this.#stepAuthority = step_authority;
         Object.defineProperty(this, 'config', { value: freeze({ cell_size: number(cell_size, 'cell_size', 1), fixed_step: number(fixed_step, 'fixed_step', EPS, 0.1), gravity: vector(gravity),
@@ -12351,6 +13101,7 @@ class physicsSystem {
         Object.defineProperty(this, 'motion', { value: new motionController(this), enumerable: true });
         Object.defineProperty(this, 'rigs', { value: new rigSystem(this), enumerable: true });
         Object.defineProperty(this, 'traffic', { value: new trafficController(this), enumerable: true });
+        Object.defineProperty(this, 'navigation', { value: new navigationSystem(this, navigation), enumerable: true });
         this.#attachments = new attachmentManager(this); this.#queries = new physicsQueries(this); this.#particles = new particlePhysics(this);
     }
     get simulation_tick() { return this.#tick; }
@@ -12387,6 +13138,7 @@ class physicsSystem {
                 ||old.collision_exclusions!==next.collision_exclusions||r.broadphase_mount!==r.parent_mount)this.#broadphaseEpoch++;
             r.broadphase_config=next;r.broadphase_mount=r.parent_mount;
         }
+        this.navigation._bodySynced(r);
         if(!bodyActive(r)){
             if(r.indexed)this.spatial_grid.removeInstance(r.id);
             r.indexed=false;r.spatial_cache=null;this.#moving.delete(r);r.moving_member=false;return;
@@ -12510,7 +13262,7 @@ class physicsSystem {
         this._mutate(() => {
             if (r.removed) return;
             this.#motionEnvelope = null;this.#candidateCache=null; this.spatial_grid.removeInstance(r.id); r.indexed = false; r.removed = true; this.#bodies.delete(r.id); this.#moving.delete(r);
-            this.#attachments._bodyRemoved(r); this.rigs._bodyRemoved(r.id); this.elements._bodyRemoved(r.id); this.traffic.removeVehicle(r.id); this.motion._remove(r.id); this.#particles._bodyRemoved(r.id);
+            this.navigation._bodyRemoved(r); this.#attachments._bodyRemoved(r); this.rigs._bodyRemoved(r.id); this.elements._bodyRemoved(r.id); this.traffic.removeVehicle(r.id); this.motion._remove(r.id); this.#particles._bodyRemoved(r.id);
             for (const [id, c] of this.#constraints) { const cr = constraintRecord(c); if (cr.a === r || cr.b === r) this.#constraints.delete(id); }
         });
     }
@@ -12949,7 +13701,7 @@ class physicsSystem {
     overlapShape(packet, results) { return this.#queries.overlapShape(packet, results); }
     isPlacementClear(body_or_shape, position, options) { return this.#queries.isPlacementClear(body_or_shape, position, options); }
     findClearPlacement(packet, result) { return this.#queries.findClearPlacement(packet, result); }
-    findPath(packet, result) { return this.#queries.findPath(packet, result); }
+    findPath(packet, result) { const path = this.navigation.findPath(packet); return path && result ? Object.assign(result, path) : path; }
     getPathClearance(packet, result) { return this.#queries.getPathClearance(packet, result); }
     queryEntitiesInBounds(packet, results) { return this.#queries.queryEntitiesInBounds(packet, results); }
     getBodyBounds(body, options) { return this.#queries.getBodyBounds(body, options); }
@@ -12971,7 +13723,7 @@ class physicsSystem {
     removeChain(chain) { return this.#particles.removeChain(chain); }
     clearWorld() {
         this._mutate(() => { for (const r of this.#bodies.values()) r.removed = true; this.#bodies.clear(); this.#moving.clear(); this.#constraints.clear(); this.#contacts.clear(); this.#stepContacts.clear();
-            this.#attachments._clear(); this.rigs._clear(); this.elements._clear(); this.traffic._clear(); this.motion._clear(); this.spatial_grid.clear(); this.#particles._clear(); this.#events = []; this.#nextId = 1; this.#nextConstraint = 1; this.#tick = 0; this.#motionEnvelope = null;this.#candidateCache=null;this.#broadphaseEpoch++; });
+            this.#attachments._clear(); this.rigs._clear(); this.elements._clear(); this.traffic._clear(); this.motion._clear(); this.spatial_grid.clear(); this.navigation._clear(); this.#particles._clear(); this.#events = []; this.#nextId = 1; this.#nextConstraint = 1; this.#tick = 0; this.#motionEnvelope = null;this.#candidateCache=null;this.#broadphaseEpoch++; });
     }
     // Versioned exchange; validate a replacement before changing the live registry.
     _exportState() {
@@ -12980,7 +13732,7 @@ class physicsSystem {
             attachments: this.#attachments._saveState(), rigs:this.rigs._saveState(),
             bodies: [...this.#bodies.values()].map(r => ({ ...snapshot(r), active: r.config.active, force: [...r.force], torque: r.torque, sleep_time: r.sleep_time, motor: this._saveMotor(r.motor) })),
             constraints: [...this.#constraints.values()].map(c => c.getState()), particles: this.#particles._saveState(), traffic: this.traffic._saveState(), motion: this.motion._saveState(),
-            spatial_instances: this.spatial_grid.exportInstances().filter(e => typeof e.id === 'string'),
+            spatial_instances: this.spatial_grid.exportInstances().filter(e => typeof e.id === 'string' && e.id.startsWith('spatial:')), navigation: this.navigation._saveState(),
             next_body_id: this.#nextId, next_constraint_id: this.#nextConstraint };
     }
     _saveMotor(m) {
@@ -13053,7 +13805,7 @@ class physicsSystem {
         this.#particles._loadState(saved.particles);
         for (const e of saved.spatial_instances ?? []) this.registerSpatialInstance(e.value.instance_id, e.bounds, e.value);
         this.elements._restoreState(saved.entities);
-        this.traffic._loadState(saved.traffic); this.motion._loadState(saved.motion);
+        this.traffic._loadState(saved.traffic); this.motion._loadState(saved.motion); this.navigation._loadState(saved.navigation);
         this.rigs._loadState(saved.rigs);
         this.#attachments._loadState(saved.attachments);
     }
@@ -13090,9 +13842,12 @@ const m1 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m2.physicsSystem;},get physicsBody(){return m18.physicsBody;},get collisionShape(){return m6.collisionShape;},get collisionDetector(){return m10.collisionDetector;},get contactSolver(){return m19.contactSolver;},get spatialGrid(){return m20.spatialGrid;},get physicsConstraint(){return m27.physicsConstraint;},get constraintSolver(){return m27.constraintSolver;},get characterMotor(){return m4.characterMotor;},get vehicleMotor(){return m21.vehicleMotor;},get pathMotor(){return m21.pathMotor;},get projectileMotor(){return m22.projectileMotor;},get particlePhysics(){return m32.particlePhysics;},get gameEntity(){return m24.gameEntity;},get gameElements(){return m25.gameElements;},get assetLibrary(){return m26.assetLibrary;},get gameCharacter(){return m23.gameCharacter;},get gameVehicle(){return m23.gameVehicle;},get gameProjectile(){return m23.gameProjectile;},get gameProp(){return m23.gameProp;},get gameStatic(){return m23.gameStatic;},get gameTrigger(){return m23.gameTrigger;},get gameDecoration(){return m23.gameDecoration;},get awarenessMatrix(){return m23.awarenessMatrix;},get BODY_GROUP(){return m7.BODY_GROUP;},get QUERY_GROUP(){return m7.QUERY_GROUP;},get PHYSICS_TYPES(){return m7.PHYSICS_TYPES;},get trafficController(){return m29.trafficController;},get motionController(){return m28.motionController;},get pathGeometry(){return m17.pathGeometry;},get layoutGeometry(){return m31.layoutGeometry;},get rigDefinition(){return m13.rigDefinition;},get rigPose(){return m12.rigPose;},get animationClip(){return m15.animationClip;},get animationController(){return m11.animationController;},get rigSystem(){return m3.rigSystem;}});
+
+
+
+return Object.freeze({get physicsSystem(){return m2.physicsSystem;},get physicsBody(){return m18.physicsBody;},get collisionShape(){return m6.collisionShape;},get collisionDetector(){return m10.collisionDetector;},get contactSolver(){return m19.contactSolver;},get spatialGrid(){return m20.spatialGrid;},get physicsConstraint(){return m27.physicsConstraint;},get constraintSolver(){return m27.constraintSolver;},get characterMotor(){return m4.characterMotor;},get vehicleMotor(){return m21.vehicleMotor;},get pathMotor(){return m21.pathMotor;},get projectileMotor(){return m22.projectileMotor;},get particlePhysics(){return m32.particlePhysics;},get gameEntity(){return m24.gameEntity;},get gameElements(){return m25.gameElements;},get assetLibrary(){return m26.assetLibrary;},get gameCharacter(){return m23.gameCharacter;},get gameVehicle(){return m23.gameVehicle;},get gameProjectile(){return m23.gameProjectile;},get gameProp(){return m23.gameProp;},get gameStatic(){return m23.gameStatic;},get gameTrigger(){return m23.gameTrigger;},get gameDecoration(){return m23.gameDecoration;},get awarenessMatrix(){return m23.awarenessMatrix;},get BODY_GROUP(){return m7.BODY_GROUP;},get QUERY_GROUP(){return m7.QUERY_GROUP;},get PHYSICS_TYPES(){return m7.PHYSICS_TYPES;},get trafficController(){return m29.trafficController;},get motionController(){return m28.motionController;},get pathGeometry(){return m17.pathGeometry;},get navigationSystem(){return m33.navigationSystem;},get navigationField(){return m34.navigationField;},get roadNetwork(){return m37.roadNetwork;},get layoutGeometry(){return m31.layoutGeometry;},get rigDefinition(){return m13.rigDefinition;},get rigPose(){return m12.rigPose;},get animationClip(){return m15.animationClip;},get animationController(){return m11.animationController;},get rigSystem(){return m3.rigSystem;}});
 })();
-const m35 = Object.freeze({default:{
+const m40 = Object.freeze({default:{
   "_about": {
     "chapter": "Enemies and encounters: what each enemy kind starts with, the drones, the Triumvirate and Lilitu, their hazards, and the Horde Gauntlet.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.enemies and checked by tools/test-game-db.cjs. Times are seconds unless a name says frames (60 a second); distances px; damage HP. Keys in UPPER_SNAKE are read by the code under those names. Gauntlet ids and kind ids are in save files: never rename one.",
@@ -13635,8 +14390,8 @@ const m35 = Object.freeze({default:{
   }
 }});
 // src/directory/game-bosses.mjs
-const m34 = (()=>{
-const enemies = m35.default;
+const m39 = (()=>{
+const enemies = m40.default;
 function createBossRules(source=enemies){return {demoness:structuredClone(source.kinds.demoness),duel:structuredClone(source.duel),warden:structuredClone(source.warden),wardens:structuredClone(source.wardens),hazards:structuredClone(source.hazards),rite_limit_radius:1800};}
 function createDemonessAppearance({decoy=false}={}){return {gender:'female',skinColor:'#8a0707',eyeColor:decoy?'#2a0508':'#ff5a1a',blood:'ink',build:'curvy',height:1.14,hair:{type:'demon_dancer',color:'#0a0000'},hat:{type:'demon_horns',color:'#160406',trim:'#e3a64a'},top:{type:'sleeved_crop',color:'#0a0406',trim:'#e3a64a'},bottom:{type:'long_skirt',color:'#0a0406',trim:'#b0122e'},train:{type:'dress_train',color:'#2a0610'},shoes:{type:'heels',color:'#0a0406'}};}
 function createBossAbilities(source=enemies){
@@ -13662,7 +14417,7 @@ function createBossAbilities(source=enemies){
 
 return Object.freeze({get createBossRules(){return createBossRules;},get createDemonessAppearance(){return createDemonessAppearance;},get createBossAbilities(){return createBossAbilities;}});
 })();
-const m36 = Object.freeze({default:{
+const m41 = Object.freeze({default:{
   "radius": 8,
   "mass": 3,
   "follow_offset": [
@@ -13679,8 +14434,8 @@ const m36 = Object.freeze({default:{
   "rest_after": 2.5
 }});
 // src/directory/game-drones.mjs
-const m37 = (()=>{
-const enemies = m35.default;
+const m42 = (()=>{
+const enemies = m40.default;
 /** Authored Drone balance is converted once to seconds and pixels per second. */
 function createDroneRules(def=enemies.drone,kind=enemies.kinds.drone){return {flight:def,health:def.HP,mass:kind.mass,radius:kind.radius,speed:kind.speed*60,damage_grace_seconds:kind.invincible_frames/60};}
 function createDroneAbilities(d=enemies.drone){
@@ -13695,7 +14450,7 @@ function createDroneAbilities(d=enemies.drone){
 
 return Object.freeze({get createDroneRules(){return createDroneRules;},get createDroneAbilities(){return createDroneAbilities;}});
 })();
-const m39 = Object.freeze({default:{
+const m44 = Object.freeze({default:{
   "weapon_id": "gatling_gunner",
   "ability_id": "gatling_burst",
   "range": 900,
@@ -13726,15 +14481,15 @@ const m39 = Object.freeze({default:{
   }
 }});
 // src/directory/game-gunners.mjs
-const m38 = (()=>{
-const enemies = m35.default;
-const rules = m39.default;
+const m43 = (()=>{
+const enemies = m40.default;
+const rules = m44.default;
 function createGunnerRules(kind=enemies.kinds.gatling_gunner){return {...structuredClone(rules),burst_count:kind.burst_count,round_seconds:kind.burst_delay/60,reload_seconds:kind.reload/60,tell_seconds:kind.telegraph_frames/60};}
 function createGunnerAbilities(kind=enemies.kinds.gatling_gunner){const r=createGunnerRules(kind);return {[r.ability_id]:{name:'Gatling burst',description:'Wind up, fire an owned rotary weapon, then reload.',delivery:'burst',required_weapon_id:r.weapon_id,range:r.range,speed:r.gun.speed*60,cooldown_seconds:r.reload_seconds,tell_seconds:r.tell_seconds,reload_seconds:r.reload_seconds,burst_count:r.burst_count,allow_mounted:false,require_sight:true}};}
 
 return Object.freeze({get createGunnerRules(){return createGunnerRules;},get createGunnerAbilities(){return createGunnerAbilities;}});
 })();
-const m41 = Object.freeze({default:{
+const m46 = Object.freeze({default:{
   "HP": 30,
   "RADIUS": 11,
   "SCALE": 0.72,
@@ -13777,8 +14532,8 @@ const m41 = Object.freeze({default:{
   "IMPACT": 84
 }});
 // src/directory/game-marionettes.mjs
-const m40 = (()=>{
-const authored = m41.default;
+const m45 = (()=>{
+const authored = m46.default;
 const freeze=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))freeze(child);Object.freeze(value);}return value;};
 const MARIONETTE_RULES=freeze(structuredClone(authored));
 function createMarionetteRules(){const m=authored;return {health:m.HP,radius:m.RADIUS,mass:m.MASS,move_speed:m.SPEED*60,damage_grace_seconds:m.INVINCIBLE_FRAMES/60,ballistic_multiplier:m.SHOT,sight:m.SIGHT,reach:m.REACH,space:m.SPACE,flank_range:m.REACH+m.CIRCLE,flank_offsets:[[m.CIRCLE,0],[0,m.CIRCLE],[-m.CIRCLE,0],[0,-m.CIRCLE]],drift_speed:m.DRIFT*60,yank_speed:m.YANK_SPEED*60,yank_interval:m.YANK,yank_seconds:m.YANK_SECONDS,cloth:m.CLOTH};}
@@ -13787,7 +14542,7 @@ function createMarionetteAbilities(){const m=authored;return {marionette_lunge:{
 return Object.freeze({get MARIONETTE_RULES(){return MARIONETTE_RULES;},get createMarionetteRules(){return createMarionetteRules;},get createMarionetteAbilities(){return createMarionetteAbilities;}});
 })();
 // src/directory/game-hunters.mjs
-const m42 = (()=>{
+const m47 = (()=>{
 /** Normalize existing Hunter authoring once; gameplay and Basement receive engine units. */
 function createHunterRules(kind,{authoring_hz=60}={}){
  return {dash_max:kind.dashes,dash_cooldown:kind.dash_cd/authoring_hz,dash_initial:90/authoring_hz,dash_chain_delay:22/authoring_hz,dash_retry:30/authoring_hz,dash_min_range:150,dash_max_range:420,dash_stop_distance:70,evade_min_cooldown:40/authoring_hz,evade_distance:90,evade_speed:540,evade_chance:.5,evade_cooldown:120/authoring_hz,minimum_visibility:.55,claw_range:kind.claw_reach};
@@ -13805,7 +14560,7 @@ function createHunterAppearance({alpha=false,random=Math.random}={}){
 
 return Object.freeze({get createHunterRules(){return createHunterRules;},get createHunterAbilities(){return createHunterAbilities;},get createHunterAppearance(){return createHunterAppearance;}});
 })();
-const m45 = Object.freeze({default:{
+const m50 = Object.freeze({default:{
   "_about": {
     "chapter": "Items and gear: everything she can carry, drink, read, craft or own.",
     "how_to_edit": "Plain JSON. tools/build.mjs inlines this file as GAME_DB.items when it builds the game, and tools/test-game-db.cjs checks it. Entry field names stay camelCase because the game code reads them by those names. A \"note\" field is for people and is never read by the game.",
@@ -14590,10 +15345,10 @@ const m45 = Object.freeze({default:{
   ]
 }});
 // src/directory/game-items.mjs
-const m44 = (()=>{
-const gunnerRules = m39.default;
-const enemies = m35.default;
-const definitions = m45.default;
+const m49 = (()=>{
+const gunnerRules = m44.default;
+const enemies = m40.default;
+const definitions = m50.default;
 
 /** Concrete item definitions stay in the Directory; gameplay receives plain catalog data. */
 function createItemCatalog(items=definitions,{enemy_kinds=enemies.kinds}={}) {
@@ -14615,7 +15370,7 @@ function createItemCatalog(items=definitions,{enemy_kinds=enemies.kinds}={}) {
 return Object.freeze({get createItemCatalog(){return createItemCatalog;}});
 })();
 // src/gameplay/values.mjs
-const m48 = (()=>{
+const m53 = (()=>{
 // Gameplay validation, deliberately unrelated to physical vectors or integration.
 function nonnegative(value, name) {
     if (!Number.isFinite(value) || value < 0) throw new TypeError(`${name} must be finite and nonnegative`);
@@ -14652,8 +15407,8 @@ function validateModifiers(modifiers) {
 return Object.freeze({get nonnegative(){return nonnegative;},get identifier(){return identifier;},get jsonCopy(){return jsonCopy;},get validateModifiers(){return validateModifiers;}});
 })();
 // src/gameplay/abilities/ability-loadout.mjs
-const m47 = (()=>{
-const {identifier,jsonCopy} = m48;
+const m52 = (()=>{
+const {identifier,jsonCopy} = m53;
 const components=new WeakMap();
 /** Learned capabilities, separate from carried items and physical/attack state. */
 class abilityLoadout{
@@ -14674,7 +15429,7 @@ function actorAbilities(data,catalog){const previous=components.get(data);if(pre
 
 return Object.freeze({get abilityLoadout(){return abilityLoadout;},get actorAbilities(){return actorAbilities;}});
 })();
-const m49 = Object.freeze({default:{
+const m54 = Object.freeze({default:{
   "_about": {
     "chapter": "Progression: Resonance (949's levels), the three tuning trees, castable abilities, and the perks closeness unlocks.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.progression and checked by tools/test-game-db.cjs. Node ids, tree ids and ability ids are in save files: never rename one. A \"note\" is for people only.",
@@ -14948,7 +15703,7 @@ const m49 = Object.freeze({default:{
     }
   }
 }});
-const m50 = Object.freeze({default:{
+const m55 = Object.freeze({default:{
   "authoring_hz": 60,
   "local_position": [20, 0],
   "projectile_radius": 5,
@@ -14957,17 +15712,17 @@ const m50 = Object.freeze({default:{
   "damage_type": "energy"
 }});
 // src/directory/game-abilities.mjs
-const m46 = (()=>{
-const {createBossAbilities} = m34;
-const {createDroneAbilities} = m37;
-const {createGunnerAbilities} = m38;
-const {createMarionetteAbilities} = m40;
-const enemies = m35.default;
-const {createHunterAbilities} = m42;
-const {abilityLoadout} = m47;
-const progression = m49.default;
-const rules = m50.default;
-const {identifier,nonnegative,jsonCopy} = m48;
+const m51 = (()=>{
+const {createBossAbilities} = m39;
+const {createDroneAbilities} = m42;
+const {createGunnerAbilities} = m43;
+const {createMarionetteAbilities} = m45;
+const enemies = m40.default;
+const {createHunterAbilities} = m47;
+const {abilityLoadout} = m52;
+const progression = m54.default;
+const rules = m55.default;
+const {identifier,nonnegative,jsonCopy} = m53;
 
 /** Existing authored balance becomes engine units once at the Directory boundary. */
 function createAbilityCatalog(definitions=progression.abilities,{hunter_kind=enemies.kinds.hunter,gunner_kind=enemies.kinds.gatling_gunner,drone_definition=enemies.drone,boss_definitions=enemies}={}){
@@ -14994,7 +15749,7 @@ function importActorAbilities(data,catalog,{default_id=null}={}){
 
 return Object.freeze({get createAbilityCatalog(){return createAbilityCatalog;},get importActorAbilities(){return importActorAbilities;}});
 })();
-const m51 = Object.freeze({default:{
+const m56 = Object.freeze({default:{
   "authoring_hz": 60,
   "crit_chance": 0.1,
   "crit_multiplier": 2,
@@ -15073,7 +15828,7 @@ const m51 = Object.freeze({default:{
     "minimum_cooldown_seconds": 0.6
   }
 }});
-const m52 = Object.freeze({default:{
+const m57 = Object.freeze({default:{
   "firearm_range": 400,
   "melee_range": 65,
   "unarmed_range": 65,
@@ -15084,11 +15839,11 @@ const m52 = Object.freeze({default:{
   }
 }});
 // src/directory/game-attacks.mjs
-const m43 = (()=>{
-const {createItemCatalog} = m44;
-const {createAbilityCatalog} = m46;
-const combatRules = m51.default;
-const rules = m52.default;
+const m48 = (()=>{
+const {createItemCatalog} = m49;
+const {createAbilityCatalog} = m51;
+const combatRules = m56.default;
+const rules = m57.default;
 
 /** References to existing item/capability definitions, not a second balance/ownership ledger. */
 function createAttackCatalog({items=createItemCatalog(),abilities=createAbilityCatalog()}={}){
@@ -15103,12 +15858,12 @@ function createAttackCatalog({items=createItemCatalog(),abilities=createAbilityC
 
 return Object.freeze({get createAttackCatalog(){return createAttackCatalog;}});
 })();
-const m53 = Object.freeze({default:{
+const m58 = Object.freeze({default:{
  "health":100,"authoring_hz":60,"damage_grace_seconds":0,
  "npc":{"follow_distance":60,"recover_distance":300,"cruise_speed":210,"match_speed":312,"catchup_speed":420,"match_distance":30,"catchup_distance":100,"combat_range":400,"recovery_delay":3,"regeneration_interval":0.5,"regeneration_amount":1,"stim_threshold":0.3,"stim_heal":50,"stim_cooldown":2,"stim_count":3,"aura_range":120,"aura_interval":1,"hire_cost":400,"hire_minutes":480},
  "ganger":{"vision_fov":1.2566370614359172,"personal_space":50,"touch_distance":32,"suspicion_near_per_second":300,"suspicion_sight_per_second":150,"suspicion_idle_drain_per_second":30,"suspicion_search_drain_per_second":6,"suspicion_decay_delay":2,"noise_decay_delay":3,"suppression_seconds":1.5,"suppression_cooldown":0.25,"search_speed":90,"retreat_speed":90,"engage_distance":150,"retreat_distance":80,"search_arrival":40,"wander_speed":30,"wander_radius":200,"wander_min_seconds":2,"wander_random_seconds":3.3333333333333335,"search_look_seconds":0.75,"search_timeout":5,"interrupt_seconds":0.2,"interrupt_resistance":0.65,"shot_jitter_seconds":0.3333333333333333}
 }});
-const m54 = Object.freeze({default:{
+const m59 = Object.freeze({default:{
   "max_health": 100,
   "movement_speed": 312,
   "sneak_speed_factor": 0.55,
@@ -15126,7 +15881,7 @@ const m54 = Object.freeze({default:{
     "minimum_distance": 1
   }
 }});
-const m55 = Object.freeze({default:{
+const m60 = Object.freeze({default:{
   "library_id": "df",
   "description": "Directory-owned entity definitions for the standalone engine. Existing game classes migrate to these contracts in the next phase. Units: world pixels, seconds, radians and kilograms.",
   "resources": {
@@ -15680,7 +16435,7 @@ const m55 = Object.freeze({default:{
     }
   }
 }});
-const m56 = Object.freeze({default:{
+const m61 = Object.freeze({default:{
   "library_id": "df_street",
   "resources": {
     "rules": {
@@ -15747,7 +16502,7 @@ const m56 = Object.freeze({default:{
     }
   }
 }});
-const m57 = Object.freeze({default:{
+const m62 = Object.freeze({default:{
   "_about": {
     "chapter": "Cast and looks: every speaker's colour, who stands where in a cinematic scene, where the crew idles at home, how every named character looks, the colours looks share, the Double Nights android finishes, the wardrobe Stella can buy and wear, and the finishes and named materials it is drawn with.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.cast and checked by tools/test-game-db.cjs. Colours are '#rrggbb' (or '#rgb'). In appearances, { \"palette\": \"<name>\" } stands for that colour from palette, so a colour several looks share is changed once. Crowds (ROLE_LOOKS) and the field mask are code and stay in core/appearances.js. _about.notes keeps the explanations that were comments in the code, keyed by path.",
@@ -17217,7 +17972,7 @@ const m57 = Object.freeze({default:{
     }
   ]
 }});
-const m58 = Object.freeze({default:{
+const m63 = Object.freeze({default:{
   "_about": {
     "chapter": "Vehicles and traffic: the car brands and models, BlackMark's factory look, the Zib cabs and where they go, how traffic treats people in the road, and the driving feel every car shares.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.vehicles and checked by tools/test-game-db.cjs. Speeds are px a tick (60 ticks a second), accelerations px a tick², times in ticks unless a name says ms, distances px, angles radians. Keys in camelCase or UPPER_SNAKE are read by the code under those names. Brand and model keys are in save files: never rename one. _about.fields explains each field of the tuning tables.",
@@ -17949,7 +18704,7 @@ const m58 = Object.freeze({default:{
     }
   }
 }});
-const m59 = Object.freeze({default:{
+const m64 = Object.freeze({default:{
   "_about": {
     "chapter": "Places: every map's size, floors, walls, zones, landmarks and ways in and out; the rooms and doors inside them; where the city's landmark blocks are; the fireplaces; and where the dyer stands.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.places and checked by tools/test-game-db.cjs. Positions and sizes are world px, from the map's top-left; angles radians. Keys in camelCase or UPPER_SNAKE are read by the code under those names. Map ids and room ids are in save files and story steps: never rename one. _about.notes keeps the explanations that were comments in the code, keyed by where they apply (maps.apt_949.cameraBounds, rooms.apt_949.doors[0], …); they're for people only.",
@@ -19689,27 +20444,27 @@ const m59 = Object.freeze({default:{
   "dyer_station": {"x":1176,"y":214,"width":58,"height":30}
 }});
 // src/directory/game-assets.mjs
-const m33 = (()=>{
-const {createBossRules,createDemonessAppearance} = m34;
-const velvetRules = m36.default;
-const {createDroneRules} = m37;
-const {createGunnerRules} = m38;
-const {createMarionetteRules} = m40;
-const {createHunterRules} = m42;
-const {createAttackCatalog} = m43;
-const progression = m49.default;
-const {createAbilityCatalog} = m46;
-const actorRules = m53.default;
-const {createItemCatalog} = m44;
+const m38 = (()=>{
+const {createBossRules,createDemonessAppearance} = m39;
+const velvetRules = m41.default;
+const {createDroneRules} = m42;
+const {createGunnerRules} = m43;
+const {createMarionetteRules} = m45;
+const {createHunterRules} = m47;
+const {createAttackCatalog} = m48;
+const progression = m54.default;
+const {createAbilityCatalog} = m51;
+const actorRules = m58.default;
+const {createItemCatalog} = m49;
 const {assetLibrary} = m1;
-const playerRules = m54.default;
-const definitions = m55.default;
-const streetDefinitions = m56.default;
-const cast = m57.default;
-const vehicles = m58.default;
-const enemies = m35.default;
-const places = m59.default;
-const items = m45.default;
+const playerRules = m59.default;
+const definitions = m60.default;
+const streetDefinitions = m61.default;
+const cast = m62.default;
+const vehicles = m63.default;
+const enemies = m40.default;
+const places = m64.default;
+const items = m50.default;
 
 /** Game data is wired here, never imported by the reusable Basement package. */
 function createGameAssetLibrary({ game_db = { cast, vehicles, enemies, places, items } } = {}) {
@@ -19750,8 +20505,8 @@ function createGameAssetLibrary({ game_db = { cast, vehicles, enemies, places, i
 return Object.freeze({get createGameAssetLibrary(){return createGameAssetLibrary;}});
 })();
 // src/gameplay/attacks/attack-registry.mjs
-const m66 = (()=>{
-const {identifier,jsonCopy} = m48;
+const m71 = (()=>{
+const {identifier,jsonCopy} = m53;
 const freeze=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))freeze(child);Object.freeze(value);}return value;};
 
 const synchronous=callback=>(...args)=>{const result=callback(...args);if(result&&typeof result.then==='function')throw new TypeError('Attack callbacks must be synchronous');return result;};
@@ -19788,9 +20543,9 @@ function validateAttackState(state,hasAttack){
 return Object.freeze({get attackRegistry(){return attackRegistry;},get validateAttackState(){return validateAttackState;}});
 })();
 // src/gameplay/actors/actor-vitals.mjs
-const m67 = (()=>{
-const rules = m53.default;
-const {nonnegative,jsonCopy} = m48;
+const m72 = (()=>{
+const rules = m58.default;
+const {nonnegative,jsonCopy} = m53;
 function validate(data){nonnegative(data.health,'health');nonnegative(data.max_health,'max_health');if(!data.max_health||data.health>data.max_health)throw new TypeError('Invalid actor health');}
 /** Shared health operations over the owner's canonical data, with no physical or UI state. */
 class actorVitals{
@@ -19813,11 +20568,11 @@ class actorVitals{
 return Object.freeze({get actorVitals(){return actorVitals;}});
 })();
 // src/entities/game-actor.mjs
-const m65 = (()=>{
-const {validateAttackState} = m66;
+const m70 = (()=>{
+const {validateAttackState} = m71;
 const {gameCharacter} = m1;
-const {actorVitals} = m67;
-const {nonnegative,jsonCopy} = m48;
+const {actorVitals} = m72;
+const {nonnegative,jsonCopy} = m53;
 const health=new WeakMap(),hooks=new WeakMap();
 const stateFor=actor=>actor.data.actor_state??={format_version:1,defeated:false,invulnerable_remaining:0,elapsed:0};
 /** Common actor gameplay over a real gameCharacter. No velocity, geometry or body mirrors. */
@@ -19862,11 +20617,11 @@ class gameActor extends gameCharacter{
 
 return Object.freeze({get gameActor(){return gameActor;}});
 })();
-const m70 = Object.freeze({default:{"capacity":10,"max_attachments":2,"owner_id":"player"}});
+const m75 = Object.freeze({default:{"capacity":10,"max_attachments":2,"owner_id":"player"}});
 // src/gameplay/items/item-system.mjs
-const m69 = (()=>{
-const itemRules = m70.default;
-const {identifier,jsonCopy,validateModifiers} = m48;
+const m74 = (()=>{
+const itemRules = m75.default;
+const {identifier,jsonCopy,validateModifiers} = m53;
 
 const modes=['normal','sniper','melee','fists'];
 const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
@@ -20047,10 +20802,10 @@ class itemSystem {
 return Object.freeze({get itemSystem(){return itemSystem;}});
 })();
 // src/gameplay/actors/actor-inventory.mjs
-const m68 = (()=>{
-const {itemSystem} = m69;
-const itemRules = m70.default;
-const {jsonCopy} = m48;
+const m73 = (()=>{
+const {itemSystem} = m74;
+const itemRules = m75.default;
+const {jsonCopy} = m53;
 const components=new WeakMap();
 function actorItems(data,owner_id,catalog){
  const prior=components.get(data);if(prior&&prior.root===data.inventory)return prior.items;
@@ -20063,10 +20818,10 @@ function restoreActorItems(data,snapshot,catalog){
 return Object.freeze({get actorItems(){return actorItems;},get restoreActorItems(){return restoreActorItems;}});
 })();
 // src/entities/ganger.mjs
-const m64 = (()=>{
-const {gameActor} = m65;
-const {actorItems,restoreActorItems} = m68;
-const {nonnegative,jsonCopy} = m48;
+const m69 = (()=>{
+const {gameActor} = m70;
+const {actorItems,restoreActorItems} = m73;
+const {nonnegative,jsonCopy} = m53;
 const states=['IDLE','SUSPICIOUS','ALERT','SUPPRESSING','SEARCHING'];
 const stateFor=actor=>actor.data.ganger_state??={format_version:1,state:'IDLE',suspicion:0,drain_remaining:0,suppression_remaining:0,look_elapsed:0,wander_remaining:0,investigate_position:null,wander_position:null,origin:[...actor.position],search_positions:[],search_elapsed:0,interrupt_remaining:0,resistance_remaining:0,telegraphing:false,aim_position:null,shot_delay:actor.data.telegraph_seconds??.15,bumped:false};
 /** Native stealth/combat policy. Awareness, leading, pathing and contact response stay in Basement. */
@@ -20124,9 +20879,9 @@ class Ganger extends gameActor{
 return Object.freeze({get Ganger(){return Ganger;}});
 })();
 // src/entities/hunter.mjs
-const m63 = (()=>{
-const {Ganger} = m64;
-const {nonnegative,jsonCopy} = m48;
+const m68 = (()=>{
+const {Ganger} = m69;
+const {nonnegative,jsonCopy} = m53;
 const stateFor=actor=>actor.data.hunter_state??={format_version:1,dash_remaining:actor.getAsset('actor_rules').data.hunter.dash_initial,chain:0,evade_requested:false};
 /** Hunter decisions only. Native motors own blink clearance, evasion and all motion. */
 class Hunter extends Ganger{
@@ -20168,9 +20923,9 @@ class Hunter extends Ganger{
 return Object.freeze({get Hunter(){return Hunter;}});
 })();
 // src/entities/demoness.mjs
-const m62 = (()=>{
-const {Hunter} = m63;
-const {nonnegative,jsonCopy} = m48;
+const m67 = (()=>{
+const {Hunter} = m68;
+const {nonnegative,jsonCopy} = m53;
 const stateFor=actor=>actor.data.demoness_state??={format_version:1,phase:1,heard_position:null,heard_at:0,next_sigil:2,next_bolt:1.5,next_step:4,next_gale:3,next_mirror:2,next_rite:1,eye:1,rise:1,flash:0,last_strike:null,decoy_remaining:actor.data.decoy_remaining??9};
 function validateDemonessData(data){if(['solo','decoy','dormant'].some(key=>typeof data[key]!=='boolean')||data.decoy&&data.max_health!==1)throw new TypeError('Invalid Demoness flags/decoy health');const state=data.demoness_state;if(!state)return data;jsonCopy(state);if(state.format_version!==1||![1,2,3].includes(state.phase)||typeof data.solo!=='boolean'||typeof data.decoy!=='boolean'||typeof data.dormant!=='boolean')throw new TypeError('Invalid Demoness state');for(const key of ['heard_at','next_sigil','next_bolt','next_step','next_gale','next_mirror','next_rite','eye','rise','flash','decoy_remaining'])nonnegative(state[key],key);if(state.heard_at>(data.actor_state?.elapsed??0)||['eye','rise','flash'].some(key=>state[key]>1)||state.heard_position!==null&&(!Array.isArray(state.heard_position)||state.heard_position.length!==2||!state.heard_position.every(Number.isFinite)))throw new TypeError('Invalid Demoness clock/appearance');if(state.last_strike!==null&&(!state.last_strike||!Number.isFinite(state.last_strike.at)||state.last_strike.at<0||!Array.isArray(state.last_strike.position)||state.last_strike.position.length!==2||!state.last_strike.position.every(Number.isFinite)))throw new TypeError('Invalid Demoness strike record');return data;}
 /** Lilitu's policy and duel phases; every attack is a reusable registered capability. */
@@ -20220,10 +20975,10 @@ class Demoness extends Hunter{
 return Object.freeze({get validateDemonessData(){return validateDemonessData;},get Demoness(){return Demoness;}});
 })();
 // src/entities/gatling-gunner.mjs
-const m72 = (()=>{
-const {gameActor} = m65;
-const {actorItems} = m68;
-const {nonnegative,jsonCopy} = m48;
+const m77 = (()=>{
+const {gameActor} = m70;
+const {actorItems} = m73;
+const {nonnegative,jsonCopy} = m53;
 const stateFor=actor=>actor.data.gunner_state??={format_version:1,hold_until:0,enrage_count:0,barrel_phase:0,barrel_speed:0,barrel_heat:0};
 /** Ordinary gunner decisions over native motors and the common owned-weapon burst action. */
 class GatlingGunner extends gameActor{
@@ -20257,9 +21012,9 @@ class GatlingGunner extends gameActor{
 return Object.freeze({get GatlingGunner(){return GatlingGunner;}});
 })();
 // src/entities/warden.mjs
-const m71 = (()=>{
-const {GatlingGunner} = m72;
-const {nonnegative,jsonCopy} = m48;
+const m76 = (()=>{
+const {GatlingGunner} = m77;
+const {nonnegative,jsonCopy} = m53;
 const stateFor=actor=>actor.data.warden_state??={format_version:1,target_id:null,seen_position:null,hidden_seconds:0,next_special_at:2,flank_position:null,flank_retry:0,eye:1,rise:1};
 function validateWardenData(data,entity_type){if(!['vesper','matins','compline'].includes(data.persona))throw new TypeError('Invalid Warden persona');const expected={df_vesper:'vesper',df_matins:'matins',df_compline:'compline'}[entity_type];if(expected&&data.persona!==expected)throw new TypeError('Warden persona does not match its class');const state=data.warden_state;if(!state)return data;jsonCopy(state);if(!['vesper','matins','compline'].includes(data.persona)||state.format_version!==1||state.target_id!==null&&(!Number.isSafeInteger(state.target_id)||state.target_id<1))throw new TypeError('Invalid Warden state');for(const key of ['hidden_seconds','next_special_at','flank_retry','eye','rise'])nonnegative(state[key],key);for(const key of ['seen_position','flank_position'])if(state[key]!==null&&(!Array.isArray(state[key])||state[key].length!==2||!state[key].every(Number.isFinite)))throw new TypeError('Invalid Warden target point');return data;}
 /** The shared Sanctum actor. Persona selects registered attacks and authored presentation. */
@@ -20296,9 +21051,9 @@ class Compline extends Warden{static entity_type='df_compline';}
 return Object.freeze({get validateWardenData(){return validateWardenData;},get Warden(){return Warden;},get Vesper(){return Vesper;},get Matins(){return Matins;},get Compline(){return Compline;}});
 })();
 // src/entities/boss-effect.mjs
-const m73 = (()=>{
+const m78 = (()=>{
 const {gameTrigger} = m1;
-const {jsonCopy,nonnegative} = m48;
+const {jsonCopy,nonnegative} = m53;
 const BOSS_EFFECT_KINDS=Object.freeze(['sigil','fire','smoke','censer','hymn','rite']);
 function validateBossEffectData(d){jsonCopy(d);if(d.format_version!==1||!BOSS_EFFECT_KINDS.includes(d.kind)||!Number.isSafeInteger(d.owner_id)||d.owner_id<1||!Array.isArray(d.hit_ids)||d.hit_ids.some(id=>!Number.isSafeInteger(id)||id<1)||new Set(d.hit_ids).size!==d.hit_ids.length)throw new TypeError('Invalid boss effect');for(const key of ['age','duration','next_tick','radius','radius_to','damage','burn_dps'])nonnegative(d[key],`effect ${key}`);if(!d.duration||d.age>d.duration+1)throw new TypeError('Invalid boss effect lifetime');if(typeof d.owner_alliance!=='string')throw new TypeError('Invalid effect allegiance');if(d.from_position!==undefined&&(!Array.isArray(d.from_position)||d.from_position.length!==2||!d.from_position.every(Number.isFinite)))throw new TypeError('Invalid effect origin');return d;}
 /** A real registered area/tell in the shared world. Its service owns only logical timing. */
@@ -20310,8 +21065,8 @@ class BossEffect extends gameTrigger{
 return Object.freeze({get BOSS_EFFECT_KINDS(){return BOSS_EFFECT_KINDS;},get validateBossEffectData(){return validateBossEffectData;},get BossEffect(){return BossEffect;}});
 })();
 // src/gameplay/abilities/pattern-actions.mjs
-const m74 = (()=>{
-const {jsonCopy,nonnegative} = m48;
+const m79 = (()=>{
+const {jsonCopy,nonnegative} = m53;
 function validatePatternAction(state,catalog,{clock}={}){
  jsonCopy(state);const definition=catalog[state.ability_id];
  if(definition?.delivery!=='pattern'||state.format_version!==1||!['tell','repeat'].includes(state.phase)||typeof state.cancel_requested!=='boolean'||!Number.isFinite(state.heading)||Object.keys(state).some(key=>!['format_version','ability_id','phase','started_at','phase_started_at','heading','aim','planned_position','executions','cancel_requested'].includes(key)))throw new TypeError('Invalid pattern action');
@@ -20347,11 +21102,11 @@ function validateSecondaryAction(state,catalog,options){if(state==null)return st
 return Object.freeze({get validatePatternAction(){return validatePatternAction;},get beginPattern(){return beginPattern;},get clearPattern(){return clearPattern;},get advancePattern(){return advancePattern;},get validateSecondaryAction(){return validateSecondaryAction;}});
 })();
 // src/directory/validate-boss-records.mjs
-const m61 = (()=>{
-const {validateDemonessData} = m62;
-const {validateWardenData} = m71;
-const {validateBossEffectData} = m73;
-const {validateSecondaryAction} = m74;
+const m66 = (()=>{
+const {validateDemonessData} = m67;
+const {validateWardenData} = m76;
+const {validateBossEffectData} = m78;
+const {validateSecondaryAction} = m79;
 /** Data-only preflight runs before replacing a live map, inventory, currency or registry. */
 function validateBossRecord(record,catalog){
  const data=record.data;if(record.entity_type==='df_demoness')validateDemonessData(data);
@@ -20364,9 +21119,9 @@ function validateBossRecord(record,catalog){
 return Object.freeze({get validateBossRecord(){return validateBossRecord;}});
 })();
 // src/gameplay/abilities/timed-actions.mjs
-const m76 = (()=>{
+const m81 = (()=>{
 const {BODY_GROUP} = m1;
-const {jsonCopy,nonnegative} = m48;
+const {jsonCopy,nonnegative} = m53;
 const id=value=>Number.isSafeInteger(value)&&value>0;
 function validateTimedAction(state,catalog,{clock}={}){
  jsonCopy(state);const definition=catalog[state.ability_id];
@@ -20427,8 +21182,8 @@ function advanceTimedAction(actor,definition,controller,api,combat,{known=true}=
 return Object.freeze({get validateTimedAction(){return validateTimedAction;},get beginTimedAction(){return beginTimedAction;},get ownedGrapple(){return ownedGrapple;},get clearTimedAction(){return clearTimedAction;},get hitGrapple(){return hitGrapple;},get advanceTimedAction(){return advanceTimedAction;}});
 })();
 // src/gameplay/abilities/burst-actions.mjs
-const m77 = (()=>{
-const {jsonCopy,nonnegative} = m48;
+const m82 = (()=>{
+const {jsonCopy,nonnegative} = m53;
 /** Logical firing cycle over the same owned weapon, launch backend and cooldown clock. */
 function validateBurstAction(state,catalog,{clock}={}){
  jsonCopy(state);if(state.format_version!==1||catalog[state.ability_id]?.delivery!=='burst'||!['tell','burst','reload'].includes(state.phase)||typeof state.weapon_instance_id!=='string'||!state.weapon_instance_id||typeof state.cancel_requested!=='boolean')throw new TypeError('Invalid saved burst action');
@@ -20475,12 +21230,12 @@ function advanceBurst(actor,definition,controller,items,api,combat,{known=true,p
 return Object.freeze({get validateBurstAction(){return validateBurstAction;},get beginBurst(){return beginBurst;},get advanceBurst(){return advanceBurst;}});
 })();
 // src/gameplay/abilities/lunge-actions.mjs
-const m75 = (()=>{
-const {validatePatternAction} = m74;
-const {validateTimedAction} = m76;
-const {validateBurstAction} = m77;
+const m80 = (()=>{
+const {validatePatternAction} = m79;
+const {validateTimedAction} = m81;
+const {validateBurstAction} = m82;
 const {BODY_GROUP} = m1;
-const {jsonCopy,nonnegative} = m48;
+const {jsonCopy,nonnegative} = m53;
 /** Persistent logical action only. Native motors, sweeps and impulses own physical work. */
 function validateAbilityAction(state,catalog,{clock}={}){
  if(state==null)return state;if(catalog[state.ability_id]?.delivery==='pattern')return validatePatternAction(state,catalog,{clock});if(['beam','grapple','bolt'].includes(catalog[state.ability_id]?.delivery))return validateTimedAction(state,catalog,{clock});if(catalog[state.ability_id]?.delivery==='burst')return validateBurstAction(state,catalog,{clock});jsonCopy(state);
@@ -20521,8 +21276,8 @@ function advanceLunge(actor,definition,controller,api,combat,{known=true}={}){
 return Object.freeze({get validateAbilityAction(){return validateAbilityAction;},get beginLunge(){return beginLunge;},get clearLunge(){return clearLunge;},get advanceLunge(){return advanceLunge;}});
 })();
 // src/gameplay/attacks/mounted-attacks.mjs
-const m78 = (()=>{
-const {jsonCopy,nonnegative,identifier} = m48;
+const m83 = (()=>{
+const {jsonCopy,nonnegative,identifier} = m53;
 
 function validateMountedAttack(state){
  if(state==null)return;jsonCopy(state);if(Object.keys(state).some(key=>!['format_version','attachment_id','revision','attack_id','aim','started_at','ready_at','expires_at'].includes(key)))throw new TypeError('Invalid mounted attack fields');identifier(state.attack_id);if(state.format_version!==1||!Number.isSafeInteger(state.attachment_id)||state.attachment_id<1||!Number.isSafeInteger(state.revision)||state.revision<0||typeof state.attack_id!=='string')throw new TypeError('Invalid mounted attack state');
@@ -20544,9 +21299,9 @@ function mountedAttackState(actor,controller,mount){
 return Object.freeze({get validateMountedAttack(){return validateMountedAttack;},get prepareMountedAttack(){return prepareMountedAttack;},get mountedAttackState(){return mountedAttackState;}});
 })();
 // src/entities/drone.mjs
-const m80 = (()=>{
-const {gameActor} = m65;
-const {nonnegative,jsonCopy} = m48;
+const m85 = (()=>{
+const {gameActor} = m70;
+const {nonnegative,jsonCopy} = m53;
 const stateFor=actor=>actor.data.drone_state??={format_version:1,flight:'descend',phase_started_at:actor.data.actor_state?.elapsed??0,alt:1,lost_seconds:0,next_bolt_at:2.2,next_special_at:3};
 /** Flight and attack decisions. Basement owns movement, impacts, eye geometry and tether forces. */
 class Drone extends gameActor{
@@ -20584,7 +21339,7 @@ class Drone extends gameActor{
 return Object.freeze({get Drone(){return Drone;}});
 })();
 // src/directory/game-velvet-appearance.mjs
-const m83 = (()=>{
+const m88 = (()=>{
         /**
          * =====================================================================
          *  VELVET CAT — Dreampunk Feline Companion
@@ -20722,8 +21477,8 @@ const VELVET_TAIL_SEGS = 9;
 return Object.freeze({get VELVET_CAT_PALETTES(){return VELVET_CAT_PALETTES;},get VELVET_T(){return VELVET_T;},get VELVET_PROFILES(){return VELVET_PROFILES;},get VELVET_GAITS(){return VELVET_GAITS;},get VELVET_TAIL_SEGS(){return VELVET_TAIL_SEGS;}});
 })();
 // src/presentation/velvet-cat-animation.mjs
-const m82 = (()=>{
-const {VELVET_GAITS,VELVET_TAIL_SEGS} = m83;
+const m87 = (()=>{
+const {VELVET_GAITS,VELVET_TAIL_SEGS} = m88;
 /** Fixed-step cosmetic animation only. No draw backend or physical movement. */
 const velvetCatAnimation={
 _random() {
@@ -20868,10 +21623,10 @@ function advanceVelvetAnimation(entity,player,seconds){const record=entity.data.
 return Object.freeze({get velvetCatAnimation(){return velvetCatAnimation;},get createVelvetAnimation(){return createVelvetAnimation;},get velvetPresentation(){return velvetPresentation;},get advanceVelvetAnimation(){return advanceVelvetAnimation;}});
 })();
 // src/entities/velvet-cat.mjs
-const m81 = (()=>{
-const {gameActor} = m65;
-const {createVelvetAnimation,advanceVelvetAnimation} = m82;
-const {nonnegative,jsonCopy} = m48;
+const m86 = (()=>{
+const {gameActor} = m70;
+const {createVelvetAnimation,advanceVelvetAnimation} = m87;
+const {nonnegative,jsonCopy} = m53;
 const stateFor=actor=>actor.data.cat_state??={format_version:1,mode:'idle',dash:false,idle_seconds:0,rest:null,rest_remaining:0};
 /** Official companion body; animation records contain cosmetic state only. */
 class VelvetCat extends gameActor{
@@ -20902,9 +21657,9 @@ class VelvetCat extends gameActor{
 return Object.freeze({get VelvetCat(){return VelvetCat;}});
 })();
 // src/entities/marionette.mjs
-const m84 = (()=>{
-const {gameActor} = m65;
-const {nonnegative,jsonCopy} = m48;
+const m89 = (()=>{
+const {gameActor} = m70;
+const {nonnegative,jsonCopy} = m53;
 const stateFor=actor=>actor.data.marionette_state??={format_version:1,initial_delay:.6,yank_remaining:0};
 /** Silent puppet policy. Spacing, following, wall response and strikes use shared native services. */
 class Marionette extends gameActor{
@@ -20931,10 +21686,10 @@ class Marionette extends gameActor{
 return Object.freeze({get Marionette(){return Marionette;}});
 })();
 // src/gameplay/player-vitals.mjs
-const m86 = (()=>{
-const {actorVitals} = m67;
-const defaults = m54.default;
-const {nonnegative,jsonCopy,identifier,validateModifiers} = m48;
+const m91 = (()=>{
+const {actorVitals} = m72;
+const defaults = m59.default;
+const {nonnegative,jsonCopy,identifier,validateModifiers} = m53;
 
 /** Shared gameplay component. It references its owner's data; it never owns or mirrors a body. */
 class playerVitals extends actorVitals {
@@ -21018,10 +21773,10 @@ class playerVitals extends actorVitals {
 return Object.freeze({get playerVitals(){return playerVitals;}});
 })();
 // src/entities/player.mjs
-const m85 = (()=>{
-const {gameActor} = m65;
-const {playerVitals} = m86;
-const {identifier,validateModifiers,nonnegative} = m48;
+const m90 = (()=>{
+const {gameActor} = m70;
+const {playerVitals} = m91;
+const {identifier,validateModifiers,nonnegative} = m53;
 const services = new WeakMap();
 const components = new WeakMap();
 function vitalsFor(player,rules) {
@@ -21110,7 +21865,7 @@ class Player extends gameActor {
 return Object.freeze({get Player(){return Player;}});
 })();
 // src/entities/apartment-prop.mjs
-const m87 = (()=>{
+const m92 = (()=>{
 const {gameProp} = m1;
 
 /** Furniture/fixture gameplay metadata; no local transform or integration. */
@@ -21125,7 +21880,7 @@ class ApartmentProp extends gameProp {
 return Object.freeze({get ApartmentProp(){return ApartmentProp;}});
 })();
 // src/directory/npc-reactions.mjs
-const m89 = (()=>{
+const m94 = (()=>{
 // Authored character reactions, shared by native and remaining classic NPCs.
 function resolveEmoteLines(reactions, cat, tier) {
     const pool = reactions && reactions[cat];
@@ -21290,13 +22045,13 @@ const NPC_EMOTE_REACTIONS = {
 return Object.freeze({get resolveEmoteLines(){return resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return NPC_EMOTE_REACTIONS;}});
 })();
 // src/entities/npc.mjs
-const m88 = (()=>{
-const {importActorAbilities} = m46;
-const {actorAbilities} = m47;
-const {resolveEmoteLines,NPC_EMOTE_REACTIONS} = m89;
-const {gameActor} = m65;
-const {actorItems,restoreActorItems} = m68;
-const {nonnegative,jsonCopy} = m48;
+const m93 = (()=>{
+const {importActorAbilities} = m51;
+const {actorAbilities} = m52;
+const {resolveEmoteLines,NPC_EMOTE_REACTIONS} = m94;
+const {gameActor} = m70;
+const {actorItems,restoreActorItems} = m73;
+const {nonnegative,jsonCopy} = m53;
 const actorContract=npc=>npc.data.hireType==='contract'?(npc.data.contract_remaining??npc.data.hireDuration??0):0;
 const stateFor=npc=>npc.data.npc_state??={format_version:1,stim_remaining:0,out_of_combat:0,regen_elapsed:0,aura_elapsed:0,quip:null,quip_remaining:0,quip_delay:0,contract_remaining:actorContract(npc)};
 const ROSTER_FIELDS=['recruited','downed','teammateStims','maxTeammateStims','relationship','hireType','hireDuration','hireTime','hireCost','hired','role','bio','alliance','burstSize','burstDelay','accuracyMod','equippedAbilityId','cooldown','shotsLeftInBurst','abilitiesSnapshot','attackSelection'];
@@ -21371,7 +22126,7 @@ for(const [key,field] of Object.entries({burstSize:'burst_size',burstDelay:'burs
 return Object.freeze({get ROSTER_FIELDS(){return ROSTER_FIELDS;},get NPC(){return NPC;},get rosterRecord(){return rosterRecord;}});
 })();
 // src/entities/world-loot.mjs
-const m90 = (()=>{
+const m95 = (()=>{
 const {gameProp} = m1;
 /** The dropped bundle is owned here until pickup; the inherited body is the only live pose. */
 class WorldLoot extends gameProp{
@@ -21383,7 +22138,7 @@ class WorldLoot extends gameProp{
 return Object.freeze({get WorldLoot(){return WorldLoot;}});
 })();
 // src/directory/street-definitions.mjs
-const m93 = (()=>{
+const m98 = (()=>{
 /** Directory authoring only: convert immutable catalog units once, never during simulation. */
 const vehicleDefinitions = new WeakMap();
 function resolveStreetVehicle(library, { brand, model, control_mode = 'AI', color } = {}) {
@@ -21454,8 +22209,8 @@ function resolveVehicleSeats(library, { brand, model }) {
 return Object.freeze({get resolveStreetVehicle(){return resolveStreetVehicle;},get resolveVehicleSeats(){return resolveVehicleSeats;}});
 })();
 // src/traffic/traffic-vehicle.mjs
-const m92 = (()=>{
-const {resolveStreetVehicle,resolveVehicleSeats} = m93;
+const m97 = (()=>{
+const {resolveStreetVehicle,resolveVehicleSeats} = m98;
 const {gameVehicle} = m1;
 const bindings = new WeakMap();
 /** Official gameplay entity. Body state and driving calculations belong to Basement. */
@@ -21550,10 +22305,10 @@ class TrafficVehicle extends gameVehicle {
 return Object.freeze({get TrafficVehicle(){return TrafficVehicle;}});
 })();
 // src/directory/game-vehicle-factory.mjs
-const m95 = (()=>{
-const {TrafficVehicle} = m92;
+const m100 = (()=>{
+const {TrafficVehicle} = m97;
 const {pathGeometry} = m1;
-const {resolveStreetVehicle} = m93;
+const {resolveStreetVehicle} = m98;
 
 const purposes = new Set(['ambient', 'owned', 'mission', 'taxi']);
 /** Shared official creation. Population limits belong to the requesting population manager. */
@@ -21593,9 +22348,9 @@ function createGameVehicle(world, packet = {}, { hooks = {} } = {}) {
 return Object.freeze({get createGameVehicle(){return createGameVehicle;}});
 })();
 // src/traffic/traffic-manager.mjs
-const m94 = (()=>{
-const {TrafficVehicle} = m92;
-const {createGameVehicle} = m95;
+const m99 = (()=>{
+const {TrafficVehicle} = m97;
+const {createGameVehicle} = m100;
 /** Spawn, ownership and driver policy. The physics world owns every spatial/physical operation. */
 class TrafficManager {
     #pendingSpawns = new Set();
@@ -21640,7 +22395,7 @@ class TrafficManager {
 return Object.freeze({get TrafficManager(){return TrafficManager;}});
 })();
 // src/entities/pedestrians.mjs
-const m96 = (()=>{
+const m101 = (()=>{
 const {gameCharacter,gameVehicle,BODY_GROUP} = m1;
 const bindings = new WeakMap();
 /** Civilian decisions and reactions. Movement, prediction and impacts stay in Basement. */
@@ -21721,8 +22476,8 @@ class Pedestrian extends gameCharacter {
 return Object.freeze({get Pedestrian(){return Pedestrian;}});
 })();
 // src/entities/pedestrian-manager.mjs
-const m97 = (()=>{
-const {Pedestrian} = m96;
+const m102 = (()=>{
+const {Pedestrian} = m101;
 /** Population and waypoint policy only. No positions, obstacle cache or sensing grid. */
 class PedestrianManager {
     #network = new Map();
@@ -21794,11 +22549,11 @@ class PedestrianManager {
 return Object.freeze({get PedestrianManager(){return PedestrianManager;}});
 })();
 // src/directory/game-street.mjs
-const m91 = (()=>{
-const {TrafficVehicle} = m92;
-const {TrafficManager} = m94;
-const {Pedestrian} = m96;
-const {PedestrianManager} = m97;
+const m96 = (()=>{
+const {TrafficVehicle} = m97;
+const {TrafficManager} = m99;
+const {Pedestrian} = m101;
+const {PedestrianManager} = m102;
 
 
 function registerStreetEntityTypes(world) {
@@ -21818,25 +22573,25 @@ class StreetPopulation {
     clearStreet() { this.traffic.clearStreet(); this.pedestrians.clearStreet(); }
 }
 
-return Object.freeze({get TrafficVehicle(){return TrafficVehicle;},get TrafficManager(){return TrafficManager;},get Pedestrian(){return Pedestrian;},get PedestrianManager(){return PedestrianManager;},get createGameVehicle(){return m95.createGameVehicle;},get registerStreetEntityTypes(){return registerStreetEntityTypes;},get StreetPopulation(){return StreetPopulation;}});
+return Object.freeze({get TrafficVehicle(){return TrafficVehicle;},get TrafficManager(){return TrafficManager;},get Pedestrian(){return Pedestrian;},get PedestrianManager(){return PedestrianManager;},get createGameVehicle(){return m100.createGameVehicle;},get registerStreetEntityTypes(){return registerStreetEntityTypes;},get StreetPopulation(){return StreetPopulation;}});
 })();
 // src/directory/game-entity-types.mjs
-const m79 = (()=>{
-const {Demoness} = m62;
-const {Warden,Vesper,Matins,Compline} = m71;
-const {BossEffect} = m73;
-const {Drone} = m80;
-const {VelvetCat} = m81;
-const {GatlingGunner} = m72;
-const {Marionette} = m84;
-const {Player} = m85;
-const {ApartmentProp} = m87;
-const {gameActor} = m65;
-const {NPC} = m88;
-const {Hunter} = m63;
-const {Ganger} = m64;
-const {WorldLoot} = m90;
-const {registerStreetEntityTypes} = m91;
+const m84 = (()=>{
+const {Demoness} = m67;
+const {Warden,Vesper,Matins,Compline} = m76;
+const {BossEffect} = m78;
+const {Drone} = m85;
+const {VelvetCat} = m86;
+const {GatlingGunner} = m77;
+const {Marionette} = m89;
+const {Player} = m90;
+const {ApartmentProp} = m92;
+const {gameActor} = m70;
+const {NPC} = m93;
+const {Hunter} = m68;
+const {Ganger} = m69;
+const {WorldLoot} = m95;
+const {registerStreetEntityTypes} = m96;
 /** The Directory registers concrete classes before any level or saved identity is constructed. */
 function registerGameEntityTypes(world){
  for(const Class of [gameActor,Player,ApartmentProp,NPC,Ganger,Hunter,Marionette,GatlingGunner,Demoness,Warden,Vesper,Matins,Compline,BossEffect,Drone,VelvetCat,WorldLoot])if(!world.elements.listEntityTypes().includes(Class.entity_type))world.elements.registerEntityType(Class.entity_type,Class);
@@ -21845,7 +22600,7 @@ function registerGameEntityTypes(world){
 
 return Object.freeze({get registerGameEntityTypes(){return registerGameEntityTypes;}});
 })();
-const m99 = Object.freeze({default:{
+const m104 = Object.freeze({default:{
   "library_id": "df_apartment",
   "description": "Authored Silver Queen apartment assets. Furniture order preserves existing questState.aptLayout indices. Physics state is held only by Basement bodies.",
   "resources": {
@@ -22931,9 +23686,9 @@ const m99 = Object.freeze({default:{
   }
 }});
 // src/directory/apartment-assets.mjs
-const m98 = (()=>{
-const {createGameAssetLibrary} = m33;
-const definition = m99.default;
+const m103 = (()=>{
+const {createGameAssetLibrary} = m38;
+const definition = m104.default;
 
 function createApartmentAssetLibrary(options = {}) {
     const library = createGameAssetLibrary(options);
@@ -22946,7 +23701,7 @@ const APARTMENT_RULES = Object.freeze(definition.resources.rules.data);
 return Object.freeze({get createApartmentAssetLibrary(){return createApartmentAssetLibrary;},get APARTMENT_RULES(){return APARTMENT_RULES;}});
 })();
 // src/directory/apartment-definition.mjs
-const m100 = (()=>{
+const m105 = (()=>{
 const {layoutGeometry,BODY_GROUP} = m1;
 const MOVABLE = new Set(['apt_sofa','apt_coffee','apt_chair','apt_console','apt_plant','apt_planter','apt_stool','apt_bed','apt_side','apt_lounger','apt_bistro','apt_telescope','apt_dining','apt_bench','apt_chaise','apt_patio_sofa']);
 const rectangle = (r, template, data = {}) => ({ template, position: [r.x + r.w / 2, r.y + r.h / 2], collision_shape: { shape_type: 'box', dimensions: [r.w, r.h] }, data });
@@ -23014,12 +23769,12 @@ function resolveApartmentDyer(game_db){
 return Object.freeze({get resolveApartmentDefinition(){return resolveApartmentDefinition;},get resolveApartmentDyer(){return resolveApartmentDyer;}});
 })();
 // src/directory/game-actor-factory.mjs
-const m101 = (()=>{
-const {createDemonessAppearance} = m34;
-const {createHunterAppearance} = m42;
-const {validateAttackState} = m66;
-const {importActorAbilities} = m46;
-const {jsonCopy} = m48;
+const m106 = (()=>{
+const {createDemonessAppearance} = m39;
+const {createHunterAppearance} = m47;
+const {validateAttackState} = m71;
+const {importActorAbilities} = m51;
+const {jsonCopy} = m53;
 /** Definitions and explicit old-roster import live in Directory, never in physics. */
 function createActorPacket(world,{kind='npc',name='',role='civilian',position=[0,0],rotation=0,data={},...packet}={}){
  if(!['npc','ganger','hunter','marionette','gatling_gunner','demoness','warden','vesper','matins','compline','drone','velvet_cat','actor'].includes(kind))throw new TypeError('Unknown actor kind');const record=jsonCopy(data);if(['npc','ganger','hunter','gatling_gunner','demoness','warden','vesper','matins','compline'].includes(kind))record.actor_loadout_initialized??=record.inventory!=null;
@@ -23049,19 +23804,19 @@ function createActorPacket(world,{kind='npc',name='',role='civilian',position=[0
 return Object.freeze({get createActorPacket(){return createActorPacket;}});
 })();
 // src/levels/apartment.mjs
-const m60 = (()=>{
-const {validateBossRecord} = m61;
-const {validateAbilityAction} = m75;
-const {validateMountedAttack} = m78;
-const {validateAttackState} = m66;
-const {abilityLoadout} = m47;
-const {importActorAbilities} = m46;
-const {registerGameEntityTypes} = m79;
+const m65 = (()=>{
+const {validateBossRecord} = m66;
+const {validateAbilityAction} = m80;
+const {validateMountedAttack} = m83;
+const {validateAttackState} = m71;
+const {abilityLoadout} = m52;
+const {importActorAbilities} = m51;
+const {registerGameEntityTypes} = m84;
 const {physicsSystem} = m1;
-const {createApartmentAssetLibrary} = m98;
-const {resolveApartmentDefinition,resolveApartmentDyer} = m100;
-const {NPC,rosterRecord} = m88;
-const {createActorPacket} = m101;
+const {createApartmentAssetLibrary} = m103;
+const {resolveApartmentDefinition,resolveApartmentDyer} = m105;
+const {NPC,rosterRecord} = m93;
+const {createActorPacket} = m106;
 const {gameProp} = m1;
 class ApartmentDoor extends gameProp { static entity_type = 'df_apartment_door'; }
 
@@ -23136,7 +23891,7 @@ class ApartmentLevel {
 return Object.freeze({get ApartmentLevel(){return ApartmentLevel;}});
 })();
 // src/lobby/level-lobby.mjs
-const m103 = (()=>{
+const m108 = (()=>{
 // ===== LV1 LOBBY =====
 // The engine's game loop. The Lobby keeps the clock and nothing else: it knows when a frame is due,
 // how many fixed simulation steps that frame owes, and how far the drawn frame sits between two steps.
@@ -23273,7 +24028,7 @@ class levelLobby {
 return Object.freeze({get levelLobby(){return levelLobby;}});
 })();
 // src/runtime/game-level.mjs
-const m104 = (()=>{
+const m109 = (()=>{
 /** Content/lifecycle contract. A level never owns a world, clock or collision solver. */
 class gameLevel {
     constructor({ level_id } = {}) {
@@ -23293,7 +24048,7 @@ class gameLevel {
 return Object.freeze({get gameLevel(){return gameLevel;}});
 })();
 // src/basement/controls/values.mjs
-const m107 = (()=>{
+const m112 = (()=>{
 const TAP = 0;
 const DOUBLETAP = 1;
 const HELD = 2;
@@ -23317,7 +24072,7 @@ function radialStick(value, dead_zone = 0.15) {
 return Object.freeze({get TAP(){return TAP;},get DOUBLETAP(){return DOUBLETAP;},get HELD(){return HELD;},get PRESS(){return PRESS;},get REPEAT(){return REPEAT;},get RELEASE(){return RELEASE;},get cleanupAll(){return cleanupAll;},get radialStick(){return radialStick;}});
 })();
 // src/basement/controls/touch-stick.mjs
-const m109 = (()=>{
+const m114 = (()=>{
 class touchStick {
     constructor(system, name, packet) {
         Object.assign(this, { anchor: 'centre', base_radius: 0, travel: 40, scale: () => 1, edge: 0, ring: null, input: null, slots: null, mouse: false, free: () => !this.s.active, onStart() {}, onMove() {}, onEnd() {} }, packet);
@@ -23416,9 +24171,9 @@ class touchStick {
 return Object.freeze({get touchStick(){return touchStick;}});
 })();
 // src/basement/controls/devices.mjs
-const m108 = (()=>{
-const {touchStick} = m109;
-const {radialStick,cleanupAll} = m107;
+const m113 = (()=>{
+const {touchStick} = m114;
+const {radialStick,cleanupAll} = m112;
 
 /** Device state uses the terminology from the original Python input instances. */
 class inputInstance {
@@ -23537,10 +24292,10 @@ class gamepadInstance extends inputInstance {
 return Object.freeze({get inputInstance(){return inputInstance;},get keyboardInstance(){return keyboardInstance;},get mouseInstance(){return mouseInstance;},get touchInstance(){return touchInstance;},get gamepadInstance(){return gamepadInstance;}});
 })();
 // src/basement/controls/system.mjs
-const m106 = (()=>{
-const {TAP,DOUBLETAP,HELD,PRESS,REPEAT,RELEASE} = m107;
-const {radialStick,cleanupAll} = m107;
-const {keyboardInstance,mouseInstance,touchInstance,gamepadInstance} = m108;
+const m111 = (()=>{
+const {TAP,DOUBLETAP,HELD,PRESS,REPEAT,RELEASE} = m112;
+const {radialStick,cleanupAll} = m112;
+const {keyboardInstance,mouseInstance,touchInstance,gamepadInstance} = m113;
 
 class controlSystem {
     #listeners = new Set();
@@ -23778,16 +24533,16 @@ class controlSystem {
 return Object.freeze({get controlSystem(){return controlSystem;}});
 })();
 // src/basement/controls/index.mjs
-const m105 = (()=>{
+const m110 = (()=>{
 
 
 
 
 
-return Object.freeze({get controlSystem(){return m106.controlSystem;},get controlsSystem(){return m106.controlSystem;},get inputInstance(){return m108.inputInstance;},get keyboardInstance(){return m108.keyboardInstance;},get mouseInstance(){return m108.mouseInstance;},get touchInstance(){return m108.touchInstance;},get gamepadInstance(){return m108.gamepadInstance;},get touchStick(){return m109.touchStick;},get TAP(){return m107.TAP;},get DOUBLETAP(){return m107.DOUBLETAP;},get HELD(){return m107.HELD;},get PRESS(){return m107.PRESS;},get REPEAT(){return m107.REPEAT;},get RELEASE(){return m107.RELEASE;}});
+return Object.freeze({get controlSystem(){return m111.controlSystem;},get controlsSystem(){return m111.controlSystem;},get inputInstance(){return m113.inputInstance;},get keyboardInstance(){return m113.keyboardInstance;},get mouseInstance(){return m113.mouseInstance;},get touchInstance(){return m113.touchInstance;},get gamepadInstance(){return m113.gamepadInstance;},get touchStick(){return m114.touchStick;},get TAP(){return m112.TAP;},get DOUBLETAP(){return m112.DOUBLETAP;},get HELD(){return m112.HELD;},get PRESS(){return m112.PRESS;},get REPEAT(){return m112.REPEAT;},get RELEASE(){return m112.RELEASE;}});
 })();
 // src/basement/rendering/values.mjs
-const m112 = (()=>{
+const m117 = (()=>{
 function finite(value,name,min=-Infinity){if(!Number.isFinite(value)||value<min)throw new TypeError(`Invalid ${name}`);return value;}
 function vector(value,name='vector',out=[]){if(!Array.isArray(value)||value.length!==2)throw new TypeError(`Invalid ${name}`);out[0]=finite(value[0],name);out[1]=finite(value[1],name);return out;}
 function identifier(value){if(typeof value!=='string'||!value||value==='screen')throw new TypeError('A nonempty resource/renderer ID is required (screen is reserved)');return value;}
@@ -23804,8 +24559,8 @@ const BLENDS = Object.freeze({normal:'source-over',add:'lighter',multiply:'multi
 return Object.freeze({get finite(){return finite;},get vector(){return vector;},get identifier(){return identifier;},get matrix(){return matrix;},get inverse(){return inverse;},get point(){return point;},get transform(){return transform;},get viewport(){return viewport;},get freezeData(){return freezeData;},get color(){return color;},get BLENDS(){return BLENDS;}});
 })();
 // src/basement/rendering/camera.mjs
-const m111 = (()=>{
-const {finite,vector,viewport,inverse,point,freezeData} = m112;
+const m116 = (()=>{
+const {finite,vector,viewport,inverse,point,freezeData} = m117;
 
 /** View state only. Following reads native poses; this class never moves a body. */
 class cameraSystem {
@@ -23859,8 +24614,8 @@ class cameraSystem {
 return Object.freeze({get cameraSystem(){return cameraSystem;}});
 })();
 // src/basement/rendering/packets.mjs
-const m114 = (()=>{
-const {finite,vector,matrix,inverse,transform,color,identifier,BLENDS} = m112;
+const m119 = (()=>{
+const {finite,vector,matrix,inverse,transform,color,identifier,BLENDS} = m117;
 
 const geometryBuffers = new WeakMap();
 
@@ -23930,9 +24685,9 @@ function requirements(draw,resolve,result=[]){
 return Object.freeze({get geometry(){return geometry;},get material(){return material;},get packet(){return packet;},get requirements(){return requirements;}});
 })();
 // src/basement/rendering/frame.mjs
-const m113 = (()=>{
-const {packet} = m114;
-const {color,finite,freezeData} = m112;
+const m118 = (()=>{
+const {packet} = m119;
+const {color,finite,freezeData} = m117;
 
 /** Reused command buffers. Producers submit data; a backend borrows a completed frame. */
 class renderFrame {
@@ -23970,10 +24725,10 @@ class renderFrame {
 return Object.freeze({get renderFrame(){return renderFrame;}});
 })();
 // src/basement/rendering/system.mjs
-const m115 = (()=>{
-const {renderFrame} = m113;
-const {geometry,material,requirements} = m114;
-const {finite,identifier,freezeData} = m112;
+const m120 = (()=>{
+const {renderFrame} = m118;
+const {geometry,material,requirements} = m119;
+const {finite,identifier,freezeData} = m117;
 
 function normalizeResource(description){
     if(!description||typeof description!=='object')throw new TypeError('A data resource descriptor is required');
@@ -24062,9 +24817,9 @@ class renderSystem {
 return Object.freeze({get renderSystem(){return renderSystem;}});
 })();
 // src/basement/rendering/canvas.mjs
-const m116 = (()=>{
-const {renderFrame} = m113;
-const {BLENDS} = m112;
+const m121 = (()=>{
+const {renderFrame} = m118;
+const {BLENDS} = m117;
 
 function createSurface(width,height){
     if(typeof OffscreenCanvas!=='undefined')return new OffscreenCanvas(width,height);
@@ -24186,21 +24941,21 @@ class canvasRenderer {
 return Object.freeze({get canvasRenderer(){return canvasRenderer;}});
 })();
 // src/basement/rendering/index.mjs
-const m110 = (()=>{
+const m115 = (()=>{
 
 
 
 
 
-return Object.freeze({get cameraSystem(){return m111.cameraSystem;},get renderFrame(){return m113.renderFrame;},get renderSystem(){return m115.renderSystem;},get canvasRenderer(){return m116.canvasRenderer;}});
+return Object.freeze({get cameraSystem(){return m116.cameraSystem;},get renderFrame(){return m118.renderFrame;},get renderSystem(){return m120.renderSystem;},get canvasRenderer(){return m121.canvasRenderer;}});
 })();
 // src/runtime/game-engine.mjs
-const m102 = (()=>{
+const m107 = (()=>{
 const {physicsSystem,assetLibrary} = m1;
-const {levelLobby} = m103;
-const {gameLevel} = m104;
-const {controlSystem} = m105;
-const {cameraSystem,renderSystem} = m110;
+const {levelLobby} = m108;
+const {gameLevel} = m109;
+const {controlSystem} = m110;
+const {cameraSystem,renderSystem} = m115;
 
 const hooks = ['attach', 'detach', 'beforePhysics', 'afterPhysics', 'render', 'levelEntered', 'levelLeaving','gameplayPaused'];
 function synchronous(fn, receiver, args) {
@@ -24455,7 +25210,7 @@ class gameEngine {
 
 return Object.freeze({get gameEngine(){return gameEngine;}});
 })();
-const m120 = Object.freeze({default:{
+const m125 = Object.freeze({default:{
   "slim": {
     "w": 0.88,
     "d": 0.92,
@@ -24486,7 +25241,7 @@ const m120 = Object.freeze({default:{
     "hip": 1.1
   }
 }});
-const m121 = Object.freeze({default:{
+const m126 = Object.freeze({default:{
   "female": {
     "sh": 10.5,
     "del": 4,
@@ -24613,9 +25368,9 @@ const m121 = Object.freeze({default:{
   }
 }});
 // src/directory/humanoid/rig-assets.mjs
-const m119 = (()=>{
-const builds = m120.default;
-const bodyCanon = m121.default;
+const m124 = (()=>{
+const builds = m125.default;
+const bodyCanon = m126.default;
 const {rigDefinition,animationClip} = m1;
 const immutable=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))immutable(child);Object.freeze(value);}return value;};
 const humanoidBodyCanon=immutable(bodyCanon);
@@ -24662,8 +25417,8 @@ function getHumanoidRigAssets(gender='androgynous',{build=null,height=1}={}){
 return Object.freeze({get humanoidBodyCanon(){return humanoidBodyCanon;},get humanoidBuilds(){return humanoidBuilds;},get getHumanoidRigAssets(){return getHumanoidRigAssets;}});
 })();
 // src/gameplay/animation/humanoid-system.mjs
-const m118 = (()=>{
-const {getHumanoidRigAssets} = m119;
+const m123 = (()=>{
+const {getHumanoidRigAssets} = m124;
 const humanoids=new Set(['df_player','df_npc','df_ganger','df_hunter','df_demoness']);
 /** Game policy chooses authored poses; Basement resolves and advances every joint. */
 class humanoidSystem {
@@ -24711,10 +25466,10 @@ function humanoidPresentation(actor,blend=1){
 return Object.freeze({get humanoidSystem(){return humanoidSystem;},get humanoidPresentation(){return humanoidPresentation;}});
 })();
 // src/gameplay/encounters/encounter-system.mjs
-const m122 = (()=>{
-const {BossEffect} = m73;
+const m127 = (()=>{
+const {BossEffect} = m78;
 const {BODY_GROUP} = m1;
-const {jsonCopy} = m48;
+const {jsonCopy} = m53;
 /** Shared encounter policy over registered effects, native queries and one simulation clock. */
 class encounterSystem{
  #context=null;#combat;#random;#actors=null;#effects=new Map();#owners=new Map();#off=[];#wardens=new Map();#orders=new Map();#squads=new Map();#decoys=new Map();
@@ -24792,7 +25547,7 @@ class encounterSystem{
 return Object.freeze({get encounterSystem(){return encounterSystem;}});
 })();
 // src/directory/weapon-appearance.mjs
-const m125 = (()=>{
+const m130 = (()=>{
 /* =====================================================================
    WEAPON MODELS — every gun as data: parts in the gun's own frame (+x down
    the barrel, the grip hand near 0,0, +y to the holder's right), each in a
@@ -25018,8 +25773,8 @@ function weaponModel(id) {
 return Object.freeze({get GUN_MATERIALS(){return GUN_MATERIALS;},get WEAPON_MODELS(){return WEAPON_MODELS;},get LASER_MODULE(){return LASER_MODULE;},get weaponModel(){return weaponModel;}});
 })();
 // src/directory/combat-profiles.mjs
-const m124 = (()=>{
-const {weaponModel} = m125;
+const m129 = (()=>{
+const {weaponModel} = m130;
 /** Shape authoring belongs with the visual assets. Runtime collision calculations stay in Basement. */
 function getCombatProfile(definition_id){
  const model=weaponModel(definition_id),edge=model.edge??[19.4,2.6];
@@ -25029,15 +25784,15 @@ function getCombatProfile(definition_id){
 return Object.freeze({get getCombatProfile(){return getCombatProfile;}});
 })();
 // src/gameplay/attacks/attack-system.mjs
-const m123 = (()=>{
-const attackRules = m52.default;
-const {getCombatProfile} = m124;
-const {prepareMountedAttack,mountedAttackState,validateMountedAttack} = m78;
-const combatRules = m51.default;
+const m128 = (()=>{
+const attackRules = m57.default;
+const {getCombatProfile} = m129;
+const {prepareMountedAttack,mountedAttackState,validateMountedAttack} = m83;
+const combatRules = m56.default;
 const {gameCharacter} = m1;
-const {actorItems} = m68;
-const {attackRegistry,validateAttackState} = m66;
-const {jsonCopy} = m48;
+const {actorItems} = m73;
+const {attackRegistry,validateAttackState} = m71;
+const {jsonCopy} = m53;
 
 /** Universal character attack entry point. Reuses existing execution, ownership and physics. */
 class attackSystem{
@@ -25153,14 +25908,14 @@ class attackSystem{
 return Object.freeze({get attackSystem(){return attackSystem;}});
 })();
 // src/gameplay/abilities/ability-system.mjs
-const m126 = (()=>{
-const {beginPattern,advancePattern,clearPattern} = m74;
-const {beginTimedAction,advanceTimedAction,hitGrapple,clearTimedAction} = m76;
-const {beginBurst,advanceBurst} = m77;
-const {validateAbilityAction,beginLunge,advanceLunge,clearLunge} = m75;
+const m131 = (()=>{
+const {beginPattern,advancePattern,clearPattern} = m79;
+const {beginTimedAction,advanceTimedAction,hitGrapple,clearTimedAction} = m81;
+const {beginBurst,advanceBurst} = m82;
+const {validateAbilityAction,beginLunge,advanceLunge,clearLunge} = m80;
 const {BODY_GROUP,gameCharacter} = m1;
-const {actorAbilities} = m47;
-const {jsonCopy,nonnegative} = m48;
+const {actorAbilities} = m52;
+const {jsonCopy,nonnegative} = m53;
 
 /** Shared spell requests. The existing attack controller owns the single cooldown clock. */
 class abilitySystem{
@@ -25215,19 +25970,19 @@ class abilitySystem{
 return Object.freeze({get abilitySystem(){return abilitySystem;}});
 })();
 // src/gameplay/actors/actor-system.mjs
-const m127 = (()=>{
-const {Demoness} = m62;
-const {Warden} = m71;
-const {Drone} = m80;
-const {VelvetCat} = m81;
-const {GatlingGunner} = m72;
-const {Marionette} = m84;
-const {gameActor} = m65;
-const {NPC} = m88;
-const {Hunter} = m63;
-const {Ganger} = m64;
+const m132 = (()=>{
+const {Demoness} = m67;
+const {Warden} = m76;
+const {Drone} = m85;
+const {VelvetCat} = m86;
+const {GatlingGunner} = m77;
+const {Marionette} = m89;
+const {gameActor} = m70;
+const {NPC} = m93;
+const {Hunter} = m68;
+const {Ganger} = m69;
 const {BODY_GROUP} = m1;
-const {createActorPacket} = m101;
+const {createActorPacket} = m106;
 
 /** Registered actor lifetimes and policy updates in the existing fixed step. No second world or index. */
 class actorSystem{
@@ -25285,7 +26040,7 @@ class actorSystem{
 
 return Object.freeze({get actorSystem(){return actorSystem;}});
 })();
-const m128 = Object.freeze({default:{
+const m133 = Object.freeze({default:{
   "keymap": {
     "move_up":["w","ArrowUp"],"move_down":["s","ArrowDown"],"move_left":["a","ArrowLeft"],"move_right":["d","ArrowRight"],
     "fire":["mouseLeft","space","gamepadRTrigger","touchFire"],
@@ -25299,11 +26054,11 @@ const m128 = Object.freeze({default:{
   }
 }});
 // src/gameplay/game-session.mjs
-const m129 = (()=>{
-const {itemSystem} = m69;
-const {createItemCatalog} = m44;
-const itemRules = m70.default;
-const {identifier,jsonCopy,nonnegative} = m48;
+const m134 = (()=>{
+const {itemSystem} = m74;
+const {createItemCatalog} = m49;
+const itemRules = m75.default;
+const {identifier,jsonCopy,nonnegative} = m53;
 
 const recordNames = ['quests', 'roster', 'progression'];
 
@@ -25376,8 +26131,8 @@ class gameSession {
 return Object.freeze({get gameSession(){return gameSession;}});
 })();
 // src/gameplay/player-state-system.mjs
-const m130 = (()=>{
-const {nonnegative,jsonCopy} = m48;
+const m135 = (()=>{
+const {nonnegative,jsonCopy} = m53;
 
 /** Game rules only. The native entity/body remains the sole owner of physical state. */
 class PlayerStateSystem {
@@ -25432,7 +26187,7 @@ class PlayerStateSystem {
 return Object.freeze({get PlayerStateSystem(){return PlayerStateSystem;}});
 })();
 // src/gameplay/player-control-system.mjs
-const m131 = (()=>{
+const m136 = (()=>{
 /** Turns input terminology into native motor requests and gameplay intents. No physical math. */
 class PlayerControlSystem {
     #session; #state; #blocked = new Set(); #placement; #context = null;
@@ -25472,10 +26227,10 @@ class PlayerControlSystem {
 return Object.freeze({get PlayerControlSystem(){return PlayerControlSystem;}});
 })();
 // src/gameplay/combat/combat-system.mjs
-const m132 = (()=>{
-const rules = m51.default;
+const m137 = (()=>{
+const rules = m56.default;
 const {BODY_GROUP} = m1;
-const {nonnegative,jsonCopy} = m48;
+const {nonnegative,jsonCopy} = m53;
 
 const isCombatDead=entity=>!entity||entity.destroyed||entity.dead===true||entity.data?.state==='dead'||typeof entity.data?.health==='number'&&entity.data.health<=0;
 const stateFor=entity=>entity.data.combat_state??=( {bleed:null,orbs:[],stagger_remaining:0,boss_resist_remaining:0,slam:null} );
@@ -25542,9 +26297,9 @@ class combatSystem{
 return Object.freeze({get isCombatDead(){return isCombatDead;},get combatSystem(){return combatSystem;}});
 })();
 // src/gameplay/combat/melee-poses.mjs
-const m134 = (()=>{
+const m139 = (()=>{
 // Authored local animation poses, shared by presentation and native swept queries.
-const rules = m51.default;
+const rules = m56.default;
 const MELEE_SWING={duration:rules.blade.duration_seconds,windup:rules.blade.windup_seconds,cutEnd:rules.blade.cut_end_seconds};
 /* A long blade's swing (a model with swing: 'wide', Blood Pact): two hands on the grip, she
    winds the blade far back to one side, then sweeps it round in front of her in one wide arc
@@ -25618,13 +26373,13 @@ function sampleMeleeSwing(age, side, out = {}, secs = MELEE_SWING.duration, styl
 return Object.freeze({get MELEE_SWING(){return MELEE_SWING;},get WIDE_SWING(){return WIDE_SWING;},get sampleWideSwing(){return sampleWideSwing;},get wideGrip(){return wideGrip;},get swingPhases(){return swingPhases;},get sampleMeleeSwing(){return sampleMeleeSwing;}});
 })();
 // src/gameplay/combat/weapon-system.mjs
-const m133 = (()=>{
-const rules = m51.default;
-const {getCombatProfile} = m124;
+const m138 = (()=>{
+const rules = m56.default;
+const {getCombatProfile} = m129;
 const {BODY_GROUP} = m1;
-const {sampleMeleeSwing,swingPhases} = m134;
-const {isCombatDead} = m132;
-const {jsonCopy,nonnegative} = m48;
+const {sampleMeleeSwing,swingPhases} = m139;
+const {isCombatDead} = m137;
+const {jsonCopy,nonnegative} = m53;
 
 const stateFor=(player,settings=rules)=>player.data.weapon_state??={format_version:1,elapsed:0,cooldown:0,holstered:false,drawn_at:null,draw_shot_used:false,quick_draw:null,punch_side:'right',haymaker:false,combo:0,last_punch_at:-99,swing:null,side:1,shield:{charge:settings.mirror.shield,spent:false,since_hit:999}};
 /** One executable weapon policy. Native physics owns every trajectory, sweep, contact and impulse. */
@@ -25795,11 +26550,11 @@ class weaponSystem{
 return Object.freeze({get weaponSystem(){return weaponSystem;}});
 })();
 // src/gameplay/items/loot-system.mjs
-const m135 = (()=>{
-const {WorldLoot} = m90;
-const rules = m51.default;
+const m140 = (()=>{
+const {WorldLoot} = m95;
+const rules = m56.default;
 const {BODY_GROUP} = m1;
-const {jsonCopy,nonnegative} = m48;
+const {jsonCopy,nonnegative} = m53;
 
 /** World ownership and pickup policy. Placement, motion, bounds and proximity use the existing engine. */
 class lootSystem{
@@ -25849,24 +26604,24 @@ class lootSystem{
 return Object.freeze({get lootSystem(){return lootSystem;}});
 })();
 // src/directory/game-runtime.mjs
-const m117 = (()=>{
-const {humanoidSystem} = m118;
-const {encounterSystem} = m122;
-const {attackSystem} = m123;
-const {abilitySystem} = m126;
-const {actorSystem} = m127;
-const {registerGameEntityTypes} = m79;
-const {gameEngine} = m102;
-const {createApartmentAssetLibrary} = m98;
-const controlProfile = m128.default;
-const {gameSession} = m129;
-const {PlayerStateSystem} = m130;
-const {PlayerControlSystem} = m131;
-const playerRules = m54.default;
-const {combatSystem} = m132;
-const {weaponSystem} = m133;
-const {lootSystem} = m135;
-const {canvasRenderer} = m110;
+const m122 = (()=>{
+const {humanoidSystem} = m123;
+const {encounterSystem} = m127;
+const {attackSystem} = m128;
+const {abilitySystem} = m131;
+const {actorSystem} = m132;
+const {registerGameEntityTypes} = m84;
+const {gameEngine} = m107;
+const {createApartmentAssetLibrary} = m103;
+const controlProfile = m133.default;
+const {gameSession} = m134;
+const {PlayerStateSystem} = m135;
+const {PlayerControlSystem} = m136;
+const playerRules = m59.default;
+const {combatSystem} = m137;
+const {weaponSystem} = m138;
+const {lootSystem} = m140;
+const {canvasRenderer} = m115;
 
 /** Explicit game composition. Importing this file never starts a second runtime. */
 function createGameRuntime({ game_db, surface, session_state, player, weapon_policy={}, combat_policy={}, actor_policy={}, ability_policy={}, ...options } = {}) {
@@ -25903,8 +26658,8 @@ function createGameRuntime({ game_db, surface, session_state, player, weapon_pol
 return Object.freeze({get createGameRuntime(){return createGameRuntime;}});
 })();
 // src/presentation/weapon-appearance.mjs
-const m136 = (()=>{
-const {GUN_MATERIALS,WEAPON_MODELS,LASER_MODULE,weaponModel} = m125;
+const m141 = (()=>{
+const {GUN_MATERIALS,WEAPON_MODELS,LASER_MODULE,weaponModel} = m130;
 
 const polygon=points=>({type:'path',commands:[...points.map(([x,y],i)=>[i?'line':'move',x,y]),['close']]});
 function shape(part){
@@ -25987,16 +26742,16 @@ class weaponAppearance {
 return Object.freeze({get weaponAppearance(){return weaponAppearance;}});
 })();
 // src/directory/game-combat.mjs
-const m137 = (()=>{
-const data = m51.default;
+const m142 = (()=>{
+const data = m56.default;
 const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
 const COMBAT_RULES=freeze(structuredClone(data));
 
 return Object.freeze({get COMBAT_RULES(){return COMBAT_RULES;}});
 })();
 // src/presentation/art-packets.mjs
-const m139 = (()=>{
-const {transform,inverse} = m112;
+const m144 = (()=>{
+const {transform,inverse} = m117;
 const identity=()=>[1,0,0,1,0,0];
 const multiply=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
 const geometry=commands=>Array.isArray(commands)?{type:'path',commands:commands.map(command=>[...command])}:structuredClone(commands);
@@ -26022,9 +26777,9 @@ function groundShadow(scene,x,y,rx,ry){scene.enter({position:[x,y],scale:[rx,ry]
 return Object.freeze({get ellipse(){return ellipse;},get circle(){return circle;},get linear(){return linear;},get radial(){return radial;},get artScene(){return artScene;},get glow(){return glow;},get groundShadow(){return groundShadow;}});
 })();
 // src/presentation/drone.mjs
-const m138 = (()=>{
-const enemies = m35.default;
-const {artScene,circle,ellipse,radial,glow} = m139;
+const m143 = (()=>{
+const enemies = m40.default;
+const {artScene,circle,ellipse,radial,glow} = m144;
 const DRONE=enemies.drone;
 function droneLift(state){return DRONE.HOVER_PX+Math.sin(state.hoverOffset)*3+state.alt*240;}
 function droneArmPose(diving,stuck,s){
@@ -26205,8 +26960,8 @@ return Object.assign({},{x:pose.position[0],y:pose.position[1],angle:pose.rotati
 return Object.freeze({get droneLift(){return droneLift;},get droneArmPose(){return droneArmPose;},get createDronePackets(){return createDronePackets;},get dronePresentation(){return dronePresentation;}});
 })();
 // src/presentation/demoness.mjs
-const m140 = (()=>{
-const enemies = m35.default;
+const m145 = (()=>{
+const enemies = m40.default;
 const DUEL=enemies.duel;
 /** Retained Canvas art over a detached record; body art is supplied by the host. */
 const demonessAppearance={
@@ -26270,8 +27025,8 @@ function demonessPresentation(entity,blend=1){const pose=entity.getRenderState(b
 return Object.freeze({get demonessAppearance(){return demonessAppearance;},get demonessPresentation(){return demonessPresentation;}});
 })();
 // src/presentation/boss-effects.mjs
-const m141 = (()=>{
-const enemies = m35.default;
+const m146 = (()=>{
+const enemies = m40.default;
 const HAZARD=enemies.hazards;
 const bossEffectAppearance={
  _smokeK(h){const now=this.render_clock??_gameTimeSec;return Math.min(1,(now-h.t0)/.5)*Math.min(1,(h.until-now)/1.2);},
@@ -26408,10 +27163,10 @@ function bossEffectPresentation(effects,clock){return effects.filter(effect=>!ef
 return Object.freeze({get bossEffectAppearance(){return bossEffectAppearance;},get bossEffectPresentation(){return bossEffectPresentation;}});
 })();
 // src/presentation/velvet-cat.mjs
-const m142 = (()=>{
-const {artScene,circle,ellipse,radial,linear,groundShadow} = m139;
-const {velvetCatAnimation} = m82;
-const {VELVET_CAT_PALETTES,VELVET_T,VELVET_PROFILES,VELVET_TAIL_SEGS} = m83;
+const m147 = (()=>{
+const {artScene,circle,ellipse,radial,linear,groundShadow} = m144;
+const {velvetCatAnimation} = m87;
+const {VELVET_CAT_PALETTES,VELVET_T,VELVET_PROFILES,VELVET_TAIL_SEGS} = m88;
 /** Renderer-neutral feline geometry/material packets over detached animation state. */
 
 function createVelvetCatArt(state){const scene=new artScene(),eyes=[];let path=[];
@@ -26840,7 +27595,7 @@ const m0 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get assetLibrary(){return m1.assetLibrary;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get createGameAssetLibrary(){return m33.createGameAssetLibrary;},get ApartmentLevel(){return m60.ApartmentLevel;},get APARTMENT_RULES(){return m98.APARTMENT_RULES;},get gameEngine(){return m102.gameEngine;},get gameLevel(){return m104.gameLevel;},get levelLobby(){return m103.levelLobby;},get createGameRuntime(){return m117.createGameRuntime;},get controlSystem(){return m105.controlSystem;},get controlsSystem(){return m105.controlsSystem;},get inputInstance(){return m105.inputInstance;},get keyboardInstance(){return m105.keyboardInstance;},get mouseInstance(){return m105.mouseInstance;},get touchInstance(){return m105.touchInstance;},get touchStick(){return m105.touchStick;},get gamepadInstance(){return m105.gamepadInstance;},get TAP(){return m105.TAP;},get DOUBLETAP(){return m105.DOUBLETAP;},get HELD(){return m105.HELD;},get PRESS(){return m105.PRESS;},get REPEAT(){return m105.REPEAT;},get RELEASE(){return m105.RELEASE;},get renderSystem(){return m110.renderSystem;},get renderFrame(){return m110.renderFrame;},get canvasRenderer(){return m110.canvasRenderer;},get cameraSystem(){return m110.cameraSystem;},get gameSession(){return m129.gameSession;},get PlayerStateSystem(){return m130.PlayerStateSystem;},get PlayerControlSystem(){return m131.PlayerControlSystem;},get Player(){return m85.Player;},get playerVitals(){return m86.playerVitals;},get itemSystem(){return m69.itemSystem;},get createItemCatalog(){return m44.createItemCatalog;},get GUN_MATERIALS(){return m125.GUN_MATERIALS;},get WEAPON_MODELS(){return m125.WEAPON_MODELS;},get LASER_MODULE(){return m125.LASER_MODULE;},get weaponModel(){return m125.weaponModel;},get weaponAppearance(){return m136.weaponAppearance;},get combatSystem(){return m132.combatSystem;},get weaponSystem(){return m133.weaponSystem;},get lootSystem(){return m135.lootSystem;},get WorldLoot(){return m90.WorldLoot;},get MELEE_SWING(){return m134.MELEE_SWING;},get WIDE_SWING(){return m134.WIDE_SWING;},get sampleMeleeSwing(){return m134.sampleMeleeSwing;},get sampleWideSwing(){return m134.sampleWideSwing;},get swingPhases(){return m134.swingPhases;},get wideGrip(){return m134.wideGrip;},get COMBAT_RULES(){return m137.COMBAT_RULES;},get registerGameEntityTypes(){return m79.registerGameEntityTypes;},get actorVitals(){return m67.actorVitals;},get gameActor(){return m65.gameActor;},get NPC(){return m88.NPC;},get rosterRecord(){return m88.rosterRecord;},get ROSTER_FIELDS(){return m88.ROSTER_FIELDS;},get Ganger(){return m64.Ganger;},get actorSystem(){return m127.actorSystem;},get actorItems(){return m68.actorItems;},get restoreActorItems(){return m68.restoreActorItems;},get resolveEmoteLines(){return m89.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m89.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m47.abilityLoadout;},get actorAbilities(){return m47.actorAbilities;},get abilitySystem(){return m126.abilitySystem;},get createAbilityCatalog(){return m46.createAbilityCatalog;},get importActorAbilities(){return m46.importActorAbilities;},get attackRegistry(){return m66.attackRegistry;},get validateAttackState(){return m66.validateAttackState;},get attackSystem(){return m123.attackSystem;},get createAttackCatalog(){return m43.createAttackCatalog;},get validateMountedAttack(){return m78.validateMountedAttack;},get TrafficVehicle(){return m91.TrafficVehicle;},get createGameVehicle(){return m91.createGameVehicle;},get Hunter(){return m63.Hunter;},get createHunterAppearance(){return m42.createHunterAppearance;},get Marionette(){return m84.Marionette;},get MARIONETTE_RULES(){return m40.MARIONETTE_RULES;},get validateAbilityAction(){return m75.validateAbilityAction;},get GatlingGunner(){return m72.GatlingGunner;},get Drone(){return m80.Drone;},get VelvetCat(){return m81.VelvetCat;},get velvetCatAnimation(){return m82.velvetCatAnimation;},get createVelvetAnimation(){return m82.createVelvetAnimation;},get velvetPresentation(){return m82.velvetPresentation;},get droneLift(){return m138.droneLift;},get droneArmPose(){return m138.droneArmPose;},get dronePresentation(){return m138.dronePresentation;},get VELVET_CAT_PALETTES(){return m83.VELVET_CAT_PALETTES;},get VELVET_T(){return m83.VELVET_T;},get VELVET_PROFILES(){return m83.VELVET_PROFILES;},get VELVET_GAITS(){return m83.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m83.VELVET_TAIL_SEGS;},get Demoness(){return m62.Demoness;},get Warden(){return m71.Warden;},get Vesper(){return m71.Vesper;},get Matins(){return m71.Matins;},get Compline(){return m71.Compline;},get BossEffect(){return m73.BossEffect;},get encounterSystem(){return m122.encounterSystem;},get createBossAbilities(){return m34.createBossAbilities;},get createDemonessAppearance(){return m34.createDemonessAppearance;},get demonessAppearance(){return m140.demonessAppearance;},get demonessPresentation(){return m140.demonessPresentation;},get bossEffectAppearance(){return m141.bossEffectAppearance;},get bossEffectPresentation(){return m141.bossEffectPresentation;},get validateBossRecord(){return m61.validateBossRecord;},get createDronePackets(){return m138.createDronePackets;},get createVelvetCatArt(){return m142.createVelvetCatArt;},get createVelvetCatPackets(){return m142.createVelvetCatPackets;},get createVelvetEyePackets(){return m142.createVelvetEyePackets;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m118.humanoidSystem;},get humanoidPresentation(){return m118.humanoidPresentation;},get humanoidBodyCanon(){return m119.humanoidBodyCanon;},get humanoidBuilds(){return m119.humanoidBuilds;},get getHumanoidRigAssets(){return m119.getHumanoidRigAssets;}});
+return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get assetLibrary(){return m1.assetLibrary;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get createGameAssetLibrary(){return m38.createGameAssetLibrary;},get ApartmentLevel(){return m65.ApartmentLevel;},get APARTMENT_RULES(){return m103.APARTMENT_RULES;},get gameEngine(){return m107.gameEngine;},get gameLevel(){return m109.gameLevel;},get levelLobby(){return m108.levelLobby;},get createGameRuntime(){return m122.createGameRuntime;},get controlSystem(){return m110.controlSystem;},get controlsSystem(){return m110.controlsSystem;},get inputInstance(){return m110.inputInstance;},get keyboardInstance(){return m110.keyboardInstance;},get mouseInstance(){return m110.mouseInstance;},get touchInstance(){return m110.touchInstance;},get touchStick(){return m110.touchStick;},get gamepadInstance(){return m110.gamepadInstance;},get TAP(){return m110.TAP;},get DOUBLETAP(){return m110.DOUBLETAP;},get HELD(){return m110.HELD;},get PRESS(){return m110.PRESS;},get REPEAT(){return m110.REPEAT;},get RELEASE(){return m110.RELEASE;},get renderSystem(){return m115.renderSystem;},get renderFrame(){return m115.renderFrame;},get canvasRenderer(){return m115.canvasRenderer;},get cameraSystem(){return m115.cameraSystem;},get gameSession(){return m134.gameSession;},get PlayerStateSystem(){return m135.PlayerStateSystem;},get PlayerControlSystem(){return m136.PlayerControlSystem;},get Player(){return m90.Player;},get playerVitals(){return m91.playerVitals;},get itemSystem(){return m74.itemSystem;},get createItemCatalog(){return m49.createItemCatalog;},get GUN_MATERIALS(){return m130.GUN_MATERIALS;},get WEAPON_MODELS(){return m130.WEAPON_MODELS;},get LASER_MODULE(){return m130.LASER_MODULE;},get weaponModel(){return m130.weaponModel;},get weaponAppearance(){return m141.weaponAppearance;},get combatSystem(){return m137.combatSystem;},get weaponSystem(){return m138.weaponSystem;},get lootSystem(){return m140.lootSystem;},get WorldLoot(){return m95.WorldLoot;},get MELEE_SWING(){return m139.MELEE_SWING;},get WIDE_SWING(){return m139.WIDE_SWING;},get sampleMeleeSwing(){return m139.sampleMeleeSwing;},get sampleWideSwing(){return m139.sampleWideSwing;},get swingPhases(){return m139.swingPhases;},get wideGrip(){return m139.wideGrip;},get COMBAT_RULES(){return m142.COMBAT_RULES;},get registerGameEntityTypes(){return m84.registerGameEntityTypes;},get actorVitals(){return m72.actorVitals;},get gameActor(){return m70.gameActor;},get NPC(){return m93.NPC;},get rosterRecord(){return m93.rosterRecord;},get ROSTER_FIELDS(){return m93.ROSTER_FIELDS;},get Ganger(){return m69.Ganger;},get actorSystem(){return m132.actorSystem;},get actorItems(){return m73.actorItems;},get restoreActorItems(){return m73.restoreActorItems;},get resolveEmoteLines(){return m94.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m94.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m52.abilityLoadout;},get actorAbilities(){return m52.actorAbilities;},get abilitySystem(){return m131.abilitySystem;},get createAbilityCatalog(){return m51.createAbilityCatalog;},get importActorAbilities(){return m51.importActorAbilities;},get attackRegistry(){return m71.attackRegistry;},get validateAttackState(){return m71.validateAttackState;},get attackSystem(){return m128.attackSystem;},get createAttackCatalog(){return m48.createAttackCatalog;},get validateMountedAttack(){return m83.validateMountedAttack;},get TrafficVehicle(){return m96.TrafficVehicle;},get createGameVehicle(){return m96.createGameVehicle;},get Hunter(){return m68.Hunter;},get createHunterAppearance(){return m47.createHunterAppearance;},get Marionette(){return m89.Marionette;},get MARIONETTE_RULES(){return m45.MARIONETTE_RULES;},get validateAbilityAction(){return m80.validateAbilityAction;},get GatlingGunner(){return m77.GatlingGunner;},get Drone(){return m85.Drone;},get VelvetCat(){return m86.VelvetCat;},get velvetCatAnimation(){return m87.velvetCatAnimation;},get createVelvetAnimation(){return m87.createVelvetAnimation;},get velvetPresentation(){return m87.velvetPresentation;},get droneLift(){return m143.droneLift;},get droneArmPose(){return m143.droneArmPose;},get dronePresentation(){return m143.dronePresentation;},get VELVET_CAT_PALETTES(){return m88.VELVET_CAT_PALETTES;},get VELVET_T(){return m88.VELVET_T;},get VELVET_PROFILES(){return m88.VELVET_PROFILES;},get VELVET_GAITS(){return m88.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m88.VELVET_TAIL_SEGS;},get Demoness(){return m67.Demoness;},get Warden(){return m76.Warden;},get Vesper(){return m76.Vesper;},get Matins(){return m76.Matins;},get Compline(){return m76.Compline;},get BossEffect(){return m78.BossEffect;},get encounterSystem(){return m127.encounterSystem;},get createBossAbilities(){return m39.createBossAbilities;},get createDemonessAppearance(){return m39.createDemonessAppearance;},get demonessAppearance(){return m145.demonessAppearance;},get demonessPresentation(){return m145.demonessPresentation;},get bossEffectAppearance(){return m146.bossEffectAppearance;},get bossEffectPresentation(){return m146.bossEffectPresentation;},get validateBossRecord(){return m66.validateBossRecord;},get createDronePackets(){return m143.createDronePackets;},get createVelvetCatArt(){return m147.createVelvetCatArt;},get createVelvetCatPackets(){return m147.createVelvetCatPackets;},get createVelvetEyePackets(){return m147.createVelvetEyePackets;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m123.humanoidSystem;},get humanoidPresentation(){return m123.humanoidPresentation;},get humanoidBodyCanon(){return m124.humanoidBodyCanon;},get humanoidBuilds(){return m124.humanoidBuilds;},get getHumanoidRigAssets(){return m124.getHumanoidRigAssets;}});
 })();
 return m0;
 })();

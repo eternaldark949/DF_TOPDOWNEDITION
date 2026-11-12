@@ -136,7 +136,7 @@ Filter options: `include_groups=ALL`, `exclude_groups=0`, `query_bit=ALL`, `igno
 | `overlapShape({collision_shape,position,rotation=0,...filters}, results=[])` | Exact overlap contacts. |
 | `isPlacementClear(body_or_shape, position, options={})` | Boolean. Touching counts as occupied within tolerance. |
 | `findClearPlacement({body OR collision_shape,from?,to,min_distance=0,max_attempts=64,...filters}, result={})` | Endpoint-first bounded search; `{position,fraction,distance}` or `null`. Can cross solids, always validates returned endpoint. |
-| `findPath({body OR collision_shape,from?,to,node_spacing?,max_nodes=2048,search_margin?,search_bounds?,...filters}, result={})` | `{points,visited_nodes}` or `null`. Bounded A* routing nodes query the same index for every edge. |
+| `findPath(packet, result?)` | Same as `navigation.findPath`: clearance-field A* with string pulling, path reuse and partial goals. `{points,length,partial,visited_nodes,...}` or `null`. See [navigation](navigation.md). |
 | `getPathClearance({body OR collision_shape,from,to,...filters}, result={})` | `{clear,distance,fraction,hit}`. |
 | `predictCollision({body_a,body_b,seconds=1}, result={})` | Geometric constant-velocity prediction or `null`, including `seconds` to impact. This does not forecast future AI decisions. |
 
@@ -247,6 +247,10 @@ Entity packets/templates may include `constraints:[joint_packet,...]`. The engin
 `vehicle_template.tyre_model` is `bicycle` (default) or `two_axle`. Two-axle parameters are `front_grip:1`, `rear_grip:1`, `cornering_stiffness:12`, `max_lateral_acceleration:500`, `load_transfer:0.15`, `load_rate:5`. Front/rear tyre impulses act at separate axle points through the common body mass/inertia rules; steering does not assign a heading directly. Braking/throttle shift axle load and handbraking reduces rear grip. This is a new model whose tuning must be evaluated in the game; it does not claim identical feel to the old per-tick model.
 
 `vehicleMotor.setSurface({grip=1,wetness=0})` and `gameVehicle.setSurface` accept a nonnegative grip multiplier and wetness in 0–1. `getVehicleState` also returns detached `axles:{load,front_slip,rear_slip}` and `surface`. These values survive save/load. Effects can consume this telemetry instead of calculating tyre slip themselves.
+
+## Navigation
+
+Every world owns `physics.navigation`, a `navigationSystem` with two layers: a cached clearance `navigationField` for open-space travel by any radius, and a `roadNetwork` lane graph for vehicles. Methods: `navigate`, `findPath`, `findRoute`, `registerProfile`, `getProfile`, `agentRadius`, `configureField`, `invalidateRegion`, `getStatistics`. Field methods: `clearanceAtCell`, `clearanceAt`, `exactSegmentClearance`, `cellOf`, `cellCenter`, `chunk`, `chunkRevision`, `isObstacle`, `invalidateRegion`, `invalidateAll`, `getConfig`. Road methods: `addNode`, `addLane`, `removeLane`, `setLaneOpen`, `getLane`, `getNode`, `snapToLane`, `findRoute`. The complete keyword reference, guarantees and measurements are in [navigation](navigation.md).
 
 ## trafficController
 

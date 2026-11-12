@@ -112,8 +112,10 @@ export class characterMotor {
                 } else if (distance > arrive + EPS) {
                     this.replan -= dt;
                     if (!intent.direct && this.replan <= 0) {
-                        this.path = world.findPath({ ...intent, body: this.body, to: approach }); this.replan = 0.25;
-                        this.path_index = 1;
+                        // Navigation returns the same path object while it remains valid, so progress is kept.
+                        const path = world.findPath({ body: this.body, to: approach, reuse: this.path, max_nodes: intent.max_nodes, search_margin: intent.search_margin, radius: intent.navigation_radius }); this.replan = 0.25;
+                        if (!path || path !== this.path) this.path_index = 1;
+                        this.path = path;
                     }
                     let goal = approach;
                     if (!intent.direct) {

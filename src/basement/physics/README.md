@@ -31,6 +31,7 @@ Rigs and keyframe animation are included in `physics.rigs`: lightweight joint hi
 - [Official entities and Directory assets](docs/entities.md)
 - [Behavior, units, events and persistence](docs/behavior.md)
 - [Practical examples](docs/examples.md)
+- [Navigation: paths, roads and profiles](docs/navigation.md)
 - [Game migration guide](docs/migration.md)
 - [Implemented, proposed and deprecated APIs](docs/status.md)
 - [Verification record](docs/verification.md)
@@ -44,6 +45,7 @@ Requires a current browser, or Node 20+ for CLI examples/tests. No install/build
 node --test src/basement/physics/tests/*.test.mjs
 node src/basement/physics/examples/headless.mjs
 node src/basement/physics/benchmarks/spatial.mjs
+node src/basement/physics/benchmarks/navigation.mjs
 ```
 
 From this directory, `python3 -m http.server 8080` serves the [browser sandbox](examples/index.html) at `http://localhost:8080/examples/`. Serve modules over HTTP rather than opening the HTML through `file://`.

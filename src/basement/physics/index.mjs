@@ -17,6 +17,9 @@ export { BODY_GROUP, QUERY_GROUP, PHYSICS_TYPES } from './core/values.mjs';
 export { trafficController } from './traffic/controller.mjs';
 export { motionController } from './motion/controller.mjs';
 export { pathGeometry } from './motion/path-geometry.mjs';
+export { navigationSystem } from './navigation/system.mjs';
+export { navigationField } from './navigation/field.mjs';
+export { roadNetwork } from './navigation/road-network.mjs';
 export { layoutGeometry } from './motion/layout-geometry.mjs';
 
 export {rigDefinition} from './animation/rig-definition.mjs';

@@ -228,37 +228,4 @@ export class physicsQueries {
         const c = collisionDetector.sweep(a.shape, pose(a), end(a), b.shape, pose(b), end(b));
         return c ? Object.assign(result, c, { seconds: c.fraction * seconds, body_a: a.handle, body_b: b.handle }) : null;
     }
-    findPath(packet, result = {}) {
-        const from = referencePosition(this.world, packet.from ?? packet.body), to = vector(packet.to);
-        const r = packet.body ? this.world._record(referenceBody(packet.body)) : null;
-        const shape = packet.collision_shape ?? r?.config.collision_shape ?? { shape_type: 'circle', radius: 1 };
-        const opts = { ...packet, collision_shape: shape, ignore_body: packet.ignore_body ?? r?.handle, include_ghosts: false };
-        const clear = (a, b) => this.getPathClearance({ ...opts, from: a, to: b }).clear;
-        if (clear(from, to)) return Object.assign(result, { points: [from, to], visited_nodes: 0 });
-        const size = number(packet.node_spacing ?? Math.max(8, shapeReach(new collisionShape(shape))), 'node_spacing', 1);
-        const max = number(packet.max_nodes ?? 2048, 'max_nodes', 1, 100000), margin = packet.search_margin ?? size * 16;
-        const bounds = packet.search_bounds ?? { left: Math.min(from[0], to[0]) - margin, right: Math.max(from[0], to[0]) + margin, top: Math.min(from[1], to[1]) - margin, bottom: Math.max(from[1], to[1]) + margin };
-        const heap = [], nodes = new Map(), key = (x, y) => `${x},${y}`;
-        const point = (x, y) => [from[0] + x * size, from[1] + y * size];
-        const push = n => { let i = heap.length; heap.push(n); while (i) { const p = (i - 1) >> 1; if (heap[p].f <= n.f) break; heap[i] = heap[p]; i = p; } heap[i] = n; };
-        const pop = () => { const first = heap[0], last = heap.pop(); if (heap.length) { let i = 0; heap[0] = last; for (;;) { const l = i * 2 + 1, rr = l + 1; let m = i; if (l < heap.length && heap[l].f < heap[m].f) m = l; if (rr < heap.length && heap[rr].f < heap[m].f) m = rr; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return first; };
-        const first = { x: 0, y: 0, g: 0, f: length(sub(to, from)), parent: null }; nodes.set('0,0', first); push(first);
-        let visited = 0;
-        while (heap.length && visited < max) {
-            const n = pop(); if (n.closed) continue; n.closed = true; visited++;
-            const at = point(n.x, n.y);
-            if (length(sub(at, to)) <= size * 1.5 && clear(at, to)) {
-                const path = [to]; for (let cur = n; cur; cur = cur.parent) path.push(point(cur.x, cur.y)); path.reverse();
-                return Object.assign(result, { points: path, visited_nodes: visited });
-            }
-            for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) {
-                const x = n.x + dx, y = n.y + dy, p = point(x, y);
-                if (p[0] < bounds.left || p[0] > bounds.right || p[1] < bounds.top || p[1] > bounds.bottom) continue;
-                const k = key(x, y), old = nodes.get(k), g = n.g + size * Math.hypot(dx, dy);
-                if ((old && old.g <= g) || !clear(at, p)) continue;
-                const next = { x, y, g, f: g + length(sub(to, p)), parent: n }; nodes.set(k, next); push(next);
-            }
-        }
-        return null;
-    }
 }

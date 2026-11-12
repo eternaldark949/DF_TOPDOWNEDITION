@@ -1,5 +1,13 @@
 # Changelog
 
+## Navigation system — 2026-11-12
+
+- Added `physics.navigation`, one request API for travel from A to B. It has a field layer (open space, any agent radius) and a road layer (authored lanes for vehicles). `navigate(body, to)` plans and hands the route to the body's existing character or vehicle motor.
+- `physics.findPath` now uses the navigation clearance field instead of a shape cast per A* edge. That is about 100× faster on the city benchmark, and it finds routes the old bounded search missed. Paths are safe by construction, pooled, widened when a detour leaves the search area, and reusable: `characterMotor` keeps its path while the chunks it depends on are unchanged.
+- The field is a lazy, chunked cache of obstacle distances built from the one spatial grid. Static/prop edits dirty only nearby chunks. Characters never touch it.
+- Road routes minimise travel time, snap through the shared grid, cache node routes, honour closed lanes and save with the world. Generic spatial-instance saves now export only `spatial:` entries.
+- Behaviour change: field planning ignores moving bodies and per-agent collision masks. Motors' local avoidance handles crowds. See `docs/navigation.md`.
+
 ## Shared renderer/camera boundary — 2026-11-10
 
 - Added the separate Basement rendering package and exposed `api.render` / `api.camera` in the new runtime. Only the Canvas backend owns contexts; appearance producers submit pooled data packets and ordered passes.
