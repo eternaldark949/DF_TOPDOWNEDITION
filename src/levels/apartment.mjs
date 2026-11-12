@@ -7,7 +7,8 @@ import {importActorAbilities} from '../directory/game-abilities.mjs';
 import {registerGameEntityTypes} from '../directory/game-entity-types.mjs';
 import { physicsSystem } from '../basement/physics/index.mjs';
 import { createApartmentAssetLibrary } from '../directory/apartment-assets.mjs';
-import { resolveApartmentDefinition, resolveApartmentDyer } from '../directory/apartment-definition.mjs';
+import { resolveApartmentDefinition, resolveApartmentDyer, APARTMENT_MAP_OPTIONS } from '../directory/apartment-definition.mjs';
+import { mapInstance } from '../basement/maps/index.mjs';
 import {NPC,rosterRecord} from '../entities/npc.mjs';
 import {createActorPacket} from '../directory/game-actor-factory.mjs';
 import { gameProp } from '../basement/physics/index.mjs';
@@ -20,7 +21,7 @@ export class ApartmentLevel {
         this.physics = new physicsSystem({ asset_library: library });
         registerGameEntityTypes(this.physics);this.physics.elements.registerEntityType(ApartmentDoor.entity_type,ApartmentDoor);
         this.definition = resolveApartmentDefinition(library, game_db);
-        this.entities = this.definition.entities.map(p=>this.physics.createEntity(p));
+        this.map = new mapInstance(this.physics, this.definition.definition, APARTMENT_MAP_OPTIONS);   // the Basement map system builds the scene
         this.player = this.physics.createEntity({...this.definition.player,...(spawn?{position:spawn}:{})});
         this.reconnect(); this.restoreLayout(layout); this.restoreRoster(roster,game_db);
         for(const owner of this.curtains)owner.data.cloth_id=this.physics.createCloth({owner,...owner.data.mesh,mass:.1,damping:4,stiffness:30,wind:[.15,0]});
@@ -53,10 +54,7 @@ export class ApartmentLevel {
     getRoster(){return this.companions.map(rosterRecord);}
     updateState() {
         for(const c of this.companions)if(c.active!==!!(c.recruited&&!c.dead)){if(c.recruited&&!c.dead)c.activate();else c.deactivate();}
-        for(const door of this.doors){
-            const near=this.physics.peruseNearbyEntities(door.data.trigger_position??door,{near_range:door.data.appearance.triggerRadius??90,include_groups:2,include_ghosts:false}).length>0;
-            if(near!==door.data.open)for(const panel of this.doorPanels.get(door.entity_id)){panel.data.open=near;this.physics.motion.moveBodyTo(panel,{position:near?panel.data.open_position:panel.data.closed_position,rotation:near?panel.data.open_rotation:panel.data.closed_rotation,duration:this.definition.rules.DOOR_DURATION,easing:'smooth'});}
-        }
+        this.map.updateDoors({near_range:door=>door.data.appearance.triggerRadius??90,duration:this.definition.rules.DOOR_DURATION,include_groups:2});
         this.physics.updateState();
     }
     saveState() { return this.physics.savePhysicsState(); }
@@ -68,7 +66,7 @@ export class ApartmentLevel {
         }
         for(const record of migrated.entities??[])if(record.entity_type===NPC.entity_type)importActorAbilities(record.data,this.physics.elements.asset_library.getResource('df:abilities').data,{default_id:record.data.role==='red_demon_dancer'?'fireball':null});
         for(const record of migrated.entities??[]){validateBossRecord(record,this.physics.elements.asset_library.getResource('df:abilities').data);validateAbilityAction(record.data.ability_action_state,this.physics.elements.asset_library.getResource('df:abilities').data,{clock:record.data.weapon_state?.elapsed??-1});validateMountedAttack(record.data.mounted_attack_state);if(record.data.attack_state)validateAttackState(record.data.attack_state,id=>!!this.physics.elements.asset_library.getResource('df:attacks').data[id]);if(record.data.abilities)new abilityLoadout(record.data.abilities,this.physics.elements.asset_library.getResource('df:abilities').data);}
-        this.physics.loadPhysicsState(migrated); this.reconnect();
+        this.physics.loadPhysicsState(migrated); this.map.reconnect(); this.reconnect();
         let upgraded=false;
         for(const door of this.doors)if(door.data.appearance.type==='sliding'&&!door.data.panel_version){
             const packets=this.definition.entities.filter(p=>p.data.door_key===door.data.authored_id),primary=packets.find(p=>p.data.role==='door');
@@ -76,7 +74,7 @@ export class ApartmentLevel {
             door.updateBody({position:primary.position,rotation:0,collision_shape:primary.collision_shape});Object.assign(door.data,structuredClone(primary.data));
             this.physics.createEntity(packets.find(p=>p.data.role==='door_panel'));upgraded=true;
         }
-        if(upgraded)this.reconnect();
+        if(upgraded){this.map.reconnect();this.reconnect();}
     }
     destroy() { this.physics.clearWorld(); }
 }

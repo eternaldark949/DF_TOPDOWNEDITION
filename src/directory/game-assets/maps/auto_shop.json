@@ -1,0 +1,47 @@
+{
+  "map_id": "auto_shop",
+  "props": [
+    {"type": "ta_lift", "x": 110, "y": 140},
+    {"type": "ta_lift", "x": 110, "y": 380, "variant": 1},
+    {"type": "ta_wrap", "x": 410, "y": 140},
+    {"type": "ta_chest", "x": 60, "y": 58},
+    {"type": "ta_chest", "x": 132, "y": 58},
+    {"type": "ta_bench", "x": 640, "y": 56},
+    {"type": "ta_compressor", "x": 808, "y": 58},
+    {"type": "ta_rack", "x": 58, "y": 600},
+    {"type": "ta_tires", "x": 330, "y": 560},
+    {"type": "ta_tires", "x": 378, "y": 574, "width": 40, "height": 40, "variant": 1},
+    {"type": "ta_tires", "x": 826, "y": 700},
+    {"type": "ta_drum", "x": 836, "y": 600},
+    {"type": "ta_drum", "x": 836, "y": 640, "variant": 1},
+    {"type": "ta_sofa", "x": 80, "y": 880},
+    {"type": "ta_table", "x": 240, "y": 888},
+    {"type": "ta_counter", "x": 950, "y": 250},
+    {"type": "ta_rims", "x": 910, "y": 58},
+    {"type": "ta_turntable", "x": 1099, "y": 439},
+    {"type": "ta_chair", "x": 930, "y": 470},
+    {"type": "ta_chair", "x": 930, "y": 574},
+    {"type": "ta_table", "x": 937, "y": 528},
+    {"type": "vending_machine", "x": 1280, "y": 600},
+    {"type": "ta_shelf", "x": 920, "y": 730},
+    {"type": "ta_shelf", "x": 920, "y": 820},
+    {"type": "ta_shelf", "x": 1150, "y": 730, "width": 150},
+    {"type": "ta_shelf", "x": 1150, "y": 820, "width": 150},
+    {"type": "ls_cashtin", "x": 700, "y": 102}
+  ],
+  "lamps": [
+    {"x": 190, "y": 188, "lampType": 4, "color": "#fff0dc", "lightRadius": 300, "apply": {"visible": false}},
+    {"x": 190, "y": 428, "lampType": 4, "color": "#fff0dc", "lightRadius": 300, "apply": {"visible": false}},
+    {"x": 505, "y": 188, "lampType": 4, "color": "#fff0dc", "lightRadius": 300, "apply": {"visible": false}},
+    {"x": 470, "y": 640, "lampType": 4, "color": "#ffc890", "lightRadius": 340, "apply": {"visible": false}},
+    {"x": 700, "y": 880, "lampType": 4, "color": "#ffd9a8", "lightRadius": 260, "apply": {"visible": false}},
+    {"x": 720, "y": 110, "lampType": 4, "color": "#ffd9a8", "lightRadius": 220, "apply": {"visible": false}},
+    {"x": 1050, "y": 200, "lampType": 4, "color": "#e8eeff", "lightRadius": 300, "apply": {"visible": false}},
+    {"x": 1165, "y": 505, "lampType": 4, "color": "#f6c2ac", "lightRadius": 280, "apply": {"visible": false}},
+    {"x": 950, "y": 540, "lampType": 4, "color": "#ffd9a0", "lightRadius": 200, "apply": {"visible": false}},
+    {"x": 1100, "y": 800, "lampType": 4, "color": "#ffb070", "lightRadius": 230, "apply": {"visible": false}}
+  ],
+  "npcs": [
+    {"class": "NPC", "args": [1050, 200, "Torque", "mechanic"], "apply": {"angle": 1.5707963267948966}}
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "map_id": "hotel_lobby",
+  "props": [
+    {"type": "dn_fountain", "x": 445, "y": 265},
+    {"type": "dn_desk", "x": 385, "y": 566},
+    {"type": "dn_sofa", "x": 190, "y": 760},
+    {"type": "dn_sofa", "x": 690, "y": 760},
+    {"type": "dn_table", "x": 215, "y": 842},
+    {"type": "dn_table", "x": 715, "y": 842},
+    {"type": "dn_wingback", "x": 180, "y": 904},
+    {"type": "dn_wingback", "x": 780, "y": 904},
+    {"type": "dn_wingback", "x": 292, "y": 904},
+    {"type": "dn_wingback", "x": 668, "y": 904},
+    {"type": "dn_lamp", "x": 330, "y": 760},
+    {"type": "dn_lamp", "x": 648, "y": 760},
+    {"type": "dn_palm", "x": 172, "y": 1022},
+    {"type": "dn_palm", "x": 794, "y": 1022},
+    {"type": "dn_palm", "x": 90, "y": 190},
+    {"type": "dn_palm", "x": 876, "y": 190},
+    {"type": "dn_float_chaise", "x": 250, "y": 1010},
+    {"type": "dn_float_chaise", "x": 658, "y": 1010},
+    {"type": "dn_float_chair", "x": 318, "y": 300},
+    {"type": "dn_float_chair", "x": 642, "y": 300},
+    {"type": "dn_lamp", "x": 372, "y": 1050, "width": 24, "height": 24},
+    {"type": "dn_lamp", "x": 604, "y": 1050, "width": 24, "height": 24},
+    {"type": "vending_machine", "x": 60, "y": 1075},
+    {"type": "vending_machine", "x": 900, "y": 1075},
+    {"type": "dn_lost_luggage", "x": 214, "y": 1062},
+    {"type": "dn_lost_luggage", "x": 812, "y": 462, "noteId": "lobby_elevator"},
+    {"type": "dn_lost_luggage", "x": 760, "y": 726, "noteId": "lobby_lounge"}
+  ],
+  "lamps": [
+    {"x": 500, "y": 850, "lampType": 4, "color": "#ffd49a", "lightRadius": 640, "apply": {"visible": false}},
+    {"x": 500, "y": 236, "lampType": 5, "color": "#ffcf8a", "lightRadius": 420, "angle": 1.5707963267948966},
+    {"x": 500, "y": 612, "lampType": 4, "color": "#ffb060", "lightRadius": 300, "angle": 0, "apply": {"fixture": "tiffany"}},
+    {"x": 341, "y": 771, "lampType": 4, "color": "#ffcc88", "lightRadius": 300, "apply": {"visible": false}},
+    {"x": 659, "y": 771, "lampType": 4, "color": "#ffcc88", "lightRadius": 300, "apply": {"visible": false}},
+    {"x": 500, "y": 1146, "lampType": 5, "color": "#ffd29a", "lightRadius": 380, "angle": -1.5707963267948966}
+  ],
+  "npcs": [
+    {"class": "NPC", "args": [500, 540, "LUVSH4D3", "robot_crimson"]},
+    {"class": "NPC", "args": [150, 320, "Guard Unit Alpha", "robot_gold"]},
+    {"class": "NPC", "args": [850, 320, "Guard Unit Beta", "robot_gold"]}
+  ],
+  "soft_lights": [
+    {"x": 500, "y": 620, "w": 880, "h": 1080, "round": 220, "soft": true, "color": "#ffc890", "intensity": 0.42},
+    {"x": 500, "y": 850, "w": 380, "h": 300, "round": 150, "soft": true, "color": "#ffd9a0", "intensity": 0.3},
+    {"x": 500, "y": 320, "radius": 110, "color": "#e0b0ff", "intensity": 0.35, "flicker": 3},
+    {"x": 500, "y": 600, "radius": 150, "color": "#ffb870", "intensity": 0.7, "flicker": 0},
+    {"x": 341, "y": 771, "radius": 90, "color": "#ffd0a0", "intensity": 0.7, "flicker": 0},
+    {"x": 659, "y": 771, "radius": 90, "color": "#ffd0a0", "intensity": 0.7, "flicker": 0},
+    {"x": 384, "y": 1062, "radius": 110, "color": "#ffd0a0", "intensity": 0.75, "flicker": 0},
+    {"x": 616, "y": 1062, "radius": 110, "color": "#ffd0a0", "intensity": 0.75, "flicker": 0},
+    {"x": 215, "y": 185, "radius": 90, "color": "#c89cff", "intensity": 0.6, "flicker": 4},
+    {"x": 785, "y": 185, "radius": 90, "color": "#c89cff", "intensity": 0.6, "flicker": 4},
+    {"x": 100, "y": 350, "radius": 150, "color": "#ffc070", "intensity": 0.8, "flicker": 0},
+    {"x": 900, "y": 350, "radius": 150, "color": "#ffc070", "intensity": 0.8, "flicker": 0},
+    {"x": 100, "y": 550, "radius": 150, "color": "#ffc070", "intensity": 0.8, "flicker": 0},
+    {"x": 900, "y": 550, "radius": 150, "color": "#ffc070", "intensity": 0.8, "flicker": 0},
+    {"x": 100, "y": 750, "radius": 150, "color": "#ffc070", "intensity": 0.8, "flicker": 0},
+    {"x": 900, "y": 750, "radius": 150, "color": "#ffc070", "intensity": 0.8, "flicker": 0}
+  ]
+}

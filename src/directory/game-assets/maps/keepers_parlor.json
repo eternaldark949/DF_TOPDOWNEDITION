@@ -1,0 +1,15 @@
+{
+  "map_id": "keepers_parlor",
+  "props": [],
+  "lamps": [],
+  "npcs": [],
+  "soft_lights": [
+    {"x": 450, "y": 140, "radius": 420, "color": "#ff8a40", "intensity": 0.45, "flicker": 6},
+    {"x": 500, "y": 290, "radius": 260, "color": "#ff9a60", "intensity": 0.22, "flicker": 4},
+    {"x": 374, "y": 44, "radius": 50, "color": "#ffc080", "intensity": 0.35, "flicker": 4},
+    {"x": 526, "y": 44, "radius": 50, "color": "#ffc080", "intensity": 0.35, "flicker": 4},
+    {"x": 96, "y": 620, "radius": 80, "color": "#ffc080", "intensity": 0.35, "flicker": 4},
+    {"x": 564, "y": 204, "radius": 56, "color": "#ffc080", "intensity": 0.35, "flicker": 4},
+    {"x": 850, "y": 300, "radius": 150, "color": "#8898ff", "intensity": 0.2, "flicker": 0}
+  ]
+}

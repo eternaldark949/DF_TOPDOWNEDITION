@@ -1,0 +1,13 @@
+{
+  "map_id": "keepers_hill",
+  "props": [],
+  "lamps": [],
+  "npcs": [],
+  "soft_lights": [
+    {"x": 900, "y": 1500, "w": 1100, "h": 2500, "round": 275, "soft": true, "color": "#b0c0e8", "intensity": 0.16},
+    {"x": 900, "y": 600, "w": 760, "h": 520, "round": 130, "soft": true, "color": "#ffb070", "intensity": 0.12},
+    {"x": 900, "y": 740, "radius": 150, "color": "#ffc080", "intensity": 0.7, "flicker": 3},
+    {"x": 790, "y": 640, "radius": 80, "color": "#ffb070", "intensity": 0.5, "flicker": 0},
+    {"x": 1010, "y": 640, "radius": 80, "color": "#ffb070", "intensity": 0.5, "flicker": 0}
+  ]
+}

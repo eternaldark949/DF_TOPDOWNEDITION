@@ -13,6 +13,7 @@ import { assetLibrary } from '../basement/physics/index.mjs';
 import playerRules from './game-player-rules.json' with { type: 'json' };
 import definitions from './game-assets/entities.json' with { type: 'json' };
 import streetDefinitions from './game-assets/street-population.json' with { type: 'json' };
+import { createMapLibraries } from './game-maps.mjs';
 import cast from './game-db/cast.json' with { type: 'json' };
 import vehicles from './game-db/vehicles.json' with { type: 'json' };
 import enemies from './game-db/enemies.json' with { type: 'json' };
@@ -52,5 +53,5 @@ export function createGameAssetLibrary({ game_db = { cast, vehicles, enemies, pl
     definition.templates.warden={extends:'gatling_gunner',entity_type:'df_warden',mass:gunner.mass,collision_shape:{shape_type:'circle',radius:30},render_shape:{shape_type:'circle',radius:120},data:{boss:true,health:game_db.enemies.warden.HP,max_health:game_db.enemies.warden.HP,persona:'vesper',squad_id:'sanctum',abilities:{format_version:1,known_ids:['warden_burst','warden_censer','warden_hymn','warden_hook'],equipped_id:null}}};
     for(const persona of ['vesper','matins','compline'])definition.templates[persona]={extends:'warden',entity_type:`df_${persona}`,data:{persona,boss_name:game_db.enemies.wardens[persona].name,formation_order:['vesper','matins','compline'].indexOf(persona)}};
     definition.templates.boss_effect={entity_type:'df_boss_effect',physics_type:'kinematic',ghost:true,mass:1,collision_group:32,collision_mask:0,collision_shape:{shape_type:'circle',radius:1},data:{role:'boss_effect'}};
-    return new assetLibrary({ libraries: [definition, streetDefinitions] });
+    return new assetLibrary({ libraries: [definition, streetDefinitions, ...createMapLibraries()] });
 }

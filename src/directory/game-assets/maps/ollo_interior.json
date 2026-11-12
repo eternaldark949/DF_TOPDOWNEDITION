@@ -1,0 +1,12 @@
+{
+  "map_id": "ollo_interior",
+  "props": [],
+  "lamps": [
+    {"x": 200, "y": 150, "lampType": 4, "color": "#ffac47", "lightRadius": 300},
+    {"x": 600, "y": 150, "lampType": 4, "color": "#ffac47", "lightRadius": 300},
+    {"x": 400, "y": 300, "lampType": 4, "color": "#ff6633", "lightRadius": 350},
+    {"x": 100, "y": 500, "lampType": 3, "color": "#cc2200", "lightRadius": 200},
+    {"x": 700, "y": 500, "lampType": 3, "color": "#cc2200", "lightRadius": 200}
+  ],
+  "npcs": []
+}
