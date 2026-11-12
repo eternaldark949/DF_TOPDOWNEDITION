@@ -19,6 +19,7 @@ export class rigPose{
   }
   this.#install(next);return this;
  }
+ getLocalJoint(id){return clone(this.#local[this.#index(id)]);}
  getLocalPose(){return Object.fromEntries(this.#definition.getJointNames().map((id,i)=>[id,clone(this.#local[i])]));}
  #resolve(){if(!this.#dirty)return;const r=definitionRecord(this.#definition);for(const i of r.order){const joint=r.joints[i],local=matrix(this.#local[i]);this.#resolved[i]=joint.parent===null?local:multiply(this.#resolved[r.index.get(joint.parent)],local);}this.#dirty=false;}
  getJoint(id,{root}={}){this.#resolve();let m=this.#resolved[this.#index(id)];if(root)m=multiply(matrix(transform(root)),m);return describe(m);}

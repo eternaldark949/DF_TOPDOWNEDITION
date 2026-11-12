@@ -1,6 +1,7 @@
 // ===== LV2 DIRECTORY =====
-// The engine's data layer: the registry, data structures and loading. See README.md.
+// The engine's data layer: the registry, data structures, loading and default libraries. See README.md.
 export { assetLibrary, mergeDefinition } from './registry.mjs';
 export { identifier, nonnegative, jsonCopy } from './values.mjs';
-export { STRUCTURES, validatePropCatalog, validateMapLayout } from './structures.mjs';
+export { STRUCTURES, validatePropCatalog, validateMapLayout, validateSkeleton, validateClipSet, validateLocomotion, validateFigure, validateLibrary } from './structures.mjs';
+export { ENGINE_LIBRARIES, createEngineRegistry } from './defaults/index.mjs';
 export { resolvePlacement, resolveLayout, isMovable } from './loading.mjs';

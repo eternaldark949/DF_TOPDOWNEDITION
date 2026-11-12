@@ -1,0 +1,691 @@
+{
+ "library_id": "engine",
+ "description": "The engine's default library: base entity kinds and a default humanoid. Any game may start from it, extend it or replace it.",
+ "resources": {
+  "humanoid_skeleton": {
+   "kind": "skeleton",
+   "rig_id": "engine:humanoid",
+   "joints": [
+    {
+     "name": "root"
+    },
+    {
+     "name": "pelvis",
+     "parent": "root",
+     "position": [
+      -1,
+      0
+     ]
+    },
+    {
+     "name": "torso",
+     "parent": "root"
+    },
+    {
+     "name": "head",
+     "parent": "torso",
+     "position": [
+      1,
+      0
+     ],
+     "limits": {
+      "min_rotation": -1.3,
+      "max_rotation": 1.3
+     }
+    },
+    {
+     "name": "shoulder_l",
+     "parent": "torso",
+     "position": [
+      0,
+      -11
+     ]
+    },
+    {
+     "name": "elbow_l",
+     "parent": "shoulder_l",
+     "position": [
+      3,
+      -3
+     ]
+    },
+    {
+     "name": "hand_l",
+     "parent": "elbow_l",
+     "position": [
+      7,
+      4
+     ]
+    },
+    {
+     "name": "hip_l",
+     "parent": "pelvis",
+     "position": [
+      0,
+      -5
+     ]
+    },
+    {
+     "name": "knee_l",
+     "parent": "hip_l",
+     "position": [
+      2,
+      0
+     ]
+    },
+    {
+     "name": "foot_l",
+     "parent": "knee_l",
+     "position": [
+      2,
+      0
+     ]
+    },
+    {
+     "name": "shoulder_r",
+     "parent": "torso",
+     "position": [
+      0,
+      11
+     ]
+    },
+    {
+     "name": "elbow_r",
+     "parent": "shoulder_r",
+     "position": [
+      3,
+      3
+     ]
+    },
+    {
+     "name": "hand_r",
+     "parent": "elbow_r",
+     "position": [
+      7,
+      -4
+     ]
+    },
+    {
+     "name": "hip_r",
+     "parent": "pelvis",
+     "position": [
+      0,
+      5
+     ]
+    },
+    {
+     "name": "knee_r",
+     "parent": "hip_r",
+     "position": [
+      2,
+      0
+     ]
+    },
+    {
+     "name": "foot_r",
+     "parent": "knee_r",
+     "position": [
+      2,
+      0
+     ]
+    }
+   ],
+   "anchors": {
+    "hand_l": {
+     "joint": "hand_l"
+    },
+    "hand_r": {
+     "joint": "hand_r"
+    },
+    "head": {
+     "joint": "head"
+    },
+    "back": {
+     "joint": "torso",
+     "position": [
+      -8,
+      0
+     ]
+    },
+    "seat": {
+     "joint": "pelvis"
+    }
+   }
+  },
+  "humanoid_clips": {
+   "kind": "clip_set",
+   "clips": [
+    {
+     "clip_id": "idle",
+     "duration": 2,
+     "tracks": [
+      {
+       "joint": "head",
+       "channel": "position",
+       "keys": [
+        {
+         "time": 0,
+         "value": [
+          1,
+          0
+         ]
+        },
+        {
+         "time": 1,
+         "value": [
+          1.25,
+          0
+         ]
+        },
+        {
+         "time": 2,
+         "value": [
+          1,
+          0
+         ]
+        }
+       ]
+      },
+      {
+       "joint": "torso",
+       "channel": "scale",
+       "keys": [
+        {
+         "time": 0,
+         "value": [
+          1,
+          1
+         ]
+        },
+        {
+         "time": 1,
+         "value": [
+          1,
+          1.02
+         ]
+        },
+        {
+         "time": 2,
+         "value": [
+          1,
+          1
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "clip_id": "walk",
+     "duration": 1,
+     "tracks": [
+      {
+       "joint": "knee_l",
+       "channel": "position",
+       "keys": [
+        {
+         "time": 0,
+         "value": [
+          2,
+          0
+         ]
+        },
+        {
+         "time": 0.25,
+         "value": [
+          5,
+          0
+         ]
+        },
+        {
+         "time": 0.5,
+         "value": [
+          2,
+          0
+         ]
+        },
+        {
+         "time": 0.75,
+         "value": [
+          -1,
+          0
+         ]
+        },
+        {
+         "time": 1,
+         "value": [
+          2,
+          0
+         ]
+        }
+       ]
+      },
+      {
+       "joint": "foot_l",
+       "channel": "position",
+       "keys": [
+        {
+         "time": 0,
+         "value": [
+          2,
+          0
+         ]
+        },
+        {
+         "time": 0.25,
+         "value": [
+          5,
+          0
+         ]
+        },
+        {
+         "time": 0.5,
+         "value": [
+          2,
+          0
+         ]
+        },
+        {
+         "time": 0.75,
+         "value": [
+          -1,
+          0
+         ]
+        },
+        {
+         "time": 1,
+         "value": [
+          2,
+          0
+         ]
+        }
+       ]
+      },
+      {
+       "joint": "hand_l",
+       "channel": "position",
+       "keys": [
+        {
+         "time": 0,
+         "value": [
+          7,
+          -4
+         ]
+        },
+        {
+         "time": 0.25,
+         "value": [
+          5,
+          -4
+         ]
+        },
+        {
+         "time": 0.5,
+         "value": [
+          7,
+          -4
+         ]
+        },
+        {
+         "time": 0.75,
+         "value": [
+          9,
+          -4
+         ]
+        },
+        {
+         "time": 1,
+         "value": [
+          7,
+          -4
+         ]
+        }
+       ]
+      },
+      {
+       "joint": "knee_r",
+       "channel": "position",
+       "keys": [
+        {
+         "time": 0,
+         "value": [
+          2,
+          0
+         ]
+        },
+        {
+         "time": 0.25,
+         "value": [
+          -1,
+          0
+         ]
+        },
+        {
+         "time": 0.5,
+         "value": [
+          2,
+          0
+         ]
+        },
+        {
+         "time": 0.75,
+         "value": [
+          5,
+          0
+         ]
+        },
+        {
+         "time": 1,
+         "value": [
+          2,
+          0
+         ]
+        }
+       ]
+      },
+      {
+       "joint": "foot_r",
+       "channel": "position",
+       "keys": [
+        {
+         "time": 0,
+         "value": [
+          2,
+          0
+         ]
+        },
+        {
+         "time": 0.25,
+         "value": [
+          -1,
+          0
+         ]
+        },
+        {
+         "time": 0.5,
+         "value": [
+          2,
+          0
+         ]
+        },
+        {
+         "time": 0.75,
+         "value": [
+          5,
+          0
+         ]
+        },
+        {
+         "time": 1,
+         "value": [
+          2,
+          0
+         ]
+        }
+       ]
+      },
+      {
+       "joint": "hand_r",
+       "channel": "position",
+       "keys": [
+        {
+         "time": 0,
+         "value": [
+          7,
+          4
+         ]
+        },
+        {
+         "time": 0.25,
+         "value": [
+          9,
+          4
+         ]
+        },
+        {
+         "time": 0.5,
+         "value": [
+          7,
+          4
+         ]
+        },
+        {
+         "time": 0.75,
+         "value": [
+          5,
+          4
+         ]
+        },
+        {
+         "time": 1,
+         "value": [
+          7,
+          4
+         ]
+        }
+       ]
+      },
+      {
+       "joint": "torso",
+       "channel": "rotation",
+       "keys": [
+        {
+         "time": 0,
+         "value": 0
+        },
+        {
+         "time": 0.25,
+         "value": 0.045
+        },
+        {
+         "time": 0.5,
+         "value": 0
+        },
+        {
+         "time": 0.75,
+         "value": -0.045
+        },
+        {
+         "time": 1,
+         "value": 0
+        }
+       ]
+      }
+     ],
+     "markers": [
+      {
+       "name": "footstep_l",
+       "time": 0.25
+      },
+      {
+       "name": "footstep_r",
+       "time": 0.75
+      }
+     ]
+    }
+   ]
+  },
+  "humanoid_locomotion": {
+   "kind": "locomotion",
+   "idle": "idle",
+   "walk": "walk",
+   "stride": 36,
+   "moving_speed": 4
+  },
+  "humanoid_figure": {
+   "kind": "figure",
+   "parts": [
+    {
+     "part": "foot_l",
+     "shape": "ellipse",
+     "joint": "foot_l",
+     "radii": [
+      3.5,
+      2.2
+     ]
+    },
+    {
+     "part": "foot_r",
+     "shape": "ellipse",
+     "joint": "foot_r",
+     "radii": [
+      3.5,
+      2.2
+     ]
+    },
+    {
+     "part": "upper_arm_l",
+     "shape": "capsule",
+     "joint": "shoulder_l",
+     "to": "elbow_l",
+     "radius": 3.2
+    },
+    {
+     "part": "forearm_l",
+     "shape": "capsule",
+     "joint": "elbow_l",
+     "to": "hand_l",
+     "radius": 2.6
+    },
+    {
+     "part": "hand_l",
+     "shape": "circle",
+     "joint": "hand_l",
+     "radius": 2.2
+    },
+    {
+     "part": "upper_arm_r",
+     "shape": "capsule",
+     "joint": "shoulder_r",
+     "to": "elbow_r",
+     "radius": 3.2
+    },
+    {
+     "part": "forearm_r",
+     "shape": "capsule",
+     "joint": "elbow_r",
+     "to": "hand_r",
+     "radius": 2.6
+    },
+    {
+     "part": "hand_r",
+     "shape": "circle",
+     "joint": "hand_r",
+     "radius": 2.2
+    },
+    {
+     "part": "torso",
+     "shape": "ellipse",
+     "joint": "torso",
+     "radii": [
+      7,
+      12
+     ]
+    },
+    {
+     "part": "head",
+     "shape": "circle",
+     "joint": "head",
+     "radius": 6.5
+    }
+   ]
+  }
+ },
+ "templates": {
+  "entity": {
+   "entity_type": "entity",
+   "tags": [],
+   "assets": {},
+   "data": {}
+  },
+  "character": {
+   "extends": "entity",
+   "entity_type": "character",
+   "physics_type": "character",
+   "collision_group": 2,
+   "collision_mask": 2147483647,
+   "collision_shape": {
+    "shape_type": "circle",
+    "radius": 12
+   },
+   "mass": 15,
+   "movement": {
+    "max_speed": 180,
+    "acceleration": 900,
+    "braking": 1200,
+    "arrival_distance": 2
+   }
+  },
+  "prop": {
+   "extends": "entity",
+   "entity_type": "prop",
+   "physics_type": "rigid",
+   "collision_group": 8,
+   "collision_mask": 2147483647,
+   "collision_shape": {
+    "shape_type": "box",
+    "dimensions": [
+     20,
+     20
+    ]
+   },
+   "mass": 5
+  },
+  "static": {
+   "extends": "entity",
+   "entity_type": "static",
+   "physics_type": "static",
+   "collision_group": 1,
+   "collision_mask": 2147483647,
+   "collision_shape": {
+    "shape_type": "box",
+    "dimensions": [
+     100,
+     10
+    ]
+   }
+  },
+  "trigger": {
+   "extends": "entity",
+   "entity_type": "trigger",
+   "physics_type": "static",
+   "ghost": true,
+   "collision_group": 32,
+   "collision_mask": 14,
+   "collision_shape": {
+    "shape_type": "box",
+    "dimensions": [
+     40,
+     40
+    ]
+   }
+  },
+  "decoration": {
+   "extends": "entity",
+   "entity_type": "decoration",
+   "physics_type": "static",
+   "collision_group": 0,
+   "collision_mask": 0,
+   "query_mask": 0,
+   "collision_shape": {
+    "shape_type": "box",
+    "dimensions": [
+     20,
+     20
+    ]
+   }
+  },
+  "humanoid": {
+   "extends": "character",
+   "tags": [
+    "humanoid"
+   ],
+   "assets": {
+    "skeleton": "humanoid_skeleton",
+    "clips": "humanoid_clips",
+    "locomotion": "humanoid_locomotion",
+    "figure": "humanoid_figure"
+   }
+  }
+ }
+}

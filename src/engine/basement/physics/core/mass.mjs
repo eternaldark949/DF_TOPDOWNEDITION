@@ -50,7 +50,10 @@ export function setCenterVelocity(r, velocity) {
     if (r.config.axis_lock.y) r.velocity[1] = 0;
 }
 export function changeAngularSpeed(r, delta) {
+    if (!delta) return;
     const velocity = centerVelocity(r); r.angular_velocity += delta; setCenterVelocity(r, velocity);
+    // A turn wakes the body, as a push does: a joint's spin is otherwise lost on a sleeping body.
+    r.sleeping = false; r.sleep_time = 0;
 }
 export function rotateAtCenter(r, delta) {
     const center = massCenter(r), velocity = centerVelocity(r);

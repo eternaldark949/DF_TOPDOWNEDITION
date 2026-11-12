@@ -28,3 +28,4 @@ export {rigPose} from './animation/rig-pose.mjs';
 export {animationClip} from './animation/animation-clip.mjs';
 export {animationController} from './animation/animation-controller.mjs';
 export {rigSystem} from './animation/rig-system.mjs';
+export {IK_SOLVERS,ikGoal,solveIk} from './animation/ik.mjs';

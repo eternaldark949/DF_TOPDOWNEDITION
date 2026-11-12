@@ -3,9 +3,10 @@ import {clone,number} from '../core/values.mjs';
 import {rigPose} from './rig-pose.mjs';
 import {animationClip,clipRecord} from './animation-clip.mjs';
 import {name,fields,blendTransform} from './values.mjs';
-/** Evaluates clips and procedural overlays. Owned rigs are advanced only by their world. */
+import {ikGoal,solveIk} from './ik.mjs';
+/** Evaluates clips, procedural overlays, then IK goals. Owned rigs are advanced only by their world. */
 export class animationController {
-    #pose;#clips=new Map();#layers=new Map();#overlay={};#paused=false;#guard;#authority;#rest;#revision=0;#rootGuard;
+    #pose;#clips=new Map();#layers=new Map();#overlay={};#goals=new Map();#root=null;#physical=null;#animated=null;#paused=false;#guard;#authority;#rest;#revision=0;#rootGuard;
     constructor({definition,clips=[],guard=()=>{},authority,root_motion_guard=()=>{}}={}){
         this.#pose=new rigPose(definition);this.#rest=this.#pose.getLocalPose();this.#guard=guard;this.#authority=authority;this.#rootGuard=root_motion_guard;
         for(const clip of clips)this.addClip(clip);
@@ -39,6 +40,19 @@ export class animationController {
     setProceduralPose(pose={}){
         this.#guard();const trial=new rigPose(this.definition);trial.setPose(pose);this.#overlay=clone(pose);this.#evaluate();return this;
     }
+    /** Sets or replaces an IK goal; goals solve in the order they were first set, after clips and the procedural pose. */
+    setIkGoal(goal_id,packet){this.#guard();name(goal_id);this.#goals.set(goal_id,ikGoal(this.definition,packet));this.#evaluate();return this;}
+    /** Changes a goal's target (and optionally weight) without re-sending the rest. */
+    moveIkGoal(goal_id,target,{weight}={}){this.#guard();const goal=this.#goals.get(name(goal_id));if(!goal)throw new TypeError('Unknown IK goal');return this.setIkGoal(goal_id,{...goal,target,...(weight===undefined?{}:{weight})});}
+    removeIkGoal(goal_id){this.#guard();if(this.#goals.delete(name(goal_id)))this.#evaluate();return this;}
+    getIkGoals(){return Object.fromEntries([...this.#goals].map(([id,goal])=>[id,clone(goal)]));}
+    /** The world pose world-space goals are solved against. Only the owning world sets it for an owned rig. */
+    _setRoot(root,authority){if(this.#authority!==undefined&&authority!==this.#authority)throw new Error('Only the owning world may place this rig');const changed=JSON.stringify(root)!==JSON.stringify(this.#root);this.#root=root?clone(root):null;if(changed&&[...this.#goals.values()].some(goal=>goal.space==='world'))this.#evaluate();}
+    /** Local rotations a world's physical chain measured; they override the animated pose for those joints. */
+    _setPhysicalPose(locals,authority){if(this.#authority!==undefined&&authority!==this.#authority)throw new Error('Only the owning world may drive this rig physically');this.#physical=locals&&Object.keys(locals).length?clone(locals):null;this.#evaluate();}
+    /** The pose before physical chains: clips, procedural pose and IK. What a chain's joints are driven toward. */
+    getAnimatedJoint(id,options){return (this.#animated??this.#pose).getJoint(id,options);}
+    getAnimatedPose(){return (this.#animated??this.#pose).getLocalPose();}
     #sampleLayer(state){
         const target=this.#clips.get(state.clip_id).sample(state.time),t=state.fade?Math.min(1,state.fade_age/state.fade):1;
         if(!state.from_pose||t===1)return target;
@@ -53,7 +67,9 @@ export class animationController {
     #evaluate(){
         this.#pose.resetPose();
         for(const state of this.#layers.values())this.#pose.setPose(this.#sampleLayer(state),{weight:state.weight,mask:state.mask,additive:state.additive});
-        this.#pose.setPose(this.#overlay);this.#revision++;
+        this.#pose.setPose(this.#overlay);if(this.#goals.size)solveIk(this.#pose,this.#goals.values(),{root:this.#root});
+        if(this.#physical){(this.#animated??=new rigPose(this.definition)).setPose(this.#pose.getLocalPose());this.#pose.setPose(Object.fromEntries(Object.entries(this.#physical).map(([id,rotation])=>[id,{rotation}])));}else this.#animated=null;
+        this.#revision++;
     }
     advance(seconds,{distance=0}={},authority){
         this.#guard();if(this.#authority!==undefined&&authority!==this.#authority)throw new Error('Only the owning world may advance this rig');
@@ -86,9 +102,9 @@ export class animationController {
     getAnchor(id,options){return this.#pose.getAnchor(id,options);}
     getPose(){return this.#pose.getLocalPose();}
     getState(){return {paused:this.#paused,layer_order:[...this.#layers.keys()],layers:Object.fromEntries([...this.#layers].map(([key,state])=>[key,clone(state)]))};}
-    getSnapshot(){return {format_version:1,definition:this.definition.toJSON(),clips:[...this.#clips.values()].map(clip=>clip.toJSON()),...this.getState(),procedural_pose:clone(this.#overlay)};}
+    getSnapshot(){return {format_version:1,definition:this.definition.toJSON(),clips:[...this.#clips.values()].map(clip=>clip.toJSON()),...this.getState(),procedural_pose:clone(this.#overlay),ik_goals:this.getIkGoals()};}
     load(snapshot){
-        this.#guard();fields(snapshot,['format_version','definition','clips','paused','layers','layer_order','procedural_pose']);
+        this.#guard();fields(snapshot,['format_version','definition','clips','paused','layers','layer_order','procedural_pose','ik_goals']);
         if(snapshot.format_version!==1||typeof snapshot.paused!=='boolean'||!snapshot.layers||typeof snapshot.layers!=='object'||Array.isArray(snapshot.layers))throw new TypeError('Invalid animation snapshot');
         if(this.#authority!==undefined&&JSON.stringify(snapshot.definition)!==JSON.stringify(this.definition.toJSON()))throw new TypeError('Cannot replace an owned rig definition');
         const trial=new animationController({definition:snapshot.definition,clips:snapshot.clips});
@@ -102,8 +118,9 @@ export class animationController {
             if(state.from_pose!==null){const pose=new rigPose(trial.definition);pose.setPose(state.from_pose);}
             trial.#layers.set(layer,clone(state));
         }
+        if(snapshot.ik_goals!==undefined){fields(snapshot.ik_goals,Object.keys(snapshot.ik_goals));for(const [id,goal] of Object.entries(snapshot.ik_goals))trial.#goals.set(name(id),ikGoal(trial.definition,goal));}
         trial.setProceduralPose(snapshot.procedural_pose);trial.#paused=snapshot.paused;trial.#evaluate();
         if(trial.#layers.get('base')?.root_motion)this.#rootGuard();
-        this.#pose=trial.#pose;this.#rest=trial.#rest;this.#clips=trial.#clips;this.#layers=trial.#layers;this.#overlay=trial.#overlay;this.#paused=trial.#paused;this.#revision++;return this;
+        this.#pose=trial.#pose;this.#rest=trial.#rest;this.#clips=trial.#clips;this.#layers=trial.#layers;this.#overlay=trial.#overlay;this.#goals=trial.#goals;this.#evaluate();this.#paused=trial.#paused;this.#revision++;return this;
     }
 }

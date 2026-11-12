@@ -1,5 +1,12 @@
 # Changelog
 
+## IK, physical chains and rigid pins — 2026-11-12
+
+- Rigs solve inverse kinematics: `setIkGoal` with the `two_bone`, `chain` and `look_at` solvers, in rig or world space, after clips and the procedural pose, saved with the rig. `ikGoal` and `solveIk` work on a bare `rigPose`.
+- `rigSystem.createPhysicalChain` makes a run of joints into hinged capsule bodies that servo toward the animated pose and write the measured angles back into the rig. They follow, lag, trail and take hits, and save with the world.
+- Hinges and attachments are now rigid pins, solved on both axes at once. Before, the pin was a soft one-axis spring, and a body hinged at one end lost most of each turn to the position correction. `damping` now applies only to distance, spring and drag joints.
+- An angular impulse wakes a sleeping body, as a linear one already did.
+
 ## Hinge springs and pivoting contacts — 2026-11-12
 
 - Hinge constraints take `spring_stiffness` and `spring_damping`: an angular acceleration toward `target_rotation`, independent of the body's inertia. A self-closing door is a hinge with a spring.

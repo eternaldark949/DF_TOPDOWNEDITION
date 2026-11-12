@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '029a990f1b27';
+        const DFAB_BUILD = 'e2d6d94cba12';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="12660">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="13034">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -9563,7 +9563,10 @@ function setCenterVelocity(r, velocity) {
     if (r.config.axis_lock.y) r.velocity[1] = 0;
 }
 function changeAngularSpeed(r, delta) {
+    if (!delta) return;
     const velocity = centerVelocity(r); r.angular_velocity += delta; setCenterVelocity(r, velocity);
+    // A turn wakes the body, as a push does: a joint's spin is otherwise lost on a sleeping body.
+    r.sleeping = false; r.sleep_time = 0;
 }
 function rotateAtCenter(r, delta) {
     const center = massCenter(r), velocity = centerVelocity(r);
@@ -10321,6 +10324,7 @@ class rigPose{
   }
   this.#install(next);return this;
  }
+ getLocalJoint(id){return clone(this.#local[this.#index(id)]);}
  getLocalPose(){return Object.fromEntries(this.#definition.getJointNames().map((id,i)=>[id,clone(this.#local[i])]));}
  #resolve(){if(!this.#dirty)return;const r=definitionRecord(this.#definition);for(const i of r.order){const joint=r.joints[i],local=matrix(this.#local[i]);this.#resolved[i]=joint.parent===null?local:multiply(this.#resolved[r.index.get(joint.parent)],local);}this.#dirty=false;}
  getJoint(id,{root}={}){this.#resolve();let m=this.#resolved[this.#index(id)];if(root)m=multiply(matrix(transform(root)),m);return describe(m);}
@@ -10412,6 +10416,80 @@ const clipRecord=clip=>{const r=records.get(clip);if(!r)throw new TypeError('Exp
 
 return Object.freeze({get animationClip(){return animationClip;},get clipRecord(){return clipRecord;}});
 })();
+// src/engine/basement/physics/animation/ik.mjs
+const m16 = (()=>{
+// ===== LV0 BASEMENT =====
+const {number,vector,clone,angleDelta} = m7;
+const {definitionRecord} = m13;
+const {name,fields,inverse,matrix,transform} = m14;
+/**
+ * Inverse kinematics on a rigPose, in rig space. Each solver turns joints' local rotations so an
+ * end reaches or faces a target; joint limits still clamp the result. Pure: no bodies, no clock.
+ *  two_bone  joints [root, mid, end]   analytic reach, bend +1 or -1 picks the elbow side
+ *  chain     joints [j0, …, end]       cyclic coordinate descent, any length
+ *  look_at   joints [joint]            turns one joint's forward (+x, plus aim_offset) to the target
+ */
+const IK_SOLVERS=Object.freeze(['two_bone','chain','look_at']);
+const GOAL_FIELDS=['solver','joints','target','space','weight','bend','aim_offset','max_angle','iterations','tolerance'];
+const det=m=>m[0]*m[3]-m[1]*m[2];
+/** Validates a goal against a definition and returns a detached, normalised copy. */
+function ikGoal(definition,packet){
+    fields(packet,GOAL_FIELDS);const r=definitionRecord(definition),solver=packet.solver;
+    if(!IK_SOLVERS.includes(solver))throw new TypeError('Unknown IK solver');
+    if(!Array.isArray(packet.joints))throw new TypeError('IK joints must be a list');
+    const joints=packet.joints.map(name),size={two_bone:3,look_at:1}[solver];
+    if(size?joints.length!==size:joints.length<2||joints.length>64)throw new TypeError(`The ${solver} solver takes ${size??'2..64'} joints`);
+    for(const id of joints)if(!r.index.has(id))throw new TypeError('Unknown IK joint');
+    const ancestor=(upper,lower)=>{for(let at=r.joints[r.index.get(lower)].parent;at!==null;at=r.joints[r.index.get(at)].parent)if(at===upper)return true;return false;};
+    for(let i=1;i<joints.length;i++)if(!ancestor(joints[i-1],joints[i]))throw new TypeError('Each IK joint must descend from the one before it');
+    const space=packet.space??'rig';if(space!=='rig'&&space!=='world')throw new TypeError('IK space is rig or world');
+    const bend=packet.bend??1;if(bend!==1&&bend!==-1)throw new TypeError('IK bend is 1 or -1');
+    return {solver,joints,target:vector(packet.target,'IK target'),space,weight:number(packet.weight??1,'IK weight',0,1),bend,
+        aim_offset:number(packet.aim_offset??0,'IK aim offset'),max_angle:number(packet.max_angle??Math.PI,'IK max angle',0,Math.PI),
+        iterations:number(packet.iterations??12,'IK iterations',1,64),tolerance:number(packet.tolerance??.01,'IK tolerance',0)};
+}
+/** Turns `id` so its subtree rotates by `delta` in rig space. A mirrored parent flips the local sense. */
+function turn(pose,id,delta){
+    if(!delta)return;const local=pose.getLocalJoint(id),parent=det(pose.getJoint(id).matrix)*det(matrix(local));
+    pose.setJoint(id,{rotation:local.rotation+(parent<0?-delta:delta)});
+}
+const at=(pose,id)=>pose.getJoint(id).position;
+const heading=(from,to)=>Math.atan2(to[1]-from[1],to[0]-from[0]);
+/** Analytic, then refined: under a non-uniformly scaled parent a bone's length depends on its angle, so the closed form is re-run until the end stops moving. */
+function twoBone(pose,joints,target,goal){
+    for(let pass=0;pass<4;pass++){const before=at(pose,joints[2]);twoBonePass(pose,joints,target,goal);const after=at(pose,joints[2]);if(Math.hypot(after[0]-before[0],after[1]-before[1])<1e-9||goal.weight<1)break;}
+}
+function twoBonePass(pose,[root,mid,end],target,{bend,weight}){
+    const a=at(pose,root),b=at(pose,mid),c=at(pose,end),upper=Math.hypot(b[0]-a[0],b[1]-a[1]),lower=Math.hypot(c[0]-b[0],c[1]-b[1]);
+    if(upper<1e-9||lower<1e-9)return;
+    const reach=Math.min(upper+lower,Math.max(Math.abs(upper-lower)+1e-9,Math.hypot(target[0]-a[0],target[1]-a[1])));
+    const opening=Math.acos(Math.max(-1,Math.min(1,(upper*upper+reach*reach-lower*lower)/(2*upper*reach))));
+    turn(pose,root,weight*angleDelta(heading(a,b),heading(a,target)-bend*opening));
+    turn(pose,mid,weight*angleDelta(heading(at(pose,mid),at(pose,end)),heading(at(pose,mid),target)));
+}
+function chain(pose,joints,target,{weight,iterations,tolerance}){
+    const end=joints.at(-1),start=clone(pose.getLocalPose()),miss=()=>{const e=at(pose,end);return Math.hypot(e[0]-target[0],e[1]-target[1]);};
+    for(let pass=0;pass<iterations&&miss()>tolerance;pass++)for(let i=joints.length-2;i>=0;i--){const p=at(pose,joints[i]);turn(pose,joints[i],angleDelta(heading(p,at(pose,end)),heading(p,target)));}
+    if(weight<1){const solved=pose.getLocalPose();pose.setPose(Object.fromEntries(joints.map(id=>[id,start[id]])));pose.setPose(Object.fromEntries(joints.map(id=>[id,{rotation:solved[id].rotation}])),{weight});}
+}
+function lookAt(pose,[id],target,{aim_offset,max_angle,weight}){
+    const joint=pose.getJoint(id),wanted=angleDelta(joint.rotation+aim_offset,heading(joint.position,target));
+    turn(pose,id,weight*Math.max(-max_angle,Math.min(max_angle,wanted)));
+}
+const SOLVE={two_bone:twoBone,chain,look_at:lookAt};
+/** Applies goals in order. `root` ({position, rotation}) maps world-space targets into rig space. */
+function solveIk(pose,goals,{root=null}={}){
+    const toRig=root?inverse(matrix(transform(root))):null;
+    for(const goal of goals){
+        if(!goal.weight)continue;let target=goal.target;
+        if(goal.space==='world'&&toRig)target=[toRig[0]*target[0]+toRig[2]*target[1]+toRig[4],toRig[1]*target[0]+toRig[3]*target[1]+toRig[5]];
+        SOLVE[goal.solver](pose,goal.joints,target,goal);
+    }
+    return pose;
+}
+
+return Object.freeze({get IK_SOLVERS(){return IK_SOLVERS;},get ikGoal(){return ikGoal;},get solveIk(){return solveIk;}});
+})();
 // src/engine/basement/physics/animation/animation-controller.mjs
 const m11 = (()=>{
 // ===== LV0 BASEMENT =====
@@ -10419,9 +10497,10 @@ const {clone,number} = m7;
 const {rigPose} = m12;
 const {animationClip,clipRecord} = m15;
 const {name,fields,blendTransform} = m14;
-/** Evaluates clips and procedural overlays. Owned rigs are advanced only by their world. */
+const {ikGoal,solveIk} = m16;
+/** Evaluates clips, procedural overlays, then IK goals. Owned rigs are advanced only by their world. */
 class animationController {
-    #pose;#clips=new Map();#layers=new Map();#overlay={};#paused=false;#guard;#authority;#rest;#revision=0;#rootGuard;
+    #pose;#clips=new Map();#layers=new Map();#overlay={};#goals=new Map();#root=null;#physical=null;#animated=null;#paused=false;#guard;#authority;#rest;#revision=0;#rootGuard;
     constructor({definition,clips=[],guard=()=>{},authority,root_motion_guard=()=>{}}={}){
         this.#pose=new rigPose(definition);this.#rest=this.#pose.getLocalPose();this.#guard=guard;this.#authority=authority;this.#rootGuard=root_motion_guard;
         for(const clip of clips)this.addClip(clip);
@@ -10455,6 +10534,19 @@ class animationController {
     setProceduralPose(pose={}){
         this.#guard();const trial=new rigPose(this.definition);trial.setPose(pose);this.#overlay=clone(pose);this.#evaluate();return this;
     }
+    /** Sets or replaces an IK goal; goals solve in the order they were first set, after clips and the procedural pose. */
+    setIkGoal(goal_id,packet){this.#guard();name(goal_id);this.#goals.set(goal_id,ikGoal(this.definition,packet));this.#evaluate();return this;}
+    /** Changes a goal's target (and optionally weight) without re-sending the rest. */
+    moveIkGoal(goal_id,target,{weight}={}){this.#guard();const goal=this.#goals.get(name(goal_id));if(!goal)throw new TypeError('Unknown IK goal');return this.setIkGoal(goal_id,{...goal,target,...(weight===undefined?{}:{weight})});}
+    removeIkGoal(goal_id){this.#guard();if(this.#goals.delete(name(goal_id)))this.#evaluate();return this;}
+    getIkGoals(){return Object.fromEntries([...this.#goals].map(([id,goal])=>[id,clone(goal)]));}
+    /** The world pose world-space goals are solved against. Only the owning world sets it for an owned rig. */
+    _setRoot(root,authority){if(this.#authority!==undefined&&authority!==this.#authority)throw new Error('Only the owning world may place this rig');const changed=JSON.stringify(root)!==JSON.stringify(this.#root);this.#root=root?clone(root):null;if(changed&&[...this.#goals.values()].some(goal=>goal.space==='world'))this.#evaluate();}
+    /** Local rotations a world's physical chain measured; they override the animated pose for those joints. */
+    _setPhysicalPose(locals,authority){if(this.#authority!==undefined&&authority!==this.#authority)throw new Error('Only the owning world may drive this rig physically');this.#physical=locals&&Object.keys(locals).length?clone(locals):null;this.#evaluate();}
+    /** The pose before physical chains: clips, procedural pose and IK. What a chain's joints are driven toward. */
+    getAnimatedJoint(id,options){return (this.#animated??this.#pose).getJoint(id,options);}
+    getAnimatedPose(){return (this.#animated??this.#pose).getLocalPose();}
     #sampleLayer(state){
         const target=this.#clips.get(state.clip_id).sample(state.time),t=state.fade?Math.min(1,state.fade_age/state.fade):1;
         if(!state.from_pose||t===1)return target;
@@ -10469,7 +10561,9 @@ class animationController {
     #evaluate(){
         this.#pose.resetPose();
         for(const state of this.#layers.values())this.#pose.setPose(this.#sampleLayer(state),{weight:state.weight,mask:state.mask,additive:state.additive});
-        this.#pose.setPose(this.#overlay);this.#revision++;
+        this.#pose.setPose(this.#overlay);if(this.#goals.size)solveIk(this.#pose,this.#goals.values(),{root:this.#root});
+        if(this.#physical){(this.#animated??=new rigPose(this.definition)).setPose(this.#pose.getLocalPose());this.#pose.setPose(Object.fromEntries(Object.entries(this.#physical).map(([id,rotation])=>[id,{rotation}])));}else this.#animated=null;
+        this.#revision++;
     }
     advance(seconds,{distance=0}={},authority){
         this.#guard();if(this.#authority!==undefined&&authority!==this.#authority)throw new Error('Only the owning world may advance this rig');
@@ -10502,9 +10596,9 @@ class animationController {
     getAnchor(id,options){return this.#pose.getAnchor(id,options);}
     getPose(){return this.#pose.getLocalPose();}
     getState(){return {paused:this.#paused,layer_order:[...this.#layers.keys()],layers:Object.fromEntries([...this.#layers].map(([key,state])=>[key,clone(state)]))};}
-    getSnapshot(){return {format_version:1,definition:this.definition.toJSON(),clips:[...this.#clips.values()].map(clip=>clip.toJSON()),...this.getState(),procedural_pose:clone(this.#overlay)};}
+    getSnapshot(){return {format_version:1,definition:this.definition.toJSON(),clips:[...this.#clips.values()].map(clip=>clip.toJSON()),...this.getState(),procedural_pose:clone(this.#overlay),ik_goals:this.getIkGoals()};}
     load(snapshot){
-        this.#guard();fields(snapshot,['format_version','definition','clips','paused','layers','layer_order','procedural_pose']);
+        this.#guard();fields(snapshot,['format_version','definition','clips','paused','layers','layer_order','procedural_pose','ik_goals']);
         if(snapshot.format_version!==1||typeof snapshot.paused!=='boolean'||!snapshot.layers||typeof snapshot.layers!=='object'||Array.isArray(snapshot.layers))throw new TypeError('Invalid animation snapshot');
         if(this.#authority!==undefined&&JSON.stringify(snapshot.definition)!==JSON.stringify(this.definition.toJSON()))throw new TypeError('Cannot replace an owned rig definition');
         const trial=new animationController({definition:snapshot.definition,clips:snapshot.clips});
@@ -10518,13 +10612,94 @@ class animationController {
             if(state.from_pose!==null){const pose=new rigPose(trial.definition);pose.setPose(state.from_pose);}
             trial.#layers.set(layer,clone(state));
         }
+        if(snapshot.ik_goals!==undefined){fields(snapshot.ik_goals,Object.keys(snapshot.ik_goals));for(const [id,goal] of Object.entries(snapshot.ik_goals))trial.#goals.set(name(id),ikGoal(trial.definition,goal));}
         trial.setProceduralPose(snapshot.procedural_pose);trial.#paused=snapshot.paused;trial.#evaluate();
         if(trial.#layers.get('base')?.root_motion)this.#rootGuard();
-        this.#pose=trial.#pose;this.#rest=trial.#rest;this.#clips=trial.#clips;this.#layers=trial.#layers;this.#overlay=trial.#overlay;this.#paused=trial.#paused;this.#revision++;return this;
+        this.#pose=trial.#pose;this.#rest=trial.#rest;this.#clips=trial.#clips;this.#layers=trial.#layers;this.#overlay=trial.#overlay;this.#goals=trial.#goals;this.#evaluate();this.#paused=trial.#paused;this.#revision++;return this;
     }
 }
 
 return Object.freeze({get animationController(){return animationController;}});
+})();
+// src/engine/basement/physics/animation/physical-chain.mjs
+const m17 = (()=>{
+// ===== LV0 BASEMENT =====
+const {number,clone,angleDelta} = m7;
+const {definitionRecord} = m13;
+const {name,fields} = m14;
+/**
+ * A run of rig joints made physical: one rigid capsule per bone, hinged to the bone before it and
+ * the first to the rig's body. Each hinge's motor servoes toward the animated pose (clips, procedural
+ * pose and IK): it asks for a turn rate of `follow_rate` × the angle still to go, with at most
+ * `follow_torque`. So the chain follows its animation, carries its own weight down the chain, and
+ * gives way when something pushes harder than its torque. The measured rotations flow back into the
+ * rig. Built from bodies and hinge constraints only: it adds no solver.
+ *
+ * A segment body sits at its bone's midpoint, turned along the bone, so its mass swings like a limb.
+ * `offset` is the bone's heading in its joint's frame; hinge angles carry it.
+ */
+const PACKET=['chain_id','joints','radius','mass','follow_rate','follow_torque','linear_damping','angular_damping','collision_group','collision_mask'];
+const heading=(a,b)=>Math.atan2(b[1]-a[1],b[0]-a[0]);
+class physicalChain{
+    #world;#owner;#controller;#authority;
+    constructor(world,owner,controller,authority,packet,restored=null){
+        this.#world=world;this.#owner=owner;this.#controller=controller;this.#authority=authority;
+        fields(packet,PACKET);const r=definitionRecord(controller.definition);
+        this.chain_id=name(packet.chain_id??'chain');
+        if(!Array.isArray(packet.joints)||packet.joints.length<2||packet.joints.length>65)throw new TypeError('A physical chain takes 2..65 joints, root to tip');
+        this.joints=packet.joints.map(name);
+        for(const [i,id] of this.joints.entries()){if(!r.index.has(id))throw new TypeError('Unknown chain joint');if(i&&r.joints[r.index.get(id)].parent!==this.joints[i-1])throw new TypeError('Each chain joint must be the child of the one before it');}
+        this.parent=r.joints[r.index.get(this.joints[0])].parent;
+        this.limits=this.joints.map(id=>r.joints[r.index.get(id)].limits);
+        this.config={radius:number(packet.radius??2,'chain radius',1e-3),mass:number(packet.mass??1,'segment mass',1e-6),follow_rate:number(packet.follow_rate??20,'follow rate',0),follow_torque:number(packet.follow_torque??1e5,'follow torque',0),
+            linear_damping:number(packet.linear_damping??2,'segment linear damping',0),angular_damping:number(packet.angular_damping??2,'segment angular damping',0),
+            collision_group:packet.collision_group??null,collision_mask:packet.collision_mask??null};
+        if(restored){Object.assign(this,{segments:restored.segments.map(id=>this.#world.fetchBody(id)),hinges:restored.hinges.map(id=>this.#world.getConstraint(id)),lengths:[...restored.lengths],offsets:[...restored.offsets]});
+            if(this.segments.some(b=>!b)||this.hinges.some(c=>!c))throw new TypeError('Saved chain parts are missing');return;}
+        const root=this.#root(),points=this.joints.map(id=>controller.getAnimatedJoint(id,{root}));
+        this.lengths=[];this.offsets=[];this.segments=[];
+        for(let k=0;k<points.length-1;k++){
+            const a=points[k].position,b=points[k+1].position,length=Math.hypot(b[0]-a[0],b[1]-a[1]);if(length<1e-6)throw new TypeError('A chain bone needs length');
+            const rotation=heading(a,b);this.lengths.push(length);this.offsets.push(angleDelta(points[k].rotation,rotation));
+            this.segments.push(this.#world.createBody({physics_type:'rigid',position:[(a[0]+b[0])/2,(a[1]+b[1])/2],rotation,mass:this.config.mass,linear_damping:this.config.linear_damping,angular_damping:this.config.angular_damping,
+                collision_shape:{shape_type:'capsule',radius:this.config.radius,points:[[-length/2,0],[length/2,0]]},
+                ...(this.config.collision_group===null?{}:{collision_group:this.config.collision_group}),...(this.config.collision_mask===null?{}:{collision_mask:this.config.collision_mask}),
+                tags:['rig_segment']}));
+        }
+        const ids=[owner.id,...this.segments.map(b=>b.body_id)];
+        for(const body of this.segments)this.#world.updateBody(body,{collision_exclusions:ids.filter(id=>id!==body.body_id)});
+        this.hinges=this.segments.map((body,k)=>this.#world.createConstraint({constraint_type:'hinge',body_a:body,body_b:k?this.segments[k-1]:owner.handle,local_anchor_a:[-this.lengths[k]/2,0],...this.#drive(k)}));
+    }
+    #root(){return {position:[...this.#owner.position],rotation:this.#owner.rotation};}
+    #angle(k){const turn=body=>this.#world._record(body).rotation;return k?angleDelta(turn(this.segments[k-1]),turn(this.segments[k])):angleDelta(this.#owner.rotation,turn(this.segments[0]));}
+    /** Hinge k's anchor on its parent body, servo and limits, from the animated pose. */
+    #drive(k){
+        const {follow_rate,follow_torque:max_torque}=this.config,local=this.#controller.getAnimatedPose()[this.joints[k]].rotation;
+        const shift=k?this.offsets[k]-this.offsets[k-1]:this.offsets[0]+(this.parent===null?0:this.#controller.getAnimatedJoint(this.parent).rotation);
+        const anchor=k?[this.lengths[k-1]/2,0]:this.#controller.getAnimatedJoint(this.joints[0]).position,limit=this.limits[k];
+        // Hinge angles are wrapped to (-π, π]; a joint limit is carried into that range, and the rig's own limit clamps the rest.
+        const wrap=v=>Math.max(-Math.PI,Math.min(Math.PI,v)),near=angleDelta(0,shift),[min_rotation,max_rotation]=limit?[wrap(limit.min_rotation+near),wrap(limit.max_rotation+near)]:[-Math.PI,Math.PI];
+        return {local_anchor_b:anchor,target_rotation:local+shift,motor_speed:this.hinges?angleDelta(this.#angle(k),local+shift)*follow_rate:0,max_torque,min_rotation:Math.min(min_rotation,max_rotation),max_rotation};
+    }
+    /** Before a step: retarget every hinge at the pose the animation wants now. */
+    _drive(){for(let k=0;k<this.hinges.length;k++)this.#world.setConstraintMotor(this.hinges[k],this.#drive(k));}
+    /** After a step: the joints' local rotations as the bodies hold them. The tip joint keeps its animation. */
+    _measure(){
+        const out={};
+        for(let k=0;k<this.segments.length;k++){
+            const relative=this.#angle(k);
+            const shift=k?this.offsets[k]-this.offsets[k-1]:this.offsets[0]+(this.parent===null?0:this.#controller.getAnimatedJoint(this.parent).rotation);
+            out[this.joints[k]]=relative-shift;
+        }
+        return out;
+    }
+    owns(body_id){return this.segments.some(b=>b.body_id===body_id);}
+    _remove(){for(const body of this.segments)if(this.#world.fetchBody(body.body_id))this.#world.removeBody(body);}
+    getState(){return {chain_id:this.chain_id,joints:[...this.joints],segments:this.segments.map(b=>b.body_id),hinges:this.hinges.map(c=>c.constraint_id)};}
+    _saveState(){return {packet:{chain_id:this.chain_id,joints:[...this.joints],...clone(this.config)},segments:this.segments.map(b=>b.body_id),hinges:this.hinges.map(c=>c.constraint_id),lengths:[...this.lengths],offsets:[...this.offsets]};}
+}
+
+return Object.freeze({get physicalChain(){return physicalChain;}});
 })();
 // src/engine/basement/physics/animation/rig-system.mjs
 const m3 = (()=>{
@@ -10533,9 +10708,10 @@ const {characterMotor} = m4;
 const {number,clone} = m7;
 const {referenceBody} = m9;
 const {animationController} = m11;
+const {physicalChain} = m17;
 const {rigPose} = m12;
 const {fields,name,inverse,multiply,describe} = m14;
-/** Body-owned animation service. No joint bodies, extra clock, or spatial index. */
+/** Body-owned animation service. Joints create no bodies unless a physical chain is asked for; no extra clock or spatial index. */
 class rigSystem {
     #world;#rigs=new Map();#authority=Symbol('world rig clock');#guard=()=>{};
     constructor(world){this.#world=world;}
@@ -10543,18 +10719,33 @@ class rigSystem {
     #record(body){return this.#world._record(referenceBody(body));}
     createRig(body,{definition,clips=[]}={}){
         this.#guard();const record=this.#record(body);if(this.#rigs.has(record.id))throw new Error('Body already owns a rig');
-        const entry={record,controller:null,previous:null};
+        const entry={record,controller:null,previous:null,chains:new Map()};
         const guard=()=>{this.#guard();this.#record(record.handle);if(entry.controller&&this.#rigs.get(record.id)!==entry)throw new Error('Rig was removed');};
         entry.controller=new animationController({definition,clips,authority:this.#authority,guard,root_motion_guard:()=>{if(!(record.motor instanceof characterMotor)||record.parent_mount)throw new Error('Root motion requires an unmounted character motor');}});
-        entry.previous=entry.controller.getPose();this.#rigs.set(record.id,entry);return entry.controller;
+        this.#place(entry);entry.previous=entry.controller.getPose();this.#rigs.set(record.id,entry);return entry.controller;
     }
+    #place(entry){entry.controller._setRoot({position:[...entry.record.position],rotation:entry.record.rotation},this.#authority);}
     getRig(body){return this.#rigs.get(this.#record(body).id)?.controller??null;}
     removeRig(body){
         this.#guard();const record=this.#record(body);
         for(const child of this.#world.getAttachedBodies(record.handle))if(this.#world.getAttachmentState(child)?.rig_anchor)throw new Error('Detach rig-mounted bodies before removing the rig');
         if(record.motor?.intent?.rig_motion_owner===record.id)record.motor.cancelMovement();
-        this.#rigs.delete(record.id);
+        const entry=this.#rigs.get(record.id);this.#rigs.delete(record.id);
+        for(const chain of entry?.chains.values()??[])chain._remove();
     }
+    /**
+     * Makes a run of joints physical: rigid capsules hinged bone to bone and to this body, sprung
+     * toward the animated pose. Returns the chain's state ({chain_id, joints, segments, hinges}).
+     */
+    createPhysicalChain(body,packet){
+        this.#guard();const entry=this.#entry(body),chain_id=packet?.chain_id??'chain';
+        if(entry.chains.has(chain_id))throw new TypeError('Duplicate physical chain');
+        for(const other of entry.chains.values())if(packet?.joints?.some(id=>other.joints.slice(0,-1).includes(id)))throw new TypeError('A joint belongs to one physical chain');
+        const chain=new physicalChain(this.#world,entry.record,entry.controller,this.#authority,packet);entry.chains.set(chain.chain_id,chain);this.#measure(entry);return chain.getState();
+    }
+    removePhysicalChain(body,chain_id){this.#guard();const entry=this.#entry(body),chain=entry.chains.get(chain_id);if(!chain)return;entry.chains.delete(chain_id);chain._remove();this.#measure(entry);}
+    getPhysicalChains(body){return [...this.#entry(body).chains.values()].map(chain=>chain.getState());}
+    #measure(entry){const locals={};for(const chain of entry.chains.values())Object.assign(locals,chain._measure());entry.controller._setPhysicalPose(locals,this.#authority);}
     #entry(body){const entry=this.#rigs.get(this.#record(body).id);if(!entry)throw new TypeError('Body has no rig');return entry;}
     #pose(entry,blend){
         number(blend,'rig blend',0,1);
@@ -10586,23 +10777,31 @@ class rigSystem {
             requests.push(()=>motor.setMovement(direction,{space:'local',speed,rig_motion_owner:record.id}));
         }
         for(const request of requests)request();
+        for(const entry of this.#rigs.values())if(entry.record.config.active)for(const chain of entry.chains.values())chain._drive();
     }
     _capturePrevious(){for(const entry of this.#rigs.values()){entry.previous=entry.controller.getPose();entry.cached_pose=null;}}
     _update(seconds){
         for(const entry of this.#rigs.values()){
             if(!entry.record.config.active)continue;
-            const distance=this.#world.getBodyMotion(entry.record.handle).distance;
+            this.#place(entry);const distance=this.#world.getBodyMotion(entry.record.handle).distance;
             for(const marker of entry.controller.advance(seconds,{distance},this.#authority))this.#world._emit('animationMarker',{body:entry.record.handle,...marker});
+            if(entry.chains.size)this.#measure(entry);
         }
     }
-    _bodyRemoved(id){this.#rigs.delete(id);}
+    _bodyRemoved(id){
+        const owned=this.#rigs.get(id);if(owned){this.#rigs.delete(id);for(const chain of owned.chains.values())chain._remove();return;}
+        // Losing one segment ends its chain: the rest of the chain goes too and the joints return to their animation.
+        for(const entry of this.#rigs.values())for(const [chain_id,chain] of entry.chains)if(chain.owns(id)){entry.chains.delete(chain_id);chain._remove();this.#measure(entry);return;}
+    }
     _clear(){this.#rigs.clear();}
-    _saveState(){return [...this.#rigs.values()].map(entry=>({body_id:entry.record.id,animation:entry.controller.getSnapshot(),previous:clone(entry.previous)}));}
+    _saveState(){return [...this.#rigs.values()].map(entry=>({body_id:entry.record.id,animation:entry.controller.getSnapshot(),previous:clone(entry.previous),...(entry.chains.size?{chains:[...entry.chains.values()].map(chain=>chain._saveState())}:{})}));}
     _loadState(entries=[]){
         if(!Array.isArray(entries))throw new TypeError('Invalid saved rigs');
         for(const saved of entries){
-            fields(saved,['body_id','animation','previous']);const controller=this.createRig(saved.body_id,{definition:saved.animation?.definition,clips:saved.animation?.clips});controller.load(saved.animation);
-            const pose=new rigPose(controller.definition);pose.load({format_version:1,rig_id:controller.definition.rig_id,locals:saved.previous});this.#entry(saved.body_id).previous=pose.getLocalPose();
+            fields(saved,['body_id','animation','previous','chains']);const controller=this.createRig(saved.body_id,{definition:saved.animation?.definition,clips:saved.animation?.clips});controller.load(saved.animation);
+            const pose=new rigPose(controller.definition);pose.load({format_version:1,rig_id:controller.definition.rig_id,locals:saved.previous});const entry=this.#entry(saved.body_id);entry.previous=pose.getLocalPose();
+            for(const chain of saved.chains??[]){fields(chain,['packet','segments','hinges','lengths','offsets']);const restored=new physicalChain(this.#world,entry.record,controller,this.#authority,chain.packet,chain);entry.chains.set(restored.chain_id,restored);}
+            if(entry.chains.size)this.#measure(entry);
         }
     }
 }
@@ -10610,7 +10809,7 @@ class rigSystem {
 return Object.freeze({get rigSystem(){return rigSystem;}});
 })();
 // src/engine/basement/physics/motion/path-geometry.mjs
-const m17 = (()=>{
+const m19 = (()=>{
 // ===== LV0 BASEMENT =====
 /** Pure authored-path geometry. It stores neither bodies nor a spatial index. */
 class pathGeometry {
@@ -10673,12 +10872,12 @@ class pathGeometry {
 return Object.freeze({get pathGeometry(){return pathGeometry;}});
 })();
 // src/engine/basement/physics/attachments/emitter.mjs
-const m16 = (()=>{
+const m18 = (()=>{
 // ===== LV0 BASEMENT =====
 const {vector,number,rotate,add,sub,length,angleDelta,EPS,BODY_GROUP} = m7;
 const {bodyActive} = m8;
 const {referenceBody,referencePosition} = m9;
-const {pathGeometry} = m17;
+const {pathGeometry} = m19;
 
 /** Generic attachment-local launch aperture. No vehicle, weapon or game policy. */
 function normalizeEmitter(packet){
@@ -10726,7 +10925,7 @@ function mountedLaunchState(world,source,{local_position=[0,0],target,direction,
 return Object.freeze({get normalizeEmitter(){return normalizeEmitter;},get mountedLaunchState(){return mountedLaunchState;}});
 })();
 // src/engine/basement/physics/core/body.mjs
-const m18 = (()=>{
+const m20 = (()=>{
 // ===== LV0 BASEMENT =====
 const {bodyRecord,bindBody,immutableState} = m8;
 
@@ -10756,7 +10955,7 @@ class physicsBody {
 return Object.freeze({get physicsBody(){return physicsBody;}});
 })();
 // src/engine/basement/physics/collision/solver.mjs
-const m19 = (()=>{
+const m21 = (()=>{
 // ===== LV0 BASEMENT =====
 const {impulseCenter} = m5;
 const {inverseMass,inverseInertia,changeVelocity,movable} = m8;
@@ -10804,7 +11003,7 @@ class contactSolver {
 return Object.freeze({get contactSolver(){return contactSolver;}});
 })();
 // src/engine/basement/physics/spatial/grid.mjs
-const m20 = (()=>{
+const m22 = (()=>{
 // ===== LV0 BASEMENT =====
 const {validBounds,number,vector} = m7;
 
@@ -11028,7 +11227,7 @@ class spatialGrid {
 return Object.freeze({get spatialGrid(){return spatialGrid;}});
 })();
 // src/engine/basement/physics/motors/vehicle.mjs
-const m21 = (()=>{
+const m23 = (()=>{
 // ===== LV0 BASEMENT =====
 const {massProperties,ownInertia,impulseCenter,changeAngularSpeed} = m5;
 const {bodyRecord,changeVelocity,inverseMass,inverseInertia} = m8;
@@ -11146,7 +11345,7 @@ class vehicleMotor {
 return Object.freeze({get pathMotor(){return pathMotor;},get vehicleMotor(){return vehicleMotor;}});
 })();
 // src/engine/basement/physics/motors/projectile.mjs
-const m22 = (()=>{
+const m24 = (()=>{
 // ===== LV0 BASEMENT =====
 const {bodyRecord} = m8;
 const {number,vector,scale,length,add} = m7;
@@ -11191,7 +11390,7 @@ class projectileMotor {
 return Object.freeze({get projectileMotor(){return projectileMotor;}});
 })();
 // src/engine/basement/physics/elements/entity.mjs
-const m24 = (()=>{
+const m26 = (()=>{
 // ===== LV0 BASEMENT =====
 const {bodyActive} = m8;
 /** Entity metadata/lifecycle only. Physical state lives exclusively in the engine body. */
@@ -11274,9 +11473,9 @@ class gameEntity {
 return Object.freeze({get entityRecord(){return entityRecord;},get restoreEntity(){return restoreEntity;},get gameEntity(){return gameEntity;}});
 })();
 // src/engine/basement/physics/elements/elements.mjs
-const m23 = (()=>{
+const m25 = (()=>{
 // ===== LV0 BASEMENT =====
-const {gameEntity} = m24;
+const {gameEntity} = m26;
 
 /** Official element inheritance. Base construction creates and registers the components. */
 class gameCharacter extends gameEntity { static entity_type = 'character'; static physics_role = 'character'; }
@@ -11306,7 +11505,7 @@ class awarenessMatrix {
 return Object.freeze({get gameCharacter(){return gameCharacter;},get gameVehicle(){return gameVehicle;},get gameProjectile(){return gameProjectile;},get gameProp(){return gameProp;},get gameStatic(){return gameStatic;},get gameTrigger(){return gameTrigger;},get gameDecoration(){return gameDecoration;},get awarenessMatrix(){return awarenessMatrix;}});
 })();
 // src/engine/basement/physics/elements/data-source.mjs
-const m26 = (()=>{
+const m28 = (()=>{
 // ===== LV0 BASEMENT =====
 // THE DATA SOURCE CONTRACT: what the Basement needs from wherever its data lives. The Directory's
 // registry (engine/directory/registry.mjs) provides it; the Basement never imports the Directory,
@@ -11340,12 +11539,12 @@ const EMPTY_DATA_SOURCE = Object.freeze({
 return Object.freeze({get isDataSource(){return isDataSource;},get EMPTY_DATA_SOURCE(){return EMPTY_DATA_SOURCE;}});
 })();
 // src/engine/basement/physics/elements/registry.mjs
-const m25 = (()=>{
+const m27 = (()=>{
 // ===== LV0 BASEMENT =====
 const {clone,freeze} = m7;
-const {EMPTY_DATA_SOURCE,isDataSource} = m26;
-const {gameEntity,entityRecord,restoreEntity} = m24;
-const {gameCharacter,gameVehicle,gameProjectile,gameProp,gameStatic,gameTrigger,gameDecoration,awarenessMatrix} = m23;
+const {EMPTY_DATA_SOURCE,isDataSource} = m28;
+const {gameEntity,entityRecord,restoreEntity} = m26;
+const {gameCharacter,gameVehicle,gameProjectile,gameProp,gameStatic,gameTrigger,gameDecoration,awarenessMatrix} = m25;
 
 const builtins = { entity: gameEntity, character: gameCharacter, vehicle: gameVehicle, projectile: gameProjectile, prop: gameProp, static: gameStatic, trigger: gameTrigger, decoration: gameDecoration };
 
@@ -11483,7 +11682,7 @@ class gameElements {
 return Object.freeze({get gameElements(){return gameElements;}});
 })();
 // src/engine/basement/physics/constraints/constraint.mjs
-const m27 = (()=>{
+const m29 = (()=>{
 // ===== LV0 BASEMENT =====
 const {impulseCenter,changeAngularSpeed,rotateAtCenter} = m5;
 const {vector,number,clone,sub,add,rotate,length,scale,dot,cross,EPS,angleDelta} = m7;
@@ -11534,6 +11733,7 @@ class constraintSolver {
         const ca = sub(pa, impulseCenter(a)), cb = b ? sub(pb, impulseCenter(b)) : [0, 0];
         if (c.constraint_type === 'slider') { solveSlider(r, dt, ra, rb, pa, pb); finish(r); return; }
         const d = sub(pb, pa), distance = length(d), n = distance > EPS ? scale(d, 1 / distance) : [1, 0];
+        if (c.constraint_type === 'hinge' || c.constraint_type === 'attachment') { solvePin(r, dt, ra, rb, ca, cb, d); solveAngle(r, dt); finish(r); return; }
         const rest = c.constraint_type === 'distance' || c.constraint_type === 'spring' ? c.rest_length : 0;
         const error = distance - rest;
         const ax = inverseMass(a, 'x'), ay = inverseMass(a, 'y'), bx = inverseMass(b, 'x'), by = inverseMass(b, 'y');
@@ -11555,29 +11755,54 @@ class constraintSolver {
                 if (b) { b.position[0] -= n[0] * correction * bx; b.position[1] -= n[1] * correction * by; rotateAtCenter(b, -cross(cb, n) * correction * ib); }
             }
         }
-        if (c.constraint_type === 'hinge' || c.constraint_type === 'attachment') {
-            const angle = angleDelta(b?.rotation ?? 0, a.rotation), inv = ia + ib;
-            let angular_error = c.constraint_type === 'attachment' ? angleDelta(c.target_rotation, angle)
-                : angle < c.min_rotation ? angle - c.min_rotation : angle > c.max_rotation ? angle - c.max_rotation : 0;
-            if (inv > EPS) {
-                const v = a.angular_velocity - (b?.angular_velocity ?? 0), limit = c.max_torque * dt;
-                const motor = limit ? Math.max(-limit, Math.min(limit, (c.motor_speed - v) / inv)) : 0;
-                const j = angular_error ? (-angular_error * Math.min(c.stiffness, 0.2 / dt) - v) / inv + motor : motor;
-                changeAngularSpeed(a, j * ia); if (b) changeAngularSpeed(b, -j * ib);
-                const correction = -angular_error * 0.5 / inv;
-                rotateAtCenter(a, correction * ia); if (b) rotateAtCenter(b, -correction * ib);
-                r.applied_impulse += Math.abs(j);
-                // A hinge's return spring: angular acceleration toward target_rotation, independent of
-                // inertia (spring_stiffness in 1/s², spring_damping in 1/s). Solved in every iteration
-                // with dt = step / iterations, so it sums to one full step.
-                if (c.constraint_type === 'hinge' && (c.spring_stiffness || c.spring_damping)) {
-                    const err = angleDelta(c.target_rotation, angle), w = a.angular_velocity - (b?.angular_velocity ?? 0);
-                    const k = (-c.spring_stiffness * err - c.spring_damping * w) * dt / inv;
-                    changeAngularSpeed(a, k * ia); if (b) changeAngularSpeed(b, -k * ib);
-                }
-            }
-        }
         finish(r);
+    }
+}
+/**
+ * A pin: the two anchors are one point. Solved on both axes at once (a 2×2 effective mass), so the
+ * velocity at the pin is removed rather than softened and a hinged limb turns about its pin instead
+ * of about its own centre. Position drift is corrected the same way, split by each body's mobility.
+ */
+function solvePin(r, dt, ra, rb, ca, cb, d) {
+    const { a, b, config: c } = r;
+    const ax = inverseMass(a, 'x'), ay = inverseMass(a, 'y'), bx = inverseMass(b, 'x'), by = inverseMass(b, 'y'), ia = inverseInertia(a), ib = inverseInertia(b);
+    const k11 = ax + bx + ia * ca[1] ** 2 + ib * cb[1] ** 2, k22 = ay + by + ia * ca[0] ** 2 + ib * cb[0] ** 2, k12 = -ia * ca[0] * ca[1] - ib * cb[0] * cb[1];
+    const det = k11 * k22 - k12 * k12;
+    if (!(det > EPS * EPS)) return;
+    const solve = v => [(k22 * v[0] - k12 * v[1]) / det, (k11 * v[1] - k12 * v[0]) / det];
+    const va = add(a.velocity, [-a.angular_velocity * ra[1], a.angular_velocity * ra[0]]);
+    const vb = b ? add(b.velocity, [-b.angular_velocity * rb[1], b.angular_velocity * rb[0]]) : [0, 0];
+    let impulse = solve(add(sub(vb, va), scale(d, Math.min(0.2 / dt, c.stiffness))));
+    const size = length(impulse); if (c.max_force > 0 && size > c.max_force * dt) impulse = scale(impulse, c.max_force * dt / size);
+    r.applied_impulse += length(impulse);
+    const pa = add(a.position, ra), pb = b ? add(b.position, rb) : c.world_target;
+    changeVelocity(a, impulse, pa); if (b) changeVelocity(b, scale(impulse, -1), pb);
+    const move = scale(solve(d), 0.5);
+    a.position[0] += move[0] * ax; a.position[1] += move[1] * ay; rotateAtCenter(a, cross(ca, move) * ia);
+    if (b) { b.position[0] -= move[0] * bx; b.position[1] -= move[1] * by; rotateAtCenter(b, -cross(cb, move) * ib); }
+}
+/** A hinge's limits, motor and return spring, or an attachment's fixed angle. */
+function solveAngle(r, dt) {
+    const { a, b, config: c } = r, ia = inverseInertia(a), ib = inverseInertia(b);
+    const angle = angleDelta(b?.rotation ?? 0, a.rotation), inv = ia + ib;
+    let angular_error = c.constraint_type === 'attachment' ? angleDelta(c.target_rotation, angle)
+        : angle < c.min_rotation ? angle - c.min_rotation : angle > c.max_rotation ? angle - c.max_rotation : 0;
+    if (inv > EPS) {
+        const v = a.angular_velocity - (b?.angular_velocity ?? 0), limit = c.max_torque * dt;
+        const motor = limit ? Math.max(-limit, Math.min(limit, (c.motor_speed - v) / inv)) : 0;
+        const j = angular_error ? (-angular_error * Math.min(c.stiffness, 0.2 / dt) - v) / inv + motor : motor;
+        changeAngularSpeed(a, j * ia); if (b) changeAngularSpeed(b, -j * ib);
+        const correction = -angular_error * 0.5 / inv;
+        rotateAtCenter(a, correction * ia); if (b) rotateAtCenter(b, -correction * ib);
+        r.applied_impulse += Math.abs(j);
+        // A hinge's return spring: angular acceleration toward target_rotation, independent of
+        // inertia (spring_stiffness in 1/s², spring_damping in 1/s). Solved in every iteration
+        // with dt = step / iterations, so it sums to one full step.
+        if (c.constraint_type === 'hinge' && (c.spring_stiffness || c.spring_damping)) {
+            const err = angleDelta(c.target_rotation, angle), w = a.angular_velocity - (b?.angular_velocity ?? 0);
+            const k = (-c.spring_stiffness * err - c.spring_damping * w) * dt / inv;
+            changeAngularSpeed(a, k * ia); if (b) changeAngularSpeed(b, -k * ib);
+        }
     }
 }
 function finish(r) {
@@ -11629,7 +11854,7 @@ function solveSlider(r, dt, ra, rb, pa, pb) {
 return Object.freeze({get physicsConstraint(){return physicsConstraint;},get constraintRecord(){return constraintRecord;},get updateConstraint(){return updateConstraint;},get constraintSolver(){return constraintSolver;}});
 })();
 // src/engine/basement/physics/motion/controller.mjs
-const m28 = (()=>{
+const m30 = (()=>{
 // ===== LV0 BASEMENT =====
 const {clone,number,vector,sub,add,scale,rotate} = m7;
 const {referenceBody} = m9;
@@ -11712,12 +11937,12 @@ class motionController {
 return Object.freeze({get motionController(){return motionController;}});
 })();
 // src/engine/basement/physics/traffic/controller.mjs
-const m29 = (()=>{
+const m31 = (()=>{
 // ===== LV0 BASEMENT =====
 const {massProperties} = m5;
 const {number,vector,clone,freeze,sub,dot,length,scale,clamp} = m7;
 const {referenceBody} = m9;
-const {vehicleMotor} = m21;
+const {vehicleMotor} = m23;
 
 /** Route topology and reservations are scheduling data. Geometry queries use the world's index. */
 class trafficController {
@@ -11893,14 +12118,14 @@ class trafficController {
 return Object.freeze({get trafficController(){return trafficController;}});
 })();
 // src/engine/basement/physics/attachments/manager.mjs
-const m30 = (()=>{
+const m32 = (()=>{
 // ===== LV0 BASEMENT =====
-const {normalizeEmitter} = m16;
+const {normalizeEmitter} = m18;
 const {invalidateMass,massProperties,massCenter,impulseCenter,centerVelocity,setCenterVelocity} = m5;
 const {vector,number,rotate,add,angleDelta} = m7;
 const {enforceLocks,movable,bodyActive,inverseInertia} = m8;
 const {referenceBody} = m9;
-const {pathGeometry} = m17;
+const {pathGeometry} = m19;
 
 /** Prescribed mounts link existing authoritative body records; they store no copied body state. */
 class attachmentManager {
@@ -12116,7 +12341,7 @@ class attachmentManager {
 return Object.freeze({get attachmentManager(){return attachmentManager;}});
 })();
 // src/engine/basement/physics/motion/layout-geometry.mjs
-const m31 = (()=>{
+const m33 = (()=>{
 // ===== LV0 BASEMENT =====
 const {vector,number,rotate,sub,add,clamp} = m7;
 
@@ -12159,7 +12384,7 @@ class layoutGeometry {
 return Object.freeze({get layoutGeometry(){return layoutGeometry;}});
 })();
 // src/engine/basement/physics/particles/particles.mjs
-const m32 = (()=>{
+const m34 = (()=>{
 // ===== LV0 BASEMENT =====
 const {number,vector,clone,length,sub,add,rotate,BODY_GROUP} = m7;
 
@@ -12333,7 +12558,7 @@ class particlePhysics {
 return Object.freeze({get particlePhysics(){return particlePhysics;}});
 })();
 // src/engine/basement/physics/navigation/geometry.mjs
-const m35 = (()=>{
+const m37 = (()=>{
 // ===== LV0 BASEMENT =====
 const {EPS} = m7;
 
@@ -12379,12 +12604,12 @@ function segmentPieceDistance(a, b, piece) {
 return Object.freeze({get pointSegmentDistance(){return pointSegmentDistance;},get segmentSegmentDistance(){return segmentSegmentDistance;},get segmentPieceDistance(){return segmentPieceDistance;}});
 })();
 // src/engine/basement/physics/navigation/field.mjs
-const m34 = (()=>{
+const m36 = (()=>{
 // ===== LV0 BASEMENT =====
 const {BODY_GROUP,EPS,number,mask,validBounds} = m7;
 const {physical} = m8;
 const {pieces} = m6;
-const {segmentPieceDistance} = m35;
+const {segmentPieceDistance} = m37;
 
 /**
  * Derived walkable-space clearance field.
@@ -12561,10 +12786,10 @@ class navigationField {
 return Object.freeze({get chunkKey(){return chunkKey;},get navigationField(){return navigationField;}});
 })();
 // src/engine/basement/physics/navigation/planner.mjs
-const m36 = (()=>{
+const m38 = (()=>{
 // ===== LV0 BASEMENT =====
 const {number} = m7;
-const {chunkKey} = m34;
+const {chunkKey} = m36;
 
 const SQRT2 = Math.SQRT2;
 const NEIGHBOURS = [[1, 0, 1], [-1, 0, 1], [0, 1, 1], [0, -1, 1], [1, 1, SQRT2], [1, -1, SQRT2], [-1, 1, SQRT2], [-1, -1, SQRT2]];
@@ -12777,10 +13002,10 @@ class fieldPlanner {
 return Object.freeze({get fieldPlanner(){return fieldPlanner;}});
 })();
 // src/engine/basement/physics/navigation/road-network.mjs
-const m37 = (()=>{
+const m39 = (()=>{
 // ===== LV0 BASEMENT =====
 const {number,vector,clone,freeze} = m7;
-const {pathGeometry} = m17;
+const {pathGeometry} = m19;
 
 /**
  * Authored lane graph for vehicles and any other lane-bound travellers.
@@ -12976,16 +13201,16 @@ class roadNetwork {
 return Object.freeze({get roadNetwork(){return roadNetwork;}});
 })();
 // src/engine/basement/physics/navigation/system.mjs
-const m33 = (()=>{
+const m35 = (()=>{
 // ===== LV0 BASEMENT =====
 const {number,vector,clone} = m7;
 const {collisionShape,shapeReach} = m6;
 const {referenceBody,referencePosition} = m9;
 const {characterMotor} = m4;
-const {vehicleMotor} = m21;
-const {navigationField} = m34;
-const {fieldPlanner} = m36;
-const {roadNetwork} = m37;
+const {vehicleMotor} = m23;
+const {navigationField} = m36;
+const {fieldPlanner} = m38;
+const {roadNetwork} = m39;
 
 const DEFAULT_PROFILES = { walker: { layer: 'field' }, car: { layer: 'road', near_range: 200 } };
 
@@ -13134,29 +13359,29 @@ return Object.freeze({get navigationSystem(){return navigationSystem;}});
 const m2 = (()=>{
 // ===== LV0 BASEMENT =====
 const {rigSystem} = m3;
-const {mountedLaunchState} = m16;
+const {mountedLaunchState} = m18;
 const {massProperties,massCenter,invalidateMass,integrateAtCenter,changeAngularSpeed,centerVelocity,setCenterVelocity} = m5;
 const {BODY_GROUP,EPS,vector,number,clone,freeze,validBounds,boundsMeet,sub,add,dot,scale,length,unit,rotate,unionBounds} = m7;
 const {bodyConfig,bodyRecord,pose,previousPose,liveBounds,bodyBounds,sweptBounds,snapshot,bodyActive,movable,physical,changeVelocity,enforceLocks,inverseInertia} = m8;
-const {physicsBody} = m18;
+const {physicsBody} = m20;
 const {collisionShape,shapeReach,shapeBounds} = m6;
 const {collisionDetector} = m10;
-const {contactSolver} = m19;
-const {spatialGrid} = m20;
+const {contactSolver} = m21;
+const {spatialGrid} = m22;
 const {physicsQueries,referenceBody,referencePosition} = m9;
 const {characterMotor} = m4;
-const {vehicleMotor} = m21;
-const {projectileMotor} = m22;
-const {awarenessMatrix} = m23;
-const {gameElements} = m25;
-const {physicsConstraint,constraintRecord,updateConstraint,constraintSolver} = m27;
-const {motionController} = m28;
-const {trafficController} = m29;
-const {attachmentManager} = m30;
-const {pathGeometry} = m17;
-const {layoutGeometry} = m31;
-const {particlePhysics} = m32;
-const {navigationSystem} = m33;
+const {vehicleMotor} = m23;
+const {projectileMotor} = m24;
+const {awarenessMatrix} = m25;
+const {gameElements} = m27;
+const {physicsConstraint,constraintRecord,updateConstraint,constraintSolver} = m29;
+const {motionController} = m30;
+const {trafficController} = m31;
+const {attachmentManager} = m32;
+const {pathGeometry} = m19;
+const {layoutGeometry} = m33;
+const {particlePhysics} = m34;
+const {navigationSystem} = m35;
 
 /** Standalone fixed-step world. Exactly one spatialGrid is constructed here. */
 class physicsSystem {
@@ -13927,10 +14152,11 @@ const m1 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m2.physicsSystem;},get physicsBody(){return m18.physicsBody;},get collisionShape(){return m6.collisionShape;},get collisionDetector(){return m10.collisionDetector;},get contactSolver(){return m19.contactSolver;},get spatialGrid(){return m20.spatialGrid;},get physicsConstraint(){return m27.physicsConstraint;},get constraintSolver(){return m27.constraintSolver;},get characterMotor(){return m4.characterMotor;},get vehicleMotor(){return m21.vehicleMotor;},get pathMotor(){return m21.pathMotor;},get projectileMotor(){return m22.projectileMotor;},get particlePhysics(){return m32.particlePhysics;},get gameEntity(){return m24.gameEntity;},get gameElements(){return m25.gameElements;},get EMPTY_DATA_SOURCE(){return m26.EMPTY_DATA_SOURCE;},get isDataSource(){return m26.isDataSource;},get gameCharacter(){return m23.gameCharacter;},get gameVehicle(){return m23.gameVehicle;},get gameProjectile(){return m23.gameProjectile;},get gameProp(){return m23.gameProp;},get gameStatic(){return m23.gameStatic;},get gameTrigger(){return m23.gameTrigger;},get gameDecoration(){return m23.gameDecoration;},get awarenessMatrix(){return m23.awarenessMatrix;},get BODY_GROUP(){return m7.BODY_GROUP;},get QUERY_GROUP(){return m7.QUERY_GROUP;},get PHYSICS_TYPES(){return m7.PHYSICS_TYPES;},get trafficController(){return m29.trafficController;},get motionController(){return m28.motionController;},get pathGeometry(){return m17.pathGeometry;},get navigationSystem(){return m33.navigationSystem;},get navigationField(){return m34.navigationField;},get roadNetwork(){return m37.roadNetwork;},get layoutGeometry(){return m31.layoutGeometry;},get rigDefinition(){return m13.rigDefinition;},get rigPose(){return m12.rigPose;},get animationClip(){return m15.animationClip;},get animationController(){return m11.animationController;},get rigSystem(){return m3.rigSystem;}});
+
+return Object.freeze({get physicsSystem(){return m2.physicsSystem;},get physicsBody(){return m20.physicsBody;},get collisionShape(){return m6.collisionShape;},get collisionDetector(){return m10.collisionDetector;},get contactSolver(){return m21.contactSolver;},get spatialGrid(){return m22.spatialGrid;},get physicsConstraint(){return m29.physicsConstraint;},get constraintSolver(){return m29.constraintSolver;},get characterMotor(){return m4.characterMotor;},get vehicleMotor(){return m23.vehicleMotor;},get pathMotor(){return m23.pathMotor;},get projectileMotor(){return m24.projectileMotor;},get particlePhysics(){return m34.particlePhysics;},get gameEntity(){return m26.gameEntity;},get gameElements(){return m27.gameElements;},get EMPTY_DATA_SOURCE(){return m28.EMPTY_DATA_SOURCE;},get isDataSource(){return m28.isDataSource;},get gameCharacter(){return m25.gameCharacter;},get gameVehicle(){return m25.gameVehicle;},get gameProjectile(){return m25.gameProjectile;},get gameProp(){return m25.gameProp;},get gameStatic(){return m25.gameStatic;},get gameTrigger(){return m25.gameTrigger;},get gameDecoration(){return m25.gameDecoration;},get awarenessMatrix(){return m25.awarenessMatrix;},get BODY_GROUP(){return m7.BODY_GROUP;},get QUERY_GROUP(){return m7.QUERY_GROUP;},get PHYSICS_TYPES(){return m7.PHYSICS_TYPES;},get trafficController(){return m31.trafficController;},get motionController(){return m30.motionController;},get pathGeometry(){return m19.pathGeometry;},get navigationSystem(){return m35.navigationSystem;},get navigationField(){return m36.navigationField;},get roadNetwork(){return m39.roadNetwork;},get layoutGeometry(){return m33.layoutGeometry;},get rigDefinition(){return m13.rigDefinition;},get rigPose(){return m12.rigPose;},get animationClip(){return m15.animationClip;},get animationController(){return m11.animationController;},get rigSystem(){return m3.rigSystem;},get IK_SOLVERS(){return m16.IK_SOLVERS;},get ikGoal(){return m16.ikGoal;},get solveIk(){return m16.solveIk;}});
 })();
 // src/engine/directory/values.mjs
-const m40 = (()=>{
+const m42 = (()=>{
 // ===== LV2 DIRECTORY =====
 // Plain-data helpers shared by the Directory's registry, structures and loading.
 
@@ -13969,7 +14195,7 @@ function jsonCopy(value) {
 return Object.freeze({get plain(){return plain;},get clone(){return clone;},get freeze(){return freeze;},get nonnegative(){return nonnegative;},get identifier(){return identifier;},get jsonCopy(){return jsonCopy;}});
 })();
 // src/engine/directory/registry.mjs
-const m39 = (()=>{
+const m41 = (()=>{
 // ===== LV2 DIRECTORY =====
 // THE REGISTRY: the one place engine levels find data. Libraries are plain JSON packets
 // {library_id, templates, resources}; every id is qualified as `library:local`. Templates `extend`
@@ -13977,7 +14203,7 @@ const m39 = (()=>{
 // all, and everything handed out is frozen. The Basement never imports this file: it receives a
 // registry as an object (`new physicsSystem({ asset_library })`) and calls only resolveTemplate()
 // and getResource() on it.
-const {clone,freeze,plain} = m40;
+const {clone,freeze,plain} = m42;
 function validateData(value) {
     if (Array.isArray(value)) { for (const entry of value) validateData(entry); return; }
     if (plain(value)) {
@@ -14073,7 +14299,7 @@ class assetLibrary {
 return Object.freeze({get mergeDefinition(){return mergeDefinition;},get assetLibrary(){return assetLibrary;}});
 })();
 // src/engine/directory/structures.mjs
-const m41 = (()=>{
+const m43 = (()=>{
 // ===== LV2 DIRECTORY =====
 // DATA STRUCTURES: what each kind of library resource looks like, and the checks that an entry is
 // well formed. A structure names fields, units and defaults; it never says what the data does.
@@ -14083,11 +14309,26 @@ const m41 = (()=>{
 // map_layout     { map_id?, props: [placement], ...any other per-map lists (copied as data) }
 //                placement = { type, x, y, ...fields }: fields override the type's defaults, and a
 //                field set to null removes that default.
-const {plain} = m40;
+// skeleton       { rig_id, joints: [{ name, parent?, position?, rotation?, scale?, limits? }], anchors? }
+//                A rig hierarchy in px and radians, +x forward, -y left. The Basement's rigDefinition
+//                packet, so a prefab compiles it as it is.
+// clip_set       { clips: [{ clip_id, duration, loop?, tracks, markers?, root_motion? }] }
+//                Animation clips for one skeleton: the Basement's animationClip packets.
+// locomotion     { idle, walk, stride, moving_speed }
+//                Which clips stand and walk, the px travelled per walk cycle, and the px/s above
+//                which a body counts as moving.
+// figure         { parts: [{ part, shape: 'circle'|'ellipse'|'capsule', joint, to?, radius?, radii? }] }
+//                How a rigged body is drawn, back to front: a circle or ellipse at a joint, or a
+//                capsule from `joint` to `to`. Sizes in px before the rig's own scale.
+const {plain} = m42;
 
 const STRUCTURES = Object.freeze({
     prop_catalog: 'A catalog of prop types: { types: { <type>: { defaults, movable? } } }.',
-    map_layout: 'A map\'s placements over a prop catalog: { props: [{ type, x, y, ...fields }], ... }.'
+    map_layout: 'A map\'s placements over a prop catalog: { props: [{ type, x, y, ...fields }], ... }.',
+    skeleton: 'A rig hierarchy: { rig_id, joints: [{ name, parent?, position?, rotation?, scale?, limits? }], anchors? }.',
+    clip_set: 'Animation clips for one skeleton: { clips: [{ clip_id, duration, tracks, markers? }] }.',
+    locomotion: 'Which clips stand and walk: { idle, walk, stride (px per cycle), moving_speed (px/s) }.',
+    figure: 'How a rigged body is drawn, back to front: { parts: [{ part, shape, joint, to?, radius?, radii? }] }.'
 });
 
 const fail = (where, message) => { throw new TypeError(`${where}: ${message}`); };
@@ -14113,10 +14354,772 @@ function validateMapLayout(layout, types, where = 'map_layout') {
     return layout;
 }
 
-return Object.freeze({get STRUCTURES(){return STRUCTURES;},get validatePropCatalog(){return validatePropCatalog;},get validateMapLayout(){return validateMapLayout;}});
+const name = value => typeof value === 'string' && value.length > 0;
+
+/** Throws unless `data` is a skeleton whose joints have unique names and known parents. Returns it. */
+function validateSkeleton(data, where = 'skeleton') {
+    if (!plain(data) || !name(data.rig_id) || !Array.isArray(data.joints) || !data.joints.length) fail(where, 'requires a rig_id and a joints list');
+    const names = new Set();
+    for (const joint of data.joints) { if (!plain(joint) || !name(joint.name) || names.has(joint.name)) fail(where, `joint ${joint?.name} needs a unique name`); names.add(joint.name); }
+    for (const joint of data.joints) if (joint.parent != null && !names.has(joint.parent)) fail(where, `joint ${joint.name}: unknown parent ${joint.parent}`);
+    for (const [id, anchor] of Object.entries(data.anchors ?? {})) if (!plain(anchor) || !names.has(anchor.joint)) fail(where, `anchor ${id}: unknown joint`);
+    return data;
+}
+
+/** Throws unless `data` is a clip_set of uniquely named clips with positive durations. Returns it. */
+function validateClipSet(data, where = 'clip_set') {
+    if (!plain(data) || !Array.isArray(data.clips)) fail(where, 'requires a clips list');
+    const ids = new Set();
+    for (const clip of data.clips) {
+        if (!plain(clip) || !name(clip.clip_id) || ids.has(clip.clip_id)) fail(where, `clip ${clip?.clip_id} needs a unique clip_id`);
+        if (!(clip.duration > 0) || !Array.isArray(clip.tracks)) fail(where, `clip ${clip.clip_id} needs a positive duration and tracks`);
+        ids.add(clip.clip_id);
+    }
+    return data;
+}
+
+/** Throws unless `data` is locomotion naming its clips, with a positive stride. Returns it. */
+function validateLocomotion(data, where = 'locomotion') {
+    if (!plain(data) || !name(data.idle) || !name(data.walk)) fail(where, 'requires idle and walk clip ids');
+    if (!(data.stride > 0) || !(data.moving_speed >= 0)) fail(where, 'requires a positive stride and a moving_speed of zero or more');
+    return data;
+}
+
+/** Throws unless `data` is a figure: named parts of a known shape, with the sizes that shape needs. Returns it. */
+function validateFigure(data, where = 'figure') {
+    if (!plain(data) || !Array.isArray(data.parts)) fail(where, 'requires a parts list');
+    for (const p of data.parts) {
+        if (!plain(p) || !name(p.part) || !name(p.joint)) fail(where, `part ${p?.part} needs a name and a joint`);
+        if (p.shape === 'capsule' ? !name(p.to) || !(p.radius > 0) : p.shape === 'circle' ? !(p.radius > 0) : p.shape === 'ellipse' ? !Array.isArray(p.radii) || !p.radii.every(r => r > 0) : true) fail(where, `part ${p.part}: a ${p.shape} needs its sizes`);
+    }
+    return data;
+}
+
+const VALIDATORS = { prop_catalog: validatePropCatalog, skeleton: validateSkeleton, clip_set: validateClipSet, locomotion: validateLocomotion, figure: validateFigure };
+/** Validates every resource of a library whose kind has a structure here; other kinds pass through. Returns the library. */
+function validateLibrary(library) {
+    for (const [id, resource] of Object.entries(library?.resources ?? {})) VALIDATORS[resource?.kind]?.(resource, `${library.library_id}:${id}`);
+    return library;
+}
+
+return Object.freeze({get STRUCTURES(){return STRUCTURES;},get validatePropCatalog(){return validatePropCatalog;},get validateMapLayout(){return validateMapLayout;},get validateSkeleton(){return validateSkeleton;},get validateClipSet(){return validateClipSet;},get validateLocomotion(){return validateLocomotion;},get validateFigure(){return validateFigure;},get validateLibrary(){return validateLibrary;}});
+})();
+const m45 = Object.freeze({default:{
+ "library_id": "engine",
+ "description": "The engine's default library: base entity kinds and a default humanoid. Any game may start from it, extend it or replace it.",
+ "resources": {
+  "humanoid_skeleton": {
+   "kind": "skeleton",
+   "rig_id": "engine:humanoid",
+   "joints": [
+    {
+     "name": "root"
+    },
+    {
+     "name": "pelvis",
+     "parent": "root",
+     "position": [
+      -1,
+      0
+     ]
+    },
+    {
+     "name": "torso",
+     "parent": "root"
+    },
+    {
+     "name": "head",
+     "parent": "torso",
+     "position": [
+      1,
+      0
+     ],
+     "limits": {
+      "min_rotation": -1.3,
+      "max_rotation": 1.3
+     }
+    },
+    {
+     "name": "shoulder_l",
+     "parent": "torso",
+     "position": [
+      0,
+      -11
+     ]
+    },
+    {
+     "name": "elbow_l",
+     "parent": "shoulder_l",
+     "position": [
+      3,
+      -3
+     ]
+    },
+    {
+     "name": "hand_l",
+     "parent": "elbow_l",
+     "position": [
+      7,
+      4
+     ]
+    },
+    {
+     "name": "hip_l",
+     "parent": "pelvis",
+     "position": [
+      0,
+      -5
+     ]
+    },
+    {
+     "name": "knee_l",
+     "parent": "hip_l",
+     "position": [
+      2,
+      0
+     ]
+    },
+    {
+     "name": "foot_l",
+     "parent": "knee_l",
+     "position": [
+      2,
+      0
+     ]
+    },
+    {
+     "name": "shoulder_r",
+     "parent": "torso",
+     "position": [
+      0,
+      11
+     ]
+    },
+    {
+     "name": "elbow_r",
+     "parent": "shoulder_r",
+     "position": [
+      3,
+      3
+     ]
+    },
+    {
+     "name": "hand_r",
+     "parent": "elbow_r",
+     "position": [
+      7,
+      -4
+     ]
+    },
+    {
+     "name": "hip_r",
+     "parent": "pelvis",
+     "position": [
+      0,
+      5
+     ]
+    },
+    {
+     "name": "knee_r",
+     "parent": "hip_r",
+     "position": [
+      2,
+      0
+     ]
+    },
+    {
+     "name": "foot_r",
+     "parent": "knee_r",
+     "position": [
+      2,
+      0
+     ]
+    }
+   ],
+   "anchors": {
+    "hand_l": {
+     "joint": "hand_l"
+    },
+    "hand_r": {
+     "joint": "hand_r"
+    },
+    "head": {
+     "joint": "head"
+    },
+    "back": {
+     "joint": "torso",
+     "position": [
+      -8,
+      0
+     ]
+    },
+    "seat": {
+     "joint": "pelvis"
+    }
+   }
+  },
+  "humanoid_clips": {
+   "kind": "clip_set",
+   "clips": [
+    {
+     "clip_id": "idle",
+     "duration": 2,
+     "tracks": [
+      {
+       "joint": "head",
+       "channel": "position",
+       "keys": [
+        {
+         "time": 0,
+         "value": [
+          1,
+          0
+         ]
+        },
+        {
+         "time": 1,
+         "value": [
+          1.25,
+          0
+         ]
+        },
+        {
+         "time": 2,
+         "value": [
+          1,
+          0
+         ]
+        }
+       ]
+      },
+      {
+       "joint": "torso",
+       "channel": "scale",
+       "keys": [
+        {
+         "time": 0,
+         "value": [
+          1,
+          1
+         ]
+        },
+        {
+         "time": 1,
+         "value": [
+          1,
+          1.02
+         ]
+        },
+        {
+         "time": 2,
+         "value": [
+          1,
+          1
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "clip_id": "walk",
+     "duration": 1,
+     "tracks": [
+      {
+       "joint": "knee_l",
+       "channel": "position",
+       "keys": [
+        {
+         "time": 0,
+         "value": [
+          2,
+          0
+         ]
+        },
+        {
+         "time": 0.25,
+         "value": [
+          5,
+          0
+         ]
+        },
+        {
+         "time": 0.5,
+         "value": [
+          2,
+          0
+         ]
+        },
+        {
+         "time": 0.75,
+         "value": [
+          -1,
+          0
+         ]
+        },
+        {
+         "time": 1,
+         "value": [
+          2,
+          0
+         ]
+        }
+       ]
+      },
+      {
+       "joint": "foot_l",
+       "channel": "position",
+       "keys": [
+        {
+         "time": 0,
+         "value": [
+          2,
+          0
+         ]
+        },
+        {
+         "time": 0.25,
+         "value": [
+          5,
+          0
+         ]
+        },
+        {
+         "time": 0.5,
+         "value": [
+          2,
+          0
+         ]
+        },
+        {
+         "time": 0.75,
+         "value": [
+          -1,
+          0
+         ]
+        },
+        {
+         "time": 1,
+         "value": [
+          2,
+          0
+         ]
+        }
+       ]
+      },
+      {
+       "joint": "hand_l",
+       "channel": "position",
+       "keys": [
+        {
+         "time": 0,
+         "value": [
+          7,
+          -4
+         ]
+        },
+        {
+         "time": 0.25,
+         "value": [
+          5,
+          -4
+         ]
+        },
+        {
+         "time": 0.5,
+         "value": [
+          7,
+          -4
+         ]
+        },
+        {
+         "time": 0.75,
+         "value": [
+          9,
+          -4
+         ]
+        },
+        {
+         "time": 1,
+         "value": [
+          7,
+          -4
+         ]
+        }
+       ]
+      },
+      {
+       "joint": "knee_r",
+       "channel": "position",
+       "keys": [
+        {
+         "time": 0,
+         "value": [
+          2,
+          0
+         ]
+        },
+        {
+         "time": 0.25,
+         "value": [
+          -1,
+          0
+         ]
+        },
+        {
+         "time": 0.5,
+         "value": [
+          2,
+          0
+         ]
+        },
+        {
+         "time": 0.75,
+         "value": [
+          5,
+          0
+         ]
+        },
+        {
+         "time": 1,
+         "value": [
+          2,
+          0
+         ]
+        }
+       ]
+      },
+      {
+       "joint": "foot_r",
+       "channel": "position",
+       "keys": [
+        {
+         "time": 0,
+         "value": [
+          2,
+          0
+         ]
+        },
+        {
+         "time": 0.25,
+         "value": [
+          -1,
+          0
+         ]
+        },
+        {
+         "time": 0.5,
+         "value": [
+          2,
+          0
+         ]
+        },
+        {
+         "time": 0.75,
+         "value": [
+          5,
+          0
+         ]
+        },
+        {
+         "time": 1,
+         "value": [
+          2,
+          0
+         ]
+        }
+       ]
+      },
+      {
+       "joint": "hand_r",
+       "channel": "position",
+       "keys": [
+        {
+         "time": 0,
+         "value": [
+          7,
+          4
+         ]
+        },
+        {
+         "time": 0.25,
+         "value": [
+          9,
+          4
+         ]
+        },
+        {
+         "time": 0.5,
+         "value": [
+          7,
+          4
+         ]
+        },
+        {
+         "time": 0.75,
+         "value": [
+          5,
+          4
+         ]
+        },
+        {
+         "time": 1,
+         "value": [
+          7,
+          4
+         ]
+        }
+       ]
+      },
+      {
+       "joint": "torso",
+       "channel": "rotation",
+       "keys": [
+        {
+         "time": 0,
+         "value": 0
+        },
+        {
+         "time": 0.25,
+         "value": 0.045
+        },
+        {
+         "time": 0.5,
+         "value": 0
+        },
+        {
+         "time": 0.75,
+         "value": -0.045
+        },
+        {
+         "time": 1,
+         "value": 0
+        }
+       ]
+      }
+     ],
+     "markers": [
+      {
+       "name": "footstep_l",
+       "time": 0.25
+      },
+      {
+       "name": "footstep_r",
+       "time": 0.75
+      }
+     ]
+    }
+   ]
+  },
+  "humanoid_locomotion": {
+   "kind": "locomotion",
+   "idle": "idle",
+   "walk": "walk",
+   "stride": 36,
+   "moving_speed": 4
+  },
+  "humanoid_figure": {
+   "kind": "figure",
+   "parts": [
+    {
+     "part": "foot_l",
+     "shape": "ellipse",
+     "joint": "foot_l",
+     "radii": [
+      3.5,
+      2.2
+     ]
+    },
+    {
+     "part": "foot_r",
+     "shape": "ellipse",
+     "joint": "foot_r",
+     "radii": [
+      3.5,
+      2.2
+     ]
+    },
+    {
+     "part": "upper_arm_l",
+     "shape": "capsule",
+     "joint": "shoulder_l",
+     "to": "elbow_l",
+     "radius": 3.2
+    },
+    {
+     "part": "forearm_l",
+     "shape": "capsule",
+     "joint": "elbow_l",
+     "to": "hand_l",
+     "radius": 2.6
+    },
+    {
+     "part": "hand_l",
+     "shape": "circle",
+     "joint": "hand_l",
+     "radius": 2.2
+    },
+    {
+     "part": "upper_arm_r",
+     "shape": "capsule",
+     "joint": "shoulder_r",
+     "to": "elbow_r",
+     "radius": 3.2
+    },
+    {
+     "part": "forearm_r",
+     "shape": "capsule",
+     "joint": "elbow_r",
+     "to": "hand_r",
+     "radius": 2.6
+    },
+    {
+     "part": "hand_r",
+     "shape": "circle",
+     "joint": "hand_r",
+     "radius": 2.2
+    },
+    {
+     "part": "torso",
+     "shape": "ellipse",
+     "joint": "torso",
+     "radii": [
+      7,
+      12
+     ]
+    },
+    {
+     "part": "head",
+     "shape": "circle",
+     "joint": "head",
+     "radius": 6.5
+    }
+   ]
+  }
+ },
+ "templates": {
+  "entity": {
+   "entity_type": "entity",
+   "tags": [],
+   "assets": {},
+   "data": {}
+  },
+  "character": {
+   "extends": "entity",
+   "entity_type": "character",
+   "physics_type": "character",
+   "collision_group": 2,
+   "collision_mask": 2147483647,
+   "collision_shape": {
+    "shape_type": "circle",
+    "radius": 12
+   },
+   "mass": 15,
+   "movement": {
+    "max_speed": 180,
+    "acceleration": 900,
+    "braking": 1200,
+    "arrival_distance": 2
+   }
+  },
+  "prop": {
+   "extends": "entity",
+   "entity_type": "prop",
+   "physics_type": "rigid",
+   "collision_group": 8,
+   "collision_mask": 2147483647,
+   "collision_shape": {
+    "shape_type": "box",
+    "dimensions": [
+     20,
+     20
+    ]
+   },
+   "mass": 5
+  },
+  "static": {
+   "extends": "entity",
+   "entity_type": "static",
+   "physics_type": "static",
+   "collision_group": 1,
+   "collision_mask": 2147483647,
+   "collision_shape": {
+    "shape_type": "box",
+    "dimensions": [
+     100,
+     10
+    ]
+   }
+  },
+  "trigger": {
+   "extends": "entity",
+   "entity_type": "trigger",
+   "physics_type": "static",
+   "ghost": true,
+   "collision_group": 32,
+   "collision_mask": 14,
+   "collision_shape": {
+    "shape_type": "box",
+    "dimensions": [
+     40,
+     40
+    ]
+   }
+  },
+  "decoration": {
+   "extends": "entity",
+   "entity_type": "decoration",
+   "physics_type": "static",
+   "collision_group": 0,
+   "collision_mask": 0,
+   "query_mask": 0,
+   "collision_shape": {
+    "shape_type": "box",
+    "dimensions": [
+     20,
+     20
+    ]
+   }
+  },
+  "humanoid": {
+   "extends": "character",
+   "tags": [
+    "humanoid"
+   ],
+   "assets": {
+    "skeleton": "humanoid_skeleton",
+    "clips": "humanoid_clips",
+    "locomotion": "humanoid_locomotion",
+    "figure": "humanoid_figure"
+   }
+  }
+ }
+}});
+// src/engine/directory/defaults/index.mjs
+const m44 = (()=>{
+// ===== LV2 DIRECTORY =====
+// DEFAULT LIBRARIES: the data the engine runs on with no game installed. `engine.json` holds the
+// base entity kinds (entity, character, prop, static, trigger, decoration) and a default humanoid
+// (skeleton, idle and walk clips, locomotion). A game registers its own libraries beside it, and
+// its templates may extend `engine:` ones.
+const engine = m45.default;
+const {assetLibrary} = m41;
+const {validateLibrary} = m43;
+
+const deepFreeze = value => { if (value && typeof value === 'object') { for (const child of Object.values(value)) deepFreeze(child); Object.freeze(value); } return value; };
+
+/** The engine's default library packets, validated and frozen. */
+const ENGINE_LIBRARIES = deepFreeze([validateLibrary(engine)]);
+
+/** A registry holding the engine's defaults, then `libraries` (each validated) in order. */
+function createEngineRegistry({ libraries = [] } = {}) {
+    return new assetLibrary({ libraries: [...ENGINE_LIBRARIES, ...libraries.map(validateLibrary)] });
+}
+
+return Object.freeze({get ENGINE_LIBRARIES(){return ENGINE_LIBRARIES;},get createEngineRegistry(){return createEngineRegistry;}});
 })();
 // src/engine/directory/loading.mjs
-const m42 = (()=>{
+const m46 = (()=>{
 // ===== LV2 DIRECTORY =====
 // LOADING: turning authored library data into ready-to-use data, once, at load time. Every result
 // is a detached copy; nothing here keeps state or touches a world.
@@ -14149,17 +15152,18 @@ function resolveLayout(layout, types, { omit = [] } = {}) {
 return Object.freeze({get resolvePlacement(){return resolvePlacement;},get isMovable(){return isMovable;},get resolveLayout(){return resolveLayout;}});
 })();
 // src/engine/directory/index.mjs
-const m38 = (()=>{
+const m40 = (()=>{
 // ===== LV2 DIRECTORY =====
-// The engine's data layer: the registry, data structures and loading. See README.md.
+// The engine's data layer: the registry, data structures, loading and default libraries. See README.md.
 
 
 
 
 
-return Object.freeze({get assetLibrary(){return m39.assetLibrary;},get mergeDefinition(){return m39.mergeDefinition;},get identifier(){return m40.identifier;},get nonnegative(){return m40.nonnegative;},get jsonCopy(){return m40.jsonCopy;},get STRUCTURES(){return m41.STRUCTURES;},get validatePropCatalog(){return m41.validatePropCatalog;},get validateMapLayout(){return m41.validateMapLayout;},get resolvePlacement(){return m42.resolvePlacement;},get resolveLayout(){return m42.resolveLayout;},get isMovable(){return m42.isMovable;}});
+
+return Object.freeze({get assetLibrary(){return m41.assetLibrary;},get mergeDefinition(){return m41.mergeDefinition;},get identifier(){return m42.identifier;},get nonnegative(){return m42.nonnegative;},get jsonCopy(){return m42.jsonCopy;},get STRUCTURES(){return m43.STRUCTURES;},get validatePropCatalog(){return m43.validatePropCatalog;},get validateMapLayout(){return m43.validateMapLayout;},get validateSkeleton(){return m43.validateSkeleton;},get validateClipSet(){return m43.validateClipSet;},get validateLocomotion(){return m43.validateLocomotion;},get validateFigure(){return m43.validateFigure;},get validateLibrary(){return m43.validateLibrary;},get ENGINE_LIBRARIES(){return m44.ENGINE_LIBRARIES;},get createEngineRegistry(){return m44.createEngineRegistry;},get resolvePlacement(){return m46.resolvePlacement;},get resolveLayout(){return m46.resolveLayout;},get isMovable(){return m46.isMovable;}});
 })();
-const m45 = Object.freeze({default:{
+const m49 = Object.freeze({default:{
   "_about": {
     "chapter": "Enemies and encounters: what each enemy kind starts with, the drones, the Triumvirate and Lilitu, their hazards, and the Horde Gauntlet.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.enemies and checked by tools/test-game-db.cjs. Times are seconds unless a name says frames (60 a second); distances px; damage HP. Keys in UPPER_SNAKE are read by the code under those names. Gauntlet ids and kind ids are in save files: never rename one.",
@@ -14702,8 +15706,8 @@ const m45 = Object.freeze({default:{
   }
 }});
 // src/game/data/game-bosses.mjs
-const m44 = (()=>{
-const enemies = m45.default;
+const m48 = (()=>{
+const enemies = m49.default;
 function createBossRules(source=enemies){return {demoness:structuredClone(source.kinds.demoness),duel:structuredClone(source.duel),warden:structuredClone(source.warden),wardens:structuredClone(source.wardens),hazards:structuredClone(source.hazards),rite_limit_radius:1800};}
 function createDemonessAppearance({decoy=false}={}){return {gender:'female',skinColor:'#8a0707',eyeColor:decoy?'#2a0508':'#ff5a1a',blood:'ink',build:'curvy',height:1.14,hair:{type:'demon_dancer',color:'#0a0000'},hat:{type:'demon_horns',color:'#160406',trim:'#e3a64a'},top:{type:'sleeved_crop',color:'#0a0406',trim:'#e3a64a'},bottom:{type:'long_skirt',color:'#0a0406',trim:'#b0122e'},train:{type:'dress_train',color:'#2a0610'},shoes:{type:'heels',color:'#0a0406'}};}
 function createBossAbilities(source=enemies){
@@ -14729,7 +15733,7 @@ function createBossAbilities(source=enemies){
 
 return Object.freeze({get createBossRules(){return createBossRules;},get createDemonessAppearance(){return createDemonessAppearance;},get createBossAbilities(){return createBossAbilities;}});
 })();
-const m46 = Object.freeze({default:{
+const m50 = Object.freeze({default:{
   "radius": 8,
   "mass": 3,
   "follow_offset": [
@@ -14746,8 +15750,8 @@ const m46 = Object.freeze({default:{
   "rest_after": 2.5
 }});
 // src/game/data/game-drones.mjs
-const m47 = (()=>{
-const enemies = m45.default;
+const m51 = (()=>{
+const enemies = m49.default;
 /** Authored Drone balance is converted once to seconds and pixels per second. */
 function createDroneRules(def=enemies.drone,kind=enemies.kinds.drone){return {flight:def,health:def.HP,mass:kind.mass,radius:kind.radius,speed:kind.speed*60,damage_grace_seconds:kind.invincible_frames/60};}
 function createDroneAbilities(d=enemies.drone){
@@ -14762,7 +15766,7 @@ function createDroneAbilities(d=enemies.drone){
 
 return Object.freeze({get createDroneRules(){return createDroneRules;},get createDroneAbilities(){return createDroneAbilities;}});
 })();
-const m49 = Object.freeze({default:{
+const m53 = Object.freeze({default:{
   "weapon_id": "gatling_gunner",
   "ability_id": "gatling_burst",
   "range": 900,
@@ -14793,15 +15797,15 @@ const m49 = Object.freeze({default:{
   }
 }});
 // src/game/data/game-gunners.mjs
-const m48 = (()=>{
-const enemies = m45.default;
-const rules = m49.default;
+const m52 = (()=>{
+const enemies = m49.default;
+const rules = m53.default;
 function createGunnerRules(kind=enemies.kinds.gatling_gunner){return {...structuredClone(rules),burst_count:kind.burst_count,round_seconds:kind.burst_delay/60,reload_seconds:kind.reload/60,tell_seconds:kind.telegraph_frames/60};}
 function createGunnerAbilities(kind=enemies.kinds.gatling_gunner){const r=createGunnerRules(kind);return {[r.ability_id]:{name:'Gatling burst',description:'Wind up, fire an owned rotary weapon, then reload.',delivery:'burst',required_weapon_id:r.weapon_id,range:r.range,speed:r.gun.speed*60,cooldown_seconds:r.reload_seconds,tell_seconds:r.tell_seconds,reload_seconds:r.reload_seconds,burst_count:r.burst_count,allow_mounted:false,require_sight:true}};}
 
 return Object.freeze({get createGunnerRules(){return createGunnerRules;},get createGunnerAbilities(){return createGunnerAbilities;}});
 })();
-const m51 = Object.freeze({default:{
+const m55 = Object.freeze({default:{
   "HP": 30,
   "RADIUS": 11,
   "SCALE": 0.72,
@@ -14844,8 +15848,8 @@ const m51 = Object.freeze({default:{
   "IMPACT": 84
 }});
 // src/game/data/game-marionettes.mjs
-const m50 = (()=>{
-const authored = m51.default;
+const m54 = (()=>{
+const authored = m55.default;
 const freeze=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))freeze(child);Object.freeze(value);}return value;};
 const MARIONETTE_RULES=freeze(structuredClone(authored));
 function createMarionetteRules(){const m=authored;return {health:m.HP,radius:m.RADIUS,mass:m.MASS,move_speed:m.SPEED*60,damage_grace_seconds:m.INVINCIBLE_FRAMES/60,ballistic_multiplier:m.SHOT,sight:m.SIGHT,reach:m.REACH,space:m.SPACE,flank_range:m.REACH+m.CIRCLE,flank_offsets:[[m.CIRCLE,0],[0,m.CIRCLE],[-m.CIRCLE,0],[0,-m.CIRCLE]],drift_speed:m.DRIFT*60,yank_speed:m.YANK_SPEED*60,yank_interval:m.YANK,yank_seconds:m.YANK_SECONDS,cloth:m.CLOTH};}
@@ -14854,7 +15858,7 @@ function createMarionetteAbilities(){const m=authored;return {marionette_lunge:{
 return Object.freeze({get MARIONETTE_RULES(){return MARIONETTE_RULES;},get createMarionetteRules(){return createMarionetteRules;},get createMarionetteAbilities(){return createMarionetteAbilities;}});
 })();
 // src/game/data/game-hunters.mjs
-const m52 = (()=>{
+const m56 = (()=>{
 /** Normalize existing Hunter authoring once; gameplay and Basement receive engine units. */
 function createHunterRules(kind,{authoring_hz=60}={}){
  return {dash_max:kind.dashes,dash_cooldown:kind.dash_cd/authoring_hz,dash_initial:90/authoring_hz,dash_chain_delay:22/authoring_hz,dash_retry:30/authoring_hz,dash_min_range:150,dash_max_range:420,dash_stop_distance:70,evade_min_cooldown:40/authoring_hz,evade_distance:90,evade_speed:540,evade_chance:.5,evade_cooldown:120/authoring_hz,minimum_visibility:.55,claw_range:kind.claw_reach};
@@ -14872,7 +15876,7 @@ function createHunterAppearance({alpha=false,random=Math.random}={}){
 
 return Object.freeze({get createHunterRules(){return createHunterRules;},get createHunterAbilities(){return createHunterAbilities;},get createHunterAppearance(){return createHunterAppearance;}});
 })();
-const m55 = Object.freeze({default:{
+const m59 = Object.freeze({default:{
   "_about": {
     "chapter": "Items and gear: everything she can carry, drink, read, craft or own.",
     "how_to_edit": "Plain JSON. tools/build.mjs inlines this file as GAME_DB.items when it builds the game, and tools/test-game-db.cjs checks it. Entry field names stay camelCase because the game code reads them by those names. A \"note\" field is for people and is never read by the game.",
@@ -15657,10 +16661,10 @@ const m55 = Object.freeze({default:{
   ]
 }});
 // src/game/data/game-items.mjs
-const m54 = (()=>{
-const gunnerRules = m49.default;
-const enemies = m45.default;
-const definitions = m55.default;
+const m58 = (()=>{
+const gunnerRules = m53.default;
+const enemies = m49.default;
+const definitions = m59.default;
 
 /** Concrete item definitions stay in the Directory; gameplay receives plain catalog data. */
 function createItemCatalog(items=definitions,{enemy_kinds=enemies.kinds}={}) {
@@ -15681,7 +16685,7 @@ function createItemCatalog(items=definitions,{enemy_kinds=enemies.kinds}={}) {
 
 return Object.freeze({get createItemCatalog(){return createItemCatalog;}});
 })();
-const m57 = Object.freeze({default:{
+const m61 = Object.freeze({default:{
   "_about": {
     "chapter": "Progression: Resonance (949's levels), the three tuning trees, castable abilities, and the perks closeness unlocks.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.progression and checked by tools/test-game-db.cjs. Node ids, tree ids and ability ids are in save files: never rename one. A \"note\" is for people only.",
@@ -15955,7 +16959,7 @@ const m57 = Object.freeze({default:{
     }
   }
 }});
-const m58 = Object.freeze({default:{
+const m62 = Object.freeze({default:{
   "authoring_hz": 60,
   "local_position": [20, 0],
   "projectile_radius": 5,
@@ -15964,16 +16968,16 @@ const m58 = Object.freeze({default:{
   "damage_type": "energy"
 }});
 // src/game/data/game-abilities.mjs
-const m56 = (()=>{
-const {createBossAbilities} = m44;
-const {createDroneAbilities} = m47;
-const {createGunnerAbilities} = m48;
-const {createMarionetteAbilities} = m50;
-const enemies = m45.default;
-const {createHunterAbilities} = m52;
-const progression = m57.default;
-const rules = m58.default;
-const {identifier,nonnegative,jsonCopy} = m38;
+const m60 = (()=>{
+const {createBossAbilities} = m48;
+const {createDroneAbilities} = m51;
+const {createGunnerAbilities} = m52;
+const {createMarionetteAbilities} = m54;
+const enemies = m49.default;
+const {createHunterAbilities} = m56;
+const progression = m61.default;
+const rules = m62.default;
+const {identifier,nonnegative,jsonCopy} = m40;
 
 /** Existing authored balance becomes engine units once at the Directory boundary. */
 function createAbilityCatalog(definitions=progression.abilities,{hunter_kind=enemies.kinds.hunter,gunner_kind=enemies.kinds.gatling_gunner,drone_definition=enemies.drone,boss_definitions=enemies}={}){
@@ -15990,7 +16994,7 @@ function createAbilityCatalog(definitions=progression.abilities,{hunter_kind=ene
 
 return Object.freeze({get createAbilityCatalog(){return createAbilityCatalog;}});
 })();
-const m59 = Object.freeze({default:{
+const m63 = Object.freeze({default:{
   "authoring_hz": 60,
   "crit_chance": 0.1,
   "crit_multiplier": 2,
@@ -16069,7 +17073,7 @@ const m59 = Object.freeze({default:{
     "minimum_cooldown_seconds": 0.6
   }
 }});
-const m60 = Object.freeze({default:{
+const m64 = Object.freeze({default:{
   "firearm_range": 400,
   "melee_range": 65,
   "unarmed_range": 65,
@@ -16080,11 +17084,11 @@ const m60 = Object.freeze({default:{
   }
 }});
 // src/game/data/game-attacks.mjs
-const m53 = (()=>{
-const {createItemCatalog} = m54;
-const {createAbilityCatalog} = m56;
-const combatRules = m59.default;
-const rules = m60.default;
+const m57 = (()=>{
+const {createItemCatalog} = m58;
+const {createAbilityCatalog} = m60;
+const combatRules = m63.default;
+const rules = m64.default;
 
 /** References to existing item/capability definitions, not a second balance/ownership ledger. */
 function createAttackCatalog({items=createItemCatalog(),abilities=createAbilityCatalog()}={}){
@@ -16099,12 +17103,12 @@ function createAttackCatalog({items=createItemCatalog(),abilities=createAbilityC
 
 return Object.freeze({get createAttackCatalog(){return createAttackCatalog;}});
 })();
-const m61 = Object.freeze({default:{
+const m65 = Object.freeze({default:{
  "health":100,"authoring_hz":60,"damage_grace_seconds":0,
  "npc":{"follow_distance":60,"recover_distance":300,"cruise_speed":210,"match_speed":312,"catchup_speed":420,"match_distance":30,"catchup_distance":100,"combat_range":400,"recovery_delay":3,"regeneration_interval":0.5,"regeneration_amount":1,"stim_threshold":0.3,"stim_heal":50,"stim_cooldown":2,"stim_count":3,"aura_range":120,"aura_interval":1,"hire_cost":400,"hire_minutes":480},
  "ganger":{"vision_fov":1.2566370614359172,"personal_space":50,"touch_distance":32,"suspicion_near_per_second":300,"suspicion_sight_per_second":150,"suspicion_idle_drain_per_second":30,"suspicion_search_drain_per_second":6,"suspicion_decay_delay":2,"noise_decay_delay":3,"suppression_seconds":1.5,"suppression_cooldown":0.25,"search_speed":90,"retreat_speed":90,"engage_distance":150,"retreat_distance":80,"search_arrival":40,"wander_speed":30,"wander_radius":200,"wander_min_seconds":2,"wander_random_seconds":3.3333333333333335,"search_look_seconds":0.75,"search_timeout":5,"interrupt_seconds":0.2,"interrupt_resistance":0.65,"shot_jitter_seconds":0.3333333333333333}
 }});
-const m62 = Object.freeze({default:{
+const m66 = Object.freeze({default:{
   "max_health": 100,
   "movement_speed": 312,
   "sneak_speed_factor": 0.55,
@@ -16122,7 +17126,7 @@ const m62 = Object.freeze({default:{
     "minimum_distance": 1
   }
 }});
-const m63 = Object.freeze({default:{
+const m67 = Object.freeze({default:{
   "library_id": "df",
   "description": "Directory-owned entity definitions for the standalone engine. Existing game classes migrate to these contracts in the next phase. Units: world pixels, seconds, radians and kilograms.",
   "resources": {
@@ -16676,7 +17680,7 @@ const m63 = Object.freeze({default:{
     }
   }
 }});
-const m64 = Object.freeze({default:{
+const m68 = Object.freeze({default:{
   "library_id": "df_street",
   "resources": {
     "rules": {
@@ -16743,7 +17747,7 @@ const m64 = Object.freeze({default:{
     }
   }
 }});
-const m66 = Object.freeze({default:{
+const m70 = Object.freeze({default:{
   "library_id": "df_props",
   "description": "Every prop type any map can place. A type gives defaults; a placement in a map file gives its top-left x, y and only the fields that differ (null removes a default). Fields are the authored appearance options the prop artists read (decorType, color, interactionType, ...). movable: the player can grab and push it.",
   "templates": {},
@@ -16999,7 +18003,7 @@ const m66 = Object.freeze({default:{
     }
   }
 }});
-const m67 = Object.freeze({default:{
+const m71 = Object.freeze({default:{
   "map_id": "apt_949",
   "host": "native",
   "props": [
@@ -17118,7 +18122,7 @@ const m67 = Object.freeze({default:{
     {"x": 700, "y": 24, "w": 1370, "h": 70, "round": 35, "color": "#ffe2b8", "intensity": 0.75, "soft": true}
   ]
 }});
-const m68 = Object.freeze({default:{
+const m72 = Object.freeze({default:{
   "map_id": "auto_shop",
   "props": [
     {"type": "ta_lift", "x": 110, "y": 140},
@@ -17165,7 +18169,7 @@ const m68 = Object.freeze({default:{
     {"class": "NPC", "args": [1050, 200, "Torque", "mechanic"], "apply": {"angle": 1.5707963267948966}}
   ]
 }});
-const m69 = Object.freeze({default:{
+const m73 = Object.freeze({default:{
   "map_id": "biggs_arena",
   "props": [],
   "lamps": [
@@ -17183,7 +18187,7 @@ const m69 = Object.freeze({default:{
     {"class": "NPC", "args": [450, 780, "Biggs", "shopkeeper"]}
   ]
 }});
-const m70 = Object.freeze({default:{
+const m74 = Object.freeze({default:{
   "map_id": "church_boss",
   "props": [
     {"type": "sc_altar", "x": 530, "y": 140},
@@ -17235,7 +18239,7 @@ const m70 = Object.freeze({default:{
     {"x": 1091, "y": 309, "radius": 60, "color": "#ffc080", "intensity": 0.5, "flicker": 4}
   ]
 }});
-const m71 = Object.freeze({default:{
+const m75 = Object.freeze({default:{
   "map_id": "cozy_cafe_interior",
   "props": [
     {"type": "cc_counter", "x": 120, "y": 245},
@@ -17330,7 +18334,7 @@ const m71 = Object.freeze({default:{
     {"x": 1061, "y": 615, "radius": 46, "color": "#ffb46a", "intensity": 0.5, "flicker": 2}
   ]
 }});
-const m72 = Object.freeze({default:{
+const m76 = Object.freeze({default:{
   "map_id": "demoness_palace",
   "props": [
     {"type": "dp_throne", "x": 866, "y": 396},
@@ -17411,7 +18415,7 @@ const m72 = Object.freeze({default:{
   ],
   "npcs": []
 }});
-const m73 = Object.freeze({default:{
+const m77 = Object.freeze({default:{
   "map_id": "enni_cole_interior",
   "props": [
     {"type": "ec_balustrade", "x": 846, "y": 50},
@@ -17547,7 +18551,7 @@ const m73 = Object.freeze({default:{
     {"x": 3015, "y": 580, "radius": 230, "color": "#ffe6c2", "intensity": 0.24, "flicker": 0}
   ]
 }});
-const m74 = Object.freeze({default:{
+const m78 = Object.freeze({default:{
   "map_id": "enni_cole_upper",
   "props": [
     {"type": "ec_balustrade", "x": 854, "y": 50, "height": 150},
@@ -17623,7 +18627,7 @@ const m74 = Object.freeze({default:{
     {"x": 1800, "y": 190, "radius": 160, "color": "#ffe0c0", "intensity": 0.3, "flicker": 0}
   ]
 }});
-const m75 = Object.freeze({default:{
+const m79 = Object.freeze({default:{
   "map_id": "ethereal_plane",
   "props": [
     {"type": "block", "x": 300, "y": 300, "width": 60, "height": 150, "color": "#4b0082"},
@@ -17637,7 +18641,7 @@ const m75 = Object.freeze({default:{
     {"class": "NPC", "args": [600, 350, "Spirit Guide", "spirit"]}
   ]
 }});
-const m76 = Object.freeze({default:{
+const m80 = Object.freeze({default:{
   "map_id": "hotel_lobby",
   "props": [
     {"type": "dn_fountain", "x": 445, "y": 265},
@@ -17700,7 +18704,7 @@ const m76 = Object.freeze({default:{
     {"x": 900, "y": 750, "radius": 150, "color": "#ffc070", "intensity": 0.8, "flicker": 0}
   ]
 }});
-const m77 = Object.freeze({default:{
+const m81 = Object.freeze({default:{
   "map_id": "hotel_suite",
   "props": [
     {"type": "ps_console", "x": 58, "y": 290},
@@ -17755,7 +18759,7 @@ const m77 = Object.freeze({default:{
     {"x": 1180, "y": 150, "radius": 90, "color": "#c890ff", "intensity": 0.4, "flicker": 3}
   ]
 }});
-const m78 = Object.freeze({default:{
+const m82 = Object.freeze({default:{
   "map_id": "house_of_death",
   "props": [
     {"type": "hod_bookcase", "x": 30, "y": 22},
@@ -17906,7 +18910,7 @@ const m78 = Object.freeze({default:{
     {"x": 1558, "y": 1458, "radius": 50, "color": "#ff8a6a", "intensity": 0.7, "flicker": 10}
   ]
 }});
-const m79 = Object.freeze({default:{
+const m83 = Object.freeze({default:{
   "map_id": "keepers_hill",
   "props": [],
   "lamps": [],
@@ -17919,7 +18923,7 @@ const m79 = Object.freeze({default:{
     {"x": 1010, "y": 640, "radius": 80, "color": "#ffb070", "intensity": 0.5, "flicker": 0}
   ]
 }});
-const m80 = Object.freeze({default:{
+const m84 = Object.freeze({default:{
   "map_id": "keepers_parlor",
   "props": [],
   "lamps": [],
@@ -17934,7 +18938,7 @@ const m80 = Object.freeze({default:{
     {"x": 850, "y": 300, "radius": 150, "color": "#8898ff", "intensity": 0.2, "flicker": 0}
   ]
 }});
-const m81 = Object.freeze({default:{
+const m85 = Object.freeze({default:{
   "map_id": "medbay_sw",
   "props": [
     {"type": "medbay_refill", "x": 200, "y": 180},
@@ -17976,7 +18980,7 @@ const m81 = Object.freeze({default:{
     {"class": "NPC", "args": [400, 200, "Dr. Yin", "medic"]}
   ]
 }});
-const m82 = Object.freeze({default:{
+const m86 = Object.freeze({default:{
   "map_id": "moon_city_nightclub",
   "props": [
     {"type": "mc_stage", "x": 620, "y": 14},
@@ -18088,7 +19092,7 @@ const m82 = Object.freeze({default:{
     {"x": 800, "y": 370, "radius": 70, "color": "#e0a0ff", "intensity": 0.6, "flicker": 2}
   ]
 }});
-const m83 = Object.freeze({default:{
+const m87 = Object.freeze({default:{
   "map_id": "neural_sys_interior",
   "props": [
     {"type": "ns_counter", "x": 400, "y": 220},
@@ -18131,7 +19135,7 @@ const m83 = Object.freeze({default:{
     {"class": "NPC", "args": [500, 170, "Prisma", "shopkeeper"]}
   ]
 }});
-const m84 = Object.freeze({default:{
+const m88 = Object.freeze({default:{
   "map_id": "ollo_interior",
   "props": [],
   "lamps": [
@@ -18143,13 +19147,13 @@ const m84 = Object.freeze({default:{
   ],
   "npcs": []
 }});
-const m85 = Object.freeze({default:{
+const m89 = Object.freeze({default:{
   "map_id": "ollo_test",
   "props": [],
   "lamps": [],
   "npcs": []
 }});
-const m86 = Object.freeze({default:{
+const m90 = Object.freeze({default:{
   "map_id": "sdc",
   "props": [
     {"type": "block", "x": 1900, "y": 1330},
@@ -18158,7 +19162,7 @@ const m86 = Object.freeze({default:{
   "lamps": [],
   "npcs": []
 }});
-const m87 = Object.freeze({default:{
+const m91 = Object.freeze({default:{
   "map_id": "van_interior",
   "props": [],
   "lamps": [],
@@ -18171,34 +19175,34 @@ const m87 = Object.freeze({default:{
   ]
 }});
 // src/game/data/game-maps.mjs
-const m65 = (()=>{
+const m69 = (()=>{
 // The game's prop library and map layouts. Any map, native or classic, places props from the one
 // catalog (game-assets/props.json); each map file (game-assets/maps/<map_id>.json) lists only
 // placements, lamps, NPC spawns and soft lights. Geometry (walls, exits, rooms, doors) stays in
 // GAME_DB.places. This file holds the game's file list; the Directory resolves the data.
-const {resolvePlacement:directoryResolvePlacement,resolveLayout,isMovable} = m38;
-const props = m66.default;
-const apt_949 = m67.default;
-const auto_shop = m68.default;
-const biggs_arena = m69.default;
-const church_boss = m70.default;
-const cozy_cafe_interior = m71.default;
-const demoness_palace = m72.default;
-const enni_cole_interior = m73.default;
-const enni_cole_upper = m74.default;
-const ethereal_plane = m75.default;
-const hotel_lobby = m76.default;
-const hotel_suite = m77.default;
-const house_of_death = m78.default;
-const keepers_hill = m79.default;
-const keepers_parlor = m80.default;
-const medbay_sw = m81.default;
-const moon_city_nightclub = m82.default;
-const neural_sys_interior = m83.default;
-const ollo_interior = m84.default;
-const ollo_test = m85.default;
-const sdc = m86.default;
-const van_interior = m87.default;
+const {resolvePlacement:directoryResolvePlacement,resolveLayout,isMovable} = m40;
+const props = m70.default;
+const apt_949 = m71.default;
+const auto_shop = m72.default;
+const biggs_arena = m73.default;
+const church_boss = m74.default;
+const cozy_cafe_interior = m75.default;
+const demoness_palace = m76.default;
+const enni_cole_interior = m77.default;
+const enni_cole_upper = m78.default;
+const ethereal_plane = m79.default;
+const hotel_lobby = m80.default;
+const hotel_suite = m81.default;
+const house_of_death = m82.default;
+const keepers_hill = m83.default;
+const keepers_parlor = m84.default;
+const medbay_sw = m85.default;
+const moon_city_nightclub = m86.default;
+const neural_sys_interior = m87.default;
+const ollo_interior = m88.default;
+const ollo_test = m89.default;
+const sdc = m90.default;
+const van_interior = m91.default;
 
 const LAYOUTS = { apt_949, auto_shop, biggs_arena, church_boss, cozy_cafe_interior, demoness_palace, enni_cole_interior, enni_cole_upper, ethereal_plane, hotel_lobby, hotel_suite, house_of_death, keepers_hill, keepers_parlor, medbay_sw, moon_city_nightclub, neural_sys_interior, ollo_interior, ollo_test, sdc, van_interior };
 
@@ -18232,7 +19236,7 @@ function resolveMapLayout(map_id, { layouts = LAYOUTS, types = PROP_TYPES } = {}
 
 return Object.freeze({get PROP_TYPES(){return PROP_TYPES;},get MAP_IDS(){return MAP_IDS;},get createMapLibraries(){return createMapLibraries;},get resolvePlacement(){return resolvePlacement;},get isMovableProp(){return isMovableProp;},get mapHost(){return mapHost;},get resolveMapLayout(){return resolveMapLayout;}});
 })();
-const m88 = Object.freeze({default:{
+const m92 = Object.freeze({default:{
   "_about": {
     "chapter": "Cast and looks: every speaker's colour, who stands where in a cinematic scene, where the crew idles at home, how every named character looks, the colours looks share, the Double Nights android finishes, the wardrobe Stella can buy and wear, and the finishes and named materials it is drawn with.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.cast and checked by tools/test-game-db.cjs. Colours are '#rrggbb' (or '#rgb'). In appearances, { \"palette\": \"<name>\" } stands for that colour from palette, so a colour several looks share is changed once. Crowds (ROLE_LOOKS) and the field mask are code and stay in core/appearances.js. _about.notes keeps the explanations that were comments in the code, keyed by path.",
@@ -19702,7 +20706,7 @@ const m88 = Object.freeze({default:{
     }
   ]
 }});
-const m89 = Object.freeze({default:{
+const m93 = Object.freeze({default:{
   "_about": {
     "chapter": "Vehicles and traffic: the car brands and models, BlackMark's factory look, the Zib cabs and where they go, how traffic treats people in the road, and the driving feel every car shares.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.vehicles and checked by tools/test-game-db.cjs. Speeds are px a tick (60 ticks a second), accelerations px a tick², times in ticks unless a name says ms, distances px, angles radians. Keys in camelCase or UPPER_SNAKE are read by the code under those names. Brand and model keys are in save files: never rename one. _about.fields explains each field of the tuning tables.",
@@ -20434,7 +21438,7 @@ const m89 = Object.freeze({default:{
     }
   }
 }});
-const m90 = Object.freeze({default:{
+const m94 = Object.freeze({default:{
   "_about": {
     "chapter": "Places: every map's size, floors, walls, zones, landmarks and ways in and out; the rooms and doors inside them; where the city's landmark blocks are; the fireplaces; and where the dyer stands.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.places and checked by tools/test-game-db.cjs. Positions and sizes are world px, from the map's top-left; angles radians. Keys in camelCase or UPPER_SNAKE are read by the code under those names. Map ids and room ids are in save files and story steps: never rename one. _about.notes keeps the explanations that were comments in the code, keyed by where they apply (maps.apt_949.cameraBounds, rooms.apt_949.doors[0], …); they're for people only.",
@@ -22174,28 +23178,28 @@ const m90 = Object.freeze({default:{
   "dyer_station": {"x":1176,"y":214,"width":58,"height":30}
 }});
 // src/game/data/game-assets.mjs
-const m43 = (()=>{
-const {createBossRules,createDemonessAppearance} = m44;
-const velvetRules = m46.default;
-const {createDroneRules} = m47;
-const {createGunnerRules} = m48;
-const {createMarionetteRules} = m50;
-const {createHunterRules} = m52;
-const {createAttackCatalog} = m53;
-const progression = m57.default;
-const {createAbilityCatalog} = m56;
-const actorRules = m61.default;
-const {createItemCatalog} = m54;
-const {assetLibrary} = m38;
-const playerRules = m62.default;
-const definitions = m63.default;
-const streetDefinitions = m64.default;
-const {createMapLibraries} = m65;
-const cast = m88.default;
-const vehicles = m89.default;
-const enemies = m45.default;
-const places = m90.default;
-const items = m55.default;
+const m47 = (()=>{
+const {createBossRules,createDemonessAppearance} = m48;
+const velvetRules = m50.default;
+const {createDroneRules} = m51;
+const {createGunnerRules} = m52;
+const {createMarionetteRules} = m54;
+const {createHunterRules} = m56;
+const {createAttackCatalog} = m57;
+const progression = m61.default;
+const {createAbilityCatalog} = m60;
+const actorRules = m65.default;
+const {createItemCatalog} = m58;
+const {assetLibrary} = m40;
+const playerRules = m66.default;
+const definitions = m67.default;
+const streetDefinitions = m68.default;
+const {createMapLibraries} = m69;
+const cast = m92.default;
+const vehicles = m93.default;
+const enemies = m49.default;
+const places = m94.default;
+const items = m59.default;
 
 /** Game data is wired here, never imported by the reusable Basement package. */
 function createGameAssetLibrary({ game_db = { cast, vehicles, enemies, places, items } } = {}) {
@@ -22236,8 +23240,8 @@ function createGameAssetLibrary({ game_db = { cast, vehicles, enemies, places, i
 return Object.freeze({get createGameAssetLibrary(){return createGameAssetLibrary;}});
 })();
 // src/game/mechanics/attacks/attack-registry.mjs
-const m97 = (()=>{
-const {identifier,jsonCopy} = m38;
+const m101 = (()=>{
+const {identifier,jsonCopy} = m40;
 const freeze=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))freeze(child);Object.freeze(value);}return value;};
 
 const synchronous=callback=>(...args)=>{const result=callback(...args);if(result&&typeof result.then==='function')throw new TypeError('Attack callbacks must be synchronous');return result;};
@@ -22274,9 +23278,9 @@ function validateAttackState(state,hasAttack){
 return Object.freeze({get attackRegistry(){return attackRegistry;},get validateAttackState(){return validateAttackState;}});
 })();
 // src/game/mechanics/actors/actor-vitals.mjs
-const m98 = (()=>{
-const rules = m61.default;
-const {nonnegative,jsonCopy} = m38;
+const m102 = (()=>{
+const rules = m65.default;
+const {nonnegative,jsonCopy} = m40;
 function validate(data){nonnegative(data.health,'health');nonnegative(data.max_health,'max_health');if(!data.max_health||data.health>data.max_health)throw new TypeError('Invalid actor health');}
 /** Shared health operations over the owner's canonical data, with no physical or UI state. */
 class actorVitals{
@@ -22299,11 +23303,11 @@ class actorVitals{
 return Object.freeze({get actorVitals(){return actorVitals;}});
 })();
 // src/game/entities/game-actor.mjs
-const m96 = (()=>{
-const {validateAttackState} = m97;
+const m100 = (()=>{
+const {validateAttackState} = m101;
 const {gameCharacter} = m1;
-const {actorVitals} = m98;
-const {nonnegative,jsonCopy} = m38;
+const {actorVitals} = m102;
+const {nonnegative,jsonCopy} = m40;
 const health=new WeakMap(),hooks=new WeakMap();
 const stateFor=actor=>actor.data.actor_state??={format_version:1,defeated:false,invulnerable_remaining:0,elapsed:0};
 /** Common actor gameplay over a real gameCharacter. No velocity, geometry or body mirrors. */
@@ -22348,12 +23352,12 @@ class gameActor extends gameCharacter{
 
 return Object.freeze({get gameActor(){return gameActor;}});
 })();
-const m101 = Object.freeze({default:{"capacity":10,"max_attachments":2,"owner_id":"player"}});
+const m105 = Object.freeze({default:{"capacity":10,"max_attachments":2,"owner_id":"player"}});
 // src/game/mechanics/values.mjs
-const m102 = (()=>{
+const m106 = (()=>{
 // Gameplay validation, deliberately unrelated to physical vectors or integration. The generic data
 // checks (identifier, nonnegative, jsonCopy) are the Directory's: engine/directory/values.mjs.
-const {identifier,nonnegative,jsonCopy} = m38;
+const {identifier,nonnegative,jsonCopy} = m40;
 function validateModifiers(modifiers) {
     const copy=jsonCopy(modifiers);
     if(!copy || typeof copy!=='object' || Array.isArray(copy))throw new TypeError('Buff modifiers must be a record');
@@ -22368,10 +23372,10 @@ function validateModifiers(modifiers) {
 return Object.freeze({get validateModifiers(){return validateModifiers;}});
 })();
 // src/game/mechanics/items/item-system.mjs
-const m100 = (()=>{
-const itemRules = m101.default;
-const {identifier,jsonCopy} = m38;
-const {validateModifiers} = m102;
+const m104 = (()=>{
+const itemRules = m105.default;
+const {identifier,jsonCopy} = m40;
+const {validateModifiers} = m106;
 
 const modes=['normal','sniper','melee','fists'];
 const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
@@ -22552,10 +23556,10 @@ class itemSystem {
 return Object.freeze({get itemSystem(){return itemSystem;}});
 })();
 // src/game/mechanics/actors/actor-inventory.mjs
-const m99 = (()=>{
-const {itemSystem} = m100;
-const itemRules = m101.default;
-const {jsonCopy} = m38;
+const m103 = (()=>{
+const {itemSystem} = m104;
+const itemRules = m105.default;
+const {jsonCopy} = m40;
 const components=new WeakMap();
 function actorItems(data,owner_id,catalog){
  const prior=components.get(data);if(prior&&prior.root===data.inventory)return prior.items;
@@ -22568,10 +23572,10 @@ function restoreActorItems(data,snapshot,catalog){
 return Object.freeze({get actorItems(){return actorItems;},get restoreActorItems(){return restoreActorItems;}});
 })();
 // src/game/entities/ganger.mjs
-const m95 = (()=>{
-const {gameActor} = m96;
-const {actorItems,restoreActorItems} = m99;
-const {nonnegative,jsonCopy} = m38;
+const m99 = (()=>{
+const {gameActor} = m100;
+const {actorItems,restoreActorItems} = m103;
+const {nonnegative,jsonCopy} = m40;
 const states=['IDLE','SUSPICIOUS','ALERT','SUPPRESSING','SEARCHING'];
 const stateFor=actor=>actor.data.ganger_state??={format_version:1,state:'IDLE',suspicion:0,drain_remaining:0,suppression_remaining:0,look_elapsed:0,wander_remaining:0,investigate_position:null,wander_position:null,origin:[...actor.position],search_positions:[],search_elapsed:0,interrupt_remaining:0,resistance_remaining:0,telegraphing:false,aim_position:null,shot_delay:actor.data.telegraph_seconds??.15,bumped:false};
 /** Native stealth/combat policy. Awareness, leading, pathing and contact response stay in Basement. */
@@ -22629,9 +23633,9 @@ class Ganger extends gameActor{
 return Object.freeze({get Ganger(){return Ganger;}});
 })();
 // src/game/entities/hunter.mjs
-const m94 = (()=>{
-const {Ganger} = m95;
-const {nonnegative,jsonCopy} = m38;
+const m98 = (()=>{
+const {Ganger} = m99;
+const {nonnegative,jsonCopy} = m40;
 const stateFor=actor=>actor.data.hunter_state??={format_version:1,dash_remaining:actor.getAsset('actor_rules').data.hunter.dash_initial,chain:0,evade_requested:false};
 /** Hunter decisions only. Native motors own blink clearance, evasion and all motion. */
 class Hunter extends Ganger{
@@ -22673,9 +23677,9 @@ class Hunter extends Ganger{
 return Object.freeze({get Hunter(){return Hunter;}});
 })();
 // src/game/entities/demoness.mjs
-const m93 = (()=>{
-const {Hunter} = m94;
-const {nonnegative,jsonCopy} = m38;
+const m97 = (()=>{
+const {Hunter} = m98;
+const {nonnegative,jsonCopy} = m40;
 const stateFor=actor=>actor.data.demoness_state??={format_version:1,phase:1,heard_position:null,heard_at:0,next_sigil:2,next_bolt:1.5,next_step:4,next_gale:3,next_mirror:2,next_rite:1,eye:1,rise:1,flash:0,last_strike:null,decoy_remaining:actor.data.decoy_remaining??9};
 function validateDemonessData(data){if(['solo','decoy','dormant'].some(key=>typeof data[key]!=='boolean')||data.decoy&&data.max_health!==1)throw new TypeError('Invalid Demoness flags/decoy health');const state=data.demoness_state;if(!state)return data;jsonCopy(state);if(state.format_version!==1||![1,2,3].includes(state.phase)||typeof data.solo!=='boolean'||typeof data.decoy!=='boolean'||typeof data.dormant!=='boolean')throw new TypeError('Invalid Demoness state');for(const key of ['heard_at','next_sigil','next_bolt','next_step','next_gale','next_mirror','next_rite','eye','rise','flash','decoy_remaining'])nonnegative(state[key],key);if(state.heard_at>(data.actor_state?.elapsed??0)||['eye','rise','flash'].some(key=>state[key]>1)||state.heard_position!==null&&(!Array.isArray(state.heard_position)||state.heard_position.length!==2||!state.heard_position.every(Number.isFinite)))throw new TypeError('Invalid Demoness clock/appearance');if(state.last_strike!==null&&(!state.last_strike||!Number.isFinite(state.last_strike.at)||state.last_strike.at<0||!Array.isArray(state.last_strike.position)||state.last_strike.position.length!==2||!state.last_strike.position.every(Number.isFinite)))throw new TypeError('Invalid Demoness strike record');return data;}
 /** Lilitu's policy and duel phases; every attack is a reusable registered capability. */
@@ -22725,10 +23729,10 @@ class Demoness extends Hunter{
 return Object.freeze({get validateDemonessData(){return validateDemonessData;},get Demoness(){return Demoness;}});
 })();
 // src/game/entities/gatling-gunner.mjs
-const m104 = (()=>{
-const {gameActor} = m96;
-const {actorItems} = m99;
-const {nonnegative,jsonCopy} = m38;
+const m108 = (()=>{
+const {gameActor} = m100;
+const {actorItems} = m103;
+const {nonnegative,jsonCopy} = m40;
 const stateFor=actor=>actor.data.gunner_state??={format_version:1,hold_until:0,enrage_count:0,barrel_phase:0,barrel_speed:0,barrel_heat:0};
 /** Ordinary gunner decisions over native motors and the common owned-weapon burst action. */
 class GatlingGunner extends gameActor{
@@ -22762,9 +23766,9 @@ class GatlingGunner extends gameActor{
 return Object.freeze({get GatlingGunner(){return GatlingGunner;}});
 })();
 // src/game/entities/warden.mjs
-const m103 = (()=>{
-const {GatlingGunner} = m104;
-const {nonnegative,jsonCopy} = m38;
+const m107 = (()=>{
+const {GatlingGunner} = m108;
+const {nonnegative,jsonCopy} = m40;
 const stateFor=actor=>actor.data.warden_state??={format_version:1,target_id:null,seen_position:null,hidden_seconds:0,next_special_at:2,flank_position:null,flank_retry:0,eye:1,rise:1};
 function validateWardenData(data,entity_type){if(!['vesper','matins','compline'].includes(data.persona))throw new TypeError('Invalid Warden persona');const expected={df_vesper:'vesper',df_matins:'matins',df_compline:'compline'}[entity_type];if(expected&&data.persona!==expected)throw new TypeError('Warden persona does not match its class');const state=data.warden_state;if(!state)return data;jsonCopy(state);if(!['vesper','matins','compline'].includes(data.persona)||state.format_version!==1||state.target_id!==null&&(!Number.isSafeInteger(state.target_id)||state.target_id<1))throw new TypeError('Invalid Warden state');for(const key of ['hidden_seconds','next_special_at','flank_retry','eye','rise'])nonnegative(state[key],key);for(const key of ['seen_position','flank_position'])if(state[key]!==null&&(!Array.isArray(state[key])||state[key].length!==2||!state[key].every(Number.isFinite)))throw new TypeError('Invalid Warden target point');return data;}
 /** The shared Sanctum actor. Persona selects registered attacks and authored presentation. */
@@ -22801,9 +23805,9 @@ class Compline extends Warden{static entity_type='df_compline';}
 return Object.freeze({get validateWardenData(){return validateWardenData;},get Warden(){return Warden;},get Vesper(){return Vesper;},get Matins(){return Matins;},get Compline(){return Compline;}});
 })();
 // src/game/entities/boss-effect.mjs
-const m105 = (()=>{
+const m109 = (()=>{
 const {gameTrigger} = m1;
-const {jsonCopy,nonnegative} = m38;
+const {jsonCopy,nonnegative} = m40;
 const BOSS_EFFECT_KINDS=Object.freeze(['sigil','fire','smoke','censer','hymn','rite']);
 function validateBossEffectData(d){jsonCopy(d);if(d.format_version!==1||!BOSS_EFFECT_KINDS.includes(d.kind)||!Number.isSafeInteger(d.owner_id)||d.owner_id<1||!Array.isArray(d.hit_ids)||d.hit_ids.some(id=>!Number.isSafeInteger(id)||id<1)||new Set(d.hit_ids).size!==d.hit_ids.length)throw new TypeError('Invalid boss effect');for(const key of ['age','duration','next_tick','radius','radius_to','damage','burn_dps'])nonnegative(d[key],`effect ${key}`);if(!d.duration||d.age>d.duration+1)throw new TypeError('Invalid boss effect lifetime');if(typeof d.owner_alliance!=='string')throw new TypeError('Invalid effect allegiance');if(d.from_position!==undefined&&(!Array.isArray(d.from_position)||d.from_position.length!==2||!d.from_position.every(Number.isFinite)))throw new TypeError('Invalid effect origin');return d;}
 /** A real registered area/tell in the shared world. Its service owns only logical timing. */
@@ -22815,8 +23819,8 @@ class BossEffect extends gameTrigger{
 return Object.freeze({get BOSS_EFFECT_KINDS(){return BOSS_EFFECT_KINDS;},get validateBossEffectData(){return validateBossEffectData;},get BossEffect(){return BossEffect;}});
 })();
 // src/game/mechanics/abilities/pattern-actions.mjs
-const m106 = (()=>{
-const {jsonCopy,nonnegative} = m38;
+const m110 = (()=>{
+const {jsonCopy,nonnegative} = m40;
 function validatePatternAction(state,catalog,{clock}={}){
  jsonCopy(state);const definition=catalog[state.ability_id];
  if(definition?.delivery!=='pattern'||state.format_version!==1||!['tell','repeat'].includes(state.phase)||typeof state.cancel_requested!=='boolean'||!Number.isFinite(state.heading)||Object.keys(state).some(key=>!['format_version','ability_id','phase','started_at','phase_started_at','heading','aim','planned_position','executions','cancel_requested'].includes(key)))throw new TypeError('Invalid pattern action');
@@ -22852,11 +23856,11 @@ function validateSecondaryAction(state,catalog,options){if(state==null)return st
 return Object.freeze({get validatePatternAction(){return validatePatternAction;},get beginPattern(){return beginPattern;},get clearPattern(){return clearPattern;},get advancePattern(){return advancePattern;},get validateSecondaryAction(){return validateSecondaryAction;}});
 })();
 // src/game/entities/validate-boss-records.mjs
-const m92 = (()=>{
-const {validateDemonessData} = m93;
-const {validateWardenData} = m103;
-const {validateBossEffectData} = m105;
-const {validateSecondaryAction} = m106;
+const m96 = (()=>{
+const {validateDemonessData} = m97;
+const {validateWardenData} = m107;
+const {validateBossEffectData} = m109;
+const {validateSecondaryAction} = m110;
 /** Data-only preflight runs before replacing a live map, inventory, currency or registry. */
 function validateBossRecord(record,catalog){
  const data=record.data;if(record.entity_type==='df_demoness')validateDemonessData(data);
@@ -22869,9 +23873,9 @@ function validateBossRecord(record,catalog){
 return Object.freeze({get validateBossRecord(){return validateBossRecord;}});
 })();
 // src/game/mechanics/abilities/timed-actions.mjs
-const m108 = (()=>{
+const m112 = (()=>{
 const {BODY_GROUP} = m1;
-const {jsonCopy,nonnegative} = m38;
+const {jsonCopy,nonnegative} = m40;
 const id=value=>Number.isSafeInteger(value)&&value>0;
 function validateTimedAction(state,catalog,{clock}={}){
  jsonCopy(state);const definition=catalog[state.ability_id];
@@ -22932,8 +23936,8 @@ function advanceTimedAction(actor,definition,controller,api,combat,{known=true}=
 return Object.freeze({get validateTimedAction(){return validateTimedAction;},get beginTimedAction(){return beginTimedAction;},get ownedGrapple(){return ownedGrapple;},get clearTimedAction(){return clearTimedAction;},get hitGrapple(){return hitGrapple;},get advanceTimedAction(){return advanceTimedAction;}});
 })();
 // src/game/mechanics/abilities/burst-actions.mjs
-const m109 = (()=>{
-const {jsonCopy,nonnegative} = m38;
+const m113 = (()=>{
+const {jsonCopy,nonnegative} = m40;
 /** Logical firing cycle over the same owned weapon, launch backend and cooldown clock. */
 function validateBurstAction(state,catalog,{clock}={}){
  jsonCopy(state);if(state.format_version!==1||catalog[state.ability_id]?.delivery!=='burst'||!['tell','burst','reload'].includes(state.phase)||typeof state.weapon_instance_id!=='string'||!state.weapon_instance_id||typeof state.cancel_requested!=='boolean')throw new TypeError('Invalid saved burst action');
@@ -22980,12 +23984,12 @@ function advanceBurst(actor,definition,controller,items,api,combat,{known=true,p
 return Object.freeze({get validateBurstAction(){return validateBurstAction;},get beginBurst(){return beginBurst;},get advanceBurst(){return advanceBurst;}});
 })();
 // src/game/mechanics/abilities/lunge-actions.mjs
-const m107 = (()=>{
-const {validatePatternAction} = m106;
-const {validateTimedAction} = m108;
-const {validateBurstAction} = m109;
+const m111 = (()=>{
+const {validatePatternAction} = m110;
+const {validateTimedAction} = m112;
+const {validateBurstAction} = m113;
 const {BODY_GROUP} = m1;
-const {jsonCopy,nonnegative} = m38;
+const {jsonCopy,nonnegative} = m40;
 /** Persistent logical action only. Native motors, sweeps and impulses own physical work. */
 function validateAbilityAction(state,catalog,{clock}={}){
  if(state==null)return state;if(catalog[state.ability_id]?.delivery==='pattern')return validatePatternAction(state,catalog,{clock});if(['beam','grapple','bolt'].includes(catalog[state.ability_id]?.delivery))return validateTimedAction(state,catalog,{clock});if(catalog[state.ability_id]?.delivery==='burst')return validateBurstAction(state,catalog,{clock});jsonCopy(state);
@@ -23026,8 +24030,8 @@ function advanceLunge(actor,definition,controller,api,combat,{known=true}={}){
 return Object.freeze({get validateAbilityAction(){return validateAbilityAction;},get beginLunge(){return beginLunge;},get clearLunge(){return clearLunge;},get advanceLunge(){return advanceLunge;}});
 })();
 // src/game/mechanics/attacks/mounted-attacks.mjs
-const m110 = (()=>{
-const {jsonCopy,nonnegative,identifier} = m38;
+const m114 = (()=>{
+const {jsonCopy,nonnegative,identifier} = m40;
 
 function validateMountedAttack(state){
  if(state==null)return;jsonCopy(state);if(Object.keys(state).some(key=>!['format_version','attachment_id','revision','attack_id','aim','started_at','ready_at','expires_at'].includes(key)))throw new TypeError('Invalid mounted attack fields');identifier(state.attack_id);if(state.format_version!==1||!Number.isSafeInteger(state.attachment_id)||state.attachment_id<1||!Number.isSafeInteger(state.revision)||state.revision<0||typeof state.attack_id!=='string')throw new TypeError('Invalid mounted attack state');
@@ -23049,8 +24053,8 @@ function mountedAttackState(actor,controller,mount){
 return Object.freeze({get validateMountedAttack(){return validateMountedAttack;},get prepareMountedAttack(){return prepareMountedAttack;},get mountedAttackState(){return mountedAttackState;}});
 })();
 // src/game/mechanics/abilities/ability-loadout.mjs
-const m111 = (()=>{
-const {identifier,jsonCopy} = m38;
+const m115 = (()=>{
+const {identifier,jsonCopy} = m40;
 const components=new WeakMap();
 /** Learned capabilities, separate from carried items and physical/attack state. */
 class abilityLoadout{
@@ -23081,9 +24085,9 @@ function importActorAbilities(data,catalog,{default_id=null}={}){
 return Object.freeze({get abilityLoadout(){return abilityLoadout;},get actorAbilities(){return actorAbilities;},get importActorAbilities(){return importActorAbilities;}});
 })();
 // src/game/entities/drone.mjs
-const m113 = (()=>{
-const {gameActor} = m96;
-const {nonnegative,jsonCopy} = m38;
+const m117 = (()=>{
+const {gameActor} = m100;
+const {nonnegative,jsonCopy} = m40;
 const stateFor=actor=>actor.data.drone_state??={format_version:1,flight:'descend',phase_started_at:actor.data.actor_state?.elapsed??0,alt:1,lost_seconds:0,next_bolt_at:2.2,next_special_at:3};
 /** Flight and attack decisions. Basement owns movement, impacts, eye geometry and tether forces. */
 class Drone extends gameActor{
@@ -23121,7 +24125,7 @@ class Drone extends gameActor{
 return Object.freeze({get Drone(){return Drone;}});
 })();
 // src/game/data/game-velvet-appearance.mjs
-const m116 = (()=>{
+const m120 = (()=>{
         /**
          * =====================================================================
          *  VELVET CAT — Dreampunk Feline Companion
@@ -23259,8 +24263,8 @@ const VELVET_TAIL_SEGS = 9;
 return Object.freeze({get VELVET_CAT_PALETTES(){return VELVET_CAT_PALETTES;},get VELVET_T(){return VELVET_T;},get VELVET_PROFILES(){return VELVET_PROFILES;},get VELVET_GAITS(){return VELVET_GAITS;},get VELVET_TAIL_SEGS(){return VELVET_TAIL_SEGS;}});
 })();
 // src/game/presentation/velvet-cat-animation.mjs
-const m115 = (()=>{
-const {VELVET_GAITS,VELVET_TAIL_SEGS} = m116;
+const m119 = (()=>{
+const {VELVET_GAITS,VELVET_TAIL_SEGS} = m120;
 /** Fixed-step cosmetic animation only. No draw backend or physical movement. */
 const velvetCatAnimation={
 _random() {
@@ -23405,10 +24409,10 @@ function advanceVelvetAnimation(entity,player,seconds){const record=entity.data.
 return Object.freeze({get velvetCatAnimation(){return velvetCatAnimation;},get createVelvetAnimation(){return createVelvetAnimation;},get velvetPresentation(){return velvetPresentation;},get advanceVelvetAnimation(){return advanceVelvetAnimation;}});
 })();
 // src/game/entities/velvet-cat.mjs
-const m114 = (()=>{
-const {gameActor} = m96;
-const {createVelvetAnimation,advanceVelvetAnimation} = m115;
-const {nonnegative,jsonCopy} = m38;
+const m118 = (()=>{
+const {gameActor} = m100;
+const {createVelvetAnimation,advanceVelvetAnimation} = m119;
+const {nonnegative,jsonCopy} = m40;
 const stateFor=actor=>actor.data.cat_state??={format_version:1,mode:'idle',dash:false,idle_seconds:0,rest:null,rest_remaining:0};
 /** Official companion body; animation records contain cosmetic state only. */
 class VelvetCat extends gameActor{
@@ -23439,9 +24443,9 @@ class VelvetCat extends gameActor{
 return Object.freeze({get VelvetCat(){return VelvetCat;}});
 })();
 // src/game/entities/marionette.mjs
-const m117 = (()=>{
-const {gameActor} = m96;
-const {nonnegative,jsonCopy} = m38;
+const m121 = (()=>{
+const {gameActor} = m100;
+const {nonnegative,jsonCopy} = m40;
 const stateFor=actor=>actor.data.marionette_state??={format_version:1,initial_delay:.6,yank_remaining:0};
 /** Silent puppet policy. Spacing, following, wall response and strikes use shared native services. */
 class Marionette extends gameActor{
@@ -23468,11 +24472,11 @@ class Marionette extends gameActor{
 return Object.freeze({get Marionette(){return Marionette;}});
 })();
 // src/game/mechanics/player-vitals.mjs
-const m119 = (()=>{
-const {actorVitals} = m98;
-const defaults = m62.default;
-const {nonnegative,jsonCopy,identifier} = m38;
-const {validateModifiers} = m102;
+const m123 = (()=>{
+const {actorVitals} = m102;
+const defaults = m66.default;
+const {nonnegative,jsonCopy,identifier} = m40;
+const {validateModifiers} = m106;
 
 /** Shared gameplay component. It references its owner's data; it never owns or mirrors a body. */
 class playerVitals extends actorVitals {
@@ -23556,11 +24560,11 @@ class playerVitals extends actorVitals {
 return Object.freeze({get playerVitals(){return playerVitals;}});
 })();
 // src/game/entities/player.mjs
-const m118 = (()=>{
-const {gameActor} = m96;
-const {playerVitals} = m119;
-const {identifier,nonnegative} = m38;
-const {validateModifiers} = m102;
+const m122 = (()=>{
+const {gameActor} = m100;
+const {playerVitals} = m123;
+const {identifier,nonnegative} = m40;
+const {validateModifiers} = m106;
 const services = new WeakMap();
 const components = new WeakMap();
 function vitalsFor(player,rules) {
@@ -23649,7 +24653,7 @@ class Player extends gameActor {
 return Object.freeze({get Player(){return Player;}});
 })();
 // src/game/entities/apartment-prop.mjs
-const m120 = (()=>{
+const m124 = (()=>{
 const {gameProp} = m1;
 
 /** Furniture/fixture gameplay metadata; no local transform or integration. */
@@ -23664,7 +24668,7 @@ class ApartmentProp extends gameProp {
 return Object.freeze({get ApartmentProp(){return ApartmentProp;}});
 })();
 // src/game/data/npc-reactions.mjs
-const m122 = (()=>{
+const m126 = (()=>{
 // Authored character reactions, shared by native and remaining classic NPCs.
 function resolveEmoteLines(reactions, cat, tier) {
     const pool = reactions && reactions[cat];
@@ -23829,13 +24833,13 @@ const NPC_EMOTE_REACTIONS = {
 return Object.freeze({get resolveEmoteLines(){return resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return NPC_EMOTE_REACTIONS;}});
 })();
 // src/game/entities/npc.mjs
-const m121 = (()=>{
-const {importActorAbilities} = m111;
-const {actorAbilities} = m111;
-const {resolveEmoteLines,NPC_EMOTE_REACTIONS} = m122;
-const {gameActor} = m96;
-const {actorItems,restoreActorItems} = m99;
-const {nonnegative,jsonCopy} = m38;
+const m125 = (()=>{
+const {importActorAbilities} = m115;
+const {actorAbilities} = m115;
+const {resolveEmoteLines,NPC_EMOTE_REACTIONS} = m126;
+const {gameActor} = m100;
+const {actorItems,restoreActorItems} = m103;
+const {nonnegative,jsonCopy} = m40;
 const actorContract=npc=>npc.data.hireType==='contract'?(npc.data.contract_remaining??npc.data.hireDuration??0):0;
 const stateFor=npc=>npc.data.npc_state??={format_version:1,stim_remaining:0,out_of_combat:0,regen_elapsed:0,aura_elapsed:0,quip:null,quip_remaining:0,quip_delay:0,contract_remaining:actorContract(npc)};
 const ROSTER_FIELDS=['recruited','downed','teammateStims','maxTeammateStims','relationship','hireType','hireDuration','hireTime','hireCost','hired','role','bio','alliance','burstSize','burstDelay','accuracyMod','equippedAbilityId','cooldown','shotsLeftInBurst','abilitiesSnapshot','attackSelection'];
@@ -23910,7 +24914,7 @@ for(const [key,field] of Object.entries({burstSize:'burst_size',burstDelay:'burs
 return Object.freeze({get ROSTER_FIELDS(){return ROSTER_FIELDS;},get NPC(){return NPC;},get rosterRecord(){return rosterRecord;}});
 })();
 // src/game/entities/world-loot.mjs
-const m123 = (()=>{
+const m127 = (()=>{
 const {gameProp} = m1;
 /** The dropped bundle is owned here until pickup; the inherited body is the only live pose. */
 class WorldLoot extends gameProp{
@@ -23922,7 +24926,7 @@ class WorldLoot extends gameProp{
 return Object.freeze({get WorldLoot(){return WorldLoot;}});
 })();
 // src/game/data/street-definitions.mjs
-const m126 = (()=>{
+const m130 = (()=>{
 /** Directory authoring only: convert immutable catalog units once, never during simulation. */
 const vehicleDefinitions = new WeakMap();
 function resolveStreetVehicle(library, { brand, model, control_mode = 'AI', color } = {}) {
@@ -23993,8 +24997,8 @@ function resolveVehicleSeats(library, { brand, model }) {
 return Object.freeze({get resolveStreetVehicle(){return resolveStreetVehicle;},get resolveVehicleSeats(){return resolveVehicleSeats;}});
 })();
 // src/game/entities/traffic-vehicle.mjs
-const m125 = (()=>{
-const {resolveStreetVehicle,resolveVehicleSeats} = m126;
+const m129 = (()=>{
+const {resolveStreetVehicle,resolveVehicleSeats} = m130;
 const {gameVehicle} = m1;
 const bindings = new WeakMap();
 /** Official gameplay entity. Body state and driving calculations belong to Basement. */
@@ -24089,10 +25093,10 @@ class TrafficVehicle extends gameVehicle {
 return Object.freeze({get TrafficVehicle(){return TrafficVehicle;}});
 })();
 // src/game/boot/game-vehicle-factory.mjs
-const m128 = (()=>{
-const {TrafficVehicle} = m125;
+const m132 = (()=>{
+const {TrafficVehicle} = m129;
 const {pathGeometry} = m1;
-const {resolveStreetVehicle} = m126;
+const {resolveStreetVehicle} = m130;
 
 const purposes = new Set(['ambient', 'owned', 'mission', 'taxi']);
 /** Shared official creation. Population limits belong to the requesting population manager. */
@@ -24132,9 +25136,9 @@ function createGameVehicle(world, packet = {}, { hooks = {} } = {}) {
 return Object.freeze({get createGameVehicle(){return createGameVehicle;}});
 })();
 // src/game/mechanics/traffic-manager.mjs
-const m127 = (()=>{
-const {TrafficVehicle} = m125;
-const {createGameVehicle} = m128;
+const m131 = (()=>{
+const {TrafficVehicle} = m129;
+const {createGameVehicle} = m132;
 /** Spawn, ownership and driver policy. The physics world owns every spatial/physical operation. */
 class TrafficManager {
     #pendingSpawns = new Set();
@@ -24179,7 +25183,7 @@ class TrafficManager {
 return Object.freeze({get TrafficManager(){return TrafficManager;}});
 })();
 // src/game/entities/pedestrians.mjs
-const m129 = (()=>{
+const m133 = (()=>{
 const {gameCharacter,gameVehicle,BODY_GROUP} = m1;
 const bindings = new WeakMap();
 /** Civilian decisions and reactions. Movement, prediction and impacts stay in Basement. */
@@ -24260,8 +25264,8 @@ class Pedestrian extends gameCharacter {
 return Object.freeze({get Pedestrian(){return Pedestrian;}});
 })();
 // src/game/entities/pedestrian-manager.mjs
-const m130 = (()=>{
-const {Pedestrian} = m129;
+const m134 = (()=>{
+const {Pedestrian} = m133;
 /** Population and waypoint policy only. No positions, obstacle cache or sensing grid. */
 class PedestrianManager {
     #network = new Map();
@@ -24333,11 +25337,11 @@ class PedestrianManager {
 return Object.freeze({get PedestrianManager(){return PedestrianManager;}});
 })();
 // src/game/boot/game-street.mjs
-const m124 = (()=>{
-const {TrafficVehicle} = m125;
-const {TrafficManager} = m127;
-const {Pedestrian} = m129;
-const {PedestrianManager} = m130;
+const m128 = (()=>{
+const {TrafficVehicle} = m129;
+const {TrafficManager} = m131;
+const {Pedestrian} = m133;
+const {PedestrianManager} = m134;
 
 
 function registerStreetEntityTypes(world) {
@@ -24357,25 +25361,25 @@ class StreetPopulation {
     clearStreet() { this.traffic.clearStreet(); this.pedestrians.clearStreet(); }
 }
 
-return Object.freeze({get TrafficVehicle(){return TrafficVehicle;},get TrafficManager(){return TrafficManager;},get Pedestrian(){return Pedestrian;},get PedestrianManager(){return PedestrianManager;},get createGameVehicle(){return m128.createGameVehicle;},get registerStreetEntityTypes(){return registerStreetEntityTypes;},get StreetPopulation(){return StreetPopulation;}});
+return Object.freeze({get TrafficVehicle(){return TrafficVehicle;},get TrafficManager(){return TrafficManager;},get Pedestrian(){return Pedestrian;},get PedestrianManager(){return PedestrianManager;},get createGameVehicle(){return m132.createGameVehicle;},get registerStreetEntityTypes(){return registerStreetEntityTypes;},get StreetPopulation(){return StreetPopulation;}});
 })();
 // src/game/boot/game-entity-types.mjs
-const m112 = (()=>{
-const {Demoness} = m93;
-const {Warden,Vesper,Matins,Compline} = m103;
-const {BossEffect} = m105;
-const {Drone} = m113;
-const {VelvetCat} = m114;
-const {GatlingGunner} = m104;
-const {Marionette} = m117;
-const {Player} = m118;
-const {ApartmentProp} = m120;
-const {gameActor} = m96;
-const {NPC} = m121;
-const {Hunter} = m94;
-const {Ganger} = m95;
-const {WorldLoot} = m123;
-const {registerStreetEntityTypes} = m124;
+const m116 = (()=>{
+const {Demoness} = m97;
+const {Warden,Vesper,Matins,Compline} = m107;
+const {BossEffect} = m109;
+const {Drone} = m117;
+const {VelvetCat} = m118;
+const {GatlingGunner} = m108;
+const {Marionette} = m121;
+const {Player} = m122;
+const {ApartmentProp} = m124;
+const {gameActor} = m100;
+const {NPC} = m125;
+const {Hunter} = m98;
+const {Ganger} = m99;
+const {WorldLoot} = m127;
+const {registerStreetEntityTypes} = m128;
 /** The Directory registers concrete classes before any level or saved identity is constructed. */
 function registerGameEntityTypes(world){
  for(const Class of [gameActor,Player,ApartmentProp,NPC,Ganger,Hunter,Marionette,GatlingGunner,Demoness,Warden,Vesper,Matins,Compline,BossEffect,Drone,VelvetCat,WorldLoot])if(!world.elements.listEntityTypes().includes(Class.entity_type))world.elements.registerEntityType(Class.entity_type,Class);
@@ -24384,7 +25388,7 @@ function registerGameEntityTypes(world){
 
 return Object.freeze({get registerGameEntityTypes(){return registerGameEntityTypes;}});
 })();
-const m132 = Object.freeze({default:{
+const m136 = Object.freeze({default:{
   "library_id": "df_apartment",
   "description": "Authored Silver Queen apartment assets. Furniture order preserves existing questState.aptLayout indices. Physics state is held only by Basement bodies.",
   "resources": {
@@ -24489,9 +25493,9 @@ const m132 = Object.freeze({default:{
   }
 }});
 // src/game/data/apartment-assets.mjs
-const m131 = (()=>{
-const {createGameAssetLibrary} = m43;
-const definition = m132.default;
+const m135 = (()=>{
+const {createGameAssetLibrary} = m47;
+const definition = m136.default;
 
 function createApartmentAssetLibrary(options = {}) {
     const library = createGameAssetLibrary(options);
@@ -24504,7 +25508,7 @@ const APARTMENT_RULES = Object.freeze(definition.resources.rules.data);
 return Object.freeze({get createApartmentAssetLibrary(){return createApartmentAssetLibrary;},get APARTMENT_RULES(){return APARTMENT_RULES;}});
 })();
 // src/engine/basement/maps/builder.mjs
-const m135 = (()=>{
+const m139 = (()=>{
 // ===== LV0 BASEMENT =====
 const {layoutGeometry,BODY_GROUP} = m1;
 
@@ -24627,7 +25631,7 @@ function buildMapPackets(definition, { templates = {}, decorate = null, prop_typ
 return Object.freeze({get HINGE(){return HINGE;},get MAP_KINDS(){return MAP_KINDS;},get DEFAULT_KINDS(){return DEFAULT_KINDS;},get buildMapPackets(){return buildMapPackets;}});
 })();
 // src/engine/basement/maps/rooms.mjs
-const m137 = (()=>{
+const m141 = (()=>{
 // ===== LV0 BASEMENT =====
 /**
  * Rooms of one map: which rooms exist, how they connect, how open each connection is right now,
@@ -24767,11 +25771,11 @@ class roomGraph {
 return Object.freeze({get roomGraph(){return roomGraph;}});
 })();
 // src/engine/basement/maps/system.mjs
-const m136 = (()=>{
+const m140 = (()=>{
 // ===== LV0 BASEMENT =====
 const {BODY_GROUP} = m1;
-const {buildMapPackets} = m135;
-const {roomGraph} = m137;
+const {buildMapPackets} = m139;
+const {roomGraph} = m141;
 
 const extentOf = packet => {
     const s = packet.collision_shape ?? packet.render_shape;
@@ -24909,18 +25913,18 @@ class mapSystem {
 return Object.freeze({get mapInstance(){return mapInstance;},get mapSystem(){return mapSystem;}});
 })();
 // src/engine/basement/maps/index.mjs
-const m134 = (()=>{
+const m138 = (()=>{
 // ===== LV0 BASEMENT =====
 
 
 
 
-return Object.freeze({get buildMapPackets(){return m135.buildMapPackets;},get MAP_KINDS(){return m135.MAP_KINDS;},get DEFAULT_KINDS(){return m135.DEFAULT_KINDS;},get mapInstance(){return m136.mapInstance;},get mapSystem(){return m136.mapSystem;},get roomGraph(){return m137.roomGraph;}});
+return Object.freeze({get buildMapPackets(){return m139.buildMapPackets;},get MAP_KINDS(){return m139.MAP_KINDS;},get DEFAULT_KINDS(){return m139.DEFAULT_KINDS;},get mapInstance(){return m140.mapInstance;},get mapSystem(){return m140.mapSystem;},get roomGraph(){return m141.roomGraph;}});
 })();
 // src/game/levels/apartment-definition.mjs
-const m133 = (()=>{
-const {buildMapPackets} = m134;
-const {resolveMapLayout,PROP_TYPES} = m65;
+const m137 = (()=>{
+const {buildMapPackets} = m138;
+const {resolveMapLayout,PROP_TYPES} = m69;
 
 const TEMPLATES = { wall: 'df_apartment:wall', prop: 'df_apartment:furniture', light: 'df_apartment:lamp', trigger: 'df_apartment:transition', room: 'df_apartment:transition', door: 'df_apartment:door', cloth: 'df_apartment:curtain' };
 
@@ -24988,12 +25992,12 @@ function resolveApartmentDyer(game_db){
 return Object.freeze({get apartmentMapDefinition(){return apartmentMapDefinition;},get APARTMENT_MAP_OPTIONS(){return APARTMENT_MAP_OPTIONS;},get resolveApartmentDefinition(){return resolveApartmentDefinition;},get resolveApartmentDyer(){return resolveApartmentDyer;}});
 })();
 // src/game/boot/game-actor-factory.mjs
-const m138 = (()=>{
-const {createDemonessAppearance} = m44;
-const {createHunterAppearance} = m52;
-const {validateAttackState} = m97;
-const {importActorAbilities} = m111;
-const {jsonCopy} = m38;
+const m142 = (()=>{
+const {createDemonessAppearance} = m48;
+const {createHunterAppearance} = m56;
+const {validateAttackState} = m101;
+const {importActorAbilities} = m115;
+const {jsonCopy} = m40;
 /** Definitions and explicit old-roster import live in Directory, never in physics. */
 function createActorPacket(world,{kind='npc',name='',role='civilian',position=[0,0],rotation=0,data={},...packet}={}){
  if(!['npc','ganger','hunter','marionette','gatling_gunner','demoness','warden','vesper','matins','compline','drone','velvet_cat','actor'].includes(kind))throw new TypeError('Unknown actor kind');const record=jsonCopy(data);if(['npc','ganger','hunter','gatling_gunner','demoness','warden','vesper','matins','compline'].includes(kind))record.actor_loadout_initialized??=record.inventory!=null;
@@ -25023,20 +26027,20 @@ function createActorPacket(world,{kind='npc',name='',role='civilian',position=[0
 return Object.freeze({get createActorPacket(){return createActorPacket;}});
 })();
 // src/game/levels/apartment.mjs
-const m91 = (()=>{
-const {validateBossRecord} = m92;
-const {validateAbilityAction} = m107;
-const {validateMountedAttack} = m110;
-const {validateAttackState} = m97;
-const {abilityLoadout} = m111;
-const {importActorAbilities} = m111;
-const {registerGameEntityTypes} = m112;
+const m95 = (()=>{
+const {validateBossRecord} = m96;
+const {validateAbilityAction} = m111;
+const {validateMountedAttack} = m114;
+const {validateAttackState} = m101;
+const {abilityLoadout} = m115;
+const {importActorAbilities} = m115;
+const {registerGameEntityTypes} = m116;
 const {physicsSystem} = m1;
-const {createApartmentAssetLibrary} = m131;
-const {resolveApartmentDefinition,resolveApartmentDyer,APARTMENT_MAP_OPTIONS} = m133;
-const {mapInstance} = m134;
-const {NPC,rosterRecord} = m121;
-const {createActorPacket} = m138;
+const {createApartmentAssetLibrary} = m135;
+const {resolveApartmentDefinition,resolveApartmentDyer,APARTMENT_MAP_OPTIONS} = m137;
+const {mapInstance} = m138;
+const {NPC,rosterRecord} = m125;
+const {createActorPacket} = m142;
 const {gameProp} = m1;
 class ApartmentDoor extends gameProp { static entity_type = 'df_apartment_door'; }
 
@@ -25116,7 +26120,7 @@ class ApartmentLevel {
 return Object.freeze({get ApartmentLevel(){return ApartmentLevel;}});
 })();
 // src/engine/lobby/level-lobby.mjs
-const m140 = (()=>{
+const m144 = (()=>{
 // ===== LV1 LOBBY =====
 // The engine's game loop. The Lobby keeps the clock and nothing else: it knows when a frame is due,
 // how many fixed simulation steps that frame owes, and how far the drawn frame sits between two steps.
@@ -25253,7 +26257,7 @@ class levelLobby {
 return Object.freeze({get levelLobby(){return levelLobby;}});
 })();
 // src/engine/lobby/runtime/game-level.mjs
-const m141 = (()=>{
+const m145 = (()=>{
 // ===== LV1 LOBBY =====
 /** Content/lifecycle contract. A level never owns a world, clock or collision solver. */
 class gameLevel {
@@ -25274,7 +26278,7 @@ class gameLevel {
 return Object.freeze({get gameLevel(){return gameLevel;}});
 })();
 // src/engine/basement/controls/values.mjs
-const m144 = (()=>{
+const m148 = (()=>{
 // ===== LV0 BASEMENT =====
 const TAP = 0;
 const DOUBLETAP = 1;
@@ -25299,7 +26303,7 @@ function radialStick(value, dead_zone = 0.15) {
 return Object.freeze({get TAP(){return TAP;},get DOUBLETAP(){return DOUBLETAP;},get HELD(){return HELD;},get PRESS(){return PRESS;},get REPEAT(){return REPEAT;},get RELEASE(){return RELEASE;},get cleanupAll(){return cleanupAll;},get radialStick(){return radialStick;}});
 })();
 // src/engine/basement/controls/touch-stick.mjs
-const m146 = (()=>{
+const m150 = (()=>{
 // ===== LV0 BASEMENT =====
 class touchStick {
     constructor(system, name, packet) {
@@ -25399,10 +26403,10 @@ class touchStick {
 return Object.freeze({get touchStick(){return touchStick;}});
 })();
 // src/engine/basement/controls/devices.mjs
-const m145 = (()=>{
+const m149 = (()=>{
 // ===== LV0 BASEMENT =====
-const {touchStick} = m146;
-const {radialStick,cleanupAll} = m144;
+const {touchStick} = m150;
+const {radialStick,cleanupAll} = m148;
 
 /** Device state uses the terminology from the original Python input instances. */
 class inputInstance {
@@ -25521,11 +26525,11 @@ class gamepadInstance extends inputInstance {
 return Object.freeze({get inputInstance(){return inputInstance;},get keyboardInstance(){return keyboardInstance;},get mouseInstance(){return mouseInstance;},get touchInstance(){return touchInstance;},get gamepadInstance(){return gamepadInstance;}});
 })();
 // src/engine/basement/controls/system.mjs
-const m143 = (()=>{
+const m147 = (()=>{
 // ===== LV0 BASEMENT =====
-const {TAP,DOUBLETAP,HELD,PRESS,REPEAT,RELEASE} = m144;
-const {radialStick,cleanupAll} = m144;
-const {keyboardInstance,mouseInstance,touchInstance,gamepadInstance} = m145;
+const {TAP,DOUBLETAP,HELD,PRESS,REPEAT,RELEASE} = m148;
+const {radialStick,cleanupAll} = m148;
+const {keyboardInstance,mouseInstance,touchInstance,gamepadInstance} = m149;
 
 class controlSystem {
     #listeners = new Set();
@@ -25763,17 +26767,17 @@ class controlSystem {
 return Object.freeze({get controlSystem(){return controlSystem;}});
 })();
 // src/engine/basement/controls/index.mjs
-const m142 = (()=>{
+const m146 = (()=>{
 // ===== LV0 BASEMENT =====
 
 
 
 
 
-return Object.freeze({get controlSystem(){return m143.controlSystem;},get controlsSystem(){return m143.controlSystem;},get inputInstance(){return m145.inputInstance;},get keyboardInstance(){return m145.keyboardInstance;},get mouseInstance(){return m145.mouseInstance;},get touchInstance(){return m145.touchInstance;},get gamepadInstance(){return m145.gamepadInstance;},get touchStick(){return m146.touchStick;},get TAP(){return m144.TAP;},get DOUBLETAP(){return m144.DOUBLETAP;},get HELD(){return m144.HELD;},get PRESS(){return m144.PRESS;},get REPEAT(){return m144.REPEAT;},get RELEASE(){return m144.RELEASE;}});
+return Object.freeze({get controlSystem(){return m147.controlSystem;},get controlsSystem(){return m147.controlSystem;},get inputInstance(){return m149.inputInstance;},get keyboardInstance(){return m149.keyboardInstance;},get mouseInstance(){return m149.mouseInstance;},get touchInstance(){return m149.touchInstance;},get gamepadInstance(){return m149.gamepadInstance;},get touchStick(){return m150.touchStick;},get TAP(){return m148.TAP;},get DOUBLETAP(){return m148.DOUBLETAP;},get HELD(){return m148.HELD;},get PRESS(){return m148.PRESS;},get REPEAT(){return m148.REPEAT;},get RELEASE(){return m148.RELEASE;}});
 })();
 // src/engine/basement/rendering/values.mjs
-const m149 = (()=>{
+const m153 = (()=>{
 // ===== LV0 BASEMENT =====
 function finite(value,name,min=-Infinity){if(!Number.isFinite(value)||value<min)throw new TypeError(`Invalid ${name}`);return value;}
 function vector(value,name='vector',out=[]){if(!Array.isArray(value)||value.length!==2)throw new TypeError(`Invalid ${name}`);out[0]=finite(value[0],name);out[1]=finite(value[1],name);return out;}
@@ -25791,9 +26795,9 @@ const BLENDS = Object.freeze({normal:'source-over',add:'lighter',multiply:'multi
 return Object.freeze({get finite(){return finite;},get vector(){return vector;},get identifier(){return identifier;},get matrix(){return matrix;},get inverse(){return inverse;},get point(){return point;},get transform(){return transform;},get viewport(){return viewport;},get freezeData(){return freezeData;},get color(){return color;},get BLENDS(){return BLENDS;}});
 })();
 // src/engine/basement/rendering/camera.mjs
-const m148 = (()=>{
+const m152 = (()=>{
 // ===== LV0 BASEMENT =====
-const {finite,vector,viewport,inverse,point,freezeData} = m149;
+const {finite,vector,viewport,inverse,point,freezeData} = m153;
 
 /** View state only. Following reads native poses; this class never moves a body. */
 class cameraSystem {
@@ -25847,9 +26851,9 @@ class cameraSystem {
 return Object.freeze({get cameraSystem(){return cameraSystem;}});
 })();
 // src/engine/basement/rendering/packets.mjs
-const m151 = (()=>{
+const m155 = (()=>{
 // ===== LV0 BASEMENT =====
-const {finite,vector,matrix,inverse,transform,color,identifier,BLENDS} = m149;
+const {finite,vector,matrix,inverse,transform,color,identifier,BLENDS} = m153;
 
 const geometryBuffers = new WeakMap();
 
@@ -25919,10 +26923,10 @@ function requirements(draw,resolve,result=[]){
 return Object.freeze({get geometry(){return geometry;},get material(){return material;},get packet(){return packet;},get requirements(){return requirements;}});
 })();
 // src/engine/basement/rendering/frame.mjs
-const m150 = (()=>{
+const m154 = (()=>{
 // ===== LV0 BASEMENT =====
-const {packet} = m151;
-const {color,finite,freezeData} = m149;
+const {packet} = m155;
+const {color,finite,freezeData} = m153;
 
 /** Reused command buffers. Producers submit data; a backend borrows a completed frame. */
 class renderFrame {
@@ -25960,11 +26964,11 @@ class renderFrame {
 return Object.freeze({get renderFrame(){return renderFrame;}});
 })();
 // src/engine/basement/rendering/system.mjs
-const m152 = (()=>{
+const m156 = (()=>{
 // ===== LV0 BASEMENT =====
-const {renderFrame} = m150;
-const {geometry,material,requirements} = m151;
-const {finite,identifier,freezeData} = m149;
+const {renderFrame} = m154;
+const {geometry,material,requirements} = m155;
+const {finite,identifier,freezeData} = m153;
 
 function normalizeResource(description){
     if(!description||typeof description!=='object')throw new TypeError('A data resource descriptor is required');
@@ -26053,10 +27057,10 @@ class renderSystem {
 return Object.freeze({get renderSystem(){return renderSystem;}});
 })();
 // src/engine/basement/rendering/canvas.mjs
-const m153 = (()=>{
+const m157 = (()=>{
 // ===== LV0 BASEMENT =====
-const {renderFrame} = m150;
-const {BLENDS} = m149;
+const {renderFrame} = m154;
+const {BLENDS} = m153;
 
 function createSurface(width,height){
     if(typeof OffscreenCanvas!=='undefined')return new OffscreenCanvas(width,height);
@@ -26178,23 +27182,23 @@ class canvasRenderer {
 return Object.freeze({get canvasRenderer(){return canvasRenderer;}});
 })();
 // src/engine/basement/rendering/index.mjs
-const m147 = (()=>{
+const m151 = (()=>{
 // ===== LV0 BASEMENT =====
 
 
 
 
 
-return Object.freeze({get cameraSystem(){return m148.cameraSystem;},get renderFrame(){return m150.renderFrame;},get renderSystem(){return m152.renderSystem;},get canvasRenderer(){return m153.canvasRenderer;}});
+return Object.freeze({get cameraSystem(){return m152.cameraSystem;},get renderFrame(){return m154.renderFrame;},get renderSystem(){return m156.renderSystem;},get canvasRenderer(){return m157.canvasRenderer;}});
 })();
 // src/engine/lobby/runtime/game-engine.mjs
-const m139 = (()=>{
+const m143 = (()=>{
 // ===== LV1 LOBBY =====
 const {physicsSystem} = m1;
-const {levelLobby} = m140;
-const {gameLevel} = m141;
-const {controlSystem} = m142;
-const {cameraSystem,renderSystem} = m147;
+const {levelLobby} = m144;
+const {gameLevel} = m145;
+const {controlSystem} = m146;
+const {cameraSystem,renderSystem} = m151;
 
 const hooks = ['attach', 'detach', 'beforePhysics', 'afterPhysics', 'render', 'levelEntered', 'levelLeaving','gameplayPaused'];
 function synchronous(fn, receiver, args) {
@@ -26449,7 +27453,7 @@ class gameEngine {
 
 return Object.freeze({get gameEngine(){return gameEngine;}});
 })();
-const m157 = Object.freeze({default:{
+const m161 = Object.freeze({default:{
   "slim": {
     "w": 0.88,
     "d": 0.92,
@@ -26480,7 +27484,7 @@ const m157 = Object.freeze({default:{
     "hip": 1.1
   }
 }});
-const m158 = Object.freeze({default:{
+const m162 = Object.freeze({default:{
   "female": {
     "sh": 10.5,
     "del": 4,
@@ -26607,9 +27611,9 @@ const m158 = Object.freeze({default:{
   }
 }});
 // src/game/data/humanoid/rig-assets.mjs
-const m156 = (()=>{
-const builds = m157.default;
-const bodyCanon = m158.default;
+const m160 = (()=>{
+const builds = m161.default;
+const bodyCanon = m162.default;
 const {rigDefinition,animationClip} = m1;
 const immutable=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))immutable(child);Object.freeze(value);}return value;};
 const humanoidBodyCanon=immutable(bodyCanon);
@@ -26656,8 +27660,8 @@ function getHumanoidRigAssets(gender='androgynous',{build=null,height=1}={}){
 return Object.freeze({get humanoidBodyCanon(){return humanoidBodyCanon;},get humanoidBuilds(){return humanoidBuilds;},get getHumanoidRigAssets(){return getHumanoidRigAssets;}});
 })();
 // src/game/mechanics/animation/humanoid-system.mjs
-const m155 = (()=>{
-const {getHumanoidRigAssets} = m156;
+const m159 = (()=>{
+const {getHumanoidRigAssets} = m160;
 const humanoids=new Set(['df_player','df_npc','df_ganger','df_hunter','df_demoness']);
 /** Game policy chooses authored poses; Basement resolves and advances every joint. */
 class humanoidSystem {
@@ -26705,10 +27709,10 @@ function humanoidPresentation(actor,blend=1){
 return Object.freeze({get humanoidSystem(){return humanoidSystem;},get humanoidPresentation(){return humanoidPresentation;}});
 })();
 // src/game/mechanics/encounters/encounter-system.mjs
-const m159 = (()=>{
-const {BossEffect} = m105;
+const m163 = (()=>{
+const {BossEffect} = m109;
 const {BODY_GROUP} = m1;
-const {jsonCopy} = m38;
+const {jsonCopy} = m40;
 /** Shared encounter policy over registered effects, native queries and one simulation clock. */
 class encounterSystem{
  #context=null;#combat;#random;#actors=null;#effects=new Map();#owners=new Map();#off=[];#wardens=new Map();#orders=new Map();#squads=new Map();#decoys=new Map();
@@ -26786,7 +27790,7 @@ class encounterSystem{
 return Object.freeze({get encounterSystem(){return encounterSystem;}});
 })();
 // src/game/data/weapon-models.mjs
-const m162 = (()=>{
+const m166 = (()=>{
 /* =====================================================================
    WEAPON MODELS — every gun as data: parts in the gun's own frame (+x down
    the barrel, the grip hand near 0,0, +y to the holder's right), each in a
@@ -27012,8 +28016,8 @@ function weaponModel(id) {
 return Object.freeze({get GUN_MATERIALS(){return GUN_MATERIALS;},get WEAPON_MODELS(){return WEAPON_MODELS;},get LASER_MODULE(){return LASER_MODULE;},get weaponModel(){return weaponModel;}});
 })();
 // src/game/data/combat-profiles.mjs
-const m161 = (()=>{
-const {weaponModel} = m162;
+const m165 = (()=>{
+const {weaponModel} = m166;
 /** Shape authoring belongs with the visual assets. Runtime collision calculations stay in Basement. */
 function getCombatProfile(definition_id){
  const model=weaponModel(definition_id),edge=model.edge??[19.4,2.6];
@@ -27023,15 +28027,15 @@ function getCombatProfile(definition_id){
 return Object.freeze({get getCombatProfile(){return getCombatProfile;}});
 })();
 // src/game/mechanics/attacks/attack-system.mjs
-const m160 = (()=>{
-const attackRules = m60.default;
-const {getCombatProfile} = m161;
-const {prepareMountedAttack,mountedAttackState,validateMountedAttack} = m110;
-const combatRules = m59.default;
+const m164 = (()=>{
+const attackRules = m64.default;
+const {getCombatProfile} = m165;
+const {prepareMountedAttack,mountedAttackState,validateMountedAttack} = m114;
+const combatRules = m63.default;
 const {gameCharacter} = m1;
-const {actorItems} = m99;
-const {attackRegistry,validateAttackState} = m97;
-const {jsonCopy} = m38;
+const {actorItems} = m103;
+const {attackRegistry,validateAttackState} = m101;
+const {jsonCopy} = m40;
 
 /** Universal character attack entry point. Reuses existing execution, ownership and physics. */
 class attackSystem{
@@ -27147,14 +28151,14 @@ class attackSystem{
 return Object.freeze({get attackSystem(){return attackSystem;}});
 })();
 // src/game/mechanics/abilities/ability-system.mjs
-const m163 = (()=>{
-const {beginPattern,advancePattern,clearPattern} = m106;
-const {beginTimedAction,advanceTimedAction,hitGrapple,clearTimedAction} = m108;
-const {beginBurst,advanceBurst} = m109;
-const {validateAbilityAction,beginLunge,advanceLunge,clearLunge} = m107;
+const m167 = (()=>{
+const {beginPattern,advancePattern,clearPattern} = m110;
+const {beginTimedAction,advanceTimedAction,hitGrapple,clearTimedAction} = m112;
+const {beginBurst,advanceBurst} = m113;
+const {validateAbilityAction,beginLunge,advanceLunge,clearLunge} = m111;
 const {BODY_GROUP,gameCharacter} = m1;
-const {actorAbilities} = m111;
-const {jsonCopy,nonnegative} = m38;
+const {actorAbilities} = m115;
+const {jsonCopy,nonnegative} = m40;
 
 /** Shared spell requests. The existing attack controller owns the single cooldown clock. */
 class abilitySystem{
@@ -27209,19 +28213,19 @@ class abilitySystem{
 return Object.freeze({get abilitySystem(){return abilitySystem;}});
 })();
 // src/game/mechanics/actors/actor-system.mjs
-const m164 = (()=>{
-const {Demoness} = m93;
-const {Warden} = m103;
-const {Drone} = m113;
-const {VelvetCat} = m114;
-const {GatlingGunner} = m104;
-const {Marionette} = m117;
-const {gameActor} = m96;
-const {NPC} = m121;
-const {Hunter} = m94;
-const {Ganger} = m95;
+const m168 = (()=>{
+const {Demoness} = m97;
+const {Warden} = m107;
+const {Drone} = m117;
+const {VelvetCat} = m118;
+const {GatlingGunner} = m108;
+const {Marionette} = m121;
+const {gameActor} = m100;
+const {NPC} = m125;
+const {Hunter} = m98;
+const {Ganger} = m99;
 const {BODY_GROUP} = m1;
-const {createActorPacket} = m138;
+const {createActorPacket} = m142;
 
 /** Registered actor lifetimes and policy updates in the existing fixed step. No second world or index. */
 class actorSystem{
@@ -27279,7 +28283,7 @@ class actorSystem{
 
 return Object.freeze({get actorSystem(){return actorSystem;}});
 })();
-const m165 = Object.freeze({default:{
+const m169 = Object.freeze({default:{
   "keymap": {
     "move_up":["w","ArrowUp"],"move_down":["s","ArrowDown"],"move_left":["a","ArrowLeft"],"move_right":["d","ArrowRight"],
     "fire":["mouseLeft","space","gamepadRTrigger","touchFire"],
@@ -27293,11 +28297,11 @@ const m165 = Object.freeze({default:{
   }
 }});
 // src/game/mechanics/game-session.mjs
-const m166 = (()=>{
-const {itemSystem} = m100;
-const {createItemCatalog} = m54;
-const itemRules = m101.default;
-const {identifier,jsonCopy,nonnegative} = m38;
+const m170 = (()=>{
+const {itemSystem} = m104;
+const {createItemCatalog} = m58;
+const itemRules = m105.default;
+const {identifier,jsonCopy,nonnegative} = m40;
 
 const recordNames = ['quests', 'roster', 'progression'];
 
@@ -27370,8 +28374,8 @@ class gameSession {
 return Object.freeze({get gameSession(){return gameSession;}});
 })();
 // src/game/mechanics/player-state-system.mjs
-const m167 = (()=>{
-const {nonnegative,jsonCopy} = m38;
+const m171 = (()=>{
+const {nonnegative,jsonCopy} = m40;
 
 /** Game rules only. The native entity/body remains the sole owner of physical state. */
 class PlayerStateSystem {
@@ -27426,7 +28430,7 @@ class PlayerStateSystem {
 return Object.freeze({get PlayerStateSystem(){return PlayerStateSystem;}});
 })();
 // src/game/mechanics/player-control-system.mjs
-const m168 = (()=>{
+const m172 = (()=>{
 /** Turns input terminology into native motor requests and gameplay intents. No physical math. */
 class PlayerControlSystem {
     #session; #state; #blocked = new Set(); #placement; #context = null;
@@ -27466,10 +28470,10 @@ class PlayerControlSystem {
 return Object.freeze({get PlayerControlSystem(){return PlayerControlSystem;}});
 })();
 // src/game/mechanics/combat/combat-system.mjs
-const m169 = (()=>{
-const rules = m59.default;
+const m173 = (()=>{
+const rules = m63.default;
 const {BODY_GROUP} = m1;
-const {nonnegative,jsonCopy} = m38;
+const {nonnegative,jsonCopy} = m40;
 
 const isCombatDead=entity=>!entity||entity.destroyed||entity.dead===true||entity.data?.state==='dead'||typeof entity.data?.health==='number'&&entity.data.health<=0;
 const stateFor=entity=>entity.data.combat_state??=( {bleed:null,orbs:[],stagger_remaining:0,boss_resist_remaining:0,slam:null} );
@@ -27536,9 +28540,9 @@ class combatSystem{
 return Object.freeze({get isCombatDead(){return isCombatDead;},get combatSystem(){return combatSystem;}});
 })();
 // src/game/mechanics/combat/melee-poses.mjs
-const m171 = (()=>{
+const m175 = (()=>{
 // Authored local animation poses, shared by presentation and native swept queries.
-const rules = m59.default;
+const rules = m63.default;
 const MELEE_SWING={duration:rules.blade.duration_seconds,windup:rules.blade.windup_seconds,cutEnd:rules.blade.cut_end_seconds};
 /* A long blade's swing (a model with swing: 'wide', Blood Pact): two hands on the grip, she
    winds the blade far back to one side, then sweeps it round in front of her in one wide arc
@@ -27612,13 +28616,13 @@ function sampleMeleeSwing(age, side, out = {}, secs = MELEE_SWING.duration, styl
 return Object.freeze({get MELEE_SWING(){return MELEE_SWING;},get WIDE_SWING(){return WIDE_SWING;},get sampleWideSwing(){return sampleWideSwing;},get wideGrip(){return wideGrip;},get swingPhases(){return swingPhases;},get sampleMeleeSwing(){return sampleMeleeSwing;}});
 })();
 // src/game/mechanics/combat/weapon-system.mjs
-const m170 = (()=>{
-const rules = m59.default;
-const {getCombatProfile} = m161;
+const m174 = (()=>{
+const rules = m63.default;
+const {getCombatProfile} = m165;
 const {BODY_GROUP} = m1;
-const {sampleMeleeSwing,swingPhases} = m171;
-const {isCombatDead} = m169;
-const {jsonCopy,nonnegative} = m38;
+const {sampleMeleeSwing,swingPhases} = m175;
+const {isCombatDead} = m173;
+const {jsonCopy,nonnegative} = m40;
 
 const stateFor=(player,settings=rules)=>player.data.weapon_state??={format_version:1,elapsed:0,cooldown:0,holstered:false,drawn_at:null,draw_shot_used:false,quick_draw:null,punch_side:'right',haymaker:false,combo:0,last_punch_at:-99,swing:null,side:1,shield:{charge:settings.mirror.shield,spent:false,since_hit:999}};
 /** One executable weapon policy. Native physics owns every trajectory, sweep, contact and impulse. */
@@ -27789,11 +28793,11 @@ class weaponSystem{
 return Object.freeze({get weaponSystem(){return weaponSystem;}});
 })();
 // src/game/mechanics/items/loot-system.mjs
-const m172 = (()=>{
-const {WorldLoot} = m123;
-const rules = m59.default;
+const m176 = (()=>{
+const {WorldLoot} = m127;
+const rules = m63.default;
 const {BODY_GROUP} = m1;
-const {jsonCopy,nonnegative} = m38;
+const {jsonCopy,nonnegative} = m40;
 
 /** World ownership and pickup policy. Placement, motion, bounds and proximity use the existing engine. */
 class lootSystem{
@@ -27843,24 +28847,24 @@ class lootSystem{
 return Object.freeze({get lootSystem(){return lootSystem;}});
 })();
 // src/game/boot/game-runtime.mjs
-const m154 = (()=>{
-const {humanoidSystem} = m155;
-const {encounterSystem} = m159;
-const {attackSystem} = m160;
-const {abilitySystem} = m163;
-const {actorSystem} = m164;
-const {registerGameEntityTypes} = m112;
-const {gameEngine} = m139;
-const {createApartmentAssetLibrary} = m131;
-const controlProfile = m165.default;
-const {gameSession} = m166;
-const {PlayerStateSystem} = m167;
-const {PlayerControlSystem} = m168;
-const playerRules = m62.default;
-const {combatSystem} = m169;
-const {weaponSystem} = m170;
-const {lootSystem} = m172;
-const {canvasRenderer} = m147;
+const m158 = (()=>{
+const {humanoidSystem} = m159;
+const {encounterSystem} = m163;
+const {attackSystem} = m164;
+const {abilitySystem} = m167;
+const {actorSystem} = m168;
+const {registerGameEntityTypes} = m116;
+const {gameEngine} = m143;
+const {createApartmentAssetLibrary} = m135;
+const controlProfile = m169.default;
+const {gameSession} = m170;
+const {PlayerStateSystem} = m171;
+const {PlayerControlSystem} = m172;
+const playerRules = m66.default;
+const {combatSystem} = m173;
+const {weaponSystem} = m174;
+const {lootSystem} = m176;
+const {canvasRenderer} = m151;
 
 /** Explicit game composition. Importing this file never starts a second runtime. */
 function createGameRuntime({ game_db, surface, session_state, player, weapon_policy={}, combat_policy={}, actor_policy={}, ability_policy={}, ...options } = {}) {
@@ -27897,8 +28901,8 @@ function createGameRuntime({ game_db, surface, session_state, player, weapon_pol
 return Object.freeze({get createGameRuntime(){return createGameRuntime;}});
 })();
 // src/game/presentation/weapon-appearance.mjs
-const m173 = (()=>{
-const {GUN_MATERIALS,WEAPON_MODELS,LASER_MODULE,weaponModel} = m162;
+const m177 = (()=>{
+const {GUN_MATERIALS,WEAPON_MODELS,LASER_MODULE,weaponModel} = m166;
 
 const polygon=points=>({type:'path',commands:[...points.map(([x,y],i)=>[i?'line':'move',x,y]),['close']]});
 function shape(part){
@@ -27981,16 +28985,16 @@ class weaponAppearance {
 return Object.freeze({get weaponAppearance(){return weaponAppearance;}});
 })();
 // src/game/data/game-combat.mjs
-const m174 = (()=>{
-const data = m59.default;
+const m178 = (()=>{
+const data = m63.default;
 const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
 const COMBAT_RULES=freeze(structuredClone(data));
 
 return Object.freeze({get COMBAT_RULES(){return COMBAT_RULES;}});
 })();
 // src/game/presentation/art-packets.mjs
-const m176 = (()=>{
-const {transform,inverse} = m149;
+const m180 = (()=>{
+const {transform,inverse} = m153;
 const identity=()=>[1,0,0,1,0,0];
 const multiply=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
 const geometry=commands=>Array.isArray(commands)?{type:'path',commands:commands.map(command=>[...command])}:structuredClone(commands);
@@ -28016,9 +29020,9 @@ function groundShadow(scene,x,y,rx,ry){scene.enter({position:[x,y],scale:[rx,ry]
 return Object.freeze({get ellipse(){return ellipse;},get circle(){return circle;},get linear(){return linear;},get radial(){return radial;},get artScene(){return artScene;},get glow(){return glow;},get groundShadow(){return groundShadow;}});
 })();
 // src/game/presentation/drone.mjs
-const m175 = (()=>{
-const enemies = m45.default;
-const {artScene,circle,ellipse,radial,glow} = m176;
+const m179 = (()=>{
+const enemies = m49.default;
+const {artScene,circle,ellipse,radial,glow} = m180;
 const DRONE=enemies.drone;
 function droneLift(state){return DRONE.HOVER_PX+Math.sin(state.hoverOffset)*3+state.alt*240;}
 function droneArmPose(diving,stuck,s){
@@ -28199,8 +29203,8 @@ return Object.assign({},{x:pose.position[0],y:pose.position[1],angle:pose.rotati
 return Object.freeze({get droneLift(){return droneLift;},get droneArmPose(){return droneArmPose;},get createDronePackets(){return createDronePackets;},get dronePresentation(){return dronePresentation;}});
 })();
 // src/game/presentation/demoness.mjs
-const m177 = (()=>{
-const enemies = m45.default;
+const m181 = (()=>{
+const enemies = m49.default;
 const DUEL=enemies.duel;
 /** Retained Canvas art over a detached record; body art is supplied by the host. */
 const demonessAppearance={
@@ -28264,8 +29268,8 @@ function demonessPresentation(entity,blend=1){const pose=entity.getRenderState(b
 return Object.freeze({get demonessAppearance(){return demonessAppearance;},get demonessPresentation(){return demonessPresentation;}});
 })();
 // src/game/presentation/boss-effects.mjs
-const m178 = (()=>{
-const enemies = m45.default;
+const m182 = (()=>{
+const enemies = m49.default;
 const HAZARD=enemies.hazards;
 const bossEffectAppearance={
  _smokeK(h){const now=this.render_clock??_gameTimeSec;return Math.min(1,(now-h.t0)/.5)*Math.min(1,(h.until-now)/1.2);},
@@ -28402,10 +29406,10 @@ function bossEffectPresentation(effects,clock){return effects.filter(effect=>!ef
 return Object.freeze({get bossEffectAppearance(){return bossEffectAppearance;},get bossEffectPresentation(){return bossEffectPresentation;}});
 })();
 // src/game/presentation/velvet-cat.mjs
-const m179 = (()=>{
-const {artScene,circle,ellipse,radial,linear,groundShadow} = m176;
-const {velvetCatAnimation} = m115;
-const {VELVET_CAT_PALETTES,VELVET_T,VELVET_PROFILES,VELVET_TAIL_SEGS} = m116;
+const m183 = (()=>{
+const {artScene,circle,ellipse,radial,linear,groundShadow} = m180;
+const {velvetCatAnimation} = m119;
+const {VELVET_CAT_PALETTES,VELVET_T,VELVET_PROFILES,VELVET_TAIL_SEGS} = m120;
 /** Renderer-neutral feline geometry/material packets over detached animation state. */
 
 function createVelvetCatArt(state){const scene=new artScene(),eyes=[];let path=[];
@@ -28748,7 +29752,7 @@ function createVelvetCatPackets(state,{pass='body',darkness=.8}={}){if(!['body',
 return Object.freeze({get createVelvetCatArt(){return createVelvetCatArt;},get createVelvetEyePackets(){return createVelvetEyePackets;},get createVelvetCatPackets(){return createVelvetCatPackets;}});
 })();
 // src/game/data/road-navigation.mjs
-const m180 = (()=>{
+const m184 = (()=>{
 /**
  * The city's lane network as Basement navigation road data.
  *
@@ -28880,7 +29884,7 @@ const m0 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m38.assetLibrary;},get createGameAssetLibrary(){return m43.createGameAssetLibrary;},get resolveMapLayout(){return m65.resolveMapLayout;},get resolvePlacement(){return m65.resolvePlacement;},get isMovableProp(){return m65.isMovableProp;},get mapHost(){return m65.mapHost;},get createMapLibraries(){return m65.createMapLibraries;},get PROP_TYPES(){return m65.PROP_TYPES;},get MAP_IDS(){return m65.MAP_IDS;},get ApartmentLevel(){return m91.ApartmentLevel;},get APARTMENT_RULES(){return m131.APARTMENT_RULES;},get gameEngine(){return m139.gameEngine;},get gameLevel(){return m141.gameLevel;},get levelLobby(){return m140.levelLobby;},get createGameRuntime(){return m154.createGameRuntime;},get controlSystem(){return m142.controlSystem;},get controlsSystem(){return m142.controlsSystem;},get inputInstance(){return m142.inputInstance;},get keyboardInstance(){return m142.keyboardInstance;},get mouseInstance(){return m142.mouseInstance;},get touchInstance(){return m142.touchInstance;},get touchStick(){return m142.touchStick;},get gamepadInstance(){return m142.gamepadInstance;},get TAP(){return m142.TAP;},get DOUBLETAP(){return m142.DOUBLETAP;},get HELD(){return m142.HELD;},get PRESS(){return m142.PRESS;},get REPEAT(){return m142.REPEAT;},get RELEASE(){return m142.RELEASE;},get renderSystem(){return m147.renderSystem;},get renderFrame(){return m147.renderFrame;},get canvasRenderer(){return m147.canvasRenderer;},get cameraSystem(){return m147.cameraSystem;},get gameSession(){return m166.gameSession;},get PlayerStateSystem(){return m167.PlayerStateSystem;},get PlayerControlSystem(){return m168.PlayerControlSystem;},get Player(){return m118.Player;},get playerVitals(){return m119.playerVitals;},get itemSystem(){return m100.itemSystem;},get createItemCatalog(){return m54.createItemCatalog;},get GUN_MATERIALS(){return m162.GUN_MATERIALS;},get WEAPON_MODELS(){return m162.WEAPON_MODELS;},get LASER_MODULE(){return m162.LASER_MODULE;},get weaponModel(){return m162.weaponModel;},get weaponAppearance(){return m173.weaponAppearance;},get combatSystem(){return m169.combatSystem;},get weaponSystem(){return m170.weaponSystem;},get lootSystem(){return m172.lootSystem;},get WorldLoot(){return m123.WorldLoot;},get MELEE_SWING(){return m171.MELEE_SWING;},get WIDE_SWING(){return m171.WIDE_SWING;},get sampleMeleeSwing(){return m171.sampleMeleeSwing;},get sampleWideSwing(){return m171.sampleWideSwing;},get swingPhases(){return m171.swingPhases;},get wideGrip(){return m171.wideGrip;},get COMBAT_RULES(){return m174.COMBAT_RULES;},get registerGameEntityTypes(){return m112.registerGameEntityTypes;},get actorVitals(){return m98.actorVitals;},get gameActor(){return m96.gameActor;},get NPC(){return m121.NPC;},get rosterRecord(){return m121.rosterRecord;},get ROSTER_FIELDS(){return m121.ROSTER_FIELDS;},get Ganger(){return m95.Ganger;},get actorSystem(){return m164.actorSystem;},get actorItems(){return m99.actorItems;},get restoreActorItems(){return m99.restoreActorItems;},get resolveEmoteLines(){return m122.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m122.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m111.abilityLoadout;},get actorAbilities(){return m111.actorAbilities;},get importActorAbilities(){return m111.importActorAbilities;},get abilitySystem(){return m163.abilitySystem;},get createAbilityCatalog(){return m56.createAbilityCatalog;},get attackRegistry(){return m97.attackRegistry;},get validateAttackState(){return m97.validateAttackState;},get attackSystem(){return m160.attackSystem;},get createAttackCatalog(){return m53.createAttackCatalog;},get validateMountedAttack(){return m110.validateMountedAttack;},get TrafficVehicle(){return m124.TrafficVehicle;},get createGameVehicle(){return m124.createGameVehicle;},get Hunter(){return m94.Hunter;},get createHunterAppearance(){return m52.createHunterAppearance;},get Marionette(){return m117.Marionette;},get MARIONETTE_RULES(){return m50.MARIONETTE_RULES;},get validateAbilityAction(){return m107.validateAbilityAction;},get GatlingGunner(){return m104.GatlingGunner;},get Drone(){return m113.Drone;},get VelvetCat(){return m114.VelvetCat;},get velvetCatAnimation(){return m115.velvetCatAnimation;},get createVelvetAnimation(){return m115.createVelvetAnimation;},get velvetPresentation(){return m115.velvetPresentation;},get droneLift(){return m175.droneLift;},get droneArmPose(){return m175.droneArmPose;},get dronePresentation(){return m175.dronePresentation;},get VELVET_CAT_PALETTES(){return m116.VELVET_CAT_PALETTES;},get VELVET_T(){return m116.VELVET_T;},get VELVET_PROFILES(){return m116.VELVET_PROFILES;},get VELVET_GAITS(){return m116.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m116.VELVET_TAIL_SEGS;},get Demoness(){return m93.Demoness;},get Warden(){return m103.Warden;},get Vesper(){return m103.Vesper;},get Matins(){return m103.Matins;},get Compline(){return m103.Compline;},get BossEffect(){return m105.BossEffect;},get encounterSystem(){return m159.encounterSystem;},get createBossAbilities(){return m44.createBossAbilities;},get createDemonessAppearance(){return m44.createDemonessAppearance;},get demonessAppearance(){return m177.demonessAppearance;},get demonessPresentation(){return m177.demonessPresentation;},get bossEffectAppearance(){return m178.bossEffectAppearance;},get bossEffectPresentation(){return m178.bossEffectPresentation;},get validateBossRecord(){return m92.validateBossRecord;},get createDronePackets(){return m175.createDronePackets;},get createVelvetCatArt(){return m179.createVelvetCatArt;},get createVelvetCatPackets(){return m179.createVelvetCatPackets;},get createVelvetEyePackets(){return m179.createVelvetEyePackets;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m155.humanoidSystem;},get humanoidPresentation(){return m155.humanoidPresentation;},get humanoidBodyCanon(){return m156.humanoidBodyCanon;},get humanoidBuilds(){return m156.humanoidBuilds;},get getHumanoidRigAssets(){return m156.getHumanoidRigAssets;},get roadNavigationData(){return m180.roadNavigationData;},get loadRoadNavigation(){return m180.loadRoadNavigation;}});
+return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m40.assetLibrary;},get createGameAssetLibrary(){return m47.createGameAssetLibrary;},get resolveMapLayout(){return m69.resolveMapLayout;},get resolvePlacement(){return m69.resolvePlacement;},get isMovableProp(){return m69.isMovableProp;},get mapHost(){return m69.mapHost;},get createMapLibraries(){return m69.createMapLibraries;},get PROP_TYPES(){return m69.PROP_TYPES;},get MAP_IDS(){return m69.MAP_IDS;},get ApartmentLevel(){return m95.ApartmentLevel;},get APARTMENT_RULES(){return m135.APARTMENT_RULES;},get gameEngine(){return m143.gameEngine;},get gameLevel(){return m145.gameLevel;},get levelLobby(){return m144.levelLobby;},get createGameRuntime(){return m158.createGameRuntime;},get controlSystem(){return m146.controlSystem;},get controlsSystem(){return m146.controlsSystem;},get inputInstance(){return m146.inputInstance;},get keyboardInstance(){return m146.keyboardInstance;},get mouseInstance(){return m146.mouseInstance;},get touchInstance(){return m146.touchInstance;},get touchStick(){return m146.touchStick;},get gamepadInstance(){return m146.gamepadInstance;},get TAP(){return m146.TAP;},get DOUBLETAP(){return m146.DOUBLETAP;},get HELD(){return m146.HELD;},get PRESS(){return m146.PRESS;},get REPEAT(){return m146.REPEAT;},get RELEASE(){return m146.RELEASE;},get renderSystem(){return m151.renderSystem;},get renderFrame(){return m151.renderFrame;},get canvasRenderer(){return m151.canvasRenderer;},get cameraSystem(){return m151.cameraSystem;},get gameSession(){return m170.gameSession;},get PlayerStateSystem(){return m171.PlayerStateSystem;},get PlayerControlSystem(){return m172.PlayerControlSystem;},get Player(){return m122.Player;},get playerVitals(){return m123.playerVitals;},get itemSystem(){return m104.itemSystem;},get createItemCatalog(){return m58.createItemCatalog;},get GUN_MATERIALS(){return m166.GUN_MATERIALS;},get WEAPON_MODELS(){return m166.WEAPON_MODELS;},get LASER_MODULE(){return m166.LASER_MODULE;},get weaponModel(){return m166.weaponModel;},get weaponAppearance(){return m177.weaponAppearance;},get combatSystem(){return m173.combatSystem;},get weaponSystem(){return m174.weaponSystem;},get lootSystem(){return m176.lootSystem;},get WorldLoot(){return m127.WorldLoot;},get MELEE_SWING(){return m175.MELEE_SWING;},get WIDE_SWING(){return m175.WIDE_SWING;},get sampleMeleeSwing(){return m175.sampleMeleeSwing;},get sampleWideSwing(){return m175.sampleWideSwing;},get swingPhases(){return m175.swingPhases;},get wideGrip(){return m175.wideGrip;},get COMBAT_RULES(){return m178.COMBAT_RULES;},get registerGameEntityTypes(){return m116.registerGameEntityTypes;},get actorVitals(){return m102.actorVitals;},get gameActor(){return m100.gameActor;},get NPC(){return m125.NPC;},get rosterRecord(){return m125.rosterRecord;},get ROSTER_FIELDS(){return m125.ROSTER_FIELDS;},get Ganger(){return m99.Ganger;},get actorSystem(){return m168.actorSystem;},get actorItems(){return m103.actorItems;},get restoreActorItems(){return m103.restoreActorItems;},get resolveEmoteLines(){return m126.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m126.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m115.abilityLoadout;},get actorAbilities(){return m115.actorAbilities;},get importActorAbilities(){return m115.importActorAbilities;},get abilitySystem(){return m167.abilitySystem;},get createAbilityCatalog(){return m60.createAbilityCatalog;},get attackRegistry(){return m101.attackRegistry;},get validateAttackState(){return m101.validateAttackState;},get attackSystem(){return m164.attackSystem;},get createAttackCatalog(){return m57.createAttackCatalog;},get validateMountedAttack(){return m114.validateMountedAttack;},get TrafficVehicle(){return m128.TrafficVehicle;},get createGameVehicle(){return m128.createGameVehicle;},get Hunter(){return m98.Hunter;},get createHunterAppearance(){return m56.createHunterAppearance;},get Marionette(){return m121.Marionette;},get MARIONETTE_RULES(){return m54.MARIONETTE_RULES;},get validateAbilityAction(){return m111.validateAbilityAction;},get GatlingGunner(){return m108.GatlingGunner;},get Drone(){return m117.Drone;},get VelvetCat(){return m118.VelvetCat;},get velvetCatAnimation(){return m119.velvetCatAnimation;},get createVelvetAnimation(){return m119.createVelvetAnimation;},get velvetPresentation(){return m119.velvetPresentation;},get droneLift(){return m179.droneLift;},get droneArmPose(){return m179.droneArmPose;},get dronePresentation(){return m179.dronePresentation;},get VELVET_CAT_PALETTES(){return m120.VELVET_CAT_PALETTES;},get VELVET_T(){return m120.VELVET_T;},get VELVET_PROFILES(){return m120.VELVET_PROFILES;},get VELVET_GAITS(){return m120.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m120.VELVET_TAIL_SEGS;},get Demoness(){return m97.Demoness;},get Warden(){return m107.Warden;},get Vesper(){return m107.Vesper;},get Matins(){return m107.Matins;},get Compline(){return m107.Compline;},get BossEffect(){return m109.BossEffect;},get encounterSystem(){return m163.encounterSystem;},get createBossAbilities(){return m48.createBossAbilities;},get createDemonessAppearance(){return m48.createDemonessAppearance;},get demonessAppearance(){return m181.demonessAppearance;},get demonessPresentation(){return m181.demonessPresentation;},get bossEffectAppearance(){return m182.bossEffectAppearance;},get bossEffectPresentation(){return m182.bossEffectPresentation;},get validateBossRecord(){return m96.validateBossRecord;},get createDronePackets(){return m179.createDronePackets;},get createVelvetCatArt(){return m183.createVelvetCatArt;},get createVelvetCatPackets(){return m183.createVelvetCatPackets;},get createVelvetEyePackets(){return m183.createVelvetEyePackets;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m159.humanoidSystem;},get humanoidPresentation(){return m159.humanoidPresentation;},get humanoidBodyCanon(){return m160.humanoidBodyCanon;},get humanoidBuilds(){return m160.humanoidBuilds;},get getHumanoidRigAssets(){return m160.getHumanoidRigAssets;},get roadNavigationData(){return m184.roadNavigationData;},get loadRoadNavigation(){return m184.loadRoadNavigation;}});
 })();
 return m0;
 })();

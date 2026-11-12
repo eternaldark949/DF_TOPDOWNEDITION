@@ -48,6 +48,7 @@ export class constraintSolver {
         const ca = sub(pa, impulseCenter(a)), cb = b ? sub(pb, impulseCenter(b)) : [0, 0];
         if (c.constraint_type === 'slider') { solveSlider(r, dt, ra, rb, pa, pb); finish(r); return; }
         const d = sub(pb, pa), distance = length(d), n = distance > EPS ? scale(d, 1 / distance) : [1, 0];
+        if (c.constraint_type === 'hinge' || c.constraint_type === 'attachment') { solvePin(r, dt, ra, rb, ca, cb, d); solveAngle(r, dt); finish(r); return; }
         const rest = c.constraint_type === 'distance' || c.constraint_type === 'spring' ? c.rest_length : 0;
         const error = distance - rest;
         const ax = inverseMass(a, 'x'), ay = inverseMass(a, 'y'), bx = inverseMass(b, 'x'), by = inverseMass(b, 'y');
@@ -69,29 +70,54 @@ export class constraintSolver {
                 if (b) { b.position[0] -= n[0] * correction * bx; b.position[1] -= n[1] * correction * by; rotateAtCenter(b, -cross(cb, n) * correction * ib); }
             }
         }
-        if (c.constraint_type === 'hinge' || c.constraint_type === 'attachment') {
-            const angle = angleDelta(b?.rotation ?? 0, a.rotation), inv = ia + ib;
-            let angular_error = c.constraint_type === 'attachment' ? angleDelta(c.target_rotation, angle)
-                : angle < c.min_rotation ? angle - c.min_rotation : angle > c.max_rotation ? angle - c.max_rotation : 0;
-            if (inv > EPS) {
-                const v = a.angular_velocity - (b?.angular_velocity ?? 0), limit = c.max_torque * dt;
-                const motor = limit ? Math.max(-limit, Math.min(limit, (c.motor_speed - v) / inv)) : 0;
-                const j = angular_error ? (-angular_error * Math.min(c.stiffness, 0.2 / dt) - v) / inv + motor : motor;
-                changeAngularSpeed(a, j * ia); if (b) changeAngularSpeed(b, -j * ib);
-                const correction = -angular_error * 0.5 / inv;
-                rotateAtCenter(a, correction * ia); if (b) rotateAtCenter(b, -correction * ib);
-                r.applied_impulse += Math.abs(j);
-                // A hinge's return spring: angular acceleration toward target_rotation, independent of
-                // inertia (spring_stiffness in 1/s², spring_damping in 1/s). Solved in every iteration
-                // with dt = step / iterations, so it sums to one full step.
-                if (c.constraint_type === 'hinge' && (c.spring_stiffness || c.spring_damping)) {
-                    const err = angleDelta(c.target_rotation, angle), w = a.angular_velocity - (b?.angular_velocity ?? 0);
-                    const k = (-c.spring_stiffness * err - c.spring_damping * w) * dt / inv;
-                    changeAngularSpeed(a, k * ia); if (b) changeAngularSpeed(b, -k * ib);
-                }
-            }
-        }
         finish(r);
+    }
+}
+/**
+ * A pin: the two anchors are one point. Solved on both axes at once (a 2×2 effective mass), so the
+ * velocity at the pin is removed rather than softened and a hinged limb turns about its pin instead
+ * of about its own centre. Position drift is corrected the same way, split by each body's mobility.
+ */
+function solvePin(r, dt, ra, rb, ca, cb, d) {
+    const { a, b, config: c } = r;
+    const ax = inverseMass(a, 'x'), ay = inverseMass(a, 'y'), bx = inverseMass(b, 'x'), by = inverseMass(b, 'y'), ia = inverseInertia(a), ib = inverseInertia(b);
+    const k11 = ax + bx + ia * ca[1] ** 2 + ib * cb[1] ** 2, k22 = ay + by + ia * ca[0] ** 2 + ib * cb[0] ** 2, k12 = -ia * ca[0] * ca[1] - ib * cb[0] * cb[1];
+    const det = k11 * k22 - k12 * k12;
+    if (!(det > EPS * EPS)) return;
+    const solve = v => [(k22 * v[0] - k12 * v[1]) / det, (k11 * v[1] - k12 * v[0]) / det];
+    const va = add(a.velocity, [-a.angular_velocity * ra[1], a.angular_velocity * ra[0]]);
+    const vb = b ? add(b.velocity, [-b.angular_velocity * rb[1], b.angular_velocity * rb[0]]) : [0, 0];
+    let impulse = solve(add(sub(vb, va), scale(d, Math.min(0.2 / dt, c.stiffness))));
+    const size = length(impulse); if (c.max_force > 0 && size > c.max_force * dt) impulse = scale(impulse, c.max_force * dt / size);
+    r.applied_impulse += length(impulse);
+    const pa = add(a.position, ra), pb = b ? add(b.position, rb) : c.world_target;
+    changeVelocity(a, impulse, pa); if (b) changeVelocity(b, scale(impulse, -1), pb);
+    const move = scale(solve(d), 0.5);
+    a.position[0] += move[0] * ax; a.position[1] += move[1] * ay; rotateAtCenter(a, cross(ca, move) * ia);
+    if (b) { b.position[0] -= move[0] * bx; b.position[1] -= move[1] * by; rotateAtCenter(b, -cross(cb, move) * ib); }
+}
+/** A hinge's limits, motor and return spring, or an attachment's fixed angle. */
+function solveAngle(r, dt) {
+    const { a, b, config: c } = r, ia = inverseInertia(a), ib = inverseInertia(b);
+    const angle = angleDelta(b?.rotation ?? 0, a.rotation), inv = ia + ib;
+    let angular_error = c.constraint_type === 'attachment' ? angleDelta(c.target_rotation, angle)
+        : angle < c.min_rotation ? angle - c.min_rotation : angle > c.max_rotation ? angle - c.max_rotation : 0;
+    if (inv > EPS) {
+        const v = a.angular_velocity - (b?.angular_velocity ?? 0), limit = c.max_torque * dt;
+        const motor = limit ? Math.max(-limit, Math.min(limit, (c.motor_speed - v) / inv)) : 0;
+        const j = angular_error ? (-angular_error * Math.min(c.stiffness, 0.2 / dt) - v) / inv + motor : motor;
+        changeAngularSpeed(a, j * ia); if (b) changeAngularSpeed(b, -j * ib);
+        const correction = -angular_error * 0.5 / inv;
+        rotateAtCenter(a, correction * ia); if (b) rotateAtCenter(b, -correction * ib);
+        r.applied_impulse += Math.abs(j);
+        // A hinge's return spring: angular acceleration toward target_rotation, independent of
+        // inertia (spring_stiffness in 1/s², spring_damping in 1/s). Solved in every iteration
+        // with dt = step / iterations, so it sums to one full step.
+        if (c.constraint_type === 'hinge' && (c.spring_stiffness || c.spring_damping)) {
+            const err = angleDelta(c.target_rotation, angle), w = a.angular_velocity - (b?.angular_velocity ?? 0);
+            const k = (-c.spring_stiffness * err - c.spring_damping * w) * dt / inv;
+            changeAngularSpeed(a, k * ia); if (b) changeAngularSpeed(b, -k * ib);
+        }
     }
 }
 function finish(r) {

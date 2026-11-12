@@ -42,7 +42,7 @@ jobs:
 
       - name: Check native systems, runtime and player ownership
         run: >-
-          node --test src/engine/directory/tests/*.test.mjs src/engine/basement/physics/tests/*.test.mjs src/engine/basement/maps/tests/*.test.mjs tools/test-map-layouts.mjs
+          node --test src/engine/directory/tests/*.test.mjs src/engine/penthouse/tests/*.test.mjs src/engine/basement/physics/tests/*.test.mjs src/engine/basement/maps/tests/*.test.mjs tools/test-map-layouts.mjs
           src/engine/basement/controls/tests/*.test.mjs src/engine/basement/rendering/tests/*.test.mjs
           tools/test-game-physics-scenarios.mjs tools/test-entity-assets.mjs
           tools/test-street-population.mjs tools/test-player-systems.mjs tools/test-player-vitals.mjs
