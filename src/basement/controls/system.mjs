@@ -175,7 +175,7 @@ export class controlSystem {
         for (const fn of this.before_fire) fn(action, type, ev);
         this.queue.push([action, type, ev.time]);
         this.actions[action]?.[1]?.(this.context(), ev);
-        for (const fn of this.on_fire) fn(action, type, ev);   // a recorder listening (basement/recorder-kit.js)
+        for (const fn of this.on_fire) fn(action, type, ev);   // a recorder listening (legacy/basement/recorder-kit.js)
         return true;
     }
     press(inst, input, ev) {

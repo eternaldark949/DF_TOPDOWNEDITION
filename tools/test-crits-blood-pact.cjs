@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 'use strict';
-// Critical hits (engine/combat-fx.js) and the Blood Pact katana (ui/inventory-augments.js, ui/weapon-models.js)
+// Critical hits (legacy/engine/combat-fx.js) and the Blood Pact katana (legacy/ui/inventory-augments.js, legacy/ui/weapon-models.js)
 const assert=require('node:assert/strict');
 const {join}=require('node:path');
 const {runtime}=require('./test-game-runtime.cjs');

@@ -2,7 +2,7 @@
    WEAPON MODELS — every gun as data: parts in the gun's own frame (+x down
    the barrel, the grip hand near 0,0, +y to the holder's right), each in a
    material. A model is painted once into a sprite (bakeWeapon) and stamped
-   by drawWeapon (ui/humanoid-render.js); only its lights are drawn live.
+   by drawWeapon (legacy/ui/humanoid-render.js); only its lights are drawn live.
    Ethereal, elegant sci-fi seen from straight above, in the shapes of
    ETERNAL's catalog sketches, shaded as angular metallic glass: hard bevel
    facets, slanted glass glints, faceted gem knobs, glass sleeves over the
@@ -11,7 +11,7 @@
      muzzle   barrel tip (shots and the laser leave from here: weaponMuzzleLocal)
      rail     where the laser module sits (its front end)
      brass    the glitter colour of the spent casings each shot throws (null: an energy gun)
-     fx       its signature (engine/combat-effects.js): trail 'crackle' | 'static' | 'wisp' behind the shot,
+     fx       its signature (legacy/engine/combat-effects.js): trail 'crackle' | 'static' | 'wisp' behind the shot,
               or barrel 'smoke' (after N quick shots with `after`) | 'embers' off the muzzle; col / core / dust / hot
      glow     live lights [x, y, r, colour], breathing slowly in a wave down the gun
      run      a spark that glides down a light line [x0, x1, y, colour]
@@ -172,8 +172,8 @@ export const WEAPON_MODELS = {
         run: [5, 18, 1.4, '#fffaea']                                                    // the glint along the edge
     },
     blood_pact: {                                                                       // Blood Pact: a long blood-red katana, a black wrapped grip, a crimson tsuba
-        stance: 'knife', muzzle: [50, -1.6], rail: [8, 0], brass: null, melee: true, swing: 'wide',   // a two-handed sweep (engine/status-effects.js)
-        edge: [50.5, -1.9],                                                             // the tip, where the slash trail runs (engine/status-effects.js)
+        stance: 'knife', muzzle: [50, -1.6], rail: [8, 0], brass: null, melee: true, swing: 'wide',   // a two-handed sweep (legacy/engine/status-effects.js)
+        edge: [50.5, -1.9],                                                             // the tip, where the slash trail runs (legacy/engine/status-effects.js)
         trail: { dust: '#ff3a5c', cols: [[9, '200, 20, 50', .26], [3.4, '255, 70, 100', .6], [1.3, '255, 210, 220', .9]] },
         parts: [
             _cap(-10.4, -8.4, 0, 2.7, 'crimson'),                                       // the pommel cap

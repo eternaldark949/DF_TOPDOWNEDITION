@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 'use strict';
-// Lane runners (traffic/lane-runner.js): most AI cars ride their rails, none overlap, and the slide through turns
+// Lane runners (legacy/traffic/lane-runner.js): most AI cars ride their rails, none overlap, and the slide through turns
 // (which lays the tyre marks) stays where the full driver had it. One seeded run of the city map.
 const assert = require('node:assert/strict');
 const {join} = require('node:path');

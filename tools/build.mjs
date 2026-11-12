@@ -6,7 +6,7 @@
  *   node tools/build.mjs --check  exit 1 if "DFAB V8.html" is out of date (CI)
  *
  * Files in assets/images and assets/audio are embedded as data URIs in the
- * ASSETS table (see src/core/assets.js for getImage / drawAsset / playSound).
+ * ASSETS table (see src/legacy/core/assets.js for getImage / drawAsset / playSound).
  * Files in assets/fonts become @font-face rules, named after the file.
  * A .json file in SCRIPTS is a GAME_DB chapter (src/directory/game-db/): it goes in as
  * `GAME_DB.<file name> = <its JSON>;`, so the data stays plain JSON that editors and tools can read.
@@ -16,7 +16,7 @@
  * files above it declared (classes before subclasses, systems before the code
  * that instantiates them). Add a new file by putting it in the right place here.
  *
- * Each file is its own script (src/app/boot-loader.js runs them one after another
+ * Each file is its own script (src/legacy/app/boot-loader.js runs them one after another
  * under the loading screen), so a function declared in a later file is not hoisted
  * into an earlier one either: at load time, `factory: createThing` needs createThing's
  * file above; `factory: (...a) => createThing(...a)` works from anywhere. Inside a
@@ -34,42 +34,42 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUTPUT = 'DFAB V8.html';
 
 const STYLES = [
-    'styles/loading-screen.css',   // first: the loading screen paints before anything else has parsed
-    'styles/base.css',
-    'styles/hud-menus.css',
-    'styles/panels-phone.css',
-    'styles/cinematic.css',
-    'styles/coach.css',
-    'styles/dossier.css',
-    'styles/shops.css',
-    'styles/landscape.css',
+    'legacy/styles/loading-screen.css',   // first: the loading screen paints before anything else has parsed
+    'legacy/styles/base.css',
+    'legacy/styles/hud-menus.css',
+    'legacy/styles/panels-phone.css',
+    'legacy/styles/cinematic.css',
+    'legacy/styles/coach.css',
+    'legacy/styles/dossier.css',
+    'legacy/styles/shops.css',
+    'legacy/styles/landscape.css',
 ];
 
 const SCRIPTS = [
-    'basement/frame-clock.js',     // LV0 Basement: the frame clock's globals (_frameTime, _simTick, _gameTimeSec), first
-    'basement/timer-kit.js',       // LV0 Basement: gTimer and game_timers (timers in game time, on the sim ticks)
-    'basement/canvas-kit.js',      // LV0 Basement: canvasKit (off-screen layers)
-    'basement/life-kit.js',        // LV0 Basement: lifeKit (lists of short-lived things)
-    'basement/sound-kit.js',       // LV0 Basement: soundKit (Web Audio building blocks)
-    'basement/sound-system.js',    // LV0 Basement: soundSystem (context, channels, volume dial, reverb, sounds by packet)
-    'basement/entity-base.js',     // LV0 Basement: GameEntity (the base of everything that moves or collides)
-    'basement/shape-kit.js',       // LV0 Basement: shapeKit (collision geometry)
-    'basement/spatial-grid.js',    // LV0 Basement: SpatialHashGrid and the render / transition grids
-    'basement/collision-kit.js',   // LV0 Basement: collisionKit and collisionWorld (the collision step, game-free: layers, grid, passes, solver)
-    'basement/vehicle-kit.js',     // LV0 Basement: vehicleKit (driving, out of walls, car-to-car contact: game-free)
+    'legacy/basement/frame-clock.js',     // LV0 Basement: the frame clock's globals (_frameTime, _simTick, _gameTimeSec), first
+    'legacy/basement/timer-kit.js',       // LV0 Basement: gTimer and game_timers (timers in game time, on the sim ticks)
+    'legacy/basement/canvas-kit.js',      // LV0 Basement: canvasKit (off-screen layers)
+    'legacy/basement/life-kit.js',        // LV0 Basement: lifeKit (lists of short-lived things)
+    'legacy/basement/sound-kit.js',       // LV0 Basement: soundKit (Web Audio building blocks)
+    'legacy/basement/sound-system.js',    // LV0 Basement: soundSystem (context, channels, volume dial, reverb, sounds by packet)
+    'legacy/basement/entity-base.js',     // LV0 Basement: GameEntity (the base of everything that moves or collides)
+    'legacy/basement/shape-kit.js',       // LV0 Basement: shapeKit (collision geometry)
+    'legacy/basement/spatial-grid.js',    // LV0 Basement: SpatialHashGrid and the render / transition grids
+    'legacy/basement/collision-kit.js',   // LV0 Basement: collisionKit and collisionWorld (the collision step, game-free: layers, grid, passes, solver)
+    'legacy/basement/vehicle-kit.js',     // LV0 Basement: vehicleKit (driving, out of walls, car-to-car contact: game-free)
     '@native',                    // Native ESM engine/Directory graph, linked from the original sources
-    'basement/controls-system.js', // LV0 Basement: controlsSystem (keyboard, mouse, touch and gamepad instances, touch sticks, keymap, action table)
-    'basement/recorder-kit.js',    // LV0 Basement: gRecorder (inputs recorded per tick, played back through the controls)
-    'basement/lane-rail-kit.js',   // LV0 Basement: railKit (things that run along a line: sampled curves, pedals, following)
-    'basement/ui-kit.js',          // LV0 Basement: uiKit (making, showing and hiding DOM panels)
-    'basement/draw-list.js',       // LV0 Basement: drawList and canvasRenderer (what to draw, apart from how)
-    'basement/material-kit.js',    // LV0 Basement: materialKit (linked materials and finish rules)
-    'basement/virtual-child.js',   // LV0 Basement: virtualChild (things that ride on a parent without being its child)
-    'basement/angle-kit.js',       // LV0 Basement: angleKit (degrees in the data, radians in the code)
-    'basement/query-kit.js',       // LV0 Basement: queryKit (find, filter and sort location packets)
-    'basement/render-system.js',   // LV0 Basement: renderQueue (shapes sorted by depth, same-style ones drawn in one call)
-    'basement/awareness-kit.js',   // LV0 Basement: awarenessMatrix (what a character knows of what's around them)
-    'directory/game-db/game-db.js',   // LV2 Directory: GAME_DB, the game's data; its chapters (JSON) follow
+    'legacy/basement/controls-system.js', // LV0 Basement: controlsSystem (keyboard, mouse, touch and gamepad instances, touch sticks, keymap, action table)
+    'legacy/basement/recorder-kit.js',    // LV0 Basement: gRecorder (inputs recorded per tick, played back through the controls)
+    'legacy/basement/lane-rail-kit.js',   // LV0 Basement: railKit (things that run along a line: sampled curves, pedals, following)
+    'legacy/basement/ui-kit.js',          // LV0 Basement: uiKit (making, showing and hiding DOM panels)
+    'legacy/basement/draw-list.js',       // LV0 Basement: drawList and canvasRenderer (what to draw, apart from how)
+    'legacy/basement/material-kit.js',    // LV0 Basement: materialKit (linked materials and finish rules)
+    'legacy/basement/virtual-child.js',   // LV0 Basement: virtualChild (things that ride on a parent without being its child)
+    'legacy/basement/angle-kit.js',       // LV0 Basement: angleKit (degrees in the data, radians in the code)
+    'legacy/basement/query-kit.js',       // LV0 Basement: queryKit (find, filter and sort location packets)
+    'legacy/basement/render-system.js',   // LV0 Basement: renderQueue (shapes sorted by depth, same-style ones drawn in one call)
+    'legacy/basement/awareness-kit.js',   // LV0 Basement: awarenessMatrix (what a character knows of what's around them)
+    'legacy/directory/game-db/game-db.js',   // LV2 Directory: GAME_DB, the game's data; its chapters (JSON) follow
     'directory/game-db/items.json',   // GAME_DB.items: gear, augments, furniture, consumables, drinks, notes, schematics
     'directory/game-db/shops.json',   // GAME_DB.shops: the auto shop's prices and colours, the dyer's fee and palette
     'directory/game-db/progression.json',   // GAME_DB.progression: Resonance, the three trees, abilities, talk perks
@@ -80,206 +80,206 @@ const SCRIPTS = [
     'directory/game-db/story.json',     // GAME_DB.story: the story's parts and steps (code in STORY_STEP_HOOKS), mission kinds, crew nights, the van's drop
     'directory/game-db/dialogue.json',  // GAME_DB.dialogue: the bonding talks and tiers, the crew's lines and texts, the prologue's poem
     'directory/game-db/cast.json',      // GAME_DB.cast: speaker colours, the scene cast, the crew's spots at home, every named look, the wardrobe, finishes and materials
-    'core/config.js',                   // reads GAME_DB.vehicles and .places, so it comes after the chapters
+    'legacy/core/config.js',                   // reads GAME_DB.vehicles and .places, so it comes after the chapters
     '@assets',              // generated from the assets/ folder
-    'core/assets.js',
-    'core/registries.js',
-    'directory/game-materials.js',    // LV2 Directory: the game's finishes and named materials (links the cosmetics)
-    'core/resonance.js',
-    'core/utils.js',
-    'world/navigation.js',
-    'world/walker.js',
-    'core/draw-helpers.js',
-    'core/cache-db.js',
-    'core/appearances.js',
-    'core/settings.js',
-    'story/story-db.js',
-    'story/captions.js',
-    'directory/game-sound.js',
-    'directory/game-controls.js',    // LV2 Directory: dfKeyMap and dfActions (which keys and buttons do what)
-    'world/weather.js',
-    'world/weather-response.js',
-    'world/particles-decals.js',
-    'presentation/indoor-door.js',
-    'world/rooms.js',
-    'world/maps.js',
-    'world/map-entities.js',
-    'directory/collision-system.js',
-    'entities/props-decor.js',
-    'entities/prop-sprites.js',
-    'entities/vehicles-minigames.js',
-    'entities/lamps.js',
-    'entities/actors.js',
-    'entities/static-builders-profiler.js',
-    'entities/performance-bench.js',
-    'entities/street-objects.js',
-    'entities/npc.js',
-    'entities/pedestrians.js',
-    'directory/venue-crowd.js',
-    'directory/lobby-life.js',
-    'directory/club-life.js',
-    'directory/cafe-life.js',
-    'directory/world-query.js',    // LV2 Directory: worldQuery (rooms, seats, NPCs, loot, doors, landmarks, buildings as packets)
-    'engine/furniture.js',
-    'presentation/gatling-gunner.js',
-    'presentation/classic-actor-packets.js',
-    'entities/enemies.js',
-    'entities/hunters.js',
-    'entities/drones.js',
-    'presentation/marionette.js',
-    'entities/marionettes.js',
-    'buildings/building-v1.js',
-    'buildings/building-v2.js',
-    'buildings/landmark-kit.js',
-    'buildings/ornament-kit.js',
-    'buildings/tiered-kit.js',
-    'buildings/entrance-lamps.js',
-    'buildings/silver-queen.js',
-    'buildings/double-nights.js',
-    'buildings/moon-city.js',
-    'buildings/cozy-cafe.js',
-    'buildings/street-variants.js',
-    'buildings/street-arcade.js',
-    'buildings/street-apartments.js',
-    'buildings/sky-craft.js',
-    'buildings/sky-layer.js',
-    'buildings/factories.js',
-    'buildings/city-view.js',
-    'buildings/registry-v3.js',
-    'buildings/biggs-park.js',
-    'buildings/neural-systems.js',
-    'buildings/torque-auto.js',
-    'buildings/dr-yins.js',
-    'buildings/warehouse-hall.js',
-    'buildings/suburb-house.js', 'buildings/town-gate.js',
-    'buildings/ashgrove.js',
-    'buildings/enni-cole.js',
-    'buildings/silver-queen-deco.js',
-    'buildings/moon-city-deco.js',
-    'traffic/roads.js',
-    'traffic/garage-zib.js',
-    'traffic/zen-art.js',
-    'traffic/car-art.js',
-    'traffic/traffic-vehicle.js',
-    'directory/game-vehicles.js', // One classic-client vehicle construction boundary
-    'traffic/vehicle-occupants.js',
-    'traffic/traffic-people.js',
-    'traffic/traffic-signals.js',
-    'traffic/lane-runner.js',
-    'traffic/traffic-manager.js',
-    'traffic/traffic-profiler.js',
-    'world/parks.js',
-    'world/lot-grounds.js',
-    'world/ground-baker.js',
-    'ui/map-icons.js',
-    'ui/ui-system.js',
-    'ui/music-widget.js',
-    'story/narrative-cutscenes.js',
-    'ui/poses.js',
-    'ui/expressions.js',
-    'ui/bodies.js',
-    'ui/cloth.js',
-    'ui/wardrobe.js',
-    'ui/color-picker.js',
-    'ui/weapon-models.js',
-    'ui/humanoid-render.js',
-    'penthouse/procedural-humanoid.js',
-    'ui/portrait-real.js',
-    'ui/face-cache.js',
-    'ui/comms.js',
-    'ui/crowd-impostors.js',
-    'ui/silhouette-fx.js',
-    'world/city-layout.js',
-    'world/scrapyard.js',
-    'world/billboards.js',
-    'ui/inventory-augments.js',
-    'gameplay/abilities/legacy-ability-launch.js',
-    'ui/action-dock.js',
-    'world/bokeh.js',
-    'story/missions.js',
-    'story/dialogue-bonding.js',
-    'story/npc-dialogue.js',
-    'story/scene-vision.js',
-    'ui/cinematic-dialogue.js',
-    'ui/hud-reveal.js',
-    'ui/coach.js',
-    'story/scene-runner.js',
-    'story/scenes/cast.js',
-    'story/scenes/prologue.js',
-    'story/scenes/van.js',
-    'lobby/level-lobby.js',        // LV1 Lobby: the game loop's clock (GameEngine builds one)
-    'lobby/level-pause.js',       // LV1 Lobby: levelPause (the pause registry)
-    'lobby/level-stages.js',      // LV1 Lobby: levelStages (which stage the engine is on: menu, loading, world)
-    'engine/pause-system.js',
-    'directory/effects-system.js',   // LV2 Directory: effectsSystem and EFFECTS (the world's short-lived effects)
-    'engine/game-engine.js',
-    'engine/events.js',
-    'engine/combat-effects.js',
-    'engine/breach-fx.js',
-    'engine/quick-draw.js',
-    'engine/player-fire.js',
-    'engine/combat-fx.js',
-    'engine/boss-intro.js',
-    'engine/boss-hazards.js',
-    'engine/noise.js',
-    'world/map-edge.js',
-    'engine/finisher.js',
-    'engine/reflections.js',
-    'engine/street-mist.js',
-    'engine/shopfront-light.js',
-    'engine/paving-inlays.js',
-    'engine/footsteps.js',
-    'engine/status-effects.js',
-    'engine/executions.js',
-    'engine/sneak.js',
-    'engine/npc-posts.js',
-    'engine/spills.js',
-    'engine/dyer.js',
-    'engine/knuckles.js',
-    'engine/pools.js',
-    'ui/dev-overlay.js',
-    'ui/render-layers.js',
-    'engine/scope.js',
-    'engine/tuning-ui.js',
-    'engine/shops-menus.js',
-    'engine/daytime-flit.js',
-    'engine/screens-ui.js',
-    'engine/save-load.js',
-    'engine/map-loading.js',
-    'engine/world-state.js',
-    'engine/cars.js',
-    'engine/markers.js',
-    'engine/update.js',
-    'engine/overhead.js',
-    'engine/draw.js',
-    'engine/interiors.js',
-    'engine/biggs-art.js',
-    'engine/palace-art.js',
-    'engine/neural-art.js',
-    'engine/torque-art.js',
-    'engine/keeper-art.js',
-    'engine/van-art.js',
-    'engine/lighting.js',
-    'engine/daylight.js',
-    'engine/player-draw-input.js',
-    'directory/new-game-state.js',   // LV2 Directory: resetGameState, the game's new-game defaults
-    'directory/world-session.js',    // LV2 Directory: menu <-> world (enterWorld, the loading screen, stop)
-    'engine/loop.js',
-    'engine/apartment-rooms.js',
-    'engine/apartment-renderer.js',
-    'engine/apartment-level.js',
-    'app/menu-wiring.js',
-    'ui/phone.js',
-    'ui/app-launch.js',
-    'ui/messages.js',
-    'ui/amber-app.js',
-    'story/crew-nights.js', 'story/talks.js',
-    'ui/screens.js',
-    'ui/sidebars.js',
-    'ui/pause-look.js',
-    'ui/save-slots-pause-menu.js',
-    'app/boot.js',
-    'ui/gamepad.js',        // controller support: after boot, so game, pauseMenu and Screens exist
+    'legacy/core/assets.js',
+    'legacy/core/registries.js',
+    'legacy/directory/game-materials.js',    // LV2 Directory: the game's finishes and named materials (links the cosmetics)
+    'legacy/core/resonance.js',
+    'legacy/core/utils.js',
+    'legacy/world/navigation.js',
+    'legacy/world/walker.js',
+    'legacy/core/draw-helpers.js',
+    'legacy/core/cache-db.js',
+    'legacy/core/appearances.js',
+    'legacy/core/settings.js',
+    'legacy/story/story-db.js',
+    'legacy/story/captions.js',
+    'legacy/directory/game-sound.js',
+    'legacy/directory/game-controls.js',    // LV2 Directory: dfKeyMap and dfActions (which keys and buttons do what)
+    'legacy/world/weather.js',
+    'legacy/world/weather-response.js',
+    'legacy/world/particles-decals.js',
+    'legacy/presentation/indoor-door.js',
+    'legacy/world/rooms.js',
+    'legacy/world/maps.js',
+    'legacy/world/map-entities.js',
+    'legacy/directory/collision-system.js',
+    'legacy/entities/props-decor.js',
+    'legacy/entities/prop-sprites.js',
+    'legacy/entities/vehicles-minigames.js',
+    'legacy/entities/lamps.js',
+    'legacy/entities/actors.js',
+    'legacy/entities/static-builders-profiler.js',
+    'legacy/entities/performance-bench.js',
+    'legacy/entities/street-objects.js',
+    'legacy/entities/npc.js',
+    'legacy/entities/pedestrians.js',
+    'legacy/directory/venue-crowd.js',
+    'legacy/directory/lobby-life.js',
+    'legacy/directory/club-life.js',
+    'legacy/directory/cafe-life.js',
+    'legacy/directory/world-query.js',    // LV2 Directory: worldQuery (rooms, seats, NPCs, loot, doors, landmarks, buildings as packets)
+    'legacy/engine/furniture.js',
+    'legacy/presentation/gatling-gunner.js',
+    'legacy/presentation/classic-actor-packets.js',
+    'legacy/entities/enemies.js',
+    'legacy/entities/hunters.js',
+    'legacy/entities/drones.js',
+    'legacy/presentation/marionette.js',
+    'legacy/entities/marionettes.js',
+    'legacy/buildings/building-v1.js',
+    'legacy/buildings/building-v2.js',
+    'legacy/buildings/landmark-kit.js',
+    'legacy/buildings/ornament-kit.js',
+    'legacy/buildings/tiered-kit.js',
+    'legacy/buildings/entrance-lamps.js',
+    'legacy/buildings/silver-queen.js',
+    'legacy/buildings/double-nights.js',
+    'legacy/buildings/moon-city.js',
+    'legacy/buildings/cozy-cafe.js',
+    'legacy/buildings/street-variants.js',
+    'legacy/buildings/street-arcade.js',
+    'legacy/buildings/street-apartments.js',
+    'legacy/buildings/sky-craft.js',
+    'legacy/buildings/sky-layer.js',
+    'legacy/buildings/factories.js',
+    'legacy/buildings/city-view.js',
+    'legacy/buildings/registry-v3.js',
+    'legacy/buildings/biggs-park.js',
+    'legacy/buildings/neural-systems.js',
+    'legacy/buildings/torque-auto.js',
+    'legacy/buildings/dr-yins.js',
+    'legacy/buildings/warehouse-hall.js',
+    'legacy/buildings/suburb-house.js', 'legacy/buildings/town-gate.js',
+    'legacy/buildings/ashgrove.js',
+    'legacy/buildings/enni-cole.js',
+    'legacy/buildings/silver-queen-deco.js',
+    'legacy/buildings/moon-city-deco.js',
+    'legacy/traffic/roads.js',
+    'legacy/traffic/garage-zib.js',
+    'legacy/traffic/zen-art.js',
+    'legacy/traffic/car-art.js',
+    'legacy/traffic/traffic-vehicle.js',
+    'legacy/directory/game-vehicles.js', // One classic-client vehicle construction boundary
+    'legacy/traffic/vehicle-occupants.js',
+    'legacy/traffic/traffic-people.js',
+    'legacy/traffic/traffic-signals.js',
+    'legacy/traffic/lane-runner.js',
+    'legacy/traffic/traffic-manager.js',
+    'legacy/traffic/traffic-profiler.js',
+    'legacy/world/parks.js',
+    'legacy/world/lot-grounds.js',
+    'legacy/world/ground-baker.js',
+    'legacy/ui/map-icons.js',
+    'legacy/ui/ui-system.js',
+    'legacy/ui/music-widget.js',
+    'legacy/story/narrative-cutscenes.js',
+    'legacy/ui/poses.js',
+    'legacy/ui/expressions.js',
+    'legacy/ui/bodies.js',
+    'legacy/ui/cloth.js',
+    'legacy/ui/wardrobe.js',
+    'legacy/ui/color-picker.js',
+    'legacy/ui/weapon-models.js',
+    'legacy/ui/humanoid-render.js',
+    'legacy/penthouse/procedural-humanoid.js',
+    'legacy/ui/portrait-real.js',
+    'legacy/ui/face-cache.js',
+    'legacy/ui/comms.js',
+    'legacy/ui/crowd-impostors.js',
+    'legacy/ui/silhouette-fx.js',
+    'legacy/world/city-layout.js',
+    'legacy/world/scrapyard.js',
+    'legacy/world/billboards.js',
+    'legacy/ui/inventory-augments.js',
+    'legacy/gameplay/abilities/legacy-ability-launch.js',
+    'legacy/ui/action-dock.js',
+    'legacy/world/bokeh.js',
+    'legacy/story/missions.js',
+    'legacy/story/dialogue-bonding.js',
+    'legacy/story/npc-dialogue.js',
+    'legacy/story/scene-vision.js',
+    'legacy/ui/cinematic-dialogue.js',
+    'legacy/ui/hud-reveal.js',
+    'legacy/ui/coach.js',
+    'legacy/story/scene-runner.js',
+    'legacy/story/scenes/cast.js',
+    'legacy/story/scenes/prologue.js',
+    'legacy/story/scenes/van.js',
+    'legacy/lobby/level-lobby.js',        // LV1 Lobby: the game loop's clock (GameEngine builds one)
+    'legacy/lobby/level-pause.js',       // LV1 Lobby: levelPause (the pause registry)
+    'legacy/lobby/level-stages.js',      // LV1 Lobby: levelStages (which stage the engine is on: menu, loading, world)
+    'legacy/engine/pause-system.js',
+    'legacy/directory/effects-system.js',   // LV2 Directory: effectsSystem and EFFECTS (the world's short-lived effects)
+    'legacy/engine/game-engine.js',
+    'legacy/engine/events.js',
+    'legacy/engine/combat-effects.js',
+    'legacy/engine/breach-fx.js',
+    'legacy/engine/quick-draw.js',
+    'legacy/engine/player-fire.js',
+    'legacy/engine/combat-fx.js',
+    'legacy/engine/boss-intro.js',
+    'legacy/engine/boss-hazards.js',
+    'legacy/engine/noise.js',
+    'legacy/world/map-edge.js',
+    'legacy/engine/finisher.js',
+    'legacy/engine/reflections.js',
+    'legacy/engine/street-mist.js',
+    'legacy/engine/shopfront-light.js',
+    'legacy/engine/paving-inlays.js',
+    'legacy/engine/footsteps.js',
+    'legacy/engine/status-effects.js',
+    'legacy/engine/executions.js',
+    'legacy/engine/sneak.js',
+    'legacy/engine/npc-posts.js',
+    'legacy/engine/spills.js',
+    'legacy/engine/dyer.js',
+    'legacy/engine/knuckles.js',
+    'legacy/engine/pools.js',
+    'legacy/ui/dev-overlay.js',
+    'legacy/ui/render-layers.js',
+    'legacy/engine/scope.js',
+    'legacy/engine/tuning-ui.js',
+    'legacy/engine/shops-menus.js',
+    'legacy/engine/daytime-flit.js',
+    'legacy/engine/screens-ui.js',
+    'legacy/engine/save-load.js',
+    'legacy/engine/map-loading.js',
+    'legacy/engine/world-state.js',
+    'legacy/engine/cars.js',
+    'legacy/engine/markers.js',
+    'legacy/engine/update.js',
+    'legacy/engine/overhead.js',
+    'legacy/engine/draw.js',
+    'legacy/engine/interiors.js',
+    'legacy/engine/biggs-art.js',
+    'legacy/engine/palace-art.js',
+    'legacy/engine/neural-art.js',
+    'legacy/engine/torque-art.js',
+    'legacy/engine/keeper-art.js',
+    'legacy/engine/van-art.js',
+    'legacy/engine/lighting.js',
+    'legacy/engine/daylight.js',
+    'legacy/engine/player-draw-input.js',
+    'legacy/directory/new-game-state.js',   // LV2 Directory: resetGameState, the game's new-game defaults
+    'legacy/directory/world-session.js',    // LV2 Directory: menu <-> world (enterWorld, the loading screen, stop)
+    'legacy/engine/loop.js',
+    'legacy/engine/apartment-rooms.js',
+    'legacy/engine/apartment-renderer.js',
+    'legacy/engine/apartment-level.js',
+    'legacy/app/menu-wiring.js',
+    'legacy/ui/phone.js',
+    'legacy/ui/app-launch.js',
+    'legacy/ui/messages.js',
+    'legacy/ui/amber-app.js',
+    'legacy/story/crew-nights.js', 'legacy/story/talks.js',
+    'legacy/ui/screens.js',
+    'legacy/ui/sidebars.js',
+    'legacy/ui/pause-look.js',
+    'legacy/ui/save-slots-pause-menu.js',
+    'legacy/app/boot.js',
+    'legacy/ui/gamepad.js',        // controller support: after boot, so game, pauseMenu and Screens exist
 ];
 
 const MIME = {
@@ -351,7 +351,7 @@ function chapterScript(p) {
 
 /*
  * Each script file goes into the page as an inert <script type="text/dfab"> block. The boot loader
- * (src/app/boot-loader.js, the one plain script) runs them in this order, one task apiece, so the
+ * (src/legacy/app/boot-loader.js, the one plain script) runs them in this order, one task apiece, so the
  * browser paints the loading screen between them and its bar shows how much has run. They are still
  * classic scripts sharing one global scope, exactly as when the game was one big <script>.
  */
@@ -374,23 +374,23 @@ function scriptBlocks() {
         if (/<\/script/i.test(code)) throw new Error(`src/${name} contains "</script", which would end its block early`);
     }
     // DFAB_BUILD: a fingerprint of this build's code, for caches kept across sessions that must not outlive the code
-    // that made them (every app's painted faces, ui/face-cache.js)
+    // that made them (every app's painted faces, legacy/ui/face-cache.js)
     const build = createHash('sha1').update(blocks.filter(([n]) => !n.startsWith('assets#')).map(([, c]) => c).join('\n')).digest('hex').slice(0, 12);
     blocks.unshift(['@build', `        const DFAB_BUILD = '${build}';\n`]);
     // data-cost: roughly how long the block takes to run, for the bar. The music is long but cheap (one string
     // literal per track); code is the slow part.
     const cost = (name, code) => Math.max(1, Math.round(code.length * (name.startsWith('assets#') ? 0.15 : 1) / 100));
     return blocks.map(([name, code]) => `    <script type="text/dfab" data-src="${escapeAttr(name)}" data-cost="${cost(name, code)}">\n${code}    </script>\n`).join('')
-        + `    <script>\n${read('app/boot-loader.js')}    </script>\n`;
+        + `    <script>\n${read('legacy/app/boot-loader.js')}    </script>\n`;
 }
 
 export function build() {
-    let html = read('index.html');
+    let html = read('legacy/index.html');
     const styles = fontFaces() + inlineLoadingArt(STYLES.map(read).join(''));
     const scripts = scriptBlocks();
     const put = (marker, text) => {
         const tag = `<!-- @${marker} -->\n`;
-        if (!html.includes(tag)) throw new Error(`src/index.html is missing ${tag.trim()}`);
+        if (!html.includes(tag)) throw new Error(`src/legacy/index.html is missing ${tag.trim()}`);
         html = html.replace(tag, () => text);
     };
     put('styles', styles);

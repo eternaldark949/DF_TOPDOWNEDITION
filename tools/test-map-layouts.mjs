@@ -32,7 +32,7 @@ test('the apartment is hosted natively and the rest still load through the class
 });
 
 test('the cafe tables and booths stay where the classic cafe code expects them', () => {
-    const source = readFileSync(new URL('../src/world/map-entities.js', import.meta.url), 'utf8');
+    const source = readFileSync(new URL('../src/legacy/world/map-entities.js', import.meta.url), 'utf8');
     const tables = JSON.parse(source.match(/const CAFE_TABLES = (\[.*?\]);/)[1]), booths = JSON.parse(source.match(/const CAFE_BOOTHS = (\[.*?\]);/)[1]);
     const layout = resolveMapLayout('cozy_cafe_interior'), of = type => layout.props.filter((_, i) => layout.prop_types[i] === type);
     assert.deepEqual(of('cc_round_table').map(p => [p.x + p.width / 2, p.y + p.height / 2]), tables);

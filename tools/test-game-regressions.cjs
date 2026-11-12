@@ -1160,7 +1160,7 @@ test('An unmarked plane (the Moon City canopy) stamps as one sprite instead of d
   ok(names.includes('stroke'), 'the gold posts still draw live');
 }, {affine: true});
 
-// Cars (engine/cars.js): her own car, Amber's van and whatever she's taken, on the hub and off it
+// Cars (legacy/engine/cars.js): her own car, Amber's van and whatever she's taken, on the hub and off it
 function carsFixture(env) {
   env.run(`{
     game.story.update=()=>{}; game._doLoadMap('sdc'); game.running=true; game.paused=false;
@@ -1386,7 +1386,7 @@ test('Traffic goes round her parked car: a lane change, or a stop and an overtak
   ok(both.moved <= 10, `no shove (${both.moved} px)`);
 }, {events:true});
 
-// People in the road (traffic/traffic-people.js): a car coming down __lane at someone on foot, measured
+// People in the road (legacy/traffic/traffic-people.js): a car coming down __lane at someone on foot, measured
 function folkScene(env) {
   carsFixture(env);
   env.run(`{

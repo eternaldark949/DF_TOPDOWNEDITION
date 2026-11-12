@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
-// Stashes round the city (world/map-entities.js ls_*, engine/shops-menus.js searchLostLuggage): each pays its own range
-// once a day; the gauntlet's two are loud. Vampiric Fists (engine/knuckles.js onPunchLanded): her punches heal her.
+// Stashes round the city (legacy/world/map-entities.js ls_*, legacy/engine/shops-menus.js searchLostLuggage): each pays its own range
+// once a day; the gauntlet's two are loud. Vampiric Fists (legacy/engine/knuckles.js onPunchLanded): her punches heal her.
 const assert=require('node:assert/strict');
 const {join}=require('node:path');
 const {runtime}=require('./test-game-runtime.cjs');

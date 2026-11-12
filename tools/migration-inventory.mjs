@@ -44,14 +44,14 @@ The classic build links **${rows.length} scripts, ${total.toLocaleString('en-US'
 
 These have no Basement or Directory home yet, so the scripts that need them cannot move until they exist:
 
-1. **Audio.** \`basement/sound-system.js\`, \`sound-kit.js\`, \`directory/game-sound.js\`: channels, reverb, music by room. The room graph's \`exposure\` can drive through-door attenuation.
-2. **UI and HUD.** \`ui/ui-system.js\`, \`basement/ui-kit.js\` and the menus, phone, inventory and dialogue screens. They need a Basement UI layer that draws through the render system and reads controls.
-3. **Lighting.** \`engine/lighting.js\`, \`daylight.js\`, \`reflections.js\`, and the classic RoomSystem's veil and darkness. Light shapes are in the grid already; there is no lighting pass in the renderer.
-4. **Game-wide saves.** \`engine/save-load.js\`. Physics snapshots exist per world; a runtime-wide save envelope does not.
-5. **Weather, decals and screen effects.** \`world/weather.js\`, \`particles-decals.js\`, \`engine/combat-effects.js\`. Particles exist; decals and weather layers do not.
-6. **City generation.** \`world/city-layout.js\` fills blocks at random on load. It must become seeded generation into exterior map data for the map system.
-7. **A native map host for every map.** \`engine/apartment-level.js\` hosts one map. It needs to become the host for any map whose layout file says \`"host": "native"\`.
-8. **Timers.** \`basement/timer-kit.js\`: gameplay timers need a runtime-owned service.
+1. **Audio.** \`legacy/basement/sound-system.js\`, \`sound-kit.js\`, \`legacy/directory/game-sound.js\`: channels, reverb, music by room. The room graph's \`exposure\` can drive through-door attenuation.
+2. **UI and HUD.** \`legacy/ui/ui-system.js\`, \`legacy/basement/ui-kit.js\` and the menus, phone, inventory and dialogue screens. They need a Basement UI layer that draws through the render system and reads controls.
+3. **Lighting.** \`legacy/engine/lighting.js\`, \`daylight.js\`, \`reflections.js\`, and the classic RoomSystem's veil and darkness. Light shapes are in the grid already; there is no lighting pass in the renderer.
+4. **Game-wide saves.** \`legacy/engine/save-load.js\`. Physics snapshots exist per world; a runtime-wide save envelope does not.
+5. **Weather, decals and screen effects.** \`legacy/world/weather.js\`, \`particles-decals.js\`, \`legacy/engine/combat-effects.js\`. Particles exist; decals and weather layers do not.
+6. **City generation.** \`legacy/world/city-layout.js\` fills blocks at random on load. It must become seeded generation into exterior map data for the map system.
+7. **A native map host for every map.** \`legacy/engine/apartment-level.js\` hosts one map. It needs to become the host for any map whose layout file says \`"host": "native"\`.
+8. **Timers.** \`legacy/basement/timer-kit.js\`: gameplay timers need a runtime-owned service.
 
 ## By status
 

@@ -15,7 +15,7 @@ const { chromium } = require('playwright');
     await page.goto(pathToFileURL(resolve(process.argv[2] || 'DFAB V8.html')).href);
     const result = await page.evaluate(() => {
       // Isolate existing leg passes without changing their geometry or draw order.
-      // (the stages after the legs: penthouse/procedural-humanoid.js)
+      // (the stages after the legs: legacy/penthouse/procedural-humanoid.js)
       const H = proceduralHumanoid.prototype;
       for (const name of ['drawHips', 'drawArms', 'drawTorso', 'drawHead', 'drawHeld']) {
         const stage = H[name]; if (typeof stage !== 'function') throw new Error('Leg render boundary missing');

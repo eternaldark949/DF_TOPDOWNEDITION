@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 'use strict';
-// Golden Retribution (engine/knuckles.js): crafted brass knuckles. Jabs on the punch hitbox, every third a haymaker
+// Golden Retribution (legacy/engine/knuckles.js): crafted brass knuckles. Jabs on the punch hitbox, every third a haymaker
 // that staggers and can slam a body into a wall; a punch in the Flit-Strike window is a haymaker. Blades and jabs
-// step her in toward someone just out of reach (engine/status-effects.js meleeStepIn), never through them.
+// step her in toward someone just out of reach (legacy/engine/status-effects.js meleeStepIn), never through them.
 const assert=require('node:assert/strict');
 const {join}=require('node:path');
 const {runtime}=require('./test-game-runtime.cjs');

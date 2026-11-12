@@ -246,7 +246,13 @@ A file that seems to fit two answers is really two files. Split it. Example: `di
 - **Single-file build.** `node tools/build.mjs` builds `DFAB V8.html`, the whole game in one offline file. It concatenates the classic scripts listed in `SCRIPTS` and bundles the new modules through `@native` (`directory/native-entry.mjs`). CI runs `node tools/build.mjs --check`, so a change to `src` must be committed together with the rebuilt HTML.
 - **`main` is the original.** `main` holds the original classic code. Compare against it whenever you need to know what the game did before, for example how hinged doors swung. Don't change behaviour silently: if the new engine changes how something feels, say so and get ETERNAL's agreement.
 - **Pull request 178 is intentionally unmerged.** It began the native engine, but parts of its layering break these rules (see section 9). Work stacked on it must fix those breaches, not copy them.
-- **Classic code** consists of the `.js` scripts in `app/`, `core/`, `engine/`, `world/`, `ui/`, `story/`, `buildings/`, and loose in the engine folders. It runs on the old `GameEngine`. Every classic script has exactly one row in `docs/migration/inventory.json` saying where it goes, and CI fails if a row is missing (`node tools/migration-inventory.mjs --check`). Classic code is migrated by moving it properly to its level. **No band-aid adapters** that make classic code look native.
+- **Classic code is quarantined in `src/legacy/`.** Every classic script, stylesheet and the page shell (`legacy/index.html`) was moved there unchanged on 2026-11-12, at its original path: `legacy/engine/loop.js` is `src/engine/loop.js` on `main`. It runs on the old `GameEngine`. The quarantine rules:
+  1. Nothing outside `src/legacy/` imports from it.
+  2. Legacy code reaches the new engine only through the bundled `DFNative` object; legacy scripts import nothing.
+  3. No classic `.js`, `.cjs` or `.css` file exists anywhere else in `src`, and no new code is added to `src/legacy/`.
+  4. A file leaves quarantine only by being **rewritten** at its proper level in `src/engine/` or `src/game/`; then it is deleted from `src/legacy/` and its row is removed. Nothing is moved back out as it is.
+
+  Every classic script has exactly one row in `docs/migration/inventory.json` saying where it goes, and CI fails if a row is missing (`node tools/migration-inventory.mjs --check`). **No band-aid adapters** that make classic code look native.
 
 ---
 
@@ -275,15 +281,19 @@ src/
   game/                           Dimensions Freelancer
     mechanics/                    combat, abilities, AI, encounters, venue life, crowds, story, missions
     audio/                        the game's sounds and music, played through the Basement audio service
-    data/                         (proposed) the game's content: props, maps, GAME_DB, builds, items,
+    data/                         the game's content: props, maps, GAME_DB, builds, items,
                                   weapons, vehicles, balance; registered into the Directory at boot
     entities/  levels/  presentation/  ui/  boot/   (proposed) game classes, one module per map,
                                   appearance producers, HUD and menus, and the runtime composition
 ```
 
-**Name clash to resolve first.** A classic folder `src/engine/` already exists and holds the old `GameEngine` scripts. It must be emptied or renamed (for example `src/classic/`, *proposed*) before the new `src/engine/` is created. The other classic folders (`app/`, `core/`, `world/`, `ui/`, `story/`, `buildings/`) follow their inventory rows in `docs/migration/inventory.json`.
+**What exists today (2026-11-12).** `src/` has three kinds of folder:
 
-**Until the move happens,** the level folders sit directly under `src/` (`src/basement/` and so on), and `gameplay/`, `entities/`, `presentation/`, `levels/` and `traffic/` count as "the game" for every rule above.
+| Folder | State |
+|---|---|
+| `src/engine/` and `src/game/` | The new structure, created as a blank slate: one `README.md` per folder stating its rules. All new work goes here. |
+| `src/legacy/` | Quarantined classic code (section 7). |
+| `src/basement/`, `lobby/`, `runtime/`, `directory/`, `penthouse/`, `gameplay/`, `entities/`, `presentation/`, `levels/`, `traffic/` | Native code written before the new structure (PR 178 and its follow-ups). It is not legacy, but it is unsorted: each file moves into `src/engine/` or `src/game/` at its proper level, split where it mixes levels, following section 9. No new files are added to these folders. Until a file moves, `gameplay/`, `entities/`, `presentation/`, `levels/` and `traffic/` count as "the game" and the others as the level their name says. |
 
 ## 9. Known mismatches today
 
@@ -314,10 +324,10 @@ Audited on 2026-11-12 by tracing every relative import of the new `.mjs` files. 
 5. **Game content sits in the Directory.** `game-db/`, `game-assets/` (props, maps, the `df_*` libraries), `humanoid/builds.json` and `body-canon.json`, combat, item, vehicle and street catalogs, palettes and reactions are this game's data and belong in `game/data`. The Directory keeps only their structures, plus engine defaults (a default skeleton and clips) so the humanoid prefab can boot without the game.
 6. **Drawing code sits in the Directory.** `directory/weapon-appearance.mjs` draws (and a file with the same name exists in `presentation/`). It belongs in presentation, or in a Penthouse prefab.
 7. **Tools and examples sit in the Directory:** `validate-boss-records.mjs`, `runtime-example.mjs` and `rendering-example.mjs`.
-8. **Classic code and folder names:** the classic `src/engine/` folder blocks the new `src/engine/` root (section 8). **Classic kits sit loose in `basement/`:** 22 classic `.js` files at the top level (sound, ui, timer, canvas and others). Two classic files read game globals: `basement/controls-system.js` and `lobby/level-lobby.js`.
+8. **Unsorted native code.** The native modules in `src/basement/`, `lobby/`, `runtime/`, `directory/`, `gameplay/`, `entities/`, `presentation/`, `levels/` and `traffic/` have not yet moved into `src/engine/` and `src/game/` (section 8). Their `README.md` files and tests move with them.
 9. **The humanoid is half migrated:**
    - Motion is native: the Basement rig, Directory data in `directory/humanoid/`, and the game's clip choice in `gameplay/animation/humanoid-system.mjs`.
-   - Drawing is classic: `penthouse/procedural-humanoid.js`, `gl-humanoid.js` and `garment-kit.js`, plus `ui/humanoid-render.js`, `bodies.js`, `wardrobe.js` and `poses.js`.
+   - Drawing is classic: `legacy/penthouse/procedural-humanoid.js`, `gl-humanoid.js` and `garment-kit.js`, plus `legacy/ui/humanoid-render.js`, `bodies.js`, `wardrobe.js` and `poses.js`.
    - The Penthouse has no native module yet.
 10. **Naming.** Some native systems use `update()` or `updateDoors()` instead of `updateState()`, for example `roomGraph.update()` and `mapInstance.updateDoors()`. Most new files lack their level banner.
 11. **A behaviour regression from PR 178:** hinged doors. In `main`, every interior hinged door, including the apartment's, was a physical swinging leaf with a spring. PR 178 made them kinematic and auto-opening. Restore the swinging behaviour.
@@ -328,17 +338,17 @@ When one of these is fixed, remove it from this list in the same commit.
 
 ## 10. Checks that enforce this
 
-Already in CI (`.github/workflows/build.yml`):
+In CI (`.github/workflows/build.yml`):
 - the build check;
-- the physics tests;
-- the map tests, including the game-neutral import check;
-- the migration-inventory check.
+- the physics, maps, controls and rendering tests, including the maps package's game-neutral import check;
+- the migration-inventory check;
+- **the layout check, `node tools/check-layout.mjs`.** It fails when:
+  - a classic `.js`, `.cjs` or `.css` file sits outside `src/legacy/`, or a page outside `src/legacy/` is not an example;
+  - any file outside `src/legacy/` imports from it, or a legacy script imports a module;
+  - a file in `src/engine/` imports outside `src/engine/`, or imports a level that section 3 forbids;
+  - a `.mjs` file in `src/engine/` lacks its level banner on the first line, or names the game (`df_`, `apartment`, `GAME_DB`, `DFNative` and so on) outside its tests.
 
-To be added, as agreed in planning:
-- **A layering check over every `src` file.** It applies the table in section 3, the game-name ban in the Basement, Lobby and Penthouse, and banner-matches-folder.
-- **A standalone check.** It runs the engine tests with the game folders absent.
-
-Until those exist, reviewers apply sections 3 and 6 by hand.
+Still to add: **a standalone check** that runs the engine's tests with `src/game/` and `src/legacy/` absent. Until the unsorted native folders are moved, reviewers apply sections 3 and 6 to them by hand.
 
 ---
 

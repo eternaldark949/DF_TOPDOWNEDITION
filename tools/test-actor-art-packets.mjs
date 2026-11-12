@@ -35,7 +35,7 @@ test('one packet producer failure cannot contaminate the next actor or rendering
 });
 test('producers/animation contain no Canvas backend calls or cached eye writes',()=>{
  for(const path of ['src/presentation/drone.mjs','src/presentation/velvet-cat.mjs','src/presentation/velvet-cat-animation.mjs','src/presentation/art-packets.mjs']){const source=readFileSync(new URL('../'+path,import.meta.url),'utf8');assert.doesNotMatch(source,/\b(?:ctx|context)\.|\bPath2D\b|\.getContext\(|createLinearGradient|createRadialGradient|_eyeWorld/);}
- const old=readFileSync(new URL('../src/entities/drones.js',import.meta.url),'utf8');assert.doesNotMatch(old,/_draw(?:Tendrils|Arms|Shell)\(/);
+ const old=readFileSync(new URL('../src/legacy/entities/drones.js',import.meta.url),'utf8');assert.doesNotMatch(old,/_draw(?:Tendrils|Arms|Shell)\(/);
 });
 class Room extends gameLevel{}
 test('native presentation submits real actors to an alternate backend without the legacy Canvas adapter',async()=>{

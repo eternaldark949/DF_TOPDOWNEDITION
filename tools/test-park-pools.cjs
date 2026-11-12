@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 'use strict';
-// The parks' moon pools (engine/pools.js): water underfoot that she wades through more slowly, her steps splash
+// The parks' moon pools (legacy/engine/pools.js): water underfoot that she wades through more slowly, her steps splash
 // and ring the water, the surface stirs on its own, and her car stops at the rim.
 const assert=require('node:assert/strict');
 const {join}=require('node:path');

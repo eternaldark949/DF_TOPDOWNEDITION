@@ -29,7 +29,7 @@ test('Every chapter is valid JSON, listed in the build, and says what each of it
 
 test('Items: the loadout, schematics and consumable hooks point at things that exist',()=>{
  const it=load('items.json');
- const registries=fs.readFileSync(join(ROOT,'src','core','registries.js'),'utf8');
+ const registries=fs.readFileSync(join(ROOT,'src','legacy','core','registries.js'),'utf8');
  const cosmetics=load('cast.json').cosmetics, cosmetic=id=>!!cosmetics[id];
  for(const id of it.default_loadout) assert.ok(it.gear[id],`default_loadout: no gear '${id}'`);
  unique(it.augments,'augments');unique(it.furniture,'furniture');unique(it.schematics,'schematics');
@@ -217,7 +217,7 @@ test('Places: maps, rooms, doors, fireplaces and notes point at things that exis
   assert.ok(m.width>0&&m.height>0&&m.label,`maps.${id}: width, height, label`);
   if(m.spawn) assert.ok(m.spawn.x>=0&&m.spawn.y>=0&&m.spawn.x<=m.width&&m.spawn.y<=m.height,`maps.${id}: spawn is off the map`);
   for(const t of m.transitions||[]) assert.ok(maps.has(t.target),`maps.${id}: a transition goes to '${t.target}', which is no map`);
-  for(const z of m.floorZones||[]) if('area' in z) assert.ok(areas.has(z.area),`maps.${id}: floor zone area '${z.area}' (MAP_AREAS, world/maps.js)`);
+  for(const z of m.floorZones||[]) if('area' in z) assert.ok(areas.has(z.area),`maps.${id}: floor zone area '${z.area}' (MAP_AREAS, legacy/world/maps.js)`);
  }
  for(const [id,r] of Object.entries(pl.rooms)){
   assert.ok(maps.has(id),`rooms.${id}: no such map`);
@@ -244,7 +244,7 @@ test('Places: maps, rooms, doors, fireplaces and notes point at things that exis
 
 test('Story: steps are named once, point at real maps and checks, crew nights at real places, and step code attaches',()=>{
  const st=load('story.json'), maps=new Set(Object.keys(load('places.json').maps));
- const checker=fs.readFileSync(join(ROOT,'src','story','narrative-cutscenes.js'),'utf8');
+ const checker=fs.readFileSync(join(ROOT,'src','legacy','story','narrative-cutscenes.js'),'utf8');
  const checks=new Set([...checker.slice(checker.indexOf('checkCondition(')).matchAll(/case "([A-Z_0-9]+)"/g)].map(m=>m[1]));
  const known=c=>c===null||checks.has(c)||/^TIMER_\d+$/.test(c)||(c.startsWith('LOC_')&&maps.has(c.slice(4).toLowerCase()));
  const steps=[];
@@ -350,7 +350,7 @@ test('Cast and looks: every speaker and look exists, colours are hex, palette na
   assert.ok(d.appearances[C.look],`scene_cast.${id}: no look '${C.look}'`);
   assert.ok(C.side==='left'||C.side==='right',`scene_cast.${id}: side is left or right`);
  }
- const poses=fs.readFileSync(join(ROOT,'src','ui','poses.js'),'utf8');
+ const poses=fs.readFileSync(join(ROOT,'src','legacy','ui','poses.js'),'utf8');
  for(const [who,p] of Object.entries(d.apartment_idle)){
   assert.ok(d.appearances[who],`apartment_idle.${who}: no such character`);
   assert.ok(Number.isFinite(p.x)&&Number.isFinite(p.y)&&poses.includes(p.pose),`apartment_idle.${who}: x, y and a real pose`);

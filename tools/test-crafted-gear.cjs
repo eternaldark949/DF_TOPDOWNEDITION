@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
-// Crafted gear (story/missions.js SCHEMATICS): the Mirror Blade, the Bloodthirsty Muzzle, the Mirrored Glass;
-// two attachment slots (ui/inventory-augments.js); the deflecting and the damage (engine/status-effects.js)
+// Crafted gear (legacy/story/missions.js SCHEMATICS): the Mirror Blade, the Bloodthirsty Muzzle, the Mirrored Glass;
+// two attachment slots (legacy/ui/inventory-augments.js); the deflecting and the damage (legacy/engine/status-effects.js)
 const assert=require('node:assert/strict');
 const {join}=require('node:path');
 const {runtime}=require('./test-game-runtime.cjs');

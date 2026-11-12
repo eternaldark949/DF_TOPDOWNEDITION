@@ -1,4 +1,4 @@
-// Enni Cole (buildings/enni-cole.js) in a shot: node tools/demo-enni-cole.cjs out.png [minutes dx dy zoom W H dsf]
+// Enni Cole (legacy/buildings/enni-cole.js) in a shot: node tools/demo-enni-cole.cjs out.png [minutes dx dy zoom W H dsf]
 // The gameplay camera: she stands dx, dy from the middle of its front (world px, +y out into the street), at zoom
 // (the phone's ~1.06), on a landscape phone by default. env CINE=1: the cinematic camera on that spot instead.
 const { chromium } = require('playwright'); const path = require('path');

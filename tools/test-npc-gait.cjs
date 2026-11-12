@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
-// Gait after a scripted walk (core/utils.js syncHumanoidGait): a Walker.goTo walk (an NPC back to its post,
-// engine/npc-posts.js) commands the gait; once it ends, a shove must still swing the legs.
+// Gait after a scripted walk (legacy/core/utils.js syncHumanoidGait): a Walker.goTo walk (an NPC back to its post,
+// legacy/engine/npc-posts.js) commands the gait; once it ends, a shove must still swing the legs.
 const assert=require('node:assert/strict');
 const {join}=require('node:path');
 const {runtime}=require('./test-game-runtime.cjs');

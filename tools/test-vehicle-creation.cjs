@@ -26,7 +26,7 @@ assert.deepEqual(result.counts, [1,1]); assert.deepEqual(result.short,[10,0]); a
 assert.deepEqual(env.errors, []);
 function files(dir) { return readdirSync(dir,{withFileTypes:true}).flatMap(e=>e.isDirectory()?files(join(dir,e.name)):[join(dir,e.name)]); }
 const constructors = files(join(root,'src')).filter(p=>p.endsWith('.js')).filter(p=>/new TrafficVehicle\(/.test(readFileSync(p,'utf8')));
-assert.deepEqual(constructors,[join(root,'src/directory/game-vehicles.js')]);
-const phone = readFileSync(join(root,'src/ui/phone.js'),'utf8').split('zibMe() {')[1].split('showCarMe() {')[0];
+assert.deepEqual(constructors,[join(root,'src/legacy/directory/game-vehicles.js')]);
+const phone = readFileSync(join(root,'src/legacy/ui/phone.js'),'utf8').split('zibMe() {')[1].split('showCarMe() {')[0];
 assert.doesNotMatch(phone,/new TrafficVehicle|Math\.|\.vehicles\.push|\.activeZibs\.push/);
 console.log('Vehicle construction, taxi service, short-lane placement and live caller retirement passed.');

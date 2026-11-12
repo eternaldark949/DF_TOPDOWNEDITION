@@ -26,7 +26,7 @@
 export class levelLobby {
     constructor (loop_config, frame_clock) {
         this.loop_config = loop_config;          // read live every frame: { STEP_MS, MAX_FRAME_MS, MAX_STEPS, GAME_SPEED }
-        this.frame_clock = frame_clock;          // the Basement's frame clock (basement/frame-clock.js)
+        this.frame_clock = frame_clock;          // the Basement's frame clock (legacy/basement/frame-clock.js)
         this.jacks = {};
 
         // --- CLOCK STATE ---

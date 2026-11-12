@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 'use strict';
-// The Clothing Dyer (engine/dyer.js): crafted for 1,000 scrap it stands in the bedroom; it recolours an owned
+// The Clothing Dyer (legacy/engine/dyer.js): crafted for 1,000 scrap it stands in the bedroom; it recolours an owned
 // outfit piece by piece for 20 scrap each (free back to the original), saved per outfit and worn in the world.
 const assert=require('node:assert/strict');
 const {join}=require('node:path');

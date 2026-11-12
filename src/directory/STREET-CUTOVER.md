@@ -7,16 +7,16 @@ The apartment now has a [native scene cutover](APARTMENT-CUTOVER.md). This page 
 | Shared official vehicle creation | Implemented | `game-vehicle-factory.mjs` creates official engine entities from Directory definitions for ambient, owned, mission and taxi purposes. |
 | Ambient admission and cleanup | Implemented for official managers | `traffic/traffic-manager.mjs` applies caps only to ambient entities, reserves event-time pending capacity and preserves owned/mission entities during street cleanup. |
 | Official owned replacement | Implemented | Factory excludes the old body from placement testing, creates a fresh body/identity, then retires the original. Failed requests retain the original. |
-| Live default owned-car caller | Consolidated | `engine/game-engine.js` calls `gameVehicles.create` with an initial pose. |
-| Live garage replacement caller | Consolidated | `engine/cars.js` sends the new entity's initial pose through the shared construction boundary. |
-| Live delivery-van caller | Consolidated | `engine/cars.js` selects `mission_id:amber_delivery`. Appearance/model/local spawn data comes from `GAME_DB.vehicles.mission_vehicles`; Basement resolves the local pose. |
-| Live ambient traffic caller | Consolidated | `traffic/traffic-manager.js` calls the shared boundary after its existing admission policy. Old sensing/admission math still needs replacement. |
+| Live default owned-car caller | Consolidated | `legacy/engine/game-engine.js` calls `gameVehicles.create` with an initial pose. |
+| Live garage replacement caller | Consolidated | `legacy/engine/cars.js` sends the new entity's initial pose through the shared construction boundary. |
+| Live delivery-van caller | Consolidated | `legacy/engine/cars.js` selects `mission_id:amber_delivery`. Appearance/model/local spawn data comes from `GAME_DB.vehicles.mission_vehicles`; Basement resolves the local pose. |
+| Live ambient traffic caller | Consolidated | `legacy/traffic/traffic-manager.js` calls the shared boundary after its existing admission policy. Old sensing/admission math still needs replacement. |
 | Live taxi callers | Consolidated | `ZibSystem.spawnOnLane` owns creation and registration for ambient and summoned taxis. |
 | Phone taxi caller | Rewritten | UI calls `ZibSystem.summonNearest`; no constructor, lane projection, placement math or population-array insertion remains in `zibMe`. |
 | Shared path/placement geometry | Implemented and used live | `basement/physics/motion/path-geometry.mjs` supplies projection, nearest authored path and local-pose transformation. The build bundles this module with the native runtime from its ESM source. |
 | Directory appearance source | Applied live and in official client | `GAME_DB.cast.pedestrian_appearances` supplies legacy static views and official entity resources/appearance IDs. |
 | One simulation clock | Official clients corrected | `StreetPopulation.updateState` performs game policy only. The application/Lobby explicitly steps its world once. The preview and tests use that separation. |
-| Remaining legacy constructor boundary | Pending retirement | `directory/game-vehicles.js` contains the only direct production `new TrafficVehicle` call. It still creates the old class; it does not claim native ownership. |
+| Remaining legacy constructor boundary | Pending retirement | `legacy/directory/game-vehicles.js` contains the only direct production `new TrafficVehicle` call. It still creates the old class; it does not claim native ownership. |
 | Native entity class switch | Pending | Change live manager initialization/factories and remaining raw field callers to official entities; do not adopt old bodies or restore writable physical aliases. |
 | Static/player/owned-car interaction | Pending | Register the game's actual scenery and other physical actors in the same official session world before retiring their old collision routes. |
 | Lane routing data | Implemented, not yet used live | `directory/road-navigation.mjs` converts the city's built lanes and junction turn paths into Basement navigation road data (`:in`/`:out` nodes per lane, one connector per real turn). `tools/test-road-navigation.cjs` routes the real city map with it. Live traffic still uses the classic planner until vehicles move to the native world. |
