@@ -127,3 +127,73 @@ test('the map system stays game-neutral', async () => {
         for (const [, path] of source.matchAll(/from '([^']+)'/g)) assert.ok(path.startsWith('./') || path.startsWith('../physics/'), `${file} imports ${path}`);
     }
 });
+
+// Hall (L-shaped, two rects) -- door -- study; hall -- arch -- yard (outdoor); study -- fixed gap -- vault
+const house = {
+    map_id: 'house', size: [600, 400], boundary: { thickness: 10 },
+    walls: [{ x: 300, y: 0, w: 8, h: 200 }],
+    rooms: {
+        hall: { rects: [{ x: 0, y: 0, w: 300, h: 100 }, { x: 0, y: 100, w: 100, h: 300 }], label: 'Hall' },
+        study: { x: 308, y: 0, w: 292, h: 200 },
+        yard: { x: 100, y: 200, w: 200, h: 200, type: 'outdoor' },
+        vault: { x: 400, y: 200, w: 200, h: 200 }
+    },
+    doors: [{ x: 300, y: 40, w: 8, h: 40, orientation: 'V', type: 'sliding', rooms: ['hall', 'study'] },
+        { x: 100, y: 200, w: 60, h: 8, orientation: 'H', type: 'arch', rooms: ['hall', 'yard'] }],
+    room_links: [{ rooms: ['study', 'vault'], openness: 0.5 }]
+};
+
+test('rooms are volumes in the shared grid, with multi-rect rooms and gaps between them', () => {
+    const physics = new physicsSystem(), map = new mapInstance(physics, house), rooms = map.rooms;
+    assert.equal(map.entities('room').length, 5, 'one volume per rectangle');
+    assert.equal(map.entities('door').length, 1, 'an arch has no leaf');
+    assert.equal(rooms.roomAt([50, 300]).id, 'hall', 'the L-shaped leg');
+    assert.equal(rooms.roomAt([200, 50]).id, 'hall');
+    assert.equal(rooms.roomAt([304, 150]), null, 'inside the wall');
+    assert.equal(rooms.roomAt([150, 300]).type, 'outdoor');
+    assert.deepEqual(rooms.room('hall').bounds, { left: 0, top: 0, right: 300, bottom: 400 });
+    assert.throws(() => new mapInstance(new physicsSystem(), { ...house, room_links: [{ rooms: ['hall', 'attic'] }] }), /known rooms/);
+});
+
+test('room links report live openness, routes and exposure', () => {
+    const physics = new physicsSystem(), map = new mapInstance(physics, house), rooms = map.rooms;
+    assert.deepEqual(rooms.connections('hall').map(c => [c.room, c.kind]).sort(), [['study', 'door'], ['yard', 'arch']]);
+    assert.equal(rooms.openness('hall', 'study'), 0, 'the door starts shut');
+    assert.equal(rooms.openness('hall', 'yard'), 1);
+    assert.equal(rooms.openness('yard', 'study'), 0, 'not directly linked');
+    assert.equal(rooms.route('yard', 'vault'), null, 'shut door blocks the only way');
+    physics.elements.createCharacter({ position: [290, 60], collision_shape: { shape_type: 'circle', radius: 8 } });
+    map.updateDoors({ duration: 0.1 });
+    for (let i = 0; i < 4; i++) physics.updateState();
+    const partly = rooms.openness('hall', 'study');
+    assert.ok(partly > 0 && partly < 1, `openness follows the leaf (${partly})`);
+    for (let i = 0; i < 20; i++) physics.updateState();
+    assert.equal(rooms.openness('hall', 'study'), 1);
+    assert.deepEqual(rooms.route('yard', 'vault'), ['yard', 'hall', 'study', 'vault']);
+    assert.equal(rooms.route('yard', 'vault', { min_openness: 0.6 }), null, 'the half-open gap is too narrow');
+    const reach = rooms.exposure('yard', { falloff: 0.8 });
+    assert.equal(reach.get('yard'), 1); assert.ok(Math.abs(reach.get('hall') - 0.8) < 1e-9); assert.ok(Math.abs(reach.get('vault') - 0.8 * 0.8 * 0.8 * 0.5) < 1e-9);
+});
+
+test('occupancy tracks any body, keeps it in its room across doorways and reports changes', () => {
+    const physics = new physicsSystem(), map = new mapInstance(physics, house), rooms = map.rooms, changes = [];
+    const cat = physics.elements.createCharacter({ position: [50, 50], collision_shape: { shape_type: 'circle', radius: 4 } });
+    const guest = physics.elements.createCharacter({ position: [500, 300], collision_shape: { shape_type: 'circle', radius: 4 } });
+    const stop = rooms.onRoomChange(c => changes.push([c.from, c.to]));
+    assert.equal(rooms.track(cat).id, 'hall'); assert.equal(rooms.track(guest).id, 'vault');
+    cat.teleportTo([304, 60]); rooms.update();
+    assert.equal(rooms.roomOf(cat).id, 'hall', 'in the doorway, still the hall');
+    cat.teleportTo([400, 60]); rooms.update();
+    assert.equal(rooms.roomOf(cat).id, 'study');
+    assert.deepEqual(rooms.occupants('study'), [cat]);
+    assert.deepEqual(changes, [['hall', 'study']]);
+    const before = rooms.getStatistics().grid_lookups;
+    for (let i = 0; i < 10; i++) rooms.update();
+    assert.equal(rooms.getStatistics().grid_lookups, before, 'staying put needs no grid query');
+    stop(); guest.destroy(); rooms.update();
+    assert.equal(rooms.getStatistics().tracked, 1, 'destroyed bodies drop out');
+    rooms.setFlag('study', 'lights_off', true);
+    const saved = JSON.parse(JSON.stringify(map.saveState()));
+    const next = new mapInstance(new physicsSystem(), house).loadState(saved);
+    assert.equal(next.rooms.getFlag('study', 'lights_off'), true, 'room flags save with the map');
+});

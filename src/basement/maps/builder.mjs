@@ -14,12 +14,12 @@ const box = (x, y, w, h) => ({ position: [finite(x, 'x') + finite(w, 'width') / 
 export const MAP_KINDS = Object.freeze(['interior', 'exterior']);
 /** Without a template, each section uses one of the engine's own entity types. */
 export const DEFAULT_KINDS = Object.freeze({ wall: { entity_type: 'static' }, prop: { entity_type: 'prop', physics_type: 'static' }, light: { entity_type: 'decoration' },
-    trigger: { entity_type: 'trigger', ghost: true }, door: { entity_type: 'prop', physics_type: 'kinematic' }, cloth: { entity_type: 'decoration' } });
+    trigger: { entity_type: 'trigger', ghost: true }, room: { entity_type: 'trigger', ghost: true, collision_mask: 0 }, door: { entity_type: 'prop', physics_type: 'kinematic' }, cloth: { entity_type: 'decoration' } });
 
 /**
  * Returns `{ entries, spawn }`. Each entry is `{ section, index, source, packet }`, in build order:
- * walls (cut by door openings), boundary, placements, lights, triggers, doors (a sliding door is two
- * leaves), cloths. `decorate(packet, entry)` may add game data; it must not change ids or roles.
+ * walls (cut by door openings), boundary, placements, lights, triggers, rooms (one entry per
+ * rectangle), doors (a sliding door is two leaves, an arch none), cloths. `decorate(packet, entry)` may add game data; it must not change ids or roles.
  */
 export function buildMapPackets(definition, { templates = {}, decorate = null, prop_types = {} } = {}) {
     const kind = definition.kind ?? 'interior';
@@ -60,8 +60,17 @@ export function buildMapPackets(definition, { templates = {}, decorate = null, p
     (definition.triggers ?? []).forEach((r, i) => push('triggers', i, r, { ...kind_of('trigger', r.template), ...box(r.x, r.y, r.w, r.h),
         data: { role: r.role ?? 'trigger', ...(r.authored_id ? { authored_id: r.authored_id } : {}), ...r.data } }));
 
-    // Doors: kinematic leaves the map instance opens by proximity. Sliding doors are two leaves.
+    // Rooms: one ghost volume per rectangle in the world's spatial grid (an L-shaped hall is two).
+    for (const [room_id, room] of Object.entries(definition.rooms ?? {})) {
+        const { template, ...fields } = room, rects = room.rects ?? [{ x: room.x, y: room.y, w: room.w, h: room.h }];
+        rects.forEach((r, k) => push('rooms', k, { room_id, room, rect: r }, { ...kind_of('room', template), ...box(r.x, r.y, r.w, r.h),
+            data: { role: 'room', room_id, ...(rects.length > 1 ? { rect_index: k } : {}), ...fields } }));
+    }
+
+    // Doors: kinematic leaves the map instance opens by proximity. Sliding doors are two leaves;
+    // an arch is an opening with no leaf (it still cuts the wall and links its rooms).
     doors.forEach((d, index) => {
+        if (d.type === 'arch') return;
         const horizontal = d.orientation === 'H', key = `door_${index}`, trigger_position = [d.x + d.w / 2, d.y + d.h / 2];
         if (d.type === 'sliding') {
             const length = (horizontal ? d.w : d.h) / 2 - 2, travel = (horizontal ? d.w : d.h) / 2 + 4;
@@ -73,9 +82,10 @@ export function buildMapPackets(definition, { templates = {}, decorate = null, p
             }
             return;
         }
-        const hinged = d.type === 'hinged', position = hinged ? (horizontal ? [d.x, d.y + d.h / 2] : [d.x + d.w / 2, d.y]) : trigger_position;
+        const hinged = d.type === 'hinged', far = d.hingeSide === 'right' ? -1 : 1;
+        const position = hinged ? (horizontal ? [far > 0 ? d.x : d.x + d.w, d.y + d.h / 2] : [d.x + d.w / 2, far > 0 ? d.y : d.y + d.h]) : trigger_position;
         push('doors', index, d, { ...kind_of('door', d.template), position,
-            collision_shape: { shape_type: 'box', dimensions: [d.w, d.h], local_position: hinged ? (horizontal ? [d.w / 2, 0] : [0, d.h / 2]) : [0, 0] }, collision_mask: DOOR_MASK,
+            collision_shape: { shape_type: 'box', dimensions: [d.w, d.h], local_position: hinged ? (horizontal ? [far * d.w / 2, 0] : [0, far * d.h / 2]) : [0, 0] }, collision_mask: DOOR_MASK,
             data: { role: 'door', authored_id: key, closed_position: position, open_position: hinged ? position : [position[0] + (horizontal ? d.w : 0), position[1] + (horizontal ? 0 : d.h)],
                 closed_rotation: 0, open_rotation: hinged ? Math.PI / 2 : 0, open: false } });
     });

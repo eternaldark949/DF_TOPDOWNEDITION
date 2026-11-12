@@ -1,7 +1,7 @@
 import { buildMapPackets } from '../basement/maps/index.mjs';
 import { resolveMapLayout, PROP_TYPES } from './game-maps.mjs';
 
-const TEMPLATES = { wall: 'df_apartment:wall', prop: 'df_apartment:furniture', light: 'df_apartment:lamp', trigger: 'df_apartment:transition', door: 'df_apartment:door', cloth: 'df_apartment:curtain' };
+const TEMPLATES = { wall: 'df_apartment:wall', prop: 'df_apartment:furniture', light: 'df_apartment:lamp', trigger: 'df_apartment:transition', room: 'df_apartment:transition', door: 'df_apartment:door', cloth: 'df_apartment:curtain' };
 
 /**
  * GAME_DB geometry + the apartment's layout file (props from the shared catalog) -> a generic
@@ -22,10 +22,8 @@ export function apartmentMapDefinition(game_db) {
                 return { type: layout.prop_types[index], x: p.x, y: p.y, width: p.width, height: p.height, ...(emission ? { light: emission } : {}), source: p, emission };
             }),
             lights: layout.lamps.filter(l => l.parent_prop === undefined).map(l => ({ position: [l.x, l.y], radius: l.lightRadius, source: l })),
-            triggers: [
-                ...map.transitions.map((r, index) => ({ ...r, role: 'transition', authored_id: `exit_${index}`, data: { target: r.target, label: r.label } })),
-                ...Object.entries(rooms.rooms).map(([id, r]) => ({ ...r, role: 'room', data: { room_id: id, ...r } }))
-            ],
+            triggers: map.transitions.map((r, index) => ({ ...r, role: 'transition', authored_id: `exit_${index}`, data: { target: r.target, label: r.label } })),
+            rooms: rooms.rooms,
             doors: rooms.doors.map(d => ({ ...d, source: d })),
             cloths: rooms.linens.map(l => ({ ...l, role: 'curtain', source: l }))
         }

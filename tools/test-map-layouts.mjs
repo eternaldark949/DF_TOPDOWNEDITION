@@ -52,3 +52,12 @@ test('every map layout builds into a native world through the Basement map build
         assert.equal(physics.elements.getEntities().length, built.entries.length, id);
     }
 });
+
+test('every map with rooms builds a room graph whose doors join known rooms', async () => {
+    const { mapInstance } = await import('../src/basement/maps/index.mjs');
+    for (const [id, def] of Object.entries(places.rooms)) {
+        const map = places.maps[id], instance = new mapInstance(new physicsSystem(), { map_id: id, size: [map.width, map.height], rooms: def.rooms, doors: def.doors ?? [] });
+        assert.equal(instance.rooms.rooms.length, Object.keys(def.rooms).length, id);
+        for (const room of instance.rooms.rooms) for (const r of room.rects) assert.equal(instance.rooms.roomAt([r.x + r.w / 2, r.y + r.h / 2])?.id, room.id, `${id}: ${room.id} centre`);
+    }
+});

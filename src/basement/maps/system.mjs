@@ -1,5 +1,6 @@
 import { BODY_GROUP } from '../physics/index.mjs';
 import { buildMapPackets } from './builder.mjs';
+import { roomGraph } from './rooms.mjs';
 
 const extentOf = packet => {
     const s = packet.collision_shape ?? packet.render_shape;
@@ -31,6 +32,8 @@ export class mapInstance {
             if (id !== undefined) this.#byId.set(id, entry);
         }
         for (const entry of this.#entries) if (entry.region === null) this.#create(entry);
+        /** Rooms, their links and who is in which (an empty graph when the map has no rooms). */
+        this.rooms = new roomGraph(physics, this, definition);
     }
     #regionKey([x, y]) { return `${Math.floor(x / this.#region_size)},${Math.floor(y / this.#region_size)}`; }
     #create(entry) {
@@ -95,8 +98,9 @@ export class mapInstance {
     }
 
     /** Region memory and loaded regions, as plain data. Interiors save their bodies with the physics snapshot. */
-    saveState() { return { map_id: this.map_id, memory: Object.fromEntries([...this.#memory].map(([id, pose]) => [id, structuredClone(pose)])), loaded_regions: [...this.#loaded] }; }
+    saveState() { return { map_id: this.map_id, rooms: this.rooms.saveState(), memory: Object.fromEntries([...this.#memory].map(([id, pose]) => [id, structuredClone(pose)])), loaded_regions: [...this.#loaded] }; }
     loadState(state) {
+        this.rooms.loadState(state?.rooms);
         this.#memory = new Map(Object.entries(state?.memory ?? {}).filter(([id]) => this.#byId.has(id)).map(([id, pose]) => [id, structuredClone(pose)]));
         return this;
     }

@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'bd5764d78040';
+        const DFAB_BUILD = '0ff020eaf1c8';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="12416">
+    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="12515">
 const DFNative = (()=>{
 'use strict';
 // src/basement/physics/core/values.mjs
@@ -24337,12 +24337,12 @@ const box = (x, y, w, h) => ({ position: [finite(x, 'x') + finite(w, 'width') / 
 const MAP_KINDS = Object.freeze(['interior', 'exterior']);
 /** Without a template, each section uses one of the engine's own entity types. */
 const DEFAULT_KINDS = Object.freeze({ wall: { entity_type: 'static' }, prop: { entity_type: 'prop', physics_type: 'static' }, light: { entity_type: 'decoration' },
-    trigger: { entity_type: 'trigger', ghost: true }, door: { entity_type: 'prop', physics_type: 'kinematic' }, cloth: { entity_type: 'decoration' } });
+    trigger: { entity_type: 'trigger', ghost: true }, room: { entity_type: 'trigger', ghost: true, collision_mask: 0 }, door: { entity_type: 'prop', physics_type: 'kinematic' }, cloth: { entity_type: 'decoration' } });
 
 /**
  * Returns `{ entries, spawn }`. Each entry is `{ section, index, source, packet }`, in build order:
- * walls (cut by door openings), boundary, placements, lights, triggers, doors (a sliding door is two
- * leaves), cloths. `decorate(packet, entry)` may add game data; it must not change ids or roles.
+ * walls (cut by door openings), boundary, placements, lights, triggers, rooms (one entry per
+ * rectangle), doors (a sliding door is two leaves, an arch none), cloths. `decorate(packet, entry)` may add game data; it must not change ids or roles.
  */
 function buildMapPackets(definition, { templates = {}, decorate = null, prop_types = {} } = {}) {
     const kind = definition.kind ?? 'interior';
@@ -24383,8 +24383,17 @@ function buildMapPackets(definition, { templates = {}, decorate = null, prop_typ
     (definition.triggers ?? []).forEach((r, i) => push('triggers', i, r, { ...kind_of('trigger', r.template), ...box(r.x, r.y, r.w, r.h),
         data: { role: r.role ?? 'trigger', ...(r.authored_id ? { authored_id: r.authored_id } : {}), ...r.data } }));
 
-    // Doors: kinematic leaves the map instance opens by proximity. Sliding doors are two leaves.
+    // Rooms: one ghost volume per rectangle in the world's spatial grid (an L-shaped hall is two).
+    for (const [room_id, room] of Object.entries(definition.rooms ?? {})) {
+        const { template, ...fields } = room, rects = room.rects ?? [{ x: room.x, y: room.y, w: room.w, h: room.h }];
+        rects.forEach((r, k) => push('rooms', k, { room_id, room, rect: r }, { ...kind_of('room', template), ...box(r.x, r.y, r.w, r.h),
+            data: { role: 'room', room_id, ...(rects.length > 1 ? { rect_index: k } : {}), ...fields } }));
+    }
+
+    // Doors: kinematic leaves the map instance opens by proximity. Sliding doors are two leaves;
+    // an arch is an opening with no leaf (it still cuts the wall and links its rooms).
     doors.forEach((d, index) => {
+        if (d.type === 'arch') return;
         const horizontal = d.orientation === 'H', key = `door_${index}`, trigger_position = [d.x + d.w / 2, d.y + d.h / 2];
         if (d.type === 'sliding') {
             const length = (horizontal ? d.w : d.h) / 2 - 2, travel = (horizontal ? d.w : d.h) / 2 + 4;
@@ -24396,9 +24405,10 @@ function buildMapPackets(definition, { templates = {}, decorate = null, prop_typ
             }
             return;
         }
-        const hinged = d.type === 'hinged', position = hinged ? (horizontal ? [d.x, d.y + d.h / 2] : [d.x + d.w / 2, d.y]) : trigger_position;
+        const hinged = d.type === 'hinged', far = d.hingeSide === 'right' ? -1 : 1;
+        const position = hinged ? (horizontal ? [far > 0 ? d.x : d.x + d.w, d.y + d.h / 2] : [d.x + d.w / 2, far > 0 ? d.y : d.y + d.h]) : trigger_position;
         push('doors', index, d, { ...kind_of('door', d.template), position,
-            collision_shape: { shape_type: 'box', dimensions: [d.w, d.h], local_position: hinged ? (horizontal ? [d.w / 2, 0] : [0, d.h / 2]) : [0, 0] }, collision_mask: DOOR_MASK,
+            collision_shape: { shape_type: 'box', dimensions: [d.w, d.h], local_position: hinged ? (horizontal ? [far * d.w / 2, 0] : [0, far * d.h / 2]) : [0, 0] }, collision_mask: DOOR_MASK,
             data: { role: 'door', authored_id: key, closed_position: position, open_position: hinged ? position : [position[0] + (horizontal ? d.w : 0), position[1] + (horizontal ? 0 : d.h)],
                 closed_rotation: 0, open_rotation: hinged ? Math.PI / 2 : 0, open: false } });
     });
@@ -24419,10 +24429,150 @@ function buildMapPackets(definition, { templates = {}, decorate = null, prop_typ
 
 return Object.freeze({get MAP_KINDS(){return MAP_KINDS;},get DEFAULT_KINDS(){return DEFAULT_KINDS;},get buildMapPackets(){return buildMapPackets;}});
 })();
+// src/basement/maps/rooms.mjs
+const m132 = (()=>{
+/**
+ * Rooms of one map: which rooms exist, how they connect, how open each connection is right now,
+ * and which room each tracked body is in. Room volumes live in the world's one spatial grid (the
+ * map builder makes one ghost per rectangle); this keeps only the room definitions and the graph.
+ *
+ * A link joins two rooms: a door (its openness follows the door's leaf from closed to open), an
+ * arch (always open), or an authored `room_links` entry with a fixed openness.
+ */
+const inside = (rect, x, y) => x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
+const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
+
+class roomGraph {
+    #physics; #map; #rooms = new Map(); #links = []; #adjacent = new Map(); #tracked = new Map(); #listeners = new Set(); #last = null;
+    #stats = { lookups: 0, grid_lookups: 0, changes: 0 };
+    constructor(physics, map, definition) {
+        this.#physics = physics; this.#map = map;
+        for (const [id, room] of Object.entries(definition.rooms ?? {})) {
+            const rects = (room.rects ?? [{ x: room.x, y: room.y, w: room.w, h: room.h }]).map(r => ({ x: r.x, y: r.y, w: r.w, h: r.h }));
+            const x0 = Math.min(...rects.map(r => r.x)), y0 = Math.min(...rects.map(r => r.y)), x1 = Math.max(...rects.map(r => r.x + r.w)), y1 = Math.max(...rects.map(r => r.y + r.h));
+            this.#rooms.set(id, { id, type: room.type ?? 'indoor', label: room.label ?? id, rects, bounds: { left: x0, top: y0, right: x1, bottom: y1 }, flags: {} });
+            this.#adjacent.set(id, []);
+        }
+        const add = (rooms, link) => {
+            const [a, b] = rooms ?? [];
+            if (!this.#rooms.has(a) || !this.#rooms.has(b) || a === b) throw new Error(`A room link must join two different known rooms: ${rooms}`);
+            const entry = { ...link, rooms: [a, b] };
+            this.#links.push(entry); this.#adjacent.get(a).push(entry); this.#adjacent.get(b).push(entry);
+        };
+        (definition.doors ?? []).forEach((d, i) => { if (d.rooms) add(d.rooms, d.type === 'arch' ? { link_id: `door_${i}`, kind: 'arch', openness: 1 } : { link_id: `door_${i}`, kind: 'door', door_id: `door_${i}` }); });
+        (definition.room_links ?? []).forEach((l, i) => add(l.rooms, { link_id: l.link_id ?? `link_${i}`, kind: 'opening', openness: clamp01(l.openness ?? 1) }));
+    }
+
+    /** Room records `{id, type, label, rects, bounds, flags}` (read-only views; use setFlag to change flags). */
+    get rooms() { return [...this.#rooms.values()]; }
+    room(id) { return this.#rooms.get(id) ?? null; }
+    contains(id, [x, y]) { const r = this.#rooms.get(id); return !!r && r.rects.some(rect => inside(rect, x, y)); }
+
+    /** The room at a point, or null. Checks the last answer first, then the world's spatial grid. */
+    roomAt(point) {
+        this.#stats.lookups++;
+        if (this.#last && this.contains(this.#last, point)) return this.#rooms.get(this.#last);
+        this.#stats.grid_lookups++;
+        const [x, y] = point;
+        for (const handle of this.#physics.queryEntitiesInBounds({ bounds: { left: x, right: x, top: y, bottom: y }, include_ghosts: true })) {
+            const data = handle.entity?.data;
+            if (data?.role === 'room' && this.#rooms.has(data.room_id) && this.contains(data.room_id, point)) { this.#last = data.room_id; return this.#rooms.get(data.room_id); }
+        }
+        return null;
+    }
+
+    /** 0 (shut) … 1 (wide open) for one link, read from its door's current pose. */
+    linkOpenness(link) {
+        if (link.kind !== 'door') return link.openness;
+        const door = this.#map.entity(link.door_id);
+        if (!door) return 0;
+        const d = door.data, travel = Math.hypot(d.open_position[0] - d.closed_position[0], d.open_position[1] - d.closed_position[1]);
+        if (travel > 1e-9) return clamp01(Math.hypot(door.position[0] - d.closed_position[0], door.position[1] - d.closed_position[1]) / travel);
+        const turn = Math.abs(d.open_rotation - d.closed_rotation);
+        return turn > 1e-9 ? clamp01(Math.abs((door.rotation ?? 0) - d.closed_rotation) / turn) : (d.open ? 1 : 0);
+    }
+    /** Rooms joined to `id`: `[{room, link_id, kind, openness}]`. */
+    connections(id) { return (this.#adjacent.get(id) ?? []).map(l => ({ room: l.rooms[0] === id ? l.rooms[1] : l.rooms[0], link_id: l.link_id, kind: l.kind, openness: this.linkOpenness(l) })); }
+    /** The most open direct link between two rooms (0 if none). */
+    openness(a, b) { let best = 0; for (const c of this.connections(a)) if (c.room === b && c.openness > best) best = c.openness; return best; }
+
+    /** The fewest-rooms route from `a` to `b` through links at least `min_openness` open, or null. */
+    route(a, b, { min_openness = 1e-3 } = {}) {
+        if (!this.#rooms.has(a) || !this.#rooms.has(b)) return null;
+        const previous = new Map([[a, null]]), queue = [a];
+        for (let i = 0; i < queue.length; i++) {
+            const id = queue[i]; if (id === b) break;
+            for (const c of this.connections(id)) if (c.openness >= min_openness && !previous.has(c.room)) { previous.set(c.room, id); queue.push(c.room); }
+        }
+        if (!previous.has(b)) return null;
+        const path = []; for (let id = b; id !== null; id = previous.get(id)) path.unshift(id);
+        return path;
+    }
+    reachable(a, b, options) { return this.route(a, b, options) !== null; }
+
+    /**
+     * How much of `from` reaches every room: the best product of link openness along any route,
+     * each step also scaled by `falloff` (1 = no loss). For light spill, sound and awareness.
+     */
+    exposure(from, { falloff = 1 } = {}) {
+        const result = new Map([...this.#rooms.keys()].map(id => [id, 0]));
+        if (!this.#rooms.has(from)) return result;
+        result.set(from, 1);
+        const open = this.#links.map(l => this.linkOpenness(l));
+        for (let pass = 0; pass < this.#rooms.size; pass++) {
+            let changed = false;
+            this.#links.forEach((l, i) => {
+                const [a, b] = l.rooms, k = open[i] * falloff;
+                if (result.get(a) * k > result.get(b) + 1e-12) { result.set(b, result.get(a) * k); changed = true; }
+                if (result.get(b) * k > result.get(a) + 1e-12) { result.set(a, result.get(b) * k); changed = true; }
+            });
+            if (!changed) break;
+        }
+        return result;
+    }
+
+    /**
+     * Track a body's room. `keep_in_gaps` (default true) leaves a body in its last room while it
+     * stands in a wall gap or doorway that belongs to no room.
+     */
+    track(entity, { keep_in_gaps = true } = {}) {
+        if (!this.#tracked.has(entity)) this.#tracked.set(entity, { room: this.roomAt(entity.position)?.id ?? null, keep_in_gaps });
+        return this.roomOf(entity);
+    }
+    untrack(entity) { this.#tracked.delete(entity); }
+    roomOf(entity) { const t = this.#tracked.get(entity); return t?.room ? this.#rooms.get(t.room) : null; }
+    /** Tracked bodies currently in a room. */
+    occupants(id) { const out = []; for (const [entity, t] of this.#tracked) if (t.room === id) out.push(entity); return out; }
+    /** `fn({entity, from, to})` on every room change; returns an unsubscribe function. */
+    onRoomChange(fn) { this.#listeners.add(fn); return () => this.#listeners.delete(fn); }
+
+    /** Re-reads each tracked body's room. A body that stays inside its room costs one rectangle test. */
+    update() {
+        for (const [entity, t] of this.#tracked) {
+            if (entity.destroyed) { this.#tracked.delete(entity); continue; }
+            if (t.room && this.contains(t.room, entity.position)) continue;
+            const next = this.roomAt(entity.position)?.id ?? (t.keep_in_gaps ? t.room : null);
+            if (next === t.room) continue;
+            const from = t.room; t.room = next; this.#stats.changes++;
+            for (const fn of this.#listeners) fn({ entity, from, to: next });
+        }
+    }
+
+    /** Per-room game flags (lights off, alarm, locked, ...). Saved with the map. */
+    setFlag(id, key, value) { const r = this.#rooms.get(id); if (!r) throw new Error(`Unknown room: ${id}`); if (value === undefined) delete r.flags[key]; else r.flags[key] = structuredClone(value); }
+    getFlag(id, key) { return this.#rooms.get(id)?.flags[key]; }
+    saveState() { return Object.fromEntries([...this.#rooms].filter(([, r]) => Object.keys(r.flags).length).map(([id, r]) => [id, structuredClone(r.flags)])); }
+    loadState(flags = {}) { for (const [id, r] of this.#rooms) r.flags = structuredClone(flags[id] ?? {}); }
+    getStatistics() { return { ...this.#stats, rooms: this.#rooms.size, links: this.#links.length, tracked: this.#tracked.size }; }
+}
+
+return Object.freeze({get roomGraph(){return roomGraph;}});
+})();
 // src/basement/maps/system.mjs
 const m131 = (()=>{
 const {BODY_GROUP} = m1;
 const {buildMapPackets} = m130;
+const {roomGraph} = m132;
 
 const extentOf = packet => {
     const s = packet.collision_shape ?? packet.render_shape;
@@ -24454,6 +24604,8 @@ class mapInstance {
             if (id !== undefined) this.#byId.set(id, entry);
         }
         for (const entry of this.#entries) if (entry.region === null) this.#create(entry);
+        /** Rooms, their links and who is in which (an empty graph when the map has no rooms). */
+        this.rooms = new roomGraph(physics, this, definition);
     }
     #regionKey([x, y]) { return `${Math.floor(x / this.#region_size)},${Math.floor(y / this.#region_size)}`; }
     #create(entry) {
@@ -24518,8 +24670,9 @@ class mapInstance {
     }
 
     /** Region memory and loaded regions, as plain data. Interiors save their bodies with the physics snapshot. */
-    saveState() { return { map_id: this.map_id, memory: Object.fromEntries([...this.#memory].map(([id, pose]) => [id, structuredClone(pose)])), loaded_regions: [...this.#loaded] }; }
+    saveState() { return { map_id: this.map_id, rooms: this.rooms.saveState(), memory: Object.fromEntries([...this.#memory].map(([id, pose]) => [id, structuredClone(pose)])), loaded_regions: [...this.#loaded] }; }
     loadState(state) {
+        this.rooms.loadState(state?.rooms);
         this.#memory = new Map(Object.entries(state?.memory ?? {}).filter(([id]) => this.#byId.has(id)).map(([id, pose]) => [id, structuredClone(pose)]));
         return this;
     }
@@ -24550,14 +24703,15 @@ const m129 = (()=>{
 
 
 
-return Object.freeze({get buildMapPackets(){return m130.buildMapPackets;},get MAP_KINDS(){return m130.MAP_KINDS;},get DEFAULT_KINDS(){return m130.DEFAULT_KINDS;},get mapInstance(){return m131.mapInstance;},get mapSystem(){return m131.mapSystem;}});
+
+return Object.freeze({get buildMapPackets(){return m130.buildMapPackets;},get MAP_KINDS(){return m130.MAP_KINDS;},get DEFAULT_KINDS(){return m130.DEFAULT_KINDS;},get mapInstance(){return m131.mapInstance;},get mapSystem(){return m131.mapSystem;},get roomGraph(){return m132.roomGraph;}});
 })();
 // src/directory/apartment-definition.mjs
 const m128 = (()=>{
 const {buildMapPackets} = m129;
 const {resolveMapLayout,PROP_TYPES} = m62;
 
-const TEMPLATES = { wall: 'df_apartment:wall', prop: 'df_apartment:furniture', light: 'df_apartment:lamp', trigger: 'df_apartment:transition', door: 'df_apartment:door', cloth: 'df_apartment:curtain' };
+const TEMPLATES = { wall: 'df_apartment:wall', prop: 'df_apartment:furniture', light: 'df_apartment:lamp', trigger: 'df_apartment:transition', room: 'df_apartment:transition', door: 'df_apartment:door', cloth: 'df_apartment:curtain' };
 
 /**
  * GAME_DB geometry + the apartment's layout file (props from the shared catalog) -> a generic
@@ -24578,10 +24732,8 @@ function apartmentMapDefinition(game_db) {
                 return { type: layout.prop_types[index], x: p.x, y: p.y, width: p.width, height: p.height, ...(emission ? { light: emission } : {}), source: p, emission };
             }),
             lights: layout.lamps.filter(l => l.parent_prop === undefined).map(l => ({ position: [l.x, l.y], radius: l.lightRadius, source: l })),
-            triggers: [
-                ...map.transitions.map((r, index) => ({ ...r, role: 'transition', authored_id: `exit_${index}`, data: { target: r.target, label: r.label } })),
-                ...Object.entries(rooms.rooms).map(([id, r]) => ({ ...r, role: 'room', data: { room_id: id, ...r } }))
-            ],
+            triggers: map.transitions.map((r, index) => ({ ...r, role: 'transition', authored_id: `exit_${index}`, data: { target: r.target, label: r.label } })),
+            rooms: rooms.rooms,
             doors: rooms.doors.map(d => ({ ...d, source: d })),
             cloths: rooms.linens.map(l => ({ ...l, role: 'curtain', source: l }))
         }
@@ -24625,7 +24777,7 @@ function resolveApartmentDyer(game_db){
 return Object.freeze({get apartmentMapDefinition(){return apartmentMapDefinition;},get APARTMENT_MAP_OPTIONS(){return APARTMENT_MAP_OPTIONS;},get resolveApartmentDefinition(){return resolveApartmentDefinition;},get resolveApartmentDyer(){return resolveApartmentDyer;}});
 })();
 // src/directory/game-actor-factory.mjs
-const m132 = (()=>{
+const m133 = (()=>{
 const {createDemonessAppearance} = m39;
 const {createHunterAppearance} = m47;
 const {validateAttackState} = m94;
@@ -24673,7 +24825,7 @@ const {createApartmentAssetLibrary} = m126;
 const {resolveApartmentDefinition,resolveApartmentDyer,APARTMENT_MAP_OPTIONS} = m128;
 const {mapInstance} = m129;
 const {NPC,rosterRecord} = m116;
-const {createActorPacket} = m132;
+const {createActorPacket} = m133;
 const {gameProp} = m1;
 class ApartmentDoor extends gameProp { static entity_type = 'df_apartment_door'; }
 
@@ -24745,7 +24897,7 @@ class ApartmentLevel {
 return Object.freeze({get ApartmentLevel(){return ApartmentLevel;}});
 })();
 // src/lobby/level-lobby.mjs
-const m134 = (()=>{
+const m135 = (()=>{
 // ===== LV1 LOBBY =====
 // The engine's game loop. The Lobby keeps the clock and nothing else: it knows when a frame is due,
 // how many fixed simulation steps that frame owes, and how far the drawn frame sits between two steps.
@@ -24882,7 +25034,7 @@ class levelLobby {
 return Object.freeze({get levelLobby(){return levelLobby;}});
 })();
 // src/runtime/game-level.mjs
-const m135 = (()=>{
+const m136 = (()=>{
 /** Content/lifecycle contract. A level never owns a world, clock or collision solver. */
 class gameLevel {
     constructor({ level_id } = {}) {
@@ -24902,7 +25054,7 @@ class gameLevel {
 return Object.freeze({get gameLevel(){return gameLevel;}});
 })();
 // src/basement/controls/values.mjs
-const m138 = (()=>{
+const m139 = (()=>{
 const TAP = 0;
 const DOUBLETAP = 1;
 const HELD = 2;
@@ -24926,7 +25078,7 @@ function radialStick(value, dead_zone = 0.15) {
 return Object.freeze({get TAP(){return TAP;},get DOUBLETAP(){return DOUBLETAP;},get HELD(){return HELD;},get PRESS(){return PRESS;},get REPEAT(){return REPEAT;},get RELEASE(){return RELEASE;},get cleanupAll(){return cleanupAll;},get radialStick(){return radialStick;}});
 })();
 // src/basement/controls/touch-stick.mjs
-const m140 = (()=>{
+const m141 = (()=>{
 class touchStick {
     constructor(system, name, packet) {
         Object.assign(this, { anchor: 'centre', base_radius: 0, travel: 40, scale: () => 1, edge: 0, ring: null, input: null, slots: null, mouse: false, free: () => !this.s.active, onStart() {}, onMove() {}, onEnd() {} }, packet);
@@ -25025,9 +25177,9 @@ class touchStick {
 return Object.freeze({get touchStick(){return touchStick;}});
 })();
 // src/basement/controls/devices.mjs
-const m139 = (()=>{
-const {touchStick} = m140;
-const {radialStick,cleanupAll} = m138;
+const m140 = (()=>{
+const {touchStick} = m141;
+const {radialStick,cleanupAll} = m139;
 
 /** Device state uses the terminology from the original Python input instances. */
 class inputInstance {
@@ -25146,10 +25298,10 @@ class gamepadInstance extends inputInstance {
 return Object.freeze({get inputInstance(){return inputInstance;},get keyboardInstance(){return keyboardInstance;},get mouseInstance(){return mouseInstance;},get touchInstance(){return touchInstance;},get gamepadInstance(){return gamepadInstance;}});
 })();
 // src/basement/controls/system.mjs
-const m137 = (()=>{
-const {TAP,DOUBLETAP,HELD,PRESS,REPEAT,RELEASE} = m138;
-const {radialStick,cleanupAll} = m138;
-const {keyboardInstance,mouseInstance,touchInstance,gamepadInstance} = m139;
+const m138 = (()=>{
+const {TAP,DOUBLETAP,HELD,PRESS,REPEAT,RELEASE} = m139;
+const {radialStick,cleanupAll} = m139;
+const {keyboardInstance,mouseInstance,touchInstance,gamepadInstance} = m140;
 
 class controlSystem {
     #listeners = new Set();
@@ -25387,16 +25539,16 @@ class controlSystem {
 return Object.freeze({get controlSystem(){return controlSystem;}});
 })();
 // src/basement/controls/index.mjs
-const m136 = (()=>{
+const m137 = (()=>{
 
 
 
 
 
-return Object.freeze({get controlSystem(){return m137.controlSystem;},get controlsSystem(){return m137.controlSystem;},get inputInstance(){return m139.inputInstance;},get keyboardInstance(){return m139.keyboardInstance;},get mouseInstance(){return m139.mouseInstance;},get touchInstance(){return m139.touchInstance;},get gamepadInstance(){return m139.gamepadInstance;},get touchStick(){return m140.touchStick;},get TAP(){return m138.TAP;},get DOUBLETAP(){return m138.DOUBLETAP;},get HELD(){return m138.HELD;},get PRESS(){return m138.PRESS;},get REPEAT(){return m138.REPEAT;},get RELEASE(){return m138.RELEASE;}});
+return Object.freeze({get controlSystem(){return m138.controlSystem;},get controlsSystem(){return m138.controlSystem;},get inputInstance(){return m140.inputInstance;},get keyboardInstance(){return m140.keyboardInstance;},get mouseInstance(){return m140.mouseInstance;},get touchInstance(){return m140.touchInstance;},get gamepadInstance(){return m140.gamepadInstance;},get touchStick(){return m141.touchStick;},get TAP(){return m139.TAP;},get DOUBLETAP(){return m139.DOUBLETAP;},get HELD(){return m139.HELD;},get PRESS(){return m139.PRESS;},get REPEAT(){return m139.REPEAT;},get RELEASE(){return m139.RELEASE;}});
 })();
 // src/basement/rendering/values.mjs
-const m143 = (()=>{
+const m144 = (()=>{
 function finite(value,name,min=-Infinity){if(!Number.isFinite(value)||value<min)throw new TypeError(`Invalid ${name}`);return value;}
 function vector(value,name='vector',out=[]){if(!Array.isArray(value)||value.length!==2)throw new TypeError(`Invalid ${name}`);out[0]=finite(value[0],name);out[1]=finite(value[1],name);return out;}
 function identifier(value){if(typeof value!=='string'||!value||value==='screen')throw new TypeError('A nonempty resource/renderer ID is required (screen is reserved)');return value;}
@@ -25413,8 +25565,8 @@ const BLENDS = Object.freeze({normal:'source-over',add:'lighter',multiply:'multi
 return Object.freeze({get finite(){return finite;},get vector(){return vector;},get identifier(){return identifier;},get matrix(){return matrix;},get inverse(){return inverse;},get point(){return point;},get transform(){return transform;},get viewport(){return viewport;},get freezeData(){return freezeData;},get color(){return color;},get BLENDS(){return BLENDS;}});
 })();
 // src/basement/rendering/camera.mjs
-const m142 = (()=>{
-const {finite,vector,viewport,inverse,point,freezeData} = m143;
+const m143 = (()=>{
+const {finite,vector,viewport,inverse,point,freezeData} = m144;
 
 /** View state only. Following reads native poses; this class never moves a body. */
 class cameraSystem {
@@ -25468,8 +25620,8 @@ class cameraSystem {
 return Object.freeze({get cameraSystem(){return cameraSystem;}});
 })();
 // src/basement/rendering/packets.mjs
-const m145 = (()=>{
-const {finite,vector,matrix,inverse,transform,color,identifier,BLENDS} = m143;
+const m146 = (()=>{
+const {finite,vector,matrix,inverse,transform,color,identifier,BLENDS} = m144;
 
 const geometryBuffers = new WeakMap();
 
@@ -25539,9 +25691,9 @@ function requirements(draw,resolve,result=[]){
 return Object.freeze({get geometry(){return geometry;},get material(){return material;},get packet(){return packet;},get requirements(){return requirements;}});
 })();
 // src/basement/rendering/frame.mjs
-const m144 = (()=>{
-const {packet} = m145;
-const {color,finite,freezeData} = m143;
+const m145 = (()=>{
+const {packet} = m146;
+const {color,finite,freezeData} = m144;
 
 /** Reused command buffers. Producers submit data; a backend borrows a completed frame. */
 class renderFrame {
@@ -25579,10 +25731,10 @@ class renderFrame {
 return Object.freeze({get renderFrame(){return renderFrame;}});
 })();
 // src/basement/rendering/system.mjs
-const m146 = (()=>{
-const {renderFrame} = m144;
-const {geometry,material,requirements} = m145;
-const {finite,identifier,freezeData} = m143;
+const m147 = (()=>{
+const {renderFrame} = m145;
+const {geometry,material,requirements} = m146;
+const {finite,identifier,freezeData} = m144;
 
 function normalizeResource(description){
     if(!description||typeof description!=='object')throw new TypeError('A data resource descriptor is required');
@@ -25671,9 +25823,9 @@ class renderSystem {
 return Object.freeze({get renderSystem(){return renderSystem;}});
 })();
 // src/basement/rendering/canvas.mjs
-const m147 = (()=>{
-const {renderFrame} = m144;
-const {BLENDS} = m143;
+const m148 = (()=>{
+const {renderFrame} = m145;
+const {BLENDS} = m144;
 
 function createSurface(width,height){
     if(typeof OffscreenCanvas!=='undefined')return new OffscreenCanvas(width,height);
@@ -25795,21 +25947,21 @@ class canvasRenderer {
 return Object.freeze({get canvasRenderer(){return canvasRenderer;}});
 })();
 // src/basement/rendering/index.mjs
-const m141 = (()=>{
+const m142 = (()=>{
 
 
 
 
 
-return Object.freeze({get cameraSystem(){return m142.cameraSystem;},get renderFrame(){return m144.renderFrame;},get renderSystem(){return m146.renderSystem;},get canvasRenderer(){return m147.canvasRenderer;}});
+return Object.freeze({get cameraSystem(){return m143.cameraSystem;},get renderFrame(){return m145.renderFrame;},get renderSystem(){return m147.renderSystem;},get canvasRenderer(){return m148.canvasRenderer;}});
 })();
 // src/runtime/game-engine.mjs
-const m133 = (()=>{
+const m134 = (()=>{
 const {physicsSystem,assetLibrary} = m1;
-const {levelLobby} = m134;
-const {gameLevel} = m135;
-const {controlSystem} = m136;
-const {cameraSystem,renderSystem} = m141;
+const {levelLobby} = m135;
+const {gameLevel} = m136;
+const {controlSystem} = m137;
+const {cameraSystem,renderSystem} = m142;
 
 const hooks = ['attach', 'detach', 'beforePhysics', 'afterPhysics', 'render', 'levelEntered', 'levelLeaving','gameplayPaused'];
 function synchronous(fn, receiver, args) {
@@ -26064,7 +26216,7 @@ class gameEngine {
 
 return Object.freeze({get gameEngine(){return gameEngine;}});
 })();
-const m151 = Object.freeze({default:{
+const m152 = Object.freeze({default:{
   "slim": {
     "w": 0.88,
     "d": 0.92,
@@ -26095,7 +26247,7 @@ const m151 = Object.freeze({default:{
     "hip": 1.1
   }
 }});
-const m152 = Object.freeze({default:{
+const m153 = Object.freeze({default:{
   "female": {
     "sh": 10.5,
     "del": 4,
@@ -26222,9 +26374,9 @@ const m152 = Object.freeze({default:{
   }
 }});
 // src/directory/humanoid/rig-assets.mjs
-const m150 = (()=>{
-const builds = m151.default;
-const bodyCanon = m152.default;
+const m151 = (()=>{
+const builds = m152.default;
+const bodyCanon = m153.default;
 const {rigDefinition,animationClip} = m1;
 const immutable=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))immutable(child);Object.freeze(value);}return value;};
 const humanoidBodyCanon=immutable(bodyCanon);
@@ -26271,8 +26423,8 @@ function getHumanoidRigAssets(gender='androgynous',{build=null,height=1}={}){
 return Object.freeze({get humanoidBodyCanon(){return humanoidBodyCanon;},get humanoidBuilds(){return humanoidBuilds;},get getHumanoidRigAssets(){return getHumanoidRigAssets;}});
 })();
 // src/gameplay/animation/humanoid-system.mjs
-const m149 = (()=>{
-const {getHumanoidRigAssets} = m150;
+const m150 = (()=>{
+const {getHumanoidRigAssets} = m151;
 const humanoids=new Set(['df_player','df_npc','df_ganger','df_hunter','df_demoness']);
 /** Game policy chooses authored poses; Basement resolves and advances every joint. */
 class humanoidSystem {
@@ -26320,7 +26472,7 @@ function humanoidPresentation(actor,blend=1){
 return Object.freeze({get humanoidSystem(){return humanoidSystem;},get humanoidPresentation(){return humanoidPresentation;}});
 })();
 // src/gameplay/encounters/encounter-system.mjs
-const m153 = (()=>{
+const m154 = (()=>{
 const {BossEffect} = m101;
 const {BODY_GROUP} = m1;
 const {jsonCopy} = m53;
@@ -26401,7 +26553,7 @@ class encounterSystem{
 return Object.freeze({get encounterSystem(){return encounterSystem;}});
 })();
 // src/directory/weapon-appearance.mjs
-const m156 = (()=>{
+const m157 = (()=>{
 /* =====================================================================
    WEAPON MODELS — every gun as data: parts in the gun's own frame (+x down
    the barrel, the grip hand near 0,0, +y to the holder's right), each in a
@@ -26627,8 +26779,8 @@ function weaponModel(id) {
 return Object.freeze({get GUN_MATERIALS(){return GUN_MATERIALS;},get WEAPON_MODELS(){return WEAPON_MODELS;},get LASER_MODULE(){return LASER_MODULE;},get weaponModel(){return weaponModel;}});
 })();
 // src/directory/combat-profiles.mjs
-const m155 = (()=>{
-const {weaponModel} = m156;
+const m156 = (()=>{
+const {weaponModel} = m157;
 /** Shape authoring belongs with the visual assets. Runtime collision calculations stay in Basement. */
 function getCombatProfile(definition_id){
  const model=weaponModel(definition_id),edge=model.edge??[19.4,2.6];
@@ -26638,9 +26790,9 @@ function getCombatProfile(definition_id){
 return Object.freeze({get getCombatProfile(){return getCombatProfile;}});
 })();
 // src/gameplay/attacks/attack-system.mjs
-const m154 = (()=>{
+const m155 = (()=>{
 const attackRules = m57.default;
-const {getCombatProfile} = m155;
+const {getCombatProfile} = m156;
 const {prepareMountedAttack,mountedAttackState,validateMountedAttack} = m106;
 const combatRules = m56.default;
 const {gameCharacter} = m1;
@@ -26762,7 +26914,7 @@ class attackSystem{
 return Object.freeze({get attackSystem(){return attackSystem;}});
 })();
 // src/gameplay/abilities/ability-system.mjs
-const m157 = (()=>{
+const m158 = (()=>{
 const {beginPattern,advancePattern,clearPattern} = m102;
 const {beginTimedAction,advanceTimedAction,hitGrapple,clearTimedAction} = m104;
 const {beginBurst,advanceBurst} = m105;
@@ -26824,7 +26976,7 @@ class abilitySystem{
 return Object.freeze({get abilitySystem(){return abilitySystem;}});
 })();
 // src/gameplay/actors/actor-system.mjs
-const m158 = (()=>{
+const m159 = (()=>{
 const {Demoness} = m90;
 const {Warden} = m99;
 const {Drone} = m108;
@@ -26836,7 +26988,7 @@ const {NPC} = m116;
 const {Hunter} = m91;
 const {Ganger} = m92;
 const {BODY_GROUP} = m1;
-const {createActorPacket} = m132;
+const {createActorPacket} = m133;
 
 /** Registered actor lifetimes and policy updates in the existing fixed step. No second world or index. */
 class actorSystem{
@@ -26894,7 +27046,7 @@ class actorSystem{
 
 return Object.freeze({get actorSystem(){return actorSystem;}});
 })();
-const m159 = Object.freeze({default:{
+const m160 = Object.freeze({default:{
   "keymap": {
     "move_up":["w","ArrowUp"],"move_down":["s","ArrowDown"],"move_left":["a","ArrowLeft"],"move_right":["d","ArrowRight"],
     "fire":["mouseLeft","space","gamepadRTrigger","touchFire"],
@@ -26908,7 +27060,7 @@ const m159 = Object.freeze({default:{
   }
 }});
 // src/gameplay/game-session.mjs
-const m160 = (()=>{
+const m161 = (()=>{
 const {itemSystem} = m97;
 const {createItemCatalog} = m49;
 const itemRules = m98.default;
@@ -26985,7 +27137,7 @@ class gameSession {
 return Object.freeze({get gameSession(){return gameSession;}});
 })();
 // src/gameplay/player-state-system.mjs
-const m161 = (()=>{
+const m162 = (()=>{
 const {nonnegative,jsonCopy} = m53;
 
 /** Game rules only. The native entity/body remains the sole owner of physical state. */
@@ -27041,7 +27193,7 @@ class PlayerStateSystem {
 return Object.freeze({get PlayerStateSystem(){return PlayerStateSystem;}});
 })();
 // src/gameplay/player-control-system.mjs
-const m162 = (()=>{
+const m163 = (()=>{
 /** Turns input terminology into native motor requests and gameplay intents. No physical math. */
 class PlayerControlSystem {
     #session; #state; #blocked = new Set(); #placement; #context = null;
@@ -27081,7 +27233,7 @@ class PlayerControlSystem {
 return Object.freeze({get PlayerControlSystem(){return PlayerControlSystem;}});
 })();
 // src/gameplay/combat/combat-system.mjs
-const m163 = (()=>{
+const m164 = (()=>{
 const rules = m56.default;
 const {BODY_GROUP} = m1;
 const {nonnegative,jsonCopy} = m53;
@@ -27151,7 +27303,7 @@ class combatSystem{
 return Object.freeze({get isCombatDead(){return isCombatDead;},get combatSystem(){return combatSystem;}});
 })();
 // src/gameplay/combat/melee-poses.mjs
-const m165 = (()=>{
+const m166 = (()=>{
 // Authored local animation poses, shared by presentation and native swept queries.
 const rules = m56.default;
 const MELEE_SWING={duration:rules.blade.duration_seconds,windup:rules.blade.windup_seconds,cutEnd:rules.blade.cut_end_seconds};
@@ -27227,12 +27379,12 @@ function sampleMeleeSwing(age, side, out = {}, secs = MELEE_SWING.duration, styl
 return Object.freeze({get MELEE_SWING(){return MELEE_SWING;},get WIDE_SWING(){return WIDE_SWING;},get sampleWideSwing(){return sampleWideSwing;},get wideGrip(){return wideGrip;},get swingPhases(){return swingPhases;},get sampleMeleeSwing(){return sampleMeleeSwing;}});
 })();
 // src/gameplay/combat/weapon-system.mjs
-const m164 = (()=>{
+const m165 = (()=>{
 const rules = m56.default;
-const {getCombatProfile} = m155;
+const {getCombatProfile} = m156;
 const {BODY_GROUP} = m1;
-const {sampleMeleeSwing,swingPhases} = m165;
-const {isCombatDead} = m163;
+const {sampleMeleeSwing,swingPhases} = m166;
+const {isCombatDead} = m164;
 const {jsonCopy,nonnegative} = m53;
 
 const stateFor=(player,settings=rules)=>player.data.weapon_state??={format_version:1,elapsed:0,cooldown:0,holstered:false,drawn_at:null,draw_shot_used:false,quick_draw:null,punch_side:'right',haymaker:false,combo:0,last_punch_at:-99,swing:null,side:1,shield:{charge:settings.mirror.shield,spent:false,since_hit:999}};
@@ -27404,7 +27556,7 @@ class weaponSystem{
 return Object.freeze({get weaponSystem(){return weaponSystem;}});
 })();
 // src/gameplay/items/loot-system.mjs
-const m166 = (()=>{
+const m167 = (()=>{
 const {WorldLoot} = m118;
 const rules = m56.default;
 const {BODY_GROUP} = m1;
@@ -27458,24 +27610,24 @@ class lootSystem{
 return Object.freeze({get lootSystem(){return lootSystem;}});
 })();
 // src/directory/game-runtime.mjs
-const m148 = (()=>{
-const {humanoidSystem} = m149;
-const {encounterSystem} = m153;
-const {attackSystem} = m154;
-const {abilitySystem} = m157;
-const {actorSystem} = m158;
+const m149 = (()=>{
+const {humanoidSystem} = m150;
+const {encounterSystem} = m154;
+const {attackSystem} = m155;
+const {abilitySystem} = m158;
+const {actorSystem} = m159;
 const {registerGameEntityTypes} = m107;
-const {gameEngine} = m133;
+const {gameEngine} = m134;
 const {createApartmentAssetLibrary} = m126;
-const controlProfile = m159.default;
-const {gameSession} = m160;
-const {PlayerStateSystem} = m161;
-const {PlayerControlSystem} = m162;
+const controlProfile = m160.default;
+const {gameSession} = m161;
+const {PlayerStateSystem} = m162;
+const {PlayerControlSystem} = m163;
 const playerRules = m59.default;
-const {combatSystem} = m163;
-const {weaponSystem} = m164;
-const {lootSystem} = m166;
-const {canvasRenderer} = m141;
+const {combatSystem} = m164;
+const {weaponSystem} = m165;
+const {lootSystem} = m167;
+const {canvasRenderer} = m142;
 
 /** Explicit game composition. Importing this file never starts a second runtime. */
 function createGameRuntime({ game_db, surface, session_state, player, weapon_policy={}, combat_policy={}, actor_policy={}, ability_policy={}, ...options } = {}) {
@@ -27512,8 +27664,8 @@ function createGameRuntime({ game_db, surface, session_state, player, weapon_pol
 return Object.freeze({get createGameRuntime(){return createGameRuntime;}});
 })();
 // src/presentation/weapon-appearance.mjs
-const m167 = (()=>{
-const {GUN_MATERIALS,WEAPON_MODELS,LASER_MODULE,weaponModel} = m156;
+const m168 = (()=>{
+const {GUN_MATERIALS,WEAPON_MODELS,LASER_MODULE,weaponModel} = m157;
 
 const polygon=points=>({type:'path',commands:[...points.map(([x,y],i)=>[i?'line':'move',x,y]),['close']]});
 function shape(part){
@@ -27596,7 +27748,7 @@ class weaponAppearance {
 return Object.freeze({get weaponAppearance(){return weaponAppearance;}});
 })();
 // src/directory/game-combat.mjs
-const m168 = (()=>{
+const m169 = (()=>{
 const data = m56.default;
 const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
 const COMBAT_RULES=freeze(structuredClone(data));
@@ -27604,8 +27756,8 @@ const COMBAT_RULES=freeze(structuredClone(data));
 return Object.freeze({get COMBAT_RULES(){return COMBAT_RULES;}});
 })();
 // src/presentation/art-packets.mjs
-const m170 = (()=>{
-const {transform,inverse} = m143;
+const m171 = (()=>{
+const {transform,inverse} = m144;
 const identity=()=>[1,0,0,1,0,0];
 const multiply=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
 const geometry=commands=>Array.isArray(commands)?{type:'path',commands:commands.map(command=>[...command])}:structuredClone(commands);
@@ -27631,9 +27783,9 @@ function groundShadow(scene,x,y,rx,ry){scene.enter({position:[x,y],scale:[rx,ry]
 return Object.freeze({get ellipse(){return ellipse;},get circle(){return circle;},get linear(){return linear;},get radial(){return radial;},get artScene(){return artScene;},get glow(){return glow;},get groundShadow(){return groundShadow;}});
 })();
 // src/presentation/drone.mjs
-const m169 = (()=>{
+const m170 = (()=>{
 const enemies = m40.default;
-const {artScene,circle,ellipse,radial,glow} = m170;
+const {artScene,circle,ellipse,radial,glow} = m171;
 const DRONE=enemies.drone;
 function droneLift(state){return DRONE.HOVER_PX+Math.sin(state.hoverOffset)*3+state.alt*240;}
 function droneArmPose(diving,stuck,s){
@@ -27814,7 +27966,7 @@ return Object.assign({},{x:pose.position[0],y:pose.position[1],angle:pose.rotati
 return Object.freeze({get droneLift(){return droneLift;},get droneArmPose(){return droneArmPose;},get createDronePackets(){return createDronePackets;},get dronePresentation(){return dronePresentation;}});
 })();
 // src/presentation/demoness.mjs
-const m171 = (()=>{
+const m172 = (()=>{
 const enemies = m40.default;
 const DUEL=enemies.duel;
 /** Retained Canvas art over a detached record; body art is supplied by the host. */
@@ -27879,7 +28031,7 @@ function demonessPresentation(entity,blend=1){const pose=entity.getRenderState(b
 return Object.freeze({get demonessAppearance(){return demonessAppearance;},get demonessPresentation(){return demonessPresentation;}});
 })();
 // src/presentation/boss-effects.mjs
-const m172 = (()=>{
+const m173 = (()=>{
 const enemies = m40.default;
 const HAZARD=enemies.hazards;
 const bossEffectAppearance={
@@ -28017,8 +28169,8 @@ function bossEffectPresentation(effects,clock){return effects.filter(effect=>!ef
 return Object.freeze({get bossEffectAppearance(){return bossEffectAppearance;},get bossEffectPresentation(){return bossEffectPresentation;}});
 })();
 // src/presentation/velvet-cat.mjs
-const m173 = (()=>{
-const {artScene,circle,ellipse,radial,linear,groundShadow} = m170;
+const m174 = (()=>{
+const {artScene,circle,ellipse,radial,linear,groundShadow} = m171;
 const {velvetCatAnimation} = m110;
 const {VELVET_CAT_PALETTES,VELVET_T,VELVET_PROFILES,VELVET_TAIL_SEGS} = m111;
 /** Renderer-neutral feline geometry/material packets over detached animation state. */
@@ -28363,7 +28515,7 @@ function createVelvetCatPackets(state,{pass='body',darkness=.8}={}){if(!['body',
 return Object.freeze({get createVelvetCatArt(){return createVelvetCatArt;},get createVelvetEyePackets(){return createVelvetEyePackets;},get createVelvetCatPackets(){return createVelvetCatPackets;}});
 })();
 // src/directory/road-navigation.mjs
-const m174 = (()=>{
+const m175 = (()=>{
 /**
  * The city's lane network as Basement navigation road data.
  *
@@ -28494,7 +28646,7 @@ const m0 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get assetLibrary(){return m1.assetLibrary;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get createGameAssetLibrary(){return m38.createGameAssetLibrary;},get resolveMapLayout(){return m62.resolveMapLayout;},get resolvePlacement(){return m62.resolvePlacement;},get isMovableProp(){return m62.isMovableProp;},get mapHost(){return m62.mapHost;},get createMapLibraries(){return m62.createMapLibraries;},get PROP_TYPES(){return m62.PROP_TYPES;},get MAP_IDS(){return m62.MAP_IDS;},get ApartmentLevel(){return m88.ApartmentLevel;},get APARTMENT_RULES(){return m126.APARTMENT_RULES;},get gameEngine(){return m133.gameEngine;},get gameLevel(){return m135.gameLevel;},get levelLobby(){return m134.levelLobby;},get createGameRuntime(){return m148.createGameRuntime;},get controlSystem(){return m136.controlSystem;},get controlsSystem(){return m136.controlsSystem;},get inputInstance(){return m136.inputInstance;},get keyboardInstance(){return m136.keyboardInstance;},get mouseInstance(){return m136.mouseInstance;},get touchInstance(){return m136.touchInstance;},get touchStick(){return m136.touchStick;},get gamepadInstance(){return m136.gamepadInstance;},get TAP(){return m136.TAP;},get DOUBLETAP(){return m136.DOUBLETAP;},get HELD(){return m136.HELD;},get PRESS(){return m136.PRESS;},get REPEAT(){return m136.REPEAT;},get RELEASE(){return m136.RELEASE;},get renderSystem(){return m141.renderSystem;},get renderFrame(){return m141.renderFrame;},get canvasRenderer(){return m141.canvasRenderer;},get cameraSystem(){return m141.cameraSystem;},get gameSession(){return m160.gameSession;},get PlayerStateSystem(){return m161.PlayerStateSystem;},get PlayerControlSystem(){return m162.PlayerControlSystem;},get Player(){return m113.Player;},get playerVitals(){return m114.playerVitals;},get itemSystem(){return m97.itemSystem;},get createItemCatalog(){return m49.createItemCatalog;},get GUN_MATERIALS(){return m156.GUN_MATERIALS;},get WEAPON_MODELS(){return m156.WEAPON_MODELS;},get LASER_MODULE(){return m156.LASER_MODULE;},get weaponModel(){return m156.weaponModel;},get weaponAppearance(){return m167.weaponAppearance;},get combatSystem(){return m163.combatSystem;},get weaponSystem(){return m164.weaponSystem;},get lootSystem(){return m166.lootSystem;},get WorldLoot(){return m118.WorldLoot;},get MELEE_SWING(){return m165.MELEE_SWING;},get WIDE_SWING(){return m165.WIDE_SWING;},get sampleMeleeSwing(){return m165.sampleMeleeSwing;},get sampleWideSwing(){return m165.sampleWideSwing;},get swingPhases(){return m165.swingPhases;},get wideGrip(){return m165.wideGrip;},get COMBAT_RULES(){return m168.COMBAT_RULES;},get registerGameEntityTypes(){return m107.registerGameEntityTypes;},get actorVitals(){return m95.actorVitals;},get gameActor(){return m93.gameActor;},get NPC(){return m116.NPC;},get rosterRecord(){return m116.rosterRecord;},get ROSTER_FIELDS(){return m116.ROSTER_FIELDS;},get Ganger(){return m92.Ganger;},get actorSystem(){return m158.actorSystem;},get actorItems(){return m96.actorItems;},get restoreActorItems(){return m96.restoreActorItems;},get resolveEmoteLines(){return m117.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m117.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m52.abilityLoadout;},get actorAbilities(){return m52.actorAbilities;},get abilitySystem(){return m157.abilitySystem;},get createAbilityCatalog(){return m51.createAbilityCatalog;},get importActorAbilities(){return m51.importActorAbilities;},get attackRegistry(){return m94.attackRegistry;},get validateAttackState(){return m94.validateAttackState;},get attackSystem(){return m154.attackSystem;},get createAttackCatalog(){return m48.createAttackCatalog;},get validateMountedAttack(){return m106.validateMountedAttack;},get TrafficVehicle(){return m119.TrafficVehicle;},get createGameVehicle(){return m119.createGameVehicle;},get Hunter(){return m91.Hunter;},get createHunterAppearance(){return m47.createHunterAppearance;},get Marionette(){return m112.Marionette;},get MARIONETTE_RULES(){return m45.MARIONETTE_RULES;},get validateAbilityAction(){return m103.validateAbilityAction;},get GatlingGunner(){return m100.GatlingGunner;},get Drone(){return m108.Drone;},get VelvetCat(){return m109.VelvetCat;},get velvetCatAnimation(){return m110.velvetCatAnimation;},get createVelvetAnimation(){return m110.createVelvetAnimation;},get velvetPresentation(){return m110.velvetPresentation;},get droneLift(){return m169.droneLift;},get droneArmPose(){return m169.droneArmPose;},get dronePresentation(){return m169.dronePresentation;},get VELVET_CAT_PALETTES(){return m111.VELVET_CAT_PALETTES;},get VELVET_T(){return m111.VELVET_T;},get VELVET_PROFILES(){return m111.VELVET_PROFILES;},get VELVET_GAITS(){return m111.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m111.VELVET_TAIL_SEGS;},get Demoness(){return m90.Demoness;},get Warden(){return m99.Warden;},get Vesper(){return m99.Vesper;},get Matins(){return m99.Matins;},get Compline(){return m99.Compline;},get BossEffect(){return m101.BossEffect;},get encounterSystem(){return m153.encounterSystem;},get createBossAbilities(){return m39.createBossAbilities;},get createDemonessAppearance(){return m39.createDemonessAppearance;},get demonessAppearance(){return m171.demonessAppearance;},get demonessPresentation(){return m171.demonessPresentation;},get bossEffectAppearance(){return m172.bossEffectAppearance;},get bossEffectPresentation(){return m172.bossEffectPresentation;},get validateBossRecord(){return m89.validateBossRecord;},get createDronePackets(){return m169.createDronePackets;},get createVelvetCatArt(){return m173.createVelvetCatArt;},get createVelvetCatPackets(){return m173.createVelvetCatPackets;},get createVelvetEyePackets(){return m173.createVelvetEyePackets;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m149.humanoidSystem;},get humanoidPresentation(){return m149.humanoidPresentation;},get humanoidBodyCanon(){return m150.humanoidBodyCanon;},get humanoidBuilds(){return m150.humanoidBuilds;},get getHumanoidRigAssets(){return m150.getHumanoidRigAssets;},get roadNavigationData(){return m174.roadNavigationData;},get loadRoadNavigation(){return m174.loadRoadNavigation;}});
+return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get assetLibrary(){return m1.assetLibrary;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get createGameAssetLibrary(){return m38.createGameAssetLibrary;},get resolveMapLayout(){return m62.resolveMapLayout;},get resolvePlacement(){return m62.resolvePlacement;},get isMovableProp(){return m62.isMovableProp;},get mapHost(){return m62.mapHost;},get createMapLibraries(){return m62.createMapLibraries;},get PROP_TYPES(){return m62.PROP_TYPES;},get MAP_IDS(){return m62.MAP_IDS;},get ApartmentLevel(){return m88.ApartmentLevel;},get APARTMENT_RULES(){return m126.APARTMENT_RULES;},get gameEngine(){return m134.gameEngine;},get gameLevel(){return m136.gameLevel;},get levelLobby(){return m135.levelLobby;},get createGameRuntime(){return m149.createGameRuntime;},get controlSystem(){return m137.controlSystem;},get controlsSystem(){return m137.controlsSystem;},get inputInstance(){return m137.inputInstance;},get keyboardInstance(){return m137.keyboardInstance;},get mouseInstance(){return m137.mouseInstance;},get touchInstance(){return m137.touchInstance;},get touchStick(){return m137.touchStick;},get gamepadInstance(){return m137.gamepadInstance;},get TAP(){return m137.TAP;},get DOUBLETAP(){return m137.DOUBLETAP;},get HELD(){return m137.HELD;},get PRESS(){return m137.PRESS;},get REPEAT(){return m137.REPEAT;},get RELEASE(){return m137.RELEASE;},get renderSystem(){return m142.renderSystem;},get renderFrame(){return m142.renderFrame;},get canvasRenderer(){return m142.canvasRenderer;},get cameraSystem(){return m142.cameraSystem;},get gameSession(){return m161.gameSession;},get PlayerStateSystem(){return m162.PlayerStateSystem;},get PlayerControlSystem(){return m163.PlayerControlSystem;},get Player(){return m113.Player;},get playerVitals(){return m114.playerVitals;},get itemSystem(){return m97.itemSystem;},get createItemCatalog(){return m49.createItemCatalog;},get GUN_MATERIALS(){return m157.GUN_MATERIALS;},get WEAPON_MODELS(){return m157.WEAPON_MODELS;},get LASER_MODULE(){return m157.LASER_MODULE;},get weaponModel(){return m157.weaponModel;},get weaponAppearance(){return m168.weaponAppearance;},get combatSystem(){return m164.combatSystem;},get weaponSystem(){return m165.weaponSystem;},get lootSystem(){return m167.lootSystem;},get WorldLoot(){return m118.WorldLoot;},get MELEE_SWING(){return m166.MELEE_SWING;},get WIDE_SWING(){return m166.WIDE_SWING;},get sampleMeleeSwing(){return m166.sampleMeleeSwing;},get sampleWideSwing(){return m166.sampleWideSwing;},get swingPhases(){return m166.swingPhases;},get wideGrip(){return m166.wideGrip;},get COMBAT_RULES(){return m169.COMBAT_RULES;},get registerGameEntityTypes(){return m107.registerGameEntityTypes;},get actorVitals(){return m95.actorVitals;},get gameActor(){return m93.gameActor;},get NPC(){return m116.NPC;},get rosterRecord(){return m116.rosterRecord;},get ROSTER_FIELDS(){return m116.ROSTER_FIELDS;},get Ganger(){return m92.Ganger;},get actorSystem(){return m159.actorSystem;},get actorItems(){return m96.actorItems;},get restoreActorItems(){return m96.restoreActorItems;},get resolveEmoteLines(){return m117.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m117.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m52.abilityLoadout;},get actorAbilities(){return m52.actorAbilities;},get abilitySystem(){return m158.abilitySystem;},get createAbilityCatalog(){return m51.createAbilityCatalog;},get importActorAbilities(){return m51.importActorAbilities;},get attackRegistry(){return m94.attackRegistry;},get validateAttackState(){return m94.validateAttackState;},get attackSystem(){return m155.attackSystem;},get createAttackCatalog(){return m48.createAttackCatalog;},get validateMountedAttack(){return m106.validateMountedAttack;},get TrafficVehicle(){return m119.TrafficVehicle;},get createGameVehicle(){return m119.createGameVehicle;},get Hunter(){return m91.Hunter;},get createHunterAppearance(){return m47.createHunterAppearance;},get Marionette(){return m112.Marionette;},get MARIONETTE_RULES(){return m45.MARIONETTE_RULES;},get validateAbilityAction(){return m103.validateAbilityAction;},get GatlingGunner(){return m100.GatlingGunner;},get Drone(){return m108.Drone;},get VelvetCat(){return m109.VelvetCat;},get velvetCatAnimation(){return m110.velvetCatAnimation;},get createVelvetAnimation(){return m110.createVelvetAnimation;},get velvetPresentation(){return m110.velvetPresentation;},get droneLift(){return m170.droneLift;},get droneArmPose(){return m170.droneArmPose;},get dronePresentation(){return m170.dronePresentation;},get VELVET_CAT_PALETTES(){return m111.VELVET_CAT_PALETTES;},get VELVET_T(){return m111.VELVET_T;},get VELVET_PROFILES(){return m111.VELVET_PROFILES;},get VELVET_GAITS(){return m111.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m111.VELVET_TAIL_SEGS;},get Demoness(){return m90.Demoness;},get Warden(){return m99.Warden;},get Vesper(){return m99.Vesper;},get Matins(){return m99.Matins;},get Compline(){return m99.Compline;},get BossEffect(){return m101.BossEffect;},get encounterSystem(){return m154.encounterSystem;},get createBossAbilities(){return m39.createBossAbilities;},get createDemonessAppearance(){return m39.createDemonessAppearance;},get demonessAppearance(){return m172.demonessAppearance;},get demonessPresentation(){return m172.demonessPresentation;},get bossEffectAppearance(){return m173.bossEffectAppearance;},get bossEffectPresentation(){return m173.bossEffectPresentation;},get validateBossRecord(){return m89.validateBossRecord;},get createDronePackets(){return m170.createDronePackets;},get createVelvetCatArt(){return m174.createVelvetCatArt;},get createVelvetCatPackets(){return m174.createVelvetCatPackets;},get createVelvetEyePackets(){return m174.createVelvetEyePackets;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m150.humanoidSystem;},get humanoidPresentation(){return m150.humanoidPresentation;},get humanoidBodyCanon(){return m151.humanoidBodyCanon;},get humanoidBuilds(){return m151.humanoidBuilds;},get getHumanoidRigAssets(){return m151.getHumanoidRigAssets;},get roadNavigationData(){return m175.roadNavigationData;},get loadRoadNavigation(){return m175.loadRoadNavigation;}});
 })();
 return m0;
 })();
@@ -111714,16 +111866,17 @@ engineMixin({
         });
 
     </script>
-    <script type="text/dfab" data-src="engine/apartment-rooms.js" data-cost="13">
-// Room lighting/door policy reads registered room volumes through the shared spatial service.
+    <script type="text/dfab" data-src="engine/apartment-rooms.js" data-cost="14">
+// The apartment's rooms come from the Basement map system's room graph (volumes in the shared spatial
+// grid, links through its doors). This keeps the classic RoomSystem's interface for the game's callers.
 class ApartmentRooms {
-    constructor(level,game){this.level=level;this.game=game;this.active=true;this.rooms={};this.doors=level.doors;this.windows=[];this.linens=[];
+    constructor(level,game){this.level=level;this.game=game;this.active=true;this.rooms={};this.doors=level.doors;this.windows=[];this.linens=[];this.graph=level.map.rooms;
         for(const[id,r]of Object.entries(level.definition.rooms.rooms))this.rooms[id]={...r,id,lightsOff:!!game.questState.apartmentLights?.[id],lightK:1,vis:1};
-        this.update();}
-    getRoomAt(x,y){return this.level.physics.queryEntitiesInBounds({bounds:{left:x,right:x,top:y,bottom:y},include_ghosts:true}).map(h=>h.entity).filter(e=>e?.data.role==='room').map(e=>this.rooms[e.data.room_id])[0]??null;}
-    update(){const p=this.level.player.position;this.currentRoom=this.getRoomAt(...p);this.outdoorness=this.currentRoom?.type==='outdoor'?1:0;}
+        this.graph.track(level.player);this.update();}
+    getRoomAt(x,y){const room=this.graph.roomAt([x,y]);return room?this.rooms[room.id]:null;}
+    update(){if(this.graph.roomOf(this.level.player)===null)this.graph.track(this.level.player);this.graph.update();const room=this.graph.roomOf(this.level.player);this.currentRoom=room?this.rooms[room.id]:null;this.outdoorness=this.currentRoom?.type==='outdoor'?1:0;}
     isPlayerOutdoor(){return this.outdoorness>0;}
-    openingBetween(a,b){return this.doors.some(d=>d.data.open&&d.data.appearance.rooms.includes(a)&&d.data.appearance.rooms.includes(b))?1:0;}
+    openingBetween(a,b){return this.graph.openness(a,b);}
     lightAt(x,y){return this.getRoomAt(x,y)?.lightsOff?0:1;}
     toggleRoomLights(id){const room=this.rooms[id];if(!room)return false;room.lightsOff=!room.lightsOff;(this.game.questState.apartmentLights??={})[id]=room.lightsOff;return room.lightsOff;}
     clear(){this.active=false;this.rooms={};this.doors=[];}

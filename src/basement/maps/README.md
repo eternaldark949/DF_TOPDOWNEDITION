@@ -27,7 +27,9 @@ Every section is optional. Rectangles are top-left: `{x, y, w, h}` for walls, tr
 | `placements` | Props: `{type, x, y, width, height, rotation?, movable?, light?: {radius, position?}, template?, data?}`. `prop_types[type].movable` is the default for `movable`. |
 | `lights` | Free lamps: `{position, radius, render_radius = 20}`. A light carried by a prop is that placement's `light`. |
 | `triggers` | Exits, rooms, zones: `{x, y, w, h, role, authored_id?, data?}`. |
-| `doors` | `{x, y, w, h, orientation: 'H' or 'V', type: 'sliding', 'hinged' or 'plain'}`. A sliding door is two leaves (`door` and `door_panel`). |
+| `rooms` | `{id: {x, y, w, h} or {rects: [...]}, type: 'indoor' or 'outdoor', label}`. One ghost volume per rectangle, in the shared grid. |
+| `doors` | `{x, y, w, h, orientation: 'H' or 'V', type: 'sliding', 'hinged', 'plain' or 'arch', hingeSide?, rooms?: [a, b]}`. A sliding door is two leaves (`door` and `door_panel`); an arch is an opening with no leaf. `rooms` links the two rooms it joins. |
+| `room_links` | Extra links without a door (a wide wall gap): `{rooms: [a, b], openness = 1}`. |
 | `cloths` | Hanging strips with a cloth mesh: `{x, y, width, length, segments = 5, role?}`. |
 | `spawn: [x, y]` | Returned as `map.spawn`. |
 | `regions: {size = 1024}` | Exterior region size. |
@@ -35,6 +37,16 @@ Every section is optional. Rectangles are top-left: `{x, y, w, h}` for walls, tr
 Ids are `wall_<i>`, `prop_<i>`, `lamp_<i>`, `door_<i>` (`door_<i>_right` for the second leaf), `<role>_<i>` for cloths, or the entry's own `authored_id`. The same definition always gives the same ids, which saves and region memory rely on.
 
 Without `templates[section]`, each section uses the engine's own types: walls `static`, props `prop` (static), lights and cloths `decoration`, triggers ghost `trigger`, doors kinematic `prop`.
+
+## Rooms
+
+`map.rooms` is the map's room graph (empty when the map has no rooms).
+
+- **Where:** `roomAt(point)` checks the last answer's rectangles, then the shared spatial grid. `contains(id, point)`, `room(id)` and `rooms` give the records `{id, type, label, rects, bounds, flags}`.
+- **Links:** `connections(id)` lists `{room, link_id, kind, openness}`. A door's openness follows its leaf from closed (0) to open (1) as it moves; an arch is 1; a `room_links` entry has its fixed value. `openness(a, b)` is the most open direct link.
+- **Routes and spill:** `route(a, b, {min_openness})` is the fewest-rooms route through open links, or null; `reachable(a, b)`. `exposure(from, {falloff})` gives every room the best product of openness along any route, for light spill, sound and awareness.
+- **Occupancy:** `track(body)` follows any body; `update()` re-reads tracked bodies (a body still inside its room costs one rectangle test, no grid query). `roomOf(body)`, `occupants(id)`, and `onRoomChange(fn)` for `{entity, from, to}`. With `keep_in_gaps` (default) a body standing in a doorway stays in its last room.
+- **Flags:** `setFlag(id, key, value)` / `getFlag` for per-room game state such as lights off. They save with `map.saveState()`.
 
 ## Interiors and exteriors
 
