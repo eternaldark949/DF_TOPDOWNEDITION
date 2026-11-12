@@ -28,6 +28,87 @@ function finish(hits, options, results) {
     if (hits.length > max) hits.length = max;
     results.length = 0; results.push(...hits); return results;
 }
+// ===== SEGMENT AGAINST A SHAPE =====
+// Where along the segment (fx, fy) + t (dx, dy), t in [0, 1], a shape is first met: the fraction, 0 when the
+// segment starts inside it, or -1 when it misses. The normal of the surface met is left in rayHit, pointing from
+// the ray into the shape (the engine's "from A toward B"). Nothing is allocated for circles and boxes.
+// A surface touched within RAY_PAD counts as met, as it did for the thin swept circle this replaces.
+const rayHit = { nx: 0, ny: 0 }, RAY_PAD = 2 * EPS;
+function rayInside(dx, dy) {
+    const size = Math.hypot(dx, dy);
+    rayHit.nx = size > EPS ? dx / size : 1; rayHit.ny = size > EPS ? dy / size : 0;
+    return 0;
+}
+function rayCircle(cx, cy, radius, fx, fy, dx, dy) {
+    radius += RAY_PAD;
+    const ox = fx - cx, oy = fy - cy, c = ox * ox + oy * oy - radius * radius;
+    if (c <= 0) return rayInside(dx, dy);
+    const a = dx * dx + dy * dy, b = ox * dx + oy * dy, disc = b * b - a * c;
+    if (a === 0 || b >= 0 || disc < 0) return -1;
+    const t = c / (-b + Math.sqrt(disc));                      // the nearer root, written to keep its precision
+    if (t > 1) return -1;
+    rayHit.nx = (cx - fx - dx * t) / radius; rayHit.ny = (cy - fy - dy * t) / radius;
+    return t;
+}
+function rayBox(cx, cy, angle, hx, hy, fx, fy, dx, dy) {
+    hx += RAY_PAD; hy += RAY_PAD;
+    // The segment in the box's own frame, then one slab per axis
+    const cos = Math.cos(angle), sin = Math.sin(angle), ox = fx - cx, oy = fy - cy;
+    const lx = ox * cos + oy * sin, ly = oy * cos - ox * sin, ldx = dx * cos + dy * sin, ldy = dy * cos - dx * sin;
+    if (Math.abs(lx) <= hx && Math.abs(ly) <= hy) return rayInside(dx, dy);
+    let enter = 0, leave = 1, axis = -1;
+    if (ldx === 0) { if (Math.abs(lx) > hx) return -1; }
+    else {
+        const a = (-hx - lx) / ldx, b = (hx - lx) / ldx, near = Math.min(a, b), far = Math.max(a, b);
+        if (near > enter) { enter = near; axis = 0; }
+        if (far < leave) leave = far;
+        if (enter > leave) return -1;
+    }
+    if (ldy === 0) { if (Math.abs(ly) > hy) return -1; }
+    else {
+        const a = (-hy - ly) / ldy, b = (hy - ly) / ldy, near = Math.min(a, b), far = Math.max(a, b);
+        if (near > enter) { enter = near; axis = 1; }
+        if (far < leave) leave = far;
+        if (enter > leave) return -1;
+    }
+    if (axis < 0) return -1;
+    const mx = axis === 0 ? Math.sign(ldx) : 0, my = axis === 1 ? Math.sign(ldy) : 0;
+    rayHit.nx = mx * cos - my * sin; rayHit.ny = mx * sin + my * cos;
+    return enter;
+}
+function rayPolygon(points, fx, fy, dx, dy) {
+    let first = 2, inside = true, turn = 0, ex = 0, ey = 0;
+    for (let i = 0; i < points.length; i++) {
+        const p = points[i], q = points[(i + 1) % points.length], ux = q[0] - p[0], uy = q[1] - p[1], wx = p[0] - fx, wy = p[1] - fy;
+        const side = uy * wx - ux * wy;                          // which side of this edge the start is on
+        if (side !== 0) { if (!turn) turn = Math.sign(side); else if (Math.sign(side) !== turn) inside = false; }
+        const den = dx * uy - dy * ux;
+        if (den === 0) continue;
+        const t = (wx * uy - wy * ux) / den, along = (wx * dy - wy * dx) / den;
+        if (t >= -RAY_PAD && t <= 1 + RAY_PAD && along >= -RAY_PAD && along <= 1 + RAY_PAD && t < first) { first = t; ex = ux; ey = uy; }
+    }
+    if (inside) return rayInside(dx, dy);
+    if (first > 1 + RAY_PAD) return -1;
+    first = Math.max(0, Math.min(1, first));
+    const size = Math.hypot(ex, ey), flip = ey * dx - ex * dy < 0 ? -1 : 1;
+    rayHit.nx = flip * ey / size; rayHit.ny = -flip * ex / size;
+    return first;
+}
+function rayShape(packet, x, y, rotation, fx, fy, dx, dy) {
+    const local = packet.local_position;
+    let cx = x, cy = y;
+    if (local[0] || local[1]) { const cos = Math.cos(rotation), sin = Math.sin(rotation); cx += local[0] * cos - local[1] * sin; cy += local[0] * sin + local[1] * cos; }
+    if (packet.shape_type === 'circle') return rayCircle(cx, cy, packet.radius, fx, fy, dx, dy);
+    if (packet.shape_type === 'box') return rayBox(cx, cy, rotation + packet.local_rotation, packet.dimensions[0] / 2, packet.dimensions[1] / 2, fx, fy, dx, dy);
+    // Polygons, segments, capsules and compounds: their resolved pieces, the nearest of them
+    let first = -1, nx = 0, ny = 0;
+    for (const piece of pieces(packet, [x, y], rotation)) {
+        const t = piece.radius !== undefined ? rayCircle(piece.center[0], piece.center[1], piece.radius, fx, fy, dx, dy) : rayPolygon(piece.points, fx, fy, dx, dy);
+        if (t >= 0 && (first < 0 || t < first)) { first = t; nx = rayHit.nx; ny = rayHit.ny; }
+    }
+    rayHit.nx = nx; rayHit.ny = ny;
+    return first;
+}
 export class physicsQueries {
     constructor(world) { this.world = world; }
     resolveAim(source,{target,direction,angle,angle_offset=0}={}){
@@ -103,10 +184,26 @@ export class physicsQueries {
         return finish(hits, packet, results);
     }
     raycast(packet, result = {}) {
-        // Thin finite circle avoids a separate and inconsistent segment implementation.
-        const hits = this.shapeCast({ ...packet, collision_shape: { shape_type: 'circle', radius: EPS }, max_results: 1 });
-        if (!hits.length) return null;
-        Object.assign(result, hits[0]); return result;
+        // Bodies predicted ahead of time move during the cast: that case stays a thin swept circle.
+        if (packet.predict_seconds) {
+            const hits = this.shapeCast({ ...packet, collision_shape: { shape_type: 'circle', radius: EPS }, max_results: 1 });
+            if (!hits.length) return null;
+            Object.assign(result, hits[0]); return result;
+        }
+        // Bodies at rest for the cast: the exact first crossing of the segment with each candidate's shape,
+        // in scalar arithmetic. The grid walks only the cells the segment crosses.
+        const from = vector(packet.from), to = vector(packet.to);
+        const fx = from[0], fy = from[1], dx = to[0] - fx, dy = to[1] - fy;
+        let best = -1, record = null, nx = 0, ny = 0;
+        for (const b of this.world.spatial_grid.querySegment(from, to, this._rayCandidates ??= [])) {
+            if (!accepts(this.world, b, packet)) continue;
+            const r = this.world._record(b), t = rayShape(r.shape.packet, r.position[0], r.position[1], r.rotation, fx, fy, dx, dy);
+            if (t < 0 || (record && (t > best || (t === best && r.id > record.id)))) continue;
+            best = t; record = r; nx = rayHit.nx; ny = rayHit.ny;
+        }
+        if (!record) return null;
+        return Object.assign(result, { normal: [nx, ny], penetration_depth: 0, separation: 0, world_point: [fx + dx * best, fy + dy * best],
+            fraction: best, body: record.handle, body_id: record.id, entity: this.world.elements.fetchEntity(record.id), distance: Math.hypot(dx, dy) * best });
     }
     overlapShape(packet, results = []) {
         const shape = new collisionShape(packet.collision_shape), p = { position: vector(packet.position), rotation: number(packet.rotation ?? 0, 'rotation') }, hits = [];

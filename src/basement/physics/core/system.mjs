@@ -17,6 +17,7 @@ import { gameElements } from '../elements/registry.mjs';
 import { physicsConstraint, constraintRecord, updateConstraint, constraintSolver } from '../constraints/constraint.mjs';
 import { motionController } from '../motion/controller.mjs';
 import { trafficController } from '../traffic/controller.mjs';
+import { railController } from '../motion/rail-controller.mjs';
 import { attachmentManager } from '../attachments/manager.mjs';
 import { pathGeometry } from '../motion/path-geometry.mjs';
 import { layoutGeometry } from '../motion/layout-geometry.mjs';
@@ -43,6 +44,7 @@ export class physicsSystem {
         Object.defineProperty(this, 'motion', { value: new motionController(this), enumerable: true });
         Object.defineProperty(this, 'rigs', { value: new rigSystem(this), enumerable: true });
         Object.defineProperty(this, 'traffic', { value: new trafficController(this), enumerable: true });
+        Object.defineProperty(this, 'rails', { value: new railController(this), enumerable: true });
         this.#attachments = new attachmentManager(this); this.#queries = new physicsQueries(this); this.#particles = new particlePhysics(this);
     }
     get simulation_tick() { return this.#tick; }
@@ -202,7 +204,7 @@ export class physicsSystem {
         this._mutate(() => {
             if (r.removed) return;
             this.#motionEnvelope = null;this.#candidateCache=null; this.spatial_grid.removeInstance(r.id); r.indexed = false; r.removed = true; this.#bodies.delete(r.id); this.#moving.delete(r);
-            this.#attachments._bodyRemoved(r); this.rigs._bodyRemoved(r.id); this.elements._bodyRemoved(r.id); this.traffic.removeVehicle(r.id); this.motion._remove(r.id); this.#particles._bodyRemoved(r.id);
+            this.#attachments._bodyRemoved(r); this.rigs._bodyRemoved(r.id); this.elements._bodyRemoved(r.id); this.traffic.removeVehicle(r.id); this.motion._remove(r.id); this.rails._remove(r.id); this.#particles._bodyRemoved(r.id);
             for (const [id, c] of this.#constraints) { const cr = constraintRecord(c); if (cr.a === r || cr.b === r) this.#constraints.delete(id); }
         });
     }
@@ -445,13 +447,13 @@ export class physicsSystem {
                 }
             }
             this.#attachments._capturePrevious(step_seconds); this.rigs._capturePrevious();
-            this.traffic._update();
+            this.traffic._update(); this.rails._update(step_seconds);
             this.#particles._beforeStep(step_seconds);
             for (const r of moving) {
                 r.motion_step = r.motor instanceof projectileMotor ? Math.min(step_seconds, Math.max(0, r.motor.remaining)) : step_seconds;
                 if (r.parent_mount) { r.force[0]=r.force[1]=0;r.torque=0;continue; }
                 if (r.sleeping) continue;
-                const scripted = this.motion._controls(r, step_seconds); r.prescribed_step = scripted || r.config.physics_type === 'kinematic';
+                const scripted = this.motion._controls(r, step_seconds) || this.rails._controls(r, step_seconds); r.prescribed_step = scripted || r.config.physics_type === 'kinematic';
                 if (!scripted) r.motor?._update(step_seconds);
                 if (movable(r) && !scripted) {
                     if (r.force[0] || r.force[1]) changeVelocity(r, scale(r.force, step_seconds));
@@ -663,7 +665,7 @@ export class physicsSystem {
     removeChain(chain) { return this.#particles.removeChain(chain); }
     clearWorld() {
         this._mutate(() => { for (const r of this.#bodies.values()) r.removed = true; this.#bodies.clear(); this.#moving.clear(); this.#constraints.clear(); this.#contacts.clear(); this.#stepContacts.clear();
-            this.#attachments._clear(); this.rigs._clear(); this.elements._clear(); this.traffic._clear(); this.motion._clear(); this.spatial_grid.clear(); this.#particles._clear(); this.#events = []; this.#nextId = 1; this.#nextConstraint = 1; this.#tick = 0; this.#motionEnvelope = null;this.#candidateCache=null;this.#broadphaseEpoch++; });
+            this.#attachments._clear(); this.rigs._clear(); this.elements._clear(); this.traffic._clear(); this.rails._clear(); this.motion._clear(); this.spatial_grid.clear(); this.#particles._clear(); this.#events = []; this.#nextId = 1; this.#nextConstraint = 1; this.#tick = 0; this.#motionEnvelope = null;this.#candidateCache=null;this.#broadphaseEpoch++; });
     }
     // Versioned exchange; validate a replacement before changing the live registry.
     _exportState() {
@@ -671,7 +673,7 @@ export class physicsSystem {
         return { format_version: 2, config: clone(this.config), simulation_tick: this.simulation_tick, entities: this.elements._saveState(),
             attachments: this.#attachments._saveState(), rigs:this.rigs._saveState(),
             bodies: [...this.#bodies.values()].map(r => ({ ...snapshot(r), active: r.config.active, force: [...r.force], torque: r.torque, sleep_time: r.sleep_time, motor: this._saveMotor(r.motor) })),
-            constraints: [...this.#constraints.values()].map(c => c.getState()), particles: this.#particles._saveState(), traffic: this.traffic._saveState(), motion: this.motion._saveState(),
+            constraints: [...this.#constraints.values()].map(c => c.getState()), particles: this.#particles._saveState(), traffic: this.traffic._saveState(), motion: this.motion._saveState(), rails: this.rails._saveState(),
             spatial_instances: this.spatial_grid.exportInstances().filter(e => typeof e.id === 'string'),
             next_body_id: this.#nextId, next_constraint_id: this.#nextConstraint };
     }
@@ -745,7 +747,7 @@ export class physicsSystem {
         this.#particles._loadState(saved.particles);
         for (const e of saved.spatial_instances ?? []) this.registerSpatialInstance(e.value.instance_id, e.bounds, e.value);
         this.elements._restoreState(saved.entities);
-        this.traffic._loadState(saved.traffic); this.motion._loadState(saved.motion);
+        this.traffic._loadState(saved.traffic); this.motion._loadState(saved.motion); this.rails._loadState(saved.rails);
         this.rigs._loadState(saved.rigs);
         this.#attachments._loadState(saved.attachments);
     }

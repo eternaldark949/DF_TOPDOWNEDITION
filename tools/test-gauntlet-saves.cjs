@@ -73,24 +73,14 @@ test('Loading a hub save from an active gauntlet stops it and respects saved cit
  return {active:hg.active,count:hg.hostiles.length,x:game.player.x,y:game.player.y,map:game.activeMap.id};`,r=>{
  assert.deepEqual(r,{active:false,count:0,x:2000,y:1400,map:'sdc'});
 });
-test('Real faded load defers gauntlet restoration until the saved map exists',`
+// Save loading commits its scene in the same call (APARTMENT-CUTOVER.md, "Persistence and lifecycle"): the saved map
+// exists before the gauntlet is restored, so nothing is left pending and no fade timer carries the restoration.
+test('Loading from the apartment restores the wounded wave on the saved map in the same call',`
  game._doLoadMap('sdc'); game.running=true;game.paused=false;
  const hg=game.hordeGauntlet; hg.active=true;hg.entry=GAUNTLET_MAPS[1];hg.mapId=hg.entry.mapId;
  game._doLoadMap('demoness_palace');hg.wave=2;hg.waveDelay=0;hg.spawnWave(game);hg.hostiles[0].hp=19;
  game.saveGame({auto:true});game._doLoadMap('apt_949');game.loadGame('dfab_save_slot_auto');
- return {map:game.activeMap.id,pending:!!game._pendingGauntletLoad};`,r=>{
- assert.deepEqual(r,{map:'apt_949',pending:true});
- // See the second half below, using the very same runtime and actual 400 ms callback.
-});
-{
- const e=runtime(join(__dirname,'..','DFAB V8.html'),{timers:true});
- e.run(`game._doLoadMap('demoness_palace'); game.running=true;game.paused=false;
- const hg=game.hordeGauntlet; hg.active=true;hg.entry=GAUNTLET_MAPS[1];hg.mapId=hg.entry.mapId;
- hg.wave=2;hg.waveDelay=0;hg.spawnWave(game);hg.hostiles[0].hp=19;
- game.saveGame({auto:true});game._doLoadMap('apt_949');game.loadGame('dfab_save_slot_auto');`);
- const fade=e.pendingTimers.find(t=>t.ms===400);assert.ok(fade);fade.f();
- const r=structuredClone(e.run(`({map:game.activeMap.id,wave:hg.wave,hp:hg.hostiles[0].hp,pending:!!game._pendingGauntletLoad,active:hg.active})`));
- assert.deepEqual(r,{map:'demoness_palace',wave:3,hp:19,pending:false,active:true});assert.deepEqual(e.errors,[]);
- results.push('Real fade callback restores the wounded wave on the arriving map');
-}
+ return {map:game.activeMap.id,wave:hg.wave,hp:hg.hostiles[0].hp,pending:!!game._pendingGauntletLoad,active:hg.active,
+  placed:hg.hostiles.every(h=>game.enemies.includes(h))};`,r=>
+ assert.deepEqual(r,{map:'demoness_palace',wave:3,hp:19,pending:false,active:true,placed:true}));
 console.log(JSON.stringify({passed:results.length,tests:results},null,2));

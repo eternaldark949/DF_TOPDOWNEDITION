@@ -30,7 +30,7 @@ export class gameEngine {
         schedule_frame = typeof requestAnimationFrame === 'function' ? callback => requestAnimationFrame(callback) : null,
         cancel_frame = typeof cancelAnimationFrame === 'function' ? handle => cancelAnimationFrame(handle) : null,
         render_target, services = {} } = {}) {
-        if (!services || typeof services !== 'object' || Array.isArray(services) || Object.keys(services).some(key => ['rigs','physics','elements','assets','motion','traffic','controls','camera','render','__proto__','constructor','prototype'].includes(key))) throw new TypeError('Game services must not replace runtime APIs');
+        if (!services || typeof services !== 'object' || Array.isArray(services) || Object.keys(services).some(key => ['rigs','physics','elements','assets','motion','traffic','rails','controls','camera','render','__proto__','constructor','prototype'].includes(key))) throw new TypeError('Game services must not replace runtime APIs');
         if(render_target!==undefined)throw new TypeError('Mount a renderer surface through api.render.setRenderer; render hooks receive a frame');
         if (Object.hasOwn(physics, 'step_authority') || Object.hasOwn(physics, 'asset_library')) throw new TypeError('The runtime owns physics authority and its asset library');
         if (schedule_frame !== null && typeof schedule_frame !== 'function' || cancel_frame !== null && typeof cancel_frame !== 'function') throw new TypeError('Frame scheduling requires functions');
@@ -44,7 +44,7 @@ export class gameEngine {
         this.#controls = new controlSystem({ ...controls, auto_update:false });
         this.#render = new renderSystem({physics_system:this.#world,camera:this.#camera});
         this.#api = Object.freeze({ ...services, physics: this.#world, elements: this.#world.elements, assets: asset_library,
-            rigs:this.#world.rigs, motion: this.#world.motion, traffic: this.#world.traffic, controls:this.#controls, camera:this.#camera, render:this.#render });
+            rigs:this.#world.rigs, motion: this.#world.motion, traffic: this.#world.traffic, rails: this.#world.rails, controls:this.#controls, camera:this.#camera, render:this.#render });
         this.#schedule = schedule_frame; this.#cancel = cancel_frame;
         this.#lobby = new levelLobby(Object.freeze(config), frame_clock);
         this.#lobby.plugIn({ isRunning: () => this.running, isPaused: () => this.paused || !this.active_level,

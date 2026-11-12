@@ -131,7 +131,7 @@ Filter options: `include_groups=ALL`, `exclude_groups=0`, `query_bit=ALL`, `igno
 |---|---|
 | `peruseNearbyEntities(reference, options={}, results=[])` | `near_range:400` default, centre-distance filter. Hits contain `body`, `body_id`, `distance`, `direction`. Self is ignored by default. |
 | `findNearestEntity(reference, options={})` | Nearest hit or `null`. |
-| `raycast({from,to,...filters}, result={})` | Nearest thin-cast contact or `null`. |
+| `raycast({from,to,...filters}, result={})` | The nearest surface the segment meets, or `null`: `fraction`, `distance`, `world_point`, `normal` (pointing from the ray into the body), `body`, `body_id`, `entity`. Exact segment geometry against every shape type at the bodies' current poses; a ray starting inside or on a body meets it at `fraction` 0. With `predict_seconds` the bodies move during the cast and a thin swept circle is used instead. |
 | `shapeCast({collision_shape,from,to,from_rotation=0,to_rotation=from_rotation,...filters}, results=[])` | Contacts with `fraction`, `distance`, `normal`, `world_point`, `penetration_depth`, `body`, `body_id`. |
 | `overlapShape({collision_shape,position,rotation=0,...filters}, results=[])` | Exact overlap contacts. |
 | `isPlacementClear(body_or_shape, position, options={})` | Boolean. Touching counts as occupied within tolerance. |
@@ -263,6 +263,42 @@ Every world owns `physics.traffic`, a `trafficController`; it owns route/signal/
 Traffic uses shared-index nearby-body prediction, path clearance and braking. Stops sharing `conflict_id` serialize their crossing, releasing after the authored clearance distance. Admission is deterministic in driver registration order. It is a conservative reservation model, not the current game's full signal timing/driver personality model. Save/load retains route cursors, signals and reservations.
 
 Events: `trafficRouteCompleted`, `passingRouteAccepted`, `passingRouteBlocked`, each with `body`, `entity`, `route_id` and simulation tick.
+
+## railController
+
+Every world owns `physics.rails`, a `railController`, for bodies that ride fixed lines. A rider's place is its rail and the distance along it; its speed follows pedals toward the slowest of its limits; its pose is read off the rail and requested as a velocity through the ordinary step. The engine owns the motion and the game owns the policy.
+
+Rails:
+
+- `registerRail(rail_id,{points,rotations?,next_rail_id=null,next_distance=0})`: 2–4096 points; `rotations` gives an authored curve its own headings, otherwise each point takes the direction through its neighbours. `next_rail_id` is where the rail leads by default.
+- `setNextRail(rail_id,next_rail_id,next_distance=0)`, `removeRail(rail_id)` (refused while it has riders), `getRail(rail_id)`, `listRails()`, `getRailPoint(rail_id,distance)` → `{position,rotation,curvature}`.
+
+Riders:
+
+- `rideRail(body,{rail_id,distance?,speed?,profile={}})`: nonstatic bodies. Without `distance` the body joins at the nearest point of the rail and whatever it is off the line, sideways and in heading, eases away. `speed` defaults to its speed along the rail.
+- `setRiderLimits(body,{speed_cap?,stop_distance?,next_rail_id?,next_distance?})`: the game's policy. A field left out keeps its value and `null` clears it. `stop_distance` is where the body's centre must stop on its current rail. A planned `next_rail_id` overrides the rail's own once, and both it and the stop are cleared when the rider changes rail.
+- `setRiderProfile(body,profile)`, `getRiderState(body)` (rail, distance, speed, slide, target speed, leader and gap, limits, profile), `getRailRiders(rail_id,results=[])`, `isRiding(body)`, `leaveRail(body)`.
+
+Profile fields, all optional, in world units, seconds and radians:
+
+| Field | Default | Meaning |
+|---|---|---|
+| `top_speed`, `acceleration`, `braking` | 300, 600, 1000 | Flat-out speed (it cruises a little under), pull and stopping power. |
+| `body_length`, `min_gap` | 40, 20 | Bumper to bumper, and the gap kept behind a stopped leader. |
+| `reaction_seconds`, `follow_brake_share`, `match_share` | 4/60, 0.85, 0.85 | Following: room held back, share of braking planned on, share of a leader's speed matched when out of room. |
+| `look_base`, `look_seconds` | 60, 8/60 | How far ahead a leader is looked for: base + length + stopping distance + speed × seconds. |
+| `stop_brake_share`, `stop_tolerance` | 0.8, 2 | Stopping at a line. |
+| `pedal_urgency`, `pedal_speed_band`, `pedal_brake_onset`, `pedal_creep_onset`, `pedal_min_brake`, `pedal_brake_seconds`, `pedal_gain_up`, `pedal_gain_down`, `pedal_gain_hold` | 0.6, 30, 18, 3, 0.12, 2/60, 0.5/60, 0.4/60, 0.2/60 | How the driver works the pedals toward a new speed. |
+| `reverse_floor`, `rest_speed` | 15, 0.03 | Below the first an opposite pedal drives instead of braking; below the second it is stopped. |
+| `bend_lateral_acceleration`, `bend_min_speed`, `bend_look_base`, `bend_look_seconds` | 0, 150, 60, 22/60 | Slowing for bends ahead, read through onto the following rails. 0 leaves bends to the game's `speed_cap`. |
+| `slide_per_acceleration`, `slide_max`, `slide_ease_rate`, `slip_max`, `slip_floor_speed` | 0, 156, 13.39, 0.7, 30 | The slide through a bend and how far it turns the nose in. |
+| `join_ease_rate` | 6.32 | How fast a join's offset eases away. |
+
+Events: `railChanged {body,from_rail_id,rail_id}`, `railEnded {body,rail_id}` (a dead end: it waits there until a next rail is set), `railDisplaced {body,rail_id,distance}` when a contact, impulse or placement moved the body off its commanded pose; it has then left the rail and answers to its own motor.
+
+`railGeometry` is the stateless sampler behind it: `sampleRail({points,rotations?})` → a frozen table `{length,count,distances,x,y,rotations,curvatures}`; `pointOnRail(table,distance,out={})` → `{x,y,rotation,curvature}`; `projectOnRail(table,position,out={})` → `{distance,lateral,rotation}`; `sharpestBend(table,from,to)` → the largest |curvature| between two distances.
+
+Riders are stepped in the order they joined and follow only other riders. Rails and riders are part of the physics save.
 
 ## motionController
 

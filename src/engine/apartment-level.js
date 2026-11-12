@@ -24,6 +24,8 @@ engineMixin({
         GameEntity.clearAll();GameEntity.clearQueue();CollisionSystem.clearSpatialGrid();_physicsSpatial.clear();
         this.traffic.reset();this.pedestrians.reset();this.roomSystem.clear();
         this._releaseLightingBase();this._clearRenderSpatial();this._clearMapResidue();
+        // Every other map's baked floor is let go on the way home, as _doLoadMap does for any other destination.
+        this._releaseMapBakes('apt_949');
         this.projectiles=[];this.enemies=[];this.npcs=[];this.loot=[];this.corpses=[];this.neonSigns=[];
         this.ownedCar=null;this.car=null;this.deliveryVehicle=null;this.isDriving=false;this._transitionGrid=null;
         this.activeLevel=candidate;
