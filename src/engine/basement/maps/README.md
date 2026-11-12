@@ -11,7 +11,7 @@ const maps = new mapSystem(physics);
 const map = maps.load(definition, { templates, prop_types, decorate });
 map.entity('door_0');            // live entity by authored id
 map.entities('prop');            // live entities by role, in build order
-map.updateDoors({ near_range: door => 90, duration: 0.35 });
+map.updateState({ near_range: door => 90, duration: 0.35 });
 map.setFocus(player.position);   // exteriors: build near regions, release far ones
 ```
 
@@ -28,7 +28,7 @@ Every section is optional. Rectangles are top-left: `{x, y, w, h}` for walls, tr
 | `lights` | Free lamps: `{position, radius, render_radius = 20}`. A light carried by a prop is that placement's `light`. |
 | `triggers` | Exits, rooms, zones: `{x, y, w, h, role, authored_id?, data?}`. |
 | `rooms` | `{id: {x, y, w, h} or {rects: [...]}, type: 'indoor' or 'outdoor', label}`. One ghost volume per rectangle, in the shared grid. |
-| `doors` | `{x, y, w, h, orientation: 'H' or 'V', type: 'sliding', 'hinged', 'plain' or 'arch', hingeSide?, rooms?: [a, b]}`. A sliding door is two leaves (`door` and `door_panel`); an arch is an opening with no leaf. `rooms` links the two rooms it joins. |
+| `doors` | `{x, y, w, h, orientation: 'H' or 'V', type: 'sliding', 'hinged', 'plain' or 'arch', hingeSide?, rooms?: [a, b]}`. A sliding door is two leaves (`door` and `door_panel`). A hinged door is one rigid leaf whose body origin is the hinge; the builder gives its entry `joints: [hinge]` with a return spring and swing limit, so bodies push it open and it swings shut. An arch is an opening with no leaf. `rooms` links the two rooms it joins. |
 | `room_links` | Extra links without a door (a wide wall gap): `{rooms: [a, b], openness = 1}`. |
 | `cloths` | Hanging strips with a cloth mesh: `{x, y, width, length, segments = 5, role?}`. |
 | `spawn: [x, y]` | Returned as `map.spawn`. |
@@ -45,7 +45,7 @@ Without `templates[section]`, each section uses the engine's own types: walls `s
 - **Where:** `roomAt(point)` checks the last answer's rectangles, then the shared spatial grid. `contains(id, point)`, `room(id)` and `rooms` give the records `{id, type, label, rects, bounds, flags}`.
 - **Links:** `connections(id)` lists `{room, link_id, kind, openness}`. A door's openness follows its leaf from closed (0) to open (1) as it moves; an arch is 1; a `room_links` entry has its fixed value. `openness(a, b)` is the most open direct link.
 - **Routes and spill:** `route(a, b, {min_openness})` is the fewest-rooms route through open links, or null; `reachable(a, b)`. `exposure(from, {falloff})` gives every room the best product of openness along any route, for light spill, sound and awareness.
-- **Occupancy:** `track(body)` follows any body; `update()` re-reads tracked bodies (a body still inside its room costs one rectangle test, no grid query). `roomOf(body)`, `occupants(id)`, and `onRoomChange(fn)` for `{entity, from, to}`. With `keep_in_gaps` (default) a body standing in a doorway stays in its last room.
+- **Occupancy:** `track(body)` follows any body; `updateState()` re-reads tracked bodies (a body still inside its room costs one rectangle test, no grid query). `roomOf(body)`, `occupants(id)`, and `onRoomChange(fn)` for `{entity, from, to}`. With `keep_in_gaps` (default) a body standing in a doorway stays in its last room.
 - **Flags:** `setFlag(id, key, value)` / `getFlag` for per-room game state such as lights off. They save with `map.saveState()`.
 
 ## Interiors and exteriors
@@ -60,10 +60,11 @@ The map system uses the world's one spatial grid and navigation field. It never 
 
 | Call | Result |
 |---|---|
-| `buildMapPackets(definition, {templates, prop_types, decorate})` | `{kind, spawn, entries}`. Each entry is `{section, index, source, packet}`. Pure, no world. |
+| `buildMapPackets(definition, {templates, prop_types, decorate})` | `{kind, spawn, entries}`. Each entry is `{section, index, source, packet, joints?}`; `joints` are constraint packets the map creates with the entity (a hinged door's hinge). Pure, no world. |
 | `new mapSystem(physics)` / `.load(definition, options)` / `.unload()` / `.current` | One active map per world. Loading releases the previous map. |
 | `mapInstance.entity(id)` / `.entities(role?)` / `.packets()` | Lookups. |
-| `mapInstance.updateDoors({near_range, duration, easing, include_groups})` | Opens and closes doors by proximity, with timed kinematic moves. |
+| `mapInstance.updateState({near_range, duration, easing, include_groups})` | Opens and closes sliding and plain doors by proximity, with timed kinematic moves, then updates room occupancy. Hinged doors are skipped: they are physical. |
+| `HINGE` | Defaults for a hinged leaf: `{mass: 12, damping: 7.7, closing_stiffness: 64.8, swing_limit: π − 0.25}`. A door's `hinge` field overrides them. |
 | `mapInstance.setFocus(point, {radius, keep})` | Exterior streaming. Returns `{loaded, unloaded}`. |
 | `mapInstance.reconnect()` / `.saveState()` / `.loadState(state)` / `.getStatistics()` / `.destroy()` | Lifecycle. |
 

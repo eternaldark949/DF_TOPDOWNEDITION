@@ -9,6 +9,13 @@ import { layoutGeometry, BODY_GROUP } from '../physics/index.mjs';
  * definition always yields the same `authored_id`s (saves and layout memory rely on that).
  */
 const DOOR_MASK = BODY_GROUP.CHARACTER | BODY_GROUP.PROP | BODY_GROUP.PROJECTILE;
+/**
+ * A hinged leaf's defaults (a door's `hinge` field overrides any of them): mass, angular damping
+ * (1/s), the closing spring (1/s², as angular acceleration per radian open) and the swing limit
+ * either side of shut (radians). They match the classic doors: a spring of 0.018 and damping of
+ * 0.88 per 60 Hz tick, stopping 0.25 rad short of folding back against the wall.
+ */
+export const HINGE = Object.freeze({ mass: 12, damping: 7.7, closing_stiffness: 64.8, swing_limit: Math.PI - 0.25 });
 const finite = (value, name) => { if (!Number.isFinite(value)) throw new TypeError(`Map ${name} must be a finite number`); return value; };
 const box = (x, y, w, h) => ({ position: [finite(x, 'x') + finite(w, 'width') / 2, finite(y, 'y') + finite(h, 'height') / 2], collision_shape: { shape_type: 'box', dimensions: [w, h] } });
 
@@ -27,9 +34,9 @@ export function buildMapPackets(definition, { templates = {}, decorate = null, p
     if (!MAP_KINDS.includes(kind)) throw new TypeError(`Unknown map kind: ${kind}`);
     const entries = [];
     const kind_of = (section, template = templates[section]) => template ? { template } : structuredClone(DEFAULT_KINDS[section]);
-    const push = (section, index, source, packet) => {
+    const push = (section, index, source, packet, joints) => {
         if (decorate) packet = decorate(packet, { section, index, source, kind }) ?? packet;
-        entries.push({ section, index, source, packet });
+        entries.push(joints ? { section, index, source, packet, joints } : { section, index, source, packet });
     };
     const [width, height] = definition.size ?? [0, 0];
     const doors = definition.doors ?? [];
@@ -68,8 +75,10 @@ export function buildMapPackets(definition, { templates = {}, decorate = null, p
             data: { role: 'room', room_id, ...(rects.length > 1 ? { rect_index: k } : {}), ...fields } }));
     }
 
-    // Doors: kinematic leaves the map instance opens by proximity. Sliding doors are two leaves;
-    // an arch is an opening with no leaf (it still cuts the wall and links its rooms).
+    // Doors. A hinged door is a physical leaf on a hinge joint: bodies push it open, a return spring
+    // swings it shut, and it stops just short of folding flat against the wall. Sliding and plain
+    // doors are kinematic leaves the map instance opens by proximity (a sliding door is two leaves).
+    // An arch is an opening with no leaf (it still cuts the wall and links its rooms).
     doors.forEach((d, index) => {
         if (d.type === 'arch') return;
         const horizontal = d.orientation === 'H', key = `door_${index}`, trigger_position = [d.x + d.w / 2, d.y + d.h / 2];
@@ -85,10 +94,13 @@ export function buildMapPackets(definition, { templates = {}, decorate = null, p
         }
         const hinged = d.type === 'hinged', far = d.hingeSide === 'right' ? -1 : 1;
         const position = hinged ? (horizontal ? [far > 0 ? d.x : d.x + d.w, d.y + d.h / 2] : [d.x + d.w / 2, far > 0 ? d.y : d.y + d.h]) : trigger_position;
+        const hinge = hinged ? { ...HINGE, ...(d.hinge ?? {}) } : null;
         push('doors', index, d, { ...kind_of('door', d.template), position,
+            ...(hinged ? { physics_type: 'rigid', mass: hinge.mass, angular_damping: hinge.damping, linear_damping: 0 } : {}),
             collision_shape: { shape_type: 'box', dimensions: [d.w, d.h], local_position: hinged ? (horizontal ? [far * d.w / 2, 0] : [0, far * d.h / 2]) : [0, 0] }, collision_mask: DOOR_MASK,
-            data: { role: 'door', authored_id: key, closed_position: position, open_position: hinged ? position : [position[0] + (horizontal ? d.w : 0), position[1] + (horizontal ? 0 : d.h)],
-                closed_rotation: 0, open_rotation: hinged ? Math.PI / 2 : 0, open: false } });
+            data: { role: 'door', authored_id: key, hinged, closed_position: position, open_position: hinged ? position : [position[0] + (horizontal ? d.w : 0), position[1] + (horizontal ? 0 : d.h)],
+                closed_rotation: 0, open_rotation: hinged ? Math.PI / 2 : 0, open: false } },
+            hinged ? [{ constraint_type: 'hinge', world_target: [...position], local_anchor_a: [0, 0], target_rotation: 0, min_rotation: -hinge.swing_limit, max_rotation: hinge.swing_limit, spring_stiffness: hinge.closing_stiffness, spring_damping: 0 }] : undefined);
     });
 
     // Cloths: a hanging strip mesh anchored at its top edge (curtains, banners, laundry).

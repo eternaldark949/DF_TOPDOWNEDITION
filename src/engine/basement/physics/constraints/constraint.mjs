@@ -16,7 +16,7 @@ export const constraintRecord = c => records.get(c);
 function validate(world, packet) {
     const config = { constraint_type: 'distance', local_anchor_a: [0, 0], local_anchor_b: [0, 0], world_target: [0, 0], rest_length: 0,
         stiffness: 30, damping: 4, target_rotation: 0, min_rotation: -Math.PI, max_rotation: Math.PI, motor_speed: 0, max_torque: 0,
-        local_axis: [1, 0], min_translation: 0, max_translation: 100, max_force: 0,
+        local_axis: [1, 0], min_translation: 0, max_translation: 100, max_force: 0, spring_stiffness: 0, spring_damping: 0,
         break_impulse: null, ...clone({ ...packet, body_a: undefined, body_b: undefined }) };
     if (!['distance', 'spring', 'hinge', 'attachment', 'drag', 'slider'].includes(config.constraint_type)) throw new TypeError('Invalid constraint_type');
     for (const k of ['local_anchor_a', 'local_anchor_b', 'world_target']) config[k] = vector(config[k]);
@@ -25,7 +25,7 @@ function validate(world, packet) {
     config.local_axis = scale(config.local_axis, 1 / axisLength);
     for (const k of ['min_translation', 'max_translation']) number(config[k], k);
     if (config.min_translation > config.max_translation) throw new TypeError('Reversed translation limits');
-    for (const k of ['rest_length', 'stiffness', 'damping', 'max_torque', 'max_force']) number(config[k], k, 0);
+    for (const k of ['rest_length', 'stiffness', 'damping', 'max_torque', 'max_force', 'spring_stiffness', 'spring_damping']) number(config[k], k, 0);
     for (const k of ['target_rotation', 'min_rotation', 'max_rotation', 'motor_speed']) number(config[k], k);
     if (config.break_impulse !== null) number(config.break_impulse, 'break_impulse', 0);
     if (config.min_rotation > config.max_rotation) throw new TypeError('Reversed angular limits');
@@ -81,6 +81,14 @@ export class constraintSolver {
                 const correction = -angular_error * 0.5 / inv;
                 rotateAtCenter(a, correction * ia); if (b) rotateAtCenter(b, -correction * ib);
                 r.applied_impulse += Math.abs(j);
+                // A hinge's return spring: angular acceleration toward target_rotation, independent of
+                // inertia (spring_stiffness in 1/s², spring_damping in 1/s). Solved in every iteration
+                // with dt = step / iterations, so it sums to one full step.
+                if (c.constraint_type === 'hinge' && (c.spring_stiffness || c.spring_damping)) {
+                    const err = angleDelta(c.target_rotation, angle), w = a.angular_velocity - (b?.angular_velocity ?? 0);
+                    const k = (-c.spring_stiffness * err - c.spring_damping * w) * dt / inv;
+                    changeAngularSpeed(a, k * ia); if (b) changeAngularSpeed(b, -k * ib);
+                }
             }
         }
         finish(r);

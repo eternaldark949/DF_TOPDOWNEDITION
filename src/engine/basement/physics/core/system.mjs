@@ -2,7 +2,7 @@
 import {rigSystem} from '../animation/rig-system.mjs';
 import {mountedLaunchState} from '../attachments/emitter.mjs';
 import { massProperties, massCenter, invalidateMass, integrateAtCenter, changeAngularSpeed, centerVelocity, setCenterVelocity } from './mass.mjs';
-import { BODY_GROUP, EPS, vector, number, clone, freeze, validBounds, boundsMeet, sub, add, scale, length, unit, rotate, unionBounds } from './values.mjs';
+import { BODY_GROUP, EPS, vector, number, clone, freeze, validBounds, boundsMeet, sub, add, dot, scale, length, unit, rotate, unionBounds } from './values.mjs';
 import { bodyConfig, bodyRecord, pose, previousPose, liveBounds, bodyBounds, sweptBounds, snapshot, bodyActive, movable, physical, changeVelocity, enforceLocks, inverseInertia } from './state.mjs';
 import { physicsBody } from './body.mjs';
 import { collisionShape, shapeReach, shapeBounds } from '../collision/shape.mjs';
@@ -398,8 +398,11 @@ export class physicsSystem {
                         const d = sub(r.position, p.position), angle = r.rotation - p.rotation, off = sub(start.world_point, p.position);
                         return [d[0] - angle * off[1], d[1] + angle * off[0]];
                     };
-                    const relative = sub(stepAt(b, pb), stepAt(a, pa));
-                    if (relative[0] * start.normal[0] + relative[1] * start.normal[1] < -EPS) contact = { ...start, fraction: 0 };
+                    // Only the body whose own step carries it into the other is rewound; one already
+                    // moving away (a pushed leaf turning on its pivot) keeps its step.
+                    const into = (r, p, sign) => r.config.physics_type !== 'static' && sign * dot(stepAt(r, p), start.normal) > EPS;
+                    const sa = stepAt(a, pa), sb = stepAt(b, pb), relative = sub(sb, sa);
+                    if (dot(relative, start.normal) < -EPS) contact = { ...start, fraction: 0, rewind: [into(a, pa, 1), into(b, pb, -1)] };
                 } else contact = collisionDetector.sweep(a.shape, pa, pose(a), b.shape, pb, pose(b));
             }
             if (contact) contacts.push({ a, b, contact });
@@ -410,7 +413,7 @@ export class physicsSystem {
             const { a, b } = entry; let c = entry.contact;
             const sensor = a.config.ghost || b.config.ghost;
             if (c.fraction !== undefined && !sensor) {
-                for (const r of [a, b]) if (r.config.physics_type !== 'static') {
+                for (const [i, r] of [a, b].entries()) if (r.config.physics_type !== 'static' && (c.rewind?.[i] ?? true)) {
                     r.position = add(r.previous_position, scale(sub(r.position, r.previous_position), c.fraction));
                     r.rotation = r.previous_rotation + (r.rotation - r.previous_rotation) * c.fraction;
                 }

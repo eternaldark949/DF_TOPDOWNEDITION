@@ -1,5 +1,10 @@
 # Changelog
 
+## Hinge springs and pivoting contacts — 2026-11-12
+
+- Hinge constraints take `spring_stiffness` and `spring_damping`: an angular acceleration toward `target_rotation`, independent of the body's inertia. A self-closing door is a hinge with a spring.
+- Continuous collision no longer undoes motion that carries a body away from a contact. When two bodies start a step touching and approaching, only the body whose own step goes into the other is rewound to the start of the step. A pivoting leaf pushed by a character now turns instead of being reverted every step.
+
 ## The registry moves to the Directory — 2026-11-12
 
 - `assetLibrary` moved out of the Basement into the engine's Directory (`engine/directory/registry.mjs`). The Basement no longer exports it and never imports the Directory.

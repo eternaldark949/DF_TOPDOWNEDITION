@@ -51,12 +51,12 @@ test('an interior builds every entity at load, finds them by id and role, and op
     assert.equal(map.entity('exit_0').data.target, 'street');
     const door = map.entity('door_0'), closed = [...door.position];
     const walker = physics.elements.createCharacter({ position: [200, 120], collision_shape: { shape_type: 'circle', radius: 8 } });
-    map.updateDoors({ duration: 0.1 });
+    map.updateState({ duration: 0.1 });
     for (let i = 0; i < 20; i++) physics.updateState();
     assert.equal(door.data.open, true);
     assert.ok(Math.abs(door.position[0] - closed[0]) > 10, 'the leaf moved');
     walker.teleportTo([50, 280]);
-    map.updateDoors({ duration: 0.1 });
+    map.updateState({ duration: 0.1 });
     for (let i = 0; i < 20; i++) physics.updateState();
     assert.equal(door.data.open, false);
     assert.ok(Math.hypot(door.position[0] - closed[0], door.position[1] - closed[1]) < 1e-6, 'and closed again');
@@ -164,7 +164,7 @@ test('room links report live openness, routes and exposure', () => {
     assert.equal(rooms.openness('yard', 'study'), 0, 'not directly linked');
     assert.equal(rooms.route('yard', 'vault'), null, 'shut door blocks the only way');
     physics.elements.createCharacter({ position: [290, 60], collision_shape: { shape_type: 'circle', radius: 8 } });
-    map.updateDoors({ duration: 0.1 });
+    map.updateState({ duration: 0.1 });
     for (let i = 0; i < 4; i++) physics.updateState();
     const partly = rooms.openness('hall', 'study');
     assert.ok(partly > 0 && partly < 1, `openness follows the leaf (${partly})`);
@@ -182,19 +182,55 @@ test('occupancy tracks any body, keeps it in its room across doorways and report
     const guest = physics.elements.createCharacter({ position: [500, 300], collision_shape: { shape_type: 'circle', radius: 4 } });
     const stop = rooms.onRoomChange(c => changes.push([c.from, c.to]));
     assert.equal(rooms.track(cat).id, 'hall'); assert.equal(rooms.track(guest).id, 'vault');
-    cat.teleportTo([304, 60]); rooms.update();
+    cat.teleportTo([304, 60]); rooms.updateState();
     assert.equal(rooms.roomOf(cat).id, 'hall', 'in the doorway, still the hall');
-    cat.teleportTo([400, 60]); rooms.update();
+    cat.teleportTo([400, 60]); rooms.updateState();
     assert.equal(rooms.roomOf(cat).id, 'study');
     assert.deepEqual(rooms.occupants('study'), [cat]);
     assert.deepEqual(changes, [['hall', 'study']]);
     const before = rooms.getStatistics().grid_lookups;
-    for (let i = 0; i < 10; i++) rooms.update();
+    for (let i = 0; i < 10; i++) rooms.updateState();
     assert.equal(rooms.getStatistics().grid_lookups, before, 'staying put needs no grid query');
-    stop(); guest.destroy(); rooms.update();
+    stop(); guest.destroy(); rooms.updateState();
     assert.equal(rooms.getStatistics().tracked, 1, 'destroyed bodies drop out');
     rooms.setFlag('study', 'lights_off', true);
     const saved = JSON.parse(JSON.stringify(map.saveState()));
     const next = new mapInstance(new physicsSystem(), house).loadState(saved);
     assert.equal(next.rooms.getFlag('study', 'lights_off'), true, 'room flags save with the map');
+});
+
+test('a hinged door is a physical leaf: a body pushes it open, its spring swings it shut, and it stops short of the wall', () => {
+    const hall = { map_id: 'hinge', size: [400, 300], walls: [{ x: 0, y: 150, w: 400, h: 10 }],
+        rooms: { north: { x: 0, y: 0, w: 400, h: 150 }, south: { x: 0, y: 160, w: 400, h: 140 } },
+        doors: [{ x: 180, y: 150, w: 40, h: 10, orientation: 'H', type: 'hinged', rooms: ['north', 'south'] }] };
+    const physics = new physicsSystem(), map = new mapInstance(physics, hall), door = map.entity('door_0');
+    assert.equal(door.data.hinged, true);
+    assert.equal(physics.getBodyConstraints(door).length, 1, 'the map built its hinge');
+    // An actor-weight walker (the game's people weigh 8 to 12); a 1 kg body cannot shift a 12 kg leaf.
+    const walker = physics.elements.createCharacter({ position: [205, 110], mass: 10, collision_shape: { shape_type: 'circle', radius: 8 }, movement: { max_speed: 90 } });
+    let widest = 0, passed = false;
+    walker.setMovement([0, 1]);
+    for (let i = 0; i < 120; i++) { map.updateState(); physics.updateState(); widest = Math.max(widest, Math.abs(door.rotation)); if (walker.position[1] > 180) { passed = true; break; } }
+    assert.ok(passed, `the walker got through (at ${walker.position[1].toFixed(1)})`);
+    assert.ok(widest > 0.5, `the walker swung the leaf open (${widest.toFixed(2)} rad)`);
+    assert.ok(map.rooms.openness('north', 'south') > 0, 'the open leaf opens the room link');
+    walker.setMovement([0, 0]); walker.teleportTo([60, 260]);
+    for (let i = 0; i < 300; i++) { map.updateState(); physics.updateState(); widest = Math.max(widest, Math.abs(door.rotation)); }
+    assert.ok(widest <= Math.PI - 0.25 + 1e-3, 'it never folds back flat against the wall');
+    assert.ok(Math.abs(door.rotation) < 0.05, `and the spring swung it shut (${door.rotation.toFixed(3)} rad)`);
+    assert.ok(Math.hypot(door.position[0] - 180, door.position[1] - 155) < 0.5, 'on its hinge');
+    const copy = new physicsSystem(); copy.loadPhysicsState(physics.savePhysicsState());
+    const restored = copy.elements.getEntities().find(e => e.data?.authored_id === door.data.authored_id);
+    assert.equal(copy.getBodyConstraints(restored).length, 1, 'the hinge saves with the world');
+});
+
+test('reconnect adds a hinge a restored world lacks', () => {
+    const hall = { doors: [{ x: 0, y: 0, w: 40, h: 10, orientation: 'H', type: 'hinged' }] };
+    const physics = new physicsSystem(), map = new mapInstance(physics, hall), door = map.entity('door_0');
+    physics.removeConstraint(physics.getBodyConstraints(door)[0]);
+    assert.equal(physics.getBodyConstraints(door).length, 0);
+    map.reconnect();
+    assert.equal(physics.getBodyConstraints(door).length, 1);
+    map.reconnect();
+    assert.equal(physics.getBodyConstraints(door).length, 1, 'never a second hinge');
 });

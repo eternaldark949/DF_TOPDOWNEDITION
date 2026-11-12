@@ -5,7 +5,7 @@ class ApartmentRooms {
         for(const[id,r]of Object.entries(level.definition.rooms.rooms))this.rooms[id]={...r,id,lightsOff:!!game.questState.apartmentLights?.[id],lightK:1,vis:1};
         this.graph.track(level.player);this.update();}
     getRoomAt(x,y){const room=this.graph.roomAt([x,y]);return room?this.rooms[room.id]:null;}
-    update(){if(this.graph.roomOf(this.level.player)===null)this.graph.track(this.level.player);this.graph.update();const room=this.graph.roomOf(this.level.player);this.currentRoom=room?this.rooms[room.id]:null;this.outdoorness=this.currentRoom?.type==='outdoor'?1:0;}
+    update(){if(this.graph.roomOf(this.level.player)===null)this.graph.track(this.level.player);this.graph.updateState();const room=this.graph.roomOf(this.level.player);this.currentRoom=room?this.rooms[room.id]:null;this.outdoorness=this.currentRoom?.type==='outdoor'?1:0;}
     isPlayerOutdoor(){return this.outdoorness>0;}
     openingBetween(a,b){return this.graph.openness(a,b);}
     lightAt(x,y){return this.getRoomAt(x,y)?.lightsOff?0:1;}

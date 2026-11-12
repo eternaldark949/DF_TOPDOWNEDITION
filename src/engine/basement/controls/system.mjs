@@ -212,7 +212,7 @@ export class controlSystem {
     }
 
     // ── The frame ───────────────────────────────────────────────────────
-    update(now = this.now(), { advance = this.auto_update } = {}) {
+    #poll(now = this.now(), { advance = this.auto_update } = {}) {
         if(this.#disposed)throw new Error('controlSystem is disposed');
         if (this.muted) { if(advance)this.generateAll(); return; }   // playback owns injected state
         this.gamepad.updateGamepads();
@@ -230,8 +230,8 @@ export class controlSystem {
         for (const fn of this.hooks) fn(this, now);
         if(advance)this.generateAll();
     }
-    updateState(now = this.now()) { this.update(now,{advance:false}); }
+    updateState(now = this.now()) { this.#poll(now,{advance:false}); }
     generateAll() { for (const inst of [this.keyboard, this.mouse, this.touch, this.gamepad]) inst.generateGhostImage();this.#activated.clear();this.#released.clear(); }
     generateGhostImage() { this.generateAll(); }
-    frame() { if(this.#disposed)return;this.update();if(!this.#disposed)this.#frameHandle=requestAnimationFrame(this.frame); }
+    frame() { if(this.#disposed)return;this.#poll();if(!this.#disposed)this.#frameHandle=requestAnimationFrame(this.frame); }
 }

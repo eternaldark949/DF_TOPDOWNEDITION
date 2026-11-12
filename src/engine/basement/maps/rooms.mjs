@@ -115,7 +115,7 @@ export class roomGraph {
     onRoomChange(fn) { this.#listeners.add(fn); return () => this.#listeners.delete(fn); }
 
     /** Re-reads each tracked body's room. A body that stays inside its room costs one rectangle test. */
-    update() {
+    updateState() {
         for (const [entity, t] of this.#tracked) {
             if (entity.destroyed) { this.#tracked.delete(entity); continue; }
             if (t.room && this.contains(t.room, entity.position)) continue;

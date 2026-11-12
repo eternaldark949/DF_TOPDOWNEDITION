@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '9eb8777896f6';
+        const DFAB_BUILD = '029a990f1b27';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="12619">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="12660">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -11502,7 +11502,7 @@ const constraintRecord = c => records.get(c);
 function validate(world, packet) {
     const config = { constraint_type: 'distance', local_anchor_a: [0, 0], local_anchor_b: [0, 0], world_target: [0, 0], rest_length: 0,
         stiffness: 30, damping: 4, target_rotation: 0, min_rotation: -Math.PI, max_rotation: Math.PI, motor_speed: 0, max_torque: 0,
-        local_axis: [1, 0], min_translation: 0, max_translation: 100, max_force: 0,
+        local_axis: [1, 0], min_translation: 0, max_translation: 100, max_force: 0, spring_stiffness: 0, spring_damping: 0,
         break_impulse: null, ...clone({ ...packet, body_a: undefined, body_b: undefined }) };
     if (!['distance', 'spring', 'hinge', 'attachment', 'drag', 'slider'].includes(config.constraint_type)) throw new TypeError('Invalid constraint_type');
     for (const k of ['local_anchor_a', 'local_anchor_b', 'world_target']) config[k] = vector(config[k]);
@@ -11511,7 +11511,7 @@ function validate(world, packet) {
     config.local_axis = scale(config.local_axis, 1 / axisLength);
     for (const k of ['min_translation', 'max_translation']) number(config[k], k);
     if (config.min_translation > config.max_translation) throw new TypeError('Reversed translation limits');
-    for (const k of ['rest_length', 'stiffness', 'damping', 'max_torque', 'max_force']) number(config[k], k, 0);
+    for (const k of ['rest_length', 'stiffness', 'damping', 'max_torque', 'max_force', 'spring_stiffness', 'spring_damping']) number(config[k], k, 0);
     for (const k of ['target_rotation', 'min_rotation', 'max_rotation', 'motor_speed']) number(config[k], k);
     if (config.break_impulse !== null) number(config.break_impulse, 'break_impulse', 0);
     if (config.min_rotation > config.max_rotation) throw new TypeError('Reversed angular limits');
@@ -11567,6 +11567,14 @@ class constraintSolver {
                 const correction = -angular_error * 0.5 / inv;
                 rotateAtCenter(a, correction * ia); if (b) rotateAtCenter(b, -correction * ib);
                 r.applied_impulse += Math.abs(j);
+                // A hinge's return spring: angular acceleration toward target_rotation, independent of
+                // inertia (spring_stiffness in 1/s², spring_damping in 1/s). Solved in every iteration
+                // with dt = step / iterations, so it sums to one full step.
+                if (c.constraint_type === 'hinge' && (c.spring_stiffness || c.spring_damping)) {
+                    const err = angleDelta(c.target_rotation, angle), w = a.angular_velocity - (b?.angular_velocity ?? 0);
+                    const k = (-c.spring_stiffness * err - c.spring_damping * w) * dt / inv;
+                    changeAngularSpeed(a, k * ia); if (b) changeAngularSpeed(b, -k * ib);
+                }
             }
         }
         finish(r);
@@ -13128,7 +13136,7 @@ const m2 = (()=>{
 const {rigSystem} = m3;
 const {mountedLaunchState} = m16;
 const {massProperties,massCenter,invalidateMass,integrateAtCenter,changeAngularSpeed,centerVelocity,setCenterVelocity} = m5;
-const {BODY_GROUP,EPS,vector,number,clone,freeze,validBounds,boundsMeet,sub,add,scale,length,unit,rotate,unionBounds} = m7;
+const {BODY_GROUP,EPS,vector,number,clone,freeze,validBounds,boundsMeet,sub,add,dot,scale,length,unit,rotate,unionBounds} = m7;
 const {bodyConfig,bodyRecord,pose,previousPose,liveBounds,bodyBounds,sweptBounds,snapshot,bodyActive,movable,physical,changeVelocity,enforceLocks,inverseInertia} = m8;
 const {physicsBody} = m18;
 const {collisionShape,shapeReach,shapeBounds} = m6;
@@ -13524,8 +13532,11 @@ class physicsSystem {
                         const d = sub(r.position, p.position), angle = r.rotation - p.rotation, off = sub(start.world_point, p.position);
                         return [d[0] - angle * off[1], d[1] + angle * off[0]];
                     };
-                    const relative = sub(stepAt(b, pb), stepAt(a, pa));
-                    if (relative[0] * start.normal[0] + relative[1] * start.normal[1] < -EPS) contact = { ...start, fraction: 0 };
+                    // Only the body whose own step carries it into the other is rewound; one already
+                    // moving away (a pushed leaf turning on its pivot) keeps its step.
+                    const into = (r, p, sign) => r.config.physics_type !== 'static' && sign * dot(stepAt(r, p), start.normal) > EPS;
+                    const sa = stepAt(a, pa), sb = stepAt(b, pb), relative = sub(sb, sa);
+                    if (dot(relative, start.normal) < -EPS) contact = { ...start, fraction: 0, rewind: [into(a, pa, 1), into(b, pb, -1)] };
                 } else contact = collisionDetector.sweep(a.shape, pa, pose(a), b.shape, pb, pose(b));
             }
             if (contact) contacts.push({ a, b, contact });
@@ -13536,7 +13547,7 @@ class physicsSystem {
             const { a, b } = entry; let c = entry.contact;
             const sensor = a.config.ghost || b.config.ghost;
             if (c.fraction !== undefined && !sensor) {
-                for (const r of [a, b]) if (r.config.physics_type !== 'static') {
+                for (const [i, r] of [a, b].entries()) if (r.config.physics_type !== 'static' && (c.rewind?.[i] ?? true)) {
                     r.position = add(r.previous_position, scale(sub(r.position, r.previous_position), c.fraction));
                     r.rotation = r.previous_rotation + (r.rotation - r.previous_rotation) * c.fraction;
                 }
@@ -24505,6 +24516,13 @@ const {layoutGeometry,BODY_GROUP} = m1;
  * definition always yields the same `authored_id`s (saves and layout memory rely on that).
  */
 const DOOR_MASK = BODY_GROUP.CHARACTER | BODY_GROUP.PROP | BODY_GROUP.PROJECTILE;
+/**
+ * A hinged leaf's defaults (a door's `hinge` field overrides any of them): mass, angular damping
+ * (1/s), the closing spring (1/s², as angular acceleration per radian open) and the swing limit
+ * either side of shut (radians). They match the classic doors: a spring of 0.018 and damping of
+ * 0.88 per 60 Hz tick, stopping 0.25 rad short of folding back against the wall.
+ */
+const HINGE = Object.freeze({ mass: 12, damping: 7.7, closing_stiffness: 64.8, swing_limit: Math.PI - 0.25 });
 const finite = (value, name) => { if (!Number.isFinite(value)) throw new TypeError(`Map ${name} must be a finite number`); return value; };
 const box = (x, y, w, h) => ({ position: [finite(x, 'x') + finite(w, 'width') / 2, finite(y, 'y') + finite(h, 'height') / 2], collision_shape: { shape_type: 'box', dimensions: [w, h] } });
 
@@ -24523,9 +24541,9 @@ function buildMapPackets(definition, { templates = {}, decorate = null, prop_typ
     if (!MAP_KINDS.includes(kind)) throw new TypeError(`Unknown map kind: ${kind}`);
     const entries = [];
     const kind_of = (section, template = templates[section]) => template ? { template } : structuredClone(DEFAULT_KINDS[section]);
-    const push = (section, index, source, packet) => {
+    const push = (section, index, source, packet, joints) => {
         if (decorate) packet = decorate(packet, { section, index, source, kind }) ?? packet;
-        entries.push({ section, index, source, packet });
+        entries.push(joints ? { section, index, source, packet, joints } : { section, index, source, packet });
     };
     const [width, height] = definition.size ?? [0, 0];
     const doors = definition.doors ?? [];
@@ -24564,8 +24582,10 @@ function buildMapPackets(definition, { templates = {}, decorate = null, prop_typ
             data: { role: 'room', room_id, ...(rects.length > 1 ? { rect_index: k } : {}), ...fields } }));
     }
 
-    // Doors: kinematic leaves the map instance opens by proximity. Sliding doors are two leaves;
-    // an arch is an opening with no leaf (it still cuts the wall and links its rooms).
+    // Doors. A hinged door is a physical leaf on a hinge joint: bodies push it open, a return spring
+    // swings it shut, and it stops just short of folding flat against the wall. Sliding and plain
+    // doors are kinematic leaves the map instance opens by proximity (a sliding door is two leaves).
+    // An arch is an opening with no leaf (it still cuts the wall and links its rooms).
     doors.forEach((d, index) => {
         if (d.type === 'arch') return;
         const horizontal = d.orientation === 'H', key = `door_${index}`, trigger_position = [d.x + d.w / 2, d.y + d.h / 2];
@@ -24581,10 +24601,13 @@ function buildMapPackets(definition, { templates = {}, decorate = null, prop_typ
         }
         const hinged = d.type === 'hinged', far = d.hingeSide === 'right' ? -1 : 1;
         const position = hinged ? (horizontal ? [far > 0 ? d.x : d.x + d.w, d.y + d.h / 2] : [d.x + d.w / 2, far > 0 ? d.y : d.y + d.h]) : trigger_position;
+        const hinge = hinged ? { ...HINGE, ...(d.hinge ?? {}) } : null;
         push('doors', index, d, { ...kind_of('door', d.template), position,
+            ...(hinged ? { physics_type: 'rigid', mass: hinge.mass, angular_damping: hinge.damping, linear_damping: 0 } : {}),
             collision_shape: { shape_type: 'box', dimensions: [d.w, d.h], local_position: hinged ? (horizontal ? [far * d.w / 2, 0] : [0, far * d.h / 2]) : [0, 0] }, collision_mask: DOOR_MASK,
-            data: { role: 'door', authored_id: key, closed_position: position, open_position: hinged ? position : [position[0] + (horizontal ? d.w : 0), position[1] + (horizontal ? 0 : d.h)],
-                closed_rotation: 0, open_rotation: hinged ? Math.PI / 2 : 0, open: false } });
+            data: { role: 'door', authored_id: key, hinged, closed_position: position, open_position: hinged ? position : [position[0] + (horizontal ? d.w : 0), position[1] + (horizontal ? 0 : d.h)],
+                closed_rotation: 0, open_rotation: hinged ? Math.PI / 2 : 0, open: false } },
+            hinged ? [{ constraint_type: 'hinge', world_target: [...position], local_anchor_a: [0, 0], target_rotation: 0, min_rotation: -hinge.swing_limit, max_rotation: hinge.swing_limit, spring_stiffness: hinge.closing_stiffness, spring_damping: 0 }] : undefined);
     });
 
     // Cloths: a hanging strip mesh anchored at its top edge (curtains, banners, laundry).
@@ -24601,7 +24624,7 @@ function buildMapPackets(definition, { templates = {}, decorate = null, prop_typ
     return { kind, entries, spawn: definition.spawn ? [...definition.spawn] : null };
 }
 
-return Object.freeze({get MAP_KINDS(){return MAP_KINDS;},get DEFAULT_KINDS(){return DEFAULT_KINDS;},get buildMapPackets(){return buildMapPackets;}});
+return Object.freeze({get HINGE(){return HINGE;},get MAP_KINDS(){return MAP_KINDS;},get DEFAULT_KINDS(){return DEFAULT_KINDS;},get buildMapPackets(){return buildMapPackets;}});
 })();
 // src/engine/basement/maps/rooms.mjs
 const m137 = (()=>{
@@ -24722,7 +24745,7 @@ class roomGraph {
     onRoomChange(fn) { this.#listeners.add(fn); return () => this.#listeners.delete(fn); }
 
     /** Re-reads each tracked body's room. A body that stays inside its room costs one rectangle test. */
-    update() {
+    updateState() {
         for (const [entity, t] of this.#tracked) {
             if (entity.destroyed) { this.#tracked.delete(entity); continue; }
             if (t.room && this.contains(t.room, entity.position)) continue;
@@ -24787,7 +24810,13 @@ class mapInstance {
     #create(entry) {
         const pose = entry.id !== null ? this.#memory.get(entry.id) : null;
         entry.entity = this.#physics.createEntity(pose ? { ...entry.packet, position: [...pose.position], rotation: pose.rotation } : entry.packet);
+        this.#join(entry);
         this.#stats.created++;
+    }
+    /** The joints the map authored for this entry (a hinged door's hinge), created on its live entity. */
+    #join(entry) {
+        if (!entry.joints || !entry.entity || this.#physics.getBodyConstraints(entry.entity).length) return;
+        for (const joint of entry.joints) this.#physics.createConstraint({ ...structuredClone(joint), body_a: entry.entity });
     }
     #release(entry) {
         const e = entry.entity; if (!e) return;
@@ -24818,13 +24847,16 @@ class mapInstance {
     get loaded_regions() { return [...this.#loaded]; }
 
     /**
-     * Opens each door while a body of `include_groups` is within its range, by a timed kinematic move.
-     * `near_range(door)` gives the range (default 90).
+     * The map's work for one fixed step, called by the Lobby's runtime (through the level that owns
+     * the map): opens each kinematic door while a body of `include_groups` is within its range, by a
+     * timed move (`near_range(door)` gives the range, default 90), then updates room occupancy.
+     * Hinged doors need nothing here: physics swings them and their spring closes them.
      */
-    updateDoors({ near_range = () => 90, duration = 0.35, easing = 'smooth', include_groups = BODY_GROUP.CHARACTER } = {}) {
+    updateState({ near_range = () => 90, duration = 0.35, easing = 'smooth', include_groups = BODY_GROUP.CHARACTER } = {}) {
         const panels = new Map();
         for (const leaf of this.entities('door_panel')) panels.set(leaf.data.door_key, leaf);
         for (const door of this.entities('door')) {
+            if (door.data.hinged) continue;
             const near = this.#physics.peruseNearbyEntities(door.data.trigger_position ?? door, { near_range: near_range(door), include_groups, include_ghosts: false }).length > 0;
             if (near === door.data.open) continue;
             for (const leaf of [door, panels.get(door.data.authored_id)]) {
@@ -24833,16 +24865,18 @@ class mapInstance {
                 this.#physics.motion.moveBodyTo(leaf, { position: near ? leaf.data.open_position : leaf.data.closed_position, rotation: near ? leaf.data.open_rotation : leaf.data.closed_rotation, duration, easing });
             }
         }
+        this.rooms.updateState();
     }
 
     /**
      * Re-links authored ids to entities after the world was restored from a physics snapshot
-     * (interiors keep every entity in the snapshot). Unmatched entries are left unbuilt.
+     * (interiors keep every entity in the snapshot), and creates any authored joint the snapshot
+     * lacks (a save made before the entry had one). Unmatched entries are left unbuilt.
      */
     reconnect() {
         const live = new Map();
         for (const e of this.#physics.elements.getEntities()) if (e.data?.authored_id !== undefined) live.set(e.data.authored_id, e);
-        for (const entry of this.#entries) entry.entity = entry.id !== null ? live.get(entry.id) ?? null : null;
+        for (const entry of this.#entries) { entry.entity = entry.id !== null ? live.get(entry.id) ?? null : null; this.#join(entry); }
     }
 
     /** Region memory and loaded regions, as plain data. Interiors save their bodies with the physics snapshot. */
@@ -25046,7 +25080,7 @@ class ApartmentLevel {
     getRoster(){return this.companions.map(rosterRecord);}
     updateState() {
         for(const c of this.companions)if(c.active!==!!(c.recruited&&!c.dead)){if(c.recruited&&!c.dead)c.activate();else c.deactivate();}
-        this.map.updateDoors({near_range:door=>door.data.appearance.triggerRadius??90,duration:this.definition.rules.DOOR_DURATION,include_groups:2});
+        this.map.updateState({near_range:door=>door.data.appearance.triggerRadius??90,duration:this.definition.rules.DOOR_DURATION,include_groups:2});
         this.physics.updateState();
     }
     saveState() { return this.physics.savePhysicsState(); }
@@ -25065,6 +25099,14 @@ class ApartmentLevel {
             this.physics.motion.stopBodyMotion(door);
             door.updateBody({position:primary.position,rotation:0,collision_shape:primary.collision_shape});Object.assign(door.data,structuredClone(primary.data));
             this.physics.createEntity(packets.find(p=>p.data.role==='door_panel'));upgraded=true;
+        }
+        // Saves from before hinged doors were physical hold them as kinematic leaves: make them the
+        // authored rigid leaf again; map.reconnect() then adds the hinge joint the save lacks.
+        for(const door of this.doors)if(door.data.appearance.type==='hinged'&&door.body.getState().physics_type!=='rigid'){
+            const primary=this.definition.entities.find(p=>p.data.authored_id===door.data.authored_id);
+            this.physics.motion.stopBodyMotion(door);
+            door.updateBody({physics_type:'rigid',mass:primary.mass,angular_damping:primary.angular_damping,linear_damping:primary.linear_damping,position:primary.position,rotation:0,angular_velocity:0,linear_velocity:[0,0]});
+            Object.assign(door.data,structuredClone(primary.data));upgraded=true;
         }
         if(upgraded){this.map.reconnect();this.reconnect();}
     }
@@ -25694,7 +25736,7 @@ class controlSystem {
     }
 
     // ── The frame ───────────────────────────────────────────────────────
-    update(now = this.now(), { advance = this.auto_update } = {}) {
+    #poll(now = this.now(), { advance = this.auto_update } = {}) {
         if(this.#disposed)throw new Error('controlSystem is disposed');
         if (this.muted) { if(advance)this.generateAll(); return; }   // playback owns injected state
         this.gamepad.updateGamepads();
@@ -25712,10 +25754,10 @@ class controlSystem {
         for (const fn of this.hooks) fn(this, now);
         if(advance)this.generateAll();
     }
-    updateState(now = this.now()) { this.update(now,{advance:false}); }
+    updateState(now = this.now()) { this.#poll(now,{advance:false}); }
     generateAll() { for (const inst of [this.keyboard, this.mouse, this.touch, this.gamepad]) inst.generateGhostImage();this.#activated.clear();this.#released.clear(); }
     generateGhostImage() { this.generateAll(); }
-    frame() { if(this.#disposed)return;this.update();if(!this.#disposed)this.#frameHandle=requestAnimationFrame(this.frame); }
+    frame() { if(this.#disposed)return;this.#poll();if(!this.#disposed)this.#frameHandle=requestAnimationFrame(this.frame); }
 }
 
 return Object.freeze({get controlSystem(){return controlSystem;}});
@@ -112066,7 +112108,7 @@ class ApartmentRooms {
         for(const[id,r]of Object.entries(level.definition.rooms.rooms))this.rooms[id]={...r,id,lightsOff:!!game.questState.apartmentLights?.[id],lightK:1,vis:1};
         this.graph.track(level.player);this.update();}
     getRoomAt(x,y){const room=this.graph.roomAt([x,y]);return room?this.rooms[room.id]:null;}
-    update(){if(this.graph.roomOf(this.level.player)===null)this.graph.track(this.level.player);this.graph.update();const room=this.graph.roomOf(this.level.player);this.currentRoom=room?this.rooms[room.id]:null;this.outdoorness=this.currentRoom?.type==='outdoor'?1:0;}
+    update(){if(this.graph.roomOf(this.level.player)===null)this.graph.track(this.level.player);this.graph.updateState();const room=this.graph.roomOf(this.level.player);this.currentRoom=room?this.rooms[room.id]:null;this.outdoorness=this.currentRoom?.type==='outdoor'?1:0;}
     isPlayerOutdoor(){return this.outdoorness>0;}
     openingBetween(a,b){return this.graph.openness(a,b);}
     lightAt(x,y){return this.getRoomAt(x,y)?.lightsOff?0:1;}

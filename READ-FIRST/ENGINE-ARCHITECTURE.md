@@ -295,14 +295,13 @@ Migration notes that described earlier cutovers are in `docs/migration/cutovers/
 
 Audited on 2026-11-12, after the native code was sorted into `src/engine/` and `src/game/`. `tools/check-layout.mjs` passes: every engine file carries its level banner, imports only what section 3 allows, and names no game. What remains is work that needs real changes, not moves. Each item is fixed by rewriting code at its level, never by adding an exception.
 
-1. **The engine has no default libraries.** `engine/directory/` and `engine/penthouse/` are empty, so no prefab can boot without the game. The humanoid's skeleton and clips exist only as game data (`game/data/humanoid/`).
+1. **The engine has no default libraries.** `engine/directory/` holds the registry, structures and loading but no default data, and `engine/penthouse/` is empty, so no prefab can boot without the game. The humanoid's skeleton and clips exist only as game data (`game/data/humanoid/`).
 2. **The humanoid is half migrated:**
    - Motion is native: the Basement rig, the game's data in `game/data/humanoid/`, and the game's clip choice in `game/mechanics/animation/humanoid-system.mjs`.
    - Drawing is classic: `legacy/penthouse/procedural-humanoid.js`, `gl-humanoid.js` and `garment-kit.js`, plus `legacy/ui/humanoid-render.js`, `bodies.js`, `wardrobe.js` and `poses.js`.
    - The Penthouse prefab (body, rig and artist, booting on Directory defaults) does not exist yet.
 3. **Behaviour still in classic code.** The classic Directory scripts that hold behaviour (`legacy/directory/venue-crowd.js`, `cafe-life.js`, `club-life.js`, `lobby-life.js`, `game-sound.js`, `effects-system.js`, `collision-system.js`, `world-session.js`, `world-query.js`, `game-controls.js`, `new-game-state.js`) are quarantined. They are rewritten as game mechanics, not moved.
-4. **Naming.** Some native systems use `update()` or `updateDoors()` instead of `updateState()`, for example `roomGraph.update()` and `mapInstance.updateDoors()`.
-5. **A behaviour regression from PR 178:** hinged doors. In `main`, every interior hinged door, including the apartment's, was a physical swinging leaf with a spring. PR 178 made them kinematic and auto-opening. Restore the swinging behaviour.
+4. **The controls system can still drive itself.** `controlSystem` keeps an `auto_update` option that polls on its own animation-frame loop. Only the classic client (`legacy/directory/game-controls.js`) uses it; the Lobby refuses it and calls `updateState()` itself. Remove the option when that script is rewritten.
 
 When one of these is fixed, remove it from this list in the same commit.
 

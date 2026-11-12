@@ -54,7 +54,7 @@ export class ApartmentLevel {
     getRoster(){return this.companions.map(rosterRecord);}
     updateState() {
         for(const c of this.companions)if(c.active!==!!(c.recruited&&!c.dead)){if(c.recruited&&!c.dead)c.activate();else c.deactivate();}
-        this.map.updateDoors({near_range:door=>door.data.appearance.triggerRadius??90,duration:this.definition.rules.DOOR_DURATION,include_groups:2});
+        this.map.updateState({near_range:door=>door.data.appearance.triggerRadius??90,duration:this.definition.rules.DOOR_DURATION,include_groups:2});
         this.physics.updateState();
     }
     saveState() { return this.physics.savePhysicsState(); }
@@ -73,6 +73,14 @@ export class ApartmentLevel {
             this.physics.motion.stopBodyMotion(door);
             door.updateBody({position:primary.position,rotation:0,collision_shape:primary.collision_shape});Object.assign(door.data,structuredClone(primary.data));
             this.physics.createEntity(packets.find(p=>p.data.role==='door_panel'));upgraded=true;
+        }
+        // Saves from before hinged doors were physical hold them as kinematic leaves: make them the
+        // authored rigid leaf again; map.reconnect() then adds the hinge joint the save lacks.
+        for(const door of this.doors)if(door.data.appearance.type==='hinged'&&door.body.getState().physics_type!=='rigid'){
+            const primary=this.definition.entities.find(p=>p.data.authored_id===door.data.authored_id);
+            this.physics.motion.stopBodyMotion(door);
+            door.updateBody({physics_type:'rigid',mass:primary.mass,angular_damping:primary.angular_damping,linear_damping:primary.linear_damping,position:primary.position,rotation:0,angular_velocity:0,linear_velocity:[0,0]});
+            Object.assign(door.data,structuredClone(primary.data));upgraded=true;
         }
         if(upgraded){this.map.reconnect();this.reconnect();}
     }

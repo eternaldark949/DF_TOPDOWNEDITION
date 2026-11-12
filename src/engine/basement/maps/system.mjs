@@ -40,7 +40,13 @@ export class mapInstance {
     #create(entry) {
         const pose = entry.id !== null ? this.#memory.get(entry.id) : null;
         entry.entity = this.#physics.createEntity(pose ? { ...entry.packet, position: [...pose.position], rotation: pose.rotation } : entry.packet);
+        this.#join(entry);
         this.#stats.created++;
+    }
+    /** The joints the map authored for this entry (a hinged door's hinge), created on its live entity. */
+    #join(entry) {
+        if (!entry.joints || !entry.entity || this.#physics.getBodyConstraints(entry.entity).length) return;
+        for (const joint of entry.joints) this.#physics.createConstraint({ ...structuredClone(joint), body_a: entry.entity });
     }
     #release(entry) {
         const e = entry.entity; if (!e) return;
@@ -71,13 +77,16 @@ export class mapInstance {
     get loaded_regions() { return [...this.#loaded]; }
 
     /**
-     * Opens each door while a body of `include_groups` is within its range, by a timed kinematic move.
-     * `near_range(door)` gives the range (default 90).
+     * The map's work for one fixed step, called by the Lobby's runtime (through the level that owns
+     * the map): opens each kinematic door while a body of `include_groups` is within its range, by a
+     * timed move (`near_range(door)` gives the range, default 90), then updates room occupancy.
+     * Hinged doors need nothing here: physics swings them and their spring closes them.
      */
-    updateDoors({ near_range = () => 90, duration = 0.35, easing = 'smooth', include_groups = BODY_GROUP.CHARACTER } = {}) {
+    updateState({ near_range = () => 90, duration = 0.35, easing = 'smooth', include_groups = BODY_GROUP.CHARACTER } = {}) {
         const panels = new Map();
         for (const leaf of this.entities('door_panel')) panels.set(leaf.data.door_key, leaf);
         for (const door of this.entities('door')) {
+            if (door.data.hinged) continue;
             const near = this.#physics.peruseNearbyEntities(door.data.trigger_position ?? door, { near_range: near_range(door), include_groups, include_ghosts: false }).length > 0;
             if (near === door.data.open) continue;
             for (const leaf of [door, panels.get(door.data.authored_id)]) {
@@ -86,16 +95,18 @@ export class mapInstance {
                 this.#physics.motion.moveBodyTo(leaf, { position: near ? leaf.data.open_position : leaf.data.closed_position, rotation: near ? leaf.data.open_rotation : leaf.data.closed_rotation, duration, easing });
             }
         }
+        this.rooms.updateState();
     }
 
     /**
      * Re-links authored ids to entities after the world was restored from a physics snapshot
-     * (interiors keep every entity in the snapshot). Unmatched entries are left unbuilt.
+     * (interiors keep every entity in the snapshot), and creates any authored joint the snapshot
+     * lacks (a save made before the entry had one). Unmatched entries are left unbuilt.
      */
     reconnect() {
         const live = new Map();
         for (const e of this.#physics.elements.getEntities()) if (e.data?.authored_id !== undefined) live.set(e.data.authored_id, e);
-        for (const entry of this.#entries) entry.entity = entry.id !== null ? live.get(entry.id) ?? null : null;
+        for (const entry of this.#entries) { entry.entity = entry.id !== null ? live.get(entry.id) ?? null : null; this.#join(entry); }
     }
 
     /** Region memory and loaded regions, as plain data. Interiors save their bodies with the physics snapshot. */
