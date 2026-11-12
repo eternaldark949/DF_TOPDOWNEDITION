@@ -70,8 +70,8 @@ const route = physics.navigation.findRoute({ from: [30, 5], to: [470, 5] });
 
 - Lanes are directed polylines between junction nodes. `two_way: true` also adds `${lane_id}:reverse`.
 - Routes minimise travel time (`length / speed_limit × cost_scale`) with A*. Each lane lists the `profiles` allowed to use it (default `['car']`).
-- Each end snaps to the nearest open, permitted lane within `near_range`. Snapping is a query on the world's spatial grid, where lane bounds are stored as non-physical entries. Up to `max_candidates` (default 2) lanes per end are compared, so either direction of a two-way street can be chosen.
-- Node-to-node results are cached per profile (least recently used, `cache_size` default 2048). Any network change clears the cache.
+- Each end snaps to the nearest open, permitted lane within `near_range`. Snapping is a query on the world's spatial grid, where lane bounds are stored as non-physical entries. Up to `max_candidates` (default 4) lanes per end are compared, so either direction of a multi-lane two-way street can be chosen (a lane that only leads to a dead end is never the only option).
+- All candidate ends go into one multi-source, multi-target A*, which stops once nothing left can beat the best complete route. Results are cached per profile and snapped ends (least recently used, `cache_size` default 2048). Any network change clears the cache.
 - Lanes and nodes are saved in physics snapshots. Signals, crossing reservations and following distance stay with the `trafficController`. A vehicle can follow a navigated route with `followPath`, or the game can register the route with traffic.
 
 ## API
@@ -84,7 +84,7 @@ Constructor options come from `new physicsSystem({ navigation: { field: {...}, m
 |---|---|
 | `navigate(body, to, {profile?, speed?, arrival_distance?, radius?, ...findPath options})` | Plans and starts travel. Characters on the field call `moveTo` on their motor. Vehicles follow a road route, or a field path with a field profile. Returns `{layer, points, ...}`, or `null` after emitting `movementBlocked` (`no_path` / `no_route`). `to` is a point, or a body for field travel. |
 | `findPath({body OR collision_shape OR radius, from?, to, max_nodes=20000, search_margin?, allow_partial=false, heuristic_weight=1.2, smooth=true, reuse?})` | `{points, length, partial, visited_nodes, goal, radius, reused, dependencies}`, or `null`. `physics.findPath` is the same method. |
-| `findRoute({body OR from (point or node id), to (point or node id), profile='car', near_range?, max_candidates=2})` | `{points, lanes, length, travel_seconds, revision}`, or `null`. |
+| `findRoute({body OR from (point or node id), to (point or node id), profile='car', near_range?, max_candidates=4})` | `{points, lanes, length, travel_seconds, revision}`, or `null`. |
 | `registerProfile(name, {layer:'field'|'road', near_range=200, radius?})` / `getProfile(name)` | Named travel profiles; saved with the world. |
 | `agentRadius(body_or_shape)` | Radius used for field planning: a circle's radius (plus offset), otherwise the shape's reach. |
 | `configureField({cell_size, chunk_cells, max_clearance, obstacle_groups})` | Replaces field settings; cached chunks are discarded. Returns the active config. |

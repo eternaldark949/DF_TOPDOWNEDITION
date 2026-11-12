@@ -81,43 +81,54 @@ export class roadNetwork {
         if (results) { results.length = 0; results.push(...hits); return results; }
         return hits[0] ?? null;
     }
-    #nodePath(start, goal, profile) {
-        const key = `${profile}\u0000${start}\u0000${goal}`, cached = this.#cache.get(key);
+    /**
+     * One multi-source, multi-target A*: sources and targets map node ids to the
+     * extra seconds of their partial lanes. Stops once no open entry can beat the
+     * best complete route. Results are cached until the network changes.
+     */
+    #search(sources, targets, profile) {
+        const key = `${profile}|${[...sources].map(([n, v]) => `${n}:${v.cost.toFixed(4)}`).join(',')}|${[...targets].map(([n, v]) => `${n}:${v.cost.toFixed(4)}`).join(',')}`;
+        const cached = this.#cache.get(key);
         if (cached !== undefined) { this.#stats.route_cache_hits++; this.#cache.delete(key); this.#cache.set(key, cached); return cached; }
         this.#stats.route_searches++;
-        const target = this.#nodes.get(goal).position, fastest = this.#fastest || 1;
-        const h = id => { const p = this.#nodes.get(id).position; return Math.hypot(p[0] - target[0], p[1] - target[1]) / fastest; };
-        const g = new Map([[start, 0]]), via = new Map(), closed = new Set(), open = [];
+        const fastest = this.#fastest || 1, goals = [...targets.keys()].map(id => this.#nodes.get(id).position);
+        const h = id => { const p = this.#nodes.get(id).position; let best = Infinity; for (const q of goals) best = Math.min(best, Math.hypot(p[0] - q[0], p[1] - q[1])); return best / fastest; };
+        const g = new Map(), via = new Map(), origin = new Map(), closed = new Set(), open = [];
         const push = (cost, node) => { let i = open.length; open.push(null); while (i) { const p = (i - 1) >> 1; if (open[p][0] <= cost) break; open[i] = open[p]; i = p; } open[i] = [cost, node]; };
         const pop = () => {
             const top = open[0], last = open.pop();
             if (open.length) { let i = 0; for (;;) { const l = i * 2 + 1; if (l >= open.length) break; const m = l + 1 < open.length && open[l + 1][0] < open[l][0] ? l + 1 : l; if (open[m][0] >= last[0]) break; open[i] = open[m]; i = m; } open[i] = last; }
             return top;
         };
-        push(h(start), start);
-        let result = null;
+        for (const [node, { cost }] of sources) if (cost < (g.get(node) ?? Infinity)) { g.set(node, cost); origin.set(node, node); push(cost + h(node), node); }
+        let best = null;
         while (open.length) {
-            const [, node] = pop();
+            const [f, node] = pop();
+            if (best && f >= best.seconds) break;
             if (closed.has(node)) continue; closed.add(node); this.#stats.expanded_nodes++;
-            if (node === goal) {
-                const lanes = []; for (let n = goal; n !== start; n = via.get(n).from) lanes.push(via.get(n).lane_id);
-                result = { seconds: g.get(goal), lanes: lanes.reverse() }; break;
+            const goal = targets.get(node);
+            if (goal) {
+                const total = g.get(node) + goal.cost;
+                if (!best || total < best.seconds) {
+                    const lanes = []; for (let n = node; via.has(n); n = via.get(n).from) lanes.push(via.get(n).lane_id);
+                    best = { seconds: total, lanes: lanes.reverse(), source: origin.get(node), target: node };
+                }
             }
             for (const lane of this.#out.get(node)) {
                 if (!lane.open || !lane.profiles.has(profile) || closed.has(lane.to)) continue;
                 const cost = g.get(node) + lane.seconds;
                 if (cost >= (g.get(lane.to) ?? Infinity)) continue;
-                g.set(lane.to, cost); via.set(lane.to, lane); push(cost + h(lane.to), lane.to);
+                g.set(lane.to, cost); via.set(lane.to, lane); origin.set(lane.to, origin.get(node)); push(cost + h(lane.to), lane.to);
             }
         }
-        if (this.cache_size) { this.#cache.set(key, result); if (this.#cache.size > this.cache_size) this.#cache.delete(this.#cache.keys().next().value); }
-        return result;
+        if (this.cache_size) { this.#cache.set(key, best); if (this.#cache.size > this.cache_size) this.#cache.delete(this.#cache.keys().next().value); }
+        return best;
     }
     /**
      * Fastest lane route between two positions (or node ids). Both ends snap to
      * the nearest usable lanes; the result is a polyline ready for followPath.
      */
-    findRoute({ from, to, profile = 'car', near_range = 200, max_candidates = 2 } = {}) {
+    findRoute({ from, to, profile = 'car', near_range = 200, max_candidates = 4 } = {}) {
         this.#stats.route_requests++;
         number(max_candidates, 'max_candidates', 1, 16);
         const ends = (value, start) => {
@@ -132,20 +143,22 @@ export class roadNetwork {
         if (!starts.length || !goals.length) return null;
         let best = null;
         const consider = (seconds, build) => { if (!best || seconds < best.seconds) best = { seconds, build }; };
-        for (const s of starts) for (const t of goals) {
-            const prefix = s.lane ? (s.lane.length - s.along) / s.lane.speed_limit * s.lane.cost_scale : 0;
-            const suffix = t.lane ? t.along / t.lane.speed_limit * t.lane.cost_scale : 0;
-            if (s.lane && t.lane && s.lane === t.lane && s.along <= t.along) {
-                consider((t.along - s.along) / s.lane.speed_limit * s.lane.cost_scale, () => ({ lanes: [s.lane.lane_id], points: this.#slice(s.lane, s.along, t.along) }));
-                continue;
-            }
-            const a = s.lane ? s.lane.to : s.node_id, b = t.lane ? t.lane.from : t.node_id, middle = a === b ? { seconds: 0, lanes: [] } : this.#nodePath(a, b, profile);
-            if (!middle) continue;
-            consider(prefix + middle.seconds + suffix, () => {
+        const seconds = (lane, distance) => distance / lane.speed_limit * lane.cost_scale;
+        const sources = new Map(), targets = new Map(), keep = (map, node, cost, end) => { if (!map.has(node) || cost < map.get(node).cost) map.set(node, { cost, end }); };
+        for (const s of starts) {
+            if (s.lane) keep(sources, s.lane.to, seconds(s.lane, s.lane.length - s.along), s); else keep(sources, s.node_id, 0, s);
+            for (const t of goals) if (s.lane && t.lane && s.lane === t.lane && s.along <= t.along)
+                consider(seconds(s.lane, t.along - s.along), () => ({ lanes: [s.lane.lane_id], points: this.#slice(s.lane, s.along, t.along) }));
+        }
+        for (const t of goals) { if (t.lane) keep(targets, t.lane.from, seconds(t.lane, t.along), t); else keep(targets, t.node_id, 0, t); }
+        const found = this.#search(sources, targets, profile);
+        if (found) {
+            const s = sources.get(found.source).end, t = targets.get(found.target).end;
+            consider(found.seconds, () => {
                 const lanes = [], points = [];
                 const append = list => { for (const p of list) { const last = points.at(-1); if (!last || last[0] !== p[0] || last[1] !== p[1]) points.push([p[0], p[1]]); } };
                 if (s.lane) { lanes.push(s.lane.lane_id); append(this.#slice(s.lane, s.along, s.lane.length)); } else append([s.position]);
-                for (const id of middle.lanes) { lanes.push(id); append(this.#lanes.get(id).points); }
+                for (const id of found.lanes) { lanes.push(id); append(this.#lanes.get(id).points); }
                 if (t.lane) { lanes.push(t.lane.lane_id); append(this.#slice(t.lane, 0, t.along)); } else append([t.position]);
                 return { lanes, points };
             });
