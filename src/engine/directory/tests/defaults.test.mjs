@@ -28,3 +28,13 @@ test('the structures refuse malformed skeletons, clip sets, locomotion and figur
     assert.throws(() => validateFigure({ parts: [{ part: 'arm', shape: 'capsule', joint: 'a', radius: 2 }] }), /sizes/);
     assert.deepEqual(validateLibrary({ library_id: 'x', resources: { y: { kind: 'unknown_kind' } } }).resources.y.kind, 'unknown_kind', 'kinds without a structure pass through');
 });
+
+test('door kinds are library data the map builder reads', async () => {
+    const { doorKindsOf, validateDoorKind } = await import('../index.mjs');
+    const { buildMapPackets } = await import('../../basement/maps/index.mjs');
+    const kinds = doorKindsOf(createEngineRegistry());
+    assert.deepEqual(Object.keys(kinds).sort(), ['double', 'saloon']);
+    const leaves = buildMapPackets({ doors: [{ x: 0, y: 0, w: 60, h: 8, orientation: 'H', type: 'saloon' }] }, { door_kinds: kinds }).entries;
+    assert.equal(leaves.length, 2); assert.ok(leaves.every(e => e.joints?.[0].constraint_type === 'hinge'));
+    assert.throws(() => validateDoorKind({ name: 'x', leaves: [{ from: [0, 0], to: [1, 0], motion: 'hinge' }] }), /pivot/);
+});

@@ -28,7 +28,7 @@ Every section is optional. Rectangles are top-left: `{x, y, w, h}` for walls, tr
 | `lights` | Free lamps: `{position, radius, render_radius = 20}`. A light carried by a prop is that placement's `light`. |
 | `triggers` | Exits, rooms, zones: `{x, y, w, h, role, authored_id?, data?}`. |
 | `rooms` | `{id: {x, y, w, h} or {rects: [...]}, type: 'indoor' or 'outdoor', label}`. One ghost volume per rectangle, in the shared grid. |
-| `doors` | `{x, y, w, h, orientation: 'H' or 'V', type: 'sliding', 'hinged', 'plain' or 'arch', hingeSide?, rooms?: [a, b]}`. A sliding door is two leaves (`door` and `door_panel`). A hinged door is one rigid leaf whose body origin is the hinge; the builder gives its entry `joints: [hinge]` with a return spring and swing limit, so bodies push it open and it swings shut. An arch is an opening with no leaf. `rooms` links the two rooms it joins. |
+| `doors` | `{x, y, w, h, orientation: 'H' or 'V', type?, hingeSide?, hinge?, rooms?: [a, b]}`. `type` names a door kind (default `plain`; see *Door kinds*). `hingeSide: 'right'` mirrors the kind end to end; `hinge` overrides a hinged leaf's `HINGE` values. `rooms` links the two rooms it joins. |
 | `room_links` | Extra links without a door (a wide wall gap): `{rooms: [a, b], openness = 1}`. |
 | `cloths` | Hanging strips with a cloth mesh: `{x, y, width, length, segments = 5, role?}`. |
 | `spawn: [x, y]` | Returned as `map.spawn`. |
@@ -60,11 +60,13 @@ The map system uses the world's one spatial grid and navigation field. It never 
 
 | Call | Result |
 |---|---|
-| `buildMapPackets(definition, {templates, prop_types, decorate})` | `{kind, spawn, entries}`. Each entry is `{section, index, source, packet, joints?}`; `joints` are constraint packets the map creates with the entity (a hinged door's hinge). Pure, no world. |
+| `buildMapPackets(definition, {templates, prop_types, decorate, door_kinds})` | `{kind, spawn, entries, door_kinds}`. Each entry is `{section, index, source, packet, joints?}`; `joints` are constraint packets the map creates with the entity (a hinged door's hinge). Pure, no world. |
 | `new mapSystem(physics)` / `.load(definition, options)` / `.unload()` / `.current` | One active map per world. Loading releases the previous map. |
 | `mapInstance.entity(id)` / `.entities(role?)` / `.packets()` | Lookups. |
+| `mapInstance(physics, definition, {…, door_kinds})` | `door_kinds` adds kinds or replaces built-in ones, for both the leaves and the room links. |
 | `mapInstance.updateState({near_range, duration, easing, include_groups})` | Opens and closes sliding and plain doors by proximity, with timed kinematic moves, then updates room occupancy. Hinged doors are skipped: they are physical. |
-| `HINGE` | Defaults for a hinged leaf: `{mass: 12, damping: 7.7, closing_stiffness: 64.8, swing_limit: π − 0.25}`. A door's `hinge` field overrides them. |
+| `HINGE` | Defaults for a hinged leaf: `{mass: 12, damping: 7.7, closing_stiffness: 64.8, swing_limit: π − 0.25}`. A kind's leaf `hinge`, then the door's `hinge` field, override them. |
+| `DOOR_KINDS` / `validateDoorKind(kind, name?)` | The built-in kinds / the check every kind passes before it is built. |
 | `mapInstance.setFocus(point, {radius, keep})` | Exterior streaming. Returns `{loaded, unloaded}`. |
 | `mapInstance.reconnect()` / `.saveState()` / `.loadState(state)` / `.getStatistics()` / `.destroy()` | Lifecycle. |
 
@@ -73,3 +75,25 @@ The map system uses the world's one spatial grid and navigation field. It never 
 The game's prop catalog and per-map layouts live in the Directory: `src/game/data/game-assets/props.json` and `src/game/data/game-assets/maps/<map_id>.json`, read through `src/game/data/game-maps.mjs`. The apartment builds through this system (`directory/apartment-definition.mjs`). Each map file's `host` field (`native` or `classic`) records which host owns it.
 
 Run `node --test src/engine/basement/maps/tests/*.test.mjs tools/test-map-layouts.mjs`.
+
+## Door kinds
+
+A door is an opening in a wall plus the leaves that fill it. A kind is data that says what those leaves are; the builder has no per-type code. Positions run along the opening from its start (left for `H`, top for `V`) as `[fraction, px]`, meaning fraction × the opening's length + px.
+
+| Leaf field | Meaning |
+|---|---|
+| `from`, `to` | Where the leaf starts and ends. |
+| `motion` | `slide`: a kinematic leaf that `updateState` moves by proximity, by `travel` (`[fraction, px]`, signed along the opening). `hinge`: a rigid leaf on a hinge joint at `pivot` (0 = the leaf's start, 1 its end). Bodies push it open and its return spring swings it shut; `hinge` overrides `HINGE`. |
+| `side` | Which side of the door the leaf is on, −1 or 1 (default −1 for the first leaf, 1 after). |
+| `suffix` | Required after the first leaf: its id is `<door id>_<suffix>`. The first leaf takes the door's id. |
+
+The built-in kinds:
+
+| Kind | Leaves |
+|---|---|
+| `plain` | One leaf that slides its own length out of the opening. |
+| `sliding` | Two half leaves, 2 px apart at the middle, that slide apart (`door_0` and `door_0_right`). |
+| `hinged` | One leaf hinged at its start. |
+| `arch` | None. The opening still cuts the wall and links its rooms, always fully open. |
+
+A room link through a door is as open as its most open leaf. The engine's Directory ships `double` and `saloon` kinds as data (`doorKindsOf(registry)` collects a registry's kinds for `door_kinds`).

@@ -234,3 +234,36 @@ test('reconnect adds a hinge a restored world lacks', () => {
     map.reconnect();
     assert.equal(physics.getBodyConstraints(door).length, 1, 'never a second hinge');
 });
+
+test('door kinds are data: a double door is two hinged leaves, and a game may add its own kind', () => {
+    const double = { leaves: [{ from: [0, 0], to: [0.5, -1], motion: 'hinge', pivot: 0, hinge: { mass: 6 } }, { from: [0.5, 1], to: [1, 0], motion: 'hinge', pivot: 1, hinge: { mass: 6 }, suffix: 'right' }] };
+    const hall = { map_id: 'double', size: [400, 300], walls: [{ x: 0, y: 150, w: 400, h: 10 }],
+        rooms: { north: { x: 0, y: 0, w: 400, h: 150 }, south: { x: 0, y: 160, w: 400, h: 140 } },
+        doors: [{ x: 160, y: 150, w: 80, h: 10, orientation: 'H', type: 'double', rooms: ['north', 'south'] }] };
+    assert.throws(() => buildMapPackets(hall), /Unknown door kind double/);
+    assert.throws(() => buildMapPackets(hall, { door_kinds: { double: { leaves: [{ from: [0, 0], to: [1, 0], motion: 'spin' }] } } }), /slide or hinge/);
+    const physics = new physicsSystem(), map = new mapInstance(physics, hall, { door_kinds: { double } });
+    const left = map.entity('door_0'), right = map.entity('door_0_right');
+    assert.deepEqual([left.position, right.position], [[160, 155], [240, 155]], 'each leaf hangs on its own end');
+    assert.equal(physics.getBodyConstraints(left).length + physics.getBodyConstraints(right).length, 2);
+    assert.equal(map.rooms.openness('north', 'south'), 0);
+    const walker = physics.elements.createCharacter({ position: [200, 110], mass: 10, collision_shape: { shape_type: 'circle', radius: 8 }, movement: { max_speed: 90 } });
+    walker.setMovement([0, 1]); let passed = false;
+    for (let i = 0; i < 120 && !passed; i++) { map.updateState(); physics.updateState(); passed = walker.position[1] > 180; }
+    assert.ok(passed, `the walker parts both leaves (at ${walker.position[1].toFixed(1)})`);
+    assert.ok(Math.abs(left.rotation) > .3 && Math.abs(right.rotation) > .3, `both leaves swing (${left.rotation.toFixed(2)}, ${right.rotation.toFixed(2)})`);
+    assert.ok(Math.sign(left.rotation) !== Math.sign(right.rotation), 'away from each other');
+    assert.ok(map.rooms.openness('north', 'south') > 0);
+});
+
+test('a mirrored door hangs on its far end, and the built-in kinds build as before', () => {
+    const one = d => buildMapPackets({ doors: [d] }).entries.map(e => e.packet);
+    const [right] = one({ x: 0, y: 0, w: 40, h: 10, orientation: 'H', type: 'hinged', hingeSide: 'right' });
+    assert.deepEqual(right.position, [40, 5]); assert.deepEqual(right.collision_shape.local_position, [-20, 0]);
+    const sliding = one({ x: 0, y: 0, w: 40, h: 10, orientation: 'H', type: 'sliding' });
+    assert.deepEqual(sliding.map(p => p.data.authored_id), ['door_0', 'door_0_right']);
+    assert.deepEqual(sliding.map(p => p.position), [[9, 5], [31, 5]]);
+    assert.deepEqual(sliding.map(p => p.data.open_position), [[-15, 5], [55, 5]]);
+    assert.deepEqual(one({ x: 0, y: 0, w: 10, h: 40, orientation: 'V' })[0].data.open_position, [5, 60], 'no type is plain');
+    assert.equal(one({ x: 0, y: 0, w: 40, h: 10, orientation: 'H', type: 'arch' }).length, 0);
+});

@@ -15,6 +15,10 @@
 // locomotion     { idle, walk, stride, moving_speed }
 //                Which clips stand and walk, the px travelled per walk cycle, and the px/s above
 //                which a body counts as moving.
+// door_kind      { name, leaves: [{ from, to, motion: 'slide'|'hinge', travel?, pivot?, hinge?, side?, suffix? }] }
+//                The leaves that fill a door's opening, positions as [fraction of the opening, px]
+//                from its start. A map door names the kind in its `type`. The Basement map builder
+//                has the full rules and the built-in kinds (plain, sliding, hinged, arch).
 // figure         { parts: [{ part, shape: 'circle'|'ellipse'|'capsule', joint, to?, radius?, radii? }] }
 //                How a rigged body is drawn, back to front: a circle or ellipse at a joint, or a
 //                capsule from `joint` to `to`. Sizes in px before the rig's own scale.
@@ -26,6 +30,7 @@ export const STRUCTURES = Object.freeze({
     skeleton: 'A rig hierarchy: { rig_id, joints: [{ name, parent?, position?, rotation?, scale?, limits? }], anchors? }.',
     clip_set: 'Animation clips for one skeleton: { clips: [{ clip_id, duration, tracks, markers? }] }.',
     locomotion: 'Which clips stand and walk: { idle, walk, stride (px per cycle), moving_speed (px/s) }.',
+    door_kind: 'The leaves that fill a door\'s opening: { name, leaves: [{ from, to, motion, travel?, pivot?, hinge?, suffix? }] }.',
     figure: 'How a rigged body is drawn, back to front: { parts: [{ part, shape, joint, to?, radius?, radii? }] }.'
 });
 
@@ -93,9 +98,26 @@ export function validateFigure(data, where = 'figure') {
     return data;
 }
 
-const VALIDATORS = { prop_catalog: validatePropCatalog, skeleton: validateSkeleton, clip_set: validateClipSet, locomotion: validateLocomotion, figure: validateFigure };
+/** Throws unless `data` is a door_kind: a name and leaves that each span the opening and slide or hinge. Returns it. */
+export function validateDoorKind(data, where = 'door_kind') {
+    if (!plain(data) || !name(data.name) || !Array.isArray(data.leaves)) fail(where, 'requires a name and a leaves list');
+    const span = v => Array.isArray(v) && v.length === 2 && v.every(Number.isFinite);
+    data.leaves.forEach((leaf, i) => {
+        if (!plain(leaf) || !span(leaf.from) || !span(leaf.to)) fail(where, `leaf ${i} needs from and to as [fraction, px]`);
+        if (leaf.motion === 'slide' ? !span(leaf.travel) : leaf.motion === 'hinge' ? !(leaf.pivot >= 0 && leaf.pivot <= 1) : true) fail(where, `leaf ${i}: slide needs travel, hinge needs a pivot 0..1`);
+        if (i && !name(leaf.suffix)) fail(where, `leaf ${i} needs a suffix`);
+    });
+    return data;
+}
+
+const VALIDATORS = { prop_catalog: validatePropCatalog, skeleton: validateSkeleton, clip_set: validateClipSet, locomotion: validateLocomotion, figure: validateFigure, door_kind: validateDoorKind };
 /** Validates every resource of a library whose kind has a structure here; other kinds pass through. Returns the library. */
 export function validateLibrary(library) {
     for (const [id, resource] of Object.entries(library?.resources ?? {})) VALIDATORS[resource?.kind]?.(resource, `${library.library_id}:${id}`);
     return library;
+}
+
+/** A registry's door kinds by name, ready for the map builder's `door_kinds` option. */
+export function doorKindsOf(registry) {
+    return Object.fromEntries(registry.listResources({ kind: 'door_kind' }).map(id => { const { kind, name: kind_name, ...door } = registry.getResource(id); return [kind_name, structuredClone(door)]; }));
 }

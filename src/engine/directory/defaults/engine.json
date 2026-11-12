@@ -589,6 +589,84 @@
      "radius": 6.5
     }
    ]
+  },
+  "door_double": {
+   "kind": "door_kind",
+   "name": "double",
+   "leaves": [
+    {
+     "from": [
+      0,
+      0
+     ],
+     "to": [
+      0.5,
+      -1
+     ],
+     "motion": "hinge",
+     "pivot": 0,
+     "hinge": {
+      "mass": 7
+     }
+    },
+    {
+     "from": [
+      0.5,
+      1
+     ],
+     "to": [
+      1,
+      0
+     ],
+     "motion": "hinge",
+     "pivot": 1,
+     "hinge": {
+      "mass": 7
+     },
+     "suffix": "right"
+    }
+   ]
+  },
+  "door_saloon": {
+   "kind": "door_kind",
+   "name": "saloon",
+   "leaves": [
+    {
+     "from": [
+      0,
+      0
+     ],
+     "to": [
+      0.5,
+      -1
+     ],
+     "motion": "hinge",
+     "pivot": 0,
+     "hinge": {
+      "mass": 3,
+      "damping": 3,
+      "closing_stiffness": 90
+     }
+    },
+    {
+     "from": [
+      0.5,
+      1
+     ],
+     "to": [
+      1,
+      0
+     ],
+     "motion": "hinge",
+     "pivot": 1,
+     "hinge": {
+      "mass": 3,
+      "damping": 3,
+      "closing_stiffness": 90
+     },
+     "suffix": "right"
+    }
+   ]
   }
  },
  "templates": {

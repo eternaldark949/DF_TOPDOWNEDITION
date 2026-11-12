@@ -1,5 +1,7 @@
 // ===== LV0 BASEMENT =====
-import { layoutGeometry, BODY_GROUP } from '../physics/index.mjs';
+import { layoutGeometry } from '../physics/index.mjs';
+import { resolveDoorKinds, doorKind, doorLeaves } from './doors.mjs';
+export { DOOR_KINDS, HINGE, validateDoorKind } from './doors.mjs';
 
 /**
  * Map definition -> entity packets. Pure: no world, no game names. Every section is optional.
@@ -8,14 +10,6 @@ import { layoutGeometry, BODY_GROUP } from '../physics/index.mjs';
  * (placements); packets are centred. Ids default to `<prefix>_<index>` per section, so the same
  * definition always yields the same `authored_id`s (saves and layout memory rely on that).
  */
-const DOOR_MASK = BODY_GROUP.CHARACTER | BODY_GROUP.PROP | BODY_GROUP.PROJECTILE;
-/**
- * A hinged leaf's defaults (a door's `hinge` field overrides any of them): mass, angular damping
- * (1/s), the closing spring (1/s², as angular acceleration per radian open) and the swing limit
- * either side of shut (radians). They match the classic doors: a spring of 0.018 and damping of
- * 0.88 per 60 Hz tick, stopping 0.25 rad short of folding back against the wall.
- */
-export const HINGE = Object.freeze({ mass: 12, damping: 7.7, closing_stiffness: 64.8, swing_limit: Math.PI - 0.25 });
 const finite = (value, name) => { if (!Number.isFinite(value)) throw new TypeError(`Map ${name} must be a finite number`); return value; };
 const box = (x, y, w, h) => ({ position: [finite(x, 'x') + finite(w, 'width') / 2, finite(y, 'y') + finite(h, 'height') / 2], collision_shape: { shape_type: 'box', dimensions: [w, h] } });
 
@@ -29,7 +23,8 @@ export const DEFAULT_KINDS = Object.freeze({ wall: { entity_type: 'static' }, pr
  * walls (cut by door openings), boundary, placements, lights, triggers, rooms (one entry per
  * rectangle), doors (a sliding door is two leaves, an arch none), cloths. `decorate(packet, entry)` may add game data; it must not change ids or roles.
  */
-export function buildMapPackets(definition, { templates = {}, decorate = null, prop_types = {} } = {}) {
+export function buildMapPackets(definition, { templates = {}, decorate = null, prop_types = {}, door_kinds = {} } = {}) {
+    const kinds = resolveDoorKinds(door_kinds);
     const kind = definition.kind ?? 'interior';
     if (!MAP_KINDS.includes(kind)) throw new TypeError(`Unknown map kind: ${kind}`);
     const entries = [];
@@ -75,32 +70,11 @@ export function buildMapPackets(definition, { templates = {}, decorate = null, p
             data: { role: 'room', room_id, ...(rects.length > 1 ? { rect_index: k } : {}), ...fields } }));
     }
 
-    // Doors. A hinged door is a physical leaf on a hinge joint: bodies push it open, a return spring
-    // swings it shut, and it stops just short of folding flat against the wall. Sliding and plain
-    // doors are kinematic leaves the map instance opens by proximity (a sliding door is two leaves).
-    // An arch is an opening with no leaf (it still cuts the wall and links its rooms).
+    // Doors. Each door's `type` names a door kind (default 'plain'): data saying what its leaves are and
+    // how each moves. See doors.mjs. `door_kinds` adds kinds or replaces built-in ones.
     doors.forEach((d, index) => {
-        if (d.type === 'arch') return;
-        const horizontal = d.orientation === 'H', key = `door_${index}`, trigger_position = [d.x + d.w / 2, d.y + d.h / 2];
-        if (d.type === 'sliding') {
-            const length = (horizontal ? d.w : d.h) / 2 - 2, travel = (horizontal ? d.w : d.h) / 2 + 4;
-            for (const side of [-1, 1]) {
-                const position = horizontal ? [d.x + d.w / 2 + side * (length / 2 + 2), d.y + d.h / 2] : [d.x + d.w / 2, d.y + d.h / 2 + side * (length / 2 + 2)];
-                push('doors', index, d, { ...kind_of('door', d.template), position, collision_shape: { shape_type: 'box', dimensions: horizontal ? [length, d.h] : [d.w, length] }, collision_mask: DOOR_MASK,
-                    data: { role: side === -1 ? 'door' : 'door_panel', authored_id: side === -1 ? key : `${key}_right`, door_key: key, panel_version: 2, panel_side: side, trigger_position,
-                        closed_position: position, open_position: [position[0] + (horizontal ? side * travel : 0), position[1] + (horizontal ? 0 : side * travel)], closed_rotation: 0, open_rotation: 0, open: false } });
-            }
-            return;
-        }
-        const hinged = d.type === 'hinged', far = d.hingeSide === 'right' ? -1 : 1;
-        const position = hinged ? (horizontal ? [far > 0 ? d.x : d.x + d.w, d.y + d.h / 2] : [d.x + d.w / 2, far > 0 ? d.y : d.y + d.h]) : trigger_position;
-        const hinge = hinged ? { ...HINGE, ...(d.hinge ?? {}) } : null;
-        push('doors', index, d, { ...kind_of('door', d.template), position,
-            ...(hinged ? { physics_type: 'rigid', mass: hinge.mass, angular_damping: hinge.damping, linear_damping: 0 } : {}),
-            collision_shape: { shape_type: 'box', dimensions: [d.w, d.h], local_position: hinged ? (horizontal ? [far * d.w / 2, 0] : [0, far * d.h / 2]) : [0, 0] }, collision_mask: DOOR_MASK,
-            data: { role: 'door', authored_id: key, hinged, closed_position: position, open_position: hinged ? position : [position[0] + (horizontal ? d.w : 0), position[1] + (horizontal ? 0 : d.h)],
-                closed_rotation: 0, open_rotation: hinged ? Math.PI / 2 : 0, open: false } },
-            hinged ? [{ constraint_type: 'hinge', world_target: [...position], local_anchor_a: [0, 0], target_rotation: 0, min_rotation: -hinge.swing_limit, max_rotation: hinge.swing_limit, spring_stiffness: hinge.closing_stiffness, spring_damping: 0 }] : undefined);
+        const key = `door_${index}`;
+        for (const { packet, joints } of doorLeaves(d, key, doorKind(kinds, d, key), kind_of('door', d.template))) push('doors', index, d, packet, joints);
     });
 
     // Cloths: a hanging strip mesh anchored at its top edge (curtains, banners, laundry).
@@ -114,5 +88,5 @@ export function buildMapPackets(definition, { templates = {}, decorate = null, p
             data: { role: c.role ?? 'cloth', authored_id: c.authored_id ?? `${c.role ?? 'cloth'}_${i}`, ...c.data, mesh: { points, edges, anchors: [0, 1] } } });
     });
 
-    return { kind, entries, spawn: definition.spawn ? [...definition.spawn] : null };
+    return { kind, entries, spawn: definition.spawn ? [...definition.spawn] : null, door_kinds: kinds };
 }

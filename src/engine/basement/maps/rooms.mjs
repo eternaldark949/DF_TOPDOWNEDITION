@@ -1,4 +1,5 @@
 // ===== LV0 BASEMENT =====
+import { resolveDoorKinds, doorKind, leafIds } from './doors.mjs';
 /**
  * Rooms of one map: which rooms exist, how they connect, how open each connection is right now,
  * and which room each tracked body is in. Room volumes live in the world's one spatial grid (the
@@ -13,7 +14,7 @@ const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
 export class roomGraph {
     #physics; #map; #rooms = new Map(); #links = []; #adjacent = new Map(); #tracked = new Map(); #listeners = new Set(); #last = null;
     #stats = { lookups: 0, grid_lookups: 0, changes: 0 };
-    constructor(physics, map, definition) {
+    constructor(physics, map, definition, door_kinds = resolveDoorKinds()) {
         this.#physics = physics; this.#map = map;
         for (const [id, room] of Object.entries(definition.rooms ?? {})) {
             const rects = (room.rects ?? [{ x: room.x, y: room.y, w: room.w, h: room.h }]).map(r => ({ x: r.x, y: r.y, w: r.w, h: r.h }));
@@ -27,7 +28,12 @@ export class roomGraph {
             const entry = { ...link, rooms: [a, b] };
             this.#links.push(entry); this.#adjacent.get(a).push(entry); this.#adjacent.get(b).push(entry);
         };
-        (definition.doors ?? []).forEach((d, i) => { if (d.rooms) add(d.rooms, d.type === 'arch' ? { link_id: `door_${i}`, kind: 'arch', openness: 1 } : { link_id: `door_${i}`, kind: 'door', door_id: `door_${i}` }); });
+        // A door whose kind has no leaves (an arch) is always open; otherwise the link is as open as its most open leaf.
+        (definition.doors ?? []).forEach((d, i) => {
+            if (!d.rooms) return;
+            const key = `door_${i}`, kind = doorKind(door_kinds, d, key);
+            add(d.rooms, kind.leaves.length ? { link_id: key, kind: 'door', door_id: key, leaf_ids: leafIds(key, kind) } : { link_id: key, kind: 'arch', openness: 1 });
+        });
         (definition.room_links ?? []).forEach((l, i) => add(l.rooms, { link_id: l.link_id ?? `link_${i}`, kind: 'opening', openness: clamp01(l.openness ?? 1) }));
     }
 
@@ -49,16 +55,21 @@ export class roomGraph {
         return null;
     }
 
-    /** 0 (shut) … 1 (wide open) for one link, read from its door's current pose. */
+    /** 0 (shut) … 1 (wide open) for one link: the most open of its door's leaves, each read from its current pose. */
     linkOpenness(link) {
         if (link.kind !== 'door') return link.openness;
-        const door = this.#map.entity(link.door_id);
-        if (!door) return 0;
-        const d = door.data, travel = Math.hypot(d.open_position[0] - d.closed_position[0], d.open_position[1] - d.closed_position[1]);
-        if (travel > 1e-9) return clamp01(Math.hypot(door.position[0] - d.closed_position[0], door.position[1] - d.closed_position[1]) / travel);
-        const turn = Math.abs(d.open_rotation - d.closed_rotation);
-        return turn > 1e-9 ? clamp01(Math.abs((door.rotation ?? 0) - d.closed_rotation) / turn) : (d.open ? 1 : 0);
+        let best = 0;
+        for (const id of link.leaf_ids) {
+            const leaf = this.#map.entity(id);
+            if (!leaf) continue;
+            const d = leaf.data, travel = Math.hypot(d.open_position[0] - d.closed_position[0], d.open_position[1] - d.closed_position[1]), turn = Math.abs(d.open_rotation - d.closed_rotation);
+            const open = travel > 1e-9 ? clamp01(Math.hypot(leaf.position[0] - d.closed_position[0], leaf.position[1] - d.closed_position[1]) / travel)
+                : turn > 1e-9 ? clamp01(Math.abs((leaf.rotation ?? 0) - d.closed_rotation) / turn) : (d.open ? 1 : 0);
+            best = Math.max(best, open);
+        }
+        return best;
     }
+
     /** Rooms joined to `id`: `[{room, link_id, kind, openness}]`. */
     connections(id) { return (this.#adjacent.get(id) ?? []).map(l => ({ room: l.rooms[0] === id ? l.rooms[1] : l.rooms[0], link_id: l.link_id, kind: l.kind, openness: this.linkOpenness(l) })); }
     /** The most open direct link between two rooms (0 if none). */

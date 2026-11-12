@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'e2d6d94cba12';
+        const DFAB_BUILD = '835fed760ef0';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="13034">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="13116">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -14317,6 +14317,10 @@ const m43 = (()=>{
 // locomotion     { idle, walk, stride, moving_speed }
 //                Which clips stand and walk, the px travelled per walk cycle, and the px/s above
 //                which a body counts as moving.
+// door_kind      { name, leaves: [{ from, to, motion: 'slide'|'hinge', travel?, pivot?, hinge?, side?, suffix? }] }
+//                The leaves that fill a door's opening, positions as [fraction of the opening, px]
+//                from its start. A map door names the kind in its `type`. The Basement map builder
+//                has the full rules and the built-in kinds (plain, sliding, hinged, arch).
 // figure         { parts: [{ part, shape: 'circle'|'ellipse'|'capsule', joint, to?, radius?, radii? }] }
 //                How a rigged body is drawn, back to front: a circle or ellipse at a joint, or a
 //                capsule from `joint` to `to`. Sizes in px before the rig's own scale.
@@ -14328,6 +14332,7 @@ const STRUCTURES = Object.freeze({
     skeleton: 'A rig hierarchy: { rig_id, joints: [{ name, parent?, position?, rotation?, scale?, limits? }], anchors? }.',
     clip_set: 'Animation clips for one skeleton: { clips: [{ clip_id, duration, tracks, markers? }] }.',
     locomotion: 'Which clips stand and walk: { idle, walk, stride (px per cycle), moving_speed (px/s) }.',
+    door_kind: 'The leaves that fill a door\'s opening: { name, leaves: [{ from, to, motion, travel?, pivot?, hinge?, suffix? }] }.',
     figure: 'How a rigged body is drawn, back to front: { parts: [{ part, shape, joint, to?, radius?, radii? }] }.'
 });
 
@@ -14395,14 +14400,31 @@ function validateFigure(data, where = 'figure') {
     return data;
 }
 
-const VALIDATORS = { prop_catalog: validatePropCatalog, skeleton: validateSkeleton, clip_set: validateClipSet, locomotion: validateLocomotion, figure: validateFigure };
+/** Throws unless `data` is a door_kind: a name and leaves that each span the opening and slide or hinge. Returns it. */
+function validateDoorKind(data, where = 'door_kind') {
+    if (!plain(data) || !name(data.name) || !Array.isArray(data.leaves)) fail(where, 'requires a name and a leaves list');
+    const span = v => Array.isArray(v) && v.length === 2 && v.every(Number.isFinite);
+    data.leaves.forEach((leaf, i) => {
+        if (!plain(leaf) || !span(leaf.from) || !span(leaf.to)) fail(where, `leaf ${i} needs from and to as [fraction, px]`);
+        if (leaf.motion === 'slide' ? !span(leaf.travel) : leaf.motion === 'hinge' ? !(leaf.pivot >= 0 && leaf.pivot <= 1) : true) fail(where, `leaf ${i}: slide needs travel, hinge needs a pivot 0..1`);
+        if (i && !name(leaf.suffix)) fail(where, `leaf ${i} needs a suffix`);
+    });
+    return data;
+}
+
+const VALIDATORS = { prop_catalog: validatePropCatalog, skeleton: validateSkeleton, clip_set: validateClipSet, locomotion: validateLocomotion, figure: validateFigure, door_kind: validateDoorKind };
 /** Validates every resource of a library whose kind has a structure here; other kinds pass through. Returns the library. */
 function validateLibrary(library) {
     for (const [id, resource] of Object.entries(library?.resources ?? {})) VALIDATORS[resource?.kind]?.(resource, `${library.library_id}:${id}`);
     return library;
 }
 
-return Object.freeze({get STRUCTURES(){return STRUCTURES;},get validatePropCatalog(){return validatePropCatalog;},get validateMapLayout(){return validateMapLayout;},get validateSkeleton(){return validateSkeleton;},get validateClipSet(){return validateClipSet;},get validateLocomotion(){return validateLocomotion;},get validateFigure(){return validateFigure;},get validateLibrary(){return validateLibrary;}});
+/** A registry's door kinds by name, ready for the map builder's `door_kinds` option. */
+function doorKindsOf(registry) {
+    return Object.fromEntries(registry.listResources({ kind: 'door_kind' }).map(id => { const { kind, name: kind_name, ...door } = registry.getResource(id); return [kind_name, structuredClone(door)]; }));
+}
+
+return Object.freeze({get STRUCTURES(){return STRUCTURES;},get validatePropCatalog(){return validatePropCatalog;},get validateMapLayout(){return validateMapLayout;},get validateSkeleton(){return validateSkeleton;},get validateClipSet(){return validateClipSet;},get validateLocomotion(){return validateLocomotion;},get validateFigure(){return validateFigure;},get validateDoorKind(){return validateDoorKind;},get validateLibrary(){return validateLibrary;},get doorKindsOf(){return doorKindsOf;}});
 })();
 const m45 = Object.freeze({default:{
  "library_id": "engine",
@@ -14995,6 +15017,84 @@ const m45 = Object.freeze({default:{
      "radius": 6.5
     }
    ]
+  },
+  "door_double": {
+   "kind": "door_kind",
+   "name": "double",
+   "leaves": [
+    {
+     "from": [
+      0,
+      0
+     ],
+     "to": [
+      0.5,
+      -1
+     ],
+     "motion": "hinge",
+     "pivot": 0,
+     "hinge": {
+      "mass": 7
+     }
+    },
+    {
+     "from": [
+      0.5,
+      1
+     ],
+     "to": [
+      1,
+      0
+     ],
+     "motion": "hinge",
+     "pivot": 1,
+     "hinge": {
+      "mass": 7
+     },
+     "suffix": "right"
+    }
+   ]
+  },
+  "door_saloon": {
+   "kind": "door_kind",
+   "name": "saloon",
+   "leaves": [
+    {
+     "from": [
+      0,
+      0
+     ],
+     "to": [
+      0.5,
+      -1
+     ],
+     "motion": "hinge",
+     "pivot": 0,
+     "hinge": {
+      "mass": 3,
+      "damping": 3,
+      "closing_stiffness": 90
+     }
+    },
+    {
+     "from": [
+      0.5,
+      1
+     ],
+     "to": [
+      1,
+      0
+     ],
+     "motion": "hinge",
+     "pivot": 1,
+     "hinge": {
+      "mass": 3,
+      "damping": 3,
+      "closing_stiffness": 90
+     },
+     "suffix": "right"
+    }
+   ]
   }
  },
  "templates": {
@@ -15161,7 +15261,7 @@ const m40 = (()=>{
 
 
 
-return Object.freeze({get assetLibrary(){return m41.assetLibrary;},get mergeDefinition(){return m41.mergeDefinition;},get identifier(){return m42.identifier;},get nonnegative(){return m42.nonnegative;},get jsonCopy(){return m42.jsonCopy;},get STRUCTURES(){return m43.STRUCTURES;},get validatePropCatalog(){return m43.validatePropCatalog;},get validateMapLayout(){return m43.validateMapLayout;},get validateSkeleton(){return m43.validateSkeleton;},get validateClipSet(){return m43.validateClipSet;},get validateLocomotion(){return m43.validateLocomotion;},get validateFigure(){return m43.validateFigure;},get validateLibrary(){return m43.validateLibrary;},get ENGINE_LIBRARIES(){return m44.ENGINE_LIBRARIES;},get createEngineRegistry(){return m44.createEngineRegistry;},get resolvePlacement(){return m46.resolvePlacement;},get resolveLayout(){return m46.resolveLayout;},get isMovable(){return m46.isMovable;}});
+return Object.freeze({get assetLibrary(){return m41.assetLibrary;},get mergeDefinition(){return m41.mergeDefinition;},get identifier(){return m42.identifier;},get nonnegative(){return m42.nonnegative;},get jsonCopy(){return m42.jsonCopy;},get STRUCTURES(){return m43.STRUCTURES;},get validatePropCatalog(){return m43.validatePropCatalog;},get validateMapLayout(){return m43.validateMapLayout;},get validateSkeleton(){return m43.validateSkeleton;},get validateClipSet(){return m43.validateClipSet;},get validateLocomotion(){return m43.validateLocomotion;},get validateFigure(){return m43.validateFigure;},get validateDoorKind(){return m43.validateDoorKind;},get validateLibrary(){return m43.validateLibrary;},get doorKindsOf(){return m43.doorKindsOf;},get ENGINE_LIBRARIES(){return m44.ENGINE_LIBRARIES;},get createEngineRegistry(){return m44.createEngineRegistry;},get resolvePlacement(){return m46.resolvePlacement;},get resolveLayout(){return m46.resolveLayout;},get isMovable(){return m46.isMovable;}});
 })();
 const m49 = Object.freeze({default:{
   "_about": {
@@ -25507,10 +25607,114 @@ const APARTMENT_RULES = Object.freeze(definition.resources.rules.data);
 
 return Object.freeze({get createApartmentAssetLibrary(){return createApartmentAssetLibrary;},get APARTMENT_RULES(){return APARTMENT_RULES;}});
 })();
+// src/engine/basement/maps/doors.mjs
+const m140 = (()=>{
+// ===== LV0 BASEMENT =====
+const {BODY_GROUP} = m1;
+
+/**
+ * DOOR KINDS: a door is an opening in a wall plus the leaves that fill it, and a kind is data that
+ * says what those leaves are. Nothing here names a particular door; the builder reads the kind.
+ *
+ * Positions run along the opening, from its start (left for an 'H' door, top for a 'V' one), as
+ * `[fraction, px]` = fraction × the opening's length + px. Each leaf:
+ *   from, to   where the leaf starts and ends
+ *   motion     'slide': a kinematic leaf the map instance moves by proximity, by `travel` ([fraction, px],
+ *              signed along the opening); 'hinge': a rigid leaf on a hinge joint at `pivot` (0 = the
+ *              leaf's start, 1 its end) that bodies push open and a return spring swings shut, with
+ *              `hinge` overriding HINGE
+ *   side       which side of the door this leaf is on (-1 or 1); defaults to -1 for the first leaf, 1 after
+ *   suffix     the leaf's id suffix; the first leaf takes the door's id, later ones `<id>_<suffix>`
+ * A door with `hingeSide: 'right'` mirrors its kind end to end. An arch has no leaves: it is only
+ * the opening, which still cuts the wall and links its rooms.
+ */
+const DOOR_KINDS = Object.freeze({
+    plain: { leaves: [{ from: [0, 0], to: [1, 0], motion: 'slide', travel: [1, 0] }] },
+    sliding: { leaves: [
+        { from: [0, 0], to: [0.5, -2], motion: 'slide', travel: [-0.5, -4], side: -1 },
+        { from: [0.5, 2], to: [1, 0], motion: 'slide', travel: [0.5, 4], side: 1, suffix: 'right' }] },
+    hinged: { leaves: [{ from: [0, 0], to: [1, 0], motion: 'hinge', pivot: 0 }] },
+    arch: { leaves: [] }
+});
+/**
+ * A hinged leaf's defaults (a kind's leaf, then the door's `hinge` field, override any of them):
+ * mass, angular damping (1/s), the closing spring (1/s², as angular acceleration per radian open)
+ * and the swing limit either side of shut (radians). They match the classic doors: a spring of
+ * 0.018 and damping of 0.88 per 60 Hz tick, stopping 0.25 rad short of folding back against the wall.
+ */
+const HINGE = Object.freeze({ mass: 12, damping: 7.7, closing_stiffness: 64.8, swing_limit: Math.PI - 0.25 });
+const DOOR_MASK = BODY_GROUP.CHARACTER | BODY_GROUP.PROP | BODY_GROUP.PROJECTILE;
+
+const pair = (value, name) => { if (!Array.isArray(value) || value.length !== 2 || !value.every(Number.isFinite)) throw new TypeError(`A door leaf's ${name} is [fraction, px]`); return value; };
+const HINGE_FIELDS = Object.keys(HINGE);
+/** Throws unless `kind` is a door kind (see above). Returns it. */
+function validateDoorKind(kind, name = 'door kind') {
+    if (!kind || !Array.isArray(kind.leaves)) throw new TypeError(`${name} requires a leaves list`);
+    const suffixes = new Set();
+    kind.leaves.forEach((leaf, i) => {
+        pair(leaf.from, 'from'); pair(leaf.to, 'to');
+        if (leaf.motion === 'slide') pair(leaf.travel, 'travel');
+        else if (leaf.motion === 'hinge') {
+            if (!(leaf.pivot >= 0 && leaf.pivot <= 1)) throw new TypeError(`${name}: a hinge leaf's pivot is 0..1 along it`);
+            for (const key of Object.keys(leaf.hinge ?? {})) if (!HINGE_FIELDS.includes(key)) throw new TypeError(`${name}: unknown hinge field ${key}`);
+        } else throw new TypeError(`${name}: a leaf's motion is slide or hinge`);
+        if (leaf.side !== undefined && leaf.side !== -1 && leaf.side !== 1) throw new TypeError(`${name}: a leaf's side is -1 or 1`);
+        if (i && (typeof leaf.suffix !== 'string' || !leaf.suffix || suffixes.has(leaf.suffix))) throw new TypeError(`${name}: every leaf after the first needs its own suffix`);
+        if (leaf.suffix) suffixes.add(leaf.suffix);
+    });
+    return kind;
+}
+for (const [name, kind] of Object.entries(DOOR_KINDS)) validateDoorKind(kind, name);
+
+/** The built-in kinds with `door_kinds` added over them, each validated. */
+function resolveDoorKinds(door_kinds = {}) {
+    return Object.freeze({ ...DOOR_KINDS, ...Object.fromEntries(Object.entries(door_kinds).map(([name, kind]) => [name, validateDoorKind(kind, name)])) });
+}
+/** The kind a door names (`type`, default 'plain'); an unknown name throws. */
+function doorKind(kinds, d, key) {
+    const name = d.type ?? 'plain';
+    if (!Object.hasOwn(kinds, name)) throw new TypeError(`Unknown door kind ${name} (${key})`);
+    return kinds[name];
+}
+/** The authored ids of a door's leaves, in kind order. */
+const leafIds = (key, kind) => kind.leaves.map((leaf, i) => i ? `${key}_${leaf.suffix}` : key);
+
+/**
+ * One door's leaves as `{packet, joints?}` pairs, in kind order. `base` is the door's entity kind
+ * (template or engine type); the packet's data carries the door's opening and open/closed poses.
+ */
+function doorLeaves(d, key, kind, base) {
+    const horizontal = d.orientation === 'H', length = horizontal ? d.w : d.h, across = horizontal ? d.h : d.w;
+    const mirror = d.hingeSide === 'right', single = kind.leaves.length === 1;
+    const at = ([fraction, px]) => { const u = fraction * length + px; return mirror ? length - u : u; };
+    const point = u => horizontal ? [d.x + u, d.y + d.h / 2] : [d.x + d.w / 2, d.y + u];
+    const along = offset => horizontal ? [offset, 0] : [0, offset];
+    const trigger_position = [d.x + d.w / 2, d.y + d.h / 2];
+    return kind.leaves.map((leaf, i) => {
+        const a = at(leaf.from), b = at(leaf.to), size = Math.abs(b - a), centre = (a + b) / 2, hinge = leaf.motion === 'hinge';
+        const pivot = hinge ? a + (b - a) * leaf.pivot : centre, position = point(pivot);
+        const travel = hinge ? 0 : (mirror ? -1 : 1) * (leaf.travel[0] * length + leaf.travel[1]);
+        const joint = hinge ? { ...HINGE, ...(leaf.hinge ?? {}), ...(d.hinge ?? {}) } : null;
+        const data = { role: i ? 'door_panel' : 'door', authored_id: leafIds(key, kind)[i],
+            ...(single ? {} : { door_key: key, panel_version: 2, panel_side: leaf.side ?? (i ? 1 : -1), trigger_position }),
+            ...(single || hinge ? { hinged: hinge } : {}),
+            closed_position: position, open_position: hinge ? position : [position[0] + along(travel)[0], position[1] + along(travel)[1]],
+            closed_rotation: 0, open_rotation: hinge ? Math.PI / 2 : 0, open: false };
+        const packet = { ...base, position,
+            ...(hinge ? { physics_type: 'rigid', mass: joint.mass, angular_damping: joint.damping, linear_damping: 0 } : {}),
+            collision_shape: { shape_type: 'box', dimensions: horizontal ? [size, across] : [across, size], local_position: along(centre - pivot) }, collision_mask: DOOR_MASK, data };
+        return { packet, joints: hinge ? [{ constraint_type: 'hinge', world_target: [...position], local_anchor_a: [0, 0], target_rotation: 0, min_rotation: -joint.swing_limit, max_rotation: joint.swing_limit, spring_stiffness: joint.closing_stiffness, spring_damping: 0 }] : undefined };
+    });
+}
+
+return Object.freeze({get DOOR_KINDS(){return DOOR_KINDS;},get HINGE(){return HINGE;},get DOOR_MASK(){return DOOR_MASK;},get validateDoorKind(){return validateDoorKind;},get resolveDoorKinds(){return resolveDoorKinds;},get doorKind(){return doorKind;},get leafIds(){return leafIds;},get doorLeaves(){return doorLeaves;}});
+})();
 // src/engine/basement/maps/builder.mjs
 const m139 = (()=>{
 // ===== LV0 BASEMENT =====
-const {layoutGeometry,BODY_GROUP} = m1;
+const {layoutGeometry} = m1;
+const {resolveDoorKinds,doorKind,doorLeaves} = m140;
+
 
 /**
  * Map definition -> entity packets. Pure: no world, no game names. Every section is optional.
@@ -25519,14 +25723,6 @@ const {layoutGeometry,BODY_GROUP} = m1;
  * (placements); packets are centred. Ids default to `<prefix>_<index>` per section, so the same
  * definition always yields the same `authored_id`s (saves and layout memory rely on that).
  */
-const DOOR_MASK = BODY_GROUP.CHARACTER | BODY_GROUP.PROP | BODY_GROUP.PROJECTILE;
-/**
- * A hinged leaf's defaults (a door's `hinge` field overrides any of them): mass, angular damping
- * (1/s), the closing spring (1/s², as angular acceleration per radian open) and the swing limit
- * either side of shut (radians). They match the classic doors: a spring of 0.018 and damping of
- * 0.88 per 60 Hz tick, stopping 0.25 rad short of folding back against the wall.
- */
-const HINGE = Object.freeze({ mass: 12, damping: 7.7, closing_stiffness: 64.8, swing_limit: Math.PI - 0.25 });
 const finite = (value, name) => { if (!Number.isFinite(value)) throw new TypeError(`Map ${name} must be a finite number`); return value; };
 const box = (x, y, w, h) => ({ position: [finite(x, 'x') + finite(w, 'width') / 2, finite(y, 'y') + finite(h, 'height') / 2], collision_shape: { shape_type: 'box', dimensions: [w, h] } });
 
@@ -25540,7 +25736,8 @@ const DEFAULT_KINDS = Object.freeze({ wall: { entity_type: 'static' }, prop: { e
  * walls (cut by door openings), boundary, placements, lights, triggers, rooms (one entry per
  * rectangle), doors (a sliding door is two leaves, an arch none), cloths. `decorate(packet, entry)` may add game data; it must not change ids or roles.
  */
-function buildMapPackets(definition, { templates = {}, decorate = null, prop_types = {} } = {}) {
+function buildMapPackets(definition, { templates = {}, decorate = null, prop_types = {}, door_kinds = {} } = {}) {
+    const kinds = resolveDoorKinds(door_kinds);
     const kind = definition.kind ?? 'interior';
     if (!MAP_KINDS.includes(kind)) throw new TypeError(`Unknown map kind: ${kind}`);
     const entries = [];
@@ -25586,32 +25783,11 @@ function buildMapPackets(definition, { templates = {}, decorate = null, prop_typ
             data: { role: 'room', room_id, ...(rects.length > 1 ? { rect_index: k } : {}), ...fields } }));
     }
 
-    // Doors. A hinged door is a physical leaf on a hinge joint: bodies push it open, a return spring
-    // swings it shut, and it stops just short of folding flat against the wall. Sliding and plain
-    // doors are kinematic leaves the map instance opens by proximity (a sliding door is two leaves).
-    // An arch is an opening with no leaf (it still cuts the wall and links its rooms).
+    // Doors. Each door's `type` names a door kind (default 'plain'): data saying what its leaves are and
+    // how each moves. See doors.mjs. `door_kinds` adds kinds or replaces built-in ones.
     doors.forEach((d, index) => {
-        if (d.type === 'arch') return;
-        const horizontal = d.orientation === 'H', key = `door_${index}`, trigger_position = [d.x + d.w / 2, d.y + d.h / 2];
-        if (d.type === 'sliding') {
-            const length = (horizontal ? d.w : d.h) / 2 - 2, travel = (horizontal ? d.w : d.h) / 2 + 4;
-            for (const side of [-1, 1]) {
-                const position = horizontal ? [d.x + d.w / 2 + side * (length / 2 + 2), d.y + d.h / 2] : [d.x + d.w / 2, d.y + d.h / 2 + side * (length / 2 + 2)];
-                push('doors', index, d, { ...kind_of('door', d.template), position, collision_shape: { shape_type: 'box', dimensions: horizontal ? [length, d.h] : [d.w, length] }, collision_mask: DOOR_MASK,
-                    data: { role: side === -1 ? 'door' : 'door_panel', authored_id: side === -1 ? key : `${key}_right`, door_key: key, panel_version: 2, panel_side: side, trigger_position,
-                        closed_position: position, open_position: [position[0] + (horizontal ? side * travel : 0), position[1] + (horizontal ? 0 : side * travel)], closed_rotation: 0, open_rotation: 0, open: false } });
-            }
-            return;
-        }
-        const hinged = d.type === 'hinged', far = d.hingeSide === 'right' ? -1 : 1;
-        const position = hinged ? (horizontal ? [far > 0 ? d.x : d.x + d.w, d.y + d.h / 2] : [d.x + d.w / 2, far > 0 ? d.y : d.y + d.h]) : trigger_position;
-        const hinge = hinged ? { ...HINGE, ...(d.hinge ?? {}) } : null;
-        push('doors', index, d, { ...kind_of('door', d.template), position,
-            ...(hinged ? { physics_type: 'rigid', mass: hinge.mass, angular_damping: hinge.damping, linear_damping: 0 } : {}),
-            collision_shape: { shape_type: 'box', dimensions: [d.w, d.h], local_position: hinged ? (horizontal ? [far * d.w / 2, 0] : [0, far * d.h / 2]) : [0, 0] }, collision_mask: DOOR_MASK,
-            data: { role: 'door', authored_id: key, hinged, closed_position: position, open_position: hinged ? position : [position[0] + (horizontal ? d.w : 0), position[1] + (horizontal ? 0 : d.h)],
-                closed_rotation: 0, open_rotation: hinged ? Math.PI / 2 : 0, open: false } },
-            hinged ? [{ constraint_type: 'hinge', world_target: [...position], local_anchor_a: [0, 0], target_rotation: 0, min_rotation: -hinge.swing_limit, max_rotation: hinge.swing_limit, spring_stiffness: hinge.closing_stiffness, spring_damping: 0 }] : undefined);
+        const key = `door_${index}`;
+        for (const { packet, joints } of doorLeaves(d, key, doorKind(kinds, d, key), kind_of('door', d.template))) push('doors', index, d, packet, joints);
     });
 
     // Cloths: a hanging strip mesh anchored at its top edge (curtains, banners, laundry).
@@ -25625,14 +25801,15 @@ function buildMapPackets(definition, { templates = {}, decorate = null, prop_typ
             data: { role: c.role ?? 'cloth', authored_id: c.authored_id ?? `${c.role ?? 'cloth'}_${i}`, ...c.data, mesh: { points, edges, anchors: [0, 1] } } });
     });
 
-    return { kind, entries, spawn: definition.spawn ? [...definition.spawn] : null };
+    return { kind, entries, spawn: definition.spawn ? [...definition.spawn] : null, door_kinds: kinds };
 }
 
-return Object.freeze({get HINGE(){return HINGE;},get MAP_KINDS(){return MAP_KINDS;},get DEFAULT_KINDS(){return DEFAULT_KINDS;},get buildMapPackets(){return buildMapPackets;}});
+return Object.freeze({get DOOR_KINDS(){return m140.DOOR_KINDS;},get HINGE(){return m140.HINGE;},get validateDoorKind(){return m140.validateDoorKind;},get MAP_KINDS(){return MAP_KINDS;},get DEFAULT_KINDS(){return DEFAULT_KINDS;},get buildMapPackets(){return buildMapPackets;}});
 })();
 // src/engine/basement/maps/rooms.mjs
-const m141 = (()=>{
+const m142 = (()=>{
 // ===== LV0 BASEMENT =====
+const {resolveDoorKinds,doorKind,leafIds} = m140;
 /**
  * Rooms of one map: which rooms exist, how they connect, how open each connection is right now,
  * and which room each tracked body is in. Room volumes live in the world's one spatial grid (the
@@ -25647,7 +25824,7 @@ const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
 class roomGraph {
     #physics; #map; #rooms = new Map(); #links = []; #adjacent = new Map(); #tracked = new Map(); #listeners = new Set(); #last = null;
     #stats = { lookups: 0, grid_lookups: 0, changes: 0 };
-    constructor(physics, map, definition) {
+    constructor(physics, map, definition, door_kinds = resolveDoorKinds()) {
         this.#physics = physics; this.#map = map;
         for (const [id, room] of Object.entries(definition.rooms ?? {})) {
             const rects = (room.rects ?? [{ x: room.x, y: room.y, w: room.w, h: room.h }]).map(r => ({ x: r.x, y: r.y, w: r.w, h: r.h }));
@@ -25661,7 +25838,12 @@ class roomGraph {
             const entry = { ...link, rooms: [a, b] };
             this.#links.push(entry); this.#adjacent.get(a).push(entry); this.#adjacent.get(b).push(entry);
         };
-        (definition.doors ?? []).forEach((d, i) => { if (d.rooms) add(d.rooms, d.type === 'arch' ? { link_id: `door_${i}`, kind: 'arch', openness: 1 } : { link_id: `door_${i}`, kind: 'door', door_id: `door_${i}` }); });
+        // A door whose kind has no leaves (an arch) is always open; otherwise the link is as open as its most open leaf.
+        (definition.doors ?? []).forEach((d, i) => {
+            if (!d.rooms) return;
+            const key = `door_${i}`, kind = doorKind(door_kinds, d, key);
+            add(d.rooms, kind.leaves.length ? { link_id: key, kind: 'door', door_id: key, leaf_ids: leafIds(key, kind) } : { link_id: key, kind: 'arch', openness: 1 });
+        });
         (definition.room_links ?? []).forEach((l, i) => add(l.rooms, { link_id: l.link_id ?? `link_${i}`, kind: 'opening', openness: clamp01(l.openness ?? 1) }));
     }
 
@@ -25683,16 +25865,21 @@ class roomGraph {
         return null;
     }
 
-    /** 0 (shut) … 1 (wide open) for one link, read from its door's current pose. */
+    /** 0 (shut) … 1 (wide open) for one link: the most open of its door's leaves, each read from its current pose. */
     linkOpenness(link) {
         if (link.kind !== 'door') return link.openness;
-        const door = this.#map.entity(link.door_id);
-        if (!door) return 0;
-        const d = door.data, travel = Math.hypot(d.open_position[0] - d.closed_position[0], d.open_position[1] - d.closed_position[1]);
-        if (travel > 1e-9) return clamp01(Math.hypot(door.position[0] - d.closed_position[0], door.position[1] - d.closed_position[1]) / travel);
-        const turn = Math.abs(d.open_rotation - d.closed_rotation);
-        return turn > 1e-9 ? clamp01(Math.abs((door.rotation ?? 0) - d.closed_rotation) / turn) : (d.open ? 1 : 0);
+        let best = 0;
+        for (const id of link.leaf_ids) {
+            const leaf = this.#map.entity(id);
+            if (!leaf) continue;
+            const d = leaf.data, travel = Math.hypot(d.open_position[0] - d.closed_position[0], d.open_position[1] - d.closed_position[1]), turn = Math.abs(d.open_rotation - d.closed_rotation);
+            const open = travel > 1e-9 ? clamp01(Math.hypot(leaf.position[0] - d.closed_position[0], leaf.position[1] - d.closed_position[1]) / travel)
+                : turn > 1e-9 ? clamp01(Math.abs((leaf.rotation ?? 0) - d.closed_rotation) / turn) : (d.open ? 1 : 0);
+            best = Math.max(best, open);
+        }
+        return best;
     }
+
     /** Rooms joined to `id`: `[{room, link_id, kind, openness}]`. */
     connections(id) { return (this.#adjacent.get(id) ?? []).map(l => ({ room: l.rooms[0] === id ? l.rooms[1] : l.rooms[0], link_id: l.link_id, kind: l.kind, openness: this.linkOpenness(l) })); }
     /** The most open direct link between two rooms (0 if none). */
@@ -25771,11 +25958,11 @@ class roomGraph {
 return Object.freeze({get roomGraph(){return roomGraph;}});
 })();
 // src/engine/basement/maps/system.mjs
-const m140 = (()=>{
+const m141 = (()=>{
 // ===== LV0 BASEMENT =====
 const {BODY_GROUP} = m1;
 const {buildMapPackets} = m139;
-const {roomGraph} = m141;
+const {roomGraph} = m142;
 
 const extentOf = packet => {
     const s = packet.collision_shape ?? packet.render_shape;
@@ -25808,7 +25995,7 @@ class mapInstance {
         }
         for (const entry of this.#entries) if (entry.region === null) this.#create(entry);
         /** Rooms, their links and who is in which (an empty graph when the map has no rooms). */
-        this.rooms = new roomGraph(physics, this, definition);
+        this.rooms = new roomGraph(physics, this, definition, built.door_kinds);
     }
     #regionKey([x, y]) { return `${Math.floor(x / this.#region_size)},${Math.floor(y / this.#region_size)}`; }
     #create(entry) {
@@ -25853,18 +26040,19 @@ class mapInstance {
     /**
      * The map's work for one fixed step, called by the Lobby's runtime (through the level that owns
      * the map): opens each kinematic door while a body of `include_groups` is within its range, by a
-     * timed move (`near_range(door)` gives the range, default 90), then updates room occupancy.
-     * Hinged doors need nothing here: physics swings them and their spring closes them.
+     * timed move of all its sliding leaves (`near_range(door)` gives the range, default 90), then
+     * updates room occupancy. Hinged leaves need nothing here: physics swings them and their spring
+     * closes them.
      */
     updateState({ near_range = () => 90, duration = 0.35, easing = 'smooth', include_groups = BODY_GROUP.CHARACTER } = {}) {
         const panels = new Map();
-        for (const leaf of this.entities('door_panel')) panels.set(leaf.data.door_key, leaf);
+        for (const leaf of this.entities('door_panel')) panels.set(leaf.data.door_key, [...(panels.get(leaf.data.door_key) ?? []), leaf]);
         for (const door of this.entities('door')) {
-            if (door.data.hinged) continue;
+            const sliding = [door, ...(panels.get(door.data.authored_id) ?? [])].filter(leaf => !leaf.data.hinged);
+            if (!sliding.length) continue;
             const near = this.#physics.peruseNearbyEntities(door.data.trigger_position ?? door, { near_range: near_range(door), include_groups, include_ghosts: false }).length > 0;
-            if (near === door.data.open) continue;
-            for (const leaf of [door, panels.get(door.data.authored_id)]) {
-                if (!leaf) continue;
+            if (near === sliding[0].data.open) continue;
+            for (const leaf of sliding) {
                 leaf.data.open = near;
                 this.#physics.motion.moveBodyTo(leaf, { position: near ? leaf.data.open_position : leaf.data.closed_position, rotation: near ? leaf.data.open_rotation : leaf.data.closed_rotation, duration, easing });
             }
@@ -25919,7 +26107,7 @@ const m138 = (()=>{
 
 
 
-return Object.freeze({get buildMapPackets(){return m139.buildMapPackets;},get MAP_KINDS(){return m139.MAP_KINDS;},get DEFAULT_KINDS(){return m139.DEFAULT_KINDS;},get mapInstance(){return m140.mapInstance;},get mapSystem(){return m140.mapSystem;},get roomGraph(){return m141.roomGraph;}});
+return Object.freeze({get buildMapPackets(){return m139.buildMapPackets;},get MAP_KINDS(){return m139.MAP_KINDS;},get DEFAULT_KINDS(){return m139.DEFAULT_KINDS;},get DOOR_KINDS(){return m139.DOOR_KINDS;},get HINGE(){return m139.HINGE;},get validateDoorKind(){return m139.validateDoorKind;},get mapInstance(){return m141.mapInstance;},get mapSystem(){return m141.mapSystem;},get roomGraph(){return m142.roomGraph;}});
 })();
 // src/game/levels/apartment-definition.mjs
 const m137 = (()=>{
@@ -25992,7 +26180,7 @@ function resolveApartmentDyer(game_db){
 return Object.freeze({get apartmentMapDefinition(){return apartmentMapDefinition;},get APARTMENT_MAP_OPTIONS(){return APARTMENT_MAP_OPTIONS;},get resolveApartmentDefinition(){return resolveApartmentDefinition;},get resolveApartmentDyer(){return resolveApartmentDyer;}});
 })();
 // src/game/boot/game-actor-factory.mjs
-const m142 = (()=>{
+const m143 = (()=>{
 const {createDemonessAppearance} = m48;
 const {createHunterAppearance} = m56;
 const {validateAttackState} = m101;
@@ -26040,7 +26228,7 @@ const {createApartmentAssetLibrary} = m135;
 const {resolveApartmentDefinition,resolveApartmentDyer,APARTMENT_MAP_OPTIONS} = m137;
 const {mapInstance} = m138;
 const {NPC,rosterRecord} = m125;
-const {createActorPacket} = m142;
+const {createActorPacket} = m143;
 const {gameProp} = m1;
 class ApartmentDoor extends gameProp { static entity_type = 'df_apartment_door'; }
 
@@ -26120,7 +26308,7 @@ class ApartmentLevel {
 return Object.freeze({get ApartmentLevel(){return ApartmentLevel;}});
 })();
 // src/engine/lobby/level-lobby.mjs
-const m144 = (()=>{
+const m145 = (()=>{
 // ===== LV1 LOBBY =====
 // The engine's game loop. The Lobby keeps the clock and nothing else: it knows when a frame is due,
 // how many fixed simulation steps that frame owes, and how far the drawn frame sits between two steps.
@@ -26257,7 +26445,7 @@ class levelLobby {
 return Object.freeze({get levelLobby(){return levelLobby;}});
 })();
 // src/engine/lobby/runtime/game-level.mjs
-const m145 = (()=>{
+const m146 = (()=>{
 // ===== LV1 LOBBY =====
 /** Content/lifecycle contract. A level never owns a world, clock or collision solver. */
 class gameLevel {
@@ -26278,7 +26466,7 @@ class gameLevel {
 return Object.freeze({get gameLevel(){return gameLevel;}});
 })();
 // src/engine/basement/controls/values.mjs
-const m148 = (()=>{
+const m149 = (()=>{
 // ===== LV0 BASEMENT =====
 const TAP = 0;
 const DOUBLETAP = 1;
@@ -26303,7 +26491,7 @@ function radialStick(value, dead_zone = 0.15) {
 return Object.freeze({get TAP(){return TAP;},get DOUBLETAP(){return DOUBLETAP;},get HELD(){return HELD;},get PRESS(){return PRESS;},get REPEAT(){return REPEAT;},get RELEASE(){return RELEASE;},get cleanupAll(){return cleanupAll;},get radialStick(){return radialStick;}});
 })();
 // src/engine/basement/controls/touch-stick.mjs
-const m150 = (()=>{
+const m151 = (()=>{
 // ===== LV0 BASEMENT =====
 class touchStick {
     constructor(system, name, packet) {
@@ -26403,10 +26591,10 @@ class touchStick {
 return Object.freeze({get touchStick(){return touchStick;}});
 })();
 // src/engine/basement/controls/devices.mjs
-const m149 = (()=>{
+const m150 = (()=>{
 // ===== LV0 BASEMENT =====
-const {touchStick} = m150;
-const {radialStick,cleanupAll} = m148;
+const {touchStick} = m151;
+const {radialStick,cleanupAll} = m149;
 
 /** Device state uses the terminology from the original Python input instances. */
 class inputInstance {
@@ -26525,11 +26713,11 @@ class gamepadInstance extends inputInstance {
 return Object.freeze({get inputInstance(){return inputInstance;},get keyboardInstance(){return keyboardInstance;},get mouseInstance(){return mouseInstance;},get touchInstance(){return touchInstance;},get gamepadInstance(){return gamepadInstance;}});
 })();
 // src/engine/basement/controls/system.mjs
-const m147 = (()=>{
+const m148 = (()=>{
 // ===== LV0 BASEMENT =====
-const {TAP,DOUBLETAP,HELD,PRESS,REPEAT,RELEASE} = m148;
-const {radialStick,cleanupAll} = m148;
-const {keyboardInstance,mouseInstance,touchInstance,gamepadInstance} = m149;
+const {TAP,DOUBLETAP,HELD,PRESS,REPEAT,RELEASE} = m149;
+const {radialStick,cleanupAll} = m149;
+const {keyboardInstance,mouseInstance,touchInstance,gamepadInstance} = m150;
 
 class controlSystem {
     #listeners = new Set();
@@ -26767,17 +26955,17 @@ class controlSystem {
 return Object.freeze({get controlSystem(){return controlSystem;}});
 })();
 // src/engine/basement/controls/index.mjs
-const m146 = (()=>{
+const m147 = (()=>{
 // ===== LV0 BASEMENT =====
 
 
 
 
 
-return Object.freeze({get controlSystem(){return m147.controlSystem;},get controlsSystem(){return m147.controlSystem;},get inputInstance(){return m149.inputInstance;},get keyboardInstance(){return m149.keyboardInstance;},get mouseInstance(){return m149.mouseInstance;},get touchInstance(){return m149.touchInstance;},get gamepadInstance(){return m149.gamepadInstance;},get touchStick(){return m150.touchStick;},get TAP(){return m148.TAP;},get DOUBLETAP(){return m148.DOUBLETAP;},get HELD(){return m148.HELD;},get PRESS(){return m148.PRESS;},get REPEAT(){return m148.REPEAT;},get RELEASE(){return m148.RELEASE;}});
+return Object.freeze({get controlSystem(){return m148.controlSystem;},get controlsSystem(){return m148.controlSystem;},get inputInstance(){return m150.inputInstance;},get keyboardInstance(){return m150.keyboardInstance;},get mouseInstance(){return m150.mouseInstance;},get touchInstance(){return m150.touchInstance;},get gamepadInstance(){return m150.gamepadInstance;},get touchStick(){return m151.touchStick;},get TAP(){return m149.TAP;},get DOUBLETAP(){return m149.DOUBLETAP;},get HELD(){return m149.HELD;},get PRESS(){return m149.PRESS;},get REPEAT(){return m149.REPEAT;},get RELEASE(){return m149.RELEASE;}});
 })();
 // src/engine/basement/rendering/values.mjs
-const m153 = (()=>{
+const m154 = (()=>{
 // ===== LV0 BASEMENT =====
 function finite(value,name,min=-Infinity){if(!Number.isFinite(value)||value<min)throw new TypeError(`Invalid ${name}`);return value;}
 function vector(value,name='vector',out=[]){if(!Array.isArray(value)||value.length!==2)throw new TypeError(`Invalid ${name}`);out[0]=finite(value[0],name);out[1]=finite(value[1],name);return out;}
@@ -26795,9 +26983,9 @@ const BLENDS = Object.freeze({normal:'source-over',add:'lighter',multiply:'multi
 return Object.freeze({get finite(){return finite;},get vector(){return vector;},get identifier(){return identifier;},get matrix(){return matrix;},get inverse(){return inverse;},get point(){return point;},get transform(){return transform;},get viewport(){return viewport;},get freezeData(){return freezeData;},get color(){return color;},get BLENDS(){return BLENDS;}});
 })();
 // src/engine/basement/rendering/camera.mjs
-const m152 = (()=>{
+const m153 = (()=>{
 // ===== LV0 BASEMENT =====
-const {finite,vector,viewport,inverse,point,freezeData} = m153;
+const {finite,vector,viewport,inverse,point,freezeData} = m154;
 
 /** View state only. Following reads native poses; this class never moves a body. */
 class cameraSystem {
@@ -26851,9 +27039,9 @@ class cameraSystem {
 return Object.freeze({get cameraSystem(){return cameraSystem;}});
 })();
 // src/engine/basement/rendering/packets.mjs
-const m155 = (()=>{
+const m156 = (()=>{
 // ===== LV0 BASEMENT =====
-const {finite,vector,matrix,inverse,transform,color,identifier,BLENDS} = m153;
+const {finite,vector,matrix,inverse,transform,color,identifier,BLENDS} = m154;
 
 const geometryBuffers = new WeakMap();
 
@@ -26923,10 +27111,10 @@ function requirements(draw,resolve,result=[]){
 return Object.freeze({get geometry(){return geometry;},get material(){return material;},get packet(){return packet;},get requirements(){return requirements;}});
 })();
 // src/engine/basement/rendering/frame.mjs
-const m154 = (()=>{
+const m155 = (()=>{
 // ===== LV0 BASEMENT =====
-const {packet} = m155;
-const {color,finite,freezeData} = m153;
+const {packet} = m156;
+const {color,finite,freezeData} = m154;
 
 /** Reused command buffers. Producers submit data; a backend borrows a completed frame. */
 class renderFrame {
@@ -26964,11 +27152,11 @@ class renderFrame {
 return Object.freeze({get renderFrame(){return renderFrame;}});
 })();
 // src/engine/basement/rendering/system.mjs
-const m156 = (()=>{
+const m157 = (()=>{
 // ===== LV0 BASEMENT =====
-const {renderFrame} = m154;
-const {geometry,material,requirements} = m155;
-const {finite,identifier,freezeData} = m153;
+const {renderFrame} = m155;
+const {geometry,material,requirements} = m156;
+const {finite,identifier,freezeData} = m154;
 
 function normalizeResource(description){
     if(!description||typeof description!=='object')throw new TypeError('A data resource descriptor is required');
@@ -27057,10 +27245,10 @@ class renderSystem {
 return Object.freeze({get renderSystem(){return renderSystem;}});
 })();
 // src/engine/basement/rendering/canvas.mjs
-const m157 = (()=>{
+const m158 = (()=>{
 // ===== LV0 BASEMENT =====
-const {renderFrame} = m154;
-const {BLENDS} = m153;
+const {renderFrame} = m155;
+const {BLENDS} = m154;
 
 function createSurface(width,height){
     if(typeof OffscreenCanvas!=='undefined')return new OffscreenCanvas(width,height);
@@ -27182,23 +27370,23 @@ class canvasRenderer {
 return Object.freeze({get canvasRenderer(){return canvasRenderer;}});
 })();
 // src/engine/basement/rendering/index.mjs
-const m151 = (()=>{
+const m152 = (()=>{
 // ===== LV0 BASEMENT =====
 
 
 
 
 
-return Object.freeze({get cameraSystem(){return m152.cameraSystem;},get renderFrame(){return m154.renderFrame;},get renderSystem(){return m156.renderSystem;},get canvasRenderer(){return m157.canvasRenderer;}});
+return Object.freeze({get cameraSystem(){return m153.cameraSystem;},get renderFrame(){return m155.renderFrame;},get renderSystem(){return m157.renderSystem;},get canvasRenderer(){return m158.canvasRenderer;}});
 })();
 // src/engine/lobby/runtime/game-engine.mjs
-const m143 = (()=>{
+const m144 = (()=>{
 // ===== LV1 LOBBY =====
 const {physicsSystem} = m1;
-const {levelLobby} = m144;
-const {gameLevel} = m145;
-const {controlSystem} = m146;
-const {cameraSystem,renderSystem} = m151;
+const {levelLobby} = m145;
+const {gameLevel} = m146;
+const {controlSystem} = m147;
+const {cameraSystem,renderSystem} = m152;
 
 const hooks = ['attach', 'detach', 'beforePhysics', 'afterPhysics', 'render', 'levelEntered', 'levelLeaving','gameplayPaused'];
 function synchronous(fn, receiver, args) {
@@ -27453,7 +27641,7 @@ class gameEngine {
 
 return Object.freeze({get gameEngine(){return gameEngine;}});
 })();
-const m161 = Object.freeze({default:{
+const m162 = Object.freeze({default:{
   "slim": {
     "w": 0.88,
     "d": 0.92,
@@ -27484,7 +27672,7 @@ const m161 = Object.freeze({default:{
     "hip": 1.1
   }
 }});
-const m162 = Object.freeze({default:{
+const m163 = Object.freeze({default:{
   "female": {
     "sh": 10.5,
     "del": 4,
@@ -27611,9 +27799,9 @@ const m162 = Object.freeze({default:{
   }
 }});
 // src/game/data/humanoid/rig-assets.mjs
-const m160 = (()=>{
-const builds = m161.default;
-const bodyCanon = m162.default;
+const m161 = (()=>{
+const builds = m162.default;
+const bodyCanon = m163.default;
 const {rigDefinition,animationClip} = m1;
 const immutable=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))immutable(child);Object.freeze(value);}return value;};
 const humanoidBodyCanon=immutable(bodyCanon);
@@ -27660,8 +27848,8 @@ function getHumanoidRigAssets(gender='androgynous',{build=null,height=1}={}){
 return Object.freeze({get humanoidBodyCanon(){return humanoidBodyCanon;},get humanoidBuilds(){return humanoidBuilds;},get getHumanoidRigAssets(){return getHumanoidRigAssets;}});
 })();
 // src/game/mechanics/animation/humanoid-system.mjs
-const m159 = (()=>{
-const {getHumanoidRigAssets} = m160;
+const m160 = (()=>{
+const {getHumanoidRigAssets} = m161;
 const humanoids=new Set(['df_player','df_npc','df_ganger','df_hunter','df_demoness']);
 /** Game policy chooses authored poses; Basement resolves and advances every joint. */
 class humanoidSystem {
@@ -27709,7 +27897,7 @@ function humanoidPresentation(actor,blend=1){
 return Object.freeze({get humanoidSystem(){return humanoidSystem;},get humanoidPresentation(){return humanoidPresentation;}});
 })();
 // src/game/mechanics/encounters/encounter-system.mjs
-const m163 = (()=>{
+const m164 = (()=>{
 const {BossEffect} = m109;
 const {BODY_GROUP} = m1;
 const {jsonCopy} = m40;
@@ -27790,7 +27978,7 @@ class encounterSystem{
 return Object.freeze({get encounterSystem(){return encounterSystem;}});
 })();
 // src/game/data/weapon-models.mjs
-const m166 = (()=>{
+const m167 = (()=>{
 /* =====================================================================
    WEAPON MODELS — every gun as data: parts in the gun's own frame (+x down
    the barrel, the grip hand near 0,0, +y to the holder's right), each in a
@@ -28016,8 +28204,8 @@ function weaponModel(id) {
 return Object.freeze({get GUN_MATERIALS(){return GUN_MATERIALS;},get WEAPON_MODELS(){return WEAPON_MODELS;},get LASER_MODULE(){return LASER_MODULE;},get weaponModel(){return weaponModel;}});
 })();
 // src/game/data/combat-profiles.mjs
-const m165 = (()=>{
-const {weaponModel} = m166;
+const m166 = (()=>{
+const {weaponModel} = m167;
 /** Shape authoring belongs with the visual assets. Runtime collision calculations stay in Basement. */
 function getCombatProfile(definition_id){
  const model=weaponModel(definition_id),edge=model.edge??[19.4,2.6];
@@ -28027,9 +28215,9 @@ function getCombatProfile(definition_id){
 return Object.freeze({get getCombatProfile(){return getCombatProfile;}});
 })();
 // src/game/mechanics/attacks/attack-system.mjs
-const m164 = (()=>{
+const m165 = (()=>{
 const attackRules = m64.default;
-const {getCombatProfile} = m165;
+const {getCombatProfile} = m166;
 const {prepareMountedAttack,mountedAttackState,validateMountedAttack} = m114;
 const combatRules = m63.default;
 const {gameCharacter} = m1;
@@ -28151,7 +28339,7 @@ class attackSystem{
 return Object.freeze({get attackSystem(){return attackSystem;}});
 })();
 // src/game/mechanics/abilities/ability-system.mjs
-const m167 = (()=>{
+const m168 = (()=>{
 const {beginPattern,advancePattern,clearPattern} = m110;
 const {beginTimedAction,advanceTimedAction,hitGrapple,clearTimedAction} = m112;
 const {beginBurst,advanceBurst} = m113;
@@ -28213,7 +28401,7 @@ class abilitySystem{
 return Object.freeze({get abilitySystem(){return abilitySystem;}});
 })();
 // src/game/mechanics/actors/actor-system.mjs
-const m168 = (()=>{
+const m169 = (()=>{
 const {Demoness} = m97;
 const {Warden} = m107;
 const {Drone} = m117;
@@ -28225,7 +28413,7 @@ const {NPC} = m125;
 const {Hunter} = m98;
 const {Ganger} = m99;
 const {BODY_GROUP} = m1;
-const {createActorPacket} = m142;
+const {createActorPacket} = m143;
 
 /** Registered actor lifetimes and policy updates in the existing fixed step. No second world or index. */
 class actorSystem{
@@ -28283,7 +28471,7 @@ class actorSystem{
 
 return Object.freeze({get actorSystem(){return actorSystem;}});
 })();
-const m169 = Object.freeze({default:{
+const m170 = Object.freeze({default:{
   "keymap": {
     "move_up":["w","ArrowUp"],"move_down":["s","ArrowDown"],"move_left":["a","ArrowLeft"],"move_right":["d","ArrowRight"],
     "fire":["mouseLeft","space","gamepadRTrigger","touchFire"],
@@ -28297,7 +28485,7 @@ const m169 = Object.freeze({default:{
   }
 }});
 // src/game/mechanics/game-session.mjs
-const m170 = (()=>{
+const m171 = (()=>{
 const {itemSystem} = m104;
 const {createItemCatalog} = m58;
 const itemRules = m105.default;
@@ -28374,7 +28562,7 @@ class gameSession {
 return Object.freeze({get gameSession(){return gameSession;}});
 })();
 // src/game/mechanics/player-state-system.mjs
-const m171 = (()=>{
+const m172 = (()=>{
 const {nonnegative,jsonCopy} = m40;
 
 /** Game rules only. The native entity/body remains the sole owner of physical state. */
@@ -28430,7 +28618,7 @@ class PlayerStateSystem {
 return Object.freeze({get PlayerStateSystem(){return PlayerStateSystem;}});
 })();
 // src/game/mechanics/player-control-system.mjs
-const m172 = (()=>{
+const m173 = (()=>{
 /** Turns input terminology into native motor requests and gameplay intents. No physical math. */
 class PlayerControlSystem {
     #session; #state; #blocked = new Set(); #placement; #context = null;
@@ -28470,7 +28658,7 @@ class PlayerControlSystem {
 return Object.freeze({get PlayerControlSystem(){return PlayerControlSystem;}});
 })();
 // src/game/mechanics/combat/combat-system.mjs
-const m173 = (()=>{
+const m174 = (()=>{
 const rules = m63.default;
 const {BODY_GROUP} = m1;
 const {nonnegative,jsonCopy} = m40;
@@ -28540,7 +28728,7 @@ class combatSystem{
 return Object.freeze({get isCombatDead(){return isCombatDead;},get combatSystem(){return combatSystem;}});
 })();
 // src/game/mechanics/combat/melee-poses.mjs
-const m175 = (()=>{
+const m176 = (()=>{
 // Authored local animation poses, shared by presentation and native swept queries.
 const rules = m63.default;
 const MELEE_SWING={duration:rules.blade.duration_seconds,windup:rules.blade.windup_seconds,cutEnd:rules.blade.cut_end_seconds};
@@ -28616,12 +28804,12 @@ function sampleMeleeSwing(age, side, out = {}, secs = MELEE_SWING.duration, styl
 return Object.freeze({get MELEE_SWING(){return MELEE_SWING;},get WIDE_SWING(){return WIDE_SWING;},get sampleWideSwing(){return sampleWideSwing;},get wideGrip(){return wideGrip;},get swingPhases(){return swingPhases;},get sampleMeleeSwing(){return sampleMeleeSwing;}});
 })();
 // src/game/mechanics/combat/weapon-system.mjs
-const m174 = (()=>{
+const m175 = (()=>{
 const rules = m63.default;
-const {getCombatProfile} = m165;
+const {getCombatProfile} = m166;
 const {BODY_GROUP} = m1;
-const {sampleMeleeSwing,swingPhases} = m175;
-const {isCombatDead} = m173;
+const {sampleMeleeSwing,swingPhases} = m176;
+const {isCombatDead} = m174;
 const {jsonCopy,nonnegative} = m40;
 
 const stateFor=(player,settings=rules)=>player.data.weapon_state??={format_version:1,elapsed:0,cooldown:0,holstered:false,drawn_at:null,draw_shot_used:false,quick_draw:null,punch_side:'right',haymaker:false,combo:0,last_punch_at:-99,swing:null,side:1,shield:{charge:settings.mirror.shield,spent:false,since_hit:999}};
@@ -28793,7 +28981,7 @@ class weaponSystem{
 return Object.freeze({get weaponSystem(){return weaponSystem;}});
 })();
 // src/game/mechanics/items/loot-system.mjs
-const m176 = (()=>{
+const m177 = (()=>{
 const {WorldLoot} = m127;
 const rules = m63.default;
 const {BODY_GROUP} = m1;
@@ -28847,24 +29035,24 @@ class lootSystem{
 return Object.freeze({get lootSystem(){return lootSystem;}});
 })();
 // src/game/boot/game-runtime.mjs
-const m158 = (()=>{
-const {humanoidSystem} = m159;
-const {encounterSystem} = m163;
-const {attackSystem} = m164;
-const {abilitySystem} = m167;
-const {actorSystem} = m168;
+const m159 = (()=>{
+const {humanoidSystem} = m160;
+const {encounterSystem} = m164;
+const {attackSystem} = m165;
+const {abilitySystem} = m168;
+const {actorSystem} = m169;
 const {registerGameEntityTypes} = m116;
-const {gameEngine} = m143;
+const {gameEngine} = m144;
 const {createApartmentAssetLibrary} = m135;
-const controlProfile = m169.default;
-const {gameSession} = m170;
-const {PlayerStateSystem} = m171;
-const {PlayerControlSystem} = m172;
+const controlProfile = m170.default;
+const {gameSession} = m171;
+const {PlayerStateSystem} = m172;
+const {PlayerControlSystem} = m173;
 const playerRules = m66.default;
-const {combatSystem} = m173;
-const {weaponSystem} = m174;
-const {lootSystem} = m176;
-const {canvasRenderer} = m151;
+const {combatSystem} = m174;
+const {weaponSystem} = m175;
+const {lootSystem} = m177;
+const {canvasRenderer} = m152;
 
 /** Explicit game composition. Importing this file never starts a second runtime. */
 function createGameRuntime({ game_db, surface, session_state, player, weapon_policy={}, combat_policy={}, actor_policy={}, ability_policy={}, ...options } = {}) {
@@ -28901,8 +29089,8 @@ function createGameRuntime({ game_db, surface, session_state, player, weapon_pol
 return Object.freeze({get createGameRuntime(){return createGameRuntime;}});
 })();
 // src/game/presentation/weapon-appearance.mjs
-const m177 = (()=>{
-const {GUN_MATERIALS,WEAPON_MODELS,LASER_MODULE,weaponModel} = m166;
+const m178 = (()=>{
+const {GUN_MATERIALS,WEAPON_MODELS,LASER_MODULE,weaponModel} = m167;
 
 const polygon=points=>({type:'path',commands:[...points.map(([x,y],i)=>[i?'line':'move',x,y]),['close']]});
 function shape(part){
@@ -28985,7 +29173,7 @@ class weaponAppearance {
 return Object.freeze({get weaponAppearance(){return weaponAppearance;}});
 })();
 // src/game/data/game-combat.mjs
-const m178 = (()=>{
+const m179 = (()=>{
 const data = m63.default;
 const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
 const COMBAT_RULES=freeze(structuredClone(data));
@@ -28993,8 +29181,8 @@ const COMBAT_RULES=freeze(structuredClone(data));
 return Object.freeze({get COMBAT_RULES(){return COMBAT_RULES;}});
 })();
 // src/game/presentation/art-packets.mjs
-const m180 = (()=>{
-const {transform,inverse} = m153;
+const m181 = (()=>{
+const {transform,inverse} = m154;
 const identity=()=>[1,0,0,1,0,0];
 const multiply=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
 const geometry=commands=>Array.isArray(commands)?{type:'path',commands:commands.map(command=>[...command])}:structuredClone(commands);
@@ -29020,9 +29208,9 @@ function groundShadow(scene,x,y,rx,ry){scene.enter({position:[x,y],scale:[rx,ry]
 return Object.freeze({get ellipse(){return ellipse;},get circle(){return circle;},get linear(){return linear;},get radial(){return radial;},get artScene(){return artScene;},get glow(){return glow;},get groundShadow(){return groundShadow;}});
 })();
 // src/game/presentation/drone.mjs
-const m179 = (()=>{
+const m180 = (()=>{
 const enemies = m49.default;
-const {artScene,circle,ellipse,radial,glow} = m180;
+const {artScene,circle,ellipse,radial,glow} = m181;
 const DRONE=enemies.drone;
 function droneLift(state){return DRONE.HOVER_PX+Math.sin(state.hoverOffset)*3+state.alt*240;}
 function droneArmPose(diving,stuck,s){
@@ -29203,7 +29391,7 @@ return Object.assign({},{x:pose.position[0],y:pose.position[1],angle:pose.rotati
 return Object.freeze({get droneLift(){return droneLift;},get droneArmPose(){return droneArmPose;},get createDronePackets(){return createDronePackets;},get dronePresentation(){return dronePresentation;}});
 })();
 // src/game/presentation/demoness.mjs
-const m181 = (()=>{
+const m182 = (()=>{
 const enemies = m49.default;
 const DUEL=enemies.duel;
 /** Retained Canvas art over a detached record; body art is supplied by the host. */
@@ -29268,7 +29456,7 @@ function demonessPresentation(entity,blend=1){const pose=entity.getRenderState(b
 return Object.freeze({get demonessAppearance(){return demonessAppearance;},get demonessPresentation(){return demonessPresentation;}});
 })();
 // src/game/presentation/boss-effects.mjs
-const m182 = (()=>{
+const m183 = (()=>{
 const enemies = m49.default;
 const HAZARD=enemies.hazards;
 const bossEffectAppearance={
@@ -29406,8 +29594,8 @@ function bossEffectPresentation(effects,clock){return effects.filter(effect=>!ef
 return Object.freeze({get bossEffectAppearance(){return bossEffectAppearance;},get bossEffectPresentation(){return bossEffectPresentation;}});
 })();
 // src/game/presentation/velvet-cat.mjs
-const m183 = (()=>{
-const {artScene,circle,ellipse,radial,linear,groundShadow} = m180;
+const m184 = (()=>{
+const {artScene,circle,ellipse,radial,linear,groundShadow} = m181;
 const {velvetCatAnimation} = m119;
 const {VELVET_CAT_PALETTES,VELVET_T,VELVET_PROFILES,VELVET_TAIL_SEGS} = m120;
 /** Renderer-neutral feline geometry/material packets over detached animation state. */
@@ -29752,7 +29940,7 @@ function createVelvetCatPackets(state,{pass='body',darkness=.8}={}){if(!['body',
 return Object.freeze({get createVelvetCatArt(){return createVelvetCatArt;},get createVelvetEyePackets(){return createVelvetEyePackets;},get createVelvetCatPackets(){return createVelvetCatPackets;}});
 })();
 // src/game/data/road-navigation.mjs
-const m184 = (()=>{
+const m185 = (()=>{
 /**
  * The city's lane network as Basement navigation road data.
  *
@@ -29884,7 +30072,7 @@ const m0 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m40.assetLibrary;},get createGameAssetLibrary(){return m47.createGameAssetLibrary;},get resolveMapLayout(){return m69.resolveMapLayout;},get resolvePlacement(){return m69.resolvePlacement;},get isMovableProp(){return m69.isMovableProp;},get mapHost(){return m69.mapHost;},get createMapLibraries(){return m69.createMapLibraries;},get PROP_TYPES(){return m69.PROP_TYPES;},get MAP_IDS(){return m69.MAP_IDS;},get ApartmentLevel(){return m95.ApartmentLevel;},get APARTMENT_RULES(){return m135.APARTMENT_RULES;},get gameEngine(){return m143.gameEngine;},get gameLevel(){return m145.gameLevel;},get levelLobby(){return m144.levelLobby;},get createGameRuntime(){return m158.createGameRuntime;},get controlSystem(){return m146.controlSystem;},get controlsSystem(){return m146.controlsSystem;},get inputInstance(){return m146.inputInstance;},get keyboardInstance(){return m146.keyboardInstance;},get mouseInstance(){return m146.mouseInstance;},get touchInstance(){return m146.touchInstance;},get touchStick(){return m146.touchStick;},get gamepadInstance(){return m146.gamepadInstance;},get TAP(){return m146.TAP;},get DOUBLETAP(){return m146.DOUBLETAP;},get HELD(){return m146.HELD;},get PRESS(){return m146.PRESS;},get REPEAT(){return m146.REPEAT;},get RELEASE(){return m146.RELEASE;},get renderSystem(){return m151.renderSystem;},get renderFrame(){return m151.renderFrame;},get canvasRenderer(){return m151.canvasRenderer;},get cameraSystem(){return m151.cameraSystem;},get gameSession(){return m170.gameSession;},get PlayerStateSystem(){return m171.PlayerStateSystem;},get PlayerControlSystem(){return m172.PlayerControlSystem;},get Player(){return m122.Player;},get playerVitals(){return m123.playerVitals;},get itemSystem(){return m104.itemSystem;},get createItemCatalog(){return m58.createItemCatalog;},get GUN_MATERIALS(){return m166.GUN_MATERIALS;},get WEAPON_MODELS(){return m166.WEAPON_MODELS;},get LASER_MODULE(){return m166.LASER_MODULE;},get weaponModel(){return m166.weaponModel;},get weaponAppearance(){return m177.weaponAppearance;},get combatSystem(){return m173.combatSystem;},get weaponSystem(){return m174.weaponSystem;},get lootSystem(){return m176.lootSystem;},get WorldLoot(){return m127.WorldLoot;},get MELEE_SWING(){return m175.MELEE_SWING;},get WIDE_SWING(){return m175.WIDE_SWING;},get sampleMeleeSwing(){return m175.sampleMeleeSwing;},get sampleWideSwing(){return m175.sampleWideSwing;},get swingPhases(){return m175.swingPhases;},get wideGrip(){return m175.wideGrip;},get COMBAT_RULES(){return m178.COMBAT_RULES;},get registerGameEntityTypes(){return m116.registerGameEntityTypes;},get actorVitals(){return m102.actorVitals;},get gameActor(){return m100.gameActor;},get NPC(){return m125.NPC;},get rosterRecord(){return m125.rosterRecord;},get ROSTER_FIELDS(){return m125.ROSTER_FIELDS;},get Ganger(){return m99.Ganger;},get actorSystem(){return m168.actorSystem;},get actorItems(){return m103.actorItems;},get restoreActorItems(){return m103.restoreActorItems;},get resolveEmoteLines(){return m126.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m126.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m115.abilityLoadout;},get actorAbilities(){return m115.actorAbilities;},get importActorAbilities(){return m115.importActorAbilities;},get abilitySystem(){return m167.abilitySystem;},get createAbilityCatalog(){return m60.createAbilityCatalog;},get attackRegistry(){return m101.attackRegistry;},get validateAttackState(){return m101.validateAttackState;},get attackSystem(){return m164.attackSystem;},get createAttackCatalog(){return m57.createAttackCatalog;},get validateMountedAttack(){return m114.validateMountedAttack;},get TrafficVehicle(){return m128.TrafficVehicle;},get createGameVehicle(){return m128.createGameVehicle;},get Hunter(){return m98.Hunter;},get createHunterAppearance(){return m56.createHunterAppearance;},get Marionette(){return m121.Marionette;},get MARIONETTE_RULES(){return m54.MARIONETTE_RULES;},get validateAbilityAction(){return m111.validateAbilityAction;},get GatlingGunner(){return m108.GatlingGunner;},get Drone(){return m117.Drone;},get VelvetCat(){return m118.VelvetCat;},get velvetCatAnimation(){return m119.velvetCatAnimation;},get createVelvetAnimation(){return m119.createVelvetAnimation;},get velvetPresentation(){return m119.velvetPresentation;},get droneLift(){return m179.droneLift;},get droneArmPose(){return m179.droneArmPose;},get dronePresentation(){return m179.dronePresentation;},get VELVET_CAT_PALETTES(){return m120.VELVET_CAT_PALETTES;},get VELVET_T(){return m120.VELVET_T;},get VELVET_PROFILES(){return m120.VELVET_PROFILES;},get VELVET_GAITS(){return m120.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m120.VELVET_TAIL_SEGS;},get Demoness(){return m97.Demoness;},get Warden(){return m107.Warden;},get Vesper(){return m107.Vesper;},get Matins(){return m107.Matins;},get Compline(){return m107.Compline;},get BossEffect(){return m109.BossEffect;},get encounterSystem(){return m163.encounterSystem;},get createBossAbilities(){return m48.createBossAbilities;},get createDemonessAppearance(){return m48.createDemonessAppearance;},get demonessAppearance(){return m181.demonessAppearance;},get demonessPresentation(){return m181.demonessPresentation;},get bossEffectAppearance(){return m182.bossEffectAppearance;},get bossEffectPresentation(){return m182.bossEffectPresentation;},get validateBossRecord(){return m96.validateBossRecord;},get createDronePackets(){return m179.createDronePackets;},get createVelvetCatArt(){return m183.createVelvetCatArt;},get createVelvetCatPackets(){return m183.createVelvetCatPackets;},get createVelvetEyePackets(){return m183.createVelvetEyePackets;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m159.humanoidSystem;},get humanoidPresentation(){return m159.humanoidPresentation;},get humanoidBodyCanon(){return m160.humanoidBodyCanon;},get humanoidBuilds(){return m160.humanoidBuilds;},get getHumanoidRigAssets(){return m160.getHumanoidRigAssets;},get roadNavigationData(){return m184.roadNavigationData;},get loadRoadNavigation(){return m184.loadRoadNavigation;}});
+return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m40.assetLibrary;},get createGameAssetLibrary(){return m47.createGameAssetLibrary;},get resolveMapLayout(){return m69.resolveMapLayout;},get resolvePlacement(){return m69.resolvePlacement;},get isMovableProp(){return m69.isMovableProp;},get mapHost(){return m69.mapHost;},get createMapLibraries(){return m69.createMapLibraries;},get PROP_TYPES(){return m69.PROP_TYPES;},get MAP_IDS(){return m69.MAP_IDS;},get ApartmentLevel(){return m95.ApartmentLevel;},get APARTMENT_RULES(){return m135.APARTMENT_RULES;},get gameEngine(){return m144.gameEngine;},get gameLevel(){return m146.gameLevel;},get levelLobby(){return m145.levelLobby;},get createGameRuntime(){return m159.createGameRuntime;},get controlSystem(){return m147.controlSystem;},get controlsSystem(){return m147.controlsSystem;},get inputInstance(){return m147.inputInstance;},get keyboardInstance(){return m147.keyboardInstance;},get mouseInstance(){return m147.mouseInstance;},get touchInstance(){return m147.touchInstance;},get touchStick(){return m147.touchStick;},get gamepadInstance(){return m147.gamepadInstance;},get TAP(){return m147.TAP;},get DOUBLETAP(){return m147.DOUBLETAP;},get HELD(){return m147.HELD;},get PRESS(){return m147.PRESS;},get REPEAT(){return m147.REPEAT;},get RELEASE(){return m147.RELEASE;},get renderSystem(){return m152.renderSystem;},get renderFrame(){return m152.renderFrame;},get canvasRenderer(){return m152.canvasRenderer;},get cameraSystem(){return m152.cameraSystem;},get gameSession(){return m171.gameSession;},get PlayerStateSystem(){return m172.PlayerStateSystem;},get PlayerControlSystem(){return m173.PlayerControlSystem;},get Player(){return m122.Player;},get playerVitals(){return m123.playerVitals;},get itemSystem(){return m104.itemSystem;},get createItemCatalog(){return m58.createItemCatalog;},get GUN_MATERIALS(){return m167.GUN_MATERIALS;},get WEAPON_MODELS(){return m167.WEAPON_MODELS;},get LASER_MODULE(){return m167.LASER_MODULE;},get weaponModel(){return m167.weaponModel;},get weaponAppearance(){return m178.weaponAppearance;},get combatSystem(){return m174.combatSystem;},get weaponSystem(){return m175.weaponSystem;},get lootSystem(){return m177.lootSystem;},get WorldLoot(){return m127.WorldLoot;},get MELEE_SWING(){return m176.MELEE_SWING;},get WIDE_SWING(){return m176.WIDE_SWING;},get sampleMeleeSwing(){return m176.sampleMeleeSwing;},get sampleWideSwing(){return m176.sampleWideSwing;},get swingPhases(){return m176.swingPhases;},get wideGrip(){return m176.wideGrip;},get COMBAT_RULES(){return m179.COMBAT_RULES;},get registerGameEntityTypes(){return m116.registerGameEntityTypes;},get actorVitals(){return m102.actorVitals;},get gameActor(){return m100.gameActor;},get NPC(){return m125.NPC;},get rosterRecord(){return m125.rosterRecord;},get ROSTER_FIELDS(){return m125.ROSTER_FIELDS;},get Ganger(){return m99.Ganger;},get actorSystem(){return m169.actorSystem;},get actorItems(){return m103.actorItems;},get restoreActorItems(){return m103.restoreActorItems;},get resolveEmoteLines(){return m126.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m126.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m115.abilityLoadout;},get actorAbilities(){return m115.actorAbilities;},get importActorAbilities(){return m115.importActorAbilities;},get abilitySystem(){return m168.abilitySystem;},get createAbilityCatalog(){return m60.createAbilityCatalog;},get attackRegistry(){return m101.attackRegistry;},get validateAttackState(){return m101.validateAttackState;},get attackSystem(){return m165.attackSystem;},get createAttackCatalog(){return m57.createAttackCatalog;},get validateMountedAttack(){return m114.validateMountedAttack;},get TrafficVehicle(){return m128.TrafficVehicle;},get createGameVehicle(){return m128.createGameVehicle;},get Hunter(){return m98.Hunter;},get createHunterAppearance(){return m56.createHunterAppearance;},get Marionette(){return m121.Marionette;},get MARIONETTE_RULES(){return m54.MARIONETTE_RULES;},get validateAbilityAction(){return m111.validateAbilityAction;},get GatlingGunner(){return m108.GatlingGunner;},get Drone(){return m117.Drone;},get VelvetCat(){return m118.VelvetCat;},get velvetCatAnimation(){return m119.velvetCatAnimation;},get createVelvetAnimation(){return m119.createVelvetAnimation;},get velvetPresentation(){return m119.velvetPresentation;},get droneLift(){return m180.droneLift;},get droneArmPose(){return m180.droneArmPose;},get dronePresentation(){return m180.dronePresentation;},get VELVET_CAT_PALETTES(){return m120.VELVET_CAT_PALETTES;},get VELVET_T(){return m120.VELVET_T;},get VELVET_PROFILES(){return m120.VELVET_PROFILES;},get VELVET_GAITS(){return m120.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m120.VELVET_TAIL_SEGS;},get Demoness(){return m97.Demoness;},get Warden(){return m107.Warden;},get Vesper(){return m107.Vesper;},get Matins(){return m107.Matins;},get Compline(){return m107.Compline;},get BossEffect(){return m109.BossEffect;},get encounterSystem(){return m164.encounterSystem;},get createBossAbilities(){return m48.createBossAbilities;},get createDemonessAppearance(){return m48.createDemonessAppearance;},get demonessAppearance(){return m182.demonessAppearance;},get demonessPresentation(){return m182.demonessPresentation;},get bossEffectAppearance(){return m183.bossEffectAppearance;},get bossEffectPresentation(){return m183.bossEffectPresentation;},get validateBossRecord(){return m96.validateBossRecord;},get createDronePackets(){return m180.createDronePackets;},get createVelvetCatArt(){return m184.createVelvetCatArt;},get createVelvetCatPackets(){return m184.createVelvetCatPackets;},get createVelvetEyePackets(){return m184.createVelvetEyePackets;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m160.humanoidSystem;},get humanoidPresentation(){return m160.humanoidPresentation;},get humanoidBodyCanon(){return m161.humanoidBodyCanon;},get humanoidBuilds(){return m161.humanoidBuilds;},get getHumanoidRigAssets(){return m161.getHumanoidRigAssets;},get roadNavigationData(){return m185.roadNavigationData;},get loadRoadNavigation(){return m185.loadRoadNavigation;}});
 })();
 return m0;
 })();

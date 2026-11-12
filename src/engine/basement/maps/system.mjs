@@ -34,7 +34,7 @@ export class mapInstance {
         }
         for (const entry of this.#entries) if (entry.region === null) this.#create(entry);
         /** Rooms, their links and who is in which (an empty graph when the map has no rooms). */
-        this.rooms = new roomGraph(physics, this, definition);
+        this.rooms = new roomGraph(physics, this, definition, built.door_kinds);
     }
     #regionKey([x, y]) { return `${Math.floor(x / this.#region_size)},${Math.floor(y / this.#region_size)}`; }
     #create(entry) {
@@ -79,18 +79,19 @@ export class mapInstance {
     /**
      * The map's work for one fixed step, called by the Lobby's runtime (through the level that owns
      * the map): opens each kinematic door while a body of `include_groups` is within its range, by a
-     * timed move (`near_range(door)` gives the range, default 90), then updates room occupancy.
-     * Hinged doors need nothing here: physics swings them and their spring closes them.
+     * timed move of all its sliding leaves (`near_range(door)` gives the range, default 90), then
+     * updates room occupancy. Hinged leaves need nothing here: physics swings them and their spring
+     * closes them.
      */
     updateState({ near_range = () => 90, duration = 0.35, easing = 'smooth', include_groups = BODY_GROUP.CHARACTER } = {}) {
         const panels = new Map();
-        for (const leaf of this.entities('door_panel')) panels.set(leaf.data.door_key, leaf);
+        for (const leaf of this.entities('door_panel')) panels.set(leaf.data.door_key, [...(panels.get(leaf.data.door_key) ?? []), leaf]);
         for (const door of this.entities('door')) {
-            if (door.data.hinged) continue;
+            const sliding = [door, ...(panels.get(door.data.authored_id) ?? [])].filter(leaf => !leaf.data.hinged);
+            if (!sliding.length) continue;
             const near = this.#physics.peruseNearbyEntities(door.data.trigger_position ?? door, { near_range: near_range(door), include_groups, include_ghosts: false }).length > 0;
-            if (near === door.data.open) continue;
-            for (const leaf of [door, panels.get(door.data.authored_id)]) {
-                if (!leaf) continue;
+            if (near === sliding[0].data.open) continue;
+            for (const leaf of sliding) {
                 leaf.data.open = near;
                 this.#physics.motion.moveBodyTo(leaf, { position: near ? leaf.data.open_position : leaf.data.closed_position, rotation: near ? leaf.data.open_rotation : leaf.data.closed_rotation, duration, easing });
             }
