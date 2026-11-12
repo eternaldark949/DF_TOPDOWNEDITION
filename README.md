@@ -1,6 +1,8 @@
 # DF_TOPDOWNEDITION
 Repo for the top down edition of my game Dimensions Freelancer
 
+> **Working on the code?** Read [READ-FIRST/ENGINE-ARCHITECTURE.md](READ-FIRST/ENGINE-ARCHITECTURE.md) before anything else. It defines how the engine and the game are structured.
+
 ## Play
 Download **`DFAB V8.html`** and open it in your browser. That one file is the whole game, and it works offline.
 
