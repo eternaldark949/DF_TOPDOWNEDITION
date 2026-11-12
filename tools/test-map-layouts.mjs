@@ -7,6 +7,7 @@ import places from '../src/game/data/game-db/places.json' with { type: 'json' };
 import { PROP_TYPES, MAP_IDS, resolveMapLayout, resolvePlacement, mapHost, createMapLibraries } from '../src/game/data/game-maps.mjs';
 import { createGameAssetLibrary } from '../src/game/data/game-assets.mjs';
 import { buildMapPackets } from '../src/engine/basement/maps/index.mjs';
+import { validatePropCatalog, validateMapLayout } from '../src/engine/directory/index.mjs';
 import { physicsSystem } from '../src/engine/basement/physics/index.mjs';
 
 test('every map in GAME_DB has a layout file, and every placement names a catalog type', () => {
@@ -14,6 +15,12 @@ test('every map in GAME_DB has a layout file, and every placement names a catalo
     for (const id of MAP_IDS) for (const p of resolveMapLayout(id).props) assert.ok(Number.isFinite(p.x) && Number.isFinite(p.y), `${id} placement position`);
     const layouts = Object.fromEntries(Object.entries(createMapLibraries()[1].resources).map(([id, resource]) => [id, resource.data]));
     for (const [id, layout] of Object.entries(layouts)) for (const p of layout.props) assert.ok(PROP_TYPES[p.type], `${id}: unknown prop type ${p.type}`);
+});
+
+test('the catalog and every layout match the Directory\'s data structures', () => {
+    const [catalog, maps] = createMapLibraries();
+    validatePropCatalog(catalog.resources.catalog.data, 'df_props:catalog');
+    for (const [id, resource] of Object.entries(maps.resources)) validateMapLayout(resource.data, PROP_TYPES, `df_maps:${id}`);
 });
 
 test('placements resolve over their type defaults, and null removes a default', () => {

@@ -61,13 +61,9 @@ Scoped `entity.on(name, handler)` filters world events to that entity, binds `th
 
 Default `gameEntity` and `gameDecoration` bodies are static with zero collision/query groups. They have a transform and spatial bounds but no physical contacts. This avoids both gravity-driven decorations and a second render proxy/index. Use `elements.peruseNearbyEntities` to include registered nonphysical entities, or shared grid bounds queries for visibility. Exact physics queries continue to exclude them. A trigger is a ghost body; a wall is static; a prop is rigid. Registration and physical participation are independent concerns.
 
-## Assets live in the Directory
+## Data lives in the Directory
 
-The reusable engine exports `assetLibrary`. It provides immutable data definitions, namespaced IDs, inheritance and resource resolution. It contains no game-specific template or resource names and imports nothing from the Directory.
-
-Game definitions belong in `src/game/data/game-assets/`. The initial `entities.json` defines DF base templates and resource bindings. `src/game/data/game-assets.mjs` resolves named resources from the existing `game-db` JSON chapters, preserving those catalogs as source content. New game-specific image, audio, animation and model libraries should be defined in this Directory concern as well.
-
-`extends` resolves parent templates, plain objects merge recursively, arrays replace and instance overrides never mutate shared templates. Resource bindings are qualified `library_id:resource_id` strings. Libraries reject duplicate IDs, missing parents/resources and inheritance cycles atomically. They store data, not physics algorithms or browser loaders.
+The Basement owns no data definitions. A world receives a data source (`asset_library`) and uses only `resolveTemplate()` and `getResource()` on it; see [the data source contract](api-reference.md#data-source). The engine's data source is the Directory's registry (`engine/directory/registry.mjs`): immutable definitions, namespaced IDs, `extends` inheritance and resource resolution. A game registers its own libraries into it at boot; this game's live in `src/game/data/game-assets/`, assembled by `src/game/data/game-assets.mjs`.
 
 ## Save/load
 

@@ -103,8 +103,8 @@ Each level below lists what it is, what it owns, what it may import, what it mus
 **Its four jobs:**
 
 1. **Data structures.** What each kind of data looks like, and the checks that a library entry is well formed: a prop type, a map layout, a room set, a skeleton, an animation clip, a material, a vehicle model, a sound bank, a plant species. A structure lists fields, units, defaults and allowed values. This is what "the Directory provides the data structure" means for a prefab: the humanoid prefab reads a skeleton, proportions and clips whose shape the Directory defines.
-2. **The registry.** The one place anything asks for data by its qualified id, `library:local` (for example `df_props:catalog`). It holds the loaded libraries, their typed resources (`{kind, data}`) and their templates, and resolves template `extends`. Today this is `assetLibrary` inside `basement/physics`; it moves here (see section 9). Engine systems receive the registry as an object, so no lower level imports the Directory.
-3. **Loading.** Reading library files and resolving them once, at load time: placements over their type's defaults (with `null` removing a default), template `extends`, authored units converted to engine units. Loading only reshapes data and holds no world state, so it does not break the no-behaviour rule. Today this logic sits in `game/data/game-maps.mjs` and `game-assets.mjs`, mixed with game content (section 9).
+2. **The registry.** The one place anything asks for data by its qualified id, `library:local` (for example `df_props:catalog`). It holds the loaded libraries, their typed resources (`{kind, data}`) and their templates, and resolves template `extends`. It is `assetLibrary` in `engine/directory/registry.mjs`. Engine systems receive the registry as an object (the Basement's *data source* contract: `resolveTemplate()` and `getResource()`), so no lower level imports the Directory.
+3. **Loading.** Reading library files and resolving them once, at load time: placements over their type's defaults (with `null` removing a default), whole map layouts, template `extends`, authored units converted to engine units. Loading only reshapes data and holds no world state, so it does not break the no-behaviour rule. It is `engine/directory/loading.mjs`, with the shapes it reads in `structures.mjs`.
 4. **The engine's own default libraries.** The data the engine needs to run with no game installed: the default entity kinds (static, prop, ghost trigger, decoration and so on), default materials, a default humanoid skeleton, builds and base clips, and later default plant species. These are what let the Penthouse prefabs boot standalone.
 
 **It does not hold the game's content.** Dimensions Freelancer's catalogs, maps, `GAME_DB`, character builds and balance numbers live in `game/data`. Game boot registers them into the Directory. The single-file build packs both the Directory and `game/data` into `DFAB V8.html`.
@@ -272,7 +272,7 @@ src/
       audio/ ui/ lighting/ timers/ saves/   (to build) the services the migration still lacks
     lobby/                        LV1  level-lobby.mjs (the clock)
       runtime/                         gameEngine and gameLevel: the coordinator that runs the phases
-    directory/                    LV2  the data layer (to build: structures, registry, loading, defaults)
+    directory/                    LV2  the data layer: registry.mjs, structures.mjs, loading.mjs (to build: defaults)
     penthouse/                    LV3  prefabs (to build: humanoid/, foliage/)
   game/                           Dimensions Freelancer
     boot/                         composes the runtime: native-entry.mjs (the DFNative bundle's entry),
@@ -295,17 +295,15 @@ Migration notes that described earlier cutovers are in `docs/migration/cutovers/
 
 Audited on 2026-11-12, after the native code was sorted into `src/engine/` and `src/game/`. `tools/check-layout.mjs` passes: every engine file carries its level banner, imports only what section 3 allows, and names no game. What remains is work that needs real changes, not moves. Each item is fixed by rewriting code at its level, never by adding an exception.
 
-1. **The registry is in the Basement.** `assetLibrary` lives in `engine/basement/physics/elements/asset-library.mjs`, and `elements/registry.mjs` and `lobby/runtime/game-engine.mjs` construct a default one. It belongs in `engine/directory/`; the Basement should only receive it (`new physicsSystem({asset_library})`), with the boot code creating it.
-2. **Loading is mixed with game content.** `game/data/game-maps.mjs` and `game/data/game-assets.mjs` mix generic resolution (placements over type defaults with `null` removing a default, library registration) with this game's file list. The resolution belongs in the Directory's loading; only the file list and the files stay in `game/data`.
-3. **`game/data` holds code that depends on mechanics.** The catalog modules are pure one-time reshaping, which is allowed, but `game-abilities.mjs` imports `game/mechanics/abilities/ability-loadout.mjs` and `mechanics/values.mjs`. Data must not depend on mechanics: the shared value helpers belong with the Directory's structures, and the loadout conversion belongs to the mechanic.
-4. **The engine has no default libraries.** `engine/directory/` and `engine/penthouse/` are empty, so no prefab can boot without the game. The humanoid's skeleton and clips exist only as game data (`game/data/humanoid/`).
-5. **The humanoid is half migrated:**
+1. **`game/data` holds code that depends on mechanics.** The catalog modules are pure one-time reshaping, which is allowed, but `game-abilities.mjs` imports `game/mechanics/abilities/ability-loadout.mjs` and `mechanics/values.mjs`. Data must not depend on mechanics: the shared value helpers belong with the Directory's structures, and the loadout conversion belongs to the mechanic.
+2. **The engine has no default libraries.** `engine/directory/` and `engine/penthouse/` are empty, so no prefab can boot without the game. The humanoid's skeleton and clips exist only as game data (`game/data/humanoid/`).
+3. **The humanoid is half migrated:**
    - Motion is native: the Basement rig, the game's data in `game/data/humanoid/`, and the game's clip choice in `game/mechanics/animation/humanoid-system.mjs`.
    - Drawing is classic: `legacy/penthouse/procedural-humanoid.js`, `gl-humanoid.js` and `garment-kit.js`, plus `legacy/ui/humanoid-render.js`, `bodies.js`, `wardrobe.js` and `poses.js`.
    - The Penthouse prefab (body, rig and artist, booting on Directory defaults) does not exist yet.
-6. **Behaviour still in classic code.** The classic Directory scripts that hold behaviour (`legacy/directory/venue-crowd.js`, `cafe-life.js`, `club-life.js`, `lobby-life.js`, `game-sound.js`, `effects-system.js`, `collision-system.js`, `world-session.js`, `world-query.js`, `game-controls.js`, `new-game-state.js`) are quarantined. They are rewritten as game mechanics, not moved.
-7. **Naming.** Some native systems use `update()` or `updateDoors()` instead of `updateState()`, for example `roomGraph.update()` and `mapInstance.updateDoors()`.
-8. **A behaviour regression from PR 178:** hinged doors. In `main`, every interior hinged door, including the apartment's, was a physical swinging leaf with a spring. PR 178 made them kinematic and auto-opening. Restore the swinging behaviour.
+4. **Behaviour still in classic code.** The classic Directory scripts that hold behaviour (`legacy/directory/venue-crowd.js`, `cafe-life.js`, `club-life.js`, `lobby-life.js`, `game-sound.js`, `effects-system.js`, `collision-system.js`, `world-session.js`, `world-query.js`, `game-controls.js`, `new-game-state.js`) are quarantined. They are rewritten as game mechanics, not moved.
+5. **Naming.** Some native systems use `update()` or `updateDoors()` instead of `updateState()`, for example `roomGraph.update()` and `mapInstance.updateDoors()`.
+6. **A behaviour regression from PR 178:** hinged doors. In `main`, every interior hinged door, including the apartment's, was a physical swinging leaf with a spring. PR 178 made them kinematic and auto-opening. Restore the swinging behaviour.
 
 When one of these is fixed, remove it from this list in the same commit.
 

@@ -9,7 +9,7 @@ import progression from './game-db/progression.json' with {type:'json'};
 import {createAbilityCatalog} from './game-abilities.mjs';
 import actorRules from './game-actor-rules.json' with {type:'json'};
 import {createItemCatalog} from './game-items.mjs';
-import { assetLibrary } from '../../engine/basement/physics/index.mjs';
+import { assetLibrary } from '../../engine/directory/index.mjs';
 import playerRules from './game-player-rules.json' with { type: 'json' };
 import definitions from './game-assets/entities.json' with { type: 'json' };
 import streetDefinitions from './game-assets/street-population.json' with { type: 'json' };

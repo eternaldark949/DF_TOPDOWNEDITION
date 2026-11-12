@@ -1,5 +1,6 @@
 // The classic playable build links this entry. Browser/module clients use the same sources.
-export { physicsSystem, gameCharacter, gameProp, gameStatic, gameTrigger, gameDecoration, gameVehicle, gameProjectile, assetLibrary, pathGeometry, layoutGeometry, BODY_GROUP } from '../../engine/basement/physics/index.mjs';
+export { physicsSystem, gameCharacter, gameProp, gameStatic, gameTrigger, gameDecoration, gameVehicle, gameProjectile, pathGeometry, layoutGeometry, BODY_GROUP } from '../../engine/basement/physics/index.mjs';
+export { assetLibrary } from '../../engine/directory/index.mjs';
 export { createGameAssetLibrary } from '../data/game-assets.mjs';
 export { resolveMapLayout, resolvePlacement, isMovableProp, mapHost, createMapLibraries, PROP_TYPES, MAP_IDS } from '../data/game-maps.mjs';
 export { ApartmentLevel } from '../levels/apartment.mjs';

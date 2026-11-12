@@ -1,7 +1,8 @@
-// The Directory's prop library and map layouts. Any map, native or classic, places props from
-// the one catalog (game-assets/props.json); each map file (game-assets/maps/<map_id>.json) lists
-// only placements, lamps, NPC spawns and soft lights. Geometry (walls, exits, rooms, doors) stays
-// in GAME_DB.places.
+// The game's prop library and map layouts. Any map, native or classic, places props from the one
+// catalog (game-assets/props.json); each map file (game-assets/maps/<map_id>.json) lists only
+// placements, lamps, NPC spawns and soft lights. Geometry (walls, exits, rooms, doors) stays in
+// GAME_DB.places. This file holds the game's file list; the Directory resolves the data.
+import { resolvePlacement as directoryResolvePlacement, resolveLayout, isMovable } from '../../engine/directory/index.mjs';
 import props from './game-assets/props.json' with { type: 'json' };
 import apt_949 from './game-assets/maps/apt_949.json' with { type: 'json' };
 import auto_shop from './game-assets/maps/auto_shop.json' with { type: 'json' };
@@ -36,19 +37,11 @@ export function createMapLibraries() {
         resources: Object.fromEntries(Object.entries(LAYOUTS).map(([id, data]) => [id, { kind: 'map_layout', data }])) }];
 }
 
-/** A placement's full authored options: its type's defaults, then its own fields (null removes a default). */
-export function resolvePlacement(placement, types = PROP_TYPES) {
-    const { type, ...fields } = placement, entry = types[type];
-    if (!entry) throw new Error(`Unknown prop type: ${type}`);
-    const options = structuredClone(entry.defaults);
-    for (const [key, value] of Object.entries(fields)) {
-        if (value === null) delete options[key]; else options[key] = structuredClone(value);
-    }
-    return options;
-}
+/** A placement over this game's catalog (null removes a default). The resolution itself is the Directory's. */
+export const resolvePlacement = (placement, types = PROP_TYPES) => directoryResolvePlacement(placement, types);
 
 /** Whether the player can grab and push props of this type. */
-export const isMovableProp = (type, types = PROP_TYPES) => !!types[type]?.movable;
+export const isMovableProp = (type, types = PROP_TYPES) => isMovable(type, types);
 
 /** 'native' when a Basement scene owns the map, otherwise 'classic'. A map file's `host` field is its migration switch. */
 export const mapHost = (map_id, layouts = LAYOUTS) => layouts[map_id]?.host ?? 'classic';
@@ -60,8 +53,5 @@ export const mapHost = (map_id, layouts = LAYOUTS) => layouts[map_id]?.host ?? '
 export function resolveMapLayout(map_id, { layouts = LAYOUTS, types = PROP_TYPES } = {}) {
     const layout = layouts[map_id];
     if (!layout) return { props: [], prop_types: [], lamps: [], npcs: [] };
-    const result = { props: layout.props.map(p => resolvePlacement(p, types)), prop_types: layout.props.map(p => p.type),
-        lamps: structuredClone(layout.lamps), npcs: structuredClone(layout.npcs) };
-    if (layout.soft_lights) result.soft_lights = structuredClone(layout.soft_lights);
-    return result;
+    return resolveLayout(layout, types, { omit: ['map_id', 'host'] });
 }

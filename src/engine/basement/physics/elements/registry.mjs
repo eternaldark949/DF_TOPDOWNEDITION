@@ -1,6 +1,6 @@
 // ===== LV0 BASEMENT =====
 import { clone, freeze } from '../core/values.mjs';
-import { assetLibrary } from './asset-library.mjs';
+import { EMPTY_DATA_SOURCE, isDataSource } from './data-source.mjs';
 import { gameEntity, entityRecord, restoreEntity } from './entity.mjs';
 import { gameCharacter, gameVehicle, gameProjectile, gameProp, gameStatic, gameTrigger, gameDecoration, awarenessMatrix } from './elements.mjs';
 
@@ -9,10 +9,10 @@ const builtins = { entity: gameEntity, character: gameCharacter, vehicle: gameVe
 /** Identity registry, never a physical-state cache or another spatial index. */
 export class gameElements {
     #entities = new Map(); #types = new Map(Object.entries(builtins)); #construction = null; #restore = null;
-    constructor(world, { asset_library = new assetLibrary() } = {}) {
+    constructor(world, { asset_library = EMPTY_DATA_SOURCE } = {}) {
         if (!world || typeof world._createEntityComponents !== 'function' || typeof world._mutate !== 'function') throw new TypeError('gameElements requires its physicsSystem owner');
         if (world.elements) throw new Error('The world already owns its authoritative gameElements registry');
-        if (!(asset_library instanceof assetLibrary)) throw new TypeError('asset_library must be an assetLibrary');
+        if (!isDataSource(asset_library)) throw new TypeError('asset_library must provide resolveTemplate() and getResource() (the Directory registry does)');
         Object.defineProperties(this, { world: { value: world }, asset_library: { value: asset_library, enumerable: true } });
     }
     #resolve(packet) {

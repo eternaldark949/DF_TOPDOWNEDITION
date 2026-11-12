@@ -42,7 +42,7 @@ flowchart TD
 
 `physicsBody` is a handle. Its authoritative data is held in a module-private WeakMap. Its public identity is immutable, position/velocity properties return frozen snapshots, and `getState` returns a detached copy. There is no writable mirror on a game element. `gameCharacter.physics_controller.body` and `fetchBody(id)` refer to that same body.
 
-`gameEntity` is the official world-element base, with automatic component creation/registration, lifecycle, scoped events and asset bindings. `gameElements` owns the identity registry. Specialized elements inherit the base instead of wrapping old game objects. Their root entity/body IDs coincide, and the identity registry contains no physical-state copies or geometry. The Directory supplies `assetLibrary` data; engine libraries contain only generic registration/resolution behavior. See [entities](entities.md).
+`gameEntity` is the official world-element base, with automatic component creation/registration, lifecycle, scoped events and asset bindings. `gameElements` owns the identity registry. Specialized elements inherit the base instead of wrapping old game objects. Their root entity/body IDs coincide, and the identity registry contains no physical-state copies or geometry. Its data comes from a data source it is handed, normally the Directory's registry; the Basement never imports the Directory. See [entities](entities.md).
 
 Controllers are engine components. A character, traffic path follower, projectile and particle do not maintain alternative body stores, grids, detection or impulse implementations. Internal methods prefixed `_` and modules below `index.mjs` are engine implementation details; clients should import only the public entry point.
 

@@ -2,9 +2,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
-import { physicsSystem, layoutGeometry, assetLibrary } from '../index.mjs';
-const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-5,`${a} != ${b}`);
-test('authored wall openings compile into independent horizontal and vertical segments',()=>{
+import { physicsSystem, layoutGeometry } from '../index.mjs';
+const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-5,`${a} != ${b}`);test('authored wall openings compile into independent horizontal and vertical segments',()=>{
  const walls=[{x:0,y:0,w:100,h:8},{x:100,y:0,w:8,h:100}],source=structuredClone(walls);
  assert.deepEqual(layoutGeometry.cutWallOpenings(walls,[{x:30,y:0,w:20,h:8},{x:100,y:30,w:8,h:20}]),[{x:0,y:0,w:28,h:8},{x:52,y:0,w:48,h:8},{x:100,y:0,w:8,h:28},{x:100,y:52,w:8,h:48}]);
  assert.deepEqual(walls,source);
@@ -48,10 +47,6 @@ test('spring force limits bound per-step impulses without position teleportation
  const p=new physicsSystem(),body=p.createBody({position:[100,0],collision_mask:0,mass:1});
  const joint=p.createConstraint({constraint_type:'spring',body_a:body,world_target:[0,0],stiffness:300,damping:1,max_force:60});p.updateState();
  assert.ok(joint.getState().applied_impulse<=1+1e-7);assert.ok(Math.abs(body.linear_velocity[0])<=1+1e-7);assert.deepEqual(body.position,[100,0]);
-});
-test('plain JSON libraries from another realm are accepted while class instances remain rejected',()=>{
- const data=vm.runInNewContext('({library_id:"foreign",templates:{prop:{entity_type:"prop",mass:1}}})');assert.ok(new assetLibrary({libraries:[data]}));
- assert.throws(()=>new assetLibrary({libraries:[{library_id:'bad',resources:{date:{kind:'bad',data:new Date()}}}]}),/plain JSON/);
 });
 test('nearby rescue placement checks the shared index and never returns an occupied fallback',()=>{
  const p=new physicsSystem(),person=p.createCharacter({position:[0,0],collision_shape:{shape_type:'circle',radius:2}});

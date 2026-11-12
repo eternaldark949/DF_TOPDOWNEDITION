@@ -1,5 +1,5 @@
 // ===== LV1 LOBBY =====
-import { physicsSystem, assetLibrary } from '../../basement/physics/index.mjs';
+import { physicsSystem } from '../../basement/physics/index.mjs';
 import { levelLobby } from '../level-lobby.mjs';
 import { gameLevel } from './game-level.mjs';
 import { controlSystem } from '../../basement/controls/index.mjs';
@@ -27,7 +27,7 @@ export class gameEngine {
     #running = false; #destroyed = false; #phase = 'idle'; #loading = false; #pauses = new Map();
     #schedule; #cancel; #frame = null; #generation = 0;
 
-    constructor({ asset_library = new assetLibrary(), physics = {}, controls = {}, camera = {}, clock = {}, frame_clock,
+    constructor({ asset_library, physics = {}, controls = {}, camera = {}, clock = {}, frame_clock,
         schedule_frame = typeof requestAnimationFrame === 'function' ? callback => requestAnimationFrame(callback) : null,
         cancel_frame = typeof cancelAnimationFrame === 'function' ? handle => cancelAnimationFrame(handle) : null,
         render_target, services = {} } = {}) {
@@ -44,7 +44,7 @@ export class gameEngine {
         this.#camera = new cameraSystem(camera);
         this.#controls = new controlSystem({ ...controls, auto_update:false });
         this.#render = new renderSystem({physics_system:this.#world,camera:this.#camera});
-        this.#api = Object.freeze({ ...services, physics: this.#world, elements: this.#world.elements, assets: asset_library,
+        this.#api = Object.freeze({ ...services, physics: this.#world, elements: this.#world.elements, assets: this.#world.elements.asset_library,
             rigs:this.#world.rigs, motion: this.#world.motion, traffic: this.#world.traffic, controls:this.#controls, camera:this.#camera, render:this.#render });
         this.#schedule = schedule_frame; this.#cancel = cancel_frame;
         this.#lobby = new levelLobby(Object.freeze(config), frame_clock);

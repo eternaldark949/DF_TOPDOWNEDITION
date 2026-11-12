@@ -4,7 +4,7 @@ All methods below exist in the independent package. Their **baseline behavior** 
 
 ## Types and constants
 
-`physicsSystem`, `physicsBody`, `collisionShape`, `collisionDetector`, `contactSolver`, `spatialGrid`, `physicsConstraint`, `constraintSolver`, `characterMotor`, `vehicleMotor`, `pathMotor`, `projectileMotor`, `particlePhysics`, `trafficController`, `motionController`, `gameEntity`, `gameElements`, `assetLibrary`, `gameCharacter`, `gameVehicle`, `gameProjectile`, `gameProp`, `gameStatic`, `gameTrigger`, `gameDecoration`, `awarenessMatrix`.
+`physicsSystem`, `physicsBody`, `collisionShape`, `collisionDetector`, `contactSolver`, `spatialGrid`, `physicsConstraint`, `constraintSolver`, `characterMotor`, `vehicleMotor`, `pathMotor`, `projectileMotor`, `particlePhysics`, `trafficController`, `motionController`, `gameEntity`, `gameElements`, `EMPTY_DATA_SOURCE`, `isDataSource`, `gameCharacter`, `gameVehicle`, `gameProjectile`, `gameProp`, `gameStatic`, `gameTrigger`, `gameDecoration`, `awarenessMatrix`.
 
 `BODY_GROUP`: `STATIC=1`, `CHARACTER=2`, `VEHICLE=4`, `PROP=8`, `PROJECTILE=16`, `SENSOR=32`, `ALL=2147483647`. Combine bits with `|`; user-defined bits are allowed through bit 30. `QUERY_GROUP.ALL` has the same value. `PHYSICS_TYPES` lists `static`, `rigid`, `kinematic`, `character`, `no_collision`.
 
@@ -21,7 +21,7 @@ Constructor options:
 | `gravity` | `[0,0]` | World acceleration for movable bodies. |
 | `solver_iterations` | `6` | Maximum contact/joint iterations, integer 1–32. |
 | `sleep_speed`, `sleep_delay` | `0.05`, `0.5` | Automatic sleeping threshold and seconds. |
-| `asset_library` | Empty `assetLibrary` | Directory-supplied definitions/resources; not part of numerical world config. |
+| `asset_library` | `EMPTY_DATA_SOURCE` | The world's data source: any object with `resolveTemplate()` and `getResource()`, normally the Directory's registry (`engine/directory/registry.mjs`). Not part of numerical world config. |
 
 `config` is frozen; `spatial_grid` and `elements` are non-replaceable references; `simulation_tick` is read-only. `elements` is the world's `gameElements` owner.
 
@@ -217,19 +217,16 @@ Entity properties are read-only: `entity_id`, `body_id` (same root identity), `e
 
 Physical query hits also contain `entity` where a root is registered. World events additionally expose `entity`, `entity_a`, `entity_b`, `target_entity` as applicable. In `projectileHit`, `projectile` is now the official `gameProjectile`. Snapshot format 2 saves the registry without replaying gameplay constructors on load. Re-register custom classes/Directory libraries before load; reconnect gameplay subscriptions afterward. Anonymous physics bodies/particles remain low-level mechanics, not game-entity surrogates.
 
-## assetLibrary
+## Data source
 
-The constructor `assetLibrary({libraries=[]}={})` accepts data-only library definitions. Each definition has `library_id`, optional `resources` and `templates`. IDs are `library_id:local_id`. Local keys use letters, digits, underscores, dots or hyphens. Concrete game libraries live in the Directory; the reusable package defaults to an empty library.
+The Basement does not own data. A world is handed a data source as `asset_library` and calls two methods on it:
 
 | Method | Contract |
 |---|---|
-| `registerLibrary(definition)` | Atomically resolve and validate resources/template inheritance; returns library. Duplicate library IDs, cycles, missing parents/resources and unsafe data throw. |
-| `hasTemplate(template_id)` | Boolean. |
-| `getTemplate(template_id)` | Immutable fully resolved definition; missing ID throws. |
-| `resolveTemplate(template_id,overrides={})` | Detached merged definition with resource bindings validated. Omit ID for direct definitions. |
-| `listTemplates({entity_type?}={})` | Qualified template IDs. |
-| `getResource(resource_id)` | Immutable resource definition; missing ID throws. |
-| `listResources({kind?}={})` | Qualified resource IDs. |
+| `resolveTemplate(template_id,packet={})` | Detached copy of the packet resolved over its template, with resource bindings validated. With no ID the packet is used as it is. An unknown ID throws. |
+| `getResource(resource_id)` | Immutable typed resource; an unknown ID throws. |
+
+`isDataSource(source)` tells whether an object provides both. `EMPTY_DATA_SOURCE` is the source of a world given none: it has no templates and no resources. The engine's real data source is the Directory's registry, `assetLibrary` in `engine/directory/`, which the Basement never imports.
 | `exportLibraries()` | Detached data definitions for inspection/sharing. |
 
 Template `extends` names a parent (local within a library or qualified). Objects merge recursively; arrays replace. `assets` binds resource IDs, and resources require a `kind` plus their data/URL/descriptor fields. No library may contain executable factories or physics algorithms. The Directory loader resolves resource `source` paths against the existing game database. The engine performs no Directory imports or game-specific asset selection.

@@ -1,7 +1,11 @@
-// ===== LV0 BASEMENT =====
-import { clone, freeze } from '../core/values.mjs';
-
-const plain = value => value !== null && typeof value === 'object' && (Object.getPrototypeOf(value) === null || Object.getPrototypeOf(Object.getPrototypeOf(value)) === null);
+// ===== LV2 DIRECTORY =====
+// THE REGISTRY: the one place engine levels find data. Libraries are plain JSON packets
+// {library_id, templates, resources}; every id is qualified as `library:local`. Templates `extend`
+// one another and name resources by slot. Registering a library resolves it completely or not at
+// all, and everything handed out is frozen. The Basement never imports this file: it receives a
+// registry as an object (`new physicsSystem({ asset_library })`) and calls only resolveTemplate()
+// and getResource() on it.
+import { clone, freeze, plain } from './values.mjs';
 function validateData(value) {
     if (Array.isArray(value)) { for (const entry of value) validateData(entry); return; }
     if (plain(value)) {
@@ -29,7 +33,7 @@ function identifier(value, name) {
 }
 const qualified = (library, id) => id.includes(':') ? id : `${library}:${id}`;
 
-/** Generic, immutable data definitions. Concrete game libraries belong to the Directory. */
+/** Generic, immutable data definitions. A game's own libraries live in its data folder and are registered at boot. */
 export class assetLibrary {
     #libraries = new Map(); #templates = new Map(); #resources = new Map();
     constructor({ libraries = [] } = {}) { for (const library of libraries) this.registerLibrary(library); }

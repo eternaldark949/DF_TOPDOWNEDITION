@@ -24,7 +24,7 @@ The classic playable boot still constructs `GameEngine`. Loading the new class i
 
 ```js
 new gameEngine({
-    asset_library,       // Directory-built native assetLibrary; defaults to an empty one
+    asset_library,       // the data source, normally the Directory registry (assetLibrary); none = EMPTY_DATA_SOURCE
     physics: {},         // Native physics options; authority/library owned by the runtime
     controls: {},        // Basement controlSystem options; polling owned by the runtime
     clock: {},           // MAX_FRAME_MS, MAX_STEPS, GAME_SPEED; STEP_MS must match physics

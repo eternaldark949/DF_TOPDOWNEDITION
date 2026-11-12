@@ -1,5 +1,11 @@
 # Changelog
 
+## The registry moves to the Directory — 2026-11-12
+
+- `assetLibrary` moved out of the Basement into the engine's Directory (`engine/directory/registry.mjs`). The Basement no longer exports it and never imports the Directory.
+- A world now takes any data source as `asset_library`: an object with `resolveTemplate()` and `getResource()`. New exports `isDataSource` and `EMPTY_DATA_SOURCE`; a world given none uses the empty source, which behaves exactly as an empty `assetLibrary` did.
+- The registry's own tests moved with it to `engine/directory/tests/registry.test.mjs`.
+
 ## Faster spatial grid — 2026-11-12
 
 - `spatialGrid` now has a coarse level for large entries (more than 16 cells across), numeric cell keys, array buckets and stamp-based deduplication. On the new `benchmarks/grid.mjs` it is about 1.5–1.9× faster than before; whole-world moving scenarios gain 15–30%.
