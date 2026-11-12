@@ -16,6 +16,8 @@ export { gameCharacter, gameVehicle, gameProjectile, gameProp, gameStatic, gameT
 export { BODY_GROUP, QUERY_GROUP, PHYSICS_TYPES } from './core/values.mjs';
 export { trafficController } from './traffic/controller.mjs';
 export { motionController } from './motion/controller.mjs';
+export { railController } from './motion/rail-controller.mjs';
+export { railGeometry } from './motion/rail-geometry.mjs';
 export { pathGeometry } from './motion/path-geometry.mjs';
 export { layoutGeometry } from './motion/layout-geometry.mjs';
 

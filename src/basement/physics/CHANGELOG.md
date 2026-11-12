@@ -1,5 +1,13 @@
 # Changelog
 
+## Rail riders — 2026-11-12
+
+- Every world owns `physics.rails`, a `railController`: bodies that ride fixed lines (a lane, a curve through a junction, a track) by distance along, with pedals, a leader to follow, stop lines, bend speed, the slide through a turn, rail-to-rail hand-over, joining off the line, and leaving the rail when something else moves the body. `railGeometry` samples the lines. The pose reaches the body as a velocity through the ordinary step, like `physics.motion`.
+- The engine owns the motion; the game owns the policy. It registers rails, plans the next rail and sets `speed_cap` / `stop_distance` per rider from its own rules. Every number that shapes the motion is a profile field in world units, seconds and radians; none is fixed in code.
+- `tests/rails.test.mjs` runs two cars down a lane, round a junction curve and through a red light and a slow zone, once through the old `railKit` in its per-tick units and once through the engine. Rail, distance, speed, slide, position and heading agree to better than 1e-9 on every one of 1,300 ticks. That check goes when the kit does.
+- `node benchmarks/rails.mjs`: 1,000 colliding kinematic riders in queues step in about 4 ms, the same as those bodies moving at a plain velocity.
+- Not here yet: riders see only other riders. Bodies that are not on a rail (a pedestrian, a parked car, the player) are the game's to turn into a `stop_distance` or `speed_cap` until the engine senses them itself. A rail should begin where the one before it ends; a gap is crossed in one step.
+
 ## Exact raycast — 2026-11-11
 
 - `raycast` now solves the segment against each candidate shape directly (circle, box, polygon, capsule, segment, compound) instead of sweeping a thin circle through the general solver, and asks the grid only for the cells the segment crosses. Results are unchanged: `tests/raycast.test.mjs` holds it to the thin swept circle across every shape type, including starts inside or exactly on a body.

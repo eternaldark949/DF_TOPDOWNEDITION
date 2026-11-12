@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'b0749b39646e';
+        const DFAB_BUILD = '04d99a6a687c';
     </script>
     <script type="text/dfab" data-src="basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="10826">
+    <script type="text/dfab" data-src="directory/native-entry.mjs" data-cost="11142">
 const DFNative = (()=>{
 'use strict';
 // src/basement/physics/core/values.mjs
@@ -11964,8 +11964,493 @@ class trafficController {
 
 return Object.freeze({get trafficController(){return trafficController;}});
 })();
-// src/basement/physics/attachments/manager.mjs
+// src/basement/physics/motion/rail-geometry.mjs
+const m31 = (()=>{
+const {number,vector,angleDelta} = m7;
+
+/**
+ * Pure rail geometry: a fixed line a body can ride, sampled once so a rider reads its position, heading and bend
+ * from the distance along it without solving a curve every step. It stores neither bodies nor a spatial index.
+ *
+ * RAIL TABLE  { length, count, distances, x, y, rotations, curvatures }
+ *   distances[i]   arc length from the start to sample i
+ *   rotations[i]   heading at sample i, radians
+ *   curvatures[i]  signed bend at sample i, radians per unit: positive turns toward +rotation
+ */
+class railGeometry {
+    /**
+     * Sample a rail from its points. `rotations` gives the heading at each point (an authored curve knows its own
+     * tangent); left out, each point takes the direction of the line through its neighbours.
+     */
+    static sampleRail({ points, rotations } = {}) {
+        if (!Array.isArray(points) || points.length < 2 || points.length > 4096) throw new TypeError('A rail needs 2..4096 points');
+        if (rotations !== undefined && (!Array.isArray(rotations) || rotations.length !== points.length)) throw new TypeError('A rail needs one rotation per point');
+        const count = points.length, last = count - 1;
+        const distances = new Float64Array(count), x = new Float64Array(count), y = new Float64Array(count);
+        const headings = new Float64Array(count), curvatures = new Float64Array(count);
+        let length = 0;
+        for (let i = 0; i < count; i++) {
+            const point = vector(points[i], 'rail point');
+            x[i] = point[0]; y[i] = point[1];
+            if (i) {
+                const step = Math.hypot(x[i] - x[i - 1], y[i] - y[i - 1]);
+                if (!(step > 0)) throw new TypeError('Rail points must not repeat');
+                length += step;
+            }
+            distances[i] = length;
+        }
+        for (let i = 0; i < count; i++) {
+            if (rotations) { headings[i] = number(rotations[i], 'rail rotation'); continue; }
+            const before = Math.max(0, i - 1), after = Math.min(last, i + 1);
+            headings[i] = Math.atan2(y[after] - y[before], x[after] - x[before]);
+        }
+        for (let i = 0; i < count; i++) {
+            const before = Math.max(0, i - 1), after = Math.min(last, i + 1), span = distances[after] - distances[before];
+            curvatures[i] = span > 1e-6 ? angleDelta(headings[before], headings[after]) / span : 0;
+        }
+        return Object.freeze({ length, count, distances, x, y, rotations: headings, curvatures });
+    }
+
+    /** Where `distance` along the rail is (held to its ends): fills and returns `out` { x, y, rotation, curvature }. */
+    static pointOnRail(table, distance, out = {}) {
+        const { distances } = table;
+        if (!(distance > 0)) distance = 0; else if (distance > table.length) distance = table.length;
+        let low = 0, high = table.count - 1;
+        while (high - low > 1) { const middle = (low + high) >> 1; if (distances[middle] <= distance) low = middle; else high = middle; }
+        const span = distances[high] - distances[low], share = span > 1e-9 ? (distance - distances[low]) / span : 0;
+        out.x = table.x[low] + (table.x[high] - table.x[low]) * share;
+        out.y = table.y[low] + (table.y[high] - table.y[low]) * share;
+        out.rotation = table.rotations[low] + angleDelta(table.rotations[low], table.rotations[high]) * share;
+        out.curvature = table.curvatures[low] + (table.curvatures[high] - table.curvatures[low]) * share;
+        return out;
+    }
+
+    /** The point of the rail nearest (x, y): { distance (along), lateral (signed, + to the left of travel), rotation }. */
+    static projectOnRail(table, position, out = {}) {
+        const [px, py] = vector(position);
+        let best = Infinity;
+        for (let i = 0; i < table.count - 1; i++) {
+            const ex = table.x[i + 1] - table.x[i], ey = table.y[i + 1] - table.y[i], size2 = ex * ex + ey * ey;
+            const share = Math.max(0, Math.min(1, ((px - table.x[i]) * ex + (py - table.y[i]) * ey) / size2));
+            const dx = px - table.x[i] - ex * share, dy = py - table.y[i] - ey * share, gap2 = dx * dx + dy * dy;
+            if (gap2 >= best) continue;
+            best = gap2;
+            out.distance = table.distances[i] + (table.distances[i + 1] - table.distances[i]) * share;
+            out.lateral = (ex * dy - ey * dx) / Math.sqrt(size2);
+        }
+        out.rotation = this.pointOnRail(table, out.distance, railScratch).rotation;
+        return out;
+    }
+
+    /** The sharpest bend between two distances along the rail, as |curvature| (0 on a straight). */
+    static sharpestBend(table, from, to) {
+        let sharpest = Math.abs(this.pointOnRail(table, from, railScratch).curvature);
+        sharpest = Math.max(sharpest, Math.abs(this.pointOnRail(table, to, railScratch).curvature));
+        for (let i = 0; i < table.count; i++) {
+            if (table.distances[i] < from) continue;
+            if (table.distances[i] > to) break;
+            sharpest = Math.max(sharpest, Math.abs(table.curvatures[i]));
+        }
+        return sharpest;
+    }
+}
+const railScratch = { x: 0, y: 0, rotation: 0, curvature: 0 };
+
+return Object.freeze({get railGeometry(){return railGeometry;}});
+})();
+// src/basement/physics/motion/rail-controller.mjs
 const m30 = (()=>{
+const {clone,number,angleDelta} = m7;
+const {referenceBody} = m9;
+const {railGeometry} = m31;
+
+/**
+ * Bodies that ride fixed lines: a lane, a curve through a junction, a track. A RIDER's place is the rail it is on and
+ * how far along; its speed follows pedals toward the slowest of its limits. Its pose is read off the rail and handed
+ * to the ordinary step as a velocity, so contacts, mounts and interpolation see a normal moving body.
+ *
+ * The engine owns the motion. The game owns the policy: it registers the rails, says which rail comes next, and sets
+ * each rider's limits (a speed cap, a place to stop) from its own rules: lights, junction access, right of way.
+ *
+ * Every number that shapes the motion is a PROFILE field, in world units, seconds and radians:
+ *
+ *   top_speed, acceleration, braking     the vehicle: its fastest (flat out; it cruises a little under), how hard it pulls, how hard it stops
+ *   body_length                          bumper to bumper, for the gap to the rider ahead
+ *   min_gap                              the gap it keeps behind a stopped leader
+ *   reaction_seconds                     following: the distance covered in this long is kept out of the room to stop
+ *   follow_brake_share, match_share      following: the share of its braking it plans on; of a leader's speed it matches
+ *   look_base, look_seconds              how far ahead it looks for a leader: base + length + stopping distance + speed × seconds
+ *   stop_brake_share, stop_tolerance     stopping at a line: the share of its braking it plans on; how near counts as there
+ *   pedal_urgency                        0..1: how hard it works the pedals toward a new speed
+ *   pedal_speed_band                     a difference in speed past this is chased hard; inside it, eased
+ *   pedal_brake_onset, pedal_creep_onset the overspeed that puts it on the brake at speed, and near a stop
+ *   pedal_min_brake                      the lightest brake it uses once braking
+ *   pedal_brake_seconds                  braking: the pedal that would shed the overspeed in this long
+ *   pedal_gain_up, pedal_gain_down, pedal_gain_hold   pedal per unit of speed difference: speeding up, slowing, holding
+ *   reverse_floor                        below this speed an opposite pedal drives rather than brakes
+ *   rest_speed                           slower than this is stopped
+ *   bend_lateral_acceleration            the sideways pull it accepts through a bend (0: bends don't slow it)
+ *   bend_min_speed, bend_look_base, bend_look_seconds   the slowest a bend makes it; how far ahead it reads the bend
+ *   slide_per_acceleration               the slide through a bend: sideways speed per unit of sideways pull (speed² × bend)
+ *   slide_max, slide_ease_rate           the most it slides; how fast the slide builds and fades (per second)
+ *   slip_max, slip_floor_speed           the most the nose turns in (as a sine); the speed below which it stops growing
+ *   join_ease_rate                       joining off the line: how fast the offset and heading error ease away (per second)
+ */
+const PROFILE = Object.freeze({
+    top_speed: 300, acceleration: 600, braking: 1000, body_length: 40, min_gap: 20,
+    reaction_seconds: 4 / 60, follow_brake_share: 0.85, match_share: 0.85,
+    look_base: 60, look_seconds: 8 / 60, stop_brake_share: 0.8, stop_tolerance: 2,
+    pedal_urgency: 0.6, pedal_speed_band: 30, pedal_brake_onset: 18, pedal_creep_onset: 3, pedal_min_brake: 0.12,
+    pedal_brake_seconds: 2 / 60, pedal_gain_up: 0.5 / 60, pedal_gain_down: 0.4 / 60, pedal_gain_hold: 0.2 / 60,
+    reverse_floor: 15, rest_speed: 0.03,
+    bend_lateral_acceleration: 0, bend_min_speed: 150, bend_look_base: 60, bend_look_seconds: 22 / 60,
+    slide_per_acceleration: 0, slide_max: 156, slide_ease_rate: 13.39, slip_max: 0.7, slip_floor_speed: 30,
+    join_ease_rate: 6.32,
+});
+const POSITIVE = new Set(['top_speed', 'acceleration', 'braking', 'body_length', 'pedal_brake_seconds', 'slip_floor_speed']);
+const MAX_HOPS = 24, LEADER_HOPS = 6, DISPLACED = 1e-6;
+
+class railController {
+    #rails = new Map(); #riders = new Map(); #order = new Map(); #orderValid = false;
+    #point = { x: 0, y: 0, rotation: 0, curvature: 0 };
+    constructor(world) {
+        if (!world || typeof world._mutate !== 'function') throw new TypeError('Controller requires its physicsSystem owner');
+        if (world.rails) throw new Error('The world already owns its rail controller');
+        Object.defineProperty(this, 'world', { value: world }); Object.freeze(this);
+    }
+
+    // ===== RAILS =====
+
+    /** A rail from its points (and their headings, for an authored curve). `next_rail_id` is where it leads by default,
+     *  entered `next_distance` along that rail. */
+    registerRail(rail_id, { points, rotations, next_rail_id = null, next_distance = 0 } = {}) {
+        this.#name(rail_id);
+        if (this.#rails.has(rail_id)) throw new Error(`Rail already registered: ${rail_id}`);
+        const table = railGeometry.sampleRail({ points, rotations });
+        const rail = { rail_id, table, points: clone(points), rotations: rotations ? [...rotations] : null, next_rail_id: null, next_distance: 0 };
+        this.#link(rail, next_rail_id, next_distance);
+        this.world._mutate(() => { this.#rails.set(rail_id, rail); this.#orderValid = false; });
+        return this;
+    }
+    setNextRail(rail_id, next_rail_id = null, next_distance = 0) {
+        const rail = this.#rail(rail_id), link = this.#link({}, next_rail_id, next_distance);
+        this.world._mutate(() => Object.assign(rail, link));
+        return this;
+    }
+    removeRail(rail_id) {
+        this.#rail(rail_id);
+        for (const rider of this.#riders.values()) if (rider.rail_id === rail_id) throw new Error(`Rail still has riders: ${rail_id}`);
+        this.world._mutate(() => { this.#rails.delete(rail_id); this.#orderValid = false; });
+        return this;
+    }
+    getRail(rail_id) { const rail = this.#rail(rail_id); return { rail_id, length: rail.table.length, next_rail_id: rail.next_rail_id, next_distance: rail.next_distance }; }
+    listRails() { return [...this.#rails.keys()]; }
+    /** Where `distance` along a rail is: { position, rotation, curvature }. */
+    getRailPoint(rail_id, distance) {
+        const point = railGeometry.pointOnRail(this.#rail(rail_id).table, number(distance, 'distance'), {});
+        return { position: [point.x, point.y], rotation: point.rotation, curvature: point.curvature };
+    }
+
+    // ===== RIDERS =====
+
+    /**
+     * Put a body on a rail. Left out, `distance` is the nearest point of the rail to where the body stands, and
+     * whatever it is off the line (sideways, and in heading) eases away instead of snapping. `speed` defaults to its
+     * speed along the rail now.
+     */
+    rideRail(body, { rail_id, distance, speed, profile = {} } = {}) {
+        const record = this.#body(body), rail = this.#rail(rail_id), table = rail.table;
+        const settings = this.#profile(profile);
+        const joined = railGeometry.projectOnRail(table, record.position, {});
+        const along = distance === undefined ? joined.distance : number(distance, 'distance', 0, table.length);
+        const rider = { body_id: record.id, record, rail_id, distance: along, slide: 0, profile: settings,
+            speed_cap: null, stop_distance: null, next_rail_id: null, next_distance: 0,
+            join_lateral: 0, join_rotation: 0, pose: null, ended: false,
+            leader_id: null, gap: null, target_speed: settings.top_speed };
+        const heading = railGeometry.pointOnRail(table, along, {}).rotation;
+        if (distance === undefined) { rider.join_lateral = joined.lateral; rider.join_rotation = angleDelta(heading, record.rotation); }
+        const along_speed = record.velocity[0] * Math.cos(heading) + record.velocity[1] * Math.sin(heading);
+        rider.speed = Math.max(0, speed === undefined ? along_speed : number(speed, 'speed', 0));
+        this.world._mutate(() => {
+            if (!this.world.fetchBody(record.id)) return;
+            this.#riders.set(record.id, rider); this.#orderValid = false;
+            record.sleeping = false; record.sleep_time = 0;
+            this.#place(rider, 0);
+        });
+        return record.handle;
+    }
+    /** Off the rail: the body keeps the velocity it has and answers to its own motor again. */
+    leaveRail(body) {
+        const record = this.world._record(referenceBody(body));
+        this.world._mutate(() => { if (this.#riders.delete(record.id)) this.#orderValid = false; });
+        return record.handle;
+    }
+    isRiding(body) { return this.#riders.has(this.world._record(referenceBody(body)).id); }
+    /**
+     * The game's policy for one rider. A field left out keeps its value; null clears it.
+     *   speed_cap      the fastest it may go for now
+     *   stop_distance  where along its current rail its centre must stop (a line, a queue)
+     *   next_rail_id   the rail it takes at the end of this one, entered at next_distance, instead of the rail's own
+     */
+    setRiderLimits(body, limits = {}) {
+        const rider = this.#rider(body), next = {};
+        if (limits.speed_cap !== undefined) next.speed_cap = limits.speed_cap === null ? null : number(limits.speed_cap, 'speed_cap', 0);
+        if (limits.stop_distance !== undefined) next.stop_distance = limits.stop_distance === null ? null : number(limits.stop_distance, 'stop_distance');
+        if (limits.next_rail_id !== undefined) Object.assign(next, this.#link({}, limits.next_rail_id, limits.next_distance ?? 0));
+        this.world._mutate(() => Object.assign(rider, next));
+        return this;
+    }
+    setRiderProfile(body, profile) {
+        const rider = this.#rider(body), settings = this.#profile({ ...rider.profile, ...profile });
+        this.world._mutate(() => { rider.profile = settings; });
+        return this;
+    }
+    /** A detached reading: where it is, how fast, how far it slides, who it follows and the speed it is aiming for. */
+    getRiderState(body) {
+        const rider = this.#rider(body);
+        return { body_id: rider.body_id, rail_id: rider.rail_id, distance: rider.distance, speed: rider.speed, slide: rider.slide,
+            target_speed: rider.target_speed, leader_body_id: rider.leader_id, gap: rider.gap, ended: rider.ended,
+            speed_cap: rider.speed_cap, stop_distance: rider.stop_distance, next_rail_id: rider.next_rail_id, next_distance: rider.next_distance,
+            profile: { ...rider.profile } };
+    }
+    /** The riders on a rail, nearest its start first, as body handles. */
+    getRailRiders(rail_id, results = []) {
+        this.#rail(rail_id); this.#sort();
+        results.length = 0;
+        for (const rider of this.#order.get(rail_id) ?? []) results.push(rider.record.handle);
+        return results;
+    }
+
+    // ===== THE STEP =====
+
+    /** Once a step, before the bodies move: each rider's speed, place and pose for this step. */
+    _update(dt) {
+        if (!this.#riders.size) return;
+        for (const rider of [...this.#riders.values()]) {
+            const record = rider.record;
+            // Moved by something else since it was put there (a contact, an impulse, a placement): it is a body again
+            const pose = rider.pose;
+            if (pose && (Math.abs(record.position[0] - pose.x) > DISPLACED || Math.abs(record.position[1] - pose.y) > DISPLACED
+                || Math.abs(angleDelta(record.rotation, pose.rotation)) > DISPLACED)) {
+                this.#riders.delete(rider.body_id); this.#orderValid = false;
+                this.world._emit('railDisplaced', { body: record.handle, rail_id: rider.rail_id, distance: rider.distance });
+            }
+        }
+        this.#orderValid = false; this.#sort();
+        for (const rider of this.#riders.values()) {
+            if (!rider.record.config.active || rider.record.parent_mount) continue;
+            this.#drive(rider, dt);
+            this.#advance(rider);
+            this.#place(rider, dt);
+            const record = rider.record, pose = rider.pose;     // a body with anywhere left to go must not fall asleep short of it
+            if (pose.x !== record.position[0] || pose.y !== record.position[1] || pose.rotation !== record.rotation) { record.sleeping = false; record.sleep_time = 0; }
+        }
+    }
+    /** Per body, in the step: the velocity that carries it to its pose. True when the rail has it. */
+    _controls(record, dt) {
+        const rider = this.#riders.get(record.id);
+        if (!rider || !rider.pose) return false;
+        record.velocity = [(rider.pose.x - record.position[0]) / dt, (rider.pose.y - record.position[1]) / dt];
+        record.angular_velocity = (rider.pose.rotation - record.rotation) / dt;
+        return true;
+    }
+
+    /** The pedals: this step's speed, toward the slowest of the top speed, the game's cap, the bend, the leader and the stop. */
+    #drive(rider, dt) {
+        const p = rider.profile, speed = rider.speed;
+        let target = p.top_speed;
+        if (rider.speed_cap !== null) target = Math.min(target, rider.speed_cap);
+        if (p.bend_lateral_acceleration > 0) {
+            const bend = this.#bendAhead(rider, p.bend_look_base + speed * p.bend_look_seconds);
+            if (bend > 1e-9) target = Math.min(target, Math.max(p.bend_min_speed, Math.sqrt(p.bend_lateral_acceleration / bend)));
+        }
+        const look = p.look_base + p.body_length + speed * speed / (2 * p.braking) + speed * p.look_seconds;
+        const leader = this.#leader(rider, look);
+        rider.leader_id = leader ? leader.body_id : null; rider.gap = leader ? this.#gap : null;
+        if (leader) target = Math.min(target, this.#followCap(this.#gap, speed, leader.speed, p, leader.profile.braking));
+        if (rider.stop_distance !== null) {
+            const room = rider.stop_distance - rider.distance;
+            target = Math.min(target, room < p.stop_tolerance ? 0 : Math.sqrt(2 * p.braking * p.stop_brake_share * room));
+        }
+        rider.target_speed = target;
+        let next = Math.max(0, this.#roll(speed, this.#pedal(speed, target, p, dt), p, dt));
+        if (next < p.rest_speed) next = 0;
+        rider.speed = next;
+        rider.distance += next * dt;
+    }
+    /** The sharpest bend within `look` of a rider, read through onto the rails it runs onto. */
+    #bendAhead(rider, look) {
+        let rail = this.#rails.get(rider.rail_id), from = rider.distance, sharpest = 0, own = true;
+        for (let hop = 0; rail && look > 0 && hop < LEADER_HOPS; hop++) {
+            sharpest = Math.max(sharpest, railGeometry.sharpestBend(rail.table, from, from + look));
+            look -= rail.table.length - from;
+            const planned = own && rider.next_rail_id !== null;
+            const next_id = planned ? rider.next_rail_id : rail.next_rail_id; from = planned ? rider.next_distance : rail.next_distance;
+            rail = next_id === null ? null : this.#rails.get(next_id); own = false;
+        }
+        return sharpest;
+    }
+    /** The pedal a driver gives to reach a speed: -1 (full brake) .. 1 (full throttle). */
+    #pedal(speed, target, p, dt) {
+        const difference = target - speed, effort = 0.5 + p.pedal_urgency;
+        if (speed > p.pedal_creep_onset && (difference < -p.pedal_brake_onset || (target < p.pedal_speed_band && difference < -p.pedal_creep_onset))) {
+            return Math.max(-1, Math.min(-p.pedal_min_brake, difference / (p.braking * p.pedal_brake_seconds)));
+        }
+        if (difference > p.pedal_speed_band) return Math.min(1, difference * p.pedal_gain_up * effort);
+        if (difference < -p.pedal_speed_band) return Math.max(-1, difference * p.pedal_gain_down * effort);
+        return difference * p.pedal_gain_hold;
+    }
+    /** One step of speed along the line. The drag is solved from the top speed, so full throttle settles exactly there. */
+    #roll(speed, pedal, p, dt) {
+        if (Math.abs(pedal) > 0.1) {
+            if (speed * pedal < 0 && Math.abs(speed) > p.reverse_floor) speed -= Math.sign(speed) * Math.min(Math.abs(speed), Math.abs(pedal) * p.braking * dt);
+            else speed += pedal * p.acceleration * dt;
+        }
+        return speed * (p.top_speed / (p.acceleration * dt + p.top_speed));
+    }
+    /** The fastest speed that can still stop behind a leader. */
+    #followCap(gap, speed, leader_speed, p, leader_braking) {
+        if (gap < p.min_gap) return 0;
+        const braking = p.braking * p.follow_brake_share, ahead = Math.max(0, leader_speed);
+        const room = gap - p.min_gap - speed * p.reaction_seconds;
+        if (room <= 0) return ahead * p.match_share;
+        return Math.sqrt(ahead * ahead * (braking / leader_braking) + 2 * braking * room);
+    }
+    /** The nearest rider ahead: the nearest past it on its own rail, else the nearest on the rails it runs onto.
+     *  Leaves the bumper-to-bumper gap in #gap. */
+    #gap = 0;
+    #leader(rider, look) {
+        let rail = this.#rails.get(rider.rail_id), ahead = -rider.distance, from = rider.distance, own = true;
+        for (let hop = 0; rail && ahead < look && hop < LEADER_HOPS; hop++) {
+            let nearest = null;                                 // riders move as the step goes, so the list's order is not trusted here
+            for (const other of this.#order.get(rail.rail_id) ?? []) {
+                if (other === rider || !other.record.config.active || (own ? other.distance <= from : other.distance < from)) continue;
+                if (!nearest || other.distance < nearest.distance || (other.distance === nearest.distance && other.body_id < nearest.body_id)) nearest = other;
+            }
+            if (nearest) {
+                this.#gap = ahead + nearest.distance - rider.profile.body_length / 2 - nearest.profile.body_length / 2;
+                return this.#gap < look ? nearest : null;
+            }
+            const planned = own && rider.next_rail_id !== null;
+            const next_id = planned ? rider.next_rail_id : rail.next_rail_id; from = planned ? rider.next_distance : rail.next_distance;
+            ahead += rail.table.length - from;
+            rail = next_id === null ? null : this.#rails.get(next_id); own = false;
+        }
+        return null;
+    }
+    /** Past the end of its rail: onto the next (the one the game planned, else the rail's own), or waiting at a dead end. */
+    #advance(rider) {
+        for (let hop = 0; hop < MAX_HOPS; hop++) {
+            const rail = this.#rails.get(rider.rail_id), length = rail.table.length;
+            if (rider.distance < length) { rider.ended = false; return; }
+            const planned = rider.next_rail_id !== null;
+            const next_id = planned ? rider.next_rail_id : rail.next_rail_id, entry = planned ? rider.next_distance : rail.next_distance;
+            if (next_id === null || !this.#rails.has(next_id)) {
+                rider.distance = length; rider.speed = 0;
+                if (!rider.ended) { rider.ended = true; this.world._emit('railEnded', { body: rider.record.handle, rail_id: rider.rail_id }); }
+                return;
+            }
+            const from_rail_id = rider.rail_id;
+            rider.distance = entry + (rider.distance - length); rider.rail_id = next_id;
+            rider.next_rail_id = null; rider.next_distance = 0; rider.stop_distance = null;
+            const left = this.#order.get(from_rail_id), at = left ? left.indexOf(rider) : -1;       // riders stepped after it this step must find it here
+            if (at >= 0) left.splice(at, 1);
+            if (!this.#order.has(next_id)) this.#order.set(next_id, []);
+            this.#order.get(next_id).push(rider);
+            this.#orderValid = false;
+            this.world._emit('railChanged', { body: rider.record.handle, from_rail_id, rail_id: next_id });
+        }
+    }
+    /** Where its place on the rail puts the body: on the line, the nose turned in by the slide through a bend. */
+    #place(rider, dt) {
+        const p = rider.profile, point = railGeometry.pointOnRail(this.#rails.get(rider.rail_id).table, rider.distance, this.#point);
+        const speed = rider.speed;
+        if (dt > 0) {
+            const pull = -p.slide_per_acceleration * speed * speed * point.curvature;
+            const wanted = Math.max(-p.slide_max, Math.min(p.slide_max, pull));
+            rider.slide += (wanted - rider.slide) * (1 - Math.exp(-p.slide_ease_rate * dt));
+        }
+        const slip = Math.asin(Math.max(-p.slip_max, Math.min(p.slip_max, rider.slide / Math.max(p.slip_floor_speed, Math.abs(speed)))));
+        const lateral = rider.join_lateral, yaw = rider.join_rotation;
+        rider.pose = { x: point.x - Math.sin(point.rotation) * lateral, y: point.y + Math.cos(point.rotation) * lateral,
+            rotation: rider.record.rotation + angleDelta(rider.record.rotation, point.rotation - slip + yaw) };
+        if (dt > 0 && (lateral || yaw)) {
+            const keep = Math.exp(-p.join_ease_rate * dt);
+            rider.join_lateral = Math.abs(lateral) < 0.05 ? 0 : lateral * keep;
+            rider.join_rotation = Math.abs(yaw) < 0.002 ? 0 : yaw * keep;
+        }
+        if (dt === 0) rider.pose = null;                        // just joined: nothing is commanded until its first step
+    }
+    /** Each rail's riders, nearest its start first. */
+    #sort() {
+        if (this.#orderValid) return;
+        this.#order.clear();
+        for (const rider of this.#riders.values()) {
+            let list = this.#order.get(rider.rail_id);
+            if (!list) this.#order.set(rider.rail_id, list = []);
+            list.push(rider);
+        }
+        for (const list of this.#order.values()) list.sort((a, b) => a.distance - b.distance || a.body_id - b.body_id);
+        this.#orderValid = true;
+    }
+
+    // ===== VALIDATION, LIFECYCLE, SAVES =====
+
+    #name(rail_id) { if (typeof rail_id !== 'string' || !rail_id.trim()) throw new TypeError('rail_id must be a nonempty string'); }
+    #rail(rail_id) { const rail = this.#rails.get(rail_id); if (!rail) throw new Error(`Unknown rail: ${rail_id}`); return rail; }
+    #rider(body) {
+        const rider = this.#riders.get(this.world._record(referenceBody(body)).id);
+        if (!rider) throw new TypeError('Body is not riding a rail');
+        return rider;
+    }
+    #body(value) {
+        const record = this.world._record(referenceBody(value));
+        if (record.config.physics_type === 'static') throw new TypeError('A rail rider must be a movable or kinematic body');
+        return record;
+    }
+    #link(target, next_rail_id, next_distance) {
+        if (next_rail_id !== null) this.#name(next_rail_id);
+        target.next_rail_id = next_rail_id; target.next_distance = next_rail_id === null ? 0 : number(next_distance, 'next_distance', 0);
+        return target;
+    }
+    #profile(packet) {
+        if (!packet || typeof packet !== 'object' || Array.isArray(packet)) throw new TypeError('A rider profile must be an object');
+        for (const key of Object.keys(packet)) if (!(key in PROFILE)) throw new TypeError(`Unknown rider profile field: ${key}`);
+        const profile = { ...PROFILE, ...packet };
+        for (const key of Object.keys(profile)) number(profile[key], key, POSITIVE.has(key) ? 1e-7 : 0);
+        number(profile.pedal_urgency, 'pedal_urgency', 0, 1); number(profile.slip_max, 'slip_max', 0, 1);
+        return profile;
+    }
+    _remove(body_id) { if (this.#riders.delete(body_id)) this.#orderValid = false; }
+    _clear() { this.#rails.clear(); this.#riders.clear(); this.#order.clear(); this.#orderValid = false; }
+    _saveState() {
+        return { format_version: 1,
+            rails: [...this.#rails.values()].map(rail => ({ rail_id: rail.rail_id, points: clone(rail.points), rotations: rail.rotations ? [...rail.rotations] : null,
+                next_rail_id: rail.next_rail_id, next_distance: rail.next_distance })),
+            riders: [...this.#riders.values()].map(rider => ({ body_id: rider.body_id, rail_id: rider.rail_id, distance: rider.distance, speed: rider.speed,
+                slide: rider.slide, profile: { ...rider.profile }, speed_cap: rider.speed_cap, stop_distance: rider.stop_distance,
+                next_rail_id: rider.next_rail_id, next_distance: rider.next_distance, join_lateral: rider.join_lateral, join_rotation: rider.join_rotation,
+                ended: rider.ended, pose: rider.pose ? { ...rider.pose } : null })) };
+    }
+    _loadState(saved) {
+        if (saved === undefined) return;
+        if (!saved || saved.format_version !== 1 || !Array.isArray(saved.rails) || !Array.isArray(saved.riders)) throw new TypeError('Invalid saved rails');
+        for (const rail of saved.rails) this.registerRail(rail.rail_id, { points: rail.points, rotations: rail.rotations ?? undefined, next_rail_id: rail.next_rail_id, next_distance: rail.next_distance });
+        for (const entry of saved.riders) {
+            this.rideRail(entry.body_id, { rail_id: entry.rail_id, distance: entry.distance, speed: entry.speed, profile: entry.profile });
+            const rider = this.#riders.get(entry.body_id);
+            this.setRiderLimits(entry.body_id, { speed_cap: entry.speed_cap, stop_distance: entry.stop_distance, next_rail_id: entry.next_rail_id, next_distance: entry.next_distance });
+            rider.slide = number(entry.slide, 'slide'); rider.join_lateral = number(entry.join_lateral, 'join_lateral'); rider.join_rotation = number(entry.join_rotation, 'join_rotation');
+            rider.ended = entry.ended === true;
+            rider.pose = entry.pose ? { x: number(entry.pose.x, 'pose x'), y: number(entry.pose.y, 'pose y'), rotation: number(entry.pose.rotation, 'pose rotation') } : null;
+        }
+    }
+}
+
+return Object.freeze({get railController(){return railController;}});
+})();
+// src/basement/physics/attachments/manager.mjs
+const m32 = (()=>{
 const {normalizeEmitter} = m16;
 const {invalidateMass,massProperties,massCenter,impulseCenter,centerVelocity,setCenterVelocity} = m5;
 const {vector,number,rotate,add,angleDelta} = m7;
@@ -12187,7 +12672,7 @@ class attachmentManager {
 return Object.freeze({get attachmentManager(){return attachmentManager;}});
 })();
 // src/basement/physics/motion/layout-geometry.mjs
-const m31 = (()=>{
+const m33 = (()=>{
 const {vector,number,rotate,sub,add,clamp} = m7;
 
 /** Build-time authored geometry and body-local interaction geometry. No obstacle store. */
@@ -12229,7 +12714,7 @@ class layoutGeometry {
 return Object.freeze({get layoutGeometry(){return layoutGeometry;}});
 })();
 // src/basement/physics/particles/particles.mjs
-const m32 = (()=>{
+const m34 = (()=>{
 const {number,vector,clone,length,sub,add,rotate,BODY_GROUP} = m7;
 
 /** Particle bodies use the world's ONLY grid and common contact solver. */
@@ -12422,10 +12907,11 @@ const {gameElements} = m25;
 const {physicsConstraint,constraintRecord,updateConstraint,constraintSolver} = m27;
 const {motionController} = m28;
 const {trafficController} = m29;
-const {attachmentManager} = m30;
+const {railController} = m30;
+const {attachmentManager} = m32;
 const {pathGeometry} = m17;
-const {layoutGeometry} = m31;
-const {particlePhysics} = m32;
+const {layoutGeometry} = m33;
+const {particlePhysics} = m34;
 
 /** Standalone fixed-step world. Exactly one spatialGrid is constructed here. */
 class physicsSystem {
@@ -12448,6 +12934,7 @@ class physicsSystem {
         Object.defineProperty(this, 'motion', { value: new motionController(this), enumerable: true });
         Object.defineProperty(this, 'rigs', { value: new rigSystem(this), enumerable: true });
         Object.defineProperty(this, 'traffic', { value: new trafficController(this), enumerable: true });
+        Object.defineProperty(this, 'rails', { value: new railController(this), enumerable: true });
         this.#attachments = new attachmentManager(this); this.#queries = new physicsQueries(this); this.#particles = new particlePhysics(this);
     }
     get simulation_tick() { return this.#tick; }
@@ -12607,7 +13094,7 @@ class physicsSystem {
         this._mutate(() => {
             if (r.removed) return;
             this.#motionEnvelope = null;this.#candidateCache=null; this.spatial_grid.removeInstance(r.id); r.indexed = false; r.removed = true; this.#bodies.delete(r.id); this.#moving.delete(r);
-            this.#attachments._bodyRemoved(r); this.rigs._bodyRemoved(r.id); this.elements._bodyRemoved(r.id); this.traffic.removeVehicle(r.id); this.motion._remove(r.id); this.#particles._bodyRemoved(r.id);
+            this.#attachments._bodyRemoved(r); this.rigs._bodyRemoved(r.id); this.elements._bodyRemoved(r.id); this.traffic.removeVehicle(r.id); this.motion._remove(r.id); this.rails._remove(r.id); this.#particles._bodyRemoved(r.id);
             for (const [id, c] of this.#constraints) { const cr = constraintRecord(c); if (cr.a === r || cr.b === r) this.#constraints.delete(id); }
         });
     }
@@ -12850,13 +13337,13 @@ class physicsSystem {
                 }
             }
             this.#attachments._capturePrevious(step_seconds); this.rigs._capturePrevious();
-            this.traffic._update();
+            this.traffic._update(); this.rails._update(step_seconds);
             this.#particles._beforeStep(step_seconds);
             for (const r of moving) {
                 r.motion_step = r.motor instanceof projectileMotor ? Math.min(step_seconds, Math.max(0, r.motor.remaining)) : step_seconds;
                 if (r.parent_mount) { r.force[0]=r.force[1]=0;r.torque=0;continue; }
                 if (r.sleeping) continue;
-                const scripted = this.motion._controls(r, step_seconds); r.prescribed_step = scripted || r.config.physics_type === 'kinematic';
+                const scripted = this.motion._controls(r, step_seconds) || this.rails._controls(r, step_seconds); r.prescribed_step = scripted || r.config.physics_type === 'kinematic';
                 if (!scripted) r.motor?._update(step_seconds);
                 if (movable(r) && !scripted) {
                     if (r.force[0] || r.force[1]) changeVelocity(r, scale(r.force, step_seconds));
@@ -13068,7 +13555,7 @@ class physicsSystem {
     removeChain(chain) { return this.#particles.removeChain(chain); }
     clearWorld() {
         this._mutate(() => { for (const r of this.#bodies.values()) r.removed = true; this.#bodies.clear(); this.#moving.clear(); this.#constraints.clear(); this.#contacts.clear(); this.#stepContacts.clear();
-            this.#attachments._clear(); this.rigs._clear(); this.elements._clear(); this.traffic._clear(); this.motion._clear(); this.spatial_grid.clear(); this.#particles._clear(); this.#events = []; this.#nextId = 1; this.#nextConstraint = 1; this.#tick = 0; this.#motionEnvelope = null;this.#candidateCache=null;this.#broadphaseEpoch++; });
+            this.#attachments._clear(); this.rigs._clear(); this.elements._clear(); this.traffic._clear(); this.rails._clear(); this.motion._clear(); this.spatial_grid.clear(); this.#particles._clear(); this.#events = []; this.#nextId = 1; this.#nextConstraint = 1; this.#tick = 0; this.#motionEnvelope = null;this.#candidateCache=null;this.#broadphaseEpoch++; });
     }
     // Versioned exchange; validate a replacement before changing the live registry.
     _exportState() {
@@ -13076,7 +13563,7 @@ class physicsSystem {
         return { format_version: 2, config: clone(this.config), simulation_tick: this.simulation_tick, entities: this.elements._saveState(),
             attachments: this.#attachments._saveState(), rigs:this.rigs._saveState(),
             bodies: [...this.#bodies.values()].map(r => ({ ...snapshot(r), active: r.config.active, force: [...r.force], torque: r.torque, sleep_time: r.sleep_time, motor: this._saveMotor(r.motor) })),
-            constraints: [...this.#constraints.values()].map(c => c.getState()), particles: this.#particles._saveState(), traffic: this.traffic._saveState(), motion: this.motion._saveState(),
+            constraints: [...this.#constraints.values()].map(c => c.getState()), particles: this.#particles._saveState(), traffic: this.traffic._saveState(), motion: this.motion._saveState(), rails: this.rails._saveState(),
             spatial_instances: this.spatial_grid.exportInstances().filter(e => typeof e.id === 'string'),
             next_body_id: this.#nextId, next_constraint_id: this.#nextConstraint };
     }
@@ -13150,7 +13637,7 @@ class physicsSystem {
         this.#particles._loadState(saved.particles);
         for (const e of saved.spatial_instances ?? []) this.registerSpatialInstance(e.value.instance_id, e.bounds, e.value);
         this.elements._restoreState(saved.entities);
-        this.traffic._loadState(saved.traffic); this.motion._loadState(saved.motion);
+        this.traffic._loadState(saved.traffic); this.motion._loadState(saved.motion); this.rails._loadState(saved.rails);
         this.rigs._loadState(saved.rigs);
         this.#attachments._loadState(saved.attachments);
     }
@@ -13187,9 +13674,11 @@ const m1 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m2.physicsSystem;},get physicsBody(){return m18.physicsBody;},get collisionShape(){return m6.collisionShape;},get collisionDetector(){return m10.collisionDetector;},get contactSolver(){return m19.contactSolver;},get spatialGrid(){return m20.spatialGrid;},get physicsConstraint(){return m27.physicsConstraint;},get constraintSolver(){return m27.constraintSolver;},get characterMotor(){return m4.characterMotor;},get vehicleMotor(){return m21.vehicleMotor;},get pathMotor(){return m21.pathMotor;},get projectileMotor(){return m22.projectileMotor;},get particlePhysics(){return m32.particlePhysics;},get gameEntity(){return m24.gameEntity;},get gameElements(){return m25.gameElements;},get assetLibrary(){return m26.assetLibrary;},get gameCharacter(){return m23.gameCharacter;},get gameVehicle(){return m23.gameVehicle;},get gameProjectile(){return m23.gameProjectile;},get gameProp(){return m23.gameProp;},get gameStatic(){return m23.gameStatic;},get gameTrigger(){return m23.gameTrigger;},get gameDecoration(){return m23.gameDecoration;},get awarenessMatrix(){return m23.awarenessMatrix;},get BODY_GROUP(){return m7.BODY_GROUP;},get QUERY_GROUP(){return m7.QUERY_GROUP;},get PHYSICS_TYPES(){return m7.PHYSICS_TYPES;},get trafficController(){return m29.trafficController;},get motionController(){return m28.motionController;},get pathGeometry(){return m17.pathGeometry;},get layoutGeometry(){return m31.layoutGeometry;},get rigDefinition(){return m13.rigDefinition;},get rigPose(){return m12.rigPose;},get animationClip(){return m15.animationClip;},get animationController(){return m11.animationController;},get rigSystem(){return m3.rigSystem;}});
+
+
+return Object.freeze({get physicsSystem(){return m2.physicsSystem;},get physicsBody(){return m18.physicsBody;},get collisionShape(){return m6.collisionShape;},get collisionDetector(){return m10.collisionDetector;},get contactSolver(){return m19.contactSolver;},get spatialGrid(){return m20.spatialGrid;},get physicsConstraint(){return m27.physicsConstraint;},get constraintSolver(){return m27.constraintSolver;},get characterMotor(){return m4.characterMotor;},get vehicleMotor(){return m21.vehicleMotor;},get pathMotor(){return m21.pathMotor;},get projectileMotor(){return m22.projectileMotor;},get particlePhysics(){return m34.particlePhysics;},get gameEntity(){return m24.gameEntity;},get gameElements(){return m25.gameElements;},get assetLibrary(){return m26.assetLibrary;},get gameCharacter(){return m23.gameCharacter;},get gameVehicle(){return m23.gameVehicle;},get gameProjectile(){return m23.gameProjectile;},get gameProp(){return m23.gameProp;},get gameStatic(){return m23.gameStatic;},get gameTrigger(){return m23.gameTrigger;},get gameDecoration(){return m23.gameDecoration;},get awarenessMatrix(){return m23.awarenessMatrix;},get BODY_GROUP(){return m7.BODY_GROUP;},get QUERY_GROUP(){return m7.QUERY_GROUP;},get PHYSICS_TYPES(){return m7.PHYSICS_TYPES;},get trafficController(){return m29.trafficController;},get motionController(){return m28.motionController;},get railController(){return m30.railController;},get railGeometry(){return m31.railGeometry;},get pathGeometry(){return m17.pathGeometry;},get layoutGeometry(){return m33.layoutGeometry;},get rigDefinition(){return m13.rigDefinition;},get rigPose(){return m12.rigPose;},get animationClip(){return m15.animationClip;},get animationController(){return m11.animationController;},get rigSystem(){return m3.rigSystem;}});
 })();
-const m35 = Object.freeze({default:{
+const m37 = Object.freeze({default:{
   "_about": {
     "chapter": "Enemies and encounters: what each enemy kind starts with, the drones, the Triumvirate and Lilitu, their hazards, and the Horde Gauntlet.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.enemies and checked by tools/test-game-db.cjs. Times are seconds unless a name says frames (60 a second); distances px; damage HP. Keys in UPPER_SNAKE are read by the code under those names. Gauntlet ids and kind ids are in save files: never rename one.",
@@ -13732,8 +14221,8 @@ const m35 = Object.freeze({default:{
   }
 }});
 // src/directory/game-bosses.mjs
-const m34 = (()=>{
-const enemies = m35.default;
+const m36 = (()=>{
+const enemies = m37.default;
 function createBossRules(source=enemies){return {demoness:structuredClone(source.kinds.demoness),duel:structuredClone(source.duel),warden:structuredClone(source.warden),wardens:structuredClone(source.wardens),hazards:structuredClone(source.hazards),rite_limit_radius:1800};}
 function createDemonessAppearance({decoy=false}={}){return {gender:'female',skinColor:'#8a0707',eyeColor:decoy?'#2a0508':'#ff5a1a',blood:'ink',build:'curvy',height:1.14,hair:{type:'demon_dancer',color:'#0a0000'},hat:{type:'demon_horns',color:'#160406',trim:'#e3a64a'},top:{type:'sleeved_crop',color:'#0a0406',trim:'#e3a64a'},bottom:{type:'long_skirt',color:'#0a0406',trim:'#b0122e'},train:{type:'dress_train',color:'#2a0610'},shoes:{type:'heels',color:'#0a0406'}};}
 function createBossAbilities(source=enemies){
@@ -13759,7 +14248,7 @@ function createBossAbilities(source=enemies){
 
 return Object.freeze({get createBossRules(){return createBossRules;},get createDemonessAppearance(){return createDemonessAppearance;},get createBossAbilities(){return createBossAbilities;}});
 })();
-const m36 = Object.freeze({default:{
+const m38 = Object.freeze({default:{
   "radius": 8,
   "mass": 3,
   "follow_offset": [
@@ -13776,8 +14265,8 @@ const m36 = Object.freeze({default:{
   "rest_after": 2.5
 }});
 // src/directory/game-drones.mjs
-const m37 = (()=>{
-const enemies = m35.default;
+const m39 = (()=>{
+const enemies = m37.default;
 /** Authored Drone balance is converted once to seconds and pixels per second. */
 function createDroneRules(def=enemies.drone,kind=enemies.kinds.drone){return {flight:def,health:def.HP,mass:kind.mass,radius:kind.radius,speed:kind.speed*60,damage_grace_seconds:kind.invincible_frames/60};}
 function createDroneAbilities(d=enemies.drone){
@@ -13792,7 +14281,7 @@ function createDroneAbilities(d=enemies.drone){
 
 return Object.freeze({get createDroneRules(){return createDroneRules;},get createDroneAbilities(){return createDroneAbilities;}});
 })();
-const m39 = Object.freeze({default:{
+const m41 = Object.freeze({default:{
   "weapon_id": "gatling_gunner",
   "ability_id": "gatling_burst",
   "range": 900,
@@ -13823,15 +14312,15 @@ const m39 = Object.freeze({default:{
   }
 }});
 // src/directory/game-gunners.mjs
-const m38 = (()=>{
-const enemies = m35.default;
-const rules = m39.default;
+const m40 = (()=>{
+const enemies = m37.default;
+const rules = m41.default;
 function createGunnerRules(kind=enemies.kinds.gatling_gunner){return {...structuredClone(rules),burst_count:kind.burst_count,round_seconds:kind.burst_delay/60,reload_seconds:kind.reload/60,tell_seconds:kind.telegraph_frames/60};}
 function createGunnerAbilities(kind=enemies.kinds.gatling_gunner){const r=createGunnerRules(kind);return {[r.ability_id]:{name:'Gatling burst',description:'Wind up, fire an owned rotary weapon, then reload.',delivery:'burst',required_weapon_id:r.weapon_id,range:r.range,speed:r.gun.speed*60,cooldown_seconds:r.reload_seconds,tell_seconds:r.tell_seconds,reload_seconds:r.reload_seconds,burst_count:r.burst_count,allow_mounted:false,require_sight:true}};}
 
 return Object.freeze({get createGunnerRules(){return createGunnerRules;},get createGunnerAbilities(){return createGunnerAbilities;}});
 })();
-const m41 = Object.freeze({default:{
+const m43 = Object.freeze({default:{
   "HP": 30,
   "RADIUS": 11,
   "SCALE": 0.72,
@@ -13874,8 +14363,8 @@ const m41 = Object.freeze({default:{
   "IMPACT": 84
 }});
 // src/directory/game-marionettes.mjs
-const m40 = (()=>{
-const authored = m41.default;
+const m42 = (()=>{
+const authored = m43.default;
 const freeze=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))freeze(child);Object.freeze(value);}return value;};
 const MARIONETTE_RULES=freeze(structuredClone(authored));
 function createMarionetteRules(){const m=authored;return {health:m.HP,radius:m.RADIUS,mass:m.MASS,move_speed:m.SPEED*60,damage_grace_seconds:m.INVINCIBLE_FRAMES/60,ballistic_multiplier:m.SHOT,sight:m.SIGHT,reach:m.REACH,space:m.SPACE,flank_range:m.REACH+m.CIRCLE,flank_offsets:[[m.CIRCLE,0],[0,m.CIRCLE],[-m.CIRCLE,0],[0,-m.CIRCLE]],drift_speed:m.DRIFT*60,yank_speed:m.YANK_SPEED*60,yank_interval:m.YANK,yank_seconds:m.YANK_SECONDS,cloth:m.CLOTH};}
@@ -13884,7 +14373,7 @@ function createMarionetteAbilities(){const m=authored;return {marionette_lunge:{
 return Object.freeze({get MARIONETTE_RULES(){return MARIONETTE_RULES;},get createMarionetteRules(){return createMarionetteRules;},get createMarionetteAbilities(){return createMarionetteAbilities;}});
 })();
 // src/directory/game-hunters.mjs
-const m42 = (()=>{
+const m44 = (()=>{
 /** Normalize existing Hunter authoring once; gameplay and Basement receive engine units. */
 function createHunterRules(kind,{authoring_hz=60}={}){
  return {dash_max:kind.dashes,dash_cooldown:kind.dash_cd/authoring_hz,dash_initial:90/authoring_hz,dash_chain_delay:22/authoring_hz,dash_retry:30/authoring_hz,dash_min_range:150,dash_max_range:420,dash_stop_distance:70,evade_min_cooldown:40/authoring_hz,evade_distance:90,evade_speed:540,evade_chance:.5,evade_cooldown:120/authoring_hz,minimum_visibility:.55,claw_range:kind.claw_reach};
@@ -13902,7 +14391,7 @@ function createHunterAppearance({alpha=false,random=Math.random}={}){
 
 return Object.freeze({get createHunterRules(){return createHunterRules;},get createHunterAbilities(){return createHunterAbilities;},get createHunterAppearance(){return createHunterAppearance;}});
 })();
-const m45 = Object.freeze({default:{
+const m47 = Object.freeze({default:{
   "_about": {
     "chapter": "Items and gear: everything she can carry, drink, read, craft or own.",
     "how_to_edit": "Plain JSON. tools/build.mjs inlines this file as GAME_DB.items when it builds the game, and tools/test-game-db.cjs checks it. Entry field names stay camelCase because the game code reads them by those names. A \"note\" field is for people and is never read by the game.",
@@ -14687,10 +15176,10 @@ const m45 = Object.freeze({default:{
   ]
 }});
 // src/directory/game-items.mjs
-const m44 = (()=>{
-const gunnerRules = m39.default;
-const enemies = m35.default;
-const definitions = m45.default;
+const m46 = (()=>{
+const gunnerRules = m41.default;
+const enemies = m37.default;
+const definitions = m47.default;
 
 /** Concrete item definitions stay in the Directory; gameplay receives plain catalog data. */
 function createItemCatalog(items=definitions,{enemy_kinds=enemies.kinds}={}) {
@@ -14712,7 +15201,7 @@ function createItemCatalog(items=definitions,{enemy_kinds=enemies.kinds}={}) {
 return Object.freeze({get createItemCatalog(){return createItemCatalog;}});
 })();
 // src/gameplay/values.mjs
-const m48 = (()=>{
+const m50 = (()=>{
 // Gameplay validation, deliberately unrelated to physical vectors or integration.
 function nonnegative(value, name) {
     if (!Number.isFinite(value) || value < 0) throw new TypeError(`${name} must be finite and nonnegative`);
@@ -14749,8 +15238,8 @@ function validateModifiers(modifiers) {
 return Object.freeze({get nonnegative(){return nonnegative;},get identifier(){return identifier;},get jsonCopy(){return jsonCopy;},get validateModifiers(){return validateModifiers;}});
 })();
 // src/gameplay/abilities/ability-loadout.mjs
-const m47 = (()=>{
-const {identifier,jsonCopy} = m48;
+const m49 = (()=>{
+const {identifier,jsonCopy} = m50;
 const components=new WeakMap();
 /** Learned capabilities, separate from carried items and physical/attack state. */
 class abilityLoadout{
@@ -14771,7 +15260,7 @@ function actorAbilities(data,catalog){const previous=components.get(data);if(pre
 
 return Object.freeze({get abilityLoadout(){return abilityLoadout;},get actorAbilities(){return actorAbilities;}});
 })();
-const m49 = Object.freeze({default:{
+const m51 = Object.freeze({default:{
   "_about": {
     "chapter": "Progression: Resonance (949's levels), the three tuning trees, castable abilities, and the perks closeness unlocks.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.progression and checked by tools/test-game-db.cjs. Node ids, tree ids and ability ids are in save files: never rename one. A \"note\" is for people only.",
@@ -15045,7 +15534,7 @@ const m49 = Object.freeze({default:{
     }
   }
 }});
-const m50 = Object.freeze({default:{
+const m52 = Object.freeze({default:{
   "authoring_hz": 60,
   "local_position": [20, 0],
   "projectile_radius": 5,
@@ -15054,17 +15543,17 @@ const m50 = Object.freeze({default:{
   "damage_type": "energy"
 }});
 // src/directory/game-abilities.mjs
-const m46 = (()=>{
-const {createBossAbilities} = m34;
-const {createDroneAbilities} = m37;
-const {createGunnerAbilities} = m38;
-const {createMarionetteAbilities} = m40;
-const enemies = m35.default;
-const {createHunterAbilities} = m42;
-const {abilityLoadout} = m47;
-const progression = m49.default;
-const rules = m50.default;
-const {identifier,nonnegative,jsonCopy} = m48;
+const m48 = (()=>{
+const {createBossAbilities} = m36;
+const {createDroneAbilities} = m39;
+const {createGunnerAbilities} = m40;
+const {createMarionetteAbilities} = m42;
+const enemies = m37.default;
+const {createHunterAbilities} = m44;
+const {abilityLoadout} = m49;
+const progression = m51.default;
+const rules = m52.default;
+const {identifier,nonnegative,jsonCopy} = m50;
 
 /** Existing authored balance becomes engine units once at the Directory boundary. */
 function createAbilityCatalog(definitions=progression.abilities,{hunter_kind=enemies.kinds.hunter,gunner_kind=enemies.kinds.gatling_gunner,drone_definition=enemies.drone,boss_definitions=enemies}={}){
@@ -15091,7 +15580,7 @@ function importActorAbilities(data,catalog,{default_id=null}={}){
 
 return Object.freeze({get createAbilityCatalog(){return createAbilityCatalog;},get importActorAbilities(){return importActorAbilities;}});
 })();
-const m51 = Object.freeze({default:{
+const m53 = Object.freeze({default:{
   "authoring_hz": 60,
   "crit_chance": 0.1,
   "crit_multiplier": 2,
@@ -15170,7 +15659,7 @@ const m51 = Object.freeze({default:{
     "minimum_cooldown_seconds": 0.6
   }
 }});
-const m52 = Object.freeze({default:{
+const m54 = Object.freeze({default:{
   "firearm_range": 400,
   "melee_range": 65,
   "unarmed_range": 65,
@@ -15181,11 +15670,11 @@ const m52 = Object.freeze({default:{
   }
 }});
 // src/directory/game-attacks.mjs
-const m43 = (()=>{
-const {createItemCatalog} = m44;
-const {createAbilityCatalog} = m46;
-const combatRules = m51.default;
-const rules = m52.default;
+const m45 = (()=>{
+const {createItemCatalog} = m46;
+const {createAbilityCatalog} = m48;
+const combatRules = m53.default;
+const rules = m54.default;
 
 /** References to existing item/capability definitions, not a second balance/ownership ledger. */
 function createAttackCatalog({items=createItemCatalog(),abilities=createAbilityCatalog()}={}){
@@ -15200,12 +15689,12 @@ function createAttackCatalog({items=createItemCatalog(),abilities=createAbilityC
 
 return Object.freeze({get createAttackCatalog(){return createAttackCatalog;}});
 })();
-const m53 = Object.freeze({default:{
+const m55 = Object.freeze({default:{
  "health":100,"authoring_hz":60,"damage_grace_seconds":0,
  "npc":{"follow_distance":60,"recover_distance":300,"cruise_speed":210,"match_speed":312,"catchup_speed":420,"match_distance":30,"catchup_distance":100,"combat_range":400,"recovery_delay":3,"regeneration_interval":0.5,"regeneration_amount":1,"stim_threshold":0.3,"stim_heal":50,"stim_cooldown":2,"stim_count":3,"aura_range":120,"aura_interval":1,"hire_cost":400,"hire_minutes":480},
  "ganger":{"vision_fov":1.2566370614359172,"personal_space":50,"touch_distance":32,"suspicion_near_per_second":300,"suspicion_sight_per_second":150,"suspicion_idle_drain_per_second":30,"suspicion_search_drain_per_second":6,"suspicion_decay_delay":2,"noise_decay_delay":3,"suppression_seconds":1.5,"suppression_cooldown":0.25,"search_speed":90,"retreat_speed":90,"engage_distance":150,"retreat_distance":80,"search_arrival":40,"wander_speed":30,"wander_radius":200,"wander_min_seconds":2,"wander_random_seconds":3.3333333333333335,"search_look_seconds":0.75,"search_timeout":5,"interrupt_seconds":0.2,"interrupt_resistance":0.65,"shot_jitter_seconds":0.3333333333333333}
 }});
-const m54 = Object.freeze({default:{
+const m56 = Object.freeze({default:{
   "max_health": 100,
   "movement_speed": 312,
   "sneak_speed_factor": 0.55,
@@ -15223,7 +15712,7 @@ const m54 = Object.freeze({default:{
     "minimum_distance": 1
   }
 }});
-const m55 = Object.freeze({default:{
+const m57 = Object.freeze({default:{
   "library_id": "df",
   "description": "Directory-owned entity definitions for the standalone engine. Existing game classes migrate to these contracts in the next phase. Units: world pixels, seconds, radians and kilograms.",
   "resources": {
@@ -15777,7 +16266,7 @@ const m55 = Object.freeze({default:{
     }
   }
 }});
-const m56 = Object.freeze({default:{
+const m58 = Object.freeze({default:{
   "library_id": "df_street",
   "resources": {
     "rules": {
@@ -15844,7 +16333,7 @@ const m56 = Object.freeze({default:{
     }
   }
 }});
-const m57 = Object.freeze({default:{
+const m59 = Object.freeze({default:{
   "_about": {
     "chapter": "Cast and looks: every speaker's colour, who stands where in a cinematic scene, where the crew idles at home, how every named character looks, the colours looks share, the Double Nights android finishes, the wardrobe Stella can buy and wear, and the finishes and named materials it is drawn with.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.cast and checked by tools/test-game-db.cjs. Colours are '#rrggbb' (or '#rgb'). In appearances, { \"palette\": \"<name>\" } stands for that colour from palette, so a colour several looks share is changed once. Crowds (ROLE_LOOKS) and the field mask are code and stay in core/appearances.js. _about.notes keeps the explanations that were comments in the code, keyed by path.",
@@ -17314,7 +17803,7 @@ const m57 = Object.freeze({default:{
     }
   ]
 }});
-const m58 = Object.freeze({default:{
+const m60 = Object.freeze({default:{
   "_about": {
     "chapter": "Vehicles and traffic: the car brands and models, BlackMark's factory look, the Zib cabs and where they go, how traffic treats people in the road, and the driving feel every car shares.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.vehicles and checked by tools/test-game-db.cjs. Speeds are px a tick (60 ticks a second), accelerations px a tick², times in ticks unless a name says ms, distances px, angles radians. Keys in camelCase or UPPER_SNAKE are read by the code under those names. Brand and model keys are in save files: never rename one. _about.fields explains each field of the tuning tables.",
@@ -18046,7 +18535,7 @@ const m58 = Object.freeze({default:{
     }
   }
 }});
-const m59 = Object.freeze({default:{
+const m61 = Object.freeze({default:{
   "_about": {
     "chapter": "Places: every map's size, floors, walls, zones, landmarks and ways in and out; the rooms and doors inside them; where the city's landmark blocks are; the fireplaces; and where the dyer stands.",
     "how_to_edit": "Plain JSON, inlined by tools/build.mjs as GAME_DB.places and checked by tools/test-game-db.cjs. Positions and sizes are world px, from the map's top-left; angles radians. Keys in camelCase or UPPER_SNAKE are read by the code under those names. Map ids and room ids are in save files and story steps: never rename one. _about.notes keeps the explanations that were comments in the code, keyed by where they apply (maps.apt_949.cameraBounds, rooms.apt_949.doors[0], …); they're for people only.",
@@ -19786,27 +20275,27 @@ const m59 = Object.freeze({default:{
   "dyer_station": {"x":1176,"y":214,"width":58,"height":30}
 }});
 // src/directory/game-assets.mjs
-const m33 = (()=>{
-const {createBossRules,createDemonessAppearance} = m34;
-const velvetRules = m36.default;
-const {createDroneRules} = m37;
-const {createGunnerRules} = m38;
-const {createMarionetteRules} = m40;
-const {createHunterRules} = m42;
-const {createAttackCatalog} = m43;
-const progression = m49.default;
-const {createAbilityCatalog} = m46;
-const actorRules = m53.default;
-const {createItemCatalog} = m44;
+const m35 = (()=>{
+const {createBossRules,createDemonessAppearance} = m36;
+const velvetRules = m38.default;
+const {createDroneRules} = m39;
+const {createGunnerRules} = m40;
+const {createMarionetteRules} = m42;
+const {createHunterRules} = m44;
+const {createAttackCatalog} = m45;
+const progression = m51.default;
+const {createAbilityCatalog} = m48;
+const actorRules = m55.default;
+const {createItemCatalog} = m46;
 const {assetLibrary} = m1;
-const playerRules = m54.default;
-const definitions = m55.default;
-const streetDefinitions = m56.default;
-const cast = m57.default;
-const vehicles = m58.default;
-const enemies = m35.default;
-const places = m59.default;
-const items = m45.default;
+const playerRules = m56.default;
+const definitions = m57.default;
+const streetDefinitions = m58.default;
+const cast = m59.default;
+const vehicles = m60.default;
+const enemies = m37.default;
+const places = m61.default;
+const items = m47.default;
 
 /** Game data is wired here, never imported by the reusable Basement package. */
 function createGameAssetLibrary({ game_db = { cast, vehicles, enemies, places, items } } = {}) {
@@ -19847,8 +20336,8 @@ function createGameAssetLibrary({ game_db = { cast, vehicles, enemies, places, i
 return Object.freeze({get createGameAssetLibrary(){return createGameAssetLibrary;}});
 })();
 // src/gameplay/attacks/attack-registry.mjs
-const m66 = (()=>{
-const {identifier,jsonCopy} = m48;
+const m68 = (()=>{
+const {identifier,jsonCopy} = m50;
 const freeze=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))freeze(child);Object.freeze(value);}return value;};
 
 const synchronous=callback=>(...args)=>{const result=callback(...args);if(result&&typeof result.then==='function')throw new TypeError('Attack callbacks must be synchronous');return result;};
@@ -19885,9 +20374,9 @@ function validateAttackState(state,hasAttack){
 return Object.freeze({get attackRegistry(){return attackRegistry;},get validateAttackState(){return validateAttackState;}});
 })();
 // src/gameplay/actors/actor-vitals.mjs
-const m67 = (()=>{
-const rules = m53.default;
-const {nonnegative,jsonCopy} = m48;
+const m69 = (()=>{
+const rules = m55.default;
+const {nonnegative,jsonCopy} = m50;
 function validate(data){nonnegative(data.health,'health');nonnegative(data.max_health,'max_health');if(!data.max_health||data.health>data.max_health)throw new TypeError('Invalid actor health');}
 /** Shared health operations over the owner's canonical data, with no physical or UI state. */
 class actorVitals{
@@ -19910,11 +20399,11 @@ class actorVitals{
 return Object.freeze({get actorVitals(){return actorVitals;}});
 })();
 // src/entities/game-actor.mjs
-const m65 = (()=>{
-const {validateAttackState} = m66;
+const m67 = (()=>{
+const {validateAttackState} = m68;
 const {gameCharacter} = m1;
-const {actorVitals} = m67;
-const {nonnegative,jsonCopy} = m48;
+const {actorVitals} = m69;
+const {nonnegative,jsonCopy} = m50;
 const health=new WeakMap(),hooks=new WeakMap();
 const stateFor=actor=>actor.data.actor_state??={format_version:1,defeated:false,invulnerable_remaining:0,elapsed:0};
 /** Common actor gameplay over a real gameCharacter. No velocity, geometry or body mirrors. */
@@ -19959,11 +20448,11 @@ class gameActor extends gameCharacter{
 
 return Object.freeze({get gameActor(){return gameActor;}});
 })();
-const m70 = Object.freeze({default:{"capacity":10,"max_attachments":2,"owner_id":"player"}});
+const m72 = Object.freeze({default:{"capacity":10,"max_attachments":2,"owner_id":"player"}});
 // src/gameplay/items/item-system.mjs
-const m69 = (()=>{
-const itemRules = m70.default;
-const {identifier,jsonCopy,validateModifiers} = m48;
+const m71 = (()=>{
+const itemRules = m72.default;
+const {identifier,jsonCopy,validateModifiers} = m50;
 
 const modes=['normal','sniper','melee','fists'];
 const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
@@ -20144,10 +20633,10 @@ class itemSystem {
 return Object.freeze({get itemSystem(){return itemSystem;}});
 })();
 // src/gameplay/actors/actor-inventory.mjs
-const m68 = (()=>{
-const {itemSystem} = m69;
-const itemRules = m70.default;
-const {jsonCopy} = m48;
+const m70 = (()=>{
+const {itemSystem} = m71;
+const itemRules = m72.default;
+const {jsonCopy} = m50;
 const components=new WeakMap();
 function actorItems(data,owner_id,catalog){
  const prior=components.get(data);if(prior&&prior.root===data.inventory)return prior.items;
@@ -20160,10 +20649,10 @@ function restoreActorItems(data,snapshot,catalog){
 return Object.freeze({get actorItems(){return actorItems;},get restoreActorItems(){return restoreActorItems;}});
 })();
 // src/entities/ganger.mjs
-const m64 = (()=>{
-const {gameActor} = m65;
-const {actorItems,restoreActorItems} = m68;
-const {nonnegative,jsonCopy} = m48;
+const m66 = (()=>{
+const {gameActor} = m67;
+const {actorItems,restoreActorItems} = m70;
+const {nonnegative,jsonCopy} = m50;
 const states=['IDLE','SUSPICIOUS','ALERT','SUPPRESSING','SEARCHING'];
 const stateFor=actor=>actor.data.ganger_state??={format_version:1,state:'IDLE',suspicion:0,drain_remaining:0,suppression_remaining:0,look_elapsed:0,wander_remaining:0,investigate_position:null,wander_position:null,origin:[...actor.position],search_positions:[],search_elapsed:0,interrupt_remaining:0,resistance_remaining:0,telegraphing:false,aim_position:null,shot_delay:actor.data.telegraph_seconds??.15,bumped:false};
 /** Native stealth/combat policy. Awareness, leading, pathing and contact response stay in Basement. */
@@ -20221,9 +20710,9 @@ class Ganger extends gameActor{
 return Object.freeze({get Ganger(){return Ganger;}});
 })();
 // src/entities/hunter.mjs
-const m63 = (()=>{
-const {Ganger} = m64;
-const {nonnegative,jsonCopy} = m48;
+const m65 = (()=>{
+const {Ganger} = m66;
+const {nonnegative,jsonCopy} = m50;
 const stateFor=actor=>actor.data.hunter_state??={format_version:1,dash_remaining:actor.getAsset('actor_rules').data.hunter.dash_initial,chain:0,evade_requested:false};
 /** Hunter decisions only. Native motors own blink clearance, evasion and all motion. */
 class Hunter extends Ganger{
@@ -20265,9 +20754,9 @@ class Hunter extends Ganger{
 return Object.freeze({get Hunter(){return Hunter;}});
 })();
 // src/entities/demoness.mjs
-const m62 = (()=>{
-const {Hunter} = m63;
-const {nonnegative,jsonCopy} = m48;
+const m64 = (()=>{
+const {Hunter} = m65;
+const {nonnegative,jsonCopy} = m50;
 const stateFor=actor=>actor.data.demoness_state??={format_version:1,phase:1,heard_position:null,heard_at:0,next_sigil:2,next_bolt:1.5,next_step:4,next_gale:3,next_mirror:2,next_rite:1,eye:1,rise:1,flash:0,last_strike:null,decoy_remaining:actor.data.decoy_remaining??9};
 function validateDemonessData(data){if(['solo','decoy','dormant'].some(key=>typeof data[key]!=='boolean')||data.decoy&&data.max_health!==1)throw new TypeError('Invalid Demoness flags/decoy health');const state=data.demoness_state;if(!state)return data;jsonCopy(state);if(state.format_version!==1||![1,2,3].includes(state.phase)||typeof data.solo!=='boolean'||typeof data.decoy!=='boolean'||typeof data.dormant!=='boolean')throw new TypeError('Invalid Demoness state');for(const key of ['heard_at','next_sigil','next_bolt','next_step','next_gale','next_mirror','next_rite','eye','rise','flash','decoy_remaining'])nonnegative(state[key],key);if(state.heard_at>(data.actor_state?.elapsed??0)||['eye','rise','flash'].some(key=>state[key]>1)||state.heard_position!==null&&(!Array.isArray(state.heard_position)||state.heard_position.length!==2||!state.heard_position.every(Number.isFinite)))throw new TypeError('Invalid Demoness clock/appearance');if(state.last_strike!==null&&(!state.last_strike||!Number.isFinite(state.last_strike.at)||state.last_strike.at<0||!Array.isArray(state.last_strike.position)||state.last_strike.position.length!==2||!state.last_strike.position.every(Number.isFinite)))throw new TypeError('Invalid Demoness strike record');return data;}
 /** Lilitu's policy and duel phases; every attack is a reusable registered capability. */
@@ -20317,10 +20806,10 @@ class Demoness extends Hunter{
 return Object.freeze({get validateDemonessData(){return validateDemonessData;},get Demoness(){return Demoness;}});
 })();
 // src/entities/gatling-gunner.mjs
-const m72 = (()=>{
-const {gameActor} = m65;
-const {actorItems} = m68;
-const {nonnegative,jsonCopy} = m48;
+const m74 = (()=>{
+const {gameActor} = m67;
+const {actorItems} = m70;
+const {nonnegative,jsonCopy} = m50;
 const stateFor=actor=>actor.data.gunner_state??={format_version:1,hold_until:0,enrage_count:0,barrel_phase:0,barrel_speed:0,barrel_heat:0};
 /** Ordinary gunner decisions over native motors and the common owned-weapon burst action. */
 class GatlingGunner extends gameActor{
@@ -20354,9 +20843,9 @@ class GatlingGunner extends gameActor{
 return Object.freeze({get GatlingGunner(){return GatlingGunner;}});
 })();
 // src/entities/warden.mjs
-const m71 = (()=>{
-const {GatlingGunner} = m72;
-const {nonnegative,jsonCopy} = m48;
+const m73 = (()=>{
+const {GatlingGunner} = m74;
+const {nonnegative,jsonCopy} = m50;
 const stateFor=actor=>actor.data.warden_state??={format_version:1,target_id:null,seen_position:null,hidden_seconds:0,next_special_at:2,flank_position:null,flank_retry:0,eye:1,rise:1};
 function validateWardenData(data,entity_type){if(!['vesper','matins','compline'].includes(data.persona))throw new TypeError('Invalid Warden persona');const expected={df_vesper:'vesper',df_matins:'matins',df_compline:'compline'}[entity_type];if(expected&&data.persona!==expected)throw new TypeError('Warden persona does not match its class');const state=data.warden_state;if(!state)return data;jsonCopy(state);if(!['vesper','matins','compline'].includes(data.persona)||state.format_version!==1||state.target_id!==null&&(!Number.isSafeInteger(state.target_id)||state.target_id<1))throw new TypeError('Invalid Warden state');for(const key of ['hidden_seconds','next_special_at','flank_retry','eye','rise'])nonnegative(state[key],key);for(const key of ['seen_position','flank_position'])if(state[key]!==null&&(!Array.isArray(state[key])||state[key].length!==2||!state[key].every(Number.isFinite)))throw new TypeError('Invalid Warden target point');return data;}
 /** The shared Sanctum actor. Persona selects registered attacks and authored presentation. */
@@ -20393,9 +20882,9 @@ class Compline extends Warden{static entity_type='df_compline';}
 return Object.freeze({get validateWardenData(){return validateWardenData;},get Warden(){return Warden;},get Vesper(){return Vesper;},get Matins(){return Matins;},get Compline(){return Compline;}});
 })();
 // src/entities/boss-effect.mjs
-const m73 = (()=>{
+const m75 = (()=>{
 const {gameTrigger} = m1;
-const {jsonCopy,nonnegative} = m48;
+const {jsonCopy,nonnegative} = m50;
 const BOSS_EFFECT_KINDS=Object.freeze(['sigil','fire','smoke','censer','hymn','rite']);
 function validateBossEffectData(d){jsonCopy(d);if(d.format_version!==1||!BOSS_EFFECT_KINDS.includes(d.kind)||!Number.isSafeInteger(d.owner_id)||d.owner_id<1||!Array.isArray(d.hit_ids)||d.hit_ids.some(id=>!Number.isSafeInteger(id)||id<1)||new Set(d.hit_ids).size!==d.hit_ids.length)throw new TypeError('Invalid boss effect');for(const key of ['age','duration','next_tick','radius','radius_to','damage','burn_dps'])nonnegative(d[key],`effect ${key}`);if(!d.duration||d.age>d.duration+1)throw new TypeError('Invalid boss effect lifetime');if(typeof d.owner_alliance!=='string')throw new TypeError('Invalid effect allegiance');if(d.from_position!==undefined&&(!Array.isArray(d.from_position)||d.from_position.length!==2||!d.from_position.every(Number.isFinite)))throw new TypeError('Invalid effect origin');return d;}
 /** A real registered area/tell in the shared world. Its service owns only logical timing. */
@@ -20407,8 +20896,8 @@ class BossEffect extends gameTrigger{
 return Object.freeze({get BOSS_EFFECT_KINDS(){return BOSS_EFFECT_KINDS;},get validateBossEffectData(){return validateBossEffectData;},get BossEffect(){return BossEffect;}});
 })();
 // src/gameplay/abilities/pattern-actions.mjs
-const m74 = (()=>{
-const {jsonCopy,nonnegative} = m48;
+const m76 = (()=>{
+const {jsonCopy,nonnegative} = m50;
 function validatePatternAction(state,catalog,{clock}={}){
  jsonCopy(state);const definition=catalog[state.ability_id];
  if(definition?.delivery!=='pattern'||state.format_version!==1||!['tell','repeat'].includes(state.phase)||typeof state.cancel_requested!=='boolean'||!Number.isFinite(state.heading)||Object.keys(state).some(key=>!['format_version','ability_id','phase','started_at','phase_started_at','heading','aim','planned_position','executions','cancel_requested'].includes(key)))throw new TypeError('Invalid pattern action');
@@ -20444,11 +20933,11 @@ function validateSecondaryAction(state,catalog,options){if(state==null)return st
 return Object.freeze({get validatePatternAction(){return validatePatternAction;},get beginPattern(){return beginPattern;},get clearPattern(){return clearPattern;},get advancePattern(){return advancePattern;},get validateSecondaryAction(){return validateSecondaryAction;}});
 })();
 // src/directory/validate-boss-records.mjs
-const m61 = (()=>{
-const {validateDemonessData} = m62;
-const {validateWardenData} = m71;
-const {validateBossEffectData} = m73;
-const {validateSecondaryAction} = m74;
+const m63 = (()=>{
+const {validateDemonessData} = m64;
+const {validateWardenData} = m73;
+const {validateBossEffectData} = m75;
+const {validateSecondaryAction} = m76;
 /** Data-only preflight runs before replacing a live map, inventory, currency or registry. */
 function validateBossRecord(record,catalog){
  const data=record.data;if(record.entity_type==='df_demoness')validateDemonessData(data);
@@ -20461,9 +20950,9 @@ function validateBossRecord(record,catalog){
 return Object.freeze({get validateBossRecord(){return validateBossRecord;}});
 })();
 // src/gameplay/abilities/timed-actions.mjs
-const m76 = (()=>{
+const m78 = (()=>{
 const {BODY_GROUP} = m1;
-const {jsonCopy,nonnegative} = m48;
+const {jsonCopy,nonnegative} = m50;
 const id=value=>Number.isSafeInteger(value)&&value>0;
 function validateTimedAction(state,catalog,{clock}={}){
  jsonCopy(state);const definition=catalog[state.ability_id];
@@ -20524,8 +21013,8 @@ function advanceTimedAction(actor,definition,controller,api,combat,{known=true}=
 return Object.freeze({get validateTimedAction(){return validateTimedAction;},get beginTimedAction(){return beginTimedAction;},get ownedGrapple(){return ownedGrapple;},get clearTimedAction(){return clearTimedAction;},get hitGrapple(){return hitGrapple;},get advanceTimedAction(){return advanceTimedAction;}});
 })();
 // src/gameplay/abilities/burst-actions.mjs
-const m77 = (()=>{
-const {jsonCopy,nonnegative} = m48;
+const m79 = (()=>{
+const {jsonCopy,nonnegative} = m50;
 /** Logical firing cycle over the same owned weapon, launch backend and cooldown clock. */
 function validateBurstAction(state,catalog,{clock}={}){
  jsonCopy(state);if(state.format_version!==1||catalog[state.ability_id]?.delivery!=='burst'||!['tell','burst','reload'].includes(state.phase)||typeof state.weapon_instance_id!=='string'||!state.weapon_instance_id||typeof state.cancel_requested!=='boolean')throw new TypeError('Invalid saved burst action');
@@ -20572,12 +21061,12 @@ function advanceBurst(actor,definition,controller,items,api,combat,{known=true,p
 return Object.freeze({get validateBurstAction(){return validateBurstAction;},get beginBurst(){return beginBurst;},get advanceBurst(){return advanceBurst;}});
 })();
 // src/gameplay/abilities/lunge-actions.mjs
-const m75 = (()=>{
-const {validatePatternAction} = m74;
-const {validateTimedAction} = m76;
-const {validateBurstAction} = m77;
+const m77 = (()=>{
+const {validatePatternAction} = m76;
+const {validateTimedAction} = m78;
+const {validateBurstAction} = m79;
 const {BODY_GROUP} = m1;
-const {jsonCopy,nonnegative} = m48;
+const {jsonCopy,nonnegative} = m50;
 /** Persistent logical action only. Native motors, sweeps and impulses own physical work. */
 function validateAbilityAction(state,catalog,{clock}={}){
  if(state==null)return state;if(catalog[state.ability_id]?.delivery==='pattern')return validatePatternAction(state,catalog,{clock});if(['beam','grapple','bolt'].includes(catalog[state.ability_id]?.delivery))return validateTimedAction(state,catalog,{clock});if(catalog[state.ability_id]?.delivery==='burst')return validateBurstAction(state,catalog,{clock});jsonCopy(state);
@@ -20618,8 +21107,8 @@ function advanceLunge(actor,definition,controller,api,combat,{known=true}={}){
 return Object.freeze({get validateAbilityAction(){return validateAbilityAction;},get beginLunge(){return beginLunge;},get clearLunge(){return clearLunge;},get advanceLunge(){return advanceLunge;}});
 })();
 // src/gameplay/attacks/mounted-attacks.mjs
-const m78 = (()=>{
-const {jsonCopy,nonnegative,identifier} = m48;
+const m80 = (()=>{
+const {jsonCopy,nonnegative,identifier} = m50;
 
 function validateMountedAttack(state){
  if(state==null)return;jsonCopy(state);if(Object.keys(state).some(key=>!['format_version','attachment_id','revision','attack_id','aim','started_at','ready_at','expires_at'].includes(key)))throw new TypeError('Invalid mounted attack fields');identifier(state.attack_id);if(state.format_version!==1||!Number.isSafeInteger(state.attachment_id)||state.attachment_id<1||!Number.isSafeInteger(state.revision)||state.revision<0||typeof state.attack_id!=='string')throw new TypeError('Invalid mounted attack state');
@@ -20641,9 +21130,9 @@ function mountedAttackState(actor,controller,mount){
 return Object.freeze({get validateMountedAttack(){return validateMountedAttack;},get prepareMountedAttack(){return prepareMountedAttack;},get mountedAttackState(){return mountedAttackState;}});
 })();
 // src/entities/drone.mjs
-const m80 = (()=>{
-const {gameActor} = m65;
-const {nonnegative,jsonCopy} = m48;
+const m82 = (()=>{
+const {gameActor} = m67;
+const {nonnegative,jsonCopy} = m50;
 const stateFor=actor=>actor.data.drone_state??={format_version:1,flight:'descend',phase_started_at:actor.data.actor_state?.elapsed??0,alt:1,lost_seconds:0,next_bolt_at:2.2,next_special_at:3};
 /** Flight and attack decisions. Basement owns movement, impacts, eye geometry and tether forces. */
 class Drone extends gameActor{
@@ -20681,7 +21170,7 @@ class Drone extends gameActor{
 return Object.freeze({get Drone(){return Drone;}});
 })();
 // src/directory/game-velvet-appearance.mjs
-const m83 = (()=>{
+const m85 = (()=>{
         /**
          * =====================================================================
          *  VELVET CAT — Dreampunk Feline Companion
@@ -20819,8 +21308,8 @@ const VELVET_TAIL_SEGS = 9;
 return Object.freeze({get VELVET_CAT_PALETTES(){return VELVET_CAT_PALETTES;},get VELVET_T(){return VELVET_T;},get VELVET_PROFILES(){return VELVET_PROFILES;},get VELVET_GAITS(){return VELVET_GAITS;},get VELVET_TAIL_SEGS(){return VELVET_TAIL_SEGS;}});
 })();
 // src/presentation/velvet-cat-animation.mjs
-const m82 = (()=>{
-const {VELVET_GAITS,VELVET_TAIL_SEGS} = m83;
+const m84 = (()=>{
+const {VELVET_GAITS,VELVET_TAIL_SEGS} = m85;
 /** Fixed-step cosmetic animation only. No draw backend or physical movement. */
 const velvetCatAnimation={
 _random() {
@@ -20965,10 +21454,10 @@ function advanceVelvetAnimation(entity,player,seconds){const record=entity.data.
 return Object.freeze({get velvetCatAnimation(){return velvetCatAnimation;},get createVelvetAnimation(){return createVelvetAnimation;},get velvetPresentation(){return velvetPresentation;},get advanceVelvetAnimation(){return advanceVelvetAnimation;}});
 })();
 // src/entities/velvet-cat.mjs
-const m81 = (()=>{
-const {gameActor} = m65;
-const {createVelvetAnimation,advanceVelvetAnimation} = m82;
-const {nonnegative,jsonCopy} = m48;
+const m83 = (()=>{
+const {gameActor} = m67;
+const {createVelvetAnimation,advanceVelvetAnimation} = m84;
+const {nonnegative,jsonCopy} = m50;
 const stateFor=actor=>actor.data.cat_state??={format_version:1,mode:'idle',dash:false,idle_seconds:0,rest:null,rest_remaining:0};
 /** Official companion body; animation records contain cosmetic state only. */
 class VelvetCat extends gameActor{
@@ -20999,9 +21488,9 @@ class VelvetCat extends gameActor{
 return Object.freeze({get VelvetCat(){return VelvetCat;}});
 })();
 // src/entities/marionette.mjs
-const m84 = (()=>{
-const {gameActor} = m65;
-const {nonnegative,jsonCopy} = m48;
+const m86 = (()=>{
+const {gameActor} = m67;
+const {nonnegative,jsonCopy} = m50;
 const stateFor=actor=>actor.data.marionette_state??={format_version:1,initial_delay:.6,yank_remaining:0};
 /** Silent puppet policy. Spacing, following, wall response and strikes use shared native services. */
 class Marionette extends gameActor{
@@ -21028,10 +21517,10 @@ class Marionette extends gameActor{
 return Object.freeze({get Marionette(){return Marionette;}});
 })();
 // src/gameplay/player-vitals.mjs
-const m86 = (()=>{
-const {actorVitals} = m67;
-const defaults = m54.default;
-const {nonnegative,jsonCopy,identifier,validateModifiers} = m48;
+const m88 = (()=>{
+const {actorVitals} = m69;
+const defaults = m56.default;
+const {nonnegative,jsonCopy,identifier,validateModifiers} = m50;
 
 /** Shared gameplay component. It references its owner's data; it never owns or mirrors a body. */
 class playerVitals extends actorVitals {
@@ -21115,10 +21604,10 @@ class playerVitals extends actorVitals {
 return Object.freeze({get playerVitals(){return playerVitals;}});
 })();
 // src/entities/player.mjs
-const m85 = (()=>{
-const {gameActor} = m65;
-const {playerVitals} = m86;
-const {identifier,validateModifiers,nonnegative} = m48;
+const m87 = (()=>{
+const {gameActor} = m67;
+const {playerVitals} = m88;
+const {identifier,validateModifiers,nonnegative} = m50;
 const services = new WeakMap();
 const components = new WeakMap();
 function vitalsFor(player,rules) {
@@ -21207,7 +21696,7 @@ class Player extends gameActor {
 return Object.freeze({get Player(){return Player;}});
 })();
 // src/entities/apartment-prop.mjs
-const m87 = (()=>{
+const m89 = (()=>{
 const {gameProp} = m1;
 
 /** Furniture/fixture gameplay metadata; no local transform or integration. */
@@ -21222,7 +21711,7 @@ class ApartmentProp extends gameProp {
 return Object.freeze({get ApartmentProp(){return ApartmentProp;}});
 })();
 // src/directory/npc-reactions.mjs
-const m89 = (()=>{
+const m91 = (()=>{
 // Authored character reactions, shared by native and remaining classic NPCs.
 function resolveEmoteLines(reactions, cat, tier) {
     const pool = reactions && reactions[cat];
@@ -21387,13 +21876,13 @@ const NPC_EMOTE_REACTIONS = {
 return Object.freeze({get resolveEmoteLines(){return resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return NPC_EMOTE_REACTIONS;}});
 })();
 // src/entities/npc.mjs
-const m88 = (()=>{
-const {importActorAbilities} = m46;
-const {actorAbilities} = m47;
-const {resolveEmoteLines,NPC_EMOTE_REACTIONS} = m89;
-const {gameActor} = m65;
-const {actorItems,restoreActorItems} = m68;
-const {nonnegative,jsonCopy} = m48;
+const m90 = (()=>{
+const {importActorAbilities} = m48;
+const {actorAbilities} = m49;
+const {resolveEmoteLines,NPC_EMOTE_REACTIONS} = m91;
+const {gameActor} = m67;
+const {actorItems,restoreActorItems} = m70;
+const {nonnegative,jsonCopy} = m50;
 const actorContract=npc=>npc.data.hireType==='contract'?(npc.data.contract_remaining??npc.data.hireDuration??0):0;
 const stateFor=npc=>npc.data.npc_state??={format_version:1,stim_remaining:0,out_of_combat:0,regen_elapsed:0,aura_elapsed:0,quip:null,quip_remaining:0,quip_delay:0,contract_remaining:actorContract(npc)};
 const ROSTER_FIELDS=['recruited','downed','teammateStims','maxTeammateStims','relationship','hireType','hireDuration','hireTime','hireCost','hired','role','bio','alliance','burstSize','burstDelay','accuracyMod','equippedAbilityId','cooldown','shotsLeftInBurst','abilitiesSnapshot','attackSelection'];
@@ -21468,7 +21957,7 @@ for(const [key,field] of Object.entries({burstSize:'burst_size',burstDelay:'burs
 return Object.freeze({get ROSTER_FIELDS(){return ROSTER_FIELDS;},get NPC(){return NPC;},get rosterRecord(){return rosterRecord;}});
 })();
 // src/entities/world-loot.mjs
-const m90 = (()=>{
+const m92 = (()=>{
 const {gameProp} = m1;
 /** The dropped bundle is owned here until pickup; the inherited body is the only live pose. */
 class WorldLoot extends gameProp{
@@ -21480,7 +21969,7 @@ class WorldLoot extends gameProp{
 return Object.freeze({get WorldLoot(){return WorldLoot;}});
 })();
 // src/directory/street-definitions.mjs
-const m93 = (()=>{
+const m95 = (()=>{
 /** Directory authoring only: convert immutable catalog units once, never during simulation. */
 const vehicleDefinitions = new WeakMap();
 function resolveStreetVehicle(library, { brand, model, control_mode = 'AI', color } = {}) {
@@ -21551,8 +22040,8 @@ function resolveVehicleSeats(library, { brand, model }) {
 return Object.freeze({get resolveStreetVehicle(){return resolveStreetVehicle;},get resolveVehicleSeats(){return resolveVehicleSeats;}});
 })();
 // src/traffic/traffic-vehicle.mjs
-const m92 = (()=>{
-const {resolveStreetVehicle,resolveVehicleSeats} = m93;
+const m94 = (()=>{
+const {resolveStreetVehicle,resolveVehicleSeats} = m95;
 const {gameVehicle} = m1;
 const bindings = new WeakMap();
 /** Official gameplay entity. Body state and driving calculations belong to Basement. */
@@ -21647,10 +22136,10 @@ class TrafficVehicle extends gameVehicle {
 return Object.freeze({get TrafficVehicle(){return TrafficVehicle;}});
 })();
 // src/directory/game-vehicle-factory.mjs
-const m95 = (()=>{
-const {TrafficVehicle} = m92;
+const m97 = (()=>{
+const {TrafficVehicle} = m94;
 const {pathGeometry} = m1;
-const {resolveStreetVehicle} = m93;
+const {resolveStreetVehicle} = m95;
 
 const purposes = new Set(['ambient', 'owned', 'mission', 'taxi']);
 /** Shared official creation. Population limits belong to the requesting population manager. */
@@ -21690,9 +22179,9 @@ function createGameVehicle(world, packet = {}, { hooks = {} } = {}) {
 return Object.freeze({get createGameVehicle(){return createGameVehicle;}});
 })();
 // src/traffic/traffic-manager.mjs
-const m94 = (()=>{
-const {TrafficVehicle} = m92;
-const {createGameVehicle} = m95;
+const m96 = (()=>{
+const {TrafficVehicle} = m94;
+const {createGameVehicle} = m97;
 /** Spawn, ownership and driver policy. The physics world owns every spatial/physical operation. */
 class TrafficManager {
     #pendingSpawns = new Set();
@@ -21737,7 +22226,7 @@ class TrafficManager {
 return Object.freeze({get TrafficManager(){return TrafficManager;}});
 })();
 // src/entities/pedestrians.mjs
-const m96 = (()=>{
+const m98 = (()=>{
 const {gameCharacter,gameVehicle,BODY_GROUP} = m1;
 const bindings = new WeakMap();
 /** Civilian decisions and reactions. Movement, prediction and impacts stay in Basement. */
@@ -21818,8 +22307,8 @@ class Pedestrian extends gameCharacter {
 return Object.freeze({get Pedestrian(){return Pedestrian;}});
 })();
 // src/entities/pedestrian-manager.mjs
-const m97 = (()=>{
-const {Pedestrian} = m96;
+const m99 = (()=>{
+const {Pedestrian} = m98;
 /** Population and waypoint policy only. No positions, obstacle cache or sensing grid. */
 class PedestrianManager {
     #network = new Map();
@@ -21891,11 +22380,11 @@ class PedestrianManager {
 return Object.freeze({get PedestrianManager(){return PedestrianManager;}});
 })();
 // src/directory/game-street.mjs
-const m91 = (()=>{
-const {TrafficVehicle} = m92;
-const {TrafficManager} = m94;
-const {Pedestrian} = m96;
-const {PedestrianManager} = m97;
+const m93 = (()=>{
+const {TrafficVehicle} = m94;
+const {TrafficManager} = m96;
+const {Pedestrian} = m98;
+const {PedestrianManager} = m99;
 
 
 function registerStreetEntityTypes(world) {
@@ -21915,25 +22404,25 @@ class StreetPopulation {
     clearStreet() { this.traffic.clearStreet(); this.pedestrians.clearStreet(); }
 }
 
-return Object.freeze({get TrafficVehicle(){return TrafficVehicle;},get TrafficManager(){return TrafficManager;},get Pedestrian(){return Pedestrian;},get PedestrianManager(){return PedestrianManager;},get createGameVehicle(){return m95.createGameVehicle;},get registerStreetEntityTypes(){return registerStreetEntityTypes;},get StreetPopulation(){return StreetPopulation;}});
+return Object.freeze({get TrafficVehicle(){return TrafficVehicle;},get TrafficManager(){return TrafficManager;},get Pedestrian(){return Pedestrian;},get PedestrianManager(){return PedestrianManager;},get createGameVehicle(){return m97.createGameVehicle;},get registerStreetEntityTypes(){return registerStreetEntityTypes;},get StreetPopulation(){return StreetPopulation;}});
 })();
 // src/directory/game-entity-types.mjs
-const m79 = (()=>{
-const {Demoness} = m62;
-const {Warden,Vesper,Matins,Compline} = m71;
-const {BossEffect} = m73;
-const {Drone} = m80;
-const {VelvetCat} = m81;
-const {GatlingGunner} = m72;
-const {Marionette} = m84;
-const {Player} = m85;
-const {ApartmentProp} = m87;
-const {gameActor} = m65;
-const {NPC} = m88;
-const {Hunter} = m63;
-const {Ganger} = m64;
-const {WorldLoot} = m90;
-const {registerStreetEntityTypes} = m91;
+const m81 = (()=>{
+const {Demoness} = m64;
+const {Warden,Vesper,Matins,Compline} = m73;
+const {BossEffect} = m75;
+const {Drone} = m82;
+const {VelvetCat} = m83;
+const {GatlingGunner} = m74;
+const {Marionette} = m86;
+const {Player} = m87;
+const {ApartmentProp} = m89;
+const {gameActor} = m67;
+const {NPC} = m90;
+const {Hunter} = m65;
+const {Ganger} = m66;
+const {WorldLoot} = m92;
+const {registerStreetEntityTypes} = m93;
 /** The Directory registers concrete classes before any level or saved identity is constructed. */
 function registerGameEntityTypes(world){
  for(const Class of [gameActor,Player,ApartmentProp,NPC,Ganger,Hunter,Marionette,GatlingGunner,Demoness,Warden,Vesper,Matins,Compline,BossEffect,Drone,VelvetCat,WorldLoot])if(!world.elements.listEntityTypes().includes(Class.entity_type))world.elements.registerEntityType(Class.entity_type,Class);
@@ -21942,7 +22431,7 @@ function registerGameEntityTypes(world){
 
 return Object.freeze({get registerGameEntityTypes(){return registerGameEntityTypes;}});
 })();
-const m99 = Object.freeze({default:{
+const m101 = Object.freeze({default:{
   "library_id": "df_apartment",
   "description": "Authored Silver Queen apartment assets. Furniture order preserves existing questState.aptLayout indices. Physics state is held only by Basement bodies.",
   "resources": {
@@ -23028,9 +23517,9 @@ const m99 = Object.freeze({default:{
   }
 }});
 // src/directory/apartment-assets.mjs
-const m98 = (()=>{
-const {createGameAssetLibrary} = m33;
-const definition = m99.default;
+const m100 = (()=>{
+const {createGameAssetLibrary} = m35;
+const definition = m101.default;
 
 function createApartmentAssetLibrary(options = {}) {
     const library = createGameAssetLibrary(options);
@@ -23043,7 +23532,7 @@ const APARTMENT_RULES = Object.freeze(definition.resources.rules.data);
 return Object.freeze({get createApartmentAssetLibrary(){return createApartmentAssetLibrary;},get APARTMENT_RULES(){return APARTMENT_RULES;}});
 })();
 // src/directory/apartment-definition.mjs
-const m100 = (()=>{
+const m102 = (()=>{
 const {layoutGeometry,BODY_GROUP} = m1;
 const MOVABLE = new Set(['apt_sofa','apt_coffee','apt_chair','apt_console','apt_plant','apt_planter','apt_stool','apt_bed','apt_side','apt_lounger','apt_bistro','apt_telescope','apt_dining','apt_bench','apt_chaise','apt_patio_sofa']);
 const rectangle = (r, template, data = {}) => ({ template, position: [r.x + r.w / 2, r.y + r.h / 2], collision_shape: { shape_type: 'box', dimensions: [r.w, r.h] }, data });
@@ -23111,12 +23600,12 @@ function resolveApartmentDyer(game_db){
 return Object.freeze({get resolveApartmentDefinition(){return resolveApartmentDefinition;},get resolveApartmentDyer(){return resolveApartmentDyer;}});
 })();
 // src/directory/game-actor-factory.mjs
-const m101 = (()=>{
-const {createDemonessAppearance} = m34;
-const {createHunterAppearance} = m42;
-const {validateAttackState} = m66;
-const {importActorAbilities} = m46;
-const {jsonCopy} = m48;
+const m103 = (()=>{
+const {createDemonessAppearance} = m36;
+const {createHunterAppearance} = m44;
+const {validateAttackState} = m68;
+const {importActorAbilities} = m48;
+const {jsonCopy} = m50;
 /** Definitions and explicit old-roster import live in Directory, never in physics. */
 function createActorPacket(world,{kind='npc',name='',role='civilian',position=[0,0],rotation=0,data={},...packet}={}){
  if(!['npc','ganger','hunter','marionette','gatling_gunner','demoness','warden','vesper','matins','compline','drone','velvet_cat','actor'].includes(kind))throw new TypeError('Unknown actor kind');const record=jsonCopy(data);if(['npc','ganger','hunter','gatling_gunner','demoness','warden','vesper','matins','compline'].includes(kind))record.actor_loadout_initialized??=record.inventory!=null;
@@ -23146,19 +23635,19 @@ function createActorPacket(world,{kind='npc',name='',role='civilian',position=[0
 return Object.freeze({get createActorPacket(){return createActorPacket;}});
 })();
 // src/levels/apartment.mjs
-const m60 = (()=>{
-const {validateBossRecord} = m61;
-const {validateAbilityAction} = m75;
-const {validateMountedAttack} = m78;
-const {validateAttackState} = m66;
-const {abilityLoadout} = m47;
-const {importActorAbilities} = m46;
-const {registerGameEntityTypes} = m79;
+const m62 = (()=>{
+const {validateBossRecord} = m63;
+const {validateAbilityAction} = m77;
+const {validateMountedAttack} = m80;
+const {validateAttackState} = m68;
+const {abilityLoadout} = m49;
+const {importActorAbilities} = m48;
+const {registerGameEntityTypes} = m81;
 const {physicsSystem} = m1;
-const {createApartmentAssetLibrary} = m98;
-const {resolveApartmentDefinition,resolveApartmentDyer} = m100;
-const {NPC,rosterRecord} = m88;
-const {createActorPacket} = m101;
+const {createApartmentAssetLibrary} = m100;
+const {resolveApartmentDefinition,resolveApartmentDyer} = m102;
+const {NPC,rosterRecord} = m90;
+const {createActorPacket} = m103;
 const {gameProp} = m1;
 class ApartmentDoor extends gameProp { static entity_type = 'df_apartment_door'; }
 
@@ -23233,7 +23722,7 @@ class ApartmentLevel {
 return Object.freeze({get ApartmentLevel(){return ApartmentLevel;}});
 })();
 // src/lobby/level-lobby.mjs
-const m103 = (()=>{
+const m105 = (()=>{
 // ===== LV1 LOBBY =====
 // The engine's game loop. The Lobby keeps the clock and nothing else: it knows when a frame is due,
 // how many fixed simulation steps that frame owes, and how far the drawn frame sits between two steps.
@@ -23370,7 +23859,7 @@ class levelLobby {
 return Object.freeze({get levelLobby(){return levelLobby;}});
 })();
 // src/runtime/game-level.mjs
-const m104 = (()=>{
+const m106 = (()=>{
 /** Content/lifecycle contract. A level never owns a world, clock or collision solver. */
 class gameLevel {
     constructor({ level_id } = {}) {
@@ -23390,7 +23879,7 @@ class gameLevel {
 return Object.freeze({get gameLevel(){return gameLevel;}});
 })();
 // src/basement/controls/values.mjs
-const m107 = (()=>{
+const m109 = (()=>{
 const TAP = 0;
 const DOUBLETAP = 1;
 const HELD = 2;
@@ -23414,7 +23903,7 @@ function radialStick(value, dead_zone = 0.15) {
 return Object.freeze({get TAP(){return TAP;},get DOUBLETAP(){return DOUBLETAP;},get HELD(){return HELD;},get PRESS(){return PRESS;},get REPEAT(){return REPEAT;},get RELEASE(){return RELEASE;},get cleanupAll(){return cleanupAll;},get radialStick(){return radialStick;}});
 })();
 // src/basement/controls/touch-stick.mjs
-const m109 = (()=>{
+const m111 = (()=>{
 class touchStick {
     constructor(system, name, packet) {
         Object.assign(this, { anchor: 'centre', base_radius: 0, travel: 40, scale: () => 1, edge: 0, ring: null, input: null, slots: null, mouse: false, free: () => !this.s.active, onStart() {}, onMove() {}, onEnd() {} }, packet);
@@ -23513,9 +24002,9 @@ class touchStick {
 return Object.freeze({get touchStick(){return touchStick;}});
 })();
 // src/basement/controls/devices.mjs
-const m108 = (()=>{
-const {touchStick} = m109;
-const {radialStick,cleanupAll} = m107;
+const m110 = (()=>{
+const {touchStick} = m111;
+const {radialStick,cleanupAll} = m109;
 
 /** Device state uses the terminology from the original Python input instances. */
 class inputInstance {
@@ -23634,10 +24123,10 @@ class gamepadInstance extends inputInstance {
 return Object.freeze({get inputInstance(){return inputInstance;},get keyboardInstance(){return keyboardInstance;},get mouseInstance(){return mouseInstance;},get touchInstance(){return touchInstance;},get gamepadInstance(){return gamepadInstance;}});
 })();
 // src/basement/controls/system.mjs
-const m106 = (()=>{
-const {TAP,DOUBLETAP,HELD,PRESS,REPEAT,RELEASE} = m107;
-const {radialStick,cleanupAll} = m107;
-const {keyboardInstance,mouseInstance,touchInstance,gamepadInstance} = m108;
+const m108 = (()=>{
+const {TAP,DOUBLETAP,HELD,PRESS,REPEAT,RELEASE} = m109;
+const {radialStick,cleanupAll} = m109;
+const {keyboardInstance,mouseInstance,touchInstance,gamepadInstance} = m110;
 
 class controlSystem {
     #listeners = new Set();
@@ -23875,16 +24364,16 @@ class controlSystem {
 return Object.freeze({get controlSystem(){return controlSystem;}});
 })();
 // src/basement/controls/index.mjs
-const m105 = (()=>{
+const m107 = (()=>{
 
 
 
 
 
-return Object.freeze({get controlSystem(){return m106.controlSystem;},get controlsSystem(){return m106.controlSystem;},get inputInstance(){return m108.inputInstance;},get keyboardInstance(){return m108.keyboardInstance;},get mouseInstance(){return m108.mouseInstance;},get touchInstance(){return m108.touchInstance;},get gamepadInstance(){return m108.gamepadInstance;},get touchStick(){return m109.touchStick;},get TAP(){return m107.TAP;},get DOUBLETAP(){return m107.DOUBLETAP;},get HELD(){return m107.HELD;},get PRESS(){return m107.PRESS;},get REPEAT(){return m107.REPEAT;},get RELEASE(){return m107.RELEASE;}});
+return Object.freeze({get controlSystem(){return m108.controlSystem;},get controlsSystem(){return m108.controlSystem;},get inputInstance(){return m110.inputInstance;},get keyboardInstance(){return m110.keyboardInstance;},get mouseInstance(){return m110.mouseInstance;},get touchInstance(){return m110.touchInstance;},get gamepadInstance(){return m110.gamepadInstance;},get touchStick(){return m111.touchStick;},get TAP(){return m109.TAP;},get DOUBLETAP(){return m109.DOUBLETAP;},get HELD(){return m109.HELD;},get PRESS(){return m109.PRESS;},get REPEAT(){return m109.REPEAT;},get RELEASE(){return m109.RELEASE;}});
 })();
 // src/basement/rendering/values.mjs
-const m112 = (()=>{
+const m114 = (()=>{
 function finite(value,name,min=-Infinity){if(!Number.isFinite(value)||value<min)throw new TypeError(`Invalid ${name}`);return value;}
 function vector(value,name='vector',out=[]){if(!Array.isArray(value)||value.length!==2)throw new TypeError(`Invalid ${name}`);out[0]=finite(value[0],name);out[1]=finite(value[1],name);return out;}
 function identifier(value){if(typeof value!=='string'||!value||value==='screen')throw new TypeError('A nonempty resource/renderer ID is required (screen is reserved)');return value;}
@@ -23901,8 +24390,8 @@ const BLENDS = Object.freeze({normal:'source-over',add:'lighter',multiply:'multi
 return Object.freeze({get finite(){return finite;},get vector(){return vector;},get identifier(){return identifier;},get matrix(){return matrix;},get inverse(){return inverse;},get point(){return point;},get transform(){return transform;},get viewport(){return viewport;},get freezeData(){return freezeData;},get color(){return color;},get BLENDS(){return BLENDS;}});
 })();
 // src/basement/rendering/camera.mjs
-const m111 = (()=>{
-const {finite,vector,viewport,inverse,point,freezeData} = m112;
+const m113 = (()=>{
+const {finite,vector,viewport,inverse,point,freezeData} = m114;
 
 /** View state only. Following reads native poses; this class never moves a body. */
 class cameraSystem {
@@ -23956,8 +24445,8 @@ class cameraSystem {
 return Object.freeze({get cameraSystem(){return cameraSystem;}});
 })();
 // src/basement/rendering/packets.mjs
-const m114 = (()=>{
-const {finite,vector,matrix,inverse,transform,color,identifier,BLENDS} = m112;
+const m116 = (()=>{
+const {finite,vector,matrix,inverse,transform,color,identifier,BLENDS} = m114;
 
 const geometryBuffers = new WeakMap();
 
@@ -24027,9 +24516,9 @@ function requirements(draw,resolve,result=[]){
 return Object.freeze({get geometry(){return geometry;},get material(){return material;},get packet(){return packet;},get requirements(){return requirements;}});
 })();
 // src/basement/rendering/frame.mjs
-const m113 = (()=>{
-const {packet} = m114;
-const {color,finite,freezeData} = m112;
+const m115 = (()=>{
+const {packet} = m116;
+const {color,finite,freezeData} = m114;
 
 /** Reused command buffers. Producers submit data; a backend borrows a completed frame. */
 class renderFrame {
@@ -24067,10 +24556,10 @@ class renderFrame {
 return Object.freeze({get renderFrame(){return renderFrame;}});
 })();
 // src/basement/rendering/system.mjs
-const m115 = (()=>{
-const {renderFrame} = m113;
-const {geometry,material,requirements} = m114;
-const {finite,identifier,freezeData} = m112;
+const m117 = (()=>{
+const {renderFrame} = m115;
+const {geometry,material,requirements} = m116;
+const {finite,identifier,freezeData} = m114;
 
 function normalizeResource(description){
     if(!description||typeof description!=='object')throw new TypeError('A data resource descriptor is required');
@@ -24159,9 +24648,9 @@ class renderSystem {
 return Object.freeze({get renderSystem(){return renderSystem;}});
 })();
 // src/basement/rendering/canvas.mjs
-const m116 = (()=>{
-const {renderFrame} = m113;
-const {BLENDS} = m112;
+const m118 = (()=>{
+const {renderFrame} = m115;
+const {BLENDS} = m114;
 
 function createSurface(width,height){
     if(typeof OffscreenCanvas!=='undefined')return new OffscreenCanvas(width,height);
@@ -24283,21 +24772,21 @@ class canvasRenderer {
 return Object.freeze({get canvasRenderer(){return canvasRenderer;}});
 })();
 // src/basement/rendering/index.mjs
-const m110 = (()=>{
+const m112 = (()=>{
 
 
 
 
 
-return Object.freeze({get cameraSystem(){return m111.cameraSystem;},get renderFrame(){return m113.renderFrame;},get renderSystem(){return m115.renderSystem;},get canvasRenderer(){return m116.canvasRenderer;}});
+return Object.freeze({get cameraSystem(){return m113.cameraSystem;},get renderFrame(){return m115.renderFrame;},get renderSystem(){return m117.renderSystem;},get canvasRenderer(){return m118.canvasRenderer;}});
 })();
 // src/runtime/game-engine.mjs
-const m102 = (()=>{
+const m104 = (()=>{
 const {physicsSystem,assetLibrary} = m1;
-const {levelLobby} = m103;
-const {gameLevel} = m104;
-const {controlSystem} = m105;
-const {cameraSystem,renderSystem} = m110;
+const {levelLobby} = m105;
+const {gameLevel} = m106;
+const {controlSystem} = m107;
+const {cameraSystem,renderSystem} = m112;
 
 const hooks = ['attach', 'detach', 'beforePhysics', 'afterPhysics', 'render', 'levelEntered', 'levelLeaving','gameplayPaused'];
 function synchronous(fn, receiver, args) {
@@ -24325,7 +24814,7 @@ class gameEngine {
         schedule_frame = typeof requestAnimationFrame === 'function' ? callback => requestAnimationFrame(callback) : null,
         cancel_frame = typeof cancelAnimationFrame === 'function' ? handle => cancelAnimationFrame(handle) : null,
         render_target, services = {} } = {}) {
-        if (!services || typeof services !== 'object' || Array.isArray(services) || Object.keys(services).some(key => ['rigs','physics','elements','assets','motion','traffic','controls','camera','render','__proto__','constructor','prototype'].includes(key))) throw new TypeError('Game services must not replace runtime APIs');
+        if (!services || typeof services !== 'object' || Array.isArray(services) || Object.keys(services).some(key => ['rigs','physics','elements','assets','motion','traffic','rails','controls','camera','render','__proto__','constructor','prototype'].includes(key))) throw new TypeError('Game services must not replace runtime APIs');
         if(render_target!==undefined)throw new TypeError('Mount a renderer surface through api.render.setRenderer; render hooks receive a frame');
         if (Object.hasOwn(physics, 'step_authority') || Object.hasOwn(physics, 'asset_library')) throw new TypeError('The runtime owns physics authority and its asset library');
         if (schedule_frame !== null && typeof schedule_frame !== 'function' || cancel_frame !== null && typeof cancel_frame !== 'function') throw new TypeError('Frame scheduling requires functions');
@@ -24339,7 +24828,7 @@ class gameEngine {
         this.#controls = new controlSystem({ ...controls, auto_update:false });
         this.#render = new renderSystem({physics_system:this.#world,camera:this.#camera});
         this.#api = Object.freeze({ ...services, physics: this.#world, elements: this.#world.elements, assets: asset_library,
-            rigs:this.#world.rigs, motion: this.#world.motion, traffic: this.#world.traffic, controls:this.#controls, camera:this.#camera, render:this.#render });
+            rigs:this.#world.rigs, motion: this.#world.motion, traffic: this.#world.traffic, rails: this.#world.rails, controls:this.#controls, camera:this.#camera, render:this.#render });
         this.#schedule = schedule_frame; this.#cancel = cancel_frame;
         this.#lobby = new levelLobby(Object.freeze(config), frame_clock);
         this.#lobby.plugIn({ isRunning: () => this.running, isPaused: () => this.paused || !this.active_level,
@@ -24552,7 +25041,7 @@ class gameEngine {
 
 return Object.freeze({get gameEngine(){return gameEngine;}});
 })();
-const m120 = Object.freeze({default:{
+const m122 = Object.freeze({default:{
   "slim": {
     "w": 0.88,
     "d": 0.92,
@@ -24583,7 +25072,7 @@ const m120 = Object.freeze({default:{
     "hip": 1.1
   }
 }});
-const m121 = Object.freeze({default:{
+const m123 = Object.freeze({default:{
   "female": {
     "sh": 10.5,
     "del": 4,
@@ -24710,9 +25199,9 @@ const m121 = Object.freeze({default:{
   }
 }});
 // src/directory/humanoid/rig-assets.mjs
-const m119 = (()=>{
-const builds = m120.default;
-const bodyCanon = m121.default;
+const m121 = (()=>{
+const builds = m122.default;
+const bodyCanon = m123.default;
 const {rigDefinition,animationClip} = m1;
 const immutable=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))immutable(child);Object.freeze(value);}return value;};
 const humanoidBodyCanon=immutable(bodyCanon);
@@ -24759,8 +25248,8 @@ function getHumanoidRigAssets(gender='androgynous',{build=null,height=1}={}){
 return Object.freeze({get humanoidBodyCanon(){return humanoidBodyCanon;},get humanoidBuilds(){return humanoidBuilds;},get getHumanoidRigAssets(){return getHumanoidRigAssets;}});
 })();
 // src/gameplay/animation/humanoid-system.mjs
-const m118 = (()=>{
-const {getHumanoidRigAssets} = m119;
+const m120 = (()=>{
+const {getHumanoidRigAssets} = m121;
 const humanoids=new Set(['df_player','df_npc','df_ganger','df_hunter','df_demoness']);
 /** Game policy chooses authored poses; Basement resolves and advances every joint. */
 class humanoidSystem {
@@ -24808,10 +25297,10 @@ function humanoidPresentation(actor,blend=1){
 return Object.freeze({get humanoidSystem(){return humanoidSystem;},get humanoidPresentation(){return humanoidPresentation;}});
 })();
 // src/gameplay/encounters/encounter-system.mjs
-const m122 = (()=>{
-const {BossEffect} = m73;
+const m124 = (()=>{
+const {BossEffect} = m75;
 const {BODY_GROUP} = m1;
-const {jsonCopy} = m48;
+const {jsonCopy} = m50;
 /** Shared encounter policy over registered effects, native queries and one simulation clock. */
 class encounterSystem{
  #context=null;#combat;#random;#actors=null;#effects=new Map();#owners=new Map();#off=[];#wardens=new Map();#orders=new Map();#squads=new Map();#decoys=new Map();
@@ -24889,7 +25378,7 @@ class encounterSystem{
 return Object.freeze({get encounterSystem(){return encounterSystem;}});
 })();
 // src/directory/weapon-appearance.mjs
-const m125 = (()=>{
+const m127 = (()=>{
 /* =====================================================================
    WEAPON MODELS — every gun as data: parts in the gun's own frame (+x down
    the barrel, the grip hand near 0,0, +y to the holder's right), each in a
@@ -25115,8 +25604,8 @@ function weaponModel(id) {
 return Object.freeze({get GUN_MATERIALS(){return GUN_MATERIALS;},get WEAPON_MODELS(){return WEAPON_MODELS;},get LASER_MODULE(){return LASER_MODULE;},get weaponModel(){return weaponModel;}});
 })();
 // src/directory/combat-profiles.mjs
-const m124 = (()=>{
-const {weaponModel} = m125;
+const m126 = (()=>{
+const {weaponModel} = m127;
 /** Shape authoring belongs with the visual assets. Runtime collision calculations stay in Basement. */
 function getCombatProfile(definition_id){
  const model=weaponModel(definition_id),edge=model.edge??[19.4,2.6];
@@ -25126,15 +25615,15 @@ function getCombatProfile(definition_id){
 return Object.freeze({get getCombatProfile(){return getCombatProfile;}});
 })();
 // src/gameplay/attacks/attack-system.mjs
-const m123 = (()=>{
-const attackRules = m52.default;
-const {getCombatProfile} = m124;
-const {prepareMountedAttack,mountedAttackState,validateMountedAttack} = m78;
-const combatRules = m51.default;
+const m125 = (()=>{
+const attackRules = m54.default;
+const {getCombatProfile} = m126;
+const {prepareMountedAttack,mountedAttackState,validateMountedAttack} = m80;
+const combatRules = m53.default;
 const {gameCharacter} = m1;
-const {actorItems} = m68;
-const {attackRegistry,validateAttackState} = m66;
-const {jsonCopy} = m48;
+const {actorItems} = m70;
+const {attackRegistry,validateAttackState} = m68;
+const {jsonCopy} = m50;
 
 /** Universal character attack entry point. Reuses existing execution, ownership and physics. */
 class attackSystem{
@@ -25250,14 +25739,14 @@ class attackSystem{
 return Object.freeze({get attackSystem(){return attackSystem;}});
 })();
 // src/gameplay/abilities/ability-system.mjs
-const m126 = (()=>{
-const {beginPattern,advancePattern,clearPattern} = m74;
-const {beginTimedAction,advanceTimedAction,hitGrapple,clearTimedAction} = m76;
-const {beginBurst,advanceBurst} = m77;
-const {validateAbilityAction,beginLunge,advanceLunge,clearLunge} = m75;
+const m128 = (()=>{
+const {beginPattern,advancePattern,clearPattern} = m76;
+const {beginTimedAction,advanceTimedAction,hitGrapple,clearTimedAction} = m78;
+const {beginBurst,advanceBurst} = m79;
+const {validateAbilityAction,beginLunge,advanceLunge,clearLunge} = m77;
 const {BODY_GROUP,gameCharacter} = m1;
-const {actorAbilities} = m47;
-const {jsonCopy,nonnegative} = m48;
+const {actorAbilities} = m49;
+const {jsonCopy,nonnegative} = m50;
 
 /** Shared spell requests. The existing attack controller owns the single cooldown clock. */
 class abilitySystem{
@@ -25312,19 +25801,19 @@ class abilitySystem{
 return Object.freeze({get abilitySystem(){return abilitySystem;}});
 })();
 // src/gameplay/actors/actor-system.mjs
-const m127 = (()=>{
-const {Demoness} = m62;
-const {Warden} = m71;
-const {Drone} = m80;
-const {VelvetCat} = m81;
-const {GatlingGunner} = m72;
-const {Marionette} = m84;
-const {gameActor} = m65;
-const {NPC} = m88;
-const {Hunter} = m63;
-const {Ganger} = m64;
+const m129 = (()=>{
+const {Demoness} = m64;
+const {Warden} = m73;
+const {Drone} = m82;
+const {VelvetCat} = m83;
+const {GatlingGunner} = m74;
+const {Marionette} = m86;
+const {gameActor} = m67;
+const {NPC} = m90;
+const {Hunter} = m65;
+const {Ganger} = m66;
 const {BODY_GROUP} = m1;
-const {createActorPacket} = m101;
+const {createActorPacket} = m103;
 
 /** Registered actor lifetimes and policy updates in the existing fixed step. No second world or index. */
 class actorSystem{
@@ -25382,7 +25871,7 @@ class actorSystem{
 
 return Object.freeze({get actorSystem(){return actorSystem;}});
 })();
-const m128 = Object.freeze({default:{
+const m130 = Object.freeze({default:{
   "keymap": {
     "move_up":["w","ArrowUp"],"move_down":["s","ArrowDown"],"move_left":["a","ArrowLeft"],"move_right":["d","ArrowRight"],
     "fire":["mouseLeft","space","gamepadRTrigger","touchFire"],
@@ -25396,11 +25885,11 @@ const m128 = Object.freeze({default:{
   }
 }});
 // src/gameplay/game-session.mjs
-const m129 = (()=>{
-const {itemSystem} = m69;
-const {createItemCatalog} = m44;
-const itemRules = m70.default;
-const {identifier,jsonCopy,nonnegative} = m48;
+const m131 = (()=>{
+const {itemSystem} = m71;
+const {createItemCatalog} = m46;
+const itemRules = m72.default;
+const {identifier,jsonCopy,nonnegative} = m50;
 
 const recordNames = ['quests', 'roster', 'progression'];
 
@@ -25473,8 +25962,8 @@ class gameSession {
 return Object.freeze({get gameSession(){return gameSession;}});
 })();
 // src/gameplay/player-state-system.mjs
-const m130 = (()=>{
-const {nonnegative,jsonCopy} = m48;
+const m132 = (()=>{
+const {nonnegative,jsonCopy} = m50;
 
 /** Game rules only. The native entity/body remains the sole owner of physical state. */
 class PlayerStateSystem {
@@ -25529,7 +26018,7 @@ class PlayerStateSystem {
 return Object.freeze({get PlayerStateSystem(){return PlayerStateSystem;}});
 })();
 // src/gameplay/player-control-system.mjs
-const m131 = (()=>{
+const m133 = (()=>{
 /** Turns input terminology into native motor requests and gameplay intents. No physical math. */
 class PlayerControlSystem {
     #session; #state; #blocked = new Set(); #placement; #context = null;
@@ -25569,10 +26058,10 @@ class PlayerControlSystem {
 return Object.freeze({get PlayerControlSystem(){return PlayerControlSystem;}});
 })();
 // src/gameplay/combat/combat-system.mjs
-const m132 = (()=>{
-const rules = m51.default;
+const m134 = (()=>{
+const rules = m53.default;
 const {BODY_GROUP} = m1;
-const {nonnegative,jsonCopy} = m48;
+const {nonnegative,jsonCopy} = m50;
 
 const isCombatDead=entity=>!entity||entity.destroyed||entity.dead===true||entity.data?.state==='dead'||typeof entity.data?.health==='number'&&entity.data.health<=0;
 const stateFor=entity=>entity.data.combat_state??=( {bleed:null,orbs:[],stagger_remaining:0,boss_resist_remaining:0,slam:null} );
@@ -25639,9 +26128,9 @@ class combatSystem{
 return Object.freeze({get isCombatDead(){return isCombatDead;},get combatSystem(){return combatSystem;}});
 })();
 // src/gameplay/combat/melee-poses.mjs
-const m134 = (()=>{
+const m136 = (()=>{
 // Authored local animation poses, shared by presentation and native swept queries.
-const rules = m51.default;
+const rules = m53.default;
 const MELEE_SWING={duration:rules.blade.duration_seconds,windup:rules.blade.windup_seconds,cutEnd:rules.blade.cut_end_seconds};
 /* A long blade's swing (a model with swing: 'wide', Blood Pact): two hands on the grip, she
    winds the blade far back to one side, then sweeps it round in front of her in one wide arc
@@ -25715,13 +26204,13 @@ function sampleMeleeSwing(age, side, out = {}, secs = MELEE_SWING.duration, styl
 return Object.freeze({get MELEE_SWING(){return MELEE_SWING;},get WIDE_SWING(){return WIDE_SWING;},get sampleWideSwing(){return sampleWideSwing;},get wideGrip(){return wideGrip;},get swingPhases(){return swingPhases;},get sampleMeleeSwing(){return sampleMeleeSwing;}});
 })();
 // src/gameplay/combat/weapon-system.mjs
-const m133 = (()=>{
-const rules = m51.default;
-const {getCombatProfile} = m124;
+const m135 = (()=>{
+const rules = m53.default;
+const {getCombatProfile} = m126;
 const {BODY_GROUP} = m1;
-const {sampleMeleeSwing,swingPhases} = m134;
-const {isCombatDead} = m132;
-const {jsonCopy,nonnegative} = m48;
+const {sampleMeleeSwing,swingPhases} = m136;
+const {isCombatDead} = m134;
+const {jsonCopy,nonnegative} = m50;
 
 const stateFor=(player,settings=rules)=>player.data.weapon_state??={format_version:1,elapsed:0,cooldown:0,holstered:false,drawn_at:null,draw_shot_used:false,quick_draw:null,punch_side:'right',haymaker:false,combo:0,last_punch_at:-99,swing:null,side:1,shield:{charge:settings.mirror.shield,spent:false,since_hit:999}};
 /** One executable weapon policy. Native physics owns every trajectory, sweep, contact and impulse. */
@@ -25892,11 +26381,11 @@ class weaponSystem{
 return Object.freeze({get weaponSystem(){return weaponSystem;}});
 })();
 // src/gameplay/items/loot-system.mjs
-const m135 = (()=>{
-const {WorldLoot} = m90;
-const rules = m51.default;
+const m137 = (()=>{
+const {WorldLoot} = m92;
+const rules = m53.default;
 const {BODY_GROUP} = m1;
-const {jsonCopy,nonnegative} = m48;
+const {jsonCopy,nonnegative} = m50;
 
 /** World ownership and pickup policy. Placement, motion, bounds and proximity use the existing engine. */
 class lootSystem{
@@ -25946,24 +26435,24 @@ class lootSystem{
 return Object.freeze({get lootSystem(){return lootSystem;}});
 })();
 // src/directory/game-runtime.mjs
-const m117 = (()=>{
-const {humanoidSystem} = m118;
-const {encounterSystem} = m122;
-const {attackSystem} = m123;
-const {abilitySystem} = m126;
-const {actorSystem} = m127;
-const {registerGameEntityTypes} = m79;
-const {gameEngine} = m102;
-const {createApartmentAssetLibrary} = m98;
-const controlProfile = m128.default;
-const {gameSession} = m129;
-const {PlayerStateSystem} = m130;
-const {PlayerControlSystem} = m131;
-const playerRules = m54.default;
-const {combatSystem} = m132;
-const {weaponSystem} = m133;
-const {lootSystem} = m135;
-const {canvasRenderer} = m110;
+const m119 = (()=>{
+const {humanoidSystem} = m120;
+const {encounterSystem} = m124;
+const {attackSystem} = m125;
+const {abilitySystem} = m128;
+const {actorSystem} = m129;
+const {registerGameEntityTypes} = m81;
+const {gameEngine} = m104;
+const {createApartmentAssetLibrary} = m100;
+const controlProfile = m130.default;
+const {gameSession} = m131;
+const {PlayerStateSystem} = m132;
+const {PlayerControlSystem} = m133;
+const playerRules = m56.default;
+const {combatSystem} = m134;
+const {weaponSystem} = m135;
+const {lootSystem} = m137;
+const {canvasRenderer} = m112;
 
 /** Explicit game composition. Importing this file never starts a second runtime. */
 function createGameRuntime({ game_db, surface, session_state, player, weapon_policy={}, combat_policy={}, actor_policy={}, ability_policy={}, ...options } = {}) {
@@ -26000,8 +26489,8 @@ function createGameRuntime({ game_db, surface, session_state, player, weapon_pol
 return Object.freeze({get createGameRuntime(){return createGameRuntime;}});
 })();
 // src/presentation/weapon-appearance.mjs
-const m136 = (()=>{
-const {GUN_MATERIALS,WEAPON_MODELS,LASER_MODULE,weaponModel} = m125;
+const m138 = (()=>{
+const {GUN_MATERIALS,WEAPON_MODELS,LASER_MODULE,weaponModel} = m127;
 
 const polygon=points=>({type:'path',commands:[...points.map(([x,y],i)=>[i?'line':'move',x,y]),['close']]});
 function shape(part){
@@ -26084,16 +26573,16 @@ class weaponAppearance {
 return Object.freeze({get weaponAppearance(){return weaponAppearance;}});
 })();
 // src/directory/game-combat.mjs
-const m137 = (()=>{
-const data = m51.default;
+const m139 = (()=>{
+const data = m53.default;
 const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
 const COMBAT_RULES=freeze(structuredClone(data));
 
 return Object.freeze({get COMBAT_RULES(){return COMBAT_RULES;}});
 })();
 // src/presentation/art-packets.mjs
-const m139 = (()=>{
-const {transform,inverse} = m112;
+const m141 = (()=>{
+const {transform,inverse} = m114;
 const identity=()=>[1,0,0,1,0,0];
 const multiply=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
 const geometry=commands=>Array.isArray(commands)?{type:'path',commands:commands.map(command=>[...command])}:structuredClone(commands);
@@ -26119,9 +26608,9 @@ function groundShadow(scene,x,y,rx,ry){scene.enter({position:[x,y],scale:[rx,ry]
 return Object.freeze({get ellipse(){return ellipse;},get circle(){return circle;},get linear(){return linear;},get radial(){return radial;},get artScene(){return artScene;},get glow(){return glow;},get groundShadow(){return groundShadow;}});
 })();
 // src/presentation/drone.mjs
-const m138 = (()=>{
-const enemies = m35.default;
-const {artScene,circle,ellipse,radial,glow} = m139;
+const m140 = (()=>{
+const enemies = m37.default;
+const {artScene,circle,ellipse,radial,glow} = m141;
 const DRONE=enemies.drone;
 function droneLift(state){return DRONE.HOVER_PX+Math.sin(state.hoverOffset)*3+state.alt*240;}
 function droneArmPose(diving,stuck,s){
@@ -26302,8 +26791,8 @@ return Object.assign({},{x:pose.position[0],y:pose.position[1],angle:pose.rotati
 return Object.freeze({get droneLift(){return droneLift;},get droneArmPose(){return droneArmPose;},get createDronePackets(){return createDronePackets;},get dronePresentation(){return dronePresentation;}});
 })();
 // src/presentation/demoness.mjs
-const m140 = (()=>{
-const enemies = m35.default;
+const m142 = (()=>{
+const enemies = m37.default;
 const DUEL=enemies.duel;
 /** Retained Canvas art over a detached record; body art is supplied by the host. */
 const demonessAppearance={
@@ -26367,8 +26856,8 @@ function demonessPresentation(entity,blend=1){const pose=entity.getRenderState(b
 return Object.freeze({get demonessAppearance(){return demonessAppearance;},get demonessPresentation(){return demonessPresentation;}});
 })();
 // src/presentation/boss-effects.mjs
-const m141 = (()=>{
-const enemies = m35.default;
+const m143 = (()=>{
+const enemies = m37.default;
 const HAZARD=enemies.hazards;
 const bossEffectAppearance={
  _smokeK(h){const now=this.render_clock??_gameTimeSec;return Math.min(1,(now-h.t0)/.5)*Math.min(1,(h.until-now)/1.2);},
@@ -26505,10 +26994,10 @@ function bossEffectPresentation(effects,clock){return effects.filter(effect=>!ef
 return Object.freeze({get bossEffectAppearance(){return bossEffectAppearance;},get bossEffectPresentation(){return bossEffectPresentation;}});
 })();
 // src/presentation/velvet-cat.mjs
-const m142 = (()=>{
-const {artScene,circle,ellipse,radial,linear,groundShadow} = m139;
-const {velvetCatAnimation} = m82;
-const {VELVET_CAT_PALETTES,VELVET_T,VELVET_PROFILES,VELVET_TAIL_SEGS} = m83;
+const m144 = (()=>{
+const {artScene,circle,ellipse,radial,linear,groundShadow} = m141;
+const {velvetCatAnimation} = m84;
+const {VELVET_CAT_PALETTES,VELVET_T,VELVET_PROFILES,VELVET_TAIL_SEGS} = m85;
 /** Renderer-neutral feline geometry/material packets over detached animation state. */
 
 function createVelvetCatArt(state){const scene=new artScene(),eyes=[];let path=[];
@@ -26937,7 +27426,7 @@ const m0 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get assetLibrary(){return m1.assetLibrary;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get createGameAssetLibrary(){return m33.createGameAssetLibrary;},get ApartmentLevel(){return m60.ApartmentLevel;},get APARTMENT_RULES(){return m98.APARTMENT_RULES;},get gameEngine(){return m102.gameEngine;},get gameLevel(){return m104.gameLevel;},get levelLobby(){return m103.levelLobby;},get createGameRuntime(){return m117.createGameRuntime;},get controlSystem(){return m105.controlSystem;},get controlsSystem(){return m105.controlsSystem;},get inputInstance(){return m105.inputInstance;},get keyboardInstance(){return m105.keyboardInstance;},get mouseInstance(){return m105.mouseInstance;},get touchInstance(){return m105.touchInstance;},get touchStick(){return m105.touchStick;},get gamepadInstance(){return m105.gamepadInstance;},get TAP(){return m105.TAP;},get DOUBLETAP(){return m105.DOUBLETAP;},get HELD(){return m105.HELD;},get PRESS(){return m105.PRESS;},get REPEAT(){return m105.REPEAT;},get RELEASE(){return m105.RELEASE;},get renderSystem(){return m110.renderSystem;},get renderFrame(){return m110.renderFrame;},get canvasRenderer(){return m110.canvasRenderer;},get cameraSystem(){return m110.cameraSystem;},get gameSession(){return m129.gameSession;},get PlayerStateSystem(){return m130.PlayerStateSystem;},get PlayerControlSystem(){return m131.PlayerControlSystem;},get Player(){return m85.Player;},get playerVitals(){return m86.playerVitals;},get itemSystem(){return m69.itemSystem;},get createItemCatalog(){return m44.createItemCatalog;},get GUN_MATERIALS(){return m125.GUN_MATERIALS;},get WEAPON_MODELS(){return m125.WEAPON_MODELS;},get LASER_MODULE(){return m125.LASER_MODULE;},get weaponModel(){return m125.weaponModel;},get weaponAppearance(){return m136.weaponAppearance;},get combatSystem(){return m132.combatSystem;},get weaponSystem(){return m133.weaponSystem;},get lootSystem(){return m135.lootSystem;},get WorldLoot(){return m90.WorldLoot;},get MELEE_SWING(){return m134.MELEE_SWING;},get WIDE_SWING(){return m134.WIDE_SWING;},get sampleMeleeSwing(){return m134.sampleMeleeSwing;},get sampleWideSwing(){return m134.sampleWideSwing;},get swingPhases(){return m134.swingPhases;},get wideGrip(){return m134.wideGrip;},get COMBAT_RULES(){return m137.COMBAT_RULES;},get registerGameEntityTypes(){return m79.registerGameEntityTypes;},get actorVitals(){return m67.actorVitals;},get gameActor(){return m65.gameActor;},get NPC(){return m88.NPC;},get rosterRecord(){return m88.rosterRecord;},get ROSTER_FIELDS(){return m88.ROSTER_FIELDS;},get Ganger(){return m64.Ganger;},get actorSystem(){return m127.actorSystem;},get actorItems(){return m68.actorItems;},get restoreActorItems(){return m68.restoreActorItems;},get resolveEmoteLines(){return m89.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m89.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m47.abilityLoadout;},get actorAbilities(){return m47.actorAbilities;},get abilitySystem(){return m126.abilitySystem;},get createAbilityCatalog(){return m46.createAbilityCatalog;},get importActorAbilities(){return m46.importActorAbilities;},get attackRegistry(){return m66.attackRegistry;},get validateAttackState(){return m66.validateAttackState;},get attackSystem(){return m123.attackSystem;},get createAttackCatalog(){return m43.createAttackCatalog;},get validateMountedAttack(){return m78.validateMountedAttack;},get TrafficVehicle(){return m91.TrafficVehicle;},get createGameVehicle(){return m91.createGameVehicle;},get Hunter(){return m63.Hunter;},get createHunterAppearance(){return m42.createHunterAppearance;},get Marionette(){return m84.Marionette;},get MARIONETTE_RULES(){return m40.MARIONETTE_RULES;},get validateAbilityAction(){return m75.validateAbilityAction;},get GatlingGunner(){return m72.GatlingGunner;},get Drone(){return m80.Drone;},get VelvetCat(){return m81.VelvetCat;},get velvetCatAnimation(){return m82.velvetCatAnimation;},get createVelvetAnimation(){return m82.createVelvetAnimation;},get velvetPresentation(){return m82.velvetPresentation;},get droneLift(){return m138.droneLift;},get droneArmPose(){return m138.droneArmPose;},get dronePresentation(){return m138.dronePresentation;},get VELVET_CAT_PALETTES(){return m83.VELVET_CAT_PALETTES;},get VELVET_T(){return m83.VELVET_T;},get VELVET_PROFILES(){return m83.VELVET_PROFILES;},get VELVET_GAITS(){return m83.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m83.VELVET_TAIL_SEGS;},get Demoness(){return m62.Demoness;},get Warden(){return m71.Warden;},get Vesper(){return m71.Vesper;},get Matins(){return m71.Matins;},get Compline(){return m71.Compline;},get BossEffect(){return m73.BossEffect;},get encounterSystem(){return m122.encounterSystem;},get createBossAbilities(){return m34.createBossAbilities;},get createDemonessAppearance(){return m34.createDemonessAppearance;},get demonessAppearance(){return m140.demonessAppearance;},get demonessPresentation(){return m140.demonessPresentation;},get bossEffectAppearance(){return m141.bossEffectAppearance;},get bossEffectPresentation(){return m141.bossEffectPresentation;},get validateBossRecord(){return m61.validateBossRecord;},get createDronePackets(){return m138.createDronePackets;},get createVelvetCatArt(){return m142.createVelvetCatArt;},get createVelvetCatPackets(){return m142.createVelvetCatPackets;},get createVelvetEyePackets(){return m142.createVelvetEyePackets;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m118.humanoidSystem;},get humanoidPresentation(){return m118.humanoidPresentation;},get humanoidBodyCanon(){return m119.humanoidBodyCanon;},get humanoidBuilds(){return m119.humanoidBuilds;},get getHumanoidRigAssets(){return m119.getHumanoidRigAssets;}});
+return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get assetLibrary(){return m1.assetLibrary;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get createGameAssetLibrary(){return m35.createGameAssetLibrary;},get ApartmentLevel(){return m62.ApartmentLevel;},get APARTMENT_RULES(){return m100.APARTMENT_RULES;},get gameEngine(){return m104.gameEngine;},get gameLevel(){return m106.gameLevel;},get levelLobby(){return m105.levelLobby;},get createGameRuntime(){return m119.createGameRuntime;},get controlSystem(){return m107.controlSystem;},get controlsSystem(){return m107.controlsSystem;},get inputInstance(){return m107.inputInstance;},get keyboardInstance(){return m107.keyboardInstance;},get mouseInstance(){return m107.mouseInstance;},get touchInstance(){return m107.touchInstance;},get touchStick(){return m107.touchStick;},get gamepadInstance(){return m107.gamepadInstance;},get TAP(){return m107.TAP;},get DOUBLETAP(){return m107.DOUBLETAP;},get HELD(){return m107.HELD;},get PRESS(){return m107.PRESS;},get REPEAT(){return m107.REPEAT;},get RELEASE(){return m107.RELEASE;},get renderSystem(){return m112.renderSystem;},get renderFrame(){return m112.renderFrame;},get canvasRenderer(){return m112.canvasRenderer;},get cameraSystem(){return m112.cameraSystem;},get gameSession(){return m131.gameSession;},get PlayerStateSystem(){return m132.PlayerStateSystem;},get PlayerControlSystem(){return m133.PlayerControlSystem;},get Player(){return m87.Player;},get playerVitals(){return m88.playerVitals;},get itemSystem(){return m71.itemSystem;},get createItemCatalog(){return m46.createItemCatalog;},get GUN_MATERIALS(){return m127.GUN_MATERIALS;},get WEAPON_MODELS(){return m127.WEAPON_MODELS;},get LASER_MODULE(){return m127.LASER_MODULE;},get weaponModel(){return m127.weaponModel;},get weaponAppearance(){return m138.weaponAppearance;},get combatSystem(){return m134.combatSystem;},get weaponSystem(){return m135.weaponSystem;},get lootSystem(){return m137.lootSystem;},get WorldLoot(){return m92.WorldLoot;},get MELEE_SWING(){return m136.MELEE_SWING;},get WIDE_SWING(){return m136.WIDE_SWING;},get sampleMeleeSwing(){return m136.sampleMeleeSwing;},get sampleWideSwing(){return m136.sampleWideSwing;},get swingPhases(){return m136.swingPhases;},get wideGrip(){return m136.wideGrip;},get COMBAT_RULES(){return m139.COMBAT_RULES;},get registerGameEntityTypes(){return m81.registerGameEntityTypes;},get actorVitals(){return m69.actorVitals;},get gameActor(){return m67.gameActor;},get NPC(){return m90.NPC;},get rosterRecord(){return m90.rosterRecord;},get ROSTER_FIELDS(){return m90.ROSTER_FIELDS;},get Ganger(){return m66.Ganger;},get actorSystem(){return m129.actorSystem;},get actorItems(){return m70.actorItems;},get restoreActorItems(){return m70.restoreActorItems;},get resolveEmoteLines(){return m91.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m91.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m49.abilityLoadout;},get actorAbilities(){return m49.actorAbilities;},get abilitySystem(){return m128.abilitySystem;},get createAbilityCatalog(){return m48.createAbilityCatalog;},get importActorAbilities(){return m48.importActorAbilities;},get attackRegistry(){return m68.attackRegistry;},get validateAttackState(){return m68.validateAttackState;},get attackSystem(){return m125.attackSystem;},get createAttackCatalog(){return m45.createAttackCatalog;},get validateMountedAttack(){return m80.validateMountedAttack;},get TrafficVehicle(){return m93.TrafficVehicle;},get createGameVehicle(){return m93.createGameVehicle;},get Hunter(){return m65.Hunter;},get createHunterAppearance(){return m44.createHunterAppearance;},get Marionette(){return m86.Marionette;},get MARIONETTE_RULES(){return m42.MARIONETTE_RULES;},get validateAbilityAction(){return m77.validateAbilityAction;},get GatlingGunner(){return m74.GatlingGunner;},get Drone(){return m82.Drone;},get VelvetCat(){return m83.VelvetCat;},get velvetCatAnimation(){return m84.velvetCatAnimation;},get createVelvetAnimation(){return m84.createVelvetAnimation;},get velvetPresentation(){return m84.velvetPresentation;},get droneLift(){return m140.droneLift;},get droneArmPose(){return m140.droneArmPose;},get dronePresentation(){return m140.dronePresentation;},get VELVET_CAT_PALETTES(){return m85.VELVET_CAT_PALETTES;},get VELVET_T(){return m85.VELVET_T;},get VELVET_PROFILES(){return m85.VELVET_PROFILES;},get VELVET_GAITS(){return m85.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m85.VELVET_TAIL_SEGS;},get Demoness(){return m64.Demoness;},get Warden(){return m73.Warden;},get Vesper(){return m73.Vesper;},get Matins(){return m73.Matins;},get Compline(){return m73.Compline;},get BossEffect(){return m75.BossEffect;},get encounterSystem(){return m124.encounterSystem;},get createBossAbilities(){return m36.createBossAbilities;},get createDemonessAppearance(){return m36.createDemonessAppearance;},get demonessAppearance(){return m142.demonessAppearance;},get demonessPresentation(){return m142.demonessPresentation;},get bossEffectAppearance(){return m143.bossEffectAppearance;},get bossEffectPresentation(){return m143.bossEffectPresentation;},get validateBossRecord(){return m63.validateBossRecord;},get createDronePackets(){return m140.createDronePackets;},get createVelvetCatArt(){return m144.createVelvetCatArt;},get createVelvetCatPackets(){return m144.createVelvetCatPackets;},get createVelvetEyePackets(){return m144.createVelvetEyePackets;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m120.humanoidSystem;},get humanoidPresentation(){return m120.humanoidPresentation;},get humanoidBodyCanon(){return m121.humanoidBodyCanon;},get humanoidBuilds(){return m121.humanoidBuilds;},get getHumanoidRigAssets(){return m121.getHumanoidRigAssets;}});
 })();
 return m0;
 })();
