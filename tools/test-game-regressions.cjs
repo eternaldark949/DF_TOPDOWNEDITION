@@ -662,12 +662,12 @@ test('Contact shadows stay on the ground across rotation, bobbing, vector and sp
     const balanced=ctx._stack.length===0;
     shots.length=0; const loot=new Loot(100,120,'scrap');_gameTimeSec=0;loot.draw(ctx);_gameTimeSec=1;loot.draw(ctx);
     const lootFixed=JSON.stringify(shots[0])===JSON.stringify(shots[1]);
-    const sofa=game.apartmentRenderer.propPacket(game.props.find(p=>p.decorType==='apt_sofa'),1);
+    const sofa=game.apartmentRenderer.propPacket(game.props.find(p=>p.interactionType==='light_switch'),1);   // (classic art: the apartment's furniture is native now)
     shots.length=0;GameSettings.propSprites=false;sofa.angle=0.7;sofa.draw(ctx);
     const vector=shots.length===1 && shots[0].m[4]===sofa.x+sofa.width/2 && shots[0].m[5]===sofa.y+sofa.height/2 && shots[0].args[0]===-sofa.width/2-5 && shots[0].args[1]===-sofa.height/2-5;
     shots.length=0;GameSettings.propSprites=true;PropSprites.frame(1.4);sofa.draw(ctx);sofa.draw(ctx);
     const stamped=shots.length===2;
-    const craft=game.apartmentRenderer.propPacket(game.props.find(p=>p.decorType==='apt_craft'),1);shots.length=0;craft.draw(ctx);craft.draw(ctx);
+    const craft=game.apartmentRenderer.propPacket(game.props.find(p=>p.interactionType==='medbay_refill'),1);shots.length=0;craft.draw(ctx);craft.draw(ctx);
     const split=shots.length===2;
     shots.length=0;PropSprites._canvas(sofa,PropSprites._plan(sofa,null),0);
     const notBaked=shots.length===0;
@@ -732,14 +732,14 @@ test('Furniture sprites: painted runs never change over time, loops repeat per p
   const r = value(env, `
     game._doLoadMap('apt_949'); game.running=true; game.paused=false; game.worldMinutes=22*60;
     const P = CanvasRenderingContext2D.prototype, ctx = game.ctx;
-    const sofa = game.apartmentRenderer.propPacket(game.props.find(p => p.decorType === 'apt_sofa'),1), sw = game.apartmentRenderer.propPacket(game.props.find(p => p.interactionType === 'light_switch'),1);
-    const craft = game.apartmentRenderer.propPacket(game.props.find(p => p.decorType === 'apt_craft'),1);
+    const sofa = game.apartmentRenderer.propPacket(game.props.find(p => p.interactionType === 'light_switch'),1), sw = game.apartmentRenderer.propPacket(game.props.find(p => p.interactionType === 'light_switch'),1);
+    const craft = game.apartmentRenderer.propPacket(game.props.find(p => p.interactionType === 'medbay_refill'),1);   // (classic split art: the apartment's furniture is native now)
     PropSprites.frame(1.4);
     const calls = (p) => { const before = __calls.n; p.draw(ctx); return __calls.n - before; };
     globalThis.__calls = { n: 0 }; for (const k of ['drawImage','fillRect','fill','stroke','save','restore','translate','rotate','arc','ellipse','roundRect','beginPath']) { const f = P[k]; P[k] = function () { __calls.n++; return f.apply(this, arguments); }; }
     const firstSofa = calls(sofa), sofaCalls = calls(sofa);
     sofa.angle = 0.3; const turned = calls(sofa); sofa.angle = 0;
-    calls(craft); const craftCalls = calls(craft), craftRuns = craft._spr.runs.length, craftSplit = craft._spr.split;
+    calls(craft); const craftCalls = calls(craft), craftRuns = craft._spr.runs.length, craftSplit = craft._spr.split; GameSettings.propSprites = false; const craftVector = calls(craft); GameSettings.propSprites = true;
     const swRuns = sw._spr || (calls(sw), sw._spr); const swBefore = sw._spr.runs[0];
     sw._switchState = !sw._switchState; calls(sw); const swRepainted = sw._spr.runs[0] !== swBefore && sw._spr.sw === sw._switchState;
     PropSprites.frame(2.6); const closeUp = calls(sofa) > 5; PropSprites.frame(1.4);
@@ -748,12 +748,12 @@ test('Furniture sprites: painted runs never change over time, loops repeat per p
     game._doLoadMap('hotel_suite');
     const released = sofa._spr === undefined && PropSprites.bytes === 0 && !game._aptFloor;
     const desk = game.props.find(p => p.decorType === 'ps_desk'); PropSprites.frame(1.4); calls(desk);
-    return {firstSofa, sofaCalls, turned, craftCalls, craftRuns, craftSplit, swRepainted, closeUp, vectorOff, bytes, floor, released, deskNever: !!(desk._spr && desk._spr.never)};
+    return {firstSofa, sofaCalls, turned, craftCalls, craftVector, craftRuns, craftSplit, swRepainted, closeUp, vectorOff, bytes, floor, released, deskNever: !!(desk._spr && desk._spr.never)};
   `);
   equal([r.sofaCalls, r.turned], [2, 10], 'a still piece stamps its art plus one ground shadow');
   ok(r.firstSofa > 5, 'the first draw paints it');
-  equal([r.craftRuns, r.craftSplit], [2, true], 'the workbench: two still runs round its live scanline and ember');
-  ok(r.craftCalls < 15, `the workbench stamps its runs and draws only what moves (${r.craftCalls} calls)`);
+  equal([r.craftRuns, r.craftSplit], [3, true], 'the health station: three still runs round its live parts');
+  ok(r.craftCalls < r.craftVector, `the health station stamps its runs and draws only what moves (${r.craftCalls} calls, ${r.craftVector} as vector)`);
   ok(r.swRepainted, 'flipping a light switch repaints its sprite');
   ok(r.closeUp, 'zoomed past what a sprite keeps sharp, the vector art draws');
   ok(r.vectorOff, 'Prop Sprites off: vector art');

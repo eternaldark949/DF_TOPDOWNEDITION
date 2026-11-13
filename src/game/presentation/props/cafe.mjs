@@ -3,26 +3,14 @@
 // (game-assets/props.json). `piece.pick(k)` is a repeatable number for the piece (the same seed the
 // classic art used, so every piece keeps the look it always had). Still parts go in `art.still`, and
 // parts that move with `piece.time` go in `art.live`, in drawing order; still runs are painted once.
-import {rect,roundRect,circle,ellipse,polygon} from '../../../engine/basement/rendering/index.mjs';
+import {rect,circle,ellipse,polygon} from '../../../engine/basement/rendering/index.mjs';
+import {box,disc,lines,choose,turned} from './draw.mjs';
 
 // Tableware on the cafe's tables and counter: the same cups and candle jars everywhere.
 const CUP={saucer:'#e8dcc4',rim:'rgba(120,90,60,0.6)',cup:'#f3e4c6',coffee:'#6b4423',gleam:'rgba(240,220,190,0.75)'};
 const JAR={glass:'rgba(255,214,160,0.35)',rim:'rgba(255,230,190,0.6)',wax:'#f6ead6',wick:'#3a2410'};
-const FACE={S:0,W:Math.PI/2,N:Math.PI,E:-Math.PI/2};
-
-/** A filled and/or outlined rounded box, as the classic art's `rr`: the backend's own rounded rectangle, so its corners are a canvas roundRect's exactly. */
-function box(s,x,y,w,h,r,fill,stroke,width=1){s.enter({position:[x+w/2,y+h/2]});s.paint({type:'rect',size:[w,h],radius:r},{fill:fill??null,stroke:stroke??null,stroke_width:width});s.leave();}
-function disc(s,cx,cy,r,fill,stroke,width=1){s.paint([circle(cx,cy,r)],{fill:fill??null,stroke:stroke??null,stroke_width:width});}
-function lines(s,segments,color,width){s.stroke(segments.flatMap(([a,b,c,d])=>[['move',a,b],['line',c,d]]),color,width);}
 function cup(s,cx,cy,col=CUP.cup,coffee=CUP.coffee){disc(s,cx,cy,4.6,CUP.saucer,CUP.rim,.6);disc(s,cx,cy,3.4,col);disc(s,cx,cy,2.6,coffee);disc(s,cx-.6,cy-.6,1,CUP.gleam);s.fill(rect(cx+4,cy-1,2.2,2),CUP.saucer);}
 function candleJar(s,cx,cy){disc(s,cx,cy,4.2,JAR.glass,JAR.rim,.7);disc(s,cx,cy,2.2,JAR.wax);disc(s,cx,cy,.9,JAR.wick);}
-/** One of `list`, chosen by the piece's number `k`: the first above one half, as the classic art chose between two. */
-function choose(list,p){return list[list.length-1-Math.min(list.length-1,Math.floor(p*list.length))];}
-/** Draws `fn(X, Y, W, H)` as the piece stands facing south, turned to its face about its centre. */
-function turned(s,piece,fn){
-    const a=FACE[piece.face]??0,side=Math.abs(Math.sin(a))>.5,W=side?piece.height:piece.width,H=side?piece.width:piece.height;
-    s.enter({position:[piece.width/2,piece.height/2],rotation:a});fn(-W/2,-H/2,W,H);s.leave();
-}
 
 export const CAFE_ARTISTS={
     bentwood_chair:{draw(art,piece,look){art.still(s=>turned(s,piece,(X,Y,W,H)=>{

@@ -71,5 +71,5 @@ export function resolveApartmentDyer(game_db){
     const position=[p.x+p.width/2,p.y+p.height/2];
     return {template:'df_apartment:furniture',position,collision_shape:{shape_type:'box',dimensions:[p.width,p.height]},
         data:{role:'prop',authored_id:'clothing_dyer',movable:false,interaction_type:'clothing_dyer',home_position:position,home_rotation:0,
-            appearance:{...p,color:'#3a2430',interactionType:'clothing_dyer',decorType:'apt_dyer'}}};
+            appearance:{...p,color:'#3a2430',interactionType:'clothing_dyer',decorType:'apt_dyer',family:'clothing_dyer'}}};
 }

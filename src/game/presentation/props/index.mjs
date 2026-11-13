@@ -7,9 +7,10 @@ import PROPS from '../../data/game-assets/props.json' with {type:'json'};
 import {resolvePropLook} from '../../../engine/directory/index.mjs';
 import {artScene,groundShadow,canvasRenderer} from '../../../engine/basement/rendering/index.mjs';
 import {CAFE_ARTISTS} from './cafe.mjs';
+import {APARTMENT_ARTISTS} from './apartment.mjs';
 
 export const PROP_FAMILIES=PROPS.resources.catalog.data.families;
-const ARTISTS=Object.freeze({...CAFE_ARTISTS});
+const ARTISTS=Object.freeze({...CAFE_ARTISTS,...APARTMENT_ARTISTS});
 /** The pad round a piece's box its art may reach past (lips, drop shadows, a hearth), in px. */
 const PAD=8;
 for(const family of Object.keys(ARTISTS))if(!PROP_FAMILIES[family])throw new Error(`Prop artist ${family} has no family in the catalog`);

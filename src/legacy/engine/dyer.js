@@ -26,7 +26,7 @@
                 if(this.activeLevel){
                     const p=this.activeLevel.addDyerStation(GAME_DB);props.push(p);return;
                 }
-                const p = new PropEntity({ ...DYER.STATION, mass: 1e7, color: '#3a2430', interactionType: 'clothing_dyer', decorType: 'apt_dyer' });
+                const p = new PropEntity({ ...DYER.STATION, mass: 1e7, color: '#3a2430', interactionType: 'clothing_dyer', decorType: 'apt_dyer', family: 'clothing_dyer' });
                 props.push(p);
                 if (this.props !== props) this.props = props;
             },
