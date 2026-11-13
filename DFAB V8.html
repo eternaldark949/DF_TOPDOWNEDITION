@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'd3267f40fe52';
+        const DFAB_BUILD = '42149b88e7de';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="13486">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="13607">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -17299,6 +17299,7 @@ const m67 = Object.freeze({default:{
         "maps"
       ]
     },
+    "room_definitions": {"kind": "map_catalog", "source": ["places", "rooms"]},
     "item_definitions": {
       "kind": "item_catalog",
       "source": [
@@ -25188,8 +25189,16 @@ class ApartmentProp extends gameProp {
 
 return Object.freeze({get ApartmentProp(){return ApartmentProp;}});
 })();
+// src/game/entities/apartment-door.mjs
+const m126 = (()=>{
+const {gameProp} = m1;
+/** A door leaf in an interior: a plain prop body that the map builds and moves; art reads its pose. */
+class ApartmentDoor extends gameProp { static entity_type = 'df_apartment_door'; }
+
+return Object.freeze({get ApartmentDoor(){return ApartmentDoor;}});
+})();
 // src/game/data/npc-reactions.mjs
-const m127 = (()=>{
+const m128 = (()=>{
 // Authored character reactions, shared by native and remaining classic NPCs.
 function resolveEmoteLines(reactions, cat, tier) {
     const pool = reactions && reactions[cat];
@@ -25354,10 +25363,10 @@ const NPC_EMOTE_REACTIONS = {
 return Object.freeze({get resolveEmoteLines(){return resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return NPC_EMOTE_REACTIONS;}});
 })();
 // src/game/entities/npc.mjs
-const m126 = (()=>{
+const m127 = (()=>{
 const {importActorAbilities} = m115;
 const {actorAbilities} = m115;
-const {resolveEmoteLines,NPC_EMOTE_REACTIONS} = m127;
+const {resolveEmoteLines,NPC_EMOTE_REACTIONS} = m128;
 const {gameActor} = m100;
 const {actorItems,restoreActorItems} = m103;
 const {nonnegative,jsonCopy} = m40;
@@ -25435,7 +25444,7 @@ for(const [key,field] of Object.entries({burstSize:'burst_size',burstDelay:'burs
 return Object.freeze({get ROSTER_FIELDS(){return ROSTER_FIELDS;},get NPC(){return NPC;},get rosterRecord(){return rosterRecord;}});
 })();
 // src/game/entities/world-loot.mjs
-const m128 = (()=>{
+const m129 = (()=>{
 const {gameProp} = m1;
 /** The dropped bundle is owned here until pickup; the inherited body is the only live pose. */
 class WorldLoot extends gameProp{
@@ -25447,7 +25456,7 @@ class WorldLoot extends gameProp{
 return Object.freeze({get WorldLoot(){return WorldLoot;}});
 })();
 // src/game/data/street-definitions.mjs
-const m131 = (()=>{
+const m132 = (()=>{
 /** Directory authoring only: convert immutable catalog units once, never during simulation. */
 const vehicleDefinitions = new WeakMap();
 function resolveStreetVehicle(library, { brand, model, control_mode = 'AI', color } = {}) {
@@ -25518,8 +25527,8 @@ function resolveVehicleSeats(library, { brand, model }) {
 return Object.freeze({get resolveStreetVehicle(){return resolveStreetVehicle;},get resolveVehicleSeats(){return resolveVehicleSeats;}});
 })();
 // src/game/entities/traffic-vehicle.mjs
-const m130 = (()=>{
-const {resolveStreetVehicle,resolveVehicleSeats} = m131;
+const m131 = (()=>{
+const {resolveStreetVehicle,resolveVehicleSeats} = m132;
 const {gameVehicle} = m1;
 const bindings = new WeakMap();
 /** Official gameplay entity. Body state and driving calculations belong to Basement. */
@@ -25614,10 +25623,10 @@ class TrafficVehicle extends gameVehicle {
 return Object.freeze({get TrafficVehicle(){return TrafficVehicle;}});
 })();
 // src/game/boot/game-vehicle-factory.mjs
-const m133 = (()=>{
-const {TrafficVehicle} = m130;
+const m134 = (()=>{
+const {TrafficVehicle} = m131;
 const {pathGeometry} = m1;
-const {resolveStreetVehicle} = m131;
+const {resolveStreetVehicle} = m132;
 
 const purposes = new Set(['ambient', 'owned', 'mission', 'taxi']);
 /** Shared official creation. Population limits belong to the requesting population manager. */
@@ -25657,9 +25666,9 @@ function createGameVehicle(world, packet = {}, { hooks = {} } = {}) {
 return Object.freeze({get createGameVehicle(){return createGameVehicle;}});
 })();
 // src/game/mechanics/traffic-manager.mjs
-const m132 = (()=>{
-const {TrafficVehicle} = m130;
-const {createGameVehicle} = m133;
+const m133 = (()=>{
+const {TrafficVehicle} = m131;
+const {createGameVehicle} = m134;
 /** Spawn, ownership and driver policy. The physics world owns every spatial/physical operation. */
 class TrafficManager {
     #pendingSpawns = new Set();
@@ -25704,7 +25713,7 @@ class TrafficManager {
 return Object.freeze({get TrafficManager(){return TrafficManager;}});
 })();
 // src/game/entities/pedestrians.mjs
-const m134 = (()=>{
+const m135 = (()=>{
 const {gameCharacter,gameVehicle,BODY_GROUP} = m1;
 const bindings = new WeakMap();
 /** Civilian decisions and reactions. Movement, prediction and impacts stay in Basement. */
@@ -25785,8 +25794,8 @@ class Pedestrian extends gameCharacter {
 return Object.freeze({get Pedestrian(){return Pedestrian;}});
 })();
 // src/game/entities/pedestrian-manager.mjs
-const m135 = (()=>{
-const {Pedestrian} = m134;
+const m136 = (()=>{
+const {Pedestrian} = m135;
 /** Population and waypoint policy only. No positions, obstacle cache or sensing grid. */
 class PedestrianManager {
     #network = new Map();
@@ -25858,11 +25867,11 @@ class PedestrianManager {
 return Object.freeze({get PedestrianManager(){return PedestrianManager;}});
 })();
 // src/game/boot/game-street.mjs
-const m129 = (()=>{
-const {TrafficVehicle} = m130;
-const {TrafficManager} = m132;
-const {Pedestrian} = m134;
-const {PedestrianManager} = m135;
+const m130 = (()=>{
+const {TrafficVehicle} = m131;
+const {TrafficManager} = m133;
+const {Pedestrian} = m135;
+const {PedestrianManager} = m136;
 
 
 function registerStreetEntityTypes(world) {
@@ -25882,7 +25891,7 @@ class StreetPopulation {
     clearStreet() { this.traffic.clearStreet(); this.pedestrians.clearStreet(); }
 }
 
-return Object.freeze({get TrafficVehicle(){return TrafficVehicle;},get TrafficManager(){return TrafficManager;},get Pedestrian(){return Pedestrian;},get PedestrianManager(){return PedestrianManager;},get createGameVehicle(){return m133.createGameVehicle;},get registerStreetEntityTypes(){return registerStreetEntityTypes;},get StreetPopulation(){return StreetPopulation;}});
+return Object.freeze({get TrafficVehicle(){return TrafficVehicle;},get TrafficManager(){return TrafficManager;},get Pedestrian(){return Pedestrian;},get PedestrianManager(){return PedestrianManager;},get createGameVehicle(){return m134.createGameVehicle;},get registerStreetEntityTypes(){return registerStreetEntityTypes;},get StreetPopulation(){return StreetPopulation;}});
 })();
 // src/game/boot/game-entity-types.mjs
 const m116 = (()=>{
@@ -25895,21 +25904,22 @@ const {GatlingGunner} = m108;
 const {Marionette} = m122;
 const {Player} = m123;
 const {ApartmentProp} = m125;
+const {ApartmentDoor} = m126;
 const {gameActor} = m100;
-const {NPC} = m126;
+const {NPC} = m127;
 const {Hunter} = m98;
 const {Ganger} = m99;
-const {WorldLoot} = m128;
-const {registerStreetEntityTypes} = m129;
+const {WorldLoot} = m129;
+const {registerStreetEntityTypes} = m130;
 /** The Directory registers concrete classes before any level or saved identity is constructed. */
 function registerGameEntityTypes(world){
- for(const Class of [gameActor,Player,ApartmentProp,NPC,Ganger,Hunter,Marionette,GatlingGunner,Demoness,Warden,Vesper,Matins,Compline,BossEffect,Drone,VelvetCat,WorldLoot])if(!world.elements.listEntityTypes().includes(Class.entity_type))world.elements.registerEntityType(Class.entity_type,Class);
+ for(const Class of [gameActor,Player,ApartmentProp,ApartmentDoor,NPC,Ganger,Hunter,Marionette,GatlingGunner,Demoness,Warden,Vesper,Matins,Compline,BossEffect,Drone,VelvetCat,WorldLoot])if(!world.elements.listEntityTypes().includes(Class.entity_type))world.elements.registerEntityType(Class.entity_type,Class);
  registerStreetEntityTypes(world);
 }
 
 return Object.freeze({get registerGameEntityTypes(){return registerGameEntityTypes;}});
 })();
-const m137 = Object.freeze({default:{
+const m138 = Object.freeze({default:{
   "library_id": "df_apartment",
   "description": "Authored Silver Queen apartment assets. Furniture order preserves existing questState.aptLayout indices. Physics state is held only by Basement bodies.",
   "resources": {
@@ -26014,9 +26024,9 @@ const m137 = Object.freeze({default:{
   }
 }});
 // src/game/data/apartment-assets.mjs
-const m136 = (()=>{
+const m137 = (()=>{
 const {createGameAssetLibrary} = m47;
-const definition = m137.default;
+const definition = m138.default;
 
 function createApartmentAssetLibrary(options = {}) {
     const library = createGameAssetLibrary(options);
@@ -26029,7 +26039,7 @@ const APARTMENT_RULES = Object.freeze(definition.resources.rules.data);
 return Object.freeze({get createApartmentAssetLibrary(){return createApartmentAssetLibrary;},get APARTMENT_RULES(){return APARTMENT_RULES;}});
 })();
 // src/engine/basement/maps/doors.mjs
-const m141 = (()=>{
+const m142 = (()=>{
 // ===== LV0 BASEMENT =====
 const {BODY_GROUP} = m1;
 
@@ -26141,10 +26151,10 @@ function doorLeaves(d, key, kind, base) {
 return Object.freeze({get DOOR_KINDS(){return DOOR_KINDS;},get HINGE(){return HINGE;},get DOOR_MASK(){return DOOR_MASK;},get validateDoorKind(){return validateDoorKind;},get resolveDoorKinds(){return resolveDoorKinds;},get doorKind(){return doorKind;},get leafIds(){return leafIds;},get doorOpening(){return doorOpening;},get doorLeaves(){return doorLeaves;}});
 })();
 // src/engine/basement/maps/builder.mjs
-const m140 = (()=>{
+const m141 = (()=>{
 // ===== LV0 BASEMENT =====
 const {layoutGeometry} = m1;
-const {resolveDoorKinds,doorKind,doorLeaves,doorOpening,leafIds} = m141;
+const {resolveDoorKinds,doorKind,doorLeaves,doorOpening,leafIds} = m142;
 
 
 /**
@@ -26237,12 +26247,12 @@ function buildMapPackets(definition, { templates = {}, decorate = null, prop_typ
     return { kind, entries, openings, spawn: definition.spawn ? [...definition.spawn] : null, door_kinds: kinds };
 }
 
-return Object.freeze({get DOOR_KINDS(){return m141.DOOR_KINDS;},get HINGE(){return m141.HINGE;},get validateDoorKind(){return m141.validateDoorKind;},get MAP_KINDS(){return MAP_KINDS;},get DEFAULT_KINDS(){return DEFAULT_KINDS;},get buildMapPackets(){return buildMapPackets;}});
+return Object.freeze({get DOOR_KINDS(){return m142.DOOR_KINDS;},get HINGE(){return m142.HINGE;},get validateDoorKind(){return m142.validateDoorKind;},get MAP_KINDS(){return MAP_KINDS;},get DEFAULT_KINDS(){return DEFAULT_KINDS;},get buildMapPackets(){return buildMapPackets;}});
 })();
 // src/engine/basement/maps/rooms.mjs
-const m143 = (()=>{
+const m144 = (()=>{
 // ===== LV0 BASEMENT =====
-const {resolveDoorKinds,doorKind,leafIds} = m141;
+const {resolveDoorKinds,doorKind,leafIds} = m142;
 /**
  * Rooms of one map: which rooms exist, how they connect, how open each connection is right now,
  * and which room each tracked body is in. Room volumes live in the world's one spatial grid (the
@@ -26391,11 +26401,11 @@ class roomGraph {
 return Object.freeze({get roomGraph(){return roomGraph;}});
 })();
 // src/engine/basement/maps/system.mjs
-const m142 = (()=>{
+const m143 = (()=>{
 // ===== LV0 BASEMENT =====
 const {BODY_GROUP} = m1;
-const {buildMapPackets} = m140;
-const {roomGraph} = m143;
+const {buildMapPackets} = m141;
+const {roomGraph} = m144;
 
 const extentOf = packet => {
     const s = packet.collision_shape ?? packet.render_shape;
@@ -26539,17 +26549,17 @@ class mapSystem {
 return Object.freeze({get mapInstance(){return mapInstance;},get mapSystem(){return mapSystem;}});
 })();
 // src/engine/basement/maps/index.mjs
-const m139 = (()=>{
+const m140 = (()=>{
 // ===== LV0 BASEMENT =====
 
 
 
 
-return Object.freeze({get buildMapPackets(){return m140.buildMapPackets;},get MAP_KINDS(){return m140.MAP_KINDS;},get DEFAULT_KINDS(){return m140.DEFAULT_KINDS;},get DOOR_KINDS(){return m140.DOOR_KINDS;},get HINGE(){return m140.HINGE;},get validateDoorKind(){return m140.validateDoorKind;},get mapInstance(){return m142.mapInstance;},get mapSystem(){return m142.mapSystem;},get roomGraph(){return m143.roomGraph;}});
+return Object.freeze({get buildMapPackets(){return m141.buildMapPackets;},get MAP_KINDS(){return m141.MAP_KINDS;},get DEFAULT_KINDS(){return m141.DEFAULT_KINDS;},get DOOR_KINDS(){return m141.DOOR_KINDS;},get HINGE(){return m141.HINGE;},get validateDoorKind(){return m141.validateDoorKind;},get mapInstance(){return m143.mapInstance;},get mapSystem(){return m143.mapSystem;},get roomGraph(){return m144.roomGraph;}});
 })();
 // src/game/levels/apartment-definition.mjs
-const m138 = (()=>{
-const {buildMapPackets} = m139;
+const m139 = (()=>{
+const {buildMapPackets} = m140;
 const {resolveMapLayout,PROP_TYPES} = m69;
 
 const TEMPLATES = { wall: 'df_apartment:wall', prop: 'df_apartment:furniture', light: 'df_apartment:lamp', trigger: 'df_apartment:transition', room: 'df_apartment:transition', door: 'df_apartment:door', cloth: 'df_apartment:curtain' };
@@ -26560,23 +26570,33 @@ const TEMPLATES = { wall: 'df_apartment:wall', prop: 'df_apartment:furniture', l
  * game data the apartment's artists and interactions read.
  */
 function apartmentMapDefinition(game_db) {
-    const map = structuredClone(game_db.places.maps.apt_949), rooms = structuredClone(game_db.places.rooms.apt_949);
-    const layout = resolveMapLayout('apt_949');
+    return interiorMapDefinition({ map_id: 'apt_949', map: game_db.places.maps.apt_949, rooms: game_db.places.rooms.apt_949 });
+}
+
+/**
+ * Any interior from its GAME_DB map and rooms records and its layout file, the same way. Rooms are
+ * optional: a map without them has no doors, room volumes or curtains. Exits are `transition`
+ * triggers whose data names the `target` map and its `label`.
+ */
+function interiorMapDefinition({ map_id, map, rooms = null }) {
+    if (!map) throw new TypeError(`Unknown map: ${map_id}`);
+    map = structuredClone(map); rooms = structuredClone(rooms ?? { rooms: {}, doors: [], linens: [] });
+    const layout = resolveMapLayout(map_id);
     return {
         map, rooms, layout,
         definition: {
-            map_id: 'apt_949', kind: 'interior', size: [map.width, map.height], boundary: { thickness: 20 }, spawn: [map.spawn.x, map.spawn.y],
-            walls: map.walls,
+            map_id, kind: 'interior', size: [map.width, map.height], boundary: { thickness: 20 }, spawn: [map.spawn.x, map.spawn.y],
+            walls: map.walls ?? [],
             placements: layout.props.map((p, index) => {
                 const lamp = layout.lamps.find(l => l.parent_prop === index);
                 const emission = p.light ? { radius: p.light.radius, color: p.light.color, position: [p.light.dx ?? 0, p.light.dy ?? 0] } : lamp ? { radius: lamp.lightRadius, color: lamp.color, position: [0, 0] } : null;
                 return { type: layout.prop_types[index], x: p.x, y: p.y, width: p.width, height: p.height, ...(emission ? { light: emission } : {}), source: p, emission };
             }),
             lights: layout.lamps.filter(l => l.parent_prop === undefined).map(l => ({ position: [l.x, l.y], radius: l.lightRadius, source: l })),
-            triggers: map.transitions.map((r, index) => ({ ...r, role: 'transition', authored_id: `exit_${index}`, data: { target: r.target, label: r.label } })),
-            rooms: rooms.rooms,
-            doors: rooms.doors.map(d => ({ ...d, source: d })),
-            cloths: rooms.linens.map(l => ({ ...l, role: 'curtain', source: l }))
+            triggers: (map.transitions ?? []).map((r, index) => ({ ...r, role: 'transition', authored_id: `exit_${index}`, data: { target: r.target, label: r.label ?? null } })),
+            rooms: rooms.rooms ?? {},
+            doors: (rooms.doors ?? []).map(d => ({ ...d, source: d })),
+            cloths: (rooms.linens ?? []).map(l => ({ ...l, role: 'curtain', source: l }))
         }
     };
 }
@@ -26615,10 +26635,10 @@ function resolveApartmentDyer(game_db){
             appearance:{...p,color:'#3a2430',interactionType:'clothing_dyer',decorType:'apt_dyer'}}};
 }
 
-return Object.freeze({get apartmentMapDefinition(){return apartmentMapDefinition;},get APARTMENT_MAP_OPTIONS(){return APARTMENT_MAP_OPTIONS;},get resolveApartmentDefinition(){return resolveApartmentDefinition;},get resolveApartmentDyer(){return resolveApartmentDyer;}});
+return Object.freeze({get apartmentMapDefinition(){return apartmentMapDefinition;},get interiorMapDefinition(){return interiorMapDefinition;},get APARTMENT_MAP_OPTIONS(){return APARTMENT_MAP_OPTIONS;},get resolveApartmentDefinition(){return resolveApartmentDefinition;},get resolveApartmentDyer(){return resolveApartmentDyer;}});
 })();
 // src/game/boot/game-actor-factory.mjs
-const m144 = (()=>{
+const m145 = (()=>{
 const {createDemonessAppearance} = m48;
 const {createHunterAppearance} = m56;
 const {validateAttackState} = m101;
@@ -26662,20 +26682,18 @@ const {abilityLoadout} = m115;
 const {importActorAbilities} = m115;
 const {registerGameEntityTypes} = m116;
 const {physicsSystem} = m1;
-const {createApartmentAssetLibrary} = m136;
-const {resolveApartmentDefinition,resolveApartmentDyer,APARTMENT_MAP_OPTIONS} = m138;
-const {mapInstance} = m139;
-const {NPC,rosterRecord} = m126;
-const {createActorPacket} = m144;
-const {gameProp} = m1;
-class ApartmentDoor extends gameProp { static entity_type = 'df_apartment_door'; }
+const {createApartmentAssetLibrary} = m137;
+const {resolveApartmentDefinition,resolveApartmentDyer,APARTMENT_MAP_OPTIONS} = m139;
+const {mapInstance} = m140;
+const {NPC,rosterRecord} = m127;
+const {createActorPacket} = m145;
 
 /** A real scene owner. No legacy actors are adopted or synchronized. */
 class ApartmentLevel {
     constructor({ game_db, spawn, layout = {}, roster = [] }) {
         const library = createApartmentAssetLibrary({ game_db });
         this.physics = new physicsSystem({ asset_library: library });
-        registerGameEntityTypes(this.physics);this.physics.elements.registerEntityType(ApartmentDoor.entity_type,ApartmentDoor);
+        registerGameEntityTypes(this.physics);
         this.definition = resolveApartmentDefinition(library, game_db);
         this.map = new mapInstance(this.physics, this.definition.definition, APARTMENT_MAP_OPTIONS);   // the Basement map system builds the scene
         this.player = this.physics.createEntity({...this.definition.player,...(spawn?{position:spawn}:{})});
@@ -26743,7 +26761,7 @@ class ApartmentLevel {
 return Object.freeze({get ApartmentLevel(){return ApartmentLevel;}});
 })();
 // src/engine/lobby/level-lobby.mjs
-const m146 = (()=>{
+const m147 = (()=>{
 // ===== LV1 LOBBY =====
 // The engine's game loop. The Lobby keeps the clock and nothing else: it knows when a frame is due,
 // how many fixed simulation steps that frame owes, and how far the drawn frame sits between two steps.
@@ -26880,7 +26898,7 @@ class levelLobby {
 return Object.freeze({get levelLobby(){return levelLobby;}});
 })();
 // src/engine/lobby/runtime/game-level.mjs
-const m147 = (()=>{
+const m148 = (()=>{
 // ===== LV1 LOBBY =====
 /** Content/lifecycle contract. A level never owns a world, clock or collision solver. */
 class gameLevel {
@@ -26901,7 +26919,7 @@ class gameLevel {
 return Object.freeze({get gameLevel(){return gameLevel;}});
 })();
 // src/engine/basement/controls/values.mjs
-const m150 = (()=>{
+const m151 = (()=>{
 // ===== LV0 BASEMENT =====
 const TAP = 0;
 const DOUBLETAP = 1;
@@ -26926,7 +26944,7 @@ function radialStick(value, dead_zone = 0.15) {
 return Object.freeze({get TAP(){return TAP;},get DOUBLETAP(){return DOUBLETAP;},get HELD(){return HELD;},get PRESS(){return PRESS;},get REPEAT(){return REPEAT;},get RELEASE(){return RELEASE;},get cleanupAll(){return cleanupAll;},get radialStick(){return radialStick;}});
 })();
 // src/engine/basement/controls/touch-stick.mjs
-const m152 = (()=>{
+const m153 = (()=>{
 // ===== LV0 BASEMENT =====
 class touchStick {
     constructor(system, name, packet) {
@@ -27026,10 +27044,10 @@ class touchStick {
 return Object.freeze({get touchStick(){return touchStick;}});
 })();
 // src/engine/basement/controls/devices.mjs
-const m151 = (()=>{
+const m152 = (()=>{
 // ===== LV0 BASEMENT =====
-const {touchStick} = m152;
-const {radialStick,cleanupAll} = m150;
+const {touchStick} = m153;
+const {radialStick,cleanupAll} = m151;
 
 /** Device state uses the terminology from the original Python input instances. */
 class inputInstance {
@@ -27148,11 +27166,11 @@ class gamepadInstance extends inputInstance {
 return Object.freeze({get inputInstance(){return inputInstance;},get keyboardInstance(){return keyboardInstance;},get mouseInstance(){return mouseInstance;},get touchInstance(){return touchInstance;},get gamepadInstance(){return gamepadInstance;}});
 })();
 // src/engine/basement/controls/system.mjs
-const m149 = (()=>{
+const m150 = (()=>{
 // ===== LV0 BASEMENT =====
-const {TAP,DOUBLETAP,HELD,PRESS,REPEAT,RELEASE} = m150;
-const {radialStick,cleanupAll} = m150;
-const {keyboardInstance,mouseInstance,touchInstance,gamepadInstance} = m151;
+const {TAP,DOUBLETAP,HELD,PRESS,REPEAT,RELEASE} = m151;
+const {radialStick,cleanupAll} = m151;
+const {keyboardInstance,mouseInstance,touchInstance,gamepadInstance} = m152;
 
 class controlSystem {
     #listeners = new Set();
@@ -27390,17 +27408,17 @@ class controlSystem {
 return Object.freeze({get controlSystem(){return controlSystem;}});
 })();
 // src/engine/basement/controls/index.mjs
-const m148 = (()=>{
+const m149 = (()=>{
 // ===== LV0 BASEMENT =====
 
 
 
 
 
-return Object.freeze({get controlSystem(){return m149.controlSystem;},get controlsSystem(){return m149.controlSystem;},get inputInstance(){return m151.inputInstance;},get keyboardInstance(){return m151.keyboardInstance;},get mouseInstance(){return m151.mouseInstance;},get touchInstance(){return m151.touchInstance;},get gamepadInstance(){return m151.gamepadInstance;},get touchStick(){return m152.touchStick;},get TAP(){return m150.TAP;},get DOUBLETAP(){return m150.DOUBLETAP;},get HELD(){return m150.HELD;},get PRESS(){return m150.PRESS;},get REPEAT(){return m150.REPEAT;},get RELEASE(){return m150.RELEASE;}});
+return Object.freeze({get controlSystem(){return m150.controlSystem;},get controlsSystem(){return m150.controlSystem;},get inputInstance(){return m152.inputInstance;},get keyboardInstance(){return m152.keyboardInstance;},get mouseInstance(){return m152.mouseInstance;},get touchInstance(){return m152.touchInstance;},get gamepadInstance(){return m152.gamepadInstance;},get touchStick(){return m153.touchStick;},get TAP(){return m151.TAP;},get DOUBLETAP(){return m151.DOUBLETAP;},get HELD(){return m151.HELD;},get PRESS(){return m151.PRESS;},get REPEAT(){return m151.REPEAT;},get RELEASE(){return m151.RELEASE;}});
 })();
 // src/engine/basement/rendering/values.mjs
-const m155 = (()=>{
+const m156 = (()=>{
 // ===== LV0 BASEMENT =====
 function finite(value,name,min=-Infinity){if(!Number.isFinite(value)||value<min)throw new TypeError(`Invalid ${name}`);return value;}
 function vector(value,name='vector',out=[]){if(!Array.isArray(value)||value.length!==2)throw new TypeError(`Invalid ${name}`);out[0]=finite(value[0],name);out[1]=finite(value[1],name);return out;}
@@ -27418,9 +27436,9 @@ const BLENDS = Object.freeze({normal:'source-over',add:'lighter',multiply:'multi
 return Object.freeze({get finite(){return finite;},get vector(){return vector;},get identifier(){return identifier;},get matrix(){return matrix;},get inverse(){return inverse;},get point(){return point;},get transform(){return transform;},get viewport(){return viewport;},get freezeData(){return freezeData;},get color(){return color;},get BLENDS(){return BLENDS;}});
 })();
 // src/engine/basement/rendering/camera.mjs
-const m154 = (()=>{
+const m155 = (()=>{
 // ===== LV0 BASEMENT =====
-const {finite,vector,viewport,inverse,point,freezeData} = m155;
+const {finite,vector,viewport,inverse,point,freezeData} = m156;
 
 /** View state only. Following reads native poses; this class never moves a body. */
 class cameraSystem {
@@ -27474,9 +27492,9 @@ class cameraSystem {
 return Object.freeze({get cameraSystem(){return cameraSystem;}});
 })();
 // src/engine/basement/rendering/packets.mjs
-const m157 = (()=>{
+const m158 = (()=>{
 // ===== LV0 BASEMENT =====
-const {finite,vector,matrix,inverse,transform,color,identifier,BLENDS} = m155;
+const {finite,vector,matrix,inverse,transform,color,identifier,BLENDS} = m156;
 
 const geometryBuffers = new WeakMap();
 
@@ -27546,10 +27564,10 @@ function requirements(draw,resolve,result=[]){
 return Object.freeze({get geometry(){return geometry;},get material(){return material;},get packet(){return packet;},get requirements(){return requirements;}});
 })();
 // src/engine/basement/rendering/frame.mjs
-const m156 = (()=>{
+const m157 = (()=>{
 // ===== LV0 BASEMENT =====
-const {packet} = m157;
-const {color,finite,freezeData} = m155;
+const {packet} = m158;
+const {color,finite,freezeData} = m156;
 
 /** Reused command buffers. Producers submit data; a backend borrows a completed frame. */
 class renderFrame {
@@ -27587,11 +27605,11 @@ class renderFrame {
 return Object.freeze({get renderFrame(){return renderFrame;}});
 })();
 // src/engine/basement/rendering/system.mjs
-const m158 = (()=>{
+const m159 = (()=>{
 // ===== LV0 BASEMENT =====
-const {renderFrame} = m156;
-const {geometry,material,requirements} = m157;
-const {finite,identifier,freezeData} = m155;
+const {renderFrame} = m157;
+const {geometry,material,requirements} = m158;
+const {finite,identifier,freezeData} = m156;
 
 function normalizeResource(description){
     if(!description||typeof description!=='object')throw new TypeError('A data resource descriptor is required');
@@ -27680,10 +27698,10 @@ class renderSystem {
 return Object.freeze({get renderSystem(){return renderSystem;}});
 })();
 // src/engine/basement/rendering/canvas.mjs
-const m159 = (()=>{
+const m160 = (()=>{
 // ===== LV0 BASEMENT =====
-const {renderFrame} = m156;
-const {BLENDS} = m155;
+const {renderFrame} = m157;
+const {BLENDS} = m156;
 
 function createSurface(width,height){
     if(typeof OffscreenCanvas!=='undefined')return new OffscreenCanvas(width,height);
@@ -27825,13 +27843,13 @@ class canvasRenderer {
 return Object.freeze({get canvasRenderer(){return canvasRenderer;}});
 })();
 // src/engine/basement/rendering/art.mjs
-const m160 = (()=>{
+const m161 = (()=>{
 // ===== LV0 BASEMENT =====
 // THE ART TOOLKIT: the shapes, effects and helpers every artist repeats, as frame packets. An artist
 // builds a picture in an `artScene` (move, rotate, scale and paint inside nested groups, as with a
 // canvas save/restore) and hands `finish()` to the frame. Nothing here touches a canvas: every
 // result is plain data that any backend can draw.
-const {transform,inverse} = m155;
+const {transform,inverse} = m156;
 
 const identity=()=>[1,0,0,1,0,0];
 const multiply=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
@@ -27926,13 +27944,13 @@ function hash2(x,y,seed=0){let h=Math.imul((x|0)^0x27d4eb2d,0x85ebca6b)^Math.imu
 return Object.freeze({get ellipse(){return ellipse;},get circle(){return circle;},get polyline(){return polyline;},get polygon(){return polygon;},get rect(){return rect;},get roundRect(){return roundRect;},get capsule(){return capsule;},get smoothShape(){return smoothShape;},get linear(){return linear;},get radial(){return radial;},get artScene(){return artScene;},get glow(){return glow;},get groundShadow(){return groundShadow;},get hexToRgb(){return hexToRgb;},get rgbToHex(){return rgbToHex;},get rgba(){return rgba;},get mix(){return mix;},get shade(){return shade;},get seededRandom(){return seededRandom;},get hash2(){return hash2;}});
 })();
 // src/engine/basement/rendering/lighting.mjs
-const m161 = (()=>{
+const m162 = (()=>{
 // ===== LV0 BASEMENT =====
 // THE LIGHT LAYER: darkness over the scene with light cut out of it. A layer is built as frame packets:
 // the dark (a tint over the bounds), areas where the dark is thinner (a lit room, an open sky), each
 // light's cut (its reach, shadowed by an optional visibility polygon), then each light's colour, added.
 // Draw it over the finished scene at the dark's strength (canvasRenderer.drawLayer, or a render target).
-const {artScene,rect,circle,radial,linear} = m160;
+const {artScene,rect,circle,radial,linear} = m161;
 
 const finite=(value,name,min=-Infinity)=>{if(!Number.isFinite(value)||value<min)throw new TypeError(`Light ${name} must be a finite number`);return value;};
 const LIGHT_CUT=Object.freeze([[0,1],[1,0]]);
@@ -27992,7 +28010,7 @@ function createLightLayer({bounds,tint,areas=[],lights=[]},{scene=new artScene()
 return Object.freeze({get LIGHT_CUT(){return LIGHT_CUT;},get createLightLayer(){return createLightLayer;}});
 })();
 // src/engine/basement/rendering/index.mjs
-const m153 = (()=>{
+const m154 = (()=>{
 // ===== LV0 BASEMENT =====
 
 
@@ -28001,16 +28019,16 @@ const m153 = (()=>{
 
 
 
-return Object.freeze({get cameraSystem(){return m154.cameraSystem;},get renderFrame(){return m156.renderFrame;},get renderSystem(){return m158.renderSystem;},get canvasRenderer(){return m159.canvasRenderer;},get artScene(){return m160.artScene;},get circle(){return m160.circle;},get ellipse(){return m160.ellipse;},get polyline(){return m160.polyline;},get polygon(){return m160.polygon;},get rect(){return m160.rect;},get roundRect(){return m160.roundRect;},get capsule(){return m160.capsule;},get smoothShape(){return m160.smoothShape;},get linear(){return m160.linear;},get radial(){return m160.radial;},get glow(){return m160.glow;},get groundShadow(){return m160.groundShadow;},get hexToRgb(){return m160.hexToRgb;},get rgbToHex(){return m160.rgbToHex;},get rgba(){return m160.rgba;},get mix(){return m160.mix;},get shade(){return m160.shade;},get seededRandom(){return m160.seededRandom;},get hash2(){return m160.hash2;},get createLightLayer(){return m161.createLightLayer;},get LIGHT_CUT(){return m161.LIGHT_CUT;}});
+return Object.freeze({get cameraSystem(){return m155.cameraSystem;},get renderFrame(){return m157.renderFrame;},get renderSystem(){return m159.renderSystem;},get canvasRenderer(){return m160.canvasRenderer;},get artScene(){return m161.artScene;},get circle(){return m161.circle;},get ellipse(){return m161.ellipse;},get polyline(){return m161.polyline;},get polygon(){return m161.polygon;},get rect(){return m161.rect;},get roundRect(){return m161.roundRect;},get capsule(){return m161.capsule;},get smoothShape(){return m161.smoothShape;},get linear(){return m161.linear;},get radial(){return m161.radial;},get glow(){return m161.glow;},get groundShadow(){return m161.groundShadow;},get hexToRgb(){return m161.hexToRgb;},get rgbToHex(){return m161.rgbToHex;},get rgba(){return m161.rgba;},get mix(){return m161.mix;},get shade(){return m161.shade;},get seededRandom(){return m161.seededRandom;},get hash2(){return m161.hash2;},get createLightLayer(){return m162.createLightLayer;},get LIGHT_CUT(){return m162.LIGHT_CUT;}});
 })();
 // src/engine/lobby/runtime/game-engine.mjs
-const m145 = (()=>{
+const m146 = (()=>{
 // ===== LV1 LOBBY =====
 const {physicsSystem} = m1;
-const {levelLobby} = m146;
-const {gameLevel} = m147;
-const {controlSystem} = m148;
-const {cameraSystem,renderSystem} = m153;
+const {levelLobby} = m147;
+const {gameLevel} = m148;
+const {controlSystem} = m149;
+const {cameraSystem,renderSystem} = m154;
 
 const hooks = ['attach', 'detach', 'beforePhysics', 'afterPhysics', 'render', 'levelEntered', 'levelLeaving','gameplayPaused'];
 function synchronous(fn, receiver, args) {
@@ -28265,7 +28283,163 @@ class gameEngine {
 
 return Object.freeze({get gameEngine(){return gameEngine;}});
 })();
-const m165 = Object.freeze({default:{
+// src/engine/lobby/runtime/map-level.mjs
+const m163 = (()=>{
+// ===== LV1 LOBBY =====
+const {gameLevel} = m148;
+const {mapInstance} = m140;
+
+/**
+ * A level that is one Basement map. A subclass says which map with `mapDefinition`; the level builds
+ * it on entry, keeps its doors and rooms current each step, and releases it on exit. Its exits are
+ * the map's triggers whose data names a `target` level (with an optional `label`, and `auto` to travel
+ * on contact). Arriving travellers are placed just inside the exit that leads back where they came
+ * from, stepping in from the map edge the exit sits on, or at the map's spawn.
+ */
+class mapLevel extends gameLevel {
+    map = null;
+    /** Returns `{definition, map_options}` for this level; `assets` is the Directory data source. */
+    mapDefinition({ assets }, options) { throw new Error(`${this.constructor.name} must give its map definition`); }
+    async prepare(context, options = {}) {
+        const { definition, map_options = {} } = await this.mapDefinition(context, options);
+        if (!definition?.size) throw new TypeError('A map level needs a map definition with a size');
+        return { definition, map_options, arrival: options.arrival ?? null, travellers: [...(options.travellers ?? [])] };
+    }
+    enter(context, prepared) {
+        this.map = new mapInstance(context.api.physics, prepared.definition, prepared.map_options);
+        this.definition = prepared.definition;
+        const travellers = prepared.travellers.map(id => context.api.elements.fetchEntity(id)).filter(e => e && !e.destroyed);
+        if (travellers.length) this.placeTravellers(context, travellers, this.arrivalPose(context, prepared.arrival?.from ?? null, travellers[0]));
+    }
+    afterPhysics(context, seconds) { this.map.updateState(this.mapUpdateOptions(context)); }
+    /** What `map.updateState` is given each step (door ranges, who opens doors). */
+    mapUpdateOptions(context) { return {}; }
+    leave(context) { this.map?.destroy(); this.map = null; }
+    /** Every exit: `{entity, target, label, auto, bounds}`. */
+    getExits() {
+        if (!this.map) return [];
+        return this.map.entities().filter(e => typeof e.data?.target === 'string').map(entity => {
+            const b = entity.physics_system.getBodyBounds(entity); return { entity, target: entity.data.target, label: entity.data.label ?? null, auto: !!entity.data.auto, bounds: b };
+        });
+    }
+    /** The exit a body stands in, or null. */
+    exitAt(body) {
+        for (const exit of this.getExits()) if (exit.entity.physics_system.containsPoint(exit.entity, body.position)) return exit;
+        return null;
+    }
+    /** Where someone arriving from `from` stands: inside the exit leading back there, else the map's spawn. */
+    arrivalPose(context, from, body) {
+        const world = context.api.physics, [width, height] = this.definition.size, spawn = this.definition.spawn ?? [width / 2, height / 2];
+        const gate = from === null ? null : this.getExits().find(exit => exit.target === from);
+        if (!gate) return { position: [...spawn], rotation: -Math.PI / 2 };
+        const b = gate.bounds, cx = (b.left + b.right) / 2, cy = (b.top + b.bottom) / 2;
+        const edges = { S: height - b.bottom, N: b.top, W: b.left, E: width - b.right }, side = Object.keys(edges).reduce((a, k) => edges[a] <= edges[k] ? a : k);
+        const dir = { S: [0, -1], N: [0, 1], W: [1, 0], E: [-1, 0] }[side];
+        const inExit = p => this.getExits().some(exit => world.containsPoint(exit.entity, p));
+        for (let step = 20; step <= 200; step += 10) {
+            const position = [side === 'S' || side === 'N' ? cx : (dir[0] > 0 ? b.right : b.left) + dir[0] * step, side === 'W' || side === 'E' ? cy : (dir[1] > 0 ? b.bottom : b.top) + dir[1] * step];
+            if (!inExit(position) && world.isPlacementClear(body, position, { ignore_body: body, include_ghosts: false })) return { position, rotation: Math.atan2(dir[1], dir[0]) };
+        }
+        return { position: [...spawn], rotation: -Math.PI / 2 };
+    }
+    /** The leader at the pose; each follower in the nearest clear spot beside it or further in, never in an exit. */
+    placeTravellers(context, [leader, ...followers], pose) {
+        const world = context.api.physics, ahead = [Math.cos(pose.rotation), Math.sin(pose.rotation)], side = [-ahead[1], ahead[0]];
+        const put = (body, position) => world.updateBody(body, { position, rotation: pose.rotation, linear_velocity: [0, 0], angular_velocity: 0 });
+        const inExit = p => this.getExits().some(exit => world.containsPoint(exit.entity, p));
+        put(leader, pose.position);
+        const spots = [];
+        for (let ring = 0; ring <= 6; ring++) for (const lateral of ring ? [0, 1, -1, 2, -2] : [1, -1, 2, -2]) spots.push([pose.position[0] + ahead[0] * 26 * ring + side[0] * 24 * lateral, pose.position[1] + ahead[1] * 26 * ring + side[1] * 24 * lateral]);
+        for (const body of followers) put(body, spots.find(p => !inExit(p) && world.isPlacementClear(body, p, { ignore_body: body, include_ghosts: false })) ?? pose.position);
+    }
+}
+
+return Object.freeze({get mapLevel(){return mapLevel;}});
+})();
+// src/engine/lobby/runtime/travel-system.mjs
+const m164 = (()=>{
+// ===== LV1 LOBBY =====
+/**
+ * Travel between levels through their exits. Each step it notes the exit the leading traveller
+ * stands in (a map level's `exitAt`); `travel()` then loads the exit's target level, carrying the
+ * travellers: the leader is placed just inside the exit leading back, the rest beside it. An exit marked
+ * `auto` travels on contact. The game says who travels (`get_travellers`: leader first, each must be a
+ * session or retained entity: the runtime retires level entities on the way out) and may veto an exit (`can_travel`). The current and
+ * previous level ids are plain state, saved with the game and given back with `loadState`.
+ */
+class travelSystem {
+    #context = null; #get; #can; #listeners = new Set(); #pending = null;
+    exit = null; previous_level = null;
+    constructor({ get_travellers, can_travel = () => true } = {}) {
+        if (typeof get_travellers !== 'function' || typeof can_travel !== 'function') throw new TypeError('travelSystem needs get_travellers (and an optional can_travel) function');
+        this.#get = get_travellers; this.#can = can_travel;
+    }
+    attach(context) { this.#context = context; }
+    detach() { this.#context = null; this.#listeners.clear(); }
+    get traveling() { return this.#pending !== null; }
+    #travellers() { return (this.#get(this.#context) ?? []).filter(e => e && !e.destroyed); }
+    afterPhysics(context) {
+        const level = context.engine.active_level, [leader] = this.#travellers();
+        const exit = leader && typeof level?.exitAt === 'function' && !this.#pending ? level.exitAt(leader) : null;
+        const offer = exit ? { target: exit.target, label: exit.label, auto: exit.auto, available: context.engine.listLevels().includes(exit.target) && !!this.#can(exit, context) } : null;
+        const changed = (offer?.target ?? null) !== (this.exit?.target ?? null);
+        this.exit = offer;
+        if (changed) for (const listener of this.#listeners) listener(offer);
+        if (offer?.auto && offer.available) this.travel().catch(() => {});
+    }
+    levelLeaving() { this.exit = null; }
+    /** Calls `listener(exit | null)` whenever the exit under the leader changes. Returns an unsubscribe function. */
+    onExitChanged(listener) { if (typeof listener !== 'function') throw new TypeError('Listener must be a function'); this.#listeners.add(listener); return () => this.#listeners.delete(listener); }
+    /**
+     * Loads `target` (default: the offered exit's), carrying the travellers. Resolves to the new level;
+     * rejects if there is no exit to take or the load fails (the runtime then has the old level unloaded
+     * only if entry itself failed, as loadLevel documents).
+     */
+    async travel(target = this.exit?.available ? this.exit.target : null) {
+        const context = this.#context;
+        if (!context) throw new Error('travelSystem is detached');
+        if (this.#pending) return this.#pending;
+        if (typeof target !== 'string') throw new Error('There is no exit to take here');
+        const from = context.engine.active_level?.level_id ?? null, travellers = this.#travellers().map(e => e.entity_id);
+        this.#pending = context.engine.loadLevel(target, { arrival: { from }, travellers });
+        try { const level = await this.#pending; this.previous_level = from; return level; }
+        finally { this.#pending = null; }
+    }
+    saveState() { return { level_id: this.#context?.engine.active_level?.level_id ?? null, previous_level: this.previous_level }; }
+    loadState(state) { if (!state || (state.previous_level !== null && typeof state.previous_level !== 'string')) throw new TypeError('Invalid travel state'); this.previous_level = state.previous_level; }
+}
+
+return Object.freeze({get travelSystem(){return travelSystem;}});
+})();
+// src/game/levels/interior-level.mjs
+const m165 = (()=>{
+const {mapLevel} = m163;
+const {interiorMapDefinition,APARTMENT_MAP_OPTIONS} = m139;
+const {MAP_IDS} = m69;
+
+/**
+ * An interior of the game as a runtime level: its level_id is the map id, its map is built from the
+ * Directory's map and room records and its layout file. Doors open for characters as they come near.
+ * Exits lead to the levels they name; one whose target is not registered is offered as unavailable.
+ */
+class InteriorLevel extends mapLevel {
+    mapDefinition({ assets }) {
+        const map = assets.getResource('df:map_definitions').data[this.level_id], rooms = assets.getResource('df:room_definitions').data[this.level_id];
+        this.rules = assets.getResource('df_apartment:rules').data;
+        return { definition: interiorMapDefinition({ map_id: this.level_id, map, rooms }).definition, map_options: APARTMENT_MAP_OPTIONS };
+    }
+    mapUpdateOptions() { return { near_range: door => door.data.appearance?.triggerRadius ?? 90, duration: this.rules.DOOR_DURATION, include_groups: 2 }; }
+}
+/** Registers each interior map as a level (default: every map with a layout file whose record is an indoor map). */
+function registerInteriorLevels(engine, map_ids) {
+    const records = engine.api.assets.getResource('df:map_definitions').data;
+    for (const id of map_ids ?? MAP_IDS.filter(id => records[id]?.type === 'indoor')) if (!engine.listLevels().includes(id)) engine.registerLevel(id, InteriorLevel);
+    return engine;
+}
+
+return Object.freeze({get InteriorLevel(){return InteriorLevel;},get registerInteriorLevels(){return registerInteriorLevels;}});
+})();
+const m169 = Object.freeze({default:{
   "slim": {
     "w": 0.88,
     "d": 0.92,
@@ -28296,7 +28470,7 @@ const m165 = Object.freeze({default:{
     "hip": 1.1
   }
 }});
-const m166 = Object.freeze({default:{
+const m170 = Object.freeze({default:{
   "female": {
     "sh": 10.5,
     "del": 4,
@@ -28423,9 +28597,9 @@ const m166 = Object.freeze({default:{
   }
 }});
 // src/game/data/humanoid/rig-assets.mjs
-const m164 = (()=>{
-const builds = m165.default;
-const bodyCanon = m166.default;
+const m168 = (()=>{
+const builds = m169.default;
+const bodyCanon = m170.default;
 const {rigDefinition,animationClip} = m1;
 const immutable=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))immutable(child);Object.freeze(value);}return value;};
 const humanoidBodyCanon=immutable(bodyCanon);
@@ -28472,8 +28646,8 @@ function getHumanoidRigAssets(gender='androgynous',{build=null,height=1}={}){
 return Object.freeze({get humanoidBodyCanon(){return humanoidBodyCanon;},get humanoidBuilds(){return humanoidBuilds;},get getHumanoidRigAssets(){return getHumanoidRigAssets;}});
 })();
 // src/game/mechanics/animation/humanoid-system.mjs
-const m163 = (()=>{
-const {getHumanoidRigAssets} = m164;
+const m167 = (()=>{
+const {getHumanoidRigAssets} = m168;
 const humanoids=new Set(['df_player','df_npc','df_ganger','df_hunter','df_demoness']);
 /** Game policy chooses authored poses; Basement resolves and advances every joint. */
 class humanoidSystem {
@@ -28521,7 +28695,7 @@ function humanoidPresentation(actor,blend=1){
 return Object.freeze({get humanoidSystem(){return humanoidSystem;},get humanoidPresentation(){return humanoidPresentation;}});
 })();
 // src/game/mechanics/encounters/encounter-system.mjs
-const m167 = (()=>{
+const m171 = (()=>{
 const {BossEffect} = m109;
 const {BODY_GROUP} = m1;
 const {jsonCopy} = m40;
@@ -28602,7 +28776,7 @@ class encounterSystem{
 return Object.freeze({get encounterSystem(){return encounterSystem;}});
 })();
 // src/game/data/weapon-models.mjs
-const m170 = (()=>{
+const m174 = (()=>{
 /* =====================================================================
    WEAPON MODELS — every gun as data: parts in the gun's own frame (+x down
    the barrel, the grip hand near 0,0, +y to the holder's right), each in a
@@ -28828,8 +29002,8 @@ function weaponModel(id) {
 return Object.freeze({get GUN_MATERIALS(){return GUN_MATERIALS;},get WEAPON_MODELS(){return WEAPON_MODELS;},get LASER_MODULE(){return LASER_MODULE;},get weaponModel(){return weaponModel;}});
 })();
 // src/game/data/combat-profiles.mjs
-const m169 = (()=>{
-const {weaponModel} = m170;
+const m173 = (()=>{
+const {weaponModel} = m174;
 /** Shape authoring belongs with the visual assets. Runtime collision calculations stay in Basement. */
 function getCombatProfile(definition_id){
  const model=weaponModel(definition_id),edge=model.edge??[19.4,2.6];
@@ -28839,9 +29013,9 @@ function getCombatProfile(definition_id){
 return Object.freeze({get getCombatProfile(){return getCombatProfile;}});
 })();
 // src/game/mechanics/attacks/attack-system.mjs
-const m168 = (()=>{
+const m172 = (()=>{
 const attackRules = m64.default;
-const {getCombatProfile} = m169;
+const {getCombatProfile} = m173;
 const {prepareMountedAttack,mountedAttackState,validateMountedAttack} = m114;
 const combatRules = m63.default;
 const {gameCharacter} = m1;
@@ -28963,7 +29137,7 @@ class attackSystem{
 return Object.freeze({get attackSystem(){return attackSystem;}});
 })();
 // src/game/mechanics/abilities/ability-system.mjs
-const m171 = (()=>{
+const m175 = (()=>{
 const {beginPattern,advancePattern,clearPattern} = m110;
 const {beginTimedAction,advanceTimedAction,hitGrapple,clearTimedAction} = m112;
 const {beginBurst,advanceBurst} = m113;
@@ -29025,7 +29199,7 @@ class abilitySystem{
 return Object.freeze({get abilitySystem(){return abilitySystem;}});
 })();
 // src/game/mechanics/actors/actor-system.mjs
-const m172 = (()=>{
+const m176 = (()=>{
 const {Demoness} = m97;
 const {Warden} = m107;
 const {Drone} = m117;
@@ -29033,11 +29207,11 @@ const {VelvetCat} = m118;
 const {GatlingGunner} = m108;
 const {Marionette} = m122;
 const {gameActor} = m100;
-const {NPC} = m126;
+const {NPC} = m127;
 const {Hunter} = m98;
 const {Ganger} = m99;
 const {BODY_GROUP} = m1;
-const {createActorPacket} = m144;
+const {createActorPacket} = m145;
 
 /** Registered actor lifetimes and policy updates in the existing fixed step. No second world or index. */
 class actorSystem{
@@ -29095,7 +29269,7 @@ class actorSystem{
 
 return Object.freeze({get actorSystem(){return actorSystem;}});
 })();
-const m173 = Object.freeze({default:{
+const m177 = Object.freeze({default:{
   "keymap": {
     "move_up":["w","ArrowUp"],"move_down":["s","ArrowDown"],"move_left":["a","ArrowLeft"],"move_right":["d","ArrowRight"],
     "fire":["mouseLeft","space","gamepadRTrigger","touchFire"],
@@ -29109,7 +29283,7 @@ const m173 = Object.freeze({default:{
   }
 }});
 // src/game/mechanics/game-session.mjs
-const m174 = (()=>{
+const m178 = (()=>{
 const {itemSystem} = m104;
 const {createItemCatalog} = m58;
 const itemRules = m105.default;
@@ -29186,7 +29360,7 @@ class gameSession {
 return Object.freeze({get gameSession(){return gameSession;}});
 })();
 // src/game/mechanics/player-state-system.mjs
-const m175 = (()=>{
+const m179 = (()=>{
 const {nonnegative,jsonCopy} = m40;
 
 /** Game rules only. The native entity/body remains the sole owner of physical state. */
@@ -29242,7 +29416,7 @@ class PlayerStateSystem {
 return Object.freeze({get PlayerStateSystem(){return PlayerStateSystem;}});
 })();
 // src/game/mechanics/player-control-system.mjs
-const m176 = (()=>{
+const m180 = (()=>{
 /** Turns input terminology into native motor requests and gameplay intents. No physical math. */
 class PlayerControlSystem {
     #session; #state; #blocked = new Set(); #placement; #context = null;
@@ -29282,7 +29456,7 @@ class PlayerControlSystem {
 return Object.freeze({get PlayerControlSystem(){return PlayerControlSystem;}});
 })();
 // src/game/mechanics/combat/combat-system.mjs
-const m177 = (()=>{
+const m181 = (()=>{
 const rules = m63.default;
 const {BODY_GROUP} = m1;
 const {nonnegative,jsonCopy} = m40;
@@ -29352,7 +29526,7 @@ class combatSystem{
 return Object.freeze({get isCombatDead(){return isCombatDead;},get combatSystem(){return combatSystem;}});
 })();
 // src/game/mechanics/combat/melee-poses.mjs
-const m179 = (()=>{
+const m183 = (()=>{
 // Authored local animation poses, shared by presentation and native swept queries.
 const rules = m63.default;
 const MELEE_SWING={duration:rules.blade.duration_seconds,windup:rules.blade.windup_seconds,cutEnd:rules.blade.cut_end_seconds};
@@ -29428,12 +29602,12 @@ function sampleMeleeSwing(age, side, out = {}, secs = MELEE_SWING.duration, styl
 return Object.freeze({get MELEE_SWING(){return MELEE_SWING;},get WIDE_SWING(){return WIDE_SWING;},get sampleWideSwing(){return sampleWideSwing;},get wideGrip(){return wideGrip;},get swingPhases(){return swingPhases;},get sampleMeleeSwing(){return sampleMeleeSwing;}});
 })();
 // src/game/mechanics/combat/weapon-system.mjs
-const m178 = (()=>{
+const m182 = (()=>{
 const rules = m63.default;
-const {getCombatProfile} = m169;
+const {getCombatProfile} = m173;
 const {BODY_GROUP} = m1;
-const {sampleMeleeSwing,swingPhases} = m179;
-const {isCombatDead} = m177;
+const {sampleMeleeSwing,swingPhases} = m183;
+const {isCombatDead} = m181;
 const {jsonCopy,nonnegative} = m40;
 
 const stateFor=(player,settings=rules)=>player.data.weapon_state??={format_version:1,elapsed:0,cooldown:0,holstered:false,drawn_at:null,draw_shot_used:false,quick_draw:null,punch_side:'right',haymaker:false,combo:0,last_punch_at:-99,swing:null,side:1,shield:{charge:settings.mirror.shield,spent:false,since_hit:999}};
@@ -29605,8 +29779,8 @@ class weaponSystem{
 return Object.freeze({get weaponSystem(){return weaponSystem;}});
 })();
 // src/game/mechanics/items/loot-system.mjs
-const m180 = (()=>{
-const {WorldLoot} = m128;
+const m184 = (()=>{
+const {WorldLoot} = m129;
 const rules = m63.default;
 const {BODY_GROUP} = m1;
 const {jsonCopy,nonnegative} = m40;
@@ -29659,24 +29833,25 @@ class lootSystem{
 return Object.freeze({get lootSystem(){return lootSystem;}});
 })();
 // src/game/boot/game-runtime.mjs
-const m162 = (()=>{
-const {humanoidSystem} = m163;
-const {encounterSystem} = m167;
-const {attackSystem} = m168;
-const {abilitySystem} = m171;
-const {actorSystem} = m172;
+const m166 = (()=>{
+const {humanoidSystem} = m167;
+const {encounterSystem} = m171;
+const {attackSystem} = m172;
+const {abilitySystem} = m175;
+const {actorSystem} = m176;
 const {registerGameEntityTypes} = m116;
-const {gameEngine} = m145;
-const {createApartmentAssetLibrary} = m136;
-const controlProfile = m173.default;
-const {gameSession} = m174;
-const {PlayerStateSystem} = m175;
-const {PlayerControlSystem} = m176;
+const {gameEngine} = m146;
+const {travelSystem} = m164;
+const {createApartmentAssetLibrary} = m137;
+const controlProfile = m177.default;
+const {gameSession} = m178;
+const {PlayerStateSystem} = m179;
+const {PlayerControlSystem} = m180;
 const playerRules = m66.default;
-const {combatSystem} = m177;
-const {weaponSystem} = m178;
-const {lootSystem} = m180;
-const {canvasRenderer} = m153;
+const {combatSystem} = m181;
+const {weaponSystem} = m182;
+const {lootSystem} = m184;
+const {canvasRenderer} = m154;
 
 /** Explicit game composition. Importing this file never starts a second runtime. */
 function createGameRuntime({ game_db, surface, session_state, player, weapon_policy={}, combat_policy={}, actor_policy={}, ability_policy={}, ...options } = {}) {
@@ -29692,9 +29867,11 @@ function createGameRuntime({ game_db, surface, session_state, player, weapon_pol
     const actors=new actorSystem({attacks,abilities,encounters,combat,session,policy:actor_policy});
     encounters.setActors(actors);
     const humanoids=new humanoidSystem({get_stance:actor=>{if(actor===session.player){if(weapons.state?.holstered)return 'idle';const weapon=session.items.getEquippedWeapon();return weapon?.weaponMode==='melee'?'knife':weapon?.weaponMode==='normal'||weapon?.weaponMode==='sniper'?'pistol':weapons.state?.cooldown>0?'punch':'idle';}return actor.data.humanoid_stance??'idle';}});
+    // Who travels through exits: the player first, then every adopted companion on foot.
+    const travel=new travelSystem({get_travellers:()=>[session.player,...actors.getActors().filter(actor=>actor.adopted&&!actor.inCar)]});
     const loot=new lootSystem({items:session.items,get_player:()=>session.player,on_event:(event,detail)=>session.emit(event,detail)});
-    if(options.services && ['session','items','player_state','player_controls','combat','weapons','loot','actors','abilities','attacks','encounters','humanoids'].some(key=>Object.hasOwn(options.services,key)))throw new TypeError('Directory owns player services');
-    const engine = new gameEngine({ ...options, services:{...options.services,session,items:session.items,player_state,player_controls,combat,weapons,loot,actors,abilities,attacks,encounters,humanoids}, controls:{...controlProfile,...(surface?.addEventListener?{mouse_target:surface}:{}),...options.controls}, asset_library });
+    if(options.services && ['session','items','player_state','player_controls','combat','weapons','loot','actors','abilities','attacks','encounters','humanoids','travel'].some(key=>Object.hasOwn(options.services,key)))throw new TypeError('Directory owns player services');
+    const engine = new gameEngine({ ...options, services:{...options.services,session,items:session.items,player_state,player_controls,combat,weapons,loot,actors,abilities,attacks,encounters,humanoids,travel}, controls:{...controlProfile,...(surface?.addEventListener?{mouse_target:surface}:{}),...options.controls}, asset_library });
     engine.api.render.registerRenderer('canvas',canvasRenderer);
     engine.registerSystem('surface-input',{
         attach(context){context.defer(context.api.render.onSurfaceChanged(({surface})=>context.api.controls.setMouseTarget(options.controls?.mouse_target??surface)));}
@@ -29705,7 +29882,7 @@ function createGameRuntime({ game_db, surface, session_state, player, weapon_pol
         engine.registerSystem('items',session.items);
         engine.registerSystem('player-state',player_state);
         engine.registerSystem('player-controls',player_controls);
-        engine.registerSystem('combat',combat);engine.registerSystem('weapons',weapons);engine.registerSystem('encounters',encounters);engine.registerSystem('abilities',abilities);engine.registerSystem('attacks',attacks);engine.registerSystem('actors',actors);engine.registerSystem('loot',loot);engine.registerSystem('humanoids',humanoids);
+        engine.registerSystem('combat',combat);engine.registerSystem('weapons',weapons);engine.registerSystem('encounters',encounters);engine.registerSystem('abilities',abilities);engine.registerSystem('attacks',attacks);engine.registerSystem('actors',actors);engine.registerSystem('loot',loot);engine.registerSystem('humanoids',humanoids);engine.registerSystem('travel',travel);
         return engine;
     } catch(error) { engine.dispose();throw error; }
 }
@@ -29713,8 +29890,8 @@ function createGameRuntime({ game_db, surface, session_state, player, weapon_pol
 return Object.freeze({get createGameRuntime(){return createGameRuntime;}});
 })();
 // src/game/presentation/weapon-appearance.mjs
-const m181 = (()=>{
-const {GUN_MATERIALS,WEAPON_MODELS,LASER_MODULE,weaponModel} = m170;
+const m185 = (()=>{
+const {GUN_MATERIALS,WEAPON_MODELS,LASER_MODULE,weaponModel} = m174;
 
 const polygon=points=>({type:'path',commands:[...points.map(([x,y],i)=>[i?'line':'move',x,y]),['close']]});
 function shape(part){
@@ -29797,7 +29974,7 @@ class weaponAppearance {
 return Object.freeze({get weaponAppearance(){return weaponAppearance;}});
 })();
 // src/game/data/game-combat.mjs
-const m182 = (()=>{
+const m186 = (()=>{
 const data = m63.default;
 const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
 const COMBAT_RULES=freeze(structuredClone(data));
@@ -29805,9 +29982,9 @@ const COMBAT_RULES=freeze(structuredClone(data));
 return Object.freeze({get COMBAT_RULES(){return COMBAT_RULES;}});
 })();
 // src/game/presentation/drone.mjs
-const m183 = (()=>{
+const m187 = (()=>{
 const enemies = m49.default;
-const {artScene,circle,ellipse,radial,glow} = m153;
+const {artScene,circle,ellipse,radial,glow} = m154;
 const DRONE=enemies.drone;
 function droneLift(state){return DRONE.HOVER_PX+Math.sin(state.hoverOffset)*3+state.alt*240;}
 function droneArmPose(diving,stuck,s){
@@ -29988,7 +30165,7 @@ return Object.assign({},{x:pose.position[0],y:pose.position[1],angle:pose.rotati
 return Object.freeze({get droneLift(){return droneLift;},get droneArmPose(){return droneArmPose;},get createDronePackets(){return createDronePackets;},get dronePresentation(){return dronePresentation;}});
 })();
 // src/game/presentation/demoness.mjs
-const m184 = (()=>{
+const m188 = (()=>{
 const enemies = m49.default;
 const DUEL=enemies.duel;
 /** Retained Canvas art over a detached record; body art is supplied by the host. */
@@ -30053,7 +30230,7 @@ function demonessPresentation(entity,blend=1){const pose=entity.getRenderState(b
 return Object.freeze({get demonessAppearance(){return demonessAppearance;},get demonessPresentation(){return demonessPresentation;}});
 })();
 // src/game/presentation/boss-effects.mjs
-const m185 = (()=>{
+const m189 = (()=>{
 const enemies = m49.default;
 const HAZARD=enemies.hazards;
 const bossEffectAppearance={
@@ -30191,8 +30368,8 @@ function bossEffectPresentation(effects,clock){return effects.filter(effect=>!ef
 return Object.freeze({get bossEffectAppearance(){return bossEffectAppearance;},get bossEffectPresentation(){return bossEffectPresentation;}});
 })();
 // src/game/presentation/velvet-cat.mjs
-const m186 = (()=>{
-const {artScene,circle,ellipse,radial,linear,groundShadow} = m153;
+const m190 = (()=>{
+const {artScene,circle,ellipse,radial,linear,groundShadow} = m154;
 const {velvetCatAnimation,velvetFrame,velvetLegGait,velvetJoints,VELVET_LEG_JOINTS} = m119;
 const {VELVET_CAT_PALETTES,VELVET_T,VELVET_PROFILES,VELVET_TAIL_SEGS} = m120;
 /** Renderer-neutral feline geometry/material packets over detached animation state. */
@@ -30480,7 +30657,7 @@ function createVelvetCatPackets(state,{pass='body',darkness=.8}={}){if(!['body',
 
 return Object.freeze({get createVelvetCatArt(){return createVelvetCatArt;},get createVelvetEyePackets(){return createVelvetEyePackets;},get createVelvetCatPackets(){return createVelvetCatPackets;}});
 })();
-const m188 = Object.freeze({default:{
+const m192 = Object.freeze({default:{
  "hinge": {
   "color": "#4a3a30",
   "sweep": "rgba(255,217,176,0.12)", "sweep_dash": [3, 4], "sweep_min_angle": 0.17,
@@ -30495,9 +30672,9 @@ const m188 = Object.freeze({default:{
  }
 }});
 // src/game/presentation/door.mjs
-const m187 = (()=>{
-const DOOR_APPEARANCE = m188.default;
-const {artScene,rect,circle,ellipse,polygon} = m153;
+const m191 = (()=>{
+const DOOR_APPEARANCE = m192.default;
+const {artScene,rect,circle,ellipse,polygon} = m154;
 
 /**
  * Doors drawn from their leaves' bodies, whatever their kind. A door comes from the map's
@@ -30550,7 +30727,7 @@ function createDoorPackets(packet,{appearance=DOOR_APPEARANCE,scene=new artScene
 
 return Object.freeze({get DOOR_APPEARANCE(){return DOOR_APPEARANCE;},get doorPresentation(){return doorPresentation;},get createDoorPackets(){return createDoorPackets;}});
 })();
-const m190 = Object.freeze({default:{
+const m194 = Object.freeze({default:{
  "indoor": { "tint": "rgb(22, 10, 48)", "darkness": 0.95, "lamp_glow": 0.08 },
  "outdoor": { "lamp_glow": 0.22 },
  "lamp": { "inner_radius": 10, "cut": [[0, 1], [1, 0]], "glow_stops": [[0, "#ffffff"], [0.1, "$color"], [0.6, "$color"], [1, "rgba(0,0,0,0)"]], "resolution": 64 },
@@ -30559,9 +30736,9 @@ const m190 = Object.freeze({default:{
  "flicker": { "floor": 0.82, "swing": 0.18 }
 }});
 // src/game/presentation/lighting.mjs
-const m189 = (()=>{
-const LIGHTING = m190.default;
-const {createLightLayer} = m153;
+const m193 = (()=>{
+const LIGHTING = m194.default;
+const {createLightLayer} = m154;
 
 const stops=(list,color)=>list.map(([o,c])=>[o,c==='$color'?color:c]);
 /**
@@ -30619,7 +30796,7 @@ function levelLights(level,{blend=1,lightAt=()=>1}={}){
 return Object.freeze({get LIGHTING(){return LIGHTING;},get sceneLighting(){return sceneLighting;},get levelLights(){return levelLights;}});
 })();
 // src/game/data/road-navigation.mjs
-const m191 = (()=>{
+const m195 = (()=>{
 /**
  * The city's lane network as Basement navigation road data.
  *
@@ -30753,7 +30930,10 @@ const m0 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m40.assetLibrary;},get createGameAssetLibrary(){return m47.createGameAssetLibrary;},get resolveMapLayout(){return m69.resolveMapLayout;},get resolvePlacement(){return m69.resolvePlacement;},get isMovableProp(){return m69.isMovableProp;},get mapHost(){return m69.mapHost;},get createMapLibraries(){return m69.createMapLibraries;},get PROP_TYPES(){return m69.PROP_TYPES;},get MAP_IDS(){return m69.MAP_IDS;},get ApartmentLevel(){return m95.ApartmentLevel;},get APARTMENT_RULES(){return m136.APARTMENT_RULES;},get gameEngine(){return m145.gameEngine;},get gameLevel(){return m147.gameLevel;},get levelLobby(){return m146.levelLobby;},get createGameRuntime(){return m162.createGameRuntime;},get controlSystem(){return m148.controlSystem;},get controlsSystem(){return m148.controlsSystem;},get inputInstance(){return m148.inputInstance;},get keyboardInstance(){return m148.keyboardInstance;},get mouseInstance(){return m148.mouseInstance;},get touchInstance(){return m148.touchInstance;},get touchStick(){return m148.touchStick;},get gamepadInstance(){return m148.gamepadInstance;},get TAP(){return m148.TAP;},get DOUBLETAP(){return m148.DOUBLETAP;},get HELD(){return m148.HELD;},get PRESS(){return m148.PRESS;},get REPEAT(){return m148.REPEAT;},get RELEASE(){return m148.RELEASE;},get renderSystem(){return m153.renderSystem;},get renderFrame(){return m153.renderFrame;},get canvasRenderer(){return m153.canvasRenderer;},get cameraSystem(){return m153.cameraSystem;},get gameSession(){return m174.gameSession;},get PlayerStateSystem(){return m175.PlayerStateSystem;},get PlayerControlSystem(){return m176.PlayerControlSystem;},get Player(){return m123.Player;},get playerVitals(){return m124.playerVitals;},get itemSystem(){return m104.itemSystem;},get createItemCatalog(){return m58.createItemCatalog;},get GUN_MATERIALS(){return m170.GUN_MATERIALS;},get WEAPON_MODELS(){return m170.WEAPON_MODELS;},get LASER_MODULE(){return m170.LASER_MODULE;},get weaponModel(){return m170.weaponModel;},get weaponAppearance(){return m181.weaponAppearance;},get combatSystem(){return m177.combatSystem;},get weaponSystem(){return m178.weaponSystem;},get lootSystem(){return m180.lootSystem;},get WorldLoot(){return m128.WorldLoot;},get MELEE_SWING(){return m179.MELEE_SWING;},get WIDE_SWING(){return m179.WIDE_SWING;},get sampleMeleeSwing(){return m179.sampleMeleeSwing;},get sampleWideSwing(){return m179.sampleWideSwing;},get swingPhases(){return m179.swingPhases;},get wideGrip(){return m179.wideGrip;},get COMBAT_RULES(){return m182.COMBAT_RULES;},get registerGameEntityTypes(){return m116.registerGameEntityTypes;},get actorVitals(){return m102.actorVitals;},get gameActor(){return m100.gameActor;},get NPC(){return m126.NPC;},get rosterRecord(){return m126.rosterRecord;},get ROSTER_FIELDS(){return m126.ROSTER_FIELDS;},get Ganger(){return m99.Ganger;},get actorSystem(){return m172.actorSystem;},get actorItems(){return m103.actorItems;},get restoreActorItems(){return m103.restoreActorItems;},get resolveEmoteLines(){return m127.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m127.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m115.abilityLoadout;},get actorAbilities(){return m115.actorAbilities;},get importActorAbilities(){return m115.importActorAbilities;},get abilitySystem(){return m171.abilitySystem;},get createAbilityCatalog(){return m60.createAbilityCatalog;},get attackRegistry(){return m101.attackRegistry;},get validateAttackState(){return m101.validateAttackState;},get attackSystem(){return m168.attackSystem;},get createAttackCatalog(){return m57.createAttackCatalog;},get validateMountedAttack(){return m114.validateMountedAttack;},get TrafficVehicle(){return m129.TrafficVehicle;},get createGameVehicle(){return m129.createGameVehicle;},get Hunter(){return m98.Hunter;},get createHunterAppearance(){return m56.createHunterAppearance;},get Marionette(){return m122.Marionette;},get MARIONETTE_RULES(){return m54.MARIONETTE_RULES;},get validateAbilityAction(){return m111.validateAbilityAction;},get GatlingGunner(){return m108.GatlingGunner;},get Drone(){return m117.Drone;},get VelvetCat(){return m118.VelvetCat;},get velvetCatAnimation(){return m119.velvetCatAnimation;},get createVelvetAnimation(){return m119.createVelvetAnimation;},get velvetPresentation(){return m119.velvetPresentation;},get droneLift(){return m183.droneLift;},get droneArmPose(){return m183.droneArmPose;},get dronePresentation(){return m183.dronePresentation;},get VELVET_CAT_PALETTES(){return m120.VELVET_CAT_PALETTES;},get VELVET_T(){return m120.VELVET_T;},get VELVET_PROFILES(){return m120.VELVET_PROFILES;},get VELVET_GAITS(){return m120.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m120.VELVET_TAIL_SEGS;},get Demoness(){return m97.Demoness;},get Warden(){return m107.Warden;},get Vesper(){return m107.Vesper;},get Matins(){return m107.Matins;},get Compline(){return m107.Compline;},get BossEffect(){return m109.BossEffect;},get encounterSystem(){return m167.encounterSystem;},get createBossAbilities(){return m48.createBossAbilities;},get createDemonessAppearance(){return m48.createDemonessAppearance;},get demonessAppearance(){return m184.demonessAppearance;},get demonessPresentation(){return m184.demonessPresentation;},get bossEffectAppearance(){return m185.bossEffectAppearance;},get bossEffectPresentation(){return m185.bossEffectPresentation;},get validateBossRecord(){return m96.validateBossRecord;},get createDronePackets(){return m183.createDronePackets;},get createVelvetCatArt(){return m186.createVelvetCatArt;},get createVelvetCatPackets(){return m186.createVelvetCatPackets;},get createVelvetEyePackets(){return m186.createVelvetEyePackets;},get doorPresentation(){return m187.doorPresentation;},get createDoorPackets(){return m187.createDoorPackets;},get DOOR_APPEARANCE(){return m187.DOOR_APPEARANCE;},get sceneLighting(){return m189.sceneLighting;},get levelLights(){return m189.levelLights;},get LIGHTING(){return m189.LIGHTING;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m163.humanoidSystem;},get humanoidPresentation(){return m163.humanoidPresentation;},get humanoidBodyCanon(){return m164.humanoidBodyCanon;},get humanoidBuilds(){return m164.humanoidBuilds;},get getHumanoidRigAssets(){return m164.getHumanoidRigAssets;},get roadNavigationData(){return m191.roadNavigationData;},get loadRoadNavigation(){return m191.loadRoadNavigation;}});
+
+
+
+return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m40.assetLibrary;},get createGameAssetLibrary(){return m47.createGameAssetLibrary;},get resolveMapLayout(){return m69.resolveMapLayout;},get resolvePlacement(){return m69.resolvePlacement;},get isMovableProp(){return m69.isMovableProp;},get mapHost(){return m69.mapHost;},get createMapLibraries(){return m69.createMapLibraries;},get PROP_TYPES(){return m69.PROP_TYPES;},get MAP_IDS(){return m69.MAP_IDS;},get ApartmentLevel(){return m95.ApartmentLevel;},get APARTMENT_RULES(){return m137.APARTMENT_RULES;},get gameEngine(){return m146.gameEngine;},get gameLevel(){return m148.gameLevel;},get mapLevel(){return m163.mapLevel;},get travelSystem(){return m164.travelSystem;},get InteriorLevel(){return m165.InteriorLevel;},get registerInteriorLevels(){return m165.registerInteriorLevels;},get levelLobby(){return m147.levelLobby;},get createGameRuntime(){return m166.createGameRuntime;},get controlSystem(){return m149.controlSystem;},get controlsSystem(){return m149.controlsSystem;},get inputInstance(){return m149.inputInstance;},get keyboardInstance(){return m149.keyboardInstance;},get mouseInstance(){return m149.mouseInstance;},get touchInstance(){return m149.touchInstance;},get touchStick(){return m149.touchStick;},get gamepadInstance(){return m149.gamepadInstance;},get TAP(){return m149.TAP;},get DOUBLETAP(){return m149.DOUBLETAP;},get HELD(){return m149.HELD;},get PRESS(){return m149.PRESS;},get REPEAT(){return m149.REPEAT;},get RELEASE(){return m149.RELEASE;},get renderSystem(){return m154.renderSystem;},get renderFrame(){return m154.renderFrame;},get canvasRenderer(){return m154.canvasRenderer;},get cameraSystem(){return m154.cameraSystem;},get gameSession(){return m178.gameSession;},get PlayerStateSystem(){return m179.PlayerStateSystem;},get PlayerControlSystem(){return m180.PlayerControlSystem;},get Player(){return m123.Player;},get playerVitals(){return m124.playerVitals;},get itemSystem(){return m104.itemSystem;},get createItemCatalog(){return m58.createItemCatalog;},get GUN_MATERIALS(){return m174.GUN_MATERIALS;},get WEAPON_MODELS(){return m174.WEAPON_MODELS;},get LASER_MODULE(){return m174.LASER_MODULE;},get weaponModel(){return m174.weaponModel;},get weaponAppearance(){return m185.weaponAppearance;},get combatSystem(){return m181.combatSystem;},get weaponSystem(){return m182.weaponSystem;},get lootSystem(){return m184.lootSystem;},get WorldLoot(){return m129.WorldLoot;},get MELEE_SWING(){return m183.MELEE_SWING;},get WIDE_SWING(){return m183.WIDE_SWING;},get sampleMeleeSwing(){return m183.sampleMeleeSwing;},get sampleWideSwing(){return m183.sampleWideSwing;},get swingPhases(){return m183.swingPhases;},get wideGrip(){return m183.wideGrip;},get COMBAT_RULES(){return m186.COMBAT_RULES;},get registerGameEntityTypes(){return m116.registerGameEntityTypes;},get actorVitals(){return m102.actorVitals;},get gameActor(){return m100.gameActor;},get NPC(){return m127.NPC;},get rosterRecord(){return m127.rosterRecord;},get ROSTER_FIELDS(){return m127.ROSTER_FIELDS;},get Ganger(){return m99.Ganger;},get actorSystem(){return m176.actorSystem;},get actorItems(){return m103.actorItems;},get restoreActorItems(){return m103.restoreActorItems;},get resolveEmoteLines(){return m128.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m128.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m115.abilityLoadout;},get actorAbilities(){return m115.actorAbilities;},get importActorAbilities(){return m115.importActorAbilities;},get abilitySystem(){return m175.abilitySystem;},get createAbilityCatalog(){return m60.createAbilityCatalog;},get attackRegistry(){return m101.attackRegistry;},get validateAttackState(){return m101.validateAttackState;},get attackSystem(){return m172.attackSystem;},get createAttackCatalog(){return m57.createAttackCatalog;},get validateMountedAttack(){return m114.validateMountedAttack;},get TrafficVehicle(){return m130.TrafficVehicle;},get createGameVehicle(){return m130.createGameVehicle;},get Hunter(){return m98.Hunter;},get createHunterAppearance(){return m56.createHunterAppearance;},get Marionette(){return m122.Marionette;},get MARIONETTE_RULES(){return m54.MARIONETTE_RULES;},get validateAbilityAction(){return m111.validateAbilityAction;},get GatlingGunner(){return m108.GatlingGunner;},get Drone(){return m117.Drone;},get VelvetCat(){return m118.VelvetCat;},get velvetCatAnimation(){return m119.velvetCatAnimation;},get createVelvetAnimation(){return m119.createVelvetAnimation;},get velvetPresentation(){return m119.velvetPresentation;},get droneLift(){return m187.droneLift;},get droneArmPose(){return m187.droneArmPose;},get dronePresentation(){return m187.dronePresentation;},get VELVET_CAT_PALETTES(){return m120.VELVET_CAT_PALETTES;},get VELVET_T(){return m120.VELVET_T;},get VELVET_PROFILES(){return m120.VELVET_PROFILES;},get VELVET_GAITS(){return m120.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m120.VELVET_TAIL_SEGS;},get Demoness(){return m97.Demoness;},get Warden(){return m107.Warden;},get Vesper(){return m107.Vesper;},get Matins(){return m107.Matins;},get Compline(){return m107.Compline;},get BossEffect(){return m109.BossEffect;},get encounterSystem(){return m171.encounterSystem;},get createBossAbilities(){return m48.createBossAbilities;},get createDemonessAppearance(){return m48.createDemonessAppearance;},get demonessAppearance(){return m188.demonessAppearance;},get demonessPresentation(){return m188.demonessPresentation;},get bossEffectAppearance(){return m189.bossEffectAppearance;},get bossEffectPresentation(){return m189.bossEffectPresentation;},get validateBossRecord(){return m96.validateBossRecord;},get createDronePackets(){return m187.createDronePackets;},get createVelvetCatArt(){return m190.createVelvetCatArt;},get createVelvetCatPackets(){return m190.createVelvetCatPackets;},get createVelvetEyePackets(){return m190.createVelvetEyePackets;},get doorPresentation(){return m191.doorPresentation;},get createDoorPackets(){return m191.createDoorPackets;},get DOOR_APPEARANCE(){return m191.DOOR_APPEARANCE;},get sceneLighting(){return m193.sceneLighting;},get levelLights(){return m193.levelLights;},get LIGHTING(){return m193.LIGHTING;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m167.humanoidSystem;},get humanoidPresentation(){return m167.humanoidPresentation;},get humanoidBodyCanon(){return m168.humanoidBodyCanon;},get humanoidBuilds(){return m168.humanoidBuilds;},get getHumanoidRigAssets(){return m168.getHumanoidRigAssets;},get roadNavigationData(){return m195.roadNavigationData;},get loadRoadNavigation(){return m195.loadRoadNavigation;}});
 })();
 return m0;
 })();

@@ -11,15 +11,13 @@ import { resolveApartmentDefinition, resolveApartmentDyer, APARTMENT_MAP_OPTIONS
 import { mapInstance } from '../../engine/basement/maps/index.mjs';
 import {NPC,rosterRecord} from '../entities/npc.mjs';
 import {createActorPacket} from '../boot/game-actor-factory.mjs';
-import { gameProp } from '../../engine/basement/physics/index.mjs';
-class ApartmentDoor extends gameProp { static entity_type = 'df_apartment_door'; }
 
 /** A real scene owner. No legacy actors are adopted or synchronized. */
 export class ApartmentLevel {
     constructor({ game_db, spawn, layout = {}, roster = [] }) {
         const library = createApartmentAssetLibrary({ game_db });
         this.physics = new physicsSystem({ asset_library: library });
-        registerGameEntityTypes(this.physics);this.physics.elements.registerEntityType(ApartmentDoor.entity_type,ApartmentDoor);
+        registerGameEntityTypes(this.physics);
         this.definition = resolveApartmentDefinition(library, game_db);
         this.map = new mapInstance(this.physics, this.definition.definition, APARTMENT_MAP_OPTIONS);   // the Basement map system builds the scene
         this.player = this.physics.createEntity({...this.definition.player,...(spawn?{position:spawn}:{})});

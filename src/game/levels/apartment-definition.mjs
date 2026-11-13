@@ -9,23 +9,33 @@ const TEMPLATES = { wall: 'df_apartment:wall', prop: 'df_apartment:furniture', l
  * game data the apartment's artists and interactions read.
  */
 export function apartmentMapDefinition(game_db) {
-    const map = structuredClone(game_db.places.maps.apt_949), rooms = structuredClone(game_db.places.rooms.apt_949);
-    const layout = resolveMapLayout('apt_949');
+    return interiorMapDefinition({ map_id: 'apt_949', map: game_db.places.maps.apt_949, rooms: game_db.places.rooms.apt_949 });
+}
+
+/**
+ * Any interior from its GAME_DB map and rooms records and its layout file, the same way. Rooms are
+ * optional: a map without them has no doors, room volumes or curtains. Exits are `transition`
+ * triggers whose data names the `target` map and its `label`.
+ */
+export function interiorMapDefinition({ map_id, map, rooms = null }) {
+    if (!map) throw new TypeError(`Unknown map: ${map_id}`);
+    map = structuredClone(map); rooms = structuredClone(rooms ?? { rooms: {}, doors: [], linens: [] });
+    const layout = resolveMapLayout(map_id);
     return {
         map, rooms, layout,
         definition: {
-            map_id: 'apt_949', kind: 'interior', size: [map.width, map.height], boundary: { thickness: 20 }, spawn: [map.spawn.x, map.spawn.y],
-            walls: map.walls,
+            map_id, kind: 'interior', size: [map.width, map.height], boundary: { thickness: 20 }, spawn: [map.spawn.x, map.spawn.y],
+            walls: map.walls ?? [],
             placements: layout.props.map((p, index) => {
                 const lamp = layout.lamps.find(l => l.parent_prop === index);
                 const emission = p.light ? { radius: p.light.radius, color: p.light.color, position: [p.light.dx ?? 0, p.light.dy ?? 0] } : lamp ? { radius: lamp.lightRadius, color: lamp.color, position: [0, 0] } : null;
                 return { type: layout.prop_types[index], x: p.x, y: p.y, width: p.width, height: p.height, ...(emission ? { light: emission } : {}), source: p, emission };
             }),
             lights: layout.lamps.filter(l => l.parent_prop === undefined).map(l => ({ position: [l.x, l.y], radius: l.lightRadius, source: l })),
-            triggers: map.transitions.map((r, index) => ({ ...r, role: 'transition', authored_id: `exit_${index}`, data: { target: r.target, label: r.label } })),
-            rooms: rooms.rooms,
-            doors: rooms.doors.map(d => ({ ...d, source: d })),
-            cloths: rooms.linens.map(l => ({ ...l, role: 'curtain', source: l }))
+            triggers: (map.transitions ?? []).map((r, index) => ({ ...r, role: 'transition', authored_id: `exit_${index}`, data: { target: r.target, label: r.label ?? null } })),
+            rooms: rooms.rooms ?? {},
+            doors: (rooms.doors ?? []).map(d => ({ ...d, source: d })),
+            cloths: (rooms.linens ?? []).map(l => ({ ...l, role: 'curtain', source: l }))
         }
     };
 }

@@ -31,6 +31,7 @@
         "maps"
       ]
     },
+    "room_definitions": {"kind": "map_catalog", "source": ["places", "rooms"]},
     "item_definitions": {
       "kind": "item_catalog",
       "source": [

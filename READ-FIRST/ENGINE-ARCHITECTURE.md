@@ -280,7 +280,8 @@ src/
     mechanics/                    game systems: abilities, actors, animation choice, attacks, combat,
                                   encounters, items, player control and state, session, traffic manager
     entities/                     the game's entity classes (player, NPCs, bosses, drones, traffic vehicle)
-    levels/                       one module per map: apartment.mjs and its map definition
+    levels/                       the apartment (apartment.mjs) and its map definition, and interior-level.mjs: every
+                                  interior as a runtime map level
     presentation/                 appearance producers -> render packets
     audio/                        (empty) the game's sounds and music, through the Basement audio service
     data/                         the game's content: GAME_DB (game-db/), game-assets/ (props, maps,

@@ -71,6 +71,26 @@ A level constructor receives `{level_id}`. The read-only `level_id` must match r
 
 Except `prepare`, hooks must be synchronous. Levels can omit hooks via the base defaults.
 
+### mapLevel
+
+`mapLevel` (`map-level.mjs`) is a `gameLevel` that is one Basement map. A subclass gives `mapDefinition({assets}, options)`, returning `{definition, map_options}`. The level then:
+
+- builds the map on `enter` and releases it on `leave`;
+- runs `map.updateState(mapUpdateOptions(context))` after each step, so doors and rooms stay current;
+- lists its exits with `getExits()`: the map's triggers whose data names a `target` level, as `{entity, target, label, auto, bounds}`. `exitAt(body)` gives the exit a body stands in.
+
+Arrival: `loadLevel(id, {arrival: {from}, travellers: [entity ids]})` places the first traveller just inside the exit whose target is `from`. It steps in from the map edge the exit sits on until the spot is clear and outside every exit, and faces into the map. Each later traveller goes to the nearest clear spot beside the first or further in, never inside an exit. With no exit leading back, the first traveller lands at the map's `spawn`.
+
+### travelSystem
+
+`travelSystem({get_travellers, can_travel})` (`travel-system.mjs`) moves the party between levels:
+
+- **Exits.** After each step it records the exit the leading traveller stands in as `exit`: `{target, label, auto, available}`. `available` is false when the target is not a registered level or `can_travel(exit, context)` refuses. `onExitChanged(listener)` reports changes. An `auto` exit travels on contact.
+- **Travel.** `travel(target?)` loads the target with the travellers, resolves to the new level and records `previous_level`. Every traveller must be a session or retained entity, because the runtime retires level entities on the way out.
+- **Saving.** `saveState()` / `loadState()` carry `{level_id, previous_level}`.
+
+The game composes it with the player first and adopted companions on foot behind (`api.travel`). Every interior with a layout is registered as an `InteriorLevel` by `registerInteriorLevels(engine)`.
+
 ### Composed systems
 
 A system is an ordinary object/class instance, not an extension to `gameEngine.prototype`. Its optional synchronous hooks are `attach(context)`, `beforePhysics(context,seconds)`, `afterPhysics(context,seconds)`, `render(context,blend,frame)`, `levelEntered(context,level)`, `levelLeaving(context,level)`, and `detach(context)`.

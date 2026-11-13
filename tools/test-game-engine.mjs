@@ -155,3 +155,31 @@ test('failed render producers abort partial frames and stop the loop without inv
 test('the game appearance producer only submits packets and never touches a Canvas context',()=>{
  const producer=readFileSync(new URL('../src/game/examples/runtime-example.mjs',import.meta.url),'utf8');assert.doesNotMatch(producer,/getContext|ctx\.|\.drawImage|new physicsSystem|new spatialGrid/);
 });
+
+test('engine alone: map levels with exits, an auto exit, and travellers carried to the way back', async () => {
+    const { mapLevel } = await import('../src/engine/lobby/runtime/map-level.mjs');
+    const { travelSystem } = await import('../src/engine/lobby/runtime/travel-system.mjs');
+    const maps = {
+        hall: { map_id: 'hall', size: [400, 300], boundary: { thickness: 20 }, spawn: [200, 150], triggers: [{ x: 360, y: 100, w: 40, h: 100, role: 'exit', data: { target: 'yard', auto: true } }] },
+        yard: { map_id: 'yard', size: [300, 300], boundary: { thickness: 20 }, spawn: [150, 150], triggers: [{ x: 0, y: 120, w: 30, h: 60, role: 'exit', data: { target: 'hall', label: 'Back in' } }] }
+    };
+    class Place extends mapLevel { mapDefinition() { return { definition: maps[this.level_id] }; } }
+    const e = runtime(); e.registerLevel('hall', Place).registerLevel('yard', Place);
+    let walker, dog;
+    e.registerSystem('party', { attach(c) { walker = c.createEntity({ entity_type: 'character', position: [200, 150], collision_shape: { shape_type: 'circle', radius: 8 } }, { lifetime: 'session' }); dog = c.createEntity({ entity_type: 'character', position: [180, 150], collision_shape: { shape_type: 'circle', radius: 6 } }, { lifetime: 'session' }); } });
+    const travel = new travelSystem({ get_travellers: () => [walker, dog] }); e.registerSystem('travel', travel);
+    await e.loadLevel('hall'); e.start();
+    assert.deepEqual(e.active_level.getExits().map(x => [x.target, x.auto]), [['yard', true]]);
+    e.api.physics.updateBody(walker, { position: [380, 150] }); e.updateState();
+    assert.equal(travel.traveling, true, 'an auto exit travels on contact');
+    await new Promise(r => setTimeout(r, 0)); while (travel.traveling) await new Promise(r => setTimeout(r, 0));
+    assert.equal(e.active_level.level_id, 'yard'); assert.equal(travel.previous_level, 'hall');
+    assert.ok(walker.position[0] >= 40 && walker.position[0] <= 70 && Math.abs(walker.position[1] - 150) < 1, `the walker steps in from the west exit (${walker.position})`);
+    assert.ok(!walker.destroyed && !dog.destroyed && dog.position[0] > 30, `and the dog arrives beside, out of the exit (${dog.position})`);
+    e.updateState(); assert.equal(travel.exit, null);
+    e.api.physics.updateBody(walker, { position: [15, 150] }); e.updateState();
+    assert.deepEqual(travel.exit, { target: 'hall', label: 'Back in', auto: false, available: true });
+    await travel.travel(); assert.equal(e.active_level.level_id, 'hall');
+    assert.ok(walker.position[0] < 360 && walker.position[0] > 300, `back in the hall beside its east exit (${walker.position})`);
+    e.dispose();
+});
