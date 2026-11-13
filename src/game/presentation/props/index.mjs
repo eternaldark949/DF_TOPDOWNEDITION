@@ -8,9 +8,10 @@ import {resolvePropLook} from '../../../engine/directory/index.mjs';
 import {artScene,groundShadow,canvasRenderer} from '../../../engine/basement/rendering/index.mjs';
 import {CAFE_ARTISTS} from './cafe.mjs';
 import {APARTMENT_ARTISTS} from './apartment.mjs';
+import {HOUSE_ARTISTS} from './house.mjs';
 
 export const PROP_FAMILIES=PROPS.resources.catalog.data.families;
-const ARTISTS=Object.freeze({...CAFE_ARTISTS,...APARTMENT_ARTISTS});
+const ARTISTS=Object.freeze({...CAFE_ARTISTS,...APARTMENT_ARTISTS,...HOUSE_ARTISTS});
 /** The pad round a piece's box its art may reach past (lips, drop shadows, a hearth), in px. */
 const PAD=8;
 for(const family of Object.keys(ARTISTS))if(!PROP_FAMILIES[family])throw new Error(`Prop artist ${family} has no family in the catalog`);
@@ -24,7 +25,7 @@ function lookOf(appearance,width,height){
     let entry=looks.get(appearance);
     if(!entry||entry.width!==width||entry.height!==height){
         const look=resolvePropLook(PROP_FAMILIES,appearance.family,appearance.look??{}),decor=appearance.decor??{};
-        const piece={face:decor.face??appearance.face??'S',vertical:!!(decor.vertical??appearance.vertical),variant:(decor.variant??appearance.variant)|0,seed:[appearance.x??0,appearance.y??0]};
+        const piece={face:decor.face??appearance.face??'S',vertical:!!(decor.vertical??appearance.vertical),variant:(decor.variant??appearance.variant)|0,candles:!!(decor.candles??appearance.candles),seed:[appearance.x??0,appearance.y??0]};
         entry={width,height,look,piece,key:JSON.stringify([appearance.family,width,height,piece,look])};looks.set(appearance,entry);
     }
     return entry;
@@ -33,7 +34,7 @@ function lookOf(appearance,width,height){
 const picker=([x,y])=>k=>{const v=Math.sin(x*12.9898+y*78.233+k*37.719)*43758.5453;return v-Math.floor(v);};
 
 /**
- * What one piece shows: `appearance` is its authored placement (family, look, face, vertical, x and
+ * What one piece shows: `appearance` is its authored placement (family, look, face, vertical, candles, x and
  * y where it was placed, which seed its detail); `position` and `rotation` its centre's pose now.
  */
 export function propArtPacket({appearance,position,rotation=0,width,height}){
@@ -47,7 +48,7 @@ export function createPropDraws(packet,{time=0}={}){
     const artist=ARTISTS[packet.family],{width:w,height:h}=packet,loop=artist.loop;
     let frame=null;
     if(loop){frame=Math.round((time%loop.period)/loop.period*loop.frames)%loop.frames;time=frame*loop.period/loop.frames;}
-    const piece={width:w,height:h,face:packet.face,vertical:packet.vertical,variant:packet.variant,seed:packet.seed,pick:picker(packet.seed),time};
+    const piece={width:w,height:h,face:packet.face,vertical:packet.vertical,variant:packet.variant,candles:packet.candles,seed:packet.seed,pick:picker(packet.seed),time};
     const [px,py]=packet.position,c=Math.cos(packet.rotation),s=Math.sin(packet.rotation);
     const pose=[c,s,-s,c,px,py],matrix=[c,s,-s,c,px-c*w/2+s*h/2,py-s*w/2-c*h/2],pad=artist.pad??PAD;
     const scene=fn=>()=>{const scene=new artScene();fn(scene);return scene.finish();};

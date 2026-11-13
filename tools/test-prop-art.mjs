@@ -1,5 +1,5 @@
 // Native prop art against the classic prop artwork, pixel by pixel in Chromium, for every piece in the
-// cafe and the apartment as it is placed there; the families and presets in the catalog; and the picture cache's
+// cafe, the apartment and the House of Death as it is placed there; the families and presets in the catalog; and the picture cache's
 // stamps against the vector art.
 // Run: node --test tools/test-prop-art.mjs   (the pixel tests need Playwright with Chromium; skip without it)
 import test from 'node:test';
@@ -13,6 +13,7 @@ import { validatePropCatalog, validateMapLayout, resolvePlacement } from '../src
 import { PROP_FAMILIES, hasPropArt, propArtPacket, createPropDraws } from '../src/game/presentation/props/index.mjs';
 import PROPS from '../src/game/data/game-assets/props.json' with { type: 'json' };
 import CAFE from '../src/game/data/game-assets/maps/cozy_cafe_interior.json' with { type: 'json' };
+import HOUSE from '../src/game/data/game-assets/maps/house_of_death.json' with { type: 'json' };
 import APARTMENT from '../src/game/data/game-assets/maps/apt_949.json' with { type: 'json' };
 import ITEMS from '../src/game/data/game-db/items.json' with { type: 'json' };
 import PLACES from '../src/game/data/game-db/places.json' with { type: 'json' };
@@ -33,11 +34,12 @@ const HOME = [...piecesOf(APARTMENT), { placement: { type: 'apt_dyer' }, ...DYER
 test('every family has an artist, every preset and every map placement fits its family', () => {
     assert.doesNotThrow(() => validatePropCatalog(CATALOG));
     for (const family of Object.keys(CATALOG.families)) assert.ok(hasPropArt(family), `${family} has a native artist`);
-    for (const [type, { defaults }] of Object.entries(TYPES)) if (/^(cc|apt)_/.test(type)) assert.ok(hasPropArt(defaults.family), `${type} is a preset of a drawn family`);
+    for (const [type, { defaults }] of Object.entries(TYPES)) if (/^(cc|apt|hod)_/.test(type)) assert.ok(hasPropArt(defaults.family), `${type} is a preset of a drawn family`);
     const maps = createMapLibraries()[1].resources;
     for (const id of MAP_IDS) assert.doesNotThrow(() => validateMapLayout(maps[id].data, TYPES, id, CATALOG.families));
     assert.equal(PIECES.length, CAFE.props.length - 2, 'every cafe piece but the vending machine and the tote is native');
     const classic = APARTMENT.props.filter(p => !resolvePlacement(p, TYPES).family).map(p => p.type).sort();
+    assert.deepEqual([...new Set(HOUSE.props.filter(p => !resolvePlacement(p, TYPES).family).map(p => p.type))], ['ls_offering'], 'every House piece but the offering bowl (a stash) is native');
     const cart = CATALOG.families.bar_cart.look;
     assert.deepEqual([cart.bottles.default[0], cart.bottles.default[2], cart.decanter.default], [ITEMS.drinks.red_wine.liquid, ITEMS.drinks.whiskey.liquid, ITEMS.drinks.whiskey.liquid], 'the bar cart pours what the bar does');
     assert.deepEqual([...new Set(classic)], ['armory', 'light_switch', 'medbay_refill', 'read_note', 'vending_machine'], 'every apartment piece but the machines, the switches and the note is native');
@@ -84,7 +86,7 @@ async function inChromium(fn, args) {
  */
 async function compare(pieces, venue) {
     const cells = pieces.map(p => ({ type: p.placement.type, x: p.x, y: p.y, w: p.width, h: p.height,
-        classic: { x: p.x, y: p.y, width: p.width, height: p.height, decorType: p.decorType, decor: { face: p.face, vertical: !!p.vertical, variant: venue.variant?.(p) ?? p.variant | 0 } },
+        classic: { x: p.x, y: p.y, width: p.width, height: p.height, decorType: p.decorType, decor: { face: p.face, vertical: !!p.vertical, candles: !!p.candles, variant: venue.variant?.(p) ?? p.variant | 0 } },
         native: propArtPacket({ appearance: p, position: [p.x + p.width / 2, p.y + p.height / 2], width: p.width, height: p.height }) }));
     return inChromium(async ({ cells, time, venue }) => {
         const { createPropDraws } = await import('/src/game/presentation/props/index.mjs'), { canvasRenderer } = await import('/src/engine/basement/rendering/index.mjs');
@@ -126,6 +128,10 @@ test('native prop art matches the classic artwork pixel for pixel, for every pie
 
 test('native prop art matches the classic artwork pixel for pixel, for every piece in the apartment', { skip: !chromium && 'Playwright is not installed' }, async () => {
     assertParity(await compare(HOME, { from: '        const APT = {', to: '        // The House of Death (gauntlet)', drawer: 'drawApartmentDecorProp' }));
+});
+
+test('native prop art matches the classic artwork pixel for pixel, for every House piece in the House of Death', { skip: !chromium && 'Playwright is not installed' }, async () => {
+    assertParity(await compare(piecesOf(HOUSE).filter(p => p.placement.type.startsWith('hod_')), { from: '        const HOD = {', to: '        // Double Nights (hotel lobby)', drawer: 'drawHouseDecorProp' }));
 });
 
 test('a stamped picture looks like the vector art it was painted from', { skip: !chromium && 'Playwright is not installed' }, async () => {
