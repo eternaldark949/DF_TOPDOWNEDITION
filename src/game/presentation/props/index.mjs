@@ -5,7 +5,7 @@
 // once (Basement pictureCache) and its live parts as vector, in drawing order.
 import PROPS from '../../data/game-assets/props.json' with {type:'json'};
 import {resolvePropLook} from '../../../engine/directory/index.mjs';
-import {artScene,groundShadow,canvasRenderer} from '../../../engine/basement/rendering/index.mjs';
+import {artScene,groundShadow,canvasRenderer,measureText} from '../../../engine/basement/rendering/index.mjs';
 import {CAFE_ARTISTS} from './cafe.mjs';
 import {APARTMENT_ARTISTS} from './apartment.mjs';
 import {HOUSE_ARTISTS} from './house.mjs';
@@ -16,10 +16,11 @@ import {CLINIC_ARTISTS} from './clinic.mjs';
 import {NEURAL_ARTISTS} from './neural.mjs';
 import {TORQUE_ARTISTS} from './torque.mjs';
 import {PALACE_ARTISTS} from './palace.mjs';
+import {ENNI_ARTISTS} from './enni.mjs';
 
 export const PROP_FAMILIES=PROPS.resources.catalog.data.families;
 /** Every venue's artists under one name each: a family drawn by two venues would silently lose one. */
-const ARTISTS=Object.freeze([CAFE_ARTISTS,APARTMENT_ARTISTS,HOUSE_ARTISTS,HOTEL_ARTISTS,CLUB_ARTISTS,SANCTUM_ARTISTS,CLINIC_ARTISTS,NEURAL_ARTISTS,TORQUE_ARTISTS,PALACE_ARTISTS].reduce((all,venue)=>{
+const ARTISTS=Object.freeze([CAFE_ARTISTS,APARTMENT_ARTISTS,HOUSE_ARTISTS,HOTEL_ARTISTS,CLUB_ARTISTS,SANCTUM_ARTISTS,CLINIC_ARTISTS,NEURAL_ARTISTS,TORQUE_ARTISTS,PALACE_ARTISTS,ENNI_ARTISTS].reduce((all,venue)=>{
     for(const family of Object.keys(venue))if(family in all)throw new Error(`prop family ${family} has two artists`);
     return Object.assign(all,venue);
 },{}));
@@ -50,21 +51,24 @@ const picker=([x,y])=>k=>{const v=Math.sin(x*12.9898+y*78.233+k*37.719)*43758.54
 
 /**
  * What one piece shows: `appearance` is its authored placement (family, look, face, vertical, candles, x and
- * y where it was placed, which seed its detail); `position` and `rotation` its centre's pose now.
+ * y where it was placed, which seed its detail); `state` what has happened to it in play, as plain flags
+ * ({searched: true}: a lost thing lies open), which its artist reads as `piece.state` and its pictures are
+ * kept apart by; `position` and `rotation` its centre's pose now.
  */
-export function propArtPacket({appearance,position,rotation=0,width,height}){
+export function propArtPacket({appearance,state=null,position,rotation=0,width,height}){
     if(!hasPropArt(appearance?.family))throw new TypeError(`No native art for prop family ${appearance?.family}`);
-    const {look,piece,key}=lookOf(appearance,width,height);
-    return {family:appearance.family,key,look,width,height,...piece,position:[...position],rotation};
+    const {look,piece,key}=lookOf(appearance,width,height),flags=Object.freeze({...state});
+    return {family:appearance.family,key:state?`${key}|${JSON.stringify(flags)}`:key,look,width,height,...piece,state:flags,position:[...position],rotation};
 }
 
 /** The piece's draws in order: {key, bounds, matrix, build} for a still run, {matrix, build} for a live one.
- *  `time` is in seconds; `beat` is the music's beat count (a club's kick), else counted from `time`. */
-export function createPropDraws(packet,{time=0,beat=null}={}){
+ *  `time` is in seconds; `beat` is the music's beat count (a club's kick), else counted from `time`;
+ *  `measure(text, font)` sizes a line of text as the host's backend will draw it (a sign fitted to its words). */
+export function createPropDraws(packet,{time=0,beat=null,measure=measureText}={}){
     const artist=ARTISTS[packet.family],{width:w,height:h}=packet,loop=artist.loop;
     let frame=null;
     if(loop){frame=Math.round((time%loop.period)/loop.period*loop.frames)%loop.frames;time=frame*loop.period/loop.frames;}
-    const piece={width:w,height:h,face:packet.face,vertical:packet.vertical,variant:packet.variant,candles:packet.candles,seed:packet.seed,pick:picker(packet.seed),time,beat:beat??time*BPM/60};
+    const piece={width:w,height:h,face:packet.face,vertical:packet.vertical,variant:packet.variant,candles:packet.candles,state:packet.state,seed:packet.seed,pick:picker(packet.seed),measure,time,beat:beat??time*BPM/60};
     const [px,py]=packet.position,c=Math.cos(packet.rotation),s=Math.sin(packet.rotation);
     const pose=[c,s,-s,c,px,py],matrix=[c,s,-s,c,px-c*w/2+s*h/2,py-s*w/2-c*h/2],pad=artist.pad??PAD;
     const scene=fn=>()=>{const scene=new artScene();fn(scene);return scene.finish();};

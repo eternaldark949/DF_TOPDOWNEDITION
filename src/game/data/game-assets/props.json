@@ -99,53 +99,53 @@
           "dp_throne": {"defaults": {"color": "#2a0c14", "decorType": "dp_throne", "family": "obsidian_throne", "height": 52, "mass": 10000000, "width": 68}},
           "dp_vanity": {"defaults": {"color": "#2a0c14", "decorType": "dp_vanity", "family": "palace_vanity", "height": 40, "mass": 10000000, "width": 90}},
           "dp_wardrobe": {"defaults": {"color": "#2a0c14", "decorType": "dp_wardrobe", "family": "palace_wardrobe", "height": 30, "mass": 10000000, "width": 120}},
-          "ec_appliances": {"defaults": {"color": "#3c2530", "decorType": "ec_appliances", "height": 78, "mass": 10000000, "width": 380}},
-          "ec_armchair": {"defaults": {"color": "#3c2530", "decorType": "ec_armchair", "face": "W", "height": 64, "mass": 10000000, "width": 64}},
-          "ec_audio": {"defaults": {"color": "#3c2530", "decorType": "ec_audio", "height": 88, "mass": 10000000, "width": 175}},
-          "ec_bagwall": {"defaults": {"color": "#3c2530", "decorType": "ec_bagwall", "height": 270, "mass": 10000000, "width": 36}},
-          "ec_bakery": {"defaults": {"color": "#3c2530", "decorType": "ec_bakery", "height": 72, "mass": 10000000, "width": 210}},
-          "ec_balustrade": {"defaults": {"color": "#3c2530", "decorType": "ec_balustrade", "height": 360, "mass": 10000000, "width": 16}},
-          "ec_bed": {"defaults": {"color": "#3c2530", "decorType": "ec_bed", "height": 214, "mass": 10000000, "width": 140}},
-          "ec_booth": {"defaults": {"color": "#3c2530", "decorType": "ec_booth", "height": 60, "mass": 10000000, "width": 110}},
-          "ec_chaise": {"defaults": {"color": "#3c2530", "decorType": "ec_chaise", "height": 54, "mass": 10000000, "width": 140}},
-          "ec_checkout": {"defaults": {"color": "#3c2530", "decorType": "ec_checkout", "height": 60, "mass": 10000000, "width": 170}},
-          "ec_cloth_aisle": {"defaults": {"color": "#3c2530", "decor": {"aisle": "A"}, "decorType": "ec_cloth_aisle", "height": 50, "mass": 10000000, "variant": 0, "width": 300}},
-          "ec_cold": {"defaults": {"color": "#3c2530", "decorType": "ec_cold", "height": 76, "mass": 10000000, "width": 330}},
-          "ec_deli": {"defaults": {"color": "#3c2530", "decorType": "ec_deli", "height": 80, "mass": 10000000, "width": 300}},
-          "ec_dessert": {"defaults": {"color": "#3c2530", "decorType": "ec_dessert", "height": 48, "mass": 10000000, "width": 200}},
-          "ec_dining": {"defaults": {"color": "#3c2530", "decorType": "ec_dining", "height": 105, "mass": 10000000, "width": 175}},
-          "ec_display": {"defaults": {"color": "#3c2530", "decorType": "ec_display", "height": 84, "mass": 10000000, "width": 84}},
-          "ec_fitting": {"defaults": {"color": "#3c2530", "decorType": "ec_fitting", "height": 104, "mass": 10000000, "width": 270}},
-          "ec_floral": {"defaults": {"color": "#3c2530", "decorType": "ec_floral", "height": 64, "mass": 10000000, "width": 64}},
-          "ec_gondola": {"defaults": {"color": "#3c2530", "decor": {"aisle": 1}, "decorType": "ec_gondola", "height": 46, "mass": 10000000, "variant": 2, "width": 384}},
-          "ec_jewel": {"defaults": {"color": "#3c2530", "decorType": "ec_jewel", "height": 60, "mass": 10000000, "width": 160}},
-          "ec_kfridge": {"defaults": {"color": "#3c2530", "decorType": "ec_kfridge", "height": 84, "mass": 10000000, "width": 64}},
-          "ec_kprep": {"defaults": {"color": "#3c2530", "decorType": "ec_kprep", "height": 56, "mass": 10000000, "width": 220}},
-          "ec_ksink": {"defaults": {"color": "#3c2530", "decorType": "ec_ksink", "height": 46, "mass": 10000000, "width": 120}},
-          "ec_laptop": {"defaults": {"color": "#3c2530", "decorType": "ec_laptop", "height": 88, "mass": 10000000, "width": 175}},
-          "ec_lowtable": {"defaults": {"color": "#3c2530", "decorType": "ec_lowtable", "height": 62, "mass": 10000000, "width": 130}},
-          "ec_mannequin": {"defaults": {"color": "#3c2530", "decorType": "ec_mannequin", "height": 40, "mass": 10000000, "variant": 2, "width": 40}},
-          "ec_mirror": {"defaults": {"color": "#3c2530", "decorType": "ec_mirror", "height": 40, "mass": 10000000, "width": 96}},
-          "ec_newel": {"defaults": {"color": "#3c2530", "decorType": "ec_newel", "height": 30, "mass": 10000000, "width": 30}},
-          "ec_ottoman": {"defaults": {"color": "#3c2530", "decorType": "ec_ottoman", "height": 90, "mass": 10000000, "width": 90}},
-          "ec_perfume": {"defaults": {"color": "#3c2530", "decorType": "ec_perfume", "height": 96, "mass": 10000000, "width": 96}},
-          "ec_plant": {"defaults": {"color": "#3c2530", "decorType": "ec_plant", "height": 50, "mass": 10000000, "width": 50}},
-          "ec_rack": {"defaults": {"color": "#3c2530", "decorType": "ec_rack", "height": 36, "mass": 10000000, "width": 180}},
-          "ec_range": {"defaults": {"color": "#3c2530", "decorType": "ec_range", "height": 56, "mass": 10000000, "width": 220}},
-          "ec_round_rack": {"defaults": {"color": "#3c2530", "decorType": "ec_round_rack", "height": 104, "mass": 10000000, "variant": 0, "width": 104}},
-          "ec_rtable": {"defaults": {"color": "#3c2530", "decorType": "ec_rtable", "height": 110, "mass": 10000000, "width": 110}},
-          "ec_shelfwall": {"defaults": {"color": "#3c2530", "decorType": "ec_shelfwall", "height": 290, "mass": 10000000, "width": 32}},
-          "ec_shoes": {"defaults": {"color": "#3c2530", "decorType": "ec_shoes", "height": 60, "mass": 10000000, "width": 160}},
-          "ec_shoewall": {"defaults": {"color": "#3c2530", "decorType": "ec_shoewall", "height": 270, "mass": 10000000, "width": 36}},
-          "ec_side": {"defaults": {"color": "#3c2530", "decorType": "ec_side", "height": 42, "mass": 10000000, "width": 40}},
-          "ec_sofa": {"defaults": {"color": "#3c2530", "decorType": "ec_sofa", "height": 64, "mass": 10000000, "width": 200}},
-          "ec_tablet": {"defaults": {"color": "#3c2530", "decorType": "ec_tablet", "height": 88, "mass": 10000000, "width": 130}},
+          "ec_appliances": {"defaults": {"color": "#3c2530", "decorType": "ec_appliances", "family": "appliance_plinth", "height": 78, "mass": 10000000, "width": 380}},
+          "ec_armchair": {"defaults": {"color": "#3c2530", "decorType": "ec_armchair", "face": "W", "family": "cream_sofa", "height": 64, "look": {"seats": 1}, "mass": 10000000, "width": 64}},
+          "ec_audio": {"defaults": {"color": "#3c2530", "decorType": "ec_audio", "family": "speaker_plinth", "height": 88, "mass": 10000000, "width": 175}},
+          "ec_bagwall": {"defaults": {"color": "#3c2530", "decorType": "ec_bagwall", "family": "accessory_wall", "height": 270, "mass": 10000000, "width": 36}},
+          "ec_bakery": {"defaults": {"color": "#3c2530", "decorType": "ec_bakery", "family": "bakery_case", "height": 72, "mass": 10000000, "width": 210}},
+          "ec_balustrade": {"defaults": {"color": "#3c2530", "decorType": "ec_balustrade", "family": "brass_balustrade", "height": 360, "mass": 10000000, "width": 16}},
+          "ec_bed": {"defaults": {"color": "#3c2530", "decorType": "ec_bed", "family": "emporium_bed", "height": 214, "mass": 10000000, "width": 140}},
+          "ec_booth": {"defaults": {"color": "#3c2530", "decorType": "ec_booth", "family": "velvet_booth", "height": 60, "mass": 10000000, "width": 110}},
+          "ec_chaise": {"defaults": {"color": "#3c2530", "decorType": "ec_chaise", "family": "velvet_chaise", "height": 54, "mass": 10000000, "width": 140}},
+          "ec_checkout": {"defaults": {"color": "#3c2530", "decorType": "ec_checkout", "family": "checkout_desk", "height": 60, "mass": 10000000, "width": 170}},
+          "ec_cloth_aisle": {"defaults": {"color": "#3c2530", "decorType": "ec_cloth_aisle", "family": "gondola", "height": 50, "look": {"goods": "clothes", "aisle": "A"}, "mass": 10000000, "variant": 0, "width": 300}},
+          "ec_cold": {"defaults": {"color": "#3c2530", "decorType": "ec_cold", "family": "chilled_counter", "height": 76, "mass": 10000000, "width": 330}},
+          "ec_deli": {"defaults": {"color": "#3c2530", "decorType": "ec_deli", "family": "deli_counter", "height": 80, "mass": 10000000, "width": 300}},
+          "ec_dessert": {"defaults": {"color": "#3c2530", "decorType": "ec_dessert", "family": "patisserie_counter", "height": 48, "mass": 10000000, "width": 200}},
+          "ec_dining": {"defaults": {"color": "#3c2530", "decorType": "ec_dining", "family": "emporium_dining", "height": 105, "mass": 10000000, "width": 175}},
+          "ec_display": {"defaults": {"color": "#3c2530", "decorType": "ec_display", "family": "bag_table", "height": 84, "mass": 10000000, "width": 84}},
+          "ec_fitting": {"defaults": {"color": "#3c2530", "decorType": "ec_fitting", "family": "fitting_rooms", "height": 104, "mass": 10000000, "width": 270}},
+          "ec_floral": {"defaults": {"color": "#3c2530", "decorType": "ec_floral", "family": "rose_urn", "height": 64, "mass": 10000000, "width": 64}},
+          "ec_gondola": {"defaults": {"color": "#3c2530", "decorType": "ec_gondola", "family": "gondola", "height": 46, "look": {"aisle": "1"}, "mass": 10000000, "variant": 2, "width": 384}},
+          "ec_jewel": {"defaults": {"color": "#3c2530", "decorType": "ec_jewel", "family": "jewel_vitrine", "height": 60, "mass": 10000000, "width": 160}},
+          "ec_kfridge": {"defaults": {"color": "#3c2530", "decorType": "ec_kfridge", "family": "kitchen_fridge", "height": 84, "mass": 10000000, "width": 64}},
+          "ec_kprep": {"defaults": {"color": "#3c2530", "decorType": "ec_kprep", "family": "kitchen_prep", "height": 56, "mass": 10000000, "width": 220}},
+          "ec_ksink": {"defaults": {"color": "#3c2530", "decorType": "ec_ksink", "family": "kitchen_sink", "height": 46, "mass": 10000000, "width": 120}},
+          "ec_laptop": {"defaults": {"color": "#3c2530", "decorType": "ec_laptop", "family": "laptop_plinth", "height": 88, "mass": 10000000, "width": 175}},
+          "ec_lowtable": {"defaults": {"color": "#3c2530", "decorType": "ec_lowtable", "family": "brass_low_table", "height": 62, "mass": 10000000, "width": 130}},
+          "ec_mannequin": {"defaults": {"color": "#3c2530", "decorType": "ec_mannequin", "family": "dress_form", "height": 40, "mass": 10000000, "variant": 2, "width": 40}},
+          "ec_mirror": {"defaults": {"color": "#3c2530", "decorType": "ec_mirror", "family": "triple_mirror", "height": 40, "mass": 10000000, "width": 96}},
+          "ec_newel": {"defaults": {"color": "#3c2530", "decorType": "ec_newel", "family": "newel_post", "height": 30, "mass": 10000000, "width": 30}},
+          "ec_ottoman": {"defaults": {"color": "#3c2530", "decorType": "ec_ottoman", "family": "buttoned_ottoman", "height": 90, "mass": 10000000, "width": 90}},
+          "ec_perfume": {"defaults": {"color": "#3c2530", "decorType": "ec_perfume", "family": "perfume_counter", "height": 96, "mass": 10000000, "width": 96}},
+          "ec_plant": {"defaults": {"color": "#3c2530", "decorType": "ec_plant", "family": "fern_planter", "height": 50, "mass": 10000000, "width": 50}},
+          "ec_rack": {"defaults": {"color": "#3c2530", "decorType": "ec_rack", "family": "clothes_rail", "height": 36, "mass": 10000000, "width": 180}},
+          "ec_range": {"defaults": {"color": "#3c2530", "decorType": "ec_range", "family": "kitchen_range", "height": 56, "mass": 10000000, "width": 220}},
+          "ec_round_rack": {"defaults": {"color": "#3c2530", "decorType": "ec_round_rack", "family": "round_rack", "height": 104, "mass": 10000000, "variant": 0, "width": 104}},
+          "ec_rtable": {"defaults": {"color": "#3c2530", "decorType": "ec_rtable", "family": "round_dining_table", "height": 110, "mass": 10000000, "width": 110}},
+          "ec_shelfwall": {"defaults": {"color": "#3c2530", "decorType": "ec_shelfwall", "family": "knit_cubbies", "height": 290, "mass": 10000000, "width": 32}},
+          "ec_shoes": {"defaults": {"color": "#3c2530", "decorType": "ec_shoes", "family": "heel_island", "height": 60, "mass": 10000000, "width": 160}},
+          "ec_shoewall": {"defaults": {"color": "#3c2530", "decorType": "ec_shoewall", "family": "accessory_wall", "height": 270, "look": {"goods": "heels"}, "mass": 10000000, "width": 36}},
+          "ec_side": {"defaults": {"color": "#3c2530", "decorType": "ec_side", "family": "walnut_side_table", "height": 42, "mass": 10000000, "width": 40}},
+          "ec_sofa": {"defaults": {"color": "#3c2530", "decorType": "ec_sofa", "family": "cream_sofa", "height": 64, "mass": 10000000, "width": 200}},
+          "ec_tablet": {"defaults": {"color": "#3c2530", "decorType": "ec_tablet", "family": "tablet_plinth", "height": 88, "mass": 10000000, "width": 130}},
           "ec_tall_aisle": {"defaults": {"color": "#3c2530", "decor": {"aisle": 1, "cat": "BAKERY & CEREAL", "kinds": ["box", "box", "can"], "run": 0, "sign": 580}, "decorType": "ec_tall_aisle", "height": 360, "mass": 10000000, "visible": false, "width": 40}},
-          "ec_topiary": {"defaults": {"color": "#3c2530", "decorType": "ec_topiary", "height": 40, "mass": 10000000, "width": 40}},
-          "ec_tvwall": {"defaults": {"color": "#3c2530", "decorType": "ec_tvwall", "height": 62, "mass": 10000000, "width": 380}},
-          "ec_vending": {"defaults": {"color": "#3c2530", "decorType": "ec_vending", "height": 64, "interactionType": "vending_machine", "mass": 10000000, "width": 44}},
-          "ec_void": {"defaults": {"color": "#3c2530", "decorType": "ec_void", "height": 300, "mass": 10000000, "width": 480}},
-          "ec_wine": {"defaults": {"color": "#3c2530", "decorType": "ec_wine", "height": 62, "mass": 10000000, "width": 300}},
+          "ec_topiary": {"defaults": {"color": "#3c2530", "decorType": "ec_topiary", "family": "cypress_planter", "height": 40, "mass": 10000000, "width": 40}},
+          "ec_tvwall": {"defaults": {"color": "#3c2530", "decorType": "ec_tvwall", "family": "screen_wall", "height": 62, "mass": 10000000, "width": 380}},
+          "ec_vending": {"defaults": {"color": "#3c2530", "decorType": "ec_vending", "family": "snack_vending", "height": 64, "interactionType": "vending_machine", "mass": 10000000, "width": 44}},
+          "ec_void": {"defaults": {"color": "#3c2530", "decorType": "ec_void", "family": "gallery_void", "height": 300, "mass": 10000000, "width": 480}},
+          "ec_wine": {"defaults": {"color": "#3c2530", "decorType": "ec_wine", "family": "wine_plinth", "height": 62, "mass": 10000000, "width": 300}},
           "hod_altar": {"defaults": {"color": "#2a1a22", "decorType": "hod_altar", "family": "crystal_altar", "height": 40, "mass": 10000000, "width": 120}},
           "hod_bookcase": {"defaults": {"color": "#2a1a22", "decorType": "hod_bookcase", "family": "gilt_bookcase", "height": 24, "mass": 10000000, "width": 220}},
           "hod_bust": {"defaults": {"color": "#2a1a22", "decorType": "hod_bust", "family": "marble_bust", "height": 30, "mass": 10000000, "width": 30}},
@@ -1095,6 +1095,102 @@
           "palace_wardrobe": {"description": "A lacquer wardrobe, gold-edged.", "look": {
             "gold": {"kind": "color", "default": "#ffc64b"}}},
           "iron_cage": {"description": "A rusted iron cage.", "look": {
+}},
+          "wine_plinth": {"description": "The cellar counter: two racks of bottles either side of a brass rule.", "look": {
+            "wood": {"kind": "color", "default": "#493428"},
+            "bottles": {"kind": "colors", "default": ["#44394a", "#39553b", "#71494c"]},
+            "label": {"kind": "text", "default": "THE CELLAR"}}},
+          "chilled_counter": {"description": "Seven glass-fronted cabinets of cheese and charcuterie.", "look": {
+            "label": {"kind": "text", "default": "DAIRY • DELICATESSEN • CHILLED"}}},
+          "bakery_case": {"description": "Loaves in two rows under a glass case.", "look": {
+            "label": {"kind": "text", "default": "BAKERY & PATISSERIE"}}},
+          "cream_sofa": {"description": "Cream upholstery in a brass-piped frame; with more than one seat, two cushions.", "look": {
+            "frame": {"kind": "color", "default": "#695549"},
+            "seats": {"kind": "integer", "default": 3, "min": 1, "max": 3, "note": "seat cushions across"}}},
+          "brass_low_table": {"description": "A cream-topped brass table: a vein, two books and a bowl.", "look": {
+}},
+          "walnut_side_table": {"description": "A walnut side table with a lamp seen from above.", "look": {
+}},
+          "emporium_bed": {"description": "A showroom bed: headboard, pillows, a turned-down cover and a runner.", "look": {
+            "runner": {"kind": "color", "default": "#714555"}}},
+          "emporium_dining": {"description": "A walnut table for six, its rose chairs inside its footprint.", "look": {
+}},
+          "screen_wall": {"description": "Three televisions on the home-cinema plinth.", "look": {
+            "label": {"kind": "text", "default": "HOME CINEMA"}}},
+          "laptop_plinth": {"description": "Three open laptops on a cream counter.", "look": {
+            "label": {"kind": "text", "default": "COMPUTING"}}},
+          "tablet_plinth": {"description": "Three tablets standing on a cream counter.", "look": {
+            "label": {"kind": "text", "default": "PERSONAL DEVICES"},
+            "label_alt": {"kind": "text", "default": "CONNECTED HOME", "note": "the sign on an odd-numbered plinth"}}},
+          "speaker_plinth": {"description": "Three speakers, woofer and tweeter each.", "look": {
+            "label": {"kind": "text", "default": "HIGH FIDELITY"}}},
+          "appliance_plinth": {"description": "A washer, a hob, an oven and a dryer.", "look": {
+            "label": {"kind": "text", "default": "DESIGNED FOR HOME"}}},
+          "checkout_desk": {"description": "A rose desk: a till screen, a card reader, a posy.", "look": {
+            "label": {"kind": "text", "default": "CHECKOUT"},
+            "label_alt": {"kind": "text", "default": "CUSTOMER SERVICES", "note": "the sign on an odd-numbered desk"}}},
+          "fern_planter": {"description": "Nine fronds fanned from a brass pot.", "look": {
+            "leaf": {"kind": "color", "default": "#3b6140"},
+            "leaf_light": {"kind": "color", "default": "#537948"}}},
+          "brass_balustrade": {"description": "A staircase rail: brass on rose stone, studded along its length.", "look": {
+            "stone": {"kind": "color", "default": "#7d4b5a"}}},
+          "newel_post": {"description": "A newel post with a frosted globe lamp.", "look": {
+}},
+          "perfume_counter": {"description": "A round glass counter of perfume bottles.", "look": {
+            "bottles": {"kind": "colors", "default": ["#f0c9a8", "#d79bb1", "#c9d6e8", "#e8d58f", "#b9e0cf", "#f4dfe9"]}}},
+          "rose_urn": {"description": "A tall urn of pale roses in a sunflower spiral.", "look": {
+            "roses": {"kind": "colors", "default": ["#f3d6dc", "#e9b3c0", "#fbefe6", "#d98ea3"]}}},
+          "cypress_planter": {"description": "A clipped cypress in a black planter.", "look": {
+}},
+          "bag_table": {"description": "A round walnut table of handbags; its number turns them round.", "look": {
+            "bags": {"kind": "colors", "default": ["#7b2f45", "#e6d2b4", "#1f1b20", "#c58f6a"]}}},
+          "dress_form": {"description": "A dressed form on a marble plinth from above; its number picks the gown, and an even one wears a necklace.", "look": {
+            "dresses": {"kind": "colors", "default": ["#e9d3a6", "#1c1a1f", "#b0475f", "#f3ece0", "#2f5a4d", "#7b3fa0"]}}},
+          "clothes_rail": {"description": "A brass rail of hung clothes.", "look": {
+            "garments": {"kind": "colors", "default": ["#e9d3a6", "#1c1a1f", "#b0475f", "#f3ece0", "#6d5a8a", "#c58f6a", "#2f5a4d"]}}},
+          "round_rack": {"description": "A two-tier round rack of garments hung by colour; its number picks one of five palettes.", "look": {
+}},
+          "gondola": {"description": "An aisle gondola: goods from above on both faces, end caps, a sign hung over it. Its number picks the goods.", "look": {
+            "goods": {"kind": "choice", "values": ["food", "clothes"], "default": "food"},
+            "aisle": {"kind": "text", "default": "", "note": "the aisle on the sign, before its name"},
+            "label": {"kind": "text", "default": "", "note": "the sign; empty, the goods name it"},
+            "sign_at": {"kind": "number", "default": 0.5, "min": 0, "max": 1, "note": "where along the run the sign hangs"}}},
+          "knit_cubbies": {"description": "Cubbies of folded knits along a wall.", "look": {
+            "knits": {"kind": "colors", "default": ["#e8ddd0", "#c9a98c", "#7b2f45", "#3a3540", "#d7b7c0", "#9aa38a"]}}},
+          "deli_counter": {"description": "The chef's counter of prepared dishes.", "look": {
+            "label": {"kind": "text", "default": "LA CUISINE  •  TRAITEUR"}}},
+          "gallery_void": {"description": "The gallery's void: the lobby's marble far below, the rail all round.", "look": {
+}},
+          "buttoned_ottoman": {"description": "A round buttoned ottoman.", "look": {
+            "velvet": {"kind": "color", "default": "#a46a7b"}}},
+          "round_dining_table": {"description": "A round table for four, linen and a candle.", "look": {
+}},
+          "velvet_booth": {"description": "A rose velvet banquette with its table for two.", "look": {
+}},
+          "patisserie_counter": {"description": "The patisserie counter: cakes on stands.", "look": {
+            "cakes": {"kind": "colors", "default": ["#e9b3c0", "#7b4a32", "#f4ead6", "#c9d79a", "#d98ea3"]},
+            "label": {"kind": "text", "default": "PATISSERIE"}}},
+          "kitchen_range": {"description": "A black range of burners.", "look": {
+}},
+          "kitchen_prep": {"description": "A steel bench: a board, a row of produce, two knives.", "look": {
+}},
+          "kitchen_fridge": {"description": "A steel double-door fridge.", "look": {
+}},
+          "kitchen_sink": {"description": "A steel double sink.", "look": {
+}},
+          "jewel_vitrine": {"description": "A glass vitrine of rings and necklaces on velvet.", "look": {
+            "velvet": {"kind": "color", "default": "#3a1f2c"}}},
+          "accessory_wall": {"description": "Wall shelves of handbags, or heels in pairs.", "look": {
+            "goods": {"kind": "choice", "values": ["bags", "heels"], "default": "bags"}}},
+          "heel_island": {"description": "A low island of heels.", "look": {
+}},
+          "velvet_chaise": {"description": "A rose velvet chaise.", "look": {
+            "velvet": {"kind": "color", "default": "#a46a7b"}}},
+          "triple_mirror": {"description": "A gilt three-way mirror.", "look": {
+}},
+          "fitting_rooms": {"description": "Curtained cubicles, each with its mirror and stool, one curtain drawn back.", "look": {
+}},
+          "snack_vending": {"description": "The store's snack machine.", "look": {
 }}
         }
       }

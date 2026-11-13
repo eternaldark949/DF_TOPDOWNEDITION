@@ -726,7 +726,7 @@ test('Furniture sprites: painted runs never change over time, loops repeat per p
   }
   // (Native pieces skip this: tools/test-prop-art.mjs proves their still runs and loops the same way. The floor
   // only guards that the sweep ran; it drops as each venue goes native.)
-  ok(checked > 200 && loops >= 5, `checked ${checked} painted props and ${loops} loops`);
+  ok(checked > 60 && loops >= 5, `checked ${checked} painted props and ${loops} loops`);
   env.run(`game._doLoadMap('house_of_death');`);
   const candle = value(env, `return game.props.findIndex(p => p.decorType === 'hod_candelabra');`);
   ok(runTrace(candle, 0, 5000) !== runTrace(candle, 0, 987654.321), 'control: a candelabra painted as if still would freeze its flames');

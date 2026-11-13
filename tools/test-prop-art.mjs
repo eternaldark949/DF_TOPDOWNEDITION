@@ -23,6 +23,8 @@ import SANCTUM from '../src/game/data/game-assets/maps/church_boss.json' with { 
 import CLINIC from '../src/game/data/game-assets/maps/medbay_sw.json' with { type: 'json' };
 import TORQUE from '../src/game/data/game-assets/maps/auto_shop.json' with { type: 'json' };
 import PALACE from '../src/game/data/game-assets/maps/demoness_palace.json' with { type: 'json' };
+import ENNI from '../src/game/data/game-assets/maps/enni_cole_interior.json' with { type: 'json' };
+import ENNI_UPPER from '../src/game/data/game-assets/maps/enni_cole_upper.json' with { type: 'json' };
 import NEURAL from '../src/game/data/game-assets/maps/neural_sys_interior.json' with { type: 'json' };
 import ITEMS from '../src/game/data/game-db/items.json' with { type: 'json' };
 import PLACES from '../src/game/data/game-db/places.json' with { type: 'json' };
@@ -38,7 +40,8 @@ const TIME = 3 * (2 * Math.PI / 0.8) / 10;
 const BEAT = 7.3;
 const piecesOf = map => map.props.filter(p => hasPropArt(resolvePlacement(p, TYPES).family)).map(p => ({ placement: p, ...resolvePlacement(p, TYPES) }));
 const PIECES = piecesOf(CAFE);
-const STILL_CLASSIC = /^(ec|ls)_|^ta_(lift|wrap|turntable)$|_lost_|lost_luggage|suitcase|^(vending_machine|medbay_refill|armory|light_switch|read_note|block)$/;
+// (Enni Cole's tall aisles are no prop art at all: the floor draws them, the prop is only their collision.)
+const STILL_CLASSIC = /^ls_|^ec_tall_aisle$|^ta_(lift|wrap|turntable)$|_lost_|lost_luggage|suitcase|^(vending_machine|medbay_refill|armory|light_switch|read_note|block)$/;
 // The apartment's pieces, and the clothing dyer's station once it is made (placed by the level, not the map)
 const DYER = resolveApartmentDyer({ places: PLACES }).data.appearance;
 const HOME = [...piecesOf(APARTMENT), { placement: { type: 'apt_dyer' }, ...DYER }];
@@ -86,8 +89,9 @@ test('still runs are pictures with stable keys; moving parts are live; the plant
 test('every native piece on the maps paints its still runs the same at any time, and a loop the same one period on', () => {
     // A still run becomes a picture painted once: an animation left in one would freeze. (The classic
     // pieces are proven the same way by the furniture-sprite regression in test-game-regressions.cjs.)
-    const all = [...PIECES, ...HOME, ...[HOUSE, LOBBY, SUITE, CLUB, SANCTUM, CLINIC, NEURAL, TORQUE, PALACE].flatMap(piecesOf)];
-    const stills = (p, time, beat) => createPropDraws(propArtPacket({ appearance: p, position: [3, 4], width: p.width, height: p.height }), { time, beat })
+    const all = [...PIECES, ...HOME, ...[HOUSE, LOBBY, SUITE, CLUB, SANCTUM, CLINIC, NEURAL, TORQUE, PALACE, ENNI, ENNI_UPPER].flatMap(piecesOf)];
+    const measure = text => ({ width: text.length * 4 });   // (no Canvas here to size a sign's words; any fixed measure proves the art still)
+    const stills = (p, time, beat) => createPropDraws(propArtPacket({ appearance: p, position: [3, 4], width: p.width, height: p.height }), { time, beat, measure })
         .filter(d => d.key).map(d => [d.key, JSON.stringify(d.build())]);
     let loops = 0;
     for (const p of all) {
@@ -144,9 +148,11 @@ async function compare(pieces, venue) {
         });
     }, { cells, time: TIME, beat: BEAT, venue: { from: venue.from, to: venue.to, drawer: venue.drawer, cuts: venue.cuts ?? {}, file: venue.file ?? '/src/legacy/entities/props-decor.js', prelude: venue.prelude ?? [] } });
 }
-// Pieces whose classic art ruled hairlines (1 to 1.5 px) with fillRect at fractional heights: the canvas
-// covers a fillRect's edge rows differently from a path's, by up to this much along every such line.
-const FILL_RECTS = { ta_chest: 16 };
+// Pieces whose classic art ruled hairlines (1 to 1.5 px, or under one, as a gondola's spine and highlight
+// rails) with fillRect at fractional heights: the canvas covers a fillRect's edge rows differently from a
+// path's, by up to this much along every such line. (A gondola's three nested outlines also part by up
+// to 37/255 on a handful of pixels at its rounded left corners; checked by eye side by side.)
+const FILL_RECTS = { ta_chest: 16, ec_gondola: 40, ec_cloth_aisle: 40 };
 // Pieces packed with tiny overlapping shapes in strongly contrasting colours (the rose bed's petals, a few
 // pixels across): where two antialiased edges meet in one pixel, a quarter-pixel shift in coverage moves
 // that pixel a long way between crimson and dark leaf. Still under 1% of the channels; worst up to this.
@@ -189,6 +195,7 @@ const CUTS = {
 };
 const TORQUE_CLASSIC = p => ({ decor: { face: p.face, variant: p.look?.rim === '#ff9a2a' || p.look?.paint === '#7a1f1a' ? 1 : 0 } });   // the classic tyres and drum read their colour off the variant
 const NEURAL_CLASSIC = p => ({ decor: { variant: ['wig', 'skin', 'vocal', 'chroma'].indexOf(p.look?.station ?? 'wig') } });   // the classic console read its station off the variant
+const ENNI_CLASSIC = p => ({ decor: { face: p.face, variant: p.variant | 0, aisle: p.look?.aisle } });   // the classic gondolas read their aisle off the decor
 const CLINIC_CLASSIC = p => ({ headSide: p.look?.head ?? 'left', patient: !!p.look?.patient });   // the classic bed read these off the placement
 for (const [name, map, from, to, drawer, more] of [
     ['the Double Nights lobby', LOBBY, '        const DNL = {', '        /* The two machines every map shares', 'drawLobbyDecorProp', { only: /^dn_/ }],
@@ -202,7 +209,9 @@ for (const [name, map, from, to, drawer, more] of [
         prelude: [['/src/legacy/engine/torque-art.js', 'const TQ = {', '// The cars on show'], ['/src/legacy/engine/torque-art.js', 'const TorqueArt = {', '    /** One of TQ_CARS'], [null, '};']] }],
     ['the Demoness Palace', PALACE, '        function drawPalaceDecorProp', null, 'drawPalaceDecorProp', { file: '/src/legacy/engine/palace-art.js',
         prelude: [['/src/legacy/engine/palace-art.js', '        const PALACE = {', '        // Fixed lights'], ['/src/legacy/engine/palace-art.js', '        function palaceFlowers', '        function palaceFlowerGlow'],
-            ['/src/legacy/core/utils.js', '        function seededRandom', '        const pickFrom']] }]])
+            ['/src/legacy/core/utils.js', '        function seededRandom', '        const pickFrom']] }],
+    ['Enni Cole', ENNI, '        function drawEnniDecorProp', '        /* Stashes round the city', 'drawEnniDecorProp', { classic: ENNI_CLASSIC }],
+    ['Enni Cole upstairs', ENNI_UPPER, '        function drawEnniDecorProp', '        /* Stashes round the city', 'drawEnniDecorProp', { classic: ENNI_CLASSIC }]])
     test(`native prop art matches the classic artwork pixel for pixel, for every piece in ${name}`, { skip: !chromium && 'Playwright is not installed' }, async () => {
         assertParity(await compare(piecesOf(map).filter(p => !STILL_CLASSIC.test(p.placement.type) && (more?.only ?? /./).test(p.placement.type)), { from, to, drawer, cuts: CUTS, ...more }));
     });
