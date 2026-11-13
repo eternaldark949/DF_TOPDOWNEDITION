@@ -17,7 +17,7 @@ class ApartmentRenderer {
     /** A prop whose family has native art: drawn from its body's pose, its still runs from pictures. */
     drawNativeProp(ctx,entity,blend){
         const pose=entity.getRenderState(blend),[width,height]=entity.collision_shape.dimensions;
-        DFNative.drawPropArt(ctx,DFNative.propArtPacket({appearance:entity.data.appearance,position:pose.position,rotation:pose.rotation,width,height}),{pictures:this.pictures,time:_frameTime/1000});
+        DFNative.drawPropArt(ctx,DFNative.propArtPacket({appearance:entity.data.appearance,position:pose.position,rotation:pose.rotation,width,height}),{pictures:this.pictures,time:_frameTime/1000,beat:clubBeatN()});
     }
     destroy(){this.lighting=null;this.pictures.clear();PropSprites.clear([...this.props.values()]);this.props.clear();this.people.clear();}
     draw(game,blend=1){

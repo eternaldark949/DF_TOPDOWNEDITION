@@ -2637,7 +2637,7 @@
                     // Seeded from where it was first drawn, as its classic sprite was
                     const art = p._artAppearance ??= { family: p.family, look: p.look ?? {}, decor: p.decor, x: p.x, y: p.y };
                     DFNative.drawPropArt(ctx, DFNative.propArtPacket({ appearance: art, position: [p.x + p.width / 2, p.y + p.height / 2], rotation: p.angle || 0, width: p.width, height: p.height }),
-                        { pictures: PropSprites.pictures, time: _frameTime / 1000 });
+                        { pictures: PropSprites.pictures, time: _frameTime / 1000, beat: clubBeatN() });   // (the club's pieces keep the music's kick)
                     return;
                 }
                 // Painting or replaying a split run draws body art only. The outer pass

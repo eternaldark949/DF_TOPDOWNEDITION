@@ -9,11 +9,15 @@ import {artScene,groundShadow,canvasRenderer} from '../../../engine/basement/ren
 import {CAFE_ARTISTS} from './cafe.mjs';
 import {APARTMENT_ARTISTS} from './apartment.mjs';
 import {HOUSE_ARTISTS} from './house.mjs';
+import {HOTEL_ARTISTS} from './hotel.mjs';
+import {CLUB_ARTISTS} from './club.mjs';
 
 export const PROP_FAMILIES=PROPS.resources.catalog.data.families;
-const ARTISTS=Object.freeze({...CAFE_ARTISTS,...APARTMENT_ARTISTS,...HOUSE_ARTISTS});
+const ARTISTS=Object.freeze({...CAFE_ARTISTS,...APARTMENT_ARTISTS,...HOUSE_ARTISTS,...HOTEL_ARTISTS,...CLUB_ARTISTS});
 /** The pad round a piece's box its art may reach past (lips, drop shadows, a hearth), in px. */
 const PAD=8;
+/** The tempo a piece keeps when its host has no music to give it (`beat`, in beats since the start). */
+const BPM=140;
 for(const family of Object.keys(ARTISTS))if(!PROP_FAMILIES[family])throw new Error(`Prop artist ${family} has no family in the catalog`);
 
 /** Whether a family has a native artist. */
@@ -43,12 +47,13 @@ export function propArtPacket({appearance,position,rotation=0,width,height}){
     return {family:appearance.family,key,look,width,height,...piece,position:[...position],rotation};
 }
 
-/** The piece's draws in order: {key, bounds, matrix, build} for a still run, {matrix, build} for a live one. */
-export function createPropDraws(packet,{time=0}={}){
+/** The piece's draws in order: {key, bounds, matrix, build} for a still run, {matrix, build} for a live one.
+ *  `time` is in seconds; `beat` is the music's beat count (a club's kick), else counted from `time`. */
+export function createPropDraws(packet,{time=0,beat=null}={}){
     const artist=ARTISTS[packet.family],{width:w,height:h}=packet,loop=artist.loop;
     let frame=null;
     if(loop){frame=Math.round((time%loop.period)/loop.period*loop.frames)%loop.frames;time=frame*loop.period/loop.frames;}
-    const piece={width:w,height:h,face:packet.face,vertical:packet.vertical,variant:packet.variant,candles:packet.candles,seed:packet.seed,pick:picker(packet.seed),time};
+    const piece={width:w,height:h,face:packet.face,vertical:packet.vertical,variant:packet.variant,candles:packet.candles,seed:packet.seed,pick:picker(packet.seed),time,beat:beat??time*BPM/60};
     const [px,py]=packet.position,c=Math.cos(packet.rotation),s=Math.sin(packet.rotation);
     const pose=[c,s,-s,c,px,py],matrix=[c,s,-s,c,px-c*w/2+s*h/2,py-s*w/2-c*h/2],pad=artist.pad??PAD;
     const scene=fn=>()=>{const scene=new artScene();fn(scene);return scene.finish();};
@@ -65,8 +70,8 @@ export function createPropDraws(packet,{time=0}={}){
  * Draws a piece on a host Canvas pass (the migration boundary, as canvasRenderer.drawPackets): still
  * runs through `pictures` (a Basement pictureCache), live parts and the shadow as vector packets.
  */
-export function drawPropArt(context,packet,{pictures,time=0}){
-    for(const draw of createPropDraws(packet,{time})){
+export function drawPropArt(context,packet,{pictures,time=0,beat=null}){
+    for(const draw of createPropDraws(packet,{time,beat})){
         if(draw.key)pictures.draw(context,draw,draw.build);
         else{context.save();try{context.transform(...draw.matrix);canvasRenderer.drawPackets(context,draw.build());}finally{context.restore();}}
     }

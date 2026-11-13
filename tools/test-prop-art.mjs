@@ -1,5 +1,6 @@
 // Native prop art against the classic prop artwork, pixel by pixel in Chromium, for every piece in the
-// cafe, the apartment and the House of Death as it is placed there; the families and presets in the catalog; and the picture cache's
+// cafe, the apartment, the House of Death, the Double Nights lobby and suite and the Moon City
+// Nightclub as it is placed there; the families and presets in the catalog; and the picture cache's
 // stamps against the vector art.
 // Run: node --test tools/test-prop-art.mjs   (the pixel tests need Playwright with Chromium; skip without it)
 import test from 'node:test';
@@ -13,6 +14,9 @@ import { validatePropCatalog, validateMapLayout, resolvePlacement } from '../src
 import { PROP_FAMILIES, hasPropArt, propArtPacket, createPropDraws } from '../src/game/presentation/props/index.mjs';
 import PROPS from '../src/game/data/game-assets/props.json' with { type: 'json' };
 import CAFE from '../src/game/data/game-assets/maps/cozy_cafe_interior.json' with { type: 'json' };
+import LOBBY from '../src/game/data/game-assets/maps/hotel_lobby.json' with { type: 'json' };
+import SUITE from '../src/game/data/game-assets/maps/hotel_suite.json' with { type: 'json' };
+import CLUB from '../src/game/data/game-assets/maps/moon_city_nightclub.json' with { type: 'json' };
 import HOUSE from '../src/game/data/game-assets/maps/house_of_death.json' with { type: 'json' };
 import APARTMENT from '../src/game/data/game-assets/maps/apt_949.json' with { type: 'json' };
 import ITEMS from '../src/game/data/game-db/items.json' with { type: 'json' };
@@ -25,6 +29,8 @@ let chromium = null; try { ({ chromium } = createRequire(import.meta.url)('playw
 const CATALOG = PROPS.resources.catalog.data, TYPES = CATALOG.types;
 // A time on one of the plant's phase frames (frame 3 of 10 of its sway), so the classic clock and the native loop agree.
 const TIME = 3 * (2 * Math.PI / 0.8) / 10;
+// A beat count part way through a kick, so the club's pulsing pieces are mid-pulse
+const BEAT = 7.3;
 const piecesOf = map => map.props.filter(p => hasPropArt(resolvePlacement(p, TYPES).family)).map(p => ({ placement: p, ...resolvePlacement(p, TYPES) }));
 const PIECES = piecesOf(CAFE);
 // The apartment's pieces, and the clothing dyer's station once it is made (placed by the level, not the map)
@@ -34,12 +40,14 @@ const HOME = [...piecesOf(APARTMENT), { placement: { type: 'apt_dyer' }, ...DYER
 test('every family has an artist, every preset and every map placement fits its family', () => {
     assert.doesNotThrow(() => validatePropCatalog(CATALOG));
     for (const family of Object.keys(CATALOG.families)) assert.ok(hasPropArt(family), `${family} has a native artist`);
-    for (const [type, { defaults }] of Object.entries(TYPES)) if (/^(cc|apt|hod)_/.test(type)) assert.ok(hasPropArt(defaults.family), `${type} is a preset of a drawn family`);
+    for (const [type, { defaults }] of Object.entries(TYPES)) if (/^(cc|apt|hod|dn|ps|mc)_/.test(type) && !/lost|suitcase/.test(type)) assert.ok(hasPropArt(defaults.family), `${type} is a preset of a drawn family`);
     const maps = createMapLibraries()[1].resources;
     for (const id of MAP_IDS) assert.doesNotThrow(() => validateMapLayout(maps[id].data, TYPES, id, CATALOG.families));
     assert.equal(PIECES.length, CAFE.props.length - 2, 'every cafe piece but the vending machine and the tote is native');
     const classic = APARTMENT.props.filter(p => !resolvePlacement(p, TYPES).family).map(p => p.type).sort();
     assert.deepEqual([...new Set(HOUSE.props.filter(p => !resolvePlacement(p, TYPES).family).map(p => p.type))], ['ls_offering'], 'every House piece but the offering bowl (a stash) is native');
+    // The lost things (searched once a day, open once searched) stay with the stashes' classic art
+    for (const map of [LOBBY, SUITE, CLUB]) assert.deepEqual(map.props.filter(p => !resolvePlacement(p, TYPES).family && !/^(vending_machine|read_note)$/.test(p.type)).map(p => p.type).filter(t => !/lost|suitcase/.test(t)), [], 'every other piece is native');
     const cart = CATALOG.families.bar_cart.look;
     assert.deepEqual([cart.bottles.default[0], cart.bottles.default[2], cart.decanter.default], [ITEMS.drinks.red_wine.liquid, ITEMS.drinks.whiskey.liquid, ITEMS.drinks.whiskey.liquid], 'the bar cart pours what the bar does');
     assert.deepEqual([...new Set(classic)], ['armory', 'light_switch', 'medbay_refill', 'read_note', 'vending_machine'], 'every apartment piece but the machines, the switches and the note is native');
@@ -88,36 +96,39 @@ async function compare(pieces, venue) {
     const cells = pieces.map(p => ({ type: p.placement.type, x: p.x, y: p.y, w: p.width, h: p.height,
         classic: { x: p.x, y: p.y, width: p.width, height: p.height, decorType: p.decorType, decor: { face: p.face, vertical: !!p.vertical, candles: !!p.candles, variant: venue.variant?.(p) ?? p.variant | 0 } },
         native: propArtPacket({ appearance: p, position: [p.x + p.width / 2, p.y + p.height / 2], width: p.width, height: p.height }) }));
-    return inChromium(async ({ cells, time, venue }) => {
+    return inChromium(async ({ cells, time, beat, venue }) => {
+        for (const list of Object.values(venue.cuts)) for (const c of list) c.splice(0, 2, ...c.slice(0, 2).map(f => (0, eval)(f)));
         const { createPropDraws } = await import('/src/game/presentation/props/index.mjs'), { canvasRenderer } = await import('/src/engine/basement/rendering/index.mjs');
         const text = async url => (await fetch(url)).text(), source = await text('/src/legacy/entities/props-decor.js'), lamps = await text('/src/legacy/entities/lamps.js');
         const drinks = (await (await fetch('/src/game/data/game-db/items.json')).json()).drinks;
         // The classic art's hosts: a split run draws all its segments in order; a lamp fixture draws as the vector its sprite is painted from
-        const fixtures = lamps.slice(lamps.indexOf('        const FX_BRASS'), lamps.indexOf('        // An iron carriage lantern'));
-        const classic = (0, eval)(`(()=>{let _frameTime=${time * 1000};const PropPass={seg:()=>true},GLASS_DRINKS=${JSON.stringify(drinks)};
-            const _lampTint=c=>c;${fixtures};
-            function drawLampFixture(c,name,x,y,o={}){const s=o.scale||1;c.save();c.translate(x,y);c.scale(s,s);LAMP_FIXTURES[name].paint(c,!!o.lit,o.color);c.restore();}
+        const fixtures = lamps.slice(lamps.indexOf('        const FX_BRASS'), lamps.indexOf('        // An iron carriage lantern')) + lamps.slice(lamps.indexOf('        function _fxColor'), lamps.indexOf('        /** The sprite size for ctx'));
+        const classic = (0, eval)(`(()=>{let _frameTime=${time * 1000};const PropPass={seg:()=>true},clubBeatN=()=>${beat},GLASS_DRINKS=${JSON.stringify(drinks)};
+            const _lampTint=(hex,t)=>{const W=[255,246,228];return '#'+[1,3,5].map((i,j)=>{const v=parseInt(hex.slice(i,i+2),16);return Math.round(v+(W[j]-v)*t).toString(16).padStart(2,'0');}).join('');};${fixtures};
+            function drawLampFixture(c,name,x,y,o={}){const s=o.scale||1;c.save();c.translate(x,y);c.scale(s,s);LAMP_FIXTURES[name].paint(c,!!o.lit,_fxColor(o.color));c.restore();}
             ${source.slice(source.indexOf(venue.from), source.indexOf(venue.to))};return ${venue.drawer};})()`);
         const PAD = 16, draw = (cell, paint) => { const W = Math.ceil(cell.w + 2 * PAD), H = Math.ceil(cell.h + 2 * PAD), canvas = Object.assign(document.createElement('canvas'), { width: W, height: H }), ctx = canvas.getContext('2d');
             ctx.fillStyle = '#20202a'; ctx.fillRect(0, 0, W, H); ctx.translate(PAD - cell.x, PAD - cell.y); paint(ctx); return ctx.getImageData(0, 0, W, H).data; };
         return cells.map(cell => {
             const a = draw(cell, ctx => classic(ctx, cell.classic));
-            const b = draw(cell, ctx => { for (const d of createPropDraws(cell.native, { time }).slice(1)) { ctx.save(); ctx.transform(...d.matrix); canvasRenderer.drawPackets(ctx, d.build()); ctx.restore(); } });
-            let worst = 0, off = 0, inked = 0; for (let k = 0; k < a.length; k++) { const d = Math.abs(a[k] - b[k]); worst = Math.max(worst, d); if (d > 3) off++; }
+            const b = draw(cell, ctx => { for (const d of createPropDraws(cell.native, { time, beat }).slice(1)) { ctx.save(); ctx.transform(...d.matrix); canvasRenderer.drawPackets(ctx, d.build()); ctx.restore(); } });
+            const W = Math.ceil(cell.w + 2 * PAD), cut = k => (venue.cuts[cell.type] ?? []).some(([cx, cy, r]) => { const i = k >> 2, px = i % W - PAD + .5, py = (i / W | 0) - PAD + .5; return Math.hypot(px - cx(cell), py - cy(cell)) <= r + 1.5; });
+            let worst = 0, off = 0, inked = 0; for (let k = 0; k < a.length; k++) { if (cut(k)) continue; const d = Math.abs(a[k] - b[k]); worst = Math.max(worst, d); if (d > 3) off++; }
             for (let k = 0; k < a.length; k += 4) if (a[k] !== 0x20 || a[k + 1] !== 0x20 || a[k + 2] !== 0x2a) inked++;
-            let at = null; for (let k = 0; k < a.length; k++) if (Math.abs(a[k] - b[k]) === worst && worst) { const i = k >> 2, W = Math.ceil(cell.w + 2 * PAD); at = [i % W - PAD, (i / W | 0) - PAD, [...a.slice(i * 4, i * 4 + 4)], [...b.slice(i * 4, i * 4 + 4)]]; break; }
+            let at = null; for (let k = 0; k < a.length; k++) if (!cut(k) && Math.abs(a[k] - b[k]) === worst && worst) { const i = k >> 2; at = [i % W - PAD, (i / W | 0) - PAD, [...a.slice(i * 4, i * 4 + 4)], [...b.slice(i * 4, i * 4 + 4)]]; break; }
             return { type: cell.type, worst, off, inked, at };
         });
-    }, { cells, time: TIME, venue: { from: venue.from, to: venue.to, drawer: venue.drawer } });
+    }, { cells, time: TIME, beat: BEAT, venue: { from: venue.from, to: venue.to, drawer: venue.drawer, cuts: venue.cuts ?? {} } });
 }
 function assertParity(results) {
     if (process.env.PROP_ART_REPORT) console.log(results.map(r => `${r.type} off ${r.off} worst ${r.worst} ${JSON.stringify(r.at)}`).join('\n'));
     for (const r of results) {
         assert.ok(r.inked > 100, `${r.type} draws something (${r.inked} pixels)`);
         // A canvas antialiases a few edge pixels a shade apart between a fillRect and a path, and along a curve
-        // drawn under a transform instead of in world coordinates: every channel within 5/255, or a handful
+        // drawn under a transform instead of in world coordinates (most along a piece caught mid-bob at a
+        // fractional height, as a floating chaise): every channel within 6/255, or a handful
         // of edge channels (under 1% of the piece's) within 32/255. Each was checked by eye side by side.
-        assert.ok(r.worst <= 5 || (r.off < r.inked * 4 * .01 && r.worst <= 32), `${r.type} matches the classic art: ${r.off} channels off of ${r.inked * 4}, worst ${r.worst}`);
+        assert.ok(r.worst <= 6 || (r.off < r.inked * 4 * .01 && r.worst <= 32), `${r.type} matches the classic art: ${r.off} channels off of ${r.inked * 4}, worst ${r.worst}`);
     }
 }
 
@@ -133,6 +144,23 @@ test('native prop art matches the classic artwork pixel for pixel, for every pie
 test('native prop art matches the classic artwork pixel for pixel, for every House piece in the House of Death', { skip: !chromium && 'Playwright is not installed' }, async () => {
     assertParity(await compare(piecesOf(HOUSE).filter(p => p.placement.type.startsWith('hod_')), { from: '        const HOD = {', to: '        // Double Nights (hotel lobby)', drawer: 'drawHouseDecorProp' }));
 });
+
+// The classic art bit its crescents out with a destination-out composite, which also cut through what lay
+// beneath; the native crescents are shapes, so each crescent's disc and its bite (cx, cy, r in the piece's box)
+// are not compared: the bite itself differs by design, and a canvas antialiases a crescent's outline a little apart
+// from the plain circle it was cut from.
+const CUTS = {
+    ps_console: [['c => c.w / 2', 'c => c.h - 18', 2.6], ['c => c.w / 2 + 1.2', 'c => c.h - 18.6', 2.3]],
+    ps_desk: [['c => 110', 'c => 40', 2.4], ['c => 111.2', 'c => 39.4', 2.1]],
+    mc_stage: [['c => c.w / 2', 'c => 16', 9], ['c => c.w / 2 + 4', 'c => 14', 8]]
+};
+for (const [name, map, prefix, from, to, drawer] of [
+    ['the Double Nights lobby', LOBBY, 'dn_', '        const DNL = {', '        /* The two machines every map shares', 'drawLobbyDecorProp'],
+    ['the Double Nights suite', SUITE, 'ps_', '        const DNL = {', '        /* The Sanctum (sc_*)', 'drawSuiteDecorProp'],
+    ['the Moon City Nightclub', CLUB, 'mc_', '        const MC = {', '        /* The hub graveyard', 'drawClubDecorProp']])
+    test(`native prop art matches the classic artwork pixel for pixel, for every piece in ${name}`, { skip: !chromium && 'Playwright is not installed' }, async () => {
+        assertParity(await compare(piecesOf(map).filter(p => p.placement.type.startsWith(prefix)), { from, to, drawer, cuts: CUTS }));
+    });
 
 test('a stamped picture looks like the vector art it was painted from', { skip: !chromium && 'Playwright is not installed' }, async () => {
     const cells = ['cc_counter', 'cc_armchair', 'cc_bookshelf', 'cc_fireplace'].map(type => { const p = PIECES.find(q => q.placement.type === type);

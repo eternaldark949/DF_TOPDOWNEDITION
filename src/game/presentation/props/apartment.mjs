@@ -6,7 +6,7 @@
 // lamp library's fixtures, unlit (their light is drawn after the darkness).
 import {rect,circle,ellipse,polyline,linear} from '../../../engine/basement/rendering/index.mjs';
 import {box,disc,lines} from './draw.mjs';
-import {SHADES,fabricShade,brassPendant,fixtureAt} from './fixtures.mjs';
+import {SHADES,fabricShade,brassPendant,fixtureAt,fixtureColor} from './fixtures.mjs';
 
 /** Where the bar island's pendants hang along it (the lighting hangs its lights there too). */
 export const ISLAND_PENDANTS=[.17,.5,.83];
@@ -123,7 +123,7 @@ export const APARTMENT_ARTISTS={
             s.fill([ellipse(cx+Math.cos(a)*r*.55,cy+Math.sin(a)*r*.55,r*.55,r*.26,a+sway)],i%2?look.leaf:look.leaf_light);
         }
     });}},
-    floor_lamp:{draw(art,piece,look){art.still(s=>fixtureAt(s,piece.width/2,piece.height/2,piece.width/26,s=>fabricShade(s,SHADES[look.shade])));}},
+    floor_lamp:{draw(art,piece,look){art.still(s=>fixtureAt(s,piece.width/2,piece.height/2,piece.width/26,s=>fabricShade(s,SHADES[look.shade],{lit:look.lit,color:fixtureColor(look.light)})));}},   // (the hotel lobby's always burn)
     panel_fridge:{draw(art,piece,look){art.still(s=>{
         const {width:w,height:h}=piece;
         box(s,0,0,w,h,2,look.body);box(s,2,2,w-4,h-4,1.5,look.door);

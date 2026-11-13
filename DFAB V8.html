@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '53ed9dab13f9';
+        const DFAB_BUILD = '633349c3791a';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="14675">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="15253">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -18024,16 +18024,16 @@ const m70 = Object.freeze({default:{
           "cc_stove": {"defaults": {"color": "#3a2418", "decorType": "cc_stove", "family": "range_stove", "height": 46, "mass": 10000000, "width": 130}},
           "cooler": {"defaults": {"color": "#ccc", "decorType": "cooler", "height": 34, "mass": 10000000, "width": 34}},
           "desk": {"defaults": {"color": "#ccc", "decorType": "desk", "height": 34, "mass": 10000000, "width": 164}},
-          "dn_desk": {"defaults": {"color": "#1a1216", "decorType": "dn_desk", "height": 44, "mass": 10000000, "width": 230}},
-          "dn_float_chair": {"defaults": {"color": "#1a1216", "decorType": "dn_float_chair", "height": 40, "mass": 10000000, "width": 40}},
-          "dn_float_chaise": {"defaults": {"color": "#1a1216", "decorType": "dn_float_chaise", "height": 34, "mass": 10000000, "width": 92}},
-          "dn_fountain": {"defaults": {"color": "#1a1216", "decorType": "dn_fountain", "height": 110, "mass": 10000000, "width": 110}},
-          "dn_lamp": {"defaults": {"color": "#1a1216", "decorType": "dn_lamp", "height": 22, "mass": 10000000, "width": 22}},
+          "dn_desk": {"defaults": {"color": "#1a1216", "decorType": "dn_desk", "family": "reception_desk", "height": 44, "mass": 10000000, "width": 230}},
+          "dn_float_chair": {"defaults": {"color": "#1a1216", "decorType": "dn_float_chair", "family": "floating_seat", "height": 40, "mass": 10000000, "width": 40}},
+          "dn_float_chaise": {"defaults": {"color": "#1a1216", "decorType": "dn_float_chaise", "family": "floating_seat", "height": 34, "look": {"style": "chaise", "trim": "#dfe6ff"}, "mass": 10000000, "width": 92}},
+          "dn_fountain": {"defaults": {"color": "#1a1216", "decorType": "dn_fountain", "family": "rift_fountain", "height": 110, "mass": 10000000, "width": 110}},
+          "dn_lamp": {"defaults": {"color": "#1a1216", "decorType": "dn_lamp", "family": "floor_lamp", "height": 22, "look": {"lit": true, "light": "#fff0c8"}, "mass": 10000000, "width": 22}},
           "dn_lost_luggage": {"defaults": {"color": "#1a1216", "decorType": "dn_lost_luggage", "height": 20, "interactionType": "lost_luggage", "label": "Lost luggage", "mass": 10000000, "noNav": true, "noteId": "lobby_palm", "width": 28}},
-          "dn_palm": {"defaults": {"color": "#1a1216", "decorType": "dn_palm", "height": 34, "mass": 10000000, "width": 34}},
-          "dn_sofa": {"defaults": {"color": "#1a1216", "decorType": "dn_sofa", "height": 56, "mass": 10000000, "width": 120}},
-          "dn_table": {"defaults": {"color": "#1a1216", "decorType": "dn_table", "height": 38, "mass": 10000000, "width": 70}},
-          "dn_wingback": {"defaults": {"color": "#1a1216", "decorType": "dn_wingback", "height": 40, "mass": 10000000, "width": 40}},
+          "dn_palm": {"defaults": {"color": "#1a1216", "decorType": "dn_palm", "family": "potted_palm", "height": 34, "mass": 10000000, "width": 34}},
+          "dn_sofa": {"defaults": {"color": "#1a1216", "decorType": "dn_sofa", "family": "velvet_settee", "height": 56, "mass": 10000000, "width": 120}},
+          "dn_table": {"defaults": {"color": "#1a1216", "decorType": "dn_table", "family": "cocktail_table", "height": 38, "mass": 10000000, "width": 70}},
+          "dn_wingback": {"defaults": {"color": "#1a1216", "decorType": "dn_wingback", "family": "wingback_chair", "height": 40, "mass": 10000000, "width": 40}},
           "dp_altar": {"defaults": {"color": "#2a0c14", "decorType": "dp_altar", "height": 65, "mass": 10000000, "width": 100}},
           "dp_bench": {"defaults": {"color": "#2a0c14", "decorType": "dp_bench", "height": 24, "mass": 10000000, "width": 90}},
           "dp_brazier": {"defaults": {"color": "#2a0c14", "decorType": "dp_brazier", "height": 26, "mass": 10000000, "width": 26}},
@@ -18119,31 +18119,31 @@ const m70 = Object.freeze({default:{
           "ls_shopbag": {"defaults": {"color": "#3c2530", "decorType": "ls_shopbag", "height": 18, "interactionType": "lost_luggage", "label": "Dropped shopping bag", "lootLines": ["TISSUE PAPER… AND PERSONICS", "THE RECEIPT SAYS SHE CAN AFFORD IT", "ENNI COLE, NEVER CHEAP"], "lootMax": 70, "lootMin": 25, "mass": 10000000, "noNav": true, "noteId": "enni_bag", "width": 20}},
           "ls_tote": {"defaults": {"color": "#3a2418", "decorType": "ls_tote", "height": 16, "interactionType": "lost_luggage", "label": "Forgotten tote", "lootLines": ["A PAPERBACK, A SCARF… AND PERSONICS", "LEFT WITH THE LAST LATTE", "THE FIRE KEPT IT WARM"], "lootMax": 35, "lootMin": 10, "mass": 10000000, "noNav": true, "noteId": "cafe_tote", "width": 18}},
           "ls_tribute": {"defaults": {"color": "#2a0c14", "decorType": "ls_tribute", "height": 22, "interactionType": "lost_luggage", "label": "Tribute chest", "lootLines": ["LILITU WON'T MISS IT. SHE WILL NOTICE", "GOLD FOR THE QUEEN, NOW YOURS", "THE HINGES SCREAM…"], "lootMax": 150, "lootMin": 60, "lootNoise": 700, "mass": 10000000, "noNav": true, "noteId": "palace_tribute", "width": 30}},
-          "mc_backbar": {"defaults": {"color": "#1a0e22", "decorType": "mc_backbar", "height": 540, "mass": 10000000, "width": 24}},
-          "mc_bar": {"defaults": {"color": "#1a0e22", "decorType": "mc_bar", "height": 225, "mass": 10000000, "width": 44}},
-          "mc_bench": {"defaults": {"color": "#1a0e22", "decorType": "mc_bench", "height": 36, "mass": 10000000, "width": 120}},
-          "mc_booth": {"defaults": {"color": "#1a0e22", "decorType": "mc_booth", "height": 70, "mass": 10000000, "width": 130}},
-          "mc_coatcheck": {"defaults": {"color": "#1a0e22", "decorType": "mc_coatcheck", "height": 40, "mass": 10000000, "width": 150}},
-          "mc_crescent_sofa": {"defaults": {"color": "#1a0e22", "decorType": "mc_crescent_sofa", "height": 64, "mass": 10000000, "width": 190}},
-          "mc_dj": {"defaults": {"color": "#1a0e22", "decorType": "mc_dj", "height": 40, "mass": 10000000, "width": 140}},
-          "mc_dryer": {"defaults": {"color": "#1a0e22", "decorType": "mc_dryer", "height": 14, "mass": 10000000, "width": 44}},
-          "mc_hightop": {"defaults": {"color": "#1a0e22", "decorType": "mc_hightop", "height": 30, "mass": 10000000, "width": 30}},
+          "mc_backbar": {"defaults": {"color": "#1a0e22", "decorType": "mc_backbar", "family": "back_bar", "height": 540, "mass": 10000000, "width": 24}},
+          "mc_bar": {"defaults": {"color": "#1a0e22", "decorType": "mc_bar", "family": "club_bar", "height": 225, "mass": 10000000, "width": 44}},
+          "mc_bench": {"defaults": {"color": "#1a0e22", "decorType": "mc_bench", "family": "button_bench", "height": 36, "mass": 10000000, "width": 120}},
+          "mc_booth": {"defaults": {"color": "#1a0e22", "decorType": "mc_booth", "family": "club_booth", "height": 70, "mass": 10000000, "width": 130}},
+          "mc_coatcheck": {"defaults": {"color": "#1a0e22", "decorType": "mc_coatcheck", "family": "coat_check", "height": 40, "mass": 10000000, "width": 150}},
+          "mc_crescent_sofa": {"defaults": {"color": "#1a0e22", "decorType": "mc_crescent_sofa", "family": "crescent_sofa", "height": 64, "mass": 10000000, "width": 190}},
+          "mc_dj": {"defaults": {"color": "#1a0e22", "decorType": "mc_dj", "family": "dj_booth", "height": 40, "mass": 10000000, "width": 140}},
+          "mc_dryer": {"defaults": {"color": "#1a0e22", "decorType": "mc_dryer", "family": "hand_dryer", "height": 14, "mass": 10000000, "width": 44}},
+          "mc_hightop": {"defaults": {"color": "#1a0e22", "decorType": "mc_hightop", "family": "high_top", "height": 30, "mass": 10000000, "width": 30}},
           "mc_lost_clutch": {"defaults": {"color": "#1a0e22", "decorType": "mc_lost_clutch", "height": 12, "interactionType": "lost_luggage", "label": "Sequined clutch", "lootLines": ["LIPSTICK, A KEYCARD… AND PERSONICS", "SHE'LL CALL IT A NIGHT'S TIP", "LEFT WITH THE LAST SONG"], "lootMax": 60, "lootMin": 20, "mass": 10000000, "noNav": true, "noteId": "club_powder", "width": 20}},
           "mc_lost_coat": {"defaults": {"color": "#1a0e22", "decorType": "mc_lost_coat", "height": 26, "interactionType": "lost_luggage", "label": "Fur-trimmed coat", "lootLines": ["CHECK YOUR POCKETS, DARLING", "FOLDED BILLS IN THE LINING"], "lootMax": 90, "lootMin": 30, "mass": 10000000, "noNav": true, "noteId": "club_coat", "width": 40}},
           "mc_lost_handbag": {"defaults": {"color": "#1a0e22", "decorType": "mc_lost_handbag", "height": 16, "interactionType": "lost_luggage", "label": "Chain-strap handbag", "lootLines": ["DROPPED ON THE DANCE FLOOR", "FINDERS KEEPERS"], "lootMax": 75, "lootMin": 25, "mass": 10000000, "noNav": true, "noteId": "club_floor", "width": 20}},
           "mc_lost_purse": {"defaults": {"color": "#1a0e22", "decorType": "mc_lost_purse", "height": 16, "interactionType": "lost_luggage", "label": "Velvet purse", "lootLines": ["WHAT HAPPENS IN THE SUITES…", "VIP MONEY SPENDS THE SAME", "A THANK-YOU NOTE AND A THICK ROLL"], "lootMax": 120, "lootMin": 40, "mass": 10000000, "noNav": true, "noteId": "club_suite1", "width": 22}},
-          "mc_lowtable": {"defaults": {"color": "#1a0e22", "decorType": "mc_lowtable", "height": 60, "mass": 10000000, "width": 44}},
-          "mc_orb": {"defaults": {"color": "#1a0e22", "decorType": "mc_orb", "height": 30, "mass": 10000000, "width": 30}},
-          "mc_pole": {"defaults": {"color": "#1a0e22", "decorType": "mc_pole", "height": 10, "mass": 10000000, "width": 10}},
-          "mc_rope": {"defaults": {"color": "#1a0e22", "decorType": "mc_rope", "height": 110, "mass": 10000000, "width": 10}},
-          "mc_settee": {"defaults": {"color": "#1a0e22", "decorType": "mc_settee", "height": 120, "mass": 10000000, "width": 44}},
-          "mc_speaker": {"defaults": {"color": "#1a0e22", "decorType": "mc_speaker", "height": 72, "mass": 10000000, "width": 48}},
-          "mc_stage": {"defaults": {"color": "#1a0e22", "decorType": "mc_stage", "height": 104, "mass": 10000000, "width": 360}},
-          "mc_stall": {"defaults": {"color": "#1a0e22", "decorType": "mc_stall", "height": 84, "mass": 10000000, "width": 80}},
-          "mc_stool": {"defaults": {"color": "#1a0e22", "decorType": "mc_stool", "height": 20, "mass": 10000000, "width": 20}},
-          "mc_suite_couch": {"defaults": {"color": "#1a0e22", "decorType": "mc_suite_couch", "height": 200, "mass": 10000000, "width": 56}},
-          "mc_urinal": {"defaults": {"color": "#1a0e22", "decorType": "mc_urinal", "height": 20, "mass": 10000000, "width": 26}},
-          "mc_vanity": {"defaults": {"color": "#1a0e22", "decorType": "mc_vanity", "height": 40, "mass": 10000000, "width": 230}},
+          "mc_lowtable": {"defaults": {"color": "#1a0e22", "decorType": "mc_lowtable", "family": "champagne_table", "height": 60, "mass": 10000000, "width": 44}},
+          "mc_orb": {"defaults": {"color": "#1a0e22", "decorType": "mc_orb", "family": "moon_orb", "height": 30, "mass": 10000000, "width": 30}},
+          "mc_pole": {"defaults": {"color": "#1a0e22", "decorType": "mc_pole", "family": "dance_pole", "height": 10, "mass": 10000000, "width": 10}},
+          "mc_rope": {"defaults": {"color": "#1a0e22", "decorType": "mc_rope", "family": "velvet_rope", "height": 110, "mass": 10000000, "width": 10}},
+          "mc_settee": {"defaults": {"color": "#1a0e22", "decorType": "mc_settee", "family": "blush_settee", "height": 120, "mass": 10000000, "width": 44}},
+          "mc_speaker": {"defaults": {"color": "#1a0e22", "decorType": "mc_speaker", "family": "speaker_stack", "height": 72, "mass": 10000000, "width": 48}},
+          "mc_stage": {"defaults": {"color": "#1a0e22", "decorType": "mc_stage", "family": "club_stage", "height": 104, "mass": 10000000, "width": 360}},
+          "mc_stall": {"defaults": {"color": "#1a0e22", "decorType": "mc_stall", "family": "toilet_stall", "height": 84, "mass": 10000000, "width": 80}},
+          "mc_stool": {"defaults": {"color": "#1a0e22", "decorType": "mc_stool", "family": "club_stool", "height": 20, "mass": 10000000, "width": 20}},
+          "mc_suite_couch": {"defaults": {"color": "#1a0e22", "decorType": "mc_suite_couch", "family": "suite_couch", "height": 200, "mass": 10000000, "width": 56}},
+          "mc_urinal": {"defaults": {"color": "#1a0e22", "decorType": "mc_urinal", "family": "urinal", "height": 20, "mass": 10000000, "width": 26}},
+          "mc_vanity": {"defaults": {"color": "#1a0e22", "decorType": "mc_vanity", "family": "bulb_vanity", "height": 40, "mass": 10000000, "width": 230}},
           "medbay_refill": {"defaults": {"color": "#0f0", "height": 60, "interactionType": "medbay_refill", "mass": 10000000, "width": 40}},
           "monitor": {"defaults": {"color": "#ccc", "decorType": "monitor", "height": 20, "mass": 10000000, "width": 22}},
           "ns_console": {"defaults": {"decorType": "ns_console", "height": 80, "mass": 100000, "variant": 0, "width": 60}},
@@ -18155,24 +18155,24 @@ const m70 = Object.freeze({default:{
           "ns_table": {"defaults": {"decorType": "ns_table", "height": 64, "mass": 100000, "width": 80}},
           "ns_tree": {"defaults": {"decorType": "ns_tree", "height": 18, "mass": 100000, "width": 18}},
           "plant": {"defaults": {"color": "#ccc", "decorType": "plant", "height": 40, "mass": 10000000, "width": 40}},
-          "ps_bar": {"defaults": {"color": "#1a1216", "decorType": "ps_bar", "height": 200, "mass": 10000000, "width": 44}},
-          "ps_bed": {"defaults": {"color": "#1a1216", "decorType": "ps_bed", "height": 200, "mass": 10000000, "width": 180}},
-          "ps_chair": {"defaults": {"color": "#1a1216", "decorType": "ps_chair", "face": "E", "height": 30, "mass": 10000000, "width": 26}},
-          "ps_chaise": {"defaults": {"color": "#1a1216", "decorType": "ps_chaise", "height": 54, "mass": 10000000, "width": 110}},
-          "ps_console": {"defaults": {"color": "#1a1216", "decorType": "ps_console", "height": 80, "mass": 10000000, "width": 30}},
-          "ps_desk": {"defaults": {"color": "#1a1216", "decorType": "ps_desk", "height": 62, "mass": 10000000, "width": 160}},
-          "ps_dining": {"defaults": {"color": "#1a1216", "decorType": "ps_dining", "height": 70, "mass": 10000000, "width": 110}},
-          "ps_fireplace": {"defaults": {"color": "#1a1216", "decorType": "ps_fireplace", "height": 38, "mass": 10000000, "width": 160}},
-          "ps_lounger": {"defaults": {"color": "#1a1216", "decorType": "ps_lounger", "height": 88, "mass": 10000000, "width": 36}},
-          "ps_piano": {"defaults": {"color": "#1a1216", "decorType": "ps_piano", "height": 104, "mass": 10000000, "width": 150}},
-          "ps_pit_sofa": {"defaults": {"color": "#1a1216", "decorType": "ps_pit_sofa", "face": "S", "height": 56, "mass": 10000000, "width": 220}},
-          "ps_pit_table": {"defaults": {"color": "#1a1216", "decorType": "ps_pit_table", "height": 56, "mass": 10000000, "width": 80}},
-          "ps_pool": {"defaults": {"color": "#1a1216", "decorType": "ps_pool", "height": 74, "mass": 10000000, "width": 170}},
+          "ps_bar": {"defaults": {"color": "#1a1216", "decorType": "ps_bar", "family": "wine_wall_bar", "height": 200, "mass": 10000000, "width": 44}},
+          "ps_bed": {"defaults": {"color": "#1a1216", "decorType": "ps_bed", "family": "canopy_bed", "height": 200, "mass": 10000000, "width": 180}},
+          "ps_chair": {"defaults": {"color": "#1a1216", "decorType": "ps_chair", "face": "E", "family": "velvet_dining_chair", "height": 30, "mass": 10000000, "width": 26}},
+          "ps_chaise": {"defaults": {"color": "#1a1216", "decorType": "ps_chaise", "family": "window_chaise", "height": 54, "mass": 10000000, "width": 110}},
+          "ps_console": {"defaults": {"color": "#1a1216", "decorType": "ps_console", "family": "visitor_console", "height": 80, "mass": 10000000, "width": 30}},
+          "ps_desk": {"defaults": {"color": "#1a1216", "decorType": "ps_desk", "family": "writing_desk", "height": 62, "mass": 10000000, "width": 160}},
+          "ps_dining": {"defaults": {"color": "#1a1216", "decorType": "ps_dining", "family": "dinner_for_two", "height": 70, "mass": 10000000, "width": 110}},
+          "ps_fireplace": {"defaults": {"color": "#1a1216", "decorType": "ps_fireplace", "family": "marble_fireplace", "height": 38, "mass": 10000000, "width": 160}},
+          "ps_lounger": {"defaults": {"color": "#1a1216", "decorType": "ps_lounger", "family": "pool_lounger", "height": 88, "mass": 10000000, "width": 36}},
+          "ps_piano": {"defaults": {"color": "#1a1216", "decorType": "ps_piano", "family": "silver_grand", "height": 104, "mass": 10000000, "width": 150}},
+          "ps_pit_sofa": {"defaults": {"color": "#1a1216", "decorType": "ps_pit_sofa", "face": "S", "family": "pit_sofa", "height": 56, "mass": 10000000, "width": 220}},
+          "ps_pit_table": {"defaults": {"color": "#1a1216", "decorType": "ps_pit_table", "family": "pit_table", "height": 56, "mass": 10000000, "width": 80}},
+          "ps_pool": {"defaults": {"color": "#1a1216", "decorType": "ps_pool", "family": "plunge_pool", "height": 74, "mass": 10000000, "width": 170}},
           "ps_suitcase": {"defaults": {"color": "#1a1216", "decorType": "ps_suitcase", "height": 36, "interactionType": "lost_luggage", "label": "Monogrammed suitcase", "lootLines": ["HE TRAVELS HEAVY", "CUFFLINKS, A SILK TIE… AND PERSONICS", "10 OUT OF 10, WOULD ROB AGAIN"], "lootMax": 110, "lootMin": 40, "mass": 10000000, "noNav": true, "noteId": "suite_case", "width": 52}},
-          "ps_telescope": {"defaults": {"color": "#1a1216", "decorType": "ps_telescope", "height": 28, "mass": 10000000, "width": 28}},
-          "ps_tub": {"defaults": {"color": "#1a1216", "decorType": "ps_tub", "height": 84, "mass": 10000000, "width": 84}},
-          "ps_vanity": {"defaults": {"color": "#1a1216", "decorType": "ps_vanity", "height": 80, "mass": 10000000, "width": 24}},
-          "ps_wardrobe": {"defaults": {"color": "#1a1216", "decorType": "ps_wardrobe", "height": 150, "mass": 10000000, "width": 40}},
+          "ps_telescope": {"defaults": {"color": "#1a1216", "decorType": "ps_telescope", "family": "trained_telescope", "height": 28, "mass": 10000000, "width": 28}},
+          "ps_tub": {"defaults": {"color": "#1a1216", "decorType": "ps_tub", "family": "round_tub", "height": 84, "mass": 10000000, "width": 84}},
+          "ps_vanity": {"defaults": {"color": "#1a1216", "decorType": "ps_vanity", "family": "basin_vanity", "height": 80, "mass": 10000000, "width": 24}},
+          "ps_wardrobe": {"defaults": {"color": "#1a1216", "decorType": "ps_wardrobe", "family": "open_wardrobe", "height": 150, "mass": 10000000, "width": 40}},
           "read_note": {"defaults": {"color": "#c8a870", "height": 14, "interactionType": "read_note", "mass": 10000000, "noteId": "dark_maker_letter", "width": 20}},
           "sc_altar": {"defaults": {"color": "#1a1418", "decorType": "sc_altar", "height": 56, "mass": 10000000, "width": 140}},
           "sc_brazier": {"defaults": {"color": "#1a1418", "decorType": "sc_brazier", "height": 36, "mass": 10000000, "width": 36}},
@@ -18389,8 +18389,10 @@ const m70 = Object.freeze({default:{
             "pot_edge": {"kind": "color", "default": "#d8cbbd"},
             "leaf": {"kind": "color", "default": "#2f5a3e"},
             "leaf_light": {"kind": "color", "default": "#3f7a52"}}},
-          "floor_lamp": {"description": "A floor lamp from above: its pleated shade.", "look": {
-            "shade": {"kind": "choice", "values": ["shade_floor", "shade_table"], "default": "shade_floor", "note": "the lamp library fixture it wears"}}},
+          "floor_lamp": {"description": "A floor lamp from above: its pleated shade, unlit, or burning in its light's colour (the hotel lobby's always do).", "look": {
+            "shade": {"kind": "choice", "values": ["shade_floor", "shade_table"], "default": "shade_floor", "note": "the lamp library fixture it wears"},
+            "lit": {"kind": "boolean", "default": false, "note": "drawn burning: the cloth glows and the bulb shows"},
+            "light": {"kind": "color", "default": "#ffd9b0", "note": "the light's colour when it burns"}}},
           "panel_fridge": {"description": "A panelled fridge, a brass trim along the top, the doors meeting in the middle.", "look": {
             "body": {"kind": "color", "default": "#8e8986"},
             "door": {"kind": "color", "default": "#b6b1ad"},
@@ -18613,7 +18615,262 @@ const m70 = Object.freeze({default:{
           "floating_reliquary": {"description": "A glass case on a gold stand, a relic floating and bobbing inside.", "look": {
             "stand": {"kind": "color", "default": "#0e0b12"},
             "gold": {"kind": "color", "default": "#c9a46a"},
-            "relics": {"kind": "colors", "default": ["#ff8a6a", "#b48cff"], "note": "one is chosen per case, from where it stands"}}}
+            "relics": {"kind": "colors", "default": ["#ff8a6a", "#b48cff"], "note": "one is chosen per case, from where it stands"}}},
+          "rift_fountain": {"description": "The lobby fountain: a black-marble basin, water sheeting down a glass column round a turning rift, ripples spreading.", "look": {
+            "basin": {"kind": "color", "default": "#1b181e"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "water": {"kind": "color", "default": "#0f1a2a"},
+            "rift": {"kind": "colors", "default": ["rgba(232,194,122,0.9)", "rgba(190,130,255,0.9)"], "note": "the rift's two arms"}}},
+          "reception_desk": {"description": "A curved black-marble reception desk with a gold edge: the bell, the ledger, a rack of keys.", "look": {
+            "marble": {"kind": "color", "default": "#2e2934"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "gold_light": {"kind": "color", "default": "#fff1c2"},
+            "gold_dark": {"kind": "color", "default": "#a8823e"},
+            "ledger": {"kind": "color", "default": "#f3e6c8"},
+            "ribbon": {"kind": "color", "default": "#8a1024"},
+            "key_rack": {"kind": "color", "default": "#8a90a8"},
+            "keys": {"kind": "color", "default": "#dfe6ff"}}},
+          "velvet_settee": {"description": "A buttoned red-velvet sofa on gold feet, its back to the north or the south.", "look": {
+            "velvet": {"kind": "color", "default": "#6a0c1c"},
+            "velvet_dark": {"kind": "color", "default": "#4a0814"},
+            "seats": {"kind": "color", "default": "#b8203a"},
+            "feet": {"kind": "color", "default": "#e8c27a"},
+            "back": {"kind": "choice", "values": ["N", "S"], "default": "N", "note": "the side its back is on"}}},
+          "wingback_chair": {"description": "A red-velvet wingback chair, its back to the south or the north.", "look": {
+            "velvet": {"kind": "color", "default": "#6a0c1c"},
+            "velvet_dark": {"kind": "color", "default": "#4a0814"},
+            "seat": {"kind": "color", "default": "#b8203a"},
+            "back": {"kind": "choice", "values": ["N", "S"], "default": "S", "note": "the side its back is on"}}},
+          "cocktail_table": {"description": "An oval marble table on gold legs: two flutes of champagne and a vase of flowers.", "look": {
+            "top": {"kind": "color", "default": "#e9e4ea"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "vase": {"kind": "color", "default": "#0e0c10"},
+            "flowers": {"kind": "colors", "default": ["#e8b4b8", "#b8203a"], "note": "in turn"}}},
+          "potted_palm": {"description": "A palm in a gold urn, its fronds swaying a little.", "look": {
+            "urn": {"kind": "color", "default": "#0e0c10"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "leaf": {"kind": "color", "default": "#1f4a34"},
+            "leaf_light": {"kind": "color", "default": "#2f6a48"}}},
+          "floating_seat": {"description": "A chaise or a chair hanging in the air, bobbing over a faint gold hover-glow on the floor.", "look": {
+            "style": {"kind": "choice", "values": ["chaise", "chair"], "default": "chair"},
+            "frame": {"kind": "color", "default": "#2a0a14"},
+            "trim": {"kind": "color", "default": "#e8c27a"},
+            "cushion": {"kind": "color", "default": "#b8203a"},
+            "seat": {"kind": "color", "default": "#6a0c1c"}}},
+          "visitor_console": {"description": "A lacquer console by the elevator: the visitor book open, a crescent wax seal.", "look": {
+            "lacquer": {"kind": "color", "default": "#0e0c10"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "gold_dark": {"kind": "color", "default": "#a8823e"},
+            "paper": {"kind": "color", "default": "#f3e6c8"},
+            "ribbon": {"kind": "color", "default": "#8a1024"}}},
+          "pit_sofa": {"description": "One half of a round crimson conversation pit, curving about its table (it faces N or S).", "look": {
+            "velvet_dark": {"kind": "color", "default": "#4a0814"},
+            "velvet": {"kind": "color", "default": "#6a0c1c"},
+            "seat": {"kind": "color", "default": "#b8203a"},
+            "gold": {"kind": "color", "default": "#e8c27a"}}},
+          "pit_table": {"description": "A black-marble oval table: a bottle, two glasses (one drunk), a folded note.", "look": {
+            "marble": {"kind": "color", "default": "#1b181e"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "silver": {"kind": "color", "default": "#dfe6ff"},
+            "note": {"kind": "color", "default": "#f3e6c8"}}},
+          "silver_grand": {"description": "A silver-lacquered grand piano, the lid up, a page of music left open, its bench.", "look": {
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "gold_dark": {"kind": "color", "default": "#a8823e"},
+            "keybed": {"kind": "color", "default": "#0e0c10"},
+            "paper": {"kind": "color", "default": "#f3e6c8"},
+            "bench": {"kind": "color", "default": "#6a0c1c"}}},
+          "marble_fireplace": {"description": "A black-marble fireplace: a gold fender, embers glowing, burnt pages in the grate.", "look": {
+            "marble": {"kind": "color", "default": "#2e2934"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "firebox": {"kind": "color", "default": "#0a0608"}}},
+          "wine_wall_bar": {"description": "A black-lacquer bar against the west wall, a wine wall behind: a glass drunk, a glass full, a decanter.", "look": {
+            "lacquer": {"kind": "color", "default": "#140e14"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "gold_dark": {"kind": "color", "default": "#a8823e"},
+            "silver": {"kind": "color", "default": "#dfe6ff"},
+            "marble": {"kind": "color", "default": "#1b181e"},
+            "bottles": {"kind": "colors", "default": ["#4a0c1c", "#1e3a24"], "note": "red, and every third row green"}}},
+          "dinner_for_two": {"description": "A marble table laid for two: a runner, the plates, candles, one glass drunk and one not, petals.", "look": {
+            "top": {"kind": "color", "default": "#ece8ee"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "gold_dark": {"kind": "color", "default": "#a8823e"},
+            "runner": {"kind": "color", "default": "#8a1024"},
+            "silver": {"kind": "color", "default": "#dfe6ff"},
+            "silver_dark": {"kind": "color", "default": "#8a90a8"},
+            "wax": {"kind": "color", "default": "#f3e6c8"},
+            "petals": {"kind": "color", "default": "#b8203a"}}},
+          "velvet_dining_chair": {"description": "A velvet dining chair in a gold frame, its back away from its face.", "look": {
+            "velvet": {"kind": "color", "default": "#6a0c1c"},
+            "velvet_dark": {"kind": "color", "default": "#4a0814"},
+            "seat": {"kind": "color", "default": "#b8203a"},
+            "gold": {"kind": "color", "default": "#e8c27a"}}},
+          "canopy_bed": {"description": "A canopy king: black posts, crimson drapes, the covers thrown back, one pillow slept on.", "look": {
+            "frame": {"kind": "color", "default": "#140e14"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "gold_dark": {"kind": "color", "default": "#a8823e"},
+            "headboard": {"kind": "color", "default": "#2a0a14"},
+            "sheets": {"kind": "color", "default": "#f1ece6"},
+            "pillows": {"kind": "color", "default": "#fbf8f4"},
+            "cover": {"kind": "color", "default": "#6a0c1c"},
+            "cover_edge": {"kind": "color", "default": "#b8203a"},
+            "drapes": {"kind": "color", "default": "rgba(138,16,36,0.45)"}}},
+          "window_chaise": {"description": "A velvet chaise under the window, a gold cushion on it.", "look": {
+            "frame": {"kind": "color", "default": "#3a0a1c"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "velvet": {"kind": "color", "default": "#6a0c1c"},
+            "seat": {"kind": "color", "default": "#b8203a"},
+            "cushion": {"kind": "color", "default": "#e8c27a"}}},
+          "writing_desk": {"description": "His writing desk: chess mid-game, a captured piece, the card rating his stay, a crescent seal, candle stubs, a pen.", "look": {
+            "wood": {"kind": "color", "default": "#2a1a1e"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "gold_dark": {"kind": "color", "default": "#a8823e"},
+            "paper": {"kind": "color", "default": "#f3e6c8"},
+            "ink": {"kind": "color", "default": "#8a1024"},
+            "wax": {"kind": "color", "default": "#f3e6c8"},
+            "card_line_1": {"kind": "text", "default": "10/10"},
+            "card_line_2": {"kind": "text", "default": "would recommend"}}},
+          "open_wardrobe": {"description": "A wardrobe standing open, empty hangers on the rail, the doors swung out.", "look": {
+            "lacquer": {"kind": "color", "default": "#140e14"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "gold_dark": {"kind": "color", "default": "#a8823e"},
+            "silver_dark": {"kind": "color", "default": "#8a90a8"},
+            "doors": {"kind": "color", "default": "#1a1216"}}},
+          "round_tub": {"description": "A round marble tub, rose petals drifting slowly round.", "look": {
+            "marble": {"kind": "color", "default": "#f4f2f6"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "water": {"kind": "color", "default": "#b8d0e8"},
+            "petals": {"kind": "colors", "default": ["#c42a52", "#e04a6e"], "note": "in turn"}}},
+          "basin_vanity": {"description": "A marble vanity along the east wall: a basin, a perfume.", "look": {
+            "marble": {"kind": "color", "default": "#f0ecf2"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "gold_dark": {"kind": "color", "default": "#a8823e"},
+            "basin": {"kind": "color", "default": "#d8dce8"},
+            "silver_dark": {"kind": "color", "default": "#8a90a8"}}},
+          "plunge_pool": {"description": "A plunge pool: a tiled edge, water rippling slowly, the ladder.", "look": {
+            "tiles": {"kind": "color", "default": "#d8d0c4"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "water": {"kind": "colors", "default": ["#1e5a7a", "#0e2a44"], "note": "from the near edge to the far"},
+            "ladder": {"kind": "color", "default": "#dfe6ff"}}},
+          "pool_lounger": {"description": "A white lounger, a folded towel at its foot.", "look": {
+            "frame": {"kind": "color", "default": "#e8e4dc"},
+            "gold_dark": {"kind": "color", "default": "#a8823e"},
+            "cushion": {"kind": "color", "default": "#f8f6f2"},
+            "towel": {"kind": "color", "default": "#b8203a"}}},
+          "trained_telescope": {"description": "A brass telescope on a tripod, trained on the sky.", "look": {
+            "tripod": {"kind": "color", "default": "#2a2a30"},
+            "tube": {"kind": "color", "default": "#e8c27a"},
+            "tube_dark": {"kind": "color", "default": "#a8823e"}}},
+          "club_stage": {"description": "A raised black stage: a gold lip, a lavender LED strip along the front pulsing on the kick, the crescent on the backdrop.", "look": {
+            "lacquer": {"kind": "color", "default": "#1a1022"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "gold_dark": {"kind": "color", "default": "#a8823e"},
+            "logo": {"kind": "color", "default": "#c8a8ff"}}},
+          "dj_booth": {"description": "The DJ booth: two decks with their needles turning, a mixer with meters on the beat, a laptop, an LED strip.", "look": {
+            "booth": {"kind": "color", "default": "#120c18"},
+            "chrome_dark": {"kind": "color", "default": "#6a6e82"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "lilac": {"kind": "color", "default": "#e8d8ff"},
+            "lavender": {"kind": "color", "default": "#c8a8ff"},
+            "rose": {"kind": "color", "default": "#ff5a8a"}}},
+          "speaker_stack": {"description": "A speaker stack: two woofers breathing on the kick, a tweeter.", "look": {
+            "cabinet": {"kind": "color", "default": "#141018"},
+            "cabinet_edge": {"kind": "color", "default": "#2e2838"},
+            "chrome_dark": {"kind": "color", "default": "#6a6e82"}}},
+          "dance_pole": {"description": "A chrome dance pole from above, a gold collar.", "look": {
+            "chrome": {"kind": "color", "default": "#d8dcef"},
+            "chrome_dark": {"kind": "color", "default": "#6a6e82"},
+            "gold": {"kind": "color", "default": "#e8c27a"}}},
+          "high_top": {"description": "A round high-top: marble on a chrome ring, a cocktail, a candle.", "look": {
+            "marble": {"kind": "color", "default": "#ece6f0"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "chrome": {"kind": "color", "default": "#d8dcef"}}},
+          "club_booth": {"description": "A curved velvet booth round a marble table, facing north: flutes and a candle.", "look": {
+            "velvet_dark": {"kind": "color", "default": "#3a0620"},
+            "velvet_light": {"kind": "color", "default": "#8a1a52"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "marble": {"kind": "color", "default": "#ece6f0"}}},
+          "back_bar": {"description": "A mirrored back bar: shelves of bottles lit from beneath.", "look": {
+            "lacquer": {"kind": "color", "default": "#150e1c"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "gold_dark": {"kind": "color", "default": "#a8823e"},
+            "bottles": {"kind": "colors", "default": ["#b8f0c0", "#ffd08a", "#ff8ab0", "#c8a8ff", "#9ad8ff", "#fff2d8", "#e8a060"], "note": "in turn, from where the bar stands"}}},
+          "club_bar": {"description": "The bar counter: black marble veined gold, a curved gold rail, a row of gold taps, glasses waiting.", "look": {
+            "top": {"kind": "color", "default": "#2a2234"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "gold_dark": {"kind": "color", "default": "#a8823e"},
+            "gold_light": {"kind": "color", "default": "#fff1c2"},
+            "chrome": {"kind": "color", "default": "#d8dcef"}}},
+          "club_stool": {"description": "A chrome bar stool, a velvet seat.", "look": {
+            "chrome": {"kind": "color", "default": "#d8dcef"},
+            "chrome_dark": {"kind": "color", "default": "#6a6e82"},
+            "seat": {"kind": "color", "default": "#8a1a52"}}},
+          "coat_check": {"description": "The coat check: a lacquer counter, a bell, tickets, a screen; the coat rail behind.", "look": {
+            "lacquer": {"kind": "color", "default": "#1a1022"},
+            "lacquer_light": {"kind": "color", "default": "#2a1a36"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "gold_light": {"kind": "color", "default": "#fff1c2"},
+            "chrome_dark": {"kind": "color", "default": "#6a6e82"},
+            "lilac": {"kind": "color", "default": "#e8d8ff"},
+            "coats": {"kind": "colors", "default": ["#2a1a36", "#5a0c34", "#1e2a3a", "#3a3040", "#8a1a52", "#1a1a1e", "#4a3a60"], "note": "along the rail, in turn"}}},
+          "velvet_rope": {"description": "A velvet rope sagging between chrome-and-gold stanchions, swaying; along its length either way.", "look": {
+            "rope": {"kind": "color", "default": "#8a1a52"},
+            "chrome": {"kind": "color", "default": "#d8dcef"},
+            "chrome_dark": {"kind": "color", "default": "#6a6e82"},
+            "gold": {"kind": "color", "default": "#e8c27a"}}},
+          "button_bench": {"description": "A buttoned velvet bench on gold feet.", "look": {
+            "velvet": {"kind": "color", "default": "#5a0c34"},
+            "seat": {"kind": "color", "default": "#8a1a52"},
+            "gold": {"kind": "color", "default": "#e8c27a"}}},
+          "moon_orb": {"description": "A moon floating and turning slowly over a black plinth.", "look": {
+            "plinth": {"kind": "color", "default": "#1a1022"},
+            "gold_dark": {"kind": "color", "default": "#a8823e"},
+            "moon": {"kind": "color", "default": "#e8d8ff"},
+            "moon_dark": {"kind": "color", "default": "#9a86c8"}}},
+          "bulb_vanity": {"description": "A marble vanity: round sinks, a mirror strip on the wall side lit with flickering bulbs (facing N, the mirror is to the south).", "look": {
+            "marble": {"kind": "color", "default": "#ece6f0"},
+            "marble_dark": {"kind": "color", "default": "#b8aec4"},
+            "porcelain": {"kind": "color", "default": "#f4f2f8"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "gold_dark": {"kind": "color", "default": "#a8823e"},
+            "lilac": {"kind": "color", "default": "#e8d8ff"}}},
+          "toilet_stall": {"description": "A stall against the west wall: tiles, the bowl and cistern, lacquer partitions, the door ajar a hair, VACANT.", "look": {
+            "tile": {"kind": "color", "default": "#dcd6e4"},
+            "porcelain": {"kind": "color", "default": "#f4f2f8"},
+            "marble_dark": {"kind": "color", "default": "#b8aec4"},
+            "partition": {"kind": "color", "default": "#2a1a36"},
+            "door": {"kind": "color", "default": "#1a1022"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "gold_dark": {"kind": "color", "default": "#a8823e"}}},
+          "urinal": {"description": "A wall-hung porcelain urinal, a gold flush plate.", "look": {
+            "porcelain": {"kind": "color", "default": "#f4f2f8"},
+            "marble_dark": {"kind": "color", "default": "#b8aec4"},
+            "gold": {"kind": "color", "default": "#e8c27a"}}},
+          "hand_dryer": {"description": "A chrome hand dryer, a blue ready-light (vertical on a side wall).", "look": {
+            "chrome": {"kind": "color", "default": "#d8dcef"},
+            "chrome_dark": {"kind": "color", "default": "#6a6e82"},
+            "light": {"kind": "color", "default": "#7fd0ff"}}},
+          "blush_settee": {"description": "A tufted blush chaise on gold feet, the back against the east side, a cushion.", "look": {
+            "fabric": {"kind": "color", "default": "#c96a8e"},
+            "fabric_dark": {"kind": "color", "default": "#a84e72"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "cushion": {"kind": "color", "default": "#e8d8ff"}}},
+          "crescent_sofa": {"description": "A crescent of wine velvet with its back to the north wall, two cushions.", "look": {
+            "velvet_dark": {"kind": "color", "default": "#3a0620"},
+            "velvet": {"kind": "color", "default": "#5a0c34"},
+            "velvet_light": {"kind": "color", "default": "#8a1a52"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "cushions": {"kind": "colors", "default": ["#e8c27a", "#e8d8ff"]}}},
+          "champagne_table": {"description": "A black-glass low table on gold: champagne on ice, two flutes, rose petals.", "look": {
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "chrome": {"kind": "color", "default": "#d8dcef"},
+            "chrome_dark": {"kind": "color", "default": "#6a6e82"},
+            "petals": {"kind": "colors", "default": ["#c42a52", "#e04a6e"], "note": "in turn"}}},
+          "suite_couch": {"description": "A long velvet couch, its back against the east wall, facing west; two cushions.", "look": {
+            "velvet_dark": {"kind": "color", "default": "#3a0620"},
+            "velvet": {"kind": "color", "default": "#5a0c34"},
+            "velvet_light": {"kind": "color", "default": "#8a1a52"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "cushions": {"kind": "colors", "default": ["#e8c27a", "#e8d8ff"]}}}
         }
       }
     }
@@ -31283,10 +31540,12 @@ const {circle} = m154;
 
 const FACE={S:0,W:Math.PI/2,N:Math.PI,E:-Math.PI/2};
 
-/** A filled and/or outlined rounded box, as the classic art's `rr`: the backend's own rounded rectangle, so its corners are a canvas roundRect's exactly. */
+/** A filled and/or outlined rounded box, as the classic art's `rr`: the backend's own rounded rectangle, so its corners are a canvas roundRect's exactly. A gradient fill is drawn in the box's own frame, about its centre. */
 function box(s,x,y,w,h,r,fill,stroke,width=1){s.enter({position:[x+w/2,y+h/2]});s.paint({type:'rect',size:[w,h],radius:r},{fill:fill??null,stroke:stroke??null,stroke_width:width});s.leave();}
 /** A filled and/or outlined circle, as the classic art's `circ`. */
 function disc(s,cx,cy,r,fill,stroke,width=1){s.paint([circle(cx,cy,r)],{fill:fill??null,stroke:stroke??null,stroke_width:width});}
+/** Separate discs [x, y, r] as one path: each its own subpath, so a fill never joins them. */
+function dots(points){return points.flatMap(([x,y,r])=>[['move',x+r,y],circle(x,y,r)]);}
 /** Straight segments [x1, y1, x2, y2] stroked as one path. */
 function lines(s,segments,color,width){s.stroke(segments.flatMap(([a,b,c,d])=>[['move',a,b],['line',c,d]]),color,width);}
 /** One of `list`, chosen by the piece's number `k`: the first above one half, as the classic art chose between two. */
@@ -31296,8 +31555,20 @@ function turned(s,piece,fn){
     const a=FACE[piece.face]??0,side=Math.abs(Math.sin(a))>.5,W=side?piece.height:piece.width,H=side?piece.width:piece.height;
     s.enter({position:[piece.width/2,piece.height/2],rotation:a});fn(-W/2,-H/2,W,H);s.leave();
 }
+/**
+ * A crescent: the disc (cx, cy, r) with the disc (bx, by, br) bitten out of it, as one closed outline
+ * (the far arc of the first circle, then back along the bite). The classic art cut the bite with a
+ * destination-out composite, which also cut through whatever lay beneath; this keeps what is beneath.
+ */
+function crescent(cx,cy,r,bx,by,br){
+    const dx=bx-cx,dy=by-cy,d=Math.hypot(dx,dy),phi=Math.atan2(dy,dx);
+    const a=(r*r-br*br+d*d)/(2*d),alpha=Math.acos(Math.max(-1,Math.min(1,a/r))),beta=Math.acos(Math.max(-1,Math.min(1,(d-a)/br)));
+    // The first circle from one meeting point round its far side to the other; the bite's circle back through the side that faces it.
+    return [['ellipse',cx,cy,r,r,0,phi+alpha,phi+TAU-alpha,0],['ellipse',bx,by,br,br,0,phi+Math.PI+beta,phi+Math.PI-beta,1],['close']];
+}
+const TAU=Math.PI*2;
 
-return Object.freeze({get FACE(){return FACE;},get box(){return box;},get disc(){return disc;},get lines(){return lines;},get choose(){return choose;},get turned(){return turned;}});
+return Object.freeze({get FACE(){return FACE;},get box(){return box;},get disc(){return disc;},get dots(){return dots;},get lines(){return lines;},get choose(){return choose;},get turned(){return turned;},get crescent(){return crescent;}});
 })();
 // src/game/presentation/props/cafe.mjs
 const m194 = (()=>{
@@ -31519,9 +31790,9 @@ return Object.freeze({get CAFE_ARTISTS(){return CAFE_ARTISTS;}});
 })();
 // src/game/presentation/props/fixtures.mjs
 const m197 = (()=>{
-// Lamp fixtures that stand on furniture, seen from above and unlit (their light is drawn after the
-// darkness, by the lighting): the pleated fabric shades of a table or floor lamp, and a spun-brass
-// pendant. Each draws centred on (0, 0) in the scene's current group, at its own size.
+// Lamp fixtures that stand on furniture, seen from above: the pleated fabric shades of a table or
+// floor lamp, unlit (their light is drawn after the darkness, by the lighting) or burning (the hotel
+// lobby's), and a spun-brass pendant. Each draws centred on (0, 0) in the scene's current group, at its own size.
 const {circle,ellipse,radial,linear} = m154;
 const {lines} = m195;
 
@@ -31531,25 +31802,37 @@ const SHADES={
     shade_floor:{R:13,r0:5,pleats:26,fabric:['#f4ead8','#cdb89a'],trim:'#6e4a22'},
     shade_table:{R:9,r0:3.6,pleats:16,fabric:['#f6ecdc','#d6c2a4'],trim:'#7a2e3c'}
 };
+const channels=hex=>[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)),toHex=v=>'#'+v.map(c=>Math.round(c).toString(16).padStart(2,'0')).join('');
+/** The lamp library's colour helpers: darkened (f < 1) or lifted towards white (f > 1, by f - 1); mixed t of the way to b; tinted t of the way to warm white. */
+const shadeHex=(hex,f)=>toHex(channels(hex).map(v=>f<=1?v*f:v+(255-v)*(f-1)));
+const mixHex=(a,b,t)=>{const v=channels(b);return toHex(channels(a).map((u,i)=>u+(v[i]-u)*t));};
+const tintHex=(hex,t)=>{const W=[255,246,228];return toHex(channels(hex).map((v,i)=>v+(W[i]-v)*t));};
+/** A fixture's glass colour: the lamp's own, or warm white when that's missing or a dull grey. */
+function fixtureColor(color){
+    if(!/^#[0-9a-f]{6}$/i.test(color||''))return '#ffeebb';
+    const v=channels(color);return Math.max(...v)-Math.min(...v)<24&&Math.max(...v)<200?'#ffe2b8':color;
+}
 function fixtureShadow(s,r){s.fill([ellipse(1.6,2.2,r,r*.94)],'rgba(0,0,0,0.26)');}
 function brassKnob(s,x,y,r){s.fill([circle(x,y,r)],radial([x-r*.4,y-r*.45],r*.05,[x,y],r,[[0,BRASS[0]],[.5,BRASS[1]],[1,BRASS[2]]]));}
 
-/** A pleated fabric shade: the cloth falling from the top ring to a braided rim, the dark socket seen down through the top. */
-function fabricShade(s,{R,r0,pleats,fabric,trim}){
+/** A pleated fabric shade: the cloth falling from the top ring to a braided rim, the socket seen down
+ *  through the top; burning (`lit`, in the light's `color`), the cloth glows, hottest by the bulb. */
+function fabricShade(s,{R,r0,pleats,fabric,trim},{lit=false,color='#ffeebb'}={}){
     fixtureShadow(s,R+.6);
     const rim=[];
     for(let i=0;i<=pleats*4;i++){const a=i/(pleats*4)*TAU,r=R-.55*(1-Math.abs(Math.cos(a*pleats/2)));rim.push([i?'line':'move',Math.cos(a)*r,Math.sin(a)*r]);}
     rim.push(['close']);
-    s.fill(rim,radial([0,0],r0,[0,0],R,[[0,fabric[0]],[1,fabric[1]]]));
+    const cloth=mixHex(fabric[0],color,.6);
+    s.fill(rim,radial([0,0],r0,[0,0],R,lit?[[0,shadeHex(mixHex(cloth,'#f0a050',.15),.97)],[.35,shadeHex(mixHex(cloth,'#e08840',.22),.82)],[1,shadeHex(mixHex(cloth,'#b85a24',.3),.56)]]:[[0,fabric[0]],[1,fabric[1]]]));
     const step=TAU/pleats,folds=[],crests=[];                  // every other fold in shadow, a crest of light between
     for(let i=0;i<pleats;i++){const a=i*step;folds.push(['move',Math.cos(a)*r0,Math.sin(a)*r0],ellipse(0,0,R-.5,R-.5,0,a,a+step*.5),ellipse(0,0,r0,r0,0,a+step*.5,a,1),['close']);}
-    s.fill(folds,'rgba(90, 60, 40, 0.16)');
+    s.fill(folds,lit?'rgba(110, 40, 8, 0.3)':'rgba(90, 60, 40, 0.16)');
     for(let i=0;i<pleats;i++){const b=(i+.75)*step;crests.push([Math.cos(b)*(r0+.8),Math.sin(b)*(r0+.8),Math.cos(b)*(R-.9),Math.sin(b)*(R-.9)]);}
-    lines(s,crests,'rgba(255, 255, 255, 0.22)',.45);
-    s.fill([circle(0,0,R-.4)],linear([-R,-R],[R,R],[[0,'rgba(255, 255, 255, 0.16)'],[.55,'rgba(255, 255, 255, 0)'],[1,'rgba(40, 20, 10, 0.18)']]));   // daylight on the far slope
+    lines(s,crests,lit?'rgba(255, 236, 200, 0.4)':'rgba(255, 255, 255, 0.22)',.45);
+    if(!lit)s.fill([circle(0,0,R-.4)],linear([-R,-R],[R,R],[[0,'rgba(255, 255, 255, 0.16)'],[.55,'rgba(255, 255, 255, 0)'],[1,'rgba(40, 20, 10, 0.18)']]));   // daylight on the far slope
     s.stroke([circle(0,0,R-1)],trim,1.3);
     s.stroke([circle(0,0,R-1.2,Math.PI*1.05,Math.PI*1.65)],'rgba(255, 240, 200, 0.35)',.4);
-    s.outlined([circle(0,0,r0)],'#3a2e28',BRASS[1],.9);        // the socket, its brass ring and the harp's spider
+    s.outlined([circle(0,0,r0)],lit?radial([0,0],0,[0,0],r0,[[0,'#ffffff'],[.55,'#fff6e0'],[1,tintHex(color,.5)]]):'#3a2e28',BRASS[1],.9);   // the bulb or its socket, the brass ring, the harp's spider
     lines(s,[[-r0,0,r0,0],[0,-r0,0,r0]],BRASS[2],.6);
     brassKnob(s,0,0,Math.max(1.2,r0*.3));
     s.fill([circle(-.4,-.45,.4)],'rgba(255, 250, 230, 0.8)');
@@ -31565,7 +31848,7 @@ function brassPendant(s){
 /** Draws `fn` centred at (x, y), `scale` times its own size. */
 function fixtureAt(s,x,y,scale,fn){s.enter({position:[x,y],scale:[scale,scale]});fn(s);s.leave();}
 
-return Object.freeze({get SHADES(){return SHADES;},get fabricShade(){return fabricShade;},get brassPendant(){return brassPendant;},get fixtureAt(){return fixtureAt;}});
+return Object.freeze({get SHADES(){return SHADES;},get fixtureColor(){return fixtureColor;},get fabricShade(){return fabricShade;},get brassPendant(){return brassPendant;},get fixtureAt(){return fixtureAt;}});
 })();
 // src/game/presentation/props/apartment.mjs
 const m196 = (()=>{
@@ -31577,7 +31860,7 @@ const m196 = (()=>{
 // lamp library's fixtures, unlit (their light is drawn after the darkness).
 const {rect,circle,ellipse,polyline,linear} = m154;
 const {box,disc,lines} = m195;
-const {SHADES,fabricShade,brassPendant,fixtureAt} = m197;
+const {SHADES,fabricShade,brassPendant,fixtureAt,fixtureColor} = m197;
 
 /** Where the bar island's pendants hang along it (the lighting hangs its lights there too). */
 const ISLAND_PENDANTS=[.17,.5,.83];
@@ -31694,7 +31977,7 @@ const APARTMENT_ARTISTS={
             s.fill([ellipse(cx+Math.cos(a)*r*.55,cy+Math.sin(a)*r*.55,r*.55,r*.26,a+sway)],i%2?look.leaf:look.leaf_light);
         }
     });}},
-    floor_lamp:{draw(art,piece,look){art.still(s=>fixtureAt(s,piece.width/2,piece.height/2,piece.width/26,s=>fabricShade(s,SHADES[look.shade])));}},
+    floor_lamp:{draw(art,piece,look){art.still(s=>fixtureAt(s,piece.width/2,piece.height/2,piece.width/26,s=>fabricShade(s,SHADES[look.shade],{lit:look.lit,color:fixtureColor(look.light)})));}},   // (the hotel lobby's always burn)
     panel_fridge:{draw(art,piece,look){art.still(s=>{
         const {width:w,height:h}=piece;
         box(s,0,0,w,h,2,look.body);box(s,2,2,w-4,h-4,1.5,look.door);
@@ -32060,6 +32343,438 @@ const HOUSE_ARTISTS={
 
 return Object.freeze({get HOUSE_ARTISTS(){return HOUSE_ARTISTS;}});
 })();
+// src/game/presentation/props/hotel.mjs
+const m199 = (()=>{
+// The Double Nights hotel's furniture families: the lobby (dn_*) and the penthouse suite (ps_*), in
+// the hotel's black marble, gold, silver and crimson velvet. Drawn on the art toolkit as the other
+// venues' are. The lobby's floating seats hang and bob on a hover-glow, live; the suite is left as
+// the Dark Maker left it (one glass drunk, the chess game unfinished, the wardrobe open).
+const {rect,circle,ellipse,polyline,linear} = m154;
+const {box,disc,lines,crescent,dots} = m195;
+
+const TAU=Math.PI*2;
+const rects=list=>list.flatMap(([x,y,w,h])=>rect(x,y,w,h));
+/** A wine glass from above: drunk (an empty bowl) or full. */
+function glass(s,gx,gy,drunk,silver){disc(s,gx,gy,3,drunk?'rgba(255,240,220,0.35)':'rgba(150,20,40,0.85)',silver,.7);if(!drunk)disc(s,gx-.8,gy-.8,.8,'rgba(255,200,210,0.6)');}
+const candle=(s,cx,cy,look)=>disc(s,cx,cy,2.2,look.wax,look.gold_dark,.5);
+/** A crimson wax seal pressed with the crescent. */
+function seal(s,cx,cy,r,inner,bite){disc(s,cx,cy,r,'#b8203a','#5a0a18',.8);s.fill(crescent(cx,cy,inner,cx+bite[0],cy+bite[1],bite[2]),'#ffd0d8');}
+
+const HOTEL_ARTISTS={
+    // ----- The lobby ------------------------------------------------------------------------------
+    rift_fountain:{draw(art,piece,look){                                 // black marble, water sheeting down a glass column round a turning rift
+        const {width:w,height:h}=piece,cx=w/2,cy=h/2,R=w/2;
+        art.still(s=>{disc(s,cx,cy,R,look.basin,look.gold,2);disc(s,cx,cy,R-5,null,'rgba(223,230,255,0.35)',1);disc(s,cx,cy,R-8,look.water);});
+        art.live(s=>{for(let i=0;i<3;i++){const ph=(piece.time*.45+i/3)%1;s.enter({},{opacity:1-ph});disc(s,cx,cy,22+ph*(R-32),null,'rgba(180,210,255,0.45)',1);s.leave();}});
+        art.still(s=>disc(s,cx,cy,22,'rgba(200,220,255,0.10)','rgba(223,230,255,0.7)',1.5));   // the glass column
+        art.live(s=>{
+            s.enter({position:[cx,cy],rotation:(piece.time*.5)%TAU});
+            for(let k=0;k<2;k++){
+                s.place({rotation:Math.PI});
+                const arm=[];for(let i=0;i<=20;i++){const a=i/20*Math.PI*1.4,r=3+i*.75;arm.push([Math.cos(a)*r,Math.sin(a)*r]);}
+                s.stroke(polyline(arm),k?look.rift[0]:look.rift[1%look.rift.length],2.2);
+            }
+            s.leave();
+        });
+        art.still(s=>disc(s,cx,cy,3,'#fff6e0'));
+    }},
+    reception_desk:{draw(art,piece,look){art.still(s=>{                 // curved black marble, a gold edge; the bell, the ledger, the keys
+        const {width:w,height:h}=piece,cx=w/2;
+        s.outlined([['move',0,0],['quadratic',cx,h*.9,w,0],['line',w,h*.5],['quadratic',cx,h*1.5,0,h*.5],['close']],look.marble,look.gold,2.5);
+        const veins=[];for(let i=0;i<5;i++)veins.push(['move',20+i*45,6],['quadratic',40+i*45,20,30+i*45,34]);s.stroke(veins,'rgba(223,230,255,0.22)',1);
+        disc(s,34,12,5,look.gold,look.gold_light,1);disc(s,34,12,1.5,look.gold_light);
+        box(s,cx-12,16,24,14,1,look.ledger,look.gold_dark,.8);s.fill(rect(cx-.5,16,1,14),look.ribbon);
+        box(s,w-58,6,30,10,1,look.key_rack);for(let i=0;i<6;i++)disc(s,w-54+i*4.4,11,1.3,look.keys);
+    });}},
+    velvet_settee:{draw(art,piece,look){art.still(s=>{                  // buttoned red velvet on gold feet, the back to the north or south
+        const {width:w,height:h}=piece,north=look.back==='N';
+        box(s,0,0,w,h,10,look.velvet);
+        box(s,2,north?0:h-16,w-4,16,8,look.velvet_dark);
+        box(s,0,4,14,h-8,6,look.velvet_dark);box(s,w-14,4,14,h-8,6,look.velvet_dark);
+        s.fill(dots([0,1,2,3,4].map(i=>[22+i*(w-44)/4,north?8:h-8,1.3])),'rgba(255,200,210,0.35)');
+        box(s,16,north?18:6,(w-34)/2,h-26,5,look.seats);box(s,w/2+1,north?18:6,(w-34)/2,h-26,5,look.seats);
+        s.fill(rects([[2,2,3,3],[w-5,2,3,3],[2,h-5,3,3],[w-5,h-5,3,3]]),look.feet);
+    });}},
+    wingback_chair:{draw(art,piece,look){art.still(s=>{
+        const {width:w,height:h}=piece;
+        box(s,0,0,w,h,6,look.velvet);
+        box(s,2,look.back==='S'?h-12:0,w-4,12,5,look.velvet_dark);box(s,0,4,8,h-8,4,look.velvet_dark);box(s,w-8,4,8,h-8,4,look.velvet_dark);
+        box(s,10,8,w-20,h-20,4,look.seat);
+    });}},
+    cocktail_table:{draw(art,piece,look){art.still(s=>{                 // a marble top on gold legs: champagne and a vase
+        const {width:w,height:h}=piece;
+        box(s,0,0,w,h,h/2,look.top,look.gold,2);
+        s.stroke([['move',10,8],['quadratic',w/2,h*.7,w-12,10]],'rgba(120,110,130,0.35)',.8);
+        disc(s,w*.3,h/2,3,'rgba(255,240,200,0.9)',look.gold,.8);disc(s,w*.42,h/2+3,3,'rgba(255,240,200,0.9)',look.gold,.8);   // flutes
+        disc(s,w*.72,h/2,6,look.vase,look.gold,1);
+        for(let i=0;i<5;i++)disc(s,w*.72+Math.cos(i*1.26)*4,h/2+Math.sin(i*1.26)*4,2,look.flowers[(i+1)%look.flowers.length]);
+    });}},
+    potted_palm:{loop:{period:2*Math.PI/.8,frames:10},pad:10,draw(art,piece,look){art.still(s=>{   // a palm in a gold urn, swaying a little
+        const {width:w,height:h}=piece,cx=w/2,cy=h/2,L=w*.62;
+        disc(s,cx,cy,w*.32,look.urn,look.gold,1.5);
+        s.enter({},{line_cap:'round'});
+        for(let i=0;i<7;i++){const a=i*.9+Math.sin(piece.time*.8+i)*.04;s.stroke([['move',cx,cy],['quadratic',cx+Math.cos(a+.3)*L*.6,cy+Math.sin(a+.3)*L*.6,cx+Math.cos(a)*L,cy+Math.sin(a)*L]],i%2?look.leaf_light:look.leaf,4);}
+        s.leave();
+    });}},
+    floating_seat:{draw(art,piece,look){art.live(s=>{                   // a chaise or a chair hanging in the air: its hover-glow stays on the floor
+        const {width:w,height:h}=piece,t=piece.time,x0=piece.seed[0];
+        s.enter({},{opacity:.35+.1*Math.sin(t*3+x0)});s.fill([ellipse(w/2,h/2+2,w*.45,h*.35)],'rgba(232,194,122,0.5)');s.leave();
+        s.enter({position:[0,Math.sin(t*1.6+x0*.05)*3-6]});
+        if(look.style==='chaise'){
+            box(s,0,0,w,h,12,look.frame,look.trim,1.2);
+            box(s,4,4,w*.3,h-8,8,look.cushion);box(s,w*.34,6,w*.6,h-12,6,look.seat);
+            s.fill(rect(12,2,w-24,1),'rgba(223,230,255,0.25)');
+        }else{box(s,0,0,w,h,8,look.frame,look.trim,1.2);box(s,6,6,w-12,h-12,6,look.cushion);}
+        s.leave();
+    });}},
+
+    // ----- The suite ------------------------------------------------------------------------------
+    visitor_console:{draw(art,piece,look){art.still(s=>{                // by the elevator: the visitor book, a crescent seal
+        const {width:w,height:h}=piece;
+        box(s,0,0,w,h,3,look.lacquer,look.gold,1.2);
+        box(s,5,10,w-10,22,1,look.paper,look.gold_dark,.6);s.fill(rect(w/2-.5,10,1,22),look.ribbon);
+        lines(s,[0,1,2,3].map(i=>[7,14+i*4,w/2-2,14+i*4]),'rgba(40,20,30,0.5)',.5);
+        seal(s,w/2,h-18,5,2.6,[1.2,-.6,2.3]);
+    });}},
+    pit_sofa:{draw(art,piece,look){art.still(s=>{                       // one half of the round crimson pit, curving about the table
+        const {width:w,height:h}=piece,up=piece.face==='N',cx=w/2;
+        const band=(off,col)=>s.fill(up?[['move',off,0],['quadratic',cx,h*1.9-off*1.6,w-off,0],['line',w-18,0],['quadratic',cx,h*1.1,18,0]]
+            :[['move',off,h],['quadratic',cx,-h*.9+off*1.6,w-off,h],['line',w-18,h],['quadratic',cx,-h*.1,18,h]],col);
+        band(0,look.velvet_dark);band(6,look.velvet);band(12,look.seat);
+        s.stroke(up?[['move',0,0],['quadratic',cx,h*1.9,w,0]]:[['move',0,h],['quadratic',cx,-h*.9,w,h]],look.gold,1);
+        const buttons=[];for(let i=1;i<6;i++){const u=i/6,by=up?(h*1.9)*2*u*(1-u)*.9-4:h-(h*1.9)*2*u*(1-u)*.9+4;buttons.push([w*u,by,1.2]);}
+        s.fill(dots(buttons),'rgba(255,200,210,0.35)');
+    });}},
+    pit_table:{draw(art,piece,look){art.still(s=>{                      // a black marble oval: a bottle, two glasses (one drunk), a folded note
+        const {width:w,height:h}=piece;
+        s.outlined([ellipse(w/2,h/2,w/2,h/2)],look.marble,look.gold,1.5);
+        s.stroke([['move',12,14],['quadratic',w/2,h*.7,w-10,16]],'rgba(223,230,255,0.2)',.7);
+        disc(s,w/2,h/2,4,'#1e3a24',look.gold,.8);glass(s,w/2-14,h/2+6,true,look.silver);glass(s,w/2+15,h/2-4,false,look.silver);
+        box(s,w-22,h-16,12,8,1,look.note);
+    });}},
+    silver_grand:{pad:16,draw(art,piece,look){art.still(s=>{            // silver lacquer, the lid up, a page of music left open
+        const {width:w,height:h}=piece,kw=(w*.5-4)/14;
+        s.outlined([['move',0,8],['line',w*.55,8],['cubic',w*.9,6,w,h*.45,w*.8,h*.75],['cubic',w*.6,h,w*.2,h,6,h-6],['close']],linear([0,0],[w,h],[[0,'#e8ecf6'],[.5,'#a8aec0'],[1,'#6a7082']]),look.gold,1);
+        lines(s,[[10,16,w*.72,h*.7]],'rgba(20,20,30,0.6)',1.5);       // the lid's prop
+        box(s,0,0,w*.5,10,1,look.keybed);
+        const white=[],black=[];for(let i=0;i<14;i++){white.push([2+i*kw,1,kw-.8,8]);if([1,2,4,5,6].includes(i%7))black.push([2+i*kw-1.2,1,2.4,5]);}
+        s.fill(rects(white),'#f4f2ee');s.fill(rects(black),look.keybed);
+        box(s,14,14,22,14,1,look.paper,look.gold_dark,.5);            // the music
+        lines(s,[0,1,2,3].map(i=>[16,17+i*2.6,34,17+i*2.6]),'rgba(40,30,40,0.6)',.4);
+        box(s,w*.18,-12,34,10,4,look.bench,look.gold,.8);
+    });}},
+    marble_fireplace:{draw(art,piece,look){                              // black marble, a gold fender, embers and burnt pages
+        const {width:w,height:h}=piece;
+        art.still(s=>{box(s,0,0,w,h,3,look.marble,look.gold,1.5);box(s,16,6,w-32,h-12,3,look.firebox);});
+        art.live(s=>{for(let i=0;i<7;i++){const f=.6+.4*Math.sin(piece.time*6+i*1.9);disc(s,26+i*(w-52)/6,h/2+Math.sin(i)*3,3+f*1.5,`rgba(255,${90+60*f|0},40,${.55+.35*f})`);}});
+        art.still(s=>{
+            for(const [px,py,r] of [[38,12,.3],[w-52,15,-.4]]){s.enter({position:[px,py],rotation:r});box(s,0,0,12,8,1,'#3a2a20');s.fill(rect(0,7,12,1),'rgba(255,120,40,0.6)');s.leave();}
+            lines(s,[[12,h-3,w-12,h-3]],look.gold,1.2);
+        });
+    }},
+    wine_wall_bar:{draw(art,piece,look){art.still(s=>{                  // black lacquer against the west wall, a wine wall behind
+        const {width:w,height:h}=piece;
+        box(s,0,0,w,h,3,look.lacquer,look.gold,1.2);
+        for(let j=0;j<12;j++)for(let i=0;i<2;i++)disc(s,8+i*9,10+j*15,3,j%3?look.bottles[0]:look.bottles[1%look.bottles.length],'rgba(0,0,0,0.5)',.5);
+        box(s,w-14,4,12,h-8,2,look.marble,look.gold_dark,.6);
+        glass(s,w-8,40,false,look.silver);glass(s,w-8,h-50,true,look.silver);disc(s,w-8,h/2,3.6,'#e8f0ff',look.silver,.8);   // a decanter
+    });}},
+    dinner_for_two:{draw(art,piece,look){art.still(s=>{                 // a marble table: candles, the plates, one glass drunk and one not
+        const {width:w,height:h}=piece;
+        box(s,0,0,w,h,8,look.top,look.gold,2);
+        s.stroke([['move',12,10],['quadratic',w/2,h*.8,w-10,12]],'rgba(120,110,130,0.3)',.7);
+        box(s,w/2-6,6,12,h-12,3,look.runner);
+        for(const px of [18,w-18]){disc(s,px,h/2,10,'#fafafa',look.silver_dark,.8);disc(s,px,h/2,6.5,null,look.gold,.6);}
+        disc(s,22,h/2+2,3.5,'rgba(120,20,30,0.5)');                     // his plate: a smear of sauce
+        glass(s,30,14,true,look.silver);glass(s,w-30,h-14,false,look.silver);
+        candle(s,w/2,18,look);candle(s,w/2,h-18,look);
+        for(let i=0;i<4;i++)s.fill([ellipse(w/2-2+i*1.5,h/2-6+i*4,2,1.2,i)],look.petals);
+    });}},
+    velvet_dining_chair:{draw(art,piece,look){art.still(s=>{            // a gold frame; the back away from its face
+        const {width:w,height:h}=piece,f=piece.face||'S';
+        box(s,0,0,w,h,5,look.velvet,look.gold,1);
+        const [bx,by,bw,bh]=f==='E'?[0,2,7,h-4]:f==='W'?[w-7,2,7,h-4]:f==='N'?[2,h-7,w-4,7]:[2,0,w-4,7];
+        box(s,bx,by,bw,bh,3,look.velvet_dark);box(s,5,5,w-10,h-10,4,look.seat);
+    });}},
+    canopy_bed:{draw(art,piece,look){art.still(s=>{                     // black posts, crimson drapes, the covers thrown back
+        const {width:w,height:h}=piece;
+        box(s,0,0,w,h,6,look.frame,look.gold,1.5);
+        box(s,4,2,w-8,18,5,look.headboard,look.gold_dark,.8);
+        box(s,10,22,w-20,h-30,6,look.sheets);
+        box(s,18,26,60,26,10,look.pillows,'rgba(0,0,0,0.12)',.6);box(s,w-78,26,60,26,10,look.pillows,'rgba(0,0,0,0.12)',.6);
+        s.fill([ellipse(w-60,46,22,9,.3)],'rgba(0,0,0,0.08)');          // one pillow slept on
+        const fold=[['move',10,96],['cubic',w*.4,80,w*.6,118,w-10,104]];
+        s.fill([...fold,['line',w-10,h-8],['line',10,h-8],['close']],look.cover);
+        s.stroke(fold,look.cover_edge,3);
+        s.stroke(rect(16,112,w-32,h-126),look.gold,.8);
+        for(const [px,py] of [[3,3],[w-3,3],[3,h-3],[w-3,h-3]])disc(s,px,py,5,'#0e0a0e',look.gold,1.2);   // the posts
+        for(const [px,dir] of [[3,1],[w-3,-1]])s.fill([['move',px,8],['quadratic',px+dir*16,h/2,px,h-8],['line',px+dir*4,h-8],['quadratic',px+dir*8,h/2,px+dir*4,8]],look.drapes);
+    });}},
+    window_chaise:{draw(art,piece,look){art.still(s=>{                  // a velvet chaise under the window, a gold cushion
+        const {width:w,height:h}=piece;
+        box(s,0,0,w,h,12,look.frame,look.gold,1);
+        box(s,4,4,22,h-8,9,look.velvet);box(s,28,6,w-34,h-12,7,look.seat);
+        box(s,40,12,18,14,5,look.cushion);
+    });}},
+    writing_desk:{draw(art,piece,look){art.still(s=>{                   // chess mid-game, a crescent seal, candle stubs, the card rating his stay
+        const {width:w,height:h}=piece,bx=10,by=10,sq=5;
+        box(s,0,0,w,h,4,look.wood,look.gold,1.4);
+        const grain=[];for(let gy=8;gy<h;gy+=6)grain.push([3,gy,w-3,gy]);lines(s,grain,'rgba(0,0,0,0.25)',.6);
+        const light=[],dark=[];for(let i=0;i<8;i++)for(let j=0;j<8;j++)((i+j)%2?dark:light).push([bx+i*sq,by+j*sq,sq,sq]);
+        s.fill(rects(light),'#e8e0d0');s.fill(rects(dark),'#1a1418');
+        s.stroke(rect(bx,by,sq*8,sq*8),look.gold,.8);
+        for(const [i,j,white] of [[1,6,1],[2,6,1],[4,4,1],[5,7,1],[3,1,0],[4,2,0],[6,1,0],[2,3,0],[6,5,1]])disc(s,bx+i*sq+sq/2,by+j*sq+sq/2,1.6,white?'#fff8ec':'#2a0a14',white?'#8a7a6a':'#b8203a',.5);
+        disc(s,bx+sq*8+6,by+6,1.8,'#fff8ec','#8a7a6a',.5);             // a captured piece
+        box(s,64,12,34,24,1,look.paper,look.gold_dark,.6);              // the card
+        s.text(look.card_line_1,81,22,{font:{family:'Georgia, serif',size:8,weight:'bold'},align:'center',baseline:'middle'},{fill:look.ink});
+        s.text(look.card_line_2,81,30,{font:{family:'Georgia, serif',size:4,style:'italic'},align:'center',baseline:'middle'},{fill:look.gold_dark});
+        seal(s,110,40,4.5,2.4,[1.2,-.6,2.1]);
+        for(const [cx,cy] of [[128,14],[138,20],[132,48]])candle(s,cx,cy,look);
+        box(s,104,8,3,18,1,'#1a1a1e');disc(s,105.5,8,1.2,look.gold);    // a pen
+    });}},
+    open_wardrobe:{pad:16,draw(art,piece,look){art.still(s=>{           // standing open, empty hangers on the rail, the doors swung out
+        const {width:w,height:h}=piece;
+        box(s,0,0,w,h,3,look.lacquer,look.gold,1.2);box(s,4,4,w-8,h-8,2,'#0a070a');
+        lines(s,[[w/2,6,w/2,h-6]],look.silver_dark,1);
+        for(let i=0;i<7;i++){const hy=14+i*19;s.stroke(polyline([[w/2-9,hy+3],[w/2,hy],[w/2+9,hy+3]]),look.gold,.8);}
+        box(s,w-2,6,14,h*.45,2,look.doors,look.gold_dark,.8);box(s,w-2,h*.52,14,h*.45,2,look.doors,look.gold_dark,.8);
+    });}},
+    round_tub:{draw(art,piece,look){                                     // round marble, rose petals drifting slowly round
+        const {width:w,height:h}=piece;
+        art.still(s=>{disc(s,w/2,h/2,w/2,look.marble,look.gold,1.5);disc(s,w/2,h/2,w/2-7,look.water);});
+        art.live(s=>{for(let i=0;i<8;i++){const a=i*.8+piece.time*.05,r=10+(i*7)%22;s.fill([ellipse(w/2+Math.cos(a)*r,h/2+Math.sin(a)*r,2.6,1.6,a)],look.petals[i%2?0:1%look.petals.length]);}});
+        art.still(s=>box(s,w/2-4,-1,8,6,2,look.gold));                 // the spout
+    }},
+    basin_vanity:{draw(art,piece,look){art.still(s=>{                   // marble along the east wall, a basin, a perfume
+        const {width:w,height:h}=piece;
+        box(s,0,0,w,h,2,look.marble,look.gold_dark,1);
+        s.outlined([ellipse(w/2,h/2,7,11)],look.basin,look.silver_dark,.6);
+        disc(s,w/2,10,2.6,'#e8b4c8',look.gold,.5);disc(s,w/2,h-10,2.2,look.gold);
+    });}},
+    plunge_pool:{draw(art,piece,look){                                   // a tiled edge, water with a slow ripple, the ladder
+        const {width:w,height:h}=piece;
+        art.still(s=>{box(s,0,0,w,h,10,look.tiles,look.gold,1.2);box(s,6,6,w-12,h-12,7,linear([0,-h/2],[0,h/2],[[0,look.water[0]],[1,look.water[1%look.water.length]]]));});
+        art.live(s=>{for(let k=0;k<5;k++){const pts=[];for(let i=0;i<=20;i++)pts.push([10+i*(w-20)/20,14+k*(h-28)/4+Math.sin(i*.9+piece.time*1.6+k)*2]);s.stroke(polyline(pts),'rgba(160,230,255,0.35)',.8);}});
+        art.still(s=>lines(s,[[w-18,3,w-18,14],[w-12,3,w-12,14]],look.ladder,1.2));
+    }},
+    pool_lounger:{draw(art,piece,look){art.still(s=>{                   // a white lounger, a folded towel
+        const {width:w,height:h}=piece;
+        box(s,0,0,w,h,6,look.frame,look.gold_dark,1);
+        box(s,3,3,w-6,24,5,look.cushion);
+        const slats=[];for(let ly=32;ly<h-4;ly+=6)slats.push([4,ly,w-4,ly]);lines(s,slats,'rgba(0,0,0,0.12)',.6);
+        box(s,6,h-22,w-12,14,2,look.towel);
+    });}},
+    trained_telescope:{pad:11,draw(art,piece,look){art.still(s=>{       // brass on a tripod, trained on the sky
+        const {width:w,height:h}=piece;
+        lines(s,[.4,2.5,4.6].map(a=>[w/2,h/2,w/2+Math.cos(a)*13,h/2+Math.sin(a)*13]),look.tripod,1.5);
+        s.enter({position:[w/2,h/2],rotation:-2.2});box(s,-3,-3,24,6,3,look.tube,look.tube_dark,.8);box(s,18,-4,6,8,2,look.tube_dark);s.leave();
+    });}}
+};
+
+return Object.freeze({get HOTEL_ARTISTS(){return HOTEL_ARTISTS;}});
+})();
+// src/game/presentation/props/club.mjs
+const m200 = (()=>{
+// Moon City Nightclub's furniture families (mc_*): black lacquer, chrome, violet and lavender neon,
+// gold, rose-wine velvet. Drawn on the art toolkit as the other venues' are. The stage, the booth and
+// the speakers keep the music's kick: `piece.beat` is its beat count, and each piece pulses on the beat.
+const {rect,circle,ellipse,radial} = m154;
+const {box,disc,lines,crescent,dots} = m195;
+
+const rects=list=>list.flatMap(([x,y,w,h])=>rect(x,y,w,h));
+/** How hard the kick lands now: 1 on the beat, falling away to 0 before the next. */
+const kick=piece=>{const beat=((piece.beat%1)+1)%1;return Math.pow(1-beat,3);};
+/** Buttons in an n by m grid over the box (x, y, w, h). */
+const tufts=(s,X,Y,W,H,n,m,col)=>{const out=[];for(let i=0;i<n;i++)for(let j=0;j<m;j++)out.push([X+(i+.5)*W/n,Y+(j+.5)*H/m,1.1]);s.fill(dots(out),col);};
+
+const CLUB_ARTISTS={
+    club_stage:{draw(art,piece,look){                                    // a raised black stage, a gold lip, a lavender LED strip along the front
+        const {width:w,height:h}=piece;
+        art.still(s=>{
+            box(s,0,0,w,h,6,look.lacquer,look.gold_dark,1.5);
+            const boards=[];for(let px=20;px<w;px+=20)boards.push([px,2,px,h-6]);lines(s,boards,'rgba(200,168,255,0.08)',1);
+        });
+        art.live(s=>box(s,4,h-6,w-8,3,1.5,`rgba(200,168,255,${.55+.4*kick(piece)})`));
+        art.still(s=>{
+            s.fill(rect(2,h-2,w-4,1.5),look.gold);
+            s.enter({},{opacity:.5});s.fill(crescent(w/2,16,9,w/2+4,14,8),look.logo);s.leave();   // the crescent on the backdrop
+        });
+    }},
+    dj_booth:{pad:9,draw(art,piece,look){                                // two decks, a mixer, a laptop, an LED strip
+        const {width:w,height:h}=piece,x0=piece.seed[0];
+        art.still(s=>box(s,0,0,w,h,4,look.booth,look.chrome_dark,1));
+        art.live(s=>box(s,2,h-5,w-4,3,1.5,`rgba(255,90,138,${.5+.5*kick(piece)})`));
+        for(const cx of [26,w-26]){
+            art.still(s=>{
+                disc(s,cx,17,13,'#1e1a24',look.chrome_dark,1);disc(s,cx,17,11,'#0a080c');
+                for(const r of [4,7,9.5])s.stroke([circle(cx,17,r)],'rgba(200,168,255,0.25)',.6);
+            });
+            art.live(s=>{const a=piece.time*4.2+x0+cx;lines(s,[[cx,17,cx+Math.cos(a)*10,17+Math.sin(a)*10]],look.lilac,1);});   // the needle, turning with its record
+            art.still(s=>disc(s,cx,17,2,look.gold));
+        }
+        art.still(s=>{
+            box(s,w/2-14,5,28,26,2,'#1a1620','#3a3644',.8);                 // the mixer
+            box(s,w/2-12,-4,24,8,1,'#2a2632',look.chrome_dark,.8);box(s,w/2-10,-3,20,5,1,'rgba(160,200,255,0.8)');   // the laptop
+        });
+        art.live(s=>{const p=kick(piece);for(let i=0;i<4;i++){const lv=.3+.7*Math.abs(Math.sin(piece.time*3+i*1.3))*(.5+.5*p);box(s,w/2-11+i*6,27-18*lv,3,18*lv,1,i<2?look.lavender:look.rose);}});   // the meters
+    }},
+    speaker_stack:{draw(art,piece,look){                                 // two woofers breathing on the kick, a tweeter
+        const {width:w,height:h}=piece;
+        art.still(s=>box(s,0,0,w,h,3,look.cabinet,look.cabinet_edge,1.2));
+        art.live(s=>{const k=1+.08*kick(piece);for(const cy of [h*.33,h*.72]){disc(s,w/2,cy,w*.34*k,'#1f1a26',look.chrome_dark,1);disc(s,w/2,cy,w*.16*k,'#0a080c');disc(s,w/2,cy,w*.05,look.chrome_dark);}});
+        art.still(s=>disc(s,w/2,7,3,'#2a2632',look.chrome_dark,.6));
+    }},
+    dance_pole:{draw(art,piece,look){art.still(s=>{                     // chrome on a lit plinth (the plinth ring is floor art, the glow the lighting's)
+        const cx=piece.width/2,cy=piece.height/2;
+        disc(s,cx,cy,5,radial([cx-1.5,cy-1.5],.5,[cx,cy],5,[[0,'#ffffff'],[.5,look.chrome],[1,look.chrome_dark]]));disc(s,cx,cy,5,null,look.gold,1);
+    });}},
+    high_top:{draw(art,piece,look){art.still(s=>{                       // marble on a chrome ring, a cocktail, a candle
+        const cx=piece.width/2,cy=piece.height/2,R=piece.width/2;
+        disc(s,cx,cy,R,look.marble,look.gold,1.5);
+        s.stroke([['move',cx-R+4,cy-3],['quadratic',cx,cy+4,cx+R-5,cy-6]],'rgba(120,100,140,0.35)',.6);
+        disc(s,cx-4,cy+2,3.2,'rgba(255,90,138,0.8)',look.chrome,.7);disc(s,cx+5,cy-3,2.2,'#fff2d8');
+    });}},
+    club_booth:{draw(art,piece,look){art.still(s=>{                     // a curved velvet booth round a marble table, facing north
+        const {width:w,height:h}=piece;
+        s.outlined([['move',0,10],['quadratic',0,h,20,h],['line',w-20,h],['quadratic',w,h,w,10],['line',w-16,10],['quadratic',w-16,h-16,w-30,h-16],['line',30,h-16],['quadratic',16,h-16,16,10],['close']],look.velvet_dark,look.gold,1);
+        tufts(s,24,h-13,w-48,10,6,1,'rgba(255,190,220,0.35)');
+        s.fill([['move',16,10],['quadratic',16,h-16,30,h-16],['line',w-30,h-16],['quadratic',w-16,h-16,w-16,10],['line',w-26,10],['quadratic',w-26,h-26,w-36,h-26],['line',36,h-26],['quadratic',26,h-26,26,10],['close']],look.velvet_light);
+        s.outlined([ellipse(w/2,16,26,13)],look.marble,look.gold,1.3);
+        disc(s,w/2-8,16,2.8,'rgba(255,240,200,0.9)',look.gold,.7);disc(s,w/2+2,13,2.8,'rgba(255,240,200,0.9)',look.gold,.7);disc(s,w/2+12,18,2,'#fff2d8');
+    });}},
+    back_bar:{draw(art,piece,look){art.still(s=>{                       // mirrored shelves of bottles, lit from beneath
+        const {width:w,height:h}=piece,cols=look.bottles,x0=piece.seed[0]|0;
+        box(s,0,0,w,h,2,look.lacquer,look.gold_dark,1);
+        box(s,2,2,6,h-4,1,'rgba(200,168,255,0.18)');                     // the mirror strip against the wall
+        for(let by=8,i=0;by<h-6;by+=9,i++){const bx=12+(i%2)*5;disc(s,bx,by,2.6,cols[(i*5+x0)%cols.length],'rgba(0,0,0,0.5)',.6);disc(s,bx,by,1,'rgba(255,255,255,0.7)');}
+        s.fill(rect(w-2,2,1.2,h-4),look.gold);
+    });}},
+    club_bar:{draw(art,piece,look){art.still(s=>{                       // black marble veined gold, a curved gold rail, a row of gold taps
+        const {width:w,height:h}=piece;
+        s.outlined([['move',0,0],['line',w-14,0],['quadratic',w,h/2,w-14,h],['line',0,h],['close']],look.top,look.gold_dark,1);
+        const veins=[];for(let vy=20;vy<h;vy+=46)veins.push(['move',4,vy],['cubic',14,vy+12,24,vy-6,w-16,vy+14]);s.stroke(veins,'rgba(232,194,122,0.3)',.7);
+        s.stroke([['move',w-12,4],['quadratic',w+1,h/2,w-12,h-4]],look.gold,3);   // the rail
+        s.stroke([['move',w-13,6],['quadratic',w-1,h/2,w-13,h-6]],look.gold_light,.8);
+        box(s,2,h/2-34,10,68,2,'#2a2230',look.gold_dark,.8);              // the taps
+        for(let i=0;i<6;i++){disc(s,7,h/2-28+i*11,2.6,look.gold,look.gold_light,.6);box(s,10,h/2-29+i*11,6,2,1,look.gold_dark);}
+        for(const [gx,f] of [[22,.12],[26,.3],[20,.7],[24,.9]])disc(s,gx,h*f,3,'rgba(255,240,200,0.85)',look.gold,.7);
+        disc(s,24,h*.22,3.2,'rgba(255,90,138,0.85)',look.chrome,.7);disc(s,22,h*.8,3.2,'rgba(200,168,255,0.85)',look.chrome,.7);
+    });}},
+    club_stool:{draw(art,piece,look){art.still(s=>{                     // chrome and velvet
+        const cx=piece.width/2,cy=piece.height/2,w=piece.width;
+        disc(s,cx,cy,w/2,look.chrome_dark,look.chrome,1.2);disc(s,cx,cy,w/2-3,look.seat);disc(s,cx-2,cy-2,2.5,'rgba(255,190,220,0.3)');
+    });}},
+    coat_check:{pad:17,draw(art,piece,look){art.still(s=>{              // a lacquer counter, a bell, tickets; the coat rail behind
+        const {width:w,height:h}=piece;
+        box(s,2,-14,w-4,10,3,'#120c18');
+        lines(s,[[6,-9,w-6,-9]],look.chrome_dark,1.5);
+        for(let i=0;i<11;i++)box(s,8+i*12.5,-13,9,9,3,look.coats[i%look.coats.length],'rgba(255,255,255,0.08)',.6);
+        box(s,0,0,w,h,4,look.lacquer_light,look.gold,1.5);box(s,4,4,w-8,h-8,3,look.lacquer);
+        disc(s,22,h/2,4.5,look.gold,look.gold_light,.8);disc(s,22,h/2,1.3,look.gold_light);
+        for(let i=0;i<4;i++)box(s,50+i*12,h/2-5,9,10,1,i%2?look.lilac:look.gold_light,'rgba(0,0,0,0.3)',.5);
+        box(s,w-40,h/2-7,26,14,2,'#0a080c',look.chrome_dark,.8);box(s,w-38,h/2-5,22,10,1,'rgba(200,168,255,0.55)');
+    });}},
+    velvet_rope:{loop:{period:2*Math.PI/1.4,frames:12},draw(art,piece,look){art.still(s=>{   // sagging between chrome-and-gold stanchions, swaying
+        const {width:w,height:h}=piece,posts=Math.max(2,Math.round(h/36)+1),vert=h>w;
+        const P=i=>vert?[w/2,i*h/(posts-1)]:[i*w/(posts-1),h/2];
+        s.enter({},{line_cap:'round'});
+        for(let i=0;i<posts-1;i++){
+            const [ax,ay]=P(i),[bx,by]=P(i+1),sway=Math.sin(piece.time*1.4+i)*.6;
+            const rope=[['move',ax,ay],['quadratic',(ax+bx)/2+(vert?5+sway:0),(ay+by)/2+(vert?0:5+sway),bx,by]];
+            s.stroke(rope,look.rope,3);s.stroke(rope,'rgba(255,160,200,0.35)',1);
+        }
+        s.leave();
+        for(let i=0;i<posts;i++){const [px,py]=P(i);disc(s,px,py,5,look.chrome_dark,look.chrome,1);disc(s,px,py,2.4,look.gold);}
+    });}},
+    button_bench:{draw(art,piece,look){art.still(s=>{                   // buttoned velvet on gold feet
+        const {width:w,height:h}=piece;
+        box(s,0,0,w,h,8,look.velvet,look.gold,1);box(s,4,4,w-8,h-8,6,look.seat);tufts(s,6,6,w-12,h-12,7,2,'rgba(255,190,220,0.4)');
+    });}},
+    moon_orb:{draw(art,piece,look){                                      // a moon floating over a black plinth, turning slowly
+        const {width:w,height:h}=piece,cx=w/2,cy=h/2,R=w*.3;
+        art.still(s=>disc(s,cx,cy,w/2,look.plinth,look.gold_dark,1.2));
+        art.live(s=>{
+            const t=piece.time,oy=cy-3+Math.sin(t*1.5+piece.seed[0])*2;
+            disc(s,cx,oy,R,radial([cx-R*.35,oy-R*.35],1,[cx,oy],R,[[0,'#ffffff'],[.6,look.moon],[1,look.moon_dark]]));
+            const craters=[];for(const [a,r] of [[t*.3,.45],[t*.3+2,.3],[t*.3+4,.55]]){const c=Math.cos(a);if(c>-.2)craters.push([cx+c*R*r,oy+Math.sin(a*1.3)*R*.3,R*.16]);}
+            if(craters.length)s.fill(dots(craters),'rgba(120,100,160,0.35)');
+        });
+    }},
+    bulb_vanity:{draw(art,piece,look){                                   // marble, round sinks, a mirror strip lit with bulbs on the wall side
+        const {width:w,height:h}=piece,north=piece.face!=='N',my=north?-4:h-2,x0=piece.seed[0];   // (against the north wall unless it faces north)
+        art.still(s=>box(s,0,my,w,6,2,'rgba(200,190,230,0.55)',look.gold,1));
+        art.live(s=>{for(let bx=8;bx<w-4;bx+=16)disc(s,bx,my+3,1.7,`rgba(255,236,200,${.8+.2*Math.sin(piece.time*2+x0+bx)})`);});
+        art.still(s=>{
+            box(s,0,0,w,h,3,look.marble,look.gold_dark,1);
+            const veins=[];for(let vx=10;vx<w;vx+=38)veins.push(['move',vx,2],['quadratic',vx+12,h/2,vx+4,h-2]);s.stroke(veins,'rgba(140,120,160,0.25)',.6);
+            const n=Math.max(2,Math.floor(w/55));
+            for(let i=0;i<n;i++){
+                const sx=(i+.5)*w/n,sy=h/2+(north?2:-2);
+                s.outlined([ellipse(sx,sy,11,8)],look.porcelain,look.marble_dark,.8);s.fill([ellipse(sx,sy,7,5)],'#d8d4e4');
+                disc(s,sx,sy,1,'#6a6e82');box(s,sx-1,north?2:h-8,2,6,1,look.gold);
+            }
+            if(w>150){disc(s,w-14,h/2,3,'#e8b4c8');disc(s,w-22,h/2+2,2.4,look.lilac);}   // perfume
+        });
+    }},
+    toilet_stall:{draw(art,piece,look){art.still(s=>{                   // against the west wall, the door on the east side ajar a hair
+        const {width:w,height:h}=piece;
+        box(s,0,0,w,h,2,look.tile);
+        const grout=[];for(let gx=10;gx<w;gx+=10)grout.push([gx,0,gx,h]);for(let gy=10;gy<h;gy+=10)grout.push([0,gy,w,gy]);lines(s,grout,'rgba(0,0,0,0.08)',.6);
+        s.outlined([ellipse(20,h/2,12,9)],look.porcelain,look.marble_dark,.8);s.fill([ellipse(21,h/2,7,5)],'#b8c8e0');   // the bowl
+        box(s,3,h/2-10,6,20,2,look.porcelain,look.marble_dark,.6);      // the cistern
+        s.fill(rects([[0,0,w,4],[0,h-4,w,4]]),look.partition);s.fill(rects([[0,3,w,1],[0,h-4,w,1]]),look.gold_dark);
+        box(s,w-5,4,5,h-8,1,look.door,look.gold,.8);
+        disc(s,w-2.5,h/2,1.2,look.gold);box(s,w-4,h/2+6,3,4,.5,'#4ad07a');   // the handle, VACANT
+    });}},
+    urinal:{draw(art,piece,look){art.still(s=>{                         // wall-hung porcelain, a gold flush plate
+        const {width:w,height:h}=piece;
+        s.outlined([['move',0,0],['line',w,0],['line',w-2,h*.6],['quadratic',w/2,h+2,2,h*.6],['close']],look.porcelain,look.marble_dark,.8);
+        s.fill([ellipse(w/2,h*.5,w*.28,h*.28)],'#c8d4e8');
+        box(s,w/2-3,1,6,3,1,look.gold);
+    });}},
+    hand_dryer:{draw(art,piece,look){art.still(s=>{                     // chrome, a blue ready-light
+        const {width:w,height:h}=piece;
+        box(s,0,0,w,h,4,look.chrome_dark,look.chrome,1);
+        if(piece.vertical){box(s,3,6,w-6,h-12,3,'#2a2e3a');disc(s,w/2,4,1.4,look.light);}
+        else{box(s,6,3,w-12,h-6,3,'#2a2e3a');disc(s,4,h/2,1.4,look.light);}
+    });}},
+    blush_settee:{draw(art,piece,look){art.still(s=>{                   // tufted, gold-footed, the back against the east side
+        const {width:w,height:h}=piece;
+        box(s,0,0,w,h,12,look.fabric,look.gold,1);
+        box(s,w-12,4,10,h-8,5,look.fabric_dark);box(s,4,4,w-18,20,8,look.fabric_dark);
+        tufts(s,6,28,w-20,h-34,2,5,'rgba(255,220,235,0.55)');
+        box(s,8,h-34,16,12,4,look.cushion);
+    });}},
+    crescent_sofa:{draw(art,piece,look){art.still(s=>{                  // a crescent of wine velvet, the back to the north wall
+        const {width:w,height:h}=piece;
+        s.outlined([['move',0,0],['line',w,0],['quadratic',w,h,w/2,h],['quadratic',0,h,0,0]],look.velvet_dark,look.gold,1.5);
+        s.fill([['move',14,12],['line',w-14,12],['quadratic',w-16,h-12,w/2,h-10],['quadratic',16,h-12,14,12]],look.velvet_light);
+        s.fill([['move',30,12],['line',w-30,12],['quadratic',w-34,h-26,w/2,h-24],['quadratic',34,h-26,30,12]],look.velvet);
+        tufts(s,20,3,w-40,7,9,1,'rgba(255,190,220,0.45)');
+        box(s,40,16,18,12,5,look.cushions[0]);box(s,w-58,16,18,12,5,look.cushions[1%look.cushions.length]);
+    });}},
+    champagne_table:{draw(art,piece,look){art.still(s=>{                // black glass on gold: champagne on ice, two flutes, rose petals
+        const {width:w,height:h}=piece,cx=w/2,cy=h/2,m=Math.min(w,h);
+        box(s,0,0,w,h,6,'rgba(20,14,28,0.92)',look.gold,1.5);
+        s.fill(rect(4,3,w-8,1.5),'rgba(200,168,255,0.12)');
+        disc(s,cx,cy,m*.22,look.chrome,look.chrome_dark,1);disc(s,cx,cy,m*.16,'#e8f0ff');   // the ice bucket
+        disc(s,cx+1,cy-1,2.8,'#1e3a24',look.gold,.8);                   // the bottle's neck
+        disc(s,cx-w*.3,cy+h*.18,2.6,'rgba(255,240,200,0.9)',look.gold,.6);disc(s,cx+w*.3,cy-h*.18,2.6,'rgba(255,240,200,0.9)',look.gold,.6);
+        for(let i=0;i<4;i++)s.fill([ellipse(6+(i*13%(w-10)),h-5-(i%2)*3,2.2,1.3,i)],look.petals[i%2?0:1%look.petals.length]);
+    });}},
+    suite_couch:{draw(art,piece,look){art.still(s=>{                    // a long velvet couch, the back against the east wall, facing west
+        const {width:w,height:h}=piece;
+        box(s,0,0,w,h,12,look.velvet_dark,look.gold,1.2);
+        box(s,w-16,4,14,h-8,7,look.velvet);
+        box(s,4,4,w-22,16,7,look.velvet);box(s,4,h-20,w-22,16,7,look.velvet);
+        box(s,6,22,w-24,h-44,6,look.velvet_light);tufts(s,w-15,8,12,h-16,1,9,'rgba(255,190,220,0.4)');
+        lines(s,[1,2].map(k=>[6,22+k*(h-44)/3,w-18,22+k*(h-44)/3]),'rgba(0,0,0,0.25)',1);
+        box(s,10,30,14,18,5,look.cushions[0]);box(s,10,h-50,14,18,5,look.cushions[1%look.cushions.length]);
+    });}}
+};
+
+return Object.freeze({get CLUB_ARTISTS(){return CLUB_ARTISTS;}});
+})();
 // src/game/presentation/props/index.mjs
 const m193 = (()=>{
 // Props drawn natively, by family. A prop type in the catalog (game-assets/props.json) that names a
@@ -32073,11 +32788,15 @@ const {artScene,groundShadow,canvasRenderer} = m154;
 const {CAFE_ARTISTS} = m194;
 const {APARTMENT_ARTISTS} = m196;
 const {HOUSE_ARTISTS} = m198;
+const {HOTEL_ARTISTS} = m199;
+const {CLUB_ARTISTS} = m200;
 
 const PROP_FAMILIES=PROPS.resources.catalog.data.families;
-const ARTISTS=Object.freeze({...CAFE_ARTISTS,...APARTMENT_ARTISTS,...HOUSE_ARTISTS});
+const ARTISTS=Object.freeze({...CAFE_ARTISTS,...APARTMENT_ARTISTS,...HOUSE_ARTISTS,...HOTEL_ARTISTS,...CLUB_ARTISTS});
 /** The pad round a piece's box its art may reach past (lips, drop shadows, a hearth), in px. */
 const PAD=8;
+/** The tempo a piece keeps when its host has no music to give it (`beat`, in beats since the start). */
+const BPM=140;
 for(const family of Object.keys(ARTISTS))if(!PROP_FAMILIES[family])throw new Error(`Prop artist ${family} has no family in the catalog`);
 
 /** Whether a family has a native artist. */
@@ -32107,12 +32826,13 @@ function propArtPacket({appearance,position,rotation=0,width,height}){
     return {family:appearance.family,key,look,width,height,...piece,position:[...position],rotation};
 }
 
-/** The piece's draws in order: {key, bounds, matrix, build} for a still run, {matrix, build} for a live one. */
-function createPropDraws(packet,{time=0}={}){
+/** The piece's draws in order: {key, bounds, matrix, build} for a still run, {matrix, build} for a live one.
+ *  `time` is in seconds; `beat` is the music's beat count (a club's kick), else counted from `time`. */
+function createPropDraws(packet,{time=0,beat=null}={}){
     const artist=ARTISTS[packet.family],{width:w,height:h}=packet,loop=artist.loop;
     let frame=null;
     if(loop){frame=Math.round((time%loop.period)/loop.period*loop.frames)%loop.frames;time=frame*loop.period/loop.frames;}
-    const piece={width:w,height:h,face:packet.face,vertical:packet.vertical,variant:packet.variant,candles:packet.candles,seed:packet.seed,pick:picker(packet.seed),time};
+    const piece={width:w,height:h,face:packet.face,vertical:packet.vertical,variant:packet.variant,candles:packet.candles,seed:packet.seed,pick:picker(packet.seed),time,beat:beat??time*BPM/60};
     const [px,py]=packet.position,c=Math.cos(packet.rotation),s=Math.sin(packet.rotation);
     const pose=[c,s,-s,c,px,py],matrix=[c,s,-s,c,px-c*w/2+s*h/2,py-s*w/2-c*h/2],pad=artist.pad??PAD;
     const scene=fn=>()=>{const scene=new artScene();fn(scene);return scene.finish();};
@@ -32129,8 +32849,8 @@ function createPropDraws(packet,{time=0}={}){
  * Draws a piece on a host Canvas pass (the migration boundary, as canvasRenderer.drawPackets): still
  * runs through `pictures` (a Basement pictureCache), live parts and the shadow as vector packets.
  */
-function drawPropArt(context,packet,{pictures,time=0}){
-    for(const draw of createPropDraws(packet,{time})){
+function drawPropArt(context,packet,{pictures,time=0,beat=null}){
+    for(const draw of createPropDraws(packet,{time,beat})){
         if(draw.key)pictures.draw(context,draw,draw.build);
         else{context.save();try{context.transform(...draw.matrix);canvasRenderer.drawPackets(context,draw.build());}finally{context.restore();}}
     }
@@ -32138,7 +32858,7 @@ function drawPropArt(context,packet,{pictures,time=0}){
 
 return Object.freeze({get PROP_FAMILIES(){return PROP_FAMILIES;},get hasPropArt(){return hasPropArt;},get propArtPacket(){return propArtPacket;},get createPropDraws(){return createPropDraws;},get drawPropArt(){return drawPropArt;}});
 })();
-const m200 = Object.freeze({default:{
+const m202 = Object.freeze({default:{
  "indoor": { "tint": "rgb(22, 10, 48)", "darkness": 0.95, "lamp_glow": 0.08 },
  "outdoor": { "lamp_glow": 0.22 },
  "lamp": { "inner_radius": 10, "cut": [[0, 1], [1, 0]], "glow_stops": [[0, "#ffffff"], [0.1, "$color"], [0.6, "$color"], [1, "rgba(0,0,0,0)"]], "resolution": 64 },
@@ -32147,8 +32867,8 @@ const m200 = Object.freeze({default:{
  "flicker": { "floor": 0.82, "swing": 0.18 }
 }});
 // src/game/presentation/lighting.mjs
-const m199 = (()=>{
-const LIGHTING = m200.default;
+const m201 = (()=>{
+const LIGHTING = m202.default;
 const {createLightLayer} = m154;
 
 const stops=(list,color)=>list.map(([o,c])=>[o,c==='$color'?color:c]);
@@ -32207,7 +32927,7 @@ function levelLights(level,{blend=1,lightAt=()=>1}={}){
 return Object.freeze({get LIGHTING(){return LIGHTING;},get sceneLighting(){return sceneLighting;},get levelLights(){return levelLights;}});
 })();
 // src/game/data/road-navigation.mjs
-const m201 = (()=>{
+const m203 = (()=>{
 /**
  * The city's lane network as Basement navigation road data.
  *
@@ -32345,7 +33065,7 @@ const m0 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m40.assetLibrary;},get createGameAssetLibrary(){return m47.createGameAssetLibrary;},get resolveMapLayout(){return m69.resolveMapLayout;},get resolvePlacement(){return m69.resolvePlacement;},get isMovableProp(){return m69.isMovableProp;},get mapHost(){return m69.mapHost;},get createMapLibraries(){return m69.createMapLibraries;},get PROP_TYPES(){return m69.PROP_TYPES;},get MAP_IDS(){return m69.MAP_IDS;},get ApartmentLevel(){return m95.ApartmentLevel;},get APARTMENT_RULES(){return m137.APARTMENT_RULES;},get gameEngine(){return m146.gameEngine;},get gameLevel(){return m148.gameLevel;},get mapLevel(){return m163.mapLevel;},get travelSystem(){return m164.travelSystem;},get InteriorLevel(){return m165.InteriorLevel;},get registerInteriorLevels(){return m165.registerInteriorLevels;},get levelLobby(){return m147.levelLobby;},get createGameRuntime(){return m166.createGameRuntime;},get controlSystem(){return m149.controlSystem;},get controlsSystem(){return m149.controlsSystem;},get inputInstance(){return m149.inputInstance;},get keyboardInstance(){return m149.keyboardInstance;},get mouseInstance(){return m149.mouseInstance;},get touchInstance(){return m149.touchInstance;},get touchStick(){return m149.touchStick;},get gamepadInstance(){return m149.gamepadInstance;},get TAP(){return m149.TAP;},get DOUBLETAP(){return m149.DOUBLETAP;},get HELD(){return m149.HELD;},get PRESS(){return m149.PRESS;},get REPEAT(){return m149.REPEAT;},get RELEASE(){return m149.RELEASE;},get renderSystem(){return m154.renderSystem;},get renderFrame(){return m154.renderFrame;},get canvasRenderer(){return m154.canvasRenderer;},get pictureCache(){return m154.pictureCache;},get measureText(){return m154.measureText;},get cameraSystem(){return m154.cameraSystem;},get gameSession(){return m178.gameSession;},get PlayerStateSystem(){return m179.PlayerStateSystem;},get PlayerControlSystem(){return m180.PlayerControlSystem;},get Player(){return m123.Player;},get playerVitals(){return m124.playerVitals;},get itemSystem(){return m104.itemSystem;},get createItemCatalog(){return m58.createItemCatalog;},get GUN_MATERIALS(){return m174.GUN_MATERIALS;},get WEAPON_MODELS(){return m174.WEAPON_MODELS;},get LASER_MODULE(){return m174.LASER_MODULE;},get weaponModel(){return m174.weaponModel;},get weaponAppearance(){return m185.weaponAppearance;},get combatSystem(){return m181.combatSystem;},get weaponSystem(){return m182.weaponSystem;},get lootSystem(){return m184.lootSystem;},get WorldLoot(){return m129.WorldLoot;},get MELEE_SWING(){return m183.MELEE_SWING;},get WIDE_SWING(){return m183.WIDE_SWING;},get sampleMeleeSwing(){return m183.sampleMeleeSwing;},get sampleWideSwing(){return m183.sampleWideSwing;},get swingPhases(){return m183.swingPhases;},get wideGrip(){return m183.wideGrip;},get COMBAT_RULES(){return m186.COMBAT_RULES;},get registerGameEntityTypes(){return m116.registerGameEntityTypes;},get actorVitals(){return m102.actorVitals;},get gameActor(){return m100.gameActor;},get NPC(){return m127.NPC;},get rosterRecord(){return m127.rosterRecord;},get ROSTER_FIELDS(){return m127.ROSTER_FIELDS;},get Ganger(){return m99.Ganger;},get actorSystem(){return m176.actorSystem;},get actorItems(){return m103.actorItems;},get restoreActorItems(){return m103.restoreActorItems;},get resolveEmoteLines(){return m128.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m128.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m115.abilityLoadout;},get actorAbilities(){return m115.actorAbilities;},get importActorAbilities(){return m115.importActorAbilities;},get abilitySystem(){return m175.abilitySystem;},get createAbilityCatalog(){return m60.createAbilityCatalog;},get attackRegistry(){return m101.attackRegistry;},get validateAttackState(){return m101.validateAttackState;},get attackSystem(){return m172.attackSystem;},get createAttackCatalog(){return m57.createAttackCatalog;},get validateMountedAttack(){return m114.validateMountedAttack;},get TrafficVehicle(){return m130.TrafficVehicle;},get createGameVehicle(){return m130.createGameVehicle;},get Hunter(){return m98.Hunter;},get createHunterAppearance(){return m56.createHunterAppearance;},get Marionette(){return m122.Marionette;},get MARIONETTE_RULES(){return m54.MARIONETTE_RULES;},get validateAbilityAction(){return m111.validateAbilityAction;},get GatlingGunner(){return m108.GatlingGunner;},get Drone(){return m117.Drone;},get VelvetCat(){return m118.VelvetCat;},get velvetCatAnimation(){return m119.velvetCatAnimation;},get createVelvetAnimation(){return m119.createVelvetAnimation;},get velvetPresentation(){return m119.velvetPresentation;},get droneLift(){return m187.droneLift;},get droneArmPose(){return m187.droneArmPose;},get dronePresentation(){return m187.dronePresentation;},get VELVET_CAT_PALETTES(){return m120.VELVET_CAT_PALETTES;},get VELVET_T(){return m120.VELVET_T;},get VELVET_PROFILES(){return m120.VELVET_PROFILES;},get VELVET_GAITS(){return m120.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m120.VELVET_TAIL_SEGS;},get Demoness(){return m97.Demoness;},get Warden(){return m107.Warden;},get Vesper(){return m107.Vesper;},get Matins(){return m107.Matins;},get Compline(){return m107.Compline;},get BossEffect(){return m109.BossEffect;},get encounterSystem(){return m171.encounterSystem;},get createBossAbilities(){return m48.createBossAbilities;},get createDemonessAppearance(){return m48.createDemonessAppearance;},get demonessAppearance(){return m188.demonessAppearance;},get demonessPresentation(){return m188.demonessPresentation;},get bossEffectAppearance(){return m189.bossEffectAppearance;},get bossEffectPresentation(){return m189.bossEffectPresentation;},get validateBossRecord(){return m96.validateBossRecord;},get createDronePackets(){return m187.createDronePackets;},get createVelvetCatArt(){return m190.createVelvetCatArt;},get createVelvetCatPackets(){return m190.createVelvetCatPackets;},get createVelvetEyePackets(){return m190.createVelvetEyePackets;},get doorPresentation(){return m191.doorPresentation;},get createDoorPackets(){return m191.createDoorPackets;},get DOOR_APPEARANCE(){return m191.DOOR_APPEARANCE;},get PROP_FAMILIES(){return m193.PROP_FAMILIES;},get hasPropArt(){return m193.hasPropArt;},get propArtPacket(){return m193.propArtPacket;},get createPropDraws(){return m193.createPropDraws;},get drawPropArt(){return m193.drawPropArt;},get sceneLighting(){return m199.sceneLighting;},get levelLights(){return m199.levelLights;},get LIGHTING(){return m199.LIGHTING;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m167.humanoidSystem;},get humanoidPresentation(){return m167.humanoidPresentation;},get humanoidBodyCanon(){return m168.humanoidBodyCanon;},get humanoidBuilds(){return m168.humanoidBuilds;},get getHumanoidRigAssets(){return m168.getHumanoidRigAssets;},get roadNavigationData(){return m201.roadNavigationData;},get loadRoadNavigation(){return m201.loadRoadNavigation;}});
+return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m40.assetLibrary;},get createGameAssetLibrary(){return m47.createGameAssetLibrary;},get resolveMapLayout(){return m69.resolveMapLayout;},get resolvePlacement(){return m69.resolvePlacement;},get isMovableProp(){return m69.isMovableProp;},get mapHost(){return m69.mapHost;},get createMapLibraries(){return m69.createMapLibraries;},get PROP_TYPES(){return m69.PROP_TYPES;},get MAP_IDS(){return m69.MAP_IDS;},get ApartmentLevel(){return m95.ApartmentLevel;},get APARTMENT_RULES(){return m137.APARTMENT_RULES;},get gameEngine(){return m146.gameEngine;},get gameLevel(){return m148.gameLevel;},get mapLevel(){return m163.mapLevel;},get travelSystem(){return m164.travelSystem;},get InteriorLevel(){return m165.InteriorLevel;},get registerInteriorLevels(){return m165.registerInteriorLevels;},get levelLobby(){return m147.levelLobby;},get createGameRuntime(){return m166.createGameRuntime;},get controlSystem(){return m149.controlSystem;},get controlsSystem(){return m149.controlsSystem;},get inputInstance(){return m149.inputInstance;},get keyboardInstance(){return m149.keyboardInstance;},get mouseInstance(){return m149.mouseInstance;},get touchInstance(){return m149.touchInstance;},get touchStick(){return m149.touchStick;},get gamepadInstance(){return m149.gamepadInstance;},get TAP(){return m149.TAP;},get DOUBLETAP(){return m149.DOUBLETAP;},get HELD(){return m149.HELD;},get PRESS(){return m149.PRESS;},get REPEAT(){return m149.REPEAT;},get RELEASE(){return m149.RELEASE;},get renderSystem(){return m154.renderSystem;},get renderFrame(){return m154.renderFrame;},get canvasRenderer(){return m154.canvasRenderer;},get pictureCache(){return m154.pictureCache;},get measureText(){return m154.measureText;},get cameraSystem(){return m154.cameraSystem;},get gameSession(){return m178.gameSession;},get PlayerStateSystem(){return m179.PlayerStateSystem;},get PlayerControlSystem(){return m180.PlayerControlSystem;},get Player(){return m123.Player;},get playerVitals(){return m124.playerVitals;},get itemSystem(){return m104.itemSystem;},get createItemCatalog(){return m58.createItemCatalog;},get GUN_MATERIALS(){return m174.GUN_MATERIALS;},get WEAPON_MODELS(){return m174.WEAPON_MODELS;},get LASER_MODULE(){return m174.LASER_MODULE;},get weaponModel(){return m174.weaponModel;},get weaponAppearance(){return m185.weaponAppearance;},get combatSystem(){return m181.combatSystem;},get weaponSystem(){return m182.weaponSystem;},get lootSystem(){return m184.lootSystem;},get WorldLoot(){return m129.WorldLoot;},get MELEE_SWING(){return m183.MELEE_SWING;},get WIDE_SWING(){return m183.WIDE_SWING;},get sampleMeleeSwing(){return m183.sampleMeleeSwing;},get sampleWideSwing(){return m183.sampleWideSwing;},get swingPhases(){return m183.swingPhases;},get wideGrip(){return m183.wideGrip;},get COMBAT_RULES(){return m186.COMBAT_RULES;},get registerGameEntityTypes(){return m116.registerGameEntityTypes;},get actorVitals(){return m102.actorVitals;},get gameActor(){return m100.gameActor;},get NPC(){return m127.NPC;},get rosterRecord(){return m127.rosterRecord;},get ROSTER_FIELDS(){return m127.ROSTER_FIELDS;},get Ganger(){return m99.Ganger;},get actorSystem(){return m176.actorSystem;},get actorItems(){return m103.actorItems;},get restoreActorItems(){return m103.restoreActorItems;},get resolveEmoteLines(){return m128.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m128.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m115.abilityLoadout;},get actorAbilities(){return m115.actorAbilities;},get importActorAbilities(){return m115.importActorAbilities;},get abilitySystem(){return m175.abilitySystem;},get createAbilityCatalog(){return m60.createAbilityCatalog;},get attackRegistry(){return m101.attackRegistry;},get validateAttackState(){return m101.validateAttackState;},get attackSystem(){return m172.attackSystem;},get createAttackCatalog(){return m57.createAttackCatalog;},get validateMountedAttack(){return m114.validateMountedAttack;},get TrafficVehicle(){return m130.TrafficVehicle;},get createGameVehicle(){return m130.createGameVehicle;},get Hunter(){return m98.Hunter;},get createHunterAppearance(){return m56.createHunterAppearance;},get Marionette(){return m122.Marionette;},get MARIONETTE_RULES(){return m54.MARIONETTE_RULES;},get validateAbilityAction(){return m111.validateAbilityAction;},get GatlingGunner(){return m108.GatlingGunner;},get Drone(){return m117.Drone;},get VelvetCat(){return m118.VelvetCat;},get velvetCatAnimation(){return m119.velvetCatAnimation;},get createVelvetAnimation(){return m119.createVelvetAnimation;},get velvetPresentation(){return m119.velvetPresentation;},get droneLift(){return m187.droneLift;},get droneArmPose(){return m187.droneArmPose;},get dronePresentation(){return m187.dronePresentation;},get VELVET_CAT_PALETTES(){return m120.VELVET_CAT_PALETTES;},get VELVET_T(){return m120.VELVET_T;},get VELVET_PROFILES(){return m120.VELVET_PROFILES;},get VELVET_GAITS(){return m120.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m120.VELVET_TAIL_SEGS;},get Demoness(){return m97.Demoness;},get Warden(){return m107.Warden;},get Vesper(){return m107.Vesper;},get Matins(){return m107.Matins;},get Compline(){return m107.Compline;},get BossEffect(){return m109.BossEffect;},get encounterSystem(){return m171.encounterSystem;},get createBossAbilities(){return m48.createBossAbilities;},get createDemonessAppearance(){return m48.createDemonessAppearance;},get demonessAppearance(){return m188.demonessAppearance;},get demonessPresentation(){return m188.demonessPresentation;},get bossEffectAppearance(){return m189.bossEffectAppearance;},get bossEffectPresentation(){return m189.bossEffectPresentation;},get validateBossRecord(){return m96.validateBossRecord;},get createDronePackets(){return m187.createDronePackets;},get createVelvetCatArt(){return m190.createVelvetCatArt;},get createVelvetCatPackets(){return m190.createVelvetCatPackets;},get createVelvetEyePackets(){return m190.createVelvetEyePackets;},get doorPresentation(){return m191.doorPresentation;},get createDoorPackets(){return m191.createDoorPackets;},get DOOR_APPEARANCE(){return m191.DOOR_APPEARANCE;},get PROP_FAMILIES(){return m193.PROP_FAMILIES;},get hasPropArt(){return m193.hasPropArt;},get propArtPacket(){return m193.propArtPacket;},get createPropDraws(){return m193.createPropDraws;},get drawPropArt(){return m193.drawPropArt;},get sceneLighting(){return m201.sceneLighting;},get levelLights(){return m201.levelLights;},get LIGHTING(){return m201.LIGHTING;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m167.humanoidSystem;},get humanoidPresentation(){return m167.humanoidPresentation;},get humanoidBodyCanon(){return m168.humanoidBodyCanon;},get humanoidBuilds(){return m168.humanoidBuilds;},get getHumanoidRigAssets(){return m168.getHumanoidRigAssets;},get roadNavigationData(){return m203.roadNavigationData;},get loadRoadNavigation(){return m203.loadRoadNavigation;}});
 })();
 return m0;
 })();
@@ -42068,7 +42788,7 @@ function drawIndoorDoorAppearance(ctx,door){return indoorDoorAppearance.draw.cal
             }
         }
     </script>
-    <script type="text/dfab" data-src="legacy/entities/props-decor.js" data-cost="2497">
+    <script type="text/dfab" data-src="legacy/entities/props-decor.js" data-cost="2498">
         // One soft, centred ground blob shared by props, pickups and Velvet. It is stamped
         // before artwork transforms and never baked into a rotating furniture sprite.
         function drawGroundContactShadow(ctx, x, y, rx, ry, angle = 0) {
@@ -44708,7 +45428,7 @@ function drawIndoorDoorAppearance(ctx,door){return indoorDoorAppearance.draw.cal
                     // Seeded from where it was first drawn, as its classic sprite was
                     const art = p._artAppearance ??= { family: p.family, look: p.look ?? {}, decor: p.decor, x: p.x, y: p.y };
                     DFNative.drawPropArt(ctx, DFNative.propArtPacket({ appearance: art, position: [p.x + p.width / 2, p.y + p.height / 2], rotation: p.angle || 0, width: p.width, height: p.height }),
-                        { pictures: PropSprites.pictures, time: _frameTime / 1000 });
+                        { pictures: PropSprites.pictures, time: _frameTime / 1000, beat: clubBeatN() });   // (the club's pieces keep the music's kick)
                     return;
                 }
                 // Painting or replaying a split run draws body art only. The outer pass
@@ -115614,7 +116334,7 @@ class ApartmentRenderer {
     /** A prop whose family has native art: drawn from its body's pose, its still runs from pictures. */
     drawNativeProp(ctx,entity,blend){
         const pose=entity.getRenderState(blend),[width,height]=entity.collision_shape.dimensions;
-        DFNative.drawPropArt(ctx,DFNative.propArtPacket({appearance:entity.data.appearance,position:pose.position,rotation:pose.rotation,width,height}),{pictures:this.pictures,time:_frameTime/1000});
+        DFNative.drawPropArt(ctx,DFNative.propArtPacket({appearance:entity.data.appearance,position:pose.position,rotation:pose.rotation,width,height}),{pictures:this.pictures,time:_frameTime/1000,beat:clubBeatN()});
     }
     destroy(){this.lighting=null;this.pictures.clear();PropSprites.clear([...this.props.values()]);this.props.clear();this.people.clear();}
     draw(game,blend=1){
