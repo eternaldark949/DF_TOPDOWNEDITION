@@ -11,7 +11,7 @@ import { join, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { validatePropCatalog, validateMapLayout, resolvePlacement } from '../src/engine/directory/index.mjs';
-import { PROP_FAMILIES, hasPropArt, propArtPacket, createPropDraws } from '../src/game/presentation/props/index.mjs';
+import { PROP_FAMILIES, hasPropArt, propArtLoop, propArtPacket, createPropDraws } from '../src/game/presentation/props/index.mjs';
 import PROPS from '../src/game/data/game-assets/props.json' with { type: 'json' };
 import CAFE from '../src/game/data/game-assets/maps/cozy_cafe_interior.json' with { type: 'json' };
 import LOBBY from '../src/game/data/game-assets/maps/hotel_lobby.json' with { type: 'json' };
@@ -74,6 +74,21 @@ test('still runs are pictures with stable keys; moving parts are live; the plant
     assert.equal(draws('cc_plant', TIME)[1].key, draws('cc_plant', TIME + 0.05)[1].key, 'and the time between frames shows the nearest');
     const chairs = PIECES.filter(p => p.placement.type === 'cc_chair').map(p => createPropDraws(propArtPacket({ appearance: p, position: [0, 0], width: 22, height: 22 }))[1].key);
     assert.equal(new Set(chairs).size, chairs.length, 'each chair, seeded from where it stands, is its own picture');
+});
+
+test('every native piece on the six maps paints its still runs the same at any time, and a loop the same one period on', () => {
+    // A still run becomes a picture painted once: an animation left in one would freeze. (The classic
+    // pieces are proven the same way by the furniture-sprite regression in test-game-regressions.cjs.)
+    const all = [...PIECES, ...HOME, ...[HOUSE, LOBBY, SUITE, CLUB].flatMap(piecesOf)];
+    const stills = (p, time, beat) => createPropDraws(propArtPacket({ appearance: p, position: [3, 4], width: p.width, height: p.height }), { time, beat })
+        .filter(d => d.key).map(d => [d.key, JSON.stringify(d.build())]);
+    let loops = 0;
+    for (const p of all) {
+        const name = p.placement.type, loop = propArtLoop(p.family);
+        if (loop) { assert.deepEqual(stills(p, 5, null), stills(p, 5 + loop.period, null), `${name}: one period on, the same frame`); loops++; continue; }
+        assert.deepEqual(stills(p, 5, 2.25), stills(p, 987654.321, 41.8), `${name}: its painted art never changes over time or with the beat`);
+    }
+    assert.ok(all.length > 250 && loops >= 3, `checked ${all.length} pieces and ${loops} loops`);
 });
 
 /** Serves the checkout, opens a blank page and runs `fn(args)` there. */

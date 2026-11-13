@@ -22,6 +22,8 @@ for(const family of Object.keys(ARTISTS))if(!PROP_FAMILIES[family])throw new Err
 
 /** Whether a family has a native artist. */
 export const hasPropArt=family=>typeof family==='string'&&Object.hasOwn(ARTISTS,family);
+/** A family's loop ({frames, period} in seconds: its still runs painted as that many phase frames), or null. */
+export const propArtLoop=family=>hasPropArt(family)?ARTISTS[family].loop??null:null;
 
 const looks=new WeakMap();
 /** A piece's whole look and its picture key, worked out once per authored appearance. */

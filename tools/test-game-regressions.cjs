@@ -724,7 +724,8 @@ test('Furniture sprites: painted runs never change over time, loops repeat per p
       checked++;
     });
   }
-  ok(checked > 300 && loops > 15, `checked ${checked} painted props and ${loops} loops`);
+  // (Native pieces skip this: tools/test-prop-art.mjs proves their still runs and loops the same way.)
+  ok(checked > 250 && loops >= 5, `checked ${checked} painted props and ${loops} loops`);
   env.run(`game._doLoadMap('house_of_death');`);
   const candle = value(env, `return game.props.findIndex(p => p.decorType === 'hod_candelabra');`);
   ok(runTrace(candle, 0, 5000) !== runTrace(candle, 0, 987654.321), 'control: a candelabra painted as if still would freeze its flames');
@@ -745,10 +746,10 @@ test('Furniture sprites: painted runs never change over time, loops repeat per p
     PropSprites.frame(2.6); const closeUp = calls(sofa) > 5; PropSprites.frame(1.4);
     GameSettings.propSprites = false; const vectorOff = calls(sofa) > 5; GameSettings.propSprites = true;
     game.draw(); const bytes = PropSprites.bytes, floor = !!game._aptFloor;
-    game._doLoadMap('hotel_suite');
+    game._doLoadMap('moon_city_nightclub');
     const released = sofa._spr === undefined && PropSprites.bytes === 0 && !game._aptFloor;
-    const desk = game.props.find(p => p.decorType === 'ps_desk'); PropSprites.frame(1.4); calls(desk);
-    return {firstSofa, sofaCalls, turned, craftCalls, craftVector, craftRuns, craftSplit, swRepainted, closeUp, vectorOff, bytes, floor, released, deskNever: !!(desk._spr && desk._spr.never)};
+    const purse = game.props.find(p => p.decorType === 'mc_lost_purse'); PropSprites.frame(1.4); calls(purse);
+    return {firstSofa, sofaCalls, turned, craftCalls, craftVector, craftRuns, craftSplit, swRepainted, closeUp, vectorOff, bytes, floor, released, purseNever: !!(purse._spr && purse._spr.never)};
   `);
   equal([r.sofaCalls, r.turned], [2, 10], 'a still piece stamps its art plus one ground shadow');
   ok(r.firstSofa > 5, 'the first draw paints it');
@@ -759,7 +760,7 @@ test('Furniture sprites: painted runs never change over time, loops repeat per p
   ok(r.vectorOff, 'Prop Sprites off: vector art');
   ok(r.bytes > 0 && r.floor, 'sprites and the apartment floor are held while she is there');
   ok(r.released, 'and let go when she leaves');
-  ok(r.deskNever, 'a piece that cuts with destination-out stays vector');
+  ok(r.purseNever, 'a piece that cuts with destination-out (a lost purse\'s clasp) stays vector');
 }, {affine: true});
 
 test('A landmark just off screen still throws its beams but skips its roof pass', env => {

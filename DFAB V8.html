@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '633349c3791a';
+        const DFAB_BUILD = 'fb982046f458';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="15253">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="15256">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -32801,6 +32801,8 @@ for(const family of Object.keys(ARTISTS))if(!PROP_FAMILIES[family])throw new Err
 
 /** Whether a family has a native artist. */
 const hasPropArt=family=>typeof family==='string'&&Object.hasOwn(ARTISTS,family);
+/** A family's loop ({frames, period} in seconds: its still runs painted as that many phase frames), or null. */
+const propArtLoop=family=>hasPropArt(family)?ARTISTS[family].loop??null:null;
 
 const looks=new WeakMap();
 /** A piece's whole look and its picture key, worked out once per authored appearance. */
@@ -32856,7 +32858,7 @@ function drawPropArt(context,packet,{pictures,time=0,beat=null}){
     }
 }
 
-return Object.freeze({get PROP_FAMILIES(){return PROP_FAMILIES;},get hasPropArt(){return hasPropArt;},get propArtPacket(){return propArtPacket;},get createPropDraws(){return createPropDraws;},get drawPropArt(){return drawPropArt;}});
+return Object.freeze({get PROP_FAMILIES(){return PROP_FAMILIES;},get hasPropArt(){return hasPropArt;},get propArtLoop(){return propArtLoop;},get propArtPacket(){return propArtPacket;},get createPropDraws(){return createPropDraws;},get drawPropArt(){return drawPropArt;}});
 })();
 const m202 = Object.freeze({default:{
  "indoor": { "tint": "rgb(22, 10, 48)", "darkness": 0.95, "lamp_glow": 0.08 },
