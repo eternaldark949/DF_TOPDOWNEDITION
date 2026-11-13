@@ -1,5 +1,5 @@
 {
-  "createdAt": "2026-11-13T20:55:31.491Z",
+  "createdAt": "2026-11-13T23:09:35.339Z",
   "duration": 8000,
   "warmup": 3000,
   "viewport": [
@@ -9,41 +9,41 @@
   "scenes": {
     "cafe-night": {
       "title": "The cafe at night, standing by the counter",
-      "calibration_ms": 48.7,
-      "frames": 229,
-      "fps": 28.6,
+      "calibration_ms": 45.1,
+      "frames": 207,
+      "fps": 25.7,
       "cpu": {
-        "mean": 27.042358078615635,
-        "p95": 31.200000000186265
+        "mean": 29.168599033816538,
+        "p95": 36.800000000046566
       },
       "lighting": {
-        "mean": 7.258951965052488,
-        "p95": 8.600000000093132
+        "mean": 7.843478260864954,
+        "p95": 10.699999999953434
       },
       "top": [
         {
           "label": "Render:Total",
-          "mean": 26.215
+          "mean": 28.129
         },
         {
           "label": "Render:PostFX",
-          "mean": 15.232
+          "mean": 16.148
         },
         {
           "label": "Render:Lighting",
-          "mean": 7.259
+          "mean": 7.843
         },
         {
           "label": "Render:Entities",
-          "mean": 3.552
+          "mean": 3.916
         },
         {
           "label": "Entities: Props",
-          "mean": 1.624
+          "mean": 1.805
         },
         {
           "label": "Entities: People extras",
-          "mean": 0.817
+          "mean": 0.875
         }
       ],
       "map": "cozy_cafe_interior",
@@ -52,36 +52,36 @@
         "pedestrians": 0
       },
       "relative": {
-        "cpu": 0.5553,
-        "lighting": 0.1491
+        "cpu": 0.6468,
+        "lighting": 0.1739
       },
       "errors": []
     },
     "apartment-night": {
       "title": "The apartment at night (the native level)",
-      "calibration_ms": 45.9,
-      "frames": 118,
-      "fps": 14.7,
+      "calibration_ms": 44.9,
+      "frames": 209,
+      "fps": 26,
       "cpu": {
-        "mean": 55.6999999999929,
-        "p95": 72.20000000018626
+        "mean": 25.255023923447983,
+        "p95": 34.800000000046566
       },
       "lighting": {
-        "mean": 40.75423728814743,
-        "p95": 54.5
+        "mean": 13.703349282296651,
+        "p95": 17.400000000023283
       },
       "top": [
         {
           "label": "Render:Total",
-          "mean": 48.905
+          "mean": 21.204
         },
         {
           "label": "Render:Lighting",
-          "mean": 40.754
+          "mean": 13.703
         },
         {
           "label": "Audio:Ambience",
-          "mean": 0.007
+          "mean": 0.006
         }
       ],
       "map": "apt_949",
@@ -90,37 +90,37 @@
         "pedestrians": 0
       },
       "relative": {
-        "cpu": 1.2135,
-        "lighting": 0.8879
+        "cpu": 0.5625,
+        "lighting": 0.3052
       },
       "errors": []
     },
     "apartment-door": {
       "title": "A door swinging open and shut beside the apartment lamps",
-      "calibration_ms": 45.6,
+      "calibration_ms": 45,
       "door_lamps": 8,
-      "frames": 122,
-      "fps": 15.2,
+      "frames": 205,
+      "fps": 25.6,
       "cpu": {
-        "mean": 56.686885245892476,
-        "p95": 69.6999999997206
+        "mean": 28.06048780487419,
+        "p95": 39.20000000006985
       },
       "lighting": {
-        "mean": 40.25327868848947,
-        "p95": 46.89999999990687
+        "mean": 14.20829268292717,
+        "p95": 18.79999999993015
       },
       "top": [
         {
           "label": "Render:Total",
-          "mean": 48.549
+          "mean": 22.547
         },
         {
           "label": "Render:Lighting",
-          "mean": 40.253
+          "mean": 14.208
         },
         {
           "label": "Audio:Ambience",
-          "mean": 0.008
+          "mean": 0.01
         }
       ],
       "map": "apt_949",
@@ -130,111 +130,111 @@
         "pedestrians": 0
       },
       "relative": {
-        "cpu": 1.2431,
-        "lighting": 0.8827
+        "cpu": 0.6236,
+        "lighting": 0.3157
       },
       "errors": []
     },
     "city-night": {
       "title": "A city street at night, standing",
-      "calibration_ms": 49.4,
-      "frames": 76,
-      "fps": 9.5,
+      "calibration_ms": 45.2,
+      "frames": 80,
+      "fps": 9.9,
       "cpu": {
-        "mean": 93.34736842102078,
-        "p95": 112.89999999990687
+        "mean": 89.21874999998836,
+        "p95": 109.59999999997672
       },
       "lighting": {
-        "mean": 34.95131578948349,
-        "p95": 44.3000000002794
+        "mean": 33.78249999999243,
+        "p95": 38.79999999993015
       },
       "top": [
         {
           "label": "Render:Total",
-          "mean": 83.232
+          "mean": 80.004
         },
         {
           "label": "Render:Lighting",
-          "mean": 34.951
+          "mean": 33.782
         },
         {
           "label": "Lighting: Glow",
-          "mean": 30.138
+          "mean": 29.079
         },
         {
           "label": "Glow: Tiered lights",
-          "mean": 29.229
+          "mean": 28.234
         },
         {
           "label": "Render:PostFX",
-          "mean": 20.441
+          "mean": 19.179
         },
         {
           "label": "Render:Buildings",
-          "mean": 15.326
+          "mean": 14.656
         }
       ],
       "map": "sdc",
       "population": {
-        "cars": 16.7,
-        "pedestrians": 25.5
+        "cars": 18.2,
+        "pedestrians": 26.8
       },
       "relative": {
-        "cpu": 1.8896,
-        "lighting": 0.7075
+        "cpu": 1.9739,
+        "lighting": 0.7474
       },
       "errors": []
     },
     "city-drive": {
       "title": "Driving across the city at night (autodrive to the clinic)",
-      "calibration_ms": 45.9,
+      "calibration_ms": 45,
       "driving": true,
       "auto_drive": true,
-      "frames": 62,
-      "fps": 7.7,
+      "frames": 65,
+      "fps": 8.1,
       "cpu": {
-        "mean": 114.5806451612753,
-        "p95": 138.1999999997206
+        "mean": 109.6923076923059,
+        "p95": 130
       },
       "lighting": {
-        "mean": 9.535483870993279,
-        "p95": 10.5
+        "mean": 9.539999999999642,
+        "p95": 12.20000000006985
       },
       "top": [
         {
           "label": "Render:Total",
-          "mean": 99.026
+          "mean": 95.74
         },
         {
           "label": "Render:PostFX",
-          "mean": 49.418
+          "mean": 46.02
         },
         {
           "label": "Render:Buildings",
-          "mean": 20.818
+          "mean": 20.292
         },
         {
           "label": "Render:Entities",
-          "mean": 19.074
-        },
-        {
-          "label": "Update:Total",
-          "mean": 11.95
+          "mean": 19.717
         },
         {
           "label": "Entities: World tops",
-          "mean": 11.518
+          "mean": 12.555
+        },
+        {
+          "label": "Update:Total",
+          "mean": 10.494
         }
       ],
       "map": "sdc",
-      "driven_px": 900,
+      "driven_px": 921,
       "population": {
-        "cars": 21.4,
-        "pedestrians": 32.4
+        "cars": 19.9,
+        "pedestrians": 27.9
       },
       "relative": {
-        "cpu": 2.4963,
-        "lighting": 0.2077
+        "cpu": 2.4376,
+        "lighting": 0.212
       },
       "errors": []
     }

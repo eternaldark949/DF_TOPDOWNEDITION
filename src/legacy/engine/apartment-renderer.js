@@ -89,7 +89,7 @@ class ApartmentRenderer {
         const lightAt=(x,y)=>game.roomSystem.lightAt(x,y),rooms=Object.values(game.roomSystem.rooms).map(r=>({rects:r.rects??[{x:r.x,y:r.y,w:r.w,h:r.h}],type:r.type,fill:r.fill,lit:r.lightsOff?0:1}));
         const light=this.lighting.createLayer({bounds:{left:Math.max(0,view.left-200),top:Math.max(0,view.top-200),right:Math.min(level.definition.map.width,view.right+200),bottom:Math.min(level.definition.map.height,view.bottom+200)},
             kind:'indoor',sky_darkness:game.dayCycle().darkness,rooms,lights:DFNative.levelLights(level,{blend,lightAt}),time:_frameTime/1000});
-        DFNative.canvasRenderer.drawLayer(ctx,light.packets,{opacity:light.opacity});
+        DFNative.canvasRenderer.drawLayer(ctx,light.packets,{opacity:light.opacity,scale:game.lightLayerScale()});   // (the player's Lighting Quality and soft shadows, as the classic layer)
         game.profiler.stop('Render:Lighting');
         game.drawNoiseRipples(ctx);
         if(game.flitVFX.length)game.drawFlitVFX(ctx);

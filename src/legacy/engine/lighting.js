@@ -334,6 +334,12 @@
              * measured light submission improve. This is not a GPU-completion timer.
              * Photos, cinematics, benchmarks, interiors and manual sharp shadows use full
              * selected fidelity; the main canvas, people, particles and UI never resize. */
+            /** The light layer's resolution against the frame: Lighting Quality, halved for soft shadows (the upscale
+             *  softens edges), times the adaptive factor. The classic layer and a native level's layer both draw at it. */
+            lightLayerScale() {
+                return this.lightingScale * (GameSettings.softShadows ? 0.5 : 1) * this._lightingAdaptiveScale();
+            },
+
             _lightingAdaptiveScale() {
                 const eligible = GameSettings.adaptiveLighting && GameSettings.softShadows && this.running &&
                     !this.paused && !this.cineCam && !this.cutscene?.active && !this.scenes?.running &&
@@ -421,8 +427,7 @@
             },
 
             _renderLightingSystem(ctx, ambient, flash, finalOpacity, scratch) {
-                // Layer resolution: lighting quality, halved for soft shadows (the upscale softens edges)
-                const LS = this.lightingScale * (GameSettings.softShadows ? 0.5 : 1) * (this._adaptiveLighting?.factor || 1);
+                const LS = this.lightingScale * (GameSettings.softShadows ? 0.5 : 1) * (this._adaptiveLighting?.factor || 1);   // (lightLayerScale, with the factor drawLightingSystem already sampled)
                 const lw = Math.max(1, Math.round(this.canvas.width * LS)), lh = Math.max(1, Math.round(this.canvas.height * LS));
                 canvasKit.fitLayer(this.lightCanvas, lw, lh);
                 const lc = this.lightCtx;

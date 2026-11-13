@@ -235,7 +235,7 @@
                 // scale rather than multiplying against it, so 'low' lighting at
                 // 0.5 render scale doesn't end up at quarter resolution.
                 // Match the final draw size so resize does not allocate a larger buffer first.
-                const lightScale = this.lightingScale * (GameSettings.softShadows ? 0.5 : 1) * this._lightingAdaptiveScale();
+                const lightScale = this.lightLayerScale();
                 const lightW = Math.max(1, Math.round(bufW * lightScale));
                 const lightH = Math.max(1, Math.round(bufH * lightScale));
                 if (this.lightCanvas.width !== lightW || this.lightCanvas.height !== lightH) {

@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '90fe9bca0832';
+        const DFAB_BUILD = '9351eb2a8736';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -97205,7 +97205,7 @@ const levelLobby = DFNative.levelLobby;
         });
 
     </script>
-    <script type="text/dfab" data-src="legacy/engine/combat-effects.js" data-cost="364">
+    <script type="text/dfab" data-src="legacy/engine/combat-effects.js" data-cost="363">
         // GameEngine — Screen shake, time slow, death, resize, firing, boosters, player damage.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         const _muzzleStars = new Map();
@@ -97443,7 +97443,7 @@ const levelLobby = DFNative.levelLobby;
                 // scale rather than multiplying against it, so 'low' lighting at
                 // 0.5 render scale doesn't end up at quarter resolution.
                 // Match the final draw size so resize does not allocate a larger buffer first.
-                const lightScale = this.lightingScale * (GameSettings.softShadows ? 0.5 : 1) * this._lightingAdaptiveScale();
+                const lightScale = this.lightLayerScale();
                 const lightW = Math.max(1, Math.round(bufW * lightScale));
                 const lightH = Math.max(1, Math.round(bufH * lightScale));
                 if (this.lightCanvas.width !== lightW || this.lightCanvas.height !== lightH) {
@@ -115707,7 +115707,7 @@ engineMixin({
             },
         });
     </script>
-    <script type="text/dfab" data-src="legacy/engine/lighting.js" data-cost="593">
+    <script type="text/dfab" data-src="legacy/engine/lighting.js" data-cost="597">
         // Shared immutable falloff tables; softArea only reads these stops.
         const HOLE_AREA = [[0, 'rgba(255,255,255,1)'], [0.5, 'rgba(255,255,255,0.9)'], [1, 'rgba(255,255,255,0)']];
         const HOLE_AREA_SOFT = [[0, 'rgba(255,255,255,1)'], [0.3, 'rgba(255,255,255,0.85)'], [0.7, 'rgba(255,255,255,0.35)'], [1, 'rgba(255,255,255,0)']];   // long, gentle edge
@@ -116044,6 +116044,12 @@ engineMixin({
              * measured light submission improve. This is not a GPU-completion timer.
              * Photos, cinematics, benchmarks, interiors and manual sharp shadows use full
              * selected fidelity; the main canvas, people, particles and UI never resize. */
+            /** The light layer's resolution against the frame: Lighting Quality, halved for soft shadows (the upscale
+             *  softens edges), times the adaptive factor. The classic layer and a native level's layer both draw at it. */
+            lightLayerScale() {
+                return this.lightingScale * (GameSettings.softShadows ? 0.5 : 1) * this._lightingAdaptiveScale();
+            },
+
             _lightingAdaptiveScale() {
                 const eligible = GameSettings.adaptiveLighting && GameSettings.softShadows && this.running &&
                     !this.paused && !this.cineCam && !this.cutscene?.active && !this.scenes?.running &&
@@ -116131,8 +116137,7 @@ engineMixin({
             },
 
             _renderLightingSystem(ctx, ambient, flash, finalOpacity, scratch) {
-                // Layer resolution: lighting quality, halved for soft shadows (the upscale softens edges)
-                const LS = this.lightingScale * (GameSettings.softShadows ? 0.5 : 1) * (this._adaptiveLighting?.factor || 1);
+                const LS = this.lightingScale * (GameSettings.softShadows ? 0.5 : 1) * (this._adaptiveLighting?.factor || 1);   // (lightLayerScale, with the factor drawLightingSystem already sampled)
                 const lw = Math.max(1, Math.round(this.canvas.width * LS)), lh = Math.max(1, Math.round(this.canvas.height * LS));
                 canvasKit.fitLayer(this.lightCanvas, lw, lh);
                 const lc = this.lightCtx;
@@ -117755,7 +117760,7 @@ class ApartmentRooms {
     tagLamps(){}
 }
     </script>
-    <script type="text/dfab" data-src="legacy/engine/apartment-renderer.js" data-cost="139">
+    <script type="text/dfab" data-src="legacy/engine/apartment-renderer.js" data-cost="140">
 /** Native scene presentation. Packets below are drawing inputs, never entities or body owners. */
 class ApartmentRenderer {
     constructor(game){this.game=game;this.people=new Map();this.props=new Map();this.pictures=new DFNative.pictureCache();}
@@ -117847,7 +117852,7 @@ class ApartmentRenderer {
         const lightAt=(x,y)=>game.roomSystem.lightAt(x,y),rooms=Object.values(game.roomSystem.rooms).map(r=>({rects:r.rects??[{x:r.x,y:r.y,w:r.w,h:r.h}],type:r.type,fill:r.fill,lit:r.lightsOff?0:1}));
         const light=this.lighting.createLayer({bounds:{left:Math.max(0,view.left-200),top:Math.max(0,view.top-200),right:Math.min(level.definition.map.width,view.right+200),bottom:Math.min(level.definition.map.height,view.bottom+200)},
             kind:'indoor',sky_darkness:game.dayCycle().darkness,rooms,lights:DFNative.levelLights(level,{blend,lightAt}),time:_frameTime/1000});
-        DFNative.canvasRenderer.drawLayer(ctx,light.packets,{opacity:light.opacity});
+        DFNative.canvasRenderer.drawLayer(ctx,light.packets,{opacity:light.opacity,scale:game.lightLayerScale()});   // (the player's Lighting Quality and soft shadows, as the classic layer)
         game.profiler.stop('Render:Lighting');
         game.drawNoiseRipples(ctx);
         if(game.flitVFX.length)game.drawFlitVFX(ctx);

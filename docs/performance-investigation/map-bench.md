@@ -48,3 +48,19 @@ What it says:
   because the light layer costs the same whether the door moves or not.
 - **The city's light is mostly glow**: tiered lights take 29 of its 35 ms.
 - **Driving is bound by post-processing and buildings**, not light: the light cache holds between rebuilds.
+
+## November 13, later: the native layer at the player's resolution
+
+The native light layer drew at full resolution whatever the settings, while the classic layer draws at
+Lighting Quality × ½ for soft shadows (half resolution by default). Both now read `game.lightLayerScale()`
+(src/legacy/engine/lighting.js). Re-recorded baseline:
+
+| Scene | Frame CPU | Light layer |
+|---|---|---|
+| cafe-night | 29.2 ms | 7.8 ms |
+| apartment-night | 25.3 ms (was 55.7) | 13.7 ms (was 40.8) |
+| apartment-door | 28.1 ms (was 56.7) | 14.2 ms (was 40.3) |
+| city-night | 89.2 ms | 33.8 ms |
+| city-drive | 109.7 ms | 9.5 ms |
+
+Of the native layer's cost, building its packets is about 1 ms; the rest is drawing them.
