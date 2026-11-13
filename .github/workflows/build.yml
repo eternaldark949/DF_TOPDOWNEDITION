@@ -23,6 +23,12 @@ jobs:
         with:
           node-version: 20
 
+      - name: Install Chromium through Playwright (the pixel tests and the map bench run in it)
+        run: |
+          npm install --no-save --prefix "$RUNNER_TEMP/pw" playwright@1.63.0
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+          echo "NODE_PATH=$RUNNER_TEMP/pw/node_modules" >> "$GITHUB_ENV"
+
       - name: Check build is up to date (pull requests)
         if: github.event_name == 'pull_request'
         run: node tools/build.mjs --check
@@ -78,6 +84,9 @@ jobs:
 
       - name: Check gameplay and rendering regressions
         run: node tools/test-game-regressions.cjs
+
+      - name: Check the maps' frame and light-layer cost against the baseline (tools/bench-maps-baseline.json)
+        run: node tools/bench-maps.mjs --check
 
       - name: Commit rebuilt game (main)
         if: github.event_name != 'pull_request'

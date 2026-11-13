@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'fa49722d928f';
+        const DFAB_BUILD = '90fe9bca0832';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -111039,7 +111039,7 @@ engineMixin({
             clear() { this.items.length = 0; }
         };
     </script>
-    <script type="text/dfab" data-src="legacy/engine/draw.js" data-cost="1000">
+    <script type="text/dfab" data-src="legacy/engine/draw.js" data-cost="1004">
         // GameEngine — The frame renderer (draw).
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -111255,7 +111255,14 @@ engineMixin({
                 return {x:camX,y:camY,zoom:viewZoom,shakeX:this.camera.shakeX||0,shakeY:this.camera.shakeY||0};
             },
             draw() {
-                if(this.activeLevel)return this.apartmentRenderer.draw(this,this._apartmentBlend??1);
+                if (this.activeLevel) {                   // a native level draws itself, timed by the same profiler frame as the classic draw
+                    this._syncProfiler(); this.profiler.beginFrame(); this.profiler.start('Render:Total');
+                    this.apartmentRenderer.draw(this, this._apartmentBlend ?? 1);
+                    this.profiler.stop('Render:Total');
+                    if (PerformanceBench.active) PerformanceBench.render(this.profiler.frameDeltas());
+                    this.profiler.tick();
+                    return;
+                }
                 if (!this.running || (this.paused && !this.cineCam)) return;   // (Cinematic View keeps drawing the held world: ui/save-slots-pause-menu.js)
 
                 this._renderDrawId = (this._renderDrawId || 0) + 1;
@@ -117748,7 +117755,7 @@ class ApartmentRooms {
     tagLamps(){}
 }
     </script>
-    <script type="text/dfab" data-src="legacy/engine/apartment-renderer.js" data-cost="137">
+    <script type="text/dfab" data-src="legacy/engine/apartment-renderer.js" data-cost="139">
 /** Native scene presentation. Packets below are drawing inputs, never entities or body owners. */
 class ApartmentRenderer {
     constructor(game){this.game=game;this.people=new Map();this.props=new Map();this.pictures=new DFNative.pictureCache();}
@@ -117835,11 +117842,13 @@ class ApartmentRenderer {
         }
         // Room dimming is presentation only; queries use the world's room volumes.
         // The light layer: the dark, each room's light and every lamp, drawn natively over the scene.
+        game.profiler.start('Render:Lighting');   // (as the classic draw times its light layer: the bench compares the two)
         this.lighting??=new DFNative.sceneLighting(world);
         const lightAt=(x,y)=>game.roomSystem.lightAt(x,y),rooms=Object.values(game.roomSystem.rooms).map(r=>({rects:r.rects??[{x:r.x,y:r.y,w:r.w,h:r.h}],type:r.type,fill:r.fill,lit:r.lightsOff?0:1}));
         const light=this.lighting.createLayer({bounds:{left:Math.max(0,view.left-200),top:Math.max(0,view.top-200),right:Math.min(level.definition.map.width,view.right+200),bottom:Math.min(level.definition.map.height,view.bottom+200)},
             kind:'indoor',sky_darkness:game.dayCycle().darkness,rooms,lights:DFNative.levelLights(level,{blend,lightAt}),time:_frameTime/1000});
         DFNative.canvasRenderer.drawLayer(ctx,light.packets,{opacity:light.opacity});
+        game.profiler.stop('Render:Lighting');
         game.drawNoiseRipples(ctx);
         if(game.flitVFX.length)game.drawFlitVFX(ctx);
         for(const packet of demonesses)DFNative.demonessAppearance.drawDuelTells.call(packet,ctx);DFNative.bossEffectAppearance.draw.call({render_clock:level.player.data.weapon_state?.elapsed??0,render_time:_frameTime/1000,_hazards:DFNative.bossEffectPresentation(game.encounters.getEffects(),level.player.data.weapon_state?.elapsed??0),_playerBurn:null,player:null,_smokeK:DFNative.bossEffectAppearance._smokeK},ctx);for(const packet of drones)DFNative.canvasRenderer.drawPackets(ctx,DFNative.createDronePackets(packet,{pass:'lights'}));for(const {packet,eyes} of cats){const room=game.roomSystem.getRoomAt(packet.x,packet.y);DFNative.canvasRenderer.drawPackets(ctx,DFNative.createVelvetEyePackets(packet,{eyes,darkness:room?.type==='outdoor'?game.getAmbientDarkness():(room?.lightsOff ? .85 : .18)}));}game.drawPlayerGlow(ctx);game.drawApartmentGlow(ctx,props);for(const packet of marionettes)drawMarionetteAppearance(ctx,packet,true);for(const packet of gunners)drawGunnerAppearance(ctx,packet,true);

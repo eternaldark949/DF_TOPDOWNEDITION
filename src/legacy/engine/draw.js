@@ -213,7 +213,14 @@
                 return {x:camX,y:camY,zoom:viewZoom,shakeX:this.camera.shakeX||0,shakeY:this.camera.shakeY||0};
             },
             draw() {
-                if(this.activeLevel)return this.apartmentRenderer.draw(this,this._apartmentBlend??1);
+                if (this.activeLevel) {                   // a native level draws itself, timed by the same profiler frame as the classic draw
+                    this._syncProfiler(); this.profiler.beginFrame(); this.profiler.start('Render:Total');
+                    this.apartmentRenderer.draw(this, this._apartmentBlend ?? 1);
+                    this.profiler.stop('Render:Total');
+                    if (PerformanceBench.active) PerformanceBench.render(this.profiler.frameDeltas());
+                    this.profiler.tick();
+                    return;
+                }
                 if (!this.running || (this.paused && !this.cineCam)) return;   // (Cinematic View keeps drawing the held world: ui/save-slots-pause-menu.js)
 
                 this._renderDrawId = (this._renderDrawId || 0) + 1;
