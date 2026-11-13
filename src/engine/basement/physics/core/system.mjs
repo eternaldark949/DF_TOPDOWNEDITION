@@ -646,6 +646,7 @@ export class physicsSystem {
     raycast(packet, result) { return this.#queries.raycast(packet, result); }
     shapeCast(packet, results) { return this.#queries.shapeCast(packet, results); }
     overlapShape(packet, results) { return this.#queries.overlapShape(packet, results); }
+    getVisibilityPolygon(packet) { return this.#queries.getVisibilityPolygon(packet); }
     isPlacementClear(body_or_shape, position, options) { return this.#queries.isPlacementClear(body_or_shape, position, options); }
     findClearPlacement(packet, result) { return this.#queries.findClearPlacement(packet, result); }
     findPath(packet, result) { const path = this.navigation.findPath(packet); return path && result ? Object.assign(result, path) : path; }

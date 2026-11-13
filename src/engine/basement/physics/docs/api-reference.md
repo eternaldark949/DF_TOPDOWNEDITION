@@ -132,6 +132,7 @@ Filter options: `include_groups=ALL`, `exclude_groups=0`, `query_bit=ALL`, `igno
 | `peruseNearbyEntities(reference, options={}, results=[])` | `near_range:400` default, centre-distance filter. Hits contain `body`, `body_id`, `distance`, `direction`. Self is ignored by default. |
 | `findNearestEntity(reference, options={})` | Nearest hit or `null`. |
 | `raycast({from,to,...filters}, result={})` | Nearest thin-cast contact or `null`. |
+| `getVisibilityPolygon({origin,radius,resolution=64,...filters})` | `{origin,radius,points}`: what a point light reaches, every ray stopped at the first blocking body (static by default; ghosts never block; a body holding the origin does not block it). Points run by angle; extra rays at each corner keep shadow edges exact. |
 | `shapeCast({collision_shape,from,to,from_rotation=0,to_rotation=from_rotation,...filters}, results=[])` | Contacts with `fraction`, `distance`, `normal`, `world_point`, `penetration_depth`, `body`, `body_id`. |
 | `overlapShape({collision_shape,position,rotation=0,...filters}, results=[])` | Exact overlap contacts. |
 | `isPlacementClear(body_or_shape, position, options={})` | Boolean. Touching counts as occupied within tolerance. |

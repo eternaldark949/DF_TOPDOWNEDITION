@@ -47,3 +47,35 @@ test('shapes, glows, shadows and the new blends draw as specified on a real canv
         assert.deepEqual(pixels.atop_outside, [0, 0, 0, 0], 'and nowhere else');
     } finally { await browser.close(); server.close(); }
 });
+
+test('the light layer cuts lights out of the dark, shadows them by polygon, adds their colour and lays over the scene', { skip: !chromium && 'Playwright is not installed' }, async () => {
+    const server = createServer(async (req, res) => {
+        try { const body = await readFile(join(root, decodeURIComponent(req.url.split('?')[0])));
+            res.writeHead(200, { 'content-type': extname(req.url) === '.mjs' ? 'text/javascript' : extname(req.url) === '.json' ? 'application/json' : 'text/html' }); res.end(body); }
+        catch { res.writeHead(404); res.end(); }
+    }).listen(0);
+    const browser = await chromium.launch();
+    try {
+        const page = await browser.newPage();
+        await page.goto(`http://127.0.0.1:${server.address().port}/tools/fixtures/blank.html`).catch(() => {});
+        const px = await page.evaluate(async () => {
+            const { canvasRenderer, createLightLayer } = await import('/src/engine/basement/rendering/index.mjs');
+            const canvas = Object.assign(document.createElement('canvas'), { width: 200, height: 100 }), ctx = canvas.getContext('2d');
+            const layer = createLightLayer({ bounds: { left: 0, top: 0, right: 200, bottom: 100 }, tint: 'rgb(0,0,40)', areas: [{ rects: [{ x: 150, y: 0, w: 50, h: 20 }], cut: 0.5 }],
+                lights: [{ position: [50, 50], radius: 40, inner_radius: 10, polygon: [[50, 50], [90, 10], [90, 90]], color: '#ff0000', glow: 0.5, glow_stops: [[0, '#ff0000'], [1, 'rgba(0,0,0,0)']] },
+                    { shape: 'area', position: [150, 70], size: [60, 20], round: 10, intensity: 1 }] });
+            const at = (x, y) => [...ctx.getImageData(x, y, 1, 1).data];
+            canvasRenderer.drawPackets(ctx, layer);
+            const raw = { far: at(5, 95), lit: at(55, 50), shadowed: at(40, 50), glow_in_shadow: at(40, 50)[0], area: at(150, 70), area_edge: at(150, 79), thinned: at(175, 10) };
+            ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'source-over'; ctx.clearRect(0, 0, 200, 100); ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, 200, 100);
+            canvasRenderer.drawLayer(ctx, layer, { opacity: 0.5 });
+            return { ...raw, composite_far: at(5, 95) };
+        });
+        assert.deepEqual(px.far, [0, 0, 40, 255], 'the dark covers the bounds');
+        assert.ok(px.lit[3] < 130 && px.lit[0] > 100 && px.lit[2] < 10, `the light cuts the dark and adds its colour (${px.lit})`);
+        assert.ok(px.shadowed[3] > 200, `outside the polygon the dark stays (${px.shadowed})`);
+        assert.ok(px.area[3] < 20, `an area light cuts its middle (${px.area})`); assert.ok(px.area_edge[3] > 100, `and fades at its edge (${px.area_edge})`);
+        assert.ok(Math.abs(px.thinned[3] - 128) < 3, `an area thins the dark by its cut (${px.thinned})`);
+        assert.ok(Math.abs(px.composite_far[0] - 128) < 3 && Math.abs(px.composite_far[2] - 147) < 3, `the layer lays over the scene at its opacity (${px.composite_far})`);
+    } finally { await browser.close(); server.close(); }
+});

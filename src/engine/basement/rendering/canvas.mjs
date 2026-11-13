@@ -20,7 +20,7 @@ function buildPath(target,g){
         if(op==='move')target.moveTo(...v);else if(op==='line')target.lineTo(...v);else if(op==='quadratic')target.quadraticCurveTo(...v);else if(op==='cubic')target.bezierCurveTo(...v);else if(op==='ellipse')target.ellipse(...v.slice(0,7),!!v[7]);else target.closePath();
     }
 }
-const overlays=new WeakMap();
+const overlays=new WeakMap(),layers=new WeakMap();
 const capabilities=Object.freeze(['shape','sprite','text','geometry:rect','geometry:ellipse','geometry:path','gradient:linear','gradient:radial','clip','shadow','dash','target',...Object.keys(BLENDS).map(name=>`blend:${name}`)]);
 
 /** Canvas implementation of the packet contract. Contexts and Canvas/GPU-like handles stay private. */
@@ -36,6 +36,26 @@ export class canvasRenderer {
         entry.frame.begin(view,{clear_color:false});
         try{for(const packet of packets){if(packet.resource_id||packet.geometry_id||packet.material_id||(packet.clips??[]).some(clip=>clip.geometry_id))throw new Error('Canvas overlay accepts inline packets; use renderSystem for resources');entry.frame.submit({...packet,opacity:(packet.opacity??1)*opacity});}entry.renderer.render(entry.frame.finish());}catch(error){entry.frame.abort();throw error;}
         return entry.frame.getStatistics().packets;
+    }
+    /**
+     * Migration boundary, like drawPackets: draws `packets` into an off-screen layer the size of the
+     * context's canvas (times `scale`, for a cheaper softer layer) under the context's current transform,
+     * then lays that layer over the canvas at `opacity` with `blend`. The light layer is drawn this way.
+     */
+    static drawLayer(context,packets,{opacity=1,blend='normal',scale=1}={}){
+        if(!context?.canvas||typeof context.getTransform!=='function')throw new TypeError('A host Canvas context is required');
+        if(!Object.hasOwn(BLENDS,blend))throw new TypeError('Unsupported blend');if(!(scale>0&&scale<=1))throw new TypeError('Layer scale is in (0, 1]');if(!(opacity>=0&&opacity<=1))throw new TypeError('Opacity must be in [0,1]');
+        const canvas=context.canvas,w=Math.max(1,Math.round(canvas.width*scale)),h=Math.max(1,Math.round(canvas.height*scale));
+        let layer=layers.get(context);if(!layer){const surface=createSurface(w,h);layer={surface,context:surface.getContext('2d')};layers.set(context,layer);}
+        if(layer.surface.width!==w)layer.surface.width=w;if(layer.surface.height!==h)layer.surface.height=h;
+        const lc=layer.context,m=context.getTransform(),sx=w/canvas.width,sy=h/canvas.height;
+        lc.setTransform(1,0,0,1,0,0);lc.globalAlpha=1;lc.globalCompositeOperation='source-over';lc.clearRect(0,0,w,h);
+        lc.setTransform(m.a*sx,m.b*sy,m.c*sx,m.d*sy,m.e*sx,m.f*sy);
+        const count=canvasRenderer.drawPackets(lc,packets);
+        context.save();
+        try{context.setTransform(1,0,0,1,0,0);context.globalAlpha=opacity;context.globalCompositeOperation=BLENDS[blend];context.imageSmoothingEnabled=true;context.drawImage(layer.surface,0,0,canvas.width,canvas.height);}
+        finally{context.restore();}
+        return count;
     }
     get capabilities(){return capabilities;}
     initialize(surface,{viewport}){

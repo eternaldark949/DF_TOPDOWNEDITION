@@ -109,6 +109,41 @@ export class physicsQueries {
         if (!hits.length) return null;
         Object.assign(result, hits[0]); return result;
     }
+    /**
+     * What a point light at `origin` can reach: the polygon of every ray out to `radius` stopped at the
+     * first blocking body (static bodies by default; ghosts never block). Points run by angle. A body
+     * that holds the origin does not block it. `resolution` rays round the circle, plus three at every
+     * blocking corner in reach, so shadow edges are exact.
+     */
+    getVisibilityPolygon(packet) {
+        const origin = vector(packet.origin), radius = number(packet.radius, 'radius', EPS), resolution = number(packet.resolution ?? 64, 'resolution', 8, 4096);
+        const options = { include_groups: BODY_GROUP.STATIC, include_ghosts: false, ...packet }, segments = [];
+        const inside = points => { let hit = false; for (let i = 0, j = points.length - 1; i < points.length; j = i++) { const [xi, yi] = points[i], [xj, yj] = points[j]; if ((yi > origin[1]) !== (yj > origin[1]) && origin[0] < (xj - xi) * (origin[1] - yi) / (yj - yi) + xi) hit = !hit; } return hit; };
+        for (const b of this.world.spatial_grid.queryRadius(origin, radius)) {
+            if (!accepts(this.world, b, options)) continue;
+            const r = this.world._record(b);
+            for (const piece of pieces(r.shape, r.position, r.rotation)) {
+                const points = piece.points ?? Array.from({ length: 16 }, (_, k) => [piece.center[0] + piece.radius * Math.cos(k * Math.PI / 8), piece.center[1] + piece.radius * Math.sin(k * Math.PI / 8)]);
+                if (inside(points)) continue;
+                for (let i = 0; i < points.length; i++) segments.push([points[i], points[(i + 1) % points.length]]);
+            }
+        }
+        const angles = Array.from({ length: resolution }, (_, k) => -Math.PI + 2 * Math.PI * k / resolution);
+        for (const [a, b] of segments) for (const [x, y] of [a, b]) if (Math.hypot(x - origin[0], y - origin[1]) <= radius * 1.5) { const t = Math.atan2(y - origin[1], x - origin[0]); angles.push(t - 1e-5, t, t + 1e-5); }
+        angles.sort((a, b) => a - b);
+        const points = [];
+        for (const angle of angles) {
+            const dx = Math.cos(angle), dy = Math.sin(angle); let reach = radius;
+            for (const [[ax, ay], [bx, by]] of segments) {
+                const ex = bx - ax, ey = by - ay, d = dx * ey - dy * ex; if (Math.abs(d) < 1e-12) continue;
+                const qx = ax - origin[0], qy = ay - origin[1], t = (qx * ey - qy * ex) / d, u = (qx * dy - qy * dx) / d;
+                if (t >= 0 && t < reach && u >= 0 && u <= 1) reach = t;
+            }
+            const last = points.at(-1), point = [origin[0] + dx * reach, origin[1] + dy * reach];
+            if (!last || Math.hypot(point[0] - last[0], point[1] - last[1]) > 1e-6) points.push(point);
+        }
+        return { origin, radius, points };
+    }
     overlapShape(packet, results = []) {
         const shape = new collisionShape(packet.collision_shape), p = { position: vector(packet.position), rotation: number(packet.rotation ?? 0, 'rotation') }, hits = [];
         for (const b of this.world.spatial_grid.queryBounds(shapeBounds(shape, p.position, p.rotation))) {

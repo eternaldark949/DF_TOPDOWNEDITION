@@ -14,7 +14,7 @@ class ApartmentRenderer {
         Object.assign(packet,{rigPose:DFNative.humanoidPresentation(entity,blend),punchSide:entity.data.weapon_state?.punch_side,punchHay:!!entity.data.weapon_state?.haymaker,x:pose.position[0],y:pose.position[1],angle:pose.rotation,velX:velocity[0]/60,velY:velocity[1]/60,vx:velocity[0]/60,vy:velocity[1]/60,radius:12,visible:entity.visible!==false&&entity.active,isHidden:!!entity.isHidden,dead:!!entity.dead,walkPhase:packet.walkPhase??0});
         return packet;
     }
-    destroy(){PropSprites.clear([...this.props.values()]);this.props.clear();this.people.clear();}
+    destroy(){this.lighting=null;PropSprites.clear([...this.props.values()]);this.props.clear();this.people.clear();}
     draw(game,blend=1){
         this.game=game;const level=game.activeLevel,world=level.physics,ctx=game.ctx,canvas=game.canvas;
         const player=this.personPacket(level.player,blend),zoom=game.camera.zoom;
@@ -76,9 +76,12 @@ class ApartmentRenderer {
             ctx.fillStyle=owner.data.appearance.color;ctx.fill();ctx.strokeStyle=owner.data.appearance.lightColor;ctx.stroke();
         }
         // Room dimming is presentation only; queries use the world's room volumes.
-        for(const r of Object.values(game.roomSystem.rooms))if(r.type!=='outdoor'){
-            ctx.fillStyle=`rgba(7,5,14,${r.lightsOff ? 0.85 : 0.18})`;ctx.fillRect(r.x,r.y,r.w,r.h);
-        }
+        // The light layer: the dark, each room's light and every lamp, drawn natively over the scene.
+        this.lighting??=new DFNative.sceneLighting(world);
+        const lightAt=(x,y)=>game.roomSystem.lightAt(x,y),rooms=Object.values(game.roomSystem.rooms).map(r=>({rects:r.rects??[{x:r.x,y:r.y,w:r.w,h:r.h}],type:r.type,fill:r.fill,lit:r.lightsOff?0:1}));
+        const light=this.lighting.createLayer({bounds:{left:Math.max(0,view.left-200),top:Math.max(0,view.top-200),right:Math.min(level.definition.map.width,view.right+200),bottom:Math.min(level.definition.map.height,view.bottom+200)},
+            kind:'indoor',sky_darkness:game.dayCycle().darkness,rooms,lights:DFNative.levelLights(level,{blend,lightAt}),time:_frameTime/1000});
+        DFNative.canvasRenderer.drawLayer(ctx,light.packets,{opacity:light.opacity});
         game.drawNoiseRipples(ctx);
         if(game.flitVFX.length)game.drawFlitVFX(ctx);
         for(const packet of demonesses)DFNative.demonessAppearance.drawDuelTells.call(packet,ctx);DFNative.bossEffectAppearance.draw.call({render_clock:level.player.data.weapon_state?.elapsed??0,render_time:_frameTime/1000,_hazards:DFNative.bossEffectPresentation(game.encounters.getEffects(),level.player.data.weapon_state?.elapsed??0),_playerBurn:null,player:null,_smokeK:DFNative.bossEffectAppearance._smokeK},ctx);for(const packet of drones)DFNative.canvasRenderer.drawPackets(ctx,DFNative.createDronePackets(packet,{pass:'lights'}));for(const {packet,eyes} of cats){const room=game.roomSystem.getRoomAt(packet.x,packet.y);DFNative.canvasRenderer.drawPackets(ctx,DFNative.createVelvetEyePackets(packet,{eyes,darkness:room?.type==='outdoor'?game.getAmbientDarkness():(room?.lightsOff ? .85 : .18)}));}game.drawPlayerGlow(ctx);game.drawApartmentGlow(ctx,props);for(const packet of marionettes)drawMarionetteAppearance(ctx,packet,true);for(const packet of gunners)drawGunnerAppearance(ctx,packet,true);

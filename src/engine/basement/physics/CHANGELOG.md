@@ -1,5 +1,9 @@
 # Changelog
 
+## Visibility polygons — 2026-11-13
+
+- `getVisibilityPolygon({origin, radius, resolution, ...filters})` returns what a point light reaches: every ray stopped at the first blocking body (static by default). Extra rays at blocking corners keep shadow edges exact. The light layer uses it for lamp shadows.
+
 ## One-way constraints — 2026-11-13
 
 - Any constraint takes `one_way: true`: body B leads and never receives the constraint's impulses or position corrections. Only `body_a` is corrected.
