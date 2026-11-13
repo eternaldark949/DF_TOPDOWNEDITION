@@ -3,9 +3,9 @@
   "props": [
     {"type": "medbay_refill", "x": 200, "y": 180},
     {"type": "bed", "x": 58, "y": 300},
-    {"type": "bed", "x": 58, "y": 470, "patient": true},
-    {"type": "bed", "x": 622, "y": 300, "headSide": "right"},
-    {"type": "bed", "x": 622, "y": 470, "headSide": "right"},
+    {"type": "bed", "x": 58, "y": 470, "look": {"patient": true}},
+    {"type": "bed", "x": 622, "y": 300, "look": {"head": "right"}},
+    {"type": "bed", "x": 622, "y": 470, "look": {"head": "right"}},
     {"type": "monitor", "x": 64, "y": 364},
     {"type": "monitor", "x": 64, "y": 534},
     {"type": "monitor", "x": 714, "y": 364},

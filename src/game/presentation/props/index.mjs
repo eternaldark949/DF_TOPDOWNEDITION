@@ -11,9 +11,18 @@ import {APARTMENT_ARTISTS} from './apartment.mjs';
 import {HOUSE_ARTISTS} from './house.mjs';
 import {HOTEL_ARTISTS} from './hotel.mjs';
 import {CLUB_ARTISTS} from './club.mjs';
+import {SANCTUM_ARTISTS} from './sanctum.mjs';
+import {CLINIC_ARTISTS} from './clinic.mjs';
+import {NEURAL_ARTISTS} from './neural.mjs';
+import {TORQUE_ARTISTS} from './torque.mjs';
+import {PALACE_ARTISTS} from './palace.mjs';
 
 export const PROP_FAMILIES=PROPS.resources.catalog.data.families;
-const ARTISTS=Object.freeze({...CAFE_ARTISTS,...APARTMENT_ARTISTS,...HOUSE_ARTISTS,...HOTEL_ARTISTS,...CLUB_ARTISTS});
+/** Every venue's artists under one name each: a family drawn by two venues would silently lose one. */
+const ARTISTS=Object.freeze([CAFE_ARTISTS,APARTMENT_ARTISTS,HOUSE_ARTISTS,HOTEL_ARTISTS,CLUB_ARTISTS,SANCTUM_ARTISTS,CLINIC_ARTISTS,NEURAL_ARTISTS,TORQUE_ARTISTS,PALACE_ARTISTS].reduce((all,venue)=>{
+    for(const family of Object.keys(venue))if(family in all)throw new Error(`prop family ${family} has two artists`);
+    return Object.assign(all,venue);
+},{}));
 /** The pad round a piece's box its art may reach past (lips, drop shadows, a hearth), in px. */
 const PAD=8;
 /** The tempo a piece keeps when its host has no music to give it (`beat`, in beats since the start). */

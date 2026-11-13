@@ -1,6 +1,6 @@
 // The drawing helpers every prop artist repeats, on the art toolkit: the classic art's rounded box,
 // disc and line runs, a choice by the piece's number, and turning a piece to its face.
-import {circle} from '../../../engine/basement/rendering/index.mjs';
+import {circle,seededRandom} from '../../../engine/basement/rendering/index.mjs';
 
 export const FACE={S:0,W:Math.PI/2,N:Math.PI,E:-Math.PI/2};
 
@@ -31,3 +31,5 @@ export function crescent(cx,cy,r,bx,by,br){
     return [['ellipse',cx,cy,r,r,0,phi+alpha,phi+TAU-alpha,0],['ellipse',bx,by,br,br,0,phi+Math.PI+beta,phi+Math.PI-beta,1],['close']];
 }
 const TAU=Math.PI*2;
+/** The classic art's seeded random (a string seed hashed, then the Basement's generator), so a piece scatters its detail as it did. */
+export function classicRandom(seed){let h=2166136261;for(const ch of String(seed)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619);}return seededRandom(h>>>0);}

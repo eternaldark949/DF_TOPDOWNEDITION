@@ -3,9 +3,9 @@
   "props": [
     {"type": "ns_counter", "x": 400, "y": 220},
     {"type": "ns_console", "x": 120, "y": 120},
-    {"type": "ns_console", "x": 120, "y": 300, "variant": 1},
-    {"type": "ns_console", "x": 820, "y": 120, "variant": 2},
-    {"type": "ns_console", "x": 820, "y": 300, "variant": 3},
+    {"type": "ns_console", "x": 120, "y": 300, "look": {"station": "skin"}},
+    {"type": "ns_console", "x": 820, "y": 120, "look": {"station": "vocal"}},
+    {"type": "ns_console", "x": 820, "y": 300, "look": {"station": "chroma"}},
     {"type": "ns_pod", "x": 150, "y": 620},
     {"type": "ns_server", "x": 650, "y": 590},
     {"type": "ns_server", "x": 730, "y": 590},

@@ -1752,12 +1752,12 @@
                     moss(x + w * 0.2, y + h * 0.4, 6, 8);
                     break;
                 }
-                case 'sc_pew': case 'sc_pew_broken': {                     // a dark wooden pew; the broken ones snapped and splintered
+                case 'sc_pew': case 'sc_pew_broken': {                     // a dark wooden pew; the broken ones snapped and splintered (the far half turns about its own middle: wood() draws from y)
                     const broken = p.decorType === 'sc_pew_broken';
 
                     const wood = (X, W) => { rr(X, y, W, h, 2, '#2e1e1a', '#140c0a', 1); rr(X + 2, y + 2, W - 4, 7, 1.5, '#3e2822'); ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 0.6; ctx.beginPath(); for (let k = y + 12; k < y + h - 2; k += 4) { ctx.moveTo(X + 2, k); ctx.lineTo(X + W - 2, k); } ctx.stroke(); };
                     if (!broken) wood(x, w);
-                    else { wood(x, w * 0.45); ctx.save(); ctx.translate(x + w * 0.72, y + h / 2); ctx.rotate(0.35); wood(-w * 0.25, w * 0.45); ctx.restore(); ctx.strokeStyle = '#6a4a3a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + w * 0.45, y + 2); ctx.lineTo(x + w * 0.5, y + 6); ctx.lineTo(x + w * 0.45, y + 10); ctx.stroke(); }
+                    else { wood(x, w * 0.45); ctx.save(); ctx.translate(x + w * 0.72, y + h / 2); ctx.rotate(0.35); ctx.translate(0, -y - h / 2); wood(-w * 0.25, w * 0.45); ctx.restore(); ctx.strokeStyle = '#6a4a3a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + w * 0.45, y + 2); ctx.lineTo(x + w * 0.5, y + 6); ctx.lineTo(x + w * 0.45, y + 10); ctx.stroke(); }
                     break;
                 }
                 case 'sc_altar': {                                         // black stone, a crimson cloth, a gold chalice, candles guttering

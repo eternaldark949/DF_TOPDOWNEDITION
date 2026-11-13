@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'fb982046f458';
+        const DFAB_BUILD = '9628491ecefe';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="15256">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="15765">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -17993,10 +17993,10 @@ const m70 = Object.freeze({default:{
           "apt_vanity": {"defaults": {"color": "#2a1a22", "decorType": "apt_vanity", "family": "dressing_table", "height": 64, "mass": 10000000, "width": 44}},
           "apt_wardrobe": {"defaults": {"color": "#2a1a22", "decorType": "apt_wardrobe", "family": "wardrobe", "height": 110, "mass": 10000000, "width": 36}},
           "armory": {"defaults": {"color": "#2a2a3a", "height": 50, "interactionType": "armory", "width": 44}},
-          "bed": {"defaults": {"color": "#ccc", "decorType": "bed", "headSide": "left", "height": 56, "mass": 10000000, "width": 120}},
-          "bench": {"defaults": {"color": "#ccc", "decorType": "bench", "height": 34, "mass": 10000000, "width": 150}},
+          "bed": {"defaults": {"color": "#ccc", "decorType": "bed", "family": "hospital_bed", "height": 56, "mass": 10000000, "width": 120}},
+          "bench": {"defaults": {"color": "#ccc", "decorType": "bench", "family": "waiting_bench", "height": 34, "mass": 10000000, "width": 150}},
           "block": {"defaults": {}},
-          "cabinet": {"defaults": {"color": "#ccc", "decorType": "cabinet", "height": 30, "mass": 10000000, "width": 118}},
+          "cabinet": {"defaults": {"color": "#ccc", "decorType": "cabinet", "family": "pharmacy_cabinet", "height": 30, "mass": 10000000, "width": 118}},
           "cc_armchair": {"defaults": {"color": "#3a2418", "decorType": "cc_armchair", "face": "S", "family": "upholstered_seat", "height": 46, "mass": 10000000, "width": 50}},
           "cc_bench": {"defaults": {"color": "#3a2418", "decorType": "cc_bench", "face": "N", "family": "cushion_bench", "height": 36, "mass": 10000000, "width": 360}},
           "cc_bookshelf": {"defaults": {"color": "#3a2418", "decorType": "cc_bookshelf", "family": "bookcase", "height": 26, "mass": 10000000, "width": 170}},
@@ -18022,8 +18022,8 @@ const m70 = Object.freeze({default:{
           "cc_side_table": {"defaults": {"color": "#3a2418", "decorType": "cc_side_table", "family": "cafe_table", "height": 30, "look": {"round": true, "setting": "side"}, "mass": 10000000, "width": 36}},
           "cc_sink": {"defaults": {"color": "#3a2418", "decorType": "cc_sink", "family": "double_sink", "height": 34, "mass": 10000000, "width": 90}},
           "cc_stove": {"defaults": {"color": "#3a2418", "decorType": "cc_stove", "family": "range_stove", "height": 46, "mass": 10000000, "width": 130}},
-          "cooler": {"defaults": {"color": "#ccc", "decorType": "cooler", "height": 34, "mass": 10000000, "width": 34}},
-          "desk": {"defaults": {"color": "#ccc", "decorType": "desk", "height": 34, "mass": 10000000, "width": 164}},
+          "cooler": {"defaults": {"color": "#ccc", "decorType": "cooler", "family": "water_cooler", "height": 34, "mass": 10000000, "width": 34}},
+          "desk": {"defaults": {"color": "#ccc", "decorType": "desk", "family": "reception_counter", "height": 34, "mass": 10000000, "width": 164}},
           "dn_desk": {"defaults": {"color": "#1a1216", "decorType": "dn_desk", "family": "reception_desk", "height": 44, "mass": 10000000, "width": 230}},
           "dn_float_chair": {"defaults": {"color": "#1a1216", "decorType": "dn_float_chair", "family": "floating_seat", "height": 40, "mass": 10000000, "width": 40}},
           "dn_float_chaise": {"defaults": {"color": "#1a1216", "decorType": "dn_float_chaise", "family": "floating_seat", "height": 34, "look": {"style": "chaise", "trim": "#dfe6ff"}, "mass": 10000000, "width": 92}},
@@ -18034,20 +18034,20 @@ const m70 = Object.freeze({default:{
           "dn_sofa": {"defaults": {"color": "#1a1216", "decorType": "dn_sofa", "family": "velvet_settee", "height": 56, "mass": 10000000, "width": 120}},
           "dn_table": {"defaults": {"color": "#1a1216", "decorType": "dn_table", "family": "cocktail_table", "height": 38, "mass": 10000000, "width": 70}},
           "dn_wingback": {"defaults": {"color": "#1a1216", "decorType": "dn_wingback", "family": "wingback_chair", "height": 40, "mass": 10000000, "width": 40}},
-          "dp_altar": {"defaults": {"color": "#2a0c14", "decorType": "dp_altar", "height": 65, "mass": 10000000, "width": 100}},
-          "dp_bench": {"defaults": {"color": "#2a0c14", "decorType": "dp_bench", "height": 24, "mass": 10000000, "width": 90}},
-          "dp_brazier": {"defaults": {"color": "#2a0c14", "decorType": "dp_brazier", "height": 26, "mass": 10000000, "width": 26}},
-          "dp_cage": {"defaults": {"color": "#2a0c14", "decorType": "dp_cage", "height": 60, "mass": 10000000, "width": 80}},
-          "dp_embers": {"defaults": {"color": "#2a0c14", "decorType": "dp_embers", "height": 150, "mass": 10000000, "width": 240}},
-          "dp_fountain": {"defaults": {"color": "#2a0c14", "decorType": "dp_fountain", "height": 90, "mass": 10000000, "width": 90}},
-          "dp_mirror": {"defaults": {"color": "#2a0c14", "decorType": "dp_mirror", "height": 16, "mass": 10000000, "noNav": true, "width": 80}},
-          "dp_pillar": {"defaults": {"color": "#2a0c14", "decorType": "dp_pillar", "height": 36, "mass": 10000000, "width": 36}},
-          "dp_pool": {"defaults": {"color": "#2a0c14", "decorType": "dp_pool", "height": 110, "mass": 10000000, "width": 160}},
-          "dp_roses": {"defaults": {"color": "#2a0c14", "decorType": "dp_roses", "height": 65, "light": {"color": "#efb1b6", "intensity": 0.26, "radius": 105}, "mass": 10000000, "width": 240}},
-          "dp_statue": {"defaults": {"color": "#2a0c14", "decorType": "dp_statue", "height": 30, "mass": 10000000, "width": 30}},
-          "dp_throne": {"defaults": {"color": "#2a0c14", "decorType": "dp_throne", "height": 52, "mass": 10000000, "width": 68}},
-          "dp_vanity": {"defaults": {"color": "#2a0c14", "decorType": "dp_vanity", "height": 40, "mass": 10000000, "width": 90}},
-          "dp_wardrobe": {"defaults": {"color": "#2a0c14", "decorType": "dp_wardrobe", "height": 30, "mass": 10000000, "width": 120}},
+          "dp_altar": {"defaults": {"color": "#2a0c14", "decorType": "dp_altar", "family": "ruby_altar", "height": 65, "mass": 10000000, "width": 100}},
+          "dp_bench": {"defaults": {"color": "#2a0c14", "decorType": "dp_bench", "family": "velvet_bench", "height": 24, "mass": 10000000, "width": 90}},
+          "dp_brazier": {"defaults": {"color": "#2a0c14", "decorType": "dp_brazier", "family": "gold_brazier", "height": 26, "mass": 10000000, "width": 26}},
+          "dp_cage": {"defaults": {"color": "#2a0c14", "decorType": "dp_cage", "family": "iron_cage", "height": 60, "mass": 10000000, "width": 80}},
+          "dp_embers": {"defaults": {"color": "#2a0c14", "decorType": "dp_embers", "family": "ember_bed", "height": 150, "mass": 10000000, "width": 240}},
+          "dp_fountain": {"defaults": {"color": "#2a0c14", "decorType": "dp_fountain", "family": "blood_fountain", "height": 90, "mass": 10000000, "width": 90}},
+          "dp_mirror": {"defaults": {"color": "#2a0c14", "decorType": "dp_mirror", "family": "gilt_mirror", "height": 16, "mass": 10000000, "noNav": true, "width": 80}},
+          "dp_pillar": {"defaults": {"color": "#2a0c14", "decorType": "dp_pillar", "family": "obsidian_pillar", "height": 36, "mass": 10000000, "width": 36}},
+          "dp_pool": {"defaults": {"color": "#2a0c14", "decorType": "dp_pool", "family": "blood_pool", "height": 110, "mass": 10000000, "width": 160}},
+          "dp_roses": {"defaults": {"color": "#2a0c14", "decorType": "dp_roses", "family": "rose_bed", "height": 65, "light": {"color": "#efb1b6", "intensity": 0.26, "radius": 105}, "mass": 10000000, "width": 240}},
+          "dp_statue": {"defaults": {"color": "#2a0c14", "decorType": "dp_statue", "family": "shard_statue", "height": 30, "mass": 10000000, "width": 30}},
+          "dp_throne": {"defaults": {"color": "#2a0c14", "decorType": "dp_throne", "family": "obsidian_throne", "height": 52, "mass": 10000000, "width": 68}},
+          "dp_vanity": {"defaults": {"color": "#2a0c14", "decorType": "dp_vanity", "family": "palace_vanity", "height": 40, "mass": 10000000, "width": 90}},
+          "dp_wardrobe": {"defaults": {"color": "#2a0c14", "decorType": "dp_wardrobe", "family": "palace_wardrobe", "height": 30, "mass": 10000000, "width": 120}},
           "ec_appliances": {"defaults": {"color": "#3c2530", "decorType": "ec_appliances", "height": 78, "mass": 10000000, "width": 380}},
           "ec_armchair": {"defaults": {"color": "#3c2530", "decorType": "ec_armchair", "face": "W", "height": 64, "mass": 10000000, "width": 64}},
           "ec_audio": {"defaults": {"color": "#3c2530", "decorType": "ec_audio", "height": 88, "mass": 10000000, "width": 175}},
@@ -18111,7 +18111,7 @@ const m70 = Object.freeze({default:{
           "hod_reliquary": {"defaults": {"color": "#2a1a22", "decorType": "hod_reliquary", "family": "floating_reliquary", "height": 36, "mass": 10000000, "width": 36}},
           "hod_statue": {"defaults": {"color": "#2a1a22", "decorType": "hod_statue", "family": "angel_statue", "height": 34, "mass": 10000000, "width": 34}},
           "hod_table": {"defaults": {"color": "#2a1a22", "decorType": "hod_table", "family": "oxblood_table", "height": 60, "mass": 10000000, "width": 140}},
-          "iv": {"defaults": {"color": "#ccc", "decorType": "iv", "height": 14, "mass": 10000000, "width": 14}},
+          "iv": {"defaults": {"color": "#ccc", "decorType": "iv", "family": "iv_stand", "height": 14, "mass": 10000000, "width": 14}},
           "light_switch": {"defaults": {"color": "#2a2a2a", "height": 14, "interactionType": "light_switch", "mass": 999999, "roomId": "main_room", "width": 10}},
           "ls_cashtin": {"defaults": {"color": "#2a2a30", "decorType": "ls_cashtin", "height": 14, "interactionType": "lost_luggage", "label": "Cash tin", "lootLines": ["TORQUE'S RAINY-DAY MONEY", "GREASY BILLS, STILL GOOD", "UNDER THE BENCH, AS ALWAYS"], "lootMax": 80, "lootMin": 30, "mass": 10000000, "noNav": true, "noteId": "torque_tin", "width": 22}},
           "ls_envelope": {"defaults": {"color": "#3c2530", "decorType": "ls_envelope", "height": 12, "interactionType": "lost_luggage", "label": "Receipt envelope", "lootLines": ["A REFUND, IN CASH", "SHE CHANGED HER MIND ABOUT THE SHOES", "FINDERS KEEPERS"], "lootMax": 70, "lootMin": 25, "mass": 10000000, "noNav": true, "noteId": "enni_envelope", "width": 18}},
@@ -18145,16 +18145,16 @@ const m70 = Object.freeze({default:{
           "mc_urinal": {"defaults": {"color": "#1a0e22", "decorType": "mc_urinal", "family": "urinal", "height": 20, "mass": 10000000, "width": 26}},
           "mc_vanity": {"defaults": {"color": "#1a0e22", "decorType": "mc_vanity", "family": "bulb_vanity", "height": 40, "mass": 10000000, "width": 230}},
           "medbay_refill": {"defaults": {"color": "#0f0", "height": 60, "interactionType": "medbay_refill", "mass": 10000000, "width": 40}},
-          "monitor": {"defaults": {"color": "#ccc", "decorType": "monitor", "height": 20, "mass": 10000000, "width": 22}},
-          "ns_console": {"defaults": {"decorType": "ns_console", "height": 80, "mass": 100000, "variant": 0, "width": 60}},
-          "ns_counter": {"defaults": {"color": "#1a1a3a", "decorType": "ns_counter", "height": 30, "interactionType": "neural_counter", "mass": 100000, "width": 200}},
-          "ns_planter": {"defaults": {"decorType": "ns_planter", "height": 32, "mass": 100000, "width": 32}},
-          "ns_pod": {"defaults": {"decorType": "ns_pod", "height": 80, "mass": 100000, "width": 80}},
-          "ns_server": {"defaults": {"decorType": "ns_server", "height": 120, "mass": 100000, "width": 40}},
-          "ns_sofa": {"defaults": {"decorType": "ns_sofa", "height": 42, "mass": 100000, "width": 130}},
-          "ns_table": {"defaults": {"decorType": "ns_table", "height": 64, "mass": 100000, "width": 80}},
-          "ns_tree": {"defaults": {"decorType": "ns_tree", "height": 18, "mass": 100000, "width": 18}},
-          "plant": {"defaults": {"color": "#ccc", "decorType": "plant", "height": 40, "mass": 10000000, "width": 40}},
+          "monitor": {"defaults": {"color": "#ccc", "decorType": "monitor", "family": "vitals_monitor", "height": 20, "mass": 10000000, "width": 22}},
+          "ns_console": {"defaults": {"decorType": "ns_console", "family": "styling_console", "height": 80, "mass": 100000, "width": 60}},
+          "ns_counter": {"defaults": {"color": "#1a1a3a", "decorType": "ns_counter", "family": "sapphire_counter", "height": 30, "interactionType": "neural_counter", "mass": 100000, "width": 200}},
+          "ns_planter": {"defaults": {"decorType": "ns_planter", "family": "sapphire_planter", "height": 32, "mass": 100000, "width": 32}},
+          "ns_pod": {"defaults": {"decorType": "ns_pod", "family": "styling_pod", "height": 80, "mass": 100000, "width": 80}},
+          "ns_server": {"defaults": {"decorType": "ns_server", "family": "server_rack", "height": 120, "mass": 100000, "width": 40}},
+          "ns_sofa": {"defaults": {"decorType": "ns_sofa", "family": "sapphire_sofa", "height": 42, "mass": 100000, "width": 130}},
+          "ns_table": {"defaults": {"decorType": "ns_table", "family": "fitting_table", "height": 64, "mass": 100000, "width": 80}},
+          "ns_tree": {"defaults": {"decorType": "ns_tree", "family": "crystal_tree", "height": 18, "mass": 100000, "width": 18}},
+          "plant": {"defaults": {"color": "#ccc", "decorType": "plant", "family": "clinic_plant", "height": 40, "mass": 10000000, "width": 40}},
           "ps_bar": {"defaults": {"color": "#1a1216", "decorType": "ps_bar", "family": "wine_wall_bar", "height": 200, "mass": 10000000, "width": 44}},
           "ps_bed": {"defaults": {"color": "#1a1216", "decorType": "ps_bed", "family": "canopy_bed", "height": 200, "mass": 10000000, "width": 180}},
           "ps_chair": {"defaults": {"color": "#1a1216", "decorType": "ps_chair", "face": "E", "family": "velvet_dining_chair", "height": 30, "mass": 10000000, "width": 26}},
@@ -18174,27 +18174,27 @@ const m70 = Object.freeze({default:{
           "ps_vanity": {"defaults": {"color": "#1a1216", "decorType": "ps_vanity", "family": "basin_vanity", "height": 80, "mass": 10000000, "width": 24}},
           "ps_wardrobe": {"defaults": {"color": "#1a1216", "decorType": "ps_wardrobe", "family": "open_wardrobe", "height": 150, "mass": 10000000, "width": 40}},
           "read_note": {"defaults": {"color": "#c8a870", "height": 14, "interactionType": "read_note", "mass": 10000000, "noteId": "dark_maker_letter", "width": 20}},
-          "sc_altar": {"defaults": {"color": "#1a1418", "decorType": "sc_altar", "height": 56, "mass": 10000000, "width": 140}},
-          "sc_brazier": {"defaults": {"color": "#1a1418", "decorType": "sc_brazier", "height": 36, "mass": 10000000, "width": 36}},
-          "sc_candles": {"defaults": {"color": "#1a1418", "decorType": "sc_candles", "height": 18, "mass": 10000000, "width": 18}},
-          "sc_fallen": {"defaults": {"color": "#1a1418", "decorType": "sc_fallen", "height": 30, "mass": 10000000, "width": 120}},
-          "sc_organ": {"defaults": {"color": "#1a1418", "decorType": "sc_organ", "height": 40, "mass": 10000000, "width": 100}},
-          "sc_pew": {"defaults": {"color": "#1a1418", "decorType": "sc_pew", "height": 24, "mass": 10000000, "width": 92}},
-          "sc_pew_broken": {"defaults": {"color": "#1a1418", "decorType": "sc_pew_broken", "height": 24, "mass": 10000000, "width": 84}},
-          "sc_pillar": {"defaults": {"color": "#1a1418", "decorType": "sc_pillar", "height": 44, "mass": 10000000, "width": 44}},
-          "ta_bench": {"defaults": {"color": "#2a2a30", "decorType": "ta_bench", "height": 40, "mass": 10000000, "width": 150}},
-          "ta_chair": {"defaults": {"color": "#2a2a30", "decorType": "ta_chair", "face": "E", "height": 44, "mass": 10000000, "width": 44}},
-          "ta_chest": {"defaults": {"color": "#2a2a30", "decorType": "ta_chest", "height": 32, "mass": 10000000, "width": 64}},
-          "ta_compressor": {"defaults": {"color": "#2a2a30", "decorType": "ta_compressor", "height": 40, "mass": 10000000, "width": 44}},
-          "ta_counter": {"defaults": {"color": "#2a2a30", "decorType": "ta_counter", "height": 40, "interactionType": "auto_shop_counter", "mass": 10000000, "width": 200}},
-          "ta_drum": {"defaults": {"color": "#2a2a30", "decorType": "ta_drum", "height": 30, "mass": 10000000, "width": 30}},
+          "sc_altar": {"defaults": {"color": "#1a1418", "decorType": "sc_altar", "family": "ring_altar", "height": 56, "mass": 10000000, "width": 140}},
+          "sc_brazier": {"defaults": {"color": "#1a1418", "decorType": "sc_brazier", "family": "coal_brazier", "height": 36, "mass": 10000000, "width": 36}},
+          "sc_candles": {"defaults": {"color": "#1a1418", "decorType": "sc_candles", "family": "candle_stand", "height": 18, "mass": 10000000, "width": 18}},
+          "sc_fallen": {"defaults": {"color": "#1a1418", "decorType": "sc_fallen", "family": "fallen_column", "height": 30, "mass": 10000000, "width": 120}},
+          "sc_organ": {"defaults": {"color": "#1a1418", "decorType": "sc_organ", "family": "ruined_organ", "height": 40, "mass": 10000000, "width": 100}},
+          "sc_pew": {"defaults": {"color": "#1a1418", "decorType": "sc_pew", "family": "chapel_pew", "height": 24, "mass": 10000000, "width": 92}},
+          "sc_pew_broken": {"defaults": {"color": "#1a1418", "decorType": "sc_pew_broken", "family": "chapel_pew", "height": 24, "look": {"broken": true}, "mass": 10000000, "width": 84}},
+          "sc_pillar": {"defaults": {"color": "#1a1418", "decorType": "sc_pillar", "family": "stone_column", "height": 44, "mass": 10000000, "width": 44}},
+          "ta_bench": {"defaults": {"color": "#2a2a30", "decorType": "ta_bench", "family": "garage_workbench", "height": 40, "mass": 10000000, "width": 150}},
+          "ta_chair": {"defaults": {"color": "#2a2a30", "decorType": "ta_chair", "face": "E", "family": "lounge_chair", "height": 44, "mass": 10000000, "width": 44}},
+          "ta_chest": {"defaults": {"color": "#2a2a30", "decorType": "ta_chest", "family": "tool_chest", "height": 32, "mass": 10000000, "width": 64}},
+          "ta_compressor": {"defaults": {"color": "#2a2a30", "decorType": "ta_compressor", "family": "air_compressor", "height": 40, "mass": 10000000, "width": 44}},
+          "ta_counter": {"defaults": {"color": "#2a2a30", "decorType": "ta_counter", "family": "service_counter", "height": 40, "interactionType": "auto_shop_counter", "mass": 10000000, "width": 200}},
+          "ta_drum": {"defaults": {"color": "#2a2a30", "decorType": "ta_drum", "family": "oil_drum", "height": 30, "mass": 10000000, "width": 30}},
           "ta_lift": {"defaults": {"color": "#2a2a30", "decorType": "ta_lift", "height": 96, "mass": 10000000, "variant": 0, "width": 160}},
-          "ta_rack": {"defaults": {"color": "#2a2a30", "decorType": "ta_rack", "height": 170, "mass": 10000000, "width": 34}},
-          "ta_rims": {"defaults": {"color": "#2a2a30", "decorType": "ta_rims", "height": 30, "mass": 10000000, "width": 200}},
-          "ta_shelf": {"defaults": {"color": "#2a2a30", "decorType": "ta_shelf", "height": 40, "mass": 10000000, "width": 180}},
-          "ta_sofa": {"defaults": {"color": "#2a2a30", "decorType": "ta_sofa", "height": 44, "mass": 10000000, "width": 140}},
-          "ta_table": {"defaults": {"color": "#2a2a30", "decorType": "ta_table", "height": 30, "mass": 10000000, "width": 30}},
-          "ta_tires": {"defaults": {"color": "#2a2a30", "decorType": "ta_tires", "height": 44, "mass": 10000000, "width": 44}},
+          "ta_rack": {"defaults": {"color": "#2a2a30", "decorType": "ta_rack", "family": "tyre_rack", "height": 170, "mass": 10000000, "width": 34}},
+          "ta_rims": {"defaults": {"color": "#2a2a30", "decorType": "ta_rims", "family": "rim_wall", "height": 30, "mass": 10000000, "width": 200}},
+          "ta_shelf": {"defaults": {"color": "#2a2a30", "decorType": "ta_shelf", "family": "parts_shelving", "height": 40, "mass": 10000000, "width": 180}},
+          "ta_sofa": {"defaults": {"color": "#2a2a30", "decorType": "ta_sofa", "family": "waiting_sofa", "height": 44, "mass": 10000000, "width": 140}},
+          "ta_table": {"defaults": {"color": "#2a2a30", "decorType": "ta_table", "family": "glass_side_table", "height": 30, "mass": 10000000, "width": 30}},
+          "ta_tires": {"defaults": {"color": "#2a2a30", "decorType": "ta_tires", "family": "tyre_stack", "height": 44, "mass": 10000000, "width": 44}},
           "ta_turntable": {"defaults": {"color": "#2a2a30", "decorType": "ta_turntable", "height": 132, "mass": 10000000, "width": 132}},
           "ta_wrap": {"defaults": {"color": "#2a2a30", "decorType": "ta_wrap", "height": 96, "mass": 10000000, "width": 190}},
           "vending_machine": {"defaults": {"color": "#00f3ff", "height": 60, "interactionType": "vending_machine", "mass": 10000000, "width": 40}}
@@ -18870,7 +18870,181 @@ const m70 = Object.freeze({default:{
             "velvet": {"kind": "color", "default": "#5a0c34"},
             "velvet_light": {"kind": "color", "default": "#8a1a52"},
             "gold": {"kind": "color", "default": "#e8c27a"},
-            "cushions": {"kind": "colors", "default": ["#e8c27a", "#e8d8ff"]}}}
+            "cushions": {"kind": "colors", "default": ["#e8c27a", "#e8d8ff"]}}},
+          "stone_column": {"description": "A round stone column from above: the capital, its fluting, moss (cover in the Sanctum).", "look": {
+            "stone_light": {"kind": "color", "default": "#8a8290"},
+            "stone": {"kind": "color", "default": "#4a4452"},
+            "stone_dark": {"kind": "color", "default": "#2a2630"},
+            "edge": {"kind": "color", "default": "#1a161e"},
+            "capital": {"kind": "color", "default": "#6a6272"}}},
+          "fallen_column": {"description": "A toppled column lying in two pieces, rubble and moss between.", "look": {
+            "stone_light": {"kind": "color", "default": "#7a7282"},
+            "stone": {"kind": "color", "default": "#5a5262"},
+            "stone_dark": {"kind": "color", "default": "#2e2a34"},
+            "edge": {"kind": "color", "default": "#1a161e"},
+            "rubble": {"kind": "color", "default": "#4a4452"}}},
+          "chapel_pew": {"description": "A dark wooden pew; broken, it is snapped and splintered.", "look": {
+            "wood": {"kind": "color", "default": "#2e1e1a"},
+            "wood_edge": {"kind": "color", "default": "#140c0a"},
+            "seat": {"kind": "color", "default": "#3e2822"},
+            "splinter": {"kind": "color", "default": "#6a4a3a"},
+            "broken": {"kind": "boolean", "default": false, "note": "snapped in two"}}},
+          "ring_altar": {"description": "A black stone altar: a crimson cloth stitched with three gold rings, a chalice, candles guttering.", "look": {
+            "stone": {"kind": "color", "default": "#1c1822"},
+            "trim": {"kind": "color", "default": "#8a6a3a"},
+            "cloth": {"kind": "color", "default": "#6a0c1c"},
+            "gold": {"kind": "color", "default": "#e8c27a"},
+            "wine": {"kind": "color", "default": "#5a0a18"},
+            "wax": {"kind": "color", "default": "#e6ddd0"}}},
+          "ruined_organ": {"description": "A ruined pipe organ: a rank of pipes, two gone, one fallen across the case.", "look": {
+            "case": {"kind": "color", "default": "#241c1a"},
+            "trim": {"kind": "color", "default": "#8a6a3a"},
+            "pipe_light": {"kind": "color", "default": "#d8d0c0"},
+            "pipe": {"kind": "color", "default": "#6a5a3a"},
+            "pipe_edge": {"kind": "color", "default": "#3a2e1e"},
+            "fallen_pipe": {"kind": "color", "default": "#8a7a5a"}}},
+          "candle_stand": {"description": "An iron stand of three pillar candles burning, wax spilled.", "look": {
+            "iron": {"kind": "color", "default": "#1a161a"},
+            "rim": {"kind": "color", "default": "#4a4452"},
+            "wax": {"kind": "color", "default": "#e6ddd0"}}},
+          "coal_brazier": {"description": "An iron bowl of coals on three legs, burning.", "look": {
+            "iron": {"kind": "color", "default": "#2a2630"},
+            "bowl": {"kind": "color", "default": "#1a161a"},
+            "rim": {"kind": "color", "default": "#6a5a4a"}}},
+          "hospital_bed": {"description": "A hospital bed: frame, mattress, pillow at the head, a folded blanket and side rails; someone resting in it, or not.", "look": {
+            "head": {"kind": "choice", "values": ["left", "right"], "default": "left", "note": "the side the pillow is on"},
+            "patient": {"kind": "boolean", "default": false, "note": "someone resting"},
+            "frame": {"kind": "color", "default": "#d9dee2"},
+            "frame_edge": {"kind": "color", "default": "#8a949b"},
+            "mattress": {"kind": "color", "default": "#eef3f6"},
+            "blanket": {"kind": "color", "default": "#3f8fa3"},
+            "rails": {"kind": "color", "default": "#9aa4ab"},
+            "skin": {"kind": "color", "default": "#6b4a36"},
+            "hair": {"kind": "color", "default": "#1b1b1b"},
+            "body": {"kind": "color", "default": "#35788a"}}},
+          "vitals_monitor": {"description": "A vitals monitor on a cart, its heartbeat trace scrolling.", "look": {
+            "cart": {"kind": "color", "default": "#2b3138"},
+            "cart_edge": {"kind": "color", "default": "#15191d"},
+            "screen": {"kind": "color", "default": "#04130c"},
+            "trace": {"kind": "color", "default": "#3dff8a"},
+            "alarm": {"kind": "color", "default": "#ff4d5e"}}},
+          "iv_stand": {"description": "An IV stand from above: five spokes, the pole, the bag.", "look": {
+            "steel": {"kind": "color", "default": "#8c969d"},
+            "pole": {"kind": "color", "default": "#c7ced3"},
+            "fluid": {"kind": "color", "default": "rgba(120,200,255,0.45)"}}},
+          "pharmacy_cabinet": {"description": "A glass-fronted pharmacy cabinet: rows of bottles and boxes, a sheen on the glass.", "look": {
+            "case": {"kind": "color", "default": "#e4e9ec"},
+            "case_edge": {"kind": "color", "default": "#8a949b"},
+            "glass": {"kind": "color", "default": "#b9cbd4"},
+            "stock": {"kind": "colors", "default": ["#e74c3c", "#f1c40f", "#2ecc71", "#3498db", "#ecf0f1", "#9b59b6"], "note": "the bottles and boxes, in turn"}}},
+          "reception_counter": {"description": "A clinic reception counter: two glowing screens facing north, papers, a mug, a teal trim.", "look": {
+            "top": {"kind": "color", "default": "#f2f4f5"},
+            "edge": {"kind": "color", "default": "#9aa4ab"},
+            "trim": {"kind": "color", "default": "#3fb6c9"},
+            "bezel": {"kind": "color", "default": "#1d2328"},
+            "glow": {"kind": "color", "default": "#6ff0ff"}}},
+          "waiting_bench": {"description": "A waiting-room bench: three padded seats on a steel frame.", "look": {
+            "frame": {"kind": "color", "default": "#8a949b"},
+            "seat": {"kind": "color", "default": "#2f6f80"}}},
+          "water_cooler": {"description": "A water cooler, its bottle seen from above.", "look": {
+            "body": {"kind": "color", "default": "#dfe5e8"},
+            "edge": {"kind": "color", "default": "#8a949b"},
+            "water": {"kind": "color", "default": "rgba(90,170,255,0.75)"}}},
+          "clinic_plant": {"description": "A potted plant, its seven leaves stirring.", "look": {
+            "pot": {"kind": "color", "default": "#6d5a4b"},
+            "leaves": {"kind": "colors", "default": ["#2e7d32", "#388e3c", "#43a047", "#1b5e20"], "note": "in turn round the pot"}}},
+          "sapphire_counter": {"description": "The store's sapphire counter: crystal facets, a vein of light, the gem seal, a card.", "look": {
+            "crystal": {"kind": "color", "default": "#27527d"},
+            "seal": {"kind": "color", "default": "#e5e6df"},
+            "card": {"kind": "color", "default": "#e0ddd4"}}},
+          "styling_console": {"description": "A styling station: a glass screen showing its subject (a wig, a face, a voice's wave or a colour), swatches and its name.", "look": {
+            "crystal": {"kind": "color", "default": "#224871"},
+            "station": {"kind": "choice", "values": ["wig", "skin", "vocal", "chroma"], "default": "wig", "note": "which station: W.I.G., S.K.I.N., V.O.C.A.L. or CHROMA"}}},
+          "styling_pod": {"description": "A private styling pod: a chair in its rounded shell, two light rails.", "look": {
+            "crystal": {"kind": "color", "default": "#254d76"},
+            "light": {"kind": "color", "default": "#6daee5"}}},
+          "server_rack": {"description": "A server cabinet, its blades in rows.", "look": {
+            "cabinet": {"kind": "color", "default": "#11213a"}}},
+          "fitting_table": {"description": "A sapphire table, three folded garments laid out under glass.", "look": {
+            "crystal": {"kind": "color", "default": "#2d527e"},
+            "garments": {"kind": "colors", "default": ["#a8a9bf", "#527394", "#d1c6b8"], "note": "the three garments"}}},
+          "sapphire_sofa": {"description": "A sapphire velvet sofa, channel-tufted, with steel arms.", "look": {
+            "frame": {"kind": "color", "default": "#152e50"},
+            "seat": {"kind": "color", "default": "#29486d"},
+            "arms": {"kind": "color", "default": "#1c385c"}}},
+          "crystal_tree": {"description": "A violet crystal tree's trunk from above (its glowing canopy is drawn by the room's glow).", "look": {
+            "crystal": {"kind": "colors", "default": ["#d8c8ff", "#6a3ab8", "#241050"], "note": "light, middle and dark of the crystal"},
+            "ring": {"kind": "color", "default": "#d8c6a0"}}},
+          "sapphire_planter": {"description": "A gold-rimmed planter, twelve leaves in a ring.", "look": {
+            "planter": {"kind": "color", "default": "#14293d"},
+            "rim": {"kind": "color", "default": "#c1a980"},
+            "soil": {"kind": "color", "default": "#0a1926"},
+            "leaves": {"kind": "colors", "default": ["#3e7176", "#244e57"], "note": "in turn round the ring"}}},
+          "tool_chest": {"description": "A rolling tool chest: lacquered, a tray of spanners on top, drawer pulls.", "look": {
+            "lacquer_light": {"kind": "color", "default": "#e0552e"},
+            "lacquer_dark": {"kind": "color", "default": "#7c1e12"},
+            "edge": {"kind": "color", "default": "#4e120a"}}},
+          "garage_workbench": {"description": "A workbench: butcher block, a pegboard of tools behind, a vise and a lamp.", "look": {
+            "wood_light": {"kind": "color", "default": "#8a5a32"},
+            "wood": {"kind": "color", "default": "#5e3a1e"}}},
+          "air_compressor": {"description": "An air compressor: the steel tank, its motor, a coiled hose.", "look": {
+            "hose": {"kind": "color", "default": "#ff9a2a"}}},
+          "tyre_stack": {"description": "A stack of tyres: the top one's tread and rim.", "look": {
+            "rim": {"kind": "color", "default": "#dfe3ea"}}},
+          "tyre_rack": {"description": "A wall rack of tyres stood on edge.", "look": {
+}},
+          "oil_drum": {"description": "An oil drum: the ribbed lid, the bung.", "look": {
+            "paint": {"kind": "color", "default": "#1f4a2c"}}},
+          "service_counter": {"description": "Torque's counter: brushed steel, an amber light line, the till, the bell, brochures and the name.", "look": {
+            "sign": {"kind": "text", "default": "TORQUE", "note": "the name on the counter"}}},
+          "rim_wall": {"description": "The rim wall: alloys hung in a row.", "look": {
+            "rims": {"kind": "colors", "default": ["#c9ccd2", "#d4af37", "#2c2c32", "#b9b6c4", "#ff9a2a"], "note": "the alloys, in turn"}}},
+          "lounge_chair": {"description": "A showroom lounge chair: cognac leather on a chrome frame, its back away from its face (E or W).", "look": {
+            "leather": {"kind": "color", "default": "#6a3a1c"},
+            "back": {"kind": "color", "default": "#542c14"}}},
+          "glass_side_table": {"description": "A round glass side table: a magazine and a Bellafore.", "look": {
+            "magazine": {"kind": "color", "default": "#e94a7a"}}},
+          "parts_shelving": {"description": "Parts shelving: steel uprights, labelled boxes of every size.", "look": {
+            "boxes": {"kind": "colors", "default": ["#a87a4a", "#c79a5e", "#4a5a7a", "#8a2a24", "#d8d2c4"], "note": "the boxes, in turn"}}},
+          "waiting_sofa": {"description": "The waiting sofa by the door: leather, three cushions.", "look": {
+            "leather": {"kind": "color", "default": "#5a3218"},
+            "base": {"kind": "color", "default": "#46260f"},
+            "cushion": {"kind": "color", "default": "#6e3e1e"}}},
+          "obsidian_throne": {"description": "Her throne: obsidian ribs sweeping round a ruby, over an upholstered seat.", "look": {
+            "obsidian": {"kind": "color", "default": "#332333"},
+            "gold": {"kind": "color", "default": "#f1b43d"},
+            "velvet": {"kind": "color", "default": "#b1092d"},
+            "ruby": {"kind": "color", "default": "#df143e"},
+            "ruby_light": {"kind": "color", "default": "#ff5a65"}}},
+          "blood_pool": {"description": "A pool of blood sunk in a gold rim: petals drifting, ripples spreading.", "look": {
+            "gold": {"kind": "color", "default": "#ffc64b"},
+            "blood": {"kind": "colors", "default": ["#9a0a2e", "#56041a", "#14020a"], "note": "light, middle and depth"}}},
+          "obsidian_pillar": {"description": "An obsidian pillar from above: gold studs, a blood-red arc creeping round.", "look": {
+            "gold": {"kind": "color", "default": "#ffc64b"}}},
+          "gold_brazier": {"description": "A gold bowl of coals on three legs, burning.", "look": {
+            "gold": {"kind": "color", "default": "#ffc64b"}}},
+          "blood_fountain": {"description": "A stone basin, its spout throwing six arcs of blood, turning.", "look": {
+            "gold": {"kind": "color", "default": "#ffc64b"}}},
+          "rose_bed": {"description": "A gold-edged bed of roses: crimson, gold, and blood roses that glow (the glow pass lights them).", "look": {
+}},
+          "velvet_bench": {"description": "A gold-edged bench in blood velvet.", "look": {
+            "gold": {"kind": "color", "default": "#ebba55"},
+            "velvet": {"kind": "color", "default": "#a30a30"}}},
+          "ruby_altar": {"description": "A stone altar: two cradles, red-black filaments, a ruby floating over it.", "look": {
+            "ruby": {"kind": "color", "default": "#dc0e40"},
+            "ruby_light": {"kind": "color", "default": "#ff526c"}}},
+          "shard_statue": {"description": "A round plinth, three stone shards standing on it.", "look": {
+}},
+          "ember_bed": {"description": "A sunk bed of embers, glowing and sparking.", "look": {
+}},
+          "gilt_mirror": {"description": "A gilt wall mirror.", "look": {
+}},
+          "palace_vanity": {"description": "Her vanity: powder, gold, a lipstick.", "look": {
+}},
+          "palace_wardrobe": {"description": "A lacquer wardrobe, gold-edged.", "look": {
+            "gold": {"kind": "color", "default": "#ffc64b"}}},
+          "iron_cage": {"description": "A rusted iron cage.", "look": {
+}}
         }
       }
     }
@@ -19007,10 +19181,10 @@ const m72 = Object.freeze({default:{
     {"type": "ta_compressor", "x": 808, "y": 58},
     {"type": "ta_rack", "x": 58, "y": 600},
     {"type": "ta_tires", "x": 330, "y": 560},
-    {"type": "ta_tires", "x": 378, "y": 574, "width": 40, "height": 40, "variant": 1},
+    {"type": "ta_tires", "x": 378, "y": 574, "width": 40, "height": 40, "look": {"rim": "#ff9a2a"}},
     {"type": "ta_tires", "x": 826, "y": 700},
     {"type": "ta_drum", "x": 836, "y": 600},
-    {"type": "ta_drum", "x": 836, "y": 640, "variant": 1},
+    {"type": "ta_drum", "x": 836, "y": 640, "look": {"paint": "#7a1f1a"}},
     {"type": "ta_sofa", "x": 80, "y": 880},
     {"type": "ta_table", "x": 240, "y": 888},
     {"type": "ta_counter", "x": 950, "y": 250},
@@ -19816,9 +19990,9 @@ const m85 = Object.freeze({default:{
   "props": [
     {"type": "medbay_refill", "x": 200, "y": 180},
     {"type": "bed", "x": 58, "y": 300},
-    {"type": "bed", "x": 58, "y": 470, "patient": true},
-    {"type": "bed", "x": 622, "y": 300, "headSide": "right"},
-    {"type": "bed", "x": 622, "y": 470, "headSide": "right"},
+    {"type": "bed", "x": 58, "y": 470, "look": {"patient": true}},
+    {"type": "bed", "x": 622, "y": 300, "look": {"head": "right"}},
+    {"type": "bed", "x": 622, "y": 470, "look": {"head": "right"}},
     {"type": "monitor", "x": 64, "y": 364},
     {"type": "monitor", "x": 64, "y": 534},
     {"type": "monitor", "x": 714, "y": 364},
@@ -19970,9 +20144,9 @@ const m87 = Object.freeze({default:{
   "props": [
     {"type": "ns_counter", "x": 400, "y": 220},
     {"type": "ns_console", "x": 120, "y": 120},
-    {"type": "ns_console", "x": 120, "y": 300, "variant": 1},
-    {"type": "ns_console", "x": 820, "y": 120, "variant": 2},
-    {"type": "ns_console", "x": 820, "y": 300, "variant": 3},
+    {"type": "ns_console", "x": 120, "y": 300, "look": {"station": "skin"}},
+    {"type": "ns_console", "x": 820, "y": 120, "look": {"station": "vocal"}},
+    {"type": "ns_console", "x": 820, "y": 300, "look": {"station": "chroma"}},
     {"type": "ns_pod", "x": 150, "y": 620},
     {"type": "ns_server", "x": 650, "y": 590},
     {"type": "ns_server", "x": 730, "y": 590},
@@ -31536,7 +31710,7 @@ return Object.freeze({get DOOR_APPEARANCE(){return DOOR_APPEARANCE;},get doorPre
 const m195 = (()=>{
 // The drawing helpers every prop artist repeats, on the art toolkit: the classic art's rounded box,
 // disc and line runs, a choice by the piece's number, and turning a piece to its face.
-const {circle} = m154;
+const {circle,seededRandom} = m154;
 
 const FACE={S:0,W:Math.PI/2,N:Math.PI,E:-Math.PI/2};
 
@@ -31567,8 +31741,10 @@ function crescent(cx,cy,r,bx,by,br){
     return [['ellipse',cx,cy,r,r,0,phi+alpha,phi+TAU-alpha,0],['ellipse',bx,by,br,br,0,phi+Math.PI+beta,phi+Math.PI-beta,1],['close']];
 }
 const TAU=Math.PI*2;
+/** The classic art's seeded random (a string seed hashed, then the Basement's generator), so a piece scatters its detail as it did. */
+function classicRandom(seed){let h=2166136261;for(const ch of String(seed)){h^=ch.charCodeAt(0);h=Math.imul(h,16777619);}return seededRandom(h>>>0);}
 
-return Object.freeze({get FACE(){return FACE;},get box(){return box;},get disc(){return disc;},get dots(){return dots;},get lines(){return lines;},get choose(){return choose;},get turned(){return turned;},get crescent(){return crescent;}});
+return Object.freeze({get FACE(){return FACE;},get box(){return box;},get disc(){return disc;},get dots(){return dots;},get lines(){return lines;},get choose(){return choose;},get turned(){return turned;},get crescent(){return crescent;},get classicRandom(){return classicRandom;}});
 })();
 // src/game/presentation/props/cafe.mjs
 const m194 = (()=>{
@@ -32775,6 +32951,519 @@ const CLUB_ARTISTS={
 
 return Object.freeze({get CLUB_ARTISTS(){return CLUB_ARTISTS;}});
 })();
+// src/game/presentation/props/sanctum.mjs
+const m201 = (()=>{
+// The Sanctum's furniture families (sc_*): weathered stone, black iron, crimson cloth, candle wax,
+// rain-dark and mossed. Drawn on the art toolkit as the other venues' are; candle flames and the
+// brazier's coals are live. The colonnade's pillars are the cover the Triumvirate's fire respects.
+const {rect,circle,ellipse,linear,radial} = m154;
+const {box,disc,lines} = m195;
+
+const TAU=Math.PI*2;
+/** Moss on stone: n tufts round (mx, my), their spread seeded by `phase` (the classic art's world x). */
+function moss(s,mx,my,n,R,phase){
+    for(let i=0;i<n;i++){const a=i*2.4+phase,r=R*(.3+((i*37)%10)/14);s.fill([circle(mx+Math.cos(a)*r,my+Math.sin(a)*r,1.4+(i%3)*.6)],`rgba(${60+(i*13)%30},${90+(i*17)%30},60,0.5)`);}
+}
+/** A candle's wax top, still. */
+const wax=(s,fx,fy,look)=>disc(s,fx,fy,1.8,look.wax);
+/** Its flame, live: flickering with the time, seeded by where it stands. */
+function flame(s,piece,fx,fy,k){const f=.75+.25*Math.sin(piece.time*11+(piece.seed[0]+fx)*.3+k);disc(s,fx,fy-.5,1.4*f,`rgba(255,${190+40*f|0},110,0.95)`);}
+/** One length of column, lying along x, about its middle. */
+function drum(s,sw,h,tilt,cx,look){
+    s.enter({position:[cx,h/2],rotation:tilt});
+    box(s,-sw/2,-h/2,sw,h,6,linear([0,-h/2],[0,h/2],[[0,look.stone_light],[.5,look.stone],[1,look.stone_dark]]),look.edge,1);
+    const flutes=[];for(let k=-sw/2+6;k<sw/2;k+=7)flutes.push([k,-h/2+3,k,h/2-3]);lines(s,flutes,'rgba(20,16,24,0.4)',.7);
+    s.leave();
+}
+/** A pew's length of dark wood, its seat board and grain. */
+function pewWood(s,X,W,h,look){
+    box(s,X,0,W,h,2,look.wood,look.wood_edge,1);box(s,X+2,2,W-4,7,1.5,look.seat);
+    const grain=[];for(let k=12;k<h-2;k+=4)grain.push([X+2,k,X+W-2,k]);lines(s,grain,'rgba(0,0,0,0.3)',.6);
+}
+
+const SANCTUM_ARTISTS={
+    stone_column:{draw(art,piece,look){art.still(s=>{                   // a round stone column from above: capital, fluting, moss
+        const {width:w,height:h}=piece,cx=w/2,cy=h/2,R=w/2;
+        s.outlined([circle(cx,cy,R)],radial([cx-R*.35,cy-R*.35],2,[cx,cy],R,[[0,look.stone_light],[.7,look.stone],[1,look.stone_dark]]),look.edge,1.2);
+        const flutes=[];for(let i=0;i<12;i++){const a=i*Math.PI/6;flutes.push([cx+Math.cos(a)*R*.55,cy+Math.sin(a)*R*.55,cx+Math.cos(a)*R*.95,cy+Math.sin(a)*R*.95]);}
+        lines(s,flutes,'rgba(20,16,24,0.45)',.8);
+        disc(s,cx,cy,R*.5,look.capital,'rgba(200,180,255,0.18)',1);
+        moss(s,cx+R*.3,cy+R*.4,7,R*.5,piece.seed[0]+cx+R*.3);
+    });}},
+    fallen_column:{draw(art,piece,look){art.still(s=>{                  // a toppled column in pieces across the aisle
+        const {width:w,height:h}=piece;
+        drum(s,w*.45,h,-.06,w*.45/2,look);drum(s,w*.5,h,.08,w*.5+w*.5/2,look);
+        for(let i=0;i<6;i++)disc(s,w*.47+(i%3)*3-3,h+3+(i/3|0)*3,2,look.rubble);   // rubble
+        moss(s,w*.2,h*.4,6,8,piece.seed[0]+w*.2);
+    });}},
+    chapel_pew:{draw(art,piece,look){art.still(s=>{                     // a dark wooden pew; a broken one snapped and splintered
+        const {width:w,height:h}=piece;
+        if(!look.broken){pewWood(s,0,w,h,look);return;}
+        pewWood(s,0,w*.45,h,look);
+        s.enter({position:[w*.72,h/2],rotation:.35});s.enter({position:[0,-h/2]});pewWood(s,-w*.25,w*.45,h,look);s.leave();s.leave();
+        s.stroke([['move',w*.45,2],['line',w*.5,6],['line',w*.45,10]],look.splinter,1);
+    });}},
+    ring_altar:{draw(art,piece,look){                                   // black stone, a crimson cloth, a gold chalice, candles guttering
+        const {width:w,height:h}=piece,candles=[[w-16,12],[w-24,20],[w-12,h-12],[10,10],[12,h-10]];
+        art.still(s=>{
+            box(s,0,0,w,h,3,look.stone,look.trim,1.5);
+            box(s,w*.2,-2,w*.6,h+4,2,look.cloth);s.fill(rect(w*.2,h-3,w*.6,1.5),look.gold);s.fill(rect(w*.2,-2,w*.6,1.5),look.gold);
+            s.enter({position:[w/2,h/2]},{opacity:.7});                 // the three rings, stitched
+            for(let k=0;k<3;k++){const a=-Math.PI/2+k*TAU/3;s.stroke([circle(Math.cos(a)*5,Math.sin(a)*5,6)],look.gold,1);}
+            s.leave();
+            disc(s,20,h/2,5,look.gold,look.trim,1);disc(s,20,h/2,2.4,look.wine);   // the chalice
+            for(const [cx,cy] of candles)wax(s,cx,cy,look);
+        });
+        art.live(s=>candles.forEach(([cx,cy],k)=>flame(s,piece,cx,cy,k)));
+    }},
+    ruined_organ:{draw(art,piece,look){art.still(s=>{                   // a ruined pipe organ: a rank of pipes, some fallen
+        const {width:w,height:h}=piece;
+        box(s,0,h*.55,w,h*.45,2,look.case,look.trim,1);
+        for(let i=0;i<11;i++){
+            if(i===3||i===8)continue;                                   // two gone from the rank
+            const px=5+i*(w-10)/10,r=3.2-Math.abs(i-5)*.18;
+            s.outlined([circle(px,10+Math.abs(i-5)*1.2,r)],radial([px-1,9],.5,[px,10],r,[[0,look.pipe_light],[1,look.pipe]]),look.pipe_edge,.6);
+        }
+        s.enter({position:[w*.35,h*.3],rotation:1.1});box(s,-2,0,4,22,2,look.fallen_pipe,look.pipe_edge,.6);s.leave();
+    });}},
+    candle_stand:{draw(art,piece,look){                                 // an iron stand of pillar candles, wax spilled
+        const {width:w,height:h}=piece,cx=w/2,cy=h/2,candles=[[-4,-3],[4,-2],[0,4]];
+        art.still(s=>{
+            disc(s,cx,cy,w/2+1,look.iron,look.rim,1);
+            s.fill([ellipse(cx+3,cy+5,6,3,.4)],'rgba(230,221,208,0.5)');
+            for(const [dx,dy] of candles)wax(s,cx+dx,cy+dy,look);
+        });
+        art.live(s=>candles.forEach(([dx,dy],k)=>flame(s,piece,cx+dx,cy+dy,k)));
+    }},
+    coal_brazier:{draw(art,piece,look){                                 // an iron bowl of coals on three legs, burning
+        const {width:w,height:h}=piece,cx=w/2,cy=h/2;
+        art.still(s=>{
+            const legs=[];for(let k=0;k<3;k++){const a=k*TAU/3+.5;legs.push(['move',cx,cy],['line',cx+Math.cos(a)*(w/2+3),cy+Math.sin(a)*(w/2+3)]);}
+            s.stroke(legs,look.iron,2);
+            disc(s,cx,cy,w/2-2,look.bowl,look.rim,1.5);
+        });
+        art.live(s=>{for(let i=0;i<9;i++){const a=i*2.4,r=(i%3)*3.5+2,f=.6+.4*Math.sin(piece.time*7+i*1.9);disc(s,cx+Math.cos(a)*r,cy+Math.sin(a)*r,2.6+f,`rgba(255,${80+90*f|0},30,${.6+.35*f})`);}});
+    }}
+};
+
+return Object.freeze({get SANCTUM_ARTISTS(){return SANCTUM_ARTISTS;}});
+})();
+// src/game/presentation/props/clinic.mjs
+const m202 = (()=>{
+// The clinic's furniture families (medbay_sw): white enamel, steel, teal. Drawn on the art toolkit as
+// the other venues' are; the vitals monitor's trace scrolls and the plant sways, live.
+const {rect,circle,ellipse} = m154;
+const {box,disc} = m195;
+
+const TAU=Math.PI*2;
+
+const CLINIC_ARTISTS={
+    hospital_bed:{draw(art,piece,look){art.still(s=>{                   // the frame, a pillow at the head, the blanket; someone resting, or not
+        const {width:w,height:h}=piece,L=look.head!=='right';
+        box(s,0,0,w,h,6,look.frame,look.frame_edge,1.5);
+        box(s,4,4,w-8,h-8,5,look.mattress);
+        box(s,L?7:w-29,9,22,h-18,6,'#ffffff','rgba(0,0,0,0.12)',1);    // the pillow
+        const bx=L?34:5,bw=w-40;
+        box(s,bx,5,bw,h-10,5,look.blanket);
+        s.fill(rect(L?bx:bx+bw-7,5,7,h-10),'rgba(255,255,255,0.18)'); // the folded sheet's edge
+        const folds=[];for(let i=1;i<4;i++){const fx=bx+bw*i/4;folds.push(['move',fx,8],['quadratic',fx+4,h/2,fx,h-8]);}
+        s.stroke(folds,'rgba(0,0,0,0.12)',1);
+        if(look.patient){
+            const hx=L?18:w-18;
+            disc(s,hx,h/2,8,look.skin);
+            s.fill([ellipse(hx+(L?-2:2),h/2,8,8,0,L?1.2:-1.9,L?5.1:1.9)],look.hair);
+            box(s,L?30:w-70,8,40,h-16,8,look.body);                     // under the blanket
+        }
+        s.fill([...rect(L?30:10,-1,w-42,3),...rect(L?30:10,h-2,w-42,3)],look.rails);
+    });}},
+    vitals_monitor:{draw(art,piece,look){                               // on a cart: a heartbeat trace scrolling across the screen
+        const {width:w,height:h}=piece;
+        art.still(s=>{box(s,0,0,w,h,3,look.cart,look.cart_edge,1);box(s,2,2,w-4,h-8,2,look.screen);});
+        art.live(s=>{
+            s.enter();s.clip(rect(2,2,w-4,h-8));
+            const mid=2+(h-8)/2,sw=w-4,trace=[];
+            for(let i=0;i<=sw;i++){const ph=((i/sw)*2+piece.time*1.2+piece.seed[0]*.01)%1,spike=ph>.45&&ph<.55?Math.sin((ph-.45)*Math.PI*20)*(h-10)*.45:0;trace.push([i?'line':'move',2+i,mid-spike]);}
+            s.paint(trace,{stroke:look.trace,stroke_width:1,shadow:{color:look.trace,blur:4}});
+            s.leave();
+        });
+        art.still(s=>disc(s,w-4,h-3,1.3,look.alarm));
+    }},
+    iv_stand:{draw(art,piece,look){art.still(s=>{                       // base spokes, the pole, the bag
+        const {width:w,height:h}=piece,cx=w/2,cy=h/2;
+        for(let i=0;i<5;i++){const a=i*TAU/5;s.stroke([['move',cx,cy],['line',cx+Math.cos(a)*7,cy+Math.sin(a)*7]],look.steel,1.5);}
+        disc(s,cx,cy,2,look.pole);
+        box(s,cx-4,cy-5,8,10,3,'rgba(200,235,255,0.55)','rgba(255,255,255,0.8)',.8);
+        s.fill(rect(cx-3,cy-1,6,5),look.fluid);
+    });}},
+    pharmacy_cabinet:{draw(art,piece,look){art.still(s=>{               // glass-fronted: bottles and boxes in rows, a sheen
+        const {width:w,height:h}=piece,cols=look.stock,x0=Math.floor(piece.seed[0]);
+        box(s,0,0,w,h,3,look.case,look.case_edge,1.5);
+        box(s,3,3,w-6,h-6,2,look.glass);
+        for(let i=0,n=Math.floor((w-10)/9);i<n;i++){
+            const bx=6+i*9;
+            disc(s,bx+3,10,2.6,cols[(i*7+x0)%cols.length]);
+            s.fill(rect(bx+1,16,5,7),cols[(i*3+1)%cols.length]);
+        }
+        s.fill([['move',w*.2,3],['line',w*.32,3],['line',w*.22,h-3],['line',w*.1,h-3]],'rgba(255,255,255,0.25)');
+    });}},
+    reception_counter:{draw(art,piece,look){art.still(s=>{              // its screens face the doctor (north); papers, a mug
+        const {width:w,height:h}=piece;
+        box(s,0,0,w,h,6,look.top,look.edge,1.5);
+        box(s,4,h-9,w-8,5,2,look.trim);
+        for(const sx of [30,w-56]){box(s,sx,4,26,5,1,look.bezel);s.paint(rect(sx+2,5,22,2.4),{fill:look.glow,shadow:{color:look.glow,blur:6}});}
+        s.enter({position:[w/2-6,14],rotation:-.15});s.fill(rect(0,0,12,9),'#ffffff');s.fill([...rect(2,2,8,1),...rect(2,5,6,1)],'#c9d1d6');s.leave();
+        disc(s,20,17,3.5,'#fafafa');disc(s,20,17,2.4,'#5a3b22');
+    });}},
+    waiting_bench:{draw(art,piece,look){art.still(s=>{                  // three padded seats on a steel frame
+        const {width:w,height:h}=piece;
+        box(s,0,0,w,h,5,look.frame);
+        for(let i=0;i<3;i++)box(s,4+i*(w-8)/3,4,(w-8)/3-3,h-8,5,look.seat,'rgba(255,255,255,0.15)',1);
+    });}},
+    water_cooler:{draw(art,piece,look){art.still(s=>{                   // the bottle seen from above
+        const {width:w,height:h}=piece;
+        box(s,0,0,w,h,4,look.body,look.edge,1);
+        disc(s,w/2,h/2,w*.36,look.water);disc(s,w/2-3,h/2-3,2.2,'rgba(255,255,255,0.7)');
+    });}},
+    clinic_plant:{loop:{period:TAU/.8,frames:10},draw(art,piece,look){  // a potted plant, its leaves stirring (one sway, painted as phase frames)
+        const {width:w,height:h}=piece,cx=w/2,cy=h/2;
+        art.still(s=>{disc(s,cx,cy,w*.42,look.pot);for(let i=0;i<7;i++){const a=i*.9+Math.sin(piece.time*.8+i)*.05,r=w*(.2+(i%3)*.08);s.fill([ellipse(cx+Math.cos(a)*r,cy+Math.sin(a)*r,w*.2,w*.1,a)],look.leaves[i%look.leaves.length]);}});
+    }}
+};
+
+return Object.freeze({get CLINIC_ARTISTS(){return CLINIC_ARTISTS;}});
+})();
+// src/game/presentation/props/neural.mjs
+const m203 = (()=>{
+// Neural Systems' furniture families (ns_*): a sapphire-crystal department store, its vitrines,
+// polished facets and private styling suites. Drawn on the art toolkit as the other venues' are.
+// Each piece lies on its own soft drop shadow, as the store's classic art drew it.
+const {rect,circle,ellipse,polygon,radial} = m154;
+const {box} = m195;
+
+const TAU=Math.PI*2,FACETS=['#28588a','#15345b','#0b1b3c','#1b4374','#456d9b'],PALE='#e5e6df',METAL='#9baebe';
+/** The drop shadow under each piece, 3 right and 4 down. */
+const drop=(s,w,h,r)=>box(s,3,4,w,h,r,'rgba(0,0,0,.3)');
+/** A six-sided sapphire slab: facets to its heart, a pale rim, one glint across. */
+function crystal(s,w,h,base){
+    const pts=[[w*.18,0],[w*.82,0],[w,h*.24],[w*.82,h],[w*.18,h],[0,h*.24]],cx=w*.5,cy=h*.48,colors=[base,...FACETS];
+    for(let i=0;i<6;i++)s.fill(polygon([pts[i],pts[(i+1)%6],[cx,cy]]),colors[i]);
+    s.stroke(polygon(pts),'rgba(181,216,243,.6)',.8);
+    s.stroke([['move',w*.18,1],['line',cx,cy],['line',w*.82,h-1]],'rgba(232,245,255,.3)',.8);
+}
+/** The store's seal: a cut gem outline, its table and girdle. */
+function seal(s,x,y,r,color){
+    s.enter({position:[x,y]});const lw=Math.max(.7,r*.022);
+    s.stroke(polygon([[0,-r],[r*.7,-r*.35],[r*.52,r*.55],[0,r],[-r*.52,r*.55],[-r*.7,-r*.35]]),color,lw);
+    s.stroke([...polygon([[0,-r],[r*.3,0],[0,r],[-r*.3,0]]),['move',-r*.7,-r*.35],['line',r*.7,-r*.35],['move',-r*.52,r*.55],['line',r*.52,r*.55]],color,lw);
+    s.leave();
+}
+const STATIONS={wig:'W.I.G.',skin:'S.K.I.N.',vocal:'V.O.C.A.L.',chroma:'CHROMA'};
+
+const NEURAL_ARTISTS={
+    sapphire_counter:{pad:12,draw(art,piece,look){art.still(s=>{         // the sapphire counter: a vein of light, the seal, a card
+        const {width:w,height:h}=piece;
+        drop(s,w,h,5);crystal(s,w,h,look.crystal);
+        s.stroke([['move',12,h*.7],['cubic',w*.3,3,w*.6,h,w-12,5]],'rgba(208,219,226,.3)',.7);
+        seal(s,w/2,h/2,9,look.seal);
+        s.fill(rect(w-30,7,14,9),look.card);
+    });}},
+    styling_console:{pad:12,draw(art,piece,look){art.still(s=>{          // a styling station: a glass screen, its subject, swatches, its name
+        const {width:w,height:h}=piece,mid=w/2,st=look.station;
+        drop(s,w,h,5);crystal(s,w,h,look.crystal);
+        box(s,7,7,w-14,h-23,1,'rgba(166,203,232,.13)','#adc4d4',.7);
+        s.fill(polygon([[9,9],[18,9],[w-10,h-26],[w-20,h-26]]),'rgba(229,244,255,.2)');
+        if(st==='vocal'){const wave=[];for(let i=0;i<33;i++)wave.push([i?'line':'move',12+i*(w-24)/32,29+Math.sin(i*.55)*Math.sin(i*Math.PI/32)*12]);s.stroke(wave,'#a8d6f7',1.4);}
+        else{
+            s.fill([ellipse(mid,29,11,13)],st==='skin'?'#bba5a5':'#0b1529');
+            s.stroke([circle(mid,27,13,Math.PI,TAU)],st==='skin'?'#ebd0c2':'#92b8dc',2);
+            s.fill([ellipse(mid,45,16,5)],'#5882a6');
+        }
+        ['#adc7df','#c9ac94','#79649d','#56888b'].forEach((c,i)=>s.fill([circle(15+i*10,h-24,2.3)],c));
+        s.text(STATIONS[st],mid,h-10,{font:{family:'Georgia,serif',size:6},align:'center',baseline:'middle'},{fill:PALE});
+    });}},
+    styling_pod:{pad:12,draw(art,piece,look){art.still(s=>{              // a private styling pod: the chair in its shell, two light rails
+        const {width:w,height:h}=piece;
+        drop(s,w,h,5);crystal(s,w,h,look.crystal);box(s,6,5,w-12,h-10,17,'#0a172a','#668cac');
+        box(s,w*.28,13,w*.44,h-25,12,'#314e75','#89a0b6');
+        box(s,w*.32,16,w*.36,15,6,'#8297ae','#b9c5ce');
+        for(const xx of [8,w-13]){box(s,xx,23,5,h-41,2,'#b5c4cf');s.fill(rect(xx+1,29,3,h-53),look.light);}
+    });}},
+    server_rack:{pad:12,draw(art,piece,look){art.still(s=>{              // a server cabinet: its blades, in rows
+        const {width:w,height:h}=piece;
+        drop(s,w,h,5);box(s,0,0,w,h,4,look.cabinet,METAL);box(s,4,5,w-8,h-10,3,'#081321','#365572');
+        for(let yy=11;yy<h-6;yy+=21){box(s,7,yy,w-14,15,1,'#274565','#809ab1',.6);s.fill(rect(10,yy+3,w-20,4),'#b9b7c7');s.fill(rect(10,yy+8,w-20,4),'#506d93');}
+    });}},
+    fitting_table:{pad:12,draw(art,piece,look){art.still(s=>{            // a sapphire table: three folded garments laid out under glass
+        const {width:w,height:h}=piece;
+        drop(s,w,h,5);crystal(s,w,h,look.crystal);
+        box(s,6,6,w-12,h-12,2,'rgba(165,195,224,.14)','#b7cad8',.6);
+        for(let i=0;i<3;i++){const xx=12+i*(w-20)/3;box(s,xx,13,(w-32)/3,h-30,2,look.garments[i%look.garments.length]);s.stroke(rect(xx+2,17,(w-44)/3,h-38),'rgba(238,236,229,.45)',.6);}
+    });}},
+    sapphire_sofa:{pad:12,draw(art,piece,look){art.still(s=>{            // a sapphire velvet sofa, channel-tufted, steel arms
+        const {width:w,height:h}=piece;
+        drop(s,w,h,5);box(s,0,0,w,h,9,look.frame,METAL);box(s,8,7,w-16,h-13,6,look.seat,'#536e8b');
+        const ch=[];for(let xx=12;xx<w-9;xx+=12)ch.push(['move',xx,9],['line',xx,h-9]);s.stroke(ch,'#3d5b7f',.6);
+        box(s,2,3,8,h-6,4,look.arms,'#9aabba');box(s,w-10,3,8,h-6,4,look.arms,'#9aabba');
+    });}},
+    crystal_tree:{pad:12,draw(art,piece,look){art.still(s=>{             // a violet crystal trunk (its glowing canopy is the room's glow pass)
+        const {width:w,height:h}=piece,cx=w/2,cy=h/2;
+        drop(s,w,h,5);
+        s.outlined([circle(cx,cy,w/2)],radial([cx-3,cy-3],1,[cx,cy],w/2,[[0,look.crystal[0]],[.5,look.crystal[1%look.crystal.length]],[1,look.crystal[2%look.crystal.length]]]),look.ring,1);
+    });}},
+    sapphire_planter:{pad:12,draw(art,piece,look){art.still(s=>{         // a gold-rimmed planter: twelve leaves in a ring
+        const {width:w,height:h}=piece;
+        drop(s,w,h,5);box(s,0,0,w,h,6,look.planter,look.rim);box(s,4,4,w-8,h-8,3,look.soil);
+        for(let i=0;i<12;i++){const a=i*TAU/12;s.fill([ellipse(w/2+Math.cos(a)*8,h/2+Math.sin(a)*8,9,3,a)],look.leaves[i%2?0:1%look.leaves.length]);}
+    });}}
+};
+
+return Object.freeze({get NEURAL_ARTISTS(){return NEURAL_ARTISTS;}});
+})();
+// src/game/presentation/props/torque.mjs
+const m204 = (()=>{
+// Torque Auto's furniture families (ta_*): the service bay's tool chests, bench and tyres, the parts
+// room's shelving, the showroom's steel counter and cognac leather. Amber is the house colour. Drawn on
+// the art toolkit as the other venues' are. (The two lifts, the wrap bay and the plinth carry cars, so
+// they wait for the vehicles' own art.)
+const {rect,circle,linear,radial} = m154;
+const {box,disc,lines} = m195;
+
+const TAU=Math.PI*2,STEEL_HI='#dfe3ea',STEEL='#9aa3ad',STEEL_LO='#4a5059',AMBER='#ff9a2a',RUBBER='#141416';
+/** Brushed steel along (x0, y0) to (x1, y1). */
+const steel=(x0,y0,x1,y1)=>linear([x0,y0],[x1,y1],[[0,'#6c747e'],[.45,STEEL_HI],[.55,'#a9b1ba'],[1,'#565d66']]);
+/** The drop shadow under each piece, 2 right and 3 down. */
+const drop=(s,w,h,r,dx=2,dy=3,a=.35)=>box(s,dx,dy,w,h,r,`rgba(0,0,0,${a})`);
+
+const TORQUE_ARTISTS={
+    tool_chest:{pad:10,draw(art,piece,look){art.still(s=>{              // a rolling tool chest: lacquer, drawer pulls, a tray of spanners on top
+        const {width:w,height:h}=piece;
+        drop(s,w,h,3);
+        box(s,0,0,w,h,3,linear([0,-h/2],[0,h/2],[[0,look.lacquer_light],[1,look.lacquer_dark]]),look.edge,1);
+        box(s,3,3,w-6,h*.42,2,'#1a1a1e','#5a5a62',.8);
+        const spanners=[];for(let i=0;i<6;i++){const sx=7+i*(w-14)/6;spanners.push([sx,6,sx+3,h*.4-2]);}lines(s,spanners,STEEL_HI,1);
+        s.fill([0,1,2].flatMap(i=>rect(6,h*.55+i*h*.14,w-12,1.2)),'rgba(255,255,255,.55)');
+    });}},
+    garage_workbench:{pad:10,draw(art,piece,look){art.still(s=>{               // butcher block, the pegboard behind, a vise and a lamp
+        const {width:w,height:h}=piece;
+        drop(s,w,h,2);
+        box(s,0,0,w,h*.34,1,'#2c2f35','#4d525a');
+        const holes=[];for(let px=5;px<w-3;px+=6)for(let py=3;py<h*.32;py+=5)holes.push(...rect(px,py,1,1));s.fill(holes,'rgba(223,227,234,.25)');
+        for(const [tx,tl] of [[20,8],[34,10],[48,7],[w-40,9]])s.stroke([['move',tx,2],['line',tx,2+tl]],STEEL_HI,1.4);
+        box(s,0,h*.34,w,h*.66,2,linear([0,-h*.34-h*.33],[0,h*.66-h*.33],[[0,look.wood_light],[1,look.wood]]),'#3a2412',1);
+        const grain=[];for(let px=8;px<w;px+=8)grain.push([px,h*.34,px,h]);lines(s,grain,'rgba(40,20,8,.35)',.7);
+        box(s,w-28,h*.42,20,12,2,'#3c414a',STEEL,.8);s.fill(rect(w-32,h*.5,28,1.6),STEEL_HI);
+        box(s,14,h*.5,24,9,2,'#1c1c20',AMBER,.8);
+    });}},
+    air_compressor:{pad:10,draw(art,piece,look){art.still(s=>{          // the tank, the motor and a coiled hose
+        const {width:w,height:h}=piece;
+        drop(s,w,h,8);
+        box(s,0,h*.25,w,h*.6,h*.3,steel(0,-h*.25-h*.3,0,h-h*.25-h*.3),'#3d434b',1);
+        box(s,w*.2,2,w*.5,h*.32,3,'#1e2024','#4d525a',1);
+        for(let i=0;i<3;i++)s.stroke([circle(w*.78,h*.5,4+i*2.2)],look.hose,1.6);
+    });}},
+    tyre_stack:{pad:10,draw(art,piece,look){art.still(s=>{              // a stack of tyres: the top one's tread and rim
+        const {width:w,height:h}=piece,cx=w/2,cy=h/2,r=Math.min(w,h)/2;
+        disc(s,cx+3,cy+4,r,'rgba(0,0,0,.4)');disc(s,cx,cy,r,RUBBER);
+        for(let i=0;i<24;i++){const a=i/24*TAU;s.stroke([['move',cx+Math.cos(a)*r*.78,cy+Math.sin(a)*r*.78],['line',cx+Math.cos(a)*r*.98,cy+Math.sin(a)*r*.98]],'#2c2c30',1);}
+        disc(s,cx,cy,r*.55,'#0a0a0c');s.stroke([circle(cx,cy,r*.42)],look.rim,1.2);
+        disc(s,cx-r*.3,cy-r*.3,r*.35,'rgba(255,255,255,.08)');
+    });}},
+    tyre_rack:{pad:10,draw(art,piece,look){art.still(s=>{               // a wall rack, tyres stood on edge
+        const {width:w,height:h}=piece,n=Math.floor(h/15);
+        drop(s,w,h,2);box(s,0,0,w,h,2,'#2a2d33',STEEL_LO,1);
+        for(let i=0;i<n;i++){const ty=4+i*(h-8)/n;box(s,3,ty,w-6,(h-8)/n-2,3,RUBBER,'#36363c',.8);s.fill(rect(5,ty+(h-8)/n/2-1.5,w-10,1),'#3a3a40');}
+    });}},
+    oil_drum:{pad:10,draw(art,piece,look){art.still(s=>{                // an oil drum: the ribbed lid, the brand's band
+        const {width:w,height:h}=piece,cx=w/2,cy=h/2,r=w/2;
+        disc(s,cx+2,cy+3,r,'rgba(0,0,0,.4)');disc(s,cx,cy,r,look.paint);
+        s.stroke([circle(cx,cy,r*.75)],'rgba(255,255,255,.25)',1);disc(s,cx+r*.4,cy-r*.2,2,STEEL);
+    });}},
+    service_counter:{pad:10,draw(art,piece,look){art.still(s=>{         // brushed steel, an amber light line, the till, the bell, brochures
+        const {width:w,height:h}=piece;
+        drop(s,w,h,6,3,4,.4);
+        box(s,0,0,w,h,6,steel(0,-h/2,0,h/2),'#3a3f46',1);
+        box(s,4,4,w-8,h-12,4,'#16161a','#5d636c',.8);
+        s.fill(rect(6,h-6,w-12,2),AMBER);
+        box(s,18,8,30,18,2,'#0d0d10',STEEL,.8);s.fill(rect(21,11,24,7),'#58d0ff');
+        disc(s,w-26,16,5,STEEL_HI);disc(s,w-26,16,1.6,'#2b2b30');
+        ['#e9e4dc','#ffcf8a','#c9c2ff'].forEach((c,i)=>box(s,60+i*20,9,15,11,1,c));
+        s.text(look.sign,w-66,16,{font:{family:'Orbitron, monospace',size:7},align:'center',baseline:'middle'},{fill:'rgba(255,196,106,.75)'});
+    });}},
+    rim_wall:{pad:10,draw(art,piece,look){art.still(s=>{                // alloys hung in a row
+        const {width:w,height:h}=piece,n=Math.floor(w/30);
+        drop(s,w,h,3);box(s,0,0,w,h,3,'#1b1b20','#4b5059',1);
+        for(let i=0;i<n;i++){
+            const cx=15+i*(w-30)/Math.max(1,n-1),cy=h/2,r=h/2-3;
+            disc(s,cx,cy,r,RUBBER);disc(s,cx,cy,r*.72,look.rims[i%look.rims.length]);
+            const spokes=[];for(let k=0;k<5;k++){const a=k/5*TAU+i;spokes.push(['move',cx,cy],['line',cx+Math.cos(a)*r*.7,cy+Math.sin(a)*r*.7]);}s.stroke(spokes,'rgba(0,0,0,.55)',1.2);
+            disc(s,cx,cy,1.6,STEEL_HI);
+        }
+    });}},
+    lounge_chair:{pad:10,draw(art,piece,look){art.still(s=>{            // cognac leather on a chrome frame, its back away from its face
+        const {width:w,height:h}=piece,f=piece.face==='W'?-1:1;
+        drop(s,w,h,8);
+        box(s,0,0,w,h,8,look.leather,'#2e180a',1);
+        box(s,f>0?0:w-10,2,10,h-4,5,look.back);
+        box(s,4,4,w-8,h-8,6,null,'rgba(255,214,160,.25)',.8);
+        s.stroke([['move',3,h-1],['line',w-3,h-1]],STEEL_HI,1);
+    });}},
+    glass_side_table:{pad:10,draw(art,piece,look){art.still(s=>{        // a glass side table: a magazine and a Bellafore
+        const {width:w,height:h}=piece;
+        disc(s,w/2+2,h/2+3,w/2,'rgba(0,0,0,.3)');
+        disc(s,w/2,h/2,w/2,'rgba(190,210,230,.25)',STEEL_HI,1);
+        s.enter({position:[w/2,h/2],rotation:.3});box(s,-8,-6,12,9,1,look.magazine);s.leave();
+        disc(s,w/2+5,h/2+3,2.4,'#ffcf8a');
+    });}},
+    parts_shelving:{pad:10,draw(art,piece,look){art.still(s=>{          // steel uprights, labelled boxes of every size
+        const {width:w,height:h}=piece,[x0,y0]=piece.seed;
+        drop(s,w,h,2);box(s,0,0,w,h,2,'#2b2e34',STEEL_LO,1);
+        let bx=4,i=0;
+        while(bx<w-10){
+            const bw=14+(((x0+bx)*7+y0)%13);                            // each box's width, as the classic art drew it from where it stood
+            if(bx+bw>w-4)break;
+            box(s,bx,4,bw,h-8,1,look.boxes[i++%look.boxes.length],'rgba(0,0,0,.4)',.6);
+            s.fill(rect(bx+3,h/2-1.5,bw-6,3),'rgba(255,255,255,.7)');
+            bx+=bw+3;
+        }
+        s.fill(rect(0,h-2,w,2),AMBER);
+    });}},
+    waiting_sofa:{pad:10,draw(art,piece,look){art.still(s=>{            // the waiting sofa by the door
+        const {width:w,height:h}=piece;
+        drop(s,w,h,9);
+        box(s,0,0,w,h,9,look.leather,'#2e180a',1);box(s,0,h-12,w,12,6,look.base);
+        for(let i=0;i<3;i++)box(s,6+i*(w-12)/3,5,(w-12)/3-3,h-19,5,look.cushion,'rgba(255,214,160,.3)',.8);
+    });}}
+};
+
+return Object.freeze({get TORQUE_ARTISTS(){return TORQUE_ARTISTS;}});
+})();
+// src/game/presentation/props/palace.mjs
+const m205 = (()=>{
+// The Demoness Palace's furniture families (dp_*): obsidian, blood-red velvet and gold, her throne
+// and her pool of blood, the rose beds, the braziers. Drawn on the art toolkit as the other venues'
+// are; the pool's ripples, the flames, the embers and the altar's floating crystal are live.
+const {rect,circle,ellipse,polygon,radial} = m154;
+const {box,disc,classicRandom} = m195;
+
+const TAU=Math.PI*2,GOLD='#ffc64b',GOLD_DIM='rgba(255,190,58,0.65)';
+const drop=(s,w,h,r=4)=>box(s,3,3,w,h,r,'rgba(0,0,0,0.4)');
+/** A rose bed's flowers, scattered as the classic art scattered them from where the bed stands. */
+function flowers(piece){
+    const {width:w,height:h,seed:[x,y]}=piece,rnd=classicRandom((x*31+y)|0),out=[],count=Math.max(12,Math.floor(w*h/280));
+    const cols=Math.max(2,Math.round(Math.sqrt(count*w/h))),rows=Math.ceil(count/cols);
+    for(let i=0;i<count;i++)out.push({x:8+((i%cols)+.2+rnd()*.6)*(w-16)/cols,y:7+(Math.floor(i/cols)+.2+rnd()*.6)*(h-14)/rows,r:3+rnd()*2,a:rnd()*6.28,blood:i%4===0,gold:i%4!==0&&i%5===2});
+    return out;
+}
+const PALACE_ARTISTS={
+    obsidian_throne:{pad:30,draw(art,piece,look){art.still(s=>{         // obsidian ribs sweeping round a ruby, over the upholstered seat
+        const {width:w,height:h}=piece,cx=w/2;
+        drop(s,w,h,10);box(s,-4,-2,w+8,h+6,12,look.obsidian,look.gold,1.4);
+        box(s,5,8,w-10,h-12,8,look.velvet,'#f4b94c',1);
+        for(const side of [-1,1]){
+            s.paint([['move',cx+side*7,8],['cubic',cx+side*32,4,cx+side*39,-15,cx+side*34,-25],['quadratic',cx+side*21,-8,cx+side*5,13]],{fill:'#322436',stroke:'#ffd06b',stroke_width:1.1});
+            box(s,cx+side*24-4,20,8,27,3,'#44303f','#d5a03e',1);
+        }
+        s.outlined(polygon([[cx,-22],[cx+8,-4],[cx,8],[cx-8,-4]]),look.ruby,'#ffda77',1);
+        s.fill(polygon([[cx,-18],[cx,4],[cx-5,-4]]),look.ruby_light);
+    });}},
+    blood_pool:{pad:12,draw(art,piece,look){                            // a gold rim, the pool sunk below the floor, petals drifting, ripples
+        const {width:w,height:h}=piece,cx=w/2,cy=h/2;
+        art.still(s=>{
+            box(s,-7,-7,w+14,h+14,33,'#2a1018',look.gold,2);box(s,-3,-3,w+6,h+6,29,null,'rgba(255,220,150,.45)',1);
+            box(s,0,0,w,h,26,radial([-18-0,-12],6,[0,0],w*.62,[[0,look.blood[0]],[.45,look.blood[1%look.blood.length]],[1,look.blood[2%look.blood.length]]]));
+            box(s,2,2,w-4,h-4,24,null,'rgba(0,0,0,.55)',5);
+        });
+        art.live(s=>{
+            const R=classicRandom(31),t=piece.time;
+            for(let i=0;i<9;i++){const px=22+R()*(w-44),py=18+R()*(h-36)+Math.sin(t*.6+i)*2,a=R()*6.28+t*.05;s.fill([ellipse(px,py,3,1.6,a)],i%3?'#e0143e':'#ff5070');}
+            for(let i=0;i<3;i++){const k=(t*.3+i/3)%1;s.enter({},{opacity:1-k});s.stroke([ellipse(cx,cy,10+k*60,6+k*36)],'rgba(255,150,150,0.2)',1);s.leave();}
+        });
+    }},
+    obsidian_pillar:{pad:12,draw(art,piece,look){                       // obsidian, gold studs, a blood-red arc creeping round
+        const {width:w,height:h}=piece,cx=w/2,cy=h/2;
+        art.still(s=>{
+            disc(s,cx+4,cy+5,w/2+2,'rgba(0,0,0,0.5)');
+            s.outlined([circle(cx,cy,w/2)],radial([cx-w*.18,cy-w*.18],2,[cx,cy],w/2,[[0,'#5a2232'],[.6,'#2a0c16'],[1,'#0c0307']]),look.gold,1.6);
+            disc(s,cx,cy,w/2-6,null,'rgba(255,200,100,.35)');
+            for(let i=0;i<8;i++){const a=i*Math.PI/4;disc(s,cx+Math.cos(a)*(w/2-3),cy+Math.sin(a)*(w/2-3),1.2,'#ffd36a');}
+        });
+        art.live(s=>{const a=piece.time*.2;s.stroke([circle(cx,cy,w/2-3,a,a+4)],'rgba(176,18,46,0.6)',1.5);});
+    }},
+    gold_brazier:{pad:12,draw(art,piece,look){                          // a gold bowl of coals on three legs, burning
+        const {width:w,height:h}=piece,cx=w/2,cy=h/2;
+        art.still(s=>{
+            disc(s,cx+3,cy+4,w/2+1,'rgba(0,0,0,0.5)');
+            for(let i=0;i<3;i++){const a=i*2.094+.5;s.stroke([['move',cx+Math.cos(a)*9,cy+Math.sin(a)*9],['line',cx+Math.cos(a)*(w/2+4),cy+Math.sin(a)*(w/2+4)]],look.gold,1.6);}
+            s.outlined([circle(cx,cy,w/2)],radial([cx,cy],2,[cx,cy],w/2,[[0,'#ff8a3a'],[.5,'#8a1a08'],[1,'#2a0a06']]),look.gold,1.6);
+        });
+        art.live(s=>{const f=.7+.3*Math.sin(piece.time*13+piece.seed[0]+cx);disc(s,cx,cy,8*f,'#ff6a2a');disc(s,cx,cy,4*f,'#ffe6a8');});
+    }},
+    blood_fountain:{draw(art,piece,look){                               // a stone basin, the spout throwing six arcs of blood, turning
+        const {width:w,height:h}=piece,cx=w/2,cy=h/2;
+        art.still(s=>{disc(s,cx,cy,w/2,'#68505d','#efc366',2);disc(s,cx,cy,w/2-8,'#302234');disc(s,cx,cy,10,'#2a1018',look.gold,1.2);});
+        art.live(s=>{for(let i=0;i<6;i++){const a=i*Math.PI/3+piece.time*.4;s.stroke([['move',cx+Math.cos(a)*10,cy+Math.sin(a)*10],['quadratic',cx+Math.cos(a)*24,cy+Math.sin(a)*24-6,cx+Math.cos(a)*32,cy+Math.sin(a)*32]],'rgba(255,106,129,0.7)',1.2);}});
+    }},
+    rose_bed:{pad:10,draw(art,piece,look){art.still(s=>{                // a gold-edged bed of roses: crimson, gold and the blood roses that glow
+        const {width:w,height:h}=piece;
+        drop(s,w,h,12);box(s,-1,-1,w+2,h+2,13,'#2a1820');box(s,0,0,w,h,12,'#5a3a44','#ffc44f',1.4);
+        box(s,4,4,w-8,h-8,9,'#170c10','rgba(255,190,150,.22)');
+        for(const f of flowers(piece)){
+            const px=f.x,py=f.y;
+            s.fill([ellipse(px-2,py+2,f.r*1.6,f.r*.75,f.a)],f.blood?'#2f6a4c':'#2a7040');
+            s.fill([ellipse(px+2,py+3,f.r*1.1,f.r*.5,f.a+1.4)],'#1c4a2c');
+            s.stroke([['move',px-3,py+4],['line',px+1,py-1]],'#7fa070',.6);
+            for(let j=0;j<6;j++){const a=f.a+j*Math.PI/3;s.fill([ellipse(px+Math.cos(a)*f.r*.5,py+Math.sin(a)*f.r*.5,f.r*.75,f.r*.42,a)],f.gold?(j%2?'#ff9a1a':'#ffd25a'):f.blood?(j%2?'#e80c44':'#ff4468'):(j%2?'#b30a30':'#ff1f4e'));}
+            disc(s,px,py,f.r*.4,f.gold?'#8a2a08':f.blood?'#ffd09a':'#680b25');
+            if(!f.blood&&!f.gold)s.stroke([circle(px,py,f.r*.52,f.a,f.a+3.8)],'#ff6a82',.55);
+        }
+    });}},
+    velvet_bench:{pad:10,draw(art,piece,look){art.still(s=>{            // a gold-edged bench in blood velvet
+        const {width:w,height:h}=piece;
+        drop(s,w,h,5);box(s,0,0,w,h,5,'#5a4751',look.gold,1.3);box(s,8,4,w-16,h-8,3,look.velvet,'#db3856');
+        for(const dx of [3,w-8])box(s,dx,2,5,h-4,2,'#ad8c69');
+    });}},
+    ruby_altar:{pad:30,draw(art,piece,look){                         // a stone altar: two cradles, red-black filaments, a ruby floating over it
+        const {width:w,height:h}=piece,cx=w/2,cy=h/2;
+        art.still(s=>{drop(s,w,h,12);box(s,0,0,w,h,12,'#352738','#c2a080',1.4);box(s,7,6,w-14,h-12,9,'#543349','rgba(225,179,147,.45)');});
+        art.live(s=>{
+            const bob=Math.sin(piece.time*1.1)*2;
+            for(const side of [-1,1]){disc(s,cx+side*32,cy+5,7,'#3d293d','#d3b28b');s.stroke([['move',cx+side*30,cy+2],['cubic',cx+side*19,cy-13,cx+side*15,cy+12,cx,cy+bob]],'rgba(232,30,77,.65)',1);}
+            s.outlined(polygon([[cx,cy-24+bob],[cx+13,cy-1+bob],[cx,cy+23+bob],[cx-13,cy-1+bob]]),look.ruby,'#ffd570',1);
+            s.fill(polygon([[cx,cy-20+bob],[cx,cy+17+bob],[cx-9,cy-1+bob]]),look.ruby_light);
+        });
+    }},
+    shard_statue:{pad:10,draw(art,piece,look){art.still(s=>{            // a round plinth, three stone shards standing on it
+        const {width:w,height:h}=piece,cx=w/2,cy=h/2;
+        drop(s,w,h,10);disc(s,cx,cy,w/2,'#493540','#b39172');
+        for(const [dx,dy,k] of [[-5,1,.65],[5,4,.55],[0,-4,1]])s.outlined(polygon([[cx+dx,cy+dy-11*k],[cx+dx+6*k,cy+dy],[cx+dx,cy+dy+9*k],[cx+dx-5*k,cy+dy]]),dx<0?'#756072':dx>0?'#442c47':'#987c91','#c6a28f',.7);
+    });}},
+    ember_bed:{pad:12,draw(art,piece,look){                             // a sunk bed of embers, glowing and sparking
+        const {width:w,height:h}=piece,cx=w/2,cy=h/2;
+        art.still(s=>{box(s,-4,-4,w+8,h+8,24,'#2a0e08',GOLD_DIM,2);box(s,0,0,w,h,20,radial([0,0],10,[0,0],Math.max(w,h)/2,[[0,'#ff8a3a'],[.5,'#b0300a'],[1,'#3a0a04']]));});
+        art.live(s=>{const R=classicRandom(17),t=piece.time;for(let i=0;i<40;i++){const px=10+R()*(w-20),py=10+R()*(h-20),f=.5+.5*Math.sin(t*(3+R()*4)+i);disc(s,px,py,1.5+R()*2,`rgba(255,${180+(f*60|0)},120,${.4+.5*f})`);}});
+    }},
+    gilt_mirror:{draw(art,piece,look){art.still(s=>{                    // a gilt wall mirror
+        const {width:w,height:h}=piece;
+        box(s,0,0,w,h,3,'#e3a64a');box(s,3,3,w-6,h-6,2,'rgba(200,190,220,0.5)');s.fill(rect(8,4,12,2),'rgba(255,255,255,0.4)');
+    });}},
+    palace_vanity:{pad:10,draw(art,piece,look){art.still(s=>{           // her vanity: powder, gold, a lipstick
+        const {width:w,height:h}=piece;
+        drop(s,w,h);box(s,0,0,w,h,5,'#2a0c16',GOLD_DIM,1.2);disc(s,20,h/2,5,'#ff8aa8');disc(s,40,h/2,4,'#e3a64a');disc(s,60,h/2-4,3,'#b0122e');
+    });}},
+    palace_wardrobe:{pad:10,draw(art,piece,look){art.still(s=>{         // a lacquer wardrobe, gold-edged
+        const {width:w,height:h}=piece;
+        drop(s,w,h);box(s,0,0,w,h,4,'#1a0710',look.gold,1.2);s.fill(rect(w/2-1,3,2,h-6),GOLD_DIM);
+    });}},
+    iron_cage:{pad:10,draw(art,piece,look){art.still(s=>{               // a rusted iron cage
+        const {width:w,height:h}=piece;
+        drop(s,w,h);box(s,0,0,w,h,4,'rgba(20,8,6,0.8)');
+        for(let i=0;i<=8;i++){const px=i*w/8;s.stroke([['move',px,0],['line',px,h]],'#6a3a1a',1.6);}
+        box(s,0,0,w,h,4,null,'#8a4a2a',2);
+    });}}
+};
+
+return Object.freeze({get PALACE_ARTISTS(){return PALACE_ARTISTS;}});
+})();
 // src/game/presentation/props/index.mjs
 const m193 = (()=>{
 // Props drawn natively, by family. A prop type in the catalog (game-assets/props.json) that names a
@@ -32790,9 +33479,18 @@ const {APARTMENT_ARTISTS} = m196;
 const {HOUSE_ARTISTS} = m198;
 const {HOTEL_ARTISTS} = m199;
 const {CLUB_ARTISTS} = m200;
+const {SANCTUM_ARTISTS} = m201;
+const {CLINIC_ARTISTS} = m202;
+const {NEURAL_ARTISTS} = m203;
+const {TORQUE_ARTISTS} = m204;
+const {PALACE_ARTISTS} = m205;
 
 const PROP_FAMILIES=PROPS.resources.catalog.data.families;
-const ARTISTS=Object.freeze({...CAFE_ARTISTS,...APARTMENT_ARTISTS,...HOUSE_ARTISTS,...HOTEL_ARTISTS,...CLUB_ARTISTS});
+/** Every venue's artists under one name each: a family drawn by two venues would silently lose one. */
+const ARTISTS=Object.freeze([CAFE_ARTISTS,APARTMENT_ARTISTS,HOUSE_ARTISTS,HOTEL_ARTISTS,CLUB_ARTISTS,SANCTUM_ARTISTS,CLINIC_ARTISTS,NEURAL_ARTISTS,TORQUE_ARTISTS,PALACE_ARTISTS].reduce((all,venue)=>{
+    for(const family of Object.keys(venue))if(family in all)throw new Error(`prop family ${family} has two artists`);
+    return Object.assign(all,venue);
+},{}));
 /** The pad round a piece's box its art may reach past (lips, drop shadows, a hearth), in px. */
 const PAD=8;
 /** The tempo a piece keeps when its host has no music to give it (`beat`, in beats since the start). */
@@ -32860,7 +33558,7 @@ function drawPropArt(context,packet,{pictures,time=0,beat=null}){
 
 return Object.freeze({get PROP_FAMILIES(){return PROP_FAMILIES;},get hasPropArt(){return hasPropArt;},get propArtLoop(){return propArtLoop;},get propArtPacket(){return propArtPacket;},get createPropDraws(){return createPropDraws;},get drawPropArt(){return drawPropArt;}});
 })();
-const m202 = Object.freeze({default:{
+const m207 = Object.freeze({default:{
  "indoor": { "tint": "rgb(22, 10, 48)", "darkness": 0.95, "lamp_glow": 0.08 },
  "outdoor": { "lamp_glow": 0.22 },
  "lamp": { "inner_radius": 10, "cut": [[0, 1], [1, 0]], "glow_stops": [[0, "#ffffff"], [0.1, "$color"], [0.6, "$color"], [1, "rgba(0,0,0,0)"]], "resolution": 64 },
@@ -32869,8 +33567,8 @@ const m202 = Object.freeze({default:{
  "flicker": { "floor": 0.82, "swing": 0.18 }
 }});
 // src/game/presentation/lighting.mjs
-const m201 = (()=>{
-const LIGHTING = m202.default;
+const m206 = (()=>{
+const LIGHTING = m207.default;
 const {createLightLayer} = m154;
 
 const stops=(list,color)=>list.map(([o,c])=>[o,c==='$color'?color:c]);
@@ -32929,7 +33627,7 @@ function levelLights(level,{blend=1,lightAt=()=>1}={}){
 return Object.freeze({get LIGHTING(){return LIGHTING;},get sceneLighting(){return sceneLighting;},get levelLights(){return levelLights;}});
 })();
 // src/game/data/road-navigation.mjs
-const m203 = (()=>{
+const m208 = (()=>{
 /**
  * The city's lane network as Basement navigation road data.
  *
@@ -33067,7 +33765,7 @@ const m0 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m40.assetLibrary;},get createGameAssetLibrary(){return m47.createGameAssetLibrary;},get resolveMapLayout(){return m69.resolveMapLayout;},get resolvePlacement(){return m69.resolvePlacement;},get isMovableProp(){return m69.isMovableProp;},get mapHost(){return m69.mapHost;},get createMapLibraries(){return m69.createMapLibraries;},get PROP_TYPES(){return m69.PROP_TYPES;},get MAP_IDS(){return m69.MAP_IDS;},get ApartmentLevel(){return m95.ApartmentLevel;},get APARTMENT_RULES(){return m137.APARTMENT_RULES;},get gameEngine(){return m146.gameEngine;},get gameLevel(){return m148.gameLevel;},get mapLevel(){return m163.mapLevel;},get travelSystem(){return m164.travelSystem;},get InteriorLevel(){return m165.InteriorLevel;},get registerInteriorLevels(){return m165.registerInteriorLevels;},get levelLobby(){return m147.levelLobby;},get createGameRuntime(){return m166.createGameRuntime;},get controlSystem(){return m149.controlSystem;},get controlsSystem(){return m149.controlsSystem;},get inputInstance(){return m149.inputInstance;},get keyboardInstance(){return m149.keyboardInstance;},get mouseInstance(){return m149.mouseInstance;},get touchInstance(){return m149.touchInstance;},get touchStick(){return m149.touchStick;},get gamepadInstance(){return m149.gamepadInstance;},get TAP(){return m149.TAP;},get DOUBLETAP(){return m149.DOUBLETAP;},get HELD(){return m149.HELD;},get PRESS(){return m149.PRESS;},get REPEAT(){return m149.REPEAT;},get RELEASE(){return m149.RELEASE;},get renderSystem(){return m154.renderSystem;},get renderFrame(){return m154.renderFrame;},get canvasRenderer(){return m154.canvasRenderer;},get pictureCache(){return m154.pictureCache;},get measureText(){return m154.measureText;},get cameraSystem(){return m154.cameraSystem;},get gameSession(){return m178.gameSession;},get PlayerStateSystem(){return m179.PlayerStateSystem;},get PlayerControlSystem(){return m180.PlayerControlSystem;},get Player(){return m123.Player;},get playerVitals(){return m124.playerVitals;},get itemSystem(){return m104.itemSystem;},get createItemCatalog(){return m58.createItemCatalog;},get GUN_MATERIALS(){return m174.GUN_MATERIALS;},get WEAPON_MODELS(){return m174.WEAPON_MODELS;},get LASER_MODULE(){return m174.LASER_MODULE;},get weaponModel(){return m174.weaponModel;},get weaponAppearance(){return m185.weaponAppearance;},get combatSystem(){return m181.combatSystem;},get weaponSystem(){return m182.weaponSystem;},get lootSystem(){return m184.lootSystem;},get WorldLoot(){return m129.WorldLoot;},get MELEE_SWING(){return m183.MELEE_SWING;},get WIDE_SWING(){return m183.WIDE_SWING;},get sampleMeleeSwing(){return m183.sampleMeleeSwing;},get sampleWideSwing(){return m183.sampleWideSwing;},get swingPhases(){return m183.swingPhases;},get wideGrip(){return m183.wideGrip;},get COMBAT_RULES(){return m186.COMBAT_RULES;},get registerGameEntityTypes(){return m116.registerGameEntityTypes;},get actorVitals(){return m102.actorVitals;},get gameActor(){return m100.gameActor;},get NPC(){return m127.NPC;},get rosterRecord(){return m127.rosterRecord;},get ROSTER_FIELDS(){return m127.ROSTER_FIELDS;},get Ganger(){return m99.Ganger;},get actorSystem(){return m176.actorSystem;},get actorItems(){return m103.actorItems;},get restoreActorItems(){return m103.restoreActorItems;},get resolveEmoteLines(){return m128.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m128.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m115.abilityLoadout;},get actorAbilities(){return m115.actorAbilities;},get importActorAbilities(){return m115.importActorAbilities;},get abilitySystem(){return m175.abilitySystem;},get createAbilityCatalog(){return m60.createAbilityCatalog;},get attackRegistry(){return m101.attackRegistry;},get validateAttackState(){return m101.validateAttackState;},get attackSystem(){return m172.attackSystem;},get createAttackCatalog(){return m57.createAttackCatalog;},get validateMountedAttack(){return m114.validateMountedAttack;},get TrafficVehicle(){return m130.TrafficVehicle;},get createGameVehicle(){return m130.createGameVehicle;},get Hunter(){return m98.Hunter;},get createHunterAppearance(){return m56.createHunterAppearance;},get Marionette(){return m122.Marionette;},get MARIONETTE_RULES(){return m54.MARIONETTE_RULES;},get validateAbilityAction(){return m111.validateAbilityAction;},get GatlingGunner(){return m108.GatlingGunner;},get Drone(){return m117.Drone;},get VelvetCat(){return m118.VelvetCat;},get velvetCatAnimation(){return m119.velvetCatAnimation;},get createVelvetAnimation(){return m119.createVelvetAnimation;},get velvetPresentation(){return m119.velvetPresentation;},get droneLift(){return m187.droneLift;},get droneArmPose(){return m187.droneArmPose;},get dronePresentation(){return m187.dronePresentation;},get VELVET_CAT_PALETTES(){return m120.VELVET_CAT_PALETTES;},get VELVET_T(){return m120.VELVET_T;},get VELVET_PROFILES(){return m120.VELVET_PROFILES;},get VELVET_GAITS(){return m120.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m120.VELVET_TAIL_SEGS;},get Demoness(){return m97.Demoness;},get Warden(){return m107.Warden;},get Vesper(){return m107.Vesper;},get Matins(){return m107.Matins;},get Compline(){return m107.Compline;},get BossEffect(){return m109.BossEffect;},get encounterSystem(){return m171.encounterSystem;},get createBossAbilities(){return m48.createBossAbilities;},get createDemonessAppearance(){return m48.createDemonessAppearance;},get demonessAppearance(){return m188.demonessAppearance;},get demonessPresentation(){return m188.demonessPresentation;},get bossEffectAppearance(){return m189.bossEffectAppearance;},get bossEffectPresentation(){return m189.bossEffectPresentation;},get validateBossRecord(){return m96.validateBossRecord;},get createDronePackets(){return m187.createDronePackets;},get createVelvetCatArt(){return m190.createVelvetCatArt;},get createVelvetCatPackets(){return m190.createVelvetCatPackets;},get createVelvetEyePackets(){return m190.createVelvetEyePackets;},get doorPresentation(){return m191.doorPresentation;},get createDoorPackets(){return m191.createDoorPackets;},get DOOR_APPEARANCE(){return m191.DOOR_APPEARANCE;},get PROP_FAMILIES(){return m193.PROP_FAMILIES;},get hasPropArt(){return m193.hasPropArt;},get propArtPacket(){return m193.propArtPacket;},get createPropDraws(){return m193.createPropDraws;},get drawPropArt(){return m193.drawPropArt;},get sceneLighting(){return m201.sceneLighting;},get levelLights(){return m201.levelLights;},get LIGHTING(){return m201.LIGHTING;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m167.humanoidSystem;},get humanoidPresentation(){return m167.humanoidPresentation;},get humanoidBodyCanon(){return m168.humanoidBodyCanon;},get humanoidBuilds(){return m168.humanoidBuilds;},get getHumanoidRigAssets(){return m168.getHumanoidRigAssets;},get roadNavigationData(){return m203.roadNavigationData;},get loadRoadNavigation(){return m203.loadRoadNavigation;}});
+return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m40.assetLibrary;},get createGameAssetLibrary(){return m47.createGameAssetLibrary;},get resolveMapLayout(){return m69.resolveMapLayout;},get resolvePlacement(){return m69.resolvePlacement;},get isMovableProp(){return m69.isMovableProp;},get mapHost(){return m69.mapHost;},get createMapLibraries(){return m69.createMapLibraries;},get PROP_TYPES(){return m69.PROP_TYPES;},get MAP_IDS(){return m69.MAP_IDS;},get ApartmentLevel(){return m95.ApartmentLevel;},get APARTMENT_RULES(){return m137.APARTMENT_RULES;},get gameEngine(){return m146.gameEngine;},get gameLevel(){return m148.gameLevel;},get mapLevel(){return m163.mapLevel;},get travelSystem(){return m164.travelSystem;},get InteriorLevel(){return m165.InteriorLevel;},get registerInteriorLevels(){return m165.registerInteriorLevels;},get levelLobby(){return m147.levelLobby;},get createGameRuntime(){return m166.createGameRuntime;},get controlSystem(){return m149.controlSystem;},get controlsSystem(){return m149.controlsSystem;},get inputInstance(){return m149.inputInstance;},get keyboardInstance(){return m149.keyboardInstance;},get mouseInstance(){return m149.mouseInstance;},get touchInstance(){return m149.touchInstance;},get touchStick(){return m149.touchStick;},get gamepadInstance(){return m149.gamepadInstance;},get TAP(){return m149.TAP;},get DOUBLETAP(){return m149.DOUBLETAP;},get HELD(){return m149.HELD;},get PRESS(){return m149.PRESS;},get REPEAT(){return m149.REPEAT;},get RELEASE(){return m149.RELEASE;},get renderSystem(){return m154.renderSystem;},get renderFrame(){return m154.renderFrame;},get canvasRenderer(){return m154.canvasRenderer;},get pictureCache(){return m154.pictureCache;},get measureText(){return m154.measureText;},get cameraSystem(){return m154.cameraSystem;},get gameSession(){return m178.gameSession;},get PlayerStateSystem(){return m179.PlayerStateSystem;},get PlayerControlSystem(){return m180.PlayerControlSystem;},get Player(){return m123.Player;},get playerVitals(){return m124.playerVitals;},get itemSystem(){return m104.itemSystem;},get createItemCatalog(){return m58.createItemCatalog;},get GUN_MATERIALS(){return m174.GUN_MATERIALS;},get WEAPON_MODELS(){return m174.WEAPON_MODELS;},get LASER_MODULE(){return m174.LASER_MODULE;},get weaponModel(){return m174.weaponModel;},get weaponAppearance(){return m185.weaponAppearance;},get combatSystem(){return m181.combatSystem;},get weaponSystem(){return m182.weaponSystem;},get lootSystem(){return m184.lootSystem;},get WorldLoot(){return m129.WorldLoot;},get MELEE_SWING(){return m183.MELEE_SWING;},get WIDE_SWING(){return m183.WIDE_SWING;},get sampleMeleeSwing(){return m183.sampleMeleeSwing;},get sampleWideSwing(){return m183.sampleWideSwing;},get swingPhases(){return m183.swingPhases;},get wideGrip(){return m183.wideGrip;},get COMBAT_RULES(){return m186.COMBAT_RULES;},get registerGameEntityTypes(){return m116.registerGameEntityTypes;},get actorVitals(){return m102.actorVitals;},get gameActor(){return m100.gameActor;},get NPC(){return m127.NPC;},get rosterRecord(){return m127.rosterRecord;},get ROSTER_FIELDS(){return m127.ROSTER_FIELDS;},get Ganger(){return m99.Ganger;},get actorSystem(){return m176.actorSystem;},get actorItems(){return m103.actorItems;},get restoreActorItems(){return m103.restoreActorItems;},get resolveEmoteLines(){return m128.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m128.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m115.abilityLoadout;},get actorAbilities(){return m115.actorAbilities;},get importActorAbilities(){return m115.importActorAbilities;},get abilitySystem(){return m175.abilitySystem;},get createAbilityCatalog(){return m60.createAbilityCatalog;},get attackRegistry(){return m101.attackRegistry;},get validateAttackState(){return m101.validateAttackState;},get attackSystem(){return m172.attackSystem;},get createAttackCatalog(){return m57.createAttackCatalog;},get validateMountedAttack(){return m114.validateMountedAttack;},get TrafficVehicle(){return m130.TrafficVehicle;},get createGameVehicle(){return m130.createGameVehicle;},get Hunter(){return m98.Hunter;},get createHunterAppearance(){return m56.createHunterAppearance;},get Marionette(){return m122.Marionette;},get MARIONETTE_RULES(){return m54.MARIONETTE_RULES;},get validateAbilityAction(){return m111.validateAbilityAction;},get GatlingGunner(){return m108.GatlingGunner;},get Drone(){return m117.Drone;},get VelvetCat(){return m118.VelvetCat;},get velvetCatAnimation(){return m119.velvetCatAnimation;},get createVelvetAnimation(){return m119.createVelvetAnimation;},get velvetPresentation(){return m119.velvetPresentation;},get droneLift(){return m187.droneLift;},get droneArmPose(){return m187.droneArmPose;},get dronePresentation(){return m187.dronePresentation;},get VELVET_CAT_PALETTES(){return m120.VELVET_CAT_PALETTES;},get VELVET_T(){return m120.VELVET_T;},get VELVET_PROFILES(){return m120.VELVET_PROFILES;},get VELVET_GAITS(){return m120.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m120.VELVET_TAIL_SEGS;},get Demoness(){return m97.Demoness;},get Warden(){return m107.Warden;},get Vesper(){return m107.Vesper;},get Matins(){return m107.Matins;},get Compline(){return m107.Compline;},get BossEffect(){return m109.BossEffect;},get encounterSystem(){return m171.encounterSystem;},get createBossAbilities(){return m48.createBossAbilities;},get createDemonessAppearance(){return m48.createDemonessAppearance;},get demonessAppearance(){return m188.demonessAppearance;},get demonessPresentation(){return m188.demonessPresentation;},get bossEffectAppearance(){return m189.bossEffectAppearance;},get bossEffectPresentation(){return m189.bossEffectPresentation;},get validateBossRecord(){return m96.validateBossRecord;},get createDronePackets(){return m187.createDronePackets;},get createVelvetCatArt(){return m190.createVelvetCatArt;},get createVelvetCatPackets(){return m190.createVelvetCatPackets;},get createVelvetEyePackets(){return m190.createVelvetEyePackets;},get doorPresentation(){return m191.doorPresentation;},get createDoorPackets(){return m191.createDoorPackets;},get DOOR_APPEARANCE(){return m191.DOOR_APPEARANCE;},get PROP_FAMILIES(){return m193.PROP_FAMILIES;},get hasPropArt(){return m193.hasPropArt;},get propArtPacket(){return m193.propArtPacket;},get createPropDraws(){return m193.createPropDraws;},get drawPropArt(){return m193.drawPropArt;},get sceneLighting(){return m206.sceneLighting;},get levelLights(){return m206.levelLights;},get LIGHTING(){return m206.LIGHTING;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m167.humanoidSystem;},get humanoidPresentation(){return m167.humanoidPresentation;},get humanoidBodyCanon(){return m168.humanoidBodyCanon;},get humanoidBuilds(){return m168.humanoidBuilds;},get getHumanoidRigAssets(){return m168.getHumanoidRigAssets;},get roadNavigationData(){return m208.roadNavigationData;},get loadRoadNavigation(){return m208.loadRoadNavigation;}});
 })();
 return m0;
 })();
@@ -42790,7 +43488,7 @@ function drawIndoorDoorAppearance(ctx,door){return indoorDoorAppearance.draw.cal
             }
         }
     </script>
-    <script type="text/dfab" data-src="legacy/entities/props-decor.js" data-cost="2498">
+    <script type="text/dfab" data-src="legacy/entities/props-decor.js" data-cost="2499">
         // One soft, centred ground blob shared by props, pickups and Velvet. It is stamped
         // before artwork transforms and never baked into a rotating furniture sprite.
         function drawGroundContactShadow(ctx, x, y, rx, ry, angle = 0) {
@@ -44545,12 +45243,12 @@ function drawIndoorDoorAppearance(ctx,door){return indoorDoorAppearance.draw.cal
                     moss(x + w * 0.2, y + h * 0.4, 6, 8);
                     break;
                 }
-                case 'sc_pew': case 'sc_pew_broken': {                     // a dark wooden pew; the broken ones snapped and splintered
+                case 'sc_pew': case 'sc_pew_broken': {                     // a dark wooden pew; the broken ones snapped and splintered (the far half turns about its own middle: wood() draws from y)
                     const broken = p.decorType === 'sc_pew_broken';
 
                     const wood = (X, W) => { rr(X, y, W, h, 2, '#2e1e1a', '#140c0a', 1); rr(X + 2, y + 2, W - 4, 7, 1.5, '#3e2822'); ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.lineWidth = 0.6; ctx.beginPath(); for (let k = y + 12; k < y + h - 2; k += 4) { ctx.moveTo(X + 2, k); ctx.lineTo(X + W - 2, k); } ctx.stroke(); };
                     if (!broken) wood(x, w);
-                    else { wood(x, w * 0.45); ctx.save(); ctx.translate(x + w * 0.72, y + h / 2); ctx.rotate(0.35); wood(-w * 0.25, w * 0.45); ctx.restore(); ctx.strokeStyle = '#6a4a3a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + w * 0.45, y + 2); ctx.lineTo(x + w * 0.5, y + 6); ctx.lineTo(x + w * 0.45, y + 10); ctx.stroke(); }
+                    else { wood(x, w * 0.45); ctx.save(); ctx.translate(x + w * 0.72, y + h / 2); ctx.rotate(0.35); ctx.translate(0, -y - h / 2); wood(-w * 0.25, w * 0.45); ctx.restore(); ctx.strokeStyle = '#6a4a3a'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x + w * 0.45, y + 2); ctx.lineTo(x + w * 0.5, y + 6); ctx.lineTo(x + w * 0.45, y + 10); ctx.stroke(); }
                     break;
                 }
                 case 'sc_altar': {                                         // black stone, a crimson cloth, a gold chalice, candles guttering
