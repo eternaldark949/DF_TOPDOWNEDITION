@@ -41,7 +41,8 @@ const BEAT = 7.3;
 const piecesOf = map => map.props.filter(p => hasPropArt(resolvePlacement(p, TYPES).family)).map(p => ({ placement: p, ...resolvePlacement(p, TYPES) }));
 const PIECES = piecesOf(CAFE);
 // (Enni Cole's tall aisles are no prop art at all: the floor draws them, the prop is only their collision.)
-const STILL_CLASSIC = /^ls_|^ec_tall_aisle$|^ta_(lift|wrap|turntable)$|_lost_|lost_luggage|suitcase|^(vending_machine|medbay_refill|armory|light_switch|read_note|block)$/;
+const DECOR = '/src/legacy/entities/props-decor.js';
+const STILL_CLASSIC = /^ec_tall_aisle$|^ta_(lift|wrap|turntable)$|^block$/;
 // The apartment's pieces, and the clothing dyer's station once it is made (placed by the level, not the map)
 const DYER = resolveApartmentDyer({ places: PLACES }).data.appearance;
 const HOME = [...piecesOf(APARTMENT), { placement: { type: 'apt_dyer' }, ...DYER }];
@@ -53,14 +54,13 @@ test('every family has an artist, every preset and every map placement fits its 
     for (const [type, { defaults }] of Object.entries(TYPES)) if (!STILL_CLASSIC.test(type)) assert.ok(hasPropArt(defaults.family), `${type} is a preset of a drawn family`);
     const maps = createMapLibraries()[1].resources;
     for (const id of MAP_IDS) assert.doesNotThrow(() => validateMapLayout(maps[id].data, TYPES, id, CATALOG.families));
-    assert.equal(PIECES.length, CAFE.props.length - 2, 'every cafe piece but the vending machine and the tote is native');
+    assert.equal(PIECES.length, CAFE.props.length, 'every cafe piece is native');
     const classic = APARTMENT.props.filter(p => !resolvePlacement(p, TYPES).family).map(p => p.type).sort();
-    assert.deepEqual([...new Set(HOUSE.props.filter(p => !resolvePlacement(p, TYPES).family).map(p => p.type))], ['ls_offering'], 'every House piece but the offering bowl (a stash) is native');
-    // The lost things (searched once a day, open once searched) stay with the stashes' classic art
-    for (const map of [LOBBY, SUITE, CLUB]) assert.deepEqual(map.props.filter(p => !resolvePlacement(p, TYPES).family && !/^(vending_machine|read_note)$/.test(p.type)).map(p => p.type).filter(t => !/lost|suitcase/.test(t)), [], 'every other piece is native');
+    assert.deepEqual(HOUSE.props.filter(p => !resolvePlacement(p, TYPES).family), [], 'every House piece is native');
+    for (const map of [LOBBY, SUITE, CLUB]) assert.deepEqual(map.props.filter(p => !resolvePlacement(p, TYPES).family), [], 'every piece is native');
     const cart = CATALOG.families.bar_cart.look;
     assert.deepEqual([cart.bottles.default[0], cart.bottles.default[2], cart.decanter.default], [ITEMS.drinks.red_wine.liquid, ITEMS.drinks.whiskey.liquid, ITEMS.drinks.whiskey.liquid], 'the bar cart pours what the bar does');
-    assert.deepEqual([...new Set(classic)], ['armory', 'light_switch', 'medbay_refill', 'read_note', 'vending_machine'], 'every apartment piece but the machines, the switches and the note is native');
+    assert.deepEqual(classic, [], 'every apartment piece is native');
 });
 
 test('a placement tweaks its preset through the look, and a wrong field is refused', () => {
@@ -84,6 +84,15 @@ test('still runs are pictures with stable keys; moving parts are live; the plant
     assert.equal(draws('cc_plant', TIME)[1].key, draws('cc_plant', TIME + 0.05)[1].key, 'and the time between frames shows the nearest');
     const chairs = PIECES.filter(p => p.placement.type === 'cc_chair').map(p => createPropDraws(propArtPacket({ appearance: p, position: [0, 0], width: 22, height: 22 }))[1].key);
     assert.equal(new Set(chairs).size, chairs.length, 'each chair, seeded from where it stands, is its own picture');
+});
+
+test('a piece in play keeps a picture for each state it shows: a lost thing open once searched, a switch lit or dark', () => {
+    const piece = type => piecesOf(createMapLibraries()[1].resources[type === 'light_switch' ? 'apt_949' : 'hotel_lobby'].data).find(p => p.placement.type === type);
+    for (const [type, states] of [['dn_lost_luggage', [{ searched: false }, { searched: true }]], ['light_switch', [{ lit: true }, { lit: false }]]]) {
+        const p = piece(type), [a, b] = states.map(state => createPropDraws(propArtPacket({ appearance: p, state, position: [0, 0], width: p.width, height: p.height })).filter(d => d.key));
+        assert.notEqual(a[0].key, b[0].key, `${type}: each state its own picture`);
+        assert.notDeepEqual(a[0].build(), b[0].build(), `${type}: and each looks its part`);
+    }
 });
 
 test('every native piece on the maps paints its still runs the same at any time, and a loop the same one period on', () => {
@@ -119,9 +128,12 @@ async function inChromium(fn, args) {
  * between `venue.from` and `venue.to`) against the native draws, and compares them channel by channel.
  */
 async function compare(pieces, venue) {
-    const cells = pieces.map(p => ({ type: p.placement.type, x: p.x, y: p.y, w: p.width, h: p.height,
-        classic: { x: p.x, y: p.y, width: p.width, height: p.height, decorType: p.decorType, decor: { face: p.face, vertical: !!p.vertical, candles: !!p.candles, variant: venue.variant?.(p) ?? p.variant | 0 }, ...venue.classic?.(p) },
-        native: propArtPacket({ appearance: p, position: [p.x + p.width / 2, p.y + p.height / 2], width: p.width, height: p.height }) }));
+    // A piece with play state is compared in each: a lost thing closed and full, and open once searched; a switch lit and dark
+    const states = p => p.interactionType === 'lost_luggage' ? [{ searched: false }, { searched: true }] : p.interactionType === 'light_switch' ? [{ lit: true }, { lit: false }] : [null];
+    const cells = pieces.flatMap(p => states(p).map(state => ({ type: p.placement.type + (state ? ` ${JSON.stringify(state)}` : ''), base: p.placement.type, x: p.x, y: p.y, w: p.width, h: p.height,
+        classic: { x: p.x, y: p.y, width: p.width, height: p.height, decorType: p.decorType, interactionType: p.interactionType, color: p.color, noteId: p.noteId, _searched: !!state?.searched, _switchState: !!state?.lit,
+            decor: { face: p.face, vertical: !!p.vertical, candles: !!p.candles, variant: venue.variant?.(p) ?? p.variant | 0 }, ...venue.classic?.(p) },
+        native: propArtPacket({ appearance: p, state, position: [p.x + p.width / 2, p.y + p.height / 2], width: p.width, height: p.height }) })));
     return inChromium(async ({ cells, time, beat, venue }) => {
         for (const list of Object.values(venue.cuts)) for (const c of list) c.splice(0, 2, ...c.slice(0, 2).map(f => (0, eval)(f)));
         const { createPropDraws } = await import('/src/game/presentation/props/index.mjs'), { canvasRenderer } = await import('/src/engine/basement/rendering/index.mjs');
@@ -134,13 +146,13 @@ async function compare(pieces, venue) {
         const classic = (0, eval)(`(()=>{let _frameTime=${time * 1000};const PropPass={seg:()=>true},clubBeatN=()=>${beat},GLASS_DRINKS=${JSON.stringify(drinks)};
             const _lampTint=(hex,t)=>{const W=[255,246,228];return '#'+[1,3,5].map((i,j)=>{const v=parseInt(hex.slice(i,i+2),16);return Math.round(v+(W[j]-v)*t).toString(16).padStart(2,'0');}).join('');};${fixtures};
             function drawLampFixture(c,name,x,y,o={}){const s=o.scale||1;c.save();c.translate(x,y);c.scale(s,s);LAMP_FIXTURES[name].paint(c,!!o.lit,_fxColor(o.color));c.restore();}
-            ${prelude}${cut(source, venue.from, venue.to)};return ${venue.drawer};})()`);
+            ${prelude}${venue.from ? cut(source, venue.from, venue.to) : ""};return ${venue.drawer};})()`);
         const PAD = 16, draw = (cell, paint) => { const W = Math.ceil(cell.w + 2 * PAD), H = Math.ceil(cell.h + 2 * PAD), canvas = Object.assign(document.createElement('canvas'), { width: W, height: H }), ctx = canvas.getContext('2d');
             ctx.fillStyle = '#20202a'; ctx.fillRect(0, 0, W, H); ctx.translate(PAD - cell.x, PAD - cell.y); paint(ctx); return ctx.getImageData(0, 0, W, H).data; };
         return cells.map(cell => {
             const a = draw(cell, ctx => classic(ctx, cell.classic));
             const b = draw(cell, ctx => { for (const d of createPropDraws(cell.native, { time, beat }).slice(1)) { ctx.save(); ctx.transform(...d.matrix); canvasRenderer.drawPackets(ctx, d.build()); ctx.restore(); } });
-            const W = Math.ceil(cell.w + 2 * PAD), cut = k => (venue.cuts[cell.type] ?? []).some(([cx, cy, r]) => { const i = k >> 2, px = i % W - PAD + .5, py = (i / W | 0) - PAD + .5; return Math.hypot(px - cx(cell), py - cy(cell)) <= r + 1.5; });
+            const W = Math.ceil(cell.w + 2 * PAD), cut = k => (venue.cuts[cell.base] ?? []).some(([cx, cy, r]) => { const i = k >> 2, px = i % W - PAD + .5, py = (i / W | 0) - PAD + .5; return Math.hypot(px - cx(cell), py - cy(cell)) <= r + 1.5; });
             let worst = 0, off = 0, inked = 0; for (let k = 0; k < a.length; k++) { if (cut(k)) continue; const d = Math.abs(a[k] - b[k]); worst = Math.max(worst, d); if (d > 3) off++; }
             for (let k = 0; k < a.length; k += 4) if (a[k] !== 0x20 || a[k + 1] !== 0x20 || a[k + 2] !== 0x2a) inked++;
             let at = null; for (let k = 0; k < a.length; k++) if (!cut(k) && Math.abs(a[k] - b[k]) === worst && worst) { const i = k >> 2; at = [i % W - PAD, (i / W | 0) - PAD, [...a.slice(i * 4, i * 4 + 4)], [...b.slice(i * 4, i * 4 + 4)]]; break; }
@@ -152,7 +164,7 @@ async function compare(pieces, venue) {
 // rails) with fillRect at fractional heights: the canvas covers a fillRect's edge rows differently from a
 // path's, by up to this much along every such line. (A gondola's three nested outlines also part by up
 // to 37/255 on a handful of pixels at its rounded left corners; checked by eye side by side.)
-const FILL_RECTS = { ta_chest: 16, ec_gondola: 40, ec_cloth_aisle: 40 };
+const FILL_RECTS = { ta_chest: 16, ec_gondola: 40, ec_cloth_aisle: 40, medbay_refill: 24 };   // (the health station's vials stand at half-pixel x)
 // Pieces packed with tiny overlapping shapes in strongly contrasting colours (the rose bed's petals, a few
 // pixels across): where two antialiased edges meet in one pixel, a quarter-pixel shift in coverage moves
 // that pixel a long way between crimson and dark leaf. Still under 1% of the channels; worst up to this.
@@ -172,12 +184,12 @@ function assertParity(results) {
 }
 
 test('native prop art matches the classic artwork pixel for pixel, for every piece in the cafe', { skip: !chromium && 'Playwright is not installed' }, async () => {
-    // The classic art read the fern and the cocoa crate from `variant`; their placements now set the look.
-    assertParity(await compare(PIECES, { from: '        const CC = {', to: "        // Enni Cole's display furniture", drawer: 'drawCafeDecorProp', variant: p => p.look?.fern || p.look?.label === 'COCOA' ? 1 : p.variant | 0 }));
+    // (The tote is a stash, compared with the others.) The classic art read the fern and the cocoa crate from `variant`; their placements now set the look.
+    assertParity(await compare(PIECES.filter(p => p.placement.type.startsWith('cc_')), { from: '        const CC = {', to: "        // Enni Cole's display furniture", drawer: 'drawCafeDecorProp', variant: p => p.look?.fern || p.look?.label === 'COCOA' ? 1 : p.variant | 0 }));
 });
 
 test('native prop art matches the classic artwork pixel for pixel, for every piece in the apartment', { skip: !chromium && 'Playwright is not installed' }, async () => {
-    assertParity(await compare(HOME, { from: '        const APT = {', to: '        // The House of Death (gauntlet)', drawer: 'drawApartmentDecorProp' }));
+    assertParity(await compare(HOME.filter(p => p.placement.type.startsWith('apt_')), { from: '        const APT = {', to: '        // The House of Death (gauntlet)', drawer: 'drawApartmentDecorProp' }));
 });
 
 test('native prop art matches the classic artwork pixel for pixel, for every House piece in the House of Death', { skip: !chromium && 'Playwright is not installed' }, async () => {
@@ -191,7 +203,8 @@ test('native prop art matches the classic artwork pixel for pixel, for every Hou
 const CUTS = {
     ps_console: [['c => c.w / 2', 'c => c.h - 18', 2.6], ['c => c.w / 2 + 1.2', 'c => c.h - 18.6', 2.3]],
     ps_desk: [['c => 110', 'c => 40', 2.4], ['c => 111.2', 'c => 39.4', 2.1]],
-    mc_stage: [['c => c.w / 2', 'c => 16', 9], ['c => c.w / 2 + 4', 'c => 14', 8]]
+    mc_stage: [['c => c.w / 2', 'c => 16', 9], ['c => c.w / 2 + 4', 'c => 14', 8]],
+    mc_lost_purse: [['c => c.w / 2 + 1', 'c => c.h * .45 - .6', 1.9]]
 };
 const TORQUE_CLASSIC = p => ({ decor: { face: p.face, variant: p.look?.rim === '#ff9a2a' || p.look?.paint === '#7a1f1a' ? 1 : 0 } });   // the classic tyres and drum read their colour off the variant
 const NEURAL_CLASSIC = p => ({ decor: { variant: ['wig', 'skin', 'vocal', 'chroma'].indexOf(p.look?.station ?? 'wig') } });   // the classic console read its station off the variant
@@ -210,10 +223,18 @@ for (const [name, map, from, to, drawer, more] of [
     ['the Demoness Palace', PALACE, '        function drawPalaceDecorProp', null, 'drawPalaceDecorProp', { file: '/src/legacy/engine/palace-art.js',
         prelude: [['/src/legacy/engine/palace-art.js', '        const PALACE = {', '        // Fixed lights'], ['/src/legacy/engine/palace-art.js', '        function palaceFlowers', '        function palaceFlowerGlow'],
             ['/src/legacy/core/utils.js', '        function seededRandom', '        const pickFrom']] }],
+    ['the machines every map shares', { props: MAP_IDS.flatMap(id => createMapLibraries()[1].resources[id].data.props) }, null, null, 'drawMachine', { only: /^(vending_machine|medbay_refill|armory|light_switch|read_note)$/, file: null,
+        // the classic drew them inline in drawPropAppearance, by what each is for: that chain, cut round its other branches
+        prelude: [[DECOR, '        function drawMiniSpree', '        // Moon City Nightclub:'],
+            [null, "function drawMachine(ctx,p){const center={x:p.x+p.width/2,y:p.y+p.height/2};ctx.save();ctx.translate(center.x,center.y);ctx.rotate(0);ctx.fillStyle=p.color;if(p.interactionType==='medbay_refill'){ctx.translate(-center.x,-center.y);drawHealthStation(ctx,p);}else if(p.interactionType==='vending_machine'){ctx.translate(-center.x,-center.y);drawMiniSpree(ctx,p);"],
+            [DECOR, "                } else if (p.interactionType === 'armory') {", "                } else if (p.interactionType === 'vending_machine') {"],
+            [DECOR, "                } else if (p.interactionType === 'light_switch') {", "                } else if (p.interactionType === 'bedside_table') {"],
+            [DECOR, "                } else {\n                    // Default prop with 3D highlights", "\n                }\n\n                ctx.restore();"], [null, '}ctx.restore();}']] }],
+    ['the stashes round the city', { props: [CAFE, HOUSE, TORQUE, PALACE, ENNI, ENNI_UPPER].flatMap(m => m.props) }, '        /* Stashes round the city', '        function drawClinicDecorProp', 'drawStashDecorProp', { only: /^ls_/ }],
     ['Enni Cole', ENNI, '        function drawEnniDecorProp', '        /* Stashes round the city', 'drawEnniDecorProp', { classic: ENNI_CLASSIC }],
     ['Enni Cole upstairs', ENNI_UPPER, '        function drawEnniDecorProp', '        /* Stashes round the city', 'drawEnniDecorProp', { classic: ENNI_CLASSIC }]])
     test(`native prop art matches the classic artwork pixel for pixel, for every piece in ${name}`, { skip: !chromium && 'Playwright is not installed' }, async () => {
-        assertParity(await compare(piecesOf(map).filter(p => !STILL_CLASSIC.test(p.placement.type) && (more?.only ?? /./).test(p.placement.type)), { from, to, drawer, cuts: CUTS, ...more }));
+        assertParity(await compare(piecesOf(map).filter(p => !STILL_CLASSIC.test(p.placement.type) && (more?.only ?? /^(?!ls_|(vending_machine|medbay_refill|armory|light_switch|read_note)$)/).test(p.placement.type)), { from, to, drawer, cuts: CUTS, ...more }));
     });
 
 test('a stamped picture looks like the vector art it was painted from', { skip: !chromium && 'Playwright is not installed' }, async () => {

@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '0427c273951a';
+        const DFAB_BUILD = 'fa49722d928f';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="16176">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="16379">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -17992,7 +17992,7 @@ const m70 = Object.freeze({default:{
           "apt_tub": {"defaults": {"color": "#2a1a22", "decorType": "apt_tub", "family": "oval_tub", "height": 64, "mass": 10000000, "width": 128}},
           "apt_vanity": {"defaults": {"color": "#2a1a22", "decorType": "apt_vanity", "family": "dressing_table", "height": 64, "mass": 10000000, "width": 44}},
           "apt_wardrobe": {"defaults": {"color": "#2a1a22", "decorType": "apt_wardrobe", "family": "wardrobe", "height": 110, "mass": 10000000, "width": 36}},
-          "armory": {"defaults": {"color": "#2a2a3a", "height": 50, "interactionType": "armory", "width": 44}},
+          "armory": {"defaults": {"color": "#2a2a3a", "family": "loadout_locker", "height": 50, "interactionType": "armory", "width": 44}},
           "bed": {"defaults": {"color": "#ccc", "decorType": "bed", "family": "hospital_bed", "height": 56, "mass": 10000000, "width": 120}},
           "bench": {"defaults": {"color": "#ccc", "decorType": "bench", "family": "waiting_bench", "height": 34, "mass": 10000000, "width": 150}},
           "block": {"defaults": {}},
@@ -18029,7 +18029,7 @@ const m70 = Object.freeze({default:{
           "dn_float_chaise": {"defaults": {"color": "#1a1216", "decorType": "dn_float_chaise", "family": "floating_seat", "height": 34, "look": {"style": "chaise", "trim": "#dfe6ff"}, "mass": 10000000, "width": 92}},
           "dn_fountain": {"defaults": {"color": "#1a1216", "decorType": "dn_fountain", "family": "rift_fountain", "height": 110, "mass": 10000000, "width": 110}},
           "dn_lamp": {"defaults": {"color": "#1a1216", "decorType": "dn_lamp", "family": "floor_lamp", "height": 22, "look": {"lit": true, "light": "#fff0c8"}, "mass": 10000000, "width": 22}},
-          "dn_lost_luggage": {"defaults": {"color": "#1a1216", "decorType": "dn_lost_luggage", "height": 20, "interactionType": "lost_luggage", "label": "Lost luggage", "mass": 10000000, "noNav": true, "noteId": "lobby_palm", "width": 28}},
+          "dn_lost_luggage": {"defaults": {"color": "#1a1216", "decorType": "dn_lost_luggage", "family": "hard_case", "height": 20, "interactionType": "lost_luggage", "label": "Lost luggage", "mass": 10000000, "noNav": true, "noteId": "lobby_palm", "width": 28}},
           "dn_palm": {"defaults": {"color": "#1a1216", "decorType": "dn_palm", "family": "potted_palm", "height": 34, "mass": 10000000, "width": 34}},
           "dn_sofa": {"defaults": {"color": "#1a1216", "decorType": "dn_sofa", "family": "velvet_settee", "height": 56, "mass": 10000000, "width": 120}},
           "dn_table": {"defaults": {"color": "#1a1216", "decorType": "dn_table", "family": "cocktail_table", "height": 38, "mass": 10000000, "width": 70}},
@@ -18112,13 +18112,13 @@ const m70 = Object.freeze({default:{
           "hod_statue": {"defaults": {"color": "#2a1a22", "decorType": "hod_statue", "family": "angel_statue", "height": 34, "mass": 10000000, "width": 34}},
           "hod_table": {"defaults": {"color": "#2a1a22", "decorType": "hod_table", "family": "oxblood_table", "height": 60, "mass": 10000000, "width": 140}},
           "iv": {"defaults": {"color": "#ccc", "decorType": "iv", "family": "iv_stand", "height": 14, "mass": 10000000, "width": 14}},
-          "light_switch": {"defaults": {"color": "#2a2a2a", "height": 14, "interactionType": "light_switch", "mass": 999999, "roomId": "main_room", "width": 10}},
-          "ls_cashtin": {"defaults": {"color": "#2a2a30", "decorType": "ls_cashtin", "height": 14, "interactionType": "lost_luggage", "label": "Cash tin", "lootLines": ["TORQUE'S RAINY-DAY MONEY", "GREASY BILLS, STILL GOOD", "UNDER THE BENCH, AS ALWAYS"], "lootMax": 80, "lootMin": 30, "mass": 10000000, "noNav": true, "noteId": "torque_tin", "width": 22}},
-          "ls_envelope": {"defaults": {"color": "#3c2530", "decorType": "ls_envelope", "height": 12, "interactionType": "lost_luggage", "label": "Receipt envelope", "lootLines": ["A REFUND, IN CASH", "SHE CHANGED HER MIND ABOUT THE SHOES", "FINDERS KEEPERS"], "lootMax": 70, "lootMin": 25, "mass": 10000000, "noNav": true, "noteId": "enni_envelope", "width": 18}},
-          "ls_offering": {"defaults": {"color": "#2a1a22", "decorType": "ls_offering", "height": 16, "interactionType": "lost_luggage", "label": "Offering bowl", "lootLines": ["THE DEAD DON'T SPEND IT", "TITHES FOR THE HOUSE", "SOMETHING STIRS…"], "lootMax": 150, "lootMin": 60, "lootNoise": 700, "mass": 10000000, "noNav": true, "noteId": "house_offering", "width": 24}},
-          "ls_shopbag": {"defaults": {"color": "#3c2530", "decorType": "ls_shopbag", "height": 18, "interactionType": "lost_luggage", "label": "Dropped shopping bag", "lootLines": ["TISSUE PAPER… AND PERSONICS", "THE RECEIPT SAYS SHE CAN AFFORD IT", "ENNI COLE, NEVER CHEAP"], "lootMax": 70, "lootMin": 25, "mass": 10000000, "noNav": true, "noteId": "enni_bag", "width": 20}},
-          "ls_tote": {"defaults": {"color": "#3a2418", "decorType": "ls_tote", "height": 16, "interactionType": "lost_luggage", "label": "Forgotten tote", "lootLines": ["A PAPERBACK, A SCARF… AND PERSONICS", "LEFT WITH THE LAST LATTE", "THE FIRE KEPT IT WARM"], "lootMax": 35, "lootMin": 10, "mass": 10000000, "noNav": true, "noteId": "cafe_tote", "width": 18}},
-          "ls_tribute": {"defaults": {"color": "#2a0c14", "decorType": "ls_tribute", "height": 22, "interactionType": "lost_luggage", "label": "Tribute chest", "lootLines": ["LILITU WON'T MISS IT. SHE WILL NOTICE", "GOLD FOR THE QUEEN, NOW YOURS", "THE HINGES SCREAM…"], "lootMax": 150, "lootMin": 60, "lootNoise": 700, "mass": 10000000, "noNav": true, "noteId": "palace_tribute", "width": 30}},
+          "light_switch": {"defaults": {"color": "#2a2a2a", "family": "light_switch", "height": 14, "interactionType": "light_switch", "mass": 999999, "roomId": "main_room", "width": 10}},
+          "ls_cashtin": {"defaults": {"color": "#2a2a30", "decorType": "ls_cashtin", "family": "cash_tin", "height": 14, "interactionType": "lost_luggage", "label": "Cash tin", "lootLines": ["TORQUE'S RAINY-DAY MONEY", "GREASY BILLS, STILL GOOD", "UNDER THE BENCH, AS ALWAYS"], "lootMax": 80, "lootMin": 30, "mass": 10000000, "noNav": true, "noteId": "torque_tin", "width": 22}},
+          "ls_envelope": {"defaults": {"color": "#3c2530", "decorType": "ls_envelope", "family": "receipt_envelope", "height": 12, "interactionType": "lost_luggage", "label": "Receipt envelope", "lootLines": ["A REFUND, IN CASH", "SHE CHANGED HER MIND ABOUT THE SHOES", "FINDERS KEEPERS"], "lootMax": 70, "lootMin": 25, "mass": 10000000, "noNav": true, "noteId": "enni_envelope", "width": 18}},
+          "ls_offering": {"defaults": {"color": "#2a1a22", "decorType": "ls_offering", "family": "offering_bowl", "height": 16, "interactionType": "lost_luggage", "label": "Offering bowl", "lootLines": ["THE DEAD DON'T SPEND IT", "TITHES FOR THE HOUSE", "SOMETHING STIRS…"], "lootMax": 150, "lootMin": 60, "lootNoise": 700, "mass": 10000000, "noNav": true, "noteId": "house_offering", "width": 24}},
+          "ls_shopbag": {"defaults": {"color": "#3c2530", "decorType": "ls_shopbag", "family": "shop_bag", "height": 18, "interactionType": "lost_luggage", "label": "Dropped shopping bag", "lootLines": ["TISSUE PAPER… AND PERSONICS", "THE RECEIPT SAYS SHE CAN AFFORD IT", "ENNI COLE, NEVER CHEAP"], "lootMax": 70, "lootMin": 25, "mass": 10000000, "noNav": true, "noteId": "enni_bag", "width": 20}},
+          "ls_tote": {"defaults": {"color": "#3a2418", "decorType": "ls_tote", "family": "canvas_tote", "height": 16, "interactionType": "lost_luggage", "label": "Forgotten tote", "lootLines": ["A PAPERBACK, A SCARF… AND PERSONICS", "LEFT WITH THE LAST LATTE", "THE FIRE KEPT IT WARM"], "lootMax": 35, "lootMin": 10, "mass": 10000000, "noNav": true, "noteId": "cafe_tote", "width": 18}},
+          "ls_tribute": {"defaults": {"color": "#2a0c14", "decorType": "ls_tribute", "family": "tribute_chest", "height": 22, "interactionType": "lost_luggage", "label": "Tribute chest", "lootLines": ["LILITU WON'T MISS IT. SHE WILL NOTICE", "GOLD FOR THE QUEEN, NOW YOURS", "THE HINGES SCREAM…"], "lootMax": 150, "lootMin": 60, "lootNoise": 700, "mass": 10000000, "noNav": true, "noteId": "palace_tribute", "width": 30}},
           "mc_backbar": {"defaults": {"color": "#1a0e22", "decorType": "mc_backbar", "family": "back_bar", "height": 540, "mass": 10000000, "width": 24}},
           "mc_bar": {"defaults": {"color": "#1a0e22", "decorType": "mc_bar", "family": "club_bar", "height": 225, "mass": 10000000, "width": 44}},
           "mc_bench": {"defaults": {"color": "#1a0e22", "decorType": "mc_bench", "family": "button_bench", "height": 36, "mass": 10000000, "width": 120}},
@@ -18128,10 +18128,10 @@ const m70 = Object.freeze({default:{
           "mc_dj": {"defaults": {"color": "#1a0e22", "decorType": "mc_dj", "family": "dj_booth", "height": 40, "mass": 10000000, "width": 140}},
           "mc_dryer": {"defaults": {"color": "#1a0e22", "decorType": "mc_dryer", "family": "hand_dryer", "height": 14, "mass": 10000000, "width": 44}},
           "mc_hightop": {"defaults": {"color": "#1a0e22", "decorType": "mc_hightop", "family": "high_top", "height": 30, "mass": 10000000, "width": 30}},
-          "mc_lost_clutch": {"defaults": {"color": "#1a0e22", "decorType": "mc_lost_clutch", "height": 12, "interactionType": "lost_luggage", "label": "Sequined clutch", "lootLines": ["LIPSTICK, A KEYCARD… AND PERSONICS", "SHE'LL CALL IT A NIGHT'S TIP", "LEFT WITH THE LAST SONG"], "lootMax": 60, "lootMin": 20, "mass": 10000000, "noNav": true, "noteId": "club_powder", "width": 20}},
-          "mc_lost_coat": {"defaults": {"color": "#1a0e22", "decorType": "mc_lost_coat", "height": 26, "interactionType": "lost_luggage", "label": "Fur-trimmed coat", "lootLines": ["CHECK YOUR POCKETS, DARLING", "FOLDED BILLS IN THE LINING"], "lootMax": 90, "lootMin": 30, "mass": 10000000, "noNav": true, "noteId": "club_coat", "width": 40}},
-          "mc_lost_handbag": {"defaults": {"color": "#1a0e22", "decorType": "mc_lost_handbag", "height": 16, "interactionType": "lost_luggage", "label": "Chain-strap handbag", "lootLines": ["DROPPED ON THE DANCE FLOOR", "FINDERS KEEPERS"], "lootMax": 75, "lootMin": 25, "mass": 10000000, "noNav": true, "noteId": "club_floor", "width": 20}},
-          "mc_lost_purse": {"defaults": {"color": "#1a0e22", "decorType": "mc_lost_purse", "height": 16, "interactionType": "lost_luggage", "label": "Velvet purse", "lootLines": ["WHAT HAPPENS IN THE SUITES…", "VIP MONEY SPENDS THE SAME", "A THANK-YOU NOTE AND A THICK ROLL"], "lootMax": 120, "lootMin": 40, "mass": 10000000, "noNav": true, "noteId": "club_suite1", "width": 22}},
+          "mc_lost_clutch": {"defaults": {"color": "#1a0e22", "decorType": "mc_lost_clutch", "family": "sequin_clutch", "height": 12, "interactionType": "lost_luggage", "label": "Sequined clutch", "lootLines": ["LIPSTICK, A KEYCARD… AND PERSONICS", "SHE'LL CALL IT A NIGHT'S TIP", "LEFT WITH THE LAST SONG"], "lootMax": 60, "lootMin": 20, "mass": 10000000, "noNav": true, "noteId": "club_powder", "width": 20}},
+          "mc_lost_coat": {"defaults": {"color": "#1a0e22", "decorType": "mc_lost_coat", "family": "fur_coat", "height": 26, "interactionType": "lost_luggage", "label": "Fur-trimmed coat", "lootLines": ["CHECK YOUR POCKETS, DARLING", "FOLDED BILLS IN THE LINING"], "lootMax": 90, "lootMin": 30, "mass": 10000000, "noNav": true, "noteId": "club_coat", "width": 40}},
+          "mc_lost_handbag": {"defaults": {"color": "#1a0e22", "decorType": "mc_lost_handbag", "family": "chain_handbag", "height": 16, "interactionType": "lost_luggage", "label": "Chain-strap handbag", "lootLines": ["DROPPED ON THE DANCE FLOOR", "FINDERS KEEPERS"], "lootMax": 75, "lootMin": 25, "mass": 10000000, "noNav": true, "noteId": "club_floor", "width": 20}},
+          "mc_lost_purse": {"defaults": {"color": "#1a0e22", "decorType": "mc_lost_purse", "family": "velvet_purse", "height": 16, "interactionType": "lost_luggage", "label": "Velvet purse", "lootLines": ["WHAT HAPPENS IN THE SUITES…", "VIP MONEY SPENDS THE SAME", "A THANK-YOU NOTE AND A THICK ROLL"], "lootMax": 120, "lootMin": 40, "mass": 10000000, "noNav": true, "noteId": "club_suite1", "width": 22}},
           "mc_lowtable": {"defaults": {"color": "#1a0e22", "decorType": "mc_lowtable", "family": "champagne_table", "height": 60, "mass": 10000000, "width": 44}},
           "mc_orb": {"defaults": {"color": "#1a0e22", "decorType": "mc_orb", "family": "moon_orb", "height": 30, "mass": 10000000, "width": 30}},
           "mc_pole": {"defaults": {"color": "#1a0e22", "decorType": "mc_pole", "family": "dance_pole", "height": 10, "mass": 10000000, "width": 10}},
@@ -18144,7 +18144,7 @@ const m70 = Object.freeze({default:{
           "mc_suite_couch": {"defaults": {"color": "#1a0e22", "decorType": "mc_suite_couch", "family": "suite_couch", "height": 200, "mass": 10000000, "width": 56}},
           "mc_urinal": {"defaults": {"color": "#1a0e22", "decorType": "mc_urinal", "family": "urinal", "height": 20, "mass": 10000000, "width": 26}},
           "mc_vanity": {"defaults": {"color": "#1a0e22", "decorType": "mc_vanity", "family": "bulb_vanity", "height": 40, "mass": 10000000, "width": 230}},
-          "medbay_refill": {"defaults": {"color": "#0f0", "height": 60, "interactionType": "medbay_refill", "mass": 10000000, "width": 40}},
+          "medbay_refill": {"defaults": {"color": "#0f0", "family": "health_station", "height": 60, "interactionType": "medbay_refill", "mass": 10000000, "width": 40}},
           "monitor": {"defaults": {"color": "#ccc", "decorType": "monitor", "family": "vitals_monitor", "height": 20, "mass": 10000000, "width": 22}},
           "ns_console": {"defaults": {"decorType": "ns_console", "family": "styling_console", "height": 80, "mass": 100000, "width": 60}},
           "ns_counter": {"defaults": {"color": "#1a1a3a", "decorType": "ns_counter", "family": "sapphire_counter", "height": 30, "interactionType": "neural_counter", "mass": 100000, "width": 200}},
@@ -18168,12 +18168,12 @@ const m70 = Object.freeze({default:{
           "ps_pit_sofa": {"defaults": {"color": "#1a1216", "decorType": "ps_pit_sofa", "face": "S", "family": "pit_sofa", "height": 56, "mass": 10000000, "width": 220}},
           "ps_pit_table": {"defaults": {"color": "#1a1216", "decorType": "ps_pit_table", "family": "pit_table", "height": 56, "mass": 10000000, "width": 80}},
           "ps_pool": {"defaults": {"color": "#1a1216", "decorType": "ps_pool", "family": "plunge_pool", "height": 74, "mass": 10000000, "width": 170}},
-          "ps_suitcase": {"defaults": {"color": "#1a1216", "decorType": "ps_suitcase", "height": 36, "interactionType": "lost_luggage", "label": "Monogrammed suitcase", "lootLines": ["HE TRAVELS HEAVY", "CUFFLINKS, A SILK TIE… AND PERSONICS", "10 OUT OF 10, WOULD ROB AGAIN"], "lootMax": 110, "lootMin": 40, "mass": 10000000, "noNav": true, "noteId": "suite_case", "width": 52}},
+          "ps_suitcase": {"defaults": {"color": "#1a1216", "decorType": "ps_suitcase", "family": "monogram_case", "height": 36, "interactionType": "lost_luggage", "label": "Monogrammed suitcase", "lootLines": ["HE TRAVELS HEAVY", "CUFFLINKS, A SILK TIE… AND PERSONICS", "10 OUT OF 10, WOULD ROB AGAIN"], "lootMax": 110, "lootMin": 40, "mass": 10000000, "noNav": true, "noteId": "suite_case", "width": 52}},
           "ps_telescope": {"defaults": {"color": "#1a1216", "decorType": "ps_telescope", "family": "trained_telescope", "height": 28, "mass": 10000000, "width": 28}},
           "ps_tub": {"defaults": {"color": "#1a1216", "decorType": "ps_tub", "family": "round_tub", "height": 84, "mass": 10000000, "width": 84}},
           "ps_vanity": {"defaults": {"color": "#1a1216", "decorType": "ps_vanity", "family": "basin_vanity", "height": 80, "mass": 10000000, "width": 24}},
           "ps_wardrobe": {"defaults": {"color": "#1a1216", "decorType": "ps_wardrobe", "family": "open_wardrobe", "height": 150, "mass": 10000000, "width": 40}},
-          "read_note": {"defaults": {"color": "#c8a870", "height": 14, "interactionType": "read_note", "mass": 10000000, "noteId": "dark_maker_letter", "width": 20}},
+          "read_note": {"defaults": {"color": "#c8a870", "family": "plain_box", "height": 14, "interactionType": "read_note", "mass": 10000000, "noteId": "dark_maker_letter", "width": 20}},
           "sc_altar": {"defaults": {"color": "#1a1418", "decorType": "sc_altar", "family": "ring_altar", "height": 56, "mass": 10000000, "width": 140}},
           "sc_brazier": {"defaults": {"color": "#1a1418", "decorType": "sc_brazier", "family": "coal_brazier", "height": 36, "mass": 10000000, "width": 36}},
           "sc_candles": {"defaults": {"color": "#1a1418", "decorType": "sc_candles", "family": "candle_stand", "height": 18, "mass": 10000000, "width": 18}},
@@ -18197,7 +18197,7 @@ const m70 = Object.freeze({default:{
           "ta_tires": {"defaults": {"color": "#2a2a30", "decorType": "ta_tires", "family": "tyre_stack", "height": 44, "mass": 10000000, "width": 44}},
           "ta_turntable": {"defaults": {"color": "#2a2a30", "decorType": "ta_turntable", "height": 132, "mass": 10000000, "width": 132}},
           "ta_wrap": {"defaults": {"color": "#2a2a30", "decorType": "ta_wrap", "height": 96, "mass": 10000000, "width": 190}},
-          "vending_machine": {"defaults": {"color": "#00f3ff", "height": 60, "interactionType": "vending_machine", "mass": 10000000, "width": 40}}
+          "vending_machine": {"defaults": {"color": "#00f3ff", "family": "mini_spree", "height": 60, "interactionType": "vending_machine", "mass": 10000000, "width": 40}}
         },
         "families": {
           "bentwood_chair": {"description": "A bentwood cafe chair seen from above: a round seat in a wooden ring, a curved back. Turns to its face.", "look": {
@@ -19140,7 +19140,55 @@ const m70 = Object.freeze({default:{
           "fitting_rooms": {"description": "Curtained cubicles, each with its mirror and stool, one curtain drawn back.", "look": {
 }},
           "snack_vending": {"description": "The store's snack machine.", "look": {
-}}
+}},
+          "hard_case": {"description": "A hard case, its luggage tag swinging; open and empty once searched.", "look": {
+            "shell": {"kind": "color", "default": "#3a2a4a"}}},
+          "monogram_case": {"description": "A monogrammed case left open; rifled once searched, its shirts tipped out.", "look": {
+            "monogram": {"kind": "text", "default": "D·M"},
+            "lining": {"kind": "color", "default": "#6a1020"}}},
+          "sequin_clutch": {"description": "A sequined envelope clutch on a gold chain, the sequins catching the light; open once searched.", "look": {
+            "leather": {"kind": "color", "default": "#5a1440"}}},
+          "fur_coat": {"description": "A coat with a fur collar draped over a bench; its pockets turned out once searched.", "look": {
+            "cloth": {"kind": "color", "default": "#3e1a4a"},
+            "sleeve": {"kind": "color", "default": "#34143e"}}},
+          "velvet_purse": {"description": "A quilted velvet purse with a gold crescent clasp; open and empty once searched.", "look": {
+            "velvet": {"kind": "color", "default": "#a8305a"},
+            "flap": {"kind": "color", "default": "#8a2048"}}},
+          "chain_handbag": {"description": "A black patent handbag on a gold chain strap; open once searched.", "look": {
+            "patent": {"kind": "color", "default": "#0e0c12"}}},
+          "canvas_tote": {"description": "A canvas tote, a paperback and a scarf poking out; emptied once searched.", "look": {
+            "stamp": {"kind": "color", "default": "#c6553a"}}},
+          "cash_tin": {"description": "A dented steel cash box, a note under the lid; open and empty once searched.", "look": {
+}},
+          "shop_bag": {"description": "A paper shopping bag with rope handles and tissue; the tissue pulled out once searched.", "look": {
+            "paper": {"kind": "color", "default": "#e8a6b8"},
+            "initials": {"kind": "text", "default": "EC"}}},
+          "receipt_envelope": {"description": "A cream envelope with a wax seal and a note inside; torn open once searched.", "look": {
+            "seal": {"kind": "color", "default": "#9a1c3a"}}},
+          "offering_bowl": {"description": "A black stone bowl of coins, bone candles round it; one ember left once searched.", "look": {
+}},
+          "tribute_chest": {"description": "A black-lacquer chest bound in gold, coins spilling over; open once searched.", "look": {
+            "lacquer": {"kind": "color", "default": "#1e0a12"},
+            "gem": {"kind": "color", "default": "#c8102e"}}},
+          "mini_spree": {"description": "MiniSpree, the city's vending machine: glossy black, a lit window of cans, a neon edge humming.", "look": {
+            "body": {"kind": "color", "default": "#0d0d12"},
+            "marquee": {"kind": "colors", "default": ["#ff4fa3", "#3ef0ff"]},
+            "brand": {"kind": "text", "default": "MiniSpree"},
+            "cans": {"kind": "colors", "default": ["#c89a6a", "#3a6ad0", "#ffe45a"], "note": "bubble tea, Jean soda, stellar lemonade"}}},
+          "health_station": {"description": "Dr. Yin's health station: a glowing green cross, stim vials refilling, a vitals trace.", "look": {
+            "body": {"kind": "color", "default": "#eceef2"},
+            "trim": {"kind": "color", "default": "#6a1a2a"},
+            "cross": {"kind": "color", "default": "#12c85a"},
+            "vials": {"kind": "color", "default": "#19d46a"}}},
+          "loadout_locker": {"description": "A wall-mounted weapons locker, pulsing violet.", "look": {
+            "casing": {"kind": "color", "default": "#1a1a22"},
+            "panel": {"kind": "color", "default": "#1a0f2a"},
+            "glow": {"kind": "color", "default": "#a469ff"},
+            "label": {"kind": "text", "default": "LOADOUT"}}},
+          "light_switch": {"description": "A wall plate with its rocker, its LED green while the room is lit (state.lit), red when dark.", "look": {
+}},
+          "plain_box": {"description": "A plain block in one colour, lit along its top and shaded down its right.", "look": {
+            "color": {"kind": "color", "default": "#c8a870"}}}
         }
       }
     }
@@ -19156,7 +19204,7 @@ const m71 = Object.freeze({default:{
     {"type": "apt_side", "x": 560, "y": 470},
     {"type": "armory", "x": 30, "y": 340},
     {"type": "vending_machine", "x": 30, "y": 520},
-    {"type": "read_note", "x": 1111, "y": 226, "width": 18, "color": "#3a4a6a", "noteId": "larissa_briefing_darklands", "mass": null},
+    {"type": "read_note", "x": 1111, "y": 226, "width": 18, "color": "#3a4a6a", "look": {"color": "#3a4a6a"}, "noteId": "larissa_briefing_darklands", "mass": null},
     {"type": "medbay_refill", "x": 30, "y": 730},
     {"type": "apt_bed", "x": 1010, "y": 216, "width": 90, "height": 110, "color": "#334466", "interactionType": "bed_sleep"},
     {"type": "apt_craft", "x": 750, "y": 750},
@@ -20185,7 +20233,7 @@ const m86 = Object.freeze({default:{
     {"type": "mc_lowtable", "x": 1450, "y": 1013},
     {"type": "mc_pole", "x": 1400, "y": 948},
     {"type": "mc_lost_clutch", "x": 150, "y": 34},
-    {"type": "mc_lost_clutch", "x": 300, "y": 1125, "noteId": "club_gents", "label": "Beaded clutch"},
+    {"type": "mc_lost_clutch", "x": 300, "y": 1125, "noteId": "club_gents", "label": "Beaded clutch", "look": {"leather": "#1e2a44"}},
     {"type": "mc_lost_coat", "x": 1030, "y": 1060},
     {"type": "mc_lost_handbag", "x": 1148, "y": 158},
     {"type": "mc_lost_purse", "x": 1532, "y": 422},
@@ -33949,6 +33997,194 @@ const HANGS=['#e9dcc4','#cdb48a','#a3815a','#2a2428','#5a1a2a','#8c2b3e','#2f5a4
 
 return Object.freeze({get ENNI_ARTISTS(){return ENNI_ARTISTS;}});
 })();
+// src/game/presentation/props/lost.mjs
+const m207 = (()=>{
+// Lost things round the city: a case, a coat, a purse, a cash tin, searched once a day for what is
+// in them. Each is drawn closed and full, or lying open and emptied once `piece.state.searched` (its
+// host sets it; the open and the closed piece are kept as separate pictures).
+const {rect,circle,ellipse} = m154;
+const {box,disc,crescent} = m195;
+
+const GOLD='#e8c27a',GOLD_DARK='#a8823e',CREAM='#f3e6c8',CRIMSON_LIGHT='#b8203a';
+const STASH_GOLD='#e8c26a',STASH_GOLD_DARK='#9a7a32';
+const searched=piece=>!!piece.state?.searched;
+/** The soft shadow a small stash casts on the floor below its front edge. */
+const pool=(s,w,h)=>s.fill([ellipse(w/2+1.5,h+1,w*.55,2.4)],'rgba(0,0,0,0.28)');
+/** A run of banknotes, each a little higher than the last. */
+const bills=(s,x,y,n)=>{for(let i=0;i<n;i++)box(s,x+i*3,y-i,7,4,.8,i%2?'#8fc89a':'#6fb07e','rgba(20,50,30,0.5)',.4);};
+
+const LOST_ARTISTS={
+    hard_case:{draw(art,piece,look){                                    // a hard case, its luggage tag swinging; open (and empty) once searched
+        const {width:w,height:h,seed:[x]}=piece,open=searched(piece);
+        art.still(s=>{
+            box(s,0,0,w,h,3,look.shell,GOLD,1);
+            if(open){box(s,-2,-h*.55,w+4,h*.55,3,'#2a1e38',GOLD_DARK,1);box(s,3,3,w-6,h-6,2,'#1a1224');}
+            else s.fill([...rect(w/2-4,-2,8,3),...rect(4,h/2-.5,w-8,1)],GOLD);
+        });
+        if(!open)art.live(s=>{s.enter({position:[w-4,2],rotation:.6+Math.sin(piece.time*2+x)*.2});s.fill(rect(0,0,5,8),CREAM);s.leave();});
+    }},
+    monogram_case:{draw(art,piece,look){art.still(s=>{                  // a monogrammed case left open; rifled, its shirts tipped out
+        const {width:w,height:h}=piece;
+        box(s,0,0,w,h,3,'#3a2418',GOLD,1);box(s,-1,-h*.62,w+2,h*.6,3,'#4a2e1e',GOLD,1);     // the open lid
+        s.text(look.monogram,w/2,-h*.32,{font:{family:'Georgia, serif',size:7,weight:'bold'},align:'center',baseline:'middle'},{fill:GOLD});
+        box(s,3,3,w-6,h-6,2,look.lining);
+        if(!searched(piece)){box(s,6,6,18,12,2,'#f4efe8');box(s,26,8,18,10,2,'#1a1a22');s.fill([['move',10,h-6],['line',40,h-10],['line',40,h-7],['close']],CRIMSON_LIGHT);disc(s,16,h-12,1.3,GOLD);disc(s,20,h-12,1.3,GOLD);}
+        else{box(s,8,h+2,20,8,2,'#f4efe8','rgba(0,0,0,0.3)',.5);s.fill(rect(w-6,h-2,14,2.5),CRIMSON_LIGHT);}
+    });}},
+    sequin_clutch:{draw(art,piece,look){                                // a sequined envelope clutch on a gold chain, the sequins catching the light
+        const {width:w,height:h,seed:[x]}=piece,open=searched(piece);
+        art.still(s=>{s.stroke([['move',2,2],['quadratic',w/2,-7,w-2,2]],GOLD,.8);box(s,0,0,w,h,2,look.leather,GOLD_DARK,.8);});
+        art.live(s=>{for(let i=0;i<9;i++){const tw=.5+.5*Math.sin(piece.time*5+i*2+x);s.enter({},{opacity:.3+.7*tw});s.fill(rect(2+(i*7)%(w-4),2+(i*5)%(h-4),1,1),'rgba(255,235,250,0.55)');s.leave();}});
+        art.still(s=>{
+            if(open)s.fill([['move',1,1],['line',w-1,1],['line',w/2,h*.75],['close']],'#12080e');
+            else{s.fill([['move',0,0],['line',w/2,h*.6],['line',w,0]],'rgba(0,0,0,0.3)');disc(s,w/2,h*.6,1.4,GOLD);}
+        });
+    }},
+    fur_coat:{draw(art,piece,look){art.still(s=>{                       // a coat with a fur collar draped over the bench; its pockets turned out once searched
+        const {width:w,height:h}=piece;
+        s.fill([['move',4,4],['line',w-4,4],['line',w,h],['line',0,h],['close']],look.cloth);
+        s.stroke([['move',w/2,6],['line',w/2,h-1]],'rgba(0,0,0,0.35)',.8);
+        box(s,1,h-8,7,10,3,look.sleeve);box(s,w-8,h-8,7,10,3,look.sleeve);                           // sleeves over the edge
+        for(let i=0;i<9;i++)disc(s,4+i*(w-8)/8,4+Math.sin(i*1.7)*1.2,2.6,i%2?'#e8dcd0':'#cfc2b6');    // the fur collar
+        disc(s,w/2+3,11,1,GOLD);disc(s,w/2+3,17,1,GOLD);
+        if(searched(piece))for(const px of [7,w-12])box(s,px,h-11,6,5,1.5,'#d8cce0','rgba(0,0,0,0.4)',.5);
+    });}},
+    velvet_purse:{draw(art,piece,look){art.still(s=>{                   // quilted velvet, a gold crescent clasp; open and empty once searched
+        const {width:w,height:h}=piece,quilt=[];
+        box(s,0,0,w,h,4,look.velvet,GOLD_DARK,.8);
+        s.enter({position:[w/2,h/2]});s.clip({type:'rect',size:[w,h],radius:4});s.enter({position:[-w/2,-h/2]});   // the quilting, inside the purse
+        for(let k=-h;k<w;k+=5)quilt.push(['move',k,0],['line',k+h,h],['move',k+h,0],['line',k,h]);
+        s.stroke(quilt,'rgba(60,0,20,0.4)',.6);s.leave();s.leave();
+        if(searched(piece)){box(s,-1,-h*.5,w+2,h*.55,3,look.flap,GOLD_DARK,.6);box(s,2,2,w-4,h-4,2,'#2a0614');}
+        else{box(s,1,0,w-2,h*.45,3,look.flap);s.fill(crescent(w/2,h*.45,2.4,w/2+1,h*.45-.6,1.9),GOLD);}
+    });}},
+    chain_handbag:{draw(art,piece,look){art.still(s=>{                  // black patent on a gold chain strap
+        const {width:w,height:h}=piece;
+        box(s,0,0,w,h,3,look.patent,'#4a4458',.8);s.fill(rect(2,2,w-6,1.2),'rgba(255,255,255,0.22)');     // the patent shine
+        s.enter({},{dash:[1.5,1]});s.stroke([['move',2,2],['cubic',-6,h+6,w+6,h+6,w-2,2]],GOLD,.9);s.leave();
+        if(searched(piece))box(s,2,2,w-4,h-5,2,'#2a2436');else box(s,w/2-3,h*.35,6,3,1,GOLD);
+    });}},
+    canvas_tote:{draw(art,piece,look){art.still(s=>{                    // a canvas tote, a paperback and a knitted scarf poking out
+        const {width:w,height:h}=piece;
+        pool(s,w,h);s.stroke([['move',4,2],['quadratic',w/2,-7,w-4,2]],'#a8916c',1.4);
+        box(s,0,1,w,h-1,2,'#e9dcc2','#a8916c',.8);box(s,3,4,w-6,5,1,look.stamp);                    // the cafe's stamp
+        if(searched(piece)){box(s,2,2,w-4,h-5,1.5,'#4a3a2a');box(s,w-3,h-4,9,4,1.5,'#b9446a');}      // emptied, the scarf trailing out
+        else{box(s,2,-2,7,5,1,'#3d6a8a','#22384a',.5);box(s,8,-3,7,5,2,'#b9446a');}
+    });}},
+    cash_tin:{draw(art,piece,look){art.still(s=>{                       // a dented steel cash box, grease on the lid
+        const {width:w,height:h}=piece;
+        pool(s,w,h);box(s,0,0,w,h,2,'#6c7480','#2c3038',.9);
+        if(searched(piece)){box(s,0,-h*.55,w,h*.55,2,'#7d8592','#2c3038',.8);box(s,2,2,w-4,h-4,1,'#1c1f24');for(let i=0;i<4;i++)box(s,3+i*4,3,3,h-6,.5,'#2a2e36');}   // the empty coin tray
+        else{s.fill(rect(2,2,w-6,1.2),'rgba(255,255,255,0.18)');s.fill([ellipse(w*.3,h*.6,3,1.6,.3)],'rgba(20,16,10,0.4)');
+            box(s,w/2-3,h/2-1.5,6,3,.8,'#c9ccd2','#3a3e46',.5);bills(s,w-4,h-2,1);}
+    });}},
+    shop_bag:{draw(art,piece,look){art.still(s=>{                       // a store bag: rose paper, black rope handles, tissue
+        const {width:w,height:h}=piece;
+        pool(s,w,h);
+        for(const hx of [5,w-5])s.stroke([['move',hx-2,2],['quadratic',hx,-5,hx+2,2]],'#1a1014',1.1);
+        box(s,0,1,w,h-1,1.5,look.paper,'#7a3a4e',.8);
+        s.text(look.initials,w/2,h/2+2,{font:{family:'serif',size:6,weight:600},align:'center',baseline:'middle'},{fill:STASH_GOLD});
+        if(searched(piece)){s.enter({position:[w+2,h-3],rotation:.4});box(s,-6,-3,12,6,2,'#f6eef2','rgba(120,80,100,0.5)',.5);s.leave();}   // the tissue, pulled out
+        else s.fill([['move',3,2],['line',7,-3],['line',10,1],['line',14,-3],['line',w-3,2]],'#f6eef2');
+    });}},
+    receipt_envelope:{draw(art,piece,look){art.still(s=>{               // a cream envelope, the store's seal
+        const {width:w,height:h}=piece,fold=[['move',0,0],['line',w/2,h*.55],['line',w,0]];
+        pool(s,w,h);box(s,0,0,w,h,1,'#f2e6cf','#9a8458',.6);
+        s.stroke(fold,'rgba(120,96,56,0.6)',.5);
+        if(searched(piece))s.paint([['move',0,0],['line',w/2,-h*.6],['line',w,0]],{fill:'#e6d6b8',stroke:'rgba(120,96,56,0.6)',stroke_width:.5});
+        else{disc(s,w/2,h*.55,2.2,look.seal,STASH_GOLD_DARK,.4);bills(s,w-6,1,1);}
+    });}},
+    offering_bowl:{draw(art,piece,look){art.still(s=>{                  // a black stone bowl of coins and wax, three bone candles round it
+        const {width:w,height:h}=piece;
+        pool(s,w,h);
+        for(const [cx,cy] of [[-3,2],[w+3,2],[w/2,h+3]]){disc(s,cx,cy,2,'#e8dcc6');disc(s,cx,cy-.5,.8,'#ffb46a');}
+        s.outlined([ellipse(w/2,h/2,w/2,h/2)],'#16101a','#4a2a4a',1);
+        s.fill([ellipse(w/2,h/2,w/2-3,h/2-2.5)],'#2a1626');
+        if(!searched(piece))for(let i=0;i<7;i++)disc(s,w/2+Math.cos(i*2.4)*(i%3+1)*2.4,h/2+Math.sin(i*2.4)*(i%3)*1.4,1.7,i%2?STASH_GOLD:'#c9a24a',STASH_GOLD_DARK,.3);
+        else disc(s,w/2,h/2,2.2,'rgba(176,112,255,0.5)');                                          // a last violet ember in the empty bowl
+    });}},
+    tribute_chest:{draw(art,piece,look){art.still(s=>{                  // a black-lacquer chest bound in gold, a crimson gem in the lock
+        const {width:w,height:h}=piece;
+        pool(s,w,h);box(s,0,0,w,h,2,look.lacquer,STASH_GOLD,1);
+        s.fill([...rect(6,0,2,h),...rect(w-8,0,2,h)],STASH_GOLD_DARK);                                // the bands
+        if(searched(piece)){box(s,-1,-h*.6,w+2,h*.6,2,'#2a0e18',STASH_GOLD,.8);box(s,3,3,w-6,h-6,1.5,'#3a0614');disc(s,w/2,h/2,1.4,'rgba(255,90,110,0.6)');}
+        else{s.fill(rect(2,2,w-4,1.2),'rgba(255,220,150,0.25)');
+            for(let i=0;i<5;i++)disc(s,4+i*(w-8)/4,-1,1.6,STASH_GOLD,STASH_GOLD_DARK,.3);                 // coins spilling over the lip
+            disc(s,w/2,h/2,2.6,look.gem,STASH_GOLD,.6);disc(s,w/2-.7,h/2-.7,.8,'rgba(255,220,230,0.8)');}
+    });}}
+};
+
+return Object.freeze({get LOST_ARTISTS(){return LOST_ARTISTS;}});
+})();
+// src/game/presentation/props/machines.mjs
+const m208 = (()=>{
+// The machines every map shares: MiniSpree's vending machine, Dr. Yin's health station, the loadout
+// locker, a room's light switch and a note left lying. Their still bodies are pictures; what hums,
+// glows, refills or runs across a screen is live. A light switch reads `piece.state.lit`.
+const {rect,circle,polygon,linear} = m154;
+const {box} = m195;
+
+const MACHINE_ARTISTS={
+    mini_spree:{draw(art,piece,look){                                    // the city's vending brand: glossy black, a lit window of cans, a pink-and-cyan marquee
+        const {width:w,height:h}=piece,wx=4,wy=13,ww=w-8,wh=h*.5,cw=(ww-8)/3;
+        const hum=()=>.85+.15*Math.sin(piece.time*7)*Math.sin(piece.time*2.3);
+        art.still(s=>box(s,0,0,w,h,4,look.body));
+        art.live(s=>{const k=hum();s.enter({position:[w/2,h/2]});s.paint({type:'rect',size:[w-1,h-1],radius:4},{stroke:`rgba(62,240,255,${.55*k})`,stroke_width:1,shadow:{color:'#3ef0ff',blur:8*k}});s.leave();});   // the neon edge
+        art.still(s=>{
+            box(s,2,2,w-4,9,2,linear([-w/2,0],[w/2,0],[[0,look.marquee[0]],[1,look.marquee[1]]]));     // the marquee
+            s.text(look.brand,w/2+2,6.8,{font:{family:'Montserrat, sans-serif',size:Math.max(5,Math.floor(w*.16)),weight:'bold'},align:'center',baseline:'middle'},{fill:'#ffffff'});
+            const spark=[];for(let i=0;i<8;i++){const a=i*Math.PI/4,r=i%2?1:2.6;spark.push([6+Math.cos(a)*r,6.5+Math.sin(a)*r]);}s.fill(polygon(spark),'#fff6b0');   // the little spark
+            s.fill(rect(wx,wy,ww,wh),'#10141e');                                                                  // the window of cans
+            for(let row=0;row<3;row++)for(let i=0;i<3;i++){const cx=wx+2+i*(cw+2),cy=wy+2+row*(wh-4)/3;box(s,cx,cy,cw,(wh-4)/3-2,1.5,look.cans[i%look.cans.length]);s.fill(rect(cx+1,cy+1,1,(wh-4)/3-4),'rgba(255,255,255,0.35)');}
+        });
+        art.live(s=>s.fill(rect(wx,wy,ww,wh),`rgba(190,240,255,${.10*hum()})`));                                // the window's light
+        art.still(s=>{
+            const ky=wy+wh+3,keys=[];
+            s.stroke([['move',wx+ww*.2,wy+wh],['line',wx+ww*.75,wy]],'rgba(255,255,255,0.18)',2);                // glass glint
+            for(let i=0;i<6;i++)keys.push(...rect(6+(i%3)*4,ky+Math.floor(i/3)*4,2,2));s.fill(keys,'#3ef0ff');     // keypad, card slot, pickup tray
+            s.fill(rect(w-12,ky,6,2),'#e8c27a');s.fill(rect(w-12,ky+4,6,1),'#ff4fa3');box(s,5,h-9,w-10,5,1.5,'#050508');
+        });
+    }},
+    health_station:{draw(art,piece,look){                                // Dr. Yin's refill cabinet: white and wine, a green cross, a rack of stim vials, a vitals readout
+        const {width:w,height:h}=piece,t=()=>piece.time,cx=w/2,cy=11,k=5,ry=20,rh=h*.34,n=5,vw=(w-10)/n,sy=ry+rh+3,sh=h-sy-5;
+        art.still(s=>{box(s,0,0,w,h,4,look.body);box(s,1,1,w-2,h-2,4,null,look.trim,2);});
+        art.live(s=>{const pulse=.7+.3*Math.sin(t()*2.5);s.paint([...rect(cx-k,cy-k*.35,k*2,k*.7),...rect(cx-k*.35,cy-k,k*.7,k*2)],{fill:look.cross,shadow:{color:'#00ff66',blur:10*pulse}});});   // the green cross, glowing
+        art.still(s=>{s.fill(rect(4,ry,w-8,rh),'#d4d8de');const glass=[];for(let i=0;i<n;i++)glass.push(...rect(5+i*vw+.5,ry+2,vw-2,rh-4));s.fill(glass,'rgba(255,255,255,0.8)');});
+        art.live(s=>{const levels=[];for(let i=0;i<n;i++){const lvl=.55+.45*(.5+.5*Math.sin(t()*.8+i*1.3));levels.push(...rect(5+i*vw+.5,ry+2+(rh-4)*(1-lvl),vw-2,(rh-4)*lvl));}s.fill(levels,look.vials);});   // the vials refilling
+        art.still(s=>{const caps=[];for(let i=0;i<n;i++)caps.push(...rect(5+i*vw+.5,ry+1,vw-2,1.5));s.fill(caps,look.trim);box(s,4,sy,w-8,sh,2,'#0a1410');});
+        art.live(s=>{                                                                                            // the vitals trace running across the screen
+            const mid=sy+sh/2,ph=(t()*30)%(w-8),trace=[];
+            for(let i=0;i<=w-8;i+=1){const q=(i+ph)%24,beat=q>8&&q<11?-sh*.35:q>11&&q<13?sh*.25:0;trace.push([i?'line':'move',4+i,mid+beat]);}
+            s.stroke(trace,'#3cff8a',1);
+        });
+    }},
+    loadout_locker:{draw(art,piece,look){                                // a wall-mounted weapons rack, pulsing violet: it can be opened
+        const {width:w,height:h}=piece,pulse=()=>.5+Math.sin(piece.time*2)*.4;
+        art.still(s=>{
+            s.fill(rect(0,0,w,h),look.casing);s.fill(rect(3,3,w-6,h-6),look.panel);
+            for(let i=0;i<3;i++){const by=10+i*(h-20)/3;s.fill(rect(8,by,w-16,3),'#444');s.fill(rect(12,by-2,5,7),'#444');}   // three guns, each with its grip
+        });
+        art.live(s=>{const k=pulse();
+            s.paint(rect(2,2,w-4,h-4),{fill:`rgba(164, 105, 255, ${.1*k})`,shadow:{color:look.glow,blur:12*k}});
+            s.text(look.label,w/2,h-5,{font:{family:'Orbitron',size:5,weight:'bold'},align:'center',baseline:'alphabetic'},{fill:`rgba(164, 105, 255, ${.5+k*.3})`});
+        });
+    }},
+    light_switch:{draw(art,piece,look){art.still(s=>{                    // a wall plate with its rocker, the LED green while the room is lit
+        const {width:w,height:h}=piece,lit=!!piece.state?.lit;
+        s.fill(rect(0,0,w,h),'#1a1a1a');
+        for(const edge of [rect(0,0,w,1),rect(0,0,1,h)])s.fill(edge,'rgba(255,255,255,0.06)');                 // lit along the top and left, shaded right and below
+        for(const edge of [rect(w-1,0,1,h),rect(0,h-1,w,1)])s.fill(edge,'rgba(0,0,0,0.3)');
+        s.fill(rect(2,3,w-4,h-6),'#2a2a2a');
+        s.paint([circle(w/2,h-3,1.5)],{fill:lit?'#44ff88':'#ff3333',shadow:{color:lit?'rgba(68, 255, 136, 0.6)':'rgba(255, 51, 51, 0.4)',blur:6}});
+    });}},
+    plain_box:{draw(art,piece,look){art.still(s=>{                       // a plain block in its colour, lit along its top and shaded down its right side
+        const {width:w,height:h}=piece;
+        s.fill(rect(0,0,w,h),look.color);s.fill(rect(0,0,w,5),'rgba(255,255,255,0.1)');s.fill(rect(w-5,0,5,h),'rgba(0,0,0,0.3)');
+    });}}
+};
+
+return Object.freeze({get MACHINE_ARTISTS(){return MACHINE_ARTISTS;}});
+})();
 // src/game/presentation/props/index.mjs
 const m193 = (()=>{
 // Props drawn natively, by family. A prop type in the catalog (game-assets/props.json) that names a
@@ -33970,10 +34206,12 @@ const {NEURAL_ARTISTS} = m203;
 const {TORQUE_ARTISTS} = m204;
 const {PALACE_ARTISTS} = m205;
 const {ENNI_ARTISTS} = m206;
+const {LOST_ARTISTS} = m207;
+const {MACHINE_ARTISTS} = m208;
 
 const PROP_FAMILIES=PROPS.resources.catalog.data.families;
 /** Every venue's artists under one name each: a family drawn by two venues would silently lose one. */
-const ARTISTS=Object.freeze([CAFE_ARTISTS,APARTMENT_ARTISTS,HOUSE_ARTISTS,HOTEL_ARTISTS,CLUB_ARTISTS,SANCTUM_ARTISTS,CLINIC_ARTISTS,NEURAL_ARTISTS,TORQUE_ARTISTS,PALACE_ARTISTS,ENNI_ARTISTS].reduce((all,venue)=>{
+const ARTISTS=Object.freeze([CAFE_ARTISTS,APARTMENT_ARTISTS,HOUSE_ARTISTS,HOTEL_ARTISTS,CLUB_ARTISTS,SANCTUM_ARTISTS,CLINIC_ARTISTS,NEURAL_ARTISTS,TORQUE_ARTISTS,PALACE_ARTISTS,ENNI_ARTISTS,LOST_ARTISTS,MACHINE_ARTISTS].reduce((all,venue)=>{
     for(const family of Object.keys(venue))if(family in all)throw new Error(`prop family ${family} has two artists`);
     return Object.assign(all,venue);
 },{}));
@@ -34047,7 +34285,7 @@ function drawPropArt(context,packet,{pictures,time=0,beat=null}){
 
 return Object.freeze({get PROP_FAMILIES(){return PROP_FAMILIES;},get hasPropArt(){return hasPropArt;},get propArtLoop(){return propArtLoop;},get propArtPacket(){return propArtPacket;},get createPropDraws(){return createPropDraws;},get drawPropArt(){return drawPropArt;}});
 })();
-const m208 = Object.freeze({default:{
+const m210 = Object.freeze({default:{
  "indoor": { "tint": "rgb(22, 10, 48)", "darkness": 0.95, "lamp_glow": 0.08 },
  "outdoor": { "lamp_glow": 0.22 },
  "lamp": { "inner_radius": 10, "cut": [[0, 1], [1, 0]], "glow_stops": [[0, "#ffffff"], [0.1, "$color"], [0.6, "$color"], [1, "rgba(0,0,0,0)"]], "resolution": 64 },
@@ -34056,8 +34294,8 @@ const m208 = Object.freeze({default:{
  "flicker": { "floor": 0.82, "swing": 0.18 }
 }});
 // src/game/presentation/lighting.mjs
-const m207 = (()=>{
-const LIGHTING = m208.default;
+const m209 = (()=>{
+const LIGHTING = m210.default;
 const {createLightLayer} = m154;
 
 const stops=(list,color)=>list.map(([o,c])=>[o,c==='$color'?color:c]);
@@ -34116,7 +34354,7 @@ function levelLights(level,{blend=1,lightAt=()=>1}={}){
 return Object.freeze({get LIGHTING(){return LIGHTING;},get sceneLighting(){return sceneLighting;},get levelLights(){return levelLights;}});
 })();
 // src/game/data/road-navigation.mjs
-const m209 = (()=>{
+const m211 = (()=>{
 /**
  * The city's lane network as Basement navigation road data.
  *
@@ -34254,7 +34492,7 @@ const m0 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m40.assetLibrary;},get createGameAssetLibrary(){return m47.createGameAssetLibrary;},get resolveMapLayout(){return m69.resolveMapLayout;},get resolvePlacement(){return m69.resolvePlacement;},get isMovableProp(){return m69.isMovableProp;},get mapHost(){return m69.mapHost;},get createMapLibraries(){return m69.createMapLibraries;},get PROP_TYPES(){return m69.PROP_TYPES;},get MAP_IDS(){return m69.MAP_IDS;},get ApartmentLevel(){return m95.ApartmentLevel;},get APARTMENT_RULES(){return m137.APARTMENT_RULES;},get gameEngine(){return m146.gameEngine;},get gameLevel(){return m148.gameLevel;},get mapLevel(){return m163.mapLevel;},get travelSystem(){return m164.travelSystem;},get InteriorLevel(){return m165.InteriorLevel;},get registerInteriorLevels(){return m165.registerInteriorLevels;},get levelLobby(){return m147.levelLobby;},get createGameRuntime(){return m166.createGameRuntime;},get controlSystem(){return m149.controlSystem;},get controlsSystem(){return m149.controlsSystem;},get inputInstance(){return m149.inputInstance;},get keyboardInstance(){return m149.keyboardInstance;},get mouseInstance(){return m149.mouseInstance;},get touchInstance(){return m149.touchInstance;},get touchStick(){return m149.touchStick;},get gamepadInstance(){return m149.gamepadInstance;},get TAP(){return m149.TAP;},get DOUBLETAP(){return m149.DOUBLETAP;},get HELD(){return m149.HELD;},get PRESS(){return m149.PRESS;},get REPEAT(){return m149.REPEAT;},get RELEASE(){return m149.RELEASE;},get renderSystem(){return m154.renderSystem;},get renderFrame(){return m154.renderFrame;},get canvasRenderer(){return m154.canvasRenderer;},get pictureCache(){return m154.pictureCache;},get measureText(){return m154.measureText;},get cameraSystem(){return m154.cameraSystem;},get gameSession(){return m178.gameSession;},get PlayerStateSystem(){return m179.PlayerStateSystem;},get PlayerControlSystem(){return m180.PlayerControlSystem;},get Player(){return m123.Player;},get playerVitals(){return m124.playerVitals;},get itemSystem(){return m104.itemSystem;},get createItemCatalog(){return m58.createItemCatalog;},get GUN_MATERIALS(){return m174.GUN_MATERIALS;},get WEAPON_MODELS(){return m174.WEAPON_MODELS;},get LASER_MODULE(){return m174.LASER_MODULE;},get weaponModel(){return m174.weaponModel;},get weaponAppearance(){return m185.weaponAppearance;},get combatSystem(){return m181.combatSystem;},get weaponSystem(){return m182.weaponSystem;},get lootSystem(){return m184.lootSystem;},get WorldLoot(){return m129.WorldLoot;},get MELEE_SWING(){return m183.MELEE_SWING;},get WIDE_SWING(){return m183.WIDE_SWING;},get sampleMeleeSwing(){return m183.sampleMeleeSwing;},get sampleWideSwing(){return m183.sampleWideSwing;},get swingPhases(){return m183.swingPhases;},get wideGrip(){return m183.wideGrip;},get COMBAT_RULES(){return m186.COMBAT_RULES;},get registerGameEntityTypes(){return m116.registerGameEntityTypes;},get actorVitals(){return m102.actorVitals;},get gameActor(){return m100.gameActor;},get NPC(){return m127.NPC;},get rosterRecord(){return m127.rosterRecord;},get ROSTER_FIELDS(){return m127.ROSTER_FIELDS;},get Ganger(){return m99.Ganger;},get actorSystem(){return m176.actorSystem;},get actorItems(){return m103.actorItems;},get restoreActorItems(){return m103.restoreActorItems;},get resolveEmoteLines(){return m128.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m128.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m115.abilityLoadout;},get actorAbilities(){return m115.actorAbilities;},get importActorAbilities(){return m115.importActorAbilities;},get abilitySystem(){return m175.abilitySystem;},get createAbilityCatalog(){return m60.createAbilityCatalog;},get attackRegistry(){return m101.attackRegistry;},get validateAttackState(){return m101.validateAttackState;},get attackSystem(){return m172.attackSystem;},get createAttackCatalog(){return m57.createAttackCatalog;},get validateMountedAttack(){return m114.validateMountedAttack;},get TrafficVehicle(){return m130.TrafficVehicle;},get createGameVehicle(){return m130.createGameVehicle;},get Hunter(){return m98.Hunter;},get createHunterAppearance(){return m56.createHunterAppearance;},get Marionette(){return m122.Marionette;},get MARIONETTE_RULES(){return m54.MARIONETTE_RULES;},get validateAbilityAction(){return m111.validateAbilityAction;},get GatlingGunner(){return m108.GatlingGunner;},get Drone(){return m117.Drone;},get VelvetCat(){return m118.VelvetCat;},get velvetCatAnimation(){return m119.velvetCatAnimation;},get createVelvetAnimation(){return m119.createVelvetAnimation;},get velvetPresentation(){return m119.velvetPresentation;},get droneLift(){return m187.droneLift;},get droneArmPose(){return m187.droneArmPose;},get dronePresentation(){return m187.dronePresentation;},get VELVET_CAT_PALETTES(){return m120.VELVET_CAT_PALETTES;},get VELVET_T(){return m120.VELVET_T;},get VELVET_PROFILES(){return m120.VELVET_PROFILES;},get VELVET_GAITS(){return m120.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m120.VELVET_TAIL_SEGS;},get Demoness(){return m97.Demoness;},get Warden(){return m107.Warden;},get Vesper(){return m107.Vesper;},get Matins(){return m107.Matins;},get Compline(){return m107.Compline;},get BossEffect(){return m109.BossEffect;},get encounterSystem(){return m171.encounterSystem;},get createBossAbilities(){return m48.createBossAbilities;},get createDemonessAppearance(){return m48.createDemonessAppearance;},get demonessAppearance(){return m188.demonessAppearance;},get demonessPresentation(){return m188.demonessPresentation;},get bossEffectAppearance(){return m189.bossEffectAppearance;},get bossEffectPresentation(){return m189.bossEffectPresentation;},get validateBossRecord(){return m96.validateBossRecord;},get createDronePackets(){return m187.createDronePackets;},get createVelvetCatArt(){return m190.createVelvetCatArt;},get createVelvetCatPackets(){return m190.createVelvetCatPackets;},get createVelvetEyePackets(){return m190.createVelvetEyePackets;},get doorPresentation(){return m191.doorPresentation;},get createDoorPackets(){return m191.createDoorPackets;},get DOOR_APPEARANCE(){return m191.DOOR_APPEARANCE;},get PROP_FAMILIES(){return m193.PROP_FAMILIES;},get hasPropArt(){return m193.hasPropArt;},get propArtPacket(){return m193.propArtPacket;},get createPropDraws(){return m193.createPropDraws;},get drawPropArt(){return m193.drawPropArt;},get sceneLighting(){return m207.sceneLighting;},get levelLights(){return m207.levelLights;},get LIGHTING(){return m207.LIGHTING;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m167.humanoidSystem;},get humanoidPresentation(){return m167.humanoidPresentation;},get humanoidBodyCanon(){return m168.humanoidBodyCanon;},get humanoidBuilds(){return m168.humanoidBuilds;},get getHumanoidRigAssets(){return m168.getHumanoidRigAssets;},get roadNavigationData(){return m209.roadNavigationData;},get loadRoadNavigation(){return m209.loadRoadNavigation;}});
+return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m40.assetLibrary;},get createGameAssetLibrary(){return m47.createGameAssetLibrary;},get resolveMapLayout(){return m69.resolveMapLayout;},get resolvePlacement(){return m69.resolvePlacement;},get isMovableProp(){return m69.isMovableProp;},get mapHost(){return m69.mapHost;},get createMapLibraries(){return m69.createMapLibraries;},get PROP_TYPES(){return m69.PROP_TYPES;},get MAP_IDS(){return m69.MAP_IDS;},get ApartmentLevel(){return m95.ApartmentLevel;},get APARTMENT_RULES(){return m137.APARTMENT_RULES;},get gameEngine(){return m146.gameEngine;},get gameLevel(){return m148.gameLevel;},get mapLevel(){return m163.mapLevel;},get travelSystem(){return m164.travelSystem;},get InteriorLevel(){return m165.InteriorLevel;},get registerInteriorLevels(){return m165.registerInteriorLevels;},get levelLobby(){return m147.levelLobby;},get createGameRuntime(){return m166.createGameRuntime;},get controlSystem(){return m149.controlSystem;},get controlsSystem(){return m149.controlsSystem;},get inputInstance(){return m149.inputInstance;},get keyboardInstance(){return m149.keyboardInstance;},get mouseInstance(){return m149.mouseInstance;},get touchInstance(){return m149.touchInstance;},get touchStick(){return m149.touchStick;},get gamepadInstance(){return m149.gamepadInstance;},get TAP(){return m149.TAP;},get DOUBLETAP(){return m149.DOUBLETAP;},get HELD(){return m149.HELD;},get PRESS(){return m149.PRESS;},get REPEAT(){return m149.REPEAT;},get RELEASE(){return m149.RELEASE;},get renderSystem(){return m154.renderSystem;},get renderFrame(){return m154.renderFrame;},get canvasRenderer(){return m154.canvasRenderer;},get pictureCache(){return m154.pictureCache;},get measureText(){return m154.measureText;},get cameraSystem(){return m154.cameraSystem;},get gameSession(){return m178.gameSession;},get PlayerStateSystem(){return m179.PlayerStateSystem;},get PlayerControlSystem(){return m180.PlayerControlSystem;},get Player(){return m123.Player;},get playerVitals(){return m124.playerVitals;},get itemSystem(){return m104.itemSystem;},get createItemCatalog(){return m58.createItemCatalog;},get GUN_MATERIALS(){return m174.GUN_MATERIALS;},get WEAPON_MODELS(){return m174.WEAPON_MODELS;},get LASER_MODULE(){return m174.LASER_MODULE;},get weaponModel(){return m174.weaponModel;},get weaponAppearance(){return m185.weaponAppearance;},get combatSystem(){return m181.combatSystem;},get weaponSystem(){return m182.weaponSystem;},get lootSystem(){return m184.lootSystem;},get WorldLoot(){return m129.WorldLoot;},get MELEE_SWING(){return m183.MELEE_SWING;},get WIDE_SWING(){return m183.WIDE_SWING;},get sampleMeleeSwing(){return m183.sampleMeleeSwing;},get sampleWideSwing(){return m183.sampleWideSwing;},get swingPhases(){return m183.swingPhases;},get wideGrip(){return m183.wideGrip;},get COMBAT_RULES(){return m186.COMBAT_RULES;},get registerGameEntityTypes(){return m116.registerGameEntityTypes;},get actorVitals(){return m102.actorVitals;},get gameActor(){return m100.gameActor;},get NPC(){return m127.NPC;},get rosterRecord(){return m127.rosterRecord;},get ROSTER_FIELDS(){return m127.ROSTER_FIELDS;},get Ganger(){return m99.Ganger;},get actorSystem(){return m176.actorSystem;},get actorItems(){return m103.actorItems;},get restoreActorItems(){return m103.restoreActorItems;},get resolveEmoteLines(){return m128.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m128.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m115.abilityLoadout;},get actorAbilities(){return m115.actorAbilities;},get importActorAbilities(){return m115.importActorAbilities;},get abilitySystem(){return m175.abilitySystem;},get createAbilityCatalog(){return m60.createAbilityCatalog;},get attackRegistry(){return m101.attackRegistry;},get validateAttackState(){return m101.validateAttackState;},get attackSystem(){return m172.attackSystem;},get createAttackCatalog(){return m57.createAttackCatalog;},get validateMountedAttack(){return m114.validateMountedAttack;},get TrafficVehicle(){return m130.TrafficVehicle;},get createGameVehicle(){return m130.createGameVehicle;},get Hunter(){return m98.Hunter;},get createHunterAppearance(){return m56.createHunterAppearance;},get Marionette(){return m122.Marionette;},get MARIONETTE_RULES(){return m54.MARIONETTE_RULES;},get validateAbilityAction(){return m111.validateAbilityAction;},get GatlingGunner(){return m108.GatlingGunner;},get Drone(){return m117.Drone;},get VelvetCat(){return m118.VelvetCat;},get velvetCatAnimation(){return m119.velvetCatAnimation;},get createVelvetAnimation(){return m119.createVelvetAnimation;},get velvetPresentation(){return m119.velvetPresentation;},get droneLift(){return m187.droneLift;},get droneArmPose(){return m187.droneArmPose;},get dronePresentation(){return m187.dronePresentation;},get VELVET_CAT_PALETTES(){return m120.VELVET_CAT_PALETTES;},get VELVET_T(){return m120.VELVET_T;},get VELVET_PROFILES(){return m120.VELVET_PROFILES;},get VELVET_GAITS(){return m120.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m120.VELVET_TAIL_SEGS;},get Demoness(){return m97.Demoness;},get Warden(){return m107.Warden;},get Vesper(){return m107.Vesper;},get Matins(){return m107.Matins;},get Compline(){return m107.Compline;},get BossEffect(){return m109.BossEffect;},get encounterSystem(){return m171.encounterSystem;},get createBossAbilities(){return m48.createBossAbilities;},get createDemonessAppearance(){return m48.createDemonessAppearance;},get demonessAppearance(){return m188.demonessAppearance;},get demonessPresentation(){return m188.demonessPresentation;},get bossEffectAppearance(){return m189.bossEffectAppearance;},get bossEffectPresentation(){return m189.bossEffectPresentation;},get validateBossRecord(){return m96.validateBossRecord;},get createDronePackets(){return m187.createDronePackets;},get createVelvetCatArt(){return m190.createVelvetCatArt;},get createVelvetCatPackets(){return m190.createVelvetCatPackets;},get createVelvetEyePackets(){return m190.createVelvetEyePackets;},get doorPresentation(){return m191.doorPresentation;},get createDoorPackets(){return m191.createDoorPackets;},get DOOR_APPEARANCE(){return m191.DOOR_APPEARANCE;},get PROP_FAMILIES(){return m193.PROP_FAMILIES;},get hasPropArt(){return m193.hasPropArt;},get propArtPacket(){return m193.propArtPacket;},get createPropDraws(){return m193.createPropDraws;},get drawPropArt(){return m193.drawPropArt;},get sceneLighting(){return m209.sceneLighting;},get levelLights(){return m209.levelLights;},get LIGHTING(){return m209.LIGHTING;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m167.humanoidSystem;},get humanoidPresentation(){return m167.humanoidPresentation;},get humanoidBodyCanon(){return m168.humanoidBodyCanon;},get humanoidBuilds(){return m168.humanoidBuilds;},get getHumanoidRigAssets(){return m168.getHumanoidRigAssets;},get roadNavigationData(){return m211.roadNavigationData;},get loadRoadNavigation(){return m211.loadRoadNavigation;}});
 })();
 return m0;
 })();
@@ -43977,7 +44215,7 @@ function drawIndoorDoorAppearance(ctx,door){return indoorDoorAppearance.draw.cal
             }
         }
     </script>
-    <script type="text/dfab" data-src="legacy/entities/props-decor.js" data-cost="2499">
+    <script type="text/dfab" data-src="legacy/entities/props-decor.js" data-cost="2502">
         // One soft, centred ground blob shared by props, pickups and Velvet. It is stamped
         // before artwork transforms and never baked into a rotating furniture sprite.
         function drawGroundContactShadow(ctx, x, y, rx, ry, angle = 0) {
@@ -46616,7 +46854,9 @@ function drawIndoorDoorAppearance(ctx,door){return indoorDoorAppearance.draw.cal
                 if (PropPass.mode === 0 && DFNative.hasPropArt(p.family)) {     // native art, its shadow included (game/presentation/props)
                     // Seeded from where it was first drawn, as its classic sprite was
                     const art = p._artAppearance ??= { family: p.family, look: p.look ?? {}, decor: p.decor, x: p.x, y: p.y };
-                    DFNative.drawPropArt(ctx, DFNative.propArtPacket({ appearance: art, position: [p.x + p.width / 2, p.y + p.height / 2], rotation: p.angle || 0, width: p.width, height: p.height }),
+                    // (its play state, kept apart in its pictures: a lost thing lies open once searched today, a switch shows its room lit)
+                    const state = p.interactionType === 'lost_luggage' ? { searched: !!p._searched } : p.interactionType === 'light_switch' ? { lit: !!p._switchState } : null;
+                    DFNative.drawPropArt(ctx, DFNative.propArtPacket({ appearance: art, state, position: [p.x + p.width / 2, p.y + p.height / 2], rotation: p.angle || 0, width: p.width, height: p.height }),
                         { pictures: PropSprites.pictures, time: _frameTime / 1000, beat: clubBeatN() });   // (the club's pieces keep the music's kick)
                     return;
                 }
@@ -102860,7 +103100,7 @@ engineMixin({
             },
         });
     </script>
-    <script type="text/dfab" data-src="legacy/engine/shops-menus.js" data-cost="349">
+    <script type="text/dfab" data-src="legacy/engine/shops-menus.js" data-cost="351">
         // GameEngine — Vending, garage, auto shop, Zib rides, sleep menu.
         // Methods are added to GameEngine.prototype (see engineMixin in game-engine.js).
         engineMixin({
@@ -103215,7 +103455,7 @@ engineMixin({
                 const qs = this.questState, id = prop.noteId || 'lobby';
                 const day = Math.floor((this.worldMinutes || 0) / 1440);
                 qs.lobbyLuggage = qs.lobbyLuggage || {};
-                if (qs.lobbyLuggage[id] === day) { showMessage('EMPTY. SOMEONE BEAT YOU TO IT.'); audioSys.sfx('ui'); return; }
+                if (this.lostThingSearched(prop)) { showMessage('EMPTY. SOMEONE BEAT YOU TO IT.'); audioSys.sfx('ui'); return; }
                 const lo = prop.lootMin ?? 25, hi = prop.lootMax ?? 80;
                 const pp = lo + Math.floor(Math.random() * (hi - lo + 1));
                 qs.lobbyLuggage[id] = day; prop._searched = true;
@@ -103225,10 +103465,15 @@ engineMixin({
                 audioSys.sfx('ui');
             },
 
+            /** Whether a lost thing has been searched today (keyed by its note, as searchLostLuggage keys it; it refills at dawn). */
+            lostThingSearched(prop) {
+                const L = (this.questState && this.questState.lobbyLuggage) || {};
+                return L[prop.noteId || 'lobby'] === Math.floor((this.worldMinutes || 0) / 1440);
+            },
+
             /** Which lost things have been searched today (they open; they refill at dawn of the next day). */
             refreshLostLuggage() {
-                const L = (this.questState && this.questState.lobbyLuggage) || {}, day = Math.floor((this.worldMinutes || 0) / 1440);
-                for (const p of this.props) if (p.interactionType === 'lost_luggage') p._searched = L[p.noteId] === day;
+                for (const p of this.props) if (p.interactionType === 'lost_luggage') p._searched = this.lostThingSearched(p);
             },
 
             // =========================================================
@@ -117503,7 +117748,7 @@ class ApartmentRooms {
     tagLamps(){}
 }
     </script>
-    <script type="text/dfab" data-src="legacy/engine/apartment-renderer.js" data-cost="134">
+    <script type="text/dfab" data-src="legacy/engine/apartment-renderer.js" data-cost="137">
 /** Native scene presentation. Packets below are drawing inputs, never entities or body owners. */
 class ApartmentRenderer {
     constructor(game){this.game=game;this.people=new Map();this.props=new Map();this.pictures=new DFNative.pictureCache();}
@@ -117522,8 +117767,10 @@ class ApartmentRenderer {
     }
     /** A prop whose family has native art: drawn from its body's pose, its still runs from pictures. */
     drawNativeProp(ctx,entity,blend){
-        const pose=entity.getRenderState(blend),[width,height]=entity.collision_shape.dimensions;
-        DFNative.drawPropArt(ctx,DFNative.propArtPacket({appearance:entity.data.appearance,position:pose.position,rotation:pose.rotation,width,height}),{pictures:this.pictures,time:_frameTime/1000,beat:clubBeatN()});
+        const pose=entity.getRenderState(blend),[width,height]=entity.collision_shape.dimensions,a=entity.data.appearance;
+        // its play state: a lost thing lies open once searched today, a switch shows its room lit
+        const state=a.interactionType==='lost_luggage'?{searched:this.game.lostThingSearched(a)}:a.interactionType==='light_switch'?{lit:!entity.data.room_id||!this.game.roomSystem.rooms[entity.data.room_id]?.lightsOff}:null;
+        DFNative.drawPropArt(ctx,DFNative.propArtPacket({appearance:a,state,position:pose.position,rotation:pose.rotation,width,height}),{pictures:this.pictures,time:_frameTime/1000,beat:clubBeatN()});
     }
     destroy(){this.lighting=null;this.pictures.clear();PropSprites.clear([...this.props.values()]);this.props.clear();this.people.clear();}
     draw(game,blend=1){

@@ -662,18 +662,17 @@ test('Contact shadows stay on the ground across rotation, bobbing, vector and sp
     const balanced=ctx._stack.length===0;
     shots.length=0; const loot=new Loot(100,120,'scrap');_gameTimeSec=0;loot.draw(ctx);_gameTimeSec=1;loot.draw(ctx);
     const lootFixed=JSON.stringify(shots[0])===JSON.stringify(shots[1]);
-    const sofa=game.apartmentRenderer.propPacket(game.props.find(p=>p.interactionType==='light_switch'),1);   // (classic art: the apartment's furniture is native now)
+    game._doLoadMap('auto_shop');
+    const sofa=game.props.find(p=>p.decorType==='ta_lift');   // (classic art: one of the last classic pieces)
     shots.length=0;GameSettings.propSprites=false;sofa.angle=0.7;sofa.draw(ctx);
     const vector=shots.length===1 && shots[0].m[4]===sofa.x+sofa.width/2 && shots[0].m[5]===sofa.y+sofa.height/2 && shots[0].args[0]===-sofa.width/2-5 && shots[0].args[1]===-sofa.height/2-5;
     shots.length=0;GameSettings.propSprites=true;PropSprites.frame(1.4);sofa.draw(ctx);sofa.draw(ctx);
     const stamped=shots.length===2;
-    const craft=game.apartmentRenderer.propPacket(game.props.find(p=>p.interactionType==='medbay_refill'),1);shots.length=0;craft.draw(ctx);craft.draw(ctx);
-    const split=shots.length===2;
     shots.length=0;PropSprites._canvas(sofa,PropSprites._plan(sofa,null),0);
     const notBaked=shots.length===0;
-    ctx.drawImage=original;return {catFixed,balanced,lootFixed,vector,stamped,split,notBaked};
+    ctx.drawImage=original;return {catFixed,balanced,lootFixed,vector,stamped,notBaked};
   `);
-  equal(r,{catFixed:true,balanced:true,lootFixed:true,vector:true,stamped:true,split:true,notBaked:true});
+  equal(r,{catFixed:true,balanced:true,lootFixed:true,vector:true,stamped:true,notBaked:true});
 }, {affine:true});
 
 test('Humanoid contact and sun shadows keep their world placement as bodies turn', env => {
@@ -732,36 +731,31 @@ test('Furniture sprites: painted runs never change over time, loops repeat per p
   ok(runTrace(candle, 0, 5000) !== runTrace(candle, 0, 987654.321), 'control: a candelabra painted as if still would freeze its flames');
 
   const r = value(env, `
-    game._doLoadMap('apt_949'); game.running=true; game.paused=false; game.worldMinutes=22*60;
+    game._doLoadMap('apt_949'); game.running=true; game.paused=false; game.worldMinutes=22*60; game.draw(); const floor = !!game._aptFloor;
+    game._doLoadMap('auto_shop'); const floorReleased = !game._aptFloor;
     const P = CanvasRenderingContext2D.prototype, ctx = game.ctx;
-    const sofa = game.apartmentRenderer.propPacket(game.props.find(p => p.interactionType === 'light_switch'),1), sw = game.apartmentRenderer.propPacket(game.props.find(p => p.interactionType === 'light_switch'),1);
-    const craft = game.apartmentRenderer.propPacket(game.props.find(p => p.interactionType === 'medbay_refill'),1);   // (classic split art: the apartment's furniture is native now)
+    const lift = game.props.find(p => p.decorType === 'ta_lift');   // (one of the last classic pieces: it carries a car, which waits for native vehicle art)
     PropSprites.frame(1.4);
     const calls = (p) => { const before = __calls.n; p.draw(ctx); return __calls.n - before; };
     globalThis.__calls = { n: 0 }; for (const k of ['drawImage','fillRect','fill','stroke','save','restore','translate','rotate','arc','ellipse','roundRect','beginPath']) { const f = P[k]; P[k] = function () { __calls.n++; return f.apply(this, arguments); }; }
-    const firstSofa = calls(sofa), sofaCalls = calls(sofa);
-    sofa.angle = 0.3; const turned = calls(sofa); sofa.angle = 0;
-    calls(craft); const craftCalls = calls(craft), craftRuns = craft._spr.runs.length, craftSplit = craft._spr.split; GameSettings.propSprites = false; const craftVector = calls(craft); GameSettings.propSprites = true;
-    const swRuns = sw._spr || (calls(sw), sw._spr); const swBefore = sw._spr.runs[0];
-    sw._switchState = !sw._switchState; calls(sw); const swRepainted = sw._spr.runs[0] !== swBefore && sw._spr.sw === sw._switchState;
-    PropSprites.frame(2.6); const closeUp = calls(sofa) > 5; PropSprites.frame(1.4);
-    GameSettings.propSprites = false; const vectorOff = calls(sofa) > 5; GameSettings.propSprites = true;
-    game.draw(); const bytes = PropSprites.bytes, floor = !!game._aptFloor;
+    const first = calls(lift), again = calls(lift);
+    lift.angle = 0.3; const turned = calls(lift); lift.angle = 0;
+    PropSprites.frame(2.6); const closeUp = calls(lift) > 5; PropSprites.frame(1.4);
+    GameSettings.propSprites = false; const vectorOff = calls(lift) > 5; GameSettings.propSprites = true;
+    const bytes = PropSprites.bytes;
     game._doLoadMap('moon_city_nightclub');
-    const released = sofa._spr === undefined && PropSprites.bytes === 0 && !game._aptFloor;
-    const purse = game.props.find(p => p.decorType === 'mc_lost_purse'); PropSprites.frame(1.4); calls(purse);
-    return {firstSofa, sofaCalls, turned, craftCalls, craftVector, craftRuns, craftSplit, swRepainted, closeUp, vectorOff, bytes, floor, released, purseNever: !!(purse._spr && purse._spr.never)};
+    const released = lift._spr === undefined && PropSprites.bytes === 0;
+    return {first, again, turned, closeUp, vectorOff, bytes, floor, floorReleased, released};
   `);
-  equal([r.sofaCalls, r.turned], [2, 10], 'a still piece stamps its art plus one ground shadow');
-  ok(r.firstSofa > 5, 'the first draw paints it');
-  equal([r.craftRuns, r.craftSplit], [3, true], 'the health station: three still runs round its live parts');
-  ok(r.craftCalls < r.craftVector, `the health station stamps its runs and draws only what moves (${r.craftCalls} calls, ${r.craftVector} as vector)`);
-  ok(r.swRepainted, 'flipping a light switch repaints its sprite');
+  // (The switches and the health station, the last split and stateful pieces, are native: tools/test-prop-art.mjs
+  //  proves their play state keeps its own pictures. A split run is still proven by the planes' sprites below.)
+  equal([r.again, r.turned], [2, 10], 'a still piece stamps its art plus one ground shadow');
+  ok(r.first > 5, 'the first draw paints it');
   ok(r.closeUp, 'zoomed past what a sprite keeps sharp, the vector art draws');
   ok(r.vectorOff, 'Prop Sprites off: vector art');
-  ok(r.bytes > 0 && r.floor, 'sprites and the apartment floor are held while she is there');
+  ok(r.bytes > 0, 'sprites are held while she is there');
   ok(r.released, 'and let go when she leaves');
-  ok(r.purseNever, 'a piece that cuts with destination-out (a lost purse\'s clasp) stays vector');
+  ok(r.floor && r.floorReleased, 'the apartment floor is held while she is there, and let go when she leaves');
 }, {affine: true});
 
 test('A landmark just off screen still throws its beams but skips its roof pass', env => {

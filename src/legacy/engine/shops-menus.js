@@ -352,7 +352,7 @@
                 const qs = this.questState, id = prop.noteId || 'lobby';
                 const day = Math.floor((this.worldMinutes || 0) / 1440);
                 qs.lobbyLuggage = qs.lobbyLuggage || {};
-                if (qs.lobbyLuggage[id] === day) { showMessage('EMPTY. SOMEONE BEAT YOU TO IT.'); audioSys.sfx('ui'); return; }
+                if (this.lostThingSearched(prop)) { showMessage('EMPTY. SOMEONE BEAT YOU TO IT.'); audioSys.sfx('ui'); return; }
                 const lo = prop.lootMin ?? 25, hi = prop.lootMax ?? 80;
                 const pp = lo + Math.floor(Math.random() * (hi - lo + 1));
                 qs.lobbyLuggage[id] = day; prop._searched = true;
@@ -362,10 +362,15 @@
                 audioSys.sfx('ui');
             },
 
+            /** Whether a lost thing has been searched today (keyed by its note, as searchLostLuggage keys it; it refills at dawn). */
+            lostThingSearched(prop) {
+                const L = (this.questState && this.questState.lobbyLuggage) || {};
+                return L[prop.noteId || 'lobby'] === Math.floor((this.worldMinutes || 0) / 1440);
+            },
+
             /** Which lost things have been searched today (they open; they refill at dawn of the next day). */
             refreshLostLuggage() {
-                const L = (this.questState && this.questState.lobbyLuggage) || {}, day = Math.floor((this.worldMinutes || 0) / 1440);
-                for (const p of this.props) if (p.interactionType === 'lost_luggage') p._searched = L[p.noteId] === day;
+                for (const p of this.props) if (p.interactionType === 'lost_luggage') p._searched = this.lostThingSearched(p);
             },
 
             // =========================================================

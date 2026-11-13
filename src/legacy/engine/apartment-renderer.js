@@ -16,8 +16,10 @@ class ApartmentRenderer {
     }
     /** A prop whose family has native art: drawn from its body's pose, its still runs from pictures. */
     drawNativeProp(ctx,entity,blend){
-        const pose=entity.getRenderState(blend),[width,height]=entity.collision_shape.dimensions;
-        DFNative.drawPropArt(ctx,DFNative.propArtPacket({appearance:entity.data.appearance,position:pose.position,rotation:pose.rotation,width,height}),{pictures:this.pictures,time:_frameTime/1000,beat:clubBeatN()});
+        const pose=entity.getRenderState(blend),[width,height]=entity.collision_shape.dimensions,a=entity.data.appearance;
+        // its play state: a lost thing lies open once searched today, a switch shows its room lit
+        const state=a.interactionType==='lost_luggage'?{searched:this.game.lostThingSearched(a)}:a.interactionType==='light_switch'?{lit:!entity.data.room_id||!this.game.roomSystem.rooms[entity.data.room_id]?.lightsOff}:null;
+        DFNative.drawPropArt(ctx,DFNative.propArtPacket({appearance:a,state,position:pose.position,rotation:pose.rotation,width,height}),{pictures:this.pictures,time:_frameTime/1000,beat:clubBeatN()});
     }
     destroy(){this.lighting=null;this.pictures.clear();PropSprites.clear([...this.props.values()]);this.props.clear();this.people.clear();}
     draw(game,blend=1){

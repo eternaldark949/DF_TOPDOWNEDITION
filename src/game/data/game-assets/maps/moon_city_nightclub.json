@@ -60,7 +60,7 @@
     {"type": "mc_lowtable", "x": 1450, "y": 1013},
     {"type": "mc_pole", "x": 1400, "y": 948},
     {"type": "mc_lost_clutch", "x": 150, "y": 34},
-    {"type": "mc_lost_clutch", "x": 300, "y": 1125, "noteId": "club_gents", "label": "Beaded clutch"},
+    {"type": "mc_lost_clutch", "x": 300, "y": 1125, "noteId": "club_gents", "label": "Beaded clutch", "look": {"leather": "#1e2a44"}},
     {"type": "mc_lost_coat", "x": 1030, "y": 1060},
     {"type": "mc_lost_handbag", "x": 1148, "y": 158},
     {"type": "mc_lost_purse", "x": 1532, "y": 422},

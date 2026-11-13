@@ -8,7 +8,7 @@
     {"type": "apt_side", "x": 560, "y": 470},
     {"type": "armory", "x": 30, "y": 340},
     {"type": "vending_machine", "x": 30, "y": 520},
-    {"type": "read_note", "x": 1111, "y": 226, "width": 18, "color": "#3a4a6a", "noteId": "larissa_briefing_darklands", "mass": null},
+    {"type": "read_note", "x": 1111, "y": 226, "width": 18, "color": "#3a4a6a", "look": {"color": "#3a4a6a"}, "noteId": "larissa_briefing_darklands", "mass": null},
     {"type": "medbay_refill", "x": 30, "y": 730},
     {"type": "apt_bed", "x": 1010, "y": 216, "width": 90, "height": 110, "color": "#334466", "interactionType": "bed_sleep"},
     {"type": "apt_craft", "x": 750, "y": 750},

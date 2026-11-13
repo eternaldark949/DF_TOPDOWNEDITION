@@ -2636,7 +2636,9 @@
                 if (PropPass.mode === 0 && DFNative.hasPropArt(p.family)) {     // native art, its shadow included (game/presentation/props)
                     // Seeded from where it was first drawn, as its classic sprite was
                     const art = p._artAppearance ??= { family: p.family, look: p.look ?? {}, decor: p.decor, x: p.x, y: p.y };
-                    DFNative.drawPropArt(ctx, DFNative.propArtPacket({ appearance: art, position: [p.x + p.width / 2, p.y + p.height / 2], rotation: p.angle || 0, width: p.width, height: p.height }),
+                    // (its play state, kept apart in its pictures: a lost thing lies open once searched today, a switch shows its room lit)
+                    const state = p.interactionType === 'lost_luggage' ? { searched: !!p._searched } : p.interactionType === 'light_switch' ? { lit: !!p._switchState } : null;
+                    DFNative.drawPropArt(ctx, DFNative.propArtPacket({ appearance: art, state, position: [p.x + p.width / 2, p.y + p.height / 2], rotation: p.angle || 0, width: p.width, height: p.height }),
                         { pictures: PropSprites.pictures, time: _frameTime / 1000, beat: clubBeatN() });   // (the club's pieces keep the music's kick)
                     return;
                 }

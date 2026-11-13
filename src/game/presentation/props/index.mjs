@@ -17,10 +17,12 @@ import {NEURAL_ARTISTS} from './neural.mjs';
 import {TORQUE_ARTISTS} from './torque.mjs';
 import {PALACE_ARTISTS} from './palace.mjs';
 import {ENNI_ARTISTS} from './enni.mjs';
+import {LOST_ARTISTS} from './lost.mjs';
+import {MACHINE_ARTISTS} from './machines.mjs';
 
 export const PROP_FAMILIES=PROPS.resources.catalog.data.families;
 /** Every venue's artists under one name each: a family drawn by two venues would silently lose one. */
-const ARTISTS=Object.freeze([CAFE_ARTISTS,APARTMENT_ARTISTS,HOUSE_ARTISTS,HOTEL_ARTISTS,CLUB_ARTISTS,SANCTUM_ARTISTS,CLINIC_ARTISTS,NEURAL_ARTISTS,TORQUE_ARTISTS,PALACE_ARTISTS,ENNI_ARTISTS].reduce((all,venue)=>{
+const ARTISTS=Object.freeze([CAFE_ARTISTS,APARTMENT_ARTISTS,HOUSE_ARTISTS,HOTEL_ARTISTS,CLUB_ARTISTS,SANCTUM_ARTISTS,CLINIC_ARTISTS,NEURAL_ARTISTS,TORQUE_ARTISTS,PALACE_ARTISTS,ENNI_ARTISTS,LOST_ARTISTS,MACHINE_ARTISTS].reduce((all,venue)=>{
     for(const family of Object.keys(venue))if(family in all)throw new Error(`prop family ${family} has two artists`);
     return Object.assign(all,venue);
 },{}));

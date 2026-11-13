@@ -43,7 +43,7 @@
           "apt_tub": {"defaults": {"color": "#2a1a22", "decorType": "apt_tub", "family": "oval_tub", "height": 64, "mass": 10000000, "width": 128}},
           "apt_vanity": {"defaults": {"color": "#2a1a22", "decorType": "apt_vanity", "family": "dressing_table", "height": 64, "mass": 10000000, "width": 44}},
           "apt_wardrobe": {"defaults": {"color": "#2a1a22", "decorType": "apt_wardrobe", "family": "wardrobe", "height": 110, "mass": 10000000, "width": 36}},
-          "armory": {"defaults": {"color": "#2a2a3a", "height": 50, "interactionType": "armory", "width": 44}},
+          "armory": {"defaults": {"color": "#2a2a3a", "family": "loadout_locker", "height": 50, "interactionType": "armory", "width": 44}},
           "bed": {"defaults": {"color": "#ccc", "decorType": "bed", "family": "hospital_bed", "height": 56, "mass": 10000000, "width": 120}},
           "bench": {"defaults": {"color": "#ccc", "decorType": "bench", "family": "waiting_bench", "height": 34, "mass": 10000000, "width": 150}},
           "block": {"defaults": {}},
@@ -80,7 +80,7 @@
           "dn_float_chaise": {"defaults": {"color": "#1a1216", "decorType": "dn_float_chaise", "family": "floating_seat", "height": 34, "look": {"style": "chaise", "trim": "#dfe6ff"}, "mass": 10000000, "width": 92}},
           "dn_fountain": {"defaults": {"color": "#1a1216", "decorType": "dn_fountain", "family": "rift_fountain", "height": 110, "mass": 10000000, "width": 110}},
           "dn_lamp": {"defaults": {"color": "#1a1216", "decorType": "dn_lamp", "family": "floor_lamp", "height": 22, "look": {"lit": true, "light": "#fff0c8"}, "mass": 10000000, "width": 22}},
-          "dn_lost_luggage": {"defaults": {"color": "#1a1216", "decorType": "dn_lost_luggage", "height": 20, "interactionType": "lost_luggage", "label": "Lost luggage", "mass": 10000000, "noNav": true, "noteId": "lobby_palm", "width": 28}},
+          "dn_lost_luggage": {"defaults": {"color": "#1a1216", "decorType": "dn_lost_luggage", "family": "hard_case", "height": 20, "interactionType": "lost_luggage", "label": "Lost luggage", "mass": 10000000, "noNav": true, "noteId": "lobby_palm", "width": 28}},
           "dn_palm": {"defaults": {"color": "#1a1216", "decorType": "dn_palm", "family": "potted_palm", "height": 34, "mass": 10000000, "width": 34}},
           "dn_sofa": {"defaults": {"color": "#1a1216", "decorType": "dn_sofa", "family": "velvet_settee", "height": 56, "mass": 10000000, "width": 120}},
           "dn_table": {"defaults": {"color": "#1a1216", "decorType": "dn_table", "family": "cocktail_table", "height": 38, "mass": 10000000, "width": 70}},
@@ -163,13 +163,13 @@
           "hod_statue": {"defaults": {"color": "#2a1a22", "decorType": "hod_statue", "family": "angel_statue", "height": 34, "mass": 10000000, "width": 34}},
           "hod_table": {"defaults": {"color": "#2a1a22", "decorType": "hod_table", "family": "oxblood_table", "height": 60, "mass": 10000000, "width": 140}},
           "iv": {"defaults": {"color": "#ccc", "decorType": "iv", "family": "iv_stand", "height": 14, "mass": 10000000, "width": 14}},
-          "light_switch": {"defaults": {"color": "#2a2a2a", "height": 14, "interactionType": "light_switch", "mass": 999999, "roomId": "main_room", "width": 10}},
-          "ls_cashtin": {"defaults": {"color": "#2a2a30", "decorType": "ls_cashtin", "height": 14, "interactionType": "lost_luggage", "label": "Cash tin", "lootLines": ["TORQUE'S RAINY-DAY MONEY", "GREASY BILLS, STILL GOOD", "UNDER THE BENCH, AS ALWAYS"], "lootMax": 80, "lootMin": 30, "mass": 10000000, "noNav": true, "noteId": "torque_tin", "width": 22}},
-          "ls_envelope": {"defaults": {"color": "#3c2530", "decorType": "ls_envelope", "height": 12, "interactionType": "lost_luggage", "label": "Receipt envelope", "lootLines": ["A REFUND, IN CASH", "SHE CHANGED HER MIND ABOUT THE SHOES", "FINDERS KEEPERS"], "lootMax": 70, "lootMin": 25, "mass": 10000000, "noNav": true, "noteId": "enni_envelope", "width": 18}},
-          "ls_offering": {"defaults": {"color": "#2a1a22", "decorType": "ls_offering", "height": 16, "interactionType": "lost_luggage", "label": "Offering bowl", "lootLines": ["THE DEAD DON'T SPEND IT", "TITHES FOR THE HOUSE", "SOMETHING STIRS…"], "lootMax": 150, "lootMin": 60, "lootNoise": 700, "mass": 10000000, "noNav": true, "noteId": "house_offering", "width": 24}},
-          "ls_shopbag": {"defaults": {"color": "#3c2530", "decorType": "ls_shopbag", "height": 18, "interactionType": "lost_luggage", "label": "Dropped shopping bag", "lootLines": ["TISSUE PAPER… AND PERSONICS", "THE RECEIPT SAYS SHE CAN AFFORD IT", "ENNI COLE, NEVER CHEAP"], "lootMax": 70, "lootMin": 25, "mass": 10000000, "noNav": true, "noteId": "enni_bag", "width": 20}},
-          "ls_tote": {"defaults": {"color": "#3a2418", "decorType": "ls_tote", "height": 16, "interactionType": "lost_luggage", "label": "Forgotten tote", "lootLines": ["A PAPERBACK, A SCARF… AND PERSONICS", "LEFT WITH THE LAST LATTE", "THE FIRE KEPT IT WARM"], "lootMax": 35, "lootMin": 10, "mass": 10000000, "noNav": true, "noteId": "cafe_tote", "width": 18}},
-          "ls_tribute": {"defaults": {"color": "#2a0c14", "decorType": "ls_tribute", "height": 22, "interactionType": "lost_luggage", "label": "Tribute chest", "lootLines": ["LILITU WON'T MISS IT. SHE WILL NOTICE", "GOLD FOR THE QUEEN, NOW YOURS", "THE HINGES SCREAM…"], "lootMax": 150, "lootMin": 60, "lootNoise": 700, "mass": 10000000, "noNav": true, "noteId": "palace_tribute", "width": 30}},
+          "light_switch": {"defaults": {"color": "#2a2a2a", "family": "light_switch", "height": 14, "interactionType": "light_switch", "mass": 999999, "roomId": "main_room", "width": 10}},
+          "ls_cashtin": {"defaults": {"color": "#2a2a30", "decorType": "ls_cashtin", "family": "cash_tin", "height": 14, "interactionType": "lost_luggage", "label": "Cash tin", "lootLines": ["TORQUE'S RAINY-DAY MONEY", "GREASY BILLS, STILL GOOD", "UNDER THE BENCH, AS ALWAYS"], "lootMax": 80, "lootMin": 30, "mass": 10000000, "noNav": true, "noteId": "torque_tin", "width": 22}},
+          "ls_envelope": {"defaults": {"color": "#3c2530", "decorType": "ls_envelope", "family": "receipt_envelope", "height": 12, "interactionType": "lost_luggage", "label": "Receipt envelope", "lootLines": ["A REFUND, IN CASH", "SHE CHANGED HER MIND ABOUT THE SHOES", "FINDERS KEEPERS"], "lootMax": 70, "lootMin": 25, "mass": 10000000, "noNav": true, "noteId": "enni_envelope", "width": 18}},
+          "ls_offering": {"defaults": {"color": "#2a1a22", "decorType": "ls_offering", "family": "offering_bowl", "height": 16, "interactionType": "lost_luggage", "label": "Offering bowl", "lootLines": ["THE DEAD DON'T SPEND IT", "TITHES FOR THE HOUSE", "SOMETHING STIRS…"], "lootMax": 150, "lootMin": 60, "lootNoise": 700, "mass": 10000000, "noNav": true, "noteId": "house_offering", "width": 24}},
+          "ls_shopbag": {"defaults": {"color": "#3c2530", "decorType": "ls_shopbag", "family": "shop_bag", "height": 18, "interactionType": "lost_luggage", "label": "Dropped shopping bag", "lootLines": ["TISSUE PAPER… AND PERSONICS", "THE RECEIPT SAYS SHE CAN AFFORD IT", "ENNI COLE, NEVER CHEAP"], "lootMax": 70, "lootMin": 25, "mass": 10000000, "noNav": true, "noteId": "enni_bag", "width": 20}},
+          "ls_tote": {"defaults": {"color": "#3a2418", "decorType": "ls_tote", "family": "canvas_tote", "height": 16, "interactionType": "lost_luggage", "label": "Forgotten tote", "lootLines": ["A PAPERBACK, A SCARF… AND PERSONICS", "LEFT WITH THE LAST LATTE", "THE FIRE KEPT IT WARM"], "lootMax": 35, "lootMin": 10, "mass": 10000000, "noNav": true, "noteId": "cafe_tote", "width": 18}},
+          "ls_tribute": {"defaults": {"color": "#2a0c14", "decorType": "ls_tribute", "family": "tribute_chest", "height": 22, "interactionType": "lost_luggage", "label": "Tribute chest", "lootLines": ["LILITU WON'T MISS IT. SHE WILL NOTICE", "GOLD FOR THE QUEEN, NOW YOURS", "THE HINGES SCREAM…"], "lootMax": 150, "lootMin": 60, "lootNoise": 700, "mass": 10000000, "noNav": true, "noteId": "palace_tribute", "width": 30}},
           "mc_backbar": {"defaults": {"color": "#1a0e22", "decorType": "mc_backbar", "family": "back_bar", "height": 540, "mass": 10000000, "width": 24}},
           "mc_bar": {"defaults": {"color": "#1a0e22", "decorType": "mc_bar", "family": "club_bar", "height": 225, "mass": 10000000, "width": 44}},
           "mc_bench": {"defaults": {"color": "#1a0e22", "decorType": "mc_bench", "family": "button_bench", "height": 36, "mass": 10000000, "width": 120}},
@@ -179,10 +179,10 @@
           "mc_dj": {"defaults": {"color": "#1a0e22", "decorType": "mc_dj", "family": "dj_booth", "height": 40, "mass": 10000000, "width": 140}},
           "mc_dryer": {"defaults": {"color": "#1a0e22", "decorType": "mc_dryer", "family": "hand_dryer", "height": 14, "mass": 10000000, "width": 44}},
           "mc_hightop": {"defaults": {"color": "#1a0e22", "decorType": "mc_hightop", "family": "high_top", "height": 30, "mass": 10000000, "width": 30}},
-          "mc_lost_clutch": {"defaults": {"color": "#1a0e22", "decorType": "mc_lost_clutch", "height": 12, "interactionType": "lost_luggage", "label": "Sequined clutch", "lootLines": ["LIPSTICK, A KEYCARD… AND PERSONICS", "SHE'LL CALL IT A NIGHT'S TIP", "LEFT WITH THE LAST SONG"], "lootMax": 60, "lootMin": 20, "mass": 10000000, "noNav": true, "noteId": "club_powder", "width": 20}},
-          "mc_lost_coat": {"defaults": {"color": "#1a0e22", "decorType": "mc_lost_coat", "height": 26, "interactionType": "lost_luggage", "label": "Fur-trimmed coat", "lootLines": ["CHECK YOUR POCKETS, DARLING", "FOLDED BILLS IN THE LINING"], "lootMax": 90, "lootMin": 30, "mass": 10000000, "noNav": true, "noteId": "club_coat", "width": 40}},
-          "mc_lost_handbag": {"defaults": {"color": "#1a0e22", "decorType": "mc_lost_handbag", "height": 16, "interactionType": "lost_luggage", "label": "Chain-strap handbag", "lootLines": ["DROPPED ON THE DANCE FLOOR", "FINDERS KEEPERS"], "lootMax": 75, "lootMin": 25, "mass": 10000000, "noNav": true, "noteId": "club_floor", "width": 20}},
-          "mc_lost_purse": {"defaults": {"color": "#1a0e22", "decorType": "mc_lost_purse", "height": 16, "interactionType": "lost_luggage", "label": "Velvet purse", "lootLines": ["WHAT HAPPENS IN THE SUITES…", "VIP MONEY SPENDS THE SAME", "A THANK-YOU NOTE AND A THICK ROLL"], "lootMax": 120, "lootMin": 40, "mass": 10000000, "noNav": true, "noteId": "club_suite1", "width": 22}},
+          "mc_lost_clutch": {"defaults": {"color": "#1a0e22", "decorType": "mc_lost_clutch", "family": "sequin_clutch", "height": 12, "interactionType": "lost_luggage", "label": "Sequined clutch", "lootLines": ["LIPSTICK, A KEYCARD… AND PERSONICS", "SHE'LL CALL IT A NIGHT'S TIP", "LEFT WITH THE LAST SONG"], "lootMax": 60, "lootMin": 20, "mass": 10000000, "noNav": true, "noteId": "club_powder", "width": 20}},
+          "mc_lost_coat": {"defaults": {"color": "#1a0e22", "decorType": "mc_lost_coat", "family": "fur_coat", "height": 26, "interactionType": "lost_luggage", "label": "Fur-trimmed coat", "lootLines": ["CHECK YOUR POCKETS, DARLING", "FOLDED BILLS IN THE LINING"], "lootMax": 90, "lootMin": 30, "mass": 10000000, "noNav": true, "noteId": "club_coat", "width": 40}},
+          "mc_lost_handbag": {"defaults": {"color": "#1a0e22", "decorType": "mc_lost_handbag", "family": "chain_handbag", "height": 16, "interactionType": "lost_luggage", "label": "Chain-strap handbag", "lootLines": ["DROPPED ON THE DANCE FLOOR", "FINDERS KEEPERS"], "lootMax": 75, "lootMin": 25, "mass": 10000000, "noNav": true, "noteId": "club_floor", "width": 20}},
+          "mc_lost_purse": {"defaults": {"color": "#1a0e22", "decorType": "mc_lost_purse", "family": "velvet_purse", "height": 16, "interactionType": "lost_luggage", "label": "Velvet purse", "lootLines": ["WHAT HAPPENS IN THE SUITES…", "VIP MONEY SPENDS THE SAME", "A THANK-YOU NOTE AND A THICK ROLL"], "lootMax": 120, "lootMin": 40, "mass": 10000000, "noNav": true, "noteId": "club_suite1", "width": 22}},
           "mc_lowtable": {"defaults": {"color": "#1a0e22", "decorType": "mc_lowtable", "family": "champagne_table", "height": 60, "mass": 10000000, "width": 44}},
           "mc_orb": {"defaults": {"color": "#1a0e22", "decorType": "mc_orb", "family": "moon_orb", "height": 30, "mass": 10000000, "width": 30}},
           "mc_pole": {"defaults": {"color": "#1a0e22", "decorType": "mc_pole", "family": "dance_pole", "height": 10, "mass": 10000000, "width": 10}},
@@ -195,7 +195,7 @@
           "mc_suite_couch": {"defaults": {"color": "#1a0e22", "decorType": "mc_suite_couch", "family": "suite_couch", "height": 200, "mass": 10000000, "width": 56}},
           "mc_urinal": {"defaults": {"color": "#1a0e22", "decorType": "mc_urinal", "family": "urinal", "height": 20, "mass": 10000000, "width": 26}},
           "mc_vanity": {"defaults": {"color": "#1a0e22", "decorType": "mc_vanity", "family": "bulb_vanity", "height": 40, "mass": 10000000, "width": 230}},
-          "medbay_refill": {"defaults": {"color": "#0f0", "height": 60, "interactionType": "medbay_refill", "mass": 10000000, "width": 40}},
+          "medbay_refill": {"defaults": {"color": "#0f0", "family": "health_station", "height": 60, "interactionType": "medbay_refill", "mass": 10000000, "width": 40}},
           "monitor": {"defaults": {"color": "#ccc", "decorType": "monitor", "family": "vitals_monitor", "height": 20, "mass": 10000000, "width": 22}},
           "ns_console": {"defaults": {"decorType": "ns_console", "family": "styling_console", "height": 80, "mass": 100000, "width": 60}},
           "ns_counter": {"defaults": {"color": "#1a1a3a", "decorType": "ns_counter", "family": "sapphire_counter", "height": 30, "interactionType": "neural_counter", "mass": 100000, "width": 200}},
@@ -219,12 +219,12 @@
           "ps_pit_sofa": {"defaults": {"color": "#1a1216", "decorType": "ps_pit_sofa", "face": "S", "family": "pit_sofa", "height": 56, "mass": 10000000, "width": 220}},
           "ps_pit_table": {"defaults": {"color": "#1a1216", "decorType": "ps_pit_table", "family": "pit_table", "height": 56, "mass": 10000000, "width": 80}},
           "ps_pool": {"defaults": {"color": "#1a1216", "decorType": "ps_pool", "family": "plunge_pool", "height": 74, "mass": 10000000, "width": 170}},
-          "ps_suitcase": {"defaults": {"color": "#1a1216", "decorType": "ps_suitcase", "height": 36, "interactionType": "lost_luggage", "label": "Monogrammed suitcase", "lootLines": ["HE TRAVELS HEAVY", "CUFFLINKS, A SILK TIE… AND PERSONICS", "10 OUT OF 10, WOULD ROB AGAIN"], "lootMax": 110, "lootMin": 40, "mass": 10000000, "noNav": true, "noteId": "suite_case", "width": 52}},
+          "ps_suitcase": {"defaults": {"color": "#1a1216", "decorType": "ps_suitcase", "family": "monogram_case", "height": 36, "interactionType": "lost_luggage", "label": "Monogrammed suitcase", "lootLines": ["HE TRAVELS HEAVY", "CUFFLINKS, A SILK TIE… AND PERSONICS", "10 OUT OF 10, WOULD ROB AGAIN"], "lootMax": 110, "lootMin": 40, "mass": 10000000, "noNav": true, "noteId": "suite_case", "width": 52}},
           "ps_telescope": {"defaults": {"color": "#1a1216", "decorType": "ps_telescope", "family": "trained_telescope", "height": 28, "mass": 10000000, "width": 28}},
           "ps_tub": {"defaults": {"color": "#1a1216", "decorType": "ps_tub", "family": "round_tub", "height": 84, "mass": 10000000, "width": 84}},
           "ps_vanity": {"defaults": {"color": "#1a1216", "decorType": "ps_vanity", "family": "basin_vanity", "height": 80, "mass": 10000000, "width": 24}},
           "ps_wardrobe": {"defaults": {"color": "#1a1216", "decorType": "ps_wardrobe", "family": "open_wardrobe", "height": 150, "mass": 10000000, "width": 40}},
-          "read_note": {"defaults": {"color": "#c8a870", "height": 14, "interactionType": "read_note", "mass": 10000000, "noteId": "dark_maker_letter", "width": 20}},
+          "read_note": {"defaults": {"color": "#c8a870", "family": "plain_box", "height": 14, "interactionType": "read_note", "mass": 10000000, "noteId": "dark_maker_letter", "width": 20}},
           "sc_altar": {"defaults": {"color": "#1a1418", "decorType": "sc_altar", "family": "ring_altar", "height": 56, "mass": 10000000, "width": 140}},
           "sc_brazier": {"defaults": {"color": "#1a1418", "decorType": "sc_brazier", "family": "coal_brazier", "height": 36, "mass": 10000000, "width": 36}},
           "sc_candles": {"defaults": {"color": "#1a1418", "decorType": "sc_candles", "family": "candle_stand", "height": 18, "mass": 10000000, "width": 18}},
@@ -248,7 +248,7 @@
           "ta_tires": {"defaults": {"color": "#2a2a30", "decorType": "ta_tires", "family": "tyre_stack", "height": 44, "mass": 10000000, "width": 44}},
           "ta_turntable": {"defaults": {"color": "#2a2a30", "decorType": "ta_turntable", "height": 132, "mass": 10000000, "width": 132}},
           "ta_wrap": {"defaults": {"color": "#2a2a30", "decorType": "ta_wrap", "height": 96, "mass": 10000000, "width": 190}},
-          "vending_machine": {"defaults": {"color": "#00f3ff", "height": 60, "interactionType": "vending_machine", "mass": 10000000, "width": 40}}
+          "vending_machine": {"defaults": {"color": "#00f3ff", "family": "mini_spree", "height": 60, "interactionType": "vending_machine", "mass": 10000000, "width": 40}}
         },
         "families": {
           "bentwood_chair": {"description": "A bentwood cafe chair seen from above: a round seat in a wooden ring, a curved back. Turns to its face.", "look": {
@@ -1191,7 +1191,55 @@
           "fitting_rooms": {"description": "Curtained cubicles, each with its mirror and stool, one curtain drawn back.", "look": {
 }},
           "snack_vending": {"description": "The store's snack machine.", "look": {
-}}
+}},
+          "hard_case": {"description": "A hard case, its luggage tag swinging; open and empty once searched.", "look": {
+            "shell": {"kind": "color", "default": "#3a2a4a"}}},
+          "monogram_case": {"description": "A monogrammed case left open; rifled once searched, its shirts tipped out.", "look": {
+            "monogram": {"kind": "text", "default": "D·M"},
+            "lining": {"kind": "color", "default": "#6a1020"}}},
+          "sequin_clutch": {"description": "A sequined envelope clutch on a gold chain, the sequins catching the light; open once searched.", "look": {
+            "leather": {"kind": "color", "default": "#5a1440"}}},
+          "fur_coat": {"description": "A coat with a fur collar draped over a bench; its pockets turned out once searched.", "look": {
+            "cloth": {"kind": "color", "default": "#3e1a4a"},
+            "sleeve": {"kind": "color", "default": "#34143e"}}},
+          "velvet_purse": {"description": "A quilted velvet purse with a gold crescent clasp; open and empty once searched.", "look": {
+            "velvet": {"kind": "color", "default": "#a8305a"},
+            "flap": {"kind": "color", "default": "#8a2048"}}},
+          "chain_handbag": {"description": "A black patent handbag on a gold chain strap; open once searched.", "look": {
+            "patent": {"kind": "color", "default": "#0e0c12"}}},
+          "canvas_tote": {"description": "A canvas tote, a paperback and a scarf poking out; emptied once searched.", "look": {
+            "stamp": {"kind": "color", "default": "#c6553a"}}},
+          "cash_tin": {"description": "A dented steel cash box, a note under the lid; open and empty once searched.", "look": {
+}},
+          "shop_bag": {"description": "A paper shopping bag with rope handles and tissue; the tissue pulled out once searched.", "look": {
+            "paper": {"kind": "color", "default": "#e8a6b8"},
+            "initials": {"kind": "text", "default": "EC"}}},
+          "receipt_envelope": {"description": "A cream envelope with a wax seal and a note inside; torn open once searched.", "look": {
+            "seal": {"kind": "color", "default": "#9a1c3a"}}},
+          "offering_bowl": {"description": "A black stone bowl of coins, bone candles round it; one ember left once searched.", "look": {
+}},
+          "tribute_chest": {"description": "A black-lacquer chest bound in gold, coins spilling over; open once searched.", "look": {
+            "lacquer": {"kind": "color", "default": "#1e0a12"},
+            "gem": {"kind": "color", "default": "#c8102e"}}},
+          "mini_spree": {"description": "MiniSpree, the city's vending machine: glossy black, a lit window of cans, a neon edge humming.", "look": {
+            "body": {"kind": "color", "default": "#0d0d12"},
+            "marquee": {"kind": "colors", "default": ["#ff4fa3", "#3ef0ff"]},
+            "brand": {"kind": "text", "default": "MiniSpree"},
+            "cans": {"kind": "colors", "default": ["#c89a6a", "#3a6ad0", "#ffe45a"], "note": "bubble tea, Jean soda, stellar lemonade"}}},
+          "health_station": {"description": "Dr. Yin's health station: a glowing green cross, stim vials refilling, a vitals trace.", "look": {
+            "body": {"kind": "color", "default": "#eceef2"},
+            "trim": {"kind": "color", "default": "#6a1a2a"},
+            "cross": {"kind": "color", "default": "#12c85a"},
+            "vials": {"kind": "color", "default": "#19d46a"}}},
+          "loadout_locker": {"description": "A wall-mounted weapons locker, pulsing violet.", "look": {
+            "casing": {"kind": "color", "default": "#1a1a22"},
+            "panel": {"kind": "color", "default": "#1a0f2a"},
+            "glow": {"kind": "color", "default": "#a469ff"},
+            "label": {"kind": "text", "default": "LOADOUT"}}},
+          "light_switch": {"description": "A wall plate with its rocker, its LED green while the room is lit (state.lit), red when dark.", "look": {
+}},
+          "plain_box": {"description": "A plain block in one colour, lit along its top and shaded down its right.", "look": {
+            "color": {"kind": "color", "default": "#c8a870"}}}
         }
       }
     }
