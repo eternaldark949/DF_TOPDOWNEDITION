@@ -1,5 +1,10 @@
 # Changelog
 
+## One-way constraints — 2026-11-13
+
+- Any constraint takes `one_way: true`: body B leads and never receives the constraint's impulses or position corrections. Only `body_a` is corrected.
+- `createPhysicalChain` takes `reaction` (default `true`). With `reaction: false` the root hinge is one-way, so the chain follows its body and never pushes it.
+
 ## IK, physical chains and rigid pins — 2026-11-12
 
 - Rigs solve inverse kinematics: `setIkGoal` with the `two_bone`, `chain` and `look_at` solvers, in rig or world space, after clips and the procedural pose, saved with the rig. `ikGoal` and `solveIk` work on a bare `rigPose`.

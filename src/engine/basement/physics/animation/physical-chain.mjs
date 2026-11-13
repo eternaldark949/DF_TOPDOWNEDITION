@@ -12,8 +12,10 @@ import {name,fields} from './values.mjs';
  *
  * A segment body sits at its bone's midpoint, turned along the bone, so its mass swings like a limb.
  * `offset` is the bone's heading in its joint's frame; hinge angles carry it.
+ * `reaction: false` makes the root hinge one-way: the chain follows the rig's body but never pushes
+ * it, for cosmetic parts (a tail, a scarf) that must not move their owner.
  */
-const PACKET=['chain_id','joints','radius','mass','follow_rate','follow_torque','linear_damping','angular_damping','collision_group','collision_mask'];
+const PACKET=['chain_id','joints','radius','mass','follow_rate','follow_torque','linear_damping','angular_damping','collision_group','collision_mask','reaction'];
 const heading=(a,b)=>Math.atan2(b[1]-a[1],b[0]-a[0]);
 export class physicalChain{
     #world;#owner;#controller;#authority;
@@ -28,7 +30,8 @@ export class physicalChain{
         this.limits=this.joints.map(id=>r.joints[r.index.get(id)].limits);
         this.config={radius:number(packet.radius??2,'chain radius',1e-3),mass:number(packet.mass??1,'segment mass',1e-6),follow_rate:number(packet.follow_rate??20,'follow rate',0),follow_torque:number(packet.follow_torque??1e5,'follow torque',0),
             linear_damping:number(packet.linear_damping??2,'segment linear damping',0),angular_damping:number(packet.angular_damping??2,'segment angular damping',0),
-            collision_group:packet.collision_group??null,collision_mask:packet.collision_mask??null};
+            collision_group:packet.collision_group??null,collision_mask:packet.collision_mask??null,reaction:packet.reaction??true};
+        if(typeof this.config.reaction!=='boolean')throw new TypeError('Chain reaction must be a boolean');
         if(restored){Object.assign(this,{segments:restored.segments.map(id=>this.#world.fetchBody(id)),hinges:restored.hinges.map(id=>this.#world.getConstraint(id)),lengths:[...restored.lengths],offsets:[...restored.offsets]});
             if(this.segments.some(b=>!b)||this.hinges.some(c=>!c))throw new TypeError('Saved chain parts are missing');return;}
         const root=this.#root(),points=this.joints.map(id=>controller.getAnimatedJoint(id,{root}));
@@ -43,7 +46,7 @@ export class physicalChain{
         }
         const ids=[owner.id,...this.segments.map(b=>b.body_id)];
         for(const body of this.segments)this.#world.updateBody(body,{collision_exclusions:ids.filter(id=>id!==body.body_id)});
-        this.hinges=this.segments.map((body,k)=>this.#world.createConstraint({constraint_type:'hinge',body_a:body,body_b:k?this.segments[k-1]:owner.handle,local_anchor_a:[-this.lengths[k]/2,0],...this.#drive(k)}));
+        this.hinges=this.segments.map((body,k)=>this.#world.createConstraint({constraint_type:'hinge',body_a:body,body_b:k?this.segments[k-1]:owner.handle,local_anchor_a:[-this.lengths[k]/2,0],one_way:!k&&!this.config.reaction,...this.#drive(k)}));
     }
     #root(){return {position:[...this.#owner.position],rotation:this.#owner.rotation};}
     #angle(k){const turn=body=>this.#world._record(body).rotation;return k?angleDelta(turn(this.segments[k-1]),turn(this.segments[k])):angleDelta(this.#owner.rotation,turn(this.segments[0]));}

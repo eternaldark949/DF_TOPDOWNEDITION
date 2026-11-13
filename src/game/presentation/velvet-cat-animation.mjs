@@ -1,4 +1,4 @@
-import {VELVET_GAITS,VELVET_TAIL_SEGS} from '../data/game-velvet-appearance.mjs';
+import {VELVET_GAITS,VELVET_TAIL_SEGS,VELVET_T,VELVET_PROFILES} from '../data/game-velvet-appearance.mjs';
 /** Fixed-step cosmetic animation only. No draw backend or physical movement. */
 export const velvetCatAnimation={
 _random() {
@@ -52,6 +52,8 @@ _animate(player, dt, moved, prevAngle, blocked, dist) {
                     let target = Math.sin(this.tailPhase * (blocked ? 1.6 : 1) - i * 0.55) * amp * (0.4 + f);
                     target += side * wrap;
                     if (i >= N - 3) target += side * (this._tailLift * 0.45 + Math.sin(this._flick * Math.PI) * 0.7);
+                    // The pose a physical tail is driven toward; without a world, the spring below stands in for its weight.
+                    (this._tailTarget ??= new Array(N).fill(0))[i] = Math.max(-1.2, Math.min(1.2, target));
                     this._tailVel[i] -= turned * (i ? 0.12 : 0.7);
                     this._tailVel[i] = this._tailVel[i] * Math.pow(0.8, dt) + (target - this._tail[i]) * (0.1 - f * 0.04) * dt;
                     this._tail[i] += this._tailVel[i] * dt;
@@ -136,6 +138,73 @@ export function createVelvetAnimation(seed=1){const record=Object.create(velvetC
                 this._groomPhase = 0;
 
                 }).call(record);return structuredClone({...record});}
-export function velvetPresentation(entity,blend=1){const pose=entity.getRenderState(blend);return Object.assign({},structuredClone(entity.data.velvet_animation),{x:pose.position[0],y:pose.position[1],angle:pose.rotation,state:entity.state,visible:entity.visible,inCar:entity.inCar,coatPalette:entity.data.coat_palette});}
+export function velvetPresentation(entity,blend=1){const pose=entity.getRenderState(blend);return Object.assign({},structuredClone(entity.data.velvet_animation),{x:pose.position[0],y:pose.position[1],angle:pose.rotation,state:entity.state,visible:entity.visible,inCar:entity.inCar,coatPalette:entity.data.coat_palette},entity.physics_system.rigs.getRig(entity)?{joints:entity.physics_system.rigs.getPose(entity,{blend}).joints}:{});}
 export function advanceVelvetAnimation(entity,player,seconds){const record=entity.data.velvet_animation,packet=Object.assign(Object.create(velvetCatAnimation),velvetPresentation(entity)),motion=entity.physics_system.getBodyMotion(entity),position=player?.position??entity.position;packet.animationSpeed=motion.distance/(seconds*60);packet._dash=entity.cat_state.dash;packet.idleBehavior=entity.cat_state.rest;packet._animate({x:position[0],y:position[1]},seconds*60,motion.distance,motion.previous_rotation,entity.state==='following'&&motion.distance<.001,player?entity.physics_system.observeTarget(entity,player).distance:0);for(const key of Object.keys(record))record[key]=structuredClone(packet[key]);}
 
+
+// ----- Her rig: the pose the animation state gives each joint ---------------------------------------
+// The skeleton (`data/velvet-skeleton.json`) runs root -> spine_0 (rump) ... spine_12 (neck) -> head ->
+// ears, tail_0 ... tail_9 from the rump, and four paws on the root, all in her own frame (+X forward).
+// `velvetLocalPose(state)` is the procedural pose the state asks for; the world's rig resolves it, a
+// physical tail chain swings tail_0..tail_8 with its own weight, and the artist draws from the joints.
+const SPINE=12,TAU=Math.PI*2,frac=v=>v-Math.floor(v);
+const LEGS=Object.freeze([['paw_hl',true,-1],['paw_fl',false,-1],['paw_hr',true,1],['paw_fr',false,1]]);
+/** Values every part of her pose and drawing derives from: pose weights, gait, spine length and bend, and her half-width along the spine. */
+export function velvetFrame(state){
+    const P=state._poses||{sit:0,loaf:0,sleep:0,stretch:0,groom:0},moving=(state.animationSpeed||0)>0.05,g=velvetCatAnimation._gaitParams.call(state);
+    const stand=Math.max(0,1-P.sit-P.loaf-P.sleep-P.stretch),breathe=1+Math.sin(state._breath||0)*0.025*(1-stand),cyc=state.walkPhase/TAU;
+    const flex=moving?Math.sin((cyc+.3)*TAU)*g.gallop:0;   // a galloping cat gathers and stretches
+    const L=23.5*(1-0.36*P.sit-0.12*P.loaf+0.03*P.sleep+0.2*P.stretch)*(1+flex*0.13);
+    const bend=(state._bend||0)*(1-P.sleep)+P.sleep*4.3*(state._curlSide||1);
+    const width=t=>{let j=0;while(j<VELVET_T.length-2&&t>VELVET_T[j+1])j++;const u=(t-VELVET_T[j])/(VELVET_T[j+1]-VELVET_T[j]);let w=0;
+        for(const [name,wt] of [['stand',stand],['sit',P.sit],['loaf',P.loaf],['sleep',P.sleep],['stretch',P.stretch]]){if(wt<=0)continue;const pr=VELVET_PROFILES[name];w+=(pr[j]+(pr[j+1]-pr[j])*u)*wt;}return w*breathe;};
+    const legU=j=>frac(cyc+g.off[j]);
+    return {P,moving,g,stand,cyc,L,bend,width,legU};
+}
+/** Each leg's gait: how far along and lifted the paw is, and how visible the leg is, for leg j (hind left, fore left, hind right, fore right). */
+export function velvetLegGait(f,j){
+    const u=f.legU(j);let along=0,lift=0;
+    if(f.moving){if(u<f.g.duty)along=f.g.stride*(0.5-u/f.g.duty);else{const s=(u-f.g.duty)/(1-f.g.duty);along=f.g.stride*(-0.5+(s*s*(3-2*s)));lift=Math.sin(s*Math.PI);}}
+    const hind=LEGS[j][1],groomPaw=!hind&&LEGS[j][2]<0&&f.P.groom>0.5;
+    return {along,lift:lift*f.stand,raw_lift:lift,vis:groomPaw?0:f.stand+f.P.sit+f.P.stretch};
+}
+/** Local joint transforms for her rig, from the animation state. */
+export function velvetLocalPose(state,{tail='spring'}={}){
+    const f=velvetFrame(state),{P,L,bend,width}=f,pts=[];
+    let px=0,py=0;
+    for(let i=SPINE;i>=0;i--){const t=i/SPINE,th=bend*(t-1);pts[i]={x:px,y:py,th};px-=Math.cos(th)*L/SPINE;py-=Math.sin(th)*L/SPINE;}
+    let cx=0,cy=0;for(const p of pts){cx+=p.x;cy+=p.y;}cx=cx/pts.length-1.5-P.sit*2;cy/=pts.length;for(const p of pts){p.x-=cx;p.y-=cy;}
+    const pose={root:{position:[0,0],rotation:0}};
+    pts.forEach((p,i)=>{pose['spine_'+i]=i?{position:[Math.cos(p.th-pts[i-1].th)*L/SPINE,Math.sin(p.th-pts[i-1].th)*L/SPINE],rotation:p.th-pts[i-1].th}:{position:[p.x,p.y],rotation:p.th};});
+    const neck=pts[SPINE],yaw=state._headYaw||0,headScale=1+P.sit*.07-P.sleep*.04-P.stretch*.05,reach=2.6-P.sit*1.2+P.stretch*1.5;
+    pose.head={position:[Math.cos(-neck.th)*reach,Math.sin(-neck.th)*reach],rotation:yaw-neck.th,scale:[headScale,headScale]};
+    for(const [e,side] of [[0,'l'],[1,'r']]){const sd=e?1:-1;pose['ear_'+side]={position:[-.9,sd*2.9],rotation:sd*((state._ears?state._ears[e]:0)+.35)};}
+    // Resting, the tail leaves the rump already turned along her side, to wrap round toward the fore paws.
+    const lift=state._tailLift||0,rump=pts[0],start=Math.PI-(state._curlSide||1)*(P.sit*1.75+P.loaf*1.75+P.sleep*1.1),turns=(tail==='target'?state._tailTarget:state._tail)??state._tail??[];
+    for(let i=0;i<=VELVET_TAIL_SEGS;i++){
+        const turn=i<VELVET_TAIL_SEGS?-(turns[i]||0):0;
+        const length=i?3.4*(1-lift*(i-1<5?.62:.22))*(1-P.loaf*.12):width(0)*.6;
+        pose['tail_'+i]=i?{position:[length,0],rotation:Math.max(-1.2,Math.min(1.2,turn))}:{position:[-length,0],rotation:start+turn};
+    }
+    const at=t=>{const s=Math.max(0,Math.min(SPINE-1e-6,t*SPINE)),i=Math.floor(s),u=s-i,a=pts[i],b=pts[Math.min(SPINE,i+1)];return {x:a.x+(b.x-a.x)*u,y:a.y+(b.y-a.y)*u,th:a.th+(b.th-a.th)*u};};
+    LEGS.forEach(([joint,hind,sideY],j)=>{
+        const anchorT=hind?.2:.78,a=at(anchorT),w=width(anchorT),nx=-Math.sin(a.th),ny=Math.cos(a.th),ux=Math.cos(a.th),uy=Math.sin(a.th),{along,raw_lift}=velvetLegGait(f,j);
+        // gait: planted feet slide back under her, lifted feet swing forward
+        const out=(hind?1:1.02)*w*(0.85+raw_lift*0.12);
+        let fx=a.x+ux*((hind?-1.5:4.6)+along)+nx*out*sideY,fy=a.y+uy*((hind?-1.5:4.6)+along)+ny*out*sideY;
+        // sit: fore paws together before the chest, hind paws peeking at the haunches; stretch: fore paws reach far ahead
+        const sx=hind?pts[3].x+3.5:neck.x+6.8,sy=hind?pts[3].y+sideY*(width(.25)+.4):neck.y+sideY*2,tx=hind?fx:neck.x+12.5,ty=hind?fy:neck.y+sideY*3.3;
+        fx=fx*f.stand+sx*P.sit+tx*P.stretch+(hind?pts[3].x:neck.x)*(P.loaf+P.sleep);fy=fy*f.stand+sy*P.sit+ty*P.stretch+(hind?pts[3].y:neck.y)*(P.loaf+P.sleep);
+        pose[joint]={position:[fx,fy],rotation:a.th};
+    });
+    return pose;
+}
+export const VELVET_LEG_JOINTS=Object.freeze(LEGS.map(([joint])=>joint));
+import skeleton from '../data/velvet-skeleton.json' with {type:'json'};
+import {rigDefinition,rigPose} from '../../engine/basement/physics/index.mjs';
+import {validateSkeleton} from '../../engine/directory/index.mjs';
+const {kind:_kind,...definitionPacket}=validateSkeleton(skeleton);
+/** Her rig definition (validated once). */
+export const VELVET_RIG=new rigDefinition(definitionPacket);
+/** Joints in her own frame for a bare animation state, with no world: what a live rig would hold before physics. */
+export function velvetJoints(state){const pose=new rigPose(VELVET_RIG).setPose(velvetLocalPose(state));return Object.fromEntries(VELVET_RIG.getJointNames().map(id=>[id,pose.getJoint(id)]));}

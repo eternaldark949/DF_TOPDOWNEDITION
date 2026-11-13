@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '600bbcb84043';
+        const DFAB_BUILD = 'ecc14d021996';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="13186">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="13274">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -10637,8 +10637,10 @@ const {name,fields} = m14;
  *
  * A segment body sits at its bone's midpoint, turned along the bone, so its mass swings like a limb.
  * `offset` is the bone's heading in its joint's frame; hinge angles carry it.
+ * `reaction: false` makes the root hinge one-way: the chain follows the rig's body but never pushes
+ * it, for cosmetic parts (a tail, a scarf) that must not move their owner.
  */
-const PACKET=['chain_id','joints','radius','mass','follow_rate','follow_torque','linear_damping','angular_damping','collision_group','collision_mask'];
+const PACKET=['chain_id','joints','radius','mass','follow_rate','follow_torque','linear_damping','angular_damping','collision_group','collision_mask','reaction'];
 const heading=(a,b)=>Math.atan2(b[1]-a[1],b[0]-a[0]);
 class physicalChain{
     #world;#owner;#controller;#authority;
@@ -10653,7 +10655,8 @@ class physicalChain{
         this.limits=this.joints.map(id=>r.joints[r.index.get(id)].limits);
         this.config={radius:number(packet.radius??2,'chain radius',1e-3),mass:number(packet.mass??1,'segment mass',1e-6),follow_rate:number(packet.follow_rate??20,'follow rate',0),follow_torque:number(packet.follow_torque??1e5,'follow torque',0),
             linear_damping:number(packet.linear_damping??2,'segment linear damping',0),angular_damping:number(packet.angular_damping??2,'segment angular damping',0),
-            collision_group:packet.collision_group??null,collision_mask:packet.collision_mask??null};
+            collision_group:packet.collision_group??null,collision_mask:packet.collision_mask??null,reaction:packet.reaction??true};
+        if(typeof this.config.reaction!=='boolean')throw new TypeError('Chain reaction must be a boolean');
         if(restored){Object.assign(this,{segments:restored.segments.map(id=>this.#world.fetchBody(id)),hinges:restored.hinges.map(id=>this.#world.getConstraint(id)),lengths:[...restored.lengths],offsets:[...restored.offsets]});
             if(this.segments.some(b=>!b)||this.hinges.some(c=>!c))throw new TypeError('Saved chain parts are missing');return;}
         const root=this.#root(),points=this.joints.map(id=>controller.getAnimatedJoint(id,{root}));
@@ -10668,7 +10671,7 @@ class physicalChain{
         }
         const ids=[owner.id,...this.segments.map(b=>b.body_id)];
         for(const body of this.segments)this.#world.updateBody(body,{collision_exclusions:ids.filter(id=>id!==body.body_id)});
-        this.hinges=this.segments.map((body,k)=>this.#world.createConstraint({constraint_type:'hinge',body_a:body,body_b:k?this.segments[k-1]:owner.handle,local_anchor_a:[-this.lengths[k]/2,0],...this.#drive(k)}));
+        this.hinges=this.segments.map((body,k)=>this.#world.createConstraint({constraint_type:'hinge',body_a:body,body_b:k?this.segments[k-1]:owner.handle,local_anchor_a:[-this.lengths[k]/2,0],one_way:!k&&!this.config.reaction,...this.#drive(k)}));
     }
     #root(){return {position:[...this.#owner.position],rotation:this.#owner.rotation};}
     #angle(k){const turn=body=>this.#world._record(body).rotation;return k?angleDelta(turn(this.segments[k-1]),turn(this.segments[k])):angleDelta(this.#owner.rotation,turn(this.segments[0]));}
@@ -11701,7 +11704,7 @@ const constraintRecord = c => records.get(c);
 function validate(world, packet) {
     const config = { constraint_type: 'distance', local_anchor_a: [0, 0], local_anchor_b: [0, 0], world_target: [0, 0], rest_length: 0,
         stiffness: 30, damping: 4, target_rotation: 0, min_rotation: -Math.PI, max_rotation: Math.PI, motor_speed: 0, max_torque: 0,
-        local_axis: [1, 0], min_translation: 0, max_translation: 100, max_force: 0, spring_stiffness: 0, spring_damping: 0,
+        local_axis: [1, 0], min_translation: 0, max_translation: 100, max_force: 0, spring_stiffness: 0, spring_damping: 0, one_way: false,
         break_impulse: null, ...clone({ ...packet, body_a: undefined, body_b: undefined }) };
     if (!['distance', 'spring', 'hinge', 'attachment', 'drag', 'slider'].includes(config.constraint_type)) throw new TypeError('Invalid constraint_type');
     for (const k of ['local_anchor_a', 'local_anchor_b', 'world_target']) config[k] = vector(config[k]);
@@ -11713,6 +11716,7 @@ function validate(world, packet) {
     for (const k of ['rest_length', 'stiffness', 'damping', 'max_torque', 'max_force', 'spring_stiffness', 'spring_damping']) number(config[k], k, 0);
     for (const k of ['target_rotation', 'min_rotation', 'max_rotation', 'motor_speed']) number(config[k], k);
     if (config.break_impulse !== null) number(config.break_impulse, 'break_impulse', 0);
+    if (typeof config.one_way !== 'boolean') throw new TypeError('one_way must be a boolean');
     if (config.min_rotation > config.max_rotation) throw new TypeError('Reversed angular limits');
     const a = world._record(referenceBody(packet.body_a)), b = packet.body_b ? world._record(referenceBody(packet.body_b)) : null;
     config.body_a = a.id; config.body_b = b?.id ?? null;
@@ -11726,7 +11730,7 @@ function updateConstraint(c, changes) {
 /** Joints share mass, locks and impulses with contacts. They own no collision index. */
 class constraintSolver {
     static solve(constraint, dt) {
-        const r = constraintRecord(constraint), { a, b, config: c } = r;
+        const r = constraintRecord(constraint), { a, b, config: c } = r, bm = c.one_way ? null : b;
         if (r.broken || !bodyActive(a) || (b && !bodyActive(b))) return;
         const ra = rotate(c.local_anchor_a, a.rotation), rb = b ? rotate(c.local_anchor_b, b.rotation) : [0, 0];
         const pa = add(a.position, ra), pb = b ? add(b.position, rb) : c.world_target;
@@ -11736,8 +11740,8 @@ class constraintSolver {
         if (c.constraint_type === 'hinge' || c.constraint_type === 'attachment') { solvePin(r, dt, ra, rb, ca, cb, d); solveAngle(r, dt); finish(r); return; }
         const rest = c.constraint_type === 'distance' || c.constraint_type === 'spring' ? c.rest_length : 0;
         const error = distance - rest;
-        const ax = inverseMass(a, 'x'), ay = inverseMass(a, 'y'), bx = inverseMass(b, 'x'), by = inverseMass(b, 'y');
-        const ia = inverseInertia(a), ib = inverseInertia(b);
+        const ax = inverseMass(a, 'x'), ay = inverseMass(a, 'y'), bx = inverseMass(bm, 'x'), by = inverseMass(bm, 'y');
+        const ia = inverseInertia(a), ib = inverseInertia(bm);
         const den = (ax + bx) * n[0] ** 2 + (ay + by) * n[1] ** 2 + cross(ca, n) ** 2 * ia + cross(cb, n) ** 2 * ib;
         if (den > EPS) {
             const va = add(a.velocity, [-a.angular_velocity * ra[1], a.angular_velocity * ra[0]]);
@@ -11747,12 +11751,12 @@ class constraintSolver {
             const request = (bias + relative * Math.min(1, c.damping * dt)) / den;
             const impulse = c.max_force > 0 ? Math.max(-c.max_force*dt,Math.min(c.max_force*dt,request)) : request;
             r.applied_impulse += Math.abs(impulse);
-            changeVelocity(a, scale(n, impulse), pa); if (b) changeVelocity(b, scale(n, -impulse), pb);
+            changeVelocity(a, scale(n, impulse), pa); if (bm) changeVelocity(bm, scale(n, -impulse), pb);
             if (c.constraint_type !== 'spring') {
                 const correction = error * 0.5 / den;
                 a.position[0] += n[0] * correction * ax; a.position[1] += n[1] * correction * ay;
                 rotateAtCenter(a, cross(ca, n) * correction * ia);
-                if (b) { b.position[0] -= n[0] * correction * bx; b.position[1] -= n[1] * correction * by; rotateAtCenter(b, -cross(cb, n) * correction * ib); }
+                if (bm) { bm.position[0] -= n[0] * correction * bx; bm.position[1] -= n[1] * correction * by; rotateAtCenter(bm, -cross(cb, n) * correction * ib); }
             }
         }
         finish(r);
@@ -11764,8 +11768,8 @@ class constraintSolver {
  * of about its own centre. Position drift is corrected the same way, split by each body's mobility.
  */
 function solvePin(r, dt, ra, rb, ca, cb, d) {
-    const { a, b, config: c } = r;
-    const ax = inverseMass(a, 'x'), ay = inverseMass(a, 'y'), bx = inverseMass(b, 'x'), by = inverseMass(b, 'y'), ia = inverseInertia(a), ib = inverseInertia(b);
+    const { a, b, config: c } = r, bm = c.one_way ? null : b;
+    const ax = inverseMass(a, 'x'), ay = inverseMass(a, 'y'), bx = inverseMass(bm, 'x'), by = inverseMass(bm, 'y'), ia = inverseInertia(a), ib = inverseInertia(bm);
     const k11 = ax + bx + ia * ca[1] ** 2 + ib * cb[1] ** 2, k22 = ay + by + ia * ca[0] ** 2 + ib * cb[0] ** 2, k12 = -ia * ca[0] * ca[1] - ib * cb[0] * cb[1];
     const det = k11 * k22 - k12 * k12;
     if (!(det > EPS * EPS)) return;
@@ -11776,14 +11780,14 @@ function solvePin(r, dt, ra, rb, ca, cb, d) {
     const size = length(impulse); if (c.max_force > 0 && size > c.max_force * dt) impulse = scale(impulse, c.max_force * dt / size);
     r.applied_impulse += length(impulse);
     const pa = add(a.position, ra), pb = b ? add(b.position, rb) : c.world_target;
-    changeVelocity(a, impulse, pa); if (b) changeVelocity(b, scale(impulse, -1), pb);
+    changeVelocity(a, impulse, pa); if (bm) changeVelocity(bm, scale(impulse, -1), pb);
     const move = scale(solve(d), 0.5);
     a.position[0] += move[0] * ax; a.position[1] += move[1] * ay; rotateAtCenter(a, cross(ca, move) * ia);
-    if (b) { b.position[0] -= move[0] * bx; b.position[1] -= move[1] * by; rotateAtCenter(b, -cross(cb, move) * ib); }
+    if (bm) { bm.position[0] -= move[0] * bx; bm.position[1] -= move[1] * by; rotateAtCenter(bm, -cross(cb, move) * ib); }
 }
 /** A hinge's limits, motor and return spring, or an attachment's fixed angle. */
 function solveAngle(r, dt) {
-    const { a, b, config: c } = r, ia = inverseInertia(a), ib = inverseInertia(b);
+    const { a, b, config: c } = r, bm = c.one_way ? null : b, ia = inverseInertia(a), ib = inverseInertia(bm);
     const angle = angleDelta(b?.rotation ?? 0, a.rotation), inv = ia + ib;
     let angular_error = c.constraint_type === 'attachment' ? angleDelta(c.target_rotation, angle)
         : angle < c.min_rotation ? angle - c.min_rotation : angle > c.max_rotation ? angle - c.max_rotation : 0;
@@ -11791,9 +11795,9 @@ function solveAngle(r, dt) {
         const v = a.angular_velocity - (b?.angular_velocity ?? 0), limit = c.max_torque * dt;
         const motor = limit ? Math.max(-limit, Math.min(limit, (c.motor_speed - v) / inv)) : 0;
         const j = angular_error ? (-angular_error * Math.min(c.stiffness, 0.2 / dt) - v) / inv + motor : motor;
-        changeAngularSpeed(a, j * ia); if (b) changeAngularSpeed(b, -j * ib);
+        changeAngularSpeed(a, j * ia); if (bm) changeAngularSpeed(bm, -j * ib);
         const correction = -angular_error * 0.5 / inv;
-        rotateAtCenter(a, correction * ia); if (b) rotateAtCenter(b, -correction * ib);
+        rotateAtCenter(a, correction * ia); if (bm) rotateAtCenter(bm, -correction * ib);
         r.applied_impulse += Math.abs(j);
         // A hinge's return spring: angular acceleration toward target_rotation, independent of
         // inertia (spring_stiffness in 1/s², spring_damping in 1/s). Solved in every iteration
@@ -11801,7 +11805,7 @@ function solveAngle(r, dt) {
         if (c.constraint_type === 'hinge' && (c.spring_stiffness || c.spring_damping)) {
             const err = angleDelta(c.target_rotation, angle), w = a.angular_velocity - (b?.angular_velocity ?? 0);
             const k = (-c.spring_stiffness * err - c.spring_damping * w) * dt / inv;
-            changeAngularSpeed(a, k * ia); if (b) changeAngularSpeed(b, -k * ib);
+            changeAngularSpeed(a, k * ia); if (bm) changeAngularSpeed(bm, -k * ib);
         }
     }
 }
@@ -11817,10 +11821,10 @@ function finish(r) {
 // Prismatic joint: the axis is authored in B's frame (world frame if B is absent).
 // The same inverse masses and angular Jacobians as physical contacts are used here.
 function solveSlider(r, dt, ra, rb, pa, pb) {
-    const { a, b, config: c } = r;
+    const { a, b, config: c } = r, bm = c.one_way ? null : b;
     const axis = rotate(c.local_axis, b?.rotation ?? 0), normal = [-axis[1], axis[0]], delta = sub(pa, pb);
-    const ax = inverseMass(a, 'x'), ay = inverseMass(a, 'y'), bx = inverseMass(b, 'x'), by = inverseMass(b, 'y');
-    const ia = inverseInertia(a), ib = inverseInertia(b);
+    const ax = inverseMass(a, 'x'), ay = inverseMass(a, 'y'), bx = inverseMass(bm, 'x'), by = inverseMass(bm, 'y');
+    const ia = inverseInertia(a), ib = inverseInertia(bm);
     const row = (n, error, motor = false) => {
         const ja = cross(sub(pa, impulseCenter(a)), n), jb = b ? cross(sub(pb, impulseCenter(b)), n) : 0;
         const den = (ax + bx) * n[0] ** 2 + (ay + by) * n[1] ** 2 + ja ** 2 * ia + jb ** 2 * ib;
@@ -11829,12 +11833,12 @@ function solveSlider(r, dt, ra, rb, pa, pb) {
         const vb = b ? add(b.velocity, [-b.angular_velocity * rb[1], b.angular_velocity * rb[0]]) : [0, 0];
         let j = ((motor ? c.motor_speed : -error * Math.min(c.stiffness, 0.2 / dt)) - dot(sub(va, vb), n)) / den;
         if (motor) j = Math.max(-c.max_force * dt, Math.min(c.max_force * dt, j));
-        changeVelocity(a, scale(n, j), pa); if (b) changeVelocity(b, scale(n, -j), pb);
+        changeVelocity(a, scale(n, j), pa); if (bm) changeVelocity(bm, scale(n, -j), pb);
         r.applied_impulse += Math.abs(j);
         if (!motor) {
             const correction = -error * 0.5 / den;
             a.position[0] += n[0] * correction * ax; a.position[1] += n[1] * correction * ay; rotateAtCenter(a, ja * correction * ia);
-            if (b) { b.position[0] -= n[0] * correction * bx; b.position[1] -= n[1] * correction * by; rotateAtCenter(b, -jb * correction * ib); }
+            if (bm) { bm.position[0] -= n[0] * correction * bx; bm.position[1] -= n[1] * correction * by; rotateAtCenter(bm, -jb * correction * ib); }
         }
     };
     row(normal, dot(delta, normal));
@@ -11846,7 +11850,7 @@ function solveSlider(r, dt, ra, rb, pa, pb) {
         const error = angleDelta(c.target_rotation, angleDelta(b?.rotation ?? 0, a.rotation));
         const j = (-error * Math.min(c.stiffness, 0.2 / dt) - a.angular_velocity + (b?.angular_velocity ?? 0)) / inv;
         changeAngularSpeed(a, j * ia); rotateAtCenter(a, -error * 0.5 * ia / inv);
-        if (b) { changeAngularSpeed(b, -j * ib); rotateAtCenter(b, error * 0.5 * ib / inv); }
+        if (bm) { changeAngularSpeed(bm, -j * ib); rotateAtCenter(bm, error * 0.5 * ib / inv); }
         r.applied_impulse += Math.abs(j);
     }
 }
@@ -24362,9 +24366,307 @@ const VELVET_TAIL_SEGS = 9;
 
 return Object.freeze({get VELVET_CAT_PALETTES(){return VELVET_CAT_PALETTES;},get VELVET_T(){return VELVET_T;},get VELVET_PROFILES(){return VELVET_PROFILES;},get VELVET_GAITS(){return VELVET_GAITS;},get VELVET_TAIL_SEGS(){return VELVET_TAIL_SEGS;}});
 })();
+const m121 = Object.freeze({default:{
+ "kind": "skeleton",
+ "rig_id": "df:velvet_cat",
+ "joints": [
+  {
+   "name": "root"
+  },
+  {
+   "name": "spine_0",
+   "parent": "root",
+   "position": [
+    -11.75,
+    0
+   ]
+  },
+  {
+   "name": "spine_1",
+   "parent": "spine_0",
+   "position": [
+    1.9583333333333333,
+    0
+   ]
+  },
+  {
+   "name": "spine_2",
+   "parent": "spine_1",
+   "position": [
+    1.9583333333333333,
+    0
+   ]
+  },
+  {
+   "name": "spine_3",
+   "parent": "spine_2",
+   "position": [
+    1.9583333333333333,
+    0
+   ]
+  },
+  {
+   "name": "spine_4",
+   "parent": "spine_3",
+   "position": [
+    1.9583333333333333,
+    0
+   ]
+  },
+  {
+   "name": "spine_5",
+   "parent": "spine_4",
+   "position": [
+    1.9583333333333333,
+    0
+   ]
+  },
+  {
+   "name": "spine_6",
+   "parent": "spine_5",
+   "position": [
+    1.9583333333333333,
+    0
+   ]
+  },
+  {
+   "name": "spine_7",
+   "parent": "spine_6",
+   "position": [
+    1.9583333333333333,
+    0
+   ]
+  },
+  {
+   "name": "spine_8",
+   "parent": "spine_7",
+   "position": [
+    1.9583333333333333,
+    0
+   ]
+  },
+  {
+   "name": "spine_9",
+   "parent": "spine_8",
+   "position": [
+    1.9583333333333333,
+    0
+   ]
+  },
+  {
+   "name": "spine_10",
+   "parent": "spine_9",
+   "position": [
+    1.9583333333333333,
+    0
+   ]
+  },
+  {
+   "name": "spine_11",
+   "parent": "spine_10",
+   "position": [
+    1.9583333333333333,
+    0
+   ]
+  },
+  {
+   "name": "spine_12",
+   "parent": "spine_11",
+   "position": [
+    1.9583333333333333,
+    0
+   ]
+  },
+  {
+   "name": "head",
+   "parent": "spine_12",
+   "position": [
+    2.6,
+    0
+   ]
+  },
+  {
+   "name": "ear_l",
+   "parent": "head",
+   "position": [
+    -0.9,
+    -2.9
+   ]
+  },
+  {
+   "name": "ear_r",
+   "parent": "head",
+   "position": [
+    -0.9,
+    2.9
+   ]
+  },
+  {
+   "name": "tail_0",
+   "parent": "spine_0",
+   "position": [
+    -5,
+    0
+   ],
+   "rotation": 3.14159
+  },
+  {
+   "name": "tail_1",
+   "parent": "tail_0",
+   "position": [
+    3.4,
+    0
+   ],
+   "limits": {
+    "min_rotation": -1.2,
+    "max_rotation": 1.2
+   }
+  },
+  {
+   "name": "tail_2",
+   "parent": "tail_1",
+   "position": [
+    3.4,
+    0
+   ],
+   "limits": {
+    "min_rotation": -1.2,
+    "max_rotation": 1.2
+   }
+  },
+  {
+   "name": "tail_3",
+   "parent": "tail_2",
+   "position": [
+    3.4,
+    0
+   ],
+   "limits": {
+    "min_rotation": -1.2,
+    "max_rotation": 1.2
+   }
+  },
+  {
+   "name": "tail_4",
+   "parent": "tail_3",
+   "position": [
+    3.4,
+    0
+   ],
+   "limits": {
+    "min_rotation": -1.2,
+    "max_rotation": 1.2
+   }
+  },
+  {
+   "name": "tail_5",
+   "parent": "tail_4",
+   "position": [
+    3.4,
+    0
+   ],
+   "limits": {
+    "min_rotation": -1.2,
+    "max_rotation": 1.2
+   }
+  },
+  {
+   "name": "tail_6",
+   "parent": "tail_5",
+   "position": [
+    3.4,
+    0
+   ],
+   "limits": {
+    "min_rotation": -1.2,
+    "max_rotation": 1.2
+   }
+  },
+  {
+   "name": "tail_7",
+   "parent": "tail_6",
+   "position": [
+    3.4,
+    0
+   ],
+   "limits": {
+    "min_rotation": -1.2,
+    "max_rotation": 1.2
+   }
+  },
+  {
+   "name": "tail_8",
+   "parent": "tail_7",
+   "position": [
+    3.4,
+    0
+   ],
+   "limits": {
+    "min_rotation": -1.2,
+    "max_rotation": 1.2
+   }
+  },
+  {
+   "name": "tail_9",
+   "parent": "tail_8",
+   "position": [
+    3.4,
+    0
+   ],
+   "limits": {
+    "min_rotation": -1.2,
+    "max_rotation": 1.2
+   }
+  },
+  {
+   "name": "paw_hl",
+   "parent": "root",
+   "position": [
+    -10,
+    -4
+   ]
+  },
+  {
+   "name": "paw_fl",
+   "parent": "root",
+   "position": [
+    8,
+    -4
+   ]
+  },
+  {
+   "name": "paw_hr",
+   "parent": "root",
+   "position": [
+    -10,
+    4
+   ]
+  },
+  {
+   "name": "paw_fr",
+   "parent": "root",
+   "position": [
+    8,
+    4
+   ]
+  }
+ ],
+ "anchors": {
+  "mouth": {
+   "joint": "head",
+   "position": [
+    4.6,
+    0
+   ]
+  },
+  "collar": {
+   "joint": "spine_11"
+  }
+ }
+}});
 // src/game/presentation/velvet-cat-animation.mjs
 const m119 = (()=>{
-const {VELVET_GAITS,VELVET_TAIL_SEGS} = m120;
+const {VELVET_GAITS,VELVET_TAIL_SEGS,VELVET_T,VELVET_PROFILES} = m120;
 /** Fixed-step cosmetic animation only. No draw backend or physical movement. */
 const velvetCatAnimation={
 _random() {
@@ -24418,6 +24720,8 @@ _animate(player, dt, moved, prevAngle, blocked, dist) {
                     let target = Math.sin(this.tailPhase * (blocked ? 1.6 : 1) - i * 0.55) * amp * (0.4 + f);
                     target += side * wrap;
                     if (i >= N - 3) target += side * (this._tailLift * 0.45 + Math.sin(this._flick * Math.PI) * 0.7);
+                    // The pose a physical tail is driven toward; without a world, the spring below stands in for its weight.
+                    (this._tailTarget ??= new Array(N).fill(0))[i] = Math.max(-1.2, Math.min(1.2, target));
                     this._tailVel[i] -= turned * (i ? 0.12 : 0.7);
                     this._tailVel[i] = this._tailVel[i] * Math.pow(0.8, dt) + (target - this._tail[i]) * (0.1 - f * 0.04) * dt;
                     this._tail[i] += this._tailVel[i] * dt;
@@ -24502,16 +24806,87 @@ function createVelvetAnimation(seed=1){const record=Object.create(velvetCatAnima
                 this._groomPhase = 0;
 
                 }).call(record);return structuredClone({...record});}
-function velvetPresentation(entity,blend=1){const pose=entity.getRenderState(blend);return Object.assign({},structuredClone(entity.data.velvet_animation),{x:pose.position[0],y:pose.position[1],angle:pose.rotation,state:entity.state,visible:entity.visible,inCar:entity.inCar,coatPalette:entity.data.coat_palette});}
+function velvetPresentation(entity,blend=1){const pose=entity.getRenderState(blend);return Object.assign({},structuredClone(entity.data.velvet_animation),{x:pose.position[0],y:pose.position[1],angle:pose.rotation,state:entity.state,visible:entity.visible,inCar:entity.inCar,coatPalette:entity.data.coat_palette},entity.physics_system.rigs.getRig(entity)?{joints:entity.physics_system.rigs.getPose(entity,{blend}).joints}:{});}
 function advanceVelvetAnimation(entity,player,seconds){const record=entity.data.velvet_animation,packet=Object.assign(Object.create(velvetCatAnimation),velvetPresentation(entity)),motion=entity.physics_system.getBodyMotion(entity),position=player?.position??entity.position;packet.animationSpeed=motion.distance/(seconds*60);packet._dash=entity.cat_state.dash;packet.idleBehavior=entity.cat_state.rest;packet._animate({x:position[0],y:position[1]},seconds*60,motion.distance,motion.previous_rotation,entity.state==='following'&&motion.distance<.001,player?entity.physics_system.observeTarget(entity,player).distance:0);for(const key of Object.keys(record))record[key]=structuredClone(packet[key]);}
 
 
-return Object.freeze({get velvetCatAnimation(){return velvetCatAnimation;},get createVelvetAnimation(){return createVelvetAnimation;},get velvetPresentation(){return velvetPresentation;},get advanceVelvetAnimation(){return advanceVelvetAnimation;}});
+// ----- Her rig: the pose the animation state gives each joint ---------------------------------------
+// The skeleton (`data/velvet-skeleton.json`) runs root -> spine_0 (rump) ... spine_12 (neck) -> head ->
+// ears, tail_0 ... tail_9 from the rump, and four paws on the root, all in her own frame (+X forward).
+// `velvetLocalPose(state)` is the procedural pose the state asks for; the world's rig resolves it, a
+// physical tail chain swings tail_0..tail_8 with its own weight, and the artist draws from the joints.
+const SPINE=12,TAU=Math.PI*2,frac=v=>v-Math.floor(v);
+const LEGS=Object.freeze([['paw_hl',true,-1],['paw_fl',false,-1],['paw_hr',true,1],['paw_fr',false,1]]);
+/** Values every part of her pose and drawing derives from: pose weights, gait, spine length and bend, and her half-width along the spine. */
+function velvetFrame(state){
+    const P=state._poses||{sit:0,loaf:0,sleep:0,stretch:0,groom:0},moving=(state.animationSpeed||0)>0.05,g=velvetCatAnimation._gaitParams.call(state);
+    const stand=Math.max(0,1-P.sit-P.loaf-P.sleep-P.stretch),breathe=1+Math.sin(state._breath||0)*0.025*(1-stand),cyc=state.walkPhase/TAU;
+    const flex=moving?Math.sin((cyc+.3)*TAU)*g.gallop:0;   // a galloping cat gathers and stretches
+    const L=23.5*(1-0.36*P.sit-0.12*P.loaf+0.03*P.sleep+0.2*P.stretch)*(1+flex*0.13);
+    const bend=(state._bend||0)*(1-P.sleep)+P.sleep*4.3*(state._curlSide||1);
+    const width=t=>{let j=0;while(j<VELVET_T.length-2&&t>VELVET_T[j+1])j++;const u=(t-VELVET_T[j])/(VELVET_T[j+1]-VELVET_T[j]);let w=0;
+        for(const [name,wt] of [['stand',stand],['sit',P.sit],['loaf',P.loaf],['sleep',P.sleep],['stretch',P.stretch]]){if(wt<=0)continue;const pr=VELVET_PROFILES[name];w+=(pr[j]+(pr[j+1]-pr[j])*u)*wt;}return w*breathe;};
+    const legU=j=>frac(cyc+g.off[j]);
+    return {P,moving,g,stand,cyc,L,bend,width,legU};
+}
+/** Each leg's gait: how far along and lifted the paw is, and how visible the leg is, for leg j (hind left, fore left, hind right, fore right). */
+function velvetLegGait(f,j){
+    const u=f.legU(j);let along=0,lift=0;
+    if(f.moving){if(u<f.g.duty)along=f.g.stride*(0.5-u/f.g.duty);else{const s=(u-f.g.duty)/(1-f.g.duty);along=f.g.stride*(-0.5+(s*s*(3-2*s)));lift=Math.sin(s*Math.PI);}}
+    const hind=LEGS[j][1],groomPaw=!hind&&LEGS[j][2]<0&&f.P.groom>0.5;
+    return {along,lift:lift*f.stand,raw_lift:lift,vis:groomPaw?0:f.stand+f.P.sit+f.P.stretch};
+}
+/** Local joint transforms for her rig, from the animation state. */
+function velvetLocalPose(state,{tail='spring'}={}){
+    const f=velvetFrame(state),{P,L,bend,width}=f,pts=[];
+    let px=0,py=0;
+    for(let i=SPINE;i>=0;i--){const t=i/SPINE,th=bend*(t-1);pts[i]={x:px,y:py,th};px-=Math.cos(th)*L/SPINE;py-=Math.sin(th)*L/SPINE;}
+    let cx=0,cy=0;for(const p of pts){cx+=p.x;cy+=p.y;}cx=cx/pts.length-1.5-P.sit*2;cy/=pts.length;for(const p of pts){p.x-=cx;p.y-=cy;}
+    const pose={root:{position:[0,0],rotation:0}};
+    pts.forEach((p,i)=>{pose['spine_'+i]=i?{position:[Math.cos(p.th-pts[i-1].th)*L/SPINE,Math.sin(p.th-pts[i-1].th)*L/SPINE],rotation:p.th-pts[i-1].th}:{position:[p.x,p.y],rotation:p.th};});
+    const neck=pts[SPINE],yaw=state._headYaw||0,headScale=1+P.sit*.07-P.sleep*.04-P.stretch*.05,reach=2.6-P.sit*1.2+P.stretch*1.5;
+    pose.head={position:[Math.cos(-neck.th)*reach,Math.sin(-neck.th)*reach],rotation:yaw-neck.th,scale:[headScale,headScale]};
+    for(const [e,side] of [[0,'l'],[1,'r']]){const sd=e?1:-1;pose['ear_'+side]={position:[-.9,sd*2.9],rotation:sd*((state._ears?state._ears[e]:0)+.35)};}
+    // Resting, the tail leaves the rump already turned along her side, to wrap round toward the fore paws.
+    const lift=state._tailLift||0,rump=pts[0],start=Math.PI-(state._curlSide||1)*(P.sit*1.75+P.loaf*1.75+P.sleep*1.1),turns=(tail==='target'?state._tailTarget:state._tail)??state._tail??[];
+    for(let i=0;i<=VELVET_TAIL_SEGS;i++){
+        const turn=i<VELVET_TAIL_SEGS?-(turns[i]||0):0;
+        const length=i?3.4*(1-lift*(i-1<5?.62:.22))*(1-P.loaf*.12):width(0)*.6;
+        pose['tail_'+i]=i?{position:[length,0],rotation:Math.max(-1.2,Math.min(1.2,turn))}:{position:[-length,0],rotation:start+turn};
+    }
+    const at=t=>{const s=Math.max(0,Math.min(SPINE-1e-6,t*SPINE)),i=Math.floor(s),u=s-i,a=pts[i],b=pts[Math.min(SPINE,i+1)];return {x:a.x+(b.x-a.x)*u,y:a.y+(b.y-a.y)*u,th:a.th+(b.th-a.th)*u};};
+    LEGS.forEach(([joint,hind,sideY],j)=>{
+        const anchorT=hind?.2:.78,a=at(anchorT),w=width(anchorT),nx=-Math.sin(a.th),ny=Math.cos(a.th),ux=Math.cos(a.th),uy=Math.sin(a.th),{along,raw_lift}=velvetLegGait(f,j);
+        // gait: planted feet slide back under her, lifted feet swing forward
+        const out=(hind?1:1.02)*w*(0.85+raw_lift*0.12);
+        let fx=a.x+ux*((hind?-1.5:4.6)+along)+nx*out*sideY,fy=a.y+uy*((hind?-1.5:4.6)+along)+ny*out*sideY;
+        // sit: fore paws together before the chest, hind paws peeking at the haunches; stretch: fore paws reach far ahead
+        const sx=hind?pts[3].x+3.5:neck.x+6.8,sy=hind?pts[3].y+sideY*(width(.25)+.4):neck.y+sideY*2,tx=hind?fx:neck.x+12.5,ty=hind?fy:neck.y+sideY*3.3;
+        fx=fx*f.stand+sx*P.sit+tx*P.stretch+(hind?pts[3].x:neck.x)*(P.loaf+P.sleep);fy=fy*f.stand+sy*P.sit+ty*P.stretch+(hind?pts[3].y:neck.y)*(P.loaf+P.sleep);
+        pose[joint]={position:[fx,fy],rotation:a.th};
+    });
+    return pose;
+}
+const VELVET_LEG_JOINTS=Object.freeze(LEGS.map(([joint])=>joint));
+const skeleton = m121.default;
+const {rigDefinition,rigPose} = m1;
+const {validateSkeleton} = m40;
+const {kind:_kind,...definitionPacket}=validateSkeleton(skeleton);
+/** Her rig definition (validated once). */
+const VELVET_RIG=new rigDefinition(definitionPacket);
+/** Joints in her own frame for a bare animation state, with no world: what a live rig would hold before physics. */
+function velvetJoints(state){const pose=new rigPose(VELVET_RIG).setPose(velvetLocalPose(state));return Object.fromEntries(VELVET_RIG.getJointNames().map(id=>[id,pose.getJoint(id)]));}
+
+return Object.freeze({get velvetCatAnimation(){return velvetCatAnimation;},get createVelvetAnimation(){return createVelvetAnimation;},get velvetPresentation(){return velvetPresentation;},get advanceVelvetAnimation(){return advanceVelvetAnimation;},get velvetFrame(){return velvetFrame;},get velvetLegGait(){return velvetLegGait;},get velvetLocalPose(){return velvetLocalPose;},get VELVET_LEG_JOINTS(){return VELVET_LEG_JOINTS;},get VELVET_RIG(){return VELVET_RIG;},get velvetJoints(){return velvetJoints;}});
 })();
 // src/game/entities/velvet-cat.mjs
 const m118 = (()=>{
 const {gameActor} = m100;
-const {createVelvetAnimation,advanceVelvetAnimation} = m119;
+const {createVelvetAnimation,advanceVelvetAnimation,velvetLocalPose,VELVET_RIG} = m119;
+const {VELVET_TAIL_SEGS} = m120;
+const TAIL=Object.freeze(Array.from({length:VELVET_TAIL_SEGS+1},(_,i)=>'tail_'+i));
+/** Her tail as a physical chain: light, cosmetic (it touches nothing), and quick to follow the pose she holds it in. */
+const TAIL_CHAIN=Object.freeze({chain_id:'tail',joints:TAIL,radius:1,mass:.08,follow_rate:14,collision_group:0,collision_mask:0,reaction:false});
 const {nonnegative,jsonCopy} = m40;
 const stateFor=actor=>actor.data.cat_state??={format_version:1,mode:'idle',dash:false,idle_seconds:0,rest:null,rest_remaining:0};
 /** Official companion body; animation records contain cosmetic state only. */
@@ -24537,13 +24912,23 @@ class VelvetCat extends gameActor{
   if(view.distance>rules.start_distance||state.mode==='following'&&view.distance>rules.stop_distance){state.mode='following';state.rest=null;state.idle_seconds=0;this.followTarget(player,{target_offset:rules.follow_offset,speed:state.dash?rules.sprint_speed:view.distance>120?rules.trot_speed:rules.walk_speed,arrival_distance:16,personal_space:18});}
   else{state.mode='idle';this.cancelMovement();state.idle_seconds+=seconds;state.rest_remaining=Math.max(0,state.rest_remaining-seconds);if(state.rest&&state.rest_remaining===0){state.rest=state.rest==='stretch'?'sit':null;state.idle_seconds=1.667;}if(!state.rest&&state.idle_seconds>=rules.rest_after){const sample=random();state.rest=sample<.28?'sit':sample<.48?'groom':sample<.62?'look':sample<.78?'loaf':sample<.9?'sleep':'stretch';state.rest_remaining=state.rest==='sleep'?25:state.rest==='loaf'?15:state.rest==='stretch'?260/60:9;}}
  }
- advanceAnimation(seconds,player){if(this.active&&this.visible&&!this.inCar)advanceVelvetAnimation(this,player,seconds);}
+ /**
+  * Advances her animation state, then poses her rig from it. While she is out and about her tail is a
+  * physical chain that swings with its own weight; in a car (or hidden) it goes, and comes back after.
+  */
+ advanceAnimation(seconds,player){
+  const rigs=this.physics_system.rigs,out=this.active&&this.visible&&!this.inCar,rig=rigs.getRig(this)??rigs.createRig(this,{definition:VELVET_RIG});
+  const tail=rigs.getPhysicalChains(this).some(chain=>chain.chain_id==='tail');
+  if(out&&!tail)rigs.createPhysicalChain(this,TAIL_CHAIN);else if(!out&&tail)rigs.removePhysicalChain(this,'tail');
+  if(!out)return;
+  advanceVelvetAnimation(this,player,seconds);rig.setProceduralPose(velvetLocalPose(this.data.velvet_animation,{tail:'target'}));
+ }
 }
 
 return Object.freeze({get VelvetCat(){return VelvetCat;}});
 })();
 // src/game/entities/marionette.mjs
-const m121 = (()=>{
+const m122 = (()=>{
 const {gameActor} = m100;
 const {nonnegative,jsonCopy} = m40;
 const stateFor=actor=>actor.data.marionette_state??={format_version:1,initial_delay:.6,yank_remaining:0};
@@ -24572,7 +24957,7 @@ class Marionette extends gameActor{
 return Object.freeze({get Marionette(){return Marionette;}});
 })();
 // src/game/mechanics/player-vitals.mjs
-const m123 = (()=>{
+const m124 = (()=>{
 const {actorVitals} = m102;
 const defaults = m66.default;
 const {nonnegative,jsonCopy,identifier} = m40;
@@ -24660,9 +25045,9 @@ class playerVitals extends actorVitals {
 return Object.freeze({get playerVitals(){return playerVitals;}});
 })();
 // src/game/entities/player.mjs
-const m122 = (()=>{
+const m123 = (()=>{
 const {gameActor} = m100;
-const {playerVitals} = m123;
+const {playerVitals} = m124;
 const {identifier,nonnegative} = m40;
 const {validateModifiers} = m106;
 const services = new WeakMap();
@@ -24753,7 +25138,7 @@ class Player extends gameActor {
 return Object.freeze({get Player(){return Player;}});
 })();
 // src/game/entities/apartment-prop.mjs
-const m124 = (()=>{
+const m125 = (()=>{
 const {gameProp} = m1;
 
 /** Furniture/fixture gameplay metadata; no local transform or integration. */
@@ -24768,7 +25153,7 @@ class ApartmentProp extends gameProp {
 return Object.freeze({get ApartmentProp(){return ApartmentProp;}});
 })();
 // src/game/data/npc-reactions.mjs
-const m126 = (()=>{
+const m127 = (()=>{
 // Authored character reactions, shared by native and remaining classic NPCs.
 function resolveEmoteLines(reactions, cat, tier) {
     const pool = reactions && reactions[cat];
@@ -24933,10 +25318,10 @@ const NPC_EMOTE_REACTIONS = {
 return Object.freeze({get resolveEmoteLines(){return resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return NPC_EMOTE_REACTIONS;}});
 })();
 // src/game/entities/npc.mjs
-const m125 = (()=>{
+const m126 = (()=>{
 const {importActorAbilities} = m115;
 const {actorAbilities} = m115;
-const {resolveEmoteLines,NPC_EMOTE_REACTIONS} = m126;
+const {resolveEmoteLines,NPC_EMOTE_REACTIONS} = m127;
 const {gameActor} = m100;
 const {actorItems,restoreActorItems} = m103;
 const {nonnegative,jsonCopy} = m40;
@@ -25014,7 +25399,7 @@ for(const [key,field] of Object.entries({burstSize:'burst_size',burstDelay:'burs
 return Object.freeze({get ROSTER_FIELDS(){return ROSTER_FIELDS;},get NPC(){return NPC;},get rosterRecord(){return rosterRecord;}});
 })();
 // src/game/entities/world-loot.mjs
-const m127 = (()=>{
+const m128 = (()=>{
 const {gameProp} = m1;
 /** The dropped bundle is owned here until pickup; the inherited body is the only live pose. */
 class WorldLoot extends gameProp{
@@ -25026,7 +25411,7 @@ class WorldLoot extends gameProp{
 return Object.freeze({get WorldLoot(){return WorldLoot;}});
 })();
 // src/game/data/street-definitions.mjs
-const m130 = (()=>{
+const m131 = (()=>{
 /** Directory authoring only: convert immutable catalog units once, never during simulation. */
 const vehicleDefinitions = new WeakMap();
 function resolveStreetVehicle(library, { brand, model, control_mode = 'AI', color } = {}) {
@@ -25097,8 +25482,8 @@ function resolveVehicleSeats(library, { brand, model }) {
 return Object.freeze({get resolveStreetVehicle(){return resolveStreetVehicle;},get resolveVehicleSeats(){return resolveVehicleSeats;}});
 })();
 // src/game/entities/traffic-vehicle.mjs
-const m129 = (()=>{
-const {resolveStreetVehicle,resolveVehicleSeats} = m130;
+const m130 = (()=>{
+const {resolveStreetVehicle,resolveVehicleSeats} = m131;
 const {gameVehicle} = m1;
 const bindings = new WeakMap();
 /** Official gameplay entity. Body state and driving calculations belong to Basement. */
@@ -25193,10 +25578,10 @@ class TrafficVehicle extends gameVehicle {
 return Object.freeze({get TrafficVehicle(){return TrafficVehicle;}});
 })();
 // src/game/boot/game-vehicle-factory.mjs
-const m132 = (()=>{
-const {TrafficVehicle} = m129;
+const m133 = (()=>{
+const {TrafficVehicle} = m130;
 const {pathGeometry} = m1;
-const {resolveStreetVehicle} = m130;
+const {resolveStreetVehicle} = m131;
 
 const purposes = new Set(['ambient', 'owned', 'mission', 'taxi']);
 /** Shared official creation. Population limits belong to the requesting population manager. */
@@ -25236,9 +25621,9 @@ function createGameVehicle(world, packet = {}, { hooks = {} } = {}) {
 return Object.freeze({get createGameVehicle(){return createGameVehicle;}});
 })();
 // src/game/mechanics/traffic-manager.mjs
-const m131 = (()=>{
-const {TrafficVehicle} = m129;
-const {createGameVehicle} = m132;
+const m132 = (()=>{
+const {TrafficVehicle} = m130;
+const {createGameVehicle} = m133;
 /** Spawn, ownership and driver policy. The physics world owns every spatial/physical operation. */
 class TrafficManager {
     #pendingSpawns = new Set();
@@ -25283,7 +25668,7 @@ class TrafficManager {
 return Object.freeze({get TrafficManager(){return TrafficManager;}});
 })();
 // src/game/entities/pedestrians.mjs
-const m133 = (()=>{
+const m134 = (()=>{
 const {gameCharacter,gameVehicle,BODY_GROUP} = m1;
 const bindings = new WeakMap();
 /** Civilian decisions and reactions. Movement, prediction and impacts stay in Basement. */
@@ -25364,8 +25749,8 @@ class Pedestrian extends gameCharacter {
 return Object.freeze({get Pedestrian(){return Pedestrian;}});
 })();
 // src/game/entities/pedestrian-manager.mjs
-const m134 = (()=>{
-const {Pedestrian} = m133;
+const m135 = (()=>{
+const {Pedestrian} = m134;
 /** Population and waypoint policy only. No positions, obstacle cache or sensing grid. */
 class PedestrianManager {
     #network = new Map();
@@ -25437,11 +25822,11 @@ class PedestrianManager {
 return Object.freeze({get PedestrianManager(){return PedestrianManager;}});
 })();
 // src/game/boot/game-street.mjs
-const m128 = (()=>{
-const {TrafficVehicle} = m129;
-const {TrafficManager} = m131;
-const {Pedestrian} = m133;
-const {PedestrianManager} = m134;
+const m129 = (()=>{
+const {TrafficVehicle} = m130;
+const {TrafficManager} = m132;
+const {Pedestrian} = m134;
+const {PedestrianManager} = m135;
 
 
 function registerStreetEntityTypes(world) {
@@ -25461,7 +25846,7 @@ class StreetPopulation {
     clearStreet() { this.traffic.clearStreet(); this.pedestrians.clearStreet(); }
 }
 
-return Object.freeze({get TrafficVehicle(){return TrafficVehicle;},get TrafficManager(){return TrafficManager;},get Pedestrian(){return Pedestrian;},get PedestrianManager(){return PedestrianManager;},get createGameVehicle(){return m132.createGameVehicle;},get registerStreetEntityTypes(){return registerStreetEntityTypes;},get StreetPopulation(){return StreetPopulation;}});
+return Object.freeze({get TrafficVehicle(){return TrafficVehicle;},get TrafficManager(){return TrafficManager;},get Pedestrian(){return Pedestrian;},get PedestrianManager(){return PedestrianManager;},get createGameVehicle(){return m133.createGameVehicle;},get registerStreetEntityTypes(){return registerStreetEntityTypes;},get StreetPopulation(){return StreetPopulation;}});
 })();
 // src/game/boot/game-entity-types.mjs
 const m116 = (()=>{
@@ -25471,15 +25856,15 @@ const {BossEffect} = m109;
 const {Drone} = m117;
 const {VelvetCat} = m118;
 const {GatlingGunner} = m108;
-const {Marionette} = m121;
-const {Player} = m122;
-const {ApartmentProp} = m124;
+const {Marionette} = m122;
+const {Player} = m123;
+const {ApartmentProp} = m125;
 const {gameActor} = m100;
-const {NPC} = m125;
+const {NPC} = m126;
 const {Hunter} = m98;
 const {Ganger} = m99;
-const {WorldLoot} = m127;
-const {registerStreetEntityTypes} = m128;
+const {WorldLoot} = m128;
+const {registerStreetEntityTypes} = m129;
 /** The Directory registers concrete classes before any level or saved identity is constructed. */
 function registerGameEntityTypes(world){
  for(const Class of [gameActor,Player,ApartmentProp,NPC,Ganger,Hunter,Marionette,GatlingGunner,Demoness,Warden,Vesper,Matins,Compline,BossEffect,Drone,VelvetCat,WorldLoot])if(!world.elements.listEntityTypes().includes(Class.entity_type))world.elements.registerEntityType(Class.entity_type,Class);
@@ -25488,7 +25873,7 @@ function registerGameEntityTypes(world){
 
 return Object.freeze({get registerGameEntityTypes(){return registerGameEntityTypes;}});
 })();
-const m136 = Object.freeze({default:{
+const m137 = Object.freeze({default:{
   "library_id": "df_apartment",
   "description": "Authored Silver Queen apartment assets. Furniture order preserves existing questState.aptLayout indices. Physics state is held only by Basement bodies.",
   "resources": {
@@ -25593,9 +25978,9 @@ const m136 = Object.freeze({default:{
   }
 }});
 // src/game/data/apartment-assets.mjs
-const m135 = (()=>{
+const m136 = (()=>{
 const {createGameAssetLibrary} = m47;
-const definition = m136.default;
+const definition = m137.default;
 
 function createApartmentAssetLibrary(options = {}) {
     const library = createGameAssetLibrary(options);
@@ -25608,7 +25993,7 @@ const APARTMENT_RULES = Object.freeze(definition.resources.rules.data);
 return Object.freeze({get createApartmentAssetLibrary(){return createApartmentAssetLibrary;},get APARTMENT_RULES(){return APARTMENT_RULES;}});
 })();
 // src/engine/basement/maps/doors.mjs
-const m140 = (()=>{
+const m141 = (()=>{
 // ===== LV0 BASEMENT =====
 const {BODY_GROUP} = m1;
 
@@ -25710,10 +26095,10 @@ function doorLeaves(d, key, kind, base) {
 return Object.freeze({get DOOR_KINDS(){return DOOR_KINDS;},get HINGE(){return HINGE;},get DOOR_MASK(){return DOOR_MASK;},get validateDoorKind(){return validateDoorKind;},get resolveDoorKinds(){return resolveDoorKinds;},get doorKind(){return doorKind;},get leafIds(){return leafIds;},get doorLeaves(){return doorLeaves;}});
 })();
 // src/engine/basement/maps/builder.mjs
-const m139 = (()=>{
+const m140 = (()=>{
 // ===== LV0 BASEMENT =====
 const {layoutGeometry} = m1;
-const {resolveDoorKinds,doorKind,doorLeaves} = m140;
+const {resolveDoorKinds,doorKind,doorLeaves} = m141;
 
 
 /**
@@ -25804,12 +26189,12 @@ function buildMapPackets(definition, { templates = {}, decorate = null, prop_typ
     return { kind, entries, spawn: definition.spawn ? [...definition.spawn] : null, door_kinds: kinds };
 }
 
-return Object.freeze({get DOOR_KINDS(){return m140.DOOR_KINDS;},get HINGE(){return m140.HINGE;},get validateDoorKind(){return m140.validateDoorKind;},get MAP_KINDS(){return MAP_KINDS;},get DEFAULT_KINDS(){return DEFAULT_KINDS;},get buildMapPackets(){return buildMapPackets;}});
+return Object.freeze({get DOOR_KINDS(){return m141.DOOR_KINDS;},get HINGE(){return m141.HINGE;},get validateDoorKind(){return m141.validateDoorKind;},get MAP_KINDS(){return MAP_KINDS;},get DEFAULT_KINDS(){return DEFAULT_KINDS;},get buildMapPackets(){return buildMapPackets;}});
 })();
 // src/engine/basement/maps/rooms.mjs
-const m142 = (()=>{
+const m143 = (()=>{
 // ===== LV0 BASEMENT =====
-const {resolveDoorKinds,doorKind,leafIds} = m140;
+const {resolveDoorKinds,doorKind,leafIds} = m141;
 /**
  * Rooms of one map: which rooms exist, how they connect, how open each connection is right now,
  * and which room each tracked body is in. Room volumes live in the world's one spatial grid (the
@@ -25958,11 +26343,11 @@ class roomGraph {
 return Object.freeze({get roomGraph(){return roomGraph;}});
 })();
 // src/engine/basement/maps/system.mjs
-const m141 = (()=>{
+const m142 = (()=>{
 // ===== LV0 BASEMENT =====
 const {BODY_GROUP} = m1;
-const {buildMapPackets} = m139;
-const {roomGraph} = m142;
+const {buildMapPackets} = m140;
+const {roomGraph} = m143;
 
 const extentOf = packet => {
     const s = packet.collision_shape ?? packet.render_shape;
@@ -26101,17 +26486,17 @@ class mapSystem {
 return Object.freeze({get mapInstance(){return mapInstance;},get mapSystem(){return mapSystem;}});
 })();
 // src/engine/basement/maps/index.mjs
-const m138 = (()=>{
+const m139 = (()=>{
 // ===== LV0 BASEMENT =====
 
 
 
 
-return Object.freeze({get buildMapPackets(){return m139.buildMapPackets;},get MAP_KINDS(){return m139.MAP_KINDS;},get DEFAULT_KINDS(){return m139.DEFAULT_KINDS;},get DOOR_KINDS(){return m139.DOOR_KINDS;},get HINGE(){return m139.HINGE;},get validateDoorKind(){return m139.validateDoorKind;},get mapInstance(){return m141.mapInstance;},get mapSystem(){return m141.mapSystem;},get roomGraph(){return m142.roomGraph;}});
+return Object.freeze({get buildMapPackets(){return m140.buildMapPackets;},get MAP_KINDS(){return m140.MAP_KINDS;},get DEFAULT_KINDS(){return m140.DEFAULT_KINDS;},get DOOR_KINDS(){return m140.DOOR_KINDS;},get HINGE(){return m140.HINGE;},get validateDoorKind(){return m140.validateDoorKind;},get mapInstance(){return m142.mapInstance;},get mapSystem(){return m142.mapSystem;},get roomGraph(){return m143.roomGraph;}});
 })();
 // src/game/levels/apartment-definition.mjs
-const m137 = (()=>{
-const {buildMapPackets} = m138;
+const m138 = (()=>{
+const {buildMapPackets} = m139;
 const {resolveMapLayout,PROP_TYPES} = m69;
 
 const TEMPLATES = { wall: 'df_apartment:wall', prop: 'df_apartment:furniture', light: 'df_apartment:lamp', trigger: 'df_apartment:transition', room: 'df_apartment:transition', door: 'df_apartment:door', cloth: 'df_apartment:curtain' };
@@ -26180,7 +26565,7 @@ function resolveApartmentDyer(game_db){
 return Object.freeze({get apartmentMapDefinition(){return apartmentMapDefinition;},get APARTMENT_MAP_OPTIONS(){return APARTMENT_MAP_OPTIONS;},get resolveApartmentDefinition(){return resolveApartmentDefinition;},get resolveApartmentDyer(){return resolveApartmentDyer;}});
 })();
 // src/game/boot/game-actor-factory.mjs
-const m143 = (()=>{
+const m144 = (()=>{
 const {createDemonessAppearance} = m48;
 const {createHunterAppearance} = m56;
 const {validateAttackState} = m101;
@@ -26224,11 +26609,11 @@ const {abilityLoadout} = m115;
 const {importActorAbilities} = m115;
 const {registerGameEntityTypes} = m116;
 const {physicsSystem} = m1;
-const {createApartmentAssetLibrary} = m135;
-const {resolveApartmentDefinition,resolveApartmentDyer,APARTMENT_MAP_OPTIONS} = m137;
-const {mapInstance} = m138;
-const {NPC,rosterRecord} = m125;
-const {createActorPacket} = m143;
+const {createApartmentAssetLibrary} = m136;
+const {resolveApartmentDefinition,resolveApartmentDyer,APARTMENT_MAP_OPTIONS} = m138;
+const {mapInstance} = m139;
+const {NPC,rosterRecord} = m126;
+const {createActorPacket} = m144;
 const {gameProp} = m1;
 class ApartmentDoor extends gameProp { static entity_type = 'df_apartment_door'; }
 
@@ -26308,7 +26693,7 @@ class ApartmentLevel {
 return Object.freeze({get ApartmentLevel(){return ApartmentLevel;}});
 })();
 // src/engine/lobby/level-lobby.mjs
-const m145 = (()=>{
+const m146 = (()=>{
 // ===== LV1 LOBBY =====
 // The engine's game loop. The Lobby keeps the clock and nothing else: it knows when a frame is due,
 // how many fixed simulation steps that frame owes, and how far the drawn frame sits between two steps.
@@ -26445,7 +26830,7 @@ class levelLobby {
 return Object.freeze({get levelLobby(){return levelLobby;}});
 })();
 // src/engine/lobby/runtime/game-level.mjs
-const m146 = (()=>{
+const m147 = (()=>{
 // ===== LV1 LOBBY =====
 /** Content/lifecycle contract. A level never owns a world, clock or collision solver. */
 class gameLevel {
@@ -26466,7 +26851,7 @@ class gameLevel {
 return Object.freeze({get gameLevel(){return gameLevel;}});
 })();
 // src/engine/basement/controls/values.mjs
-const m149 = (()=>{
+const m150 = (()=>{
 // ===== LV0 BASEMENT =====
 const TAP = 0;
 const DOUBLETAP = 1;
@@ -26491,7 +26876,7 @@ function radialStick(value, dead_zone = 0.15) {
 return Object.freeze({get TAP(){return TAP;},get DOUBLETAP(){return DOUBLETAP;},get HELD(){return HELD;},get PRESS(){return PRESS;},get REPEAT(){return REPEAT;},get RELEASE(){return RELEASE;},get cleanupAll(){return cleanupAll;},get radialStick(){return radialStick;}});
 })();
 // src/engine/basement/controls/touch-stick.mjs
-const m151 = (()=>{
+const m152 = (()=>{
 // ===== LV0 BASEMENT =====
 class touchStick {
     constructor(system, name, packet) {
@@ -26591,10 +26976,10 @@ class touchStick {
 return Object.freeze({get touchStick(){return touchStick;}});
 })();
 // src/engine/basement/controls/devices.mjs
-const m150 = (()=>{
+const m151 = (()=>{
 // ===== LV0 BASEMENT =====
-const {touchStick} = m151;
-const {radialStick,cleanupAll} = m149;
+const {touchStick} = m152;
+const {radialStick,cleanupAll} = m150;
 
 /** Device state uses the terminology from the original Python input instances. */
 class inputInstance {
@@ -26713,11 +27098,11 @@ class gamepadInstance extends inputInstance {
 return Object.freeze({get inputInstance(){return inputInstance;},get keyboardInstance(){return keyboardInstance;},get mouseInstance(){return mouseInstance;},get touchInstance(){return touchInstance;},get gamepadInstance(){return gamepadInstance;}});
 })();
 // src/engine/basement/controls/system.mjs
-const m148 = (()=>{
+const m149 = (()=>{
 // ===== LV0 BASEMENT =====
-const {TAP,DOUBLETAP,HELD,PRESS,REPEAT,RELEASE} = m149;
-const {radialStick,cleanupAll} = m149;
-const {keyboardInstance,mouseInstance,touchInstance,gamepadInstance} = m150;
+const {TAP,DOUBLETAP,HELD,PRESS,REPEAT,RELEASE} = m150;
+const {radialStick,cleanupAll} = m150;
+const {keyboardInstance,mouseInstance,touchInstance,gamepadInstance} = m151;
 
 class controlSystem {
     #listeners = new Set();
@@ -26955,17 +27340,17 @@ class controlSystem {
 return Object.freeze({get controlSystem(){return controlSystem;}});
 })();
 // src/engine/basement/controls/index.mjs
-const m147 = (()=>{
+const m148 = (()=>{
 // ===== LV0 BASEMENT =====
 
 
 
 
 
-return Object.freeze({get controlSystem(){return m148.controlSystem;},get controlsSystem(){return m148.controlSystem;},get inputInstance(){return m150.inputInstance;},get keyboardInstance(){return m150.keyboardInstance;},get mouseInstance(){return m150.mouseInstance;},get touchInstance(){return m150.touchInstance;},get gamepadInstance(){return m150.gamepadInstance;},get touchStick(){return m151.touchStick;},get TAP(){return m149.TAP;},get DOUBLETAP(){return m149.DOUBLETAP;},get HELD(){return m149.HELD;},get PRESS(){return m149.PRESS;},get REPEAT(){return m149.REPEAT;},get RELEASE(){return m149.RELEASE;}});
+return Object.freeze({get controlSystem(){return m149.controlSystem;},get controlsSystem(){return m149.controlSystem;},get inputInstance(){return m151.inputInstance;},get keyboardInstance(){return m151.keyboardInstance;},get mouseInstance(){return m151.mouseInstance;},get touchInstance(){return m151.touchInstance;},get gamepadInstance(){return m151.gamepadInstance;},get touchStick(){return m152.touchStick;},get TAP(){return m150.TAP;},get DOUBLETAP(){return m150.DOUBLETAP;},get HELD(){return m150.HELD;},get PRESS(){return m150.PRESS;},get REPEAT(){return m150.REPEAT;},get RELEASE(){return m150.RELEASE;}});
 })();
 // src/engine/basement/rendering/values.mjs
-const m154 = (()=>{
+const m155 = (()=>{
 // ===== LV0 BASEMENT =====
 function finite(value,name,min=-Infinity){if(!Number.isFinite(value)||value<min)throw new TypeError(`Invalid ${name}`);return value;}
 function vector(value,name='vector',out=[]){if(!Array.isArray(value)||value.length!==2)throw new TypeError(`Invalid ${name}`);out[0]=finite(value[0],name);out[1]=finite(value[1],name);return out;}
@@ -26983,9 +27368,9 @@ const BLENDS = Object.freeze({normal:'source-over',add:'lighter',multiply:'multi
 return Object.freeze({get finite(){return finite;},get vector(){return vector;},get identifier(){return identifier;},get matrix(){return matrix;},get inverse(){return inverse;},get point(){return point;},get transform(){return transform;},get viewport(){return viewport;},get freezeData(){return freezeData;},get color(){return color;},get BLENDS(){return BLENDS;}});
 })();
 // src/engine/basement/rendering/camera.mjs
-const m153 = (()=>{
+const m154 = (()=>{
 // ===== LV0 BASEMENT =====
-const {finite,vector,viewport,inverse,point,freezeData} = m154;
+const {finite,vector,viewport,inverse,point,freezeData} = m155;
 
 /** View state only. Following reads native poses; this class never moves a body. */
 class cameraSystem {
@@ -27039,9 +27424,9 @@ class cameraSystem {
 return Object.freeze({get cameraSystem(){return cameraSystem;}});
 })();
 // src/engine/basement/rendering/packets.mjs
-const m156 = (()=>{
+const m157 = (()=>{
 // ===== LV0 BASEMENT =====
-const {finite,vector,matrix,inverse,transform,color,identifier,BLENDS} = m154;
+const {finite,vector,matrix,inverse,transform,color,identifier,BLENDS} = m155;
 
 const geometryBuffers = new WeakMap();
 
@@ -27111,10 +27496,10 @@ function requirements(draw,resolve,result=[]){
 return Object.freeze({get geometry(){return geometry;},get material(){return material;},get packet(){return packet;},get requirements(){return requirements;}});
 })();
 // src/engine/basement/rendering/frame.mjs
-const m155 = (()=>{
+const m156 = (()=>{
 // ===== LV0 BASEMENT =====
-const {packet} = m156;
-const {color,finite,freezeData} = m154;
+const {packet} = m157;
+const {color,finite,freezeData} = m155;
 
 /** Reused command buffers. Producers submit data; a backend borrows a completed frame. */
 class renderFrame {
@@ -27152,11 +27537,11 @@ class renderFrame {
 return Object.freeze({get renderFrame(){return renderFrame;}});
 })();
 // src/engine/basement/rendering/system.mjs
-const m157 = (()=>{
+const m158 = (()=>{
 // ===== LV0 BASEMENT =====
-const {renderFrame} = m155;
-const {geometry,material,requirements} = m156;
-const {finite,identifier,freezeData} = m154;
+const {renderFrame} = m156;
+const {geometry,material,requirements} = m157;
+const {finite,identifier,freezeData} = m155;
 
 function normalizeResource(description){
     if(!description||typeof description!=='object')throw new TypeError('A data resource descriptor is required');
@@ -27245,10 +27630,10 @@ class renderSystem {
 return Object.freeze({get renderSystem(){return renderSystem;}});
 })();
 // src/engine/basement/rendering/canvas.mjs
-const m158 = (()=>{
+const m159 = (()=>{
 // ===== LV0 BASEMENT =====
-const {renderFrame} = m155;
-const {BLENDS} = m154;
+const {renderFrame} = m156;
+const {BLENDS} = m155;
 
 function createSurface(width,height){
     if(typeof OffscreenCanvas!=='undefined')return new OffscreenCanvas(width,height);
@@ -27370,13 +27755,13 @@ class canvasRenderer {
 return Object.freeze({get canvasRenderer(){return canvasRenderer;}});
 })();
 // src/engine/basement/rendering/art.mjs
-const m159 = (()=>{
+const m160 = (()=>{
 // ===== LV0 BASEMENT =====
 // THE ART TOOLKIT: the shapes, effects and helpers every artist repeats, as frame packets. An artist
 // builds a picture in an `artScene` (move, rotate, scale and paint inside nested groups, as with a
 // canvas save/restore) and hands `finish()` to the frame. Nothing here touches a canvas: every
 // result is plain data that any backend can draw.
-const {transform,inverse} = m154;
+const {transform,inverse} = m155;
 
 const identity=()=>[1,0,0,1,0,0];
 const multiply=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
@@ -27471,7 +27856,7 @@ function hash2(x,y,seed=0){let h=Math.imul((x|0)^0x27d4eb2d,0x85ebca6b)^Math.imu
 return Object.freeze({get ellipse(){return ellipse;},get circle(){return circle;},get polyline(){return polyline;},get polygon(){return polygon;},get rect(){return rect;},get roundRect(){return roundRect;},get capsule(){return capsule;},get smoothShape(){return smoothShape;},get linear(){return linear;},get radial(){return radial;},get artScene(){return artScene;},get glow(){return glow;},get groundShadow(){return groundShadow;},get hexToRgb(){return hexToRgb;},get rgbToHex(){return rgbToHex;},get rgba(){return rgba;},get mix(){return mix;},get shade(){return shade;},get seededRandom(){return seededRandom;},get hash2(){return hash2;}});
 })();
 // src/engine/basement/rendering/index.mjs
-const m152 = (()=>{
+const m153 = (()=>{
 // ===== LV0 BASEMENT =====
 
 
@@ -27479,16 +27864,16 @@ const m152 = (()=>{
 
 
 
-return Object.freeze({get cameraSystem(){return m153.cameraSystem;},get renderFrame(){return m155.renderFrame;},get renderSystem(){return m157.renderSystem;},get canvasRenderer(){return m158.canvasRenderer;},get artScene(){return m159.artScene;},get circle(){return m159.circle;},get ellipse(){return m159.ellipse;},get polyline(){return m159.polyline;},get polygon(){return m159.polygon;},get rect(){return m159.rect;},get roundRect(){return m159.roundRect;},get capsule(){return m159.capsule;},get smoothShape(){return m159.smoothShape;},get linear(){return m159.linear;},get radial(){return m159.radial;},get glow(){return m159.glow;},get groundShadow(){return m159.groundShadow;},get hexToRgb(){return m159.hexToRgb;},get rgbToHex(){return m159.rgbToHex;},get rgba(){return m159.rgba;},get mix(){return m159.mix;},get shade(){return m159.shade;},get seededRandom(){return m159.seededRandom;},get hash2(){return m159.hash2;}});
+return Object.freeze({get cameraSystem(){return m154.cameraSystem;},get renderFrame(){return m156.renderFrame;},get renderSystem(){return m158.renderSystem;},get canvasRenderer(){return m159.canvasRenderer;},get artScene(){return m160.artScene;},get circle(){return m160.circle;},get ellipse(){return m160.ellipse;},get polyline(){return m160.polyline;},get polygon(){return m160.polygon;},get rect(){return m160.rect;},get roundRect(){return m160.roundRect;},get capsule(){return m160.capsule;},get smoothShape(){return m160.smoothShape;},get linear(){return m160.linear;},get radial(){return m160.radial;},get glow(){return m160.glow;},get groundShadow(){return m160.groundShadow;},get hexToRgb(){return m160.hexToRgb;},get rgbToHex(){return m160.rgbToHex;},get rgba(){return m160.rgba;},get mix(){return m160.mix;},get shade(){return m160.shade;},get seededRandom(){return m160.seededRandom;},get hash2(){return m160.hash2;}});
 })();
 // src/engine/lobby/runtime/game-engine.mjs
-const m144 = (()=>{
+const m145 = (()=>{
 // ===== LV1 LOBBY =====
 const {physicsSystem} = m1;
-const {levelLobby} = m145;
-const {gameLevel} = m146;
-const {controlSystem} = m147;
-const {cameraSystem,renderSystem} = m152;
+const {levelLobby} = m146;
+const {gameLevel} = m147;
+const {controlSystem} = m148;
+const {cameraSystem,renderSystem} = m153;
 
 const hooks = ['attach', 'detach', 'beforePhysics', 'afterPhysics', 'render', 'levelEntered', 'levelLeaving','gameplayPaused'];
 function synchronous(fn, receiver, args) {
@@ -27743,7 +28128,7 @@ class gameEngine {
 
 return Object.freeze({get gameEngine(){return gameEngine;}});
 })();
-const m163 = Object.freeze({default:{
+const m164 = Object.freeze({default:{
   "slim": {
     "w": 0.88,
     "d": 0.92,
@@ -27774,7 +28159,7 @@ const m163 = Object.freeze({default:{
     "hip": 1.1
   }
 }});
-const m164 = Object.freeze({default:{
+const m165 = Object.freeze({default:{
   "female": {
     "sh": 10.5,
     "del": 4,
@@ -27901,9 +28286,9 @@ const m164 = Object.freeze({default:{
   }
 }});
 // src/game/data/humanoid/rig-assets.mjs
-const m162 = (()=>{
-const builds = m163.default;
-const bodyCanon = m164.default;
+const m163 = (()=>{
+const builds = m164.default;
+const bodyCanon = m165.default;
 const {rigDefinition,animationClip} = m1;
 const immutable=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))immutable(child);Object.freeze(value);}return value;};
 const humanoidBodyCanon=immutable(bodyCanon);
@@ -27950,8 +28335,8 @@ function getHumanoidRigAssets(gender='androgynous',{build=null,height=1}={}){
 return Object.freeze({get humanoidBodyCanon(){return humanoidBodyCanon;},get humanoidBuilds(){return humanoidBuilds;},get getHumanoidRigAssets(){return getHumanoidRigAssets;}});
 })();
 // src/game/mechanics/animation/humanoid-system.mjs
-const m161 = (()=>{
-const {getHumanoidRigAssets} = m162;
+const m162 = (()=>{
+const {getHumanoidRigAssets} = m163;
 const humanoids=new Set(['df_player','df_npc','df_ganger','df_hunter','df_demoness']);
 /** Game policy chooses authored poses; Basement resolves and advances every joint. */
 class humanoidSystem {
@@ -27999,7 +28384,7 @@ function humanoidPresentation(actor,blend=1){
 return Object.freeze({get humanoidSystem(){return humanoidSystem;},get humanoidPresentation(){return humanoidPresentation;}});
 })();
 // src/game/mechanics/encounters/encounter-system.mjs
-const m165 = (()=>{
+const m166 = (()=>{
 const {BossEffect} = m109;
 const {BODY_GROUP} = m1;
 const {jsonCopy} = m40;
@@ -28080,7 +28465,7 @@ class encounterSystem{
 return Object.freeze({get encounterSystem(){return encounterSystem;}});
 })();
 // src/game/data/weapon-models.mjs
-const m168 = (()=>{
+const m169 = (()=>{
 /* =====================================================================
    WEAPON MODELS — every gun as data: parts in the gun's own frame (+x down
    the barrel, the grip hand near 0,0, +y to the holder's right), each in a
@@ -28306,8 +28691,8 @@ function weaponModel(id) {
 return Object.freeze({get GUN_MATERIALS(){return GUN_MATERIALS;},get WEAPON_MODELS(){return WEAPON_MODELS;},get LASER_MODULE(){return LASER_MODULE;},get weaponModel(){return weaponModel;}});
 })();
 // src/game/data/combat-profiles.mjs
-const m167 = (()=>{
-const {weaponModel} = m168;
+const m168 = (()=>{
+const {weaponModel} = m169;
 /** Shape authoring belongs with the visual assets. Runtime collision calculations stay in Basement. */
 function getCombatProfile(definition_id){
  const model=weaponModel(definition_id),edge=model.edge??[19.4,2.6];
@@ -28317,9 +28702,9 @@ function getCombatProfile(definition_id){
 return Object.freeze({get getCombatProfile(){return getCombatProfile;}});
 })();
 // src/game/mechanics/attacks/attack-system.mjs
-const m166 = (()=>{
+const m167 = (()=>{
 const attackRules = m64.default;
-const {getCombatProfile} = m167;
+const {getCombatProfile} = m168;
 const {prepareMountedAttack,mountedAttackState,validateMountedAttack} = m114;
 const combatRules = m63.default;
 const {gameCharacter} = m1;
@@ -28441,7 +28826,7 @@ class attackSystem{
 return Object.freeze({get attackSystem(){return attackSystem;}});
 })();
 // src/game/mechanics/abilities/ability-system.mjs
-const m169 = (()=>{
+const m170 = (()=>{
 const {beginPattern,advancePattern,clearPattern} = m110;
 const {beginTimedAction,advanceTimedAction,hitGrapple,clearTimedAction} = m112;
 const {beginBurst,advanceBurst} = m113;
@@ -28503,19 +28888,19 @@ class abilitySystem{
 return Object.freeze({get abilitySystem(){return abilitySystem;}});
 })();
 // src/game/mechanics/actors/actor-system.mjs
-const m170 = (()=>{
+const m171 = (()=>{
 const {Demoness} = m97;
 const {Warden} = m107;
 const {Drone} = m117;
 const {VelvetCat} = m118;
 const {GatlingGunner} = m108;
-const {Marionette} = m121;
+const {Marionette} = m122;
 const {gameActor} = m100;
-const {NPC} = m125;
+const {NPC} = m126;
 const {Hunter} = m98;
 const {Ganger} = m99;
 const {BODY_GROUP} = m1;
-const {createActorPacket} = m143;
+const {createActorPacket} = m144;
 
 /** Registered actor lifetimes and policy updates in the existing fixed step. No second world or index. */
 class actorSystem{
@@ -28573,7 +28958,7 @@ class actorSystem{
 
 return Object.freeze({get actorSystem(){return actorSystem;}});
 })();
-const m171 = Object.freeze({default:{
+const m172 = Object.freeze({default:{
   "keymap": {
     "move_up":["w","ArrowUp"],"move_down":["s","ArrowDown"],"move_left":["a","ArrowLeft"],"move_right":["d","ArrowRight"],
     "fire":["mouseLeft","space","gamepadRTrigger","touchFire"],
@@ -28587,7 +28972,7 @@ const m171 = Object.freeze({default:{
   }
 }});
 // src/game/mechanics/game-session.mjs
-const m172 = (()=>{
+const m173 = (()=>{
 const {itemSystem} = m104;
 const {createItemCatalog} = m58;
 const itemRules = m105.default;
@@ -28664,7 +29049,7 @@ class gameSession {
 return Object.freeze({get gameSession(){return gameSession;}});
 })();
 // src/game/mechanics/player-state-system.mjs
-const m173 = (()=>{
+const m174 = (()=>{
 const {nonnegative,jsonCopy} = m40;
 
 /** Game rules only. The native entity/body remains the sole owner of physical state. */
@@ -28720,7 +29105,7 @@ class PlayerStateSystem {
 return Object.freeze({get PlayerStateSystem(){return PlayerStateSystem;}});
 })();
 // src/game/mechanics/player-control-system.mjs
-const m174 = (()=>{
+const m175 = (()=>{
 /** Turns input terminology into native motor requests and gameplay intents. No physical math. */
 class PlayerControlSystem {
     #session; #state; #blocked = new Set(); #placement; #context = null;
@@ -28760,7 +29145,7 @@ class PlayerControlSystem {
 return Object.freeze({get PlayerControlSystem(){return PlayerControlSystem;}});
 })();
 // src/game/mechanics/combat/combat-system.mjs
-const m175 = (()=>{
+const m176 = (()=>{
 const rules = m63.default;
 const {BODY_GROUP} = m1;
 const {nonnegative,jsonCopy} = m40;
@@ -28830,7 +29215,7 @@ class combatSystem{
 return Object.freeze({get isCombatDead(){return isCombatDead;},get combatSystem(){return combatSystem;}});
 })();
 // src/game/mechanics/combat/melee-poses.mjs
-const m177 = (()=>{
+const m178 = (()=>{
 // Authored local animation poses, shared by presentation and native swept queries.
 const rules = m63.default;
 const MELEE_SWING={duration:rules.blade.duration_seconds,windup:rules.blade.windup_seconds,cutEnd:rules.blade.cut_end_seconds};
@@ -28906,12 +29291,12 @@ function sampleMeleeSwing(age, side, out = {}, secs = MELEE_SWING.duration, styl
 return Object.freeze({get MELEE_SWING(){return MELEE_SWING;},get WIDE_SWING(){return WIDE_SWING;},get sampleWideSwing(){return sampleWideSwing;},get wideGrip(){return wideGrip;},get swingPhases(){return swingPhases;},get sampleMeleeSwing(){return sampleMeleeSwing;}});
 })();
 // src/game/mechanics/combat/weapon-system.mjs
-const m176 = (()=>{
+const m177 = (()=>{
 const rules = m63.default;
-const {getCombatProfile} = m167;
+const {getCombatProfile} = m168;
 const {BODY_GROUP} = m1;
-const {sampleMeleeSwing,swingPhases} = m177;
-const {isCombatDead} = m175;
+const {sampleMeleeSwing,swingPhases} = m178;
+const {isCombatDead} = m176;
 const {jsonCopy,nonnegative} = m40;
 
 const stateFor=(player,settings=rules)=>player.data.weapon_state??={format_version:1,elapsed:0,cooldown:0,holstered:false,drawn_at:null,draw_shot_used:false,quick_draw:null,punch_side:'right',haymaker:false,combo:0,last_punch_at:-99,swing:null,side:1,shield:{charge:settings.mirror.shield,spent:false,since_hit:999}};
@@ -29083,8 +29468,8 @@ class weaponSystem{
 return Object.freeze({get weaponSystem(){return weaponSystem;}});
 })();
 // src/game/mechanics/items/loot-system.mjs
-const m178 = (()=>{
-const {WorldLoot} = m127;
+const m179 = (()=>{
+const {WorldLoot} = m128;
 const rules = m63.default;
 const {BODY_GROUP} = m1;
 const {jsonCopy,nonnegative} = m40;
@@ -29137,24 +29522,24 @@ class lootSystem{
 return Object.freeze({get lootSystem(){return lootSystem;}});
 })();
 // src/game/boot/game-runtime.mjs
-const m160 = (()=>{
-const {humanoidSystem} = m161;
-const {encounterSystem} = m165;
-const {attackSystem} = m166;
-const {abilitySystem} = m169;
-const {actorSystem} = m170;
+const m161 = (()=>{
+const {humanoidSystem} = m162;
+const {encounterSystem} = m166;
+const {attackSystem} = m167;
+const {abilitySystem} = m170;
+const {actorSystem} = m171;
 const {registerGameEntityTypes} = m116;
-const {gameEngine} = m144;
-const {createApartmentAssetLibrary} = m135;
-const controlProfile = m171.default;
-const {gameSession} = m172;
-const {PlayerStateSystem} = m173;
-const {PlayerControlSystem} = m174;
+const {gameEngine} = m145;
+const {createApartmentAssetLibrary} = m136;
+const controlProfile = m172.default;
+const {gameSession} = m173;
+const {PlayerStateSystem} = m174;
+const {PlayerControlSystem} = m175;
 const playerRules = m66.default;
-const {combatSystem} = m175;
-const {weaponSystem} = m176;
-const {lootSystem} = m178;
-const {canvasRenderer} = m152;
+const {combatSystem} = m176;
+const {weaponSystem} = m177;
+const {lootSystem} = m179;
+const {canvasRenderer} = m153;
 
 /** Explicit game composition. Importing this file never starts a second runtime. */
 function createGameRuntime({ game_db, surface, session_state, player, weapon_policy={}, combat_policy={}, actor_policy={}, ability_policy={}, ...options } = {}) {
@@ -29191,8 +29576,8 @@ function createGameRuntime({ game_db, surface, session_state, player, weapon_pol
 return Object.freeze({get createGameRuntime(){return createGameRuntime;}});
 })();
 // src/game/presentation/weapon-appearance.mjs
-const m179 = (()=>{
-const {GUN_MATERIALS,WEAPON_MODELS,LASER_MODULE,weaponModel} = m168;
+const m180 = (()=>{
+const {GUN_MATERIALS,WEAPON_MODELS,LASER_MODULE,weaponModel} = m169;
 
 const polygon=points=>({type:'path',commands:[...points.map(([x,y],i)=>[i?'line':'move',x,y]),['close']]});
 function shape(part){
@@ -29275,7 +29660,7 @@ class weaponAppearance {
 return Object.freeze({get weaponAppearance(){return weaponAppearance;}});
 })();
 // src/game/data/game-combat.mjs
-const m180 = (()=>{
+const m181 = (()=>{
 const data = m63.default;
 const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
 const COMBAT_RULES=freeze(structuredClone(data));
@@ -29283,9 +29668,9 @@ const COMBAT_RULES=freeze(structuredClone(data));
 return Object.freeze({get COMBAT_RULES(){return COMBAT_RULES;}});
 })();
 // src/game/presentation/drone.mjs
-const m181 = (()=>{
+const m182 = (()=>{
 const enemies = m49.default;
-const {artScene,circle,ellipse,radial,glow} = m152;
+const {artScene,circle,ellipse,radial,glow} = m153;
 const DRONE=enemies.drone;
 function droneLift(state){return DRONE.HOVER_PX+Math.sin(state.hoverOffset)*3+state.alt*240;}
 function droneArmPose(diving,stuck,s){
@@ -29466,7 +29851,7 @@ return Object.assign({},{x:pose.position[0],y:pose.position[1],angle:pose.rotati
 return Object.freeze({get droneLift(){return droneLift;},get droneArmPose(){return droneArmPose;},get createDronePackets(){return createDronePackets;},get dronePresentation(){return dronePresentation;}});
 })();
 // src/game/presentation/demoness.mjs
-const m182 = (()=>{
+const m183 = (()=>{
 const enemies = m49.default;
 const DUEL=enemies.duel;
 /** Retained Canvas art over a detached record; body art is supplied by the host. */
@@ -29531,7 +29916,7 @@ function demonessPresentation(entity,blend=1){const pose=entity.getRenderState(b
 return Object.freeze({get demonessAppearance(){return demonessAppearance;},get demonessPresentation(){return demonessPresentation;}});
 })();
 // src/game/presentation/boss-effects.mjs
-const m183 = (()=>{
+const m184 = (()=>{
 const enemies = m49.default;
 const HAZARD=enemies.hazards;
 const bossEffectAppearance={
@@ -29669,9 +30054,9 @@ function bossEffectPresentation(effects,clock){return effects.filter(effect=>!ef
 return Object.freeze({get bossEffectAppearance(){return bossEffectAppearance;},get bossEffectPresentation(){return bossEffectPresentation;}});
 })();
 // src/game/presentation/velvet-cat.mjs
-const m184 = (()=>{
-const {artScene,circle,ellipse,radial,linear,groundShadow} = m152;
-const {velvetCatAnimation} = m119;
+const m185 = (()=>{
+const {artScene,circle,ellipse,radial,linear,groundShadow} = m153;
+const {velvetCatAnimation,velvetFrame,velvetLegGait,velvetJoints,VELVET_LEG_JOINTS} = m119;
 const {VELVET_CAT_PALETTES,VELVET_T,VELVET_PROFILES,VELVET_TAIL_SEGS} = m120;
 /** Renderer-neutral feline geometry/material packets over detached animation state. */
 
@@ -29700,41 +30085,18 @@ function createVelvetCatArt(state){const scene=new artScene(),eyes=[];let path=[
                 const lx = Math.cos(-state.angle) * -0.6 - Math.sin(-state.angle) * -0.8;
                 const ly = Math.sin(-state.angle) * -0.6 + Math.cos(-state.angle) * -0.8;
 
-                // --- Spine: an arc from rump (t = 0) to neck (t = 1), the neck facing +X ---
-                const cyc = state.walkPhase / TAU;
-                const flex = moving ? Math.sin((cyc + .3) * TAU) * g.gallop : 0;   // a galloping cat gathers and stretches
-                const L = 23.5 * (1 - 0.36 * P.sit - 0.12 * P.loaf + 0.03 * P.sleep + 0.2 * P.stretch) * (1 + flex * 0.13);
-                const bend = (state._bend || 0) * (1 - P.sleep) + P.sleep * 4.3 * (state._curlSide || 1);
-                const S = 12, pts = [];
-                let px = 0, py = 0;
-                for (let i = S; i >= 0; i--) {
-                    const t = i / S, th = bend * (t - 1);
-                    pts[i] = { x: px, y: py, th };
-                    px -= Math.cos(th) * L / S; py -= Math.sin(th) * L / S;
-                }
-                let cx = 0, cy = 0;
-                for (const p of pts) { cx += p.x; cy += p.y; }
-                cx = cx / pts.length - 1.5 - P.sit * 2; cy /= pts.length;
-                for (const p of pts) { p.x -= cx; p.y -= cy; }
-                const width = (t) => {
-                    let j = 0; while (j < VELVET_T.length - 2 && t > VELVET_T[j + 1]) j++;
-                    const u = (t - VELVET_T[j]) / (VELVET_T[j + 1] - VELVET_T[j]);
-                    let w = 0;
-                    for (const [name, wt] of [['stand', stand], ['sit', P.sit], ['loaf', P.loaf], ['sleep', P.sleep], ['stretch', P.stretch]]) {
-                        if (wt <= 0) continue;
-                        const pr = VELVET_PROFILES[name];
-                        w += (pr[j] + (pr[j + 1] - pr[j]) * u) * wt;
-                    }
-                    return w * breathe;
-                };
+                // --- Spine: the rig's spine joints, rump (spine_0) to neck (spine_12), the neck facing +X ---
+                const J = state.joints ?? velvetJoints(state), f = velvetFrame(state), width = f.width, S = 12;
+                const pts = Array.from({ length: S + 1 }, (_, i) => { const j = J['spine_' + i]; return { x: j.position[0], y: j.position[1], th: j.rotation }; });
+                // A curled spine turns past a half circle; unwrap the joints' angles so they run on smoothly.
+                for (let i = 1; i <= S; i++) { const d = pts[i].th - pts[i - 1].th; pts[i].th = pts[i - 1].th + Math.atan2(Math.sin(d), Math.cos(d)); }
                 const at = (t) => {
-                    const f = Math.max(0, Math.min(S - 1e-6, t * S)), i = Math.floor(f), u = f - i;
+                    const s = Math.max(0, Math.min(S - 1e-6, t * S)), i = Math.floor(s), u = s - i;
                     const a = pts[i], b = pts[Math.min(S, i + 1)];
                     return { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, th: a.th + (b.th - a.th) * u };
                 };
                 // Shoulder blades and hips roll up on the side of the leg that's bearing weight.
-                const legU = (j) => frac(cyc + g.off[j]);
-                const roll = (j) => moving && legU(j) < g.duty ? Math.sin(legU(j) / g.duty * Math.PI) * 0.7 * stand : 0;
+                const roll = (j) => moving && f.legU(j) < g.duty ? Math.sin(f.legU(j) / g.duty * Math.PI) * 0.7 * stand : 0;
                 const left = [], right = [];
                 for (let i = 0; i <= S; i++) {
                     const p = pts[i], t = i / S, w = width(t), nx = -Math.sin(p.th), ny = Math.cos(p.th);
@@ -29757,33 +30119,12 @@ function createVelvetCatArt(state){const scene=new artScene(),eyes=[];let path=[
                 const outline = [];
                 smoothRing(outline, ring);
 
-                // --- Paw positions: gait, blended toward each rest pose ---
-                const legs = [];
-                for (let j = 0; j < 4; j++) {
-                    const hind = j % 2 === 0, sideY = j < 2 ? -1 : 1;
-                    const anchorT = hind ? .2 : .78, a = at(anchorT), w = width(anchorT);
-                    const nx = -Math.sin(a.th), ny = Math.cos(a.th), ux = Math.cos(a.th), uy = Math.sin(a.th);
-                    // gait: planted feet slide back under her, lifted feet swing forward
-                    const u = legU(j);
-                    let along = 0, lift = 0;
-                    if (moving) {
-                        if (u < g.duty) along = g.stride * (0.5 - u / g.duty);
-                        else { const s = (u - g.duty) / (1 - g.duty); along = g.stride * (-0.5 + (s * s * (3 - 2 * s))); lift = Math.sin(s * Math.PI); }
-                    }
-                    const out = (hind ? 1 : 1.02) * w * (0.85 + lift * 0.12);
-                    let fx = a.x + ux * ((hind ? -1.5 : 4.6) + along) + nx * out * sideY;
-                    let fy = a.y + uy * ((hind ? -1.5 : 4.6) + along) + ny * out * sideY;
-                    let vis = stand;
-                    // sit: fore paws together before the chest, hind paws peeking at the haunches
-                    const sx = hind ? pts[3].x + 3.5 : neck.x + 6.8, sy = hind ? pts[3].y + sideY * (width(.25) + .4) : neck.y + sideY * 2;
-                    // stretch: fore paws reach far ahead
-                    const tx = hind ? fx : neck.x + 12.5, ty = hind ? fy : neck.y + sideY * 3.3;
-                    fx = fx * stand + sx * P.sit + tx * P.stretch + (hind ? pts[3].x : neck.x) * (P.loaf + P.sleep);
-                    fy = fy * stand + sy * P.sit + ty * P.stretch + (hind ? pts[3].y : neck.y) * (P.loaf + P.sleep);
-                    vis += P.sit + P.stretch;
-                    const groomPaw = !hind && sideY < 0 && P.groom > 0.5;
-                    legs.push({ hind, sideY, ax: a.x + nx * w * .45 * sideY, ay: a.y + ny * w * .45 * sideY, fx, fy, lift: lift * stand, vis: groomPaw ? 0 : vis, th: a.th });
-                }
+                // --- Legs: from the spine to the rig's paw joints ---
+                const legs = VELVET_LEG_JOINTS.map((joint, j) => {
+                    const hind = j % 2 === 0, sideY = j < 2 ? -1 : 1, a = at(hind ? .2 : .78), w = width(hind ? .2 : .78), nx = -Math.sin(a.th), ny = Math.cos(a.th);
+                    const { lift, vis } = velvetLegGait(f, j), p = J[joint];
+                    return { hind, sideY, ax: a.x + nx * w * .45 * sideY, ay: a.y + ny * w * .45 * sideY, fx: p.position[0], fy: p.position[1], lift, vis, th: p.rotation };
+                });
                 const paw = (x, y, th, s, raised) => {
                     scene.enter(); scene.place({position:[x, y]}); scene.place({rotation:th}); scene.place({scale:[s, s]});
                     scene.style.fill = raised ? C.raisedPaw : C.pawTop;
@@ -29796,20 +30137,8 @@ function createVelvetCatArt(state){const scene=new artScene(),eyes=[];let path=[
                     scene.paint(path,{stroke:scene.style.stroke}); scene.leave();
                 };
 
-                // --- Tail: nine springy segments from the rump, foreshortened as it rises ---
-                const tail = [];
-                {
-                    // Resting, it leaves the rump already turned along her side, to wrap round toward the fore paws.
-                    let th = rump.th + Math.PI - (state._curlSide || 1) * (P.sit * 1.75 + P.loaf * 1.75 + P.sleep * 1.1), x = rump.x - Math.cos(rump.th) * width(0) * .6, y = rump.y - Math.sin(rump.th) * width(0) * .6;
-                    tail.push({ x, y });
-                    const lift = state._tailLift || 0;
-                    for (let i = 0; i < VELVET_TAIL_SEGS; i++) {
-                        th += -(state._tail ? state._tail[i] : 0);
-                        const len = 3.4 * (1 - lift * (i < 5 ? .62 : .22)) * (1 - P.loaf * .12);
-                        x += Math.cos(th) * len; y += Math.sin(th) * len;
-                        tail.push({ x, y });
-                    }
-                }
+                // --- Tail: the rig's tail joints from the rump, foreshortened as it rises ---
+                const tail = Array.from({ length: VELVET_TAIL_SEGS + 1 }, (_, i) => ({ x: J['tail_' + i].position[0], y: J['tail_' + i].position[1] }));
                 // One tapering filled shape (no overlapping strokes to bead at the joints), rounded at the tip.
                 const tailPath = [];
                 {
@@ -29888,11 +30217,10 @@ function createVelvetCatArt(state){const scene=new artScene(),eyes=[];let path=[
                 if (tailOver) drawTail();
 
                 // --- Head ---
-                const headScale = 1 + P.sit * .07 - P.sleep * .04 - P.stretch * .05;
-                const hx = neck.x + 2.6 - P.sit * 1.2 + P.stretch * 1.5, hy = neck.y;
+                const headScale = J.head.scale[1], [hx, hy] = J.head.position, headYaw = J.head.rotation;
                 // Return eye anchors for the later glow pass; presentation never writes to the actor.
                 {
-                    const yaw = state._headYaw || 0, ca = Math.cos(state.angle), sa = Math.sin(state.angle);
+                    const yaw = headYaw, ca = Math.cos(state.angle), sa = Math.sin(state.angle);
 
                     for (let e = 0; e < 2; e++) {
                         const ex = 2.9 * headScale, ey = (e ? 1 : -1) * 2.05 * headScale;
@@ -29901,7 +30229,7 @@ function createVelvetCatArt(state){const scene=new artScene(),eyes=[];let path=[
                     }
                 }
                 scene.enter();
-                scene.place({position:[hx, hy]}); scene.place({rotation:state._headYaw || 0}); scene.place({scale:[headScale, headScale]});
+                scene.place({position:[hx, hy]}); scene.place({rotation:headYaw}); scene.place({scale:[headScale, headScale]});
                 // the head shades the shoulders under it
                 scene.style.fill = 'rgba(0,0,0,.2)'; path=[]; path.push(ellipse(-lx * 1.4, -ly * 1.4, 5.2, 5, 0, 0, TAU)); scene.paint(path,{fill:scene.style.fill});
                 const skull = [];
@@ -29913,8 +30241,8 @@ function createVelvetCatArt(state){const scene=new artScene(),eyes=[];let path=[
                 skull.push(['cubic',4.2, 3.1, 2.9, 4.9, .6, 4.95]);
                 skull.push(['cubic',-2.2, 5, -4.3, 3.5, -4.3, 0]);
                 skull.push(['close']);
-                const hlx = Math.cos(-(state._headYaw || 0)) * lx - Math.sin(-(state._headYaw || 0)) * ly;
-                const hly = Math.sin(-(state._headYaw || 0)) * lx + Math.cos(-(state._headYaw || 0)) * ly;
+                const hlx = Math.cos(-headYaw) * lx - Math.sin(-headYaw) * ly;
+                const hly = Math.sin(-headYaw) * lx + Math.cos(-headYaw) * ly;
                 const face = radial([hlx * 2 + .5,hly * 2],.5,[.5,0],6.5,[]);
                 face.stops.push([0, C.headTop]); face.stops.push([.55, C.headMiddle]); face.stops.push([1, C.headShadow]);
                 scene.style.fill = face; scene.paint(skull,{fill:scene.style.fill});
@@ -29958,8 +30286,9 @@ function createVelvetCatArt(state){const scene=new artScene(),eyes=[];let path=[
                 scene.paint(path,{stroke:scene.style.stroke});
                 // Ears stand above the skull at its back corners: seen from above, triangles opening forward
                 for (const sd of [-1, 1]) {
-                    const e = state._ears ? state._ears[sd < 0 ? 0 : 1] : 0;
-                    scene.enter(); scene.place({position:[-.9, sd * 2.9]}); scene.place({rotation:sd * (e + .35)});
+                    const ear = J[sd < 0 ? 'ear_l' : 'ear_r'], [ex0, ey0] = [ear.position[0] - hx, ear.position[1] - hy], back = -headYaw;
+                    // the ear's pose inside the head's frame (the head group already carries its position, turn and scale)
+                    scene.enter(); scene.place({position:[(Math.cos(back) * ex0 - Math.sin(back) * ey0) / headScale, (Math.sin(back) * ex0 + Math.cos(back) * ey0) / headScale]}); scene.place({rotation:ear.rotation - headYaw});
                     // a cup of fur: the back of the ear, then the pink inside showing at its open front
                     scene.style.fill = C.earBase; path=[];
                     path.push(['move',-2.5, -sd * .5]); path.push(['quadratic',-2.9, sd * 2, -2.6, sd * 3.9]);
@@ -29975,7 +30304,7 @@ function createVelvetCatArt(state){const scene=new artScene(),eyes=[];let path=[
                 // Grooming: a fore paw lifts to the mouth for a few licks, then wipes back over the ear.
                 if (P.groom > 0.5) {
                     const ph = state._groomPhase || 0, wipe = Math.max(0, Math.sin(ph * .35)) ** 2, lick = Math.sin(ph * 3);
-                    const yaw = state._headYaw || 0;
+                    const yaw = headYaw;
                     const mx = hx + Math.cos(yaw) * 4.2 - Math.sin(yaw) * -2.2, my = hy + Math.sin(yaw) * 4.2 + Math.cos(yaw) * -2.2;
                     const ex = hx - 1, ey = hy - 4.5;
                     const px2 = mx + (ex - mx) * wipe, py2 = my + (ey - my) * wipe + lick * .25 * (1 - wipe);
@@ -30015,7 +30344,7 @@ function createVelvetCatPackets(state,{pass='body',darkness=.8}={}){if(!['body',
 return Object.freeze({get createVelvetCatArt(){return createVelvetCatArt;},get createVelvetEyePackets(){return createVelvetEyePackets;},get createVelvetCatPackets(){return createVelvetCatPackets;}});
 })();
 // src/game/data/road-navigation.mjs
-const m185 = (()=>{
+const m186 = (()=>{
 /**
  * The city's lane network as Basement navigation road data.
  *
@@ -30147,7 +30476,7 @@ const m0 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m40.assetLibrary;},get createGameAssetLibrary(){return m47.createGameAssetLibrary;},get resolveMapLayout(){return m69.resolveMapLayout;},get resolvePlacement(){return m69.resolvePlacement;},get isMovableProp(){return m69.isMovableProp;},get mapHost(){return m69.mapHost;},get createMapLibraries(){return m69.createMapLibraries;},get PROP_TYPES(){return m69.PROP_TYPES;},get MAP_IDS(){return m69.MAP_IDS;},get ApartmentLevel(){return m95.ApartmentLevel;},get APARTMENT_RULES(){return m135.APARTMENT_RULES;},get gameEngine(){return m144.gameEngine;},get gameLevel(){return m146.gameLevel;},get levelLobby(){return m145.levelLobby;},get createGameRuntime(){return m160.createGameRuntime;},get controlSystem(){return m147.controlSystem;},get controlsSystem(){return m147.controlsSystem;},get inputInstance(){return m147.inputInstance;},get keyboardInstance(){return m147.keyboardInstance;},get mouseInstance(){return m147.mouseInstance;},get touchInstance(){return m147.touchInstance;},get touchStick(){return m147.touchStick;},get gamepadInstance(){return m147.gamepadInstance;},get TAP(){return m147.TAP;},get DOUBLETAP(){return m147.DOUBLETAP;},get HELD(){return m147.HELD;},get PRESS(){return m147.PRESS;},get REPEAT(){return m147.REPEAT;},get RELEASE(){return m147.RELEASE;},get renderSystem(){return m152.renderSystem;},get renderFrame(){return m152.renderFrame;},get canvasRenderer(){return m152.canvasRenderer;},get cameraSystem(){return m152.cameraSystem;},get gameSession(){return m172.gameSession;},get PlayerStateSystem(){return m173.PlayerStateSystem;},get PlayerControlSystem(){return m174.PlayerControlSystem;},get Player(){return m122.Player;},get playerVitals(){return m123.playerVitals;},get itemSystem(){return m104.itemSystem;},get createItemCatalog(){return m58.createItemCatalog;},get GUN_MATERIALS(){return m168.GUN_MATERIALS;},get WEAPON_MODELS(){return m168.WEAPON_MODELS;},get LASER_MODULE(){return m168.LASER_MODULE;},get weaponModel(){return m168.weaponModel;},get weaponAppearance(){return m179.weaponAppearance;},get combatSystem(){return m175.combatSystem;},get weaponSystem(){return m176.weaponSystem;},get lootSystem(){return m178.lootSystem;},get WorldLoot(){return m127.WorldLoot;},get MELEE_SWING(){return m177.MELEE_SWING;},get WIDE_SWING(){return m177.WIDE_SWING;},get sampleMeleeSwing(){return m177.sampleMeleeSwing;},get sampleWideSwing(){return m177.sampleWideSwing;},get swingPhases(){return m177.swingPhases;},get wideGrip(){return m177.wideGrip;},get COMBAT_RULES(){return m180.COMBAT_RULES;},get registerGameEntityTypes(){return m116.registerGameEntityTypes;},get actorVitals(){return m102.actorVitals;},get gameActor(){return m100.gameActor;},get NPC(){return m125.NPC;},get rosterRecord(){return m125.rosterRecord;},get ROSTER_FIELDS(){return m125.ROSTER_FIELDS;},get Ganger(){return m99.Ganger;},get actorSystem(){return m170.actorSystem;},get actorItems(){return m103.actorItems;},get restoreActorItems(){return m103.restoreActorItems;},get resolveEmoteLines(){return m126.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m126.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m115.abilityLoadout;},get actorAbilities(){return m115.actorAbilities;},get importActorAbilities(){return m115.importActorAbilities;},get abilitySystem(){return m169.abilitySystem;},get createAbilityCatalog(){return m60.createAbilityCatalog;},get attackRegistry(){return m101.attackRegistry;},get validateAttackState(){return m101.validateAttackState;},get attackSystem(){return m166.attackSystem;},get createAttackCatalog(){return m57.createAttackCatalog;},get validateMountedAttack(){return m114.validateMountedAttack;},get TrafficVehicle(){return m128.TrafficVehicle;},get createGameVehicle(){return m128.createGameVehicle;},get Hunter(){return m98.Hunter;},get createHunterAppearance(){return m56.createHunterAppearance;},get Marionette(){return m121.Marionette;},get MARIONETTE_RULES(){return m54.MARIONETTE_RULES;},get validateAbilityAction(){return m111.validateAbilityAction;},get GatlingGunner(){return m108.GatlingGunner;},get Drone(){return m117.Drone;},get VelvetCat(){return m118.VelvetCat;},get velvetCatAnimation(){return m119.velvetCatAnimation;},get createVelvetAnimation(){return m119.createVelvetAnimation;},get velvetPresentation(){return m119.velvetPresentation;},get droneLift(){return m181.droneLift;},get droneArmPose(){return m181.droneArmPose;},get dronePresentation(){return m181.dronePresentation;},get VELVET_CAT_PALETTES(){return m120.VELVET_CAT_PALETTES;},get VELVET_T(){return m120.VELVET_T;},get VELVET_PROFILES(){return m120.VELVET_PROFILES;},get VELVET_GAITS(){return m120.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m120.VELVET_TAIL_SEGS;},get Demoness(){return m97.Demoness;},get Warden(){return m107.Warden;},get Vesper(){return m107.Vesper;},get Matins(){return m107.Matins;},get Compline(){return m107.Compline;},get BossEffect(){return m109.BossEffect;},get encounterSystem(){return m165.encounterSystem;},get createBossAbilities(){return m48.createBossAbilities;},get createDemonessAppearance(){return m48.createDemonessAppearance;},get demonessAppearance(){return m182.demonessAppearance;},get demonessPresentation(){return m182.demonessPresentation;},get bossEffectAppearance(){return m183.bossEffectAppearance;},get bossEffectPresentation(){return m183.bossEffectPresentation;},get validateBossRecord(){return m96.validateBossRecord;},get createDronePackets(){return m181.createDronePackets;},get createVelvetCatArt(){return m184.createVelvetCatArt;},get createVelvetCatPackets(){return m184.createVelvetCatPackets;},get createVelvetEyePackets(){return m184.createVelvetEyePackets;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m161.humanoidSystem;},get humanoidPresentation(){return m161.humanoidPresentation;},get humanoidBodyCanon(){return m162.humanoidBodyCanon;},get humanoidBuilds(){return m162.humanoidBuilds;},get getHumanoidRigAssets(){return m162.getHumanoidRigAssets;},get roadNavigationData(){return m185.roadNavigationData;},get loadRoadNavigation(){return m185.loadRoadNavigation;}});
+return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m40.assetLibrary;},get createGameAssetLibrary(){return m47.createGameAssetLibrary;},get resolveMapLayout(){return m69.resolveMapLayout;},get resolvePlacement(){return m69.resolvePlacement;},get isMovableProp(){return m69.isMovableProp;},get mapHost(){return m69.mapHost;},get createMapLibraries(){return m69.createMapLibraries;},get PROP_TYPES(){return m69.PROP_TYPES;},get MAP_IDS(){return m69.MAP_IDS;},get ApartmentLevel(){return m95.ApartmentLevel;},get APARTMENT_RULES(){return m136.APARTMENT_RULES;},get gameEngine(){return m145.gameEngine;},get gameLevel(){return m147.gameLevel;},get levelLobby(){return m146.levelLobby;},get createGameRuntime(){return m161.createGameRuntime;},get controlSystem(){return m148.controlSystem;},get controlsSystem(){return m148.controlsSystem;},get inputInstance(){return m148.inputInstance;},get keyboardInstance(){return m148.keyboardInstance;},get mouseInstance(){return m148.mouseInstance;},get touchInstance(){return m148.touchInstance;},get touchStick(){return m148.touchStick;},get gamepadInstance(){return m148.gamepadInstance;},get TAP(){return m148.TAP;},get DOUBLETAP(){return m148.DOUBLETAP;},get HELD(){return m148.HELD;},get PRESS(){return m148.PRESS;},get REPEAT(){return m148.REPEAT;},get RELEASE(){return m148.RELEASE;},get renderSystem(){return m153.renderSystem;},get renderFrame(){return m153.renderFrame;},get canvasRenderer(){return m153.canvasRenderer;},get cameraSystem(){return m153.cameraSystem;},get gameSession(){return m173.gameSession;},get PlayerStateSystem(){return m174.PlayerStateSystem;},get PlayerControlSystem(){return m175.PlayerControlSystem;},get Player(){return m123.Player;},get playerVitals(){return m124.playerVitals;},get itemSystem(){return m104.itemSystem;},get createItemCatalog(){return m58.createItemCatalog;},get GUN_MATERIALS(){return m169.GUN_MATERIALS;},get WEAPON_MODELS(){return m169.WEAPON_MODELS;},get LASER_MODULE(){return m169.LASER_MODULE;},get weaponModel(){return m169.weaponModel;},get weaponAppearance(){return m180.weaponAppearance;},get combatSystem(){return m176.combatSystem;},get weaponSystem(){return m177.weaponSystem;},get lootSystem(){return m179.lootSystem;},get WorldLoot(){return m128.WorldLoot;},get MELEE_SWING(){return m178.MELEE_SWING;},get WIDE_SWING(){return m178.WIDE_SWING;},get sampleMeleeSwing(){return m178.sampleMeleeSwing;},get sampleWideSwing(){return m178.sampleWideSwing;},get swingPhases(){return m178.swingPhases;},get wideGrip(){return m178.wideGrip;},get COMBAT_RULES(){return m181.COMBAT_RULES;},get registerGameEntityTypes(){return m116.registerGameEntityTypes;},get actorVitals(){return m102.actorVitals;},get gameActor(){return m100.gameActor;},get NPC(){return m126.NPC;},get rosterRecord(){return m126.rosterRecord;},get ROSTER_FIELDS(){return m126.ROSTER_FIELDS;},get Ganger(){return m99.Ganger;},get actorSystem(){return m171.actorSystem;},get actorItems(){return m103.actorItems;},get restoreActorItems(){return m103.restoreActorItems;},get resolveEmoteLines(){return m127.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m127.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m115.abilityLoadout;},get actorAbilities(){return m115.actorAbilities;},get importActorAbilities(){return m115.importActorAbilities;},get abilitySystem(){return m170.abilitySystem;},get createAbilityCatalog(){return m60.createAbilityCatalog;},get attackRegistry(){return m101.attackRegistry;},get validateAttackState(){return m101.validateAttackState;},get attackSystem(){return m167.attackSystem;},get createAttackCatalog(){return m57.createAttackCatalog;},get validateMountedAttack(){return m114.validateMountedAttack;},get TrafficVehicle(){return m129.TrafficVehicle;},get createGameVehicle(){return m129.createGameVehicle;},get Hunter(){return m98.Hunter;},get createHunterAppearance(){return m56.createHunterAppearance;},get Marionette(){return m122.Marionette;},get MARIONETTE_RULES(){return m54.MARIONETTE_RULES;},get validateAbilityAction(){return m111.validateAbilityAction;},get GatlingGunner(){return m108.GatlingGunner;},get Drone(){return m117.Drone;},get VelvetCat(){return m118.VelvetCat;},get velvetCatAnimation(){return m119.velvetCatAnimation;},get createVelvetAnimation(){return m119.createVelvetAnimation;},get velvetPresentation(){return m119.velvetPresentation;},get droneLift(){return m182.droneLift;},get droneArmPose(){return m182.droneArmPose;},get dronePresentation(){return m182.dronePresentation;},get VELVET_CAT_PALETTES(){return m120.VELVET_CAT_PALETTES;},get VELVET_T(){return m120.VELVET_T;},get VELVET_PROFILES(){return m120.VELVET_PROFILES;},get VELVET_GAITS(){return m120.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m120.VELVET_TAIL_SEGS;},get Demoness(){return m97.Demoness;},get Warden(){return m107.Warden;},get Vesper(){return m107.Vesper;},get Matins(){return m107.Matins;},get Compline(){return m107.Compline;},get BossEffect(){return m109.BossEffect;},get encounterSystem(){return m166.encounterSystem;},get createBossAbilities(){return m48.createBossAbilities;},get createDemonessAppearance(){return m48.createDemonessAppearance;},get demonessAppearance(){return m183.demonessAppearance;},get demonessPresentation(){return m183.demonessPresentation;},get bossEffectAppearance(){return m184.bossEffectAppearance;},get bossEffectPresentation(){return m184.bossEffectPresentation;},get validateBossRecord(){return m96.validateBossRecord;},get createDronePackets(){return m182.createDronePackets;},get createVelvetCatArt(){return m185.createVelvetCatArt;},get createVelvetCatPackets(){return m185.createVelvetCatPackets;},get createVelvetEyePackets(){return m185.createVelvetEyePackets;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m162.humanoidSystem;},get humanoidPresentation(){return m162.humanoidPresentation;},get humanoidBodyCanon(){return m163.humanoidBodyCanon;},get humanoidBuilds(){return m163.humanoidBuilds;},get getHumanoidRigAssets(){return m163.getHumanoidRigAssets;},get roadNavigationData(){return m186.roadNavigationData;},get loadRoadNavigation(){return m186.loadRoadNavigation;}});
 })();
 return m0;
 })();

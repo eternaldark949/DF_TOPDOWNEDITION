@@ -198,3 +198,13 @@ test('a chain saves with the world and goes when a segment, the rig or the body 
     assert.equal(p.getBodyConstraints(body).length,0);
     copy.rigs.removeRig(twin);for(const id of chain.segments)assert.equal(copy.fetchBody(id),null);
 });
+test('a chain with reaction false follows its body but never pushes it; a one-way hinge leaves body B alone',()=>{
+    const drift=reaction=>{const p=new physicsSystem(),body=p.elements.createCharacter({position:[100,100],mass:.2,linear_damping:0,collision_shape:{shape_type:'circle',radius:6}});
+        const rig=p.rigs.createRig(body,{definition:tail,clips:[sway]});p.rigs.createPhysicalChain(body,{chain_id:'tail',joints:['a','b','c','tip'],mass:1,reaction});rig.play('sway');
+        let most=0;for(let i=0;i<60;i++){p.updateState();most=Math.max(most,Math.hypot(body.position[0]-100,body.position[1]-100));}return {most,p,body};};
+    assert.ok(drift(true).most>.05,'a heavy tail on a light body swings the body');
+    const {most,p,body}=drift(false);assert.equal(most,0,'a one-way tail never moves it');
+    const tip=p.rigs.getPose(body,{world_space:true}).joints.tip.position;assert.ok(Math.hypot(tip[0]-60,tip[1]-100)<15,'and still hangs off it');
+    p.rigs.removePhysicalChain(body,'tail');assert.throws(()=>p.rigs.createPhysicalChain(body,{chain_id:'x',joints:['a','b'],reaction:1}));
+    assert.throws(()=>p.createConstraint({constraint_type:'hinge',body_a:body,one_way:'yes'}));
+});

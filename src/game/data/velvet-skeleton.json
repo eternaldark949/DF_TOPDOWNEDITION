@@ -1,0 +1,298 @@
+{
+ "kind": "skeleton",
+ "rig_id": "df:velvet_cat",
+ "joints": [
+  {
+   "name": "root"
+  },
+  {
+   "name": "spine_0",
+   "parent": "root",
+   "position": [
+    -11.75,
+    0
+   ]
+  },
+  {
+   "name": "spine_1",
+   "parent": "spine_0",
+   "position": [
+    1.9583333333333333,
+    0
+   ]
+  },
+  {
+   "name": "spine_2",
+   "parent": "spine_1",
+   "position": [
+    1.9583333333333333,
+    0
+   ]
+  },
+  {
+   "name": "spine_3",
+   "parent": "spine_2",
+   "position": [
+    1.9583333333333333,
+    0
+   ]
+  },
+  {
+   "name": "spine_4",
+   "parent": "spine_3",
+   "position": [
+    1.9583333333333333,
+    0
+   ]
+  },
+  {
+   "name": "spine_5",
+   "parent": "spine_4",
+   "position": [
+    1.9583333333333333,
+    0
+   ]
+  },
+  {
+   "name": "spine_6",
+   "parent": "spine_5",
+   "position": [
+    1.9583333333333333,
+    0
+   ]
+  },
+  {
+   "name": "spine_7",
+   "parent": "spine_6",
+   "position": [
+    1.9583333333333333,
+    0
+   ]
+  },
+  {
+   "name": "spine_8",
+   "parent": "spine_7",
+   "position": [
+    1.9583333333333333,
+    0
+   ]
+  },
+  {
+   "name": "spine_9",
+   "parent": "spine_8",
+   "position": [
+    1.9583333333333333,
+    0
+   ]
+  },
+  {
+   "name": "spine_10",
+   "parent": "spine_9",
+   "position": [
+    1.9583333333333333,
+    0
+   ]
+  },
+  {
+   "name": "spine_11",
+   "parent": "spine_10",
+   "position": [
+    1.9583333333333333,
+    0
+   ]
+  },
+  {
+   "name": "spine_12",
+   "parent": "spine_11",
+   "position": [
+    1.9583333333333333,
+    0
+   ]
+  },
+  {
+   "name": "head",
+   "parent": "spine_12",
+   "position": [
+    2.6,
+    0
+   ]
+  },
+  {
+   "name": "ear_l",
+   "parent": "head",
+   "position": [
+    -0.9,
+    -2.9
+   ]
+  },
+  {
+   "name": "ear_r",
+   "parent": "head",
+   "position": [
+    -0.9,
+    2.9
+   ]
+  },
+  {
+   "name": "tail_0",
+   "parent": "spine_0",
+   "position": [
+    -5,
+    0
+   ],
+   "rotation": 3.14159
+  },
+  {
+   "name": "tail_1",
+   "parent": "tail_0",
+   "position": [
+    3.4,
+    0
+   ],
+   "limits": {
+    "min_rotation": -1.2,
+    "max_rotation": 1.2
+   }
+  },
+  {
+   "name": "tail_2",
+   "parent": "tail_1",
+   "position": [
+    3.4,
+    0
+   ],
+   "limits": {
+    "min_rotation": -1.2,
+    "max_rotation": 1.2
+   }
+  },
+  {
+   "name": "tail_3",
+   "parent": "tail_2",
+   "position": [
+    3.4,
+    0
+   ],
+   "limits": {
+    "min_rotation": -1.2,
+    "max_rotation": 1.2
+   }
+  },
+  {
+   "name": "tail_4",
+   "parent": "tail_3",
+   "position": [
+    3.4,
+    0
+   ],
+   "limits": {
+    "min_rotation": -1.2,
+    "max_rotation": 1.2
+   }
+  },
+  {
+   "name": "tail_5",
+   "parent": "tail_4",
+   "position": [
+    3.4,
+    0
+   ],
+   "limits": {
+    "min_rotation": -1.2,
+    "max_rotation": 1.2
+   }
+  },
+  {
+   "name": "tail_6",
+   "parent": "tail_5",
+   "position": [
+    3.4,
+    0
+   ],
+   "limits": {
+    "min_rotation": -1.2,
+    "max_rotation": 1.2
+   }
+  },
+  {
+   "name": "tail_7",
+   "parent": "tail_6",
+   "position": [
+    3.4,
+    0
+   ],
+   "limits": {
+    "min_rotation": -1.2,
+    "max_rotation": 1.2
+   }
+  },
+  {
+   "name": "tail_8",
+   "parent": "tail_7",
+   "position": [
+    3.4,
+    0
+   ],
+   "limits": {
+    "min_rotation": -1.2,
+    "max_rotation": 1.2
+   }
+  },
+  {
+   "name": "tail_9",
+   "parent": "tail_8",
+   "position": [
+    3.4,
+    0
+   ],
+   "limits": {
+    "min_rotation": -1.2,
+    "max_rotation": 1.2
+   }
+  },
+  {
+   "name": "paw_hl",
+   "parent": "root",
+   "position": [
+    -10,
+    -4
+   ]
+  },
+  {
+   "name": "paw_fl",
+   "parent": "root",
+   "position": [
+    8,
+    -4
+   ]
+  },
+  {
+   "name": "paw_hr",
+   "parent": "root",
+   "position": [
+    -10,
+    4
+   ]
+  },
+  {
+   "name": "paw_fr",
+   "parent": "root",
+   "position": [
+    8,
+    4
+   ]
+  }
+ ],
+ "anchors": {
+  "mouth": {
+   "joint": "head",
+   "position": [
+    4.6,
+    0
+   ]
+  },
+  "collar": {
+   "joint": "spine_11"
+  }
+ }
+}

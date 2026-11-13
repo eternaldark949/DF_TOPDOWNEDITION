@@ -1,5 +1,9 @@
 import {gameActor} from './game-actor.mjs';
-import {createVelvetAnimation,advanceVelvetAnimation} from '../presentation/velvet-cat-animation.mjs';
+import {createVelvetAnimation,advanceVelvetAnimation,velvetLocalPose,VELVET_RIG} from '../presentation/velvet-cat-animation.mjs';
+import {VELVET_TAIL_SEGS} from '../data/game-velvet-appearance.mjs';
+const TAIL=Object.freeze(Array.from({length:VELVET_TAIL_SEGS+1},(_,i)=>'tail_'+i));
+/** Her tail as a physical chain: light, cosmetic (it touches nothing), and quick to follow the pose she holds it in. */
+const TAIL_CHAIN=Object.freeze({chain_id:'tail',joints:TAIL,radius:1,mass:.08,follow_rate:14,collision_group:0,collision_mask:0,reaction:false});
 import { nonnegative, jsonCopy } from '../../engine/directory/index.mjs';
 const stateFor=actor=>actor.data.cat_state??={format_version:1,mode:'idle',dash:false,idle_seconds:0,rest:null,rest_remaining:0};
 /** Official companion body; animation records contain cosmetic state only. */
@@ -25,5 +29,15 @@ export class VelvetCat extends gameActor{
   if(view.distance>rules.start_distance||state.mode==='following'&&view.distance>rules.stop_distance){state.mode='following';state.rest=null;state.idle_seconds=0;this.followTarget(player,{target_offset:rules.follow_offset,speed:state.dash?rules.sprint_speed:view.distance>120?rules.trot_speed:rules.walk_speed,arrival_distance:16,personal_space:18});}
   else{state.mode='idle';this.cancelMovement();state.idle_seconds+=seconds;state.rest_remaining=Math.max(0,state.rest_remaining-seconds);if(state.rest&&state.rest_remaining===0){state.rest=state.rest==='stretch'?'sit':null;state.idle_seconds=1.667;}if(!state.rest&&state.idle_seconds>=rules.rest_after){const sample=random();state.rest=sample<.28?'sit':sample<.48?'groom':sample<.62?'look':sample<.78?'loaf':sample<.9?'sleep':'stretch';state.rest_remaining=state.rest==='sleep'?25:state.rest==='loaf'?15:state.rest==='stretch'?260/60:9;}}
  }
- advanceAnimation(seconds,player){if(this.active&&this.visible&&!this.inCar)advanceVelvetAnimation(this,player,seconds);}
+ /**
+  * Advances her animation state, then poses her rig from it. While she is out and about her tail is a
+  * physical chain that swings with its own weight; in a car (or hidden) it goes, and comes back after.
+  */
+ advanceAnimation(seconds,player){
+  const rigs=this.physics_system.rigs,out=this.active&&this.visible&&!this.inCar,rig=rigs.getRig(this)??rigs.createRig(this,{definition:VELVET_RIG});
+  const tail=rigs.getPhysicalChains(this).some(chain=>chain.chain_id==='tail');
+  if(out&&!tail)rigs.createPhysicalChain(this,TAIL_CHAIN);else if(!out&&tail)rigs.removePhysicalChain(this,'tail');
+  if(!out)return;
+  advanceVelvetAnimation(this,player,seconds);rig.setProceduralPose(velvetLocalPose(this.data.velvet_animation,{tail:'target'}));
+ }
 }

@@ -1,5 +1,5 @@
 import {artScene,circle,ellipse,radial,linear,groundShadow} from '../../engine/basement/rendering/index.mjs';
-import {velvetCatAnimation} from './velvet-cat-animation.mjs';
+import {velvetCatAnimation,velvetFrame,velvetLegGait,velvetJoints,VELVET_LEG_JOINTS} from './velvet-cat-animation.mjs';
 import {VELVET_CAT_PALETTES,VELVET_T,VELVET_PROFILES,VELVET_TAIL_SEGS} from '../data/game-velvet-appearance.mjs';
 /** Renderer-neutral feline geometry/material packets over detached animation state. */
 
@@ -28,41 +28,18 @@ export function createVelvetCatArt(state){const scene=new artScene(),eyes=[];let
                 const lx = Math.cos(-state.angle) * -0.6 - Math.sin(-state.angle) * -0.8;
                 const ly = Math.sin(-state.angle) * -0.6 + Math.cos(-state.angle) * -0.8;
 
-                // --- Spine: an arc from rump (t = 0) to neck (t = 1), the neck facing +X ---
-                const cyc = state.walkPhase / TAU;
-                const flex = moving ? Math.sin((cyc + .3) * TAU) * g.gallop : 0;   // a galloping cat gathers and stretches
-                const L = 23.5 * (1 - 0.36 * P.sit - 0.12 * P.loaf + 0.03 * P.sleep + 0.2 * P.stretch) * (1 + flex * 0.13);
-                const bend = (state._bend || 0) * (1 - P.sleep) + P.sleep * 4.3 * (state._curlSide || 1);
-                const S = 12, pts = [];
-                let px = 0, py = 0;
-                for (let i = S; i >= 0; i--) {
-                    const t = i / S, th = bend * (t - 1);
-                    pts[i] = { x: px, y: py, th };
-                    px -= Math.cos(th) * L / S; py -= Math.sin(th) * L / S;
-                }
-                let cx = 0, cy = 0;
-                for (const p of pts) { cx += p.x; cy += p.y; }
-                cx = cx / pts.length - 1.5 - P.sit * 2; cy /= pts.length;
-                for (const p of pts) { p.x -= cx; p.y -= cy; }
-                const width = (t) => {
-                    let j = 0; while (j < VELVET_T.length - 2 && t > VELVET_T[j + 1]) j++;
-                    const u = (t - VELVET_T[j]) / (VELVET_T[j + 1] - VELVET_T[j]);
-                    let w = 0;
-                    for (const [name, wt] of [['stand', stand], ['sit', P.sit], ['loaf', P.loaf], ['sleep', P.sleep], ['stretch', P.stretch]]) {
-                        if (wt <= 0) continue;
-                        const pr = VELVET_PROFILES[name];
-                        w += (pr[j] + (pr[j + 1] - pr[j]) * u) * wt;
-                    }
-                    return w * breathe;
-                };
+                // --- Spine: the rig's spine joints, rump (spine_0) to neck (spine_12), the neck facing +X ---
+                const J = state.joints ?? velvetJoints(state), f = velvetFrame(state), width = f.width, S = 12;
+                const pts = Array.from({ length: S + 1 }, (_, i) => { const j = J['spine_' + i]; return { x: j.position[0], y: j.position[1], th: j.rotation }; });
+                // A curled spine turns past a half circle; unwrap the joints' angles so they run on smoothly.
+                for (let i = 1; i <= S; i++) { const d = pts[i].th - pts[i - 1].th; pts[i].th = pts[i - 1].th + Math.atan2(Math.sin(d), Math.cos(d)); }
                 const at = (t) => {
-                    const f = Math.max(0, Math.min(S - 1e-6, t * S)), i = Math.floor(f), u = f - i;
+                    const s = Math.max(0, Math.min(S - 1e-6, t * S)), i = Math.floor(s), u = s - i;
                     const a = pts[i], b = pts[Math.min(S, i + 1)];
                     return { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u, th: a.th + (b.th - a.th) * u };
                 };
                 // Shoulder blades and hips roll up on the side of the leg that's bearing weight.
-                const legU = (j) => frac(cyc + g.off[j]);
-                const roll = (j) => moving && legU(j) < g.duty ? Math.sin(legU(j) / g.duty * Math.PI) * 0.7 * stand : 0;
+                const roll = (j) => moving && f.legU(j) < g.duty ? Math.sin(f.legU(j) / g.duty * Math.PI) * 0.7 * stand : 0;
                 const left = [], right = [];
                 for (let i = 0; i <= S; i++) {
                     const p = pts[i], t = i / S, w = width(t), nx = -Math.sin(p.th), ny = Math.cos(p.th);
@@ -85,33 +62,12 @@ export function createVelvetCatArt(state){const scene=new artScene(),eyes=[];let
                 const outline = [];
                 smoothRing(outline, ring);
 
-                // --- Paw positions: gait, blended toward each rest pose ---
-                const legs = [];
-                for (let j = 0; j < 4; j++) {
-                    const hind = j % 2 === 0, sideY = j < 2 ? -1 : 1;
-                    const anchorT = hind ? .2 : .78, a = at(anchorT), w = width(anchorT);
-                    const nx = -Math.sin(a.th), ny = Math.cos(a.th), ux = Math.cos(a.th), uy = Math.sin(a.th);
-                    // gait: planted feet slide back under her, lifted feet swing forward
-                    const u = legU(j);
-                    let along = 0, lift = 0;
-                    if (moving) {
-                        if (u < g.duty) along = g.stride * (0.5 - u / g.duty);
-                        else { const s = (u - g.duty) / (1 - g.duty); along = g.stride * (-0.5 + (s * s * (3 - 2 * s))); lift = Math.sin(s * Math.PI); }
-                    }
-                    const out = (hind ? 1 : 1.02) * w * (0.85 + lift * 0.12);
-                    let fx = a.x + ux * ((hind ? -1.5 : 4.6) + along) + nx * out * sideY;
-                    let fy = a.y + uy * ((hind ? -1.5 : 4.6) + along) + ny * out * sideY;
-                    let vis = stand;
-                    // sit: fore paws together before the chest, hind paws peeking at the haunches
-                    const sx = hind ? pts[3].x + 3.5 : neck.x + 6.8, sy = hind ? pts[3].y + sideY * (width(.25) + .4) : neck.y + sideY * 2;
-                    // stretch: fore paws reach far ahead
-                    const tx = hind ? fx : neck.x + 12.5, ty = hind ? fy : neck.y + sideY * 3.3;
-                    fx = fx * stand + sx * P.sit + tx * P.stretch + (hind ? pts[3].x : neck.x) * (P.loaf + P.sleep);
-                    fy = fy * stand + sy * P.sit + ty * P.stretch + (hind ? pts[3].y : neck.y) * (P.loaf + P.sleep);
-                    vis += P.sit + P.stretch;
-                    const groomPaw = !hind && sideY < 0 && P.groom > 0.5;
-                    legs.push({ hind, sideY, ax: a.x + nx * w * .45 * sideY, ay: a.y + ny * w * .45 * sideY, fx, fy, lift: lift * stand, vis: groomPaw ? 0 : vis, th: a.th });
-                }
+                // --- Legs: from the spine to the rig's paw joints ---
+                const legs = VELVET_LEG_JOINTS.map((joint, j) => {
+                    const hind = j % 2 === 0, sideY = j < 2 ? -1 : 1, a = at(hind ? .2 : .78), w = width(hind ? .2 : .78), nx = -Math.sin(a.th), ny = Math.cos(a.th);
+                    const { lift, vis } = velvetLegGait(f, j), p = J[joint];
+                    return { hind, sideY, ax: a.x + nx * w * .45 * sideY, ay: a.y + ny * w * .45 * sideY, fx: p.position[0], fy: p.position[1], lift, vis, th: p.rotation };
+                });
                 const paw = (x, y, th, s, raised) => {
                     scene.enter(); scene.place({position:[x, y]}); scene.place({rotation:th}); scene.place({scale:[s, s]});
                     scene.style.fill = raised ? C.raisedPaw : C.pawTop;
@@ -124,20 +80,8 @@ export function createVelvetCatArt(state){const scene=new artScene(),eyes=[];let
                     scene.paint(path,{stroke:scene.style.stroke}); scene.leave();
                 };
 
-                // --- Tail: nine springy segments from the rump, foreshortened as it rises ---
-                const tail = [];
-                {
-                    // Resting, it leaves the rump already turned along her side, to wrap round toward the fore paws.
-                    let th = rump.th + Math.PI - (state._curlSide || 1) * (P.sit * 1.75 + P.loaf * 1.75 + P.sleep * 1.1), x = rump.x - Math.cos(rump.th) * width(0) * .6, y = rump.y - Math.sin(rump.th) * width(0) * .6;
-                    tail.push({ x, y });
-                    const lift = state._tailLift || 0;
-                    for (let i = 0; i < VELVET_TAIL_SEGS; i++) {
-                        th += -(state._tail ? state._tail[i] : 0);
-                        const len = 3.4 * (1 - lift * (i < 5 ? .62 : .22)) * (1 - P.loaf * .12);
-                        x += Math.cos(th) * len; y += Math.sin(th) * len;
-                        tail.push({ x, y });
-                    }
-                }
+                // --- Tail: the rig's tail joints from the rump, foreshortened as it rises ---
+                const tail = Array.from({ length: VELVET_TAIL_SEGS + 1 }, (_, i) => ({ x: J['tail_' + i].position[0], y: J['tail_' + i].position[1] }));
                 // One tapering filled shape (no overlapping strokes to bead at the joints), rounded at the tip.
                 const tailPath = [];
                 {
@@ -216,11 +160,10 @@ export function createVelvetCatArt(state){const scene=new artScene(),eyes=[];let
                 if (tailOver) drawTail();
 
                 // --- Head ---
-                const headScale = 1 + P.sit * .07 - P.sleep * .04 - P.stretch * .05;
-                const hx = neck.x + 2.6 - P.sit * 1.2 + P.stretch * 1.5, hy = neck.y;
+                const headScale = J.head.scale[1], [hx, hy] = J.head.position, headYaw = J.head.rotation;
                 // Return eye anchors for the later glow pass; presentation never writes to the actor.
                 {
-                    const yaw = state._headYaw || 0, ca = Math.cos(state.angle), sa = Math.sin(state.angle);
+                    const yaw = headYaw, ca = Math.cos(state.angle), sa = Math.sin(state.angle);
 
                     for (let e = 0; e < 2; e++) {
                         const ex = 2.9 * headScale, ey = (e ? 1 : -1) * 2.05 * headScale;
@@ -229,7 +172,7 @@ export function createVelvetCatArt(state){const scene=new artScene(),eyes=[];let
                     }
                 }
                 scene.enter();
-                scene.place({position:[hx, hy]}); scene.place({rotation:state._headYaw || 0}); scene.place({scale:[headScale, headScale]});
+                scene.place({position:[hx, hy]}); scene.place({rotation:headYaw}); scene.place({scale:[headScale, headScale]});
                 // the head shades the shoulders under it
                 scene.style.fill = 'rgba(0,0,0,.2)'; path=[]; path.push(ellipse(-lx * 1.4, -ly * 1.4, 5.2, 5, 0, 0, TAU)); scene.paint(path,{fill:scene.style.fill});
                 const skull = [];
@@ -241,8 +184,8 @@ export function createVelvetCatArt(state){const scene=new artScene(),eyes=[];let
                 skull.push(['cubic',4.2, 3.1, 2.9, 4.9, .6, 4.95]);
                 skull.push(['cubic',-2.2, 5, -4.3, 3.5, -4.3, 0]);
                 skull.push(['close']);
-                const hlx = Math.cos(-(state._headYaw || 0)) * lx - Math.sin(-(state._headYaw || 0)) * ly;
-                const hly = Math.sin(-(state._headYaw || 0)) * lx + Math.cos(-(state._headYaw || 0)) * ly;
+                const hlx = Math.cos(-headYaw) * lx - Math.sin(-headYaw) * ly;
+                const hly = Math.sin(-headYaw) * lx + Math.cos(-headYaw) * ly;
                 const face = radial([hlx * 2 + .5,hly * 2],.5,[.5,0],6.5,[]);
                 face.stops.push([0, C.headTop]); face.stops.push([.55, C.headMiddle]); face.stops.push([1, C.headShadow]);
                 scene.style.fill = face; scene.paint(skull,{fill:scene.style.fill});
@@ -286,8 +229,9 @@ export function createVelvetCatArt(state){const scene=new artScene(),eyes=[];let
                 scene.paint(path,{stroke:scene.style.stroke});
                 // Ears stand above the skull at its back corners: seen from above, triangles opening forward
                 for (const sd of [-1, 1]) {
-                    const e = state._ears ? state._ears[sd < 0 ? 0 : 1] : 0;
-                    scene.enter(); scene.place({position:[-.9, sd * 2.9]}); scene.place({rotation:sd * (e + .35)});
+                    const ear = J[sd < 0 ? 'ear_l' : 'ear_r'], [ex0, ey0] = [ear.position[0] - hx, ear.position[1] - hy], back = -headYaw;
+                    // the ear's pose inside the head's frame (the head group already carries its position, turn and scale)
+                    scene.enter(); scene.place({position:[(Math.cos(back) * ex0 - Math.sin(back) * ey0) / headScale, (Math.sin(back) * ex0 + Math.cos(back) * ey0) / headScale]}); scene.place({rotation:ear.rotation - headYaw});
                     // a cup of fur: the back of the ear, then the pink inside showing at its open front
                     scene.style.fill = C.earBase; path=[];
                     path.push(['move',-2.5, -sd * .5]); path.push(['quadratic',-2.9, sd * 2, -2.6, sd * 3.9]);
@@ -303,7 +247,7 @@ export function createVelvetCatArt(state){const scene=new artScene(),eyes=[];let
                 // Grooming: a fore paw lifts to the mouth for a few licks, then wipes back over the ear.
                 if (P.groom > 0.5) {
                     const ph = state._groomPhase || 0, wipe = Math.max(0, Math.sin(ph * .35)) ** 2, lick = Math.sin(ph * 3);
-                    const yaw = state._headYaw || 0;
+                    const yaw = headYaw;
                     const mx = hx + Math.cos(yaw) * 4.2 - Math.sin(yaw) * -2.2, my = hy + Math.sin(yaw) * 4.2 + Math.cos(yaw) * -2.2;
                     const ex = hx - 1, ey = hy - 4.5;
                     const px2 = mx + (ex - mx) * wipe, py2 = my + (ey - my) * wipe + lick * .25 * (1 - wipe);
