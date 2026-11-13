@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'ecc14d021996';
+        const DFAB_BUILD = '7cb6c8a23d0d';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="13274">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="13331">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -26065,8 +26065,18 @@ function doorKind(kinds, d, key) {
 const leafIds = (key, kind) => kind.leaves.map((leaf, i) => i ? `${key}_${leaf.suffix}` : key);
 
 /**
+ * A door's opening in its own frame: centre `position`, `length` along the opening, `across` it (the
+ * wall's thickness) and the `rotation` that turns the frame's +x along the opening. Arches have it too.
+ */
+function doorOpening(d) {
+    const horizontal = d.orientation === 'H';
+    return { position: [d.x + d.w / 2, d.y + d.h / 2], length: horizontal ? d.w : d.h, across: horizontal ? d.h : d.w, rotation: horizontal ? 0 : Math.PI / 2 };
+}
+
+/**
  * One door's leaves as `{packet, joints?}` pairs, in kind order. `base` is the door's entity kind
  * (template or engine type); the packet's data carries the door's opening and open/closed poses.
+ * `data.opening` is the door's opening (see doorOpening).
  */
 function doorLeaves(d, key, kind, base) {
     const horizontal = d.orientation === 'H', length = horizontal ? d.w : d.h, across = horizontal ? d.h : d.w;
@@ -26080,7 +26090,7 @@ function doorLeaves(d, key, kind, base) {
         const pivot = hinge ? a + (b - a) * leaf.pivot : centre, position = point(pivot);
         const travel = hinge ? 0 : (mirror ? -1 : 1) * (leaf.travel[0] * length + leaf.travel[1]);
         const joint = hinge ? { ...HINGE, ...(leaf.hinge ?? {}), ...(d.hinge ?? {}) } : null;
-        const data = { role: i ? 'door_panel' : 'door', authored_id: leafIds(key, kind)[i],
+        const data = { role: i ? 'door_panel' : 'door', authored_id: leafIds(key, kind)[i], opening: doorOpening(d),
             ...(single ? {} : { door_key: key, panel_version: 2, panel_side: leaf.side ?? (i ? 1 : -1), trigger_position }),
             ...(single || hinge ? { hinged: hinge } : {}),
             closed_position: position, open_position: hinge ? position : [position[0] + along(travel)[0], position[1] + along(travel)[1]],
@@ -26092,13 +26102,13 @@ function doorLeaves(d, key, kind, base) {
     });
 }
 
-return Object.freeze({get DOOR_KINDS(){return DOOR_KINDS;},get HINGE(){return HINGE;},get DOOR_MASK(){return DOOR_MASK;},get validateDoorKind(){return validateDoorKind;},get resolveDoorKinds(){return resolveDoorKinds;},get doorKind(){return doorKind;},get leafIds(){return leafIds;},get doorLeaves(){return doorLeaves;}});
+return Object.freeze({get DOOR_KINDS(){return DOOR_KINDS;},get HINGE(){return HINGE;},get DOOR_MASK(){return DOOR_MASK;},get validateDoorKind(){return validateDoorKind;},get resolveDoorKinds(){return resolveDoorKinds;},get doorKind(){return doorKind;},get leafIds(){return leafIds;},get doorOpening(){return doorOpening;},get doorLeaves(){return doorLeaves;}});
 })();
 // src/engine/basement/maps/builder.mjs
 const m140 = (()=>{
 // ===== LV0 BASEMENT =====
 const {layoutGeometry} = m1;
-const {resolveDoorKinds,doorKind,doorLeaves} = m141;
+const {resolveDoorKinds,doorKind,doorLeaves,doorOpening,leafIds} = m141;
 
 
 /**
@@ -26170,9 +26180,11 @@ function buildMapPackets(definition, { templates = {}, decorate = null, prop_typ
 
     // Doors. Each door's `type` names a door kind (default 'plain'): data saying what its leaves are and
     // how each moves. See doors.mjs. `door_kinds` adds kinds or replaces built-in ones.
-    doors.forEach((d, index) => {
-        const key = `door_${index}`;
-        for (const { packet, joints } of doorLeaves(d, key, doorKind(kinds, d, key), kind_of('door', d.template))) push('doors', index, d, packet, joints);
+    // `openings` lists every door, arches included, with its kind name, opening and leaf ids.
+    const openings = doors.map((d, index) => {
+        const key = `door_${index}`, door_kind = doorKind(kinds, d, key);
+        for (const { packet, joints } of doorLeaves(d, key, door_kind, kind_of('door', d.template))) push('doors', index, d, packet, joints);
+        return { door_key: key, index, type: d.type ?? 'plain', opening: doorOpening(d), leaf_ids: leafIds(key, door_kind) };
     });
 
     // Cloths: a hanging strip mesh anchored at its top edge (curtains, banners, laundry).
@@ -26186,7 +26198,7 @@ function buildMapPackets(definition, { templates = {}, decorate = null, prop_typ
             data: { role: c.role ?? 'cloth', authored_id: c.authored_id ?? `${c.role ?? 'cloth'}_${i}`, ...c.data, mesh: { points, edges, anchors: [0, 1] } } });
     });
 
-    return { kind, entries, spawn: definition.spawn ? [...definition.spawn] : null, door_kinds: kinds };
+    return { kind, entries, openings, spawn: definition.spawn ? [...definition.spawn] : null, door_kinds: kinds };
 }
 
 return Object.freeze({get DOOR_KINDS(){return m141.DOOR_KINDS;},get HINGE(){return m141.HINGE;},get validateDoorKind(){return m141.validateDoorKind;},get MAP_KINDS(){return MAP_KINDS;},get DEFAULT_KINDS(){return DEFAULT_KINDS;},get buildMapPackets(){return buildMapPackets;}});
@@ -26363,11 +26375,11 @@ const moved = (entity, packet) => Math.hypot(entity.position[0] - packet.positio
  * entity that was moved keeps its pose in the map's region memory while its region is unloaded.
  */
 class mapInstance {
-    #physics; #entries; #byId = new Map(); #regions = new Map(); #loaded = new Set(); #memory = new Map(); #region_size; #stats = { region_loads: 0, region_unloads: 0, created: 0, destroyed: 0 };
+    #physics; #entries; #openings; #byId = new Map(); #regions = new Map(); #loaded = new Set(); #memory = new Map(); #region_size; #stats = { region_loads: 0, region_unloads: 0, created: 0, destroyed: 0 };
     constructor(physics, definition, options = {}) {
         this.#physics = physics; this.map_id = definition.map_id ?? null;
         const built = buildMapPackets(definition, options);
-        this.kind = built.kind; this.spawn = built.spawn; this.#entries = built.entries;
+        this.kind = built.kind; this.spawn = built.spawn; this.#entries = built.entries; this.#openings = built.openings;
         this.#region_size = definition.regions?.size ?? 1024;
         if (!(this.#region_size > 0)) throw new TypeError('Map region size must be positive');
         for (const entry of this.#entries) {
@@ -26405,6 +26417,11 @@ class mapInstance {
     entity(authored_id) { const e = this.#byId.get(authored_id)?.entity; return e && !e.destroyed ? e : null; }
     /** Live entities with this data role ('wall', 'prop', 'lamp', 'door', ...), in build order. */
     entities(role) { const out = []; for (const entry of this.#entries) if (entry.entity && !entry.entity.destroyed && (role === undefined || entry.packet.data?.role === role)) out.push(entry.entity); return out; }
+    /**
+     * Every door, arches included, in authored order: `{door_key, index, type, opening, leaves}`, where
+     * `leaves` holds each leaf's live entity (null while unloaded) in kind order. For artists and tools.
+     */
+    getDoors() { return this.#openings.map(({ leaf_ids, opening, ...door }) => ({ ...door, opening: structuredClone(opening), leaves: leaf_ids.map(id => this.entity(id)) })); }
     /** Authored packets, for tools and tests. */
     packets() { return this.#entries.map(e => e.packet); }
 
@@ -26633,9 +26650,6 @@ class ApartmentLevel {
         this.entities=this.physics.elements.getEntities().filter(e=>e.entity_type!=='df_player');
         this.player=this.physics.elements.getEntities({entity_type:'df_player'})[0];
         this.props=this.entities.filter(e=>e.data.role==='prop'); this.doors=this.entities.filter(e=>e.data.role==='door');
-        this.doorByKey=new Map(this.doors.map(door=>[door.data.authored_id,door]));
-        const panels=new Map(this.entities.filter(e=>e.data.role==='door_panel').map(e=>[e.data.door_key,e]));
-        this.doorPanels=new Map(this.doors.map(door=>[door.entity_id,[door,...(panels.has(door.data.authored_id)?[panels.get(door.data.authored_id)]:[])]]));
         this.curtains=this.entities.filter(e=>e.data.role==='curtain');
         this.companions=this.entities.filter(e=>e.entity_type===NPC.entity_type);
         this.lamps=this.entities.filter(e=>e.data.role==='lamp'); this.transitions=this.entities.filter(e=>e.data.role==='transition');
@@ -30343,8 +30357,78 @@ function createVelvetCatPackets(state,{pass='body',darkness=.8}={}){if(!['body',
 
 return Object.freeze({get createVelvetCatArt(){return createVelvetCatArt;},get createVelvetEyePackets(){return createVelvetEyePackets;},get createVelvetCatPackets(){return createVelvetCatPackets;}});
 })();
-// src/game/data/road-navigation.mjs
+const m187 = Object.freeze({default:{
+ "hinge": {
+  "color": "#4a3a30",
+  "sweep": "rgba(255,217,176,0.12)", "sweep_dash": [3, 4], "sweep_min_angle": 0.17,
+  "shadow": "rgba(0,0,0,0.3)", "sheen": "rgba(255,220,190,0.12)",
+  "outline": "rgba(0,0,0,0.35)", "outline_width": 0.8,
+  "handle": "#c9a46a", "handle_at": 0.82, "pin": "#8a7048", "pin_radius": 2.4
+ },
+ "slide": { "color": "rgba(150, 200, 220, 0.25)", "track": "rgba(255, 255, 255, 0.08)" },
+ "arch": {
+  "threshold": "rgba(0,0,0,0.22)", "inlay": "rgba(201,164,106,0.35)",
+  "jamb": "#2a2230", "jamb_light": "rgba(255,230,200,0.10)", "keystone": "#c9a46a"
+ }
+}});
+// src/game/presentation/door.mjs
 const m186 = (()=>{
+const DOOR_APPEARANCE = m187.default;
+const {artScene,rect,circle,ellipse,polygon} = m153;
+
+/**
+ * Doors drawn from their leaves' bodies, whatever their kind. A door comes from the map's
+ * `getDoors()`: its opening, plus each leaf's entity. A hinged leaf is a panel turning about its pin;
+ * a sliding leaf is a pane where its body is, over a track along the opening; a door with no leaves
+ * is an arch (jambs, threshold and keystone). The look is game data (game-door-appearance.json),
+ * with the door's authored `color` for its leaves.
+ */
+function doorPresentation(door,{blend=1}={}){
+ const leaves=door.leaves.filter(Boolean).map(entity=>{const pose=entity.getRenderState(blend),shape=entity.collision_shape;
+  return {motion:entity.data.hinged?'hinge':'slide',position:[...pose.position],rotation:pose.rotation,closed_rotation:entity.data.closed_rotation??0,local_position:[...(shape.local_position??[0,0])],dimensions:[...shape.dimensions]};});
+ const color=door.leaves.find(Boolean)?.data.appearance?.color??null;
+ return {door_key:door.door_key,type:door.type,opening:structuredClone(door.opening),arch:!door.leaves.length,color,leaves};
+}
+function hingeLeaf(scene,leaf,look,color){
+ const [lx,ly]=leaf.local_position,L=2*Math.hypot(lx,ly),t=Math.abs(lx)>=Math.abs(ly)?leaf.dimensions[1]:leaf.dimensions[0];
+ const base=leaf.closed_rotation+Math.atan2(ly,lx),angle=leaf.rotation-leaf.closed_rotation;
+ scene.enter({position:leaf.position});
+ if(Math.abs(angle)>look.sweep_min_angle){scene.enter({},{dash:look.sweep_dash});scene.stroke([ellipse(0,0,L,L,0,base,base+angle,angle<0)],look.sweep,1);scene.leave();}
+ scene.place({rotation:base+angle});
+ scene.fill(rect(2,-t/2+2,L-2,t),look.shadow);
+ scene.fill(rect(0,-t/2,L,t),color);
+ scene.fill(rect(3,-t/2+1,L-6,1.2),look.sheen);
+ scene.stroke(rect(0,-t/2,L,t),look.outline,look.outline_width);
+ scene.fill(rect(L*look.handle_at,-t/2-2,5,2),look.handle);scene.fill(rect(L*look.handle_at,t/2,5,2),look.handle);
+ scene.fill([circle(0,0,look.pin_radius)],look.pin);
+ scene.leave();
+}
+function slideLeaf(scene,leaf,color){
+ const [lx,ly]=leaf.local_position,[w,h]=leaf.dimensions;
+ scene.enter({position:leaf.position,rotation:leaf.rotation});scene.fill(rect(lx-w/2,ly-h/2,w,h),color);scene.leave();
+}
+function arch(scene,{length:len,across:th},look){
+ scene.fill(rect(-len/2,-th/2,len,th),look.threshold);
+ scene.fill(rect(-len/2+4,-.5,len-8,1),look.inlay);
+ for(const sx of [-1,1]){scene.fill(rect(sx*len/2-5,-th/2-3,10,th+6),look.jamb);scene.fill(rect(sx*len/2-5,-th/2-3,10,1.5),look.jamb_light);}
+ scene.fill(polygon([[0,-th/2-4],[3,-th/2],[0,-th/2+2],[-3,-th/2]]),look.keystone);
+}
+/** One door's frame packets. `appearance` replaces the game's door look, part by part. */
+function createDoorPackets(packet,{appearance=DOOR_APPEARANCE,scene=new artScene()}={}){
+ const look={hinge:{...DOOR_APPEARANCE.hinge,...appearance.hinge},slide:{...DOOR_APPEARANCE.slide,...appearance.slide},arch:{...DOOR_APPEARANCE.arch,...appearance.arch}};
+ const {opening}=packet;
+ if(packet.arch){scene.enter({position:opening.position,rotation:opening.rotation});arch(scene,opening,look.arch);scene.leave();return scene.finish();}
+ for(const leaf of packet.leaves)if(leaf.motion==='slide')slideLeaf(scene,leaf,packet.color??look.slide.color);
+ if(packet.leaves.some(leaf=>leaf.motion==='slide')){const {length:len,across:th}=opening;
+  scene.enter({position:opening.position,rotation:opening.rotation});scene.fill(rect(-len,-th/2-1,2*len,1),look.slide.track);scene.fill(rect(-len,th/2,2*len,1),look.slide.track);scene.leave();}
+ for(const leaf of packet.leaves)if(leaf.motion==='hinge')hingeLeaf(scene,leaf,look.hinge,packet.color??look.hinge.color);
+ return scene.finish();
+}
+
+return Object.freeze({get DOOR_APPEARANCE(){return DOOR_APPEARANCE;},get doorPresentation(){return doorPresentation;},get createDoorPackets(){return createDoorPackets;}});
+})();
+// src/game/data/road-navigation.mjs
+const m188 = (()=>{
 /**
  * The city's lane network as Basement navigation road data.
  *
@@ -30476,7 +30560,8 @@ const m0 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m40.assetLibrary;},get createGameAssetLibrary(){return m47.createGameAssetLibrary;},get resolveMapLayout(){return m69.resolveMapLayout;},get resolvePlacement(){return m69.resolvePlacement;},get isMovableProp(){return m69.isMovableProp;},get mapHost(){return m69.mapHost;},get createMapLibraries(){return m69.createMapLibraries;},get PROP_TYPES(){return m69.PROP_TYPES;},get MAP_IDS(){return m69.MAP_IDS;},get ApartmentLevel(){return m95.ApartmentLevel;},get APARTMENT_RULES(){return m136.APARTMENT_RULES;},get gameEngine(){return m145.gameEngine;},get gameLevel(){return m147.gameLevel;},get levelLobby(){return m146.levelLobby;},get createGameRuntime(){return m161.createGameRuntime;},get controlSystem(){return m148.controlSystem;},get controlsSystem(){return m148.controlsSystem;},get inputInstance(){return m148.inputInstance;},get keyboardInstance(){return m148.keyboardInstance;},get mouseInstance(){return m148.mouseInstance;},get touchInstance(){return m148.touchInstance;},get touchStick(){return m148.touchStick;},get gamepadInstance(){return m148.gamepadInstance;},get TAP(){return m148.TAP;},get DOUBLETAP(){return m148.DOUBLETAP;},get HELD(){return m148.HELD;},get PRESS(){return m148.PRESS;},get REPEAT(){return m148.REPEAT;},get RELEASE(){return m148.RELEASE;},get renderSystem(){return m153.renderSystem;},get renderFrame(){return m153.renderFrame;},get canvasRenderer(){return m153.canvasRenderer;},get cameraSystem(){return m153.cameraSystem;},get gameSession(){return m173.gameSession;},get PlayerStateSystem(){return m174.PlayerStateSystem;},get PlayerControlSystem(){return m175.PlayerControlSystem;},get Player(){return m123.Player;},get playerVitals(){return m124.playerVitals;},get itemSystem(){return m104.itemSystem;},get createItemCatalog(){return m58.createItemCatalog;},get GUN_MATERIALS(){return m169.GUN_MATERIALS;},get WEAPON_MODELS(){return m169.WEAPON_MODELS;},get LASER_MODULE(){return m169.LASER_MODULE;},get weaponModel(){return m169.weaponModel;},get weaponAppearance(){return m180.weaponAppearance;},get combatSystem(){return m176.combatSystem;},get weaponSystem(){return m177.weaponSystem;},get lootSystem(){return m179.lootSystem;},get WorldLoot(){return m128.WorldLoot;},get MELEE_SWING(){return m178.MELEE_SWING;},get WIDE_SWING(){return m178.WIDE_SWING;},get sampleMeleeSwing(){return m178.sampleMeleeSwing;},get sampleWideSwing(){return m178.sampleWideSwing;},get swingPhases(){return m178.swingPhases;},get wideGrip(){return m178.wideGrip;},get COMBAT_RULES(){return m181.COMBAT_RULES;},get registerGameEntityTypes(){return m116.registerGameEntityTypes;},get actorVitals(){return m102.actorVitals;},get gameActor(){return m100.gameActor;},get NPC(){return m126.NPC;},get rosterRecord(){return m126.rosterRecord;},get ROSTER_FIELDS(){return m126.ROSTER_FIELDS;},get Ganger(){return m99.Ganger;},get actorSystem(){return m171.actorSystem;},get actorItems(){return m103.actorItems;},get restoreActorItems(){return m103.restoreActorItems;},get resolveEmoteLines(){return m127.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m127.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m115.abilityLoadout;},get actorAbilities(){return m115.actorAbilities;},get importActorAbilities(){return m115.importActorAbilities;},get abilitySystem(){return m170.abilitySystem;},get createAbilityCatalog(){return m60.createAbilityCatalog;},get attackRegistry(){return m101.attackRegistry;},get validateAttackState(){return m101.validateAttackState;},get attackSystem(){return m167.attackSystem;},get createAttackCatalog(){return m57.createAttackCatalog;},get validateMountedAttack(){return m114.validateMountedAttack;},get TrafficVehicle(){return m129.TrafficVehicle;},get createGameVehicle(){return m129.createGameVehicle;},get Hunter(){return m98.Hunter;},get createHunterAppearance(){return m56.createHunterAppearance;},get Marionette(){return m122.Marionette;},get MARIONETTE_RULES(){return m54.MARIONETTE_RULES;},get validateAbilityAction(){return m111.validateAbilityAction;},get GatlingGunner(){return m108.GatlingGunner;},get Drone(){return m117.Drone;},get VelvetCat(){return m118.VelvetCat;},get velvetCatAnimation(){return m119.velvetCatAnimation;},get createVelvetAnimation(){return m119.createVelvetAnimation;},get velvetPresentation(){return m119.velvetPresentation;},get droneLift(){return m182.droneLift;},get droneArmPose(){return m182.droneArmPose;},get dronePresentation(){return m182.dronePresentation;},get VELVET_CAT_PALETTES(){return m120.VELVET_CAT_PALETTES;},get VELVET_T(){return m120.VELVET_T;},get VELVET_PROFILES(){return m120.VELVET_PROFILES;},get VELVET_GAITS(){return m120.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m120.VELVET_TAIL_SEGS;},get Demoness(){return m97.Demoness;},get Warden(){return m107.Warden;},get Vesper(){return m107.Vesper;},get Matins(){return m107.Matins;},get Compline(){return m107.Compline;},get BossEffect(){return m109.BossEffect;},get encounterSystem(){return m166.encounterSystem;},get createBossAbilities(){return m48.createBossAbilities;},get createDemonessAppearance(){return m48.createDemonessAppearance;},get demonessAppearance(){return m183.demonessAppearance;},get demonessPresentation(){return m183.demonessPresentation;},get bossEffectAppearance(){return m184.bossEffectAppearance;},get bossEffectPresentation(){return m184.bossEffectPresentation;},get validateBossRecord(){return m96.validateBossRecord;},get createDronePackets(){return m182.createDronePackets;},get createVelvetCatArt(){return m185.createVelvetCatArt;},get createVelvetCatPackets(){return m185.createVelvetCatPackets;},get createVelvetEyePackets(){return m185.createVelvetEyePackets;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m162.humanoidSystem;},get humanoidPresentation(){return m162.humanoidPresentation;},get humanoidBodyCanon(){return m163.humanoidBodyCanon;},get humanoidBuilds(){return m163.humanoidBuilds;},get getHumanoidRigAssets(){return m163.getHumanoidRigAssets;},get roadNavigationData(){return m186.roadNavigationData;},get loadRoadNavigation(){return m186.loadRoadNavigation;}});
+
+return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m40.assetLibrary;},get createGameAssetLibrary(){return m47.createGameAssetLibrary;},get resolveMapLayout(){return m69.resolveMapLayout;},get resolvePlacement(){return m69.resolvePlacement;},get isMovableProp(){return m69.isMovableProp;},get mapHost(){return m69.mapHost;},get createMapLibraries(){return m69.createMapLibraries;},get PROP_TYPES(){return m69.PROP_TYPES;},get MAP_IDS(){return m69.MAP_IDS;},get ApartmentLevel(){return m95.ApartmentLevel;},get APARTMENT_RULES(){return m136.APARTMENT_RULES;},get gameEngine(){return m145.gameEngine;},get gameLevel(){return m147.gameLevel;},get levelLobby(){return m146.levelLobby;},get createGameRuntime(){return m161.createGameRuntime;},get controlSystem(){return m148.controlSystem;},get controlsSystem(){return m148.controlsSystem;},get inputInstance(){return m148.inputInstance;},get keyboardInstance(){return m148.keyboardInstance;},get mouseInstance(){return m148.mouseInstance;},get touchInstance(){return m148.touchInstance;},get touchStick(){return m148.touchStick;},get gamepadInstance(){return m148.gamepadInstance;},get TAP(){return m148.TAP;},get DOUBLETAP(){return m148.DOUBLETAP;},get HELD(){return m148.HELD;},get PRESS(){return m148.PRESS;},get REPEAT(){return m148.REPEAT;},get RELEASE(){return m148.RELEASE;},get renderSystem(){return m153.renderSystem;},get renderFrame(){return m153.renderFrame;},get canvasRenderer(){return m153.canvasRenderer;},get cameraSystem(){return m153.cameraSystem;},get gameSession(){return m173.gameSession;},get PlayerStateSystem(){return m174.PlayerStateSystem;},get PlayerControlSystem(){return m175.PlayerControlSystem;},get Player(){return m123.Player;},get playerVitals(){return m124.playerVitals;},get itemSystem(){return m104.itemSystem;},get createItemCatalog(){return m58.createItemCatalog;},get GUN_MATERIALS(){return m169.GUN_MATERIALS;},get WEAPON_MODELS(){return m169.WEAPON_MODELS;},get LASER_MODULE(){return m169.LASER_MODULE;},get weaponModel(){return m169.weaponModel;},get weaponAppearance(){return m180.weaponAppearance;},get combatSystem(){return m176.combatSystem;},get weaponSystem(){return m177.weaponSystem;},get lootSystem(){return m179.lootSystem;},get WorldLoot(){return m128.WorldLoot;},get MELEE_SWING(){return m178.MELEE_SWING;},get WIDE_SWING(){return m178.WIDE_SWING;},get sampleMeleeSwing(){return m178.sampleMeleeSwing;},get sampleWideSwing(){return m178.sampleWideSwing;},get swingPhases(){return m178.swingPhases;},get wideGrip(){return m178.wideGrip;},get COMBAT_RULES(){return m181.COMBAT_RULES;},get registerGameEntityTypes(){return m116.registerGameEntityTypes;},get actorVitals(){return m102.actorVitals;},get gameActor(){return m100.gameActor;},get NPC(){return m126.NPC;},get rosterRecord(){return m126.rosterRecord;},get ROSTER_FIELDS(){return m126.ROSTER_FIELDS;},get Ganger(){return m99.Ganger;},get actorSystem(){return m171.actorSystem;},get actorItems(){return m103.actorItems;},get restoreActorItems(){return m103.restoreActorItems;},get resolveEmoteLines(){return m127.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m127.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m115.abilityLoadout;},get actorAbilities(){return m115.actorAbilities;},get importActorAbilities(){return m115.importActorAbilities;},get abilitySystem(){return m170.abilitySystem;},get createAbilityCatalog(){return m60.createAbilityCatalog;},get attackRegistry(){return m101.attackRegistry;},get validateAttackState(){return m101.validateAttackState;},get attackSystem(){return m167.attackSystem;},get createAttackCatalog(){return m57.createAttackCatalog;},get validateMountedAttack(){return m114.validateMountedAttack;},get TrafficVehicle(){return m129.TrafficVehicle;},get createGameVehicle(){return m129.createGameVehicle;},get Hunter(){return m98.Hunter;},get createHunterAppearance(){return m56.createHunterAppearance;},get Marionette(){return m122.Marionette;},get MARIONETTE_RULES(){return m54.MARIONETTE_RULES;},get validateAbilityAction(){return m111.validateAbilityAction;},get GatlingGunner(){return m108.GatlingGunner;},get Drone(){return m117.Drone;},get VelvetCat(){return m118.VelvetCat;},get velvetCatAnimation(){return m119.velvetCatAnimation;},get createVelvetAnimation(){return m119.createVelvetAnimation;},get velvetPresentation(){return m119.velvetPresentation;},get droneLift(){return m182.droneLift;},get droneArmPose(){return m182.droneArmPose;},get dronePresentation(){return m182.dronePresentation;},get VELVET_CAT_PALETTES(){return m120.VELVET_CAT_PALETTES;},get VELVET_T(){return m120.VELVET_T;},get VELVET_PROFILES(){return m120.VELVET_PROFILES;},get VELVET_GAITS(){return m120.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m120.VELVET_TAIL_SEGS;},get Demoness(){return m97.Demoness;},get Warden(){return m107.Warden;},get Vesper(){return m107.Vesper;},get Matins(){return m107.Matins;},get Compline(){return m107.Compline;},get BossEffect(){return m109.BossEffect;},get encounterSystem(){return m166.encounterSystem;},get createBossAbilities(){return m48.createBossAbilities;},get createDemonessAppearance(){return m48.createDemonessAppearance;},get demonessAppearance(){return m183.demonessAppearance;},get demonessPresentation(){return m183.demonessPresentation;},get bossEffectAppearance(){return m184.bossEffectAppearance;},get bossEffectPresentation(){return m184.bossEffectPresentation;},get validateBossRecord(){return m96.validateBossRecord;},get createDronePackets(){return m182.createDronePackets;},get createVelvetCatArt(){return m185.createVelvetCatArt;},get createVelvetCatPackets(){return m185.createVelvetCatPackets;},get createVelvetEyePackets(){return m185.createVelvetEyePackets;},get doorPresentation(){return m186.doorPresentation;},get createDoorPackets(){return m186.createDoorPackets;},get DOOR_APPEARANCE(){return m186.DOOR_APPEARANCE;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m162.humanoidSystem;},get humanoidPresentation(){return m162.humanoidPresentation;},get humanoidBodyCanon(){return m163.humanoidBodyCanon;},get humanoidBuilds(){return m163.humanoidBuilds;},get getHumanoidRigAssets(){return m163.getHumanoidRigAssets;},get roadNavigationData(){return m188.roadNavigationData;},get loadRoadNavigation(){return m188.loadRoadNavigation;}});
 })();
 return m0;
 })();
@@ -113742,19 +113827,19 @@ class ApartmentRenderer {
         ctx.save();ctx.translate(canvas.width/2,canvas.height/2);ctx.scale(zoom,zoom);ctx.translate(-cam.x,-cam.y);
         game.drawApartmentBackdrop(ctx);game.drawApartmentInterior(ctx);
         const bounds={left:cam.x-canvas.width/(2*zoom)-180,right:cam.x+canvas.width/(2*zoom)+180,top:cam.y-canvas.height/(2*zoom)-180,bottom:cam.y+canvas.height/(2*zoom)+180};
-        const visible=world.queryEntitiesInBounds({bounds}),props=[],marionettes=[],gunners=[],drones=[],cats=[],demonesses=[],drawnDoors=new Set();PropSprites.frame(zoom);
+        const visible=world.queryEntitiesInBounds({bounds}),props=[],marionettes=[],gunners=[],drones=[],cats=[],demonesses=[],drawnDoors=new Set(),doors=level.map.getDoors(),doorOf=new Map(doors.flatMap(door=>door.leaves.filter(Boolean).map(leaf=>[leaf.entity_id,door])));PropSprites.frame(zoom);
         for(const{entity:e}of visible){
             if(!e)continue;
             if(e.data.role==='wall'){const p=e.getRenderState(blend),[w,h]=e.collision_shape.dimensions;ctx.fillStyle='#291d2d';ctx.fillRect(p.position[0]-w/2,p.position[1]-h/2,w,h);}
             if(e.data.role==='prop'){const p=this.propPacket(e,blend);props.push(p);p.draw(ctx);}
             if(e.data.role==='door'||e.data.role==='door_panel'){
-                const door=e.data.role==='door'?e:level.doorByKey.get(e.data.door_key);if(drawnDoors.has(door.entity_id))continue;drawnDoors.add(door.entity_id);
-                const a=door.data.appearance,pose=door.getRenderState(blend),shape=door.collision_shape;
-                const packet={...a,hx:pose.position[0],hy:pose.position[1],length:a.orientation==='H'?a.w:a.h,baseAngle:a.orientation==='H'?0:Math.PI/2,angle:pose.rotation,thickness:a.orientation==='H'?shape.dimensions[1]:shape.dimensions[0]};
-                if(a.type==='sliding')packet.panels=level.doorPanels.get(door.entity_id).map(panel=>({...panel.getRenderState(blend),dimensions:panel.collision_shape.dimensions,local_position:panel.collision_shape.local_position??[0,0]}));
-                drawIndoorDoorAppearance(ctx,packet);
+                // Doors are drawn natively from their leaves' bodies, once per door, whatever their kind.
+                const door=doorOf.get(e.entity_id);if(!door||drawnDoors.has(door.door_key))continue;drawnDoors.add(door.door_key);
+                DFNative.canvasRenderer.drawPackets(ctx,DFNative.createDoorPackets(DFNative.doorPresentation(door,{blend})));
             }
         }
+        for(const door of doors)if(!door.leaves.length){const [x,y]=door.opening.position,r=door.opening.length/2+10;
+            if(x+r>=bounds.left&&x-r<=bounds.right&&y+r>=bounds.top&&y-r<=bounds.bottom)DFNative.canvasRenderer.drawPackets(ctx,DFNative.createDoorPackets(DFNative.doorPresentation(door,{blend})));}
         for(const{entity:e}of visible)if(e?.data.role==='lamp'){
             const a=e.data.appearance,p=e.getRenderState(blend);if(a.visible!==false)drawLampFixture(ctx,a.fixture??'shade_rose',...p.position,{color:a.color,angle:a.angle??0,lit:!!game.roomSystem.lightAt(...p.position)});
         }

@@ -80,6 +80,7 @@ export {validateBossRecord} from '../entities/validate-boss-records.mjs';
 
 export {createDronePackets} from '../presentation/drone.mjs';
 export {createVelvetCatArt,createVelvetCatPackets,createVelvetEyePackets} from '../presentation/velvet-cat.mjs';
+export {doorPresentation,createDoorPackets,DOOR_APPEARANCE} from '../presentation/door.mjs';
 
 export {rigDefinition,rigPose,animationClip,animationController,rigSystem} from '../../engine/basement/physics/index.mjs';
 export {humanoidSystem,humanoidPresentation} from '../mechanics/animation/humanoid-system.mjs';

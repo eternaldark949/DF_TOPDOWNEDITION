@@ -267,3 +267,13 @@ test('a mirrored door hangs on its far end, and the built-in kinds build as befo
     assert.deepEqual(one({ x: 0, y: 0, w: 10, h: 40, orientation: 'V' })[0].data.open_position, [5, 60], 'no type is plain');
     assert.equal(one({ x: 0, y: 0, w: 40, h: 10, orientation: 'H', type: 'arch' }).length, 0);
 });
+test('getDoors lists every door with its opening and live leaves, arches included', () => {
+    const physics = new physicsSystem(), map = new mapInstance(physics, { map_id: 'd', size: [400, 300], doors: [
+        { x: 180, y: 150, w: 40, h: 10, orientation: 'H', type: 'sliding' }, { x: 100, y: 40, w: 20, h: 80, orientation: 'V', type: 'arch' }, { x: 300, y: 100, w: 8, h: 60, orientation: 'V', type: 'hinged' }] });
+    const doors = map.getDoors();
+    assert.deepEqual(doors.map(d => [d.door_key, d.type, d.leaves.length]), [['door_0', 'sliding', 2], ['door_1', 'arch', 0], ['door_2', 'hinged', 1]]);
+    assert.deepEqual(doors[1].opening, { position: [110, 80], length: 80, across: 20, rotation: Math.PI / 2 });
+    assert.deepEqual(doors[0].opening, { position: [200, 155], length: 40, across: 10, rotation: 0 });
+    assert.equal(doors[0].leaves[1], map.entity('door_0_right')); assert.deepEqual(doors[2].leaves[0].data.opening, doors[2].opening);
+    doors[1].opening.position[0] = 999; assert.equal(map.getDoors()[1].opening.position[0], 110, 'callers get copies');
+});

@@ -26,19 +26,19 @@ class ApartmentRenderer {
         ctx.save();ctx.translate(canvas.width/2,canvas.height/2);ctx.scale(zoom,zoom);ctx.translate(-cam.x,-cam.y);
         game.drawApartmentBackdrop(ctx);game.drawApartmentInterior(ctx);
         const bounds={left:cam.x-canvas.width/(2*zoom)-180,right:cam.x+canvas.width/(2*zoom)+180,top:cam.y-canvas.height/(2*zoom)-180,bottom:cam.y+canvas.height/(2*zoom)+180};
-        const visible=world.queryEntitiesInBounds({bounds}),props=[],marionettes=[],gunners=[],drones=[],cats=[],demonesses=[],drawnDoors=new Set();PropSprites.frame(zoom);
+        const visible=world.queryEntitiesInBounds({bounds}),props=[],marionettes=[],gunners=[],drones=[],cats=[],demonesses=[],drawnDoors=new Set(),doors=level.map.getDoors(),doorOf=new Map(doors.flatMap(door=>door.leaves.filter(Boolean).map(leaf=>[leaf.entity_id,door])));PropSprites.frame(zoom);
         for(const{entity:e}of visible){
             if(!e)continue;
             if(e.data.role==='wall'){const p=e.getRenderState(blend),[w,h]=e.collision_shape.dimensions;ctx.fillStyle='#291d2d';ctx.fillRect(p.position[0]-w/2,p.position[1]-h/2,w,h);}
             if(e.data.role==='prop'){const p=this.propPacket(e,blend);props.push(p);p.draw(ctx);}
             if(e.data.role==='door'||e.data.role==='door_panel'){
-                const door=e.data.role==='door'?e:level.doorByKey.get(e.data.door_key);if(drawnDoors.has(door.entity_id))continue;drawnDoors.add(door.entity_id);
-                const a=door.data.appearance,pose=door.getRenderState(blend),shape=door.collision_shape;
-                const packet={...a,hx:pose.position[0],hy:pose.position[1],length:a.orientation==='H'?a.w:a.h,baseAngle:a.orientation==='H'?0:Math.PI/2,angle:pose.rotation,thickness:a.orientation==='H'?shape.dimensions[1]:shape.dimensions[0]};
-                if(a.type==='sliding')packet.panels=level.doorPanels.get(door.entity_id).map(panel=>({...panel.getRenderState(blend),dimensions:panel.collision_shape.dimensions,local_position:panel.collision_shape.local_position??[0,0]}));
-                drawIndoorDoorAppearance(ctx,packet);
+                // Doors are drawn natively from their leaves' bodies, once per door, whatever their kind.
+                const door=doorOf.get(e.entity_id);if(!door||drawnDoors.has(door.door_key))continue;drawnDoors.add(door.door_key);
+                DFNative.canvasRenderer.drawPackets(ctx,DFNative.createDoorPackets(DFNative.doorPresentation(door,{blend})));
             }
         }
+        for(const door of doors)if(!door.leaves.length){const [x,y]=door.opening.position,r=door.opening.length/2+10;
+            if(x+r>=bounds.left&&x-r<=bounds.right&&y+r>=bounds.top&&y-r<=bounds.bottom)DFNative.canvasRenderer.drawPackets(ctx,DFNative.createDoorPackets(DFNative.doorPresentation(door,{blend})));}
         for(const{entity:e}of visible)if(e?.data.role==='lamp'){
             const a=e.data.appearance,p=e.getRenderState(blend);if(a.visible!==false)drawLampFixture(ctx,a.fixture??'shade_rose',...p.position,{color:a.color,angle:a.angle??0,lit:!!game.roomSystem.lightAt(...p.position)});
         }

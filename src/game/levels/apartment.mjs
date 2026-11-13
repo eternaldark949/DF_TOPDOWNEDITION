@@ -30,9 +30,6 @@ export class ApartmentLevel {
         this.entities=this.physics.elements.getEntities().filter(e=>e.entity_type!=='df_player');
         this.player=this.physics.elements.getEntities({entity_type:'df_player'})[0];
         this.props=this.entities.filter(e=>e.data.role==='prop'); this.doors=this.entities.filter(e=>e.data.role==='door');
-        this.doorByKey=new Map(this.doors.map(door=>[door.data.authored_id,door]));
-        const panels=new Map(this.entities.filter(e=>e.data.role==='door_panel').map(e=>[e.data.door_key,e]));
-        this.doorPanels=new Map(this.doors.map(door=>[door.entity_id,[door,...(panels.has(door.data.authored_id)?[panels.get(door.data.authored_id)]:[])]]));
         this.curtains=this.entities.filter(e=>e.data.role==='curtain');
         this.companions=this.entities.filter(e=>e.entity_type===NPC.entity_type);
         this.lamps=this.entities.filter(e=>e.data.role==='lamp'); this.transitions=this.entities.filter(e=>e.data.role==='transition');

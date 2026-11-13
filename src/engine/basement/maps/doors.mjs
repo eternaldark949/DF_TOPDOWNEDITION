@@ -69,8 +69,18 @@ export function doorKind(kinds, d, key) {
 export const leafIds = (key, kind) => kind.leaves.map((leaf, i) => i ? `${key}_${leaf.suffix}` : key);
 
 /**
+ * A door's opening in its own frame: centre `position`, `length` along the opening, `across` it (the
+ * wall's thickness) and the `rotation` that turns the frame's +x along the opening. Arches have it too.
+ */
+export function doorOpening(d) {
+    const horizontal = d.orientation === 'H';
+    return { position: [d.x + d.w / 2, d.y + d.h / 2], length: horizontal ? d.w : d.h, across: horizontal ? d.h : d.w, rotation: horizontal ? 0 : Math.PI / 2 };
+}
+
+/**
  * One door's leaves as `{packet, joints?}` pairs, in kind order. `base` is the door's entity kind
  * (template or engine type); the packet's data carries the door's opening and open/closed poses.
+ * `data.opening` is the door's opening (see doorOpening).
  */
 export function doorLeaves(d, key, kind, base) {
     const horizontal = d.orientation === 'H', length = horizontal ? d.w : d.h, across = horizontal ? d.h : d.w;
@@ -84,7 +94,7 @@ export function doorLeaves(d, key, kind, base) {
         const pivot = hinge ? a + (b - a) * leaf.pivot : centre, position = point(pivot);
         const travel = hinge ? 0 : (mirror ? -1 : 1) * (leaf.travel[0] * length + leaf.travel[1]);
         const joint = hinge ? { ...HINGE, ...(leaf.hinge ?? {}), ...(d.hinge ?? {}) } : null;
-        const data = { role: i ? 'door_panel' : 'door', authored_id: leafIds(key, kind)[i],
+        const data = { role: i ? 'door_panel' : 'door', authored_id: leafIds(key, kind)[i], opening: doorOpening(d),
             ...(single ? {} : { door_key: key, panel_version: 2, panel_side: leaf.side ?? (i ? 1 : -1), trigger_position }),
             ...(single || hinge ? { hinged: hinge } : {}),
             closed_position: position, open_position: hinge ? position : [position[0] + along(travel)[0], position[1] + along(travel)[1]],

@@ -1,6 +1,6 @@
 // ===== LV0 BASEMENT =====
 import { layoutGeometry } from '../physics/index.mjs';
-import { resolveDoorKinds, doorKind, doorLeaves } from './doors.mjs';
+import { resolveDoorKinds, doorKind, doorLeaves, doorOpening, leafIds } from './doors.mjs';
 export { DOOR_KINDS, HINGE, validateDoorKind } from './doors.mjs';
 
 /**
@@ -72,9 +72,11 @@ export function buildMapPackets(definition, { templates = {}, decorate = null, p
 
     // Doors. Each door's `type` names a door kind (default 'plain'): data saying what its leaves are and
     // how each moves. See doors.mjs. `door_kinds` adds kinds or replaces built-in ones.
-    doors.forEach((d, index) => {
-        const key = `door_${index}`;
-        for (const { packet, joints } of doorLeaves(d, key, doorKind(kinds, d, key), kind_of('door', d.template))) push('doors', index, d, packet, joints);
+    // `openings` lists every door, arches included, with its kind name, opening and leaf ids.
+    const openings = doors.map((d, index) => {
+        const key = `door_${index}`, door_kind = doorKind(kinds, d, key);
+        for (const { packet, joints } of doorLeaves(d, key, door_kind, kind_of('door', d.template))) push('doors', index, d, packet, joints);
+        return { door_key: key, index, type: d.type ?? 'plain', opening: doorOpening(d), leaf_ids: leafIds(key, door_kind) };
     });
 
     // Cloths: a hanging strip mesh anchored at its top edge (curtains, banners, laundry).
@@ -88,5 +90,5 @@ export function buildMapPackets(definition, { templates = {}, decorate = null, p
             data: { role: c.role ?? 'cloth', authored_id: c.authored_id ?? `${c.role ?? 'cloth'}_${i}`, ...c.data, mesh: { points, edges, anchors: [0, 1] } } });
     });
 
-    return { kind, entries, spawn: definition.spawn ? [...definition.spawn] : null, door_kinds: kinds };
+    return { kind, entries, openings, spawn: definition.spawn ? [...definition.spawn] : null, door_kinds: kinds };
 }

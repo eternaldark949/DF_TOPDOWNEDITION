@@ -17,11 +17,11 @@ const moved = (entity, packet) => Math.hypot(entity.position[0] - packet.positio
  * entity that was moved keeps its pose in the map's region memory while its region is unloaded.
  */
 export class mapInstance {
-    #physics; #entries; #byId = new Map(); #regions = new Map(); #loaded = new Set(); #memory = new Map(); #region_size; #stats = { region_loads: 0, region_unloads: 0, created: 0, destroyed: 0 };
+    #physics; #entries; #openings; #byId = new Map(); #regions = new Map(); #loaded = new Set(); #memory = new Map(); #region_size; #stats = { region_loads: 0, region_unloads: 0, created: 0, destroyed: 0 };
     constructor(physics, definition, options = {}) {
         this.#physics = physics; this.map_id = definition.map_id ?? null;
         const built = buildMapPackets(definition, options);
-        this.kind = built.kind; this.spawn = built.spawn; this.#entries = built.entries;
+        this.kind = built.kind; this.spawn = built.spawn; this.#entries = built.entries; this.#openings = built.openings;
         this.#region_size = definition.regions?.size ?? 1024;
         if (!(this.#region_size > 0)) throw new TypeError('Map region size must be positive');
         for (const entry of this.#entries) {
@@ -59,6 +59,11 @@ export class mapInstance {
     entity(authored_id) { const e = this.#byId.get(authored_id)?.entity; return e && !e.destroyed ? e : null; }
     /** Live entities with this data role ('wall', 'prop', 'lamp', 'door', ...), in build order. */
     entities(role) { const out = []; for (const entry of this.#entries) if (entry.entity && !entry.entity.destroyed && (role === undefined || entry.packet.data?.role === role)) out.push(entry.entity); return out; }
+    /**
+     * Every door, arches included, in authored order: `{door_key, index, type, opening, leaves}`, where
+     * `leaves` holds each leaf's live entity (null while unloaded) in kind order. For artists and tools.
+     */
+    getDoors() { return this.#openings.map(({ leaf_ids, opening, ...door }) => ({ ...door, opening: structuredClone(opening), leaves: leaf_ids.map(id => this.entity(id)) })); }
     /** Authored packets, for tools and tests. */
     packets() { return this.#entries.map(e => e.packet); }
 
