@@ -6,7 +6,7 @@
     {"type": "cc_espresso", "x": 140, "y": 54},
     {"type": "cc_grinder", "x": 214, "y": 58},
     {"type": "cc_mug_shelf", "x": 252, "y": 52},
-    {"type": "cc_plant", "x": 60, "y": 300, "width": 36, "height": 36, "variant": 1},
+    {"type": "cc_plant", "x": 60, "y": 300, "width": 36, "height": 36, "look": {"fern": true}},
     {"type": "cc_fireplace", "x": 52, "y": 470},
     {"type": "cc_armchair", "x": 142, "y": 410},
     {"type": "cc_armchair", "x": 142, "y": 618, "face": "N"},
@@ -53,7 +53,7 @@
     {"type": "cc_fridge", "x": 1090, "y": 56},
     {"type": "cc_shelf", "x": 1104, "y": 184},
     {"type": "cc_crate", "x": 990, "y": 756},
-    {"type": "cc_crate", "x": 1060, "y": 756, "variant": 1},
+    {"type": "cc_crate", "x": 1060, "y": 756, "look": {"label": "COCOA"}},
     {"type": "cc_sacks", "x": 1056, "y": 856},
     {"type": "cc_shelf", "x": 962, "y": 880, "width": 36, "height": 60},
     {"type": "ls_tote", "x": 198, "y": 424}

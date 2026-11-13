@@ -78,10 +78,13 @@
             _bake: { k: 1, blur: false, bad: false, retry: false },
 
             /** Once a frame, before the props: the view's zoom (backing px per world unit) and a fresh budget */
-            frame(zoom) { this.density = zoom || 1; this._spent = 0; },
+            /** Native prop art's pictures (game/presentation/props), on the same frame budget and released with the sprites */
+            get pictures() { return this._pictures ??= new DFNative.pictureCache({ max_bytes: PROP_SPRITE.MAX_BYTES / 2, budget_ms: PROP_SPRITE.BUDGET_MS }); },
+            frame(zoom) { this.density = zoom || 1; this._spent = 0; this._pictures?.beginFrame(); },
 
             /** Whether a piece is painted once, and how: 'still' (one sprite, or the runs of a split drawer), 'loop', or null (vector) */
             kindOf(p) {
+                if (DFNative.hasPropArt(p.family)) return null;     // native art keeps its own pictures (PropSprites.pictures)
                 const k = p.decorType;
                 if (k) {
                     if (k.startsWith('gy_')) return null;                 // gravestones keep their own sprite (_gySprite)
@@ -204,8 +207,8 @@
 
             /** Let go of every sprite (a map change, a reset, the setting turned off) */
             clear(props) {
-                if (props) for (const p of props) if (p) p._spr = undefined;
-                this.bytes = 0;
+                if (props) for (const p of props) if (p) { p._spr = undefined; p._artAppearance = undefined; }
+                this.bytes = 0; this._pictures?.clear();
             },
 
             /** Paint ahead (the map's fade): `props` now, ignoring the frame budget */

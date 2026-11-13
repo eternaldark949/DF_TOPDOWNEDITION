@@ -53,3 +53,12 @@ test('seeded randomness repeats for the same seed and cell', () => {
     assert.equal(hash2(3,4,1),hash2(3,4,1));assert.notEqual(hash2(3,4,1),hash2(4,3,1));
     const values=Array.from({length:1000},(_,i)=>hash2(i,i*7,2)),mean=values.reduce((s,v)=>s+v,0)/values.length;assert.ok(Math.abs(mean-.5)<.05,`spread evenly (${mean})`);
 });
+
+test('rounded boxes take the canvas outline, and text is a packet the frame accepts', () => {
+    const box=roundRect(0,0,20,10,4),arcs=box.filter(c=>c[0]==='ellipse');
+    assert.equal(arcs.length,4,'four circular corners, as a canvas roundRect');assert.deepEqual(arcs[0].slice(1,5),[16,4,4,4]);
+    const s=new artScene();s.enter({position:[10,5]}).clip(rect(0,0,4,4)).text('latte',2,3,{font:{family:'Georgia, serif',size:5,weight:600},align:'center',baseline:'middle'},{fill:'#fff'}).leave();
+    const [label]=accepted(s.finish());
+    assert.equal(label.type,'text');assert.equal(label.text,'latte');assert.deepEqual(label.transform.slice(4),[12,8]);assert.equal(label.font.weight,600);assert.equal(label.align,'center');
+    assert.deepEqual(label.clips[0].transform.slice(4),[-2,-3],'the clip stays where it was drawn');
+});

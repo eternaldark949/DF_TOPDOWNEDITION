@@ -2633,6 +2633,13 @@
         /** Pure prop artwork. Native renderers pass presentation packets, never mutable physics objects. */
         function drawPropAppearance(ctx, p, { use_cache = true } = {}) {
                 if (!p.visible) return;
+                if (PropPass.mode === 0 && DFNative.hasPropArt(p.family)) {     // native art, its shadow included (game/presentation/props)
+                    // Seeded from where it was first drawn, as its classic sprite was
+                    const art = p._artAppearance ??= { family: p.family, look: p.look ?? {}, decor: p.decor, x: p.x, y: p.y };
+                    DFNative.drawPropArt(ctx, DFNative.propArtPacket({ appearance: art, position: [p.x + p.width / 2, p.y + p.height / 2], rotation: p.angle || 0, width: p.width, height: p.height }),
+                        { pictures: PropSprites.pictures, time: _frameTime / 1000 });
+                    return;
+                }
                 // Painting or replaying a split run draws body art only. The outer pass
                 // adds exactly one ground shadow, including vector fallback and live props.
                 if (PropPass.mode === 0) {
@@ -2872,6 +2879,8 @@
                 this.color = config.color || '#00CED1';
                 this.interactionType = config.interactionType || null;
                 this.decorType = config.decorType || null;       // custom furniture art (clinic)
+                this.family = config.family || null;             // a catalog family with native art (game/presentation/props)
+                this.look = config.look || null;
                 this.light = config.light || null;               // soft light that follows the prop: { radius, color, intensity, dx, dy }
                 this.headSide = config.headSide || null;
                 this.decor = Object.assign({ face: config.face, vertical: !!config.vertical, candles: !!config.candles, variant: config.variant | 0 }, config.decor);   // House pieces: facing, wall run, lit

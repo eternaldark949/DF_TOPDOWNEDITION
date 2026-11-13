@@ -1,6 +1,6 @@
 /** Native scene presentation. Packets below are drawing inputs, never entities or body owners. */
 class ApartmentRenderer {
-    constructor(game){this.game=game;this.people=new Map();this.props=new Map();}
+    constructor(game){this.game=game;this.people=new Map();this.props=new Map();this.pictures=new DFNative.pictureCache();}
     propPacket(entity,blend){
         const pose=entity.getRenderState(blend),a=entity.data.appearance,[width,height]=entity.collision_shape.dimensions;
         let packet=this.props.get(entity.entity_id);
@@ -14,7 +14,12 @@ class ApartmentRenderer {
         Object.assign(packet,{rigPose:DFNative.humanoidPresentation(entity,blend),punchSide:entity.data.weapon_state?.punch_side,punchHay:!!entity.data.weapon_state?.haymaker,x:pose.position[0],y:pose.position[1],angle:pose.rotation,velX:velocity[0]/60,velY:velocity[1]/60,vx:velocity[0]/60,vy:velocity[1]/60,radius:12,visible:entity.visible!==false&&entity.active,isHidden:!!entity.isHidden,dead:!!entity.dead,walkPhase:packet.walkPhase??0});
         return packet;
     }
-    destroy(){this.lighting=null;PropSprites.clear([...this.props.values()]);this.props.clear();this.people.clear();}
+    /** A prop whose family has native art: drawn from its body's pose, its still runs from pictures. */
+    drawNativeProp(ctx,entity,blend){
+        const pose=entity.getRenderState(blend),[width,height]=entity.collision_shape.dimensions;
+        DFNative.drawPropArt(ctx,DFNative.propArtPacket({appearance:entity.data.appearance,position:pose.position,rotation:pose.rotation,width,height}),{pictures:this.pictures,time:_frameTime/1000});
+    }
+    destroy(){this.lighting=null;this.pictures.clear();PropSprites.clear([...this.props.values()]);this.props.clear();this.people.clear();}
     draw(game,blend=1){
         this.game=game;const level=game.activeLevel,world=level.physics,ctx=game.ctx,canvas=game.canvas;
         const player=this.personPacket(level.player,blend),zoom=game.camera.zoom;
@@ -26,11 +31,11 @@ class ApartmentRenderer {
         ctx.save();ctx.translate(canvas.width/2,canvas.height/2);ctx.scale(zoom,zoom);ctx.translate(-cam.x,-cam.y);
         game.drawApartmentBackdrop(ctx);game.drawApartmentInterior(ctx);
         const bounds={left:cam.x-canvas.width/(2*zoom)-180,right:cam.x+canvas.width/(2*zoom)+180,top:cam.y-canvas.height/(2*zoom)-180,bottom:cam.y+canvas.height/(2*zoom)+180};
-        const visible=world.queryEntitiesInBounds({bounds}),props=[],marionettes=[],gunners=[],drones=[],cats=[],demonesses=[],drawnDoors=new Set(),doors=level.map.getDoors(),doorOf=new Map(doors.flatMap(door=>door.leaves.filter(Boolean).map(leaf=>[leaf.entity_id,door])));PropSprites.frame(zoom);
+        const visible=world.queryEntitiesInBounds({bounds}),props=[],marionettes=[],gunners=[],drones=[],cats=[],demonesses=[],drawnDoors=new Set(),doors=level.map.getDoors(),doorOf=new Map(doors.flatMap(door=>door.leaves.filter(Boolean).map(leaf=>[leaf.entity_id,door])));PropSprites.frame(zoom);this.pictures.beginFrame();
         for(const{entity:e}of visible){
             if(!e)continue;
             if(e.data.role==='wall'){const p=e.getRenderState(blend),[w,h]=e.collision_shape.dimensions;ctx.fillStyle='#291d2d';ctx.fillRect(p.position[0]-w/2,p.position[1]-h/2,w,h);}
-            if(e.data.role==='prop'){const p=this.propPacket(e,blend);props.push(p);p.draw(ctx);}
+            if(e.data.role==='prop'){const p=this.propPacket(e,blend);props.push(p);if(DFNative.hasPropArt(e.data.appearance?.family))this.drawNativeProp(ctx,e,blend);else p.draw(ctx);}
             if(e.data.role==='door'||e.data.role==='door_panel'){
                 // Doors are drawn natively from their leaves' bodies, once per door, whatever their kind.
                 const door=doorOf.get(e.entity_id);if(!door||drawnDoors.has(door.door_key))continue;drawnDoors.add(door.door_key);

@@ -2,8 +2,13 @@
 // DATA STRUCTURES: what each kind of library resource looks like, and the checks that an entry is
 // well formed. A structure names fields, units and defaults; it never says what the data does.
 //
-// prop_catalog   { types: { <type>: { defaults: {...authored options}, movable?: boolean } } }
+// prop_catalog   { types: { <type>: { defaults: {...authored options}, movable?: boolean } }, families?: { <family>: { look } } }
 //                One entry per prop type. A placement names its type and lists only what differs.
+//                A family is a kind of piece drawn by one artist (a bentwood chair, a round table);
+//                its `look` is a schema, { <field>: { kind, default, min?, max?, values?, note? } },
+//                kind color | colors | number | integer | boolean | text | choice (one of `values`).
+//                A type that names a `family` in its defaults is a preset of it: its defaults' `look`
+//                sets some of the family's fields, and a placement's `look` sets more, field by field.
 // map_layout     { map_id?, props: [placement], ...any other per-map lists (copied as data) }
 //                placement = { type, x, y, ...fields }: fields override the type's defaults, and a
 //                field set to null removes that default.
@@ -25,7 +30,7 @@
 import { plain } from './values.mjs';
 
 export const STRUCTURES = Object.freeze({
-    prop_catalog: 'A catalog of prop types: { types: { <type>: { defaults, movable? } } }.',
+    prop_catalog: 'A catalog of prop types and the families they are presets of: { types: { <type>: { defaults, movable? } }, families?: { <family>: { look: { <field>: { kind, default } } } } }.',
     map_layout: 'A map\'s placements over a prop catalog: { props: [{ type, x, y, ...fields }], ... }.',
     skeleton: 'A rig hierarchy: { rig_id, joints: [{ name, parent?, position?, rotation?, scale?, limits? }], anchors? }.',
     clip_set: 'Animation clips for one skeleton: { clips: [{ clip_id, duration, tracks, markers? }] }.',
@@ -36,23 +41,63 @@ export const STRUCTURES = Object.freeze({
 
 const fail = (where, message) => { throw new TypeError(`${where}: ${message}`); };
 
-/** Throws unless `data` is a prop_catalog. Returns it. */
+const COLOR = /^(#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})|rgba?\([^()]*\)|hsla?\([^()]*\)|transparent)$/i;
+const LOOK_KINDS = Object.freeze({
+    color: () => v => typeof v === 'string' && COLOR.test(v.trim()),
+    colors: () => v => Array.isArray(v) && v.length > 0 && v.every(c => typeof c === 'string' && COLOR.test(c.trim())),
+    number: f => v => Number.isFinite(v) && !(v < f.min) && !(v > f.max),
+    integer: f => v => Number.isInteger(v) && !(v < f.min) && !(v > f.max),
+    boolean: () => v => typeof v === 'boolean',
+    text: () => v => typeof v === 'string',
+    choice: f => v => f.values.includes(v)
+});
+/** Throws unless every field of `look` is one the family declares, with a value of its kind. Returns `look`. */
+export function checkLook(family, look, where = 'look') {
+    if (!plain(look)) fail(where, 'a look is an object of fields');
+    for (const [field, value] of Object.entries(look)) {
+        const spec = family.look[field];
+        if (!spec) fail(where, `unknown look field ${field} (the family has ${Object.keys(family.look).join(', ')})`);
+        if (!LOOK_KINDS[spec.kind](spec)(value)) fail(where, `look field ${field} must be ${spec.kind === 'choice' ? `one of ${spec.values.join(', ')}` : `${spec.kind === 'integer' ? 'an' : 'a'} ${spec.kind}`}${spec.min !== undefined || spec.max !== undefined ? ` in ${spec.min ?? '-inf'}..${spec.max ?? 'inf'}` : ''}`);
+    }
+    return look;
+}
+function validateFamily(family, where) {
+    if (!plain(family) || !plain(family.look)) fail(where, 'requires a look schema');
+    for (const [field, spec] of Object.entries(family.look)) {
+        if (!plain(spec) || !Object.hasOwn(LOOK_KINDS, spec.kind)) fail(where, `look field ${field} needs a kind: ${Object.keys(LOOK_KINDS).join(', ')}`);
+        if (spec.kind === 'choice' && (!Array.isArray(spec.values) || !spec.values.length)) fail(where, `look field ${field}: a choice needs values`);
+        if (!LOOK_KINDS[spec.kind](spec)(spec.default)) fail(where, `look field ${field}: its default is not a ${spec.kind}`);
+    }
+}
+
+/** Throws unless `data` is a prop_catalog, with every preset's look checked against its family. Returns it. */
 export function validatePropCatalog(data, where = 'prop_catalog') {
     if (!plain(data) || !plain(data.types)) fail(where, 'requires a types object');
+    if (data.families !== undefined && !plain(data.families)) fail(where, 'families must be an object');
+    for (const [id, family] of Object.entries(data.families ?? {})) validateFamily(family, `${where}: family ${id}`);
     for (const [type, entry] of Object.entries(data.types)) {
         if (!plain(entry) || !plain(entry.defaults)) fail(where, `type ${type} requires a defaults object`);
         if (entry.movable !== undefined && typeof entry.movable !== 'boolean') fail(where, `type ${type}: movable must be a boolean`);
+        const { family, look } = entry.defaults;
+        if (family !== undefined && !Object.hasOwn(data.families ?? {}, family)) fail(where, `type ${type}: unknown family ${family}`);
+        if (look !== undefined) { if (family === undefined) fail(where, `type ${type}: a look needs a family`); checkLook(data.families[family], look, `${where}: type ${type}`); }
     }
     return data;
 }
 
-/** Throws unless `layout` is a map_layout whose placements name types in `types`. Returns it. */
-export function validateMapLayout(layout, types, where = 'map_layout') {
+/** Throws unless `layout` is a map_layout whose placements name types in `types`, and whose looks fit
+ *  their families in `families` (when given). Returns it. */
+export function validateMapLayout(layout, types, where = 'map_layout', families = null) {
     if (!plain(layout) || !Array.isArray(layout.props)) fail(where, 'requires a props array');
     layout.props.forEach((p, i) => {
         if (!plain(p) || typeof p.type !== 'string') fail(where, `placement ${i} requires a type`);
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) fail(where, `placement ${i} (${p.type}) requires a finite x and y`);
         if (types && !Object.hasOwn(types, p.type)) fail(where, `placement ${i}: unknown prop type ${p.type}`);
+        if (families && (p.look !== undefined || p.family !== undefined)) {
+            const family = p.family ?? types?.[p.type]?.defaults.family;
+            if (!Object.hasOwn(families, family ?? '')) fail(where, `placement ${i} (${p.type}): unknown family ${family}`);
+            if (p.look != null) checkLook(families[family], Object.fromEntries(Object.entries(p.look).filter(([, v]) => v !== null)), `${where}: placement ${i} (${p.type})`);
+        }
     });
     return layout;
 }

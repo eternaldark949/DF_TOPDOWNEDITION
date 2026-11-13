@@ -64,7 +64,7 @@ A template needs `entity_type`; its `assets` map slots to resource ids, qualifie
 
 | Kind | Shape |
 |---|---|
-| `prop_catalog` | `{ types: { <type>: { defaults: {...authored options}, movable?: boolean } } }` |
+| `prop_catalog` | `{ types: { <type>: { defaults: {...authored options}, movable?: boolean } }, families?: { <family>: { look: { <field>: { kind, default, min?, max?, values?, note? } } } } }`. A family is a kind of piece one artist draws; its `look` is a schema whose field kinds are `color`, `colors`, `number`, `integer`, `boolean`, `text` and `choice` (one of `values`). A type whose defaults name a `family` is a preset of it, and its defaults' `look` sets some of the family's fields. |
 | `map_layout` | `{ map_id?, props: [{ type, x, y, ...fields }], ...other per-map lists }`. A placement's fields override its type's defaults; a field set to `null` removes that default. |
 | `skeleton` | `{ rig_id, joints: [{ name, parent?, position?, rotation?, scale?, limits? }], anchors? }`: the Basement's `rigDefinition` packet. px and radians, +x forward, −y left. |
 | `clip_set` | `{ clips: [...] }`: the Basement's `animationClip` packets for one skeleton. |
@@ -72,13 +72,14 @@ A template needs `entity_type`; its `assets` map slots to resource ids, qualifie
 | `door_kind` | `{ name, leaves: [{ from, to, motion: 'slide' \| 'hinge', travel?, pivot?, hinge?, side?, suffix? }] }`: the leaves that fill a door's opening. A map door names it in `type`. The Basement maps README has the full rules. |
 | `figure` | `{ parts: [{ part, shape: 'circle' \| 'ellipse' \| 'capsule', joint, to?, radius?, radii? }] }`: how a rigged body is drawn, back to front. A capsule runs from `joint` to `to`. Sizes are px before the rig's scale. |
 
-`validatePropCatalog`, `validateSkeleton`, `validateClipSet`, `validateLocomotion` and `validateFigure` (each `(data, where?)`) and `validateMapLayout(layout, types?, where?)` throw a `TypeError` naming the first problem, and return their input when it is well formed. `validateDoorKind(data, where?)` checks a `door_kind`, and `doorKindsOf(registry)` returns a registry's door kinds by name for the map builder's `door_kinds` option. `validateLibrary(library)` runs the matching check on every resource whose kind has one. `STRUCTURES` describes each kind in one line.
+`validatePropCatalog`, `validateSkeleton`, `validateClipSet`, `validateLocomotion` and `validateFigure` (each `(data, where?)`) and `validateMapLayout(layout, types?, where?, families?)` (with `families`, every placement's `look` is checked against its family too) throw a `TypeError` naming the first problem, and return their input when it is well formed. `validateDoorKind(data, where?)` checks a `door_kind`, and `doorKindsOf(registry)` returns a registry's door kinds by name for the map builder's `door_kinds` option. `validateLibrary(library)` runs the matching check on every resource whose kind has one. `STRUCTURES` describes each kind in one line.
 
 ## Loading
 
 | Function | Result |
 |---|---|
-| `resolvePlacement(placement, types)` | The placement's full options: its type's defaults, then its own fields, `null` removing a default. An unknown type throws. |
+| `resolvePlacement(placement, types)` | The placement's full options: its type's defaults, then its own fields, `null` removing a default. A placement's `look` merges over its type's look field by field (`null` hands a field back to the family default). An unknown type throws. |
+| `resolvePropLook(families, family, look)` | A piece's whole look: the family's defaults with `look` over them. `checkLook(family, look, where?)` throws on a field the family does not declare or a value not of its kind. |
 | `resolveLayout(layout, types, {omit=[]})` | `{ props, prop_types, ...other fields }`: every placement resolved, `prop_types[i]` naming the type of `props[i]`, every other field copied in authored order except those in `omit`. |
 | `isMovable(type, types)` | The catalog's `movable` flag for the type (false when unknown). |
 

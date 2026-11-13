@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '42149b88e7de';
+        const DFAB_BUILD = '0707111e94eb';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="13607">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="14064">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -14344,8 +14344,13 @@ const m43 = (()=>{
 // DATA STRUCTURES: what each kind of library resource looks like, and the checks that an entry is
 // well formed. A structure names fields, units and defaults; it never says what the data does.
 //
-// prop_catalog   { types: { <type>: { defaults: {...authored options}, movable?: boolean } } }
+// prop_catalog   { types: { <type>: { defaults: {...authored options}, movable?: boolean } }, families?: { <family>: { look } } }
 //                One entry per prop type. A placement names its type and lists only what differs.
+//                A family is a kind of piece drawn by one artist (a bentwood chair, a round table);
+//                its `look` is a schema, { <field>: { kind, default, min?, max?, values?, note? } },
+//                kind color | colors | number | integer | boolean | text | choice (one of `values`).
+//                A type that names a `family` in its defaults is a preset of it: its defaults' `look`
+//                sets some of the family's fields, and a placement's `look` sets more, field by field.
 // map_layout     { map_id?, props: [placement], ...any other per-map lists (copied as data) }
 //                placement = { type, x, y, ...fields }: fields override the type's defaults, and a
 //                field set to null removes that default.
@@ -14367,7 +14372,7 @@ const m43 = (()=>{
 const {plain} = m42;
 
 const STRUCTURES = Object.freeze({
-    prop_catalog: 'A catalog of prop types: { types: { <type>: { defaults, movable? } } }.',
+    prop_catalog: 'A catalog of prop types and the families they are presets of: { types: { <type>: { defaults, movable? } }, families?: { <family>: { look: { <field>: { kind, default } } } } }.',
     map_layout: 'A map\'s placements over a prop catalog: { props: [{ type, x, y, ...fields }], ... }.',
     skeleton: 'A rig hierarchy: { rig_id, joints: [{ name, parent?, position?, rotation?, scale?, limits? }], anchors? }.',
     clip_set: 'Animation clips for one skeleton: { clips: [{ clip_id, duration, tracks, markers? }] }.',
@@ -14378,23 +14383,63 @@ const STRUCTURES = Object.freeze({
 
 const fail = (where, message) => { throw new TypeError(`${where}: ${message}`); };
 
-/** Throws unless `data` is a prop_catalog. Returns it. */
+const COLOR = /^(#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})|rgba?\([^()]*\)|hsla?\([^()]*\)|transparent)$/i;
+const LOOK_KINDS = Object.freeze({
+    color: () => v => typeof v === 'string' && COLOR.test(v.trim()),
+    colors: () => v => Array.isArray(v) && v.length > 0 && v.every(c => typeof c === 'string' && COLOR.test(c.trim())),
+    number: f => v => Number.isFinite(v) && !(v < f.min) && !(v > f.max),
+    integer: f => v => Number.isInteger(v) && !(v < f.min) && !(v > f.max),
+    boolean: () => v => typeof v === 'boolean',
+    text: () => v => typeof v === 'string',
+    choice: f => v => f.values.includes(v)
+});
+/** Throws unless every field of `look` is one the family declares, with a value of its kind. Returns `look`. */
+function checkLook(family, look, where = 'look') {
+    if (!plain(look)) fail(where, 'a look is an object of fields');
+    for (const [field, value] of Object.entries(look)) {
+        const spec = family.look[field];
+        if (!spec) fail(where, `unknown look field ${field} (the family has ${Object.keys(family.look).join(', ')})`);
+        if (!LOOK_KINDS[spec.kind](spec)(value)) fail(where, `look field ${field} must be ${spec.kind === 'choice' ? `one of ${spec.values.join(', ')}` : `${spec.kind === 'integer' ? 'an' : 'a'} ${spec.kind}`}${spec.min !== undefined || spec.max !== undefined ? ` in ${spec.min ?? '-inf'}..${spec.max ?? 'inf'}` : ''}`);
+    }
+    return look;
+}
+function validateFamily(family, where) {
+    if (!plain(family) || !plain(family.look)) fail(where, 'requires a look schema');
+    for (const [field, spec] of Object.entries(family.look)) {
+        if (!plain(spec) || !Object.hasOwn(LOOK_KINDS, spec.kind)) fail(where, `look field ${field} needs a kind: ${Object.keys(LOOK_KINDS).join(', ')}`);
+        if (spec.kind === 'choice' && (!Array.isArray(spec.values) || !spec.values.length)) fail(where, `look field ${field}: a choice needs values`);
+        if (!LOOK_KINDS[spec.kind](spec)(spec.default)) fail(where, `look field ${field}: its default is not a ${spec.kind}`);
+    }
+}
+
+/** Throws unless `data` is a prop_catalog, with every preset's look checked against its family. Returns it. */
 function validatePropCatalog(data, where = 'prop_catalog') {
     if (!plain(data) || !plain(data.types)) fail(where, 'requires a types object');
+    if (data.families !== undefined && !plain(data.families)) fail(where, 'families must be an object');
+    for (const [id, family] of Object.entries(data.families ?? {})) validateFamily(family, `${where}: family ${id}`);
     for (const [type, entry] of Object.entries(data.types)) {
         if (!plain(entry) || !plain(entry.defaults)) fail(where, `type ${type} requires a defaults object`);
         if (entry.movable !== undefined && typeof entry.movable !== 'boolean') fail(where, `type ${type}: movable must be a boolean`);
+        const { family, look } = entry.defaults;
+        if (family !== undefined && !Object.hasOwn(data.families ?? {}, family)) fail(where, `type ${type}: unknown family ${family}`);
+        if (look !== undefined) { if (family === undefined) fail(where, `type ${type}: a look needs a family`); checkLook(data.families[family], look, `${where}: type ${type}`); }
     }
     return data;
 }
 
-/** Throws unless `layout` is a map_layout whose placements name types in `types`. Returns it. */
-function validateMapLayout(layout, types, where = 'map_layout') {
+/** Throws unless `layout` is a map_layout whose placements name types in `types`, and whose looks fit
+ *  their families in `families` (when given). Returns it. */
+function validateMapLayout(layout, types, where = 'map_layout', families = null) {
     if (!plain(layout) || !Array.isArray(layout.props)) fail(where, 'requires a props array');
     layout.props.forEach((p, i) => {
         if (!plain(p) || typeof p.type !== 'string') fail(where, `placement ${i} requires a type`);
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) fail(where, `placement ${i} (${p.type}) requires a finite x and y`);
         if (types && !Object.hasOwn(types, p.type)) fail(where, `placement ${i}: unknown prop type ${p.type}`);
+        if (families && (p.look !== undefined || p.family !== undefined)) {
+            const family = p.family ?? types?.[p.type]?.defaults.family;
+            if (!Object.hasOwn(families, family ?? '')) fail(where, `placement ${i} (${p.type}): unknown family ${family}`);
+            if (p.look != null) checkLook(families[family], Object.fromEntries(Object.entries(p.look).filter(([, v]) => v !== null)), `${where}: placement ${i} (${p.type})`);
+        }
     });
     return layout;
 }
@@ -14464,7 +14509,7 @@ function doorKindsOf(registry) {
     return Object.fromEntries(registry.listResources({ kind: 'door_kind' }).map(id => { const { kind, name: kind_name, ...door } = registry.getResource(id); return [kind_name, structuredClone(door)]; }));
 }
 
-return Object.freeze({get STRUCTURES(){return STRUCTURES;},get validatePropCatalog(){return validatePropCatalog;},get validateMapLayout(){return validateMapLayout;},get validateSkeleton(){return validateSkeleton;},get validateClipSet(){return validateClipSet;},get validateLocomotion(){return validateLocomotion;},get validateFigure(){return validateFigure;},get validateDoorKind(){return validateDoorKind;},get validateLibrary(){return validateLibrary;},get doorKindsOf(){return doorKindsOf;}});
+return Object.freeze({get STRUCTURES(){return STRUCTURES;},get checkLook(){return checkLook;},get validatePropCatalog(){return validatePropCatalog;},get validateMapLayout(){return validateMapLayout;},get validateSkeleton(){return validateSkeleton;},get validateClipSet(){return validateClipSet;},get validateLocomotion(){return validateLocomotion;},get validateFigure(){return validateFigure;},get validateDoorKind(){return validateDoorKind;},get validateLibrary(){return validateLibrary;},get doorKindsOf(){return doorKindsOf;}});
 })();
 const m45 = Object.freeze({default:{
  "library_id": "engine",
@@ -15264,15 +15309,29 @@ const m46 = (()=>{
 // LOADING: turning authored library data into ready-to-use data, once, at load time. Every result
 // is a detached copy; nothing here keeps state or touches a world.
 
+
+const {plain} = m42;
+const {checkLook} = m43;
 /** A placement's full options: its type's defaults, then its own fields (null removes a default). */
 function resolvePlacement(placement, types) {
     const { type, ...fields } = placement, entry = types?.[type];
     if (!entry) throw new Error(`Unknown prop type: ${type}`);
     const options = structuredClone(entry.defaults);
     for (const [key, value] of Object.entries(fields)) {
-        if (value === null) delete options[key]; else options[key] = structuredClone(value);
+        if (value === null) delete options[key];
+        else if (key === 'look' && plain(value) && plain(options.look)) {           // a look is set field by field
+            for (const [field, v] of Object.entries(value)) if (v === null) delete options.look[field]; else options.look[field] = structuredClone(v);
+        } else options[key] = structuredClone(value);
     }
     return options;
+}
+
+/** A piece's whole look: its family's defaults with `look` over them, checked against the family's schema. */
+function resolvePropLook(families, family, look = {}) {
+    const entry = families?.[family];
+    if (!entry) throw new TypeError(`Unknown prop family: ${family}`);
+    checkLook(entry, look, `family ${family}`);
+    return { ...Object.fromEntries(Object.entries(entry.look).map(([field, spec]) => [field, structuredClone(spec.default)])), ...structuredClone(look) };
 }
 
 /** Whether props of this catalog type can be pushed (the catalog's `movable` flag). */
@@ -15289,7 +15348,7 @@ function resolveLayout(layout, types, { omit = [] } = {}) {
     return result;
 }
 
-return Object.freeze({get resolvePlacement(){return resolvePlacement;},get isMovable(){return isMovable;},get resolveLayout(){return resolveLayout;}});
+return Object.freeze({get resolvePlacement(){return resolvePlacement;},get resolvePropLook(){return resolvePropLook;},get isMovable(){return isMovable;},get resolveLayout(){return resolveLayout;}});
 })();
 // src/engine/directory/index.mjs
 const m40 = (()=>{
@@ -15301,7 +15360,7 @@ const m40 = (()=>{
 
 
 
-return Object.freeze({get assetLibrary(){return m41.assetLibrary;},get mergeDefinition(){return m41.mergeDefinition;},get identifier(){return m42.identifier;},get nonnegative(){return m42.nonnegative;},get jsonCopy(){return m42.jsonCopy;},get STRUCTURES(){return m43.STRUCTURES;},get validatePropCatalog(){return m43.validatePropCatalog;},get validateMapLayout(){return m43.validateMapLayout;},get validateSkeleton(){return m43.validateSkeleton;},get validateClipSet(){return m43.validateClipSet;},get validateLocomotion(){return m43.validateLocomotion;},get validateFigure(){return m43.validateFigure;},get validateDoorKind(){return m43.validateDoorKind;},get validateLibrary(){return m43.validateLibrary;},get doorKindsOf(){return m43.doorKindsOf;},get ENGINE_LIBRARIES(){return m44.ENGINE_LIBRARIES;},get createEngineRegistry(){return m44.createEngineRegistry;},get resolvePlacement(){return m46.resolvePlacement;},get resolveLayout(){return m46.resolveLayout;},get isMovable(){return m46.isMovable;}});
+return Object.freeze({get assetLibrary(){return m41.assetLibrary;},get mergeDefinition(){return m41.mergeDefinition;},get identifier(){return m42.identifier;},get nonnegative(){return m42.nonnegative;},get jsonCopy(){return m42.jsonCopy;},get STRUCTURES(){return m43.STRUCTURES;},get validatePropCatalog(){return m43.validatePropCatalog;},get validateMapLayout(){return m43.validateMapLayout;},get checkLook(){return m43.checkLook;},get validateSkeleton(){return m43.validateSkeleton;},get validateClipSet(){return m43.validateClipSet;},get validateLocomotion(){return m43.validateLocomotion;},get validateFigure(){return m43.validateFigure;},get validateDoorKind(){return m43.validateDoorKind;},get validateLibrary(){return m43.validateLibrary;},get doorKindsOf(){return m43.doorKindsOf;},get ENGINE_LIBRARIES(){return m44.ENGINE_LIBRARIES;},get createEngineRegistry(){return m44.createEngineRegistry;},get resolvePlacement(){return m46.resolvePlacement;},get resolveLayout(){return m46.resolveLayout;},get resolvePropLook(){return m46.resolvePropLook;},get isMovable(){return m46.isMovable;}});
 })();
 const m49 = Object.freeze({default:{
   "_about": {
@@ -17890,7 +17949,7 @@ const m68 = Object.freeze({default:{
 }});
 const m70 = Object.freeze({default:{
   "library_id": "df_props",
-  "description": "Every prop type any map can place. A type gives defaults; a placement in a map file gives its top-left x, y and only the fields that differ (null removes a default). Fields are the authored appearance options the prop artists read (decorType, color, interactionType, ...). movable: the player can grab and push it.",
+  "description": "Every prop type any map can place. A type gives defaults; a placement in a map file gives its top-left x, y and only the fields that differ (null removes a default). Fields are the authored appearance options the prop artists read (decorType, color, interactionType, ...). movable: the player can grab and push it. A type that names a family is a preset of it: a family is a kind of piece one artist draws, and its look is a schema of the fields a type or a placement may set (look: {...}, field by field).",
   "templates": {},
   "resources": {
     "catalog": {
@@ -17938,31 +17997,31 @@ const m70 = Object.freeze({default:{
           "bench": {"defaults": {"color": "#ccc", "decorType": "bench", "height": 34, "mass": 10000000, "width": 150}},
           "block": {"defaults": {}},
           "cabinet": {"defaults": {"color": "#ccc", "decorType": "cabinet", "height": 30, "mass": 10000000, "width": 118}},
-          "cc_armchair": {"defaults": {"color": "#3a2418", "decorType": "cc_armchair", "face": "S", "height": 46, "mass": 10000000, "width": 50}},
-          "cc_bench": {"defaults": {"color": "#3a2418", "decorType": "cc_bench", "face": "N", "height": 36, "mass": 10000000, "width": 360}},
-          "cc_bookshelf": {"defaults": {"color": "#3a2418", "decorType": "cc_bookshelf", "height": 26, "mass": 10000000, "width": 170}},
-          "cc_booth": {"defaults": {"color": "#3a2418", "decorType": "cc_booth", "face": "W", "height": 80, "mass": 10000000, "width": 42}},
-          "cc_booth_table": {"defaults": {"candles": true, "color": "#3a2418", "decorType": "cc_booth_table", "height": 56, "mass": 10000000, "width": 62}},
-          "cc_chair": {"defaults": {"color": "#3a2418", "decorType": "cc_chair", "face": "E", "height": 22, "mass": 10000000, "width": 22}},
-          "cc_counter": {"defaults": {"color": "#3a2418", "decorType": "cc_counter", "height": 30, "mass": 10000000, "width": 300}},
-          "cc_crate": {"defaults": {"color": "#3a2418", "decorType": "cc_crate", "height": 40, "mass": 10000000, "width": 56}},
-          "cc_easel": {"defaults": {"color": "#3a2418", "decorType": "cc_easel", "height": 18, "mass": 10000000, "width": 34}},
-          "cc_espresso": {"defaults": {"color": "#3a2418", "decorType": "cc_espresso", "height": 36, "mass": 10000000, "width": 66}},
-          "cc_fireplace": {"defaults": {"color": "#3a2418", "decorType": "cc_fireplace", "height": 130, "mass": 10000000, "width": 46}},
-          "cc_fridge": {"defaults": {"color": "#3a2418", "decorType": "cc_fridge", "height": 76, "mass": 10000000, "width": 54}},
-          "cc_grinder": {"defaults": {"color": "#3a2418", "decorType": "cc_grinder", "height": 28, "mass": 10000000, "width": 26}},
-          "cc_loveseat": {"defaults": {"color": "#3a2418", "decorType": "cc_loveseat", "face": "W", "height": 104, "mass": 10000000, "width": 46}},
-          "cc_lowtable": {"defaults": {"color": "#3a2418", "decorType": "cc_lowtable", "height": 54, "mass": 10000000, "width": 62}},
-          "cc_mug_shelf": {"defaults": {"color": "#3a2418", "decorType": "cc_mug_shelf", "height": 24, "mass": 10000000, "width": 130}},
-          "cc_plant": {"defaults": {"color": "#3a2418", "decorType": "cc_plant", "height": 32, "mass": 10000000, "width": 32}},
-          "cc_prep": {"defaults": {"color": "#3a2418", "decorType": "cc_prep", "height": 44, "mass": 10000000, "width": 150}},
-          "cc_record": {"defaults": {"color": "#3a2418", "decorType": "cc_record", "height": 28, "mass": 10000000, "width": 58}},
-          "cc_round_table": {"defaults": {"candles": true, "color": "#3a2418", "decorType": "cc_round_table", "height": 52, "mass": 10000000, "width": 52}},
-          "cc_sacks": {"defaults": {"color": "#3a2418", "decorType": "cc_sacks", "height": 52, "mass": 10000000, "width": 76}},
-          "cc_shelf": {"defaults": {"color": "#3a2418", "decorType": "cc_shelf", "height": 104, "mass": 10000000, "vertical": true, "width": 40}},
-          "cc_side_table": {"defaults": {"color": "#3a2418", "decorType": "cc_side_table", "height": 30, "mass": 10000000, "width": 36}},
-          "cc_sink": {"defaults": {"color": "#3a2418", "decorType": "cc_sink", "height": 34, "mass": 10000000, "width": 90}},
-          "cc_stove": {"defaults": {"color": "#3a2418", "decorType": "cc_stove", "height": 46, "mass": 10000000, "width": 130}},
+          "cc_armchair": {"defaults": {"color": "#3a2418", "decorType": "cc_armchair", "face": "S", "family": "upholstered_seat", "height": 46, "mass": 10000000, "width": 50}},
+          "cc_bench": {"defaults": {"color": "#3a2418", "decorType": "cc_bench", "face": "N", "family": "cushion_bench", "height": 36, "mass": 10000000, "width": 360}},
+          "cc_bookshelf": {"defaults": {"color": "#3a2418", "decorType": "cc_bookshelf", "family": "bookcase", "height": 26, "mass": 10000000, "width": 170}},
+          "cc_booth": {"defaults": {"color": "#3a2418", "decorType": "cc_booth", "face": "W", "family": "booth_bench", "height": 80, "mass": 10000000, "width": 42}},
+          "cc_booth_table": {"defaults": {"candles": true, "color": "#3a2418", "decorType": "cc_booth_table", "family": "cafe_table", "height": 56, "mass": 10000000, "width": 62}},
+          "cc_chair": {"defaults": {"color": "#3a2418", "decorType": "cc_chair", "face": "E", "family": "bentwood_chair", "height": 22, "mass": 10000000, "width": 22}},
+          "cc_counter": {"defaults": {"color": "#3a2418", "decorType": "cc_counter", "family": "cafe_counter", "height": 30, "mass": 10000000, "width": 300}},
+          "cc_crate": {"defaults": {"color": "#3a2418", "decorType": "cc_crate", "family": "stencilled_crate", "height": 40, "mass": 10000000, "width": 56}},
+          "cc_easel": {"defaults": {"color": "#3a2418", "decorType": "cc_easel", "family": "chalkboard_easel", "height": 18, "mass": 10000000, "width": 34}},
+          "cc_espresso": {"defaults": {"color": "#3a2418", "decorType": "cc_espresso", "family": "espresso_machine", "height": 36, "mass": 10000000, "width": 66}},
+          "cc_fireplace": {"defaults": {"color": "#3a2418", "decorType": "cc_fireplace", "family": "fireplace", "height": 130, "mass": 10000000, "width": 46}},
+          "cc_fridge": {"defaults": {"color": "#3a2418", "decorType": "cc_fridge", "family": "fridge", "height": 76, "mass": 10000000, "width": 54}},
+          "cc_grinder": {"defaults": {"color": "#3a2418", "decorType": "cc_grinder", "family": "coffee_grinder", "height": 28, "mass": 10000000, "width": 26}},
+          "cc_loveseat": {"defaults": {"color": "#3a2418", "decorType": "cc_loveseat", "face": "W", "family": "upholstered_seat", "height": 104, "look": {"upholstery": ["#6d8a64"], "upholstery_dark": ["#4a6244"], "seats": 2, "cushioned": true}, "mass": 10000000, "width": 46}},
+          "cc_lowtable": {"defaults": {"color": "#3a2418", "decorType": "cc_lowtable", "family": "round_table", "height": 54, "look": {"edge_width": 1.5, "setting": "reading"}, "mass": 10000000, "width": 62}},
+          "cc_mug_shelf": {"defaults": {"color": "#3a2418", "decorType": "cc_mug_shelf", "family": "mug_shelf", "height": 24, "mass": 10000000, "width": 130}},
+          "cc_plant": {"defaults": {"color": "#3a2418", "decorType": "cc_plant", "family": "potted_plant", "height": 32, "mass": 10000000, "width": 32}},
+          "cc_prep": {"defaults": {"color": "#3a2418", "decorType": "cc_prep", "family": "prep_table", "height": 44, "mass": 10000000, "width": 150}},
+          "cc_record": {"defaults": {"color": "#3a2418", "decorType": "cc_record", "family": "record_player", "height": 28, "mass": 10000000, "width": 58}},
+          "cc_round_table": {"defaults": {"candles": true, "color": "#3a2418", "decorType": "cc_round_table", "family": "round_table", "height": 52, "mass": 10000000, "width": 52}},
+          "cc_sacks": {"defaults": {"color": "#3a2418", "decorType": "cc_sacks", "family": "flour_sacks", "height": 52, "mass": 10000000, "width": 76}},
+          "cc_shelf": {"defaults": {"color": "#3a2418", "decorType": "cc_shelf", "family": "jar_shelf", "height": 104, "mass": 10000000, "vertical": true, "width": 40}},
+          "cc_side_table": {"defaults": {"color": "#3a2418", "decorType": "cc_side_table", "family": "cafe_table", "height": 30, "look": {"round": true, "setting": "side"}, "mass": 10000000, "width": 36}},
+          "cc_sink": {"defaults": {"color": "#3a2418", "decorType": "cc_sink", "family": "double_sink", "height": 34, "mass": 10000000, "width": 90}},
+          "cc_stove": {"defaults": {"color": "#3a2418", "decorType": "cc_stove", "family": "range_stove", "height": 46, "mass": 10000000, "width": 130}},
           "cooler": {"defaults": {"color": "#ccc", "decorType": "cooler", "height": 34, "mass": 10000000, "width": 34}},
           "desk": {"defaults": {"color": "#ccc", "decorType": "desk", "height": 34, "mass": 10000000, "width": 164}},
           "dn_desk": {"defaults": {"color": "#1a1216", "decorType": "dn_desk", "height": 44, "mass": 10000000, "width": 230}},
@@ -18139,6 +18198,150 @@ const m70 = Object.freeze({default:{
           "ta_turntable": {"defaults": {"color": "#2a2a30", "decorType": "ta_turntable", "height": 132, "mass": 10000000, "width": 132}},
           "ta_wrap": {"defaults": {"color": "#2a2a30", "decorType": "ta_wrap", "height": 96, "mass": 10000000, "width": 190}},
           "vending_machine": {"defaults": {"color": "#00f3ff", "height": 60, "interactionType": "vending_machine", "mass": 10000000, "width": 40}}
+        },
+        "families": {
+          "bentwood_chair": {"description": "A bentwood cafe chair seen from above: a round seat in a wooden ring, a curved back. Turns to its face.", "look": {
+            "frame": {"kind": "color", "default": "#6e4529"},
+            "frame_edge": {"kind": "color", "default": "#2e1b10"},
+            "back": {"kind": "color", "default": "#4a2c1a"},
+            "seats": {"kind": "colors", "default": ["#8e4632", "#6d8a64"], "note": "one seat colour is chosen per chair"}}},
+          "upholstered_seat": {"description": "A tufted armchair or sofa: a back, two deep arms, one cushion per seat, sometimes a knitted throw. Turns to its face.", "look": {
+            "upholstery": {"kind": "colors", "default": ["#8e4632", "#c0903a"], "note": "one is chosen per piece"},
+            "upholstery_dark": {"kind": "colors", "default": ["#5e2a1e", "#8a6424"], "note": "the shadow colour for each upholstery colour, in the same order"},
+            "seats": {"kind": "integer", "default": 1, "min": 1, "max": 4, "note": "seat cushions side by side"},
+            "cushioned": {"kind": "boolean", "default": false, "note": "a scatter cushion in the first seat"},
+            "cushion": {"kind": "color", "default": "#c0903a"},
+            "throw": {"kind": "number", "default": 0.6, "min": 0, "max": 1, "note": "how often a knitted throw lies over it"},
+            "throw_color": {"kind": "color", "default": "rgba(232,220,196,0.85)"}}},
+          "booth_bench": {"description": "A padded booth bench with its back to the wall. Turns to its face.", "look": {
+            "frame": {"kind": "color", "default": "#2e1b10"},
+            "upholstery": {"kind": "color", "default": "#6d8a64"},
+            "upholstery_dark": {"kind": "color", "default": "#4a6244"},
+            "seats": {"kind": "integer", "default": 3, "min": 1, "max": 6, "note": "seat pads along it"}}},
+          "cushion_bench": {"description": "A window bench: cushions in turn along it, pillows against the glass. Turns to its face.", "look": {
+            "frame": {"kind": "color", "default": "#2e1b10"},
+            "frame_edge": {"kind": "color", "default": "#1a0f08"},
+            "cushions": {"kind": "colors", "default": ["#8e4632", "#6d8a64", "#c0903a", "#e8dcc4"], "note": "used in turn, starting from where the bench stands"}}},
+          "round_table": {"description": "A round wooden table, laid: a candle jar, cups, a pastry and a bud vase, or books, mugs and a candle.", "look": {
+            "top": {"kind": "color", "default": "#4a2c1a"},
+            "top_light": {"kind": "color", "default": "#6e4529"},
+            "edge": {"kind": "color", "default": "#2e1b10"},
+            "edge_width": {"kind": "number", "default": 1.4, "min": 0, "max": 4},
+            "setting": {"kind": "choice", "values": ["candle", "reading"], "default": "candle", "note": "what is on it"}}},
+          "cafe_table": {"description": "A small table, square or round, laid: a booth table has a candle jar, cups and sugar; a side table a cup and a glass.", "look": {
+            "top": {"kind": "color", "default": "#4a2c1a"},
+            "top_light": {"kind": "color", "default": "#6e4529"},
+            "edge": {"kind": "color", "default": "#2e1b10"},
+            "round": {"kind": "boolean", "default": false},
+            "setting": {"kind": "choice", "values": ["booth", "side"], "default": "booth", "note": "what is on it"}}},
+          "cafe_counter": {"description": "A cafe bar: a wooden top with a bright edge, slatted front, a register, a tip jar and cups, and a pastry case at the end. Placed vertical it is a side run with a cake dome and a biscotti jar.", "look": {
+            "wood": {"kind": "color", "default": "#4a2c1a"},
+            "wood_light": {"kind": "color", "default": "#6e4529"},
+            "wood_dark": {"kind": "color", "default": "#2e1b10"},
+            "edge": {"kind": "color", "default": "#c98c4a"},
+            "brass": {"kind": "color", "default": "#c9a24a"},
+            "pastries": {"kind": "colors", "default": ["#d9a36a", "#f0c9a0", "#8a4b2e", "#e8b8c8", "#f4dcae", "#c27b4a"], "note": "the pastry case, in turn"}}},
+          "espresso_machine": {"description": "An espresso machine: two group heads, cups warming on top, a pressure gauge whose needle moves.", "look": {
+            "body": {"kind": "color", "default": "#4a4d55"},
+            "face": {"kind": "color", "default": "#8d9098"},
+            "trim": {"kind": "color", "default": "#c9a24a"},
+            "cups": {"kind": "color", "default": "#e8dcc4"}}},
+          "coffee_grinder": {"description": "A coffee grinder: a hopper of beans over a dark body.", "look": {
+            "body": {"kind": "color", "default": "#2a2026"},
+            "body_edge": {"kind": "color", "default": "#14100f"},
+            "hopper": {"kind": "color", "default": "rgba(120,80,50,0.85)"},
+            "beans": {"kind": "color", "default": "#3a2214"}}},
+          "mug_shelf": {"description": "A wall shelf of mismatched mugs on hooks.", "look": {
+            "shelf": {"kind": "color", "default": "#6e4529"},
+            "shelf_edge": {"kind": "color", "default": "#2e1b10"},
+            "mugs": {"kind": "colors", "default": ["#e9dcc6", "#c98c4a", "#6d8a64", "#8e4632", "#f1e4cc", "#5d6f8a", "#d9b45a", "#b5643e"], "note": "in turn along the shelf"},
+            "count": {"kind": "integer", "default": 9, "min": 1, "max": 30, "note": "mugs along it"}}},
+          "potted_plant": {"description": "A terracotta pot with leaves fanned out, swaying a little; a fern has more, longer, narrower fronds.", "look": {
+            "pot": {"kind": "color", "default": "#b5643e"},
+            "pot_edge": {"kind": "color", "default": "#7a3e22"},
+            "soil": {"kind": "color", "default": "#3a2416"},
+            "leaf": {"kind": "color", "default": "#4f7a3a"},
+            "leaf_light": {"kind": "color", "default": "#79a656"},
+            "fern": {"kind": "boolean", "default": false}}},
+          "fireplace": {"description": "A brick fireplace on a wall: a stone hearth, crossed logs and glowing embers in the firebox, candlesticks on the mantel.", "look": {
+            "brick": {"kind": "color", "default": "#8a3b28"},
+            "brick_dark": {"kind": "color", "default": "#5a2418"},
+            "mortar": {"kind": "color", "default": "rgba(40,12,8,0.55)"},
+            "hearth": {"kind": "color", "default": "#6a625a"},
+            "hearth_edge": {"kind": "color", "default": "#3c3630"},
+            "firebox": {"kind": "color", "default": "#140806"},
+            "firebox_edge": {"kind": "color", "default": "#2a120a"},
+            "logs": {"kind": "color", "default": "#4a2c18"},
+            "mantel": {"kind": "color", "default": "#4a2c1a"},
+            "brass": {"kind": "color", "default": "#c9a24a"}}},
+          "bookcase": {"description": "A case of well-read spines, a few leaning.", "look": {
+            "case": {"kind": "color", "default": "#2e1b10"},
+            "case_edge": {"kind": "color", "default": "#1a0f08"},
+            "spines": {"kind": "colors", "default": ["#7a3b2e", "#3e5a6e", "#c0903a", "#5f7a5a", "#d9c8a6", "#4a3a5e", "#9a5a3a", "#2e4a3a"]}}},
+          "record_player": {"description": "A sideboard with a turntable turning and a stack of sleeves.", "look": {
+            "cabinet": {"kind": "color", "default": "#4a2c1a"},
+            "cabinet_edge": {"kind": "color", "default": "#2e1b10"},
+            "deck": {"kind": "color", "default": "#2a2026"},
+            "vinyl": {"kind": "color", "default": "#0e0c10"},
+            "label": {"kind": "color", "default": "#c0903a"},
+            "arm": {"kind": "color", "default": "#c9a24a"},
+            "sleeves": {"kind": "colors", "default": ["#c98c4a", "#6d8a64", "#8e4632"], "note": "stacked beside the deck"}}},
+          "chalkboard_easel": {"description": "A chalkboard on legs with two lines of chalk.", "look": {
+            "frame": {"kind": "color", "default": "#6e4529"},
+            "frame_edge": {"kind": "color", "default": "#2e1b10"},
+            "board": {"kind": "color", "default": "#1f2a24"},
+            "chalk": {"kind": "color", "default": "rgba(240,235,220,0.85)"},
+            "line_1": {"kind": "text", "default": "honey"},
+            "line_2": {"kind": "text", "default": "latte ♥"}}},
+          "range_stove": {"description": "A kitchen range: four burners, a pot of soup on one, a copper pan on another, knobs along the front.", "look": {
+            "body": {"kind": "color", "default": "#4a4d55"},
+            "body_edge": {"kind": "color", "default": "#202228"},
+            "top": {"kind": "color", "default": "#2c2e34"},
+            "burner": {"kind": "color", "default": "#16171b"},
+            "burner_ring": {"kind": "color", "default": "#55585f"},
+            "pot": {"kind": "color", "default": "#8d9098"},
+            "pot_edge": {"kind": "color", "default": "#3a3c42"},
+            "soup": {"kind": "color", "default": "#c27b4a"},
+            "pan": {"kind": "color", "default": "#b8683a"},
+            "pan_edge": {"kind": "color", "default": "#6e3a1a"},
+            "knobs": {"kind": "color", "default": "#c9c9c9"}}},
+          "double_sink": {"description": "A steel double sink with a tap between the bowls.", "look": {
+            "basin": {"kind": "color", "default": "#8d9098"},
+            "basin_edge": {"kind": "color", "default": "#4a4d55"},
+            "bowl": {"kind": "color", "default": "#5a5e66"},
+            "tap": {"kind": "color", "default": "#d0d2d8"}}},
+          "prep_table": {"description": "A butcher-block table: a scored loaf, a board and knife, a bowl of lemons.", "look": {
+            "block": {"kind": "color", "default": "#b07a44"},
+            "block_edge": {"kind": "color", "default": "#6e4628"},
+            "grain": {"kind": "color", "default": "rgba(80,50,25,0.3)"},
+            "loaf": {"kind": "color", "default": "#c8894a"},
+            "loaf_score": {"kind": "color", "default": "#8a5428"},
+            "board": {"kind": "color", "default": "#e3c38e"},
+            "knife": {"kind": "color", "default": "#cfd2d8"},
+            "bowl": {"kind": "color", "default": "#e8e2d4"},
+            "bowl_edge": {"kind": "color", "default": "#b0a890"},
+            "lemons": {"kind": "color", "default": "#f2cf45"}}},
+          "fridge": {"description": "A fridge seen from above: two doors, handles, notes and a drawing stuck on.", "look": {
+            "body": {"kind": "color", "default": "#d6d8de"},
+            "body_edge": {"kind": "color", "default": "#8a8d95"},
+            "seam": {"kind": "color", "default": "#9a9da5"},
+            "handle": {"kind": "color", "default": "#6a6d75"},
+            "notes": {"kind": "colors", "default": ["#f5e9a8", "#a8d8f5"], "note": "the first a note, the second a drawing"}}},
+          "jar_shelf": {"description": "Shelves of jars and tins in two rows; vertical runs them down the shelf.", "look": {
+            "case": {"kind": "color", "default": "#2e1b10"},
+            "case_edge": {"kind": "color", "default": "#1a0f08"},
+            "jars": {"kind": "colors", "default": ["#d9a36a", "#f4dcae", "#8a4b2e", "#6d8a64", "#c0903a", "#e8dcc4"]}}},
+          "stencilled_crate": {"description": "A wooden crate with a stencilled word.", "look": {
+            "wood": {"kind": "color", "default": "#8a5a32"},
+            "wood_edge": {"kind": "color", "default": "#4a2c14"},
+            "slats": {"kind": "color", "default": "rgba(40,20,8,0.5)"},
+            "stencil": {"kind": "color", "default": "rgba(30,14,6,0.55)"},
+            "label": {"kind": "text", "default": "BEANS"}}},
+          "flour_sacks": {"description": "Flour sacks slumped together, each with a red band.", "look": {
+            "sack": {"kind": "color", "default": "#e4d6b8"},
+            "sack_edge": {"kind": "color", "default": "#a89470"},
+            "band": {"kind": "color", "default": "#b8574a"},
+            "count": {"kind": "integer", "default": 3, "min": 1, "max": 6}}}
         }
       }
     }
@@ -18388,7 +18591,7 @@ const m75 = Object.freeze({default:{
     {"type": "cc_espresso", "x": 140, "y": 54},
     {"type": "cc_grinder", "x": 214, "y": 58},
     {"type": "cc_mug_shelf", "x": 252, "y": 52},
-    {"type": "cc_plant", "x": 60, "y": 300, "width": 36, "height": 36, "variant": 1},
+    {"type": "cc_plant", "x": 60, "y": 300, "width": 36, "height": 36, "look": {"fern": true}},
     {"type": "cc_fireplace", "x": 52, "y": 470},
     {"type": "cc_armchair", "x": 142, "y": 410},
     {"type": "cc_armchair", "x": 142, "y": 618, "face": "N"},
@@ -18435,7 +18638,7 @@ const m75 = Object.freeze({default:{
     {"type": "cc_fridge", "x": 1090, "y": 56},
     {"type": "cc_shelf", "x": 1104, "y": 184},
     {"type": "cc_crate", "x": 990, "y": 756},
-    {"type": "cc_crate", "x": 1060, "y": 756, "variant": 1},
+    {"type": "cc_crate", "x": 1060, "y": 756, "look": {"label": "COCOA"}},
     {"type": "cc_sacks", "x": 1056, "y": 856},
     {"type": "cc_shelf", "x": 962, "y": 880, "width": 36, "height": 60},
     {"type": "ls_tote", "x": 198, "y": 424}
@@ -27840,7 +28043,72 @@ class canvasRenderer {
     dispose(){if(this.#disposed)return;this.#disposed=true;this.#generation++;for(const entry of this.#resources.values())this.#release(entry);this.#resources.clear();this.#context=null;this.#surface=null;}
 }
 
-return Object.freeze({get canvasRenderer(){return canvasRenderer;}});
+let measurer=null;
+/** The width and the ascent/descent above and below the baseline of one line of text in `font`
+ *  {family, size, weight, style}, as the Canvas backend would draw it. */
+function measureText(text,font={},{create_surface=createSurface}={}){
+    measurer??=create_surface(1,1).getContext('2d');
+    measurer.font=`${font.style??'normal'} ${font.weight??400} ${font.size??16}px ${font.family??'sans-serif'}`;
+    const m=measurer.measureText(String(text));
+    return Object.freeze({width:m.width,ascent:m.actualBoundingBoxAscent??0,descent:m.actualBoundingBoxDescent??0});
+}
+
+const multiply=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
+/**
+ * Pictures painted once and stamped every frame: a migration boundary like drawPackets, for hosts that
+ * own a Canvas pass. `draw(context, {key, bounds, matrix}, build)` stamps the picture `key` (the packets
+ * `build()` returns, in local units inside `bounds` [x, y, w, h]) under the context's transform times
+ * `matrix`. A picture is painted at the first of `densities` (device pixels per local unit) at or above
+ * what the view needs, so it stays sharp as the view zooms; past the last it draws as vector. Painting
+ * spends at most `budget_ms` a frame (`beginFrame()`); a picture waiting its turn draws as vector, as
+ * does one with a blend other than normal (a picture's own blend has nothing under it to work on).
+ * The least recently stamped pictures go first when `max_bytes` would be passed. The key must name
+ * everything the picture shows: the cache never looks inside `build`.
+ */
+class pictureCache{
+    #entries=new Map();#bytes=0;#spent=0;#max_bytes;#budget_ms;#densities;#create_surface;#now;
+    constructor({max_bytes=48*1048576,budget_ms=3,densities=[1,1.5,2,3,4],create_surface=createSurface,now=()=>performance.now()}={}){
+        if(!(max_bytes>0)||!(budget_ms>=0))throw new TypeError('A picture cache needs a memory budget and a time budget');
+        if(!Array.isArray(densities)||!densities.length||densities.some((d,i)=>!(d>0)||(i&&d<=densities[i-1])))throw new TypeError('Densities must rise');
+        this.#max_bytes=max_bytes;this.#budget_ms=budget_ms;this.#densities=[...densities];this.#create_surface=create_surface;this.#now=now;
+    }
+    /** A fresh painting budget, once a frame. */
+    beginFrame(){this.#spent=0;}
+    get statistics(){return Object.freeze({pictures:[...this.#entries.values()].filter(e=>e.surface).length,bytes:this.#bytes});}
+    /** Draws the picture; returns how: 'stamp' (from the cache), 'paint' (painted now, then stamped) or 'vector'. */
+    draw(context,{key,bounds,matrix=[1,0,0,1,0,0]},build){
+        if(!context?.canvas||typeof context.getTransform!=='function')throw new TypeError('A host Canvas context is required');
+        if(typeof key!=='string'||!key)throw new TypeError('A picture needs a key');
+        const [bx,by,bw,bh]=bounds;if(![bx,by,bw,bh].every(Number.isFinite)||!(bw>0&&bh>0))throw new TypeError('A picture needs finite bounds');
+        const t=context.getTransform(),m=multiply([t.a,t.b,t.c,t.d,t.e,t.f],matrix),scale=Math.max(Math.hypot(m[0],m[1]),Math.hypot(m[2],m[3]));
+        const density=this.#densities.find(d=>d>=scale-1e-9);
+        const vector=packets=>{context.save();try{context.transform(...matrix);canvasRenderer.drawPackets(context,packets??build());}finally{context.restore();}return 'vector';};
+        if(density===undefined||this.#entries.get(key)?.vector)return vector();
+        const id=`${key}@${density}`;let entry=this.#entries.get(id),how='stamp';
+        if(!entry){
+            if(this.#spent>=this.#budget_ms)return vector();
+            const t0=this.#now(),packets=build();
+            if(packets.some(p=>(p.blend??'normal')!=='normal')){this.#entries.set(key,{vector:true,bytes:0});return vector(packets);}
+            const W=Math.ceil(bw*density),H=Math.ceil(bh*density),bytes=W*H*4;
+            if(bytes>this.#max_bytes)return vector(packets);
+            this.#evict(bytes);
+            const surface=this.#create_surface(W,H),ctx=surface.getContext('2d');if(!ctx)throw new Error('Picture surface unavailable');
+            ctx.setTransform(W/bw,0,0,H/bh,-bx*W/bw,-by*H/bh);canvasRenderer.drawPackets(ctx,packets);
+            entry={surface,bytes};this.#bytes+=bytes;this.#spent+=this.#now()-t0;how='paint';
+        }else this.#entries.delete(id);
+        this.#entries.set(id,entry);
+        context.save();
+        try{context.transform(...matrix);context.drawImage(entry.surface,bx,by,bw,bh);}finally{context.restore();}
+        return how;
+    }
+    #evict(bytes){for(const [id,entry]of this.#entries){if(this.#bytes+bytes<=this.#max_bytes)break;if(entry.surface){this.#free(entry);this.#entries.delete(id);}}}
+    #free(entry){this.#bytes-=entry.bytes;entry.surface.width=0;entry.surface.height=0;}
+    /** Lets go of every picture whose key starts with `prefix` (all of them without one). */
+    release(prefix=''){for(const [id,entry]of [...this.#entries])if(id.startsWith(prefix)){if(entry.surface)this.#free(entry);this.#entries.delete(id);}}
+    clear(){this.release();}
+}
+
+return Object.freeze({get canvasRenderer(){return canvasRenderer;},get measureText(){return measureText;},get pictureCache(){return pictureCache;}});
 })();
 // src/engine/basement/rendering/art.mjs
 const m161 = (()=>{
@@ -27865,10 +28133,12 @@ function polyline(points){if(!Array.isArray(points)||points.length<2)throw new T
 function polygon(points){if(points?.length<3)throw new TypeError('A polygon needs three points or more');return [...polyline(points),['close']];}
 /** A box from its top-left corner, the classic canvas convention. */
 const rect=(x,y,w,h)=>polygon([[x,y],[x+w,y],[x+w,y+h],[x,y+h]]);
-/** A box from its top-left corner with rounded corners; `r` is clamped to half the shorter side. */
+/** A box from its top-left corner with rounded corners, the same outline as a canvas roundRect (circular
+ *  arcs); `r` is clamped to half the shorter side. */
 function roundRect(x,y,w,h,r){
     r=Math.max(0,Math.min(finite(r,'corner radius'),Math.abs(w)/2,Math.abs(h)/2));if(!r)return rect(x,y,w,h);
-    return [['move',x+r,y],['line',x+w-r,y],['quadratic',x+w,y,x+w,y+r],['line',x+w,y+h-r],['quadratic',x+w,y+h,x+w-r,y+h],['line',x+r,y+h],['quadratic',x,y+h,x,y+h-r],['line',x,y+r],['quadratic',x,y,x+r,y],['close']];
+    const q=Math.PI/2;
+    return [['move',x+r,y],['line',x+w-r,y],ellipse(x+w-r,y+r,r,r,0,-q,0),['line',x+w,y+h-r],ellipse(x+w-r,y+h-r,r,r,0,0,q),['line',x+r,y+h],ellipse(x+r,y+h-r,r,r,0,q,2*q),['line',x,y+r],ellipse(x+r,y+r,r,r,0,2*q,3*q),['close']];
 }
 /** A stadium from `from` to `to` with round ends: a limb, a cable, a pipe. Fill it. */
 function capsule([ax,ay],[bx,by],r){
@@ -27906,6 +28176,12 @@ class artScene{
     stroke(commands,color,stroke_width=this.style.stroke_width){return this.paint(commands,{stroke:color,stroke_width});}
     /** The fill-then-outline pair the classic art draws for nearly every part. */
     outlined(commands,fill,stroke,stroke_width=this.style.stroke_width){return this.paint(commands,{fill,stroke,stroke_width});}
+    /** One line of text at (x, y) in the group: `font` {family, size, weight, style}, `align` left|center|right,
+     *  `baseline` top|middle|bottom|alphabetic; `material` as for paint (fill, or stroke for outlined text). */
+    text(string,x,y,{font={},align='left',baseline='alphabetic'}={},material={fill:'#000'}){
+        const m=multiply(this.matrix,[1,0,0,1,finite(x,'x'),finite(y,'y')]),inv=this.clips.length?inverse(m):null,{stroke_width,line_cap,line_join,dash}=this.style;
+        this.packets.push({type:'text',text:String(string),matrix:m,font:{...font},align,baseline,material:{fill:null,stroke:null,stroke_width,line_cap,line_join,dash:[...dash],...structuredClone(material)},opacity:this.style.opacity,blend:this.style.blend,clips:this.clips.map(clip=>({geometry:clip.geometry,transform:multiply(inv,clip.matrix)}))});return this;
+    }
     finish(){if(this.#stack.length)throw new Error('Unclosed art group');return this.packets;}
 }
 
@@ -28019,7 +28295,7 @@ const m154 = (()=>{
 
 
 
-return Object.freeze({get cameraSystem(){return m155.cameraSystem;},get renderFrame(){return m157.renderFrame;},get renderSystem(){return m159.renderSystem;},get canvasRenderer(){return m160.canvasRenderer;},get artScene(){return m161.artScene;},get circle(){return m161.circle;},get ellipse(){return m161.ellipse;},get polyline(){return m161.polyline;},get polygon(){return m161.polygon;},get rect(){return m161.rect;},get roundRect(){return m161.roundRect;},get capsule(){return m161.capsule;},get smoothShape(){return m161.smoothShape;},get linear(){return m161.linear;},get radial(){return m161.radial;},get glow(){return m161.glow;},get groundShadow(){return m161.groundShadow;},get hexToRgb(){return m161.hexToRgb;},get rgbToHex(){return m161.rgbToHex;},get rgba(){return m161.rgba;},get mix(){return m161.mix;},get shade(){return m161.shade;},get seededRandom(){return m161.seededRandom;},get hash2(){return m161.hash2;},get createLightLayer(){return m162.createLightLayer;},get LIGHT_CUT(){return m162.LIGHT_CUT;}});
+return Object.freeze({get cameraSystem(){return m155.cameraSystem;},get renderFrame(){return m157.renderFrame;},get renderSystem(){return m159.renderSystem;},get canvasRenderer(){return m160.canvasRenderer;},get pictureCache(){return m160.pictureCache;},get measureText(){return m160.measureText;},get artScene(){return m161.artScene;},get circle(){return m161.circle;},get ellipse(){return m161.ellipse;},get polyline(){return m161.polyline;},get polygon(){return m161.polygon;},get rect(){return m161.rect;},get roundRect(){return m161.roundRect;},get capsule(){return m161.capsule;},get smoothShape(){return m161.smoothShape;},get linear(){return m161.linear;},get radial(){return m161.radial;},get glow(){return m161.glow;},get groundShadow(){return m161.groundShadow;},get hexToRgb(){return m161.hexToRgb;},get rgbToHex(){return m161.rgbToHex;},get rgba(){return m161.rgba;},get mix(){return m161.mix;},get shade(){return m161.shade;},get seededRandom(){return m161.seededRandom;},get hash2(){return m161.hash2;},get createLightLayer(){return m162.createLightLayer;},get LIGHT_CUT(){return m162.LIGHT_CUT;}});
 })();
 // src/engine/lobby/runtime/game-engine.mjs
 const m146 = (()=>{
@@ -30727,7 +31003,313 @@ function createDoorPackets(packet,{appearance=DOOR_APPEARANCE,scene=new artScene
 
 return Object.freeze({get DOOR_APPEARANCE(){return DOOR_APPEARANCE;},get doorPresentation(){return doorPresentation;},get createDoorPackets(){return createDoorPackets;}});
 })();
-const m194 = Object.freeze({default:{
+// src/game/presentation/props/cafe.mjs
+const m194 = (()=>{
+// The cafe's furniture families, drawn on the art toolkit. Each artist draws one piece from its
+// top-left corner (0, 0) to (width, height), in the look its family declares in the prop catalog
+// (game-assets/props.json). `piece.pick(k)` is a repeatable number for the piece (the same seed the
+// classic art used, so every piece keeps the look it always had). Still parts go in `art.still`, and
+// parts that move with `piece.time` go in `art.live`, in drawing order; still runs are painted once.
+const {rect,roundRect,circle,ellipse,polygon} = m154;
+
+// Tableware on the cafe's tables and counter: the same cups and candle jars everywhere.
+const CUP={saucer:'#e8dcc4',rim:'rgba(120,90,60,0.6)',cup:'#f3e4c6',coffee:'#6b4423',gleam:'rgba(240,220,190,0.75)'};
+const JAR={glass:'rgba(255,214,160,0.35)',rim:'rgba(255,230,190,0.6)',wax:'#f6ead6',wick:'#3a2410'};
+const FACE={S:0,W:Math.PI/2,N:Math.PI,E:-Math.PI/2};
+
+/** A filled and/or outlined rounded box, as the classic art's `rr`: the backend's own rounded rectangle, so its corners are a canvas roundRect's exactly. */
+function box(s,x,y,w,h,r,fill,stroke,width=1){s.enter({position:[x+w/2,y+h/2]});s.paint({type:'rect',size:[w,h],radius:r},{fill:fill??null,stroke:stroke??null,stroke_width:width});s.leave();}
+function disc(s,cx,cy,r,fill,stroke,width=1){s.paint([circle(cx,cy,r)],{fill:fill??null,stroke:stroke??null,stroke_width:width});}
+function lines(s,segments,color,width){s.stroke(segments.flatMap(([a,b,c,d])=>[['move',a,b],['line',c,d]]),color,width);}
+function cup(s,cx,cy,col=CUP.cup,coffee=CUP.coffee){disc(s,cx,cy,4.6,CUP.saucer,CUP.rim,.6);disc(s,cx,cy,3.4,col);disc(s,cx,cy,2.6,coffee);disc(s,cx-.6,cy-.6,1,CUP.gleam);s.fill(rect(cx+4,cy-1,2.2,2),CUP.saucer);}
+function candleJar(s,cx,cy){disc(s,cx,cy,4.2,JAR.glass,JAR.rim,.7);disc(s,cx,cy,2.2,JAR.wax);disc(s,cx,cy,.9,JAR.wick);}
+/** One of `list`, chosen by the piece's number `k`: the first above one half, as the classic art chose between two. */
+function choose(list,p){return list[list.length-1-Math.min(list.length-1,Math.floor(p*list.length))];}
+/** Draws `fn(X, Y, W, H)` as the piece stands facing south, turned to its face about its centre. */
+function turned(s,piece,fn){
+    const a=FACE[piece.face]??0,side=Math.abs(Math.sin(a))>.5,W=side?piece.height:piece.width,H=side?piece.width:piece.height;
+    s.enter({position:[piece.width/2,piece.height/2],rotation:a});fn(-W/2,-H/2,W,H);s.leave();
+}
+
+const CAFE_ARTISTS={
+    bentwood_chair:{draw(art,piece,look){art.still(s=>turned(s,piece,(X,Y,W,H)=>{
+        disc(s,X+W/2,Y+H/2+1,W/2-1,look.frame,look.frame_edge,1.2);
+        disc(s,X+W/2,Y+H/2+1,W/2-5,choose(look.seats,piece.pick(2)));
+        s.stroke([circle(X+W/2,Y+H/2+1,W/2-1,Math.PI*1.08,Math.PI*1.92)],look.back,3);
+    }));}},
+    upholstered_seat:{draw(art,piece,look){
+        const p=piece.pick(1),i=look.upholstery.length-1-Math.min(look.upholstery.length-1,Math.floor(p*look.upholstery.length)),col=look.upholstery[i],dk=look.upholstery_dark[Math.min(i,look.upholstery_dark.length-1)];
+        art.still(s=>turned(s,piece,(X,Y,W,H)=>{
+            box(s,X,Y,W,H,10,dk);box(s,X,Y,W,H*.34,9,col,dk,1);
+            box(s,X,Y+4,W*.18,H-6,6,col,dk,1);box(s,X+W*.82,Y+4,W*.18,H-6,6,col,dk,1);
+            const sw=(W*.64)/look.seats;
+            for(let k=0;k<look.seats;k++)box(s,X+W*.18+k*sw+1,Y+H*.32,sw-2,H*.62,6,col,'rgba(0,0,0,0.25)',.8);
+            for(let k=1;k<4;k++)for(const yy of [Y+H*.12,Y+H*.24])s.fill([circle(X+W*k/4,yy,1.1)],'rgba(0,0,0,0.22)');   // tufting
+            if(piece.pick(3)>1-look.throw){
+                s.fill(polygon([[X+W*.62,Y+H*.3],[X+W*.84,Y+H*.3],[X+W*.8,Y+H*.95],[X+W*.56,Y+H*.9]]),look.throw_color);
+                const rows=[];for(let k=.4;k<.95;k+=.1)rows.push([X+W*.6,Y+H*k,X+W*.82,Y+H*k]);lines(s,rows,'rgba(160,120,80,0.35)',.6);
+            }
+            if(look.cushioned)box(s,X+W*.24,Y+H*.3,W*.16,H*.2,4,look.cushion,'rgba(0,0,0,0.25)',.6);
+        }));
+    }},
+    booth_bench:{draw(art,piece,look){art.still(s=>turned(s,piece,(X,Y,W,H)=>{
+        box(s,X,Y,W,H,8,look.frame);box(s,X+2,Y+1,W-4,H*.38,7,look.upholstery,look.upholstery_dark,1);
+        for(let i=0;i<look.seats;i++)box(s,X+3+i*(W-6)/look.seats,Y+H*.36,(W-6)/look.seats-2,H*.56,5,look.upholstery,'rgba(0,0,0,0.25)',.8);
+        for(let i=1;i<6;i++)s.fill([circle(X+W*i/6,Y+H*.18,1.1)],'rgba(0,0,0,0.2)');
+    }));}},
+    cushion_bench:{draw(art,piece,look){art.still(s=>turned(s,piece,(X,Y,W,H)=>{
+        box(s,X,Y,W,H,6,look.frame,look.frame_edge,1);
+        const cols=look.cushions,n=Math.max(2,Math.round(W/62)),from=piece.seed[0]|0;
+        for(let i=0;i<n;i++)box(s,X+3+i*(W-6)/n,Y+3,(W-6)/n-3,H-6,6,cols[(i+from)%cols.length],'rgba(0,0,0,0.22)',.8);
+        for(let i=0;i<n;i+=2)box(s,X+8+i*(W-6)/n,Y+H-14,16,10,4,cols[(i+1+from)%cols.length],'rgba(0,0,0,0.25)',.6);   // pillows against the glass
+    }));}},
+    round_table:{draw(art,piece,look){art.still(s=>{
+        const cx=piece.width/2,cy=piece.height/2,R=Math.min(piece.width,piece.height)/2;
+        disc(s,cx,cy,R,look.top,look.edge,look.edge_width);disc(s,cx,cy,R-4,look.top_light);
+        if(look.setting==='reading'){                                    // a stack of books, two mugs, a candle
+            box(s,cx-16,cy-10,20,14,1,'#7a3b2e');box(s,cx-15,cy-13,18,4,1,'#d9c8a6');box(s,cx-14,cy-17,16,4,1,'#3e5a6e');
+            cup(s,cx+10,cy-6);cup(s,cx+6,cy+10,'#e2c7a2');candleJar(s,cx-8,cy+10);return;
+        }
+        s.stroke([circle(cx,cy,R-10)],'rgba(255,220,170,0.08)',1);       // a candle jar, cups and saucers, a pastry, a sprig in a bud vase
+        candleJar(s,cx,cy);
+        const k=piece.pick(5);
+        if(k>.3)cup(s,cx-13,cy+4);
+        if(k>.55)cup(s,cx+13,cy-4,'#e2c7a2');
+        if(k<.5){box(s,cx+6,cy+6,12,8,2,'#f1e4cc');disc(s,cx+12,cy+10,3,'#c27b4a');}
+        disc(s,cx-6,cy-12,2.4,'rgba(220,235,255,0.5)');disc(s,cx-6,cy-14,2,piece.pick(6)>.5?'#e8b8c8':'#f4dcae');
+    });}},
+    cafe_table:{draw(art,piece,look){art.still(s=>{
+        const {width:w,height:h}=piece,r=Math.min(w,h)/2;
+        box(s,0,0,w,h,look.round?r:4,look.top,look.edge,1.4);box(s,3,3,w-6,h-6,look.round?r-3:3,look.top_light);
+        if(look.setting==='side'){cup(s,w/2-5,h/2);disc(s,w/2+8,h/2-3,2,'rgba(220,235,255,0.5)');return;}
+        candleJar(s,w/2,h/2);
+        cup(s,14,14);if(piece.pick(4)>.4)cup(s,w-14,h-14,'#e2c7a2');
+        box(s,w-18,6,10,12,3,'rgba(220,235,255,0.25)','rgba(255,255,255,0.5)',.6);s.fill(rect(w-16,11,6,6),'#f4ead6');   // sugar
+    });}},
+    cafe_counter:{draw(art,piece,look){art.still(s=>{
+        const {width:w,height:h}=piece;
+        if(piece.vertical){                                              // a side run: a cake under a glass dome, a jar of biscotti, cups
+            box(s,0,0,w,h,4,look.wood,look.wood_dark,1.2);box(s,3,3,w-6,h-6,3,look.wood_light);
+            for(let yy=10;yy<h-4;yy+=9)s.fill(rect(w-6,yy,4,5),'rgba(0,0,0,0.18)');   // the slats on the room side
+            s.fill(rect(w-3,2,2,h-4),look.edge);
+            disc(s,w/2,40,10,'rgba(230,240,255,0.18)','rgba(255,255,255,0.45)',.8);disc(s,w/2,40,7,'#d9a36a');disc(s,w/2-2,38,2,'#f4dcc0');
+            box(s,w/2-5,74,10,14,3,'rgba(220,235,255,0.3)','rgba(255,255,255,0.5)',.7);s.fill(rect(w/2-3,78,6,8),'#c8935a');
+            cup(s,w/2,112);cup(s,w/2,140,'#e9d2b4');return;
+        }
+        box(s,0,0,w,h,4,look.wood,look.wood_dark,1.2);box(s,3,3,w-6,h-9,3,look.wood_light);
+        s.fill(rect(2,h-4,w-4,2),look.edge);                             // the edge the guests lean on
+        const grain=[];for(let xx=12;xx<w;xx+=16)grain.push([xx,4,xx+6,h-8]);lines(s,grain,'rgba(255,220,170,0.08)',1);
+        box(s,50,5,30,16,3,'#2a2026',look.brass,1);box(s,54,8,14,6,1,'rgba(170,255,200,0.65)');s.fill(rect(70,8,6,9),look.brass);   // the register
+        disc(s,98,13,6,'rgba(220,235,255,0.25)','rgba(255,255,255,0.55)',.8);s.fill(rect(95,12,6,3),'#7fb06a');disc(s,99,15,1.4,look.brass);   // the tip jar
+        cup(s,130,13);cup(s,150,15,'#d8b48c');
+        const px=w-104,pw=98,pastry=look.pastries;                       // the pastry case: glass over two rows of something sweet
+        box(s,px,2,pw,h-7,3,'rgba(255,236,210,0.12)','rgba(255,240,220,0.55)',1);
+        for(let i=0;i<7;i++)for(let j=0;j<2;j++){
+            const cx=px+9+i*13,cy=9+j*10,col=pastry[(i*3+j*5)%pastry.length];
+            if((i+j)%3===2)s.fill([['move',cx-5,cy+3],['quadratic',cx,cy-6,cx+5,cy+3],['close']],col);   // croissants
+            else{disc(s,cx,cy,4,col);disc(s,cx-1,cy-1,1.4,'rgba(255,255,255,0.4)');}
+        }
+        s.fill(rect(px+4,3,3,h-10),'rgba(255,255,255,0.22)');
+    });}},
+    espresso_machine:{draw(art,piece,look){
+        const {width:w,height:h}=piece;
+        art.still(s=>{
+            box(s,0,0,w,h,6,look.body,'#2a2c32',1);box(s,3,3,w-6,h-10,5,look.face);box(s,3,3,w-6,5,3,look.trim);
+            for(const gx of [18,w-18]){disc(s,gx,h-9,6,'#2a2c32',look.trim,1.2);disc(s,gx,h-9,2.5,'#111');}
+            disc(s,w/2,18,5,'#f4efe6',look.trim,1);
+        });
+        art.live(s=>lines(s,[[w/2,18,w/2+3*Math.cos(piece.time),18+3*Math.sin(piece.time)]],'#a3241a',1));   // the gauge's needle
+        art.still(s=>{for(let i=0;i<4;i++)disc(s,10+i*6,12,2.6,look.cups,'rgba(0,0,0,0.25)',.5);});   // cups warming on top
+    }},
+    coffee_grinder:{draw(art,piece,look){art.still(s=>{
+        const {width:w,height:h}=piece;
+        box(s,3,8,w-6,h-8,3,look.body,look.body_edge,1);
+        s.fill(polygon([[2,10],[w-2,10],[w-6,0],[6,0]]),look.hopper);
+        for(let i=0;i<6;i++)disc(s,7+(i%3)*6,3+(i/3|0)*3,1.3,look.beans);
+    });}},
+    mug_shelf:{draw(art,piece,look){art.still(s=>{
+        const {width:w,height:h}=piece,mugs=look.mugs;
+        box(s,0,h-8,w,8,2,look.shelf,look.shelf_edge,1);
+        for(let i=0;i<look.count;i++){const mx=8+i*13.5,col=mugs[i%mugs.length];box(s,mx-5,2,10,11,2,col,'rgba(0,0,0,0.3)',.6);s.stroke([circle(mx+5,7,2.6,-1.2,1.2)],col,1.4);}
+    });}},
+    potted_plant:{loop:{period:2*Math.PI/.8,frames:10},pad:12,draw(art,piece,look){art.still(s=>{
+        const cx=piece.width/2,cy=piece.height/2,big=look.fern,R=Math.min(piece.width,piece.height)/2;
+        disc(s,cx,cy,R*.58,look.pot,look.pot_edge,1.2);disc(s,cx,cy,R*.44,look.soil);
+        const n=big?13:9,sway=Math.sin(piece.time*.8+piece.seed[0])*.05;
+        for(let i=0;i<n;i++){
+            const a=i/n*Math.PI*2+sway+piece.pick(i)*.3,L=R*(big?1.25:.95)*(.75+piece.pick(i+9)*.35);
+            s.fill([ellipse(cx+Math.cos(a)*L*.55,cy+Math.sin(a)*L*.55,L*.55,big?3.2:4.4,a)],i%2?look.leaf:look.leaf_light);
+        }
+    });}},
+    fireplace:{pad:13,draw(art,piece,look){
+        const {width:w,height:h}=piece;
+        art.still(s=>{
+            box(s,0,0,w,h,3,look.brick,look.brick_dark,1.5);
+            const mortar=[];for(let yy=8,row=0;yy<h;yy+=8,row++){mortar.push([0,yy,w,yy]);for(let xx=row%2?6:12;xx<w;xx+=12)mortar.push([xx,yy-8,xx,yy]);}
+            lines(s,mortar,look.mortar,1);
+            box(s,w-4,-8,14,h+16,3,look.hearth,look.hearth_edge,1);             // the hearthstone
+            box(s,8,26,w-14,h-52,4,look.firebox,look.firebox_edge,1.2);        // the firebox
+            s.enter({position:[w/2+2,h/2],rotation:.4});s.fill(rect(-4,-26,8,52),look.logs);s.place({rotation:-.8});s.fill(rect(-4,-24,8,48),look.logs);s.leave();   // crossed logs
+        });
+        art.live(s=>{for(let i=0;i<7;i++){const f=.5+.5*Math.sin(piece.time*5+i*1.7);disc(s,w/2+2+(piece.pick(i)-.5)*12,34+i*((h-68)/6),2+f*1.5,`rgba(255,${90+80*f|0},30,${.55+.4*f})`);}});   // embers
+        art.still(s=>{
+            box(s,2,6,8,h-12,2,look.mantel);                                  // the mantel's shadow line
+            for(const cy of [14,h-14]){disc(s,6,cy,3,look.brass);disc(s,6,cy,1.6,'#f6ead6');}   // candlesticks on the mantel
+        });
+    }},
+    bookcase:{draw(art,piece,look){art.still(s=>{
+        const {width:w,height:h}=piece,x0=piece.seed[0],cols=look.spines;
+        box(s,0,0,w,h,2,look.case,look.case_edge,1);
+        let bx=x0+3;                                                     // spine by spine, from where the case stands
+        while(bx<x0+w-4){
+            const bw=3+(piece.pick(bx)*4|0),lean=piece.pick(bx+1)>.88,col=cols[(bx*7|0)%cols.length];
+            if(lean){s.enter({position:[bx-x0,h-3],rotation:-.25});s.fill(rect(0,-(h-7),bw,h-7),col);s.leave();}else s.fill(rect(bx-x0,3,bw,h-6),col);
+            bx+=bw+.6;
+        }
+        s.fill(rect(2,2,w-4,2),'rgba(255,220,160,0.08)');
+    });}},
+    record_player:{draw(art,piece,look){
+        const {width:w,height:h}=piece,cx=3+(h-6)/2,cy=h/2;
+        art.still(s=>{box(s,0,0,w,h,3,look.cabinet,look.cabinet_edge,1);box(s,3,3,h-6,h-6,2,look.deck);disc(s,cx,cy,(h-10)/2,look.vinyl);disc(s,cx,cy,3,look.label);});
+        art.live(s=>s.stroke([circle(cx,cy,7,piece.time*3.5,piece.time*3.5+1.2)],'rgba(255,255,255,0.12)',.6));   // the record turning
+        art.still(s=>{
+            lines(s,[[h,4,cx+4,cy-2]],look.arm,1.2);
+            for(let i=0;i<look.sleeves.length;i++)box(s,h+4+i*2,5,14,h-10,1,look.sleeves[i],'rgba(0,0,0,0.3)',.5);
+        });
+    }},
+    chalkboard_easel:{draw(art,piece,look){art.still(s=>{
+        const {width:w,height:h}=piece,text={font:{family:'Georgia, serif',size:5,weight:600},align:'center',baseline:'middle'};
+        box(s,0,0,w,h,2,look.frame,look.frame_edge,1);box(s,2,2,w-4,h-4,1,look.board);
+        s.text(look.line_1,w/2,h/2-3,text,{fill:look.chalk});s.text(look.line_2,w/2,h/2+4,text,{fill:look.chalk});
+    });}},
+    range_stove:{draw(art,piece,look){art.still(s=>{
+        // The soup pot stands on the lit burner, so its flame is hidden under it: the range is all still.
+        const {width:w,height:h}=piece,by=h/2-2;
+        box(s,0,0,w,h,3,look.body,look.body_edge,1);box(s,3,3,w-6,h-8,2,look.top);
+        for(let i=0;i<4;i++)disc(s,18+i*32,by,10,look.burner,look.burner_ring,1);
+        disc(s,50,by,11,look.pot,look.pot_edge,1);disc(s,50,by,8,look.soup);
+        disc(s,114,by,10,look.pan,look.pan_edge,1);s.fill(rect(123,h/2-4,10,3),look.pan);
+        for(let i=0;i<4;i++)disc(s,18+i*32,h-3,2,look.knobs);
+    });}},
+    double_sink:{draw(art,piece,look){art.still(s=>{
+        const {width:w,height:h}=piece;
+        box(s,0,0,w,h,3,look.basin,look.basin_edge,1);box(s,6,5,w/2-9,h-10,4,look.bowl);box(s,w/2+3,5,w/2-9,h-10,4,look.bowl);disc(s,w/2,4,2.5,look.tap);
+    });}},
+    prep_table:{draw(art,piece,look){art.still(s=>{
+        const {width:w,height:h}=piece;
+        box(s,0,0,w,h,3,look.block,look.block_edge,1.2);
+        const grain=[];for(let xx=10;xx<w;xx+=10)grain.push([xx,2,xx,h-2]);lines(s,grain,look.grain,1);
+        s.fill([ellipse(30,h/2,18,9)],look.loaf);
+        const scores=[];for(let k=-10;k<=10;k+=6)scores.push([30+k-2,h/2-6,30+k+2,h/2+6]);lines(s,scores,look.loaf_score,1);
+        box(s,64,10,30,22,3,look.board);s.fill(rect(70,20,18,2),look.knife);
+        disc(s,122,h/2,12,look.bowl,look.bowl_edge,1);for(let i=0;i<4;i++)disc(s,118+(i%2)*8,h/2-3+(i>>1)*6,3.4,look.lemons);
+    });}},
+    fridge:{draw(art,piece,look){art.still(s=>{
+        const {width:w,height:h}=piece;
+        box(s,0,0,w,h,4,look.body,look.body_edge,1);s.fill(rect(3,h*.42,w-6,1.5),look.seam);
+        box(s,w-9,8,3,18,1,look.handle);box(s,w-9,h*.5,3,22,1,look.handle);
+        box(s,8,10,14,10,1,look.notes[0]);box(s,26,30,12,12,1,look.notes[1%look.notes.length]);   // a note and a drawing on the door
+    });}},
+    jar_shelf:{draw(art,piece,look){art.still(s=>{
+        const {width:w,height:h}=piece,v=piece.vertical,along=v?h:w,across=v?w:h,jars=look.jars;
+        box(s,0,0,w,h,2,look.case,look.case_edge,1);
+        for(let i=0;i*12+8<along;i++)for(let j=0;j<2;j++){const a=i*12+7,b=across*(j?.7:.3);disc(s,v?b:a,v?a:b,4,jars[(i*2+j)%jars.length],'rgba(0,0,0,0.3)',.6);}
+    });}},
+    stencilled_crate:{draw(art,piece,look){art.still(s=>{
+        const {width:w,height:h}=piece;
+        box(s,0,0,w,h,2,look.wood,look.wood_edge,1.2);
+        lines(s,[[0,h/2,w,h/2],[0,0,w,h]],look.slats,1);
+        s.text(look.label,w/2,h/2,{font:{family:'Georgia, serif',size:7,weight:700},align:'center',baseline:'middle'},{fill:look.stencil});
+    });}},
+    flour_sacks:{pad:9,draw(art,piece,look){art.still(s=>{
+        for(let i=0;i<look.count;i++){
+            const sx=4+i*24,sy=(i%2)*8;
+            s.fill([ellipse(sx+16,sy+24,14,18)],'rgba(0,0,0,0.3)');
+            s.outlined([ellipse(sx+13,sy+20,13,17)],look.sack,look.sack_edge,1);
+            s.fill(rect(sx+6,sy+18,14,3),look.band);
+        }
+    });}}
+};
+
+return Object.freeze({get CAFE_ARTISTS(){return CAFE_ARTISTS;}});
+})();
+// src/game/presentation/props/index.mjs
+const m193 = (()=>{
+// Props drawn natively, by family. A prop type in the catalog (game-assets/props.json) that names a
+// `family` is a preset of it; its look is the family's defaults, then the type's look, then the
+// placement's, checked against the family's schema. `propArtPacket` gathers what one piece shows,
+// and `drawPropArt` draws it: a ground shadow, then the family's still runs from pictures painted
+// once (Basement pictureCache) and its live parts as vector, in drawing order.
+const PROPS = m70.default;
+const {resolvePropLook} = m40;
+const {artScene,groundShadow,canvasRenderer} = m154;
+const {CAFE_ARTISTS} = m194;
+
+const PROP_FAMILIES=PROPS.resources.catalog.data.families;
+const ARTISTS=Object.freeze({...CAFE_ARTISTS});
+/** The pad round a piece's box its art may reach past (lips, drop shadows, a hearth), in px. */
+const PAD=8;
+for(const family of Object.keys(ARTISTS))if(!PROP_FAMILIES[family])throw new Error(`Prop artist ${family} has no family in the catalog`);
+
+/** Whether a family has a native artist. */
+const hasPropArt=family=>typeof family==='string'&&Object.hasOwn(ARTISTS,family);
+
+const looks=new WeakMap();
+/** A piece's whole look and its picture key, worked out once per authored appearance. */
+function lookOf(appearance,width,height){
+    let entry=looks.get(appearance);
+    if(!entry||entry.width!==width||entry.height!==height){
+        const look=resolvePropLook(PROP_FAMILIES,appearance.family,appearance.look??{}),decor=appearance.decor??{};
+        const piece={face:decor.face??appearance.face??'S',vertical:!!(decor.vertical??appearance.vertical),variant:(decor.variant??appearance.variant)|0,seed:[appearance.x??0,appearance.y??0]};
+        entry={width,height,look,piece,key:JSON.stringify([appearance.family,width,height,piece,look])};looks.set(appearance,entry);
+    }
+    return entry;
+}
+/** The seeded number the classic art drew a piece's detail from, so each piece keeps its old look. */
+const picker=([x,y])=>k=>{const v=Math.sin(x*12.9898+y*78.233+k*37.719)*43758.5453;return v-Math.floor(v);};
+
+/**
+ * What one piece shows: `appearance` is its authored placement (family, look, face, vertical, x and
+ * y where it was placed, which seed its detail); `position` and `rotation` its centre's pose now.
+ */
+function propArtPacket({appearance,position,rotation=0,width,height}){
+    if(!hasPropArt(appearance?.family))throw new TypeError(`No native art for prop family ${appearance?.family}`);
+    const {look,piece,key}=lookOf(appearance,width,height);
+    return {family:appearance.family,key,look,width,height,...piece,position:[...position],rotation};
+}
+
+/** The piece's draws in order: {key, bounds, matrix, build} for a still run, {matrix, build} for a live one. */
+function createPropDraws(packet,{time=0}={}){
+    const artist=ARTISTS[packet.family],{width:w,height:h}=packet,loop=artist.loop;
+    let frame=null;
+    if(loop){frame=Math.round((time%loop.period)/loop.period*loop.frames)%loop.frames;time=frame*loop.period/loop.frames;}
+    const piece={width:w,height:h,face:packet.face,vertical:packet.vertical,variant:packet.variant,seed:packet.seed,pick:picker(packet.seed),time};
+    const [px,py]=packet.position,c=Math.cos(packet.rotation),s=Math.sin(packet.rotation);
+    const pose=[c,s,-s,c,px,py],matrix=[c,s,-s,c,px-c*w/2+s*h/2,py-s*w/2-c*h/2],pad=artist.pad??PAD;
+    const scene=fn=>()=>{const scene=new artScene();fn(scene);return scene.finish();};
+    const draws=[{matrix:pose,build:scene(s=>groundShadow(s,0,0,w/2+5,h/2+5))}];
+    let run=0;
+    artist.draw({
+        still:fn=>{draws.push({key:`${packet.key}#${run++}${frame===null?'':`@${frame}`}`,bounds:[-pad,-pad,w+2*pad,h+2*pad],matrix,build:scene(fn)});},
+        live:fn=>{draws.push({matrix,build:scene(fn)});}
+    },piece,packet.look);
+    return draws;
+}
+
+/**
+ * Draws a piece on a host Canvas pass (the migration boundary, as canvasRenderer.drawPackets): still
+ * runs through `pictures` (a Basement pictureCache), live parts and the shadow as vector packets.
+ */
+function drawPropArt(context,packet,{pictures,time=0}){
+    for(const draw of createPropDraws(packet,{time})){
+        if(draw.key)pictures.draw(context,draw,draw.build);
+        else{context.save();try{context.transform(...draw.matrix);canvasRenderer.drawPackets(context,draw.build());}finally{context.restore();}}
+    }
+}
+
+return Object.freeze({get PROP_FAMILIES(){return PROP_FAMILIES;},get hasPropArt(){return hasPropArt;},get propArtPacket(){return propArtPacket;},get createPropDraws(){return createPropDraws;},get drawPropArt(){return drawPropArt;}});
+})();
+const m196 = Object.freeze({default:{
  "indoor": { "tint": "rgb(22, 10, 48)", "darkness": 0.95, "lamp_glow": 0.08 },
  "outdoor": { "lamp_glow": 0.22 },
  "lamp": { "inner_radius": 10, "cut": [[0, 1], [1, 0]], "glow_stops": [[0, "#ffffff"], [0.1, "$color"], [0.6, "$color"], [1, "rgba(0,0,0,0)"]], "resolution": 64 },
@@ -30736,8 +31318,8 @@ const m194 = Object.freeze({default:{
  "flicker": { "floor": 0.82, "swing": 0.18 }
 }});
 // src/game/presentation/lighting.mjs
-const m193 = (()=>{
-const LIGHTING = m194.default;
+const m195 = (()=>{
+const LIGHTING = m196.default;
 const {createLightLayer} = m154;
 
 const stops=(list,color)=>list.map(([o,c])=>[o,c==='$color'?color:c]);
@@ -30796,7 +31378,7 @@ function levelLights(level,{blend=1,lightAt=()=>1}={}){
 return Object.freeze({get LIGHTING(){return LIGHTING;},get sceneLighting(){return sceneLighting;},get levelLights(){return levelLights;}});
 })();
 // src/game/data/road-navigation.mjs
-const m195 = (()=>{
+const m197 = (()=>{
 /**
  * The city's lane network as Basement navigation road data.
  *
@@ -30933,7 +31515,8 @@ const m0 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m40.assetLibrary;},get createGameAssetLibrary(){return m47.createGameAssetLibrary;},get resolveMapLayout(){return m69.resolveMapLayout;},get resolvePlacement(){return m69.resolvePlacement;},get isMovableProp(){return m69.isMovableProp;},get mapHost(){return m69.mapHost;},get createMapLibraries(){return m69.createMapLibraries;},get PROP_TYPES(){return m69.PROP_TYPES;},get MAP_IDS(){return m69.MAP_IDS;},get ApartmentLevel(){return m95.ApartmentLevel;},get APARTMENT_RULES(){return m137.APARTMENT_RULES;},get gameEngine(){return m146.gameEngine;},get gameLevel(){return m148.gameLevel;},get mapLevel(){return m163.mapLevel;},get travelSystem(){return m164.travelSystem;},get InteriorLevel(){return m165.InteriorLevel;},get registerInteriorLevels(){return m165.registerInteriorLevels;},get levelLobby(){return m147.levelLobby;},get createGameRuntime(){return m166.createGameRuntime;},get controlSystem(){return m149.controlSystem;},get controlsSystem(){return m149.controlsSystem;},get inputInstance(){return m149.inputInstance;},get keyboardInstance(){return m149.keyboardInstance;},get mouseInstance(){return m149.mouseInstance;},get touchInstance(){return m149.touchInstance;},get touchStick(){return m149.touchStick;},get gamepadInstance(){return m149.gamepadInstance;},get TAP(){return m149.TAP;},get DOUBLETAP(){return m149.DOUBLETAP;},get HELD(){return m149.HELD;},get PRESS(){return m149.PRESS;},get REPEAT(){return m149.REPEAT;},get RELEASE(){return m149.RELEASE;},get renderSystem(){return m154.renderSystem;},get renderFrame(){return m154.renderFrame;},get canvasRenderer(){return m154.canvasRenderer;},get cameraSystem(){return m154.cameraSystem;},get gameSession(){return m178.gameSession;},get PlayerStateSystem(){return m179.PlayerStateSystem;},get PlayerControlSystem(){return m180.PlayerControlSystem;},get Player(){return m123.Player;},get playerVitals(){return m124.playerVitals;},get itemSystem(){return m104.itemSystem;},get createItemCatalog(){return m58.createItemCatalog;},get GUN_MATERIALS(){return m174.GUN_MATERIALS;},get WEAPON_MODELS(){return m174.WEAPON_MODELS;},get LASER_MODULE(){return m174.LASER_MODULE;},get weaponModel(){return m174.weaponModel;},get weaponAppearance(){return m185.weaponAppearance;},get combatSystem(){return m181.combatSystem;},get weaponSystem(){return m182.weaponSystem;},get lootSystem(){return m184.lootSystem;},get WorldLoot(){return m129.WorldLoot;},get MELEE_SWING(){return m183.MELEE_SWING;},get WIDE_SWING(){return m183.WIDE_SWING;},get sampleMeleeSwing(){return m183.sampleMeleeSwing;},get sampleWideSwing(){return m183.sampleWideSwing;},get swingPhases(){return m183.swingPhases;},get wideGrip(){return m183.wideGrip;},get COMBAT_RULES(){return m186.COMBAT_RULES;},get registerGameEntityTypes(){return m116.registerGameEntityTypes;},get actorVitals(){return m102.actorVitals;},get gameActor(){return m100.gameActor;},get NPC(){return m127.NPC;},get rosterRecord(){return m127.rosterRecord;},get ROSTER_FIELDS(){return m127.ROSTER_FIELDS;},get Ganger(){return m99.Ganger;},get actorSystem(){return m176.actorSystem;},get actorItems(){return m103.actorItems;},get restoreActorItems(){return m103.restoreActorItems;},get resolveEmoteLines(){return m128.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m128.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m115.abilityLoadout;},get actorAbilities(){return m115.actorAbilities;},get importActorAbilities(){return m115.importActorAbilities;},get abilitySystem(){return m175.abilitySystem;},get createAbilityCatalog(){return m60.createAbilityCatalog;},get attackRegistry(){return m101.attackRegistry;},get validateAttackState(){return m101.validateAttackState;},get attackSystem(){return m172.attackSystem;},get createAttackCatalog(){return m57.createAttackCatalog;},get validateMountedAttack(){return m114.validateMountedAttack;},get TrafficVehicle(){return m130.TrafficVehicle;},get createGameVehicle(){return m130.createGameVehicle;},get Hunter(){return m98.Hunter;},get createHunterAppearance(){return m56.createHunterAppearance;},get Marionette(){return m122.Marionette;},get MARIONETTE_RULES(){return m54.MARIONETTE_RULES;},get validateAbilityAction(){return m111.validateAbilityAction;},get GatlingGunner(){return m108.GatlingGunner;},get Drone(){return m117.Drone;},get VelvetCat(){return m118.VelvetCat;},get velvetCatAnimation(){return m119.velvetCatAnimation;},get createVelvetAnimation(){return m119.createVelvetAnimation;},get velvetPresentation(){return m119.velvetPresentation;},get droneLift(){return m187.droneLift;},get droneArmPose(){return m187.droneArmPose;},get dronePresentation(){return m187.dronePresentation;},get VELVET_CAT_PALETTES(){return m120.VELVET_CAT_PALETTES;},get VELVET_T(){return m120.VELVET_T;},get VELVET_PROFILES(){return m120.VELVET_PROFILES;},get VELVET_GAITS(){return m120.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m120.VELVET_TAIL_SEGS;},get Demoness(){return m97.Demoness;},get Warden(){return m107.Warden;},get Vesper(){return m107.Vesper;},get Matins(){return m107.Matins;},get Compline(){return m107.Compline;},get BossEffect(){return m109.BossEffect;},get encounterSystem(){return m171.encounterSystem;},get createBossAbilities(){return m48.createBossAbilities;},get createDemonessAppearance(){return m48.createDemonessAppearance;},get demonessAppearance(){return m188.demonessAppearance;},get demonessPresentation(){return m188.demonessPresentation;},get bossEffectAppearance(){return m189.bossEffectAppearance;},get bossEffectPresentation(){return m189.bossEffectPresentation;},get validateBossRecord(){return m96.validateBossRecord;},get createDronePackets(){return m187.createDronePackets;},get createVelvetCatArt(){return m190.createVelvetCatArt;},get createVelvetCatPackets(){return m190.createVelvetCatPackets;},get createVelvetEyePackets(){return m190.createVelvetEyePackets;},get doorPresentation(){return m191.doorPresentation;},get createDoorPackets(){return m191.createDoorPackets;},get DOOR_APPEARANCE(){return m191.DOOR_APPEARANCE;},get sceneLighting(){return m193.sceneLighting;},get levelLights(){return m193.levelLights;},get LIGHTING(){return m193.LIGHTING;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m167.humanoidSystem;},get humanoidPresentation(){return m167.humanoidPresentation;},get humanoidBodyCanon(){return m168.humanoidBodyCanon;},get humanoidBuilds(){return m168.humanoidBuilds;},get getHumanoidRigAssets(){return m168.getHumanoidRigAssets;},get roadNavigationData(){return m195.roadNavigationData;},get loadRoadNavigation(){return m195.loadRoadNavigation;}});
+
+return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m40.assetLibrary;},get createGameAssetLibrary(){return m47.createGameAssetLibrary;},get resolveMapLayout(){return m69.resolveMapLayout;},get resolvePlacement(){return m69.resolvePlacement;},get isMovableProp(){return m69.isMovableProp;},get mapHost(){return m69.mapHost;},get createMapLibraries(){return m69.createMapLibraries;},get PROP_TYPES(){return m69.PROP_TYPES;},get MAP_IDS(){return m69.MAP_IDS;},get ApartmentLevel(){return m95.ApartmentLevel;},get APARTMENT_RULES(){return m137.APARTMENT_RULES;},get gameEngine(){return m146.gameEngine;},get gameLevel(){return m148.gameLevel;},get mapLevel(){return m163.mapLevel;},get travelSystem(){return m164.travelSystem;},get InteriorLevel(){return m165.InteriorLevel;},get registerInteriorLevels(){return m165.registerInteriorLevels;},get levelLobby(){return m147.levelLobby;},get createGameRuntime(){return m166.createGameRuntime;},get controlSystem(){return m149.controlSystem;},get controlsSystem(){return m149.controlsSystem;},get inputInstance(){return m149.inputInstance;},get keyboardInstance(){return m149.keyboardInstance;},get mouseInstance(){return m149.mouseInstance;},get touchInstance(){return m149.touchInstance;},get touchStick(){return m149.touchStick;},get gamepadInstance(){return m149.gamepadInstance;},get TAP(){return m149.TAP;},get DOUBLETAP(){return m149.DOUBLETAP;},get HELD(){return m149.HELD;},get PRESS(){return m149.PRESS;},get REPEAT(){return m149.REPEAT;},get RELEASE(){return m149.RELEASE;},get renderSystem(){return m154.renderSystem;},get renderFrame(){return m154.renderFrame;},get canvasRenderer(){return m154.canvasRenderer;},get pictureCache(){return m154.pictureCache;},get measureText(){return m154.measureText;},get cameraSystem(){return m154.cameraSystem;},get gameSession(){return m178.gameSession;},get PlayerStateSystem(){return m179.PlayerStateSystem;},get PlayerControlSystem(){return m180.PlayerControlSystem;},get Player(){return m123.Player;},get playerVitals(){return m124.playerVitals;},get itemSystem(){return m104.itemSystem;},get createItemCatalog(){return m58.createItemCatalog;},get GUN_MATERIALS(){return m174.GUN_MATERIALS;},get WEAPON_MODELS(){return m174.WEAPON_MODELS;},get LASER_MODULE(){return m174.LASER_MODULE;},get weaponModel(){return m174.weaponModel;},get weaponAppearance(){return m185.weaponAppearance;},get combatSystem(){return m181.combatSystem;},get weaponSystem(){return m182.weaponSystem;},get lootSystem(){return m184.lootSystem;},get WorldLoot(){return m129.WorldLoot;},get MELEE_SWING(){return m183.MELEE_SWING;},get WIDE_SWING(){return m183.WIDE_SWING;},get sampleMeleeSwing(){return m183.sampleMeleeSwing;},get sampleWideSwing(){return m183.sampleWideSwing;},get swingPhases(){return m183.swingPhases;},get wideGrip(){return m183.wideGrip;},get COMBAT_RULES(){return m186.COMBAT_RULES;},get registerGameEntityTypes(){return m116.registerGameEntityTypes;},get actorVitals(){return m102.actorVitals;},get gameActor(){return m100.gameActor;},get NPC(){return m127.NPC;},get rosterRecord(){return m127.rosterRecord;},get ROSTER_FIELDS(){return m127.ROSTER_FIELDS;},get Ganger(){return m99.Ganger;},get actorSystem(){return m176.actorSystem;},get actorItems(){return m103.actorItems;},get restoreActorItems(){return m103.restoreActorItems;},get resolveEmoteLines(){return m128.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m128.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m115.abilityLoadout;},get actorAbilities(){return m115.actorAbilities;},get importActorAbilities(){return m115.importActorAbilities;},get abilitySystem(){return m175.abilitySystem;},get createAbilityCatalog(){return m60.createAbilityCatalog;},get attackRegistry(){return m101.attackRegistry;},get validateAttackState(){return m101.validateAttackState;},get attackSystem(){return m172.attackSystem;},get createAttackCatalog(){return m57.createAttackCatalog;},get validateMountedAttack(){return m114.validateMountedAttack;},get TrafficVehicle(){return m130.TrafficVehicle;},get createGameVehicle(){return m130.createGameVehicle;},get Hunter(){return m98.Hunter;},get createHunterAppearance(){return m56.createHunterAppearance;},get Marionette(){return m122.Marionette;},get MARIONETTE_RULES(){return m54.MARIONETTE_RULES;},get validateAbilityAction(){return m111.validateAbilityAction;},get GatlingGunner(){return m108.GatlingGunner;},get Drone(){return m117.Drone;},get VelvetCat(){return m118.VelvetCat;},get velvetCatAnimation(){return m119.velvetCatAnimation;},get createVelvetAnimation(){return m119.createVelvetAnimation;},get velvetPresentation(){return m119.velvetPresentation;},get droneLift(){return m187.droneLift;},get droneArmPose(){return m187.droneArmPose;},get dronePresentation(){return m187.dronePresentation;},get VELVET_CAT_PALETTES(){return m120.VELVET_CAT_PALETTES;},get VELVET_T(){return m120.VELVET_T;},get VELVET_PROFILES(){return m120.VELVET_PROFILES;},get VELVET_GAITS(){return m120.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m120.VELVET_TAIL_SEGS;},get Demoness(){return m97.Demoness;},get Warden(){return m107.Warden;},get Vesper(){return m107.Vesper;},get Matins(){return m107.Matins;},get Compline(){return m107.Compline;},get BossEffect(){return m109.BossEffect;},get encounterSystem(){return m171.encounterSystem;},get createBossAbilities(){return m48.createBossAbilities;},get createDemonessAppearance(){return m48.createDemonessAppearance;},get demonessAppearance(){return m188.demonessAppearance;},get demonessPresentation(){return m188.demonessPresentation;},get bossEffectAppearance(){return m189.bossEffectAppearance;},get bossEffectPresentation(){return m189.bossEffectPresentation;},get validateBossRecord(){return m96.validateBossRecord;},get createDronePackets(){return m187.createDronePackets;},get createVelvetCatArt(){return m190.createVelvetCatArt;},get createVelvetCatPackets(){return m190.createVelvetCatPackets;},get createVelvetEyePackets(){return m190.createVelvetEyePackets;},get doorPresentation(){return m191.doorPresentation;},get createDoorPackets(){return m191.createDoorPackets;},get DOOR_APPEARANCE(){return m191.DOOR_APPEARANCE;},get PROP_FAMILIES(){return m193.PROP_FAMILIES;},get hasPropArt(){return m193.hasPropArt;},get propArtPacket(){return m193.propArtPacket;},get createPropDraws(){return m193.createPropDraws;},get drawPropArt(){return m193.drawPropArt;},get sceneLighting(){return m195.sceneLighting;},get levelLights(){return m195.levelLights;},get LIGHTING(){return m195.LIGHTING;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m167.humanoidSystem;},get humanoidPresentation(){return m167.humanoidPresentation;},get humanoidBodyCanon(){return m168.humanoidBodyCanon;},get humanoidBuilds(){return m168.humanoidBuilds;},get getHumanoidRigAssets(){return m168.getHumanoidRigAssets;},get roadNavigationData(){return m197.roadNavigationData;},get loadRoadNavigation(){return m197.loadRoadNavigation;}});
 })();
 return m0;
 })();
@@ -40656,7 +41239,7 @@ function drawIndoorDoorAppearance(ctx,door){return indoorDoorAppearance.draw.cal
             }
         }
     </script>
-    <script type="text/dfab" data-src="legacy/entities/props-decor.js" data-cost="2488">
+    <script type="text/dfab" data-src="legacy/entities/props-decor.js" data-cost="2497">
         // One soft, centred ground blob shared by props, pickups and Velvet. It is stamped
         // before artwork transforms and never baked into a rotating furniture sprite.
         function drawGroundContactShadow(ctx, x, y, rx, ry, angle = 0) {
@@ -43292,6 +43875,13 @@ function drawIndoorDoorAppearance(ctx,door){return indoorDoorAppearance.draw.cal
         /** Pure prop artwork. Native renderers pass presentation packets, never mutable physics objects. */
         function drawPropAppearance(ctx, p, { use_cache = true } = {}) {
                 if (!p.visible) return;
+                if (PropPass.mode === 0 && DFNative.hasPropArt(p.family)) {     // native art, its shadow included (game/presentation/props)
+                    // Seeded from where it was first drawn, as its classic sprite was
+                    const art = p._artAppearance ??= { family: p.family, look: p.look ?? {}, decor: p.decor, x: p.x, y: p.y };
+                    DFNative.drawPropArt(ctx, DFNative.propArtPacket({ appearance: art, position: [p.x + p.width / 2, p.y + p.height / 2], rotation: p.angle || 0, width: p.width, height: p.height }),
+                        { pictures: PropSprites.pictures, time: _frameTime / 1000 });
+                    return;
+                }
                 // Painting or replaying a split run draws body art only. The outer pass
                 // adds exactly one ground shadow, including vector fallback and live props.
                 if (PropPass.mode === 0) {
@@ -43531,6 +44121,8 @@ function drawIndoorDoorAppearance(ctx,door){return indoorDoorAppearance.draw.cal
                 this.color = config.color || '#00CED1';
                 this.interactionType = config.interactionType || null;
                 this.decorType = config.decorType || null;       // custom furniture art (clinic)
+                this.family = config.family || null;             // a catalog family with native art (game/presentation/props)
+                this.look = config.look || null;
                 this.light = config.light || null;               // soft light that follows the prop: { radius, color, intensity, dx, dy }
                 this.headSide = config.headSide || null;
                 this.decor = Object.assign({ face: config.face, vertical: !!config.vertical, candles: !!config.candles, variant: config.variant | 0 }, config.decor);   // House pieces: facing, wall run, lit
@@ -43615,7 +44207,7 @@ function drawIndoorDoorAppearance(ctx,door){return indoorDoorAppearance.draw.cal
         }
 
     </script>
-    <script type="text/dfab" data-src="legacy/entities/prop-sprites.js" data-cost="215">
+    <script type="text/dfab" data-src="legacy/entities/prop-sprites.js" data-cost="220">
         // ═══ PROP SPRITES — furniture painted once, stamped every frame ═══
         // A piece of furniture's vector art (entities/props-decor.js) is about 30 canvas calls; its sprite is one
         // drawImage, five when it's turned. Each prop keeps its own sprite (p._spr), so art seeded from where it
@@ -43696,10 +44288,13 @@ function drawIndoorDoorAppearance(ctx,door){return indoorDoorAppearance.draw.cal
             _bake: { k: 1, blur: false, bad: false, retry: false },
 
             /** Once a frame, before the props: the view's zoom (backing px per world unit) and a fresh budget */
-            frame(zoom) { this.density = zoom || 1; this._spent = 0; },
+            /** Native prop art's pictures (game/presentation/props), on the same frame budget and released with the sprites */
+            get pictures() { return this._pictures ??= new DFNative.pictureCache({ max_bytes: PROP_SPRITE.MAX_BYTES / 2, budget_ms: PROP_SPRITE.BUDGET_MS }); },
+            frame(zoom) { this.density = zoom || 1; this._spent = 0; this._pictures?.beginFrame(); },
 
             /** Whether a piece is painted once, and how: 'still' (one sprite, or the runs of a split drawer), 'loop', or null (vector) */
             kindOf(p) {
+                if (DFNative.hasPropArt(p.family)) return null;     // native art keeps its own pictures (PropSprites.pictures)
                 const k = p.decorType;
                 if (k) {
                     if (k.startsWith('gy_')) return null;                 // gravestones keep their own sprite (_gySprite)
@@ -43822,8 +44417,8 @@ function drawIndoorDoorAppearance(ctx,door){return indoorDoorAppearance.draw.cal
 
             /** Let go of every sprite (a map change, a reset, the setting turned off) */
             clear(props) {
-                if (props) for (const p of props) if (p) p._spr = undefined;
-                this.bytes = 0;
+                if (props) for (const p of props) if (p) { p._spr = undefined; p._artAppearance = undefined; }
+                this.bytes = 0; this._pictures?.clear();
             },
 
             /** Paint ahead (the map's fade): `props` now, ignoring the frame budget */
@@ -114170,10 +114765,10 @@ class ApartmentRooms {
     tagLamps(){}
 }
     </script>
-    <script type="text/dfab" data-src="legacy/engine/apartment-renderer.js" data-cost="127">
+    <script type="text/dfab" data-src="legacy/engine/apartment-renderer.js" data-cost="134">
 /** Native scene presentation. Packets below are drawing inputs, never entities or body owners. */
 class ApartmentRenderer {
-    constructor(game){this.game=game;this.people=new Map();this.props=new Map();}
+    constructor(game){this.game=game;this.people=new Map();this.props=new Map();this.pictures=new DFNative.pictureCache();}
     propPacket(entity,blend){
         const pose=entity.getRenderState(blend),a=entity.data.appearance,[width,height]=entity.collision_shape.dimensions;
         let packet=this.props.get(entity.entity_id);
@@ -114187,7 +114782,12 @@ class ApartmentRenderer {
         Object.assign(packet,{rigPose:DFNative.humanoidPresentation(entity,blend),punchSide:entity.data.weapon_state?.punch_side,punchHay:!!entity.data.weapon_state?.haymaker,x:pose.position[0],y:pose.position[1],angle:pose.rotation,velX:velocity[0]/60,velY:velocity[1]/60,vx:velocity[0]/60,vy:velocity[1]/60,radius:12,visible:entity.visible!==false&&entity.active,isHidden:!!entity.isHidden,dead:!!entity.dead,walkPhase:packet.walkPhase??0});
         return packet;
     }
-    destroy(){this.lighting=null;PropSprites.clear([...this.props.values()]);this.props.clear();this.people.clear();}
+    /** A prop whose family has native art: drawn from its body's pose, its still runs from pictures. */
+    drawNativeProp(ctx,entity,blend){
+        const pose=entity.getRenderState(blend),[width,height]=entity.collision_shape.dimensions;
+        DFNative.drawPropArt(ctx,DFNative.propArtPacket({appearance:entity.data.appearance,position:pose.position,rotation:pose.rotation,width,height}),{pictures:this.pictures,time:_frameTime/1000});
+    }
+    destroy(){this.lighting=null;this.pictures.clear();PropSprites.clear([...this.props.values()]);this.props.clear();this.people.clear();}
     draw(game,blend=1){
         this.game=game;const level=game.activeLevel,world=level.physics,ctx=game.ctx,canvas=game.canvas;
         const player=this.personPacket(level.player,blend),zoom=game.camera.zoom;
@@ -114199,11 +114799,11 @@ class ApartmentRenderer {
         ctx.save();ctx.translate(canvas.width/2,canvas.height/2);ctx.scale(zoom,zoom);ctx.translate(-cam.x,-cam.y);
         game.drawApartmentBackdrop(ctx);game.drawApartmentInterior(ctx);
         const bounds={left:cam.x-canvas.width/(2*zoom)-180,right:cam.x+canvas.width/(2*zoom)+180,top:cam.y-canvas.height/(2*zoom)-180,bottom:cam.y+canvas.height/(2*zoom)+180};
-        const visible=world.queryEntitiesInBounds({bounds}),props=[],marionettes=[],gunners=[],drones=[],cats=[],demonesses=[],drawnDoors=new Set(),doors=level.map.getDoors(),doorOf=new Map(doors.flatMap(door=>door.leaves.filter(Boolean).map(leaf=>[leaf.entity_id,door])));PropSprites.frame(zoom);
+        const visible=world.queryEntitiesInBounds({bounds}),props=[],marionettes=[],gunners=[],drones=[],cats=[],demonesses=[],drawnDoors=new Set(),doors=level.map.getDoors(),doorOf=new Map(doors.flatMap(door=>door.leaves.filter(Boolean).map(leaf=>[leaf.entity_id,door])));PropSprites.frame(zoom);this.pictures.beginFrame();
         for(const{entity:e}of visible){
             if(!e)continue;
             if(e.data.role==='wall'){const p=e.getRenderState(blend),[w,h]=e.collision_shape.dimensions;ctx.fillStyle='#291d2d';ctx.fillRect(p.position[0]-w/2,p.position[1]-h/2,w,h);}
-            if(e.data.role==='prop'){const p=this.propPacket(e,blend);props.push(p);p.draw(ctx);}
+            if(e.data.role==='prop'){const p=this.propPacket(e,blend);props.push(p);if(DFNative.hasPropArt(e.data.appearance?.family))this.drawNativeProp(ctx,e,blend);else p.draw(ctx);}
             if(e.data.role==='door'||e.data.role==='door_panel'){
                 // Doors are drawn natively from their leaves' bodies, once per door, whatever their kind.
                 const door=doorOf.get(e.entity_id);if(!door||drawnDoors.has(door.door_key))continue;drawnDoors.add(door.door_key);

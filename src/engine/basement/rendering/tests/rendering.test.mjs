@@ -1,7 +1,7 @@
 // ===== LV0 BASEMENT =====
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {cameraSystem,renderSystem,renderFrame,canvasRenderer} from '../index.mjs';
+import {cameraSystem,renderSystem,renderFrame,canvasRenderer,pictureCache,measureText} from '../index.mjs';
 import {physicsSystem} from '../../physics/index.mjs';
 
 const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-7,`${a} != ${b}`);
@@ -132,4 +132,39 @@ test('Canvas migration overlay preserves host transform, opacity, surface size a
 test('Canvas overlay validates a complete inline batch before painting and recovers after rejection',()=>{
  const ctx=context(),cv=surface(ctx);cv.width=cv.height=100;ctx.canvas=cv;ctx.globalAlpha=1;ctx.getTransform=()=>({a:1,b:0,c:0,d:1,e:0,f:0});
  assert.throws(()=>canvasRenderer.drawPackets(ctx,[rect(),{type:'sprite',resource_id:'unregistered',size:[1,1]}]),/inline packets/);assert.equal(ctx.calls.some(c=>c[0]==='fill'),false);assert.equal(canvasRenderer.drawPackets(ctx,[rect()]),1);assert.equal(ctx.stack,0);
+});
+
+test('a picture is painted once at the density the view needs and stamped after, under the given matrix',()=>{
+ const host=()=>{const ctx=context(),cv=surface(ctx);cv.width=cv.height=200;ctx.canvas=cv;ctx.globalAlpha=1;let m={a:1.2,b:0,c:0,d:1.2,e:0,f:0};ctx.getTransform=()=>m;ctx.zoom=k=>{m={a:k,b:0,c:0,d:k,e:0,f:0};};return ctx;};
+ const made=[],cache=new pictureCache({create_surface:(w,h)=>{const s=surface();s.width=w;s.height=h;s.ctx.canvas=s;s.ctx.globalAlpha=1;s.ctx.getTransform=()=>({a:1,b:0,c:0,d:1,e:0,f:0});made.push(s);return s;}});
+ const ctx=host();let builds=0;const build=()=>{builds++;return [rect('#0f0',{position:[0,0]})];};
+ const at={key:'chair:1',bounds:[-12,-12,24,24],matrix:[1,0,0,1,40,50]};
+ assert.equal(cache.draw(ctx,at,build),'paint');assert.equal(cache.draw(ctx,at,build),'stamp');assert.equal(builds,1);
+ assert.deepEqual([made[0].width,made[0].height],[36,36],'1.2 device px per unit takes the 1.5 density');
+ assert.ok(made[0].ctx.calls.some(c=>c[0]==='fill'),'the packets were painted into the picture');
+ const stamp=ctx.calls.filter(c=>c[0]==='drawImage').at(-1);assert.equal(stamp[1],made[0]);assert.deepEqual(stamp.slice(2),[-12,-12,24,24]);
+ assert.ok(ctx.calls.some(c=>c[0]==='transform'&&c.slice(1).join(',')==='1,0,0,1,40,50'));assert.equal(ctx.stack,0);
+ ctx.zoom(2.5);assert.equal(cache.draw(ctx,at,build),'paint');assert.deepEqual([made[1].width,made[1].height],[72,72],'zooming in paints a sharper one');
+ ctx.zoom(9);assert.equal(cache.draw(ctx,at,build),'vector','past the last density it draws as vector');
+ assert.equal(cache.statistics.pictures,2);assert.equal(cache.statistics.bytes,(36*36+72*72)*4);
+ cache.release('chair:');assert.equal(cache.statistics.pictures,0);assert.equal(cache.statistics.bytes,0);assert.equal(made[0].width,0,'released surfaces are emptied');
+});
+
+test('the picture cache keeps to its time and memory budgets and never bakes a blend',()=>{
+ let clock=0;const make=(w,h)=>{const s=surface();s.width=w;s.height=h;s.ctx.canvas=s;s.ctx.globalAlpha=1;s.ctx.getTransform=()=>({a:1,b:0,c:0,d:1,e:0,f:0});return s;};
+ const cache=new pictureCache({create_surface:make,budget_ms:2,max_bytes:10*10*4*2,densities:[1],now:()=>clock});
+ const ctx=context(),cv=surface(ctx);cv.width=cv.height=100;ctx.canvas=cv;ctx.globalAlpha=1;ctx.getTransform=()=>({a:1,b:0,c:0,d:1,e:0,f:0});
+ const slow=()=>{clock+=3;return [rect()];},at=key=>({key,bounds:[0,0,10,10]});
+ assert.equal(cache.draw(ctx,at('a'),slow),'paint');assert.equal(cache.draw(ctx,at('b'),slow),'vector','the frame budget is spent');
+ cache.beginFrame();assert.equal(cache.draw(ctx,at('b'),slow),'paint');cache.beginFrame();cache.draw(ctx,at('a'),slow);
+ cache.beginFrame();assert.equal(cache.draw(ctx,at('c'),slow),'paint');assert.equal(cache.statistics.pictures,2);
+ cache.beginFrame();assert.equal(cache.draw(ctx,at('a'),slow),'stamp','the least recently stamped picture went first');assert.equal(cache.draw(ctx,at('b'),slow),'paint','and b, pushed out for c, paints again');
+ cache.beginFrame();assert.equal(cache.draw(ctx,at('glow'),()=>[rect('#fff',{blend:'add'})]),'vector');cache.beginFrame();assert.equal(cache.draw(ctx,at('glow'),()=>[rect('#fff',{blend:'add'})]),'vector','a blended picture stays vector');
+ assert.throws(()=>cache.draw(ctx,{key:'',bounds:[0,0,1,1]},slow),/key/);assert.throws(()=>cache.draw(ctx,{key:'x',bounds:[0,0,0,1]},slow),/bounds/);assert.throws(()=>new pictureCache({densities:[2,1]}),/rise/);
+});
+
+test('text is measured as the backend draws it',()=>{
+ let font;const ctx={set font(v){font=v;},get font(){return font;},measureText:s=>({width:s.length*3,actualBoundingBoxAscent:4,actualBoundingBoxDescent:1})};
+ const size=measureText('honey',{family:'Georgia, serif',size:5,weight:600},{create_surface:()=>({getContext:()=>ctx})});
+ assert.deepEqual({...size},{width:15,ascent:4,descent:1});assert.equal(font,'normal 600 5px Georgia, serif');
 });

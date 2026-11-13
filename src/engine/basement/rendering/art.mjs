@@ -19,10 +19,12 @@ export function polyline(points){if(!Array.isArray(points)||points.length<2)thro
 export function polygon(points){if(points?.length<3)throw new TypeError('A polygon needs three points or more');return [...polyline(points),['close']];}
 /** A box from its top-left corner, the classic canvas convention. */
 export const rect=(x,y,w,h)=>polygon([[x,y],[x+w,y],[x+w,y+h],[x,y+h]]);
-/** A box from its top-left corner with rounded corners; `r` is clamped to half the shorter side. */
+/** A box from its top-left corner with rounded corners, the same outline as a canvas roundRect (circular
+ *  arcs); `r` is clamped to half the shorter side. */
 export function roundRect(x,y,w,h,r){
     r=Math.max(0,Math.min(finite(r,'corner radius'),Math.abs(w)/2,Math.abs(h)/2));if(!r)return rect(x,y,w,h);
-    return [['move',x+r,y],['line',x+w-r,y],['quadratic',x+w,y,x+w,y+r],['line',x+w,y+h-r],['quadratic',x+w,y+h,x+w-r,y+h],['line',x+r,y+h],['quadratic',x,y+h,x,y+h-r],['line',x,y+r],['quadratic',x,y,x+r,y],['close']];
+    const q=Math.PI/2;
+    return [['move',x+r,y],['line',x+w-r,y],ellipse(x+w-r,y+r,r,r,0,-q,0),['line',x+w,y+h-r],ellipse(x+w-r,y+h-r,r,r,0,0,q),['line',x+r,y+h],ellipse(x+r,y+h-r,r,r,0,q,2*q),['line',x,y+r],ellipse(x+r,y+r,r,r,0,2*q,3*q),['close']];
 }
 /** A stadium from `from` to `to` with round ends: a limb, a cable, a pipe. Fill it. */
 export function capsule([ax,ay],[bx,by],r){
@@ -60,6 +62,12 @@ export class artScene{
     stroke(commands,color,stroke_width=this.style.stroke_width){return this.paint(commands,{stroke:color,stroke_width});}
     /** The fill-then-outline pair the classic art draws for nearly every part. */
     outlined(commands,fill,stroke,stroke_width=this.style.stroke_width){return this.paint(commands,{fill,stroke,stroke_width});}
+    /** One line of text at (x, y) in the group: `font` {family, size, weight, style}, `align` left|center|right,
+     *  `baseline` top|middle|bottom|alphabetic; `material` as for paint (fill, or stroke for outlined text). */
+    text(string,x,y,{font={},align='left',baseline='alphabetic'}={},material={fill:'#000'}){
+        const m=multiply(this.matrix,[1,0,0,1,finite(x,'x'),finite(y,'y')]),inv=this.clips.length?inverse(m):null,{stroke_width,line_cap,line_join,dash}=this.style;
+        this.packets.push({type:'text',text:String(string),matrix:m,font:{...font},align,baseline,material:{fill:null,stroke:null,stroke_width,line_cap,line_join,dash:[...dash],...structuredClone(material)},opacity:this.style.opacity,blend:this.style.blend,clips:this.clips.map(clip=>({geometry:clip.geometry,transform:multiply(inv,clip.matrix)}))});return this;
+    }
     finish(){if(this.#stack.length)throw new Error('Unclosed art group');return this.packets;}
 }
 

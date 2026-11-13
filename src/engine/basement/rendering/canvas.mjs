@@ -138,3 +138,68 @@ export class canvasRenderer {
     }
     dispose(){if(this.#disposed)return;this.#disposed=true;this.#generation++;for(const entry of this.#resources.values())this.#release(entry);this.#resources.clear();this.#context=null;this.#surface=null;}
 }
+
+let measurer=null;
+/** The width and the ascent/descent above and below the baseline of one line of text in `font`
+ *  {family, size, weight, style}, as the Canvas backend would draw it. */
+export function measureText(text,font={},{create_surface=createSurface}={}){
+    measurer??=create_surface(1,1).getContext('2d');
+    measurer.font=`${font.style??'normal'} ${font.weight??400} ${font.size??16}px ${font.family??'sans-serif'}`;
+    const m=measurer.measureText(String(text));
+    return Object.freeze({width:m.width,ascent:m.actualBoundingBoxAscent??0,descent:m.actualBoundingBoxDescent??0});
+}
+
+const multiply=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
+/**
+ * Pictures painted once and stamped every frame: a migration boundary like drawPackets, for hosts that
+ * own a Canvas pass. `draw(context, {key, bounds, matrix}, build)` stamps the picture `key` (the packets
+ * `build()` returns, in local units inside `bounds` [x, y, w, h]) under the context's transform times
+ * `matrix`. A picture is painted at the first of `densities` (device pixels per local unit) at or above
+ * what the view needs, so it stays sharp as the view zooms; past the last it draws as vector. Painting
+ * spends at most `budget_ms` a frame (`beginFrame()`); a picture waiting its turn draws as vector, as
+ * does one with a blend other than normal (a picture's own blend has nothing under it to work on).
+ * The least recently stamped pictures go first when `max_bytes` would be passed. The key must name
+ * everything the picture shows: the cache never looks inside `build`.
+ */
+export class pictureCache{
+    #entries=new Map();#bytes=0;#spent=0;#max_bytes;#budget_ms;#densities;#create_surface;#now;
+    constructor({max_bytes=48*1048576,budget_ms=3,densities=[1,1.5,2,3,4],create_surface=createSurface,now=()=>performance.now()}={}){
+        if(!(max_bytes>0)||!(budget_ms>=0))throw new TypeError('A picture cache needs a memory budget and a time budget');
+        if(!Array.isArray(densities)||!densities.length||densities.some((d,i)=>!(d>0)||(i&&d<=densities[i-1])))throw new TypeError('Densities must rise');
+        this.#max_bytes=max_bytes;this.#budget_ms=budget_ms;this.#densities=[...densities];this.#create_surface=create_surface;this.#now=now;
+    }
+    /** A fresh painting budget, once a frame. */
+    beginFrame(){this.#spent=0;}
+    get statistics(){return Object.freeze({pictures:[...this.#entries.values()].filter(e=>e.surface).length,bytes:this.#bytes});}
+    /** Draws the picture; returns how: 'stamp' (from the cache), 'paint' (painted now, then stamped) or 'vector'. */
+    draw(context,{key,bounds,matrix=[1,0,0,1,0,0]},build){
+        if(!context?.canvas||typeof context.getTransform!=='function')throw new TypeError('A host Canvas context is required');
+        if(typeof key!=='string'||!key)throw new TypeError('A picture needs a key');
+        const [bx,by,bw,bh]=bounds;if(![bx,by,bw,bh].every(Number.isFinite)||!(bw>0&&bh>0))throw new TypeError('A picture needs finite bounds');
+        const t=context.getTransform(),m=multiply([t.a,t.b,t.c,t.d,t.e,t.f],matrix),scale=Math.max(Math.hypot(m[0],m[1]),Math.hypot(m[2],m[3]));
+        const density=this.#densities.find(d=>d>=scale-1e-9);
+        const vector=packets=>{context.save();try{context.transform(...matrix);canvasRenderer.drawPackets(context,packets??build());}finally{context.restore();}return 'vector';};
+        if(density===undefined||this.#entries.get(key)?.vector)return vector();
+        const id=`${key}@${density}`;let entry=this.#entries.get(id),how='stamp';
+        if(!entry){
+            if(this.#spent>=this.#budget_ms)return vector();
+            const t0=this.#now(),packets=build();
+            if(packets.some(p=>(p.blend??'normal')!=='normal')){this.#entries.set(key,{vector:true,bytes:0});return vector(packets);}
+            const W=Math.ceil(bw*density),H=Math.ceil(bh*density),bytes=W*H*4;
+            if(bytes>this.#max_bytes)return vector(packets);
+            this.#evict(bytes);
+            const surface=this.#create_surface(W,H),ctx=surface.getContext('2d');if(!ctx)throw new Error('Picture surface unavailable');
+            ctx.setTransform(W/bw,0,0,H/bh,-bx*W/bw,-by*H/bh);canvasRenderer.drawPackets(ctx,packets);
+            entry={surface,bytes};this.#bytes+=bytes;this.#spent+=this.#now()-t0;how='paint';
+        }else this.#entries.delete(id);
+        this.#entries.set(id,entry);
+        context.save();
+        try{context.transform(...matrix);context.drawImage(entry.surface,bx,by,bw,bh);}finally{context.restore();}
+        return how;
+    }
+    #evict(bytes){for(const [id,entry]of this.#entries){if(this.#bytes+bytes<=this.#max_bytes)break;if(entry.surface){this.#free(entry);this.#entries.delete(id);}}}
+    #free(entry){this.#bytes-=entry.bytes;entry.surface.width=0;entry.surface.height=0;}
+    /** Lets go of every picture whose key starts with `prefix` (all of them without one). */
+    release(prefix=''){for(const [id,entry]of [...this.#entries])if(id.startsWith(prefix)){if(entry.surface)this.#free(entry);this.#entries.delete(id);}}
+    clear(){this.release();}
+}

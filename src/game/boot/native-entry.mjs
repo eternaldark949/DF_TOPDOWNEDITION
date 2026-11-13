@@ -13,7 +13,7 @@ export { InteriorLevel, registerInteriorLevels } from '../levels/interior-level.
 export { levelLobby } from '../../engine/lobby/level-lobby.mjs';
 export { createGameRuntime } from './game-runtime.mjs';
 export { controlSystem, controlsSystem, inputInstance, keyboardInstance, mouseInstance, touchInstance, touchStick, gamepadInstance, TAP, DOUBLETAP, HELD, PRESS, REPEAT, RELEASE } from '../../engine/basement/controls/index.mjs';
-export { renderSystem, renderFrame, canvasRenderer, cameraSystem } from '../../engine/basement/rendering/index.mjs';
+export { renderSystem, renderFrame, canvasRenderer, pictureCache, measureText, cameraSystem } from '../../engine/basement/rendering/index.mjs';
 
 export { gameSession } from '../mechanics/game-session.mjs';
 export { PlayerStateSystem } from '../mechanics/player-state-system.mjs';
@@ -84,6 +84,7 @@ export {validateBossRecord} from '../entities/validate-boss-records.mjs';
 export {createDronePackets} from '../presentation/drone.mjs';
 export {createVelvetCatArt,createVelvetCatPackets,createVelvetEyePackets} from '../presentation/velvet-cat.mjs';
 export {doorPresentation,createDoorPackets,DOOR_APPEARANCE} from '../presentation/door.mjs';
+export {PROP_FAMILIES,hasPropArt,propArtPacket,createPropDraws,drawPropArt} from '../presentation/props/index.mjs';
 export {sceneLighting,levelLights,LIGHTING} from '../presentation/lighting.mjs';
 
 export {rigDefinition,rigPose,animationClip,animationController,rigSystem} from '../../engine/basement/physics/index.mjs';
