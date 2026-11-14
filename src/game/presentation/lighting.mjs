@@ -1,5 +1,5 @@
 import LIGHTING from '../data/game-lighting.json' with {type:'json'};
-import {createLightLayer} from '../../engine/basement/rendering/index.mjs';
+import {createLightLayer,createLightLayerParts} from '../../engine/basement/rendering/index.mjs';
 export {LIGHTING};
 const stops=(list,color)=>list.map(([o,c])=>[o,c==='$color'?color:c]);
 /**
@@ -23,20 +23,27 @@ export class sceneLighting{
         const points=this.#world.getVisibilityPolygon({origin:light.position,radius:light.radius,resolution:this.look.lamp.resolution}).points;
         this.#polygons.set(key,{at,points});return points;
     }
-    createLayer({bounds,kind='indoor',sky_darkness=0,rooms=[],lights=[],time=0}){
+    /**
+     * The layer's packets and the strength to draw it at. With `extent` (the map's {left, top, right,
+     * bottom}) the lamps and the steady soft lights are kept as pictures over it, repainted only when one
+     * of them changes (a room's switch, a lamp moved), and only flickering lights are drawn live: draw the
+     * packets with canvasRenderer.drawLayer and a pictureCache. Without it, every light is drawn live.
+     */
+    createLayer({bounds,extent,kind='indoor',sky_darkness=0,rooms=[],lights=[],time=0}){
         const look=this.look,ambient=look.indoor.darkness,base=kind==='indoor'?look.indoor.lamp_glow:look.outdoor.lamp_glow;
         const areas=rooms.map(r=>({rects:r.rects,cut:r.type==='outdoor'?1-Math.min(1,sky_darkness/ambient):r.fill!==undefined?(1-Math.min(1,r.fill/ambient))*(r.lit??1):0}));
         const out=[];
         for(const l of lights){
             const lit=l.lit??1;if(lit<.01)continue;
-            if(l.kind==='lamp'){const k=(l.intensity??1)*lit;out.push({position:l.position,radius:l.radius,inner_radius:look.lamp.inner_radius,polygon:this.#polygon(l),intensity:k,cut:look.lamp.cut,color:l.color,glow:base*Math.min(1,k),glow_stops:stops(look.lamp.glow_stops,l.color)});continue;}
+            if(l.kind==='lamp'){const k=(l.intensity??1)*lit;out.push({still:true,position:l.position,radius:l.radius,inner_radius:look.lamp.inner_radius,polygon:this.#polygon(l),intensity:k,cut:look.lamp.cut,color:l.color,glow:base*Math.min(1,k),glow_stops:stops(look.lamp.glow_stops,l.color)});continue;}
             const f=l.flicker?look.flicker.floor+look.flicker.swing*Math.sin(time*l.flicker+l.position[0]*.7)*Math.sin(time*l.flicker*.37+l.position[1]):1;
             const a=(l.intensity??look.soft.intensity)*f*lit,color=l.color??look.soft.color;
-            if(l.size)out.push({shape:'area',position:l.position,size:l.size,round:l.round,intensity:a,cut:l.soft?look.area.soft_cut:look.area.cut,color,glow:Math.min(1,look.area.glow*a),glow_stops:stops(look.area.glow_stops,color)});
-            else out.push({position:l.position,radius:l.radius,intensity:a,cut:look.soft.cut,color,glow:Math.min(1,look.soft.glow*a),glow_stops:stops(look.soft.glow_stops,color)});
+            if(l.size)out.push({still:!l.flicker,shape:'area',position:l.position,size:l.size,round:l.round,intensity:a,cut:l.soft?look.area.soft_cut:look.area.cut,color,glow:Math.min(1,look.area.glow*a),glow_stops:stops(look.area.glow_stops,color)});
+            else out.push({still:!l.flicker,position:l.position,radius:l.radius,intensity:a,cut:look.soft.cut,color,glow:Math.min(1,look.soft.glow*a),glow_stops:stops(look.soft.glow_stops,color)});
         }
         // Lamps cut first, then the soft lights, as the classic layer did.
         out.sort((a,b)=>(a.polygon?0:1)-(b.polygon?0:1));
+        if(extent)return {packets:createLightLayerParts({extent,tint:look.indoor.tint,areas,lights:out,key:'scene_light'}),opacity:ambient};
         return {packets:createLightLayer({bounds,tint:look.indoor.tint,areas,lights:out}),opacity:ambient};
     }
 }

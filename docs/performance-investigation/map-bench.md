@@ -64,3 +64,16 @@ Lighting Quality × ½ for soft shadows (half resolution by default). Both now r
 | city-drive | 109.7 ms | 9.5 ms |
 
 Of the native layer's cost, building its packets is about 1 ms; the rest is drawing them.
+
+## November 14: still lights kept between frames
+
+The engine's light layer can now be split (`createLightLayerParts`): lamps and steady lights are painted
+once into two pictures over the map (the dark with their cuts, and their colour) and stamped each frame;
+only flickering lights and the rooms' areas are drawn live. The pictures repaint when a still light changes
+(a room switched, a lamp moved). A Chromium pixel test holds the split layer to the whole one within 3 per
+channel. Re-recorded (this machine ran about 15% slower than the day before: compare `relative`):
+
+| Scene | Frame CPU | Light layer |
+|---|---|---|
+| apartment-night | 16.0 ms (was 25.3) | 3.2 ms (was 13.7) |
+| apartment-door | 14.6 ms (was 28.1) | 2.0 ms (was 14.2) |

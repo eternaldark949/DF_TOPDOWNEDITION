@@ -41,8 +41,10 @@ export class canvasRenderer {
      * Migration boundary, like drawPackets: draws `packets` into an off-screen layer the size of the
      * context's canvas (times `scale`, for a cheaper softer layer) under the context's current transform,
      * then lays that layer over the canvas at `opacity` with `blend`. The light layer is drawn this way.
+     * An entry of `packets` may instead be `{picture: {key, bounds, build}, blend}`: a picture stamped from
+     * `pictures` (a pictureCache) into the layer with `blend`, its own blends kept inside it (`layered`).
      */
-    static drawLayer(context,packets,{opacity=1,blend='normal',scale=1}={}){
+    static drawLayer(context,packets,{opacity=1,blend='normal',scale=1,pictures}={}){
         if(!context?.canvas||typeof context.getTransform!=='function')throw new TypeError('A host Canvas context is required');
         if(!Object.hasOwn(BLENDS,blend))throw new TypeError('Unsupported blend');if(!(scale>0&&scale<=1))throw new TypeError('Layer scale is in (0, 1]');if(!(opacity>=0&&opacity<=1))throw new TypeError('Opacity must be in [0,1]');
         const canvas=context.canvas,w=Math.max(1,Math.round(canvas.width*scale)),h=Math.max(1,Math.round(canvas.height*scale));
@@ -51,7 +53,14 @@ export class canvasRenderer {
         const lc=layer.context,m=context.getTransform(),sx=w/canvas.width,sy=h/canvas.height;
         lc.setTransform(1,0,0,1,0,0);lc.globalAlpha=1;lc.globalCompositeOperation='source-over';lc.clearRect(0,0,w,h);
         lc.setTransform(m.a*sx,m.b*sy,m.c*sx,m.d*sy,m.e*sx,m.f*sy);
-        const count=canvasRenderer.drawPackets(lc,packets);
+        let count=0,run=[];const flush=()=>{if(run.length)count+=canvasRenderer.drawPackets(lc,run);run=[];};
+        for(const entry of packets){
+            if(!entry.picture){run.push(entry);continue;}
+            flush();if(!pictures)throw new TypeError('A layer with pictures needs a pictureCache');if(!Object.hasOwn(BLENDS,entry.blend??'normal'))throw new TypeError('Unsupported blend');
+            lc.globalCompositeOperation=BLENDS[entry.blend??'normal'];
+            try{pictures.draw(lc,{...entry.picture,layered:true},entry.picture.build);count++;}finally{lc.globalCompositeOperation='source-over';}
+        }
+        flush();
         context.save();
         try{context.setTransform(1,0,0,1,0,0);context.globalAlpha=opacity;context.globalCompositeOperation=BLENDS[blend];context.imageSmoothingEnabled=true;context.drawImage(layer.surface,0,0,canvas.width,canvas.height);}
         finally{context.restore();}
@@ -159,7 +168,8 @@ const multiply=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[
  * spends at most `budget_ms` a frame (`beginFrame()`); a picture waiting its turn draws as vector, as
  * does one with a blend other than normal (a picture's own blend has nothing under it to work on).
  * The least recently stamped pictures go first when `max_bytes` would be passed. The key must name
- * everything the picture shows: the cache never looks inside `build`.
+ * everything the picture shows: the cache never looks inside `build`. A `layered` picture paints its own
+ * base first, so its blends work on that and it is cached too (a light layer's dark with its cuts).
  */
 export class pictureCache{
     #entries=new Map();#bytes=0;#spent=0;#max_bytes;#budget_ms;#densities;#create_surface;#now;
@@ -172,7 +182,7 @@ export class pictureCache{
     beginFrame(){this.#spent=0;}
     get statistics(){return Object.freeze({pictures:[...this.#entries.values()].filter(e=>e.surface).length,bytes:this.#bytes});}
     /** Draws the picture; returns how: 'stamp' (from the cache), 'paint' (painted now, then stamped) or 'vector'. */
-    draw(context,{key,bounds,matrix=[1,0,0,1,0,0]},build){
+    draw(context,{key,bounds,matrix=[1,0,0,1,0,0],layered=false},build){
         if(!context?.canvas||typeof context.getTransform!=='function')throw new TypeError('A host Canvas context is required');
         if(typeof key!=='string'||!key)throw new TypeError('A picture needs a key');
         const [bx,by,bw,bh]=bounds;if(![bx,by,bw,bh].every(Number.isFinite)||!(bw>0&&bh>0))throw new TypeError('A picture needs finite bounds');
@@ -184,7 +194,7 @@ export class pictureCache{
         if(!entry){
             if(this.#spent>=this.#budget_ms)return vector();
             const t0=this.#now(),packets=build();
-            if(packets.some(p=>(p.blend??'normal')!=='normal')){this.#entries.set(key,{vector:true,bytes:0});return vector(packets);}
+            if(!layered&&packets.some(p=>(p.blend??'normal')!=='normal')){this.#entries.set(key,{vector:true,bytes:0});return vector(packets);}
             const W=Math.ceil(bw*density),H=Math.ceil(bh*density),bytes=W*H*4;
             if(bytes>this.#max_bytes)return vector(packets);
             this.#evict(bytes);

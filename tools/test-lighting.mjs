@@ -46,3 +46,14 @@ test('rooms thin the dark: the sky over an outdoor room, a lit room to its fill'
     const night = layerOf(lighting.createLayer({ bounds, rooms, sky_darkness: .6 }).packets, 'destination-out')[0].opacity;
     assert.ok(Math.abs(night - (1 - .6 / .95)) < 1e-9, 'at night the sky is darker');
 });
+
+test('given the map extent, lamps and steady lights are kept as pictures and only flickering lights stay live', () => {
+    const { physics, level } = scene(), lighting = new sceneLighting(physics), extent = { left: 0, top: 0, right: 400, bottom: 300 };
+    level.definition.soft_lights.push({ x: 120, y: 260, radius: 30, color: '#ffcc88', intensity: .7, flicker: 6 });
+    const parts = lighting.createLayer({ extent, lights: levelLights(level), time: 1 }).packets;
+    assert.deepEqual(parts.filter(p => p.picture).map(p => p.blend ?? 'normal'), ['normal', 'add'], 'the dark with the still cuts, then their colour added');
+    assert.equal(layerOf(parts, 'destination-out').length, 1, 'only the candle cuts live'); assert.equal(layerOf(parts.filter(p => !p.picture), 'add').length, 1, 'and adds its colour live');
+    const later = lighting.createLayer({ extent, lights: levelLights(level), time: 2 }).packets, key = p => p.filter(e => e.picture).map(e => e.picture.key).join();
+    assert.equal(key(later), key(parts), 'the candle flickering keeps the pictures');
+    assert.notEqual(key(lighting.createLayer({ extent, lights: levelLights(level, { lightAt: x => x < 200 ? 1 : 0 }) }).packets), key(parts), 'a room switched off repaints them');
+});

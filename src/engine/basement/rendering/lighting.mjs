@@ -42,20 +42,59 @@ export function createLightLayer({bounds,tint,areas=[],lights=[]},{scene=new art
     const {left,top,right,bottom}=bounds??{};for(const v of [left,top,right,bottom])finite(v,'bounds');
     if(typeof tint!=='string'||!tint)throw new TypeError('The light layer needs a tint colour');
     scene.fill(rect(left,top,right-left,bottom-top),tint);
+    thin(scene,areas);
+    const shapes=lights.map(validLight);
+    lights.forEach((l,i)=>cut(scene,l,shapes[i]));
+    lights.forEach((l,i)=>glow(scene,l,shapes[i]));
+    return scene.finish();
+}
+/**
+ * The same layer, split so what holds still between frames is painted once. Lights marked `still: true`
+ * go into two pictures over `extent` ({left, top, right, bottom}: the whole map, not the view): the dark
+ * with their cuts, and their colour. The areas and the other lights stay live packets. Returns the parts
+ * for canvasRenderer.drawLayer, in order: the dark picture, the live cuts, the colour picture (added), the
+ * live colour. Cuts (destination-out) and colour (add) each commute, so it is the layer createLightLayer
+ * draws. A picture's key names the tint, the extent and every still light; a light's `polygon` is known
+ * by its array, so give a new array when the shadow changes. `key` prefixes the pictures' keys.
+ */
+export function createLightLayerParts({extent,tint,areas=[],lights=[],key='light'}){
+    const {left,top,right,bottom}=extent??{};for(const v of [left,top,right,bottom])finite(v,'extent');
+    if(typeof tint!=='string'||!tint)throw new TypeError('The light layer needs a tint colour');
+    const shapes=lights.map(validLight),still=[],live=[];lights.forEach((l,i)=>(l.still?still:live).push([l,shapes[i]]));
+    const bounds=[left,top,right-left,bottom-top],name=`${key}:${signature(tint,bounds,still)}`;
+    const picture=(part,paint)=>({key:`${name}:${part}`,bounds,build(){const scene=new artScene();paint(scene);return scene.finish();}});
+    const cuts=new artScene(),colour=new artScene();
+    thin(cuts,areas);for(const [l,shape] of live){cut(cuts,l,shape);glow(colour,l,shape);}
+    return [{picture:picture('dark',scene=>{scene.fill(rect(...bounds),tint);for(const [l,shape] of still)cut(scene,l,shape);})},...cuts.finish(),
+        {picture:picture('glow',scene=>{for(const [l,shape] of still)glow(scene,l,shape);}),blend:'add'},...colour.finish()];
+}
+/** The dark thinned where an area is lit. */
+function thin(scene,areas){
     for(const a of areas){const k=finite(a.cut,'area cut',0);if(k<.001)continue;
         const shape=a.polygon?polygonPath(a.polygon):(a.rects??[]).flatMap(q=>rect(q.x,q.y,q.w,q.h));if(!shape.length)continue;
         scene.enter({},{blend:'destination-out',opacity:Math.min(1,k)});scene.fill(shape,'#ffffff');scene.leave();}
-    const shapes=lights.map(validLight);
-    lights.forEach((l,i)=>{
-        const k=Math.min(1,l.intensity??1);if(k<.001)return;const stops=(l.cut??LIGHT_CUT).map(([o,a])=>[o,white(a)]);
-        if(shapes[i]==='area'){area(scene,l.position,l.size,l.round,stops,k,'destination-out');return;}
-        const [x,y]=l.position,shape=l.polygon?polygonPath(l.polygon):[circle(x,y,l.radius)];
-        scene.enter({},{blend:'destination-out',opacity:k});scene.fill(shape,radial([x,y],l.inner_radius??0,[x,y],l.radius,stops));scene.leave();
-    });
-    lights.forEach((l,i)=>{
-        const k=Math.min(1,l.glow??0);if(k<.001||!l.color)return;const stops=l.glow_stops??[[0,l.color],[1,'rgba(0,0,0,0)']];
-        if(shapes[i]==='area'){area(scene,l.position,l.size,l.round,stops,k,'add');return;}
-        const [x,y]=l.position;scene.enter({},{blend:'add',opacity:k});scene.fill([circle(x,y,l.radius)],radial([x,y],0,[x,y],l.radius,stops));scene.leave();
-    });
-    return scene.finish();
+}
+/** A light's cut out of the dark. */
+function cut(scene,l,shape){
+    const k=Math.min(1,l.intensity??1);if(k<.001)return;const stops=(l.cut??LIGHT_CUT).map(([o,a])=>[o,white(a)]);
+    if(shape==='area'){area(scene,l.position,l.size,l.round,stops,k,'destination-out');return;}
+    const [x,y]=l.position,outline=l.polygon?polygonPath(l.polygon):[circle(x,y,l.radius)];
+    scene.enter({},{blend:'destination-out',opacity:k});scene.fill(outline,radial([x,y],l.inner_radius??0,[x,y],l.radius,stops));scene.leave();
+}
+/** A light's colour, added. */
+function glow(scene,l,shape){
+    const k=Math.min(1,l.glow??0);if(k<.001||!l.color)return;const stops=l.glow_stops??[[0,l.color],[1,'rgba(0,0,0,0)']];
+    if(shape==='area'){area(scene,l.position,l.size,l.round,stops,k,'add');return;}
+    const [x,y]=l.position;scene.enter({},{blend:'add',opacity:k});scene.fill([circle(x,y,l.radius)],radial([x,y],0,[x,y],l.radius,stops));scene.leave();
+}
+const polygonIds=new WeakMap();let polygonCount=0;
+/** A short hash of everything the still pictures show (FNV-1a over the fields, polygons by identity). */
+function signature(tint,bounds,still){
+    let h=0x811c9dc5;const add=text=>{for(let i=0;i<text.length;i++){h^=text.charCodeAt(i);h=Math.imul(h,0x01000193);}};
+    add(`${tint}|${bounds}`);
+    for(const [l] of still){
+        if(l.polygon&&!polygonIds.has(l.polygon))polygonIds.set(l.polygon,++polygonCount);
+        add(`|${l.shape},${l.position},${l.radius},${l.size},${l.round},${l.inner_radius},${l.polygon?polygonIds.get(l.polygon):''},${l.intensity},${l.cut},${l.color},${l.glow},${l.glow_stops}`);
+    }
+    return (h>>>0).toString(36)+still.length;
 }

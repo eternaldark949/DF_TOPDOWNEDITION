@@ -79,3 +79,39 @@ test('the light layer cuts lights out of the dark, shadows them by polygon, adds
         assert.ok(Math.abs(px.composite_far[0] - 128) < 3 && Math.abs(px.composite_far[2] - 147) < 3, `the layer lays over the scene at its opacity (${px.composite_far})`);
     } finally { await browser.close(); server.close(); }
 });
+
+test('a light layer split into still pictures and live lights draws the same layer, at any zoom', { skip: !chromium && 'Playwright is not installed' }, async () => {
+    const server = createServer(async (req, res) => {
+        try { const body = await readFile(join(root, decodeURIComponent(req.url.split('?')[0])));
+            res.writeHead(200, { 'content-type': extname(req.url) === '.mjs' ? 'text/javascript' : extname(req.url) === '.json' ? 'application/json' : 'text/html' }); res.end(body); }
+        catch { res.writeHead(404); res.end(); }
+    }).listen(0);
+    const browser = await chromium.launch();
+    try {
+        const page = await browser.newPage();
+        await page.goto(`http://127.0.0.1:${server.address().port}/tools/fixtures/blank.html`).catch(() => {});
+        const result = await page.evaluate(async () => {
+            const { canvasRenderer, pictureCache, createLightLayer, createLightLayerParts } = await import('/src/engine/basement/rendering/index.mjs');
+            const extent = { left: 0, top: 0, right: 200, bottom: 100 }, tint = 'rgb(20,8,40)', areas = [{ rects: [{ x: 150, y: 0, w: 50, h: 20 }], cut: 0.4 }];
+            const lights = [{ still: true, position: [50, 50], radius: 40, inner_radius: 10, polygon: [[50, 50], [90, 10], [90, 90]], color: '#ff8800', glow: 0.5 },
+                { still: true, shape: 'area', position: [150, 70], size: [60, 20], round: 10, intensity: .8, color: '#88ccff', glow: .3 },
+                { position: [100, 40], radius: 30, intensity: .7, color: '#ffffff', glow: .4 }];   // (the live one: a flickering candle)
+            const pictures = new pictureCache({ densities: [1, 2] }), worst = [];
+            for (const [zoom, ox, oy] of [[1, 0, 0], [2, -60, -30]]) {
+                const draw = packets => { const canvas = Object.assign(document.createElement('canvas'), { width: 200, height: 100 }), ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#c0c0c0'; ctx.fillRect(0, 0, 200, 100); ctx.setTransform(zoom, 0, 0, zoom, ox, oy);
+                    canvasRenderer.drawLayer(ctx, packets, { opacity: .9, pictures }); return ctx.getImageData(0, 0, 200, 100).data; };
+                const whole = draw(createLightLayer({ bounds: extent, tint, areas, lights })), split = draw(createLightLayerParts({ extent, tint, areas, lights }));
+                let max = 0; for (let i = 0; i < whole.length; i++) max = Math.max(max, Math.abs(whole[i] - split[i])); worst.push(max);
+            }
+            const parts = createLightLayerParts({ extent, tint, areas, lights }), again = createLightLayerParts({ extent, tint, areas, lights: lights.map(l => l.still ? l : { ...l, intensity: .2 }) });
+            const moved = createLightLayerParts({ extent, tint, areas, lights: lights.map((l, i) => i ? l : { ...l, position: [52, 50] }) });
+            const keys = p => p.filter(e => e.picture).map(e => e.picture.key);
+            return { worst, pictures: keys(parts).length, live_only: keys(again).join() === keys(parts).join(), moved: keys(moved).every((k, i) => k !== keys(parts)[i]) };
+        });
+        assert.equal(result.pictures, 2, 'the still lights become two pictures: the dark with their cuts, and their colour');
+        assert.ok(result.worst.every(d => d <= 3), `the split layer matches the whole one within rounding (${result.worst})`);
+        assert.ok(result.live_only, 'a live light changing keeps the pictures');
+        assert.ok(result.moved, 'a still light moving repaints them');
+    } finally { await browser.close(); server.close(); }
+});

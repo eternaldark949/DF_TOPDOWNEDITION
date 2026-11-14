@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '9351eb2a8736';
+        const DFAB_BUILD = '24a5f46558d6';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="16379">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="16424">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -28792,8 +28792,10 @@ class canvasRenderer {
      * Migration boundary, like drawPackets: draws `packets` into an off-screen layer the size of the
      * context's canvas (times `scale`, for a cheaper softer layer) under the context's current transform,
      * then lays that layer over the canvas at `opacity` with `blend`. The light layer is drawn this way.
+     * An entry of `packets` may instead be `{picture: {key, bounds, build}, blend}`: a picture stamped from
+     * `pictures` (a pictureCache) into the layer with `blend`, its own blends kept inside it (`layered`).
      */
-    static drawLayer(context,packets,{opacity=1,blend='normal',scale=1}={}){
+    static drawLayer(context,packets,{opacity=1,blend='normal',scale=1,pictures}={}){
         if(!context?.canvas||typeof context.getTransform!=='function')throw new TypeError('A host Canvas context is required');
         if(!Object.hasOwn(BLENDS,blend))throw new TypeError('Unsupported blend');if(!(scale>0&&scale<=1))throw new TypeError('Layer scale is in (0, 1]');if(!(opacity>=0&&opacity<=1))throw new TypeError('Opacity must be in [0,1]');
         const canvas=context.canvas,w=Math.max(1,Math.round(canvas.width*scale)),h=Math.max(1,Math.round(canvas.height*scale));
@@ -28802,7 +28804,14 @@ class canvasRenderer {
         const lc=layer.context,m=context.getTransform(),sx=w/canvas.width,sy=h/canvas.height;
         lc.setTransform(1,0,0,1,0,0);lc.globalAlpha=1;lc.globalCompositeOperation='source-over';lc.clearRect(0,0,w,h);
         lc.setTransform(m.a*sx,m.b*sy,m.c*sx,m.d*sy,m.e*sx,m.f*sy);
-        const count=canvasRenderer.drawPackets(lc,packets);
+        let count=0,run=[];const flush=()=>{if(run.length)count+=canvasRenderer.drawPackets(lc,run);run=[];};
+        for(const entry of packets){
+            if(!entry.picture){run.push(entry);continue;}
+            flush();if(!pictures)throw new TypeError('A layer with pictures needs a pictureCache');if(!Object.hasOwn(BLENDS,entry.blend??'normal'))throw new TypeError('Unsupported blend');
+            lc.globalCompositeOperation=BLENDS[entry.blend??'normal'];
+            try{pictures.draw(lc,{...entry.picture,layered:true},entry.picture.build);count++;}finally{lc.globalCompositeOperation='source-over';}
+        }
+        flush();
         context.save();
         try{context.setTransform(1,0,0,1,0,0);context.globalAlpha=opacity;context.globalCompositeOperation=BLENDS[blend];context.imageSmoothingEnabled=true;context.drawImage(layer.surface,0,0,canvas.width,canvas.height);}
         finally{context.restore();}
@@ -28910,7 +28919,8 @@ const multiply=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[
  * spends at most `budget_ms` a frame (`beginFrame()`); a picture waiting its turn draws as vector, as
  * does one with a blend other than normal (a picture's own blend has nothing under it to work on).
  * The least recently stamped pictures go first when `max_bytes` would be passed. The key must name
- * everything the picture shows: the cache never looks inside `build`.
+ * everything the picture shows: the cache never looks inside `build`. A `layered` picture paints its own
+ * base first, so its blends work on that and it is cached too (a light layer's dark with its cuts).
  */
 class pictureCache{
     #entries=new Map();#bytes=0;#spent=0;#max_bytes;#budget_ms;#densities;#create_surface;#now;
@@ -28923,7 +28933,7 @@ class pictureCache{
     beginFrame(){this.#spent=0;}
     get statistics(){return Object.freeze({pictures:[...this.#entries.values()].filter(e=>e.surface).length,bytes:this.#bytes});}
     /** Draws the picture; returns how: 'stamp' (from the cache), 'paint' (painted now, then stamped) or 'vector'. */
-    draw(context,{key,bounds,matrix=[1,0,0,1,0,0]},build){
+    draw(context,{key,bounds,matrix=[1,0,0,1,0,0],layered=false},build){
         if(!context?.canvas||typeof context.getTransform!=='function')throw new TypeError('A host Canvas context is required');
         if(typeof key!=='string'||!key)throw new TypeError('A picture needs a key');
         const [bx,by,bw,bh]=bounds;if(![bx,by,bw,bh].every(Number.isFinite)||!(bw>0&&bh>0))throw new TypeError('A picture needs finite bounds');
@@ -28935,7 +28945,7 @@ class pictureCache{
         if(!entry){
             if(this.#spent>=this.#budget_ms)return vector();
             const t0=this.#now(),packets=build();
-            if(packets.some(p=>(p.blend??'normal')!=='normal')){this.#entries.set(key,{vector:true,bytes:0});return vector(packets);}
+            if(!layered&&packets.some(p=>(p.blend??'normal')!=='normal')){this.#entries.set(key,{vector:true,bytes:0});return vector(packets);}
             const W=Math.ceil(bw*density),H=Math.ceil(bh*density),bytes=W*H*4;
             if(bytes>this.#max_bytes)return vector(packets);
             this.#evict(bytes);
@@ -29112,25 +29122,64 @@ function createLightLayer({bounds,tint,areas=[],lights=[]},{scene=new artScene()
     const {left,top,right,bottom}=bounds??{};for(const v of [left,top,right,bottom])finite(v,'bounds');
     if(typeof tint!=='string'||!tint)throw new TypeError('The light layer needs a tint colour');
     scene.fill(rect(left,top,right-left,bottom-top),tint);
+    thin(scene,areas);
+    const shapes=lights.map(validLight);
+    lights.forEach((l,i)=>cut(scene,l,shapes[i]));
+    lights.forEach((l,i)=>glow(scene,l,shapes[i]));
+    return scene.finish();
+}
+/**
+ * The same layer, split so what holds still between frames is painted once. Lights marked `still: true`
+ * go into two pictures over `extent` ({left, top, right, bottom}: the whole map, not the view): the dark
+ * with their cuts, and their colour. The areas and the other lights stay live packets. Returns the parts
+ * for canvasRenderer.drawLayer, in order: the dark picture, the live cuts, the colour picture (added), the
+ * live colour. Cuts (destination-out) and colour (add) each commute, so it is the layer createLightLayer
+ * draws. A picture's key names the tint, the extent and every still light; a light's `polygon` is known
+ * by its array, so give a new array when the shadow changes. `key` prefixes the pictures' keys.
+ */
+function createLightLayerParts({extent,tint,areas=[],lights=[],key='light'}){
+    const {left,top,right,bottom}=extent??{};for(const v of [left,top,right,bottom])finite(v,'extent');
+    if(typeof tint!=='string'||!tint)throw new TypeError('The light layer needs a tint colour');
+    const shapes=lights.map(validLight),still=[],live=[];lights.forEach((l,i)=>(l.still?still:live).push([l,shapes[i]]));
+    const bounds=[left,top,right-left,bottom-top],name=`${key}:${signature(tint,bounds,still)}`;
+    const picture=(part,paint)=>({key:`${name}:${part}`,bounds,build(){const scene=new artScene();paint(scene);return scene.finish();}});
+    const cuts=new artScene(),colour=new artScene();
+    thin(cuts,areas);for(const [l,shape] of live){cut(cuts,l,shape);glow(colour,l,shape);}
+    return [{picture:picture('dark',scene=>{scene.fill(rect(...bounds),tint);for(const [l,shape] of still)cut(scene,l,shape);})},...cuts.finish(),
+        {picture:picture('glow',scene=>{for(const [l,shape] of still)glow(scene,l,shape);}),blend:'add'},...colour.finish()];
+}
+/** The dark thinned where an area is lit. */
+function thin(scene,areas){
     for(const a of areas){const k=finite(a.cut,'area cut',0);if(k<.001)continue;
         const shape=a.polygon?polygonPath(a.polygon):(a.rects??[]).flatMap(q=>rect(q.x,q.y,q.w,q.h));if(!shape.length)continue;
         scene.enter({},{blend:'destination-out',opacity:Math.min(1,k)});scene.fill(shape,'#ffffff');scene.leave();}
-    const shapes=lights.map(validLight);
-    lights.forEach((l,i)=>{
-        const k=Math.min(1,l.intensity??1);if(k<.001)return;const stops=(l.cut??LIGHT_CUT).map(([o,a])=>[o,white(a)]);
-        if(shapes[i]==='area'){area(scene,l.position,l.size,l.round,stops,k,'destination-out');return;}
-        const [x,y]=l.position,shape=l.polygon?polygonPath(l.polygon):[circle(x,y,l.radius)];
-        scene.enter({},{blend:'destination-out',opacity:k});scene.fill(shape,radial([x,y],l.inner_radius??0,[x,y],l.radius,stops));scene.leave();
-    });
-    lights.forEach((l,i)=>{
-        const k=Math.min(1,l.glow??0);if(k<.001||!l.color)return;const stops=l.glow_stops??[[0,l.color],[1,'rgba(0,0,0,0)']];
-        if(shapes[i]==='area'){area(scene,l.position,l.size,l.round,stops,k,'add');return;}
-        const [x,y]=l.position;scene.enter({},{blend:'add',opacity:k});scene.fill([circle(x,y,l.radius)],radial([x,y],0,[x,y],l.radius,stops));scene.leave();
-    });
-    return scene.finish();
+}
+/** A light's cut out of the dark. */
+function cut(scene,l,shape){
+    const k=Math.min(1,l.intensity??1);if(k<.001)return;const stops=(l.cut??LIGHT_CUT).map(([o,a])=>[o,white(a)]);
+    if(shape==='area'){area(scene,l.position,l.size,l.round,stops,k,'destination-out');return;}
+    const [x,y]=l.position,outline=l.polygon?polygonPath(l.polygon):[circle(x,y,l.radius)];
+    scene.enter({},{blend:'destination-out',opacity:k});scene.fill(outline,radial([x,y],l.inner_radius??0,[x,y],l.radius,stops));scene.leave();
+}
+/** A light's colour, added. */
+function glow(scene,l,shape){
+    const k=Math.min(1,l.glow??0);if(k<.001||!l.color)return;const stops=l.glow_stops??[[0,l.color],[1,'rgba(0,0,0,0)']];
+    if(shape==='area'){area(scene,l.position,l.size,l.round,stops,k,'add');return;}
+    const [x,y]=l.position;scene.enter({},{blend:'add',opacity:k});scene.fill([circle(x,y,l.radius)],radial([x,y],0,[x,y],l.radius,stops));scene.leave();
+}
+const polygonIds=new WeakMap();let polygonCount=0;
+/** A short hash of everything the still pictures show (FNV-1a over the fields, polygons by identity). */
+function signature(tint,bounds,still){
+    let h=0x811c9dc5;const add=text=>{for(let i=0;i<text.length;i++){h^=text.charCodeAt(i);h=Math.imul(h,0x01000193);}};
+    add(`${tint}|${bounds}`);
+    for(const [l] of still){
+        if(l.polygon&&!polygonIds.has(l.polygon))polygonIds.set(l.polygon,++polygonCount);
+        add(`|${l.shape},${l.position},${l.radius},${l.size},${l.round},${l.inner_radius},${l.polygon?polygonIds.get(l.polygon):''},${l.intensity},${l.cut},${l.color},${l.glow},${l.glow_stops}`);
+    }
+    return (h>>>0).toString(36)+still.length;
 }
 
-return Object.freeze({get LIGHT_CUT(){return LIGHT_CUT;},get createLightLayer(){return createLightLayer;}});
+return Object.freeze({get LIGHT_CUT(){return LIGHT_CUT;},get createLightLayer(){return createLightLayer;},get createLightLayerParts(){return createLightLayerParts;}});
 })();
 // src/engine/basement/rendering/index.mjs
 const m154 = (()=>{
@@ -29142,7 +29191,7 @@ const m154 = (()=>{
 
 
 
-return Object.freeze({get cameraSystem(){return m155.cameraSystem;},get renderFrame(){return m157.renderFrame;},get renderSystem(){return m159.renderSystem;},get canvasRenderer(){return m160.canvasRenderer;},get pictureCache(){return m160.pictureCache;},get measureText(){return m160.measureText;},get artScene(){return m161.artScene;},get circle(){return m161.circle;},get ellipse(){return m161.ellipse;},get polyline(){return m161.polyline;},get polygon(){return m161.polygon;},get rect(){return m161.rect;},get roundRect(){return m161.roundRect;},get capsule(){return m161.capsule;},get smoothShape(){return m161.smoothShape;},get linear(){return m161.linear;},get radial(){return m161.radial;},get glow(){return m161.glow;},get groundShadow(){return m161.groundShadow;},get hexToRgb(){return m161.hexToRgb;},get rgbToHex(){return m161.rgbToHex;},get rgba(){return m161.rgba;},get mix(){return m161.mix;},get shade(){return m161.shade;},get seededRandom(){return m161.seededRandom;},get hash2(){return m161.hash2;},get createLightLayer(){return m162.createLightLayer;},get LIGHT_CUT(){return m162.LIGHT_CUT;}});
+return Object.freeze({get cameraSystem(){return m155.cameraSystem;},get renderFrame(){return m157.renderFrame;},get renderSystem(){return m159.renderSystem;},get canvasRenderer(){return m160.canvasRenderer;},get pictureCache(){return m160.pictureCache;},get measureText(){return m160.measureText;},get artScene(){return m161.artScene;},get circle(){return m161.circle;},get ellipse(){return m161.ellipse;},get polyline(){return m161.polyline;},get polygon(){return m161.polygon;},get rect(){return m161.rect;},get roundRect(){return m161.roundRect;},get capsule(){return m161.capsule;},get smoothShape(){return m161.smoothShape;},get linear(){return m161.linear;},get radial(){return m161.radial;},get glow(){return m161.glow;},get groundShadow(){return m161.groundShadow;},get hexToRgb(){return m161.hexToRgb;},get rgbToHex(){return m161.rgbToHex;},get rgba(){return m161.rgba;},get mix(){return m161.mix;},get shade(){return m161.shade;},get seededRandom(){return m161.seededRandom;},get hash2(){return m161.hash2;},get createLightLayer(){return m162.createLightLayer;},get createLightLayerParts(){return m162.createLightLayerParts;},get LIGHT_CUT(){return m162.LIGHT_CUT;}});
 })();
 // src/engine/lobby/runtime/game-engine.mjs
 const m146 = (()=>{
@@ -34296,7 +34345,7 @@ const m210 = Object.freeze({default:{
 // src/game/presentation/lighting.mjs
 const m209 = (()=>{
 const LIGHTING = m210.default;
-const {createLightLayer} = m154;
+const {createLightLayer,createLightLayerParts} = m154;
 
 const stops=(list,color)=>list.map(([o,c])=>[o,c==='$color'?color:c]);
 /**
@@ -34320,20 +34369,27 @@ class sceneLighting{
         const points=this.#world.getVisibilityPolygon({origin:light.position,radius:light.radius,resolution:this.look.lamp.resolution}).points;
         this.#polygons.set(key,{at,points});return points;
     }
-    createLayer({bounds,kind='indoor',sky_darkness=0,rooms=[],lights=[],time=0}){
+    /**
+     * The layer's packets and the strength to draw it at. With `extent` (the map's {left, top, right,
+     * bottom}) the lamps and the steady soft lights are kept as pictures over it, repainted only when one
+     * of them changes (a room's switch, a lamp moved), and only flickering lights are drawn live: draw the
+     * packets with canvasRenderer.drawLayer and a pictureCache. Without it, every light is drawn live.
+     */
+    createLayer({bounds,extent,kind='indoor',sky_darkness=0,rooms=[],lights=[],time=0}){
         const look=this.look,ambient=look.indoor.darkness,base=kind==='indoor'?look.indoor.lamp_glow:look.outdoor.lamp_glow;
         const areas=rooms.map(r=>({rects:r.rects,cut:r.type==='outdoor'?1-Math.min(1,sky_darkness/ambient):r.fill!==undefined?(1-Math.min(1,r.fill/ambient))*(r.lit??1):0}));
         const out=[];
         for(const l of lights){
             const lit=l.lit??1;if(lit<.01)continue;
-            if(l.kind==='lamp'){const k=(l.intensity??1)*lit;out.push({position:l.position,radius:l.radius,inner_radius:look.lamp.inner_radius,polygon:this.#polygon(l),intensity:k,cut:look.lamp.cut,color:l.color,glow:base*Math.min(1,k),glow_stops:stops(look.lamp.glow_stops,l.color)});continue;}
+            if(l.kind==='lamp'){const k=(l.intensity??1)*lit;out.push({still:true,position:l.position,radius:l.radius,inner_radius:look.lamp.inner_radius,polygon:this.#polygon(l),intensity:k,cut:look.lamp.cut,color:l.color,glow:base*Math.min(1,k),glow_stops:stops(look.lamp.glow_stops,l.color)});continue;}
             const f=l.flicker?look.flicker.floor+look.flicker.swing*Math.sin(time*l.flicker+l.position[0]*.7)*Math.sin(time*l.flicker*.37+l.position[1]):1;
             const a=(l.intensity??look.soft.intensity)*f*lit,color=l.color??look.soft.color;
-            if(l.size)out.push({shape:'area',position:l.position,size:l.size,round:l.round,intensity:a,cut:l.soft?look.area.soft_cut:look.area.cut,color,glow:Math.min(1,look.area.glow*a),glow_stops:stops(look.area.glow_stops,color)});
-            else out.push({position:l.position,radius:l.radius,intensity:a,cut:look.soft.cut,color,glow:Math.min(1,look.soft.glow*a),glow_stops:stops(look.soft.glow_stops,color)});
+            if(l.size)out.push({still:!l.flicker,shape:'area',position:l.position,size:l.size,round:l.round,intensity:a,cut:l.soft?look.area.soft_cut:look.area.cut,color,glow:Math.min(1,look.area.glow*a),glow_stops:stops(look.area.glow_stops,color)});
+            else out.push({still:!l.flicker,position:l.position,radius:l.radius,intensity:a,cut:look.soft.cut,color,glow:Math.min(1,look.soft.glow*a),glow_stops:stops(look.soft.glow_stops,color)});
         }
         // Lamps cut first, then the soft lights, as the classic layer did.
         out.sort((a,b)=>(a.polygon?0:1)-(b.polygon?0:1));
+        if(extent)return {packets:createLightLayerParts({extent,tint:look.indoor.tint,areas,lights:out,key:'scene_light'}),opacity:ambient};
         return {packets:createLightLayer({bounds,tint:look.indoor.tint,areas,lights:out}),opacity:ambient};
     }
 }
@@ -117760,7 +117816,7 @@ class ApartmentRooms {
     tagLamps(){}
 }
     </script>
-    <script type="text/dfab" data-src="legacy/engine/apartment-renderer.js" data-cost="140">
+    <script type="text/dfab" data-src="legacy/engine/apartment-renderer.js" data-cost="143">
 /** Native scene presentation. Packets below are drawing inputs, never entities or body owners. */
 class ApartmentRenderer {
     constructor(game){this.game=game;this.people=new Map();this.props=new Map();this.pictures=new DFNative.pictureCache();}
@@ -117850,9 +117906,10 @@ class ApartmentRenderer {
         game.profiler.start('Render:Lighting');   // (as the classic draw times its light layer: the bench compares the two)
         this.lighting??=new DFNative.sceneLighting(world);
         const lightAt=(x,y)=>game.roomSystem.lightAt(x,y),rooms=Object.values(game.roomSystem.rooms).map(r=>({rects:r.rects??[{x:r.x,y:r.y,w:r.w,h:r.h}],type:r.type,fill:r.fill,lit:r.lightsOff?0:1}));
-        const light=this.lighting.createLayer({bounds:{left:Math.max(0,view.left-200),top:Math.max(0,view.top-200),right:Math.min(level.definition.map.width,view.right+200),bottom:Math.min(level.definition.map.height,view.bottom+200)},
+        const W=level.definition.map.width,H=level.definition.map.height;this.lightPictures??=new DFNative.pictureCache({max_bytes:32*1048576,budget_ms:12,densities:[.125,.25,.5,1,2]});this.lightPictures.beginFrame();   // (the still lights, over the whole map: kept across frames)
+        const light=this.lighting.createLayer({extent:{left:0,top:0,right:W,bottom:H},bounds:{left:Math.max(0,view.left-200),top:Math.max(0,view.top-200),right:Math.min(W,view.right+200),bottom:Math.min(H,view.bottom+200)},
             kind:'indoor',sky_darkness:game.dayCycle().darkness,rooms,lights:DFNative.levelLights(level,{blend,lightAt}),time:_frameTime/1000});
-        DFNative.canvasRenderer.drawLayer(ctx,light.packets,{opacity:light.opacity,scale:game.lightLayerScale()});   // (the player's Lighting Quality and soft shadows, as the classic layer)
+        DFNative.canvasRenderer.drawLayer(ctx,light.packets,{opacity:light.opacity,scale:game.lightLayerScale(),pictures:this.lightPictures});   // (the player's Lighting Quality and soft shadows, as the classic layer)
         game.profiler.stop('Render:Lighting');
         game.drawNoiseRipples(ctx);
         if(game.flitVFX.length)game.drawFlitVFX(ctx);
