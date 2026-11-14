@@ -219,7 +219,8 @@ const multiply=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[
  * `build()` returns, in local units inside `bounds` [x, y, w, h]) under the context's transform times
  * `matrix`. A picture is painted at the first of `densities` (device pixels per local unit) at or above
  * what the view needs, so it stays sharp as the view zooms; past the last it draws as vector. Painting
- * spends at most `budget_ms` a frame (`beginFrame()`); a picture waiting its turn draws as vector, as
+ * spends at most `budget_ms` a frame (`beginFrame()`); a picture waiting its turn draws as vector (a tile, given
+ * a `source`, is painted at once instead: as vector it would draw the whole picture), as
  * does one with a blend other than normal (a picture's own blend has nothing under it to work on).
  * The least recently stamped pictures go first when `max_bytes` would be passed. The key must name
  * everything the picture shows: the cache never looks inside `build`. A `layered` picture paints its own
@@ -254,7 +255,7 @@ export class pictureCache{
         const id=`${key}@${density}`;let entry=this.#entries.get(id),how='stamp';
         if(!stamp&&entry){this.#entries.delete(id);this.#entries.set(id,entry);return 'kept';}
         if(!entry){
-            if(this.#spent>=this.#budget_ms)return stamp?vector():'later';
+            if(this.#spent>=this.#budget_ms&&!(stamp&&source))return stamp?vector():'later';   // a tile waits for nothing: as vector it would draw the whole picture, clipped, which costs more than painting it
             const t0=this.#now(),packets=build();
             if(!layered&&packets.some(p=>(p.blend??'normal')!=='normal')){this.#entries.set(key,{vector:true,bytes:0});return stamp?vector(packets):'later';}
             const W=Math.ceil(bw*density),H=Math.ceil(bh*density),bytes=W*H*4;

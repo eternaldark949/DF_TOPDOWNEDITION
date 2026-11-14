@@ -217,3 +217,11 @@ test('a layer pass draws into a scaled surface laid over its pass at its blend a
  const over=main.ctx.calls.find(c=>c[0]==='drawImage'&&c[1]===layer);assert.deepEqual(over.slice(2),[0,0,200,200,.8,'multiply']);assert.equal(main.ctx.stack,0);assert.equal(layer.ctx.stack,0);
  render.beginFrame().beginPass({layer:{}}).endPass();render.endFrame();assert.equal(made.length,1,'one layer surface serves every frame');render.dispose();
 });
+
+test('a tile of a picture is painted past the frame budget, since as vector it draws the whole picture',()=>{
+ let clock=0;const make=(w,h)=>{const s=surface();s.width=w;s.height=h;s.ctx.canvas=s;s.ctx.globalAlpha=1;s.ctx.getTransform=()=>({a:1,b:0,c:0,d:1,e:0,f:0});return s;};
+ const cache=new pictureCache({create_surface:make,budget_ms:2,densities:[1],now:()=>clock}),host=tracked().ctx,slow=()=>{clock+=3;return [rect()];};
+ assert.equal(cache.draw(host,{key:'a',bounds:[0,0,10,10]},slow),'paint');assert.equal(cache.draw(host,{key:'b',bounds:[0,0,10,10]},slow),'vector','a whole picture waits');
+ assert.equal(cache.draw(host,{key:'strip',bounds:[0,0,40,10],source:[0,0,10,10]},slow),'paint','a tile does not');
+ assert.equal(cache.draw(host,{key:'later',bounds:[0,0,40,10],source:[0,0,10,10],stamp:false},slow),'later','one only readied ahead still waits');
+});
