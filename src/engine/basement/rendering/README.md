@@ -67,6 +67,7 @@ Common packet fields:
     ['move',x,y], ['line',x,y],
     ['quadratic',cx,cy,x,y], ['cubic',c1x,c1y,c2x,c2y,x,y],
     ['ellipse',cx,cy,rx,ry,rotation,start_angle,end_angle,anticlockwise_0_or_1],
+    ['rect',x,y,w,h],   // a closed box from its top-left corner, a subpath of its own
     ['close']
 ]}
 ```
@@ -122,7 +123,7 @@ for (const packet of art.finish()) frame.submit({ ...packet, layer: 20, depth: p
 | `text(string, x, y, {font, align, baseline}, material)` | One text packet at (x, y) in the group: `font` is `{family, size, weight, style, letter_spacing}` (letter spacing in px, 0 by default), `align` left, center or right, `baseline` top, middle, bottom or alphabetic. `material` defaults to a black fill. |
 | `finish()` | The packets, in paint order. Throws if a group is still open. |
 
-Shapes are arrays of path commands, so several can go in one paint call: `circle(x, y, r, start?, end?)`, `ellipse(x, y, rx, ry, rotation?, start?, end?, reverse?)`, `rect(x, y, w, h)` and `roundRect(x, y, w, h, r)` (top-left corner, the same circular-arc outline as a canvas `roundRect`; the radius is clamped to half the shorter side), `polygon(points)` (closed), `polyline(points)` (open, for strokes), `capsule(from, to, r)` (round-ended limb, cable or pipe), and `smoothShape(points)` (a closed blob through rounded corners). `linear(from, to, stops)` and `radial(from, inner_radius, to, outer_radius, stops)` make gradient paint. A paint call keeps the shape array it is given rather than copying it, so build a fresh shape for each call and do not change it afterwards.
+Shapes are arrays of path commands, so several can go in one paint call: `circle(x, y, r, start?, end?)`, `ellipse(x, y, rx, ry, rotation?, start?, end?, reverse?)`, `rect(x, y, w, h)` (one `rect` command) and `roundRect(x, y, w, h, r)` (top-left corner, the same circular-arc outline as a canvas `roundRect`; the radius is clamped to half the shorter side), `polygon(points)` (closed), `polyline(points)` (open, for strokes), `capsule(from, to, r)` (round-ended limb, cable or pipe), and `smoothShape(points)` (a closed blob through rounded corners). `linear(from, to, stops)` and `radial(from, inner_radius, to, outer_radius, stops)` make gradient paint. A paint call keeps the shape array it is given rather than copying it, so build a fresh shape for each call and do not change it afterwards.
 
 Effects: `glow(scene, x, y, r, 'r,g,b', core = .35, {blend, alpha = 1})` is a soft round light that fades out at `r`, in the group's blend unless given one; `groundShadow(scene, x, y, rx, ry, {strength = 1})` is the soft dark ellipse that sets an object on the floor.
 

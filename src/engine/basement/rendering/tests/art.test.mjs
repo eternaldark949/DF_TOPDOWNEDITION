@@ -9,7 +9,7 @@ const accepted=packets=>{const frame=new renderFrame();frame.begin(view());for(c
 const ends=commands=>commands.filter(c=>c[0]==='move'||c[0]==='line'||c[0]==='quadratic').map(c=>c.slice(-2));
 
 test('shapes are plain path commands that the frame accepts', () => {
-    assert.deepEqual(ends(rect(1,2,3,4)),[[1,2],[4,2],[4,6],[1,6]]);
+    assert.deepEqual(rect(1,2,3,4),[['rect',1,2,3,4]]);
     assert.equal(polygon([[0,0],[1,0],[0,1]]).at(-1)[0],'close');assert.notEqual(polyline([[0,0],[1,1]]).at(-1)[0],'close');
     assert.throws(()=>polyline([[0,0]]));assert.throws(()=>polygon([[0,0],[1,1]]));
     const box=roundRect(0,0,10,4,9);assert.deepEqual(box[0],['move',2,0],'the radius is clamped to half the short side');

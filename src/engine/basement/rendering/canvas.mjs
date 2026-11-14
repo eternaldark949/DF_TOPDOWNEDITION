@@ -18,7 +18,7 @@ function buildPath(target,g){
     else if(g.type==='ellipse'){target.ellipse(0,0,...g.radii,0,0,Math.PI*2);target.closePath();}
     else for(const c of g.commands){
         const op=c[0];
-        if(op==='line')target.lineTo(c[1],c[2]);else if(op==='move')target.moveTo(c[1],c[2]);else if(op==='close')target.closePath();
+        if(op==='line')target.lineTo(c[1],c[2]);else if(op==='move')target.moveTo(c[1],c[2]);else if(op==='close')target.closePath();else if(op==='rect')target.rect(c[1],c[2],c[3],c[4]);
         else if(op==='quadratic')target.quadraticCurveTo(c[1],c[2],c[3],c[4]);else if(op==='cubic')target.bezierCurveTo(c[1],c[2],c[3],c[4],c[5],c[6]);
         else target.ellipse(c[1],c[2],c[3],c[4],c[5],c[6],c[7],!!c[8]);
     }

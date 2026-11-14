@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '4705c48d5a82';
+        const DFAB_BUILD = 'c397087f5258';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="16973">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="16975">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -28783,7 +28783,7 @@ function geometry(packet,out={}){
     else if(packet.type==='ellipse'){out.radii=vector(packet.radii,'radii',out.radii);out.radii.forEach(v=>finite(v,'radius',0));}
     else if(packet.type==='path'){
         if(!Array.isArray(packet.commands))throw new TypeError('Path commands must be data arrays');out.commands??=[];out.commands.length=packet.commands.length;
-        const sizes={move:2,line:2,quadratic:4,cubic:6,ellipse:8,close:0};
+        const sizes={move:2,line:2,quadratic:4,cubic:6,ellipse:8,rect:4,close:0};
         for(let i=0;i<packet.commands.length;i++){const cmd=packet.commands[i],kind=cmd?.[0];if(!Object.hasOwn(sizes,kind)||cmd.length!==sizes[kind]+1)throw new TypeError('Invalid path command');const dst=out.commands[i]??[];dst.length=cmd.length;dst[0]=kind;for(let j=1;j<cmd.length;j++)dst[j]=finite(cmd[j],'path coordinate');if(kind==='ellipse'&&(dst[3]<0||dst[4]<0))throw new TypeError('Negative ellipse radius');out.commands[i]=dst;}
     }else throw new TypeError(`Unknown geometry: ${packet.type}`);
     out.fill_rule=packet.fill_rule??'nonzero';if(!['nonzero','evenodd'].includes(out.fill_rule))throw new TypeError('Invalid fill rule');
@@ -28996,7 +28996,7 @@ function buildPath(target,g){
     else if(g.type==='ellipse'){target.ellipse(0,0,...g.radii,0,0,Math.PI*2);target.closePath();}
     else for(const c of g.commands){
         const op=c[0];
-        if(op==='line')target.lineTo(c[1],c[2]);else if(op==='move')target.moveTo(c[1],c[2]);else if(op==='close')target.closePath();
+        if(op==='line')target.lineTo(c[1],c[2]);else if(op==='move')target.moveTo(c[1],c[2]);else if(op==='close')target.closePath();else if(op==='rect')target.rect(c[1],c[2],c[3],c[4]);
         else if(op==='quadratic')target.quadraticCurveTo(c[1],c[2],c[3],c[4]);else if(op==='cubic')target.bezierCurveTo(c[1],c[2],c[3],c[4],c[5],c[6]);
         else target.ellipse(c[1],c[2],c[3],c[4],c[5],c[6],c[7],!!c[8]);
     }
@@ -29255,11 +29255,11 @@ const finite=(value,name)=>{if(!Number.isFinite(value))throw new TypeError(`Art 
 const ellipse=(x,y,rx,ry,rotation=0,start=0,end=Math.PI*2,reverse=0)=>['ellipse',x,y,rx,ry,rotation,start,end,Number(reverse)];
 const circle=(x,y,r,start=0,end=Math.PI*2)=>ellipse(x,y,r,r,0,start,end);
 /** An open run of straight lines through `points` ([x, y] each). Stroke it; filling closes it implicitly. */
-function polyline(points){if(!Array.isArray(points)||points.length<2)throw new TypeError('A polyline needs two points or more');return points.map(([x,y],i)=>[i?'line':'move',finite(x,'x'),finite(y,'y')]);}
+function polyline(points){if(!Array.isArray(points)||points.length<2)throw new TypeError('A polyline needs two points or more');const out=new Array(points.length);for(let i=0;i<points.length;i++){const p=points[i];out[i]=[i?'line':'move',finite(p[0],'x'),finite(p[1],'y')];}return out;}
 /** A closed polygon through `points`. */
 function polygon(points){if(points?.length<3)throw new TypeError('A polygon needs three points or more');return [...polyline(points),['close']];}
 /** A box from its top-left corner, the classic canvas convention. */
-const rect=(x,y,w,h)=>polygon([[x,y],[x+w,y],[x+w,y+h],[x,y+h]]);
+const rect=(x,y,w,h)=>[['rect',finite(x,'x'),finite(y,'y'),finite(w,'width'),finite(h,'height')]];   // (one command: a strip is grained with thousands of rects)
 /** A box from its top-left corner with rounded corners, the same outline as a canvas roundRect (circular
  *  arcs); `r` is clamped to half the shorter side. */
 function roundRect(x,y,w,h,r){

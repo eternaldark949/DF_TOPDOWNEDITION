@@ -16,11 +16,11 @@ const finite=(value,name)=>{if(!Number.isFinite(value))throw new TypeError(`Art 
 export const ellipse=(x,y,rx,ry,rotation=0,start=0,end=Math.PI*2,reverse=0)=>['ellipse',x,y,rx,ry,rotation,start,end,Number(reverse)];
 export const circle=(x,y,r,start=0,end=Math.PI*2)=>ellipse(x,y,r,r,0,start,end);
 /** An open run of straight lines through `points` ([x, y] each). Stroke it; filling closes it implicitly. */
-export function polyline(points){if(!Array.isArray(points)||points.length<2)throw new TypeError('A polyline needs two points or more');return points.map(([x,y],i)=>[i?'line':'move',finite(x,'x'),finite(y,'y')]);}
+export function polyline(points){if(!Array.isArray(points)||points.length<2)throw new TypeError('A polyline needs two points or more');const out=new Array(points.length);for(let i=0;i<points.length;i++){const p=points[i];out[i]=[i?'line':'move',finite(p[0],'x'),finite(p[1],'y')];}return out;}
 /** A closed polygon through `points`. */
 export function polygon(points){if(points?.length<3)throw new TypeError('A polygon needs three points or more');return [...polyline(points),['close']];}
 /** A box from its top-left corner, the classic canvas convention. */
-export const rect=(x,y,w,h)=>polygon([[x,y],[x+w,y],[x+w,y+h],[x,y+h]]);
+export const rect=(x,y,w,h)=>[['rect',finite(x,'x'),finite(y,'y'),finite(w,'width'),finite(h,'height')]];   // (one command: a strip is grained with thousands of rects)
 /** A box from its top-left corner with rounded corners, the same outline as a canvas roundRect (circular
  *  arcs); `r` is clamped to half the shorter side. */
 export function roundRect(x,y,w,h,r){

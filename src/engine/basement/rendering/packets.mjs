@@ -11,7 +11,7 @@ export function geometry(packet,out={}){
     else if(packet.type==='ellipse'){out.radii=vector(packet.radii,'radii',out.radii);out.radii.forEach(v=>finite(v,'radius',0));}
     else if(packet.type==='path'){
         if(!Array.isArray(packet.commands))throw new TypeError('Path commands must be data arrays');out.commands??=[];out.commands.length=packet.commands.length;
-        const sizes={move:2,line:2,quadratic:4,cubic:6,ellipse:8,close:0};
+        const sizes={move:2,line:2,quadratic:4,cubic:6,ellipse:8,rect:4,close:0};
         for(let i=0;i<packet.commands.length;i++){const cmd=packet.commands[i],kind=cmd?.[0];if(!Object.hasOwn(sizes,kind)||cmd.length!==sizes[kind]+1)throw new TypeError('Invalid path command');const dst=out.commands[i]??[];dst.length=cmd.length;dst[0]=kind;for(let j=1;j<cmd.length;j++)dst[j]=finite(cmd[j],'path coordinate');if(kind==='ellipse'&&(dst[3]<0||dst[4]<0))throw new TypeError('Negative ellipse radius');out.commands[i]=dst;}
     }else throw new TypeError(`Unknown geometry: ${packet.type}`);
     out.fill_rule=packet.fill_rule??'nonzero';if(!['nonzero','evenodd'].includes(out.fill_rule))throw new TypeError('Invalid fill rule');
