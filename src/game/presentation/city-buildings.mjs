@@ -6,6 +6,7 @@ import { streetArcade } from './city-street-arcade.mjs';
 import { streetApartment } from './city-street-apartments.mjs';
 import { tieredBuilding } from './city-tiered.mjs';
 import { cozyCafe } from './city-landmark-cozy-cafe.mjs';
+import { warehouse } from './city-landmark-warehouse.mjs';
 
 /**
  * The city's street buildings as art, from the looks its generator resolved (the `look` of each exported
@@ -27,7 +28,7 @@ export class cityBuildings {
     constructor(city, { look = LOOK } = {}) {
         this.#look = look;
         this.#houses = city.buildings.map((record, index) => !record.look ? null : record.kind === 'BuildingV2' ? new house(record, index, look)
-            : LANDMARKS[record.kind] ? new tieredBuilding(record, index, LANDMARKS[record.kind](), look) : null).filter(Boolean);
+            : LANDMARKS[record.kind] ? new tieredBuilding(record, index, LANDMARKS[record.kind](record), look) : null).filter(Boolean);
         for (const h of this.#houses) for (const key of cellsOf(h.reach)) { let list = this.#cells.get(key); if (!list) this.#cells.set(key, list = []); list.push(h); }
     }
     get houses() { return this.#houses; }
@@ -95,7 +96,7 @@ function* cellsOf([x0, y0, x1, y1]) { for (let x = Math.floor(x0 / CELL); x <= M
 const mul = (a, b) => [a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1], a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3], a[0] * b[4] + a[2] * b[5] + a[4], a[1] * b[4] + a[3] * b[5] + a[5]];
 const VARIANTS = { shop: streetShop, arcade: streetArcade, apt: streetApartment };
 /** The landmarks drawn natively so far, by their classic class. */
-const LANDMARKS = { CozyCafeBuilding: cozyCafe };
+const LANDMARKS = { CozyCafeBuilding: cozyCafe, WarehouseHall: warehouse };
 
 /** Its front's frame: x along the front (left to right, seen from the street), y in from the back, the front at y = fd. */
 function frameOf(facing, W, D) {
