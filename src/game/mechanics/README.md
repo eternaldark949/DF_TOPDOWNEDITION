@@ -158,3 +158,7 @@ Directory now also installs `api.abilities`. `abilityLoadout` owns learned/equip
 `api.attacks` now exposes the common registered firearm/melee/ability interface for Player, NPC, Ganger and arbitrary native gameCharacter subclasses. `selectAttack`, `canAttack`, `requestAttack` and `executeAttack` use canonical inventory/capability ownership and the existing cooldown. Normal input and native AI use this path. See [attack API, extensibility, persistence and boundaries](attacks/README.md).
 
 Native mounted attacks now run through that same API. Directory supplies seat emitters; Basement computes all launch geometry and inherited motion; gameplay uses its existing attack clock for preparation. [Mounted attack API and remaining work](attacks/MOUNTED-ATTACKS.md).
+
+## Driving
+
+`new drivingSystem({get_player, rules})` puts the player at the wheel; register it as a runtime system. On foot, `interact` takes the driver's seat of the nearest car within `rules.reach` that no one drives and that is not traffic on its route (`nearestVehicle(context)` names it); at the wheel, `interact` parks the car and steps out. While driving, `move` drives through the car's own motor (`setControls`): forward is the throttle, back brakes and then reverses once the car is slower than `rules.reverse_below` px/s, sideways steers, and `flit` pulls the handbrake. `enter(vehicle)` and `leave()` do the same from code, and `vehicle` is the car being driven (or null). The tuning is `data/game-driving.json`.

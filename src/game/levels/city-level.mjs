@@ -26,15 +26,15 @@ export class CityLevel extends mapLevel {
         this.scene.render(frame, { view: view.bounds, zoom: view.zoom, time: world.simulation_tick * world.config.fixed_step,
             lamps: [...this.map.entities('lamp'), ...this.map.entities('neon')], props: this.map.entities('prop'), bodies: f => this.drawBodies(context, blend, f) });
     }
-    /** Each character and vehicle in view as its collision shape. */
+    /** Each vehicle in view, then each character on foot or at a wheel, as its collision shape. */
     drawBodies(context, blend, frame) {
-        for (const { entity } of context.api.render.getVisibleEntities({ blend })) {
-            const type = entity.body?.getState().physics_type;
-            if (!entity.visible || entity.data?.role === 'lamp' || !['character', 'vehicle'].includes(entity.data?.role === 'vehicle' ? 'vehicle' : type)) continue;
-            const pose = entity.getRenderState(blend), shape = entity.collision_shape;
+        const hits = context.api.render.getVisibleEntities({ blend }).map(hit => hit.entity).filter(e => e.visible !== false);
+        const cars = hits.filter(e => typeof e.getVehicleState === 'function'), people = hits.filter(e => e.body?.getState().physics_type === 'character');
+        for (const entity of [...cars, ...people]) {
+            const pose = entity.getRenderState(blend), shape = entity.collision_shape, car = cars.includes(entity);
             frame.submit({ type: 'shape', position: pose.position, rotation: pose.rotation,
-                geometry: shape.shape_type === 'circle' ? { type: 'ellipse', radii: [shape.radius, shape.radius] } : { type: 'rect', size: shape.dimensions },
-                material: { fill: entity.data?.color ?? (entity.entity_type === 'df_player' ? '#f4d8ff' : '#c9f6ef'), stroke: '#1b1424', stroke_width: 2 } });
+                geometry: shape.shape_type === 'circle' ? { type: 'ellipse', radii: [shape.radius, shape.radius] } : { type: 'rect', size: shape.dimensions, radius: car ? 8 : 0 },
+                material: { fill: car ? entity.data.color ?? '#3a3348' : entity.entity_type === 'df_player' ? '#f4d8ff' : '#c9f6ef', stroke: car ? '#8a80a8' : '#1b1424', stroke_width: 2 } });
         }
     }
     leave(context) { this.scene = null; super.leave(context); }

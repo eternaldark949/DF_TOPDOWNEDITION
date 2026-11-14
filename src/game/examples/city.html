@@ -4,11 +4,13 @@
 <style>html,body{margin:0;height:100%;background:#0a0812;color:#eef2ff;font:14px system-ui;overflow:hidden}canvas{display:block;width:100vw;height:100vh}#hud{position:fixed;left:12px;top:10px;background:#0a0812cc;padding:8px 10px;border-radius:6px;white-space:pre;pointer-events:none}</style>
 <canvas id="scene"></canvas><div id="hud">Loading the city…</div>
 <script type="module">
-// The city on the native runtime: one map level, drawn by cityScene at night. WASD walks.
+// The city on the native runtime: one map level, drawn by cityScene at night. WASD walks; E takes the wheel of the car parked by the spawn.
 import { canvasRenderer } from '../../engine/basement/rendering/index.mjs';
 import { createGameRuntime } from '../boot/game-runtime.mjs';
 import { CityLevel } from '../levels/city-level.mjs';
 import { CITY_PICTURES } from '../presentation/city-scene.mjs';
+import { drivingSystem } from '../mechanics/driving-system.mjs';
+import { createGameVehicle } from '../boot/game-vehicle-factory.mjs';
 const surface = document.getElementById('scene'), hud = document.getElementById('hud');
 const places = (await import('../data/game-db/places.json', { with: { type: 'json' } })).default, spawn = places.maps.sdc.spawn;
 const engine = createGameRuntime({ surface, player: { template: 'df:player_949', entity_type: 'df_player', position: [spawn.x, spawn.y] } });
@@ -19,14 +21,16 @@ size(); addEventListener('resize', size);
 await engine.api.render.setRenderer('city-canvas', { surface });
 engine.registerLevel('sdc', CityLevel);
 await engine.loadLevel('sdc');
-const player = engine.api.session.player;
+const player = engine.api.session.player, driving = new drivingSystem({ get_player: () => engine.api.session.player });
+engine.registerSystem('driving', driving);
+createGameVehicle(engine.api.physics, { purpose: 'owned', control_mode: 'PARKED', position: [spawn.x, spawn.y + 150], rotation: -Math.PI / 2, color: '#7a2e5c' });
 engine.api.camera.follow(player, { smoothing: .15, snap: true });
 // Frame time on the page's clock, for a feel of how it runs (the mean and the worst of the last second).
 let last = performance.now(), times = [];
 engine.registerSystem('hud', { render() {
     const now = performance.now(); times.push(now - last); last = now;
-    if (times.length >= 60) { const mean = times.reduce((a, b) => a + b, 0) / times.length, worst = Math.max(...times); hud.textContent = `WASD to walk\n${(1000 / mean).toFixed(0)} fps, worst frame ${worst.toFixed(0)} ms\nat ${player.position.map(Math.round).join(', ')}`; times = []; }
+    if (times.length >= 60) { const mean = times.reduce((a, b) => a + b, 0) / times.length, worst = Math.max(...times); hud.textContent = `${driving.vehicle ? 'WASD to drive, Shift for the handbrake, E to get out' : driving.nearestVehicle({ api: engine.api }) ? 'E to get in' : 'WASD to walk, E near a car to drive it'}\n${(1000 / mean).toFixed(0)} fps, worst frame ${worst.toFixed(0)} ms\nat ${player.position.map(Math.round).join(', ')}`; times = []; }
 } });
 engine.start();
-globalThis.cityExample = { engine, player };   // (for the browser check; never used by the playable build)
+globalThis.cityExample = { engine, player, driving };   // (for the browser check; never used by the playable build)
 </script></html>
