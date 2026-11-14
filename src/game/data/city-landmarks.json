@@ -135,5 +135,35 @@
       "hero": 1.5
     },
     "font": "Montserrat, Helvetica, sans-serif"
+  },
+  "neural_systems": {
+    "colors": {
+      "ink": "#081326",
+      "navy": "#102444",
+      "blue": "#234d80",
+      "cobalt": "#326fc2",
+      "ice": "#bed8ee",
+      "metal": "#9baebe",
+      "pale": "#e5e6df",
+      "gold": "#c1a980",
+      "glass": "#102a46",
+      "facets": [
+        "#0e2442",
+        "#163558",
+        "#1d4372",
+        "#0b1d38",
+        "#25528a",
+        "#112c4e"
+      ]
+    },
+    "plan": {
+      "w": 400,
+      "d": 400,
+      "atrium": 72,
+      "salon": 46,
+      "vitrine": 14,
+      "hero": 1.5
+    },
+    "font": "Georgia, serif"
   }
 }
