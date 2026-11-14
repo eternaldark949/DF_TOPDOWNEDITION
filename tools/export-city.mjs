@@ -44,7 +44,7 @@ function exportCity() {
             return { template: p.templateId, block: p.blockName ?? null, ...rect(p), ...(Object.keys(p.options ?? {}).length ? { options: p.options } : {}),
                 ...plain(b, ['id', 'label', 'type', 'style', 'facing', 'floors', '_seed']), kind: b.constructor?.name ?? null };
         }),
-        colliders: m.buildingColliders.map(rect),
+        colliders: m.buildingColliders.map(rect).filter(c => c.w > 0 && c.h > 0),   // (the generator leaves one empty strip)
         walls: m.walls.map(w => ({ ...rect(w), ...(w.style ? { style: w.style } : {}) })),
         lamps: m.lamps.map(l => ({ x: r(l.x), y: r(l.y), lampType: l.lampType, color: l.color, lightRadius: l.lightRadius, ...(l.angle ? { angle: r(l.angle) } : {}), ...(l.fixture ? { fixture: l.fixture } : {}) })),
         neon: (game.neonSigns ?? []).map(n => plain(n, ['x', 'y', 'text', 'color', 'fontSize', 'fontFamily', 'flickerOffset'])),

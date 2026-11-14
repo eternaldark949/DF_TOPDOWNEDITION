@@ -15,7 +15,7 @@ export class changeCounters {
         const b = validBounds(bounds), s = this.cell_size;
         const x0 = Math.floor(b.left / s), x1 = Math.floor(b.right / s), y0 = Math.floor(b.top / s), y1 = Math.floor(b.bottom / s);
         if ((x1 - x0 + 1) * (y1 - y0 + 1) > 1e6) throw new RangeError('Change bounds cover over one million cells');
-        for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) visit(`${x},${y}`);
+        for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) visit(x * 67108864 + y);   // (a number key: unique while |y| < 2^25 cells)
     }
     touch(bounds) { const stamp = ++this.#next; this.#each(bounds, key => this.#cells.set(key, stamp)); return stamp; }
     revision(bounds) { let newest = 0; this.#each(bounds, key => { const v = this.#cells.get(key); if (v > newest) newest = v; }); return newest; }

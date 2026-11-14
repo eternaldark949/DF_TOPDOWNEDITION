@@ -21,8 +21,8 @@ const stops=(list,color)=>list.map(([o,c])=>[o,c==='$color'?color:c]);
  * A polygon is kept until its light moves or changes reach, or a light blocker in its reach changes
  * (the world's light revision). Stale shadows are rebuilt nearest the view first within
  * `look.lamp.shadow_budget_ms` a frame; one past the budget keeps its last shape for a frame, and one
- * outside the view with no shape yet waits (one in view is always cast). A light
- * goes back into the still pictures once its shadow has held for `look.lamp.settle` s.
+ * off the tiles in view with no shape yet waits (one on them is always cast, so a tile in view is
+ * painted whole, and a tile ahead is readied once its lights are all cast). A light goes back into the still pictures once its shadow has held for `look.lamp.settle` s.
  */
 export class sceneLighting{
     #world;#polygons=new Map();#now;#spent=0;
@@ -57,18 +57,20 @@ export class sceneLighting{
         const areas=rooms.map(r=>({rects:r.rects,cut:r.type==='outdoor'?1-Math.min(1,sky_darkness/ambient):r.fill!==undefined?(1-Math.min(1,r.fill/ambient))*(r.lit??1):0}));
         // The lights to look at: those reaching the view, or (still) the tiles that meet it or are readied ahead of it, whole.
         const snap=(v,o,down)=>tile_size?o+(down?Math.floor:Math.ceil)((v-o)/tile_size)*tile_size:v;
-        const near=bounds&&(extent?{left:snap(bounds.left-ahead,extent.left,true),top:snap(bounds.top-ahead,extent.top,true),right:snap(bounds.right+ahead,extent.left,false),bottom:snap(bounds.bottom+ahead,extent.top,false)}:bounds);
+        const grid=(b,m)=>b&&(extent?{left:snap(b.left-m,extent.left,true),top:snap(b.top-m,extent.top,true),right:snap(b.right+m,extent.left,false),bottom:snap(b.bottom+m,extent.top,false)}:b);
+        const near=grid(bounds,ahead),shown=grid(bounds,0);   // (the tiles readied ahead, and the tiles drawn)
         const meets=(l,b)=>{const [x,y]=l.position,[rx,ry]=l.shape==='strip'?[l.size[0]/2,l.size[1]/2]:[l.radius,l.radius];return x+rx>b.left&&x-rx<b.right&&y+ry>b.top&&y-ry<b.bottom;};
         if(near)lights=lights.filter(l=>meets(l,near));
         const out=[],[cx,cy]=bounds?[(bounds.left+bounds.right)/2,(bounds.top+bounds.bottom)/2]:extent?[(extent.left+extent.right)/2,(extent.top+extent.bottom)/2]:[0,0];
         this.#spent=0;   // shadow rebuilds share one budget a frame, nearest the view first
         const order=lights.map((l,i)=>[l.shadows==='none'?Infinity:Math.hypot(l.position[0]-cx,l.position[1]-cy),i]).sort((a,b)=>a[0]-b[0]),shadows=new Map();
-        for(const [d,i] of order){if(d===Infinity)break;const l=lights[i];if((l.lit??1)>=.01)shadows.set(i,this.#polygon(l,time,!bounds||meets(l,bounds)));}
+        for(const [d,i] of order){if(d===Infinity)break;const l=lights[i];if((l.lit??1)>=.01)shadows.set(i,this.#polygon(l,time,!bounds||meets(l,shown)));}
+        const waiting=[];
         for(const [i,l] of lights.entries()){
             const lit=l.lit??1;if(lit<.01)continue;
             const f=this.#animate(l,time),steady=(l.animation?.kind??'steady')==='steady';
             if(l.shadows!=='none'){
-                const shadow=shadows.get(i);if(!shadow)continue;
+                const shadow=shadows.get(i);if(!shadow){waiting.push([l.position[0]-l.radius,l.position[1]-l.radius,l.position[0]+l.radius,l.position[1]+l.radius]);continue;}
                 const k=(l.intensity??1)*lit*f,settled=time-shadow.changed_at>=look.lamp.settle;
                 const still=steady?(settled?true:'glow'):false;   // a moving shadow cuts live, its unshadowed colour stays baked
                 if(still!==true&&bounds&&!meets(l,bounds))continue;
@@ -82,7 +84,7 @@ export class sceneLighting{
         // Lamps cut first, then the soft lights, as the classic layer did.
         out.sort((a,b)=>(a.polygon?0:1)-(b.polygon?0:1));
         const live=out.filter(l=>l.still!==true).length;
-        if(extent)return {packets:createLightLayerParts({extent,tint:look.indoor.tint,areas,lights:out,key:'scene_light',tile_size,view:bounds,ahead}),opacity:ambient,live};
+        if(extent)return {packets:createLightLayerParts({extent,tint:look.indoor.tint,areas,lights:out,key:'scene_light',tile_size,view:bounds,ahead,waiting}),opacity:ambient,live};
         return {packets:createLightLayer({bounds,tint:look.indoor.tint,areas,lights:out}),opacity:ambient,live:out.length};
     }
 }

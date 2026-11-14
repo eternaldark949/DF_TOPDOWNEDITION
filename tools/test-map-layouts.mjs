@@ -70,7 +70,7 @@ test('every map loads through the one streaming loader: a map inside its radius 
             lights: layout.lamps.map(l => ({ position: [l.x, l.y], radius: l.lightRadius ?? 100 })) };
         const instance = new mapInstance(new physicsSystem({ asset_library: library }), definition, { prop_types: PROP_TYPES }), entries = instance.packets().length;
         if (Math.max(map.width, map.height) <= 4096) assert.equal(instance.entities().length, entries, `${id} is whole from the start`);
-        else {                                                         // (the city: its streets become data in phase 4; its size streams today)
+        else {                                                         // (the city's layout file holds no streets: they stream from its exported map file, below)
             const far = [map.width - 100, map.height - 100], step = instance.setFocus([far], { budget_ms: Infinity });
             assert.equal(step.pending, 0, `${id}: the focus can cross the whole map`);
             const back = instance.setFocus([spawn ?? [0, 0]], { budget_ms: Infinity });
@@ -78,6 +78,24 @@ test('every map loads through the one streaming loader: a map inside its radius 
         }
         instance.destroy();
     }
+});
+
+test('the city from its exported map file streams through the one loader: its buildings, lamps and doors near the focus, the rest as it moves', async () => {
+    const { mapInstance } = await import('../src/engine/basement/maps/index.mjs');
+    const { cityMapDefinition } = await import('../src/game/levels/city-definition.mjs');
+    const { definition, city } = cityMapDefinition({ map: places.maps.sdc });
+    assert.ok(definition.walls.length > 600 && definition.lights.length > 1800 && city.buildings.length > 600, 'the whole city is in the file');
+    for (const w of definition.walls) assert.ok(w.w > 0 && w.h > 0, 'every wall has an area');
+    assert.ok(definition.triggers.some(t => t.data.target === 'apt_949'), 'her apartment door is an exit');
+    const physics = new physicsSystem(), map = new mapInstance(physics, definition, { prop_types: PROP_TYPES });
+    const near = ([x, y]) => map.entities('lamp').filter(l => Math.hypot(l.position[0] - x, l.position[1] - y) < 1000).length;
+    assert.ok(near(definition.spawn) > 0 && map.entities('lamp').length < definition.lights.length / 4, 'only the lamps round the spawn are built');
+    assert.equal(map.setFocus([9000, 9000], { budget_ms: Infinity }).pending, 0);
+    assert.ok(near([9000, 9000]) > 0 && near(definition.spawn) === 0, 'moving the focus builds what is ahead and releases what is behind');
+    const lamp = map.entities('lamp').find(l => Math.hypot(l.position[0] - 9000, l.position[1] - 9000) < 1000);
+    const shadow = physics.getVisibilityPolygon({ origin: lamp.position, radius: lamp.data.emission.radius });
+    assert.ok(shadow.points.length >= 3, 'a streamed lamp casts its shadow against the streamed buildings');
+    map.destroy();
 });
 
 test('every map with rooms builds a room graph whose doors join known rooms', async () => {

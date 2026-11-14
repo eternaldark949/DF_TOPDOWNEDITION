@@ -126,3 +126,34 @@ dropped: the extra surfaces cost more than the pixels they saved.
 | apartment-door | 5.9 ms (was 9.8) |
 | light-street | 7.6 ms (was 8.0) |
 | light-cafe | 2.0 ms |
+
+## Phase 4, step 2: the city at night through the native light layer
+
+The classic city is exported once from its seeded generator to `src/game/data/game-assets/generated/sdc-city.json`
+(`node tools/export-city.mjs`, `--check` to compare). `src/game/levels/city-definition.mjs` makes it a map
+definition: 677 building and yard walls, 1843 lamps, 10 doors as exits, streamed in 1024 px regions 3072 px
+round the camera. Two scenes light it as one outdoor room at the classic sky's 22:00 darkness:
+`light-city` (standing on Crimson Blvd) and `light-city-drive` (the camera along it at 500 px/s).
+
+| Scene | Light layer |
+|---|---|
+| light-city | 2.4 ms (the classic city-night light layer: about 40 ms) |
+| light-city-drive | 4.4 ms (p95 6.0) |
+| light-cafe | 1.9 ms |
+| light-street | 7.1 ms (was 7.6) |
+
+What made the difference, all in the shared code:
+
+- **Signatures without text.** A tile's key hashed every still light as a string each frame. Each light is
+  now hashed once a frame as numbers, and a tile mixes its lights' digests: the layer's own work fell from
+  1.1 to 0.5 ms.
+- **The outdoor sky baked.** An area's thinning of the dark (the sky over an outdoor room) is drawn into the
+  dark tiles it covers instead of over the view every frame.
+- **Tiles painted once, whole.** A tile ahead of the camera waits until every light reaching it has its
+  shadow, and a light reaching a tile in view casts at once. Bodies stream in past the light layer's reach,
+  so a wall arriving never recasts a painted tile. Driving went from 49 to 8 tile paints per 2000 px.
+- **Number keys for change counters.** The light revision a lamp checks each frame reads cells by number.
+
+Driving still costs 2 ms more than standing: that is the tiles ahead being painted, about 40 lamp gradients
+each, on Chromium's software canvas, close to one tile pair per 1000 px.
+

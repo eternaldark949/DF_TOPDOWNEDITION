@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '021b86e945fe';
+        const DFAB_BUILD = '5b04033cd7d6';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="16656">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="16677">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -11357,7 +11357,7 @@ class changeCounters {
         const b = validBounds(bounds), s = this.cell_size;
         const x0 = Math.floor(b.left / s), x1 = Math.floor(b.right / s), y0 = Math.floor(b.top / s), y1 = Math.floor(b.bottom / s);
         if ((x1 - x0 + 1) * (y1 - y0 + 1) > 1e6) throw new RangeError('Change bounds cover over one million cells');
-        for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) visit(`${x},${y}`);
+        for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) visit(x * 67108864 + y);   // (a number key: unique while |y| < 2^25 cells)
     }
     touch(bounds) { const stamp = ++this.#next; this.#each(bounds, key => this.#cells.set(key, stamp)); return stamp; }
     revision(bounds) { let newest = 0; this.#each(bounds, key => { const v = this.#cells.get(key); if (v > newest) newest = v; }); return newest; }
@@ -29341,7 +29341,7 @@ function createLightLayer({bounds,tint,areas=[],lights=[]},{scene=new artScene()
 /**
  * The same layer, split so what holds still between frames is painted once. Lights marked `still: true`
  * go into pictures over `extent` ({left, top, right, bottom}: the whole map, not the view): the dark with
- * their cuts, and their colour. The areas and the other lights stay live packets. Returns the parts for
+ * their cuts and the areas' thinning, and their colour. The other lights stay live packets. Returns the parts for
  * canvasRenderer.drawLayer, in order: the dark pictures, the live cuts, the colour pictures (added), the
  * live colour. Cuts (destination-out) and colour (add) each commute, so it is the layer createLightLayer
  * draws.
@@ -29354,29 +29354,38 @@ function createLightLayer({bounds,tint,areas=[],lights=[]},{scene=new artScene()
  * tiles meeting `view` are returned: a big map keeps only the tiles near the camera, and a change repaints
  * only the tiles its light reaches. The tiles within `ahead` px of the view come last, marked `prepare`:
  * drawLayer paints them into the cache when the frame's budget allows and draws nothing, so the camera
- * finds them ready. Pass every still light that reaches them. A picture's key names the tint, its tile and every still light that
- * reaches it; a light's `polygon` is known by its array, so give a new array when the shadow changes.
+ * finds them ready. Pass every still light that reaches them; `waiting` lists the reaches
+ * ([left, top, right, bottom]) of lights not ready yet (a shadow still to cast), and a tile one of them
+ * reaches is not readied until it is, so it is painted once, whole. A picture's key names the tint, its
+ * tile, the areas over it and every still light that reaches it; a light's `polygon` is known by its array, so give a new array when the shadow changes.
  * `key` prefixes the pictures' keys.
  */
-function createLightLayerParts({extent,tint,areas=[],lights=[],key='light',tile_size=null,view=null,ahead=0}){
+function createLightLayerParts({extent,tint,areas=[],lights=[],key='light',tile_size=null,view=null,ahead=0,waiting=[]}){
     const {left,top,right,bottom}=extent??{};for(const v of [left,top,right,bottom])finite(v,'extent');
     if(typeof tint!=='string'||!tint)throw new TypeError('The light layer needs a tint colour');
-    const all=lights.map(l=>{const shape=validLight(l);return [l,shape,reach(l,shape)];});
+    const all=lights.map(l=>{const shape=validLight(l);return [l,shape,reach(l,shape),l.still?digests(l):null];});
     const cutStill=all.filter(([l])=>l.still===true),glowStill=all.filter(([l])=>l.still===true||l.still==='glow');
     const darks=[],glows=[],ready=[],near=view&&ahead>0?{left:view.left-ahead,top:view.top-ahead,right:view.right+ahead,bottom:view.bottom+ahead}:view;
     const meets=([x,y,w,h])=>([,,r])=>r[0]<x+w&&r[2]>x&&r[1]<y+h&&r[3]>y;
+    const shades=areas.filter(a=>finite(a.cut,'area cut',0)>=.001).map(a=>[a,null,areaReach(a)]).filter(([,,r])=>r);
     for(const tile of tiles(extent,tile_size,near)){
         const shown=!view||(tile[0]<view.right&&tile[0]+tile[2]>view.left&&tile[1]<view.bottom&&tile[1]+tile[3]>view.top);
-        const cuts=cutStill.filter(meets(tile)),lit=glowStill.filter(meets(tile)).filter(([l])=>l.color&&(l.glow??0)>=.001);
-        const picture=(part,list,paint)=>({key:`${key}:${signature(tint,tile,list,part)}:${part}`,bounds:tile,build(){const scene=new artScene();paint(scene);return scene.finish();}});
-        const dark={picture:picture('dark',cuts,scene=>{scene.fill(rect(...tile),tint);for(const [l,shape] of cuts)cut(scene,l,shape);})};
+        const cuts=cutStill.filter(meets(tile)),lit=glowStill.filter(meets(tile)).filter(([l])=>l.color&&(l.glow??0)>=.001),thinned=shades.filter(meets(tile)).map(([a])=>a);
+        const picture=(part,list,paint,extra)=>({key:`${key}:${signature(tint,tile,list,part,extra)}:${part}`,bounds:tile,build(){const scene=new artScene();paint(scene);return scene.finish();}});
+        const dark={picture:picture('dark',cuts,scene=>{scene.fill(rect(...tile),tint);thin(scene,thinned);for(const [l,shape] of cuts)cut(scene,l,shape);},thinned)};
         const colour=lit.length?{picture:picture('glow',lit,scene=>{for(const [l,shape] of lit)glow(scene,l,shape);}),blend:'add'}:null;
         if(shown){darks.push(dark);if(colour)glows.push(colour);}
+        else if(waiting.some(r=>meets(tile)([,,r])))continue;
         else{ready.push({...dark,prepare:true});if(colour)ready.push({...colour,prepare:true});}
     }
     const cuts=new artScene(),colour=new artScene();
-    thin(cuts,areas);for(const [l,shape] of all){if(l.still!==true)cut(cuts,l,shape);if(!l.still)glow(colour,l,shape);}
+    for(const [l,shape] of all){if(l.still!==true)cut(cuts,l,shape);if(!l.still)glow(colour,l,shape);}
     return [...darks,...cuts.finish(),...glows,...colour.finish(),...ready];
+}
+/** An area's reach as [left, top, right, bottom], or null when it has no shape. */
+function areaReach(a){
+    const points=a.polygon??(a.rects??[]).flatMap(q=>[[q.x,q.y],[q.x+q.w,q.y+q.h]]);if(!points.length)return null;
+    const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]);return [Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)];
 }
 /** A light's reach as [left, top, right, bottom]. */
 function reach(l,shape){
@@ -29412,17 +29421,30 @@ function glow(scene,l,shape){
     const [x,y]=l.position;scene.enter({},{blend:'add',opacity:k});scene.fill([circle(x,y,l.radius)],radial([x,y],0,[x,y],l.radius,stops));scene.leave();
 }
 const polygonIds=new WeakMap();let polygonCount=0;
-/** A short hash of everything a still picture shows (FNV-1a over the fields its part draws, polygons by identity). */
-function signature(tint,bounds,still,part){
-    let h=0x811c9dc5;const add=text=>{for(let i=0;i<text.length;i++){h^=text.charCodeAt(i);h=Math.imul(h,0x01000193);}};
-    add(`${tint}|${bounds}|${part}`);
-    for(const [l] of still){
-        if(part==='dark'){
-            if(l.polygon&&!polygonIds.has(l.polygon))polygonIds.set(l.polygon,++polygonCount);
-            add(`|${l.shape},${l.position},${l.radius},${l.size},${l.round},${l.inner_radius},${l.polygon?polygonIds.get(l.polygon):''},${l.intensity},${l.cut}`);
-        }else add(`|${l.shape},${l.position},${l.radius},${l.size},${l.round},${l.color},${l.glow},${l.glow_stops}`);
-    }
-    return (h>>>0).toString(36)+still.length;
+const bits=new Float64Array(1),words=new Uint32Array(bits.buffer);
+/** FNV-1a over plain values (numbers, strings, arrays of them, null, booleans) as they are, without text: `hash = 0x811c9dc5`, then `add` each. */
+let hash=0;
+const mix=w=>{hash=Math.imul(hash^w,0x01000193);};
+function add(v){
+    if(typeof v==='number'){bits[0]=v;mix(words[0]);mix(words[1]);}
+    else if(typeof v==='string'){mix(0x73);for(let i=0;i<v.length;i++)mix(v.charCodeAt(i));mix(v.length);}
+    else if(Array.isArray(v)){mix(0x5b);for(let i=0;i<v.length;i++)add(v[i]);mix(0x5d);}
+    else mix(v===null?0x6e:v===undefined?0x75:v===true?0x74:v===false?0x66:0x6f);
+}
+/** A still light's two digests, once a frame: what its cut draws (its polygon by identity) and what its colour draws. */
+function digests(l){
+    if(l.polygon&&!polygonIds.has(l.polygon))polygonIds.set(l.polygon,++polygonCount);
+    hash=0x811c9dc5;add(l.shape);add(l.position);add(l.radius);add(l.size);add(l.round);const base=hash;
+    add(l.inner_radius);add(l.polygon?polygonIds.get(l.polygon):0);add(l.intensity);add(l.cut);const dark=hash>>>0;
+    hash=base;add(l.color);add(l.glow);add(l.glow_stops);
+    return {dark,glow:hash>>>0};
+}
+/** A short hash of everything a still picture shows: its tint, tile and part, the areas over it by value and its lights' digests. */
+function signature(tint,bounds,still,part,areas=[]){
+    hash=0x811c9dc5;add(tint);add(bounds);add(part);
+    for(const a of areas){mix(0x61);add(a.cut);if(a.polygon)add(a.polygon);else for(const q of a.rects)add([q.x,q.y,q.w,q.h]);}
+    for(const entry of still)mix(entry[3][part]);
+    return (hash>>>0).toString(36)+still.length;
 }
 
 return Object.freeze({get LIGHT_CUT(){return LIGHT_CUT;},get createLightLayer(){return createLightLayer;},get createLightLayerParts(){return createLightLayerParts;}});
@@ -34627,8 +34649,8 @@ const stops=(list,color)=>list.map(([o,c])=>[o,c==='$color'?color:c]);
  * A polygon is kept until its light moves or changes reach, or a light blocker in its reach changes
  * (the world's light revision). Stale shadows are rebuilt nearest the view first within
  * `look.lamp.shadow_budget_ms` a frame; one past the budget keeps its last shape for a frame, and one
- * outside the view with no shape yet waits (one in view is always cast). A light
- * goes back into the still pictures once its shadow has held for `look.lamp.settle` s.
+ * off the tiles in view with no shape yet waits (one on them is always cast, so a tile in view is
+ * painted whole, and a tile ahead is readied once its lights are all cast). A light goes back into the still pictures once its shadow has held for `look.lamp.settle` s.
  */
 class sceneLighting{
     #world;#polygons=new Map();#now;#spent=0;
@@ -34663,18 +34685,20 @@ class sceneLighting{
         const areas=rooms.map(r=>({rects:r.rects,cut:r.type==='outdoor'?1-Math.min(1,sky_darkness/ambient):r.fill!==undefined?(1-Math.min(1,r.fill/ambient))*(r.lit??1):0}));
         // The lights to look at: those reaching the view, or (still) the tiles that meet it or are readied ahead of it, whole.
         const snap=(v,o,down)=>tile_size?o+(down?Math.floor:Math.ceil)((v-o)/tile_size)*tile_size:v;
-        const near=bounds&&(extent?{left:snap(bounds.left-ahead,extent.left,true),top:snap(bounds.top-ahead,extent.top,true),right:snap(bounds.right+ahead,extent.left,false),bottom:snap(bounds.bottom+ahead,extent.top,false)}:bounds);
+        const grid=(b,m)=>b&&(extent?{left:snap(b.left-m,extent.left,true),top:snap(b.top-m,extent.top,true),right:snap(b.right+m,extent.left,false),bottom:snap(b.bottom+m,extent.top,false)}:b);
+        const near=grid(bounds,ahead),shown=grid(bounds,0);   // (the tiles readied ahead, and the tiles drawn)
         const meets=(l,b)=>{const [x,y]=l.position,[rx,ry]=l.shape==='strip'?[l.size[0]/2,l.size[1]/2]:[l.radius,l.radius];return x+rx>b.left&&x-rx<b.right&&y+ry>b.top&&y-ry<b.bottom;};
         if(near)lights=lights.filter(l=>meets(l,near));
         const out=[],[cx,cy]=bounds?[(bounds.left+bounds.right)/2,(bounds.top+bounds.bottom)/2]:extent?[(extent.left+extent.right)/2,(extent.top+extent.bottom)/2]:[0,0];
         this.#spent=0;   // shadow rebuilds share one budget a frame, nearest the view first
         const order=lights.map((l,i)=>[l.shadows==='none'?Infinity:Math.hypot(l.position[0]-cx,l.position[1]-cy),i]).sort((a,b)=>a[0]-b[0]),shadows=new Map();
-        for(const [d,i] of order){if(d===Infinity)break;const l=lights[i];if((l.lit??1)>=.01)shadows.set(i,this.#polygon(l,time,!bounds||meets(l,bounds)));}
+        for(const [d,i] of order){if(d===Infinity)break;const l=lights[i];if((l.lit??1)>=.01)shadows.set(i,this.#polygon(l,time,!bounds||meets(l,shown)));}
+        const waiting=[];
         for(const [i,l] of lights.entries()){
             const lit=l.lit??1;if(lit<.01)continue;
             const f=this.#animate(l,time),steady=(l.animation?.kind??'steady')==='steady';
             if(l.shadows!=='none'){
-                const shadow=shadows.get(i);if(!shadow)continue;
+                const shadow=shadows.get(i);if(!shadow){waiting.push([l.position[0]-l.radius,l.position[1]-l.radius,l.position[0]+l.radius,l.position[1]+l.radius]);continue;}
                 const k=(l.intensity??1)*lit*f,settled=time-shadow.changed_at>=look.lamp.settle;
                 const still=steady?(settled?true:'glow'):false;   // a moving shadow cuts live, its unshadowed colour stays baked
                 if(still!==true&&bounds&&!meets(l,bounds))continue;
@@ -34688,7 +34712,7 @@ class sceneLighting{
         // Lamps cut first, then the soft lights, as the classic layer did.
         out.sort((a,b)=>(a.polygon?0:1)-(b.polygon?0:1));
         const live=out.filter(l=>l.still!==true).length;
-        if(extent)return {packets:createLightLayerParts({extent,tint:look.indoor.tint,areas,lights:out,key:'scene_light',tile_size,view:bounds,ahead}),opacity:ambient,live};
+        if(extent)return {packets:createLightLayerParts({extent,tint:look.indoor.tint,areas,lights:out,key:'scene_light',tile_size,view:bounds,ahead,waiting}),opacity:ambient,live};
         return {packets:createLightLayer({bounds,tint:look.indoor.tint,areas,lights:out}),opacity:ambient,live:out.length};
     }
 }

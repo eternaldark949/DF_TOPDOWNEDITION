@@ -1,5 +1,5 @@
 {
-  "createdAt": "2026-11-14T02:44:37.932Z",
+  "createdAt": "2026-11-14T14:13:48.520Z",
   "duration": 8000,
   "warmup": 3000,
   "viewport": [
@@ -240,15 +240,15 @@
     },
     "light-cafe": {
       "title": "The native light layer over the cafe at night",
-      "calibration_ms": 56.1,
+      "calibration_ms": 58.1,
       "frames": 481,
       "cpu": {
-        "mean": 2.038877338876637,
-        "p95": 2.6000000000349246
+        "mean": 1.8929313929352654,
+        "p95": 2.5
       },
       "lighting": {
-        "mean": 2.038877338876637,
-        "p95": 2.6000000000349246
+        "mean": 1.8929313929352654,
+        "p95": 2.5
       },
       "shadows": {
         "mean": 0,
@@ -258,33 +258,83 @@
       "lights": 16,
       "map": "cozy_cafe_interior",
       "relative": {
-        "cpu": 0.0363,
-        "lighting": 0.0363
+        "cpu": 0.0326,
+        "lighting": 0.0326
       },
       "errors": []
     },
     "light-street": {
       "title": "The native light layer over a dense test street: 72 lamps, 8 doors sliding, 12 vending machines, the camera panning",
-      "calibration_ms": 54.1,
+      "calibration_ms": 58.7,
       "frames": 481,
       "cpu": {
-        "mean": 7.639293139293018,
-        "p95": 13.5
+        "mean": 7.101455301450073,
+        "p95": 11.5
       },
       "lighting": {
-        "mean": 7.639293139293018,
-        "p95": 13.5
+        "mean": 7.101455301450073,
+        "p95": 11.5
       },
       "shadows": {
-        "mean": 0.756,
+        "mean": 0.761,
         "p95": 1.1
       },
       "live_lights": 12,
       "lights": 86,
       "map": "bench_street",
       "relative": {
-        "cpu": 0.1412,
-        "lighting": 0.1412
+        "cpu": 0.121,
+        "lighting": 0.121
+      },
+      "errors": []
+    },
+    "light-city": {
+      "title": "The native light layer over the city at night, standing on Crimson Blvd",
+      "calibration_ms": 54.2,
+      "frames": 481,
+      "cpu": {
+        "mean": 2.4316008315957007,
+        "p95": 3.2000000001862645
+      },
+      "lighting": {
+        "mean": 2.4316008315957007,
+        "p95": 3.2000000001862645
+      },
+      "shadows": {
+        "mean": 0,
+        "p95": 0
+      },
+      "live_lights": 0,
+      "lights": 444,
+      "map": "sdc",
+      "relative": {
+        "cpu": 0.0449,
+        "lighting": 0.0449
+      },
+      "errors": []
+    },
+    "light-city-drive": {
+      "title": "The native light layer over the city at night, driving Crimson Blvd at 500 px/s",
+      "calibration_ms": 55.8,
+      "frames": 481,
+      "cpu": {
+        "mean": 4.39002079002534,
+        "p95": 6
+      },
+      "lighting": {
+        "mean": 4.39002079002534,
+        "p95": 6
+      },
+      "shadows": {
+        "mean": 0.012,
+        "p95": 0
+      },
+      "live_lights": 0,
+      "lights": 515,
+      "map": "sdc",
+      "relative": {
+        "cpu": 0.0787,
+        "lighting": 0.0787
       },
       "errors": []
     }

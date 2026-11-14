@@ -110,13 +110,16 @@ test('a light layer split into still pictures and live lights draws the same lay
             const tiled = createLightLayerParts({ extent, tint, areas, lights, tile_size: 64 }), view = createLightLayerParts({ extent, tint, areas, lights, tile_size: 64, view: { left: 0, top: 0, right: 60, bottom: 60 } });
             const nudged = createLightLayerParts({ extent, tint, areas, tile_size: 64, lights: lights.map((l, i) => i === 1 ? { ...l, position: [151, 70] } : l) });
             const kept = keys(nudged).filter(k => keys(tiled).includes(k)).length;
-            return { worst, tile_worst, tiles: keys(tiled).filter(k => k.endsWith(':dark')).length, view: keys(view).filter(k => k.endsWith(':dark')).length, kept, pictures: keys(parts).length, live_only: keys(again).join() === keys(parts).join(), moved: keys(moved).every((k, i) => k !== keys(parts)[i]) };
+            const dimmed = createLightLayerParts({ extent, tint, lights, tile_size: 64, areas: [{ ...areas[0], cut: .2 }] });
+            const area_repaints = keys(dimmed).filter(k => k.endsWith(':dark') && !keys(tiled).includes(k)).length;
+            return { area_repaints, worst, tile_worst, tiles: keys(tiled).filter(k => k.endsWith(':dark')).length, view: keys(view).filter(k => k.endsWith(':dark')).length, kept, pictures: keys(parts).length, live_only: keys(again).join() === keys(parts).join(), moved: keys(moved).every((k, i) => k !== keys(parts)[i]) };
         });
         assert.equal(result.pictures, 2, 'the still lights become two pictures: the dark with their cuts, and their colour');
         assert.ok(result.worst.every(d => d <= 3), `the split layer matches the whole one within rounding (${result.worst})`);
         assert.ok(result.tile_worst.every(d => d <= 3), `tiled, and with a lamp cutting live over its baked colour, it matches too, with no seams (${result.tile_worst})`);
         assert.equal(result.tiles, 8, 'a 200 × 100 extent is eight 64 px tiles'); assert.equal(result.view, 1, 'and a view in one tile asks for that one');
         assert.ok(result.kept >= 3, `a strip light moving repaints only the tiles it reaches (${result.kept} kept)`);
+        assert.equal(result.area_repaints, 2, 'an area thinning the dark is baked into the tiles it covers, and changing it repaints just those');
         assert.ok(result.live_only, 'a live light changing keeps the pictures');
         assert.ok(result.moved, 'a still light moving repaints them');
     } finally { await browser.close(); server.close(); }

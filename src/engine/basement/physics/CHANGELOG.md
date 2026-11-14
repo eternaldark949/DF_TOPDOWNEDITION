@@ -1,5 +1,9 @@
 # Changelog
 
+## Faster light revisions — 2026-11-14
+
+- Change counters key their cells by number instead of by text: `getLightRevision` reads about twice as fast, the same revisions.
+
 ## The fast shadow cast and light change counters — 2026-11-14
 
 - `getVisibilityPolygon` sweeps once round the light over only the edges that face it within its reach, with edges end to end on one line joined: about four times faster round an apartment lamp, the same shape. A ray grazing a corner stops there, as a raycast does. It no longer returns `moving`.

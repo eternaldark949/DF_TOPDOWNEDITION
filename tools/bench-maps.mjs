@@ -37,7 +37,10 @@ const SCENES = [
     // The native light layer on its own (phase 3's gate): built from the map's definition, drawn each frame as the
     // apartment host draws it (half resolution, tiles and still pictures), with no game around it.
     { id: 'light-cafe', title: 'The native light layer over the cafe at night', light: 'cafe', hold: ['lighting'] },
-    { id: 'light-street', title: 'The native light layer over a dense test street: 72 lamps, 8 doors sliding, 12 vending machines, the camera panning', light: 'street', hold: ['lighting'] }
+    { id: 'light-street', title: 'The native light layer over a dense test street: 72 lamps, 8 doors sliding, 12 vending machines, the camera panning', light: 'street', hold: ['lighting'] },
+    // Phase 4's gate: the city from its exported map file, streamed round the camera, lit as one outdoor room at night.
+    { id: 'light-city', title: 'The native light layer over the city at night, standing on Crimson Blvd', light: 'city', hold: ['lighting'] },
+    { id: 'light-city-drive', title: 'The native light layer over the city at night, driving Crimson Blvd at 500 px/s', light: 'city-drive', hold: ['lighting'] }
 ];
 
 const args = process.argv.slice(2), flag = name => args.includes(name);
@@ -80,8 +83,15 @@ async function measureLight({ scene, duration, warmup }) {
     const { sceneLighting, levelLights } = await import('/src/game/presentation/lighting.mjs');
     const { PROP_TYPES } = await import('/src/game/data/game-maps.mjs');
     const physics = new physicsSystem(), W = 1280, H = 720, scale = .5;
-    let definition, options = { prop_types: PROP_TYPES }, camera, doors = [];
-    if (scene === 'cafe') {
+    let definition, options = { prop_types: PROP_TYPES }, camera, doors = [], kind = 'indoor', rooms = [], sky_darkness = 0;
+    if (scene.startsWith('city')) {
+        const { cityMapDefinition, cityRooms } = await import('/src/game/levels/city-definition.mjs');
+        const places = (await import('/src/game/data/game-db/places.json', { with: { type: 'json' } })).default;
+        ({ definition } = cityMapDefinition({ map: places.maps.sdc }));
+        kind = 'outdoor'; rooms = cityRooms(places.maps.sdc); sky_darkness = .6;   // (the classic sky at 22:00)
+        camera = scene === 'city' ? () => [3300, 2500] : t => [1500 + (t * .5) % 9000, 2500];
+        options = { prop_types: PROP_TYPES, focus: camera(0) };
+    } else if (scene === 'cafe') {
         const { interiorMapDefinition, APARTMENT_MAP_OPTIONS } = await import('/src/game/levels/apartment-definition.mjs');
         const places = (await import('/src/game/data/game-db/places.json', { with: { type: 'json' } })).default;
         ({ definition } = interiorMapDefinition({ map_id: 'cozy_cafe_interior', map: places.maps.cozy_cafe_interior, rooms: places.rooms.cozy_cafe_interior }));
@@ -111,10 +121,12 @@ async function measureLight({ scene, duration, warmup }) {
         const frame = () => {
             const now = performance.now(), t = now - start;
             doors.forEach((d, i) => d.updateBody({ position: [homes[i][0] + 30 * (1 + Math.sin(t / 700 + i)), homes[i][1]] }));
-            const [cx, cy] = camera(t), view = { left: cx - W / 2, top: cy - H / 2, right: cx + W / 2, bottom: cy + H / 2 };
+            const [cx, cy] = camera(t);
+            map.setFocus([cx, cy]); level.lamps = map.entities('lamp'); level.props = map.entities('prop');   // (the map streams round the camera, outside the light layer's time)
+            const view = { left: cx - W / 2, top: cy - H / 2, right: cx + W / 2, bottom: cy + H / 2 };
             shadow_ms = 0; const t0 = performance.now();
             pictures.beginFrame();
-            const layer = lighting.createLayer({ extent, bounds: view, kind: 'indoor', lights: levelLights(level), time: t / 1000 });
+            const layer = lighting.createLayer({ extent, bounds: view, kind, rooms, sky_darkness, lights: levelLights(level), time: t / 1000 });
             ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.setTransform(scale, 0, 0, scale, -view.left * scale, -view.top * scale);
             canvasRenderer.drawLayer(ctx, layer.packets, { opacity: layer.opacity, pictures });
@@ -216,7 +228,10 @@ try {
     }
 } finally { await browser.close(); server.close(); }
 
-if (flag('--record')) { await writeFile(BASELINE, JSON.stringify(out, null, 2) + '\n'); console.log(`Baseline written: ${BASELINE}`); }
+if (flag('--record')) {   // (with --scene, only those scenes' entries are replaced)
+    const base = only.length ? JSON.parse(await readFile(BASELINE, 'utf8')) : { scenes: {} };
+    await writeFile(BASELINE, JSON.stringify({ ...out, scenes: { ...base.scenes, ...out.scenes } }, null, 2) + '\n'); console.log(`Baseline written: ${BASELINE}`);
+}
 if (flag('--check')) {
     const base = JSON.parse(await readFile(BASELINE, 'utf8'));
     for (const [id, now] of Object.entries(out.scenes)) {
