@@ -2,7 +2,17 @@
  "tile_size": 1024,
  "tile_ahead": 128,
  "indoor": { "tint": "rgb(22, 10, 48)", "darkness": 0.95, "lamp_glow": 0.08 },
- "outdoor": { "lamp_glow": 0.22 },
+ "outdoor": { "lamp_glow": 0.22, "deepen": { "from": 0.3, "full": 0.6, "opacity": 0.3 } },
+ "profiles": {
+  "street": { "cut": [[0, 1], [0.1, 0.92], [0.22, 0.55], [0.36, 0.2], [0.55, 0.05], [1, 0]],
+   "glow_stops": [[0, "$warm:0.55"], [0.1, "$warm:0.25@0.85"], [0.25, "$warm:0.25@0.42"], [0.45, "$warm:0.25@0.1"], [0.66, "rgba(0,0,0,0)"]], "glow_boost": 0.12 }
+ },
+ "beam": { "cut": [[0, 1], [1, 0]], "glow_stops": [[0, "$color"], [1, "rgba(0,0,0,0)"]] },
+ "headlight": { "range": 40, "length": 6, "width": 1.5, "near_width": 15, "colour": "#ffffee", "lamp_radius": 22, "lamp_glow": 2.2, "lamp_spacing": 0.35 },
+ "shot": { "radius": 50, "glow": 1.36, "colour": "#ffd9a0" },
+ "muzzle": { "reach": 1.5, "glow": 2, "life": 3, "colour": "#ffcc88" },
+ "laser": { "width": 3, "intensity": 0.45, "dot_radius": 8, "dot_intensity": 0.4, "colour": "#ff3200" },
+ "wet": { "lift": 0.38, "head_height": 64, "width": 26, "streak": 140, "glow": 0.5, "steps": 10 },
  "lamp": { "inner_radius": 10, "cut": [[0, 1], [1, 0]], "glow_stops": [[0, "#ffffff"], [0.1, "$color"], [0.6, "$color"], [1, "rgba(0,0,0,0)"]], "resolution": 64, "settle": 0.3, "shadow_budget_ms": 1 },
  "soft": { "cut": [[0, 1], [0.45, 0.45], [1, 0]], "glow": 0.22, "glow_stops": [[0, "$color"], [1, "rgba(0,0,0,0)"]], "color": "#ffd9b0", "intensity": 0.8 },
  "area": { "cut": [[0, 1], [0.5, 0.9], [1, 0]], "soft_cut": [[0, 1], [0.3, 0.85], [0.7, 0.35], [1, 0]], "glow": 0.22, "glow_stops": [[0, "$color"], [0.55, "$color"], [1, "rgba(0,0,0,0)"]] },

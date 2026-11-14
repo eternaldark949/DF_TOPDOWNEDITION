@@ -57,8 +57,8 @@ export class canvasRenderer {
         for(const entry of packets){
             if(!entry.picture){run.push(entry);continue;}
             flush();if(!pictures)throw new TypeError('A layer with pictures needs a pictureCache');if(!Object.hasOwn(BLENDS,entry.blend??'normal'))throw new TypeError('Unsupported blend');
-            lc.globalCompositeOperation=BLENDS[entry.blend??'normal'];
-            try{pictures.draw(lc,{...entry.picture,layered:true,stamp:!entry.prepare},entry.picture.build);if(!entry.prepare)count++;}finally{lc.globalCompositeOperation='source-over';}
+            lc.globalCompositeOperation=BLENDS[entry.blend??'normal'];lc.globalAlpha=finiteOpacity(entry.opacity??1);
+            try{pictures.draw(lc,{...entry.picture,layered:true,stamp:!entry.prepare,blend:entry.blend??null},entry.picture.build);if(!entry.prepare)count++;}finally{lc.globalCompositeOperation='source-over';lc.globalAlpha=1;}
         }
         flush();
         context.save();
@@ -158,6 +158,7 @@ export function measureText(text,font={},{create_surface=createSurface}={}){
     return Object.freeze({width:m.width,ascent:m.actualBoundingBoxAscent??0,descent:m.actualBoundingBoxDescent??0});
 }
 
+const finiteOpacity=v=>{if(!(v>=0&&v<=1))throw new TypeError('A picture entry\'s opacity is in [0, 1]');return v;};
 const multiply=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
 /**
  * Pictures painted once and stamped every frame: a migration boundary like drawPackets, for hosts that
@@ -185,14 +186,16 @@ export class pictureCache{
      * Draws the picture; returns how: 'stamp' (from the cache), 'paint' (painted now, then stamped) or 'vector'.
      * With `stamp: false` it only paints the picture ahead of need, if the frame's budget allows ('paint'),
      * and draws nothing ('kept' when it is already painted, 'later' when the budget is spent).
+     * `blend` is the blend the picture is stamped with (the context's composite, set by the caller): drawn
+     * as vector, its normal packets take it, so the fallback looks the same as the stamp.
      */
-    draw(context,{key,bounds,matrix=[1,0,0,1,0,0],layered=false,stamp=true},build){
+    draw(context,{key,bounds,matrix=[1,0,0,1,0,0],layered=false,stamp=true,blend=null},build){
         if(!context?.canvas||typeof context.getTransform!=='function')throw new TypeError('A host Canvas context is required');
         if(typeof key!=='string'||!key)throw new TypeError('A picture needs a key');
         const [bx,by,bw,bh]=bounds;if(![bx,by,bw,bh].every(Number.isFinite)||!(bw>0&&bh>0))throw new TypeError('A picture needs finite bounds');
         const t=context.getTransform(),m=multiply([t.a,t.b,t.c,t.d,t.e,t.f],matrix),scale=Math.max(Math.hypot(m[0],m[1]),Math.hypot(m[2],m[3]));
         const density=this.#densities.find(d=>d>=scale-1e-9);
-        const vector=packets=>{context.save();try{context.transform(...matrix);context.beginPath();context.rect(bx,by,bw,bh);context.clip();canvasRenderer.drawPackets(context,packets??build());}finally{context.restore();}return 'vector';};   // a picture is only its bounds, painted or not
+        const vector=packets=>{packets??=build();if(blend)packets=packets.map(p=>(p.blend??'normal')==='normal'?{...p,blend}:p);context.save();try{context.transform(...matrix);context.beginPath();context.rect(bx,by,bw,bh);context.clip();canvasRenderer.drawPackets(context,packets);}finally{context.restore();}return 'vector';};   // a picture is only its bounds, painted or not
         if(density===undefined||this.#entries.get(key)?.vector)return stamp?vector():'later';
         const id=`${key}@${density}`;let entry=this.#entries.get(id),how='stamp';
         if(!stamp&&entry){this.#entries.delete(id);this.#entries.set(id,entry);return 'kept';}

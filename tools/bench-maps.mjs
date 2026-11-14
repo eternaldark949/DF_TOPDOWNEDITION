@@ -43,7 +43,9 @@ const SCENES = [
     { id: 'light-city-drive', title: 'The native light layer over the city at night, driving Crimson Blvd at 500 px/s', light: 'city-drive', hold: ['lighting'] },
     // The city's ground tiles under its light layer, both as a native host draws them: `cpu` is the two together.
     { id: 'city-native', title: 'The native city at night, ground and light, standing on Crimson Blvd', light: 'city', ground: true, hold: ['cpu'] },
-    { id: 'city-native-drive', title: 'The native city at night, ground and light, driving Crimson Blvd at 500 px/s', light: 'city-drive', ground: true, hold: ['cpu'] }
+    { id: 'city-native-drive', title: 'The native city at night, ground and light, driving Crimson Blvd at 500 px/s', light: 'city-drive', ground: true, hold: ['cpu'] },
+    // Phase 4, step 4: what moves lights the night too. Eight cars with their headlights, shots, a laser sight, and rain on the street.
+    { id: 'city-native-busy', title: 'The native city at night in the rain, driving Crimson Blvd among eight cars, shots and a laser sight', light: 'city-drive', ground: true, busy: true, hold: ['cpu'] }
 ];
 
 const args = process.argv.slice(2), flag = name => args.includes(name);
@@ -79,7 +81,7 @@ function calibrate() {
  * layer every frame for `duration` ms after `warmup`, as the native apartment host does. Returns the layer's
  * cost a frame (`lighting`, and `cpu` the same), the shadow rebuilds' share, and how many lights stayed live.
  */
-async function measureLight({ scene, ground: with_ground = false, duration, warmup }) {
+async function measureLight({ scene, ground: with_ground = false, busy = false, duration, warmup }) {
     const { physicsSystem } = await import('/src/engine/basement/physics/index.mjs');
     const { mapInstance } = await import('/src/engine/basement/maps/index.mjs');
     const { canvasRenderer, pictureCache, aheadOf } = await import('/src/engine/basement/rendering/index.mjs');
@@ -112,6 +114,19 @@ async function measureLight({ scene, ground: with_ground = false, duration, warm
         camera = t => [640 + (t * .3) % 4600, 600];
     }
     const map = new mapInstance(physics, definition, options);
+    const dynamic = busy && await import('/src/game/presentation/dynamic-lights.mjs');
+    // (the busy street: four cars each way on Crimson Blvd's lanes, a shot every 150 ms from the camera, a laser sight sweeping, the street wet)
+    const extras = t => {
+        if (!dynamic) return [];
+        const s = t / 1000, [cx, cy] = camera(t), cars = [];
+        for (let i = 0; i < 4; i++) { const x = 1500 + ((s * (380 + 60 * i) + i * 700) % 9000); cars.push({ id: `east${i}`, position: [x, 2530 + 60 * (i % 3)], angle: 0, length: 90, width: 44, haze: i ? .7 : 1 }); }
+        for (let i = 0; i < 4; i++) { const x = 10500 - ((s * (420 + 50 * i) + i * 900) % 9000); cars.push({ id: `west${i}`, position: [x, 2470 - 60 * (i % 3)], angle: Math.PI, length: 90, width: 44 }); }
+        const projectiles = [], muzzles = [];
+        for (let k = 0; k < 6; k++) { const born = Math.floor(s / .15) - k, age = s - born * .15, a = born * 2.39; projectiles.push({ id: `shot${born}`, position: [cx + Math.cos(a) * 1200 * age, cy + Math.sin(a) * 1200 * age], color: '#ffaa44' }); }
+        muzzles.push({ id: 'muzzle', position: [cx + 20, cy], radius: 14, life: 3 * (1 - (s % .15) / .15) });
+        const aim = s * 1.3;
+        return [...dynamic.headlightLights(cars), ...dynamic.shotLights({ projectiles, muzzles }), ...dynamic.laserLights({ from: [cx, cy], to: [cx + Math.cos(aim) * 400, cy + Math.sin(aim) * 400] })];
+    };
     doors = scene === 'street' ? map.entities('door') : [];
     const level = { physics, lamps: map.entities('lamp'), props: map.entities('prop'), definition };
     const lighting = new sceneLighting(physics), pictures = new pictureCache({ max_bytes: 32 * 1048576, budget_ms: 12, densities: [.125, .25, .5, 1, 2] });
@@ -130,7 +145,7 @@ async function measureLight({ scene, ground: with_ground = false, duration, warm
             const now = performance.now(), t = now - start;
             doors.forEach((d, i) => d.updateBody({ position: [homes[i][0] + 30 * (1 + Math.sin(t / 700 + i)), homes[i][1]] }));
             const [cx, cy] = camera(t), [nx, ny] = camera(t + 100), velocity = [(nx - cx) * 10, (ny - cy) * 10];   // (the camera's motion: what is readied ahead leads it by a second)
-            map.setFocus([cx, cy]); level.lamps = map.entities('lamp'); level.props = map.entities('prop');   // (the map streams round the camera, outside the light layer's time)
+            map.setFocus([cx, cy]); level.lamps = [...map.entities('lamp'), ...map.entities('neon')]; level.props = map.entities('prop');   // (the map streams round the camera, outside the light layer's time)
             const view = { left: cx - W / 2, top: cy - H / 2, right: cx + W / 2, bottom: cy + H / 2 };
             let ground_ms = 0; if (t < warmup) { paints.ground = paints.light = 0; held.ground = held.light = 0; }   // (counted over the measured window)
             ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -143,7 +158,8 @@ async function measureLight({ scene, ground: with_ground = false, duration, warm
             }
             shadow_ms = 0; const t0 = performance.now();
             pictures.beginFrame();
-            const layer = lighting.createLayer({ extent, bounds: view, ahead: aheadOf({ margin: lighting.look.tile_ahead, velocity }), kind, rooms, sky_darkness, lights: levelLights(level), time: t / 1000 });
+            const placed = [...levelLights(level), ...extras(t)], lights = dynamic ? [...placed, ...dynamic.wetLights(placed, .8)] : placed;
+            const layer = lighting.createLayer({ extent, bounds: view, ahead: aheadOf({ margin: lighting.look.tile_ahead, velocity }), kind, rooms, sky_darkness, lights, time: t / 1000 });
             held.light = Math.max(held.light, layer.packets.filter(p => p.picture).reduce((n, p) => n + p.picture.bounds[2] * p.picture.bounds[3] * scale * scale * 4, 0));
             if (ground) { ctx.setTransform(1, 0, 0, 1, -view.left, -view.top); canvasRenderer.drawLayer(ctx, layer.packets, { opacity: layer.opacity, pictures, scale }); }
             else { ctx.setTransform(scale, 0, 0, scale, -view.left * scale, -view.top * scale); canvasRenderer.drawLayer(ctx, layer.packets, { opacity: layer.opacity, pictures }); }
@@ -229,7 +245,7 @@ try {
         if (scene.light) {
             await page.goto(`http://127.0.0.1:${server.address().port}/tools/fixtures/blank.html`).catch(() => {});
             calibration = await page.evaluate(calibrate);
-            result = await page.evaluate(measureLight, { scene: scene.light, ground: !!scene.ground, duration, warmup });
+            result = await page.evaluate(measureLight, { scene: scene.light, ground: !!scene.ground, busy: !!scene.busy, duration, warmup });
         } else {
             await page.goto(`http://127.0.0.1:${server.address().port}/DFAB%20V8.html`, { waitUntil: 'load' });
             await page.waitForFunction("typeof game!=='undefined' && typeof PerformanceBench!=='undefined'");

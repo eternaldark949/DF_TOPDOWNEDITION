@@ -14,26 +14,32 @@ const finite = (value, name) => { if (!Number.isFinite(value)) throw new TypeErr
 const box = (x, y, w, h) => ({ position: [finite(x, 'x') + finite(w, 'width') / 2, finite(y, 'y') + finite(h, 'height') / 2], collision_shape: { shape_type: 'box', dimensions: [w, h] } });
 
 export const LIGHT_SHADOWS = Object.freeze(['static', 'dynamic', 'none']);
-export const LIGHT_ANIMATIONS = Object.freeze(['steady', 'flicker', 'pulse']);
+export const LIGHT_ANIMATIONS = Object.freeze(['steady', 'flicker', 'pulse', 'stutter']);
 /**
  * A declared light, as a lamp, a placement or a catalog type gives it, in its one runtime form:
- * `{shape: 'point' | 'strip', radius | size + round + soft, position, color, intensity, shadows, animation}`.
+ * `{shape: 'point' | 'strip', radius | size + round + soft + rotation, position, color, intensity, glow, look, shadows, animation}`.
  *  position   offset from its body's centre ([dx, dy], or the authored `dx` / `dy`)
+ *  intensity  how much of the dark it lifts; `glow` how strong its colour is (a neon sign colours the
+ *             street without lifting the dark much)
  *  shadows    'dynamic' (default): walls and every body that blocks light, kept until one in reach moves;
  *             'static': walls only; 'none': a pool with no shadow
- *  animation  {kind: 'steady' | 'flicker' | 'pulse', rate (rad/s), depth (pulse: the swing, 0..1)};
- *             the older `flicker: rate` is a flicker
- * `color` and `intensity` stay null when unset, for the look to choose.
+ *  animation  {kind: 'steady' | 'flicker' | 'pulse' | 'stutter', ...}: flicker and pulse at `rate` (rad/s),
+ *             a pulse swinging by `depth` (0..1); a stutter (a faulty lamp) holds steady but for `burst` s
+ *             every `period` s, when it drops by `depth` on and off. The older `flicker: rate` is a flicker.
+ *  look       the name of a profile the game's look gives it (a street lamp's pool), or null
+ * `color`, `intensity` and `glow` stay null when unset, for the look to choose.
  */
 export function declaredLight(light, { shadows = 'dynamic' } = {}) {
     const a = light.animation ?? (light.flicker ? { kind: 'flicker', rate: light.flicker } : { kind: 'steady' });
     if (!LIGHT_ANIMATIONS.includes(a.kind)) throw new TypeError(`Unknown light animation: ${a.kind}`);
     const shade = light.shadows ?? shadows;
     if (!LIGHT_SHADOWS.includes(shade)) throw new TypeError(`Unknown light shadows: ${shade}`);
-    const animation = a.kind === 'steady' ? { kind: 'steady' } : { kind: a.kind, rate: finite(a.rate ?? 1, 'light rate'), ...(a.kind === 'pulse' ? { depth: finite(a.depth ?? .1, 'light depth') } : {}) };
-    const shape = light.size ? { shape: 'strip', size: [finite(light.size[0], 'light width'), finite(light.size[1], 'light height')], round: light.round ?? null, soft: !!light.soft }
+    const animation = a.kind === 'steady' ? { kind: 'steady' }
+        : a.kind === 'stutter' ? { kind: 'stutter', period: finite(a.period ?? 8, 'light period'), burst: finite(a.burst ?? .9, 'light burst'), depth: finite(a.depth ?? .7, 'light depth'), offset: finite(a.offset ?? 0, 'light offset') }
+        : { kind: a.kind, rate: finite(a.rate ?? 1, 'light rate'), ...(a.kind === 'pulse' ? { depth: finite(a.depth ?? .1, 'light depth') } : {}) };
+    const shape = light.size ? { shape: 'strip', size: [finite(light.size[0], 'light width'), finite(light.size[1], 'light height')], round: light.round ?? null, soft: !!light.soft, rotation: finite(light.rotation ?? 0, 'light rotation') }
         : { shape: 'point', radius: finite(light.radius, 'light radius') };
-    return { ...shape, position: light.position ? [...light.position] : [light.dx ?? 0, light.dy ?? 0], color: light.color ?? null, intensity: light.intensity ?? null, shadows: shade, animation };
+    return { ...shape, position: light.position ? [...light.position] : [light.dx ?? 0, light.dy ?? 0], color: light.color ?? null, intensity: light.intensity ?? null, glow: light.glow ?? null, look: light.look ?? null, shadows: shade, animation };
 }
 const lightShape = l => l.shape === 'strip' ? { shape_type: 'box', dimensions: l.size, local_position: l.position } : { shape_type: 'circle', radius: l.radius, local_position: l.position };
 

@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '0db691092b9b';
+        const DFAB_BUILD = '34ebfb59d54c';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="16691">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="16784">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -27344,26 +27344,32 @@ const finite = (value, name) => { if (!Number.isFinite(value)) throw new TypeErr
 const box = (x, y, w, h) => ({ position: [finite(x, 'x') + finite(w, 'width') / 2, finite(y, 'y') + finite(h, 'height') / 2], collision_shape: { shape_type: 'box', dimensions: [w, h] } });
 
 const LIGHT_SHADOWS = Object.freeze(['static', 'dynamic', 'none']);
-const LIGHT_ANIMATIONS = Object.freeze(['steady', 'flicker', 'pulse']);
+const LIGHT_ANIMATIONS = Object.freeze(['steady', 'flicker', 'pulse', 'stutter']);
 /**
  * A declared light, as a lamp, a placement or a catalog type gives it, in its one runtime form:
- * `{shape: 'point' | 'strip', radius | size + round + soft, position, color, intensity, shadows, animation}`.
+ * `{shape: 'point' | 'strip', radius | size + round + soft + rotation, position, color, intensity, glow, look, shadows, animation}`.
  *  position   offset from its body's centre ([dx, dy], or the authored `dx` / `dy`)
+ *  intensity  how much of the dark it lifts; `glow` how strong its colour is (a neon sign colours the
+ *             street without lifting the dark much)
  *  shadows    'dynamic' (default): walls and every body that blocks light, kept until one in reach moves;
  *             'static': walls only; 'none': a pool with no shadow
- *  animation  {kind: 'steady' | 'flicker' | 'pulse', rate (rad/s), depth (pulse: the swing, 0..1)};
- *             the older `flicker: rate` is a flicker
- * `color` and `intensity` stay null when unset, for the look to choose.
+ *  animation  {kind: 'steady' | 'flicker' | 'pulse' | 'stutter', ...}: flicker and pulse at `rate` (rad/s),
+ *             a pulse swinging by `depth` (0..1); a stutter (a faulty lamp) holds steady but for `burst` s
+ *             every `period` s, when it drops by `depth` on and off. The older `flicker: rate` is a flicker.
+ *  look       the name of a profile the game's look gives it (a street lamp's pool), or null
+ * `color`, `intensity` and `glow` stay null when unset, for the look to choose.
  */
 function declaredLight(light, { shadows = 'dynamic' } = {}) {
     const a = light.animation ?? (light.flicker ? { kind: 'flicker', rate: light.flicker } : { kind: 'steady' });
     if (!LIGHT_ANIMATIONS.includes(a.kind)) throw new TypeError(`Unknown light animation: ${a.kind}`);
     const shade = light.shadows ?? shadows;
     if (!LIGHT_SHADOWS.includes(shade)) throw new TypeError(`Unknown light shadows: ${shade}`);
-    const animation = a.kind === 'steady' ? { kind: 'steady' } : { kind: a.kind, rate: finite(a.rate ?? 1, 'light rate'), ...(a.kind === 'pulse' ? { depth: finite(a.depth ?? .1, 'light depth') } : {}) };
-    const shape = light.size ? { shape: 'strip', size: [finite(light.size[0], 'light width'), finite(light.size[1], 'light height')], round: light.round ?? null, soft: !!light.soft }
+    const animation = a.kind === 'steady' ? { kind: 'steady' }
+        : a.kind === 'stutter' ? { kind: 'stutter', period: finite(a.period ?? 8, 'light period'), burst: finite(a.burst ?? .9, 'light burst'), depth: finite(a.depth ?? .7, 'light depth'), offset: finite(a.offset ?? 0, 'light offset') }
+        : { kind: a.kind, rate: finite(a.rate ?? 1, 'light rate'), ...(a.kind === 'pulse' ? { depth: finite(a.depth ?? .1, 'light depth') } : {}) };
+    const shape = light.size ? { shape: 'strip', size: [finite(light.size[0], 'light width'), finite(light.size[1], 'light height')], round: light.round ?? null, soft: !!light.soft, rotation: finite(light.rotation ?? 0, 'light rotation') }
         : { shape: 'point', radius: finite(light.radius, 'light radius') };
-    return { ...shape, position: light.position ? [...light.position] : [light.dx ?? 0, light.dy ?? 0], color: light.color ?? null, intensity: light.intensity ?? null, shadows: shade, animation };
+    return { ...shape, position: light.position ? [...light.position] : [light.dx ?? 0, light.dy ?? 0], color: light.color ?? null, intensity: light.intensity ?? null, glow: light.glow ?? null, look: light.look ?? null, shadows: shade, animation };
 }
 const lightShape = l => l.shape === 'strip' ? { shape_type: 'box', dimensions: l.size, local_position: l.position } : { shape_type: 'circle', radius: l.radius, local_position: l.position };
 
@@ -29029,8 +29035,8 @@ class canvasRenderer {
         for(const entry of packets){
             if(!entry.picture){run.push(entry);continue;}
             flush();if(!pictures)throw new TypeError('A layer with pictures needs a pictureCache');if(!Object.hasOwn(BLENDS,entry.blend??'normal'))throw new TypeError('Unsupported blend');
-            lc.globalCompositeOperation=BLENDS[entry.blend??'normal'];
-            try{pictures.draw(lc,{...entry.picture,layered:true,stamp:!entry.prepare},entry.picture.build);if(!entry.prepare)count++;}finally{lc.globalCompositeOperation='source-over';}
+            lc.globalCompositeOperation=BLENDS[entry.blend??'normal'];lc.globalAlpha=finiteOpacity(entry.opacity??1);
+            try{pictures.draw(lc,{...entry.picture,layered:true,stamp:!entry.prepare,blend:entry.blend??null},entry.picture.build);if(!entry.prepare)count++;}finally{lc.globalCompositeOperation='source-over';lc.globalAlpha=1;}
         }
         flush();
         context.save();
@@ -29130,6 +29136,7 @@ function measureText(text,font={},{create_surface=createSurface}={}){
     return Object.freeze({width:m.width,ascent:m.actualBoundingBoxAscent??0,descent:m.actualBoundingBoxDescent??0});
 }
 
+const finiteOpacity=v=>{if(!(v>=0&&v<=1))throw new TypeError('A picture entry\'s opacity is in [0, 1]');return v;};
 const multiply=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
 /**
  * Pictures painted once and stamped every frame: a migration boundary like drawPackets, for hosts that
@@ -29157,14 +29164,16 @@ class pictureCache{
      * Draws the picture; returns how: 'stamp' (from the cache), 'paint' (painted now, then stamped) or 'vector'.
      * With `stamp: false` it only paints the picture ahead of need, if the frame's budget allows ('paint'),
      * and draws nothing ('kept' when it is already painted, 'later' when the budget is spent).
+     * `blend` is the blend the picture is stamped with (the context's composite, set by the caller): drawn
+     * as vector, its normal packets take it, so the fallback looks the same as the stamp.
      */
-    draw(context,{key,bounds,matrix=[1,0,0,1,0,0],layered=false,stamp=true},build){
+    draw(context,{key,bounds,matrix=[1,0,0,1,0,0],layered=false,stamp=true,blend=null},build){
         if(!context?.canvas||typeof context.getTransform!=='function')throw new TypeError('A host Canvas context is required');
         if(typeof key!=='string'||!key)throw new TypeError('A picture needs a key');
         const [bx,by,bw,bh]=bounds;if(![bx,by,bw,bh].every(Number.isFinite)||!(bw>0&&bh>0))throw new TypeError('A picture needs finite bounds');
         const t=context.getTransform(),m=multiply([t.a,t.b,t.c,t.d,t.e,t.f],matrix),scale=Math.max(Math.hypot(m[0],m[1]),Math.hypot(m[2],m[3]));
         const density=this.#densities.find(d=>d>=scale-1e-9);
-        const vector=packets=>{context.save();try{context.transform(...matrix);context.beginPath();context.rect(bx,by,bw,bh);context.clip();canvasRenderer.drawPackets(context,packets??build());}finally{context.restore();}return 'vector';};   // a picture is only its bounds, painted or not
+        const vector=packets=>{packets??=build();if(blend)packets=packets.map(p=>(p.blend??'normal')==='normal'?{...p,blend}:p);context.save();try{context.transform(...matrix);context.beginPath();context.rect(bx,by,bw,bh);context.clip();canvasRenderer.drawPackets(context,packets);}finally{context.restore();}return 'vector';};   // a picture is only its bounds, painted or not
         if(density===undefined||this.#entries.get(key)?.vector)return stamp?vector():'later';
         const id=`${key}@${density}`;let entry=this.#entries.get(id),how='stamp';
         if(!stamp&&entry){this.#entries.delete(id);this.#entries.set(id,entry);return 'kept';}
@@ -29310,27 +29319,41 @@ const m163 = (()=>{
 // the dark (a tint over the bounds), areas where the dark is thinner (a lit room, an open sky), each
 // light's cut (its reach, shadowed by an optional visibility polygon), then each light's colour, added.
 // Draw it over the finished scene at the dark's strength (canvasRenderer.drawLayer, or a render target).
-const {artScene,rect,circle,radial,linear} = m162;
+const {artScene,rect,polygon,circle,radial,linear} = m162;
 const {viewAhead} = m156;
 
 const finite=(value,name,min=-Infinity)=>{if(!Number.isFinite(value)||value<min)throw new TypeError(`Light ${name} must be a finite number`);return value;};
 const LIGHT_CUT=Object.freeze([[0,1],[1,0]]);
 const white=a=>`rgba(255,255,255,${+a.toFixed(4)})`;
 const polygonPath=points=>[['move',...points[0]],...points.slice(1).map(p=>['line',...p]),['close']];
-/** A rounded strip light (a window, a lit doorway): a band across its middle and a half-ellipse cap at each end. */
-function area(scene,[x,y],[w,h],round,stops,opacity,blend){
-    const hw=w/2,hh=h/2,r=Math.max(0,Math.min(hw,round??hh)),x0=x-hw+r,x1=x+hw-r;
-    scene.enter({},{opacity,blend});
+/** A rounded strip light (a window, a lit doorway, a laser's line): a band across its middle and a half-ellipse cap at each end, turned by `rotation`. */
+function area(scene,[x,y],[w,h],round,stops,opacity,blend,rotation=0){
+    const hw=w/2,hh=h/2,r=Math.max(0,Math.min(hw,round??hh)),x0=-hw+r,x1=hw-r;
+    scene.enter({position:[x,y],rotation},{opacity,blend});
     const band=[];for(const [o,c] of stops){band.push([.5-o/2,c],[.5+o/2,c]);}band.sort((a,b)=>a[0]-b[0]);
-    scene.fill(rect(x0,y-hh,x1-x0,hh*2),linear([0,y-hh],[0,y+hh],band));
-    if(r>0)for(const side of [-1,1]){scene.enter();scene.clip(rect(side<0?x0-r:x1,y-hh,r,hh*2));scene.enter({position:[side<0?x0:x1,y],scale:[r,hh]});scene.fill([circle(0,0,1)],radial([0,0],0,[0,0],1,stops));scene.leave();scene.leave();}
+    scene.fill(rect(x0,-hh,x1-x0,hh*2),linear([0,-hh],[0,hh],band));
+    if(r>0)for(const side of [-1,1]){scene.enter();scene.clip(rect(side<0?x0-r:x1,-hh,r,hh*2));scene.enter({position:[side<0?x0:x1,0],scale:[r,hh]});scene.fill([circle(0,0,1)],radial([0,0],0,[0,0],1,stops));scene.leave();scene.leave();}
     scene.leave();
 }
+/** A beam (a headlight): from `near_width` either side at its source to `width` either side `length` ahead along
+ *  `rotation`, fading along it through `stops` and softer toward its edges; limited to `polygon` when given. */
+function beam(scene,l,stops,opacity,blend){
+    const [x,y]=l.position,L=l.length,W=l.width,n=l.near_width??15;
+    scene.enter({},{blend});if(l.polygon)scene.clip(polygonPath(l.polygon));
+    scene.enter({position:[x,y],rotation:l.rotation??0});
+    for(const [k,a] of BEAM_LAYERS){scene.enter({},{opacity:opacity*a});scene.fill(polygon([[0,-n*k],[L,-W*k],[L,W*k],[0,n*k]]),linear([0,0],[L,0],stops));scene.leave();}
+    scene.leave();scene.leave();
+}
+/** A beam's softness across it: the whole width faint, its middle stronger (width fraction, opacity). */
+const BEAM_LAYERS=Object.freeze([[1,.45],[.55,.55]]);
+const SHAPES=Object.freeze(['point','area','beam']);
 function validLight(light,i){
     const name=`light ${i}`;if(!light||!Array.isArray(light.position))throw new TypeError(`${name} needs a position`);
-    const shape=light.shape??'point';if(shape!=='point'&&shape!=='area')throw new TypeError(`${name}: shape is point or area`);
-    if(shape==='point')finite(light.radius,'radius',0);else if(!Array.isArray(light.size))throw new TypeError(`${name}: an area light needs a size`);
-    finite(light.intensity??1,'intensity',0);finite(light.glow??0,'glow',0);
+    const shape=light.shape??'point';if(!SHAPES.includes(shape))throw new TypeError(`${name}: shape is point, area or beam`);
+    if(shape==='point')finite(light.radius,'radius',0);
+    else if(shape==='area'){if(!Array.isArray(light.size))throw new TypeError(`${name}: an area light needs a size`);}
+    else{finite(light.length,'length',0);finite(light.width,'width',0);finite(light.near_width??15,'near width',0);}
+    finite(light.rotation??0,'rotation');finite(light.intensity??1,'intensity',0);finite(light.glow??0,'glow',0);
     if(light.polygon!==undefined&&light.polygon!==null&&(!Array.isArray(light.polygon)||light.polygon.length<3))throw new TypeError(`${name}: a polygon needs three points`);
     return shape;
 }
@@ -29339,12 +29362,14 @@ function validLight(light,i){
  *  bounds   {left, top, right, bottom}: where the dark is drawn (the view, with a margin)
  *  tint     the dark's colour, any CSS colour
  *  areas    [{rects: [{x, y, w, h}] | polygon: [[x, y], ...], cut}]: the dark thinned by `cut` (0..1) there
- *  lights   [{position, shape: 'point' | 'area', radius | size + round, inner_radius, polygon, intensity,
- *            cut: [[offset, alpha]], color, glow, glow_stops: [[offset, colour]]}]
+ *  lights   [{position, shape: 'point' | 'area' | 'beam', radius | size + round | length + width + near_width,
+ *            rotation, inner_radius, polygon, intensity, cut: [[offset, alpha]], color, glow, glow_stops: [[offset, colour]]}]
  *           A point light cuts a radial gradient from inner_radius to radius (shaped by `cut`, scaled by
  *           `intensity` up to 1), limited to `polygon` when given (from getVisibilityPolygon). Its colour
  *           is added after every cut at `glow` opacity, through `glow_stops` (default: colour fading out).
- *           An area light does the same over a rounded strip of `size`.
+ *           An area light does the same over a rounded strip of `size` turned by `rotation`; a beam (a
+ *           headlight) from `near_width` either side at its position to `width` either side `length` ahead
+ *           along `rotation`, fading along it, softer toward its edges and limited to `polygon` when given.
  */
 function createLightLayer({bounds,tint,areas=[],lights=[]},{scene=new artScene()}={}){
     const {left,top,right,bottom}=bounds??{};for(const v of [left,top,right,bottom])finite(v,'bounds');
@@ -29397,9 +29422,29 @@ function createLightLayerParts({extent,tint,areas=[],lights=[],key='light',tile_
         else if(waiting.some(r=>meets(tile)([,,r])))continue;
         else{ready.push({...dark,prepare:true});if(colour)ready.push({...colour,prepare:true});}
     }
-    const cuts=new artScene(),colour=new artScene();
-    for(const [l,shape] of all){if(l.still!==true)cut(cuts,l,shape);if(!l.still)glow(colour,l,shape);}
-    return [...darks,...cuts.finish(),...glows,...colour.finish(),...ready];
+    const cuts=new artScene(),colour=new artScene(),cutStamps=[],colourStamps=[];
+    for(const [l,shape] of all){
+        if(l.still==='stamp'){const [c,g]=stamps(key,l,shape);if(c)cutStamps.push(c);if(g)colourStamps.push(g);continue;}
+        if(l.still!==true)cut(cuts,l,shape);if(!l.still)glow(colour,l,shape);
+    }
+    return [...darks,...cutStamps,...cuts.finish(),...glows,...colourStamps,...colour.finish(),...ready];
+}
+/**
+ * A light whose shape holds still while its strength changes (a pulsing sign, a stuttering lamp, a shot in
+ * flight): its cut and its colour each painted once as a picture at full strength round its own origin,
+ * keyed by its shape alone, and stamped where it is, turned as it is, at its strength. Shots of one kind
+ * share one picture.
+ */
+function stamps(key,l,shape){
+    const [x,y]=l.position,a=l.rotation??0,c=Math.cos(a),s=Math.sin(a),matrix=[c,s,-s,c,x,y];
+    const local={...l,position:[0,0],rotation:0,intensity:1,glow:1,polygon:l.polygon?l.polygon.map(([px,py])=>[(px-x)*c+(py-y)*s,-(px-x)*s+(py-y)*c]):null};
+    const [rl,rt,rr,rb]=reach(local,shape),bounds=[rl,rt,rr-rl,rb-rt];
+    if(l.polygon&&!polygonIds.has(l.polygon))polygonIds.set(l.polygon,++polygonCount);
+    const id=digests({...local,polygon:null}),ring=l.polygon?`~${polygonIds.get(l.polygon)}`:'';   // (a shadow by its array: a new one when it changes)
+    const picture=(part,draw)=>({key:`${key}:stamp:${id[part].toString(36)}${ring}:${part}`,bounds,matrix,build(){const scene=new artScene();draw(scene,local,shape);return scene.finish();}});
+    const k=Math.min(1,l.intensity??1),g=Math.min(1,l.glow??0);
+    return [k>=.001?{picture:picture('dark',(scene,lt,sh)=>cut(scene,lt,sh,'normal')),blend:'destination-out',opacity:k}:null,
+        g>=.001&&l.color?{picture:picture('glow',(scene,lt,sh)=>glow(scene,lt,sh,'normal')),blend:'add',opacity:g}:null];
 }
 /** An area's reach as [left, top, right, bottom], or null when it has no shape. */
 function areaReach(a){
@@ -29408,8 +29453,12 @@ function areaReach(a){
 }
 /** A light's reach as [left, top, right, bottom]. */
 function reach(l,shape){
-    if(shape==='area'){const [x,y]=l.position,[w,h]=l.size;return [x-w/2,y-h/2,x+w/2,y+h/2];}
-    const [x,y]=l.position,r=l.radius;return [x-r,y-r,x+r,y+r];
+    const [x,y]=l.position;
+    if(shape==='point'){const r=l.radius;return [x-r,y-r,x+r,y+r];}
+    const c=Math.cos(l.rotation??0),s=Math.sin(l.rotation??0),n=l.near_width??15;
+    const corners=shape==='area'?[[-l.size[0]/2,-l.size[1]/2],[l.size[0]/2,-l.size[1]/2],[l.size[0]/2,l.size[1]/2],[-l.size[0]/2,l.size[1]/2]]:[[0,-n],[l.length,-l.width],[l.length,l.width],[0,n]];
+    const xs=corners.map(([u,v])=>x+u*c-v*s),ys=corners.map(([u,v])=>y+u*s+v*c);
+    return [Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)];
 }
 /** The extent whole, or its tiles of `size` that meet `view`, each [x, y, w, h] (edge tiles cut to the extent). */
 function tiles({left,top,right,bottom},size,view){
@@ -29427,17 +29476,19 @@ function thin(scene,areas){
         scene.enter({},{blend:'destination-out',opacity:Math.min(1,k)});scene.fill(shape,'#ffffff');scene.leave();}
 }
 /** A light's cut out of the dark. */
-function cut(scene,l,shape){
+function cut(scene,l,shape,blend='destination-out'){
     const k=Math.min(1,l.intensity??1);if(k<.001)return;const stops=(l.cut??LIGHT_CUT).map(([o,a])=>[o,white(a)]);
-    if(shape==='area'){area(scene,l.position,l.size,l.round,stops,k,'destination-out');return;}
+    if(shape==='area'){area(scene,l.position,l.size,l.round,stops,k,blend,l.rotation);return;}
+    if(shape==='beam'){beam(scene,l,stops,k,blend);return;}
     const [x,y]=l.position,outline=l.polygon?polygonPath(l.polygon):[circle(x,y,l.radius)];
-    scene.enter({},{blend:'destination-out',opacity:k});scene.fill(outline,radial([x,y],l.inner_radius??0,[x,y],l.radius,stops));scene.leave();
+    scene.enter({},{blend,opacity:k});scene.fill(outline,radial([x,y],l.inner_radius??0,[x,y],l.radius,stops));scene.leave();
 }
 /** A light's colour, added. */
-function glow(scene,l,shape){
+function glow(scene,l,shape,blend='add'){
     const k=Math.min(1,l.glow??0);if(k<.001||!l.color)return;const stops=l.glow_stops??[[0,l.color],[1,'rgba(0,0,0,0)']];
-    if(shape==='area'){area(scene,l.position,l.size,l.round,stops,k,'add');return;}
-    const [x,y]=l.position;scene.enter({},{blend:'add',opacity:k});scene.fill([circle(x,y,l.radius)],radial([x,y],0,[x,y],l.radius,stops));scene.leave();
+    if(shape==='area'){area(scene,l.position,l.size,l.round,stops,k,blend,l.rotation);return;}
+    if(shape==='beam'){beam(scene,l,stops,k,blend);return;}
+    const [x,y]=l.position;scene.enter({},{blend,opacity:k});scene.fill([circle(x,y,l.radius)],radial([x,y],0,[x,y],l.radius,stops));scene.leave();
 }
 const polygonIds=new WeakMap();let polygonCount=0;
 const bits=new Float64Array(1),words=new Uint32Array(bits.buffer);
@@ -29453,7 +29504,7 @@ function add(v){
 /** A still light's two digests, once a frame: what its cut draws (its polygon by identity) and what its colour draws. */
 function digests(l){
     if(l.polygon&&!polygonIds.has(l.polygon))polygonIds.set(l.polygon,++polygonCount);
-    hash=0x811c9dc5;add(l.shape);add(l.position);add(l.radius);add(l.size);add(l.round);const base=hash;
+    hash=0x811c9dc5;add(l.shape);add(l.position);add(l.radius);add(l.size);add(l.round);add(l.rotation);add(l.length);add(l.width);add(l.near_width);const base=hash;
     add(l.inner_radius);add(l.polygon?polygonIds.get(l.polygon):0);add(l.intensity);add(l.cut);const dark=hash>>>0;
     hash=base;add(l.color);add(l.glow);add(l.glow_stops);
     return {dark,glow:hash>>>0};
@@ -34637,7 +34688,17 @@ const m211 = Object.freeze({default:{
  "tile_size": 1024,
  "tile_ahead": 128,
  "indoor": { "tint": "rgb(22, 10, 48)", "darkness": 0.95, "lamp_glow": 0.08 },
- "outdoor": { "lamp_glow": 0.22 },
+ "outdoor": { "lamp_glow": 0.22, "deepen": { "from": 0.3, "full": 0.6, "opacity": 0.3 } },
+ "profiles": {
+  "street": { "cut": [[0, 1], [0.1, 0.92], [0.22, 0.55], [0.36, 0.2], [0.55, 0.05], [1, 0]],
+   "glow_stops": [[0, "$warm:0.55"], [0.1, "$warm:0.25@0.85"], [0.25, "$warm:0.25@0.42"], [0.45, "$warm:0.25@0.1"], [0.66, "rgba(0,0,0,0)"]], "glow_boost": 0.12 }
+ },
+ "beam": { "cut": [[0, 1], [1, 0]], "glow_stops": [[0, "$color"], [1, "rgba(0,0,0,0)"]] },
+ "headlight": { "range": 40, "length": 6, "width": 1.5, "near_width": 15, "colour": "#ffffee", "lamp_radius": 22, "lamp_glow": 2.2, "lamp_spacing": 0.35 },
+ "shot": { "radius": 50, "glow": 1.36, "colour": "#ffd9a0" },
+ "muzzle": { "reach": 1.5, "glow": 2, "life": 3, "colour": "#ffcc88" },
+ "laser": { "width": 3, "intensity": 0.45, "dot_radius": 8, "dot_intensity": 0.4, "colour": "#ff3200" },
+ "wet": { "lift": 0.38, "head_height": 64, "width": 26, "streak": 140, "glow": 0.5, "steps": 10 },
  "lamp": { "inner_radius": 10, "cut": [[0, 1], [1, 0]], "glow_stops": [[0, "#ffffff"], [0.1, "$color"], [0.6, "$color"], [1, "rgba(0,0,0,0)"]], "resolution": 64, "settle": 0.3, "shadow_budget_ms": 1 },
  "soft": { "cut": [[0, 1], [0.45, 0.45], [1, 0]], "glow": 0.22, "glow_stops": [[0, "$color"], [1, "rgba(0,0,0,0)"]], "color": "#ffd9b0", "intensity": 0.8 },
  "area": { "cut": [[0, 1], [0.5, 0.9], [1, 0]], "soft_cut": [[0, 1], [0.3, 0.85], [0.7, 0.35], [1, 0]], "glow": 0.22, "glow_stops": [[0, "$color"], [0.55, "$color"], [1, "rgba(0,0,0,0)"]] },
@@ -34649,7 +34710,23 @@ const LIGHTING = m211.default;
 const {createLightLayer,createLightLayerParts,viewAhead} = m155;
 const {declaredLight} = m141;
 
-const stops=(list,color)=>list.map(([o,c])=>[o,c==='$color'?color:c]);
+/** A look's colour stops for a light: `$color` is its colour, `$warm:T` its colour pulled T toward a warm white, `$warm:T@A` that at alpha A. */
+const stopsMade=new WeakMap();
+function stops(list,color){
+    let made=stopsMade.get(list);if(!made)stopsMade.set(list,made=new Map());
+    let out=made.get(color);if(out)return out;   // (once per look and colour: every lamp of a colour shares them)
+    out=list.map(([o,c])=>{
+        if(c==='$color')return [o,color];
+        const m=/^\$warm:([\d.]+)(?:@([\d.]+))?$/.exec(c);if(!m)return [o,c];
+        const rgb=warm(color,+m[1]);return [o,m[2]===undefined?`rgb(${rgb})`:`rgba(${rgb},${m[2]})`];
+    });
+    made.set(color,out);return out;
+}
+/** A colour pulled toward a candle's warm white by t (0..1): the hot heart of a street lamp's light. */
+function warm(hex,t){
+    if(!/^#[0-9a-f]{6}$/i.test(hex??''))hex='#ffeebb';
+    return [1,3,5].map((i,j)=>Math.round(parseInt(hex.slice(i,i+2),16)+([255,241,220][j]-parseInt(hex.slice(i,i+2),16))*t)).join(',');
+}
 /**
  * The game's lighting look over the Basement light layer. A scene gives its rooms and its lights;
  * this keeps each shadowed light's visibility polygon and returns the layer's packets with the strength
@@ -34661,9 +34738,17 @@ const stops=(list,color)=>list.map(([o,c])=>[o,c==='$color'?color:c]);
  *                                blocks light, a door leaf), a warm glow over its reach
  *  shadows 'none'                a pool of light with no shadow (a candle, a screen, a vending machine);
  *                                a strip is a rounded rectangle
- *  animation  steady, flicker (the light breathes at `rate`) or pulse (1 ± `depth` at `rate` rad/s)
+ *  animation  steady, flicker (the light breathes at `rate`), pulse (1 ± `depth` at `rate` rad/s) or
+ *             stutter (a faulty lamp: steady but for `burst` s every `period` s, dropping by `depth`)
+ *  glow       its colour's strength against the look's (1 by default); `intensity: 0, glow: 1.5` colours
+ *             the street without lifting the dark (a neon sign)
+ *  look       a profile in the look's `profiles` for its cut and colour (a street lamp's pool)
+ *  moving     it moves every frame (a shot, a car's headlight): never baked, its shape stamped or drawn live
+ * The host adds its own lights the same way: a `beam` (a headlight: `rotation`, `length`, `width`,
+ * `near_width`, shadowed by walls) and turned strips (a laser's line).
  * `lit` (0..1) is the room's light switch. Rooms: {rects, type: 'outdoor' | 'indoor', fill, lit}:
- * an outdoor room shows the sky's darkness, a room with `fill` is no darker than that while lit.
+ * an outdoor room shows the sky's darkness, deepened at night by the look's `outdoor.deepen` so the lamps'
+ * pools stand out of real dark; a room with `fill` is no darker than that while lit.
  *
  * A polygon is kept until its light moves or changes reach, or a light blocker in its reach changes
  * (the world's light revision). Stale shadows are rebuilt nearest the view first within
@@ -34676,8 +34761,8 @@ class sceneLighting{
     constructor(world,{look=LIGHTING,now=()=>performance.now()}={}){this.#world=world;this.look=look;this.#now=now;}
     /** The light's kept shadow, rebuilt when it is stale and the frame's shadow budget allows (a light with none yet is always built). */
     #polygon(light,time,urgent){
-        const key=light.id??`${light.position}`,at=`${light.position[0]},${light.position[1]},${light.radius},${light.shadows}`,cached=this.#polygons.get(key);
-        const query={origin:light.position,radius:light.radius,include_moving:light.shadows==='dynamic'},revision=this.#world.getLightRevision(query);
+        const reach=light.radius??light.length,key=light.id??`${light.position}`,at=`${light.position[0]},${light.position[1]},${reach},${light.shadows}`,cached=this.#polygons.get(key);
+        const query={origin:light.position,radius:reach,include_moving:light.shadows==='dynamic'},revision=this.#world.getLightRevision(query);
         if(cached?.at===at&&cached.revision===revision)return cached;
         if(this.#spent>=this.look.lamp.shadow_budget_ms){
             if(cached){cached.changed_at=time;return cached;}   // waits a frame with its last shape
@@ -34690,6 +34775,7 @@ class sceneLighting{
         const a=l.animation;
         if(a?.kind==='flicker')return this.look.flicker.floor+this.look.flicker.swing*Math.sin(time*a.rate+l.position[0]*.7)*Math.sin(time*a.rate*.37+l.position[1]);
         if(a?.kind==='pulse')return 1+a.depth*Math.sin(time*a.rate+phase(l.id));
+        if(a?.kind==='stutter'){const t=(time+a.offset)%a.period;return t>a.burst||Math.sin(t*47)*Math.sin(t*23+1.3)<=.15?1:1-a.depth;}
         return 1;
     }
     /**
@@ -34703,12 +34789,14 @@ class sceneLighting{
      */
     createLayer({bounds,extent,tile_size=this.look.tile_size,ahead=this.look.tile_ahead,kind='indoor',sky_darkness=0,rooms=[],lights=[],time=0}){
         const look=this.look,ambient=look.indoor.darkness,base=kind==='indoor'?look.indoor.lamp_glow:look.outdoor.lamp_glow;
-        const areas=rooms.map(r=>({rects:r.rects,cut:r.type==='outdoor'?1-Math.min(1,sky_darkness/ambient):r.fill!==undefined?(1-Math.min(1,r.fill/ambient))*(r.lit??1):0}));
+        // Outdoors at night the dark goes deeper than the sky's darkness, so the lamps' pools stand out of real dark.
+        const deep=look.outdoor.deepen,night=kind==='indoor'?0:Math.max(0,Math.min(1,(sky_darkness-deep.from)/(deep.full-deep.from))),sky=Math.min(ambient,sky_darkness+deep.opacity*night);
+        const areas=rooms.map(r=>({rects:r.rects,cut:r.type==='outdoor'?1-Math.min(1,sky/ambient):r.fill!==undefined?(1-Math.min(1,r.fill/ambient))*(r.lit??1):0}));
         // The lights to look at: those reaching the view, or (still) the tiles that meet it or are readied ahead of it, whole.
         const snap=(v,o,down)=>tile_size?o+(down?Math.floor:Math.ceil)((v-o)/tile_size)*tile_size:v;
         const grid=b=>b&&(extent?{left:snap(b.left,extent.left,true),top:snap(b.top,extent.top,true),right:snap(b.right,extent.left,false),bottom:snap(b.bottom,extent.top,false)}:b);
         const near=grid(bounds&&viewAhead(bounds,ahead)),shown=grid(bounds);   // (the tiles readied ahead, and the tiles drawn)
-        const meets=(l,b)=>{const [x,y]=l.position,[rx,ry]=l.shape==='strip'?[l.size[0]/2,l.size[1]/2]:[l.radius,l.radius];return x+rx>b.left&&x-rx<b.right&&y+ry>b.top&&y-ry<b.bottom;};
+        const meets=(l,b)=>{const [x,y]=l.position,r=reachOf(l);return x+r>b.left&&x-r<b.right&&y+r>b.top&&y-r<b.bottom;};
         if(near)lights=lights.filter(l=>meets(l,near));
         const out=[],[cx,cy]=bounds?[(bounds.left+bounds.right)/2,(bounds.top+bounds.bottom)/2]:extent?[(extent.left+extent.right)/2,(extent.top+extent.bottom)/2]:[0,0];
         this.#spent=0;   // shadow rebuilds share one budget a frame, nearest the view first
@@ -34717,18 +34805,22 @@ class sceneLighting{
         const waiting=[];
         for(const [i,l] of lights.entries()){
             const lit=l.lit??1;if(lit<.01)continue;
-            const f=this.#animate(l,time),steady=(l.animation?.kind??'steady')==='steady';
+            const f=this.#animate(l,time),steady=(l.animation?.kind??'steady')==='steady'&&!l.moving;
             if(l.shadows!=='none'){
-                const shadow=shadows.get(i);if(!shadow){waiting.push([l.position[0]-l.radius,l.position[1]-l.radius,l.position[0]+l.radius,l.position[1]+l.radius]);continue;}
-                const k=(l.intensity??1)*lit*f,settled=time-shadow.changed_at>=look.lamp.settle;
-                const still=steady?(settled?true:'glow'):false;   // a moving shadow cuts live, its unshadowed colour stays baked
+                const shadow=shadows.get(i),r=reachOf(l);if(!shadow){waiting.push([l.position[0]-r,l.position[1]-r,l.position[0]+r,l.position[1]+r]);continue;}
+                const k=(l.intensity??1)*lit*f,settled=time-shadow.changed_at>=look.lamp.settle,profile=look.profiles[l.look]??null;
+                // A still lamp is baked (its colour too while its shadow moves); an animated one with a settled shadow is stamped; the rest cut live.
+                const still=steady?(settled?true:'glow'):!l.moving&&settled?'stamp':false;
                 if(still!==true&&bounds&&!meets(l,bounds))continue;
-                out.push({still,position:l.position,radius:l.radius,inner_radius:look.lamp.inner_radius,polygon:shadow.points,intensity:k,cut:look.lamp.cut,color:l.color,glow:base*Math.min(1,k),glow_stops:stops(look.lamp.glow_stops,l.color)});continue;
+                const glow=(base+(profile?.glow_boost??0)*night)*Math.min(1,k)*(l.glow??1);
+                if(l.shape==='beam'){out.push({still,shape:'beam',position:l.position,rotation:l.rotation,length:l.length,width:l.width,near_width:l.near_width,polygon:shadow.points,intensity:k,cut:look.beam.cut,color:l.color,glow,glow_stops:stops(look.beam.glow_stops,l.color)});continue;}
+                out.push({still,position:l.position,radius:l.radius,inner_radius:look.lamp.inner_radius,polygon:shadow.points,intensity:k,cut:profile?.cut??look.lamp.cut,color:l.color,glow,glow_stops:stops(profile?.glow_stops??look.lamp.glow_stops,l.color)});continue;
             }
             if(!steady&&bounds&&!meets(l,bounds))continue;
-            const a=(l.intensity??look.soft.intensity)*f*lit,color=l.color??look.soft.color;
-            if(l.shape==='strip')out.push({still:steady,shape:'area',position:l.position,size:l.size,round:l.round,intensity:a,cut:l.soft?look.area.soft_cut:look.area.cut,color,glow:Math.min(1,look.area.glow*a),glow_stops:stops(look.area.glow_stops,color)});
-            else out.push({still:steady,position:l.position,radius:l.radius,intensity:a,cut:look.soft.cut,color,glow:Math.min(1,look.soft.glow*a),glow_stops:stops(look.soft.glow_stops,color)});
+            const still=steady?true:'stamp';   // (a shadowless light keeps its shape: animated or moving, it is stamped)
+            const a=(l.intensity??look.soft.intensity)*f*lit,g=(l.glow??(l.intensity??look.soft.intensity))*f*lit,color=l.color??look.soft.color;
+            if(l.shape==='strip')out.push({still,shape:'area',position:l.position,size:l.size,round:l.round,rotation:l.rotation??0,intensity:a,cut:l.soft?look.area.soft_cut:look.area.cut,color,glow:Math.min(1,look.area.glow*g),glow_stops:stops(look.area.glow_stops,color)});
+            else out.push({still,position:l.position,radius:l.radius,intensity:a,cut:look.soft.cut,color,glow:Math.min(1,look.soft.glow*g),glow_stops:stops(look.soft.glow_stops,color)});
         }
         // Lamps cut first, then the soft lights, as the classic layer did.
         out.sort((a,b)=>(a.polygon?0:1)-(b.polygon?0:1));
@@ -34739,12 +34831,19 @@ class sceneLighting{
 }
 /** A native level's lights: its lamps and the props that carry a light (their declared `emission`), and the layout's soft lights. */
 function levelLights(level,{blend=1,lightAt=()=>1}={}){
-    const lights=[],place=(id,e,p)=>{const at=[p[0]+e.position[0],p[1]+e.position[1]];lights.push({...e,id,position:at,lit:lightAt(...at)});};
-    for(const lamp of level.lamps)place(lamp.data.authored_id,lamp.data.emission,lamp.getRenderState(blend).position);
-    for(const prop of level.props)if(prop.data.emission&&prop.visible!==false)place(prop.data.authored_id,prop.data.emission,prop.getRenderState(blend).position);
+    const lights=[],place=(id,e,p,owner)=>{
+        const x=p[0]+e.position[0],y=p[1]+e.position[1],lit=lightAt(x,y),kept=owner&&placed.get(owner);
+        if(kept&&kept.e===e&&kept.x===x&&kept.y===y&&kept.lit===lit){lights.push(kept.light);return;}   // (a light that stayed put is the same object: nothing downstream is redone for it)
+        const light={...e,id,position:[x,y],lit};if(owner)placed.set(owner,{e,x,y,lit,light});lights.push(light);
+    };
+    for(const lamp of level.lamps)place(lamp.data.authored_id,lamp.data.emission,lamp.getRenderState(blend,scratch).position,lamp);
+    for(const prop of level.props)if(prop.data.emission&&prop.visible!==false)place(prop.data.authored_id,prop.data.emission,prop.getRenderState(blend,scratch).position,prop);
     (level.definition.soft_lights??[]).forEach((s,i)=>place(`soft_${i}`,declaredLight({...s,...(s.w?{size:[s.w,s.h]}:{}),shadows:'none'}),[s.x,s.y]));
     return lights;
 }
+const placed=new WeakMap(),scratch={};
+/** How far a light reaches from its position, any way it points. */
+function reachOf(l){return l.shape==='strip'?Math.hypot(l.size[0],l.size[1])/2:l.shape==='beam'?l.length:l.radius;}
 /** A steady phase for a light's pulse from its id, so lights pulse out of step and keep their beat when pushed. */
 function phase(id=''){let h=2166136261;for(const c of String(id))h=Math.imul(h^c.charCodeAt(0),16777619);return (h>>>0)/2**32*Math.PI*2;}
 

@@ -36,15 +36,16 @@ Every section is optional. Rectangles are top-left: `{x, y, w, h}` for walls, tr
 
 ### Lights
 
-A light is declared the same way on a lamp, a placement or a catalog type: `{radius | size + round + soft, position | dx + dy, color, intensity, shadows, animation}`. The builder turns each into `declaredLight(light)`, kept on the packet as `data.emission`, with a matching `light_shape`:
+A light is declared the same way on a lamp, a placement or a catalog type: `{radius | size + round + soft + rotation, position | dx + dy, color, intensity, glow, look, shadows, animation}`. The builder turns each into `declaredLight(light)`, kept on the packet as `data.emission`, with a matching `light_shape`:
 
 | Field | Meaning |
 |---|---|
-| `shape` | `'point'` (a `radius`) or `'strip'` (a `size: [w, h]` with `round` and `soft`, a rounded rectangle). |
+| `shape` | `'point'` (a `radius`) or `'strip'` (a `size: [w, h]` with `round`, `soft` and `rotation`, a rounded rectangle). |
 | `position` | Offset from its body's centre. |
-| `color`, `intensity` | `null` when unset, for the game's look to choose. |
+| `color`, `intensity`, `glow` | `null` when unset, for the game's look to choose. `intensity` is how much of the dark it lifts, `glow` how strong its colour is: a neon sign has `intensity: 0` and a glow. |
+| `look` | The name of a profile the game's look gives the light (a street lamp's pool), or `null`. |
 | `shadows` | `'dynamic'` (default): walls and every body that blocks light; `'static'`: walls only; `'none'`: no shadow. |
-| `animation` | `{kind: 'steady' \| 'flicker' \| 'pulse', rate, depth}`: `rate` in rad/s, `depth` the pulse's swing. The older `flicker: rate` is a flicker. |
+| `animation` | `{kind: 'steady' \| 'flicker' \| 'pulse' \| 'stutter', ...}`: flicker and pulse at `rate` rad/s, a pulse swinging by `depth`; a stutter (a faulty lamp) holds steady but for `burst` s every `period` s (shifted by `offset`), dropping by `depth`. The older `flicker: rate` is a flicker. |
 
 Door leaves always block light (`blocks_light: true`). A placement blocks light when it or its type sets `blocks_light`; ghosts never do.
 

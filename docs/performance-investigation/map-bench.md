@@ -197,3 +197,29 @@ it as `ahead`; the looks' `tile_ahead` is that margin.
 
 The baked tiles in use are now within the 32 MB target.
 
+## Phase 4, step 4: the classic city's night effects as lights
+
+- **Street lamps** outdoors take the look's `street` profile: the classic pool (bright under the lamp, half by a
+  fifth out) and its warm colour, a little stronger the deeper the night. The dark outdoors goes deeper at night
+  (`outdoor.deepen`), as the classic night did.
+- **Neon signs** (1204) are lights with `intensity: 0` and a glow: they colour the street without lifting the dark.
+- **Faulty lamps and signs**, one in ten chosen by where they stand as before, `stutter`.
+- **Headlights** are `beam` lights (a new light shape) cut by walls, with a glow at each headlamp; **shots**,
+  **muzzle flashes** and a **laser sight** (a turned strip) are lights that move; in the **rain** each street
+  lamp's head and each sign is mirrored as a streak down the wet street (`presentation/dynamic-lights.mjs`).
+- **Stamps.** A light whose shape holds still while its strength changes or it moves (a pulsing sign, a faulty
+  lamp, a shot) is no longer drawn live: its cut and colour are painted once as pictures round its own origin and
+  stamped where it is, at its strength. Shots of one colour share one picture.
+
+`city-native-busy` drives Crimson Blvd in the rain among eight cars, a shot every 150 ms and a sweeping laser.
+
+| Scene | Ground + light | Ground | Light | Lights live or stamped | Baked tiles in use |
+|---|---|---|---|---|---|
+| city-native | 7.3 ms | 1.5 ms | 5.8 ms | 1 | 21 MB |
+| city-native-drive | 14.1 ms | 5.5 ms | 8.7 ms | 2 | 29 MB |
+| city-native-busy | 17.2 ms (p95 23.8) | 5.4 ms | 11.7 ms | 19 | 29 MB |
+| light-city-drive | | | 5.7 ms (was 3.9: the signs' colour in the tiles) | 2 | 14 MB |
+| classic city-drive | 138 ms frame | | | | |
+
+The signs made each light tile dearer to paint; driving, about 3.5 light tiles are painted a second.
+

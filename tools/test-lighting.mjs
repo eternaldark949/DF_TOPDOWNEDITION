@@ -47,12 +47,15 @@ test('rooms thin the dark: the sky over an outdoor room, a lit room to its fill'
     assert.ok(Math.abs(night - (1 - .6 / .95)) < 1e-9, 'at night the sky is darker');
 });
 
-test('given the map extent, lamps and steady lights are kept as pictures and only flickering lights stay live', () => {
+test('given the map extent, lamps and steady lights are kept as pictures, and a flickering light is stamped from its own picture', () => {
     const { physics, level } = scene(), lighting = new sceneLighting(physics), extent = { left: 0, top: 0, right: 400, bottom: 300 };
     level.definition.soft_lights.push({ x: 120, y: 260, radius: 30, color: '#ffcc88', intensity: .7, flicker: 6 });
     const parts = lighting.createLayer({ extent, lights: levelLights(level), time: 1 }).packets;
-    assert.deepEqual(parts.filter(p => p.picture).map(p => p.blend ?? 'normal'), ['normal', 'add'], 'the dark with the still cuts, then their colour added');
-    assert.equal(layerOf(parts, 'destination-out').length, 1, 'only the candle cuts live'); assert.equal(layerOf(parts.filter(p => !p.picture), 'add').length, 1, 'and adds its colour live');
+    assert.deepEqual(parts.filter(p => p.picture).map(p => p.blend ?? 'normal'), ['normal', 'destination-out', 'add', 'add'], 'the dark with the still cuts, the candle\'s cut, their colour and the candle\'s');
+    const candle = parts.filter(p => p.picture?.key.includes(':stamp:'));
+    assert.equal(candle.length, 2, 'the candle is stamped: its cut and its colour'); assert.equal(parts.filter(p => !p.picture).length, 0, 'nothing is drawn live');
+    const flick = lighting.createLayer({ extent, lights: levelLights(level), time: 1.37 }).packets.filter(p => p.picture?.key.includes(':stamp:'));
+    assert.deepEqual(flick.map(p => p.picture.key), candle.map(p => p.picture.key), 'its pictures hold as it flickers'); assert.notEqual(flick[0].opacity, candle[0].opacity, 'its strength changes');
     const later = lighting.createLayer({ extent, lights: levelLights(level), time: 2 }).packets, key = p => p.filter(e => e.picture).map(e => e.picture.key).join();
     assert.equal(key(later), key(parts), 'the candle flickering keeps the pictures');
     assert.notEqual(key(lighting.createLayer({ extent, lights: levelLights(level, { lightAt: x => x < 200 ? 1 : 0 }) }).packets), key(parts), 'a room switched off repaints them');
@@ -94,7 +97,7 @@ test('gate: vending machines and health stations glow and pulse from their catal
         const lighting = new sceneLighting(physics), bounds = { left: 0, top: 0, right: definition.size[0], bottom: definition.size[1] };
         const a = lighting.createLayer({ bounds, lights: glow, time: 0 }), b = lighting.createLayer({ bounds, lights: glow, time: .3 });
         assert.notDeepEqual(a.packets.map(p => p.opacity), b.packets.map(p => p.opacity), `${map_id}: the glow pulses`);
-        assert.ok(lighting.createLayer({ extent: bounds, lights: glow, time: 0 }).packets.some(p => p.blend === 'destination-out' && !p.picture), 'a pulsing light stays live');
+        assert.ok(lighting.createLayer({ extent: bounds, lights: glow, time: 0 }).packets.some(p => p.blend === 'destination-out' && p.picture?.key.includes(':stamp:')), 'a pulsing light is stamped at its strength');
     }
 });
 
@@ -115,4 +118,55 @@ test('shadow rebuilds share a budget a frame, nearest the view first; a light pa
     for (const leaf of map.entities('door')) leaf.updateBody({ position: [leaf.position[0] + 5, leaf.position[1]] });
     built = []; lighting.createLayer({ bounds: { left: 0, top: 0, right: 300, bottom: 200 }, lights: levelLights(level), time: .3 });
     assert.deepEqual(built, [100, 250, 400], 'lights out of view are left alone');
+});
+
+test('the city at night: street lamps light a pool, signs colour without lifting the dark, the faulty ones stutter, and the dark goes deeper', async () => {
+    const places = (await import('../src/game/data/game-db/places.json', { with: { type: 'json' } })).default;
+    const { cityMapDefinition, cityRooms } = await import('../src/game/levels/city-definition.mjs');
+    const { definition } = cityMapDefinition({ map: places.maps.sdc });
+    const lamps = definition.lights.filter(l => l.role !== 'neon'), signs = definition.lights.filter(l => l.role === 'neon');
+    assert.ok(lamps.filter(l => l.look === 'street').length > 1000 && signs.length > 1000, 'standing lamps take the street pool; every sign is a light');
+    const faulty = definition.lights.filter(l => l.animation?.kind === 'stutter').length / definition.lights.length;
+    assert.ok(faulty > .05 && faulty < .15, `about one in ten stutters (${faulty.toFixed(3)})`);
+    const physics = new physicsSystem(), lighting = new sceneLighting(physics), rooms = cityRooms(places.maps.sdc);
+    const lamp = { id: 'l', position: [500, 500], radius: 300, color: '#ff9944', look: 'street', shadows: 'static', animation: { kind: 'steady' } };
+    const sign = { id: 's', position: [900, 500], radius: 150, color: '#ff00aa', intensity: 0, glow: 1.5, shadows: 'none', animation: { kind: 'steady' } };
+    const layer = lighting.createLayer({ bounds: { left: 0, top: 0, right: 1200, bottom: 1000 }, kind: 'outdoor', rooms, sky_darkness: .6, lights: [lamp, sign] }).packets;
+    const cuts = layerOf(layer, 'destination-out'), glows = layerOf(layer, 'add');
+    assert.equal(cuts.filter(p => p.material?.fill?.stops).length, 1, 'only the lamp lifts the dark: the sign does not');
+    assert.deepEqual(cuts.find(p => p.material?.fill?.stops).material.fill.stops.map(s => s[0]), LIGHTING.profiles.street.cut.map(s => s[0]), 'the lamp cuts the street pool');
+    assert.equal(glows.length, 2, 'both add their colour');
+    const sky = cuts.find(p => !p.material?.fill?.stops).opacity, plain = lighting.createLayer({ bounds: { left: 0, top: 0, right: 10, bottom: 10 }, kind: 'outdoor', rooms, sky_darkness: .25 }).packets;
+    assert.ok(sky < layerOf(plain, 'destination-out')[0].opacity, 'at night the sky shows less through the dark: it goes deeper');
+    const flick = { ...lamp, id: 'f', animation: { kind: 'stutter', period: 8, burst: .9, depth: .7, offset: 0 } };
+    const strengths = Array.from({ length: 90 }, (_, i) => lighting.createLayer({ bounds: { left: 0, top: 0, right: 1200, bottom: 1000 }, kind: 'outdoor', lights: [flick], time: i * .01 }).packets.find(p => p.blend === 'destination-out' && p.material?.fill?.stops).opacity);
+    assert.ok(strengths.some(k => k < .5) && strengths.some(k => k > .99), 'a faulty lamp drops and comes back in its burst');
+    const later = lighting.createLayer({ bounds: { left: 0, top: 0, right: 1200, bottom: 1000 }, kind: 'outdoor', lights: [flick], time: 3 }).packets.find(p => p.blend === 'destination-out' && p.material?.fill?.stops).opacity;
+    assert.equal(later, 1, 'and holds steady the rest of its period');
+});
+
+test('headlights are beams cut by walls, shots and lasers are stamped as they move, and the wet street mirrors lamps and signs', async () => {
+    const { headlightLights, shotLights, laserLights, wetLights } = await import('../src/game/presentation/dynamic-lights.mjs');
+    const physics = new physicsSystem();
+    new mapInstance(physics, { map_id: 'street', size: [1000, 600], walls: [{ x: 600, y: 200, w: 20, h: 200 }] });
+    const lighting = new sceneLighting(physics), extent = { left: 0, top: 0, right: 1000, bottom: 600 }, bounds = { left: 0, top: 0, right: 1000, bottom: 600 };
+    const cars = headlightLights([{ id: 'car', position: [300, 300], angle: 0, length: 90, width: 44, haze: 1 }]);
+    assert.deepEqual(cars.map(l => l.shape ?? 'point'), ['beam', 'point', 'point'], 'a beam and a glow at each headlamp');
+    const beam = cars[0], polygon = physics.getVisibilityPolygon({ origin: beam.position, radius: beam.length }).points;
+    assert.ok(Math.max(...polygon.filter(([, y]) => Math.abs(y - 300) < 5).map(([x]) => x)) <= 601, 'the wall stops the beam');
+    const shots = shotLights({ projectiles: [{ id: 'p', position: [100, 100], color: '#ff0000' }], muzzles: [{ id: 'm', position: [120, 100], radius: 10, life: 1.5 }] });
+    const laser = laserLights({ from: [100, 500], to: [400, 450] });
+    const layer = lighting.createLayer({ extent, bounds, kind: 'outdoor', lights: [...cars, ...shots, ...laser], time: 0 });
+    const live = layer.packets.filter(p => !p.picture), stamps = layer.packets.filter(p => p.picture?.key.includes(':stamp:'));
+    assert.ok(live.some(p => p.blend === 'destination-out'), 'the beam, cut by walls, is drawn live');
+    assert.ok(stamps.filter(p => p.blend === 'destination-out').length >= 4, 'shots, the muzzle flash and the laser are stamped');
+    const moved = lighting.createLayer({ extent, bounds, kind: 'outdoor', lights: [...shotLights({ projectiles: [{ id: 'p', position: [300, 140], color: '#ff0000' }] })], time: .1 });
+    const key = l => l.packets.filter(p => p.picture && !p.picture.key.includes(':stamp:')).map(p => p.picture.key).join();
+    assert.equal(key(moved), key(lighting.createLayer({ extent, bounds, kind: 'outdoor', lights: [], time: .2 })), 'a shot in flight never touches the baked tiles');
+    const lamps = [{ id: 'a', position: [200, 100], radius: 300, color: '#ffaa55', look: 'street', shadows: 'static' }, { id: 'b', position: [500, 80], radius: 150, color: '#ff00aa', intensity: 0, glow: 1.5, shadows: 'none' }, { id: 'c', position: [0, 0], radius: 100, shadows: 'none' }];
+    const wet = wetLights(lamps, .66);
+    assert.deepEqual(wet.map(l => l.id), ['a:wet', 'b:wet'], 'street lamps and signs are mirrored, other lights not');
+    assert.ok(wet[0].position[1] > 100 + LIGHTING.wet.head_height && wet[0].shape === 'strip', 'a streak down the street below the lamp\'s head');
+    assert.equal(wetLights(lamps, .69)[0].intensity, wet[0].intensity, 'wetness is taken in steps, so the baked reflections hold');
+    assert.equal(wetLights(lamps, 0).length, 0);
 });

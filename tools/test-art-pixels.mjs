@@ -124,3 +124,38 @@ test('a light layer split into still pictures and live lights draws the same lay
         assert.ok(result.moved, 'a still light moving repaints them');
     } finally { await browser.close(); server.close(); }
 });
+
+test('turned strips, beams and stamped lights draw the same as the whole layer, and one stamp serves every copy', { skip: !chromium && 'Playwright is not installed' }, async () => {
+    const server = createServer(async (req, res) => {
+        try { const body = await readFile(join(root, decodeURIComponent(req.url.split('?')[0])));
+            res.writeHead(200, { 'content-type': extname(req.url) === '.mjs' ? 'text/javascript' : extname(req.url) === '.json' ? 'application/json' : 'text/html' }); res.end(body); }
+        catch { res.writeHead(404); res.end(); }
+    }).listen(0);
+    const browser = await chromium.launch();
+    try {
+        const page = await browser.newPage();
+        await page.goto(`http://127.0.0.1:${server.address().port}/tools/fixtures/blank.html`).catch(() => {});
+        const result = await page.evaluate(async () => {
+            const { canvasRenderer, pictureCache, createLightLayer, createLightLayerParts } = await import('/src/engine/basement/rendering/index.mjs');
+            const extent = { left: 0, top: 0, right: 200, bottom: 100 }, tint = 'rgb(20,8,40)';
+            const lights = [{ position: [40, 50], radius: 35, inner_radius: 5, polygon: [[40, 50], [75, 20], [75, 85], [20, 80]], intensity: .6, color: '#ff8800', glow: .5 },
+                { shape: 'area', position: [110, 30], size: [70, 6], rotation: .5, intensity: .9, color: '#ff3300', glow: .4 },
+                { shape: 'beam', position: [120, 70], rotation: -.2, length: 70, width: 25, near_width: 6, intensity: .8, color: '#ffffdd', glow: .3, polygon: [[100, 75], [195, 40], [195, 99], [130, 99]] },
+                { position: [170, 20], radius: 15, intensity: .5, color: '#00ffcc', glow: .6 }, { position: [185, 80], radius: 15, intensity: .3, color: '#00ffcc', glow: .2 }];
+            const pictures = new pictureCache({ densities: [1, 2] }), worst = [];
+            for (const [zoom, ox, oy] of [[1, 0, 0], [2, -60, -30]]) {
+                const draw = packets => { const canvas = Object.assign(document.createElement('canvas'), { width: 200, height: 100 }), ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#c0c0c0'; ctx.fillRect(0, 0, 200, 100); ctx.setTransform(zoom, 0, 0, zoom, ox, oy);
+                    canvasRenderer.drawLayer(ctx, packets, { opacity: .9, pictures }); return ctx.getImageData(0, 0, 200, 100).data; };
+                const whole = draw(createLightLayer({ bounds: extent, tint, lights })), stamped = draw(createLightLayerParts({ extent, tint, lights: lights.map(l => ({ ...l, still: 'stamp' })) }));
+                // (a turned picture resamples a hard edge, so its edge pixels may differ: count the pixels that do, and the mean)
+                let off = 0, sum = 0; for (let i = 0; i < whole.length; i++) { const d = Math.abs(whole[i] - stamped[i]); sum += d; if (d > 8) off++; }
+                worst.push({ off: off / whole.length, mean: sum / whole.length });
+            }
+            const keys = createLightLayerParts({ extent, tint, lights: lights.map(l => ({ ...l, still: 'stamp' })) }).filter(e => e.picture).map(e => e.picture.key);
+            return { worst, shared: keys.filter(k => k.endsWith(':glow')).length - new Set(keys.filter(k => k.endsWith(':glow'))).size };
+        });
+        assert.ok(result.worst.every(d => d.off < .01 && d.mean < .5), `stamped lights match the whole layer but at a turned edge (${JSON.stringify(result.worst)})`);
+        assert.equal(result.shared, 1, 'two lights of one shape share one colour picture, at their own strengths');
+    } finally { await browser.close(); server.close(); }
+});
