@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createGameRuntime} from '../src/directory/game-runtime.mjs';
-import {gameLevel} from '../src/runtime/game-level.mjs';
-import {createGameVehicle} from '../src/directory/game-vehicle-factory.mjs';
-import {combatPresentation} from '../src/presentation/combat-presentation.mjs';
+import {createGameRuntime} from '../src/game/boot/game-runtime.mjs';
+import {gameLevel} from '../src/engine/lobby/runtime/game-level.mjs';
+import {createGameVehicle} from '../src/game/boot/game-vehicle-factory.mjs';
+import {combatPresentation} from '../src/game/presentation/combat-presentation.mjs';
 class Room extends gameLevel{}
 async function setup(){const engine=createGameRuntime({schedule_frame:null,actor_policy:{random:()=>.5},ability_policy:{random:()=>.5},player:{template:'df:player_949',entity_type:'df_player',position:[100,100]}});engine.registerLevel('a',Room).registerLevel('b',Room);await engine.loadLevel('a');engine.start();const api=engine.api,car=createGameVehicle(api.physics,{purpose:'owned',control_mode:'PLAYER',position:[300,300]}),npc=api.actors.spawn({kind:'npc',role:'teammate',position:[200,300],data:{recruited:true,hireType:'permanent',weapon_definition_id:'pistol_fpx',accuracy_mod:0}});car.assignPassenger(npc);return {engine,api,car,npc,player:api.session.player,tick:(n=1)=>{for(let i=0;i<n;i++)engine.updateState();}};}
 const aim=car=>{const seat=car.getSeatLayout()[1];return [car.position[0]+seat.local_position[0],car.position[1]+200];};

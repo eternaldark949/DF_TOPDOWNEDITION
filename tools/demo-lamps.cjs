@@ -1,4 +1,4 @@
-// Indoor lamp fixtures (entities/lamps.js) in a shot: node tools/demo-lamps.cjs out.png map x y [minutes zoom W H dsf]
+// Indoor lamp fixtures (legacy/entities/lamps.js) in a shot: node tools/demo-lamps.cjs out.png map x y [minutes zoom W H dsf]
 // The gameplay camera on a landscape phone by default: she stands at x, y in the map at that hour.
 const { chromium } = require('playwright'); const path = require('path');
 const [out = 'lamps.png', map = 'apt_949', x = 400, y = 300, mins = 1380, zoom = 1.06, W = 844, H = 390, dsf = 2] = process.argv.slice(2);

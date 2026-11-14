@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createGameRuntime} from '../src/directory/game-runtime.mjs';
-import {gameLevel} from '../src/runtime/game-level.mjs';
-import {humanoidPresentation} from '../src/gameplay/animation/humanoid-system.mjs';
-import {getHumanoidRigAssets} from '../src/directory/humanoid/rig-assets.mjs';
-import {rigPose} from '../src/basement/physics/index.mjs';
+import {createGameRuntime} from '../src/game/boot/game-runtime.mjs';
+import {gameLevel} from '../src/engine/lobby/runtime/game-level.mjs';
+import {humanoidPresentation} from '../src/game/mechanics/animation/humanoid-system.mjs';
+import {getHumanoidRigAssets} from '../src/game/data/humanoid/rig-assets.mjs';
+import {rigPose} from '../src/engine/basement/physics/index.mjs';
 class Room extends gameLevel{}
 async function ready(){const e=createGameRuntime({schedule_frame:null,actor_policy:{random:()=>.5}});e.registerLevel('a',Room).registerLevel('b',Room);await e.loadLevel('a');e.start();return e;}
 const tick=(e,n=1)=>{for(let i=0;i<n;i++)e.updateState();};

@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createGameRuntime} from '../src/directory/game-runtime.mjs';
-import {gameLevel} from '../src/runtime/game-level.mjs';
-import {Demoness} from '../src/entities/demoness.mjs';
-import {Warden,Vesper,Matins,Compline} from '../src/entities/warden.mjs';
-import {BossEffect} from '../src/entities/boss-effect.mjs';
-import {validateAbilityAction} from '../src/gameplay/abilities/lunge-actions.mjs';
+import {createGameRuntime} from '../src/game/boot/game-runtime.mjs';
+import {gameLevel} from '../src/engine/lobby/runtime/game-level.mjs';
+import {Demoness} from '../src/game/entities/demoness.mjs';
+import {Warden,Vesper,Matins,Compline} from '../src/game/entities/warden.mjs';
+import {BossEffect} from '../src/game/entities/boss-effect.mjs';
+import {validateAbilityAction} from '../src/game/mechanics/abilities/lunge-actions.mjs';
 class Room extends gameLevel{}
 async function setup(){const engine=createGameRuntime({schedule_frame:null,actor_policy:{random:()=>.5},player:{template:'df:player_949',entity_type:'df_player',position:[500,500]}});engine.registerLevel('a',Room).registerLevel('b',Room);await engine.loadLevel('a');engine.start();const api=engine.api;api.session.player.maxHp=10000;api.session.player.hp=10000;return {engine,api,player:api.session.player,tick:(n=1)=>{for(let i=0;i<n;i++)engine.updateState();}};}
 const spawn=(api,kind='demoness',data={},position=[740,500])=>api.actors.spawn({kind,position,rotation:Math.PI,data});

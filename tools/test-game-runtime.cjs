@@ -110,7 +110,7 @@ function runtime(file,options={}) {
     confirm(){return true;},alert(){},prompt(){return null;},};
   scope.window=scope;scope.self=scope;scope.globalThis=scope;
   vm.createContext(scope);
-  // Each block runs as a script of its own, as the boot loader (src/app/boot-loader.js) runs them in the browser:
+  // Each block runs as a script of its own, as the boot loader (src/legacy/app/boot-loader.js) runs them in the browser:
   // a file that uses, at load time, something only a later file declares fails here just as it would there.
   const html=fs.readFileSync(file,'utf8');const scripts=[...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)].map(m=>({code:m[2],name:(m[1].match(/data-src="([^"]*)"/)||[])[1]||'boot-loader'}));
   for(const s of scripts)vm.runInContext(s.code,scope,{filename:'src/'+s.name,timeout:30000});

@@ -1,18 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createGameRuntime} from '../src/directory/game-runtime.mjs';
-import {createGameVehicle} from '../src/directory/game-vehicle-factory.mjs';
-import {gameLevel} from '../src/runtime/game-level.mjs';
-import {Drone} from '../src/entities/drone.mjs';
-import {VelvetCat} from '../src/entities/velvet-cat.mjs';
-import {dronePresentation} from '../src/presentation/drone.mjs';
-import {velvetPresentation} from '../src/presentation/velvet-cat-animation.mjs';
+import {createGameRuntime} from '../src/game/boot/game-runtime.mjs';
+import {createGameVehicle} from '../src/game/boot/game-vehicle-factory.mjs';
+import {gameLevel} from '../src/engine/lobby/runtime/game-level.mjs';
+import {Drone} from '../src/game/entities/drone.mjs';
+import {VelvetCat} from '../src/game/entities/velvet-cat.mjs';
+import {VELVET_TAIL_SEGS} from '../src/game/data/game-velvet-appearance.mjs';
+import {dronePresentation} from '../src/game/presentation/drone.mjs';
+import {velvetPresentation} from '../src/game/presentation/velvet-cat-animation.mjs';
 class Room extends gameLevel{}
 async function setup(){const engine=createGameRuntime({schedule_frame:null,player:{template:'df:player_949',entity_type:'df_player',position:[500,500]}});engine.registerLevel('a',Room).registerLevel('b',Room);await engine.loadLevel('a');engine.start();const api=engine.api;api.session.player.maxHp=10000;api.session.player.hp=10000;return {engine,api,player:api.session.player,tick:(n=1)=>{for(let i=0;i<n;i++)engine.updateState();}};}
 function drone(api,kind='lancer',position=[740,500]){return api.actors.spawn({kind:'drone',position,rotation:Math.PI,data:{drone_kind:kind}});}
 function ground(actor){Object.assign(actor.drone_state,{flight:'hover',alt:0});actor.updateBody({ghost:false});actor.updateBehavior=()=>{};}
 test('both concrete types register one real body and survive constructor-free restoration',async()=>{
- const {engine,api,tick}=await setup(),d=drone(api),cat=api.actors.spawn({kind:'velvet_cat',position:[300,500]});tick(2);const ids=[d.entity_id,cat.entity_id],snapshot=api.physics.savePhysicsState();api.physics.loadPhysicsState(snapshot);api.weapons.reconnectGameplay();api.actors.reconnectGameplay();assert.ok(api.elements.fetchEntity(ids[0]) instanceof Drone);assert.ok(api.elements.fetchEntity(ids[1]) instanceof VelvetCat);assert.equal(api.physics.getStatistics().bodies,3);engine.dispose();
+ const {engine,api,tick}=await setup(),d=drone(api),cat=api.actors.spawn({kind:'velvet_cat',position:[300,500]});tick(2);const ids=[d.entity_id,cat.entity_id],snapshot=api.physics.savePhysicsState();api.physics.loadPhysicsState(snapshot);api.weapons.reconnectGameplay();api.actors.reconnectGameplay();assert.ok(api.elements.fetchEntity(ids[0]) instanceof Drone);assert.ok(api.elements.fetchEntity(ids[1]) instanceof VelvetCat);// Player, drone and cat, plus the cat's physical tail: one body per tail bone.
+ assert.equal(api.physics.getStatistics().bodies,3+VELVET_TAIL_SEGS);const restored=api.elements.fetchEntity(ids[1]);assert.ok(restored.physics_system.rigs.getPhysicalChains(restored).some(c=>c.chain_id==='tail'),'the tail chain survives a load');engine.dispose();
 });
 test('descent gates damage and lands through shared area attack without shadow hit bodies',async()=>{
  const {engine,api,player,tick}=await setup(),d=drone(api,'lancer',[535,500]);assert.equal(d.takeDamage(10),false);const before=player.hp;tick(56);assert.equal(d.drone_state.alt,0);assert.equal(d.drone_state.flight,'hover');assert.ok(player.hp<before);assert.equal(api.physics.getStatistics().bodies,2);engine.dispose();
@@ -63,4 +65,13 @@ test('ordinary violet bolts share the visible tell and projectile damage pipelin
 });
 test('native vehicle contact drives the cat impact reaction without a second collision pass',async()=>{
  const {engine,api,tick}=await setup(),cat=api.actors.spawn({kind:'velvet_cat',position:[390,300]}),car=createGameVehicle(api.physics,{purpose:'owned',control_mode:'PLAYER',position:[300,300]});let impacts=0;api.session.on('cat:vehicle-impact',()=>impacts++);car.body.setLinearVelocity([360,0]);tick(20);assert.ok(impacts>0);assert.ok(cat.position[0]>390);engine.dispose();
+});
+test('the cat is a rig: her animation poses its joints, her tail is a physical chain, and it goes while she is hidden',async()=>{
+ const {engine,api,tick}=await setup(),cat=api.actors.spawn({kind:'velvet_cat',position:[300,500]});cat.adopt();tick(10);
+ const rigs=cat.physics_system.rigs,chains=()=>rigs.getPhysicalChains(cat).map(c=>c.chain_id);
+ assert.ok(rigs.getRig(cat),'she has a rig');assert.deepEqual(chains(),['tail']);
+ const packet=velvetPresentation(cat);for(const id of ['root','spine_0','spine_12','head','ear_l','tail_9','paw_fl'])assert.ok(packet.joints?.[id],`the packet carries joint ${id}`);
+ const tip=packet.joints.tail_9.position,base=packet.joints.tail_0.position;assert.ok(Math.hypot(tip[0]-base[0],tip[1]-base[1])>10,'the tail hangs off her body');
+ const before=api.physics.getStatistics().bodies;cat.visible=false;tick(2);assert.deepEqual(chains(),[],'a hidden cat drops her tail bodies');assert.equal(api.physics.getStatistics().bodies,before-VELVET_TAIL_SEGS);
+ cat.visible=true;tick(2);assert.deepEqual(chains(),['tail'],'and grows them back');engine.dispose();
 });

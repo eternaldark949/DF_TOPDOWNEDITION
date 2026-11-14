@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 'use strict';
-// Physics bodies (basement/entity-base.js GameEntity.body, basement/collision-kit.js collisionWorld): every entity has a
+// Physics bodies (legacy/basement/entity-base.js GameEntity.body, legacy/basement/collision-kit.js collisionWorld): every entity has a
 // body whose defaults reproduce the old behaviour; masks keep pairs apart; ghosts are told, not pushed (begin / stay / end);
 // a TriggerEntity fires onEnter / onExit with no other code; addPair gives a new kind of thing collisions in one line;
 // raycast and overlap find bodies by mask.

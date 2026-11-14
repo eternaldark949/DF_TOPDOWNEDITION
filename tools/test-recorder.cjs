@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 'use strict';
-// The recorder (basement/recorder-kit.js): a recording played back through the controls walks the same path.
+// The recorder (legacy/basement/recorder-kit.js): a recording played back through the controls walks the same path.
 const assert = require('node:assert/strict');
 const { join } = require('node:path');
 const { runtime } = require('./test-game-runtime.cjs');

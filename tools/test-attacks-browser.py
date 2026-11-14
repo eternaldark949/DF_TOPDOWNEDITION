@@ -15,7 +15,7 @@ try:
   page.route('**/favicon.ico',lambda route:route.fulfill(status=204))
   page.on('pageerror',lambda error:errors.append(str(error)))
   page.on('console',lambda message:errors.append(message.text) if message.type=='error' else None)
-  page.goto(f'http://127.0.0.1:{server.server_port}/src/runtime/examples/',wait_until='networkidle')
+  page.goto(f'http://127.0.0.1:{server.server_port}/src/game/examples/',wait_until='networkidle')
   page.wait_for_function('!!globalThis.runtimeExample?.engine.active_level')
   page.select_option('#weapon','pistol_fpx');page.click('#learn-abilities');page.select_option('#attack','ability:fireball')
   page.evaluate('''()=>{const {engine,player}=runtimeExample,api=engine.api;globalThis.attackCheck={count:0,guns:0,body:player.body,grid:api.physics.spatial_grid,target:api.actors.spawn({kind:'actor',position:[260,180],data:{health:1000,max_health:1000,alliance:'hostile'}})};api.session.on('attack:executed',event=>{if(event.entity_id===player.entity_id)attackCheck.count++;});api.session.on('weapon:fired',event=>{if(event.entity_id===player.entity_id)attackCheck.guns++;});player.lookInDirection([1,0]);}''')

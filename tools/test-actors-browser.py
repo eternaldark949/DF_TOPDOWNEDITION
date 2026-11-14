@@ -15,7 +15,7 @@ try:
   page.route('**/favicon.ico',lambda route:route.fulfill(status=204))
   page.on('pageerror',lambda error:errors.append(str(error)))
   page.on('console',lambda message:errors.append(message.text) if message.type=='error' else None)
-  page.goto(f'http://127.0.0.1:{server.server_port}/src/runtime/examples/',wait_until='networkidle')
+  page.goto(f'http://127.0.0.1:{server.server_port}/src/game/examples/',wait_until='networkidle')
   page.wait_for_function('!!globalThis.runtimeExample?.engine.active_level')
   report=page.evaluate('''async()=>{
    const {engine,player}=runtimeExample,api=engine.api;player.maxHp=10000;player.hp=10000;

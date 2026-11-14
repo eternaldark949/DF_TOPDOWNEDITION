@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createGameRuntime} from '../src/directory/game-runtime.mjs';
-import {gameLevel} from '../src/runtime/game-level.mjs';
-import {actorVitals} from '../src/gameplay/actors/actor-vitals.mjs';
-import {playerVitals} from '../src/gameplay/player-vitals.mjs';
-import {gameActor} from '../src/entities/game-actor.mjs';
-import {NPC} from '../src/entities/npc.mjs';
-import {Ganger} from '../src/entities/ganger.mjs';
+import {createGameRuntime} from '../src/game/boot/game-runtime.mjs';
+import {gameLevel} from '../src/engine/lobby/runtime/game-level.mjs';
+import {actorVitals} from '../src/game/mechanics/actors/actor-vitals.mjs';
+import {playerVitals} from '../src/game/mechanics/player-vitals.mjs';
+import {gameActor} from '../src/game/entities/game-actor.mjs';
+import {NPC} from '../src/game/entities/npc.mjs';
+import {Ganger} from '../src/game/entities/ganger.mjs';
 class Room extends gameLevel{}
 async function setup(){const e=createGameRuntime({schedule_frame:null,actor_policy:{random:()=>.5},player:{template:'df:player_949',entity_type:'df_player',position:[100,100]}});e.registerLevel('a',Room).registerLevel('b',Room);await e.loadLevel('a');e.start();const a=e.api;return {e,a,p:a.session.player,tick:(n=1)=>{for(let i=0;i<n;i++)e.updateState();}};}
 test('shared vitals are the actual health owner for actors and player extensions',()=>{const data={health:30,max_health:100},v=new actorVitals(data);v.damage(10);assert.equal(data.health,20);assert.equal(v.heal(200),80);const saved=v.snapshot();assert.throws(()=>v.load({health:101,max_health:100}));assert.deepEqual(v.snapshot(),saved);const p=new playerVitals();assert.ok(p instanceof actorVitals);p.damage(20);assert.equal(p.health,80);});

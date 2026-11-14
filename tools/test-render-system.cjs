@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 'use strict';
-// The render system (basement/render-system.js, renderQueue): shapes sorted by depth and drawn in batches of the
+// The render system (legacy/basement/render-system.js, renderQueue): shapes sorted by depth and drawn in batches of the
 // same style, never moved past anything they overlap. And the frame's canvas calls, so a regression shows as a
 // number: each scene has a budget (CALL_BUDGET) a little over what it costs today. And the crowd's pose frames
-// (ui/crowd-impostors.js): the café's seated and standing crowd is drawn from its bakes.
+// (legacy/ui/crowd-impostors.js): the café's seated and standing crowd is drawn from its bakes.
 // The crowd's bakes against the live body, in Chromium: tools/check-crowd-bakes.cjs.
 // The pixel comparison (batched against unbatched, in Chromium) is tools/check-render-batching.cjs.
 const assert=require('node:assert/strict');

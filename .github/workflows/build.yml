@@ -23,6 +23,12 @@ jobs:
         with:
           node-version: 20
 
+      - name: Install Chromium through Playwright (the pixel tests and the map bench run in it)
+        run: |
+          npm install --no-save --prefix "$RUNNER_TEMP/pw" playwright@1.63.0
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+          echo "NODE_PATH=$RUNNER_TEMP/pw/node_modules" >> "$GITHUB_ENV"
+
       - name: Check build is up to date (pull requests)
         if: github.event_name == 'pull_request'
         run: node tools/build.mjs --check
@@ -31,7 +37,7 @@ jobs:
         if: github.event_name != 'pull_request'
         run: node tools/build.mjs
 
-      - name: Check the game data (src/directory/game-db)
+      - name: Check the game data (src/game/data/game-db)
         run: node tools/test-game-db.cjs
 
       - name: Check the world queries (rooms, seats, NPCs, buildings)
@@ -42,8 +48,8 @@ jobs:
 
       - name: Check native systems, runtime and player ownership
         run: >-
-          node --test src/basement/physics/tests/*.test.mjs
-          src/basement/controls/tests/*.test.mjs src/basement/rendering/tests/*.test.mjs
+          node --test src/engine/directory/tests/*.test.mjs src/engine/penthouse/tests/*.test.mjs src/engine/basement/physics/tests/*.test.mjs src/engine/basement/maps/tests/*.test.mjs tools/test-map-layouts.mjs tools/test-city-ground.mjs tools/test-city-buildings.mjs tools/test-city-foliage.mjs tools/test-art-pixels.mjs tools/test-door-art.mjs tools/test-lighting.mjs tools/test-level-travel.mjs tools/test-prop-art.mjs
+          src/engine/basement/controls/tests/*.test.mjs src/engine/basement/rendering/tests/*.test.mjs
           tools/test-game-physics-scenarios.mjs tools/test-entity-assets.mjs
           tools/test-street-population.mjs tools/test-player-systems.mjs tools/test-player-vitals.mjs
           tools/test-game-engine.mjs tools/test-native-bundle.mjs
@@ -67,8 +73,20 @@ jobs:
           node tools/test-attack-callers.cjs
           node tools/test-mounted-attack-callers.cjs
 
+      - name: Check the migration inventory covers every classic script
+        run: node tools/migration-inventory.mjs --check
+
+      - name: Check the folder rules (legacy quarantine, standalone engine levels)
+        run: node tools/check-layout.mjs
+
+      - name: Check the city's lane network routes on Basement navigation
+        run: node tools/test-road-navigation.cjs
+
       - name: Check gameplay and rendering regressions
         run: node tools/test-game-regressions.cjs
+
+      - name: Check the maps' frame and light-layer cost against the baseline (tools/bench-maps-baseline.json)
+        run: node tools/bench-maps.mjs --check
 
       - name: Commit rebuilt game (main)
         if: github.event_name != 'pull_request'

@@ -1,0 +1,9 @@
+{
+  "map_id": "sdc",
+  "props": [
+    {"type": "block", "x": 1900, "y": 1330},
+    {"type": "block", "x": 2100, "y": 1330}
+  ],
+  "lamps": [],
+  "npcs": []
+}

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 'use strict';
-// Drink spills (engine/spills.js): her glass drains a little on a hard turn, a Flit or a hit, leaves a puddle the
+// Drink spills (legacy/engine/spills.js): her glass drains a little on a hard turn, a Flit or a hit, leaves a puddle the
 // drink's colour that splashes underfoot, and the bar cart at home tops it back up; the level saves.
 const assert=require('node:assert/strict');
 const {join}=require('node:path');

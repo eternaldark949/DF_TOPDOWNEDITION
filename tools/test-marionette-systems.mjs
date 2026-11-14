@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createGameRuntime} from '../src/directory/game-runtime.mjs';
-import {gameLevel} from '../src/runtime/game-level.mjs';
-import {Marionette} from '../src/entities/marionette.mjs';
+import {createGameRuntime} from '../src/game/boot/game-runtime.mjs';
+import {gameLevel} from '../src/engine/lobby/runtime/game-level.mjs';
+import {Marionette} from '../src/game/entities/marionette.mjs';
 class Room extends gameLevel{}
 async function setup(){const engine=createGameRuntime({schedule_frame:null,actor_policy:{random:()=>.5},player:{template:'df:player_949',entity_type:'df_player',position:[100,100]}});engine.registerLevel('a',Room).registerLevel('b',Room);await engine.loadLevel('a');engine.start();return {engine,api:engine.api,player:engine.api.session.player,tick:(n=1)=>{for(let i=0;i<n;i++)engine.updateState();}};}
 test('native Marionette owns one official body, canonical capability and no weapon surrogate',async()=>{

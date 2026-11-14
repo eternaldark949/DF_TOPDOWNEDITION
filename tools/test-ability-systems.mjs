@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createGameRuntime} from '../src/directory/game-runtime.mjs';
-import {createAbilityCatalog} from '../src/directory/game-abilities.mjs';
-import {abilityLoadout} from '../src/gameplay/abilities/ability-loadout.mjs';
-import {gameLevel} from '../src/runtime/game-level.mjs';
+import {createGameRuntime} from '../src/game/boot/game-runtime.mjs';
+import {createAbilityCatalog} from '../src/game/data/game-abilities.mjs';
+import {abilityLoadout} from '../src/game/mechanics/abilities/ability-loadout.mjs';
+import {gameLevel} from '../src/engine/lobby/runtime/game-level.mjs';
 class Room extends gameLevel{}
 async function setup(){const engine=createGameRuntime({schedule_frame:null,ability_policy:{random:()=>.5},actor_policy:{random:()=>.5},player:{template:'df:player_949',entity_type:'df_player',position:[100,100]}});engine.registerLevel('a',Room).registerLevel('b',Room);await engine.loadLevel('a');engine.start();const api=engine.api;return {engine,api,player:api.session.player,tick:(n=1)=>{for(let i=0;i<n;i++)engine.updateState();}};}
 const caster=(api,extra={})=>api.actors.spawn({kind:'npc',name:'Scarlet',role:'red_demon_dancer',position:[50,100],data:{recruited:true,hireType:'permanent',alliance:'friendly',...extra}});
@@ -47,5 +47,5 @@ test('renderer cannot cast/request spells or advance their queue',async()=>{
 });
 
 test('ability presentation emits renderer-neutral packets without touching attack or body state',async()=>{
- const {abilityPresentation}=await import('../src/presentation/ability-presentation.mjs');const {engine,api}=await setup(),npc=caster(api);npc.equippedAbilityId='shadow_bolt';const shot=api.abilities.cast(npc,'shadow_bolt',{direction:[1,0]}),before=api.physics.savePhysicsState(),packets=[];engine.api.camera.setView({position:[100,100]});engine.api.render.resize({width:640,height:360});new abilityPresentation().render({api},1,{submit:packet=>packets.push(packet)});assert.equal(packets.length,1);assert.equal(packets[0].material.fill,shot.data.color);assert.equal(packets[0].type,'shape');assert.deepEqual(api.physics.savePhysicsState(),before);engine.dispose();
+ const {abilityPresentation}=await import('../src/game/presentation/ability-presentation.mjs');const {engine,api}=await setup(),npc=caster(api);npc.equippedAbilityId='shadow_bolt';const shot=api.abilities.cast(npc,'shadow_bolt',{direction:[1,0]}),before=api.physics.savePhysicsState(),packets=[];engine.api.camera.setView({position:[100,100]});engine.api.render.resize({width:640,height:360});new abilityPresentation().render({api},1,{submit:packet=>packets.push(packet)});assert.equal(packets.length,1);assert.equal(packets[0].material.fill,shot.data.color);assert.equal(packets[0].type,'shape');assert.deepEqual(api.physics.savePhysicsState(),before);engine.dispose();
 });

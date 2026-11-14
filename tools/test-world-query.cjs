@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
-// World queries: basement/query-kit.js (queryKit: find, nearest, sort location packets, game-free) and
-// directory/world-query.js (worldQuery: the game's rooms, seats, NPCs, loot, doors, landmarks and buildings).
+// World queries: legacy/basement/query-kit.js (queryKit: find, nearest, sort location packets, game-free) and
+// legacy/directory/world-query.js (worldQuery: the game's rooms, seats, NPCs, loot, doors, landmarks and buildings).
 const assert=require('node:assert/strict');
 const {join}=require('node:path');
 const {runtime}=require('./test-game-runtime.cjs');

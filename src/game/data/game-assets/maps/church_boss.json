@@ -1,0 +1,52 @@
+{
+  "map_id": "church_boss",
+  "props": [
+    {"type": "sc_altar", "x": 530, "y": 140},
+    {"type": "sc_organ", "x": 400, "y": 58},
+    {"type": "sc_organ", "x": 700, "y": 58},
+    {"type": "sc_pillar", "x": 228, "y": 398},
+    {"type": "sc_pillar", "x": 928, "y": 398},
+    {"type": "sc_pillar", "x": 228, "y": 538},
+    {"type": "sc_pillar", "x": 928, "y": 538},
+    {"type": "sc_pillar", "x": 228, "y": 678},
+    {"type": "sc_pillar", "x": 928, "y": 678},
+    {"type": "sc_pillar", "x": 228, "y": 818},
+    {"type": "sc_pillar", "x": 928, "y": 818},
+    {"type": "sc_pillar", "x": 228, "y": 958},
+    {"type": "sc_pillar", "x": 928, "y": 958},
+    {"type": "sc_pillar", "x": 228, "y": 1098},
+    {"type": "sc_pillar", "x": 928, "y": 1098},
+    {"type": "sc_fallen", "x": 990, "y": 758},
+    {"type": "sc_pew", "x": 330, "y": 640},
+    {"type": "sc_pew", "x": 778, "y": 640},
+    {"type": "sc_pew_broken", "x": 340, "y": 900},
+    {"type": "sc_pew", "x": 776, "y": 900, "width": 84},
+    {"type": "sc_pew_broken", "x": 96, "y": 520},
+    {"type": "sc_pew", "x": 1020, "y": 1020, "width": 84},
+    {"type": "sc_candles", "x": 470, "y": 240},
+    {"type": "sc_candles", "x": 712, "y": 240},
+    {"type": "sc_candles", "x": 100, "y": 300},
+    {"type": "sc_candles", "x": 1082, "y": 300},
+    {"type": "sc_brazier", "x": 180, "y": 1200},
+    {"type": "sc_brazier", "x": 984, "y": 1200},
+    {"type": "sc_brazier", "x": 150, "y": 230},
+    {"type": "sc_brazier", "x": 1014, "y": 230}
+  ],
+  "lamps": [
+    {"x": 600, "y": 150, "lampType": 4, "color": "#c060ff", "lightRadius": 460, "apply": {"visible": false}},
+    {"x": 198, "y": 1218, "lampType": 4, "color": "#ff8a40", "lightRadius": 320, "apply": {"visible": false}},
+    {"x": 1002, "y": 1218, "lampType": 4, "color": "#ff8a40", "lightRadius": 320, "apply": {"visible": false}},
+    {"x": 600, "y": 720, "lampType": 4, "color": "#9a70ff", "lightRadius": 520, "apply": {"visible": false}}
+  ],
+  "npcs": [],
+  "soft_lights": [
+    {"x": 600, "y": 700, "w": 1060, "h": 1280, "round": 265, "soft": true, "color": "#8a78c8", "intensity": 0.22},
+    {"x": 600, "y": 170, "w": 700, "h": 280, "round": 70, "soft": true, "color": "#ff5a8a", "intensity": 0.12},
+    {"x": 168, "y": 248, "radius": 110, "color": "#ff8a40", "intensity": 0.8, "flicker": 5},
+    {"x": 1032, "y": 248, "radius": 110, "color": "#ff8a40", "intensity": 0.8, "flicker": 5},
+    {"x": 479, "y": 249, "radius": 70, "color": "#ffc080", "intensity": 0.6, "flicker": 4},
+    {"x": 721, "y": 249, "radius": 70, "color": "#ffc080", "intensity": 0.6, "flicker": 4},
+    {"x": 109, "y": 309, "radius": 60, "color": "#ffc080", "intensity": 0.5, "flicker": 4},
+    {"x": 1091, "y": 309, "radius": 60, "color": "#ffc080", "intensity": 0.5, "flicker": 4}
+  ]
+}

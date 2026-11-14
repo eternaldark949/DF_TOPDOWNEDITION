@@ -1,0 +1,42 @@
+{
+  "map_id": "medbay_sw",
+  "props": [
+    {"type": "medbay_refill", "x": 200, "y": 180},
+    {"type": "bed", "x": 58, "y": 300},
+    {"type": "bed", "x": 58, "y": 470, "look": {"patient": true}},
+    {"type": "bed", "x": 622, "y": 300, "look": {"head": "right"}},
+    {"type": "bed", "x": 622, "y": 470, "look": {"head": "right"}},
+    {"type": "monitor", "x": 64, "y": 364},
+    {"type": "monitor", "x": 64, "y": 534},
+    {"type": "monitor", "x": 714, "y": 364},
+    {"type": "monitor", "x": 714, "y": 534},
+    {"type": "iv", "x": 184, "y": 284},
+    {"type": "iv", "x": 184, "y": 454},
+    {"type": "iv", "x": 602, "y": 284},
+    {"type": "iv", "x": 602, "y": 454},
+    {"type": "cabinet", "x": 62, "y": 56},
+    {"type": "cabinet", "x": 260, "y": 56, "width": 100},
+    {"type": "cabinet", "x": 440, "y": 56, "width": 100},
+    {"type": "cabinet", "x": 620, "y": 56},
+    {"type": "desk", "x": 318, "y": 228},
+    {"type": "bench", "x": 64, "y": 690},
+    {"type": "bench", "x": 586, "y": 690},
+    {"type": "cooler", "x": 700, "y": 610},
+    {"type": "plant", "x": 58, "y": 612},
+    {"type": "plant", "x": 706, "y": 108, "width": 34, "height": 34}
+  ],
+  "lamps": [
+    {"x": 53, "y": 250, "lampType": 5, "color": "#dff4ff", "lightRadius": 280},
+    {"x": 53, "y": 560, "lampType": 5, "color": "#dff4ff", "lightRadius": 280},
+    {"x": 747, "y": 250, "lampType": 5, "color": "#dff4ff", "lightRadius": 280},
+    {"x": 747, "y": 560, "lampType": 5, "color": "#dff4ff", "lightRadius": 280},
+    {"x": 220, "y": 53, "lampType": 5, "angle": 1.5707963267948966, "color": "#e8f6ff", "lightRadius": 250},
+    {"x": 580, "y": 53, "lampType": 5, "angle": 1.5707963267948966, "color": "#e8f6ff", "lightRadius": 250},
+    {"x": 250, "y": 747, "lampType": 5, "angle": 1.5707963267948966, "color": "#dff4ff", "lightRadius": 220},
+    {"x": 550, "y": 747, "lampType": 5, "angle": 1.5707963267948966, "color": "#dff4ff", "lightRadius": 220},
+    {"x": 400, "y": 480, "lampType": 4, "fixture": "orb", "color": "#3fe3ff", "lightRadius": 200}
+  ],
+  "npcs": [
+    {"class": "NPC", "args": [400, 200, "Dr. Yin", "medic"]}
+  ]
+}

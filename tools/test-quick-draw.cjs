@@ -7,7 +7,7 @@ const tests=[];
 function test(name,code,check){const e=runtime(join(__dirname,'..','DFAB V8.html'),{events:true,timers:true});e.scope.dispatchEvent=e.dispatchWindow;const r=structuredClone(e.run(`(()=>{${setup}${code}})()`));check(r);assert.deepEqual(e.errors,[]);tests.push(name);}
 const setup=`game._doLoadMap('ollo_test');game.running=true;game.paused=false;game.player.visible=true;
  game.items.equipItem((game.items.findItem('sniper_sara')??game.items.grantItem('sniper_sara')).instance_id);game.items.setFireMode('sniper');game.shootCooldown=0;
- game.rollCrit=()=>1;// crits are random (engine/combat-fx.js); these compare exact damage
+ game.rollCrit=()=>1;// crits are random (legacy/engine/combat-fx.js); these compare exact damage
  game.resonance.deserialize({level:50,points:0,ranks:{hollow_points:3,quick_draw:3,flit_strike:3,quick_hands:3}});
  _gameTimeSec=10;game.player.vitals.state.last_flit_at=9.8;
  const tick=(n)=>{for(let i=0;i<n;i++){_gameTimeSec+=1/60;if(game.shootCooldown>0)game.shootCooldown--;game.updateQuickDraw();}};
@@ -61,7 +61,7 @@ test('New game clears quick draw and restores ordinary drawn controls',`
  e.run(`(()=>{${setup}
  game.holsterBtn.dispatchEvent({type:'pointerdown',pointerId:1,button:0,preventDefault(){},stopPropagation(){}});
  })()`);
- e.run('controls.update(controlsSystem.now()+0.46)');   // held past 0.45 s (the controls system's HELD binding)
+ e.run('controls.updateState(controlsSystem.now()+0.46)');   // held past 0.45 s (the controls system's HELD binding)
  e.run(`game.holsterBtn.dispatchEvent({type:'pointerup',pointerId:1,preventDefault(){}})`);
  assert.equal(e.run('!!game._quickDraw&&game.weaponHolstered'),true);
  e.run(`game.holsterBtn.dispatchEvent({type:'pointerdown',pointerId:2,button:0,preventDefault(){},stopPropagation(){}});

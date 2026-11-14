@@ -1,0 +1,14 @@
+{
+  "map_id": "ethereal_plane",
+  "props": [
+    {"type": "block", "x": 300, "y": 300, "width": 60, "height": 150, "color": "#4b0082"},
+    {"type": "block", "x": 900, "y": 300, "width": 60, "height": 150, "color": "#4b0082"},
+    {"type": "block", "x": 600, "y": 600, "width": 100, "height": 100, "color": "#8a2be2"}
+  ],
+  "lamps": [],
+  "npcs": [
+    {"class": "NPC", "args": [400, 500, "Lost Soul", "spirit"]},
+    {"class": "NPC", "args": [800, 500, "Wandering Spirit", "spirit"]},
+    {"class": "NPC", "args": [600, 350, "Spirit Guide", "spirit"]}
+  ]
+}

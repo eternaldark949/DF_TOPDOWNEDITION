@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 'use strict';
-// The awareness matrix (basement/awareness-kit.js), and the gangers who now see through it.
+// The awareness matrix (legacy/basement/awareness-kit.js), and the gangers who now see through it.
 const assert = require('node:assert/strict');
 const { join } = require('node:path');
 const { runtime } = require('./test-game-runtime.cjs');

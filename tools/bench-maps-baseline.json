@@ -1,0 +1,485 @@
+{
+  "createdAt": "2026-11-14T14:43:05.102Z",
+  "duration": 8000,
+  "warmup": 3000,
+  "viewport": [
+    1280,
+    720
+  ],
+  "scenes": {
+    "cafe-night": {
+      "title": "The cafe at night, standing by the counter",
+      "calibration_ms": 54.5,
+      "frames": 168,
+      "fps": 20.9,
+      "cpu": {
+        "mean": 33.06488095238352,
+        "p95": 40
+      },
+      "lighting": {
+        "mean": 8.874404761903861,
+        "p95": 11
+      },
+      "top": [
+        {
+          "label": "Render:Total",
+          "mean": 31.879
+        },
+        {
+          "label": "Render:PostFX",
+          "mean": 18.047
+        },
+        {
+          "label": "Render:Lighting",
+          "mean": 8.874
+        },
+        {
+          "label": "Render:Entities",
+          "mean": 4.743
+        },
+        {
+          "label": "Entities: Props",
+          "mean": 1.895
+        },
+        {
+          "label": "Entities: People",
+          "mean": 1.424
+        }
+      ],
+      "map": "cozy_cafe_interior",
+      "population": {
+        "cars": 0,
+        "pedestrians": 0
+      },
+      "relative": {
+        "cpu": 0.6067,
+        "lighting": 0.1628
+      },
+      "errors": []
+    },
+    "apartment-night": {
+      "title": "The apartment at night (the native level)",
+      "calibration_ms": 50.9,
+      "frames": 257,
+      "fps": 32.1,
+      "cpu": {
+        "mean": 16.01595330739789,
+        "p95": 21.800000000046566
+      },
+      "lighting": {
+        "mean": 3.2136186770428923,
+        "p95": 3.900000000023283
+      },
+      "top": [
+        {
+          "label": "Render:Total",
+          "mean": 12.17
+        },
+        {
+          "label": "Render:Lighting",
+          "mean": 3.214
+        },
+        {
+          "label": "Audio:Ambience",
+          "mean": 0.005
+        }
+      ],
+      "map": "apt_949",
+      "population": {
+        "cars": 0,
+        "pedestrians": 0
+      },
+      "relative": {
+        "cpu": 0.3147,
+        "lighting": 0.0631
+      },
+      "errors": []
+    },
+    "apartment-door": {
+      "title": "A door swinging open and shut beside the apartment lamps",
+      "calibration_ms": 55.3,
+      "door_lamps": 8,
+      "frames": 233,
+      "fps": 29,
+      "cpu": {
+        "mean": 21.77725321888377,
+        "p95": 32.5
+      },
+      "lighting": {
+        "mean": 5.930472103003742,
+        "p95": 8.099999999976717
+      },
+      "top": [
+        {
+          "label": "Render:Total",
+          "mean": 15.827
+        },
+        {
+          "label": "Render:Lighting",
+          "mean": 5.93
+        },
+        {
+          "label": "Audio:Ambience",
+          "mean": 0.012
+        }
+      ],
+      "map": "apt_949",
+      "door_swing": 1.3,
+      "population": {
+        "cars": 0,
+        "pedestrians": 0
+      },
+      "relative": {
+        "cpu": 0.3938,
+        "lighting": 0.1072
+      },
+      "errors": []
+    },
+    "city-night": {
+      "title": "A city street at night, standing",
+      "calibration_ms": 50.3,
+      "frames": 67,
+      "fps": 8.3,
+      "cpu": {
+        "mean": 107.77014925372752,
+        "p95": 129.40000000002328
+      },
+      "lighting": {
+        "mean": 39.98656716418571,
+        "p95": 48.90000000002328
+      },
+      "top": [
+        {
+          "label": "Render:Total",
+          "mean": 95.582
+        },
+        {
+          "label": "Render:Lighting",
+          "mean": 39.987
+        },
+        {
+          "label": "Lighting: Glow",
+          "mean": 34.578
+        },
+        {
+          "label": "Glow: Tiered lights",
+          "mean": 33.494
+        },
+        {
+          "label": "Render:PostFX",
+          "mean": 23.364
+        },
+        {
+          "label": "Render:Buildings",
+          "mean": 17.169
+        }
+      ],
+      "map": "sdc",
+      "population": {
+        "cars": 17.8,
+        "pedestrians": 24.1
+      },
+      "relative": {
+        "cpu": 2.1425,
+        "lighting": 0.795
+      },
+      "errors": []
+    },
+    "city-drive": {
+      "title": "Driving across the city at night (autodrive to the clinic)",
+      "calibration_ms": 53.9,
+      "driving": true,
+      "auto_drive": true,
+      "frames": 52,
+      "fps": 6.5,
+      "cpu": {
+        "mean": 137.71923076922673,
+        "p95": 167.40000000002328
+      },
+      "lighting": {
+        "mean": 11.646153846144443,
+        "p95": 43.300000000046566
+      },
+      "top": [
+        {
+          "label": "Render:Total",
+          "mean": 119.3
+        },
+        {
+          "label": "Render:PostFX",
+          "mean": 56.404
+        },
+        {
+          "label": "Render:Entities",
+          "mean": 26.24
+        },
+        {
+          "label": "Render:Buildings",
+          "mean": 24.812
+        },
+        {
+          "label": "Entities: World tops",
+          "mean": 15.975
+        },
+        {
+          "label": "Update:Total",
+          "mean": 13.61
+        }
+      ],
+      "map": "sdc",
+      "driven_px": 935,
+      "population": {
+        "cars": 16.5,
+        "pedestrians": 28.8
+      },
+      "relative": {
+        "cpu": 2.5551,
+        "lighting": 0.2161
+      },
+      "errors": []
+    },
+    "light-cafe": {
+      "title": "The native light layer over the cafe at night",
+      "calibration_ms": 53.9,
+      "frames": 481,
+      "cpu": {
+        "mean": 1.8904365904274902,
+        "p95": 2.3999999999068677
+      },
+      "lighting": {
+        "mean": 1.8904365904274902,
+        "p95": 2.3999999999068677
+      },
+      "paints_per_s": {
+        "light": 0,
+        "ground": 0
+      },
+      "tiles_mb": {
+        "light": 2.5,
+        "ground": 0
+      },
+      "shadows": {
+        "mean": 0,
+        "p95": 0
+      },
+      "live_lights": 1,
+      "lights": 16,
+      "map": "cozy_cafe_interior",
+      "relative": {
+        "cpu": 0.0351,
+        "lighting": 0.0351
+      },
+      "errors": []
+    },
+    "light-street": {
+      "title": "The native light layer over a dense test street: 72 lamps, 8 doors sliding, 12 vending machines, the camera panning",
+      "calibration_ms": 50.9,
+      "frames": 481,
+      "cpu": {
+        "mean": 6.926611226612582,
+        "p95": 11.799999999813735
+      },
+      "lighting": {
+        "mean": 6.926611226612582,
+        "p95": 11.799999999813735
+      },
+      "paints_per_s": {
+        "light": 4.3,
+        "ground": 0
+      },
+      "tiles_mb": {
+        "light": 8,
+        "ground": 0
+      },
+      "shadows": {
+        "mean": 0.65,
+        "p95": 1.1
+      },
+      "live_lights": 12,
+      "lights": 86,
+      "map": "bench_street",
+      "relative": {
+        "cpu": 0.1361,
+        "lighting": 0.1361
+      },
+      "errors": []
+    },
+    "light-city": {
+      "title": "The native light layer over the city at night, standing on Crimson Blvd",
+      "calibration_ms": 59.9,
+      "frames": 481,
+      "cpu": {
+        "mean": 2.672557172546523,
+        "p95": 3.5
+      },
+      "lighting": {
+        "mean": 2.672557172546523,
+        "p95": 3.5
+      },
+      "paints_per_s": {
+        "light": 0,
+        "ground": 0
+      },
+      "tiles_mb": {
+        "light": 8.9,
+        "ground": 0
+      },
+      "shadows": {
+        "mean": 0,
+        "p95": 0
+      },
+      "live_lights": 1,
+      "lights": 696,
+      "map": "sdc",
+      "relative": {
+        "cpu": 0.0446,
+        "lighting": 0.0446
+      },
+      "errors": []
+    },
+    "light-city-drive": {
+      "title": "The native light layer over the city at night, driving Crimson Blvd at 500 px/s",
+      "calibration_ms": 63.5,
+      "frames": 481,
+      "cpu": {
+        "mean": 5.739085239082335,
+        "p95": 7.899999999906868
+      },
+      "lighting": {
+        "mean": 5.739085239082335,
+        "p95": 7.899999999906868
+      },
+      "paints_per_s": {
+        "light": 3.5,
+        "ground": 0
+      },
+      "tiles_mb": {
+        "light": 13.6,
+        "ground": 0
+      },
+      "shadows": {
+        "mean": 0.02,
+        "p95": 0
+      },
+      "live_lights": 2,
+      "lights": 849,
+      "map": "sdc",
+      "relative": {
+        "cpu": 0.0904,
+        "lighting": 0.0904
+      },
+      "errors": []
+    },
+    "city-native": {
+      "title": "The native city at night, ground and light, standing on Crimson Blvd",
+      "calibration_ms": 57.4,
+      "frames": 481,
+      "cpu": {
+        "mean": 7.327650727652857,
+        "p95": 9.200000000186265
+      },
+      "lighting": {
+        "mean": 5.806444906444713,
+        "p95": 7.399999999906868
+      },
+      "ground": {
+        "mean": 1.5212058212081447,
+        "p95": 2
+      },
+      "paints_per_s": {
+        "light": 0,
+        "ground": 0
+      },
+      "tiles_mb": {
+        "light": 8.9,
+        "ground": 12
+      },
+      "shadows": {
+        "mean": 0,
+        "p95": 0
+      },
+      "live_lights": 1,
+      "lights": 696,
+      "map": "sdc",
+      "relative": {
+        "cpu": 0.1277,
+        "lighting": 0.1012
+      },
+      "errors": []
+    },
+    "city-native-drive": {
+      "title": "The native city at night, ground and light, driving Crimson Blvd at 500 px/s",
+      "calibration_ms": 55.4,
+      "frames": 467,
+      "cpu": {
+        "mean": 14.117558886505448,
+        "p95": 18.899999999906868
+      },
+      "lighting": {
+        "mean": 8.658458244117332,
+        "p95": 11.399999999906868
+      },
+      "ground": {
+        "mean": 5.459100642388116,
+        "p95": 7.600000000093132
+      },
+      "paints_per_s": {
+        "light": 3.5,
+        "ground": 3
+      },
+      "tiles_mb": {
+        "light": 13.6,
+        "ground": 15
+      },
+      "shadows": {
+        "mean": 0.022,
+        "p95": 0
+      },
+      "live_lights": 2,
+      "lights": 849,
+      "map": "sdc",
+      "relative": {
+        "cpu": 0.2548,
+        "lighting": 0.1563
+      },
+      "errors": []
+    },
+    "city-native-busy": {
+      "title": "The native city at night in the rain, driving Crimson Blvd among eight cars, shots and a laser sight",
+      "calibration_ms": 54.1,
+      "frames": 430,
+      "cpu": {
+        "mean": 17.153255813944607,
+        "p95": 23.800000000279397
+      },
+      "lighting": {
+        "mean": 11.711162790701573,
+        "p95": 14.199999999720603
+      },
+      "ground": {
+        "mean": 5.442093023243035,
+        "p95": 9.399999999906868
+      },
+      "paints_per_s": {
+        "light": 4.5,
+        "ground": 3
+      },
+      "tiles_mb": {
+        "light": 13.7,
+        "ground": 15
+      },
+      "shadows": {
+        "mean": 0.27,
+        "p95": 0.5
+      },
+      "live_lights": 19,
+      "lights": 849,
+      "map": "sdc",
+      "relative": {
+        "cpu": 0.3171,
+        "lighting": 0.2165
+      },
+      "errors": []
+    }
+  }
+}

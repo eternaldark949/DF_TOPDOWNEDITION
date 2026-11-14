@@ -12,7 +12,7 @@ try:
  with sync_playwright() as pw:
   browser=pw.chromium.launch(headless=True,executable_path=which('chromium') or None,args=['--no-sandbox'])
   page=browser.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
-  page.goto(f'http://127.0.0.1:{server.server_port}/src/directory/examples/street-population.html',wait_until='networkidle')
+  page.goto(f'http://127.0.0.1:{server.server_port}/src/legacy/directory/examples/street-population.html',wait_until='networkidle')
   page.wait_for_timeout(1000)
   before=json.loads(page.locator('#stats').inner_text())
   page.locator('#combine-mass').check()

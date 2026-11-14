@@ -1,14 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createGameRuntime } from '../src/directory/game-runtime.mjs';
-import { createGameAssetLibrary } from '../src/directory/game-assets.mjs';
-import { gameEngine } from '../src/runtime/game-engine.mjs';
-import { gameLevel } from '../src/runtime/game-level.mjs';
-import { gameSession } from '../src/gameplay/game-session.mjs';
-import { PlayerStateSystem } from '../src/gameplay/player-state-system.mjs';
-import { Player } from '../src/entities/player.mjs';
-import rules from '../src/directory/game-player-rules.json' with {type:'json'};
+import { createGameRuntime } from '../src/game/boot/game-runtime.mjs';
+import { createGameAssetLibrary } from '../src/game/data/game-assets.mjs';
+import { gameEngine } from '../src/engine/lobby/runtime/game-engine.mjs';
+import { gameLevel } from '../src/engine/lobby/runtime/game-level.mjs';
+import { gameSession } from '../src/game/mechanics/game-session.mjs';
+import { PlayerStateSystem } from '../src/game/mechanics/player-state-system.mjs';
+import { Player } from '../src/game/entities/player.mjs';
+import rules from '../src/game/data/game-player-rules.json' with {type:'json'};
 const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-6,`${a} != ${b}`);
 class Room extends gameLevel {}
 async function ready(){const engine=createGameRuntime({schedule_frame:null});engine.registerLevel('a',Room).registerLevel('b',Room);await engine.loadLevel('a');engine.start();return engine;}
@@ -94,7 +94,7 @@ test('bad session/player snapshots reject and cannot silently spawn a replacemen
  assert.throws(()=>new gameSession({state:{...new gameSession().snapshot(),health:90}}),/Unsupported/);
 });
 test('gameplay conversion has no legacy host, DOM, Canvas, private grid or collision math dependency',()=>{
- for(const path of ['entities/player.mjs','gameplay/game-session.mjs','gameplay/player-state-system.mjs','gameplay/player-control-system.mjs']){
+ for(const path of ['game/entities/player.mjs','game/mechanics/game-session.mjs','game/mechanics/player-state-system.mjs','game/mechanics/player-control-system.mjs']){
   const code=readFileSync(new URL(`../src/${path}`,import.meta.url),'utf8');
   assert.doesNotMatch(code,/engineMixin|GameEngine|document\.|window\.|getContext\(|Math\.(atan2|hypot|sin|cos)|new (?:Spatial|spatial)|CollisionSystem|\.playerHealth/);
  }

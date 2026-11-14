@@ -14,12 +14,12 @@ try:
   page=browser.new_page();errors=[]
   page.route('**/favicon.ico',lambda route:route.fulfill(status=204))
   page.on('pageerror',lambda error:errors.append(str(error)))
-  page.goto(f'http://127.0.0.1:{server.server_port}/src/runtime/examples/index.html',wait_until='networkidle')
+  page.goto(f'http://127.0.0.1:{server.server_port}/src/game/examples/index.html',wait_until='networkidle')
   page.wait_for_function('!!globalThis.runtimeExample?.engine.active_level')
   report=page.evaluate('''async () => {
    const e=runtimeExample.engine;e.pause('weapon-art');
-   const {weaponAppearance}=await import('/src/presentation/weapon-appearance.mjs');
-   const {WEAPON_MODELS}=await import('/src/directory/weapon-appearance.mjs');
+   const {weaponAppearance}=await import('/src/game/presentation/weapon-appearance.mjs');
+   const {WEAPON_MODELS}=await import('/src/game/data/weapon-models.mjs');
    const ids=Object.keys(WEAPON_MODELS),a=e.api,art=await new weaponAppearance({resource_prefix:'weapon-acceptance'}).prepare(a.render);
    a.render.resize({width:640,height:ids.length*45+20,pixel_ratio:1});e.removeSystem('appearance');
    e.registerSystem('weapon-board',{render(c,blend,frame){frame.clear('#101018');ids.forEach((id,i)=>{for(const laser of [false,true])art.draw(frame,id,{laser,space:'screen',position:[80+(laser?320:0),30+i*45],scale:[3,3]});});}});

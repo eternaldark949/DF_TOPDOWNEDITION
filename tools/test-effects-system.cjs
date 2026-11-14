@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 'use strict';
-// The effects system (directory/effects-system.js) on the draw list (basement/draw-list.js): an effect only says what
+// The effects system (legacy/directory/effects-system.js) on the draw list (legacy/basement/draw-list.js): an effect only says what
 // it looks like, as shape packets; canvasRenderer is the only thing that touches the canvas. Spawning caps a list,
 // update ages it, clear empties every list, and each type's look fills a draw list the renderer turns into canvas calls.
 const assert = require('node:assert/strict');

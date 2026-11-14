@@ -1,0 +1,104 @@
+{
+  "library_id": "df_apartment",
+  "description": "Authored Silver Queen apartment assets. Furniture order preserves existing questState.aptLayout indices. Physics state is held only by Basement bodies.",
+  "resources": {
+    "rules": {
+      "kind": "interaction_rules",
+      "data": {
+        "MAP": "apt_949",
+        "RANGE": 90,
+        "QUERY_RANGE": 180,
+        "MOVE_MUL": 0.4,
+        "GRIP_GAP": 28,
+        "TURN": 0.2617993877991494,
+        "TURN_DURATION": 0.2,
+        "STIFFNESS": 300,
+        "DAMPING": 1,
+        "MAX_FORCE": 100000,
+        "INTERACTION_RANGE": 60,
+        "DOOR_DURATION": 0.3,
+        "NAMES": {
+          "apt_sofa": "Sofa",
+          "apt_coffee": "Coffee Table",
+          "apt_chair": "Armchair",
+          "apt_console": "Console",
+          "apt_plant": "Plant",
+          "apt_planter": "Planter",
+          "apt_stool": "Stool",
+          "apt_bed": "Bed",
+          "apt_side": "Side Table",
+          "apt_lounger": "Lounger",
+          "apt_bistro": "Bistro Set",
+          "apt_telescope": "Telescope",
+          "apt_dining": "Dining Table",
+          "apt_bench": "Bench",
+          "apt_chaise": "Chaise",
+          "apt_patio_sofa": "Patio Sofa"
+        }
+      }
+    }
+  },
+  "templates": {
+    "player": {
+      "extends": "df:player_949",
+      "entity_type": "df_player",
+      "movement": {
+        "max_speed": 312,
+        "acceleration": 20000,
+        "braking": 24000,
+        "arrival_distance": 2
+      },
+      "data": {
+        "role": "player",
+        "health": 100,
+        "max_health": 100
+      }
+    },
+    "furniture": {
+      "extends": "df:prop",
+      "entity_type": "df_apartment_prop",
+      "physics_type": "static",
+      "mass": 50,
+      "friction": 0.6,
+      "restitution": 0.1,
+      "linear_damping": 8,
+      "angular_damping": 8
+    },
+    "wall": {
+      "extends": "df:wall",
+      "data": {
+        "role": "wall"
+      }
+    },
+    "door": {
+      "extends": "df:prop",
+      "entity_type": "df_apartment_door",
+      "physics_type": "kinematic",
+      "mass": 20,
+      "friction": 0,
+      "restitution": 0,
+      "data": {
+        "role": "door"
+      }
+    },
+    "lamp": {
+      "extends": "df:decoration",
+      "data": {
+        "role": "lamp"
+      }
+    },
+    "transition": {
+      "extends": "df:trigger",
+      "data": {
+        "role": "transition"
+      },
+      "collision_mask": 0
+    },
+    "curtain": {
+      "extends": "df:decoration",
+      "data": {
+        "role": "curtain"
+      }
+    }
+  }
+}

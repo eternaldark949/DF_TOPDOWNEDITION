@@ -2,14 +2,14 @@ import test from 'node:test';
 import poses from './fixtures/actor-art/poses.json' with {type:'json'};
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {createDronePackets,dronePresentation} from '../src/presentation/drone.mjs';
-import {createVelvetCatArt,createVelvetEyePackets,createVelvetCatPackets} from '../src/presentation/velvet-cat.mjs';
-import {createVelvetAnimation,velvetPresentation} from '../src/presentation/velvet-cat-animation.mjs';
-import {actorPresentation} from '../src/presentation/actor-presentation.mjs';
-import {renderFrame,cameraSystem,canvasRenderer} from '../src/basement/rendering/index.mjs';
-import {artScene} from '../src/presentation/art-packets.mjs';
-import {createGameRuntime} from '../src/directory/game-runtime.mjs';
-import {gameLevel} from '../src/runtime/game-level.mjs';
+import {createDronePackets,dronePresentation} from '../src/game/presentation/drone.mjs';
+import {createVelvetCatArt,createVelvetEyePackets,createVelvetCatPackets} from '../src/game/presentation/velvet-cat.mjs';
+import {createVelvetAnimation,velvetPresentation} from '../src/game/presentation/velvet-cat-animation.mjs';
+import {actorPresentation} from '../src/game/presentation/actor-presentation.mjs';
+import {renderFrame,cameraSystem,canvasRenderer} from '../src/engine/basement/rendering/index.mjs';
+import {artScene} from '../src/engine/basement/rendering/index.mjs';
+import {createGameRuntime} from '../src/game/boot/game-runtime.mjs';
+import {gameLevel} from '../src/engine/lobby/runtime/game-level.mjs';
 const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
 const drone=(state='hover')=>structuredClone(poses['drone-'+state]);
 const cat=(pose='stand')=>structuredClone(poses['cat-'+pose]);
@@ -34,8 +34,8 @@ test('one packet producer failure cannot contaminate the next actor or rendering
  const bad={...cat(),_poses:{...cat()._poses,sleep:NaN}};assert.throws(()=>normalized(createVelvetCatPackets(bad)));assert.doesNotThrow(()=>normalized(createVelvetCatPackets(cat())));
 });
 test('producers/animation contain no Canvas backend calls or cached eye writes',()=>{
- for(const path of ['src/presentation/drone.mjs','src/presentation/velvet-cat.mjs','src/presentation/velvet-cat-animation.mjs','src/presentation/art-packets.mjs']){const source=readFileSync(new URL('../'+path,import.meta.url),'utf8');assert.doesNotMatch(source,/\b(?:ctx|context)\.|\bPath2D\b|\.getContext\(|createLinearGradient|createRadialGradient|_eyeWorld/);}
- const old=readFileSync(new URL('../src/entities/drones.js',import.meta.url),'utf8');assert.doesNotMatch(old,/_draw(?:Tendrils|Arms|Shell)\(/);
+ for(const path of ['src/game/presentation/drone.mjs','src/game/presentation/velvet-cat.mjs','src/game/presentation/velvet-cat-animation.mjs','src/engine/basement/rendering/art.mjs']){const source=readFileSync(new URL('../'+path,import.meta.url),'utf8');assert.doesNotMatch(source,/\b(?:ctx|context)\.|\bPath2D\b|\.getContext\(|createLinearGradient|createRadialGradient|_eyeWorld/);}
+ const old=readFileSync(new URL('../src/legacy/entities/drones.js',import.meta.url),'utf8');assert.doesNotMatch(old,/_draw(?:Tendrils|Arms|Shell)\(/);
 });
 class Room extends gameLevel{}
 test('native presentation submits real actors to an alternate backend without the legacy Canvas adapter',async()=>{

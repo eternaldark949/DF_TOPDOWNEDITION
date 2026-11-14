@@ -1,6 +1,8 @@
 # DF_TOPDOWNEDITION
 Repo for the top down edition of my game Dimensions Freelancer
 
+> **Working on the code?** Read [READ-FIRST/ENGINE-ARCHITECTURE.md](READ-FIRST/ENGINE-ARCHITECTURE.md) before anything else. It defines how the engine and the game are structured.
+
 ## Play
 Download **`DFAB V8.html`** and open it in your browser. That one file is the whole game, and it works offline.
 
@@ -25,19 +27,22 @@ Plug in or pair any standard controller (Xbox, PlayStation, most Bluetooth pads)
 - `assets/images` and `assets/audio` hold **your own images and sounds**. They're baked into the game file automatically (see the README inside each folder).
 - `tools/build.mjs` joins `src/` and `assets/` back into `DFAB V8.html`.
 
-The [new gameEngine runtime](src/runtime/README.md) owns the native physics API, shared clock, level lifecycle and composed systems. Its [browser example](src/runtime/examples/index.html) runs two Directory-authored levels in one world. The playable boot still uses the original `GameEngine` while shared classes and their callers are converted; importing the new runtime does not start another world.
+The [new gameEngine runtime](src/engine/lobby/runtime/README.md) owns the native physics API, shared clock, level lifecycle and composed systems. Its [browser example](src/game/examples/index.html) runs two Directory-authored levels in one world. The playable boot still uses the original `GameEngine` while shared classes and their callers are converted; importing the new runtime does not start another world.
 
-The [Basement controlSystem API](src/basement/controls/README.md) centralizes keyboard, mouse, gamepad and multi-touch input. The new runtime exposes it as `engine.api.controls`; bindings remain in the Directory.
+The [Basement controlSystem API](src/engine/basement/controls/README.md) centralizes keyboard, mouse, gamepad and multi-touch input. The new runtime exposes it as `engine.api.controls`; bindings remain in the Directory.
 
-The [shared rendering/camera API](src/basement/rendering/README.md) separates data-only frames from the Canvas backend. [Its browser example](src/runtime/examples/rendering.html) demonstrates the new runtime boundary; existing game artwork still needs class conversion.
+The [shared rendering/camera API](src/engine/basement/rendering/README.md) separates data-only frames from the Canvas backend. [Its browser example](src/game/examples/rendering.html) demonstrates the new runtime boundary; existing game artwork still needs class conversion.
 
-The [session/player API](src/gameplay/README.md) documents the shared session, native player health and abilities, and player input policy now installed by Directory composition. Production health/Flit consumers now use the shared player-vitals component; weapons, interactions, other gameplay policies and the production runtime switch remain under conversion.
+The [session/player API](src/game/mechanics/README.md) documents the shared session, native player health and abilities, and player input policy now installed by Directory composition. Production health/Flit consumers now use the shared player-vitals component; weapons, interactions, other gameplay policies and the production runtime switch remain under conversion.
 
 ## Adding your own images or sounds (works from the phone)
 1. On GitHub, open `assets/images` (or `assets/audio`), then choose **Add file → Upload files**.
 2. Give the file a simple name, like `portrait_949.png`.
 3. Commit. GitHub rebuilds `DFAB V8.html` for you within a minute or two.
 4. In code, use it by name: `drawAsset(ctx, 'portrait_949', x, y)` or `playSound('door_bell')`.
+
+## Moving to the new engine
+The [migration inventory](docs/migration/README.md) lists every classic script, where it goes on the Basement engine and what is still missing. CI checks that every new classic script gets a row.
 
 ## Building by hand (optional, needs Node 18+)
 ```

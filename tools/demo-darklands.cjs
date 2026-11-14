@@ -1,7 +1,7 @@
-// Darklands draft (buildings/suburb-house.js, entities/marionettes.js), in a shot on an empty outdoor map:
+// Darklands draft (legacy/buildings/suburb-house.js, legacy/entities/marionettes.js), in a shot on an empty outdoor map:
 // node tools/demo-darklands.cjs out.png [scene minutes zoom W H dsf]
 //   scene: 'street' (four houses), 'swarm' (949 and a swarm of marionettes), 'close' (marionettes up close),
-//          'gate' (the town gate, buildings/town-gate.js, with houses behind it; env OPEN sets the gates 0..1)
+//          'gate' (the town gate, legacy/buildings/town-gate.js, with houses behind it; env OPEN sets the gates 0..1)
 const { chromium } = require('playwright'); const path = require('path');
 const [out = 'darklands.png', scene = 'street', mins = 1380, zoom = 1, W = 1400, H = 900, dsf = 1] = process.argv.slice(2);
 (async () => {

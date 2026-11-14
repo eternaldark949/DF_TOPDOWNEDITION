@@ -1,0 +1,12 @@
+{
+  "map_id": "van_interior",
+  "props": [],
+  "lamps": [],
+  "npcs": [],
+  "soft_lights": [
+    {"x": 200, "y": 440, "radius": 200, "color": "#c02848", "intensity": 0.22, "flicker": 5},
+    {"x": 200, "y": 300, "radius": 150, "color": "#a469ff", "intensity": 0.16, "flicker": 0},
+    {"x": 200, "y": 580, "radius": 150, "color": "#a469ff", "intensity": 0.14, "flicker": 0},
+    {"x": 200, "y": 120, "radius": 90, "color": "#8fd8ff", "intensity": 0.16, "flicker": 0}
+  ]
+}

@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { physicsSystem, gameEntity } from '../src/basement/physics/index.mjs';
-import {registerGameEntityTypes} from '../src/directory/game-entity-types.mjs';
-import { createGameAssetLibrary } from '../src/directory/game-assets.mjs';
+import { physicsSystem, gameEntity } from '../src/engine/basement/physics/index.mjs';
+import {registerGameEntityTypes} from '../src/game/boot/game-entity-types.mjs';
+import { createGameAssetLibrary } from '../src/game/data/game-assets.mjs';
 
 test('Directory libraries create registered official entities for every declared template', () => {
     const p = new physicsSystem({ asset_library: createGameAssetLibrary() }); registerGameEntityTypes(p);
@@ -15,7 +15,7 @@ test('Directory libraries create registered official entities for every declared
     assert.equal(p.getStatistics().entities, p.elements.asset_library.listTemplates().length);
 });
 test('Directory resources resolve the existing database chapters rather than replacement copies', () => {
-    const assets = createGameAssetLibrary(), cast = JSON.parse(readFileSync(new URL('../src/directory/game-db/cast.json', import.meta.url), 'utf8'));
+    const assets = createGameAssetLibrary(), cast = JSON.parse(readFileSync(new URL('../src/game/data/game-db/cast.json', import.meta.url), 'utf8'));
     assert.deepEqual(assets.getResource('df:player_appearance').data, cast.appearances['949']);
     assert.ok(assets.getResource('df:vehicle_brands').data.LADY.models);
     assert.throws(() => assets.getResource('df:vehicle_brands').data.LADY = {});

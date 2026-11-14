@@ -1,6 +1,6 @@
 // The crowd's bakes against drawing each body live, in Chromium (needs Playwright):
 //   node tools/check-crowd-bakes.cjs
-// In each venue, every body the crowd draws from a bake (ui/crowd-impostors.js CrowdBakes: a walk frame, or a
+// In each venue, every body the crowd draws from a bake (legacy/ui/crowd-impostors.js CrowdBakes: a walk frame, or a
 // pose frame for someone standing or seated) is also drawn live, both into a little canvas of its own at the
 // view's scale and turn, and the pixels compared. A bake is drawn at its own resolution and scaled, so edges
 // soften a little: pmean is the average difference per painted pixel (0..255), big the share of painted pixels

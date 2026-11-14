@@ -1,5 +1,5 @@
 // WebGL humanoid trial: Canvas 2D vs WebGL timings for 26, 200 and 1000 people, plus a 300-person crowd's frames.
-// node tools/bench-webgl-humanoid.cjs "$PWD/DFAB V8.html" src/penthouse/gl-humanoid.js <out dir for PNG frames>
+// node tools/bench-webgl-humanoid.cjs "$PWD/DFAB V8.html" src/legacy/penthouse/gl-humanoid.js <out dir for PNG frames>
 const { chromium } = require('playwright'); const fs = require('fs');
 (async () => {
   const [file, glsrc, outDir] = process.argv.slice(2);

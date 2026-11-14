@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createGameRuntime} from '../src/directory/game-runtime.mjs';
-import {gameLevel} from '../src/runtime/game-level.mjs';
-import {GatlingGunner} from '../src/entities/gatling-gunner.mjs';
+import {createGameRuntime} from '../src/game/boot/game-runtime.mjs';
+import {gameLevel} from '../src/engine/lobby/runtime/game-level.mjs';
+import {GatlingGunner} from '../src/game/entities/gatling-gunner.mjs';
 class Room extends gameLevel{}
 async function setup({weapon_policy={}}={}){const engine=createGameRuntime({schedule_frame:null,weapon_policy,player:{template:'df:player_949',entity_type:'df_player',position:[500,500]}});engine.registerLevel('a',Room).registerLevel('b',Room);await engine.loadLevel('a');engine.start();const api=engine.api;api.session.player.maxHp=10000;api.session.player.hp=10000;return {engine,api,player:api.session.player,tick:(n=1)=>{for(let i=0;i<n;i++)engine.updateState();}};}
 const spawn=(api,data={})=>api.actors.spawn({kind:'gatling_gunner',position:[740,500],rotation:Math.PI,data});

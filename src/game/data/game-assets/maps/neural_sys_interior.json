@@ -1,0 +1,43 @@
+{
+  "map_id": "neural_sys_interior",
+  "props": [
+    {"type": "ns_counter", "x": 400, "y": 220},
+    {"type": "ns_console", "x": 120, "y": 120},
+    {"type": "ns_console", "x": 120, "y": 300, "look": {"station": "skin"}},
+    {"type": "ns_console", "x": 820, "y": 120, "look": {"station": "vocal"}},
+    {"type": "ns_console", "x": 820, "y": 300, "look": {"station": "chroma"}},
+    {"type": "ns_pod", "x": 150, "y": 620},
+    {"type": "ns_server", "x": 650, "y": 590},
+    {"type": "ns_server", "x": 730, "y": 590},
+    {"type": "ns_server", "x": 810, "y": 590},
+    {"type": "ns_server", "x": 890, "y": 590},
+    {"type": "ns_table", "x": 270, "y": 130},
+    {"type": "ns_table", "x": 650, "y": 130},
+    {"type": "ns_table", "x": 250, "y": 325, "width": 90, "height": 65},
+    {"type": "ns_table", "x": 660, "y": 325, "width": 90, "height": 65},
+    {"type": "ns_sofa", "x": 255, "y": 455},
+    {"type": "ns_sofa", "x": 615, "y": 455},
+    {"type": "ns_planter", "x": 65, "y": 450},
+    {"type": "ns_planter", "x": 903, "y": 450},
+    {"type": "ns_tree", "x": 206, "y": 253},
+    {"type": "ns_tree", "x": 776, "y": 253},
+    {"type": "ns_tree", "x": 423, "y": 469},
+    {"type": "ns_tree", "x": 559, "y": 469}
+  ],
+  "lamps": [
+    {"x": 300, "y": 200, "lampType": 3, "color": "#c8d8ee", "lightRadius": 320},
+    {"x": 700, "y": 200, "lampType": 3, "color": "#c8d8ee", "lightRadius": 320},
+    {"x": 500, "y": 400, "lampType": 3, "color": "#89a9d2", "lightRadius": 300},
+    {"x": 500, "y": 230, "lampType": 5, "color": "#d8cbb6", "lightRadius": 200},
+    {"x": 200, "y": 650, "lampType": 3, "color": "#d8cbb6", "lightRadius": 200},
+    {"x": 775, "y": 650, "lampType": 3, "color": "#5275ad", "lightRadius": 200},
+    {"x": 500, "y": 700, "lampType": 3, "color": "#9fb9da", "lightRadius": 250},
+    {"x": 215, "y": 262, "lampType": 4, "color": "#a678ff", "lightRadius": 150, "apply": {"visible": false}},
+    {"x": 785, "y": 262, "lampType": 4, "color": "#a678ff", "lightRadius": 150, "apply": {"visible": false}},
+    {"x": 432, "y": 478, "lampType": 4, "color": "#a678ff", "lightRadius": 150, "apply": {"visible": false}},
+    {"x": 568, "y": 478, "lampType": 4, "color": "#a678ff", "lightRadius": 150, "apply": {"visible": false}}
+  ],
+  "npcs": [
+    {"class": "NPC", "args": [500, 170, "Prisma", "shopkeeper"]}
+  ]
+}

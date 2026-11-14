@@ -1,5 +1,5 @@
 /*
- * The loading screen's art (src/styles/loading-screen.css), drawn here at build time as small SVGs so it is
+ * The loading screen's art (src/legacy/styles/loading-screen.css), drawn here at build time as small SVGs so it is
  * in the page's first bytes: nothing has to load or run before the loading screen can paint.
  *
  *   url(@art:skyline-far)          a far row of towers, a tile that repeats sideways

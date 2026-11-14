@@ -14,7 +14,7 @@ try:
   page=browser.new_page(viewport={'width':1000,'height':900},device_scale_factor=2);errors=[]
   page.route('**/favicon.ico',lambda route:route.fulfill(status=204))
   page.on('pageerror',lambda error:errors.append(str(error)));page.on('console',lambda message:errors.append(message.text) if message.type=='error' else None)
-  page.goto(f'http://127.0.0.1:{server.server_port}/src/runtime/examples/rendering.html',wait_until='networkidle')
+  page.goto(f'http://127.0.0.1:{server.server_port}/src/game/examples/rendering.html',wait_until='networkidle')
   page.wait_for_function('!!globalThis.renderingExample?.engine.active_level')
   pixels=page.evaluate('''() => {
    const e=renderingExample.engine;e.pause('verification');e.render();
@@ -34,7 +34,7 @@ try:
   report=page.evaluate('''async () => {
    const e=renderingExample.engine,a=e.api,before=JSON.stringify(a.physics.savePhysicsState());for(let i=0;i<10;i++)e.render(.4);
    const frame=a.render.getFrameSnapshot(),stable=before===JSON.stringify(a.physics.savePhysicsState()),old=document.getElementById('scene');
-   const module=await import('/src/basement/rendering/index.mjs');a.render.registerRenderer('alternate-canvas',module.canvasRenderer);
+   const module=await import('/src/engine/basement/rendering/index.mjs');a.render.registerRenderer('alternate-canvas',module.canvasRenderer);
    let rejected=false;try{await a.render.setRenderer('alternate-canvas',{surface:old});}catch{rejected=true;}
    const replacement=document.createElement('canvas');replacement.id='scene';old.replaceWith(replacement);
    await a.render.setRenderer('alternate-canvas',{surface:replacement});e.render();

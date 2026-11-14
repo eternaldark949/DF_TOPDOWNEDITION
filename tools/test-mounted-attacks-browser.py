@@ -15,7 +15,7 @@ try:
   page.route('**/favicon.ico',lambda route:route.fulfill(status=204))
   page.on('pageerror',lambda error:errors.append(str(error)))
   page.on('console',lambda message:errors.append(message.text) if message.type=='error' else None)
-  page.goto(f'http://127.0.0.1:{server.server_port}/src/runtime/examples/',wait_until='networkidle')
+  page.goto(f'http://127.0.0.1:{server.server_port}/src/game/examples/',wait_until='networkidle')
   page.wait_for_function('!!globalThis.runtimeExample?.engine.active_level')
   page.select_option('#weapon','pistol_fpx');page.click('#mounted-demo')
   initial=page.evaluate('''()=>{const {engine,player}=runtimeExample,api=engine.api,car=api.elements.getEntities({entity_type:'df_traffic_vehicle'})[0],npc=api.actors.getActors().find(actor=>actor.entity_type==='df_npc'),target=api.actors.getActors().find(actor=>actor.name==='Practice target');globalThis.mountedCheck={car,npc,target,body:player.body,grid:api.physics.spatial_grid,shots:0};api.session.on('attack:executed',event=>{if(event.entity_id===player.entity_id)mountedCheck.shots++;});return {mounted:api.physics.getAttachmentState(player).parent_body_id===car.entity_id,npcMounted:npc.inCar,combined:api.physics.getAttachmentState(npc).combine_mass};}''')

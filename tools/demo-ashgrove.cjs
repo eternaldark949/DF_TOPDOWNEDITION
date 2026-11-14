@@ -1,4 +1,4 @@
-// The Ashgrove on the hub (buildings/ashgrove.js), in a shot: node tools/demo-ashgrove.cjs out.png [minutes viewX viewY zoom W H dsf]
+// The Ashgrove on the hub (legacy/buildings/ashgrove.js), in a shot: node tools/demo-ashgrove.cjs out.png [minutes viewX viewY zoom W H dsf]
 // env PX PY: the vantage (the player; the lean leans away from it). Defaults: night, from Foundry Rd.
 const { chromium } = require('playwright'); const path = require('path');
 const [out = 'ashgrove.png', mins = 1380, vx = 8680, vy = 9380, zoom = 1.1, W = 1300, H = 1300, dsf = 1] = process.argv.slice(2);

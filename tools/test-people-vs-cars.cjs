@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 'use strict';
-// People vs cars (directory/collision-system.js _processPeopleVsCars, basement/collision-kit.js): a car meets whoever is
+// People vs cars (legacy/directory/collision-system.js _processPeopleVsCars, legacy/basement/collision-kit.js): a car meets whoever is
 // on foot with its real body, every tick and along its path, so nobody ends up inside one and a fast one can't skip past.
 const assert = require('node:assert/strict');
 const { join } = require('node:path');

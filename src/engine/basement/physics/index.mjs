@@ -1,0 +1,31 @@
+// ===== LV0 BASEMENT =====
+export { physicsSystem } from './core/system.mjs';
+export { physicsBody } from './core/body.mjs';
+export { collisionShape } from './collision/shape.mjs';
+export { collisionDetector } from './collision/detector.mjs';
+export { contactSolver } from './collision/solver.mjs';
+export { spatialGrid } from './spatial/grid.mjs';
+export { physicsConstraint, constraintSolver } from './constraints/constraint.mjs';
+export { characterMotor } from './motors/character.mjs';
+export { vehicleMotor, pathMotor } from './motors/vehicle.mjs';
+export { projectileMotor } from './motors/projectile.mjs';
+export { particlePhysics } from './particles/particles.mjs';
+export { gameEntity } from './elements/entity.mjs';
+export { gameElements } from './elements/registry.mjs';
+export { EMPTY_DATA_SOURCE, isDataSource } from './elements/data-source.mjs';
+export { gameCharacter, gameVehicle, gameProjectile, gameProp, gameStatic, gameTrigger, gameDecoration, awarenessMatrix } from './elements/elements.mjs';
+export { BODY_GROUP, QUERY_GROUP, PHYSICS_TYPES } from './core/values.mjs';
+export { trafficController } from './traffic/controller.mjs';
+export { motionController } from './motion/controller.mjs';
+export { pathGeometry } from './motion/path-geometry.mjs';
+export { navigationSystem } from './navigation/system.mjs';
+export { navigationField } from './navigation/field.mjs';
+export { roadNetwork } from './navigation/road-network.mjs';
+export { layoutGeometry } from './motion/layout-geometry.mjs';
+
+export {rigDefinition} from './animation/rig-definition.mjs';
+export {rigPose} from './animation/rig-pose.mjs';
+export {animationClip} from './animation/animation-clip.mjs';
+export {animationController} from './animation/animation-controller.mjs';
+export {rigSystem} from './animation/rig-system.mjs';
+export {IK_SOLVERS,ikGoal,solveIk} from './animation/ik.mjs';

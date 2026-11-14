@@ -1,0 +1,18 @@
+{
+  "map_id": "biggs_arena",
+  "props": [],
+  "lamps": [
+    {"x": 260, "y": 270, "lampType": 4, "color": "#f0d9b8", "lightRadius": 430, "apply": {"visible": false}},
+    {"x": 640, "y": 270, "lampType": 4, "color": "#f0d9b8", "lightRadius": 430, "apply": {"visible": false}},
+    {"x": 260, "y": 590, "lampType": 4, "color": "#dfcbd1", "lightRadius": 400, "apply": {"visible": false}},
+    {"x": 640, "y": 590, "lampType": 4, "color": "#dfcbd1", "lightRadius": 400, "apply": {"visible": false}},
+    {"x": 81, "y": 180, "lampType": 3, "fixture": "twin_sconce", "angle": 0, "color": "#e8b989", "lightRadius": 190},
+    {"x": 819, "y": 180, "lampType": 3, "fixture": "twin_sconce", "angle": 3.141592653589793, "color": "#e8b989", "lightRadius": 190},
+    {"x": 81, "y": 650, "lampType": 3, "fixture": "twin_sconce", "angle": 0, "color": "#e8b989", "lightRadius": 190},
+    {"x": 819, "y": 650, "lampType": 3, "fixture": "twin_sconce", "angle": 3.141592653589793, "color": "#e8b989", "lightRadius": 190},
+    {"x": 450, "y": 810, "lampType": 4, "color": "#f6d4a2", "lightRadius": 190, "apply": {"visible": false}}
+  ],
+  "npcs": [
+    {"class": "NPC", "args": [450, 780, "Biggs", "shopkeeper"]}
+  ]
+}

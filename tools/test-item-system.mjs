@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { itemSystem } from '../src/gameplay/items/item-system.mjs';
-import { createItemCatalog } from '../src/directory/game-items.mjs';
-import { gameSession } from '../src/gameplay/game-session.mjs';
+import { itemSystem } from '../src/game/mechanics/items/item-system.mjs';
+import { createItemCatalog } from '../src/game/data/game-items.mjs';
+import { gameSession } from '../src/game/mechanics/game-session.mjs';
 const catalog=createItemCatalog();
 const make=options=>new itemSystem({catalog,...options});
 
