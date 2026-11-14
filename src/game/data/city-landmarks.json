@@ -288,5 +288,51 @@
       ]
     },
     "script_font": "Anthropology, \"Great Vibes\", \"URW Chancery L\", \"Z003\", cursive"
+  },
+  "ashgrove": {
+    "plan": {
+      "w": 820,
+      "d": 470,
+      "hero": 1.5,
+      "storey": 18
+    },
+    "teal": {
+      "stone": "#40806f",
+      "stone_mid": "#336a5c",
+      "stone_lo": "#214b40",
+      "stone_dk": "#0e2622",
+      "stone_hi": "#9ad6bf",
+      "stone_lt": "#5f9e89",
+      "trim": "#e6e1d2",
+      "trim_lo": "#a29c8d",
+      "trim_dk": "#6f6a5f",
+      "frame": "#11171a"
+    },
+    "lime": {
+      "stone": "#d8cdb3",
+      "stone_mid": "#c7bb9f",
+      "stone_lo": "#a89c80",
+      "stone_dk": "#6e6450",
+      "stone_hi": "#fbf4e2",
+      "stone_lt": "#e8dfc8",
+      "trim": "#ece5d2",
+      "trim_lo": "#b3a98f",
+      "trim_dk": "#7a705c",
+      "frame": "#15181b"
+    },
+    "brick": {
+      "brick": "#cfc6b2",
+      "brick_lo": "#b8ae98",
+      "mortar": "rgba(84, 78, 64, 0.3)"
+    },
+    "slate": {
+      "slate": "#3b4450",
+      "slate_lo": "#2a313a",
+      "slate_hi": "#5b6674",
+      "copper": "#5f9e89"
+    },
+    "gold": "#d8b46a",
+    "warm": "#ffcf8a",
+    "name_font": "Montserrat, \"Cinzel\", serif"
   }
 }

@@ -11,7 +11,8 @@ import { artScene, rect, linear } from '../../engine/basement/rendering/index.mj
  *
  * The definition (one per landmark, `city-landmark-*.mjs`) is `{plan: {W, D}, hero, facing, tiers, ground, order}`:
  * each tier `{id, poly | rect: [x, y, w, h], z0, z1, on, fill, paint, roof, roof_glow, top, ledges: [{z,
- * out, th, top, band, lip}], shade: [r, g, b], solid, rise}`, laid out with its front at the bottom (+y);
+ * out, th, top, band, lip}], shade: [r, g, b], solid, rise, lit_under}` (`lit_under`: its day strip shows faintly
+ * under its light by night, at that alpha), laid out with its front at the bottom (+y);
  * facing 'N' turns it round. The classic kit is `legacy/buildings/tiered-kit.js`.
  */
 export const TIER = { z_scale: 2, tile: [40, 14], error: .75, foot: 22, contact: 8, light: [-.78, .62] };
@@ -154,7 +155,7 @@ export class tieredBuilding {
     }
     /** A face's slice of its tier's strip, as stamps in tiles. */
     #lay(view, f, strip, zoom, extra = {}) {
-        const Z = this.tier.z_scale, out = [], overlap = extra.blend ? .25 : 1;
+        const Z = this.tier.z_scale, out = [], overlap = extra.blend || extra.opacity !== undefined ? .25 : 1;
         for (const tile of view.tiles(f, f.z0 * Z, f.z1 * Z, { zoom, error: this.tier.error, max: [this.tier.tile[0], this.tier.tile[1] * Z], overlap })) {
             const m = tile.matrix, matrix = [m[0], m[1], m[2], m[3], m[4] - f.u0 * m[0], m[5] - f.u0 * m[1]];
             out.push({ picture: { ...strip, matrix, source: [f.u0 + tile.u0, f.z1 * Z - tile.z1, tile.u1 - tile.u0, tile.z1 - tile.z0] }, ...extra });
@@ -227,6 +228,7 @@ export class tieredBuilding {
         const view = this.view(base), out = [];
         for (const t of this.order(view)) {
             const art = new artScene(); art.enter({}, { blend: 'destination-out' }).fill(pathOf(this.hull(view, t)), '#000').leave(); out.push(...art.finish());
+            if (t.lit_under) for (const f of this.seen(view, t)) out.push(...this.#lay(view, f, this.strips[t.i].day, zoom, { opacity: glow * t.lit_under }));
             for (const f of this.seen(view, t)) out.push(...this.#lay(view, f, this.strips[t.i].lit, zoom, { blend: 'add', opacity: glow }));
             if (t.roof && t.roof_glow) out.push({ picture: this.#roof(view, t, true), blend: 'add', opacity: glow });
             if (t.top) { const top = new artScene(); top.enter({}, { blend: 'add', opacity: glow }); t.top(top, true, t, this, view, time); top.leave(); out.push(...top.finish()); }
