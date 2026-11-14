@@ -20,18 +20,22 @@ const stops=(list,color)=>list.map(([o,c])=>[o,c==='$color'?color:c]);
  *
  * A polygon is kept until its light moves or changes reach, or a light blocker in its reach changes
  * (the world's light revision). Stale shadows are rebuilt nearest the view first within
- * `look.lamp.shadow_budget_ms` a frame; one past the budget keeps its last shape for a frame. A light
+ * `look.lamp.shadow_budget_ms` a frame; one past the budget keeps its last shape for a frame, and one
+ * outside the view with no shape yet waits (one in view is always cast). A light
  * goes back into the still pictures once its shadow has held for `look.lamp.settle` s.
  */
 export class sceneLighting{
     #world;#polygons=new Map();#now;#spent=0;
     constructor(world,{look=LIGHTING,now=()=>performance.now()}={}){this.#world=world;this.look=look;this.#now=now;}
     /** The light's kept shadow, rebuilt when it is stale and the frame's shadow budget allows (a light with none yet is always built). */
-    #polygon(light,time){
+    #polygon(light,time,urgent){
         const key=light.id??`${light.position}`,at=`${light.position[0]},${light.position[1]},${light.radius},${light.shadows}`,cached=this.#polygons.get(key);
         const query={origin:light.position,radius:light.radius,include_moving:light.shadows==='dynamic'},revision=this.#world.getLightRevision(query);
         if(cached?.at===at&&cached.revision===revision)return cached;
-        if(cached&&this.#spent>=this.look.lamp.shadow_budget_ms){cached.changed_at=time;return cached;}   // waits a frame with its last shape
+        if(this.#spent>=this.look.lamp.shadow_budget_ms){
+            if(cached){cached.changed_at=time;return cached;}   // waits a frame with its last shape
+            if(!urgent)return null;                              // one not yet in view waits for its first
+        }
         const t0=this.#now(),next={at,revision,points:this.#world.getVisibilityPolygon({...query,resolution:this.look.lamp.resolution}).points,changed_at:cached?time:-Infinity};
         this.#spent+=this.#now()-t0;this.#polygons.set(key,next);return next;
     }
@@ -59,12 +63,13 @@ export class sceneLighting{
         const out=[],[cx,cy]=bounds?[(bounds.left+bounds.right)/2,(bounds.top+bounds.bottom)/2]:extent?[(extent.left+extent.right)/2,(extent.top+extent.bottom)/2]:[0,0];
         this.#spent=0;   // shadow rebuilds share one budget a frame, nearest the view first
         const order=lights.map((l,i)=>[l.shadows==='none'?Infinity:Math.hypot(l.position[0]-cx,l.position[1]-cy),i]).sort((a,b)=>a[0]-b[0]),shadows=new Map();
-        for(const [d,i] of order){if(d===Infinity)break;const l=lights[i];if((l.lit??1)>=.01)shadows.set(i,this.#polygon(l,time));}
+        for(const [d,i] of order){if(d===Infinity)break;const l=lights[i];if((l.lit??1)>=.01)shadows.set(i,this.#polygon(l,time,!bounds||meets(l,bounds)));}
         for(const [i,l] of lights.entries()){
             const lit=l.lit??1;if(lit<.01)continue;
             const f=this.#animate(l,time),steady=(l.animation?.kind??'steady')==='steady';
             if(l.shadows!=='none'){
-                const shadow=shadows.get(i),k=(l.intensity??1)*lit*f,settled=time-shadow.changed_at>=look.lamp.settle;
+                const shadow=shadows.get(i);if(!shadow)continue;
+                const k=(l.intensity??1)*lit*f,settled=time-shadow.changed_at>=look.lamp.settle;
                 const still=steady?(settled?true:'glow'):false;   // a moving shadow cuts live, its unshadowed colour stays baked
                 if(still!==true&&bounds&&!meets(l,bounds))continue;
                 out.push({still,position:l.position,radius:l.radius,inner_radius:look.lamp.inner_radius,polygon:shadow.points,intensity:k,cut:look.lamp.cut,color:l.color,glow:base*Math.min(1,k),glow_stops:stops(look.lamp.glow_stops,l.color)});continue;
