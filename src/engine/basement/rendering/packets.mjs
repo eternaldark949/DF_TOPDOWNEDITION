@@ -34,10 +34,11 @@ export function material(packet={},out={}){
     return out;
 }
 export function packet(input,out={}){
-    if(!input||!['shape','sprite','text'].includes(input.type))throw new TypeError('Expected a shape, sprite or text packet');out.type=input.type;
+    if(!input||!['shape','sprite','text','picture'].includes(input.type))throw new TypeError('Expected a shape, sprite, text or picture packet');out.type=input.type;
     out.layer=finite(input.layer??0,'layer');out.depth=finite(input.depth??0,'depth');out.space=input.space??'world';if(!['world','screen'].includes(out.space))throw new TypeError('Invalid coordinate space');
     out.opacity=finite(input.opacity??1,'opacity',0);if(out.opacity>1)throw new TypeError('Opacity must be in [0,1]');out.blend=input.blend??'normal';if(!Object.hasOwn(BLENDS,out.blend))throw new TypeError('Unsupported blend');
-    out.transform=transform(input,out.transform);out.material_id=input.material_id===undefined?null:identifier(input.material_id);out.material=out.material_id?null:material(input.material,out.material??{});
+    out.transform=transform(input,out.transform);out.material_id=input.material_id===undefined?null:identifier(input.material_id);out.material=out.material_id||input.type==='picture'?null:material(input.material,out.material??{});
+    if(input.type==='picture'){if(input.material_id!==undefined||input.material!==undefined)throw new TypeError('A picture carries its own paint');picture(input,out);}else{out.picture=null;out.prepare=false;if(out.build)out.build=null;}
     out.geometry_id=null;out.geometry=null;out.resource_id=null;out.text=null;
     if(input.type!=='sprite'){out.size=null;out.source=null;out.origin=null;}
     if(input.type!=='text'){out.font=null;out.align=null;out.baseline=null;}
@@ -57,9 +58,21 @@ export function packet(input,out={}){
     clips.forEach((clip,i)=>{const dst=out.clips[i]??{};dst.geometry_id=clip.geometry_id===undefined?null:identifier(clip.geometry_id);dst.geometry=dst.geometry_id?null:geometry(clip.geometry,dst.geometry??{});dst.transform=matrix(clip.transform??[1,0,0,1,0,0],dst.transform);dst.inverse=inverse(dst.transform);dst.rule=clip.rule??'nonzero';if(!['nonzero','evenodd'].includes(dst.rule))throw new TypeError('Invalid clip rule');out.clips[i]=dst;});
     return out;
 }
+// A picture's build is code, so it stays off the data: snapshots and clones see everything else.
+function picture(input,out){
+    const p=input.picture;if(!p||typeof p!=='object')throw new TypeError('A picture packet needs a picture');
+    if(typeof p.key!=='string'||!p.key)throw new TypeError('A picture needs a key');if(typeof p.build!=='function')throw new TypeError('A picture needs a build function');
+    const dst=out.picture??{};dst.key=p.key;dst.bounds=rect4(p.bounds,'picture bounds',dst.bounds??[]);if(!(dst.bounds[2]>0&&dst.bounds[3]>0))throw new TypeError('A picture needs finite bounds');
+    dst.matrix=matrix(p.matrix??[1,0,0,1,0,0],dst.matrix??[]);dst.source=p.source?rect4(p.source,'picture source',dst.source??[]):null;dst.layered=p.layered===true;out.picture=dst;
+    out.prepare=input.prepare===true;
+    if(!Object.hasOwn(out,'build'))Object.defineProperty(out,'build',{writable:true,enumerable:false,value:null});out.build=p.build;
+}
+function rect4(value,name,out){if(!Array.isArray(value)||value.length!==4)throw new TypeError(`Invalid ${name}`);for(let i=0;i<4;i++)out[i]=finite(value[i],name);return out;}
 function matrixSource(source,out){if(!Array.isArray(source)||source.length!==4)throw new TypeError('Sprite source must be [x,y,width,height]');for(let i=0;i<4;i++)out[i]=finite(source[i],'sprite source',0);if(!out[2]||!out[3])throw new TypeError('Empty sprite source');return out;}
 export function requirements(draw,resolve,result=[]){
-    result.length=0;result.push(draw.type,`blend:${draw.blend}`);const g=draw.geometry_id?resolve(draw.geometry_id,'geometry').geometry:draw.geometry,m=draw.material_id?resolve(draw.material_id,'material').material:draw.material;
+    result.length=0;result.push(draw.type,`blend:${draw.blend}`);
+    if(draw.type==='picture'){if(draw.clips.length)result.push('clip');for(const clip of draw.clips){const g=clip.geometry_id?resolve(clip.geometry_id,'geometry').geometry:clip.geometry;result.push(`geometry:${g.type}`);}return result;}
+    const g=draw.geometry_id?resolve(draw.geometry_id,'geometry').geometry:draw.geometry,m=draw.material_id?resolve(draw.material_id,'material').material:draw.material;
     if(g)result.push(`geometry:${g.type}`);if(draw.clips.length)result.push('clip');if(m.shadow)result.push('shadow');if(m.dash.length)result.push('dash');
     for(const p of [m.fill,m.stroke])if(p&&typeof p==='object')result.push(`gradient:${p.type}`);
     for(const clip of draw.clips){const g=clip.geometry_id?resolve(clip.geometry_id,'geometry').geometry:clip.geometry;result.push(`geometry:${g.type}`);}

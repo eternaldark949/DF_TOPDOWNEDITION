@@ -50,7 +50,7 @@ Common packet fields:
 
 | Field | Contract |
 |---|---|
-| `type` | `shape`, `sprite`, or `text`. |
+| `type` | `shape`, `sprite`, `text`, or `picture`. |
 | `space` | `world` (default) or viewport-relative `screen`. |
 | `layer`, `depth` | Finite numbers; lower first, then stable submission order. |
 | `position`, `rotation`, `scale` | Local-to-world/screen transform; centers, radians, `[1,1]` default scale. |
@@ -92,6 +92,16 @@ frame.endPass();
 frame.submit({type:'sprite',space:'screen',resource_id:'lighting:buffer',
               position:[400,300],size:[800,600],blend:'add'});
 ```
+
+A `picture` packet is art painted once and stamped every frame: `{type:'picture', picture:{key, bounds:[x,y,w,h], matrix, source, layered, build}, prepare}` with the common fields (no `material`). `build()` returns the packets the picture shows, in local units inside `bounds`; it is the one function a frame accepts, kept off the packet's data (a snapshot or a clone leaves it behind). The backend stamps it from its own picture cache (see `pictureCache`) under the packet's transform times `matrix`, only the part inside `source` when given (a tile of a strip), at the packet's `opacity` and `blend`; `prepare: true` only paints it ahead of need and draws nothing. The Canvas backend takes `new canvasRenderer({pictures})`, a `pictureCache` or the options for one, and starts its painting budget afresh each frame. The key must name everything the picture shows. A backend declares the `picture` capability.
+
+```js
+frame.beginPass({layer:{scale:.5, blend:'multiply', opacity:1}, clear_color:'#0a0c18'});
+// submit the light layer: the dark, its cuts (destination-out), its colour (add)
+frame.endPass();
+```
+
+A layer pass (`beginPass({layer:{scale = 1, blend = 'normal', opacity = 1}, clear_color})`) draws into a fresh off-screen surface the size of its enclosing pass (times `scale`, for a cheaper softer layer), cleared to `clear_color`, and `endPass` lays it over that pass at `opacity` with `blend`. Its packets' blends act only on the layer, and its pictures paint their own base (`layered`), so a light layer's dark with its cuts can be cached. A layer pass takes no target or viewport and cannot open another pass. A backend declares the `layer` capability.
 
 `endPass` creates a continuation of the previous pass without clearing it. Default pass viewport dimensions inherit from the enclosing pass; supply dimensions explicitly when using a cache-sized coordinate system. Targets have fixed physical pixel dimensions, while pass viewport dimensions define logical coordinates. Scaling is handled by the backend. A pass cannot sample the target it is currently writing.
 

@@ -24,12 +24,16 @@ function buildPath(target,g){
     }
 }
 const overlays=new WeakMap(),layers=new WeakMap();
-const capabilities=Object.freeze(['shape','sprite','text','geometry:rect','geometry:ellipse','geometry:path','gradient:linear','gradient:radial','clip','shadow','dash','target',...Object.keys(BLENDS).map(name=>`blend:${name}`)]);
+const capabilities=Object.freeze(['shape','sprite','text','geometry:rect','geometry:ellipse','geometry:path','gradient:linear','gradient:radial','clip','shadow','dash','target','picture','layer',...Object.keys(BLENDS).map(name=>`blend:${name}`)]);
 
 /** Canvas implementation of the packet contract. Contexts and Canvas/GPU-like handles stay private. */
 export class canvasRenderer {
-    #surface;#context;#viewport;#resources=new Map();#createSurface;#decodeImage;#createPath;#disposed=false;#generation=0;
-    constructor({create_surface=createSurface,decode_image=decodeImage,create_path=()=>typeof Path2D==='undefined'?null:new Path2D()}={}){this.#createSurface=create_surface;this.#decodeImage=decode_image;this.#createPath=create_path;}
+    #surface;#context;#viewport;#resources=new Map();#createSurface;#decodeImage;#createPath;#disposed=false;#generation=0;#pictures;#layer=null;#ask={};
+    /** `pictures` is the pictureCache that picture packets are stamped from, or the options for a new one. */
+    constructor({create_surface=createSurface,decode_image=decodeImage,create_path=()=>typeof Path2D==='undefined'?null:new Path2D(),pictures={}}={}){
+        this.#createSurface=create_surface;this.#decodeImage=decode_image;this.#createPath=create_path;
+        this.#pictures=pictures instanceof pictureCache?pictures:new pictureCache({create_surface,...pictures});
+    }
     /** Migration boundary for hosts which already own a Canvas pass. Artists still supply only data. */
     static drawPackets(context,packets){
         if(!context?.canvas||typeof context.getTransform!=='function')throw new TypeError('A host Canvas context is required');
@@ -142,12 +146,20 @@ export class canvasRenderer {
         if(m.fill!==null)entry.path?ctx.fill(entry.path,rule):ctx.fill(rule);
         if(m.stroke!==null&&m.stroke_width>0)entry.path?ctx.stroke(entry.path):ctx.stroke();
     }
-    #draw(ctx,draw,view,sx,sy){
+    // A picture stamped from the cache under the packet's transform; inside a layer its own base comes with it.
+    #picture(ctx,draw,layered){
+        const st=this.#set,alpha=draw.opacity,composite=BLENDS[draw.blend];
+        if(st.globalAlpha!==alpha){ctx.globalAlpha=alpha;st.globalAlpha=alpha;}if(st.globalCompositeOperation!==composite){ctx.globalCompositeOperation=composite;st.globalCompositeOperation=composite;}
+        const p=draw.picture,ask=this.#ask;ask.key=p.key;ask.bounds=p.bounds;ask.matrix=p.matrix;ask.source=p.source;ask.layered=layered||p.layered;ask.stamp=!draw.prepare;ask.blend=draw.blend;
+        if(this.#pictures.draw(ctx,ask,draw.build)==='vector')this.#set={};   // the vector fallback drew packets of its own
+    }
+    #draw(ctx,draw,view,sx,sy,layered=false){
         const clipped=draw.clips.length>0;   // only a clip needs the context saved: everything else is set for each packet
         if(clipped){ctx.save();this.#set={};}
         try{
             const m=draw.space==='world'?view.world_to_screen:[1,0,0,1,0,0];ctx.setTransform(m[0]*sx,m[1]*sy,m[2]*sx,m[3]*sy,m[4]*sx,m[5]*sy);ctx.transform(...draw.transform);
             for(const clip of draw.clips){ctx.transform(...clip.transform);const entry=this.#geometry(clip.geometry_id,clip.geometry);if(entry.path)ctx.clip(entry.path,clip.rule);else{buildPath(ctx,entry.descriptor.geometry);ctx.clip(clip.rule);}ctx.transform(...clip.inverse);}
+            if(draw.type==='picture'){this.#picture(ctx,draw,layered);return;}
             const material=draw.material_id?this.#resources.get(draw.material_id).descriptor.material:draw.material;this.#style(ctx,material,draw,sx,sy);
             if(draw.type==='shape')this.#shape(ctx,this.#geometry(draw.geometry_id,draw.geometry),material);
             else if(draw.type==='sprite'){
@@ -163,17 +175,30 @@ export class canvasRenderer {
     render(frame){
         this.#live();
         if(frame.format_version!==1)throw new TypeError('Unsupported render frame version');
+        this.#pictures.beginFrame();
+        const main={surface:this.#surface,context:this.#context},find=id=>id===null?main:this.#resources.get(id);
         for(const pass of frame.passes){
-            const target=pass.target_id===null?{surface:this.#surface,context:this.#context}:this.#resources.get(pass.target_id),ctx=target.context;
+            const layer=pass.layer,into=layer?find(layer.into):null,target=layer?this.#layerOver(into.surface,layer.scale):find(pass.target_id),ctx=target.context;
             const sx=target.surface.width/pass.viewport.width,sy=target.surface.height/pass.viewport.height;
             ctx.save();this.#set={};
             try{
-                if(pass.clear_color!==false){ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.clearRect(0,0,target.surface.width,target.surface.height);ctx.fillStyle=pass.clear_color;ctx.fillRect(0,0,target.surface.width,target.surface.height);}
-                for(const draw of pass.packets)this.#draw(ctx,draw,frame.view,sx,sy);
+                if(pass.clear_color!==false||layer){ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.clearRect(0,0,target.surface.width,target.surface.height);if(pass.clear_color!==false){ctx.fillStyle=pass.clear_color;ctx.fillRect(0,0,target.surface.width,target.surface.height);}}
+                for(const draw of pass.packets)this.#draw(ctx,draw,frame.view,sx,sy,!!layer);
             }finally{ctx.restore();this.#set={};}
+            if(layer){
+                const out=into.context;out.save();
+                try{out.setTransform(1,0,0,1,0,0);out.globalAlpha=layer.opacity;out.globalCompositeOperation=BLENDS[layer.blend];out.shadowColor='transparent';out.shadowBlur=0;out.imageSmoothingEnabled=true;out.drawImage(target.surface,0,0,into.surface.width,into.surface.height);}
+                finally{out.restore();}
+            }
         }
     }
-    dispose(){if(this.#disposed)return;this.#disposed=true;this.#generation++;for(const entry of this.#resources.values())this.#release(entry);this.#resources.clear();this.#context=null;this.#surface=null;}
+    // One off-screen surface serves every layer pass in turn: each is laid over its pass before the next begins.
+    #layerOver(base,scale){
+        const w=Math.max(1,Math.round(base.width*scale)),h=Math.max(1,Math.round(base.height*scale));
+        if(!this.#layer){const surface=this.#createSurface(w,h),context=surface.getContext('2d');if(!context)throw new Error('Layer surface unavailable');this.#layer={surface,context};}
+        if(this.#layer.surface.width!==w)this.#layer.surface.width=w;if(this.#layer.surface.height!==h)this.#layer.surface.height=h;return this.#layer;
+    }
+    dispose(){if(this.#disposed)return;this.#disposed=true;this.#generation++;for(const entry of this.#resources.values())this.#release(entry);this.#resources.clear();this.#pictures.clear();if(this.#layer)this.#release(this.#layer);this.#layer=null;this.#context=null;this.#surface=null;}
 }
 
 let measurer=null;

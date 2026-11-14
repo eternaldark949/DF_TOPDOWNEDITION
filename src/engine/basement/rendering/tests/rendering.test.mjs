@@ -176,3 +176,44 @@ test('a view readied ahead grows on the side the camera moves toward',async()=>{
  assert.deepEqual(viewAhead(view,5),{left:-5,top:-5,right:105,bottom:55});
  assert.throws(()=>aheadOf({margin:-1}),/margin/);assert.throws(()=>viewAhead(view,{left:1,top:1,right:1}),/ahead bottom/);
 });
+
+// A context that keeps its transform, so pictures can read it back.
+function tracked(){
+ const ctx=context();let m=[1,0,0,1,0,0];const mul=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
+ const set=ctx.setTransform,turn=ctx.transform,saved=[],save=ctx.save,restore=ctx.restore;ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
+ ctx.setTransform=(...a)=>{set(...a);m=a.length===1?[a[0].a,a[0].b,a[0].c,a[0].d,a[0].e,a[0].f]:a;};ctx.transform=(...a)=>{turn(...a);m=mul(m,a);};
+ ctx.getTransform=()=>({a:m[0],b:m[1],c:m[2],d:m[3],e:m[4],f:m[5]});
+ ctx.save=()=>{save();saved.push([m,ctx.globalAlpha,ctx.globalCompositeOperation]);};ctx.restore=()=>{restore();[m,ctx.globalAlpha,ctx.globalCompositeOperation]=saved.pop();};
+ ctx.drawImage=(...a)=>ctx.calls.push(['drawImage',...a,ctx.globalAlpha,ctx.globalCompositeOperation]);
+ const s=surface(ctx);ctx.canvas=s;return s;
+}
+
+test('picture packets are stamped from the backend\'s cache and keep their build off the data',async()=>{
+ const {render}=fixture(),main=tracked(),made=[];
+ class Canvas extends canvasRenderer{constructor(){super({create_surface:(w,h)=>{const s=tracked();s.width=w;s.height=h;made.push(s);return s;}});}}
+ render.registerRenderer('canvas',Canvas);await render.setRenderer('canvas',{surface:main});
+ let builds=0;const picture={key:'sign:1',bounds:[-10,-10,20,20],build:()=>{builds++;return [rect('#0f0',{position:[0,0]})];}};
+ for(let i=0;i<3;i++){render.beginFrame().submit({type:'picture',picture,position:[50,50],opacity:.5});render.endFrame();}
+ assert.equal(builds,1,'painted once, stamped after');assert.equal(made.length,1);
+ const stamps=main.ctx.calls.filter(c=>c[0]==='drawImage'&&c[1]===made[0]);assert.equal(stamps.length,3);assert.equal(stamps[0].at(-2),.5,'at the packet\'s opacity');
+ const snap=render.getFrameSnapshot().passes[0].packets[0];assert.equal(snap.picture.key,'sign:1');assert.equal(snap.build,undefined,'the snapshot is data only');
+ render.beginFrame().submit({type:'picture',picture,prepare:true});render.endFrame();assert.equal(main.ctx.calls.filter(c=>c[0]==='drawImage'&&c[1]===made[0]).length,3,'a prepare packet draws nothing');
+ const frame=render.beginFrame();assert.throws(()=>frame.submit({type:'picture',picture:{key:'x',bounds:[0,0,1,1]}}),/build/);assert.throws(()=>frame.submit({type:'picture',picture,material:{fill:'#fff'}}),/own paint/);render.abortFrame();
+ render.dispose();
+ const plain=fixture();class Old{constructor(){this.capabilities=['shape','blend:normal'];}initialize(){}resize(){}render(){}registerResource(){}releaseResource(){}getSurfaceBounds(){}dispose(){}}
+ plain.render.registerRenderer('old',Old);await plain.render.setRenderer('old',{surface:{}});plain.render.beginFrame().submit({type:'picture',picture});assert.throws(()=>plain.render.endFrame(),/capability unavailable: picture/);plain.render.dispose();
+});
+
+test('a layer pass draws into a scaled surface laid over its pass at its blend and opacity',async()=>{
+ const frame=new renderFrame();frame.begin(view().getView());frame.submit(rect());frame.beginPass({layer:{scale:.5,blend:'multiply',opacity:.8},clear_color:'#000'});frame.submit(rect());
+ assert.throws(()=>frame.beginPass(),/layer pass cannot/);frame.endPass();frame.submit(rect());
+ assert.deepEqual(frame.finish().passes.map(p=>[p.target_id,p.layer?.blend??null]),[[null,null],[null,'multiply'],[null,null]]);
+ frame.begin(view().getView());assert.throws(()=>frame.beginPass({layer:{scale:2}}),/scale/);assert.throws(()=>frame.beginPass({layer:{},target_id:'t'}),/no target/);frame.abort();
+ const {render}=fixture(),main=tracked(),made=[];
+ class Canvas extends canvasRenderer{constructor(){super({create_surface:(w,h)=>{const s=tracked();s.width=w;s.height=h;made.push(s);return s;}});}}
+ render.registerRenderer('canvas',Canvas);await render.setRenderer('canvas',{surface:main});
+ const f=render.beginFrame();f.submit(rect());f.beginPass({layer:{scale:.5,blend:'multiply',opacity:.8},clear_color:'#000'});f.submit(rect('#fff',{blend:'destination-out'}));f.endPass();render.endFrame();
+ const layer=made[0];assert.deepEqual([layer.width,layer.height],[100,100],'half the 200 px surface');assert.ok(layer.ctx.calls.some(c=>c[0]==='fillRect'),'the layer was cleared to its colour');assert.ok(layer.ctx.calls.some(c=>c[0]==='fill'));
+ const over=main.ctx.calls.find(c=>c[0]==='drawImage'&&c[1]===layer);assert.deepEqual(over.slice(2),[0,0,200,200,.8,'multiply']);assert.equal(main.ctx.stack,0);assert.equal(layer.ctx.stack,0);
+ render.beginFrame().beginPass({layer:{}}).endPass();render.endFrame();assert.equal(made.length,1,'one layer surface serves every frame');render.dispose();
+});

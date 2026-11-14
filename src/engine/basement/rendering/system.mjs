@@ -70,8 +70,10 @@ export class renderSystem {
             const frame=this.#frame.finish(),caps=this.#backend?new Set(this.#backend.capabilities):null;
             for(const pass of frame.passes){
                 if(pass.target_id!==null){this.#resource(pass.target_id,'target');if(caps&&!caps.has('target'))throw new Error('Renderer does not support targets');}
+                if(pass.layer&&caps&&!caps.has('layer'))throw new Error('Renderer capability unavailable: layer');
+                const writes=pass.layer?pass.layer.into:pass.target_id;
                 for(const draw of pass.packets){
-                    if(draw.resource_id===pass.target_id&&pass.target_id!==null)throw new Error('A pass cannot sample its own render target');
+                    if(draw.resource_id===writes&&writes!==null)throw new Error('A pass cannot sample its own render target');
                     for(const need of requirements(draw,(id,types)=>this.#resource(id,types),this.#requirements))if(caps&&!caps.has(need))throw new Error(`Renderer capability unavailable: ${need}`);
                 }
             }
