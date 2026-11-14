@@ -7,6 +7,7 @@ import { streetApartment } from './city-street-apartments.mjs';
 import { tieredBuilding } from './city-tiered.mjs';
 import { cozyCafe } from './city-landmark-cozy-cafe.mjs';
 import { warehouse } from './city-landmark-warehouse.mjs';
+import { drYins } from './city-landmark-dr-yins.mjs';
 
 /**
  * The city's street buildings as art, from the looks its generator resolved (the `look` of each exported
@@ -96,7 +97,7 @@ function* cellsOf([x0, y0, x1, y1]) { for (let x = Math.floor(x0 / CELL); x <= M
 const mul = (a, b) => [a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1], a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3], a[0] * b[4] + a[2] * b[5] + a[4], a[1] * b[4] + a[3] * b[5] + a[5]];
 const VARIANTS = { shop: streetShop, arcade: streetArcade, apt: streetApartment };
 /** The landmarks drawn natively so far, by their classic class. */
-const LANDMARKS = { CozyCafeBuilding: cozyCafe, WarehouseHall: warehouse };
+const LANDMARKS = { CozyCafeBuilding: cozyCafe, WarehouseHall: warehouse, DrYinsBuilding: drYins };
 
 /** Its front's frame: x along the front (left to right, seen from the street), y in from the back, the front at y = fd. */
 function frameOf(facing, W, D) {

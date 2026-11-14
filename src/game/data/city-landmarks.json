@@ -112,5 +112,28 @@
       "hero": 1.5
     },
     "name_font": "Montserrat, Helvetica, sans-serif"
+  },
+  "dr_yins": {
+    "colors": {
+      "teal": "#1c3434",
+      "teal_lo": "#0e1c1c",
+      "teal_hi": "#2a4a4a",
+      "fin": "#0b1616",
+      "glass": "#0a1a1c",
+      "cyan": "#00f3ff",
+      "cyan_soft": "#7affd8",
+      "frost": "#5f8a88",
+      "frost_hi": "#86b0ad",
+      "ink": "#061010"
+    },
+    "plan": {
+      "w": 500,
+      "d": 400,
+      "ward": 54,
+      "wing": 30,
+      "lobby": 14,
+      "hero": 1.5
+    },
+    "font": "Montserrat, Helvetica, sans-serif"
   }
 }
