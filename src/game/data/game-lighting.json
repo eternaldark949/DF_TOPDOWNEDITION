@@ -1,7 +1,9 @@
 {
+ "tile_size": 1024,
+ "tile_ahead": 512,
  "indoor": { "tint": "rgb(22, 10, 48)", "darkness": 0.95, "lamp_glow": 0.08 },
  "outdoor": { "lamp_glow": 0.22 },
- "lamp": { "inner_radius": 10, "cut": [[0, 1], [1, 0]], "glow_stops": [[0, "#ffffff"], [0.1, "$color"], [0.6, "$color"], [1, "rgba(0,0,0,0)"]], "resolution": 64, "settle": 0.3 },
+ "lamp": { "inner_radius": 10, "cut": [[0, 1], [1, 0]], "glow_stops": [[0, "#ffffff"], [0.1, "$color"], [0.6, "$color"], [1, "rgba(0,0,0,0)"]], "resolution": 64, "settle": 0.3, "shadow_budget_ms": 1 },
  "soft": { "cut": [[0, 1], [0.45, 0.45], [1, 0]], "glow": 0.22, "glow_stops": [[0, "$color"], [1, "rgba(0,0,0,0)"]], "color": "#ffd9b0", "intensity": 0.8 },
  "area": { "cut": [[0, 1], [0.5, 0.9], [1, 0]], "soft_cut": [[0, 1], [0.3, 0.85], [0.7, 0.35], [1, 0]], "glow": 0.22, "glow_stops": [[0, "$color"], [0.55, "$color"], [1, "rgba(0,0,0,0)"]] },
  "flicker": { "floor": 0.82, "swing": 0.18 }

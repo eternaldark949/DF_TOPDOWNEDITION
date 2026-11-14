@@ -89,3 +89,27 @@ Phase 3 (the one-sweep shadow cast and per-frame budgets) is where this cost com
 | Scene | Frame CPU | Light layer |
 |---|---|---|
 | apartment-door | 26.8 ms (was 14.6) | 12.0 ms (was 2.0) |
+
+## November 14, later still: the fast path (phase 3)
+
+- **One sweep.** The shadow cast keeps only the edges facing the light within its reach, joins edges end to
+  end on a line, and sweeps once round the light: 0.61 to 0.16 ms an apartment lamp, the same shape.
+- **Change counters.** Light blockers count up per-cell counters when they move, change or go; a light keeps
+  the revision under its reach and recasts only when it moves on. Walls built or removed now recast too.
+- **Tiles.** Still light is baked into 1024 px tiles (the region size), only those in view stamped and those
+  within 512 px painted ahead of the camera; a change repaints only the tiles its light reaches.
+- **Budgets.** Shadow rebuilds share 1 ms a frame, nearest the view first. Lights out of view are skipped.
+
+Two new scenes measure the native light layer alone, built from the map definition and drawn as the native
+host draws it: `light-cafe` (the cafe at night) and `light-street` (a 6000 px street, 72 lamps, 12 vending
+machines, 8 doors always sliding, the camera panning). They hold the light layer only.
+
+| Scene | Light layer | Shadows | Lights live |
+|---|---|---|---|
+| light-cafe | 1.9 ms (classic cafe: 9.5) | 0 | 1 of 16 (the vending machine's pulse) |
+| light-street | 8.0 ms | 0.7 ms | 12 of 86 |
+| apartment-door | 9.8 ms (was 12.0) | | |
+
+The street without its doors moving costs 4.3 ms panning and 2.4 ms standing. What is left is drawing the
+live lights on Chromium's software canvas (about 0.4 ms each for a 320 px lamp): every lamp beside a moving
+door is live. The apartment-door and light scenes' baselines were recorded with this change.

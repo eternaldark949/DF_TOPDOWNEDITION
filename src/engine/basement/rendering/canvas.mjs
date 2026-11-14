@@ -58,7 +58,7 @@ export class canvasRenderer {
             if(!entry.picture){run.push(entry);continue;}
             flush();if(!pictures)throw new TypeError('A layer with pictures needs a pictureCache');if(!Object.hasOwn(BLENDS,entry.blend??'normal'))throw new TypeError('Unsupported blend');
             lc.globalCompositeOperation=BLENDS[entry.blend??'normal'];
-            try{pictures.draw(lc,{...entry.picture,layered:true},entry.picture.build);count++;}finally{lc.globalCompositeOperation='source-over';}
+            try{pictures.draw(lc,{...entry.picture,layered:true,stamp:!entry.prepare},entry.picture.build);if(!entry.prepare)count++;}finally{lc.globalCompositeOperation='source-over';}
         }
         flush();
         context.save();
@@ -181,28 +181,34 @@ export class pictureCache{
     /** A fresh painting budget, once a frame. */
     beginFrame(){this.#spent=0;}
     get statistics(){return Object.freeze({pictures:[...this.#entries.values()].filter(e=>e.surface).length,bytes:this.#bytes});}
-    /** Draws the picture; returns how: 'stamp' (from the cache), 'paint' (painted now, then stamped) or 'vector'. */
-    draw(context,{key,bounds,matrix=[1,0,0,1,0,0],layered=false},build){
+    /**
+     * Draws the picture; returns how: 'stamp' (from the cache), 'paint' (painted now, then stamped) or 'vector'.
+     * With `stamp: false` it only paints the picture ahead of need, if the frame's budget allows ('paint'),
+     * and draws nothing ('kept' when it is already painted, 'later' when the budget is spent).
+     */
+    draw(context,{key,bounds,matrix=[1,0,0,1,0,0],layered=false,stamp=true},build){
         if(!context?.canvas||typeof context.getTransform!=='function')throw new TypeError('A host Canvas context is required');
         if(typeof key!=='string'||!key)throw new TypeError('A picture needs a key');
         const [bx,by,bw,bh]=bounds;if(![bx,by,bw,bh].every(Number.isFinite)||!(bw>0&&bh>0))throw new TypeError('A picture needs finite bounds');
         const t=context.getTransform(),m=multiply([t.a,t.b,t.c,t.d,t.e,t.f],matrix),scale=Math.max(Math.hypot(m[0],m[1]),Math.hypot(m[2],m[3]));
         const density=this.#densities.find(d=>d>=scale-1e-9);
-        const vector=packets=>{context.save();try{context.transform(...matrix);canvasRenderer.drawPackets(context,packets??build());}finally{context.restore();}return 'vector';};
-        if(density===undefined||this.#entries.get(key)?.vector)return vector();
+        const vector=packets=>{context.save();try{context.transform(...matrix);context.beginPath();context.rect(bx,by,bw,bh);context.clip();canvasRenderer.drawPackets(context,packets??build());}finally{context.restore();}return 'vector';};   // a picture is only its bounds, painted or not
+        if(density===undefined||this.#entries.get(key)?.vector)return stamp?vector():'later';
         const id=`${key}@${density}`;let entry=this.#entries.get(id),how='stamp';
+        if(!stamp&&entry){this.#entries.delete(id);this.#entries.set(id,entry);return 'kept';}
         if(!entry){
-            if(this.#spent>=this.#budget_ms)return vector();
+            if(this.#spent>=this.#budget_ms)return stamp?vector():'later';
             const t0=this.#now(),packets=build();
-            if(!layered&&packets.some(p=>(p.blend??'normal')!=='normal')){this.#entries.set(key,{vector:true,bytes:0});return vector(packets);}
+            if(!layered&&packets.some(p=>(p.blend??'normal')!=='normal')){this.#entries.set(key,{vector:true,bytes:0});return stamp?vector(packets):'later';}
             const W=Math.ceil(bw*density),H=Math.ceil(bh*density),bytes=W*H*4;
-            if(bytes>this.#max_bytes)return vector(packets);
+            if(bytes>this.#max_bytes)return stamp?vector(packets):'later';
             this.#evict(bytes);
             const surface=this.#create_surface(W,H),ctx=surface.getContext('2d');if(!ctx)throw new Error('Picture surface unavailable');
             ctx.setTransform(W/bw,0,0,H/bh,-bx*W/bw,-by*H/bh);canvasRenderer.drawPackets(ctx,packets);
             entry={surface,bytes};this.#bytes+=bytes;this.#spent+=this.#now()-t0;how='paint';
         }else this.#entries.delete(id);
         this.#entries.set(id,entry);
+        if(!stamp)return how;
         context.save();
         try{context.transform(...matrix);context.drawImage(entry.surface,bx,by,bw,bh);}finally{context.restore();}
         return how;

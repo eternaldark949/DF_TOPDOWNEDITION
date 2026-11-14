@@ -9,6 +9,7 @@ import { collisionShape, shapeReach, shapeBounds } from '../collision/shape.mjs'
 import { collisionDetector } from '../collision/detector.mjs';
 import { contactSolver } from '../collision/solver.mjs';
 import { spatialGrid } from '../spatial/grid.mjs';
+import { changeCounters } from '../spatial/changes.mjs';
 import { physicsQueries, referenceBody, referencePosition } from '../spatial/queries.mjs';
 import { characterMotor } from '../motors/character.mjs';
 import { vehicleMotor } from '../motors/vehicle.mjs';
@@ -32,7 +33,7 @@ export class physicsSystem {
     #stepping = false; #dispatching = false; #committing = false;
     #tick = 0; #motionEnvelope = null;
     #stepAuthority; #broadphaseEpoch=0; #candidateCache=null;
-    #queries; #particles; #attachments; #projectilePolicies=new Set();
+    #queries; #particles; #attachments; #projectilePolicies=new Set(); #lightChanges;
     #stats = { steps: 0, narrow_checks: 0, candidate_pairs: 0, active_movers: 0, spatial_sync_requests: 0, spatial_sync_skips: 0, bounds_calculations: 0, swept_bounds_calculations: 0, attachment_placements: 0, broadphase_builds: 0, broadphase_reuses: 0 };
     constructor({ cell_size = 128, fixed_step = 1 / 60, gravity = [0, 0], solver_iterations = 6, sleep_speed = 0.05, sleep_delay = 0.5, asset_library, step_authority, navigation } = {}) {
         if (step_authority !== undefined && typeof step_authority !== 'symbol') throw new TypeError('step_authority must be a private Symbol');
@@ -41,6 +42,7 @@ export class physicsSystem {
             solver_iterations: number(solver_iterations, 'solver_iterations', 1, 32), sleep_speed: number(sleep_speed, 'sleep_speed', 0), sleep_delay: number(sleep_delay, 'sleep_delay', 0) }), enumerable: true });
         if (!Number.isInteger(solver_iterations)) throw new TypeError('solver_iterations must be integral');
         Object.defineProperty(this, 'spatial_grid', { value: new spatialGrid({ cell_size }), enumerable: true });
+        this.#lightChanges = new changeCounters({ cell_size: cell_size * 2 });
         Object.defineProperty(this, 'elements', { value: new gameElements(this, { asset_library }), enumerable: true });
         Object.defineProperty(this, 'motion', { value: new motionController(this), enumerable: true });
         Object.defineProperty(this, 'rigs', { value: new rigSystem(this), enumerable: true });
@@ -73,9 +75,24 @@ export class physicsSystem {
         }
         return this.#motionEnvelope;
     }
+    /**
+     * Light blockers (by the default rule: not a ghost, `blocks_light`, else in the static group) count
+     * up the light change counters under where they were and where they are, whenever they move,
+     * change or go. getLightRevision reads them.
+     */
+    #lightTouch(r, changed) {
+        const c = r.config, blocks = !r.removed && bodyActive(r) && physical(r) && !c.ghost && (c.blocks_light ?? !!(c.collision_group & BODY_GROUP.STATIC));
+        if (!blocks && !r.light_bounds) return;
+        const bounds = blocks ? liveBounds(r) : null, last = r.light_bounds;
+        if (!changed && last && bounds && last.left === bounds.left && last.right === bounds.right && last.top === bounds.top && last.bottom === bounds.bottom) return;
+        if (last) this.#lightChanges.touch(last);
+        if (bounds) this.#lightChanges.touch(bounds);
+        r.light_bounds = bounds;
+    }
     #sync(r, swept = false) {
         this.#motionEnvelope=null;this.#stats.spatial_sync_requests++;
         if(r.removed)return;
+        const configChanged=r.light_config!==r.config;r.light_config=r.config;
         if(r.broadphase_config!==r.config||r.broadphase_mount!==r.parent_mount){
             const old=r.broadphase_config,next=r.config;
             if(!old||old.physics_type!==next.physics_type||old.active!==next.active||old.collision_group!==next.collision_group||old.collision_mask!==next.collision_mask
@@ -84,6 +101,7 @@ export class physicsSystem {
         }
         this.navigation._bodySynced(r);
         if(!bodyActive(r)){
+            this.#lightTouch(r,true);
             if(r.indexed)this.spatial_grid.removeInstance(r.id);
             r.indexed=false;r.spatial_cache=null;this.#moving.delete(r);r.moving_member=false;return;
         }
@@ -100,8 +118,10 @@ export class physicsSystem {
             ||swept&&(cache.px!==px||cache.py!==py||cache.previous_rotation!==r.previous_rotation))this.#broadphaseEpoch++;
         if(r.indexed&&cache&&cache.x===x&&cache.y===y&&cache.rotation===rotation&&cache.shape===r.shape&&cache.render===render&&cache.light===light
             &&cache.swept===swept&&(!swept||cache.px===px&&cache.py===py&&cache.previous_rotation===r.previous_rotation)){
+            if(configChanged)this.#lightTouch(r,true);
             this.#stats.spatial_sync_skips++;return;
         }
+        this.#lightTouch(r,configChanged);
         let bounds=swept?sweptBounds(r):liveBounds(r);
         if(render)bounds=unionBounds(bounds,bodyBounds(r,'render'));
         if(light)bounds=unionBounds(bounds,bodyBounds(r,'light'));
@@ -205,7 +225,7 @@ export class physicsSystem {
         const r = this._record(value);
         this._mutate(() => {
             if (r.removed) return;
-            this.#motionEnvelope = null;this.#candidateCache=null; this.spatial_grid.removeInstance(r.id); r.indexed = false; r.removed = true; this.#bodies.delete(r.id); this.#moving.delete(r);
+            this.#motionEnvelope = null;this.#candidateCache=null; this.spatial_grid.removeInstance(r.id); r.indexed = false; r.removed = true; this.#lightTouch(r, true); this.#bodies.delete(r.id); this.#moving.delete(r);
             this.navigation._bodyRemoved(r); this.#attachments._bodyRemoved(r); this.rigs._bodyRemoved(r.id); this.elements._bodyRemoved(r.id); this.traffic.removeVehicle(r.id); this.motion._remove(r.id); this.#particles._bodyRemoved(r.id);
             for (const [id, c] of this.#constraints) { const cr = constraintRecord(c); if (cr.a === r || cr.b === r) this.#constraints.delete(id); }
         });
@@ -647,7 +667,8 @@ export class physicsSystem {
     shapeCast(packet, results) { return this.#queries.shapeCast(packet, results); }
     overlapShape(packet, results) { return this.#queries.overlapShape(packet, results); }
     getVisibilityPolygon(packet) { return this.#queries.getVisibilityPolygon(packet); }
-    getMovingLightBlockers(packet) { return this.#queries.getMovingLightBlockers(packet); }
+    /** The newest light change within `radius` of `origin`: a kept visibility polygon is stale once this moves on. */
+    getLightRevision({ origin, radius }) { const [x, y] = vector(origin), d = number(radius, 'radius', 0); return this.#lightChanges.revision({ left: x - d, right: x + d, top: y - d, bottom: y + d }); }
     isPlacementClear(body_or_shape, position, options) { return this.#queries.isPlacementClear(body_or_shape, position, options); }
     findClearPlacement(packet, result) { return this.#queries.findClearPlacement(packet, result); }
     findPath(packet, result) { const path = this.navigation.findPath(packet); return path && result ? Object.assign(result, path) : path; }

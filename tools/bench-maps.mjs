@@ -33,7 +33,11 @@ const SCENES = [
     { id: 'apartment-door', title: 'A door swinging open and shut beside the apartment lamps', map: 'apt_949', setup: 'door' },
     { id: 'city-night', title: 'A city street at night, standing', map: 'sdc', setup: 'spawn' },
     // (the drive's light layer is kept but not held: it costs 10 or 25 ms a frame by whether the cached light rebuilds in the window)
-    { id: 'city-drive', title: 'Driving across the city at night (autodrive to the clinic)', map: 'sdc', setup: 'drive', hold: ['cpu'] }
+    { id: 'city-drive', title: 'Driving across the city at night (autodrive to the clinic)', map: 'sdc', setup: 'drive', hold: ['cpu'] },
+    // The native light layer on its own (phase 3's gate): built from the map's definition, drawn each frame as the
+    // apartment host draws it (half resolution, tiles and still pictures), with no game around it.
+    { id: 'light-cafe', title: 'The native light layer over the cafe at night', light: 'cafe', hold: ['lighting'] },
+    { id: 'light-street', title: 'The native light layer over a dense test street: 72 lamps, 8 doors sliding, 12 vending machines, the camera panning', light: 'street', hold: ['lighting'] }
 ];
 
 const args = process.argv.slice(2), flag = name => args.includes(name);
@@ -62,6 +66,68 @@ function calibrate() {
     once();
     const runs = Array.from({ length: 7 }, () => once().ms).sort((a, b) => a - b);
     return runs[3];
+}
+
+/**
+ * In the page (a blank one): build a map in a physics world, light it with the game's look and draw the light
+ * layer every frame for `duration` ms after `warmup`, as the native apartment host does. Returns the layer's
+ * cost a frame (`lighting`, and `cpu` the same), the shadow rebuilds' share, and how many lights stayed live.
+ */
+async function measureLight({ scene, duration, warmup }) {
+    const { physicsSystem } = await import('/src/engine/basement/physics/index.mjs');
+    const { mapInstance } = await import('/src/engine/basement/maps/index.mjs');
+    const { canvasRenderer, pictureCache } = await import('/src/engine/basement/rendering/index.mjs');
+    const { sceneLighting, levelLights } = await import('/src/game/presentation/lighting.mjs');
+    const { PROP_TYPES } = await import('/src/game/data/game-maps.mjs');
+    const physics = new physicsSystem(), W = 1280, H = 720, scale = .5;
+    let definition, options = { prop_types: PROP_TYPES }, camera, doors = [];
+    if (scene === 'cafe') {
+        const { interiorMapDefinition, APARTMENT_MAP_OPTIONS } = await import('/src/game/levels/apartment-definition.mjs');
+        const places = (await import('/src/game/data/game-db/places.json', { with: { type: 'json' } })).default;
+        ({ definition } = interiorMapDefinition({ map_id: 'cozy_cafe_interior', map: places.maps.cozy_cafe_interior, rooms: places.rooms.cozy_cafe_interior }));
+        options = { ...APARTMENT_MAP_OPTIONS, templates: {} };
+        camera = t => [definition.spawn[0], definition.spawn[1]];
+    } else {
+        // A street 6000 px long: shopfronts on both sides with a doorway each 500 px, a lamp every 160 px on each kerb,
+        // vending machines by every other doorway; eight doors slide open and shut out of step.
+        const walls = [], lights = [], placements = [], street = [];
+        for (let x = 0; x < 6000; x += 500) for (const y of [300, 900]) { walls.push({ x, y, w: 440, h: 12 }); street.push({ x: x + 440, y, w: 60, h: 12, orientation: 'H', type: 'sliding' }); }
+        for (let x = 80; x < 6000; x += 160) for (const y of [380, 820]) lights.push({ position: [x, y], radius: 320, color: '#ffc890' });
+        for (let x = 250; x < 6000; x += 1000) for (const y of [330, 870]) placements.push({ type: 'vending_machine', x, y: y - 30, width: 40, height: 60 });
+        definition = { map_id: 'bench_street', size: [6000, 1200], walls, lights, placements, doors: street.slice(0, 8) };
+        camera = t => [640 + (t * .3) % 4600, 600];
+    }
+    const map = new mapInstance(physics, definition, options);
+    doors = scene === 'street' ? map.entities('door') : [];
+    const level = { physics, lamps: map.entities('lamp'), props: map.entities('prop'), definition };
+    const lighting = new sceneLighting(physics), pictures = new pictureCache({ max_bytes: 32 * 1048576, budget_ms: 12, densities: [.125, .25, .5, 1, 2] });
+    const extent = { left: 0, top: 0, right: definition.size[0], bottom: definition.size[1] };
+    const canvas = Object.assign(document.createElement('canvas'), { width: W * scale, height: H * scale }), ctx = canvas.getContext('2d');
+    let shadow_ms = 0; const cast = physics.getVisibilityPolygon.bind(physics);
+    physics.getVisibilityPolygon = p => { const t0 = performance.now(), r = cast(p); shadow_ms += performance.now() - t0; return r; };
+    const homes = doors.map(d => [...d.position]), frames = [], shadows = [], live = [];
+    const start = performance.now();
+    await new Promise(done => {
+        const frame = () => {
+            const now = performance.now(), t = now - start;
+            doors.forEach((d, i) => d.updateBody({ position: [homes[i][0] + 30 * (1 + Math.sin(t / 700 + i)), homes[i][1]] }));
+            const [cx, cy] = camera(t), view = { left: cx - W / 2, top: cy - H / 2, right: cx + W / 2, bottom: cy + H / 2 };
+            shadow_ms = 0; const t0 = performance.now();
+            pictures.beginFrame();
+            const layer = lighting.createLayer({ extent, bounds: view, kind: 'indoor', lights: levelLights(level), time: t / 1000 });
+            ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.setTransform(scale, 0, 0, scale, -view.left * scale, -view.top * scale);
+            canvasRenderer.drawLayer(ctx, layer.packets, { opacity: layer.opacity, pictures });
+            ctx.getImageData(0, 0, 1, 1);
+            const ms = performance.now() - t0;
+            if (t >= warmup) { frames.push(ms); shadows.push(shadow_ms); live.push(layer.live); }
+            if (t < warmup + duration) requestAnimationFrame(frame); else done();
+        };
+        requestAnimationFrame(frame);
+    });
+    const stat = list => { const sorted = [...list].sort((a, b) => a - b); return { mean: list.reduce((a, b) => a + b, 0) / list.length, p95: sorted[Math.floor(sorted.length * .95)] }; };
+    const lit = stat(frames);
+    return { frames: frames.length, cpu: lit, lighting: lit, shadows: { mean: +stat(shadows).mean.toFixed(3), p95: +stat(shadows).p95.toFixed(3) }, live_lights: +stat(live).mean.toFixed(1), lights: levelLights(level).length, map: definition.map_id };
 }
 
 /** In the page: load the scene's map at night and put the player (or her car, or a door) to work. */
@@ -129,13 +195,21 @@ try {
     for (const scene of chosen) {
         const page = await browser.newPage({ viewport: { width: 1280, height: 720 } }), errors = [];
         page.on('pageerror', e => errors.push(String(e)));
-        await page.goto(`http://127.0.0.1:${server.address().port}/DFAB%20V8.html`, { waitUntil: 'load' });
-        await page.waitForFunction("typeof game!=='undefined' && typeof PerformanceBench!=='undefined'");
-        const calibration = await page.evaluate(calibrate);
-        const set = await page.evaluate(setupScene, { map: scene.map, setup: scene.setup });
-        const result = await page.evaluate(measure, { duration, warmup });
+        let calibration, set = {}, result;
+        if (scene.light) {
+            await page.goto(`http://127.0.0.1:${server.address().port}/tools/fixtures/blank.html`).catch(() => {});
+            calibration = await page.evaluate(calibrate);
+            result = await page.evaluate(measureLight, { scene: scene.light, duration, warmup });
+        } else {
+            await page.goto(`http://127.0.0.1:${server.address().port}/DFAB%20V8.html`, { waitUntil: 'load' });
+            await page.waitForFunction("typeof game!=='undefined' && typeof PerformanceBench!=='undefined'");
+            calibration = await page.evaluate(calibrate);
+            set = await page.evaluate(setupScene, { map: scene.map, setup: scene.setup });
+            result = await page.evaluate(measure, { duration, warmup });
+        }
         const relative = Object.fromEntries(HELD.map(([k]) => [k, +(result[k].mean / calibration).toFixed(4)]));
         out.scenes[scene.id] = { title: scene.title, calibration_ms: +calibration.toFixed(2), ...set, ...result, relative, errors: errors.slice(0, 5) };
+        if (scene.light) console.log(`${scene.id.padEnd(16)} light layer ${result.lighting.mean.toFixed(2)} ms (p95 ${result.lighting.p95.toFixed(2)}), shadows ${result.shadows.mean} ms, ${result.live_lights} of ${result.lights} lights live, calibration ${calibration.toFixed(1)} ms`); else
         console.log(`${scene.id.padEnd(16)} frame ${result.cpu.mean.toFixed(2)} ms (p95 ${result.cpu.p95.toFixed(2)}), light ${result.lighting.mean.toFixed(2)} ms (p95 ${result.lighting.p95.toFixed(2)}), calibration ${calibration.toFixed(1)} ms${errors.length ? `, ${errors.length} page errors` : ''}`);
         if (errors.length) failed = true;
         await page.close();

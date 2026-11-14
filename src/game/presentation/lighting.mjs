@@ -18,18 +18,22 @@ const stops=(list,color)=>list.map(([o,c])=>[o,c==='$color'?color:c]);
  * `lit` (0..1) is the room's light switch. Rooms: {rects, type: 'outdoor' | 'indoor', fill, lit}:
  * an outdoor room shows the sky's darkness, a room with `fill` is no darker than that while lit.
  *
- * A polygon is kept until its light moves or changes reach, or (dynamic shadows) a blocker in reach
- * moves; a light stays a still picture once its blockers have been at rest for `look.lamp.settle` s.
+ * A polygon is kept until its light moves or changes reach, or a light blocker in its reach changes
+ * (the world's light revision). Stale shadows are rebuilt nearest the view first within
+ * `look.lamp.shadow_budget_ms` a frame; one past the budget keeps its last shape for a frame. A light
+ * goes back into the still pictures once its shadow has held for `look.lamp.settle` s.
  */
 export class sceneLighting{
-    #world;#polygons=new Map();
-    constructor(world,{look=LIGHTING}={}){this.#world=world;this.look=look;}
+    #world;#polygons=new Map();#now;#spent=0;
+    constructor(world,{look=LIGHTING,now=()=>performance.now()}={}){this.#world=world;this.look=look;this.#now=now;}
+    /** The light's kept shadow, rebuilt when it is stale and the frame's shadow budget allows (a light with none yet is always built). */
     #polygon(light,time){
         const key=light.id??`${light.position}`,at=`${light.position[0]},${light.position[1]},${light.radius},${light.shadows}`,cached=this.#polygons.get(key);
-        const query={origin:light.position,radius:light.radius,include_moving:light.shadows==='dynamic'};
-        if(cached?.at===at&&(!query.include_moving||same(cached.moving,this.#world.getMovingLightBlockers(query))))return cached;
-        const {points,moving}=this.#world.getVisibilityPolygon({...query,resolution:this.look.lamp.resolution});
-        const next={at,points,moving,changed_at:cached?time:-Infinity};this.#polygons.set(key,next);return next;
+        const query={origin:light.position,radius:light.radius,include_moving:light.shadows==='dynamic'},revision=this.#world.getLightRevision(query);
+        if(cached?.at===at&&cached.revision===revision)return cached;
+        if(cached&&this.#spent>=this.look.lamp.shadow_budget_ms){cached.changed_at=time;return cached;}   // waits a frame with its last shape
+        const t0=this.#now(),next={at,revision,points:this.#world.getVisibilityPolygon({...query,resolution:this.look.lamp.resolution}).points,changed_at:cached?time:-Infinity};
+        this.#spent+=this.#now()-t0;this.#polygons.set(key,next);return next;
     }
     #animate(l,time){
         const a=l.animation;
@@ -39,29 +43,41 @@ export class sceneLighting{
     }
     /**
      * The layer's packets and the strength to draw it at. With `extent` (the map's {left, top, right,
-     * bottom}) the lamps and the steady soft lights are kept as pictures over it, repainted only when one
-     * of them changes (a room's switch, a lamp moved), and only flickering lights are drawn live: draw the
-     * packets with canvasRenderer.drawLayer and a pictureCache. Without it, every light is drawn live.
+     * bottom}) the still lights are baked into tiles of `tile_size` over it (the map's regions; the look's
+     * `tile_size` by default), only those meeting `bounds` (the view), each repainted only when a light
+     * reaching it changes (a room's switch, a lamp moved, a door come to rest); the rest are drawn live:
+     * draw the packets with canvasRenderer.drawLayer and a pictureCache. Without it, every light is live.
      */
-    createLayer({bounds,extent,kind='indoor',sky_darkness=0,rooms=[],lights=[],time=0}){
+    createLayer({bounds,extent,tile_size=this.look.tile_size,ahead=this.look.tile_ahead,kind='indoor',sky_darkness=0,rooms=[],lights=[],time=0}){
         const look=this.look,ambient=look.indoor.darkness,base=kind==='indoor'?look.indoor.lamp_glow:look.outdoor.lamp_glow;
         const areas=rooms.map(r=>({rects:r.rects,cut:r.type==='outdoor'?1-Math.min(1,sky_darkness/ambient):r.fill!==undefined?(1-Math.min(1,r.fill/ambient))*(r.lit??1):0}));
-        const out=[];
-        for(const l of lights){
+        // The lights to look at: those reaching the view, or (still) the tiles that meet it or are readied ahead of it, whole.
+        const snap=(v,o,down)=>tile_size?o+(down?Math.floor:Math.ceil)((v-o)/tile_size)*tile_size:v;
+        const near=bounds&&(extent?{left:snap(bounds.left-ahead,extent.left,true),top:snap(bounds.top-ahead,extent.top,true),right:snap(bounds.right+ahead,extent.left,false),bottom:snap(bounds.bottom+ahead,extent.top,false)}:bounds);
+        const meets=(l,b)=>{const [x,y]=l.position,[rx,ry]=l.shape==='strip'?[l.size[0]/2,l.size[1]/2]:[l.radius,l.radius];return x+rx>b.left&&x-rx<b.right&&y+ry>b.top&&y-ry<b.bottom;};
+        if(near)lights=lights.filter(l=>meets(l,near));
+        const out=[],[cx,cy]=bounds?[(bounds.left+bounds.right)/2,(bounds.top+bounds.bottom)/2]:extent?[(extent.left+extent.right)/2,(extent.top+extent.bottom)/2]:[0,0];
+        this.#spent=0;   // shadow rebuilds share one budget a frame, nearest the view first
+        const order=lights.map((l,i)=>[l.shadows==='none'?Infinity:Math.hypot(l.position[0]-cx,l.position[1]-cy),i]).sort((a,b)=>a[0]-b[0]),shadows=new Map();
+        for(const [d,i] of order){if(d===Infinity)break;const l=lights[i];if((l.lit??1)>=.01)shadows.set(i,this.#polygon(l,time));}
+        for(const [i,l] of lights.entries()){
             const lit=l.lit??1;if(lit<.01)continue;
             const f=this.#animate(l,time),steady=(l.animation?.kind??'steady')==='steady';
             if(l.shadows!=='none'){
-                const shadow=this.#polygon(l,time),k=(l.intensity??1)*lit*f,still=steady&&time-shadow.changed_at>=look.lamp.settle;
+                const shadow=shadows.get(i),k=(l.intensity??1)*lit*f,still=steady&&time-shadow.changed_at>=look.lamp.settle;
+                if(!still&&bounds&&!meets(l,bounds))continue;
                 out.push({still,position:l.position,radius:l.radius,inner_radius:look.lamp.inner_radius,polygon:shadow.points,intensity:k,cut:look.lamp.cut,color:l.color,glow:base*Math.min(1,k),glow_stops:stops(look.lamp.glow_stops,l.color)});continue;
             }
+            if(!steady&&bounds&&!meets(l,bounds))continue;
             const a=(l.intensity??look.soft.intensity)*f*lit,color=l.color??look.soft.color;
             if(l.shape==='strip')out.push({still:steady,shape:'area',position:l.position,size:l.size,round:l.round,intensity:a,cut:l.soft?look.area.soft_cut:look.area.cut,color,glow:Math.min(1,look.area.glow*a),glow_stops:stops(look.area.glow_stops,color)});
             else out.push({still:steady,position:l.position,radius:l.radius,intensity:a,cut:look.soft.cut,color,glow:Math.min(1,look.soft.glow*a),glow_stops:stops(look.soft.glow_stops,color)});
         }
         // Lamps cut first, then the soft lights, as the classic layer did.
         out.sort((a,b)=>(a.polygon?0:1)-(b.polygon?0:1));
-        if(extent)return {packets:createLightLayerParts({extent,tint:look.indoor.tint,areas,lights:out,key:'scene_light'}),opacity:ambient};
-        return {packets:createLightLayer({bounds,tint:look.indoor.tint,areas,lights:out}),opacity:ambient};
+        const live=out.filter(l=>!l.still).length;
+        if(extent)return {packets:createLightLayerParts({extent,tint:look.indoor.tint,areas,lights:out,key:'scene_light',tile_size,view:bounds,ahead}),opacity:ambient,live};
+        return {packets:createLightLayer({bounds,tint:look.indoor.tint,areas,lights:out}),opacity:ambient,live:out.length};
     }
 }
 /** A native level's lights: its lamps and the props that carry a light (their declared `emission`), and the layout's soft lights. */
@@ -72,6 +88,5 @@ export function levelLights(level,{blend=1,lightAt=()=>1}={}){
     (level.definition.soft_lights??[]).forEach((s,i)=>place(`soft_${i}`,declaredLight({...s,...(s.w?{size:[s.w,s.h]}:{}),shadows:'none'}),[s.x,s.y]));
     return lights;
 }
-const same=(a,b)=>a.length===b.length&&a.every((m,i)=>m.body_id===b[i].body_id&&m.rotation===b[i].rotation&&m.position[0]===b[i].position[0]&&m.position[1]===b[i].position[1]);
 /** A steady phase for a light's pulse from its id, so lights pulse out of step and keep their beat when pushed. */
 function phase(id=''){let h=2166136261;for(const c of String(id))h=Math.imul(h^c.charCodeAt(0),16777619);return (h>>>0)/2**32*Math.PI*2;}

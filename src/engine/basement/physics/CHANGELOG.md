@@ -1,8 +1,13 @@
 # Changelog
 
+## The fast shadow cast and light change counters — 2026-11-14
+
+- `getVisibilityPolygon` sweeps once round the light over only the edges that face it within its reach, with edges end to end on one line joined: about four times faster round an apartment lamp, the same shape. A ray grazing a corner stops there, as a raycast does. It no longer returns `moving`.
+- `getLightRevision({origin, radius})` replaces `getMovingLightBlockers`: light blockers count up per-cell change counters (`spatial/changes.mjs`) when they move, change or go, so a kept polygon knows it is stale without listing what is in reach. It also catches walls built or removed.
+
 ## Light blockers — 2026-11-14
 
-- Bodies take `blocks_light`: `true` always blocks light (door leaves, big props), `false` never, `null` by the query's groups as before. `getVisibilityPolygon` returns the blockers that are not static as `moving`, and `getMovingLightBlockers` lists them without casting, so a kept polygon can be checked each frame. `include_moving:false` casts against static bodies only.
+- Bodies take `blocks_light`: `true` always blocks light (door leaves, big props), `false` never, `null` by the query's groups as before. (Superseded the same day by `getLightRevision`.) `include_moving:false` casts against static bodies only.
 
 ## Visibility polygons — 2026-11-13
 

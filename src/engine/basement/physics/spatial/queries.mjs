@@ -29,6 +29,88 @@ function finish(hits, options, results) {
     if (hits.length > max) hits.length = max;
     results.length = 0; results.push(...hits); return results;
 }
+const circlePoints = p => Array.from({ length: 16 }, (_, k) => [p.center[0] + p.radius * Math.cos(k * Math.PI / 8), p.center[1] + p.radius * Math.sin(k * Math.PI / 8)]);
+/**
+ * The edges of one closed outline that face a light at (ox, oy) and come within its reach. A ray that
+ * meets a back edge has already met a front one, so only front edges can stop light. An outline
+ * holding the light blocks nothing.
+ */
+function frontEdges(points, ox, oy, radius, out) {
+    let area = 0, inside = false;
+    for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
+        const [xi, yi] = points[i], [xj, yj] = points[j];
+        area += xj * yi - xi * yj;
+        if ((yi > oy) !== (yj > oy) && ox < (xj - xi) * (oy - yi) / (yj - yi) + xi) inside = !inside;
+    }
+    if (inside || Math.abs(area) < 1e-12) return;
+    const turn = area > 0 ? 1 : -1;                          // outward normal side of each edge
+    for (let i = 0; i < points.length; i++) {
+        const [ax, ay] = points[i], [bx, by] = points[(i + 1) % points.length], ex = bx - ax, ey = by - ay;
+        if (turn * (ex * (oy - ay) - ey * (ox - ax)) >= 0) continue;   // the light is behind (or on) it
+        const len2 = ex * ex + ey * ey, t = len2 ? Math.max(0, Math.min(1, ((ox - ax) * ex + (oy - ay) * ey) / len2)) : 0;
+        if (Math.hypot(ax + ex * t - ox, ay + ey * t - oy) > radius) continue;
+        out.push([ax, ay, bx, by]);
+    }
+}
+/** Edges that lie end to end on one line, facing the same way, become one (cut walls, wall runs). */
+function mergeEdges(edges) {
+    if (edges.length < 2) return edges;
+    const lines = new Map();
+    for (const e of edges) {
+        const dx = e[2] - e[0], dy = e[3] - e[1], len = Math.hypot(dx, dy); if (len < 1e-9) continue;
+        const ux = dx / len, uy = dy / len, key = `${ux.toFixed(6)},${uy.toFixed(6)},${(e[0] * uy - e[1] * ux).toFixed(4)}`;
+        let line = lines.get(key); if (!line) lines.set(key, line = { ux, uy, spans: [] });
+        line.spans.push([e[0] * ux + e[1] * uy, e[2] * ux + e[3] * uy, e]);
+    }
+    const out = [];
+    for (const { ux, uy, spans } of lines.values()) {
+        if (spans.length === 1) { out.push(spans[0][2]); continue; }
+        spans.sort((a, b) => a[0] - b[0]);
+        let [s0, s1, first] = spans[0], ax = first[0], ay = first[1], bx = first[2], by = first[3];
+        for (let i = 1; i <= spans.length; i++) {
+            const next = spans[i];
+            if (next && next[0] <= s1 + 1e-6) { if (next[1] > s1) { s1 = next[1]; bx = next[2][2]; by = next[2][3]; } continue; }
+            out.push([ax, ay, bx, by]);
+            if (next) { s0 = next[0]; s1 = next[1]; ax = next[2][0]; ay = next[2][1]; bx = next[2][2]; by = next[2][3]; }
+        }
+        void s0; void ux; void uy;
+    }
+    return out;
+}
+/**
+ * One sweep round the light by angle: `resolution` rays plus three at each edge end in reach, sorted;
+ * each edge is active only over the angles it spans, so a ray is tested against the few edges at its
+ * angle, not against every edge in reach.
+ */
+function sweep(edges, ox, oy, radius, resolution) {
+    const angles = Array.from({ length: resolution }, (_, k) => -Math.PI + 2 * Math.PI * k / resolution), spans = [];
+    for (const e of edges) {
+        let a = Math.atan2(e[1] - oy, e[0] - ox), b = Math.atan2(e[3] - oy, e[2] - ox);
+        for (const [x, y, t] of [[e[0], e[1], a], [e[2], e[3], b]]) if (Math.hypot(x - ox, y - oy) <= radius * 1.5) angles.push(t - 1e-5, t, t + 1e-5);
+        if (b < a) { const w = a; a = b; b = w; }
+        const pad = 1e-7;
+        if (b - a <= Math.PI) spans.push([a - pad, b + pad, e]);
+        else { spans.push([-Math.PI - pad, a + pad, e], [b - pad, Math.PI + pad, e]); }   // the edge crosses the angle ±π
+    }
+    angles.sort((a, b) => a - b); spans.sort((a, b) => a[0] - b[0]);
+    const points = [], active = [];
+    let next = 0;
+    for (const angle of angles) {
+        while (next < spans.length && spans[next][0] <= angle) active.push(spans[next++]);
+        const dx = Math.cos(angle), dy = Math.sin(angle); let reach = radius;
+        for (let i = active.length - 1; i >= 0; i--) {
+            const span = active[i];
+            if (span[1] < angle) { active[i] = active[active.length - 1]; active.pop(); continue; }
+            const [ax, ay, bx, by] = span[2], ex = bx - ax, ey = by - ay, d = dx * ey - dy * ex; if (Math.abs(d) < 1e-12) continue;
+            const qx = ax - ox, qy = ay - oy, t = (qx * ey - qy * ex) / d, u = (qx * dy - qy * dx) / d;
+            if (t >= 0 && t < reach && u >= -1e-9 && u <= 1 + 1e-9) reach = t;   // a ray grazing a corner is stopped there, as a raycast is
+        }
+        const last = points.at(-1), point = [ox + dx * reach, oy + dy * reach];
+        if (!last || Math.hypot(point[0] - last[0], point[1] - last[1]) > 1e-6) points.push(point);
+    }
+    return points;
+}
+
 export class physicsQueries {
     constructor(world) { this.world = world; }
     resolveAim(source,{target,direction,angle,angle_offset=0}={}){
@@ -114,49 +196,19 @@ export class physicsQueries {
      * first blocking body. A body blocks light by its `blocks_light`: true always (a door leaf, a big prop),
      * false never (glass), null (the default) when it is in `include_groups` (static bodies by default).
      * Ghosts never block, nor does a body that holds the origin. `include_moving: false` leaves out every
-     * body that is not static. `resolution` rays round the circle, plus three at every blocking corner in
-     * reach, so shadow edges are exact. `moving` lists the blockers that are not static, with their poses.
+     * body that is not static. The cast keeps only the edges facing the light within its reach, joins
+     * edges end to end on one line, and sweeps once round the light: `resolution` rays plus three at each
+     * edge end, so shadow edges are exact. The cost grows with the edges near the light, not the map.
+     * getLightRevision says when a kept polygon is stale.
      */
     getVisibilityPolygon(packet) {
         const origin = vector(packet.origin), radius = number(packet.radius, 'radius', EPS), resolution = number(packet.resolution ?? 64, 'resolution', 8, 4096);
-        const segments = [], moving = [];
-        const inside = points => { let hit = false; for (let i = 0, j = points.length - 1; i < points.length; j = i++) { const [xi, yi] = points[i], [xj, yj] = points[j]; if ((yi > origin[1]) !== (yj > origin[1]) && origin[0] < (xj - xi) * (origin[1] - yi) / (yj - yi) + xi) hit = !hit; } return hit; };
+        const [ox, oy] = origin, edges = [];
         for (const b of this.#lightBlockers(origin, radius, packet)) {
             const r = this.world._record(b);
-            if (r.config.physics_type !== 'static') moving.push({ body_id: r.id, position: [...r.position], rotation: r.rotation });
-            for (const piece of pieces(r.shape, r.position, r.rotation)) {
-                const points = piece.points ?? Array.from({ length: 16 }, (_, k) => [piece.center[0] + piece.radius * Math.cos(k * Math.PI / 8), piece.center[1] + piece.radius * Math.sin(k * Math.PI / 8)]);
-                if (inside(points)) continue;
-                for (let i = 0; i < points.length; i++) segments.push([points[i], points[(i + 1) % points.length]]);
-            }
+            for (const piece of pieces(r.shape, r.position, r.rotation)) frontEdges(piece.points ?? circlePoints(piece), ox, oy, radius, edges);
         }
-        const angles = Array.from({ length: resolution }, (_, k) => -Math.PI + 2 * Math.PI * k / resolution);
-        for (const [a, b] of segments) for (const [x, y] of [a, b]) if (Math.hypot(x - origin[0], y - origin[1]) <= radius * 1.5) { const t = Math.atan2(y - origin[1], x - origin[0]); angles.push(t - 1e-5, t, t + 1e-5); }
-        angles.sort((a, b) => a - b);
-        const points = [];
-        for (const angle of angles) {
-            const dx = Math.cos(angle), dy = Math.sin(angle); let reach = radius;
-            for (const [[ax, ay], [bx, by]] of segments) {
-                const ex = bx - ax, ey = by - ay, d = dx * ey - dy * ex; if (Math.abs(d) < 1e-12) continue;
-                const qx = ax - origin[0], qy = ay - origin[1], t = (qx * ey - qy * ex) / d, u = (qx * dy - qy * dx) / d;
-                if (t >= 0 && t < reach && u >= 0 && u <= 1) reach = t;
-            }
-            const last = points.at(-1), point = [origin[0] + dx * reach, origin[1] + dy * reach];
-            if (!last || Math.hypot(point[0] - last[0], point[1] - last[1]) > 1e-6) points.push(point);
-        }
-        return { origin, radius, points, moving };
-    }
-    /**
-     * The blockers that are not static within `radius` of `origin`, with their poses, by the same rules
-     * as getVisibilityPolygon: compare them with its `moving` to know when a kept polygon is stale.
-     */
-    getMovingLightBlockers(packet) {
-        const origin = vector(packet.origin), radius = number(packet.radius, 'radius', EPS), out = [];
-        for (const b of this.#lightBlockers(origin, radius, packet)) {
-            const r = this.world._record(b);
-            if (r.config.physics_type !== 'static') out.push({ body_id: r.id, position: [...r.position], rotation: r.rotation });
-        }
-        return out;
+        return { origin, radius, points: sweep(mergeEdges(edges), ox, oy, radius, resolution) };
     }
     *#lightBlockers(origin, radius, packet) {
         const options = { include_groups: BODY_GROUP.STATIC, ...packet, include_ghosts: false }, always = { ...options, include_groups: BODY_GROUP.ALL };

@@ -97,30 +97,30 @@
     },
     "apartment-door": {
       "title": "A door swinging open and shut beside the apartment lamps",
-      "calibration_ms": 56.1,
+      "calibration_ms": 50.7,
       "door_lamps": 8,
-      "frames": 208,
-      "fps": 25.9,
+      "frames": 224,
+      "fps": 28,
       "cpu": {
-        "mean": 26.81826923077908,
-        "p95": 37.3000000002794
+        "mean": 23.88348214286712,
+        "p95": 33.60000000009313
       },
       "lighting": {
-        "mean": 11.983173076907406,
-        "p95": 16.299999999813735
+        "mean": 9.786607142855896,
+        "p95": 12.799999999813735
       },
       "top": [
         {
           "label": "Render:Total",
-          "mean": 21.071
+          "mean": 18.556
         },
         {
           "label": "Render:Lighting",
-          "mean": 11.983
+          "mean": 9.787
         },
         {
           "label": "Audio:Ambience",
-          "mean": 0.008
+          "mean": 0.005
         }
       ],
       "map": "apt_949",
@@ -130,8 +130,8 @@
         "pedestrians": 0
       },
       "relative": {
-        "cpu": 0.478,
-        "lighting": 0.2136
+        "cpu": 0.4711,
+        "lighting": 0.193
       },
       "errors": []
     },
@@ -235,6 +235,56 @@
       "relative": {
         "cpu": 2.5551,
         "lighting": 0.2161
+      },
+      "errors": []
+    },
+    "light-cafe": {
+      "title": "The native light layer over the cafe at night",
+      "calibration_ms": 56.6,
+      "frames": 481,
+      "cpu": {
+        "mean": 1.854885654885074,
+        "p95": 2.3000000002793968
+      },
+      "lighting": {
+        "mean": 1.854885654885074,
+        "p95": 2.3000000002793968
+      },
+      "shadows": {
+        "mean": 0,
+        "p95": 0
+      },
+      "live_lights": 1,
+      "lights": 16,
+      "map": "cozy_cafe_interior",
+      "relative": {
+        "cpu": 0.0328,
+        "lighting": 0.0328
+      },
+      "errors": []
+    },
+    "light-street": {
+      "title": "The native light layer over a dense test street: 72 lamps, 8 doors sliding, 12 vending machines, the camera panning",
+      "calibration_ms": 53.1,
+      "frames": 481,
+      "cpu": {
+        "mean": 7.9517671517735415,
+        "p95": 13.699999999720603
+      },
+      "lighting": {
+        "mean": 7.9517671517735415,
+        "p95": 13.699999999720603
+      },
+      "shadows": {
+        "mean": 0.688,
+        "p95": 1
+      },
+      "live_lights": 12,
+      "lights": 86,
+      "map": "bench_street",
+      "relative": {
+        "cpu": 0.1498,
+        "lighting": 0.1498
       },
       "errors": []
     }

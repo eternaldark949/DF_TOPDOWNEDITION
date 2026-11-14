@@ -97,3 +97,22 @@ test('gate: vending machines and health stations glow and pulse from their catal
         assert.ok(lighting.createLayer({ extent: bounds, lights: glow, time: 0 }).packets.some(p => p.blend === 'destination-out' && !p.picture), 'a pulsing light stays live');
     }
 });
+
+test('shadow rebuilds share a budget a frame, nearest the view first; a light past it keeps its last shape a frame', () => {
+    const physics = new physicsSystem(), lamps = Array.from({ length: 6 }, (_, i) => ({ position: [100 + i * 150, 100], radius: 120 }));
+    const map = new mapInstance(physics, { map_id: 'row', size: [1000, 200], lights: lamps,
+        doors: lamps.map((l, i) => ({ x: 80 + i * 150, y: 140, w: 40, h: 8, orientation: 'H', type: 'sliding' })) });
+    let clock = 0; const lighting = new sceneLighting(physics, { now: () => clock, look: { ...LIGHTING, lamp: { ...LIGHTING.lamp, shadow_budget_ms: 1 } } });
+    let built = []; const real = physics.getVisibilityPolygon.bind(physics); physics.getVisibilityPolygon = p => { built.push(p.origin[0]); clock += .4; return real(p); };
+    const level = { physics, lamps: map.entities('lamp'), props: [], definition: {} }, bounds = { left: 0, top: 0, right: 1000, bottom: 200 };
+    lighting.createLayer({ bounds, lights: levelLights(level), time: 0 });
+    assert.equal(built.length, 6, 'every light gets a first shadow, budget or not');
+    for (const leaf of map.entities('door')) leaf.updateBody({ position: [leaf.position[0] + 5, leaf.position[1]] });
+    built = []; lighting.createLayer({ bounds, lights: levelLights(level), time: .1 });
+    assert.deepEqual(built, [550, 400, 700], 'three fit in the budget, the nearest the view\'s centre');
+    built = []; lighting.createLayer({ bounds, lights: levelLights(level), time: .2 });
+    assert.deepEqual(built, [250, 850, 100], 'and the rest the next frame');
+    for (const leaf of map.entities('door')) leaf.updateBody({ position: [leaf.position[0] + 5, leaf.position[1]] });
+    built = []; lighting.createLayer({ bounds: { left: 0, top: 0, right: 300, bottom: 200 }, lights: levelLights(level), time: .3 });
+    assert.deepEqual(built, [100, 250, 400], 'lights out of view are left alone');
+});
