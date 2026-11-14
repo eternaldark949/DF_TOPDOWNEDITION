@@ -26,7 +26,7 @@ export function bayPlan(x0, x1, wy, cheek, depth, n) {
     return pts;
 }
 
-export const TIER = { z_scale: 2, tile: [40, 14], error: .75, foot: 22, contact: 8, light: [-.78, .62] };
+export const TIER = { z_scale: 2, tile: [40, 14], chunk: [256, 24], error: .75, foot: 22, contact: 8, light: [-.78, .62] };
 
 const rectPoly = (x, y, w, h) => [[x, y], [x, y + h], [x + w, y + h], [x + w, y]];
 const signedArea = p => { let s = 0; for (let i = 0; i < p.length; i++) { const a = p[i], b = p[(i + 1) % p.length]; s += a[0] * b[1] - b[0] * a[1]; } return s / 2; };
@@ -162,19 +162,35 @@ export class tieredBuilding {
 
     /* ---------------- walls: strips laid in tiles ---------------- */
 
-    /** A tier's strips (day and lit), painted once: x along its plan from its first corner, y down from its top. */
+    /**
+     * A tier's strips (day and lit), painted once, as pictures in chunks along the strip: a whole long wall in one picture
+     * would hold a tall building's every face at the view's density, and push the faces in view out of the cache.
+     * Chunk c is `chunk[0]` long and reaches `chunk[1]` past each end, so a tile (never longer than that) lies whole in one.
+     * The art behind them (x along the plan from its first corner, y down from its top) is made once for all of them.
+     */
     #strip(t) {
-        const Z = this.tier.z_scale, H = t.z1 - t.z0, L = t.perimeter, bounds = [0, 0, L, H * Z], key = `city_tier:${this.id}:${t.i}`;
+        const Z = this.tier.z_scale, H = t.z1 - t.z0, L = t.perimeter, [CH, PAD] = this.tier.chunk, key = `city_tier:${this.id}:${t.i}`;
+        let art = null;
         // painted in design units, kept in world px up the wall: a strip kept in design units would need z_scale times the density round its whole length
-        const build = lit => () => { const d = new artScene().enter({ scale: [1, Z] }), l = new artScene().enter({ scale: [1, Z] }); t.paint?.(d, l, t, H, L, this); return (lit ? l : d).leave().finish(); };
-        return { day: { key: `${key}:day`, bounds, build: build(false) }, lit: { key: `${key}:lit`, bounds, layered: true, build: build(true) } };   // (a lit strip's cut-outs act on its own light)
+        const made = () => { if (!art) { const d = new artScene().enter({ scale: [1, Z] }), l = new artScene().enter({ scale: [1, Z] }); t.paint?.(d, l, t, H, L, this); art = { day: d.leave().finish(), lit: l.leave().finish() }; } return art; };
+        const chunks = (lit, name) => Array.from({ length: Math.max(1, Math.ceil(L / CH)) }, (_, c) => {
+            const u0 = Math.max(0, c * CH - PAD), u1 = Math.min(L, (c + 1) * CH + PAD);
+            return { key: `${key}:${name}:${c}`, bounds: [u0, 0, u1 - u0, H * Z], ...(lit ? { layered: true } : {}), build: () => made()[name] };   // (a lit strip's cut-outs act on its own light)
+        });
+        return { day: chunks(false, 'day'), lit: chunks(true, 'lit') };
     }
-    /** A face's slice of its tier's strip, as stamps in tiles. */
-    #lay(view, f, strip, zoom, extra = {}) {
+    /** A face's slice of its tier's strip, as stamps in tiles, each from the chunk its middle falls in; none for a tile off `area` (the screen's {left, top, right, bottom}). */
+    #lay(view, f, strip, zoom, area, extra = {}) {
         const Z = this.tier.z_scale, out = [], overlap = extra.blend || extra.opacity !== undefined ? .25 : 1;
         for (const tile of view.tiles(f, f.z0 * Z, f.z1 * Z, { zoom, error: this.tier.error, max: [this.tier.tile[0], this.tier.tile[1] * Z], overlap })) {
-            const m = tile.matrix, matrix = [m[0], m[1], m[2], m[3], m[4] - f.u0 * m[0], m[5] - f.u0 * m[1]];
-            out.push({ picture: { ...strip, matrix, source: [f.u0 + tile.u0, f.z1 * Z - tile.z1, tile.u1 - tile.u0, tile.z1 - tile.z0] }, ...extra });
+            const m = tile.matrix, matrix = [m[0], m[1], m[2], m[3], m[4] - f.u0 * m[0], m[5] - f.u0 * m[1]], u0 = f.u0 + tile.u0, u1 = f.u0 + tile.u1;
+            if (area) {
+                const y0 = f.z1 * Z - tile.z1, y1 = f.z1 * Z - tile.z0, xs = [], ys = [];
+                for (const [u, y] of [[u0, y0], [u1, y0], [u0, y1], [u1, y1]]) { xs.push(matrix[0] * u + matrix[2] * y + matrix[4]); ys.push(matrix[1] * u + matrix[3] * y + matrix[5]); }
+                if (Math.max(...xs) < area.left || Math.min(...xs) > area.right || Math.max(...ys) < area.top || Math.min(...ys) > area.bottom) continue;
+            }
+            const chunk = strip[Math.min(strip.length - 1, Math.floor((u0 + u1) / 2 / this.tier.chunk[0]))];
+            out.push({ picture: { ...chunk, matrix, source: [u0, f.z1 * Z - tile.z1, u1 - u0, tile.z1 - tile.z0] }, ...extra });
         }
         return out;
     }
@@ -192,13 +208,13 @@ export class tieredBuilding {
     quad(view, f, z0, z1) { return pathOf([this.at(view, f.x1, f.y1, z0), this.at(view, f.x2, f.y2, z0), this.at(view, f.x2, f.y2, z1), this.at(view, f.x1, f.y1, z1)]); }
 
     /** The building over the people: each tier's walls, shade and ledges, its roof, what stands on it. */
-    draws(base, { zoom = 1, time = 0 } = {}) {
+    draws(base, { zoom = 1, time = 0, area = null } = {}) {
         const view = this.view(base), out = [], Z = this.tier.z_scale;
         for (const t of this.order(view)) {
             const faces = this.seen(view, t), sh = t.shade ?? [6, 16, 18], strip = this.strips[t.i];
             for (const f of faces) {
                 const under = new artScene(); under.fill(this.quad(view, f, f.z0, f.z1), t.fill ?? '#555'); out.push(...under.finish());
-                out.push(...this.#lay(view, f, strip.day, zoom));
+                out.push(...this.#lay(view, f, strip.day, zoom, area));
                 const art = new artScene();
                 art.fill(this.quad(view, f, f.z0, f.z1), `rgba(${sh[0]}, ${sh[1]}, ${sh[2]}, ${.03 + .4 * this.turn(f)})`);
                 const fz = f.z0 < 1 ? this.tier.foot / Z : this.tier.contact, z0 = f.z0 < 1 ? 0 : f.z0, c0 = f.z0 < 1 ? `rgba(${sh[0]}, ${sh[1]}, ${sh[2]}, 0.35)` : 'rgba(0, 0, 0, 0.3)', c1 = f.z0 < 1 ? `rgba(${sh[0]}, ${sh[1]}, ${sh[2]}, 0)` : 'rgba(0, 0, 0, 0)';
@@ -239,13 +255,13 @@ export class tieredBuilding {
     /** How strongly the tiers' light shows: 12% at the least once the sky starts to darken, none in full day. */
     glowStrength(dark) { return Math.max(.12, Math.min(.92, dark * 1.05)) * Math.min(1, Math.max(0, dark) / .12); }
     /** The lit strips, roofs and tops, tier by tier in drawing order, for the glow layer (`cityBuildings.createGlow`): each tier first erases the glow behind it. */
-    glowDraws(base, { zoom = 1, time = 0, dark = 1 } = {}) {
+    glowDraws(base, { zoom = 1, time = 0, dark = 1, area = null } = {}) {
         const glow = this.glowStrength(dark); if (glow < .004) return [];
         const view = this.view(base), out = [];
         for (const t of this.order(view)) {
             const art = new artScene(); art.enter({}, { blend: 'destination-out' }).fill(pathOf(this.hull(view, t)), '#000').leave(); out.push(...art.finish());
-            if (t.lit_under) for (const f of this.seen(view, t)) out.push(...this.#lay(view, f, this.strips[t.i].day, zoom, { opacity: glow * t.lit_under }));
-            for (const f of this.seen(view, t)) out.push(...this.#lay(view, f, this.strips[t.i].lit, zoom, { blend: 'add', opacity: glow }));
+            if (t.lit_under) for (const f of this.seen(view, t)) out.push(...this.#lay(view, f, this.strips[t.i].day, zoom, area, { opacity: glow * t.lit_under }));
+            for (const f of this.seen(view, t)) out.push(...this.#lay(view, f, this.strips[t.i].lit, zoom, area, { blend: 'add', opacity: glow }));
             if (t.roof && t.roof_glow) out.push({ picture: this.#roof(view, t, true), blend: 'add', opacity: glow });
             if (t.top) { const top = new artScene(); top.enter({}, { blend: 'add', opacity: glow }); t.top(top, true, t, this, view, time); top.leave(); out.push(...top.finish()); }
         }

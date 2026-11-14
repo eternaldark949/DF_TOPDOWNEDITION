@@ -15,6 +15,7 @@ import { enniCole } from './city-landmark-enni-cole.mjs';
 import { ashgrove } from './city-landmark-ashgrove.mjs';
 import { doubleNights } from './city-landmark-double-nights.mjs';
 import { moonCity } from './city-landmark-moon-city.mjs';
+import { silverQueen } from './city-landmark-silver-queen.mjs';
 
 /**
  * The city's street buildings as art, from the looks its generator resolved (the `look` of each exported
@@ -69,7 +70,7 @@ export class cityBuildings {
     /** Every building over the people, farthest first: packets and roof pictures, in paint order. */
     createDraws({ view, camera, zoom = 1, time = 0 }) {
         const base = new heightView({ camera, eye: this.eye(zoom) }), out = [];
-        for (const h of this.visible(view, camera, zoom)) out.push(...h.draws(base, { zoom, time }));
+        for (const h of this.visible(view, camera, zoom)) out.push(...h.draws(base, { zoom, time, area: view }));
         return out;
     }
     /** What shines after the light layer, farthest building first, for one glow layer (`canvasRenderer.drawLayer(context, entries, {blend: 'add', pictures})`):
@@ -78,7 +79,7 @@ export class cityBuildings {
         const base = new heightView({ camera, eye: this.eye(zoom) }), out = [];
         for (const h of this.visible(view, camera, zoom)) {
             const art = new artScene(); art.enter({}, { blend: 'destination-out' }).fill(h.silhouettes(base).flat(), '#000').leave();
-            out.push(...art.finish(), ...h.glowDraws(base, { zoom, time, dark }));
+            out.push(...art.finish(), ...h.glowDraws(base, { zoom, time, dark, area: view }));
         }
         return out;
     }
@@ -100,7 +101,7 @@ function* cellsOf([x0, y0, x1, y1]) { for (let x = Math.floor(x0 / CELL); x <= M
 const mul = (a, b) => [a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1], a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3], a[0] * b[4] + a[2] * b[5] + a[4], a[1] * b[4] + a[3] * b[5] + a[5]];
 const VARIANTS = { shop: streetShop, arcade: streetArcade, apt: streetApartment };
 /** The landmarks drawn natively so far, by their classic class. */
-const LANDMARKS = { CozyCafeBuilding: cozyCafe, WarehouseHall: warehouse, DrYinsBuilding: drYins, NeuralSystemsBuilding: neuralSystems, TorqueAutoBuilding: torqueAuto, BiggsParkBuilding: biggsPark, EnniColeBuilding: enniCole, AshgroveBuilding: ashgrove, DoubleNightsBuilding: doubleNights, MoonCityBuilding: moonCity };
+const LANDMARKS = { CozyCafeBuilding: cozyCafe, WarehouseHall: warehouse, DrYinsBuilding: drYins, NeuralSystemsBuilding: neuralSystems, TorqueAutoBuilding: torqueAuto, BiggsParkBuilding: biggsPark, EnniColeBuilding: enniCole, AshgroveBuilding: ashgrove, DoubleNightsBuilding: doubleNights, MoonCityBuilding: moonCity, SilverQueenBuilding: silverQueen };
 
 /** Its front's frame: x along the front (left to right, seen from the street), y in from the back, the front at y = fd. */
 function frameOf(facing, W, D) {

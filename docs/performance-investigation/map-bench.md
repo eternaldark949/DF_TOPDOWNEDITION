@@ -292,3 +292,20 @@ first thing to trim if the glow needs to come down.
 
 Moon City (camera 5300, 5500): the first frame paints in about 0.2 s; then a frame's buildings take about 7 ms to
 make and 6 ms to draw, and the glow (with the dome's beat grid, the festoons and the searchlights) about 25 to 27 ms.
+
+The Silver Queen (camera 347, 1050, on its forecourt, and 520, 700, over its motor court) first showed what a tall
+landmark does to whole-strip pictures: the tower's strip runs 2,400 px round its plan, so its day and lit
+pictures at the view's density pushed each other out of a 48 MB cache every frame (about 3.4 s of painting a frame
+on the forecourt), and the setback's and crown's faces, far off the top of the screen, leaned so hard toward the
+eye that they fell past the last density and drew as vector (about 1 s of glow a frame). Two changes to the
+tiered kit fixed it for every landmark:
+
+- A strip is kept as pictures in chunks along it (256 px, reaching 24 px past each end so a tile lies whole in one),
+  with its art made once for all of them, so only the walls in view are painted.
+- `draws` and `glowDraws` leave out the tiles off the screen.
+
+On the forecourt a frame's buildings now take about 4 ms to stamp, 5 ms to draw, and 14 ms of glow. Over the motor
+court, where most of the tower and both wings are in view, the pictures in view come to about 48 to 67 MB at the
+default densities (up to 4): with a 48 MB cache some still repaint (about 115 ms a frame), with 64 MB about 27 ms
+to stamp, 6 ms to draw and 29 ms of glow. The native city boot's building picture budget has to cover that, or
+cap the densities.

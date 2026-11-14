@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import places from '../src/game/data/game-db/places.json' with { type: 'json' };
 import { cityMapDefinition } from '../src/game/levels/city-definition.mjs';
 import { cityBuildings } from '../src/game/presentation/city-buildings.mjs';
-import { renderFrame, cameraSystem } from '../src/engine/basement/rendering/index.mjs';
+import { renderFrame, cameraSystem, heightView } from '../src/engine/basement/rendering/index.mjs';
 
 const { city, definition } = cityMapDefinition({ map: places.maps.sdc });
 const buildings = new cityBuildings(city);
@@ -67,5 +67,20 @@ test('a landmark lays its painted walls on its faces in tiles, and its light by 
     for (const key of new Set(stamps.map(e => e.picture.key))) { const p = stamps.find(e => e.picture.key === key).picture.build(); assert.ok(p.length > 10); submit(p); }
     submit(draws.filter(e => !e.picture));
     const glow = buildings.createGlow({ view: v, camera: at, time: 3, dark: .9 });
-    assert.ok(glow.some(e => e.picture?.key.endsWith(':lit') && e.blend === 'add'), 'its windows shine by night');
+    assert.ok(glow.some(e => /:lit:\d+$/.test(e.picture?.key ?? '') && e.blend === 'add'), 'its windows shine by night');
+});
+
+test('a tall landmark keeps its walls in chunks, and stamps none off the screen', () => {
+    const queen = buildings.houses.find(h => h.id === 'silver_queen');
+    assert.ok(queen, 'the Silver Queen is drawn natively');
+    const at = [347, 1050], v = { left: at[0] - 640, top: at[1] - 360, right: at[0] + 640, bottom: at[1] + 360 };
+    const stamps = buildings.createDraws({ view: v, camera: at, time: 3 }).filter(e => e.picture?.key.startsWith('city_tier:silver_queen'));
+    assert.ok(stamps.length > 4, 'its walls are drawn');
+    for (const { picture: p } of stamps) {
+        const [bx, , bw] = p.bounds, [sx, , sw] = p.source;
+        assert.ok(bw <= 256 + 48, 'a chunk is short');
+        assert.ok(sx >= bx - 1e-6 && sx + sw <= bx + bw + 1e-6, 'a tile lies whole in its chunk');
+    }
+    const all = buildings.houses.find(h => h.id === 'silver_queen').draws(new heightView({ camera: at, eye: buildings.eye(1) }), { time: 3 }).filter(e => e.picture?.key.startsWith('city_tier:silver_queen'));
+    assert.ok(all.length > stamps.length, 'the tiles off the screen are left out');
 });

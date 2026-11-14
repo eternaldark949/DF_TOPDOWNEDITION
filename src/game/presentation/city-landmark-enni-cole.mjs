@@ -259,8 +259,8 @@ function showRoof(art, glow, t) {
     art.text('Enni Cole', cx + 1, cy + 1.5, how, { fill: 'rgba(0, 0, 0, 0.45)' }); art.text('Enni Cole', cx, cy, how, { fill: C.gold_hi });
 }
 
-/** A clipped cypress out of its planter: rings of foliage stacked up a cone, darker at the foot. */
-function cypress(art, glow, t, b, view) {
+/** A clipped cypress out of its planter: rings of foliage stacked up a cone, darker at the foot (a tier's `top`; the Silver Queen has a pair too). */
+export function cypress(art, glow, t, b, view) {
     if (glow) return;
     let cx = 0, cy = 0; for (const [x, y] of t.poly) { cx += x / t.poly.length; cy += y / t.poly.length; }
     const N = 12, R = 11, Hc = 50;

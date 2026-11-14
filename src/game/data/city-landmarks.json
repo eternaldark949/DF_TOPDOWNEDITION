@@ -579,5 +579,101 @@
       "marble": "#0e0a12",
       "water": "#1c1240"
     }
+  },
+  "silver_queen": {
+    "plan": {
+      "w": 700,
+      "d": 880,
+      "hero": 1.5,
+      "ground": 22,
+      "storey": 13,
+      "bay": 40
+    },
+    "z": {
+      "wing": 80,
+      "pavilion": 96,
+      "tower": 126,
+      "setback": 158,
+      "crown": 182
+    },
+    "stone": {
+      "stone": "#a4a0ae",
+      "stone_mid": "#96919f",
+      "stone_lo": "#7a7489",
+      "stone_dk": "#46415a",
+      "stone_hi": "#cac7d4",
+      "stone_lt": "#aeabb8",
+      "trim": "#b6b3c0",
+      "trim_lo": "#8e8a9c",
+      "trim_dk": "#5e5970",
+      "frame": "#17151e"
+    },
+    "colors": {
+      "char": "#2c2a36",
+      "char_hi": "#45424f",
+      "silver": "#a3a0b2",
+      "silver_hi": "#d2cfdd",
+      "silver_lo": "#6c6982",
+      "gold": "#d9bf86",
+      "warm": "#ffcf8a",
+      "iron": "#1b1922"
+    },
+    "court_colors": {
+      "plum": "#2d1d59",
+      "bay": "#2d1d59",
+      "gold": "#e8c27a",
+      "gold_hi": "#fff1c9"
+    },
+    "court": {
+      "drive": [
+        114,
+        86,
+        152
+      ],
+      "fountain": [
+        0.75,
+        0.52,
+        50
+      ]
+    },
+    "lanterns": [
+      [
+        298,
+        964
+      ],
+      [
+        382,
+        964
+      ],
+      [
+        -20,
+        1018
+      ],
+      [
+        60,
+        1018
+      ],
+      [
+        290,
+        1018
+      ],
+      [
+        370,
+        1018
+      ]
+    ],
+    "beams": [
+      [
+        278,
+        446,
+        0
+      ],
+      [
+        422,
+        446,
+        2.3
+      ]
+    ],
+    "serif": "\"Cinzel\", \"Trajan Pro\", \"Optima\", Georgia, \"Times New Roman\", serif"
   }
 }
