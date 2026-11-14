@@ -322,7 +322,13 @@ and lamps) added on top. The buildings and plants share one picture cache of 64 
 | `city-native-full`, standing on Crimson Blvd | 23 ms (p95 34) | 1.5 ms | 8.5 ms | 6.2 ms | 6.9 ms | 3.6 MB |
 | `city-native-full-drive`, at 500 px/s | 37 ms (p95 60) | 6.1 ms | 13 ms | 9.0 ms | 8.9 ms | 25 MB |
 
-The classic city on the same machine: 108 ms standing (`city-night`), 138 ms driving (`city-drive`). The drive's
-p95 is buildings coming into view: a wall chunk or roof waiting for the frame's painting budget draws as vector,
-and its first draw also makes its strip's art. Painting them ahead of the camera, as the ground and light tiles
-are, is the next thing to take off that spike.
+The classic city on the same machine: 108 ms standing (`city-night`), 138 ms driving (`city-drive`).
+
+Readying the buildings' pictures ahead of the camera (256 px past the view, from what the frame's budget leaves, as
+the ground and light tiles are) was tried and taken out: the drive's p95 stayed where it was and the pictures held
+went from 25 MB to 61 MB. Timing every picture draw over the drive shows why. The pictures cost about 2.7 ms a frame
+in all (stamps, and about 1.6 ms of painting); the rest of the buildings' 14 ms is the street buildings' walls and
+the landmarks' ledges and tops drawn as packets each frame. The spikes are single paints of a tall wall's first
+chunk (up to 12 ms), which makes the whole strip's art at once, and the ground's and glow's own spikes landing in the
+same frames. Making a strip's art chunk by chunk, and baking the street buildings' walls, are what would bring the
+drive down next.
