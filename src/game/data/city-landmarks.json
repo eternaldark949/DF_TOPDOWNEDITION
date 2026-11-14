@@ -165,5 +165,64 @@
       "hero": 1.5
     },
     "font": "Georgia, serif"
+  },
+  "torque_auto": {
+    "colors": {
+      "wall": "#1f1f25",
+      "wall_hi": "#34343c",
+      "amber": "#ff9a2a",
+      "amber_hi": "#ffc46a",
+      "steel": "#9aa3ad",
+      "steel_hi": "#dfe3ea",
+      "rose_gold": "#f4b49a",
+      "roof": "#2a2b31",
+      "roof_lo": "#17171c",
+      "glass": "#26384a",
+      "glass_hi": "#4d6880",
+      "ink": "#0c0b0f"
+    },
+    "plan": {
+      "w": 700,
+      "d": 350,
+      "hall": 30,
+      "wing": 24,
+      "hero": 1.5,
+      "teeth": 4,
+      "teeth_d": 65,
+      "rollups": [
+        [
+          28,
+          130
+        ],
+        [
+          342,
+          130
+        ]
+      ],
+      "entry": [
+        190,
+        120
+      ],
+      "board": [
+        60,
+        272,
+        380,
+        64
+      ],
+      "bill": [
+        514,
+        266,
+        172,
+        70
+      ],
+      "sky": [
+        522,
+        76,
+        156,
+        168
+      ]
+    },
+    "font": "Orbitron, monospace",
+    "script_font": "\"Great Vibes\", cursive"
   }
 }
