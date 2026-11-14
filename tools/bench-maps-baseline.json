@@ -1,5 +1,5 @@
 {
-  "createdAt": "2026-11-14T20:06:54.998Z",
+  "createdAt": "2026-11-14T20:38:07.811Z",
   "duration": 8000,
   "warmup": 3000,
   "viewport": [
@@ -483,27 +483,27 @@
     },
     "city-native-full": {
       "title": "The native city at night, ground, buildings, plants, light and glow, standing on Crimson Blvd",
-      "calibration_ms": 55.4,
-      "frames": 333,
+      "calibration_ms": 59.7,
+      "frames": 364,
       "cpu": {
-        "mean": 22.745945945949863,
-        "p95": 30.700000000186265
+        "mean": 21.20054945055009,
+        "p95": 28.099999999976717
       },
       "lighting": {
-        "mean": 6.135735735750279,
-        "p95": 8.599999999627471
+        "mean": 5.670604395601773,
+        "p95": 7.599999999976717
       },
       "ground": {
-        "mean": 1.419519519520079,
-        "p95": 1.7999999998137355
+        "mean": 1.3489010989014187,
+        "p95": 1.6999999999534339
       },
       "buildings": {
-        "mean": 8.393993993994552,
-        "p95": 11.900000000372529
+        "mean": 7.876648351647009,
+        "p95": 11.300000000046566
       },
       "glow": {
-        "mean": 6.7966966966849505,
-        "p95": 9.099999999627471
+        "mean": 6.30439560439989,
+        "p95": 8.300000000046566
       },
       "building_pictures_mb": 3.6,
       "paints_per_s": {
@@ -522,34 +522,34 @@
       "lights": 696,
       "map": "sdc",
       "relative": {
-        "cpu": 0.4106,
-        "lighting": 0.1108
+        "cpu": 0.3551,
+        "lighting": 0.095
       },
       "errors": []
     },
     "city-native-full-drive": {
       "title": "The native city at night, ground, buildings, plants, light and glow, driving Crimson Blvd at 500 px/s",
-      "calibration_ms": 54.5,
-      "frames": 192,
+      "calibration_ms": 55.1,
+      "frames": 221,
       "cpu": {
-        "mean": 40.11458333338669,
-        "p95": 67.09999999962747
+        "mean": 34.68687782805819,
+        "p95": 49.09999999997672
       },
       "lighting": {
-        "mean": 9.440104166739426,
-        "p95": 12.799999999813735
+        "mean": 8.746153846155531,
+        "p95": 13.900000000023283
       },
       "ground": {
-        "mean": 6.591145833362437,
-        "p95": 22
+        "mean": 4.978733031674945,
+        "p95": 9.400000000023283
       },
       "buildings": {
-        "mean": 14.181249999935972,
-        "p95": 28.299999999813735
+        "mean": 12.36199095022361,
+        "p95": 21
       },
       "glow": {
-        "mean": 9.902083333348855,
-        "p95": 17.399999999441206
+        "mean": 8.600000000004108,
+        "p95": 11.599999999976717
       },
       "building_pictures_mb": 25.4,
       "paints_per_s": {
@@ -561,15 +561,15 @@
         "ground": 15
       },
       "shadows": {
-        "mean": 0.04,
+        "mean": 0.029,
         "p95": 0
       },
-      "live_lights": 1.8,
+      "live_lights": 1.9,
       "lights": 849,
       "map": "sdc",
       "relative": {
-        "cpu": 0.736,
-        "lighting": 0.1732
+        "cpu": 0.6295,
+        "lighting": 0.1587
       },
       "errors": []
     }

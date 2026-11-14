@@ -332,3 +332,9 @@ the landmarks' ledges and tops drawn as packets each frame. The spikes are singl
 chunk (up to 12 ms), which makes the whole strip's art at once, and the ground's and glow's own spikes landing in the
 same frames. Making a strip's art chunk by chunk, and baking the street buildings' walls, are what would bring the
 drive down next.
+
+Then the art itself. Profiling the strips' making showed the Silver Queen's tower spending most of its 50 ms (and
+up to 110 ms with a collection in it) in `rect` and the garbage collector: a strip is grained with tens of
+thousands of specks, and `rect` gave five path commands and a point array per corner for each. `rect` is now one
+`['rect', x, y, w, h]` command (a canvas `rect`, the same box), and the tower makes in about 17 ms; no other strip
+takes more than about 11. Rerecorded: 21 ms standing (p95 28), 35 ms driving (p95 49, from 67).
