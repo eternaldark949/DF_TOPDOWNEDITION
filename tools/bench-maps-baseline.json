@@ -97,30 +97,30 @@
     },
     "apartment-door": {
       "title": "A door swinging open and shut beside the apartment lamps",
-      "calibration_ms": 50.7,
+      "calibration_ms": 55.3,
       "door_lamps": 8,
-      "frames": 224,
-      "fps": 28,
+      "frames": 233,
+      "fps": 29,
       "cpu": {
-        "mean": 23.88348214286712,
-        "p95": 33.60000000009313
+        "mean": 21.77725321888377,
+        "p95": 32.5
       },
       "lighting": {
-        "mean": 9.786607142855896,
-        "p95": 12.799999999813735
+        "mean": 5.930472103003742,
+        "p95": 8.099999999976717
       },
       "top": [
         {
           "label": "Render:Total",
-          "mean": 18.556
+          "mean": 15.827
         },
         {
           "label": "Render:Lighting",
-          "mean": 9.787
+          "mean": 5.93
         },
         {
           "label": "Audio:Ambience",
-          "mean": 0.005
+          "mean": 0.012
         }
       ],
       "map": "apt_949",
@@ -130,8 +130,8 @@
         "pedestrians": 0
       },
       "relative": {
-        "cpu": 0.4711,
-        "lighting": 0.193
+        "cpu": 0.3938,
+        "lighting": 0.1072
       },
       "errors": []
     },
@@ -240,15 +240,15 @@
     },
     "light-cafe": {
       "title": "The native light layer over the cafe at night",
-      "calibration_ms": 56.6,
+      "calibration_ms": 56.1,
       "frames": 481,
       "cpu": {
-        "mean": 1.854885654885074,
-        "p95": 2.3000000002793968
+        "mean": 2.038877338876637,
+        "p95": 2.6000000000349246
       },
       "lighting": {
-        "mean": 1.854885654885074,
-        "p95": 2.3000000002793968
+        "mean": 2.038877338876637,
+        "p95": 2.6000000000349246
       },
       "shadows": {
         "mean": 0,
@@ -258,33 +258,33 @@
       "lights": 16,
       "map": "cozy_cafe_interior",
       "relative": {
-        "cpu": 0.0328,
-        "lighting": 0.0328
+        "cpu": 0.0363,
+        "lighting": 0.0363
       },
       "errors": []
     },
     "light-street": {
       "title": "The native light layer over a dense test street: 72 lamps, 8 doors sliding, 12 vending machines, the camera panning",
-      "calibration_ms": 53.1,
+      "calibration_ms": 54.1,
       "frames": 481,
       "cpu": {
-        "mean": 7.9517671517735415,
-        "p95": 13.699999999720603
+        "mean": 7.639293139293018,
+        "p95": 13.5
       },
       "lighting": {
-        "mean": 7.9517671517735415,
-        "p95": 13.699999999720603
+        "mean": 7.639293139293018,
+        "p95": 13.5
       },
       "shadows": {
-        "mean": 0.688,
-        "p95": 1
+        "mean": 0.756,
+        "p95": 1.1
       },
       "live_lights": 12,
       "lights": 86,
       "map": "bench_street",
       "relative": {
-        "cpu": 0.1498,
-        "lighting": 0.1498
+        "cpu": 0.1412,
+        "lighting": 0.1412
       },
       "errors": []
     }

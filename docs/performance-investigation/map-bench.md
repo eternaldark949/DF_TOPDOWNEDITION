@@ -113,3 +113,16 @@ machines, 8 doors always sliding, the camera panning). They hold the light layer
 The street without its doors moving costs 4.3 ms panning and 2.4 ms standing. What is left is drawing the
 live lights on Chromium's software canvas (about 0.4 ms each for a 320 px lamp): every lamp beside a moving
 door is live. The apartment-door and light scenes' baselines were recorded with this change.
+
+## November 14, evening: a moving shadow keeps its colour baked
+
+Profiling the street showed the live lamps are bound by filled pixels, and that a lamp's colour (an added
+radial glow, which no shadow clips) was more than half of each. A lamp whose shadow is moving now cuts live
+while its colour stays in the baked tiles. Drawing the live lights at a lower resolution was tried and
+dropped: the extra surfaces cost more than the pixels they saved.
+
+| Scene | Light layer |
+|---|---|
+| apartment-door | 5.9 ms (was 9.8) |
+| light-street | 7.6 ms (was 8.0) |
+| light-cafe | 2.0 ms |

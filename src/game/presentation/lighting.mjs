@@ -64,8 +64,9 @@ export class sceneLighting{
             const lit=l.lit??1;if(lit<.01)continue;
             const f=this.#animate(l,time),steady=(l.animation?.kind??'steady')==='steady';
             if(l.shadows!=='none'){
-                const shadow=shadows.get(i),k=(l.intensity??1)*lit*f,still=steady&&time-shadow.changed_at>=look.lamp.settle;
-                if(!still&&bounds&&!meets(l,bounds))continue;
+                const shadow=shadows.get(i),k=(l.intensity??1)*lit*f,settled=time-shadow.changed_at>=look.lamp.settle;
+                const still=steady?(settled?true:'glow'):false;   // a moving shadow cuts live, its unshadowed colour stays baked
+                if(still!==true&&bounds&&!meets(l,bounds))continue;
                 out.push({still,position:l.position,radius:l.radius,inner_radius:look.lamp.inner_radius,polygon:shadow.points,intensity:k,cut:look.lamp.cut,color:l.color,glow:base*Math.min(1,k),glow_stops:stops(look.lamp.glow_stops,l.color)});continue;
             }
             if(!steady&&bounds&&!meets(l,bounds))continue;
@@ -75,7 +76,7 @@ export class sceneLighting{
         }
         // Lamps cut first, then the soft lights, as the classic layer did.
         out.sort((a,b)=>(a.polygon?0:1)-(b.polygon?0:1));
-        const live=out.filter(l=>!l.still).length;
+        const live=out.filter(l=>l.still!==true).length;
         if(extent)return {packets:createLightLayerParts({extent,tint:look.indoor.tint,areas,lights:out,key:'scene_light',tile_size,view:bounds,ahead}),opacity:ambient,live};
         return {packets:createLightLayer({bounds,tint:look.indoor.tint,areas,lights:out}),opacity:ambient,live:out.length};
     }

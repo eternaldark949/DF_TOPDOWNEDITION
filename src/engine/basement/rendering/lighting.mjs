@@ -56,6 +56,10 @@ export function createLightLayer({bounds,tint,areas=[],lights=[]},{scene=new art
  * live colour. Cuts (destination-out) and colour (add) each commute, so it is the layer createLightLayer
  * draws.
  *
+ * A light marked `still: 'glow'` keeps only its colour in the pictures and cuts live: a lamp whose shadow
+ * is moving (its colour is not shadowed). The dark and the colour pictures are keyed apart, so one
+ * repaints without the other.
+ *
  * With `tile_size` the pictures are tiles of that size over the extent (a map's regions), and only the
  * tiles meeting `view` are returned: a big map keeps only the tiles near the camera, and a change repaints
  * only the tiles its light reaches. The tiles within `ahead` px of the view come last, marked `prepare`:
@@ -67,20 +71,21 @@ export function createLightLayer({bounds,tint,areas=[],lights=[]},{scene=new art
 export function createLightLayerParts({extent,tint,areas=[],lights=[],key='light',tile_size=null,view=null,ahead=0}){
     const {left,top,right,bottom}=extent??{};for(const v of [left,top,right,bottom])finite(v,'extent');
     if(typeof tint!=='string'||!tint)throw new TypeError('The light layer needs a tint colour');
-    const shapes=lights.map(validLight),still=[],live=[];lights.forEach((l,i)=>(l.still?still:live).push([l,shapes[i],reach(l,shapes[i])]));
+    const all=lights.map(l=>{const shape=validLight(l);return [l,shape,reach(l,shape)];});
+    const cutStill=all.filter(([l])=>l.still===true),glowStill=all.filter(([l])=>l.still===true||l.still==='glow');
     const darks=[],glows=[],ready=[],near=view&&ahead>0?{left:view.left-ahead,top:view.top-ahead,right:view.right+ahead,bottom:view.bottom+ahead}:view;
-    const seen=view?view:null;
+    const meets=([x,y,w,h])=>([,,r])=>r[0]<x+w&&r[2]>x&&r[1]<y+h&&r[3]>y;
     for(const tile of tiles(extent,tile_size,near)){
-        const shown=!seen||(tile[0]<seen.right&&tile[0]+tile[2]>seen.left&&tile[1]<seen.bottom&&tile[1]+tile[3]>seen.top);
-        const [x,y,w,h]=tile,mine=still.filter(([,,r])=>r[0]<x+w&&r[2]>x&&r[1]<y+h&&r[3]>y),name=`${key}:${signature(tint,tile,mine)}`;
-        const picture=(part,paint)=>({key:`${name}:${part}`,bounds:tile,build(){const scene=new artScene();paint(scene);return scene.finish();}});
-        const dark={picture:picture('dark',scene=>{scene.fill(rect(...tile),tint);for(const [l,shape] of mine)cut(scene,l,shape);})};
-        const colour=mine.some(([l])=>l.color&&(l.glow??0)>=.001)?{picture:picture('glow',scene=>{for(const [l,shape] of mine)glow(scene,l,shape);}),blend:'add'}:null;
+        const shown=!view||(tile[0]<view.right&&tile[0]+tile[2]>view.left&&tile[1]<view.bottom&&tile[1]+tile[3]>view.top);
+        const cuts=cutStill.filter(meets(tile)),lit=glowStill.filter(meets(tile)).filter(([l])=>l.color&&(l.glow??0)>=.001);
+        const picture=(part,list,paint)=>({key:`${key}:${signature(tint,tile,list,part)}:${part}`,bounds:tile,build(){const scene=new artScene();paint(scene);return scene.finish();}});
+        const dark={picture:picture('dark',cuts,scene=>{scene.fill(rect(...tile),tint);for(const [l,shape] of cuts)cut(scene,l,shape);})};
+        const colour=lit.length?{picture:picture('glow',lit,scene=>{for(const [l,shape] of lit)glow(scene,l,shape);}),blend:'add'}:null;
         if(shown){darks.push(dark);if(colour)glows.push(colour);}
         else{ready.push({...dark,prepare:true});if(colour)ready.push({...colour,prepare:true});}
     }
     const cuts=new artScene(),colour=new artScene();
-    thin(cuts,areas);for(const [l,shape] of live){cut(cuts,l,shape);glow(colour,l,shape);}
+    thin(cuts,areas);for(const [l,shape] of all){if(l.still!==true)cut(cuts,l,shape);if(!l.still)glow(colour,l,shape);}
     return [...darks,...cuts.finish(),...glows,...colour.finish(),...ready];
 }
 /** A light's reach as [left, top, right, bottom]. */
@@ -117,13 +122,15 @@ function glow(scene,l,shape){
     const [x,y]=l.position;scene.enter({},{blend:'add',opacity:k});scene.fill([circle(x,y,l.radius)],radial([x,y],0,[x,y],l.radius,stops));scene.leave();
 }
 const polygonIds=new WeakMap();let polygonCount=0;
-/** A short hash of everything the still pictures show (FNV-1a over the fields, polygons by identity). */
-function signature(tint,bounds,still){
+/** A short hash of everything a still picture shows (FNV-1a over the fields its part draws, polygons by identity). */
+function signature(tint,bounds,still,part){
     let h=0x811c9dc5;const add=text=>{for(let i=0;i<text.length;i++){h^=text.charCodeAt(i);h=Math.imul(h,0x01000193);}};
-    add(`${tint}|${bounds}`);
+    add(`${tint}|${bounds}|${part}`);
     for(const [l] of still){
-        if(l.polygon&&!polygonIds.has(l.polygon))polygonIds.set(l.polygon,++polygonCount);
-        add(`|${l.shape},${l.position},${l.radius},${l.size},${l.round},${l.inner_radius},${l.polygon?polygonIds.get(l.polygon):''},${l.intensity},${l.cut},${l.color},${l.glow},${l.glow_stops}`);
+        if(part==='dark'){
+            if(l.polygon&&!polygonIds.has(l.polygon))polygonIds.set(l.polygon,++polygonCount);
+            add(`|${l.shape},${l.position},${l.radius},${l.size},${l.round},${l.inner_radius},${l.polygon?polygonIds.get(l.polygon):''},${l.intensity},${l.cut}`);
+        }else add(`|${l.shape},${l.position},${l.radius},${l.size},${l.round},${l.color},${l.glow},${l.glow_stops}`);
     }
     return (h>>>0).toString(36)+still.length;
 }

@@ -101,8 +101,8 @@ test('a light layer split into still pictures and live lights draws the same lay
                 const draw = packets => { const canvas = Object.assign(document.createElement('canvas'), { width: 200, height: 100 }), ctx = canvas.getContext('2d');
                     ctx.fillStyle = '#c0c0c0'; ctx.fillRect(0, 0, 200, 100); ctx.setTransform(zoom, 0, 0, zoom, ox, oy);
                     canvasRenderer.drawLayer(ctx, packets, { opacity: .9, pictures }); return ctx.getImageData(0, 0, 200, 100).data; };
-                const whole = draw(createLightLayer({ bounds: extent, tint, areas, lights })), split = draw(createLightLayerParts({ extent, tint, areas, lights })), tiled = draw(createLightLayerParts({ extent, tint, areas, lights, tile_size: 64 }));
-                let max = 0, tiles = 0; for (let i = 0; i < whole.length; i++) { max = Math.max(max, Math.abs(whole[i] - split[i])); tiles = Math.max(tiles, Math.abs(whole[i] - tiled[i])); } worst.push(max); tile_worst.push(tiles);
+                const whole = draw(createLightLayer({ bounds: extent, tint, areas, lights })), split = draw(createLightLayerParts({ extent, tint, areas, lights })), tiled = draw(createLightLayerParts({ extent, tint, areas, lights, tile_size: 64 })), halfStill = draw(createLightLayerParts({ extent, tint, areas, tile_size: 64, lights: lights.map((l, i) => i ? l : { ...l, still: 'glow' }) }));
+                let max = 0, tiles = 0; for (let i = 0; i < whole.length; i++) { max = Math.max(max, Math.abs(whole[i] - split[i])); tiles = Math.max(tiles, Math.abs(whole[i] - tiled[i]), Math.abs(whole[i] - halfStill[i])); } worst.push(max); tile_worst.push(tiles);
             }
             const parts = createLightLayerParts({ extent, tint, areas, lights }), again = createLightLayerParts({ extent, tint, areas, lights: lights.map(l => l.still ? l : { ...l, intensity: .2 }) });
             const moved = createLightLayerParts({ extent, tint, areas, lights: lights.map((l, i) => i ? l : { ...l, position: [52, 50] }) });
@@ -114,7 +114,7 @@ test('a light layer split into still pictures and live lights draws the same lay
         });
         assert.equal(result.pictures, 2, 'the still lights become two pictures: the dark with their cuts, and their colour');
         assert.ok(result.worst.every(d => d <= 3), `the split layer matches the whole one within rounding (${result.worst})`);
-        assert.ok(result.tile_worst.every(d => d <= 3), `tiled, it matches too, with no seams (${result.tile_worst})`);
+        assert.ok(result.tile_worst.every(d => d <= 3), `tiled, and with a lamp cutting live over its baked colour, it matches too, with no seams (${result.tile_worst})`);
         assert.equal(result.tiles, 8, 'a 200 × 100 extent is eight 64 px tiles'); assert.equal(result.view, 1, 'and a view in one tile asks for that one');
         assert.ok(result.kept >= 3, `a strip light moving repaints only the tiles it reaches (${result.kept} kept)`);
         assert.ok(result.live_only, 'a live light changing keeps the pictures');
