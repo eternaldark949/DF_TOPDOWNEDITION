@@ -11,6 +11,7 @@ import { drYins } from './city-landmark-dr-yins.mjs';
 import { neuralSystems } from './city-landmark-neural-systems.mjs';
 import { torqueAuto } from './city-landmark-torque-auto.mjs';
 import { biggsPark } from './city-landmark-biggs-park.mjs';
+import { enniCole } from './city-landmark-enni-cole.mjs';
 
 /**
  * The city's street buildings as art, from the looks its generator resolved (the `look` of each exported
@@ -21,8 +22,9 @@ import { biggsPark } from './city-landmark-biggs-park.mjs';
  *
  * `createDraws({view, camera, zoom, time})` gives the buildings over the people, farthest first, as packets
  * and picture entries (`canvasRenderer.drawEntries`). `createGlow({view, camera, zoom, time, dark})` gives
- * what shines after the light layer (lit windows, shopfronts, signs, roof lights), each building kept off
- * the nearer ones in front of it. `groundArt(scene, tile)` adds what lies on the ground (the buildings'
+ * what shines after the light layer (lit windows, shopfronts, signs, roof lights) for one glow layer added
+ * over the scene (`canvasRenderer.drawLayer(context, entries, {blend: 'add', pictures})`), farthest first,
+ * each building erasing what shines behind its silhouette before adding its own. `groundArt(scene, tile)` adds what lies on the ground (the buildings'
  * shadows and footprints, the street variants' stoops, carpets and planters) to a ground tile.
  * The look is `data/city-buildings.json`; the classic artists are `legacy/buildings/building-v2.js` and
  * `street-*.js`.
@@ -67,19 +69,14 @@ export class cityBuildings {
         for (const h of this.visible(view, camera, zoom)) out.push(...h.draws(base, { zoom, time }));
         return out;
     }
-    /** What shines after the light layer, building by building, each kept off the nearer ones' walls and roofs. */
+    /** What shines after the light layer, farthest building first, for one glow layer (`canvasRenderer.drawLayer(context, entries, {blend: 'add', pictures})`):
+     *  each building first erases the glow behind its silhouette from the layer, so the nearer walls and roofs hide what shines behind them. */
     createGlow({ view, camera, zoom = 1, time = 0, dark = 1 }) {
-        const base = new heightView({ camera, eye: this.eye(zoom) }), order = this.visible(view, camera, zoom), boxes = order.map(h => h.box(base));
-        const out = [];
-        order.forEach((h, i) => {
-            const bb = boxes[i], clips = [];
-            for (let j = i + 1; j < order.length; j++) {
-                const o = boxes[j];
-                if (o[0] > bb[2] || o[2] < bb[0] || o[1] > bb[3] || o[3] < bb[1]) continue;
-                clips.push(...order[j].silhouettes(base));
-            }
-            out.push(...h.glowDraws(base, { zoom, time, dark, clips }));
-        });
+        const base = new heightView({ camera, eye: this.eye(zoom) }), out = [];
+        for (const h of this.visible(view, camera, zoom)) {
+            const art = new artScene(); art.enter({}, { blend: 'destination-out' }).fill(h.silhouettes(base).flat(), '#000').leave();
+            out.push(...art.finish(), ...h.glowDraws(base, { zoom, time, dark }));
+        }
         return out;
     }
     /** Adds the buildings' ground (shadows, footprints, the street variants' pavement dressing) meeting `tile` [x, y, w, h] to `scene`. */
@@ -100,7 +97,7 @@ function* cellsOf([x0, y0, x1, y1]) { for (let x = Math.floor(x0 / CELL); x <= M
 const mul = (a, b) => [a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1], a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3], a[0] * b[4] + a[2] * b[5] + a[4], a[1] * b[4] + a[3] * b[5] + a[5]];
 const VARIANTS = { shop: streetShop, arcade: streetArcade, apt: streetApartment };
 /** The landmarks drawn natively so far, by their classic class. */
-const LANDMARKS = { CozyCafeBuilding: cozyCafe, WarehouseHall: warehouse, DrYinsBuilding: drYins, NeuralSystemsBuilding: neuralSystems, TorqueAutoBuilding: torqueAuto, BiggsParkBuilding: biggsPark };
+const LANDMARKS = { CozyCafeBuilding: cozyCafe, WarehouseHall: warehouse, DrYinsBuilding: drYins, NeuralSystemsBuilding: neuralSystems, TorqueAutoBuilding: torqueAuto, BiggsParkBuilding: biggsPark, EnniColeBuilding: enniCole };
 
 /** Its front's frame: x along the front (left to right, seen from the street), y in from the back, the front at y = fd. */
 function frameOf(facing, W, D) {
@@ -205,13 +202,8 @@ class house {
         this.walls(ctx, art); this.roofLive(ctx, live);
         return [...art.finish(), this.roofPicture(ctx), ...live.finish()];
     }
-    /** Its night light, kept off `clips` (the nearer buildings' silhouettes). */
-    glowDraws(base, { time = 0, dark = 1, clips = [] } = {}) {
-        const art = new artScene(); art.enter();
-        for (const path of clips) art.clip([...rect(-1e7, -1e7, 2e7, 2e7), ...path], { rule: 'evenodd' });
-        this.glow(this.context(base, time, dark), art); art.leave();
-        return art.finish();
-    }
+    /** Its night light. */
+    glowDraws(base, { time = 0, dark = 1 } = {}) { const art = new artScene(); this.glow(this.context(base, time, dark), art); return art.finish(); }
     /** The roof as one picture in the plane of its height: shared by its variant and size, or its own. */
     roofPicture(ctx) {
         const plane = ctx.view.plane(ctx.k);

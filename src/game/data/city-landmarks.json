@@ -252,5 +252,41 @@
     },
     "font": "Orbitron, monospace",
     "script_font": "\"Great Vibes\", cursive"
+  },
+  "enni_cole": {
+    "colors": {
+      "stone": "#b8698a",
+      "stone_mid": "#a85d7e",
+      "stone_lo": "#8a4566",
+      "stone_dk": "#55223c",
+      "stone_hi": "#e6b0c6",
+      "stone_lt": "#c97c9c",
+      "steel": "#15161c",
+      "steel_hi": "#2b2c35",
+      "bronze": "#7d5c3c",
+      "gold": "#d6b277",
+      "gold_hi": "#f5dfb2",
+      "neon": "rgba(255, 234, 196, 1)"
+    },
+    "plan": {
+      "w": 900,
+      "d": 700,
+      "podium": 62,
+      "pavilion": 92,
+      "glass": 112,
+      "showroom": 132,
+      "hero": 1.5,
+      "cypresses": [
+        [
+          318,
+          716
+        ],
+        [
+          582,
+          716
+        ]
+      ]
+    },
+    "script_font": "Anthropology, \"Great Vibes\", \"URW Chancery L\", \"Z003\", cursive"
   }
 }

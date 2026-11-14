@@ -9,7 +9,7 @@ import { artScene, rect, linear } from '../../engine/basement/rendering/index.mj
  * the plan; each tier's roof is a picture in the plane of its top (`roof(art, emissive, tier, building)`),
  * what stands on it is drawn live (`top(art, emissive, tier, building, view, time)`).
  *
- * The definition (one per landmark, `city-landmarks.mjs`) is `{plan: {W, D}, hero, facing, tiers, ground}`:
+ * The definition (one per landmark, `city-landmark-*.mjs`) is `{plan: {W, D}, hero, facing, tiers, ground, order}`:
  * each tier `{id, poly | rect: [x, y, w, h], z0, z1, on, fill, paint, roof, roof_glow, top, ledges: [{z,
  * out, th, top, band, lip}], shade: [r, g, b], solid, rise}`, laid out with its front at the bottom (+y);
  * facing 'N' turns it round. The classic kit is `legacy/buildings/tiered-kit.js`.
@@ -27,8 +27,6 @@ function hull(points) {
     return lo.slice(0, -1).concat(up.slice(0, -1));
 }
 const boxOf = pts => { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity; for (const [x, y] of pts) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } return [x0, y0, x1, y1]; };
-const meets = (a, b) => !(a[0] > b[2] || a[2] < b[0] || a[1] > b[3] || a[3] < b[1]);
-const outside = path => [['move', -1e7, -1e7], ['line', 1e7, -1e7], ['line', 1e7, 1e7], ['line', -1e7, 1e7], ['close'], ...path];
 
 export class tieredBuilding {
     constructor(record, index, def, look, tier = TIER) {
@@ -120,10 +118,11 @@ export class tieredBuilding {
     /** The scale at design height z, and where (x, y) at design height z draws. */
     k(view, z) { return view.k(z * this.tier.z_scale); }
     at(view, x, y, z) { return view.at(x, y, z * this.tier.z_scale); }
-    /** The tiers in drawing order: farthest group first (a tier and those on it), then lower tops first. */
+    /** The tiers in drawing order: farthest group first (a tier and those on it), then lower tops first; the definition's `order(tiers, view, building)` may reorder them. */
     order(view) {
         const [cx, cy] = view.camera, dist = t => { const [x0, y0, x1, y1] = t.root.box, dx = Math.max(x0 - cx, 0, cx - x1), dy = Math.max(y0 - cy, 0, cy - y1); return dx * dx + dy * dy; };
-        return this.tiers.slice().sort((a, b) => (dist(b) - dist(a)) || (a.z1 - b.z1) || (a.z0 - b.z0) || (a.i - b.i));
+        const order = this.tiers.slice().sort((a, b) => (dist(b) - dist(a)) || (a.z1 - b.z1) || (a.z0 - b.z0) || (a.i - b.i));
+        return this.def.order?.(order, view, this) ?? order;
     }
     /** A tier's faces turned to the camera, farthest first. */
     seen(view, t) {
@@ -148,18 +147,30 @@ export class tieredBuilding {
 
     /** A tier's strips (day and lit), painted once: x along its plan from its first corner, y down from its top. */
     #strip(t) {
-        const H = t.z1 - t.z0, L = t.perimeter, bounds = [0, 0, L, H], key = `city_tier:${this.id}:${t.i}`;
-        const build = lit => () => { const d = new artScene(), l = new artScene(); t.paint?.(d, l, t, H, L, this); return (lit ? l : d).finish(); };
-        return { day: { key: `${key}:day`, bounds, build: build(false) }, lit: { key: `${key}:lit`, bounds, build: build(true) } };
+        const Z = this.tier.z_scale, H = t.z1 - t.z0, L = t.perimeter, bounds = [0, 0, L, H * Z], key = `city_tier:${this.id}:${t.i}`;
+        // painted in design units, kept in world px up the wall: a strip kept in design units would need z_scale times the density round its whole length
+        const build = lit => () => { const d = new artScene().enter({ scale: [1, Z] }), l = new artScene().enter({ scale: [1, Z] }); t.paint?.(d, l, t, H, L, this); return (lit ? l : d).leave().finish(); };
+        return { day: { key: `${key}:day`, bounds, build: build(false) }, lit: { key: `${key}:lit`, bounds, layered: true, build: build(true) } };   // (a lit strip's cut-outs act on its own light)
     }
     /** A face's slice of its tier's strip, as stamps in tiles. */
     #lay(view, f, strip, zoom, extra = {}) {
         const Z = this.tier.z_scale, out = [], overlap = extra.blend ? .25 : 1;
         for (const tile of view.tiles(f, f.z0 * Z, f.z1 * Z, { zoom, error: this.tier.error, max: [this.tier.tile[0], this.tier.tile[1] * Z], overlap })) {
-            const m = tile.matrix, matrix = [m[0], m[1], m[2] * Z, m[3] * Z, m[4] - f.u0 * m[0], m[5] - f.u0 * m[1]];
-            out.push({ picture: { ...strip, matrix, source: [f.u0 + tile.u0, (f.z1 * Z - tile.z1) / Z, tile.u1 - tile.u0, (tile.z1 - tile.z0) / Z] }, ...extra });
+            const m = tile.matrix, matrix = [m[0], m[1], m[2], m[3], m[4] - f.u0 * m[0], m[5] - f.u0 * m[1]];
+            out.push({ picture: { ...strip, matrix, source: [f.u0 + tile.u0, f.z1 * Z - tile.z1, tile.u1 - tile.u0, tile.z1 - tile.z0] }, ...extra });
         }
         return out;
+    }
+    /** A box standing on a roof, for a tier's `top`: x0..x1, y0..y1 from design height z0 to z1, the walls turned to the camera (shaded by their side), then its cap. */
+    prism(art, view, x0, y0, x1, y1, z0, z1, wall, cap) {
+        const [cx, cy] = view.camera, walls = [];
+        if (cy > y1) walls.push([x0, y1, x1, y1, 0]); if (cy < y0) walls.push([x1, y0, x0, y0, .3]);
+        if (cx > x1) walls.push([x1, y1, x1, y0, .15]); if (cx < x0) walls.push([x0, y0, x0, y1, .15]);
+        for (const [ax, ay, bx, by, s] of walls) {
+            const q = pathOf([this.at(view, ax, ay, z0), this.at(view, bx, by, z0), this.at(view, bx, by, z1), this.at(view, ax, ay, z1)]);
+            art.fill(q, wall); if (s) art.fill(q, `rgba(0, 0, 0, ${s})`);
+        }
+        art.enter({ matrix: view.plane(this.k(view, z1)) }).fill(rect(x0 - 1.5, y0 - 1.5, x1 - x0 + 3, y1 - y0 + 3), cap).leave();
     }
     quad(view, f, z0, z1) { return pathOf([this.at(view, f.x1, f.y1, z0), this.at(view, f.x2, f.y2, z0), this.at(view, f.x2, f.y2, z1), this.at(view, f.x1, f.y1, z1)]); }
 
@@ -210,22 +221,16 @@ export class tieredBuilding {
 
     /** How strongly the tiers' light shows: 12% at the least once the sky starts to darken, none in full day. */
     glowStrength(dark) { return Math.max(.12, Math.min(.92, dark * 1.05)) * Math.min(1, Math.max(0, dark) / .12); }
-    /** The lit strips, roofs and tops, each tier cut out of the tiers drawn over it and out of `clips` (nearer buildings' silhouettes, path commands). */
-    glowDraws(base, { zoom = 1, time = 0, dark = 1, clips = [] } = {}) {
+    /** The lit strips, roofs and tops, tier by tier in drawing order, for the glow layer (`cityBuildings.createGlow`): each tier first erases the glow behind it. */
+    glowDraws(base, { zoom = 1, time = 0, dark = 1 } = {}) {
         const glow = this.glowStrength(dark); if (glow < .004) return [];
-        const view = this.view(base), order = this.order(view), hulls = order.map(t => this.hull(view, t)), boxes = hulls.map(boxOf), out = [];
-        order.forEach((t, i) => {
-            const cover = clips.slice();
-            for (let j = i + 1; j < order.length; j++) if (meets(boxes[i], boxes[j])) cover.push(pathOf(hulls[j]));
-            const pictureClips = cover.map(poly => ({ geometry: { type: 'path', commands: outside(poly), fill_rule: 'evenodd' } }));
-            for (const f of this.seen(view, t)) out.push(...this.#lay(view, f, this.strips[t.i].lit, zoom, { blend: 'add', opacity: glow, clips: pictureClips }));
-            if (t.roof && t.roof_glow) out.push({ picture: this.#roof(view, t, true), blend: 'add', opacity: glow, clips: pictureClips });
-            if (t.top) {
-                const art = new artScene(); art.enter({}, { blend: 'add', opacity: glow });
-                for (const poly of cover) art.clip(outside(poly), { rule: 'evenodd' });
-                t.top(art, true, t, this, view, time); art.leave(); out.push(...art.finish());
-            }
-        });
+        const view = this.view(base), out = [];
+        for (const t of this.order(view)) {
+            const art = new artScene(); art.enter({}, { blend: 'destination-out' }).fill(pathOf(this.hull(view, t)), '#000').leave(); out.push(...art.finish());
+            for (const f of this.seen(view, t)) out.push(...this.#lay(view, f, this.strips[t.i].lit, zoom, { blend: 'add', opacity: glow }));
+            if (t.roof && t.roof_glow) out.push({ picture: this.#roof(view, t, true), blend: 'add', opacity: glow });
+            if (t.top) { const top = new artScene(); top.enter({}, { blend: 'add', opacity: glow }); t.top(top, true, t, this, view, time); top.leave(); out.push(...top.finish()); }
+        }
         return out;
     }
 

@@ -1,5 +1,5 @@
 // The city's street buildings, drawn natively from their exported looks: farthest first, every packet a
-// frame takes, the same every time, with the roofs shared as pictures and the glow kept off nearer walls.
+// frame takes, the same every time, with the roofs shared as pictures and the glow erased behind nearer walls.
 // Run: node --test tools/test-city-buildings.mjs
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -40,11 +40,13 @@ test('a building leans away from the camera as the camera moves', () => {
     assert.notDeepEqual(near.picture.matrix, moved.picture.matrix);
 });
 
-test('the glow is kept off nearer buildings and is valid packets', () => {
+test('the glow is erased behind each nearer building and is valid packets', () => {
     const glow = buildings.createGlow({ view, camera, time: 3, dark: .9 });
     assert.ok(glow.length > 0);
-    assert.ok(glow.some(p => p.clips.some(c => c.rule === 'evenodd')), 'nearer silhouettes clip the glow');
-    submit(glow);
+    const erase = glow.map((p, i) => p.blend === 'destination-out' ? i : -1).filter(i => i >= 0);
+    assert.ok(erase.length > 1, 'each building erases what shines behind its silhouette');
+    assert.ok(glow.slice(erase[0] + 1).some(p => p.blend !== 'destination-out'), 'then adds its own light');
+    submit(glow.filter(e => !e.picture));
 });
 
 test('every street building on the map draws', () => {

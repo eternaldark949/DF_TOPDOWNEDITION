@@ -263,3 +263,23 @@ Measured in the park at 1920, 5400 (29 plants, 165 canopy stamps, 1280 x 720, he
 The plants cost about half again the classic, where the streets of buildings cost about half the classic. Most
 of what is left is the 165 canopy stamps and building the live packets every frame (the wind moves every
 plant); a canopy picture per whole tree is not possible, because its boughs lean by different amounts.
+
+## Phase 4, step 5 (third part): the landmarks
+
+The landmarks are tiered buildings (`city-tiered.mjs`): each tier's walls are a strip painted once and stamped
+on the faces the camera sees in tiles. Drawn natively so far: the Cozy Cafe, the Warehouse, Dr. Yin's, Neural
+Systems, Torque Auto, Biggs Park and Enni Cole.
+
+Enni Cole (camera 6625, 6080) showed three costs:
+
+- Its podium's stone grain was two paths of 10k crossing specks; Chromium took about 500 ms to fill each. In
+  runs of 300 specks the whole strip paints in about 140 ms instead of 1.1 s.
+- The strips were kept in design units, so a 2x tall wall needed twice the density round its whole length.
+  They overflowed the 48 MB picture budget and repainted every frame (about 800 ms a frame). Kept in world px up
+  the wall, a frame's walls take 6 ms.
+- The glow clipped every lit tile (about 260) to the nearer silhouettes: 77 ms a frame. Keeping one clip set
+  across a strip's tiles brought it to 33 ms. The glow is now one layer, painted farthest first, with each
+  building and tier erasing what shines behind it; there are no clips, and it settles at about 11 ms.
+
+Enni Cole's strips and roofs still hold about 43 MB of pictures at this spot, so the native city boot will
+need its own building picture budget.
