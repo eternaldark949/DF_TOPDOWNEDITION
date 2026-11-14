@@ -44,3 +44,18 @@ test('depth batches paint lowest first and group a look across things that do no
     // a1 and a2 touch along an edge and join; d passes the picture p it misses; c lands on p, so it waits.
     assert.deepEqual(groups.map(g => g.map(i => i.name)), [['b1'], ['a1', 'a2', 'd'], ['p'], ['c']]);
 });
+
+test('a strip laid on a wall in tiles lands within the error of where the wall leans', async () => {
+    const { heightView } = await import('../index.mjs');
+    const view = new heightView({ camera: [0, 0], eye: 700 }), face = { x1: -200, y1: 300, x2: 220, y2: 300 }, z0 = 0, z1 = 160;
+    const tiles = view.tiles(face, z0, z1, { error: .75 });
+    assert.ok(tiles.length > 1 && tiles.length <= Math.ceil(420 / 40) * Math.ceil(160 / 14));
+    let worst = 0;
+    for (const t of tiles) for (const [fu, fz] of [[.1, .1], [.5, .5], [.9, .9], [.1, .9]]) {
+        const u = t.u0 + (t.u1 - t.u0) * fu, z = t.z0 + (t.z1 - t.z0) * fz, y = z1 - z, m = t.matrix;
+        const got = [m[0] * u + m[2] * y + m[4], m[1] * u + m[3] * y + m[5]], want = view.at(face.x1 + u, 300, z);
+        worst = Math.max(worst, Math.hypot(got[0] - want[0], got[1] - want[1]));
+    }
+    assert.ok(worst < 1.5, `off by ${worst}`);
+    assert.ok(view.tiles(face, z0, z1, { error: 3 }).length < tiles.length, 'a looser error takes fewer tiles');
+});

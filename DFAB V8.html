@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '5e589b9224df';
+        const DFAB_BUILD = 'e2ca84f96f4a';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="16940">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="16969">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -29190,13 +29190,14 @@ class pictureCache{
      * `blend` is the blend the picture is stamped with (the context's composite, set by the caller): drawn
      * as vector, its normal packets take it, so the fallback looks the same as the stamp.
      */
-    draw(context,{key,bounds,matrix=[1,0,0,1,0,0],layered=false,stamp=true,blend=null},build){
+    draw(context,{key,bounds,matrix=[1,0,0,1,0,0],source=null,layered=false,stamp=true,blend=null},build){
         if(!context?.canvas||typeof context.getTransform!=='function')throw new TypeError('A host Canvas context is required');
         if(typeof key!=='string'||!key)throw new TypeError('A picture needs a key');
         const [bx,by,bw,bh]=bounds;if(![bx,by,bw,bh].every(Number.isFinite)||!(bw>0&&bh>0))throw new TypeError('A picture needs finite bounds');
         const t=context.getTransform(),m=multiply([t.a,t.b,t.c,t.d,t.e,t.f],matrix),scale=Math.max(Math.hypot(m[0],m[1]),Math.hypot(m[2],m[3]));
         const density=this.#densities.find(d=>d>=scale-1e-9);
-        const vector=packets=>{packets??=build();if(blend)packets=packets.map(p=>(p.blend??'normal')==='normal'?{...p,blend}:p);context.save();try{context.transform(...matrix);context.beginPath();context.rect(bx,by,bw,bh);context.clip();canvasRenderer.drawPackets(context,packets);}finally{context.restore();}return 'vector';};   // a picture is only its bounds, painted or not
+        const [rx,ry,rw,rh]=source??bounds;if(source&&![rx,ry,rw,rh].every(Number.isFinite))throw new TypeError('A picture source is a finite rect');
+        const vector=packets=>{packets??=build();if(blend)packets=packets.map(p=>(p.blend??'normal')==='normal'?{...p,blend}:p);context.save();try{context.transform(...matrix);context.beginPath();context.rect(rx,ry,rw,rh);context.clip();canvasRenderer.drawPackets(context,packets);}finally{context.restore();}return 'vector';};   // a picture is only its bounds, painted or not
         if(density===undefined||this.#entries.get(key)?.vector)return stamp?vector():'later';
         const id=`${key}@${density}`;let entry=this.#entries.get(id),how='stamp';
         if(!stamp&&entry){this.#entries.delete(id);this.#entries.set(id,entry);return 'kept';}
@@ -29214,7 +29215,10 @@ class pictureCache{
         this.#entries.set(id,entry);
         if(!stamp)return how;
         context.setTransform(m[0],m[1],m[2],m[3],m[4],m[5]);   // the stamp changes only the transform, so put it back rather than save the whole state
-        try{context.drawImage(entry.surface,bx,by,bw,bh);}finally{context.setTransform(t);}
+        try{
+            if(!source)context.drawImage(entry.surface,bx,by,bw,bh);
+            else{const sx=entry.surface.width/bw,sy=entry.surface.height/bh,x0=Math.max(rx,bx),y0=Math.max(ry,by),x1=Math.min(rx+rw,bx+bw),y1=Math.min(ry+rh,by+bh);if(x1>x0&&y1>y0)context.drawImage(entry.surface,(x0-bx)*sx,(y0-by)*sy,(x1-x0)*sx,(y1-y0)*sy,x0,y0,x1-x0,y1-y0);}
+        }finally{context.setTransform(t);}
         return how;
     }
     #evict(bytes){for(const [id,entry]of this.#entries){if(this.#bytes+bytes<=this.#max_bytes)break;if(entry.surface){this.#free(entry);this.#entries.delete(id);}}}
@@ -29591,6 +29595,37 @@ class heightView{
             quad:(u0,u1,v0,v1,out=[])=>quad(out,at(u0,v0),at(u1,v0),at(u1,v1),at(u0,v1)),
             line:(u0,v0,u1,v1,out=[])=>segment(out,at(u0,v0),at(u1,v1)),
             outline:()=>quad([],[ax,ay],[face.x2,face.y2],[rx2,ry2],[rx1,ry1])};
+    }
+    /**
+     * A flat strip of art laid on a wall in affine pieces: the face (x1, y1, x2, y2) from height z0 up to z1.
+     * A point at height z draws at a scale k(z) that is not linear in z, so one affine piece would let the art
+     * slide; each tile is small enough that its error on screen (times `zoom`) stays under `error` px, and
+     * never larger than `max` [along, up] px. Returns the tiles `{u0, u1, z0, z1, matrix}`: `matrix` draws
+     * strip coordinates (x along the face from its first end, y down from z1, both px) where the tile
+     * lands, so stamping the strip's rect [u0, z1 - tile z1, u1 - u0, tile z1 - tile z0] under it covers
+     * the tile. `overlap` widens each tile's rect (px) so neighbours meet without a seam.
+     */
+    tiles(face,z0,z1,{zoom=1,error=.75,max=[40,14],overlap=0}={}){
+        const L=Math.hypot(face.x2-face.x1,face.y2-face.y1),H=z1-z0;if(!(L>0)||!(H>0))return [];
+        let nu=Math.max(1,Math.ceil(L/max[0])),nz=Math.max(2,Math.ceil(H/max[1]));
+        const [cx,cy]=this.camera,k0=this.k(z0),k1=this.k(z1),km=this.k((z0+z1)/2);
+        const D=Math.max(Math.hypot(face.x1-cx,face.y1-cy),Math.hypot(face.x2-cx,face.y2-cy)),slide=zoom*D*Math.abs(km-(k0+k1)/2),span=rows=>k1-this.k(z1-H/rows);
+        const err=Math.max(error,slide/(nz*nz),zoom*L/nu*span(nz));let best=null;
+        for(let rows=Math.max(1,Math.min(nz,Math.ceil(Math.sqrt(slide/err))));rows<=nz;rows++){
+            const cols=Math.max(1,Math.ceil(zoom*L*span(rows)/err-1e-9));
+            if(cols<=nu&&rows*rows*err>=slide-1e-9&&(!best||cols*rows<best[0]*best[1]))best=[cols,rows];
+        }
+        if(best)[nu,nz]=best;
+        const out=[],du=L/nu,dz=H/nz,ex=(face.x2-face.x1)/L,ey=(face.y2-face.y1)/L;
+        for(let j=0;j<nz;j++){
+            const za=z0+dz*j,zb=za+dz,ka=this.k(za),kb=this.k(zb);
+            for(let i=0;i<nu;i++){
+                const u0=du*i,a=this.scaled(face.x1+ex*u0,face.y1+ey*u0,ka),b=this.scaled(face.x1+ex*(u0+du),face.y1+ey*(u0+du),ka),d=this.scaled(face.x1+ex*u0,face.y1+ey*u0,kb);
+                const X=[(b[0]-a[0])/du,(b[1]-a[1])/du],Y=[(a[0]-d[0])/dz,(a[1]-d[1])/dz],y0=z1-zb;
+                out.push({u0:Math.max(0,u0-overlap),u1:Math.min(L,u0+du+overlap),z0:Math.max(z0,za-overlap),z1:Math.min(z1,zb+overlap),matrix:[X[0],X[1],Y[0],Y[1],d[0]-u0*X[0]-y0*Y[0],d[1]-u0*X[1]-y0*Y[1]]});
+            }
+        }
+        return out;
     }
     /**
      * Vertical plates standing proud of a wall: at each anchor {x, y, nx, ny} (a point on the wall and its

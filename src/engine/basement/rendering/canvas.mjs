@@ -212,13 +212,14 @@ export class pictureCache{
      * `blend` is the blend the picture is stamped with (the context's composite, set by the caller): drawn
      * as vector, its normal packets take it, so the fallback looks the same as the stamp.
      */
-    draw(context,{key,bounds,matrix=[1,0,0,1,0,0],layered=false,stamp=true,blend=null},build){
+    draw(context,{key,bounds,matrix=[1,0,0,1,0,0],source=null,layered=false,stamp=true,blend=null},build){
         if(!context?.canvas||typeof context.getTransform!=='function')throw new TypeError('A host Canvas context is required');
         if(typeof key!=='string'||!key)throw new TypeError('A picture needs a key');
         const [bx,by,bw,bh]=bounds;if(![bx,by,bw,bh].every(Number.isFinite)||!(bw>0&&bh>0))throw new TypeError('A picture needs finite bounds');
         const t=context.getTransform(),m=multiply([t.a,t.b,t.c,t.d,t.e,t.f],matrix),scale=Math.max(Math.hypot(m[0],m[1]),Math.hypot(m[2],m[3]));
         const density=this.#densities.find(d=>d>=scale-1e-9);
-        const vector=packets=>{packets??=build();if(blend)packets=packets.map(p=>(p.blend??'normal')==='normal'?{...p,blend}:p);context.save();try{context.transform(...matrix);context.beginPath();context.rect(bx,by,bw,bh);context.clip();canvasRenderer.drawPackets(context,packets);}finally{context.restore();}return 'vector';};   // a picture is only its bounds, painted or not
+        const [rx,ry,rw,rh]=source??bounds;if(source&&![rx,ry,rw,rh].every(Number.isFinite))throw new TypeError('A picture source is a finite rect');
+        const vector=packets=>{packets??=build();if(blend)packets=packets.map(p=>(p.blend??'normal')==='normal'?{...p,blend}:p);context.save();try{context.transform(...matrix);context.beginPath();context.rect(rx,ry,rw,rh);context.clip();canvasRenderer.drawPackets(context,packets);}finally{context.restore();}return 'vector';};   // a picture is only its bounds, painted or not
         if(density===undefined||this.#entries.get(key)?.vector)return stamp?vector():'later';
         const id=`${key}@${density}`;let entry=this.#entries.get(id),how='stamp';
         if(!stamp&&entry){this.#entries.delete(id);this.#entries.set(id,entry);return 'kept';}
@@ -236,7 +237,10 @@ export class pictureCache{
         this.#entries.set(id,entry);
         if(!stamp)return how;
         context.setTransform(m[0],m[1],m[2],m[3],m[4],m[5]);   // the stamp changes only the transform, so put it back rather than save the whole state
-        try{context.drawImage(entry.surface,bx,by,bw,bh);}finally{context.setTransform(t);}
+        try{
+            if(!source)context.drawImage(entry.surface,bx,by,bw,bh);
+            else{const sx=entry.surface.width/bw,sy=entry.surface.height/bh,x0=Math.max(rx,bx),y0=Math.max(ry,by),x1=Math.min(rx+rw,bx+bw),y1=Math.min(ry+rh,by+bh);if(x1>x0&&y1>y0)context.drawImage(entry.surface,(x0-bx)*sx,(y0-by)*sy,(x1-x0)*sx,(y1-y0)*sy,x0,y0,x1-x0,y1-y0);}
+        }finally{context.setTransform(t);}
         return how;
     }
     #evict(bytes){for(const [id,entry]of this.#entries){if(this.#bytes+bytes<=this.#max_bytes)break;if(entry.surface){this.#free(entry);this.#entries.delete(id);}}}

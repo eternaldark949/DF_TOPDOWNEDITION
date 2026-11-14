@@ -45,6 +45,37 @@ export class heightView{
             outline:()=>quad([],[ax,ay],[face.x2,face.y2],[rx2,ry2],[rx1,ry1])};
     }
     /**
+     * A flat strip of art laid on a wall in affine pieces: the face (x1, y1, x2, y2) from height z0 up to z1.
+     * A point at height z draws at a scale k(z) that is not linear in z, so one affine piece would let the art
+     * slide; each tile is small enough that its error on screen (times `zoom`) stays under `error` px, and
+     * never larger than `max` [along, up] px. Returns the tiles `{u0, u1, z0, z1, matrix}`: `matrix` draws
+     * strip coordinates (x along the face from its first end, y down from z1, both px) where the tile
+     * lands, so stamping the strip's rect [u0, z1 - tile z1, u1 - u0, tile z1 - tile z0] under it covers
+     * the tile. `overlap` widens each tile's rect (px) so neighbours meet without a seam.
+     */
+    tiles(face,z0,z1,{zoom=1,error=.75,max=[40,14],overlap=0}={}){
+        const L=Math.hypot(face.x2-face.x1,face.y2-face.y1),H=z1-z0;if(!(L>0)||!(H>0))return [];
+        let nu=Math.max(1,Math.ceil(L/max[0])),nz=Math.max(2,Math.ceil(H/max[1]));
+        const [cx,cy]=this.camera,k0=this.k(z0),k1=this.k(z1),km=this.k((z0+z1)/2);
+        const D=Math.max(Math.hypot(face.x1-cx,face.y1-cy),Math.hypot(face.x2-cx,face.y2-cy)),slide=zoom*D*Math.abs(km-(k0+k1)/2),span=rows=>k1-this.k(z1-H/rows);
+        const err=Math.max(error,slide/(nz*nz),zoom*L/nu*span(nz));let best=null;
+        for(let rows=Math.max(1,Math.min(nz,Math.ceil(Math.sqrt(slide/err))));rows<=nz;rows++){
+            const cols=Math.max(1,Math.ceil(zoom*L*span(rows)/err-1e-9));
+            if(cols<=nu&&rows*rows*err>=slide-1e-9&&(!best||cols*rows<best[0]*best[1]))best=[cols,rows];
+        }
+        if(best)[nu,nz]=best;
+        const out=[],du=L/nu,dz=H/nz,ex=(face.x2-face.x1)/L,ey=(face.y2-face.y1)/L;
+        for(let j=0;j<nz;j++){
+            const za=z0+dz*j,zb=za+dz,ka=this.k(za),kb=this.k(zb);
+            for(let i=0;i<nu;i++){
+                const u0=du*i,a=this.scaled(face.x1+ex*u0,face.y1+ey*u0,ka),b=this.scaled(face.x1+ex*(u0+du),face.y1+ey*(u0+du),ka),d=this.scaled(face.x1+ex*u0,face.y1+ey*u0,kb);
+                const X=[(b[0]-a[0])/du,(b[1]-a[1])/du],Y=[(a[0]-d[0])/dz,(a[1]-d[1])/dz],y0=z1-zb;
+                out.push({u0:Math.max(0,u0-overlap),u1:Math.min(L,u0+du+overlap),z0:Math.max(z0,za-overlap),z1:Math.min(z1,zb+overlap),matrix:[X[0],X[1],Y[0],Y[1],d[0]-u0*X[0]-y0*Y[0],d[1]-u0*X[1]-y0*Y[1]]});
+            }
+        }
+        return out;
+    }
+    /**
      * Vertical plates standing proud of a wall: at each anchor {x, y, nx, ny} (a point on the wall and its
      * outward normal) a plate `w` wide, `out` in front, from height z0 to z1. `front` is every plate's face;
      * `edge` the lit edge of those `lit(anchor)` picks (all of them without it).
