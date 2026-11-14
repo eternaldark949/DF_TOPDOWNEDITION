@@ -473,5 +473,111 @@
       "leaf": "#2f5a32",
       "leaf_hi": "#4d8650"
     }
+  },
+  "moon_city": {
+    "plan": {
+      "w": 600,
+      "d": 500,
+      "hero": 1.5
+    },
+    "z": {
+      "wing": 46,
+      "glass_0": 18,
+      "glass": 82,
+      "hall": 92,
+      "drum": 110,
+      "dome": 30,
+      "canopy": 12,
+      "sign": 24
+    },
+    "door": [
+      140,
+      500
+    ],
+    "drum": [
+      330,
+      150,
+      92
+    ],
+    "glass": [
+      66,
+      214,
+      42
+    ],
+    "moon": [
+      528,
+      72
+    ],
+    "turrets": [
+      [
+        58,
+        56,
+        "200, 168, 255",
+        0
+      ],
+      [
+        560,
+        252,
+        "255, 120, 180",
+        2.3
+      ]
+    ],
+    "palms": [
+      [
+        20,
+        548
+      ],
+      [
+        260,
+        548
+      ],
+      [
+        394,
+        338
+      ],
+      [
+        494,
+        338
+      ],
+      [
+        584,
+        338
+      ]
+    ],
+    "bay": [
+      330,
+      578,
+      236,
+      104
+    ],
+    "canopy_r": 60,
+    "bpm": 140,
+    "club": [
+      "176, 120, 255",
+      "220, 190, 255",
+      "255, 90, 150",
+      "232, 194, 122"
+    ],
+    "name_font": "Montserrat, \"Poiret One\", sans-serif",
+    "script_font": "'Great Vibes', cursive",
+    "sans_font": "Montserrat, sans-serif",
+    "colors": {
+      "lacquer": "#0b0810",
+      "plum": "#1a1022",
+      "wall": "#140c1a",
+      "fin": "#2a1a36",
+      "violet": "#8a5cff",
+      "lavender": "#c8a8ff",
+      "lilac": "#e8d8ff",
+      "gold": "#e8c27a",
+      "gold_dk": "#a8823e",
+      "gold_lt": "#fff1c2",
+      "rose": "#ff5a8a",
+      "velvet": "#5a0c34",
+      "velvet_lt": "#8a1a52",
+      "crimson": "#ff3a6a",
+      "marble": "#0e0a12",
+      "water": "#1c1240"
+    }
   }
 }

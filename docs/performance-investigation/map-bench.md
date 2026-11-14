@@ -289,3 +289,6 @@ roofs and forecourt in about 0.5 s; after that a frame's buildings take 10 to 12
 and the glow (lit windows, the light pooled on the forecourt, the reflections and the two searchlights, which
 cross most of the screen) about 21 to 29 ms. The searchlights and the pools are large gradients, so they are the
 first thing to trim if the glow needs to come down.
+
+Moon City (camera 5300, 5500): the first frame paints in about 0.2 s; then a frame's buildings take about 7 ms to
+make and 6 ms to draw, and the glow (with the dome's beat grid, the festoons and the searchlights) about 25 to 27 ms.
