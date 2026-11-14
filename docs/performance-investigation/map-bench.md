@@ -283,3 +283,9 @@ Enni Cole (camera 6625, 6080) showed three costs:
 
 Enni Cole's strips and roofs still hold about 43 MB of pictures at this spot, so the native city boot will
 need its own building picture budget.
+
+Double Nights (camera 2000, 700, in front of the rotunda, in headless Chromium): the first frame paints its strips,
+roofs and forecourt in about 0.5 s; after that a frame's buildings take 10 to 12 ms to make and about 7 ms to draw,
+and the glow (lit windows, the light pooled on the forecourt, the reflections and the two searchlights, which
+cross most of the screen) about 21 to 29 ms. The searchlights and the pools are large gradients, so they are the
+first thing to trim if the glow needs to come down.

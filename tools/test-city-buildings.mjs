@@ -21,7 +21,7 @@ test('the street buildings in view come farthest first', () => {
     assert.ok(shown.length >= 4, 'a street of buildings is in view');
     const far = h => { const dx = Math.max(h.bounds[0] - camera[0], 0, camera[0] - h.bounds[2]), dy = Math.max(h.bounds[1] - camera[1], 0, camera[1] - h.bounds[3]); return dx * dx + dy * dy; };
     for (let i = 1; i < shown.length; i++) assert.ok(far(shown[i - 1]) >= far(shown[i]), 'nearer buildings paint later');
-    assert.equal(buildings.visible({ left: -900, top: -900, right: -100, bottom: -100 }, camera).length, 0, 'nothing off the map');
+    assert.equal(buildings.visible({ left: -900, top: -900, right: -100, bottom: -100 }, [-500, -500]).length, 0, 'nothing off the map');   // (seen from far off, a landmark as tall as Double Nights leans a long way)
 });
 
 test('the walls are frame packets, the same every time, with each roof a picture', () => {

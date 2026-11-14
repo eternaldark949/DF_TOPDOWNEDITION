@@ -2,6 +2,7 @@ import LANDMARKS from '../data/city-landmarks.json' with { type: 'json' };
 import { rect, polygon, circle, ellipse, linear, radial } from '../../engine/basement/rendering/index.mjs';
 import { classicRandom, moveLine } from './city-building-art.mjs';
 import { ornament } from './city-ornament.mjs';
+import { bayPlan } from './city-tiered.mjs';
 
 /**
  * The Ashgrove, a mansion block across Ashgrove St from Biggs Park, as a tiered building (`city-tiered.mjs`):
@@ -310,14 +311,6 @@ function dome(art, glow, t, b, view) {
     const top = b.at(view, cx, cy, t.z1 + R * .98), f0 = b.at(view, cx, cy, t.z1 + R), f1 = b.at(view, cx, cy, t.z1 + R + 9), k = b.k(view, t.z1 + R + 6);
     art.stroke(moveLine([], top, f1), '#c9a457', 1.6);
     art.fill([circle(f0[0] + (f1[0] - f0[0]) * .55, f0[1] + (f1[1] - f0[1]) * .55, 2.2 * k)], '#e8c97a');
-}
-
-/** A bay out of a wall at wy: x0..x1 wide, straight cheeks `cheek` deep, then a half-polygon `depth` deep in n facets. */
-function bayPlan(x0, x1, wy, cheek, depth, n) {
-    const cx = (x0 + x1) / 2, a = (x1 - x0) / 2, ey = wy + cheek, pts = [[x0, wy], [x0, ey]];
-    for (let i = 1; i < n; i++) { const th = Math.PI - i * Math.PI / n; pts.push([cx + a * Math.cos(th), ey + depth * Math.sin(th)]); }
-    pts.push([x1, ey], [x1, wy]);
-    return pts;
 }
 
 /** The Ashgrove's tiers, for `tieredBuilding`. */

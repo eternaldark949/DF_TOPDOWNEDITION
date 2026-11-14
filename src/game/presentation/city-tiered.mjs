@@ -9,12 +9,23 @@ import { artScene, rect, linear } from '../../engine/basement/rendering/index.mj
  * the plan; each tier's roof is a picture in the plane of its top (`roof(art, emissive, tier, building)`),
  * what stands on it is drawn live (`top(art, emissive, tier, building, view, time)`).
  *
- * The definition (one per landmark, `city-landmark-*.mjs`) is `{plan: {W, D}, hero, facing, tiers, ground, order}`:
+ * The definition (one per landmark, `city-landmark-*.mjs`) is `{plan: {W, D}, hero, facing, origin, tiers, ground, ground_area, shade, order, glow}`
+ * (`origin`: where the plan's corner sits from the record's x, y; `shade`: `{offset, color}`, its own shade on the ground
+ * in place of the usual one; `ground_area`: [x, y, w, h] in the plan, how far
+ * its `ground(scene, building)` reaches; `glow(art, building, view, time)`: what it adds to its glow after its tiers):
  * each tier `{id, poly | rect: [x, y, w, h], z0, z1, on, fill, paint, roof, roof_glow, top, ledges: [{z,
  * out, th, top, band, lip}], shade: [r, g, b], solid, rise, lit_under}` (`lit_under`: its day strip shows faintly
  * under its light by night, at that alpha), laid out with its front at the bottom (+y);
  * facing 'N' turns it round. The classic kit is `legacy/buildings/tiered-kit.js`.
  */
+/** A bay out of a wall at wy (a tier's plan): x0..x1 wide, straight cheeks `cheek` deep, then a half-polygon `depth` deep in n facets. */
+export function bayPlan(x0, x1, wy, cheek, depth, n) {
+    const cx = (x0 + x1) / 2, a = (x1 - x0) / 2, ey = wy + cheek, pts = [[x0, wy], [x0, ey]];
+    for (let i = 1; i < n; i++) { const th = Math.PI - i * Math.PI / n; pts.push([cx + a * Math.cos(th), ey + depth * Math.sin(th)]); }
+    pts.push([x1, ey], [x1, wy]);
+    return pts;
+}
+
 export const TIER = { z_scale: 2, tile: [40, 14], error: .75, foot: 22, contact: 8, light: [-.78, .62] };
 
 const rectPoly = (x, y, w, h) => [[x, y], [x, y + h], [x + w, y + h], [x + w, y]];
@@ -32,7 +43,8 @@ const boxOf = pts => { let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -I
 export class tieredBuilding {
     constructor(record, index, def, look, tier = TIER) {
         const P = def.plan, N = def.facing === 'N', Z = tier.z_scale;
-        Object.assign(this, { record, index, def, look, tier, id: record.id, x: record.x, y: record.y, hero: def.hero ?? 1, facing: N ? 'N' : 'S' });
+        const [ox, oy] = def.origin ?? [0, 0];
+        Object.assign(this, { record, index, def, look, tier, id: record.id, x: record.x + ox, y: record.y + oy, hero: def.hero ?? 1, facing: N ? 'N' : 'S' });
         this.local = (x, y) => N ? [P.W - x, P.D - y] : [x, y];
         this.tiers = this.#geometry();
         this.faces = this.tiers.flatMap(t => t.faces);
@@ -45,6 +57,10 @@ export class tieredBuilding {
         this.colors = record.look?.colors ?? {};
         const depth = this.floors * 3;
         this.groundBox = [this.bounds[0] - 80, this.bounds[1] - 80, this.bounds[2] + depth + 80, this.bounds[3] + depth + 120];
+        if (def.ground_area) {
+            const [gx, gy, gw, gh] = def.ground_area, g = boxOf([this.local(gx, gy), this.local(gx + gw, gy + gh)].map(([x, y]) => [this.x + x, this.y + y]));
+            this.groundBox = [Math.min(this.groundBox[0], g[0]), Math.min(this.groundBox[1], g[1]), Math.max(this.groundBox[2], g[2]), Math.max(this.groundBox[3], g[3])];
+        }
         this.reach = [this.bounds[0] - 1200, this.bounds[1] - 1200, this.bounds[2] + 1200, this.bounds[3] + 1200];
         this.strips = this.tiers.map(t => this.#strip(t));
     }
@@ -233,15 +249,19 @@ export class tieredBuilding {
             if (t.roof && t.roof_glow) out.push({ picture: this.#roof(view, t, true), blend: 'add', opacity: glow });
             if (t.top) { const top = new artScene(); top.enter({}, { blend: 'add', opacity: glow }); t.top(top, true, t, this, view, time); top.leave(); out.push(...top.finish()); }
         }
+        if (this.def.glow) { const art = new artScene(); art.enter({}, { blend: 'add', opacity: glow }); this.def.glow(art, this, view, time); art.leave(); out.push(...art.finish()); }
         return out;
     }
 
     /* ---------------- the ground ---------------- */
 
     ground(scene) {
-        const depth = this.floors * 3;
-        for (const s of this.sections) scene.fill(rect(s.x + depth, s.y + depth, s.w, s.h), 'rgba(0, 0, 0, 0.5)');
-        for (const s of this.sections) scene.fill(rect(s.x - 5, s.y - 5, s.w + 10, s.h + 10), 'rgba(10, 10, 15, 0.3)');
+        const depth = this.floors * 3, shade = this.def.shade;
+        if (shade) for (const s of this.sections) scene.fill(rect(s.x + shade.offset[0], s.y + shade.offset[1], s.w, s.h), shade.color);
+        else {
+            for (const s of this.sections) scene.fill(rect(s.x + depth, s.y + depth, s.w, s.h), 'rgba(0, 0, 0, 0.5)');
+            for (const s of this.sections) scene.fill(rect(s.x - 5, s.y - 5, s.w + 10, s.h + 10), 'rgba(10, 10, 15, 0.3)');
+        }
         this.def.ground?.(scene, this);
     }
 }

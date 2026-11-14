@@ -334,5 +334,144 @@
     "gold": "#d8b46a",
     "warm": "#ffcf8a",
     "name_font": "Montserrat, \"Cinzel\", serif"
+  },
+  "double_nights": {
+    "plan": {
+      "w": 800,
+      "d": 430,
+      "hero": 1.5,
+      "origin": [
+        -20,
+        0
+      ],
+      "ground": 22,
+      "storey": 11
+    },
+    "z": {
+      "wing": 92,
+      "mansard": 106,
+      "core": 114,
+      "attic": 126,
+      "rotunda": 132,
+      "crown": 146,
+      "dome": 20,
+      "canopy_0": 25,
+      "canopy_1": 32,
+      "plinth": 30
+    },
+    "rotunda": [
+      270,
+      530,
+      320,
+      10,
+      100
+    ],
+    "crown": [
+      400,
+      372,
+      40
+    ],
+    "canopies": [
+      [
+        90,
+        250,
+        "ONE NIGHT"
+      ],
+      [
+        550,
+        710,
+        "ANOTHER NIGHT"
+      ]
+    ],
+    "lamps": [
+      [
+        30,
+        600
+      ],
+      [
+        262,
+        600
+      ],
+      [
+        538,
+        600
+      ],
+      [
+        770,
+        600
+      ]
+    ],
+    "topiaries": [
+      [
+        112,
+        398
+      ],
+      [
+        228,
+        398
+      ],
+      [
+        572,
+        398
+      ],
+      [
+        688,
+        398
+      ],
+      [
+        336,
+        446
+      ],
+      [
+        464,
+        446
+      ]
+    ],
+    "plinth": [
+      586,
+      646,
+      44,
+      14
+    ],
+    "medal": [
+      400,
+      730,
+      76
+    ],
+    "beams": [
+      [
+        322,
+        396
+      ],
+      [
+        478,
+        396
+      ]
+    ],
+    "forecourt": [
+      -10,
+      318,
+      820,
+      542
+    ],
+    "serif": "Georgia, \"Times New Roman\", serif",
+    "colors": {
+      "stone": "#b9a98f",
+      "stone_hi": "#d3c5aa",
+      "stone_lo": "#8f7f69",
+      "stone_dk": "#4a3f36",
+      "cream": "#efe4cc",
+      "iron": "#17141a",
+      "iron_hi": "#3a3540",
+      "gold": "#e3c07a",
+      "gold_hi": "#fff0c4",
+      "gold_dk": "#9a7a3e",
+      "slate": "#3e4250",
+      "slate_hi": "#5a5f70",
+      "slate_dk": "#262934",
+      "lacquer": "#120f16",
+      "leaf": "#2f5a32",
+      "leaf_hi": "#4d8650"
+    }
   }
 }
