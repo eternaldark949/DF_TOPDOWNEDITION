@@ -52,6 +52,18 @@ test('every street building on the map draws', () => {
     for (let y = 0; y < h; y += 1200) for (let x = 0; x < w; x += 2000) {
         const v = { left: x, top: y, right: x + 2000, bottom: y + 1200 }, c = [x + 1000, y + 600];
         submit(buildings.createDraws({ view: v, camera: c, time: 1 }).filter(e => !e.picture));
-        submit(buildings.createGlow({ view: v, camera: c, time: 1, dark: 1 }));
+        submit(buildings.createGlow({ view: v, camera: c, time: 1, dark: 1 }).filter(e => !e.picture));
     }
+});
+
+test('a landmark lays its painted walls on its faces in tiles, and its light by night', () => {
+    const cafe = buildings.houses.find(h => h.id === 'cozy_cafe');
+    assert.ok(cafe, 'the Cozy Cafe is drawn natively');
+    const at = [4560, 2250], v = { left: at[0] - 640, top: at[1] - 360, right: at[0] + 640, bottom: at[1] + 360 };
+    const draws = buildings.createDraws({ view: v, camera: at, time: 3 }), stamps = draws.filter(e => e.picture?.key.startsWith('city_tier:cozy_cafe'));
+    assert.ok(stamps.length > 4 && stamps.every(e => e.picture.source.length === 4), 'its walls are tiles of its strips');
+    for (const key of new Set(stamps.map(e => e.picture.key))) { const p = stamps.find(e => e.picture.key === key).picture.build(); assert.ok(p.length > 10); submit(p); }
+    submit(draws.filter(e => !e.picture));
+    const glow = buildings.createGlow({ view: v, camera: at, time: 3, dark: .9 });
+    assert.ok(glow.some(e => e.picture?.key.endsWith(':lit') && e.blend === 'add'), 'its windows shine by night');
 });

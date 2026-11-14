@@ -7,6 +7,13 @@
 /** The classic buildings' hash: a repeatable number in [0, 1) for a seed and an index. */
 export const buildingHash = (seed, i) => { const s = Math.sin(seed * 12.9898 + i * 78.233) * 43758.5453; return s - Math.floor(s); };
 
+/** The classic seeded random (FNV over the seed's text, then mulberry32), so the canopies match. */
+export function classicRandom(seed) {
+    let h = 2166136261;
+    for (const ch of String(seed)) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+    return () => { h += 0x6D2B79F5; let t = h; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+
 const channels = hex => { let h = hex.replace('#', ''); if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2]; return [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16)); };
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 /** A hex colour `amount` (0..255) darker or lighter in every channel, as `rgb(r,g,b)`. */

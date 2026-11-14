@@ -4,6 +4,8 @@ import { buildingHash, darken, lighten, alpha, rgbOf, boxPath, dotPath, moveLine
 import { streetShop } from './city-street-shops.mjs';
 import { streetArcade } from './city-street-arcade.mjs';
 import { streetApartment } from './city-street-apartments.mjs';
+import { tieredBuilding } from './city-tiered.mjs';
+import { cozyCafe } from './city-landmark-cozy-cafe.mjs';
 
 /**
  * The city's street buildings as art, from the looks its generator resolved (the `look` of each exported
@@ -24,7 +26,8 @@ export class cityBuildings {
     #look; #houses; #cells = new Map();
     constructor(city, { look = LOOK } = {}) {
         this.#look = look;
-        this.#houses = city.buildings.map((record, index) => record.kind === 'BuildingV2' && record.look ? new house(record, index, look) : null).filter(Boolean);
+        this.#houses = city.buildings.map((record, index) => !record.look ? null : record.kind === 'BuildingV2' ? new house(record, index, look)
+            : LANDMARKS[record.kind] ? new tieredBuilding(record, index, LANDMARKS[record.kind](), look) : null).filter(Boolean);
         for (const h of this.#houses) for (const key of cellsOf(h.reach)) { let list = this.#cells.get(key); if (!list) this.#cells.set(key, list = []); list.push(h); }
     }
     get houses() { return this.#houses; }
@@ -49,36 +52,30 @@ export class cityBuildings {
         for (const key of cellsOf([box[0] - 400, box[1] - 400, box[2] + 400, box[3] + 400])) for (const h of this.#cells.get(key) ?? []) {
             if (seen.has(h)) continue; seen.add(h);
             const b = h.box(base); if (b[0] > box[2] || b[2] < box[0] || b[1] > box[3] || b[3] < box[1]) continue;
-            for (const polygon of h.silhouettes(base)) out.push({ z: h.H, polygon });
+            for (const path of h.silhouettes(base)) out.push({ z: h.H, polygon: path.filter(c => c[0] !== 'close').map(c => [c[1], c[2]]) });
         }
         return out;
     }
     /** Every building over the people, farthest first: packets and roof pictures, in paint order. */
     createDraws({ view, camera, zoom = 1, time = 0 }) {
         const base = new heightView({ camera, eye: this.eye(zoom) }), out = [];
-        for (const h of this.visible(view, camera, zoom)) {
-            const ctx = h.context(base, time), art = new artScene();
-            h.walls(ctx, art);
-            out.push(...art.finish(), h.roofPicture(ctx));
-            const live = new artScene(); h.roofLive(ctx, live); out.push(...live.finish());
-        }
+        for (const h of this.visible(view, camera, zoom)) out.push(...h.draws(base, { zoom, time }));
         return out;
     }
     /** What shines after the light layer, building by building, each kept off the nearer ones' walls and roofs. */
     createGlow({ view, camera, zoom = 1, time = 0, dark = 1 }) {
-        const base = new heightView({ camera, eye: this.eye(zoom) }), order = this.visible(view, camera, zoom), boxes = order.map(h => h.box(base)), art = new artScene();
+        const base = new heightView({ camera, eye: this.eye(zoom) }), order = this.visible(view, camera, zoom), boxes = order.map(h => h.box(base));
+        const out = [];
         order.forEach((h, i) => {
-            const bb = boxes[i];
-            art.enter();
+            const bb = boxes[i], clips = [];
             for (let j = i + 1; j < order.length; j++) {
                 const o = boxes[j];
                 if (o[0] > bb[2] || o[2] < bb[0] || o[1] > bb[3] || o[3] < bb[1]) continue;
-                for (const poly of order[j].silhouettes(base)) art.clip([...rect(-1e7, -1e7, 2e7, 2e7), ...poly], { rule: 'evenodd' });
+                clips.push(...order[j].silhouettes(base));
             }
-            h.glow(h.context(base, time, dark), art);
-            art.leave();
+            out.push(...h.glowDraws(base, { zoom, time, dark, clips }));
         });
-        return art.finish();
+        return out;
     }
     /** Adds the buildings' ground (shadows, footprints, the street variants' pavement dressing) meeting `tile` [x, y, w, h] to `scene`. */
     groundArt(scene, [x, y, w, h]) {
@@ -97,6 +94,8 @@ const CELL = 1024, WIDTHS = new Map();
 function* cellsOf([x0, y0, x1, y1]) { for (let x = Math.floor(x0 / CELL); x <= Math.floor(x1 / CELL); x++) for (let y = Math.floor(y0 / CELL); y <= Math.floor(y1 / CELL); y++) yield x * 65536 + y; }
 const mul = (a, b) => [a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1], a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3], a[0] * b[4] + a[2] * b[5] + a[4], a[1] * b[4] + a[3] * b[5] + a[5]];
 const VARIANTS = { shop: streetShop, arcade: streetArcade, apt: streetApartment };
+/** The landmarks drawn natively so far, by their classic class. */
+const LANDMARKS = { CozyCafeBuilding: cozyCafe };
 
 /** Its front's frame: x along the front (left to right, seen from the street), y in from the back, the front at y = fd. */
 function frameOf(facing, W, D) {
@@ -195,6 +194,19 @@ class house {
         if (this.variant) { this.artist.faceOver(this, ctx, art); this.artist.front(this, ctx, art, false); }
     }
 
+    /** Its walls, roof picture and what moves on its roof, in paint order. */
+    draws(base, { time = 0 } = {}) {
+        const ctx = this.context(base, time), art = new artScene(), live = new artScene();
+        this.walls(ctx, art); this.roofLive(ctx, live);
+        return [...art.finish(), this.roofPicture(ctx), ...live.finish()];
+    }
+    /** Its night light, kept off `clips` (the nearer buildings' silhouettes). */
+    glowDraws(base, { time = 0, dark = 1, clips = [] } = {}) {
+        const art = new artScene(); art.enter();
+        for (const path of clips) art.clip([...rect(-1e7, -1e7, 2e7, 2e7), ...path], { rule: 'evenodd' });
+        this.glow(this.context(base, time, dark), art); art.leave();
+        return art.finish();
+    }
     /** The roof as one picture in the plane of its height: shared by its variant and size, or its own. */
     roofPicture(ctx) {
         const plane = ctx.view.plane(ctx.k);

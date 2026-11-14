@@ -1,0 +1,18 @@
+{
+  "cozy_cafe": {
+    "colors": {
+      "brick": "#6a3426", "brick_hi": "#7d4130", "brick_lo": "#43201a", "mortar": "rgba(232,190,140,.16)",
+      "cream": "#efdcb6", "wood": "#3a2116", "wood_hi": "#5d3a24", "amber": "#ffaa00", "amber_soft": "#ffc66a",
+      "glass": "#2a1b14", "warm": "#ffd690", "stripe_a": "#e2902c", "stripe_b": "#f1e0bd",
+      "roof_s": "#6c3e2d", "roof_n": "#3d241b", "roof_e": "#55301f", "roof_w": "#4b2b1e", "ridge": "#2a1711",
+      "deck": "#6f4a31", "deck_lo": "#563723", "leaf": "#4f7d43", "leaf_hi": "#77a25d"
+    },
+    "plan": {
+      "w": 350, "d": 350, "house": 30, "door": 175, "awnings": [[14, 115], [221, 115]], "awning_z": [13, 16], "eave": 3, "roof_y1": 232, "rise": 48,
+      "chimney": { "x": 34, "y": 98, "w": 30, "h": 30, "up": 34 },
+      "parasols": [[66, 292], [176, 284], [286, 292]], "parasol_r": 25, "parasol_z": 17,
+      "lights_z": 21, "skylights": [[62, 112], [238, 288]], "hero": 1.5
+    },
+    "sign": { "text": "Cozy Cafe", "font": "Great Vibes, URW Chancery L, Z003, cursive", "size": 12.5 }
+  }
+}
