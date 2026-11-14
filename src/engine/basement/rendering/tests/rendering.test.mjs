@@ -143,7 +143,7 @@ test('a picture is painted once at the density the view needs and stamped after,
  assert.deepEqual([made[0].width,made[0].height],[36,36],'1.2 device px per unit takes the 1.5 density');
  assert.ok(made[0].ctx.calls.some(c=>c[0]==='fill'),'the packets were painted into the picture');
  const stamp=ctx.calls.filter(c=>c[0]==='drawImage').at(-1);assert.equal(stamp[1],made[0]);assert.deepEqual(stamp.slice(2),[-12,-12,24,24]);
- assert.ok(ctx.calls.some(c=>c[0]==='transform'&&c.slice(1).join(',')==='1,0,0,1,40,50'));assert.equal(ctx.stack,0);
+ assert.ok(ctx.calls.some(c=>c[0]==='setTransform'&&c.slice(1).join(',')==='1.2,0,0,1.2,48,60'),'stamped under the view times the matrix');assert.equal(ctx.stack,0);
  ctx.zoom(2.5);assert.equal(cache.draw(ctx,at,build),'paint');assert.deepEqual([made[1].width,made[1].height],[72,72],'zooming in paints a sharper one');
  ctx.zoom(9);assert.equal(cache.draw(ctx,at,build),'vector','past the last density it draws as vector');
  assert.equal(cache.statistics.pictures,2);assert.equal(cache.statistics.bytes,(36*36+72*72)*4);

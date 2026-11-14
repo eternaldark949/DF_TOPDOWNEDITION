@@ -79,7 +79,7 @@ function exportCity() {
         walls: m.walls.map(w => ({ ...rect(w), ...(w.style ? { style: w.style } : {}) })),
         lamps: m.lamps.map(l => ({ x: r(l.x), y: r(l.y), lampType: l.lampType, color: l.color, lightRadius: l.lightRadius, ...(l.angle ? { angle: r(l.angle) } : {}), ...(l.fixture ? { fixture: l.fixture } : {}) })),
         neon: (game.neonSigns ?? []).map(n => plain(n, ['x', 'y', 'text', 'color', 'fontSize', 'fontFamily', 'flickerOffset'])),
-        foliage: m.foliage.map(f => plain(f, ['x', 'y', 'type', 'size', 'phaseOffset', 'swayMultiplier', 'isGlowing', 'glowColor', 'leafColor', 'trunkColor'])),
+        foliage: m.foliage.map(f => snake(plain(f, ['x', 'y', 'type', 'size', 'phaseOffset', 'swayMultiplier', 'isGlowing', 'glowColor', 'leafColor', 'trunkColor']))),
         props: m.props.filter(p => p.decorType).map(p => ({ decorType: p.decorType, x: r(p.x), y: r(p.y), width: r(p.width), height: r(p.height), color: p.color, mass: p.mass, ...(p.decor?.variant ? { variant: p.decor.variant } : {}) })),
         transitions: m.transitions.map(t => ({ ...rect(t), target: t.target, label: t.label }))
     };

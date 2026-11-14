@@ -241,3 +241,25 @@ Measured on Hotel Dr. (camera 3650, 1250, six buildings in view, 1280 x 720, hea
 The walls are about 13k path commands; drawing them is now mostly the canvas filling paths. A paint call keeps
 the shape it is given instead of copying it, materials are copied without `structuredClone`, and the Canvas
 backend reads path commands without spreading them, which took about a tenth off the wall draw.
+
+## Phase 4, step 5 (second part): the plants
+
+The 572 plants (302 trees, 225 dream trees in blossom, 88 bushes, 17 palms) are drawn natively from the
+exported foliage. Each canopy is a picture painted once per kind, size bucket and variant (bushes stand on the
+ground; a tree's six boughs are stamped leaned to their heights). Trunks, bough limbs and palm fronds are live
+packets, painted lowest first through the Basement's `depthBatches`, which groups faces of one colour that
+nothing painted between them crosses, and a trunk's column of bark faces is one strip between its boughs.
+
+The Canvas backend now sets only the context properties that change from one packet to the next, saves the
+context only for a packet with clips, and a picture stamp restores just the transform. On Hotel Dr. the walls
+went from about 8.4 to 7.0 ms and the glow is 2.2 ms.
+
+Measured in the park at 1920, 5400 (29 plants, 165 canopy stamps, 1280 x 720, headless Chromium):
+
+| Part | Native | Classic |
+|---|---|---|
+| Plants (make + stamps + live packets) | 4.2 + 4.2 + 3.3 ms | 8.0 ms |
+
+The plants cost about half again the classic, where the streets of buildings cost about half the classic. Most
+of what is left is the 165 canopy stamps and building the live packets every frame (the wind moves every
+plant); a canopy picture per whole tree is not possible, because its boughs lean by different amounts.

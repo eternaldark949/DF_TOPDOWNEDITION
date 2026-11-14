@@ -42,6 +42,17 @@ export class cityBuildings {
         }
         return out.sort((a, b) => (b.dist - a.dist) || (a.height - b.height) || (a.h.index - b.h.index)).map(e => e.h);
     }
+    /** What stands up in `box` [left, top, right, bottom] from `camera`: each building's roof silhouettes with
+     *  its height, `{z, polygon}`, for things that must stay behind the taller ones (trees, lamp heads). */
+    covers(box, camera, zoom = 1) {
+        const base = new heightView({ camera, eye: this.eye(zoom) }), seen = new Set(), out = [];
+        for (const key of cellsOf([box[0] - 400, box[1] - 400, box[2] + 400, box[3] + 400])) for (const h of this.#cells.get(key) ?? []) {
+            if (seen.has(h)) continue; seen.add(h);
+            const b = h.box(base); if (b[0] > box[2] || b[2] < box[0] || b[1] > box[3] || b[3] < box[1]) continue;
+            for (const polygon of h.silhouettes(base)) out.push({ z: h.H, polygon });
+        }
+        return out;
+    }
     /** Every building over the people, farthest first: packets and roof pictures, in paint order. */
     createDraws({ view, camera, zoom = 1, time = 0 }) {
         const base = new heightView({ camera, eye: this.eye(zoom) }), out = [];

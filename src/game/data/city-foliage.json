@@ -1,0 +1,22 @@
+{
+  "kinds": {
+    "tree":        { "base": "#153524", "mid": "#245a38", "hi": "#5d9a68", "dark": "#0c2016" },
+    "glow_pink":   { "base": "#4a1f3e", "mid": "#9a4a78", "hi": "#f4b0d4", "dark": "#2a0f22", "petals": ["#ffd3ea", "#ff9fcf", "#fff4fa"] },
+    "glow_purple": { "base": "#2f2052", "mid": "#6448a8", "hi": "#c9aeff", "dark": "#1a1030", "petals": ["#e6d8ff", "#b894ff", "#fff"] },
+    "glow_gold":   { "base": "#3e2a14", "mid": "#8e6228", "hi": "#f0c878", "dark": "#22160a", "petals": ["#ffe6b0", "#fff2d0"] },
+    "glow_green":  { "base": "#11302a", "mid": "#2a6a56", "hi": "#8ee0c2", "dark": "#081c18", "petals": ["#d8fff0"] },
+    "glow_cyan":   { "base": "#1c2840", "mid": "#465f92", "hi": "#bcd2ff", "dark": "#0e1426", "petals": ["#eaf2ff", "#cfe0ff"] },
+    "glow_red":    { "base": "#3e1018", "mid": "#98243a", "hi": "#ff8a9e", "dark": "#22060c", "petals": ["#ffd0d8"] },
+    "bush":        { "base": "#16341f", "mid": "#285c34", "hi": "#5c9660", "dark": "#0c2014" },
+    "palm":        { "base": "#1b3d22", "mid": "#2f6636", "hi": "#7cb46a", "dark": "#10261a" }
+  },
+  "height": { "tree": 65, "palm": 90, "bush": 0 },
+  "canopy_r": { "tree": 21, "palm": 24, "bush": 13 },
+  "shadow_r": { "tree": 19, "palm": 16, "bush": 13 },
+  "shadow": "rgba(0,0,0,0.22)",
+  "sway": { "rate": 2, "reach": 8 },
+  "bark": ["#604329", "#392718", "#241a12", "#49311e", "#755235"],
+  "palm_ring": "#957653",
+  "palm_fronds": ["#54854b", "#366a3d"],
+  "palm_rib": "#9b9b5c"
+}

@@ -35,3 +35,12 @@ test('a wall runs from its foot to its leaned top, and the parts are shapes the 
     assert.equal(view.fins([],0,10,1,1).front,null,'nothing to draw is null');
     const hull=view.silhouette([[0,0],[10,0],[10,10],[0,10]],1.5);assert.ok(hull.length>=4&&hull.length<=8);assert.ok(hull.some(([,y])=>y<-100),'it reaches the leaned roof, away from the camera');
 });
+
+test('depth batches paint lowest first and group a look across things that do not cross', async () => {
+    const { depthBatches } = await import('../index.mjs');
+    const quad = (x, y) => [[x, y], [x + 10, y], [x + 10, y + 10], [x, y + 10]];
+    const item = (name, z, key, x, y) => ({ name, z, key, box: [x, y, x + 10, y + 10], convex: quad(x, y) });
+    const groups = depthBatches([item('a2', 5, 'bark', 0, 0), item('b1', 1, 'leaf', 100, 0), item('a1', 1, 'bark', 10, 0), item('c', 9, 'bark', 5, 0), item('p', 7, null, 0, 0), item('d', 8, 'bark', 300, 0)]);
+    // a1 and a2 touch along an edge and join; d passes the picture p it misses; c lands on p, so it waits.
+    assert.deepEqual(groups.map(g => g.map(i => i.name)), [['b1'], ['a1', 'a2', 'd'], ['p'], ['c']]);
+});

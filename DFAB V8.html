@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'f75c3de63853';
+        const DFAB_BUILD = '5e589b9224df';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="16892">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="16940">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -28979,6 +28979,7 @@ const m161 = (()=>{
 // ===== LV0 BASEMENT =====
 const {renderFrame} = m158;
 const {BLENDS} = m157;
+const {geometry} = m159;
 
 function createSurface(width,height){
     if(typeof OffscreenCanvas!=='undefined')return new OffscreenCanvas(width,height);
@@ -29053,7 +29054,8 @@ class canvasRenderer {
             flush();if(!pictures)throw new TypeError('Entries with pictures need a pictureCache');if(!Object.hasOwn(BLENDS,entry.blend??'normal'))throw new TypeError('Unsupported blend');
             const composite=context.globalCompositeOperation,alpha=context.globalAlpha;
             context.globalCompositeOperation=BLENDS[entry.blend??'normal'];context.globalAlpha=alpha*finiteOpacity(entry.opacity??1);
-            try{pictures.draw(context,{...entry.picture,layered,stamp:!entry.prepare,blend:entry.blend??null},entry.picture.build);if(!entry.prepare)count++;}finally{context.globalCompositeOperation=composite;context.globalAlpha=alpha;}
+            const clips=!entry.prepare&&entry.clips?.length?entry.clips:null;if(clips){context.save();for(const clip of clips){buildPath(context,geometry(clip.geometry));context.clip(clip.geometry.fill_rule??'nonzero');}}
+            try{pictures.draw(context,{...entry.picture,layered,stamp:!entry.prepare,blend:entry.blend??null},entry.picture.build);if(!entry.prepare)count++;}finally{if(clips)context.restore();context.globalCompositeOperation=composite;context.globalAlpha=alpha;}
         }
         flush();return count;
     }
@@ -29094,11 +29096,17 @@ class canvasRenderer {
         const gradient=paint.type==='linear'?ctx.createLinearGradient(...paint.from,...paint.to):ctx.createRadialGradient(...paint.from,paint.inner_radius,...paint.to,paint.outer_radius);
         for(const [offset,color]of paint.stops)gradient.addColorStop(offset,color);return gradient;
     }
+    // What the context was last set to by #style, so a run of packets alike sets only what changes (setting
+    // a canvas colour parses it every time). Cleared when anything else may have touched the context.
+    #set={};
     #style(ctx,m,draw,sx,sy){
-        ctx.globalAlpha=draw.opacity;ctx.globalCompositeOperation=BLENDS[draw.blend];
-        ctx.fillStyle=this.#paint(ctx,m.fill)??'transparent';ctx.strokeStyle=this.#paint(ctx,m.stroke)??'transparent';ctx.lineWidth=m.stroke_width||1;ctx.lineCap=m.line_cap;ctx.lineJoin=m.line_join;
-        ctx.setLineDash(m.dash);ctx.lineDashOffset=m.dash_offset;
-        ctx.shadowColor=m.shadow?.color??'transparent';ctx.shadowBlur=(m.shadow?.blur??0)*Math.max(sx,sy);ctx.shadowOffsetX=(m.shadow?.offset[0]??0)*sx;ctx.shadowOffsetY=(m.shadow?.offset[1]??0)*sy;
+        const st=this.#set,set=(key,value)=>{if(st[key]!==value){ctx[key]=value;st[key]=value;}};
+        set('globalAlpha',draw.opacity);set('globalCompositeOperation',BLENDS[draw.blend]);
+        if(typeof m.fill==='object'&&m.fill!==null){ctx.fillStyle=this.#paint(ctx,m.fill);st.fillStyle=null;}else set('fillStyle',m.fill??'transparent');
+        if(typeof m.stroke==='object'&&m.stroke!==null){ctx.strokeStyle=this.#paint(ctx,m.stroke);st.strokeStyle=null;}else set('strokeStyle',m.stroke??'transparent');
+        set('lineWidth',m.stroke_width||1);set('lineCap',m.line_cap);set('lineJoin',m.line_join);
+        const dash=m.dash.length?m.dash.join(','):'';if(st.dash!==dash){ctx.setLineDash(m.dash);st.dash=dash;}set('lineDashOffset',m.dash_offset);
+        set('shadowColor',m.shadow?.color??'transparent');set('shadowBlur',(m.shadow?.blur??0)*Math.max(sx,sy));set('shadowOffsetX',(m.shadow?.offset[0]??0)*sx);set('shadowOffsetY',(m.shadow?.offset[1]??0)*sy);
     }
     #geometry(id,inline){return id?this.#resources.get(id):{descriptor:{geometry:inline},path:null};}
     #shape(ctx,entry,m){
@@ -29108,7 +29116,8 @@ class canvasRenderer {
         if(m.stroke!==null&&m.stroke_width>0)entry.path?ctx.stroke(entry.path):ctx.stroke();
     }
     #draw(ctx,draw,view,sx,sy){
-        ctx.save();
+        const clipped=draw.clips.length>0;   // only a clip needs the context saved: everything else is set for each packet
+        if(clipped){ctx.save();this.#set={};}
         try{
             const m=draw.space==='world'?view.world_to_screen:[1,0,0,1,0,0];ctx.setTransform(m[0]*sx,m[1]*sy,m[2]*sx,m[3]*sy,m[4]*sx,m[5]*sy);ctx.transform(...draw.transform);
             for(const clip of draw.clips){ctx.transform(...clip.transform);const entry=this.#geometry(clip.geometry_id,clip.geometry);if(entry.path)ctx.clip(entry.path,clip.rule);else{buildPath(ctx,entry.descriptor.geometry);ctx.clip(clip.rule);}ctx.transform(...clip.inverse);}
@@ -29122,7 +29131,7 @@ class canvasRenderer {
                 if(material.fill!==null)ctx.fillText(draw.text,0,0);if(material.stroke!==null&&material.stroke_width>0)ctx.strokeText(draw.text,0,0);
                 if(f.letter_spacing&&'letterSpacing' in ctx)ctx.letterSpacing='0px';
             }
-        }finally{ctx.restore();}
+        }finally{if(clipped){ctx.restore();this.#set={};}}
     }
     render(frame){
         this.#live();
@@ -29130,11 +29139,11 @@ class canvasRenderer {
         for(const pass of frame.passes){
             const target=pass.target_id===null?{surface:this.#surface,context:this.#context}:this.#resources.get(pass.target_id),ctx=target.context;
             const sx=target.surface.width/pass.viewport.width,sy=target.surface.height/pass.viewport.height;
-            ctx.save();
+            ctx.save();this.#set={};
             try{
                 if(pass.clear_color!==false){ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.clearRect(0,0,target.surface.width,target.surface.height);ctx.fillStyle=pass.clear_color;ctx.fillRect(0,0,target.surface.width,target.surface.height);}
                 for(const draw of pass.packets)this.#draw(ctx,draw,frame.view,sx,sy);
-            }finally{ctx.restore();}
+            }finally{ctx.restore();this.#set={};}
         }
     }
     dispose(){if(this.#disposed)return;this.#disposed=true;this.#generation++;for(const entry of this.#resources.values())this.#release(entry);this.#resources.clear();this.#context=null;this.#surface=null;}
@@ -29204,8 +29213,8 @@ class pictureCache{
         }else this.#entries.delete(id);
         this.#entries.set(id,entry);
         if(!stamp)return how;
-        context.save();
-        try{context.transform(...matrix);context.drawImage(entry.surface,bx,by,bw,bh);}finally{context.restore();}
+        context.setTransform(m[0],m[1],m[2],m[3],m[4],m[5]);   // the stamp changes only the transform, so put it back rather than save the whole state
+        try{context.drawImage(entry.surface,bx,by,bw,bh);}finally{context.setTransform(t);}
         return how;
     }
     #evict(bytes){for(const [id,entry]of this.#entries){if(this.#bytes+bytes<=this.#max_bytes)break;if(entry.surface){this.#free(entry);this.#entries.delete(id);}}}
@@ -29671,6 +29680,61 @@ function boxFaces(sections){
 
 return Object.freeze({get heightScale(){return heightScale;},get heightView(){return heightView;},get boxFaces(){return boxFaces;}});
 })();
+// src/engine/basement/rendering/depth.mjs
+const m165 = (()=>{
+// ===== LV0 BASEMENT =====
+// DEPTH BATCHES: things that stand up toward the camera (trunk faces, posts, canopies) must be painted
+// lowest first, but a frame of them is hundreds of small shapes. Sorted by height, a shape may still join
+// an earlier group of the same look when nothing painted since that group overlaps it: the picture is the
+// same, painted in a few calls. Plain data in, groups out; the artist paints each group.
+
+const overlap=(a,b)=>a[0]<b[2]&&a[2]>b[0]&&a[1]<b[3]&&a[3]>b[1];
+// Two convex polygons cross when no edge of either separates them; touching along an edge (within a
+// quarter pixel) does not count, so the faces of one post do not hold each other apart.
+function separates(p,q){
+    for(let i=0;i<p.length;i++){
+        const a=p[i],b=p[(i+1)%p.length],nx=a[1]-b[1],ny=b[0]-a[0],len=Math.hypot(nx,ny);if(!len)continue;
+        let p0=Infinity,p1=-Infinity,q0=Infinity,q1=-Infinity;
+        for(const v of p){const d=(v[0]*nx+v[1]*ny)/len;if(d<p0)p0=d;if(d>p1)p1=d;}
+        for(const v of q){const d=(v[0]*nx+v[1]*ny)/len;if(d<q0)q0=d;if(d>q1)q1=d;}
+        if(Math.min(p1,q1)-Math.max(p0,q0)<=.25)return true;
+    }
+    return false;
+}
+const crosses=(a,b)=>overlap(a.box,b.box)&&(!a.convex||!b.convex||!(separates(a.convex,b.convex)||separates(b.convex,a.convex)));
+
+/**
+ * Groups `items` ({z, key, box: [left, top, right, bottom], convex}, key null for one that never groups) for
+ * painting in order: lowest z first (ties in the order given), each group one key. An item joins the
+ * latest group of its key unless a group of another key painted after that one overlaps its box;
+ * `lookback` caps how many groups back it looks. A group is one paint, so where its members overlap they
+ * are covered once: that is the same picture for opaque paint, so give translucent paint a null key.
+ * An item's `convex` ([[x, y], ...], optional) is its outline when convex: then it is tested exactly, not
+ * by its box. Returns the groups as arrays of items, in paint order.
+ */
+const CELL=64,cells=(box,visit)=>{const x0=Math.floor(box[0]/CELL),x1=Math.floor(box[2]/CELL),y0=Math.floor(box[1]/CELL),y1=Math.floor(box[3]/CELL);for(let x=x0;x<=x1;x++)for(let y=y0;y<=y1;y++)if(visit(x*65536+y))return true;return false;};
+const hits=(group,item)=>overlap(group.box,item.box)&&cells(item.box,cell=>group.grid.get(cell)?.some(other=>crosses(other,item)));
+function join(group,item){
+    const b=group.box;b[0]=Math.min(b[0],item.box[0]);b[1]=Math.min(b[1],item.box[1]);b[2]=Math.max(b[2],item.box[2]);b[3]=Math.max(b[3],item.box[3]);
+    group.items.push(item);cells(item.box,cell=>{let list=group.grid.get(cell);if(!list)group.grid.set(cell,list=[]);list.push(item);return false;});
+}
+function depthBatches(items,{lookback=64}={}){
+    const order=items.map((item,i)=>[item.z,i]).sort((a,b)=>(a[0]-b[0])||(a[1]-b[1])),groups=[];
+    for(const [,i]of order){
+        const item=items[i];let target=null;
+        if(item.key!==null&&item.key!==undefined)for(let g=groups.length-1,steps=0;g>=0&&steps<lookback;g--,steps++){
+            const group=groups[g];
+            if(group.key===item.key){target=group;break;}
+            if(hits(group,item))break;
+        }
+        if(!target)groups.push(target={key:item.key,items:[],box:[...item.box],grid:new Map()});
+        join(target,item);
+    }
+    return groups.map(group=>group.items);
+}
+
+return Object.freeze({get depthBatches(){return depthBatches;}});
+})();
 // src/engine/basement/rendering/index.mjs
 const m155 = (()=>{
 // ===== LV0 BASEMENT =====
@@ -29682,7 +29746,8 @@ const m155 = (()=>{
 
 
 
-return Object.freeze({get cameraSystem(){return m156.cameraSystem;},get aheadOf(){return m156.aheadOf;},get viewAhead(){return m156.viewAhead;},get renderFrame(){return m158.renderFrame;},get renderSystem(){return m160.renderSystem;},get canvasRenderer(){return m161.canvasRenderer;},get pictureCache(){return m161.pictureCache;},get measureText(){return m161.measureText;},get artScene(){return m162.artScene;},get circle(){return m162.circle;},get ellipse(){return m162.ellipse;},get polyline(){return m162.polyline;},get polygon(){return m162.polygon;},get rect(){return m162.rect;},get roundRect(){return m162.roundRect;},get capsule(){return m162.capsule;},get smoothShape(){return m162.smoothShape;},get linear(){return m162.linear;},get radial(){return m162.radial;},get glow(){return m162.glow;},get groundShadow(){return m162.groundShadow;},get hexToRgb(){return m162.hexToRgb;},get rgbToHex(){return m162.rgbToHex;},get rgba(){return m162.rgba;},get mix(){return m162.mix;},get shade(){return m162.shade;},get seededRandom(){return m162.seededRandom;},get hash2(){return m162.hash2;},get createLightLayer(){return m163.createLightLayer;},get createLightLayerParts(){return m163.createLightLayerParts;},get LIGHT_CUT(){return m163.LIGHT_CUT;},get heightScale(){return m164.heightScale;},get heightView(){return m164.heightView;},get boxFaces(){return m164.boxFaces;}});
+
+return Object.freeze({get cameraSystem(){return m156.cameraSystem;},get aheadOf(){return m156.aheadOf;},get viewAhead(){return m156.viewAhead;},get renderFrame(){return m158.renderFrame;},get renderSystem(){return m160.renderSystem;},get canvasRenderer(){return m161.canvasRenderer;},get pictureCache(){return m161.pictureCache;},get measureText(){return m161.measureText;},get artScene(){return m162.artScene;},get circle(){return m162.circle;},get ellipse(){return m162.ellipse;},get polyline(){return m162.polyline;},get polygon(){return m162.polygon;},get rect(){return m162.rect;},get roundRect(){return m162.roundRect;},get capsule(){return m162.capsule;},get smoothShape(){return m162.smoothShape;},get linear(){return m162.linear;},get radial(){return m162.radial;},get glow(){return m162.glow;},get groundShadow(){return m162.groundShadow;},get hexToRgb(){return m162.hexToRgb;},get rgbToHex(){return m162.rgbToHex;},get rgba(){return m162.rgba;},get mix(){return m162.mix;},get shade(){return m162.shade;},get seededRandom(){return m162.seededRandom;},get hash2(){return m162.hash2;},get createLightLayer(){return m163.createLightLayer;},get createLightLayerParts(){return m163.createLightLayerParts;},get LIGHT_CUT(){return m163.LIGHT_CUT;},get heightScale(){return m164.heightScale;},get heightView(){return m164.heightView;},get boxFaces(){return m164.boxFaces;},get depthBatches(){return m165.depthBatches;}});
 })();
 // src/engine/lobby/runtime/game-engine.mjs
 const m147 = (()=>{
@@ -29947,7 +30012,7 @@ class gameEngine {
 return Object.freeze({get gameEngine(){return gameEngine;}});
 })();
 // src/engine/lobby/runtime/map-level.mjs
-const m165 = (()=>{
+const m166 = (()=>{
 // ===== LV1 LOBBY =====
 const {gameLevel} = m149;
 const {mapInstance} = m141;
@@ -30032,7 +30097,7 @@ class mapLevel extends gameLevel {
 return Object.freeze({get mapLevel(){return mapLevel;}});
 })();
 // src/engine/lobby/runtime/travel-system.mjs
-const m166 = (()=>{
+const m167 = (()=>{
 // ===== LV1 LOBBY =====
 /**
  * Travel between levels through their exits. Each step it notes the exit the leading traveller
@@ -30087,8 +30152,8 @@ class travelSystem {
 return Object.freeze({get travelSystem(){return travelSystem;}});
 })();
 // src/game/levels/interior-level.mjs
-const m167 = (()=>{
-const {mapLevel} = m165;
+const m168 = (()=>{
+const {mapLevel} = m166;
 const {interiorMapDefinition,APARTMENT_MAP_OPTIONS} = m140;
 const {MAP_IDS} = m70;
 
@@ -30114,7 +30179,7 @@ function registerInteriorLevels(engine, map_ids) {
 
 return Object.freeze({get InteriorLevel(){return InteriorLevel;},get registerInteriorLevels(){return registerInteriorLevels;}});
 })();
-const m171 = Object.freeze({default:{
+const m172 = Object.freeze({default:{
   "slim": {
     "w": 0.88,
     "d": 0.92,
@@ -30145,7 +30210,7 @@ const m171 = Object.freeze({default:{
     "hip": 1.1
   }
 }});
-const m172 = Object.freeze({default:{
+const m173 = Object.freeze({default:{
   "female": {
     "sh": 10.5,
     "del": 4,
@@ -30272,9 +30337,9 @@ const m172 = Object.freeze({default:{
   }
 }});
 // src/game/data/humanoid/rig-assets.mjs
-const m170 = (()=>{
-const builds = m171.default;
-const bodyCanon = m172.default;
+const m171 = (()=>{
+const builds = m172.default;
+const bodyCanon = m173.default;
 const {rigDefinition,animationClip} = m1;
 const immutable=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))immutable(child);Object.freeze(value);}return value;};
 const humanoidBodyCanon=immutable(bodyCanon);
@@ -30321,8 +30386,8 @@ function getHumanoidRigAssets(gender='androgynous',{build=null,height=1}={}){
 return Object.freeze({get humanoidBodyCanon(){return humanoidBodyCanon;},get humanoidBuilds(){return humanoidBuilds;},get getHumanoidRigAssets(){return getHumanoidRigAssets;}});
 })();
 // src/game/mechanics/animation/humanoid-system.mjs
-const m169 = (()=>{
-const {getHumanoidRigAssets} = m170;
+const m170 = (()=>{
+const {getHumanoidRigAssets} = m171;
 const humanoids=new Set(['df_player','df_npc','df_ganger','df_hunter','df_demoness']);
 /** Game policy chooses authored poses; Basement resolves and advances every joint. */
 class humanoidSystem {
@@ -30370,7 +30435,7 @@ function humanoidPresentation(actor,blend=1){
 return Object.freeze({get humanoidSystem(){return humanoidSystem;},get humanoidPresentation(){return humanoidPresentation;}});
 })();
 // src/game/mechanics/encounters/encounter-system.mjs
-const m173 = (()=>{
+const m174 = (()=>{
 const {BossEffect} = m110;
 const {BODY_GROUP} = m1;
 const {jsonCopy} = m41;
@@ -30451,7 +30516,7 @@ class encounterSystem{
 return Object.freeze({get encounterSystem(){return encounterSystem;}});
 })();
 // src/game/data/weapon-models.mjs
-const m176 = (()=>{
+const m177 = (()=>{
 /* =====================================================================
    WEAPON MODELS — every gun as data: parts in the gun's own frame (+x down
    the barrel, the grip hand near 0,0, +y to the holder's right), each in a
@@ -30677,8 +30742,8 @@ function weaponModel(id) {
 return Object.freeze({get GUN_MATERIALS(){return GUN_MATERIALS;},get WEAPON_MODELS(){return WEAPON_MODELS;},get LASER_MODULE(){return LASER_MODULE;},get weaponModel(){return weaponModel;}});
 })();
 // src/game/data/combat-profiles.mjs
-const m175 = (()=>{
-const {weaponModel} = m176;
+const m176 = (()=>{
+const {weaponModel} = m177;
 /** Shape authoring belongs with the visual assets. Runtime collision calculations stay in Basement. */
 function getCombatProfile(definition_id){
  const model=weaponModel(definition_id),edge=model.edge??[19.4,2.6];
@@ -30688,9 +30753,9 @@ function getCombatProfile(definition_id){
 return Object.freeze({get getCombatProfile(){return getCombatProfile;}});
 })();
 // src/game/mechanics/attacks/attack-system.mjs
-const m174 = (()=>{
+const m175 = (()=>{
 const attackRules = m65.default;
-const {getCombatProfile} = m175;
+const {getCombatProfile} = m176;
 const {prepareMountedAttack,mountedAttackState,validateMountedAttack} = m115;
 const combatRules = m64.default;
 const {gameCharacter} = m1;
@@ -30812,7 +30877,7 @@ class attackSystem{
 return Object.freeze({get attackSystem(){return attackSystem;}});
 })();
 // src/game/mechanics/abilities/ability-system.mjs
-const m177 = (()=>{
+const m178 = (()=>{
 const {beginPattern,advancePattern,clearPattern} = m111;
 const {beginTimedAction,advanceTimedAction,hitGrapple,clearTimedAction} = m113;
 const {beginBurst,advanceBurst} = m114;
@@ -30874,7 +30939,7 @@ class abilitySystem{
 return Object.freeze({get abilitySystem(){return abilitySystem;}});
 })();
 // src/game/mechanics/actors/actor-system.mjs
-const m178 = (()=>{
+const m179 = (()=>{
 const {Demoness} = m98;
 const {Warden} = m108;
 const {Drone} = m118;
@@ -30944,7 +31009,7 @@ class actorSystem{
 
 return Object.freeze({get actorSystem(){return actorSystem;}});
 })();
-const m179 = Object.freeze({default:{
+const m180 = Object.freeze({default:{
   "keymap": {
     "move_up":["w","ArrowUp"],"move_down":["s","ArrowDown"],"move_left":["a","ArrowLeft"],"move_right":["d","ArrowRight"],
     "fire":["mouseLeft","space","gamepadRTrigger","touchFire"],
@@ -30958,7 +31023,7 @@ const m179 = Object.freeze({default:{
   }
 }});
 // src/game/mechanics/game-session.mjs
-const m180 = (()=>{
+const m181 = (()=>{
 const {itemSystem} = m105;
 const {createItemCatalog} = m59;
 const itemRules = m106.default;
@@ -31035,7 +31100,7 @@ class gameSession {
 return Object.freeze({get gameSession(){return gameSession;}});
 })();
 // src/game/mechanics/player-state-system.mjs
-const m181 = (()=>{
+const m182 = (()=>{
 const {nonnegative,jsonCopy} = m41;
 
 /** Game rules only. The native entity/body remains the sole owner of physical state. */
@@ -31091,7 +31156,7 @@ class PlayerStateSystem {
 return Object.freeze({get PlayerStateSystem(){return PlayerStateSystem;}});
 })();
 // src/game/mechanics/player-control-system.mjs
-const m182 = (()=>{
+const m183 = (()=>{
 /** Turns input terminology into native motor requests and gameplay intents. No physical math. */
 class PlayerControlSystem {
     #session; #state; #blocked = new Set(); #placement; #context = null;
@@ -31131,7 +31196,7 @@ class PlayerControlSystem {
 return Object.freeze({get PlayerControlSystem(){return PlayerControlSystem;}});
 })();
 // src/game/mechanics/combat/combat-system.mjs
-const m183 = (()=>{
+const m184 = (()=>{
 const rules = m64.default;
 const {BODY_GROUP} = m1;
 const {nonnegative,jsonCopy} = m41;
@@ -31201,7 +31266,7 @@ class combatSystem{
 return Object.freeze({get isCombatDead(){return isCombatDead;},get combatSystem(){return combatSystem;}});
 })();
 // src/game/mechanics/combat/melee-poses.mjs
-const m185 = (()=>{
+const m186 = (()=>{
 // Authored local animation poses, shared by presentation and native swept queries.
 const rules = m64.default;
 const MELEE_SWING={duration:rules.blade.duration_seconds,windup:rules.blade.windup_seconds,cutEnd:rules.blade.cut_end_seconds};
@@ -31277,12 +31342,12 @@ function sampleMeleeSwing(age, side, out = {}, secs = MELEE_SWING.duration, styl
 return Object.freeze({get MELEE_SWING(){return MELEE_SWING;},get WIDE_SWING(){return WIDE_SWING;},get sampleWideSwing(){return sampleWideSwing;},get wideGrip(){return wideGrip;},get swingPhases(){return swingPhases;},get sampleMeleeSwing(){return sampleMeleeSwing;}});
 })();
 // src/game/mechanics/combat/weapon-system.mjs
-const m184 = (()=>{
+const m185 = (()=>{
 const rules = m64.default;
-const {getCombatProfile} = m175;
+const {getCombatProfile} = m176;
 const {BODY_GROUP} = m1;
-const {sampleMeleeSwing,swingPhases} = m185;
-const {isCombatDead} = m183;
+const {sampleMeleeSwing,swingPhases} = m186;
+const {isCombatDead} = m184;
 const {jsonCopy,nonnegative} = m41;
 
 const stateFor=(player,settings=rules)=>player.data.weapon_state??={format_version:1,elapsed:0,cooldown:0,holstered:false,drawn_at:null,draw_shot_used:false,quick_draw:null,punch_side:'right',haymaker:false,combo:0,last_punch_at:-99,swing:null,side:1,shield:{charge:settings.mirror.shield,spent:false,since_hit:999}};
@@ -31454,7 +31519,7 @@ class weaponSystem{
 return Object.freeze({get weaponSystem(){return weaponSystem;}});
 })();
 // src/game/mechanics/items/loot-system.mjs
-const m186 = (()=>{
+const m187 = (()=>{
 const {WorldLoot} = m130;
 const rules = m64.default;
 const {BODY_GROUP} = m1;
@@ -31508,24 +31573,24 @@ class lootSystem{
 return Object.freeze({get lootSystem(){return lootSystem;}});
 })();
 // src/game/boot/game-runtime.mjs
-const m168 = (()=>{
-const {humanoidSystem} = m169;
-const {encounterSystem} = m173;
-const {attackSystem} = m174;
-const {abilitySystem} = m177;
-const {actorSystem} = m178;
+const m169 = (()=>{
+const {humanoidSystem} = m170;
+const {encounterSystem} = m174;
+const {attackSystem} = m175;
+const {abilitySystem} = m178;
+const {actorSystem} = m179;
 const {registerGameEntityTypes} = m117;
 const {gameEngine} = m147;
-const {travelSystem} = m166;
+const {travelSystem} = m167;
 const {createApartmentAssetLibrary} = m138;
-const controlProfile = m179.default;
-const {gameSession} = m180;
-const {PlayerStateSystem} = m181;
-const {PlayerControlSystem} = m182;
+const controlProfile = m180.default;
+const {gameSession} = m181;
+const {PlayerStateSystem} = m182;
+const {PlayerControlSystem} = m183;
 const playerRules = m67.default;
-const {combatSystem} = m183;
-const {weaponSystem} = m184;
-const {lootSystem} = m186;
+const {combatSystem} = m184;
+const {weaponSystem} = m185;
+const {lootSystem} = m187;
 const {canvasRenderer} = m155;
 
 /** Explicit game composition. Importing this file never starts a second runtime. */
@@ -31565,8 +31630,8 @@ function createGameRuntime({ game_db, surface, session_state, player, weapon_pol
 return Object.freeze({get createGameRuntime(){return createGameRuntime;}});
 })();
 // src/game/presentation/weapon-appearance.mjs
-const m187 = (()=>{
-const {GUN_MATERIALS,WEAPON_MODELS,LASER_MODULE,weaponModel} = m176;
+const m188 = (()=>{
+const {GUN_MATERIALS,WEAPON_MODELS,LASER_MODULE,weaponModel} = m177;
 
 const polygon=points=>({type:'path',commands:[...points.map(([x,y],i)=>[i?'line':'move',x,y]),['close']]});
 function shape(part){
@@ -31649,7 +31714,7 @@ class weaponAppearance {
 return Object.freeze({get weaponAppearance(){return weaponAppearance;}});
 })();
 // src/game/data/game-combat.mjs
-const m188 = (()=>{
+const m189 = (()=>{
 const data = m64.default;
 const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
 const COMBAT_RULES=freeze(structuredClone(data));
@@ -31657,7 +31722,7 @@ const COMBAT_RULES=freeze(structuredClone(data));
 return Object.freeze({get COMBAT_RULES(){return COMBAT_RULES;}});
 })();
 // src/game/presentation/drone.mjs
-const m189 = (()=>{
+const m190 = (()=>{
 const enemies = m50.default;
 const {artScene,circle,ellipse,radial,glow} = m155;
 const DRONE=enemies.drone;
@@ -31840,7 +31905,7 @@ return Object.assign({},{x:pose.position[0],y:pose.position[1],angle:pose.rotati
 return Object.freeze({get droneLift(){return droneLift;},get droneArmPose(){return droneArmPose;},get createDronePackets(){return createDronePackets;},get dronePresentation(){return dronePresentation;}});
 })();
 // src/game/presentation/demoness.mjs
-const m190 = (()=>{
+const m191 = (()=>{
 const enemies = m50.default;
 const DUEL=enemies.duel;
 /** Retained Canvas art over a detached record; body art is supplied by the host. */
@@ -31905,7 +31970,7 @@ function demonessPresentation(entity,blend=1){const pose=entity.getRenderState(b
 return Object.freeze({get demonessAppearance(){return demonessAppearance;},get demonessPresentation(){return demonessPresentation;}});
 })();
 // src/game/presentation/boss-effects.mjs
-const m191 = (()=>{
+const m192 = (()=>{
 const enemies = m50.default;
 const HAZARD=enemies.hazards;
 const bossEffectAppearance={
@@ -32043,7 +32108,7 @@ function bossEffectPresentation(effects,clock){return effects.filter(effect=>!ef
 return Object.freeze({get bossEffectAppearance(){return bossEffectAppearance;},get bossEffectPresentation(){return bossEffectPresentation;}});
 })();
 // src/game/presentation/velvet-cat.mjs
-const m192 = (()=>{
+const m193 = (()=>{
 const {artScene,circle,ellipse,radial,linear,groundShadow} = m155;
 const {velvetCatAnimation,velvetFrame,velvetLegGait,velvetJoints,VELVET_LEG_JOINTS} = m120;
 const {VELVET_CAT_PALETTES,VELVET_T,VELVET_PROFILES,VELVET_TAIL_SEGS} = m121;
@@ -32332,7 +32397,7 @@ function createVelvetCatPackets(state,{pass='body',darkness=.8}={}){if(!['body',
 
 return Object.freeze({get createVelvetCatArt(){return createVelvetCatArt;},get createVelvetEyePackets(){return createVelvetEyePackets;},get createVelvetCatPackets(){return createVelvetCatPackets;}});
 })();
-const m194 = Object.freeze({default:{
+const m195 = Object.freeze({default:{
  "hinge": {
   "color": "#4a3a30",
   "sweep": "rgba(255,217,176,0.12)", "sweep_dash": [3, 4], "sweep_min_angle": 0.17,
@@ -32347,8 +32412,8 @@ const m194 = Object.freeze({default:{
  }
 }});
 // src/game/presentation/door.mjs
-const m193 = (()=>{
-const DOOR_APPEARANCE = m194.default;
+const m194 = (()=>{
+const DOOR_APPEARANCE = m195.default;
 const {artScene,rect,circle,ellipse,polygon} = m155;
 
 /**
@@ -32403,7 +32468,7 @@ function createDoorPackets(packet,{appearance=DOOR_APPEARANCE,scene=new artScene
 return Object.freeze({get DOOR_APPEARANCE(){return DOOR_APPEARANCE;},get doorPresentation(){return doorPresentation;},get createDoorPackets(){return createDoorPackets;}});
 })();
 // src/game/presentation/props/draw.mjs
-const m197 = (()=>{
+const m198 = (()=>{
 // The drawing helpers every prop artist repeats, on the art toolkit: the classic art's rounded box,
 // disc and line runs, a choice by the piece's number, and turning a piece to its face.
 const {circle,seededRandom} = m155;
@@ -32443,14 +32508,14 @@ function classicRandom(seed){let h=2166136261;for(const ch of String(seed)){h^=c
 return Object.freeze({get FACE(){return FACE;},get box(){return box;},get disc(){return disc;},get dots(){return dots;},get lines(){return lines;},get choose(){return choose;},get turned(){return turned;},get crescent(){return crescent;},get classicRandom(){return classicRandom;}});
 })();
 // src/game/presentation/props/cafe.mjs
-const m196 = (()=>{
+const m197 = (()=>{
 // The cafe's furniture families, drawn on the art toolkit. Each artist draws one piece from its
 // top-left corner (0, 0) to (width, height), in the look its family declares in the prop catalog
 // (game-assets/props.json). `piece.pick(k)` is a repeatable number for the piece (the same seed the
 // classic art used, so every piece keeps the look it always had). Still parts go in `art.still`, and
 // parts that move with `piece.time` go in `art.live`, in drawing order; still runs are painted once.
 const {rect,circle,ellipse,polygon} = m155;
-const {box,disc,lines,choose,turned} = m197;
+const {box,disc,lines,choose,turned} = m198;
 
 // Tableware on the cafe's tables and counter: the same cups and candle jars everywhere.
 const CUP={saucer:'#e8dcc4',rim:'rgba(120,90,60,0.6)',cup:'#f3e4c6',coffee:'#6b4423',gleam:'rgba(240,220,190,0.75)'};
@@ -32661,12 +32726,12 @@ const CAFE_ARTISTS={
 return Object.freeze({get CAFE_ARTISTS(){return CAFE_ARTISTS;}});
 })();
 // src/game/presentation/props/fixtures.mjs
-const m199 = (()=>{
+const m200 = (()=>{
 // Lamp fixtures that stand on furniture, seen from above: the pleated fabric shades of a table or
 // floor lamp, unlit (their light is drawn after the darkness, by the lighting) or burning (the hotel
 // lobby's), and a spun-brass pendant. Each draws centred on (0, 0) in the scene's current group, at its own size.
 const {circle,ellipse,radial,linear} = m155;
-const {lines} = m197;
+const {lines} = m198;
 
 const BRASS=['#f0d79a','#c9a46a','#8d6a32'],BRONZE='#2a211c',TAU=Math.PI*2;
 /** The fixtures by name, as the lamp library has them: the shades' radius, the top ring's, their pleats, fabric and trim. */
@@ -32723,7 +32788,7 @@ function fixtureAt(s,x,y,scale,fn){s.enter({position:[x,y],scale:[scale,scale]})
 return Object.freeze({get SHADES(){return SHADES;},get fixtureColor(){return fixtureColor;},get fabricShade(){return fabricShade;},get brassPendant(){return brassPendant;},get fixtureAt(){return fixtureAt;}});
 })();
 // src/game/presentation/props/apartment.mjs
-const m198 = (()=>{
+const m199 = (()=>{
 // The apartment's furniture families (apt_949, and the pieces the hotel and the House of Death borrow
 // from it), drawn on the art toolkit. As the cafe's: each artist draws one piece from its top-left
 // corner (0, 0) to (width, height) in the look its family declares in the prop catalog
@@ -32731,8 +32796,8 @@ const m198 = (()=>{
 // `art.live`, in drawing order. The table lamps, the floor lamps and the island's pendants wear the
 // lamp library's fixtures, unlit (their light is drawn after the darkness).
 const {rect,circle,ellipse,polyline,linear} = m155;
-const {box,disc,lines} = m197;
-const {SHADES,fabricShade,brassPendant,fixtureAt,fixtureColor} = m199;
+const {box,disc,lines} = m198;
+const {SHADES,fabricShade,brassPendant,fixtureAt,fixtureColor} = m200;
 
 /** Where the bar island's pendants hang along it (the lighting hangs its lights there too). */
 const ISLAND_PENDANTS=[.17,.5,.83];
@@ -33057,12 +33122,12 @@ const APARTMENT_ARTISTS={
 return Object.freeze({get ISLAND_PENDANTS(){return ISLAND_PENDANTS;},get APARTMENT_ARTISTS(){return APARTMENT_ARTISTS;}});
 })();
 // src/game/presentation/props/house.mjs
-const m200 = (()=>{
+const m201 = (()=>{
 // The House of Death's furniture families (the gauntlet's mansion: black marble, oxblood wood, gold,
 // violet glass, cyan holograms), drawn on the art toolkit as the cafe's and the apartment's are. Its
 // candles burn live: each flame breathes on its own beat, keyed to where it stands, as the classic did.
 const {rect,circle,ellipse,polygon} = m155;
-const {box,disc,lines} = m197;
+const {box,disc,lines} = m198;
 
 const TAU=Math.PI*2;
 const rects=list=>list.flatMap(([x,y,w,h])=>rect(x,y,w,h));
@@ -33216,13 +33281,13 @@ const HOUSE_ARTISTS={
 return Object.freeze({get HOUSE_ARTISTS(){return HOUSE_ARTISTS;}});
 })();
 // src/game/presentation/props/hotel.mjs
-const m201 = (()=>{
+const m202 = (()=>{
 // The Double Nights hotel's furniture families: the lobby (dn_*) and the penthouse suite (ps_*), in
 // the hotel's black marble, gold, silver and crimson velvet. Drawn on the art toolkit as the other
 // venues' are. The lobby's floating seats hang and bob on a hover-glow, live; the suite is left as
 // the Dark Maker left it (one glass drunk, the chess game unfinished, the wardrobe open).
 const {rect,circle,ellipse,polyline,linear} = m155;
-const {box,disc,lines,crescent,dots} = m197;
+const {box,disc,lines,crescent,dots} = m198;
 
 const TAU=Math.PI*2;
 const rects=list=>list.flatMap(([x,y,w,h])=>rect(x,y,w,h));
@@ -33446,12 +33511,12 @@ const HOTEL_ARTISTS={
 return Object.freeze({get HOTEL_ARTISTS(){return HOTEL_ARTISTS;}});
 })();
 // src/game/presentation/props/club.mjs
-const m202 = (()=>{
+const m203 = (()=>{
 // Moon City Nightclub's furniture families (mc_*): black lacquer, chrome, violet and lavender neon,
 // gold, rose-wine velvet. Drawn on the art toolkit as the other venues' are. The stage, the booth and
 // the speakers keep the music's kick: `piece.beat` is its beat count, and each piece pulses on the beat.
 const {rect,circle,ellipse,radial} = m155;
-const {box,disc,lines,crescent,dots} = m197;
+const {box,disc,lines,crescent,dots} = m198;
 
 const rects=list=>list.flatMap(([x,y,w,h])=>rect(x,y,w,h));
 /** How hard the kick lands now: 1 on the beat, falling away to 0 before the next. */
@@ -33648,12 +33713,12 @@ const CLUB_ARTISTS={
 return Object.freeze({get CLUB_ARTISTS(){return CLUB_ARTISTS;}});
 })();
 // src/game/presentation/props/sanctum.mjs
-const m203 = (()=>{
+const m204 = (()=>{
 // The Sanctum's furniture families (sc_*): weathered stone, black iron, crimson cloth, candle wax,
 // rain-dark and mossed. Drawn on the art toolkit as the other venues' are; candle flames and the
 // brazier's coals are live. The colonnade's pillars are the cover the Triumvirate's fire respects.
 const {rect,circle,ellipse,linear,radial} = m155;
-const {box,disc,lines} = m197;
+const {box,disc,lines} = m198;
 
 const TAU=Math.PI*2;
 /** Moss on stone: n tufts round (mx, my), their spread seeded by `phase` (the classic art's world x). */
@@ -33745,11 +33810,11 @@ const SANCTUM_ARTISTS={
 return Object.freeze({get SANCTUM_ARTISTS(){return SANCTUM_ARTISTS;}});
 })();
 // src/game/presentation/props/clinic.mjs
-const m204 = (()=>{
+const m205 = (()=>{
 // The clinic's furniture families (medbay_sw): white enamel, steel, teal. Drawn on the art toolkit as
 // the other venues' are; the vitals monitor's trace scrolls and the plant sways, live.
 const {rect,circle,ellipse} = m155;
-const {box,disc} = m197;
+const {box,disc} = m198;
 
 const TAU=Math.PI*2;
 
@@ -33829,12 +33894,12 @@ const CLINIC_ARTISTS={
 return Object.freeze({get CLINIC_ARTISTS(){return CLINIC_ARTISTS;}});
 })();
 // src/game/presentation/props/neural.mjs
-const m205 = (()=>{
+const m206 = (()=>{
 // Neural Systems' furniture families (ns_*): a sapphire-crystal department store, its vitrines,
 // polished facets and private styling suites. Drawn on the art toolkit as the other venues' are.
 // Each piece lies on its own soft drop shadow, as the store's classic art drew it.
 const {rect,circle,ellipse,polygon,radial} = m155;
-const {box} = m197;
+const {box} = m198;
 
 const TAU=Math.PI*2,FACETS=['#28588a','#15345b','#0b1b3c','#1b4374','#456d9b'],PALE='#e5e6df',METAL='#9baebe';
 /** The drop shadow under each piece, 3 right and 4 down. */
@@ -33916,13 +33981,13 @@ const NEURAL_ARTISTS={
 return Object.freeze({get NEURAL_ARTISTS(){return NEURAL_ARTISTS;}});
 })();
 // src/game/presentation/props/torque.mjs
-const m206 = (()=>{
+const m207 = (()=>{
 // Torque Auto's furniture families (ta_*): the service bay's tool chests, bench and tyres, the parts
 // room's shelving, the showroom's steel counter and cognac leather. Amber is the house colour. Drawn on
 // the art toolkit as the other venues' are. (The two lifts, the wrap bay and the plinth carry cars, so
 // they wait for the vehicles' own art.)
 const {rect,circle,linear,radial} = m155;
-const {box,disc,lines} = m197;
+const {box,disc,lines} = m198;
 
 const TAU=Math.PI*2,STEEL_HI='#dfe3ea',STEEL='#9aa3ad',STEEL_LO='#4a5059',AMBER='#ff9a2a',RUBBER='#141416';
 /** Brushed steel along (x0, y0) to (x1, y1). */
@@ -34034,12 +34099,12 @@ const TORQUE_ARTISTS={
 return Object.freeze({get TORQUE_ARTISTS(){return TORQUE_ARTISTS;}});
 })();
 // src/game/presentation/props/palace.mjs
-const m207 = (()=>{
+const m208 = (()=>{
 // The Demoness Palace's furniture families (dp_*): obsidian, blood-red velvet and gold, her throne
 // and her pool of blood, the rose beds, the braziers. Drawn on the art toolkit as the other venues'
 // are; the pool's ripples, the flames, the embers and the altar's floating crystal are live.
 const {rect,circle,ellipse,polygon,radial} = m155;
-const {box,disc,classicRandom} = m197;
+const {box,disc,classicRandom} = m198;
 
 const TAU=Math.PI*2,GOLD='#ffc64b',GOLD_DIM='rgba(255,190,58,0.65)';
 const drop=(s,w,h,r=4)=>box(s,3,3,w,h,r,'rgba(0,0,0,0.4)');
@@ -34161,12 +34226,12 @@ const PALACE_ARTISTS={
 return Object.freeze({get PALACE_ARTISTS(){return PALACE_ARTISTS;}});
 })();
 // src/game/presentation/props/enni.mjs
-const m208 = (()=>{
+const m209 = (()=>{
 // Enni Cole's furniture families (ec_*): a department store in rose stone, walnut and brass, both
 // floors. Drawn on the art toolkit as the other venues' are. The store's goods (bottles, garments,
 // aisle stock) are arranged by the piece's number, so a map picks a counter's stock as it did.
 const {rect,circle,ellipse,polygon,linear,radial} = m155;
-const {box,disc,lines,turned} = m197;
+const {box,disc,lines,turned} = m198;
 
 const TAU=Math.PI*2,BRASS='#b0844c',BRIGHT='#ead5a6',ROSE='#2b2328',DARK='#262328',WALNUT='#493428',CREAM='#e8ddd0',IVORY='#f4eadc';
 /** A brass-ringed disc, as the classic art's `dot`: its outline a hairline. */
@@ -34550,12 +34615,12 @@ const HANGS=['#e9dcc4','#cdb48a','#a3815a','#2a2428','#5a1a2a','#8c2b3e','#2f5a4
 return Object.freeze({get ENNI_ARTISTS(){return ENNI_ARTISTS;}});
 })();
 // src/game/presentation/props/lost.mjs
-const m209 = (()=>{
+const m210 = (()=>{
 // Lost things round the city: a case, a coat, a purse, a cash tin, searched once a day for what is
 // in them. Each is drawn closed and full, or lying open and emptied once `piece.state.searched` (its
 // host sets it; the open and the closed piece are kept as separate pictures).
 const {rect,circle,ellipse} = m155;
-const {box,disc,crescent} = m197;
+const {box,disc,crescent} = m198;
 
 const GOLD='#e8c27a',GOLD_DARK='#a8823e',CREAM='#f3e6c8',CRIMSON_LIGHT='#b8203a';
 const STASH_GOLD='#e8c26a',STASH_GOLD_DARK='#9a7a32';
@@ -34669,12 +34734,12 @@ const LOST_ARTISTS={
 return Object.freeze({get LOST_ARTISTS(){return LOST_ARTISTS;}});
 })();
 // src/game/presentation/props/machines.mjs
-const m210 = (()=>{
+const m211 = (()=>{
 // The machines every map shares: MiniSpree's vending machine, Dr. Yin's health station, the loadout
 // locker, a room's light switch and a note left lying. Their still bodies are pictures; what hums,
 // glows, refills or runs across a screen is live. A light switch reads `piece.state.lit`.
 const {rect,circle,polygon,linear} = m155;
-const {box} = m197;
+const {box} = m198;
 
 const MACHINE_ARTISTS={
     mini_spree:{draw(art,piece,look){                                    // the city's vending brand: glossy black, a lit window of cans, a pink-and-cyan marquee
@@ -34738,7 +34803,7 @@ const MACHINE_ARTISTS={
 return Object.freeze({get MACHINE_ARTISTS(){return MACHINE_ARTISTS;}});
 })();
 // src/game/presentation/props/index.mjs
-const m195 = (()=>{
+const m196 = (()=>{
 // Props drawn natively, by family. A prop type in the catalog (game-assets/props.json) that names a
 // `family` is a preset of it; its look is the family's defaults, then the type's look, then the
 // placement's, checked against the family's schema. `propArtPacket` gathers what one piece shows,
@@ -34747,19 +34812,19 @@ const m195 = (()=>{
 const PROPS = m71.default;
 const {resolvePropLook} = m41;
 const {artScene,groundShadow,canvasRenderer,measureText} = m155;
-const {CAFE_ARTISTS} = m196;
-const {APARTMENT_ARTISTS} = m198;
-const {HOUSE_ARTISTS} = m200;
-const {HOTEL_ARTISTS} = m201;
-const {CLUB_ARTISTS} = m202;
-const {SANCTUM_ARTISTS} = m203;
-const {CLINIC_ARTISTS} = m204;
-const {NEURAL_ARTISTS} = m205;
-const {TORQUE_ARTISTS} = m206;
-const {PALACE_ARTISTS} = m207;
-const {ENNI_ARTISTS} = m208;
-const {LOST_ARTISTS} = m209;
-const {MACHINE_ARTISTS} = m210;
+const {CAFE_ARTISTS} = m197;
+const {APARTMENT_ARTISTS} = m199;
+const {HOUSE_ARTISTS} = m201;
+const {HOTEL_ARTISTS} = m202;
+const {CLUB_ARTISTS} = m203;
+const {SANCTUM_ARTISTS} = m204;
+const {CLINIC_ARTISTS} = m205;
+const {NEURAL_ARTISTS} = m206;
+const {TORQUE_ARTISTS} = m207;
+const {PALACE_ARTISTS} = m208;
+const {ENNI_ARTISTS} = m209;
+const {LOST_ARTISTS} = m210;
+const {MACHINE_ARTISTS} = m211;
 
 const PROP_FAMILIES=PROPS.resources.catalog.data.families;
 /** Every venue's artists under one name each: a family drawn by two venues would silently lose one. */
@@ -34837,7 +34902,7 @@ function drawPropArt(context,packet,{pictures,time=0,beat=null}){
 
 return Object.freeze({get PROP_FAMILIES(){return PROP_FAMILIES;},get hasPropArt(){return hasPropArt;},get propArtLoop(){return propArtLoop;},get propArtPacket(){return propArtPacket;},get createPropDraws(){return createPropDraws;},get drawPropArt(){return drawPropArt;}});
 })();
-const m212 = Object.freeze({default:{
+const m213 = Object.freeze({default:{
  "tile_size": 1024,
  "tile_ahead": 128,
  "indoor": { "tint": "rgb(22, 10, 48)", "darkness": 0.95, "lamp_glow": 0.08 },
@@ -34858,8 +34923,8 @@ const m212 = Object.freeze({default:{
  "flicker": { "floor": 0.82, "swing": 0.18 }
 }});
 // src/game/presentation/lighting.mjs
-const m211 = (()=>{
-const LIGHTING = m212.default;
+const m212 = (()=>{
+const LIGHTING = m213.default;
 const {createLightLayer,createLightLayerParts,viewAhead} = m155;
 const {declaredLight} = m141;
 
@@ -35003,7 +35068,7 @@ function phase(id=''){let h=2166136261;for(const c of String(id))h=Math.imul(h^c
 return Object.freeze({get LIGHTING(){return LIGHTING;},get sceneLighting(){return sceneLighting;},get levelLights(){return levelLights;}});
 })();
 // src/game/data/road-navigation.mjs
-const m213 = (()=>{
+const m214 = (()=>{
 /**
  * The city's lane network as Basement navigation road data.
  *
@@ -35141,7 +35206,7 @@ const m0 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m41.assetLibrary;},get createGameAssetLibrary(){return m48.createGameAssetLibrary;},get resolveMapLayout(){return m70.resolveMapLayout;},get resolvePlacement(){return m70.resolvePlacement;},get isMovableProp(){return m70.isMovableProp;},get mapHost(){return m70.mapHost;},get createMapLibraries(){return m70.createMapLibraries;},get PROP_TYPES(){return m70.PROP_TYPES;},get MAP_IDS(){return m70.MAP_IDS;},get ApartmentLevel(){return m96.ApartmentLevel;},get APARTMENT_RULES(){return m138.APARTMENT_RULES;},get gameEngine(){return m147.gameEngine;},get gameLevel(){return m149.gameLevel;},get mapLevel(){return m165.mapLevel;},get travelSystem(){return m166.travelSystem;},get InteriorLevel(){return m167.InteriorLevel;},get registerInteriorLevels(){return m167.registerInteriorLevels;},get levelLobby(){return m148.levelLobby;},get createGameRuntime(){return m168.createGameRuntime;},get controlSystem(){return m150.controlSystem;},get controlsSystem(){return m150.controlsSystem;},get inputInstance(){return m150.inputInstance;},get keyboardInstance(){return m150.keyboardInstance;},get mouseInstance(){return m150.mouseInstance;},get touchInstance(){return m150.touchInstance;},get touchStick(){return m150.touchStick;},get gamepadInstance(){return m150.gamepadInstance;},get TAP(){return m150.TAP;},get DOUBLETAP(){return m150.DOUBLETAP;},get HELD(){return m150.HELD;},get PRESS(){return m150.PRESS;},get REPEAT(){return m150.REPEAT;},get RELEASE(){return m150.RELEASE;},get renderSystem(){return m155.renderSystem;},get renderFrame(){return m155.renderFrame;},get canvasRenderer(){return m155.canvasRenderer;},get pictureCache(){return m155.pictureCache;},get measureText(){return m155.measureText;},get cameraSystem(){return m155.cameraSystem;},get gameSession(){return m180.gameSession;},get PlayerStateSystem(){return m181.PlayerStateSystem;},get PlayerControlSystem(){return m182.PlayerControlSystem;},get Player(){return m124.Player;},get playerVitals(){return m125.playerVitals;},get itemSystem(){return m105.itemSystem;},get createItemCatalog(){return m59.createItemCatalog;},get GUN_MATERIALS(){return m176.GUN_MATERIALS;},get WEAPON_MODELS(){return m176.WEAPON_MODELS;},get LASER_MODULE(){return m176.LASER_MODULE;},get weaponModel(){return m176.weaponModel;},get weaponAppearance(){return m187.weaponAppearance;},get combatSystem(){return m183.combatSystem;},get weaponSystem(){return m184.weaponSystem;},get lootSystem(){return m186.lootSystem;},get WorldLoot(){return m130.WorldLoot;},get MELEE_SWING(){return m185.MELEE_SWING;},get WIDE_SWING(){return m185.WIDE_SWING;},get sampleMeleeSwing(){return m185.sampleMeleeSwing;},get sampleWideSwing(){return m185.sampleWideSwing;},get swingPhases(){return m185.swingPhases;},get wideGrip(){return m185.wideGrip;},get COMBAT_RULES(){return m188.COMBAT_RULES;},get registerGameEntityTypes(){return m117.registerGameEntityTypes;},get actorVitals(){return m103.actorVitals;},get gameActor(){return m101.gameActor;},get NPC(){return m128.NPC;},get rosterRecord(){return m128.rosterRecord;},get ROSTER_FIELDS(){return m128.ROSTER_FIELDS;},get Ganger(){return m100.Ganger;},get actorSystem(){return m178.actorSystem;},get actorItems(){return m104.actorItems;},get restoreActorItems(){return m104.restoreActorItems;},get resolveEmoteLines(){return m129.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m129.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m116.abilityLoadout;},get actorAbilities(){return m116.actorAbilities;},get importActorAbilities(){return m116.importActorAbilities;},get abilitySystem(){return m177.abilitySystem;},get createAbilityCatalog(){return m61.createAbilityCatalog;},get attackRegistry(){return m102.attackRegistry;},get validateAttackState(){return m102.validateAttackState;},get attackSystem(){return m174.attackSystem;},get createAttackCatalog(){return m58.createAttackCatalog;},get validateMountedAttack(){return m115.validateMountedAttack;},get TrafficVehicle(){return m131.TrafficVehicle;},get createGameVehicle(){return m131.createGameVehicle;},get Hunter(){return m99.Hunter;},get createHunterAppearance(){return m57.createHunterAppearance;},get Marionette(){return m123.Marionette;},get MARIONETTE_RULES(){return m55.MARIONETTE_RULES;},get validateAbilityAction(){return m112.validateAbilityAction;},get GatlingGunner(){return m109.GatlingGunner;},get Drone(){return m118.Drone;},get VelvetCat(){return m119.VelvetCat;},get velvetCatAnimation(){return m120.velvetCatAnimation;},get createVelvetAnimation(){return m120.createVelvetAnimation;},get velvetPresentation(){return m120.velvetPresentation;},get droneLift(){return m189.droneLift;},get droneArmPose(){return m189.droneArmPose;},get dronePresentation(){return m189.dronePresentation;},get VELVET_CAT_PALETTES(){return m121.VELVET_CAT_PALETTES;},get VELVET_T(){return m121.VELVET_T;},get VELVET_PROFILES(){return m121.VELVET_PROFILES;},get VELVET_GAITS(){return m121.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m121.VELVET_TAIL_SEGS;},get Demoness(){return m98.Demoness;},get Warden(){return m108.Warden;},get Vesper(){return m108.Vesper;},get Matins(){return m108.Matins;},get Compline(){return m108.Compline;},get BossEffect(){return m110.BossEffect;},get encounterSystem(){return m173.encounterSystem;},get createBossAbilities(){return m49.createBossAbilities;},get createDemonessAppearance(){return m49.createDemonessAppearance;},get demonessAppearance(){return m190.demonessAppearance;},get demonessPresentation(){return m190.demonessPresentation;},get bossEffectAppearance(){return m191.bossEffectAppearance;},get bossEffectPresentation(){return m191.bossEffectPresentation;},get validateBossRecord(){return m97.validateBossRecord;},get createDronePackets(){return m189.createDronePackets;},get createVelvetCatArt(){return m192.createVelvetCatArt;},get createVelvetCatPackets(){return m192.createVelvetCatPackets;},get createVelvetEyePackets(){return m192.createVelvetEyePackets;},get doorPresentation(){return m193.doorPresentation;},get createDoorPackets(){return m193.createDoorPackets;},get DOOR_APPEARANCE(){return m193.DOOR_APPEARANCE;},get PROP_FAMILIES(){return m195.PROP_FAMILIES;},get hasPropArt(){return m195.hasPropArt;},get propArtPacket(){return m195.propArtPacket;},get createPropDraws(){return m195.createPropDraws;},get drawPropArt(){return m195.drawPropArt;},get sceneLighting(){return m211.sceneLighting;},get levelLights(){return m211.levelLights;},get LIGHTING(){return m211.LIGHTING;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m169.humanoidSystem;},get humanoidPresentation(){return m169.humanoidPresentation;},get humanoidBodyCanon(){return m170.humanoidBodyCanon;},get humanoidBuilds(){return m170.humanoidBuilds;},get getHumanoidRigAssets(){return m170.getHumanoidRigAssets;},get roadNavigationData(){return m213.roadNavigationData;},get loadRoadNavigation(){return m213.loadRoadNavigation;}});
+return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m41.assetLibrary;},get createGameAssetLibrary(){return m48.createGameAssetLibrary;},get resolveMapLayout(){return m70.resolveMapLayout;},get resolvePlacement(){return m70.resolvePlacement;},get isMovableProp(){return m70.isMovableProp;},get mapHost(){return m70.mapHost;},get createMapLibraries(){return m70.createMapLibraries;},get PROP_TYPES(){return m70.PROP_TYPES;},get MAP_IDS(){return m70.MAP_IDS;},get ApartmentLevel(){return m96.ApartmentLevel;},get APARTMENT_RULES(){return m138.APARTMENT_RULES;},get gameEngine(){return m147.gameEngine;},get gameLevel(){return m149.gameLevel;},get mapLevel(){return m166.mapLevel;},get travelSystem(){return m167.travelSystem;},get InteriorLevel(){return m168.InteriorLevel;},get registerInteriorLevels(){return m168.registerInteriorLevels;},get levelLobby(){return m148.levelLobby;},get createGameRuntime(){return m169.createGameRuntime;},get controlSystem(){return m150.controlSystem;},get controlsSystem(){return m150.controlsSystem;},get inputInstance(){return m150.inputInstance;},get keyboardInstance(){return m150.keyboardInstance;},get mouseInstance(){return m150.mouseInstance;},get touchInstance(){return m150.touchInstance;},get touchStick(){return m150.touchStick;},get gamepadInstance(){return m150.gamepadInstance;},get TAP(){return m150.TAP;},get DOUBLETAP(){return m150.DOUBLETAP;},get HELD(){return m150.HELD;},get PRESS(){return m150.PRESS;},get REPEAT(){return m150.REPEAT;},get RELEASE(){return m150.RELEASE;},get renderSystem(){return m155.renderSystem;},get renderFrame(){return m155.renderFrame;},get canvasRenderer(){return m155.canvasRenderer;},get pictureCache(){return m155.pictureCache;},get measureText(){return m155.measureText;},get cameraSystem(){return m155.cameraSystem;},get gameSession(){return m181.gameSession;},get PlayerStateSystem(){return m182.PlayerStateSystem;},get PlayerControlSystem(){return m183.PlayerControlSystem;},get Player(){return m124.Player;},get playerVitals(){return m125.playerVitals;},get itemSystem(){return m105.itemSystem;},get createItemCatalog(){return m59.createItemCatalog;},get GUN_MATERIALS(){return m177.GUN_MATERIALS;},get WEAPON_MODELS(){return m177.WEAPON_MODELS;},get LASER_MODULE(){return m177.LASER_MODULE;},get weaponModel(){return m177.weaponModel;},get weaponAppearance(){return m188.weaponAppearance;},get combatSystem(){return m184.combatSystem;},get weaponSystem(){return m185.weaponSystem;},get lootSystem(){return m187.lootSystem;},get WorldLoot(){return m130.WorldLoot;},get MELEE_SWING(){return m186.MELEE_SWING;},get WIDE_SWING(){return m186.WIDE_SWING;},get sampleMeleeSwing(){return m186.sampleMeleeSwing;},get sampleWideSwing(){return m186.sampleWideSwing;},get swingPhases(){return m186.swingPhases;},get wideGrip(){return m186.wideGrip;},get COMBAT_RULES(){return m189.COMBAT_RULES;},get registerGameEntityTypes(){return m117.registerGameEntityTypes;},get actorVitals(){return m103.actorVitals;},get gameActor(){return m101.gameActor;},get NPC(){return m128.NPC;},get rosterRecord(){return m128.rosterRecord;},get ROSTER_FIELDS(){return m128.ROSTER_FIELDS;},get Ganger(){return m100.Ganger;},get actorSystem(){return m179.actorSystem;},get actorItems(){return m104.actorItems;},get restoreActorItems(){return m104.restoreActorItems;},get resolveEmoteLines(){return m129.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m129.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m116.abilityLoadout;},get actorAbilities(){return m116.actorAbilities;},get importActorAbilities(){return m116.importActorAbilities;},get abilitySystem(){return m178.abilitySystem;},get createAbilityCatalog(){return m61.createAbilityCatalog;},get attackRegistry(){return m102.attackRegistry;},get validateAttackState(){return m102.validateAttackState;},get attackSystem(){return m175.attackSystem;},get createAttackCatalog(){return m58.createAttackCatalog;},get validateMountedAttack(){return m115.validateMountedAttack;},get TrafficVehicle(){return m131.TrafficVehicle;},get createGameVehicle(){return m131.createGameVehicle;},get Hunter(){return m99.Hunter;},get createHunterAppearance(){return m57.createHunterAppearance;},get Marionette(){return m123.Marionette;},get MARIONETTE_RULES(){return m55.MARIONETTE_RULES;},get validateAbilityAction(){return m112.validateAbilityAction;},get GatlingGunner(){return m109.GatlingGunner;},get Drone(){return m118.Drone;},get VelvetCat(){return m119.VelvetCat;},get velvetCatAnimation(){return m120.velvetCatAnimation;},get createVelvetAnimation(){return m120.createVelvetAnimation;},get velvetPresentation(){return m120.velvetPresentation;},get droneLift(){return m190.droneLift;},get droneArmPose(){return m190.droneArmPose;},get dronePresentation(){return m190.dronePresentation;},get VELVET_CAT_PALETTES(){return m121.VELVET_CAT_PALETTES;},get VELVET_T(){return m121.VELVET_T;},get VELVET_PROFILES(){return m121.VELVET_PROFILES;},get VELVET_GAITS(){return m121.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m121.VELVET_TAIL_SEGS;},get Demoness(){return m98.Demoness;},get Warden(){return m108.Warden;},get Vesper(){return m108.Vesper;},get Matins(){return m108.Matins;},get Compline(){return m108.Compline;},get BossEffect(){return m110.BossEffect;},get encounterSystem(){return m174.encounterSystem;},get createBossAbilities(){return m49.createBossAbilities;},get createDemonessAppearance(){return m49.createDemonessAppearance;},get demonessAppearance(){return m191.demonessAppearance;},get demonessPresentation(){return m191.demonessPresentation;},get bossEffectAppearance(){return m192.bossEffectAppearance;},get bossEffectPresentation(){return m192.bossEffectPresentation;},get validateBossRecord(){return m97.validateBossRecord;},get createDronePackets(){return m190.createDronePackets;},get createVelvetCatArt(){return m193.createVelvetCatArt;},get createVelvetCatPackets(){return m193.createVelvetCatPackets;},get createVelvetEyePackets(){return m193.createVelvetEyePackets;},get doorPresentation(){return m194.doorPresentation;},get createDoorPackets(){return m194.createDoorPackets;},get DOOR_APPEARANCE(){return m194.DOOR_APPEARANCE;},get PROP_FAMILIES(){return m196.PROP_FAMILIES;},get hasPropArt(){return m196.hasPropArt;},get propArtPacket(){return m196.propArtPacket;},get createPropDraws(){return m196.createPropDraws;},get drawPropArt(){return m196.drawPropArt;},get sceneLighting(){return m212.sceneLighting;},get levelLights(){return m212.levelLights;},get LIGHTING(){return m212.LIGHTING;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m170.humanoidSystem;},get humanoidPresentation(){return m170.humanoidPresentation;},get humanoidBodyCanon(){return m171.humanoidBodyCanon;},get humanoidBuilds(){return m171.humanoidBuilds;},get getHumanoidRigAssets(){return m171.getHumanoidRigAssets;},get roadNavigationData(){return m214.roadNavigationData;},get loadRoadNavigation(){return m214.loadRoadNavigation;}});
 })();
 return m0;
 })();

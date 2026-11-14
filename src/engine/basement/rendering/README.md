@@ -148,6 +148,10 @@ Art that stands up from the ground under a camera above it. A point at height `z
 
 `boxFaces(sections)` gives the outside walls of a block of rectangles (`{side, section, x1, y1, x2, y2, nx, ny}`), with the stretches where sections meet taken out. A shape that would be empty is `null`.
 
+## Depth batches (`depth.mjs`)
+
+Things that stand up toward the camera (trunk faces, posts, canopies) are painted lowest first, but a frame of them is hundreds of small shapes. `depthBatches(items, {lookback = 64})` groups `items` (`{z, key, box: [left, top, right, bottom], convex}`) for painting: lowest `z` first (ties in the order given), each group one `key`. An item joins the latest group of its key unless a group of another key painted after it overlaps the item; `convex` (its outline as `[[x, y], ...]`, when convex) makes that test exact, so shapes touching along an edge (the faces of one post) do not hold each other apart. A null key never groups (a picture). A group is one paint, so where its members overlap they are covered once: the same for opaque paint, so give translucent paint a null key. It returns the groups, arrays of items, in paint order; the artist paints each as one shape.
+
 ## Rendering resources
 
 ```js
@@ -238,7 +242,7 @@ Verified batch: **217 combined engine/controls/rendering/Directory/runtime tests
 
 `canvasRenderer.drawPackets(context, packets)` is a synchronous compatibility boundary for a host already inside a Canvas drawing pass. It accepts inline packet data, validates the complete batch, then uses the same Canvas backend as `renderSystem`. It preserves the host's current transform, clip, opacity, drawing state and backing dimensions; it never clears the surface or installs a simulation clock. Buffers/backend instances are reused per context through weak ownership. Resource-ID packets reject before drawing: registered images/targets/geometry/materials belong to `renderSystem`.
 
-`canvasRenderer.drawEntries(context, entries, {pictures, layered})` draws a run that mixes packets and pictures straight onto the canvas, in order: packets as `drawPackets` does, and each `{picture: {key, bounds, matrix, build}, blend, opacity, prepare}` entry stamped from `pictures` (a `pictureCache`) with its blend at its opacity (a `prepare` entry only painted ahead of need). `layered` paints each picture with its own base under its blends. `drawLayer` draws its packets this way into its layer.
+`canvasRenderer.drawEntries(context, entries, {pictures, layered})` draws a run that mixes packets and pictures straight onto the canvas, in order: packets as `drawPackets` does, and each `{picture: {key, bounds, matrix, build}, blend, opacity, prepare}` entry stamped from `pictures` (a `pictureCache`) with its blend at its opacity (a `prepare` entry only painted ahead of need). An entry's `clips` (`[{geometry}]`, each a path geometry in the context's units with its `fill_rule`) limit where its stamp lands, as packet clips do. `layered` paints each picture with its own base under its blends. `drawLayer` draws its packets this way into its layer.
 
 `canvasRenderer.drawLayer(context, packets, {opacity = 1, blend = 'normal', scale = 1, pictures})` is the same boundary for a layer: it draws the packets into an off-screen surface the size of the canvas (times `scale`) under the context's current transform, then lays that surface over the canvas at `opacity` with `blend`. The light layer is drawn this way. Under `renderSystem`, the same packets go into a pass on a `target` resource, drawn back as a sprite.
 

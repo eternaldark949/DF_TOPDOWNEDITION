@@ -1,6 +1,7 @@
 // ===== LV0 BASEMENT =====
 import {renderFrame} from './frame.mjs';
 import {BLENDS} from './values.mjs';
+import {geometry} from './packets.mjs';
 
 function createSurface(width,height){
     if(typeof OffscreenCanvas!=='undefined')return new OffscreenCanvas(width,height);
@@ -75,7 +76,8 @@ export class canvasRenderer {
             flush();if(!pictures)throw new TypeError('Entries with pictures need a pictureCache');if(!Object.hasOwn(BLENDS,entry.blend??'normal'))throw new TypeError('Unsupported blend');
             const composite=context.globalCompositeOperation,alpha=context.globalAlpha;
             context.globalCompositeOperation=BLENDS[entry.blend??'normal'];context.globalAlpha=alpha*finiteOpacity(entry.opacity??1);
-            try{pictures.draw(context,{...entry.picture,layered,stamp:!entry.prepare,blend:entry.blend??null},entry.picture.build);if(!entry.prepare)count++;}finally{context.globalCompositeOperation=composite;context.globalAlpha=alpha;}
+            const clips=!entry.prepare&&entry.clips?.length?entry.clips:null;if(clips){context.save();for(const clip of clips){buildPath(context,geometry(clip.geometry));context.clip(clip.geometry.fill_rule??'nonzero');}}
+            try{pictures.draw(context,{...entry.picture,layered,stamp:!entry.prepare,blend:entry.blend??null},entry.picture.build);if(!entry.prepare)count++;}finally{if(clips)context.restore();context.globalCompositeOperation=composite;context.globalAlpha=alpha;}
         }
         flush();return count;
     }
@@ -116,11 +118,17 @@ export class canvasRenderer {
         const gradient=paint.type==='linear'?ctx.createLinearGradient(...paint.from,...paint.to):ctx.createRadialGradient(...paint.from,paint.inner_radius,...paint.to,paint.outer_radius);
         for(const [offset,color]of paint.stops)gradient.addColorStop(offset,color);return gradient;
     }
+    // What the context was last set to by #style, so a run of packets alike sets only what changes (setting
+    // a canvas colour parses it every time). Cleared when anything else may have touched the context.
+    #set={};
     #style(ctx,m,draw,sx,sy){
-        ctx.globalAlpha=draw.opacity;ctx.globalCompositeOperation=BLENDS[draw.blend];
-        ctx.fillStyle=this.#paint(ctx,m.fill)??'transparent';ctx.strokeStyle=this.#paint(ctx,m.stroke)??'transparent';ctx.lineWidth=m.stroke_width||1;ctx.lineCap=m.line_cap;ctx.lineJoin=m.line_join;
-        ctx.setLineDash(m.dash);ctx.lineDashOffset=m.dash_offset;
-        ctx.shadowColor=m.shadow?.color??'transparent';ctx.shadowBlur=(m.shadow?.blur??0)*Math.max(sx,sy);ctx.shadowOffsetX=(m.shadow?.offset[0]??0)*sx;ctx.shadowOffsetY=(m.shadow?.offset[1]??0)*sy;
+        const st=this.#set,set=(key,value)=>{if(st[key]!==value){ctx[key]=value;st[key]=value;}};
+        set('globalAlpha',draw.opacity);set('globalCompositeOperation',BLENDS[draw.blend]);
+        if(typeof m.fill==='object'&&m.fill!==null){ctx.fillStyle=this.#paint(ctx,m.fill);st.fillStyle=null;}else set('fillStyle',m.fill??'transparent');
+        if(typeof m.stroke==='object'&&m.stroke!==null){ctx.strokeStyle=this.#paint(ctx,m.stroke);st.strokeStyle=null;}else set('strokeStyle',m.stroke??'transparent');
+        set('lineWidth',m.stroke_width||1);set('lineCap',m.line_cap);set('lineJoin',m.line_join);
+        const dash=m.dash.length?m.dash.join(','):'';if(st.dash!==dash){ctx.setLineDash(m.dash);st.dash=dash;}set('lineDashOffset',m.dash_offset);
+        set('shadowColor',m.shadow?.color??'transparent');set('shadowBlur',(m.shadow?.blur??0)*Math.max(sx,sy));set('shadowOffsetX',(m.shadow?.offset[0]??0)*sx);set('shadowOffsetY',(m.shadow?.offset[1]??0)*sy);
     }
     #geometry(id,inline){return id?this.#resources.get(id):{descriptor:{geometry:inline},path:null};}
     #shape(ctx,entry,m){
@@ -130,7 +138,8 @@ export class canvasRenderer {
         if(m.stroke!==null&&m.stroke_width>0)entry.path?ctx.stroke(entry.path):ctx.stroke();
     }
     #draw(ctx,draw,view,sx,sy){
-        ctx.save();
+        const clipped=draw.clips.length>0;   // only a clip needs the context saved: everything else is set for each packet
+        if(clipped){ctx.save();this.#set={};}
         try{
             const m=draw.space==='world'?view.world_to_screen:[1,0,0,1,0,0];ctx.setTransform(m[0]*sx,m[1]*sy,m[2]*sx,m[3]*sy,m[4]*sx,m[5]*sy);ctx.transform(...draw.transform);
             for(const clip of draw.clips){ctx.transform(...clip.transform);const entry=this.#geometry(clip.geometry_id,clip.geometry);if(entry.path)ctx.clip(entry.path,clip.rule);else{buildPath(ctx,entry.descriptor.geometry);ctx.clip(clip.rule);}ctx.transform(...clip.inverse);}
@@ -144,7 +153,7 @@ export class canvasRenderer {
                 if(material.fill!==null)ctx.fillText(draw.text,0,0);if(material.stroke!==null&&material.stroke_width>0)ctx.strokeText(draw.text,0,0);
                 if(f.letter_spacing&&'letterSpacing' in ctx)ctx.letterSpacing='0px';
             }
-        }finally{ctx.restore();}
+        }finally{if(clipped){ctx.restore();this.#set={};}}
     }
     render(frame){
         this.#live();
@@ -152,11 +161,11 @@ export class canvasRenderer {
         for(const pass of frame.passes){
             const target=pass.target_id===null?{surface:this.#surface,context:this.#context}:this.#resources.get(pass.target_id),ctx=target.context;
             const sx=target.surface.width/pass.viewport.width,sy=target.surface.height/pass.viewport.height;
-            ctx.save();
+            ctx.save();this.#set={};
             try{
                 if(pass.clear_color!==false){ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.clearRect(0,0,target.surface.width,target.surface.height);ctx.fillStyle=pass.clear_color;ctx.fillRect(0,0,target.surface.width,target.surface.height);}
                 for(const draw of pass.packets)this.#draw(ctx,draw,frame.view,sx,sy);
-            }finally{ctx.restore();}
+            }finally{ctx.restore();this.#set={};}
         }
     }
     dispose(){if(this.#disposed)return;this.#disposed=true;this.#generation++;for(const entry of this.#resources.values())this.#release(entry);this.#resources.clear();this.#context=null;this.#surface=null;}
@@ -226,8 +235,8 @@ export class pictureCache{
         }else this.#entries.delete(id);
         this.#entries.set(id,entry);
         if(!stamp)return how;
-        context.save();
-        try{context.transform(...matrix);context.drawImage(entry.surface,bx,by,bw,bh);}finally{context.restore();}
+        context.setTransform(m[0],m[1],m[2],m[3],m[4],m[5]);   // the stamp changes only the transform, so put it back rather than save the whole state
+        try{context.drawImage(entry.surface,bx,by,bw,bh);}finally{context.setTransform(t);}
         return how;
     }
     #evict(bytes){for(const [id,entry]of this.#entries){if(this.#bytes+bytes<=this.#max_bytes)break;if(entry.surface){this.#free(entry);this.#entries.delete(id);}}}
