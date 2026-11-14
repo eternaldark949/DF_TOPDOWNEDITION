@@ -224,5 +224,33 @@
     },
     "font": "Orbitron, monospace",
     "script_font": "\"Great Vibes\", cursive"
+  },
+  "biggs_park": {
+    "colors": {
+      "wine": "#692735",
+      "dark": "#23131f",
+      "cream": "#ead8b1",
+      "brass": "#bc945b",
+      "gold": "#ffe0a0",
+      "teal": "#426e75",
+      "ink": "#111a23",
+      "rose": "#e5a29a"
+    },
+    "plan": {
+      "w": 450,
+      "d": 400,
+      "pavilion": 54,
+      "entrance": 34,
+      "lantern": [
+        172,
+        78,
+        106,
+        94
+      ],
+      "lantern_h": 14,
+      "hero": 1.5
+    },
+    "font": "Orbitron, monospace",
+    "script_font": "\"Great Vibes\", cursive"
   }
 }
