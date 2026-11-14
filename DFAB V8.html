@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = 'e2ca84f96f4a';
+        const DFAB_BUILD = '4705c48d5a82';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="16969">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="16973">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -29045,19 +29045,24 @@ class canvasRenderer {
      * drawPackets draws it, each `{picture: {key, bounds, matrix, build}, blend, opacity, prepare}` entry
      * stamped from `pictures` (a pictureCache) in order, with `blend` at `opacity` (a `prepare` entry is only
      * painted ahead of need). `layered` paints each picture with its own base under its blends, as a light
-     * layer's are. Returns how many packets and pictures were drawn.
+     * layer's are; a picture marked `layered` itself is painted so wherever it is drawn. Returns how many packets and pictures were drawn.
      */
     static drawEntries(context,entries,{pictures,layered=false}={}){
-        let count=0,run=[];const flush=()=>{if(run.length)count+=canvasRenderer.drawPackets(context,run);run=[];};
-        for(const entry of entries){
-            if(!entry.picture){run.push(entry);continue;}
-            flush();if(!pictures)throw new TypeError('Entries with pictures need a pictureCache');if(!Object.hasOwn(BLENDS,entry.blend??'normal'))throw new TypeError('Unsupported blend');
-            const composite=context.globalCompositeOperation,alpha=context.globalAlpha;
-            context.globalCompositeOperation=BLENDS[entry.blend??'normal'];context.globalAlpha=alpha*finiteOpacity(entry.opacity??1);
-            const clips=!entry.prepare&&entry.clips?.length?entry.clips:null;if(clips){context.save();for(const clip of clips){buildPath(context,geometry(clip.geometry));context.clip(clip.geometry.fill_rule??'nonzero');}}
-            try{pictures.draw(context,{...entry.picture,layered,stamp:!entry.prepare,blend:entry.blend??null},entry.picture.build);if(!entry.prepare)count++;}finally{if(clips)context.restore();context.globalCompositeOperation=composite;context.globalAlpha=alpha;}
-        }
-        flush();return count;
+        // the clip stays set while the entries after it carry the same clips array, so tiles of one strip share it
+        let count=0,run=[],open=null;const close=()=>{if(open){context.restore();open=null;}},flush=()=>{if(run.length){close();count+=canvasRenderer.drawPackets(context,run);}run=[];};
+        try{
+            for(const entry of entries){
+                if(!entry.picture){run.push(entry);continue;}
+                flush();if(!pictures)throw new TypeError('Entries with pictures need a pictureCache');if(!Object.hasOwn(BLENDS,entry.blend??'normal'))throw new TypeError('Unsupported blend');
+                const clips=!entry.prepare&&entry.clips?.length?entry.clips:null;
+                if(clips!==open){close();if(clips){context.save();for(const clip of clips){buildPath(context,geometry(clip.geometry));context.clip(clip.geometry.fill_rule??'nonzero');}open=clips;}}
+                const composite=context.globalCompositeOperation,alpha=context.globalAlpha;
+                context.globalCompositeOperation=BLENDS[entry.blend??'normal'];context.globalAlpha=alpha*finiteOpacity(entry.opacity??1);
+                try{pictures.draw(context,{...entry.picture,layered:layered||entry.picture.layered===true,stamp:!entry.prepare,blend:entry.blend??null},entry.picture.build);if(!entry.prepare)count++;}finally{context.globalCompositeOperation=composite;context.globalAlpha=alpha;}
+            }
+            flush();
+        }finally{close();}
+        return count;
     }
     get capabilities(){return capabilities;}
     initialize(surface,{viewport}){
