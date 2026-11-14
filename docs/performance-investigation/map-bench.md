@@ -182,3 +182,18 @@ one: drawLayer scales its half-size surface up over the whole view. Driving, a g
 milliseconds to paint here. The baked tiles in use come to about 44 MB, over the 32 MB target; the light
 layer's tiles ahead (512 px, snapped out to whole 1024 px tiles) are most of its share.
 
+## Readying only what the camera heads for
+
+Tiles were readied the same distance all round the view, so a camera standing still or driving east kept
+tiles on every side. `aheadOf({margin, velocity, lead})` (rendering) now gives per-side margins: 128 px all
+round, and a second of the camera's motion on the side it moves toward. The light layer and the ground take
+it as `ahead`; the looks' `tile_ahead` is that margin.
+
+| Scene | Ground + light | Ground | Light | Baked tiles in use |
+|---|---|---|---|---|
+| city-native | 6.3 ms (was 7.0) | 1.4 ms | 4.9 ms | 20 MB (was 38) |
+| city-native-drive | 11.8 ms, p95 16.5 (was 13.2, p95 22) | 5.1 ms | 6.7 ms | 27 MB (was 44) |
+| light-city-drive | | | 3.9 ms (was 4.4) | 12 MB (was 24) |
+
+The baked tiles in use are now within the 32 MB target.
+

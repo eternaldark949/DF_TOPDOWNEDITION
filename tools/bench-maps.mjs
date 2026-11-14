@@ -82,11 +82,11 @@ function calibrate() {
 async function measureLight({ scene, ground: with_ground = false, duration, warmup }) {
     const { physicsSystem } = await import('/src/engine/basement/physics/index.mjs');
     const { mapInstance } = await import('/src/engine/basement/maps/index.mjs');
-    const { canvasRenderer, pictureCache } = await import('/src/engine/basement/rendering/index.mjs');
+    const { canvasRenderer, pictureCache, aheadOf } = await import('/src/engine/basement/rendering/index.mjs');
     const { sceneLighting, levelLights } = await import('/src/game/presentation/lighting.mjs');
     const { PROP_TYPES } = await import('/src/game/data/game-maps.mjs');
     const physics = new physicsSystem(), W = 1280, H = 720, scale = .5;
-    let definition, options = { prop_types: PROP_TYPES }, camera, doors = [], kind = 'indoor', rooms = [], sky_darkness = 0, ground = null;
+    let definition, options = { prop_types: PROP_TYPES }, camera, doors = [], kind = 'indoor', rooms = [], sky_darkness = 0, ground = null, ground_ahead = 0;
     if (scene.startsWith('city')) {
         const { cityMapDefinition, cityRooms } = await import('/src/game/levels/city-definition.mjs');
         const places = (await import('/src/game/data/game-db/places.json', { with: { type: 'json' } })).default;
@@ -94,7 +94,7 @@ async function measureLight({ scene, ground: with_ground = false, duration, warm
         kind = 'outdoor'; rooms = cityRooms(places.maps.sdc); sky_darkness = .6;   // (the classic sky at 22:00)
         camera = scene === 'city' ? () => [3300, 2500] : t => [1500 + (t * .5) % 9000, 2500];
         options = { prop_types: PROP_TYPES, focus: camera(0) };
-        if (with_ground) { const { cityGround } = await import('/src/game/presentation/city-ground.mjs'); ground = new cityGround(cityMapDefinition({ map: places.maps.sdc }).city, { size: definition.size }); }
+        if (with_ground) { const { cityGround } = await import('/src/game/presentation/city-ground.mjs'); ground_ahead = (await import('/src/game/data/city-ground.json', { with: { type: 'json' } })).default.tile_ahead; ground = new cityGround(cityMapDefinition({ map: places.maps.sdc }).city, { size: definition.size }); }
     } else if (scene === 'cafe') {
         const { interiorMapDefinition, APARTMENT_MAP_OPTIONS } = await import('/src/game/levels/apartment-definition.mjs');
         const places = (await import('/src/game/data/game-db/places.json', { with: { type: 'json' } })).default;
@@ -129,7 +129,7 @@ async function measureLight({ scene, ground: with_ground = false, duration, warm
         const frame = () => {
             const now = performance.now(), t = now - start;
             doors.forEach((d, i) => d.updateBody({ position: [homes[i][0] + 30 * (1 + Math.sin(t / 700 + i)), homes[i][1]] }));
-            const [cx, cy] = camera(t);
+            const [cx, cy] = camera(t), [nx, ny] = camera(t + 100), velocity = [(nx - cx) * 10, (ny - cy) * 10];   // (the camera's motion: what is readied ahead leads it by a second)
             map.setFocus([cx, cy]); level.lamps = map.entities('lamp'); level.props = map.entities('prop');   // (the map streams round the camera, outside the light layer's time)
             const view = { left: cx - W / 2, top: cy - H / 2, right: cx + W / 2, bottom: cy + H / 2 };
             let ground_ms = 0; if (t < warmup) { paints.ground = paints.light = 0; held.ground = held.light = 0; }   // (counted over the measured window)
@@ -137,13 +137,13 @@ async function measureLight({ scene, ground: with_ground = false, duration, warm
             if (ground) {
                 const g0 = performance.now(); tiles.beginFrame(); ctx.setTransform(1, 0, 0, 1, -view.left, -view.top);
                 let bytes = 0;
-                for (const d of ground.createDraws({ view })) { bytes += d.bounds[2] * d.bounds[3] * 4; if (tiles.draw(ctx, { ...d, stamp: !d.prepare }, d.build) === 'paint') paints.ground++; }
+                for (const d of ground.createDraws({ view, ahead: aheadOf({ margin: ground_ahead, velocity }) })) { bytes += d.bounds[2] * d.bounds[3] * 4; if (tiles.draw(ctx, { ...d, stamp: !d.prepare }, d.build) === 'paint') paints.ground++; }
                 held.ground = Math.max(held.ground, bytes);
                 ctx.getImageData(0, 0, 1, 1); ground_ms = performance.now() - g0;
             }
             shadow_ms = 0; const t0 = performance.now();
             pictures.beginFrame();
-            const layer = lighting.createLayer({ extent, bounds: view, kind, rooms, sky_darkness, lights: levelLights(level), time: t / 1000 });
+            const layer = lighting.createLayer({ extent, bounds: view, ahead: aheadOf({ margin: lighting.look.tile_ahead, velocity }), kind, rooms, sky_darkness, lights: levelLights(level), time: t / 1000 });
             held.light = Math.max(held.light, layer.packets.filter(p => p.picture).reduce((n, p) => n + p.picture.bounds[2] * p.picture.bounds[3] * scale * scale * 4, 0));
             if (ground) { ctx.setTransform(1, 0, 0, 1, -view.left, -view.top); canvasRenderer.drawLayer(ctx, layer.packets, { opacity: layer.opacity, pictures, scale }); }
             else { ctx.setTransform(scale, 0, 0, scale, -view.left * scale, -view.top * scale); canvasRenderer.drawLayer(ctx, layer.packets, { opacity: layer.opacity, pictures }); }

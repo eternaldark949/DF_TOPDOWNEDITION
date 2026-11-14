@@ -1,5 +1,5 @@
 import GROUND from '../data/city-ground.json' with { type: 'json' };
-import { artScene, rect, polygon, polyline, circle, radial, seededRandom, hash2 } from '../../engine/basement/rendering/index.mjs';
+import { artScene, rect, polygon, polyline, circle, radial, seededRandom, hash2, viewAhead } from '../../engine/basement/rendering/index.mjs';
 
 /**
  * The city's ground as art, painted once per tile: the lots with their grain, the floor zones and lawns,
@@ -8,7 +8,7 @@ import { artScene, rect, polygon, polyline, circle, radial, seededRandom, hash2 
  * (`cityMapDefinition().city`) and the look in `data/city-ground.json`.
  *
  * `createDraws({view, ahead})` gives one draw per tile meeting the view, then (marked `prepare`) those
- * within `ahead` px of it: `{key, bounds, build, prepare}`, for a Basement pictureCache
+ * within `ahead` of it (px all round, or per-side margins from the camera's motion, rendering `aheadOf`): `{key, bounds, build, prepare}`, for a Basement pictureCache
  * (`pictures.draw(context, {...draw, stamp: !draw.prepare}, draw.build)`). The ground never changes, so a
  * tile is painted once and stamped after that.
  */
@@ -20,9 +20,9 @@ export class cityGround {
     }
     /** The tiles meeting the view, then those within `ahead` of it, as draws. */
     createDraws({ view, ahead = this.#look.tile_ahead, tile_size = this.#look.tile_size }) {
-        const [W, H] = this.size ?? [Infinity, Infinity], out = [], later = [];
-        const x0 = Math.max(0, Math.floor((view.left - ahead) / tile_size)), y0 = Math.max(0, Math.floor((view.top - ahead) / tile_size));
-        for (let x = x0 * tile_size; x < Math.min(W, view.right + ahead); x += tile_size) for (let y = y0 * tile_size; y < Math.min(H, view.bottom + ahead); y += tile_size) {
+        const [W, H] = this.size ?? [Infinity, Infinity], out = [], later = [], near = viewAhead(view, ahead);
+        const x0 = Math.max(0, Math.floor(near.left / tile_size)), y0 = Math.max(0, Math.floor(near.top / tile_size));
+        for (let x = x0 * tile_size; x < Math.min(W, near.right); x += tile_size) for (let y = y0 * tile_size; y < Math.min(H, near.bottom); y += tile_size) {
             const bounds = [x, y, tile_size, tile_size], shown = x < view.right && x + tile_size > view.left && y < view.bottom && y + tile_size > view.top;
             (shown ? out : later).push({ key: `city_ground:${tile_size}:${x},${y}`, bounds, build: () => this.tileArt(bounds), prepare: !shown });
         }

@@ -4,6 +4,7 @@
 // light's cut (its reach, shadowed by an optional visibility polygon), then each light's colour, added.
 // Draw it over the finished scene at the dark's strength (canvasRenderer.drawLayer, or a render target).
 import {artScene,rect,circle,radial,linear} from './art.mjs';
+import {viewAhead} from './camera.mjs';
 
 const finite=(value,name,min=-Infinity)=>{if(!Number.isFinite(value)||value<min)throw new TypeError(`Light ${name} must be a finite number`);return value;};
 export const LIGHT_CUT=Object.freeze([[0,1],[1,0]]);
@@ -62,7 +63,8 @@ export function createLightLayer({bounds,tint,areas=[],lights=[]},{scene=new art
  *
  * With `tile_size` the pictures are tiles of that size over the extent (a map's regions), and only the
  * tiles meeting `view` are returned: a big map keeps only the tiles near the camera, and a change repaints
- * only the tiles its light reaches. The tiles within `ahead` px of the view come last, marked `prepare`:
+ * only the tiles its light reaches. The tiles within `ahead` of the view (px all round, or per-side margins
+ * `{left, top, right, bottom}` such as camera `aheadOf` gives) come last, marked `prepare`:
  * drawLayer paints them into the cache when the frame's budget allows and draws nothing, so the camera
  * finds them ready. Pass every still light that reaches them; `waiting` lists the reaches
  * ([left, top, right, bottom]) of lights not ready yet (a shadow still to cast), and a tile one of them
@@ -75,7 +77,7 @@ export function createLightLayerParts({extent,tint,areas=[],lights=[],key='light
     if(typeof tint!=='string'||!tint)throw new TypeError('The light layer needs a tint colour');
     const all=lights.map(l=>{const shape=validLight(l);return [l,shape,reach(l,shape),l.still?digests(l):null];});
     const cutStill=all.filter(([l])=>l.still===true),glowStill=all.filter(([l])=>l.still===true||l.still==='glow');
-    const darks=[],glows=[],ready=[],near=view&&ahead>0?{left:view.left-ahead,top:view.top-ahead,right:view.right+ahead,bottom:view.bottom+ahead}:view;
+    const darks=[],glows=[],ready=[],near=view&&viewAhead(view,ahead);
     const meets=([x,y,w,h])=>([,,r])=>r[0]<x+w&&r[2]>x&&r[1]<y+h&&r[3]>y;
     const shades=areas.filter(a=>finite(a.cut,'area cut',0)>=.001).map(a=>[a,null,areaReach(a)]).filter(([,,r])=>r);
     for(const tile of tiles(extent,tile_size,near)){

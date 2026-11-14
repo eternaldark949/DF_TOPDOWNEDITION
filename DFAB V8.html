@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '5b04033cd7d6';
+        const DFAB_BUILD = '0db691092b9b';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="16677">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="16691">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -28743,7 +28743,24 @@ class cameraSystem {
     getVisibleBounds({blend=1,margin=0}={}){finite(margin,'margin',0);const b=this.getView(blend).bounds;return Object.freeze({left:b.left-margin,top:b.top-margin,right:b.right+margin,bottom:b.bottom+margin});}
 }
 
-return Object.freeze({get cameraSystem(){return cameraSystem;}});
+/**
+ * How far past each side of the view to ready what the camera will show next: `margin` all round, and
+ * `lead` seconds of `velocity` (world units a second) on the side it is moving toward. Returns
+ * `{left, top, right, bottom}` margins, for a tiled layer's `ahead`.
+ */
+function aheadOf({margin=0,velocity=[0,0],lead=1}={}){
+    finite(margin,'margin',0);finite(lead,'lead',0);const [vx,vy]=vector(velocity,'velocity');
+    return Object.freeze({left:margin+Math.max(0,-vx*lead),top:margin+Math.max(0,-vy*lead),right:margin+Math.max(0,vx*lead),bottom:margin+Math.max(0,vy*lead)});
+}
+/** The view grown by `ahead`: a number of px all round, or per-side margins `{left, top, right, bottom}`. */
+function viewAhead(view,ahead=0){
+    const m=typeof ahead==='number'?{left:ahead,top:ahead,right:ahead,bottom:ahead}:ahead;
+    for(const k of ['left','top','right','bottom'])finite(m[k],`ahead ${k}`,0);
+    return {left:view.left-m.left,top:view.top-m.top,right:view.right+m.right,bottom:view.bottom+m.bottom};
+}
+
+
+return Object.freeze({get cameraSystem(){return cameraSystem;},get aheadOf(){return aheadOf;},get viewAhead(){return viewAhead;}});
 })();
 // src/engine/basement/rendering/packets.mjs
 const m159 = (()=>{
@@ -29294,6 +29311,7 @@ const m163 = (()=>{
 // light's cut (its reach, shadowed by an optional visibility polygon), then each light's colour, added.
 // Draw it over the finished scene at the dark's strength (canvasRenderer.drawLayer, or a render target).
 const {artScene,rect,circle,radial,linear} = m162;
+const {viewAhead} = m156;
 
 const finite=(value,name,min=-Infinity)=>{if(!Number.isFinite(value)||value<min)throw new TypeError(`Light ${name} must be a finite number`);return value;};
 const LIGHT_CUT=Object.freeze([[0,1],[1,0]]);
@@ -29352,7 +29370,8 @@ function createLightLayer({bounds,tint,areas=[],lights=[]},{scene=new artScene()
  *
  * With `tile_size` the pictures are tiles of that size over the extent (a map's regions), and only the
  * tiles meeting `view` are returned: a big map keeps only the tiles near the camera, and a change repaints
- * only the tiles its light reaches. The tiles within `ahead` px of the view come last, marked `prepare`:
+ * only the tiles its light reaches. The tiles within `ahead` of the view (px all round, or per-side margins
+ * `{left, top, right, bottom}` such as camera `aheadOf` gives) come last, marked `prepare`:
  * drawLayer paints them into the cache when the frame's budget allows and draws nothing, so the camera
  * finds them ready. Pass every still light that reaches them; `waiting` lists the reaches
  * ([left, top, right, bottom]) of lights not ready yet (a shadow still to cast), and a tile one of them
@@ -29365,7 +29384,7 @@ function createLightLayerParts({extent,tint,areas=[],lights=[],key='light',tile_
     if(typeof tint!=='string'||!tint)throw new TypeError('The light layer needs a tint colour');
     const all=lights.map(l=>{const shape=validLight(l);return [l,shape,reach(l,shape),l.still?digests(l):null];});
     const cutStill=all.filter(([l])=>l.still===true),glowStill=all.filter(([l])=>l.still===true||l.still==='glow');
-    const darks=[],glows=[],ready=[],near=view&&ahead>0?{left:view.left-ahead,top:view.top-ahead,right:view.right+ahead,bottom:view.bottom+ahead}:view;
+    const darks=[],glows=[],ready=[],near=view&&viewAhead(view,ahead);
     const meets=([x,y,w,h])=>([,,r])=>r[0]<x+w&&r[2]>x&&r[1]<y+h&&r[3]>y;
     const shades=areas.filter(a=>finite(a.cut,'area cut',0)>=.001).map(a=>[a,null,areaReach(a)]).filter(([,,r])=>r);
     for(const tile of tiles(extent,tile_size,near)){
@@ -29459,7 +29478,7 @@ const m155 = (()=>{
 
 
 
-return Object.freeze({get cameraSystem(){return m156.cameraSystem;},get renderFrame(){return m158.renderFrame;},get renderSystem(){return m160.renderSystem;},get canvasRenderer(){return m161.canvasRenderer;},get pictureCache(){return m161.pictureCache;},get measureText(){return m161.measureText;},get artScene(){return m162.artScene;},get circle(){return m162.circle;},get ellipse(){return m162.ellipse;},get polyline(){return m162.polyline;},get polygon(){return m162.polygon;},get rect(){return m162.rect;},get roundRect(){return m162.roundRect;},get capsule(){return m162.capsule;},get smoothShape(){return m162.smoothShape;},get linear(){return m162.linear;},get radial(){return m162.radial;},get glow(){return m162.glow;},get groundShadow(){return m162.groundShadow;},get hexToRgb(){return m162.hexToRgb;},get rgbToHex(){return m162.rgbToHex;},get rgba(){return m162.rgba;},get mix(){return m162.mix;},get shade(){return m162.shade;},get seededRandom(){return m162.seededRandom;},get hash2(){return m162.hash2;},get createLightLayer(){return m163.createLightLayer;},get createLightLayerParts(){return m163.createLightLayerParts;},get LIGHT_CUT(){return m163.LIGHT_CUT;}});
+return Object.freeze({get cameraSystem(){return m156.cameraSystem;},get aheadOf(){return m156.aheadOf;},get viewAhead(){return m156.viewAhead;},get renderFrame(){return m158.renderFrame;},get renderSystem(){return m160.renderSystem;},get canvasRenderer(){return m161.canvasRenderer;},get pictureCache(){return m161.pictureCache;},get measureText(){return m161.measureText;},get artScene(){return m162.artScene;},get circle(){return m162.circle;},get ellipse(){return m162.ellipse;},get polyline(){return m162.polyline;},get polygon(){return m162.polygon;},get rect(){return m162.rect;},get roundRect(){return m162.roundRect;},get capsule(){return m162.capsule;},get smoothShape(){return m162.smoothShape;},get linear(){return m162.linear;},get radial(){return m162.radial;},get glow(){return m162.glow;},get groundShadow(){return m162.groundShadow;},get hexToRgb(){return m162.hexToRgb;},get rgbToHex(){return m162.rgbToHex;},get rgba(){return m162.rgba;},get mix(){return m162.mix;},get shade(){return m162.shade;},get seededRandom(){return m162.seededRandom;},get hash2(){return m162.hash2;},get createLightLayer(){return m163.createLightLayer;},get createLightLayerParts(){return m163.createLightLayerParts;},get LIGHT_CUT(){return m163.LIGHT_CUT;}});
 })();
 // src/engine/lobby/runtime/game-engine.mjs
 const m147 = (()=>{
@@ -34616,7 +34635,7 @@ return Object.freeze({get PROP_FAMILIES(){return PROP_FAMILIES;},get hasPropArt(
 })();
 const m211 = Object.freeze({default:{
  "tile_size": 1024,
- "tile_ahead": 512,
+ "tile_ahead": 128,
  "indoor": { "tint": "rgb(22, 10, 48)", "darkness": 0.95, "lamp_glow": 0.08 },
  "outdoor": { "lamp_glow": 0.22 },
  "lamp": { "inner_radius": 10, "cut": [[0, 1], [1, 0]], "glow_stops": [[0, "#ffffff"], [0.1, "$color"], [0.6, "$color"], [1, "rgba(0,0,0,0)"]], "resolution": 64, "settle": 0.3, "shadow_budget_ms": 1 },
@@ -34627,7 +34646,7 @@ const m211 = Object.freeze({default:{
 // src/game/presentation/lighting.mjs
 const m210 = (()=>{
 const LIGHTING = m211.default;
-const {createLightLayer,createLightLayerParts} = m155;
+const {createLightLayer,createLightLayerParts,viewAhead} = m155;
 const {declaredLight} = m141;
 
 const stops=(list,color)=>list.map(([o,c])=>[o,c==='$color'?color:c]);
@@ -34679,14 +34698,16 @@ class sceneLighting{
      * `tile_size` by default), only those meeting `bounds` (the view), each repainted only when a light
      * reaching it changes (a room's switch, a lamp moved, a door come to rest); the rest are drawn live:
      * draw the packets with canvasRenderer.drawLayer and a pictureCache. Without it, every light is live.
+     * The tiles within `ahead` of the view are readied too: px all round (the look's `tile_ahead`), or per-side
+     * margins from the camera's motion (rendering `aheadOf`), so a moving view readies only what it is heading for.
      */
     createLayer({bounds,extent,tile_size=this.look.tile_size,ahead=this.look.tile_ahead,kind='indoor',sky_darkness=0,rooms=[],lights=[],time=0}){
         const look=this.look,ambient=look.indoor.darkness,base=kind==='indoor'?look.indoor.lamp_glow:look.outdoor.lamp_glow;
         const areas=rooms.map(r=>({rects:r.rects,cut:r.type==='outdoor'?1-Math.min(1,sky_darkness/ambient):r.fill!==undefined?(1-Math.min(1,r.fill/ambient))*(r.lit??1):0}));
         // The lights to look at: those reaching the view, or (still) the tiles that meet it or are readied ahead of it, whole.
         const snap=(v,o,down)=>tile_size?o+(down?Math.floor:Math.ceil)((v-o)/tile_size)*tile_size:v;
-        const grid=(b,m)=>b&&(extent?{left:snap(b.left-m,extent.left,true),top:snap(b.top-m,extent.top,true),right:snap(b.right+m,extent.left,false),bottom:snap(b.bottom+m,extent.top,false)}:b);
-        const near=grid(bounds,ahead),shown=grid(bounds,0);   // (the tiles readied ahead, and the tiles drawn)
+        const grid=b=>b&&(extent?{left:snap(b.left,extent.left,true),top:snap(b.top,extent.top,true),right:snap(b.right,extent.left,false),bottom:snap(b.bottom,extent.top,false)}:b);
+        const near=grid(bounds&&viewAhead(bounds,ahead)),shown=grid(bounds);   // (the tiles readied ahead, and the tiles drawn)
         const meets=(l,b)=>{const [x,y]=l.position,[rx,ry]=l.shape==='strip'?[l.size[0]/2,l.size[1]/2]:[l.radius,l.radius];return x+rx>b.left&&x-rx<b.right&&y+ry>b.top&&y-ry<b.bottom;};
         if(near)lights=lights.filter(l=>meets(l,near));
         const out=[],[cx,cy]=bounds?[(bounds.left+bounds.right)/2,(bounds.top+bounds.bottom)/2]:extent?[(extent.left+extent.right)/2,(extent.top+extent.bottom)/2]:[0,0];

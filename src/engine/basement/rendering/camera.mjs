@@ -49,3 +49,20 @@ export class cameraSystem {
     }
     getVisibleBounds({blend=1,margin=0}={}){finite(margin,'margin',0);const b=this.getView(blend).bounds;return Object.freeze({left:b.left-margin,top:b.top-margin,right:b.right+margin,bottom:b.bottom+margin});}
 }
+
+/**
+ * How far past each side of the view to ready what the camera will show next: `margin` all round, and
+ * `lead` seconds of `velocity` (world units a second) on the side it is moving toward. Returns
+ * `{left, top, right, bottom}` margins, for a tiled layer's `ahead`.
+ */
+export function aheadOf({margin=0,velocity=[0,0],lead=1}={}){
+    finite(margin,'margin',0);finite(lead,'lead',0);const [vx,vy]=vector(velocity,'velocity');
+    return Object.freeze({left:margin+Math.max(0,-vx*lead),top:margin+Math.max(0,-vy*lead),right:margin+Math.max(0,vx*lead),bottom:margin+Math.max(0,vy*lead)});
+}
+/** The view grown by `ahead`: a number of px all round, or per-side margins `{left, top, right, bottom}`. */
+export function viewAhead(view,ahead=0){
+    const m=typeof ahead==='number'?{left:ahead,top:ahead,right:ahead,bottom:ahead}:ahead;
+    for(const k of ['left','top','right','bottom'])finite(m[k],`ahead ${k}`,0);
+    return {left:view.left-m.left,top:view.top-m.top,right:view.right+m.right,bottom:view.bottom+m.bottom};
+}
+

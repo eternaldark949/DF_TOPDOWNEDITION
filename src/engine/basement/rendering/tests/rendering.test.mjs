@@ -168,3 +168,11 @@ test('text is measured as the backend draws it',()=>{
  const size=measureText('honey',{family:'Georgia, serif',size:5,weight:600},{create_surface:()=>({getContext:()=>ctx})});
  assert.deepEqual({...size},{width:15,ascent:4,descent:1});assert.equal(font,'normal 600 5px Georgia, serif');
 });
+
+test('a view readied ahead grows on the side the camera moves toward',async()=>{
+ const {aheadOf,viewAhead}=await import('../index.mjs'),view={left:0,top:0,right:100,bottom:50};
+ assert.deepEqual({...aheadOf({margin:10,velocity:[200,-40],lead:.5})},{left:10,top:30,right:110,bottom:10});
+ assert.deepEqual(viewAhead(view,aheadOf({margin:10,velocity:[200,-40],lead:.5})),{left:-10,top:-30,right:210,bottom:60});
+ assert.deepEqual(viewAhead(view,5),{left:-5,top:-5,right:105,bottom:55});
+ assert.throws(()=>aheadOf({margin:-1}),/margin/);assert.throws(()=>viewAhead(view,{left:1,top:1,right:1}),/ahead bottom/);
+});

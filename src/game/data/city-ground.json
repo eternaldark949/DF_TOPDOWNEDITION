@@ -1,6 +1,6 @@
 {
  "tile_size": 512,
- "tile_ahead": 256,
+ "tile_ahead": 128,
  "lot": "#221e28", "lot_grain": ["rgba(255, 240, 255, 0.022)", "rgba(0, 0, 0, 0.14)"], "lot_grain_count": 420,
  "zone_tint": 0.45,
  "lawn": "#15281b", "lawn_hi": "#20402a", "lawn_lo": "rgba(6, 18, 10, 0.7)", "lawn_hollow": "rgba(4, 14, 8, 0.35)",

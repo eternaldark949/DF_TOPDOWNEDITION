@@ -1,5 +1,5 @@
 import LIGHTING from '../data/game-lighting.json' with {type:'json'};
-import {createLightLayer,createLightLayerParts} from '../../engine/basement/rendering/index.mjs';
+import {createLightLayer,createLightLayerParts,viewAhead} from '../../engine/basement/rendering/index.mjs';
 import {declaredLight} from '../../engine/basement/maps/index.mjs';
 export {LIGHTING};
 const stops=(list,color)=>list.map(([o,c])=>[o,c==='$color'?color:c]);
@@ -51,14 +51,16 @@ export class sceneLighting{
      * `tile_size` by default), only those meeting `bounds` (the view), each repainted only when a light
      * reaching it changes (a room's switch, a lamp moved, a door come to rest); the rest are drawn live:
      * draw the packets with canvasRenderer.drawLayer and a pictureCache. Without it, every light is live.
+     * The tiles within `ahead` of the view are readied too: px all round (the look's `tile_ahead`), or per-side
+     * margins from the camera's motion (rendering `aheadOf`), so a moving view readies only what it is heading for.
      */
     createLayer({bounds,extent,tile_size=this.look.tile_size,ahead=this.look.tile_ahead,kind='indoor',sky_darkness=0,rooms=[],lights=[],time=0}){
         const look=this.look,ambient=look.indoor.darkness,base=kind==='indoor'?look.indoor.lamp_glow:look.outdoor.lamp_glow;
         const areas=rooms.map(r=>({rects:r.rects,cut:r.type==='outdoor'?1-Math.min(1,sky_darkness/ambient):r.fill!==undefined?(1-Math.min(1,r.fill/ambient))*(r.lit??1):0}));
         // The lights to look at: those reaching the view, or (still) the tiles that meet it or are readied ahead of it, whole.
         const snap=(v,o,down)=>tile_size?o+(down?Math.floor:Math.ceil)((v-o)/tile_size)*tile_size:v;
-        const grid=(b,m)=>b&&(extent?{left:snap(b.left-m,extent.left,true),top:snap(b.top-m,extent.top,true),right:snap(b.right+m,extent.left,false),bottom:snap(b.bottom+m,extent.top,false)}:b);
-        const near=grid(bounds,ahead),shown=grid(bounds,0);   // (the tiles readied ahead, and the tiles drawn)
+        const grid=b=>b&&(extent?{left:snap(b.left,extent.left,true),top:snap(b.top,extent.top,true),right:snap(b.right,extent.left,false),bottom:snap(b.bottom,extent.top,false)}:b);
+        const near=grid(bounds&&viewAhead(bounds,ahead)),shown=grid(bounds);   // (the tiles readied ahead, and the tiles drawn)
         const meets=(l,b)=>{const [x,y]=l.position,[rx,ry]=l.shape==='strip'?[l.size[0]/2,l.size[1]/2]:[l.radius,l.radius];return x+rx>b.left&&x-rx<b.right&&y+ry>b.top&&y-ry<b.bottom;};
         if(near)lights=lights.filter(l=>meets(l,near));
         const out=[],[cx,cy]=bounds?[(bounds.left+bounds.right)/2,(bounds.top+bounds.bottom)/2]:extent?[(extent.left+extent.right)/2,(extent.top+extent.bottom)/2]:[0,0];
