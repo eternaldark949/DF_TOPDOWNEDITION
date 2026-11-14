@@ -28,17 +28,19 @@ function exportCity() {
     const plain = (o, keys) => Object.fromEntries(keys.filter(k => o[k] !== undefined && o[k] !== null).map(k => [k, typeof o[k] === 'number' ? r(o[k]) : o[k]]));
     // What a building looks like, as the generator resolved it: its sections (world rects), colours, height, the
     // street it fronts and its entrance there, its sign, its roof and facade features and its street variant's picks.
+    const snake = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k.replace(/[A-Z]/g, c => '_' + c.toLowerCase()), v]));
     const look = b => {
         const E = b._entrance?.(), v = b.variant, s = b.attachedSign;
-        return {
+        return snake({
             sections: b.sections.map(q => rect({ x: b.x + q.x, y: b.y + q.y, w: q.w, h: q.h })),
-            colors: plain(b.colors, ['roof', 'roofLight', 'wall', 'accent', 'windowLit']), shopfront: b._shopfront ?? false,
+            window_seed: b._seed || Math.round(b.x + b.y),
+            colors: snake(plain(b.colors, ['roof', 'roofLight', 'wall', 'accent', 'windowLit'])), shopfront: b._shopfront ?? false,
             ...(E ? { entrance: plain(E, ['cx', 'cy', 'nx', 'ny', 'ux', 'uy']) } : {}),
             ...(s ? { sign: { x: r(s.x), y: r(s.y), text: s.text, color: s.color, size: r(s.fontSize), font: s.fontFamily } } : {}),
             ...plain(b, ['roofFeatures', 'facadeFeature', 'sills', 'leanHero', 'crownZ', 'roundR']),
             ...(b.style ? {} : { roof_props: b.roofProps.map(q => plain(q, ['type', 'section', 'x', 'y', 'w', 'h', 'r'])) }),
-            ...(v ? { variant: { kind: v.kind, id: v.id, seed: v.seed, ...plain(v, ['name', 'awning', 'neon']), ...(v.tone ? { tone: v.tone } : {}), ...(v.door ? { door: v.door } : {}) } } : {})
-        };
+            ...(v ? { variant: { kind: v.kind, id: v.id, seed: v.seed, ...plain(v, ['name', 'awning', 'neon']), ...(v.tone ? { tone: snake(v.tone) } : {}), ...(v.door ? { door: v.door } : {}) } } : {})
+        });
     };
     return {
         map_id: 'sdc', generator: 'CityLayout, seeded 949 (legacy/engine/map-loading.js)', size: [m.width, m.height],

@@ -1,0 +1,344 @@
+{
+ "eye": {
+  "height": 700,
+  "ref_zoom": 1,
+  "min": 0.7,
+  "max": 3.2
+ },
+ "floor_height": 9,
+ "max_floors": 14,
+ "gold": "#d8b77a",
+ "shops": {
+  "arcade": {
+   "id": "arcade",
+   "wall": "#ddd2b8",
+   "roof": "#3b4450",
+   "material": "limestone",
+   "trim": "#f6efdc",
+   "frame": "#28241f",
+   "mull": "#17181c",
+   "glass": "#28241f",
+   "ink": "#e9cf8e",
+   "glow": "rgba(255,214,150,.95)"
+  },
+  "bakery": {
+   "id": "bakery",
+   "wall": "#5a2b22",
+   "roof": "#4a2a20",
+   "material": "brick",
+   "trim": "#efdcb6",
+   "frame": "#efdcb6",
+   "mull": "#3a2116",
+   "glass": "#2a1b14",
+   "board": [
+    "#4a2a1a",
+    "#2a160d"
+   ],
+   "edge": "#c99a52",
+   "ink": "#ffbf4d",
+   "glow": "rgba(255,196,96,.95)"
+  },
+  "florist": {
+   "id": "florist",
+   "wall": "#2c3a31",
+   "roof": "#4a4c40",
+   "material": "timber",
+   "trim": "#e8e2cc",
+   "frame": "#e8e2cc",
+   "mull": "#1f2a22",
+   "glass": "#1b2620",
+   "board": [
+    "#2f4a37",
+    "#1c2e22"
+   ],
+   "edge": "#d9cfa8",
+   "ink": "#f4ecd2",
+   "glow": "rgba(214,255,200,.85)"
+  },
+  "boutique": {
+   "id": "boutique",
+   "wall": "#5e2f42",
+   "roof": "#2d242c",
+   "material": "stone",
+   "trim": "#d0ac72",
+   "frame": "#d0ac72",
+   "mull": "#1c2028",
+   "glass": "#352d30",
+   "stone": "#71354d",
+   "stone_lo": "#422031",
+   "steel": "#1c2028",
+   "gold": "#d0ac72",
+   "gold_hi": "#f3ddb0",
+   "ink": "#f3ddb0",
+   "glow": "rgba(255,226,170,.95)"
+  },
+  "lounge": {
+   "id": "lounge",
+   "wall": "#1d1424",
+   "roof": "#18121f",
+   "material": "lacquer",
+   "trim": "#d9b26a",
+   "frame": "#d9b26a",
+   "mull": "#120c19",
+   "glass": "#2a1f3a",
+   "gold": "#d9b26a",
+   "velvet": "#8e2148",
+   "velvet_lo": "#5a1530",
+   "ink": "#ffd9ec",
+   "glow": "rgba(255,120,190,.95)"
+  }
+ },
+ "apts": {
+  "brownstone": {
+   "id": "brownstone",
+   "weight": 3,
+   "sills": {
+    "lip": "rgba(239,220,182,0.8)",
+    "shade": "rgba(16,8,6,0.5)"
+   }
+  },
+  "deco": {
+   "id": "deco",
+   "weight": 2,
+   "sills": {
+    "lip": "rgba(226,198,146,0.8)",
+    "shade": "rgba(10,8,16,0.5)"
+   },
+   "no_balconies": true
+  },
+  "terrace": {
+   "id": "terrace",
+   "weight": 2,
+   "sills": {
+    "lip": "rgba(240,236,228,0.7)",
+    "shade": "rgba(10,8,16,0.45)"
+   },
+   "no_balconies": true
+  },
+  "loft": {
+   "id": "loft",
+   "weight": 2,
+   "sills": null,
+   "no_balconies": true
+  }
+ },
+ "apt_kit": {
+  "brownstone": {
+   "hero": 3.5,
+   "bay": 42,
+   "ww": 19,
+   "g": 9,
+   "p": 25,
+   "corn": 6,
+   "storey": 13.5,
+   "door_w": 8.5,
+   "trim": "#d6c09a",
+   "trim_lo": "#a68f6c",
+   "trim_hi": "#f1e2c4",
+   "cornice": "#332824",
+   "cornice_lo": "#1d1714",
+   "iron": "#15161a",
+   "pane": "#1f242c",
+   "door": "#2c1a12",
+   "gold": "#d8b46a",
+   "roof": [
+    "#2e2a2a",
+    "#3c3636"
+   ],
+   "hood": {
+    "z": 23.8,
+    "out": 10,
+    "th": 2,
+    "w": 19,
+    "top": "#332824",
+    "band": "#1d1714",
+    "lip": "rgba(216,180,106,.85)"
+   },
+   "name": {
+    "font": "\"Great Vibes\", \"URW Chancery L\", \"Z003\", cursive",
+    "px": 14,
+    "ink": "#d8b46a",
+    "glow": "rgba(255,214,150,.95)"
+   },
+   "lamps": {
+    "d": [
+     -13.5,
+     13.5
+    ],
+    "out": 1.4,
+    "z": 16,
+    "r": 1.3
+   },
+   "lit": "rgba(255,186,104,.6)",
+   "rim": 4.5
+  },
+  "deco": {
+   "hero": 3.5,
+   "bay": 34,
+   "ww": 16,
+   "g": 7,
+   "p": 26,
+   "corn": 7,
+   "storey": 13,
+   "door_w": 9,
+   "gold": "#d9b46a",
+   "bronze": "#4a3826",
+   "pane": "#1d222a",
+   "spandrel": "#2b2723",
+   "iron": "#15161a",
+   "roof": [
+    "#3a3740",
+    "#46434c"
+   ],
+   "hood": {
+    "z": 22.5,
+    "out": 14,
+    "th": 3,
+    "w": 26,
+    "top": "#141318",
+    "band": "#0b0a0e",
+    "lip": "rgba(217,180,106,.9)"
+   },
+   "name": {
+    "font": "Montserrat, \"Futura\", sans-serif",
+    "weight": "600 ",
+    "px": 8,
+    "caps": true,
+    "spacing": 1.4,
+    "ink": "#d9b46a",
+    "glow": "rgba(255,220,150,.95)"
+   },
+   "lamps": {
+    "d": [
+     -16,
+     16
+    ],
+    "out": 1,
+    "z": 13,
+    "r": 1.4
+   },
+   "lit": "rgba(255,200,140,.6)",
+   "rim": 2.6
+  },
+  "terrace": {
+   "hero": 3.5,
+   "bay": 40,
+   "ww": 17,
+   "g": 4,
+   "p": 24,
+   "corn": 7,
+   "storey": 14,
+   "door_w": 7.5,
+   "doors": [
+    "#15171c",
+    "#1d2b4a",
+    "#5a1f24",
+    "#1f3a2c"
+   ],
+   "trim": "#f6f2ea",
+   "trim_lo": "#bdb5a6",
+   "iron": "#17191f",
+   "pane": "#161b25",
+   "roof": [
+    "#4b4f57",
+    "#5a5e66"
+   ],
+   "hood": {
+    "z": 22,
+    "out": 12,
+    "th": 3,
+    "w": 17,
+    "top": "#f6f2ea",
+    "band": "#bdb5a6",
+    "lip": "rgba(255,255,255,.85)"
+   },
+   "name": {
+    "font": "Montserrat, Helvetica, sans-serif",
+    "weight": "700 ",
+    "px": 7.5,
+    "caps": true,
+    "spacing": 1.2,
+    "ink": "#1a2030",
+    "glow": "rgba(255,224,176,.95)"
+   },
+   "lamps": {
+    "d": [
+     0
+    ],
+    "out": 6,
+    "z": 17,
+    "r": 1.6
+   },
+   "lit": "rgba(255,196,124,.6)",
+   "rim": 4.2
+  },
+  "loft": {
+   "hero": 3.5,
+   "bay": 48,
+   "ww": 30,
+   "g": 3,
+   "p": 26,
+   "corn": 5,
+   "storey": 16,
+   "door_w": 10,
+   "steel": "#22252b",
+   "steel_hi": "#5a606a",
+   "pane": "#1c2328",
+   "conc": "#9c968c",
+   "iron": "#15161a",
+   "roof": [
+    "#34373d",
+    "#41444b"
+   ],
+   "hood": {
+    "z": 24,
+    "out": 13,
+    "th": 1.6,
+    "w": 24,
+    "top": "#2b2f36",
+    "band": "#16181c",
+    "lip": "rgba(214,190,150,.55)"
+   },
+   "name": {
+    "font": "Montserrat, Helvetica, sans-serif",
+    "weight": "800 ",
+    "px": 7.5,
+    "caps": true,
+    "spacing": 1.8,
+    "ink": "#ece6da",
+    "glow": "rgba(255,236,200,.95)"
+   },
+   "lamps": {
+    "d": [
+     -19,
+     19
+    ],
+    "out": 4,
+    "z": 30,
+    "r": 1.5
+   },
+   "lit": "rgba(255,196,120,.55)",
+   "lit2": "rgba(196,216,255,.45)",
+   "rim": 1.6
+  }
+ },
+ "arcade": {
+  "a": 18,
+  "hero": 3.5,
+  "bay": 32,
+  "aw": 20,
+  "m": 8,
+  "slate": {
+   "slate": "#3b4450",
+   "lo": "#2a313a",
+   "hi": "#5b6674",
+   "zinc": "#3c424a",
+   "zinc_lo": "#30353c"
+  },
+  "iron": "#17181c",
+  "gold": "#d8b46a",
+  "glass": "#28241f",
+  "bronze": "#3a2a1c",
+  "pane": "#22272e"
+ }
+}

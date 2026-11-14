@@ -5,7 +5,8 @@ import { artScene, rect, polygon, polyline, circle, radial, seededRandom, hash2,
  * The city's ground as art, painted once per tile: the lots with their grain, the floor zones and lawns,
  * the roads (asphalt, wheel paths, lane dashes, the centre line, edges and names), the junctions, the
  * pavements with their kerbs and drains, and the crossings. It reads the city's exported data
- * (`cityMapDefinition().city`) and the look in `data/city-ground.json`.
+ * (`cityMapDefinition().city`) and the look in `data/city-ground.json`; given the city's `buildings`
+ * (`cityBuildings`), their shadows, footprints and pavement dressing are painted into the tiles too.
  *
  * `createDraws({view, ahead})` gives one draw per tile meeting the view, then (marked `prepare`) those
  * within `ahead` of it (px all round, or per-side margins from the camera's motion, rendering `aheadOf`): `{key, bounds, build, prepare}`, for a Basement pictureCache
@@ -13,9 +14,9 @@ import { artScene, rect, polygon, polyline, circle, radial, seededRandom, hash2,
  * tile is painted once and stamped after that.
  */
 export class cityGround {
-    #city; #look; #roads;
-    constructor(city, { look = GROUND, size } = {}) {
-        this.#city = city; this.#look = look; this.size = size ?? null;
+    #city; #look; #roads; #buildings;
+    constructor(city, { look = GROUND, size, buildings = null } = {}) {
+        this.#city = city; this.#look = look; this.size = size ?? null; this.#buildings = buildings;
         this.#roads = city.streets.roads.map(road => ({ ...road, lengths: lengthsOf(road.stops) }));
     }
     /** The tiles meeting the view, then those within `ahead` of it, as draws. */
@@ -45,6 +46,8 @@ export class cityGround {
         // 4. Pavements and crossings
         for (const p of city.pavements) if (meets(p.x, p.y, p.w, p.h)) pavement(scene, L, p, tile);
         for (const c of city.crosswalks) if (meets(c.x, c.y, c.w, c.h)) crossing(scene, L, c, rnd);
+        // 5. What the buildings lay on the ground: their shadows and footprints, the street variants' stoops and planters
+        this.#buildings?.groundArt(scene, [x0, y0, S, T]);
         return scene.finish();
     }
     /** A road from its geometry: any line along it is its stops moved across by their offsets. */

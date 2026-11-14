@@ -49,7 +49,7 @@ export function packet(input,out={}){
     }
     if(input.type==='text'){
         if(typeof input.text!=='string')throw new TypeError('Text must be a string');out.text=input.text;
-        const f=input.font??{};out.font??={};out.font.family=color(f.family??'sans-serif');out.font.size=finite(f.size??16,'font size',.01);out.font.weight=f.weight??400;out.font.style=f.style??'normal';
+        const f=input.font??{};out.font??={};out.font.family=color(f.family??'sans-serif');out.font.size=finite(f.size??16,'font size',.01);out.font.weight=f.weight??400;out.font.style=f.style??'normal';out.font.letter_spacing=finite(f.letter_spacing??0,'letter spacing');
         if(![100,200,300,400,500,600,700,800,900,'normal','bold'].includes(out.font.weight)||!['normal','italic','oblique'].includes(out.font.style))throw new TypeError('Invalid font');
         out.align=input.align??'left';out.baseline=input.baseline??'alphabetic';if(!['left','center','right'].includes(out.align)||!['top','middle','bottom','alphabetic'].includes(out.baseline))throw new TypeError('Invalid text alignment');
     }

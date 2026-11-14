@@ -15,9 +15,11 @@ function buildPath(target,g){
     target.beginPath?.();
     if(g.type==='rect'){const [w,h]=g.size;if(g.radius)target.roundRect(-w/2,-h/2,w,h,Math.min(g.radius,w/2,h/2));else target.rect(-w/2,-h/2,w,h);}
     else if(g.type==='ellipse'){target.ellipse(0,0,...g.radii,0,0,Math.PI*2);target.closePath();}
-    else for(const command of g.commands){
-        const [op,...v]=command;
-        if(op==='move')target.moveTo(...v);else if(op==='line')target.lineTo(...v);else if(op==='quadratic')target.quadraticCurveTo(...v);else if(op==='cubic')target.bezierCurveTo(...v);else if(op==='ellipse')target.ellipse(...v.slice(0,7),!!v[7]);else target.closePath();
+    else for(const c of g.commands){
+        const op=c[0];
+        if(op==='line')target.lineTo(c[1],c[2]);else if(op==='move')target.moveTo(c[1],c[2]);else if(op==='close')target.closePath();
+        else if(op==='quadratic')target.quadraticCurveTo(c[1],c[2],c[3],c[4]);else if(op==='cubic')target.bezierCurveTo(c[1],c[2],c[3],c[4],c[5],c[6]);
+        else target.ellipse(c[1],c[2],c[3],c[4],c[5],c[6],c[7],!!c[8]);
     }
 }
 const overlays=new WeakMap(),layers=new WeakMap();
@@ -53,18 +55,29 @@ export class canvasRenderer {
         const lc=layer.context,m=context.getTransform(),sx=w/canvas.width,sy=h/canvas.height;
         lc.setTransform(1,0,0,1,0,0);lc.globalAlpha=1;lc.globalCompositeOperation='source-over';lc.clearRect(0,0,w,h);
         lc.setTransform(m.a*sx,m.b*sy,m.c*sx,m.d*sy,m.e*sx,m.f*sy);
-        let count=0,run=[];const flush=()=>{if(run.length)count+=canvasRenderer.drawPackets(lc,run);run=[];};
-        for(const entry of packets){
-            if(!entry.picture){run.push(entry);continue;}
-            flush();if(!pictures)throw new TypeError('A layer with pictures needs a pictureCache');if(!Object.hasOwn(BLENDS,entry.blend??'normal'))throw new TypeError('Unsupported blend');
-            lc.globalCompositeOperation=BLENDS[entry.blend??'normal'];lc.globalAlpha=finiteOpacity(entry.opacity??1);
-            try{pictures.draw(lc,{...entry.picture,layered:true,stamp:!entry.prepare,blend:entry.blend??null},entry.picture.build);if(!entry.prepare)count++;}finally{lc.globalCompositeOperation='source-over';lc.globalAlpha=1;}
-        }
-        flush();
+        const count=canvasRenderer.drawEntries(lc,packets,{pictures,layered:true});
         context.save();
         try{context.setTransform(1,0,0,1,0,0);context.globalAlpha=opacity;context.globalCompositeOperation=BLENDS[blend];context.imageSmoothingEnabled=true;context.drawImage(layer.surface,0,0,canvas.width,canvas.height);}
         finally{context.restore();}
         return count;
+    }
+    /**
+     * Migration boundary, like drawPackets, for a run that mixes packets and pictures: each packet as
+     * drawPackets draws it, each `{picture: {key, bounds, matrix, build}, blend, opacity, prepare}` entry
+     * stamped from `pictures` (a pictureCache) in order, with `blend` at `opacity` (a `prepare` entry is only
+     * painted ahead of need). `layered` paints each picture with its own base under its blends, as a light
+     * layer's are. Returns how many packets and pictures were drawn.
+     */
+    static drawEntries(context,entries,{pictures,layered=false}={}){
+        let count=0,run=[];const flush=()=>{if(run.length)count+=canvasRenderer.drawPackets(context,run);run=[];};
+        for(const entry of entries){
+            if(!entry.picture){run.push(entry);continue;}
+            flush();if(!pictures)throw new TypeError('Entries with pictures need a pictureCache');if(!Object.hasOwn(BLENDS,entry.blend??'normal'))throw new TypeError('Unsupported blend');
+            const composite=context.globalCompositeOperation,alpha=context.globalAlpha;
+            context.globalCompositeOperation=BLENDS[entry.blend??'normal'];context.globalAlpha=alpha*finiteOpacity(entry.opacity??1);
+            try{pictures.draw(context,{...entry.picture,layered,stamp:!entry.prepare,blend:entry.blend??null},entry.picture.build);if(!entry.prepare)count++;}finally{context.globalCompositeOperation=composite;context.globalAlpha=alpha;}
+        }
+        flush();return count;
     }
     get capabilities(){return capabilities;}
     initialize(surface,{viewport}){
@@ -127,8 +140,9 @@ export class canvasRenderer {
                 const image=this.#resources.get(draw.resource_id).image,[w,h]=draw.size;
                 if(draw.source)ctx.drawImage(image,...draw.source,-w*draw.origin[0],-h*draw.origin[1],w,h);else ctx.drawImage(image,-w*draw.origin[0],-h*draw.origin[1],w,h);
             }else{
-                const f=draw.font;ctx.font=`${f.style} ${f.weight} ${f.size}px ${f.family}`;ctx.textAlign=draw.align;ctx.textBaseline=draw.baseline;
+                const f=draw.font;ctx.font=`${f.style} ${f.weight} ${f.size}px ${f.family}`;ctx.textAlign=draw.align;ctx.textBaseline=draw.baseline;if(f.letter_spacing&&'letterSpacing' in ctx)ctx.letterSpacing=`${f.letter_spacing}px`;
                 if(material.fill!==null)ctx.fillText(draw.text,0,0);if(material.stroke!==null&&material.stroke_width>0)ctx.strokeText(draw.text,0,0);
+                if(f.letter_spacing&&'letterSpacing' in ctx)ctx.letterSpacing='0px';
             }
         }finally{ctx.restore();}
     }
@@ -150,12 +164,12 @@ export class canvasRenderer {
 
 let measurer=null;
 /** The width and the ascent/descent above and below the baseline of one line of text in `font`
- *  {family, size, weight, style}, as the Canvas backend would draw it. */
+ *  {family, size, weight, style, letter_spacing}, as the Canvas backend would draw it. */
 export function measureText(text,font={},{create_surface=createSurface}={}){
     measurer??=create_surface(1,1).getContext('2d');
     measurer.font=`${font.style??'normal'} ${font.weight??400} ${font.size??16}px ${font.family??'sans-serif'}`;
     const m=measurer.measureText(String(text));
-    return Object.freeze({width:m.width,ascent:m.actualBoundingBoxAscent??0,descent:m.actualBoundingBoxDescent??0});
+    return Object.freeze({width:m.width+(font.letter_spacing??0)*[...String(text)].length,ascent:m.actualBoundingBoxAscent??0,descent:m.actualBoundingBoxDescent??0});
 }
 
 const finiteOpacity=v=>{if(!(v>=0&&v<=1))throw new TypeError('A picture entry\'s opacity is in [0, 1]');return v;};

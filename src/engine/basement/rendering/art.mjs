@@ -7,7 +7,9 @@ import {transform,inverse} from './values.mjs';
 
 const identity=()=>[1,0,0,1,0,0];
 const multiply=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
-const geometry=commands=>Array.isArray(commands)?{type:'path',commands:commands.map(command=>[...command])}:structuredClone(commands);
+// A paint call keeps the commands array it is given (no copy): build a fresh shape for each call.
+const geometry=commands=>Array.isArray(commands)?{type:'path',commands}:copy(commands);
+const copy=value=>Array.isArray(value)?value.map(copy):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([k,v])=>[k,copy(v)])):value;
 const finite=(value,name)=>{if(!Number.isFinite(value))throw new TypeError(`Art ${name} must be a finite number`);return value;};
 
 // ----- Shapes: path commands, composable in one paint call ---------------------------------------
@@ -54,9 +56,9 @@ export class artScene{
     leave(){const state=this.#stack.pop();if(!state)throw new Error('Unbalanced art group');Object.assign(this,state);return this;}
     place(pose){this.matrix=multiply(this.matrix,transform(pose));return this;}
     /** Limits everything painted later in this group to the shape. */
-    clip(commands){this.clips.push({geometry:geometry(commands),matrix:[...this.matrix]});return this;}
+    clip(commands,{rule='nonzero'}={}){this.clips.push({geometry:geometry(commands),matrix:[...this.matrix],rule});return this;}
     paint(commands,material){const {stroke_width,line_cap,line_join,dash}=this.style,inv=this.clips.length?inverse(this.matrix):null;
-        this.packets.push({type:'shape',matrix:[...this.matrix],geometry:geometry(commands),material:{fill:null,stroke:null,stroke_width,line_cap,line_join,dash:[...dash],...structuredClone(material)},opacity:this.style.opacity,blend:this.style.blend,clips:this.clips.map(clip=>({geometry:clip.geometry,transform:multiply(inv,clip.matrix)}))});return this;
+        this.packets.push({type:'shape',matrix:[...this.matrix],geometry:geometry(commands),material:{fill:null,stroke:null,stroke_width,line_cap,line_join,dash:[...dash],...copy(material)},opacity:this.style.opacity,blend:this.style.blend,clips:this.clips.map(clip=>({geometry:clip.geometry,transform:multiply(inv,clip.matrix),rule:clip.rule}))});return this;
     }
     fill(commands,color){return this.paint(commands,{fill:color});}
     stroke(commands,color,stroke_width=this.style.stroke_width){return this.paint(commands,{stroke:color,stroke_width});}
@@ -66,7 +68,7 @@ export class artScene{
      *  `baseline` top|middle|bottom|alphabetic; `material` as for paint (fill, or stroke for outlined text). */
     text(string,x,y,{font={},align='left',baseline='alphabetic'}={},material={fill:'#000'}){
         const m=multiply(this.matrix,[1,0,0,1,finite(x,'x'),finite(y,'y')]),inv=this.clips.length?inverse(m):null,{stroke_width,line_cap,line_join,dash}=this.style;
-        this.packets.push({type:'text',text:String(string),matrix:m,font:{...font},align,baseline,material:{fill:null,stroke:null,stroke_width,line_cap,line_join,dash:[...dash],...structuredClone(material)},opacity:this.style.opacity,blend:this.style.blend,clips:this.clips.map(clip=>({geometry:clip.geometry,transform:multiply(inv,clip.matrix)}))});return this;
+        this.packets.push({type:'text',text:String(string),matrix:m,font:{...font},align,baseline,material:{fill:null,stroke:null,stroke_width,line_cap,line_join,dash:[...dash],...copy(material)},opacity:this.style.opacity,blend:this.style.blend,clips:this.clips.map(clip=>({geometry:clip.geometry,transform:multiply(inv,clip.matrix),rule:clip.rule}))});return this;
     }
     finish(){if(this.#stack.length)throw new Error('Unclosed art group');return this.packets;}
 }

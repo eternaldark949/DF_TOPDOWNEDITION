@@ -116,19 +116,37 @@ for (const packet of art.finish()) frame.submit({ ...packet, layer: 20, depth: p
 | `new artScene()` | An empty scene with the identity transform and style `{stroke_width:1, line_cap:'butt', line_join:'miter', dash:[], opacity:1, blend:'normal'}`. |
 | `enter(pose, style)` / `leave()` | Open a group: the pose (`position`, `rotation`, `scale` or `matrix`) composes onto the current transform, and `style` overrides any style field. `leave` restores the transform, style and clips. Unbalanced groups throw. |
 | `place(pose)` | Compose a pose onto the current group without opening a new one. |
-| `clip(shape)` | Everything painted later in this group is limited to the shape. |
+| `clip(shape, {rule})` | Everything painted later in this group is limited to the shape (`rule` `nonzero` or `evenodd`: a shape with a hole cut in it keeps paint out of the hole). |
 | `paint(shape, material)` | One shape packet: the group's transform, style and clips, with `material` over a default of no fill and no stroke. |
 | `fill(shape, colour)` / `stroke(shape, colour, width)` / `outlined(shape, fill, stroke, width)` | The common materials in one call. |
-| `text(string, x, y, {font, align, baseline}, material)` | One text packet at (x, y) in the group: `font` is `{family, size, weight, style}`, `align` left, center or right, `baseline` top, middle, bottom or alphabetic. `material` defaults to a black fill. |
+| `text(string, x, y, {font, align, baseline}, material)` | One text packet at (x, y) in the group: `font` is `{family, size, weight, style, letter_spacing}` (letter spacing in px, 0 by default), `align` left, center or right, `baseline` top, middle, bottom or alphabetic. `material` defaults to a black fill. |
 | `finish()` | The packets, in paint order. Throws if a group is still open. |
 
-Shapes are arrays of path commands, so several can go in one paint call: `circle(x, y, r, start?, end?)`, `ellipse(x, y, rx, ry, rotation?, start?, end?, reverse?)`, `rect(x, y, w, h)` and `roundRect(x, y, w, h, r)` (top-left corner, the same circular-arc outline as a canvas `roundRect`; the radius is clamped to half the shorter side), `polygon(points)` (closed), `polyline(points)` (open, for strokes), `capsule(from, to, r)` (round-ended limb, cable or pipe), and `smoothShape(points)` (a closed blob through rounded corners). `linear(from, to, stops)` and `radial(from, inner_radius, to, outer_radius, stops)` make gradient paint.
+Shapes are arrays of path commands, so several can go in one paint call: `circle(x, y, r, start?, end?)`, `ellipse(x, y, rx, ry, rotation?, start?, end?, reverse?)`, `rect(x, y, w, h)` and `roundRect(x, y, w, h, r)` (top-left corner, the same circular-arc outline as a canvas `roundRect`; the radius is clamped to half the shorter side), `polygon(points)` (closed), `polyline(points)` (open, for strokes), `capsule(from, to, r)` (round-ended limb, cable or pipe), and `smoothShape(points)` (a closed blob through rounded corners). `linear(from, to, stops)` and `radial(from, inner_radius, to, outer_radius, stops)` make gradient paint. A paint call keeps the shape array it is given rather than copying it, so build a fresh shape for each call and do not change it afterwards.
 
 Effects: `glow(scene, x, y, r, 'r,g,b', core = .35, {blend, alpha = 1})` is a soft round light that fades out at `r`, in the group's blend unless given one; `groundShadow(scene, x, y, rx, ry, {strength = 1})` is the soft dark ellipse that sets an object on the floor.
 
 Colour: `hexToRgb(hex)` gives `[r, g, b]`; `rgbToHex(rgb)`; `rgba(hex or rgb, a)` gives a CSS string; `mix(a, b, k)` blends two hex colours; `shade(hex, k)` darkens toward black (k < 0) or lightens toward white (k > 0).
 
 Seeded randomness, for procedural detail that is the same every frame: `seededRandom(seed)` returns a function giving numbers in [0, 1); `hash2(x, y, seed)` is a repeatable number in [0, 1) for a grid cell.
+
+## Height (`height.mjs`)
+
+Art that stands up from the ground under a camera above it. A point at height `z` draws at `camera + (point - camera) * k(z)`; `heightScale(z, eye)` is that `k` for a camera `eye` above the ground (`eye / (eye - z)`, with heights past 86% of the eye held there). At one height that is a uniform scale about the camera, so flat things up there are drawn in world units under one matrix.
+
+| Member | Contract |
+|---|---|
+| `new heightView({camera, eye, lean = 1})` | The view from `camera` ([x, y]). `lean` multiplies how far things lean (`k = 1 + (heightScale - 1) * lean`); `leaning(lean)` gives the same view leaning otherwise. |
+| `k(z)`, `at(x, y, z)`, `scaled(x, y, k)` | The scale at a height, and where a point at a height (or in the plane of scale k) draws. |
+| `plane(k)` | The matrix that draws world coordinates in the plane of scale k, for `artScene.enter({matrix})` or a picture's matrix. |
+| `sees(face)` | Whether a face's outward side is toward the camera. |
+| `silhouette(points, k)` | The convex outline a box covers from its footprint `points` up to the plane of scale k (what it hides of things behind it). |
+| `wall(face, k)` | A wall from the face's foot up to the plane of scale k: `at(u, v)`, `quad(u0, u1, v0, v1)`, `line(u0, v0, u1, v1)` and `outline()` give points and shapes on it (u along the face, v up it); `length`, `depth` (how far its top leans) and `top`. |
+| `fins(anchors, z0, z1, w, out, lit)` | Plates standing proud of a wall at each `{x, y, nx, ny}`: `{front, edge}` shapes. |
+| `ledge(edges, z, out, th)` | A slab along `{a, b, nx, ny}` edges: `{top, band, lip}`. `veranda(edges, z, out, step, rh)` adds `{posts, rail}`. |
+| `columns(points, r, z0, z1)` | Round columns: `{shafts, caps}`. `sills(windows, out)`: `{lip, shade}` under each window's bottom edge. |
+
+`boxFaces(sections)` gives the outside walls of a block of rectangles (`{side, section, x1, y1, x2, y2, nx, ny}`), with the stretches where sections meet taken out. A shape that would be empty is `null`.
 
 ## Rendering resources
 
@@ -220,11 +238,13 @@ Verified batch: **217 combined engine/controls/rendering/Directory/runtime tests
 
 `canvasRenderer.drawPackets(context, packets)` is a synchronous compatibility boundary for a host already inside a Canvas drawing pass. It accepts inline packet data, validates the complete batch, then uses the same Canvas backend as `renderSystem`. It preserves the host's current transform, clip, opacity, drawing state and backing dimensions; it never clears the surface or installs a simulation clock. Buffers/backend instances are reused per context through weak ownership. Resource-ID packets reject before drawing: registered images/targets/geometry/materials belong to `renderSystem`.
 
+`canvasRenderer.drawEntries(context, entries, {pictures, layered})` draws a run that mixes packets and pictures straight onto the canvas, in order: packets as `drawPackets` does, and each `{picture: {key, bounds, matrix, build}, blend, opacity, prepare}` entry stamped from `pictures` (a `pictureCache`) with its blend at its opacity (a `prepare` entry only painted ahead of need). `layered` paints each picture with its own base under its blends. `drawLayer` draws its packets this way into its layer.
+
 `canvasRenderer.drawLayer(context, packets, {opacity = 1, blend = 'normal', scale = 1, pictures})` is the same boundary for a layer: it draws the packets into an off-screen surface the size of the canvas (times `scale`) under the context's current transform, then lays that surface over the canvas at `opacity` with `blend`. The light layer is drawn this way. Under `renderSystem`, the same packets go into a pass on a `target` resource, drawn back as a sprite.
 
 `new pictureCache({max_bytes = 48 MB, budget_ms = 3, densities = [1, 1.5, 2, 3, 4]})` is the same boundary for art that rarely changes: paint once, stamp every frame. `draw(context, {key, bounds, layered, matrix}, build)` stamps the picture named `key` (the packets `build()` returns, in local units inside `bounds` `[x, y, w, h]`) under the context's transform times `matrix`, and returns `'stamp'`, `'paint'` or `'vector'`. A picture is painted at the first density (device pixels per local unit) at or above what the view needs, so zooming in paints a sharper one, and past the last density it draws as vector. `beginFrame()` starts a fresh painting budget; a picture still waiting draws as vector meanwhile, clipped to its bounds. With `stamp: false` it only paints the picture ahead of need when the budget allows, and draws nothing (`'paint'`, `'kept'` or `'later'`). A picture with any blend but normal always draws as vector, because inside a picture a blend has nothing under it to act on, unless it is `layered`: it paints its own base first, so its blends act on that and it is cached like any other (a light layer's dark with its cuts). When `max_bytes` would be passed, the least recently stamped pictures go first. `release(prefix)` lets go of the pictures whose keys start with `prefix` (`clear()` all of them), and `statistics` gives `{pictures, bytes}`. The key must name everything the picture shows: the cache never looks inside `build`. A shadow's blur is in device pixels, so a picture keeps the blur it was painted with. Under `renderSystem`, the same picture is a `target` resource drawn back as a sprite.
 
-`measureText(text, font)` gives `{width, ascent, descent}` for one line in `font` `{family, size, weight, style}`, as the Canvas backend would draw it, for art that fits a label to a box.
+`measureText(text, font)` gives `{width, ascent, descent}` for one line in `font` `{family, size, weight, style, letter_spacing}`, as the Canvas backend would draw it, for art that fits a label to a box.
 
 ## Light layer
 

@@ -223,3 +223,21 @@ The baked tiles in use are now within the 32 MB target.
 
 The signs made each light tile dearer to paint; driving, about 3.5 light tiles are painted a second.
 
+
+## Phase 4, step 5 (first part): the street buildings
+
+The 602 street buildings (shops, arcades, apartments) are drawn natively from the look each one carries in the
+exported city. The walls lean away from the camera as frame packets (a Basement `heightView`); each roof is a
+picture in the plane of its height, so it is painted once and stamped every frame (shops and arcades of one kind
+and size share one). The glow after the light layer clips each building out of the nearer ones' silhouettes.
+
+Measured on Hotel Dr. (camera 3650, 1250, six buildings in view, 1280 x 720, headless Chromium):
+
+| Part | Native | Classic |
+|---|---|---|
+| Walls and roofs (make + roof stamps + wall packets) | 2.7 + 1.0 + 6.5 to 8.5 ms | 13.3 ms |
+| Glow | 1.9 ms | 7.6 ms |
+
+The walls are about 13k path commands; drawing them is now mostly the canvas filling paths. A paint call keeps
+the shape it is given instead of copying it, materials are copied without `structuredClone`, and the Canvas
+backend reads path commands without spreading them, which took about a tenth off the wall draw.
