@@ -164,7 +164,7 @@ function ground(scene, b) {
 export function neuralSystems(record) {
     const ledge = (z, lip) => ({ z, out: 2.2, th: 2, top: '#9baebe', band: [26, 44, 70], lip }), shade = [6, 12, 26], gold = 'rgba(193,169,128,.9)', ice = 'rgba(190,216,238,.8)';
     return {
-        plan: { W: P.w, D: P.d }, hero: P.hero, facing: record?.facing === 'N' ? 'N' : 'S', ground,
+        plan: { W: P.w, D: P.d }, hero: P.hero, lamps: LOOK.entrance_lamps, facing: record?.facing === 'N' ? 'N' : 'S', ground,
         tiers: [
             { id: 'atrium', rect: [0, 0, 400, 200], z0: 0, z1: P.atrium, fill: C.ink, paint: atrium, shade, ledges: [ledge(P.vitrine, gold), ledge(P.atrium, ice)], roof_glow: true, roof: atriumRoof },
             { id: 'salon', rect: [75, 200, 250, 200], z0: 0, z1: P.salon, fill: C.ink, paint: salon, shade, ledges: [ledge(P.vitrine, gold), ledge(P.salon, ice)], roof_glow: true, roof: salonRoof },

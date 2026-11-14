@@ -86,7 +86,25 @@
       "text": "Cozy Cafe",
       "font": "Great Vibes, URW Chancery L, Z003, cursive",
       "size": 12.5
-    }
+    },
+    "entrance_lamps": [
+      {
+        "kind": "lantern",
+        "x": 151,
+        "y": 350,
+        "z": 10.5,
+        "out": 6,
+        "rgb": "255, 186, 100"
+      },
+      {
+        "kind": "lantern",
+        "x": 199,
+        "y": 350,
+        "z": 10.5,
+        "out": 6,
+        "rgb": "255, 186, 100"
+      }
+    ]
   },
   "warehouse": {
     "colors": {
@@ -111,7 +129,33 @@
       "dock_h": 22,
       "hero": 1.5
     },
-    "name_font": "Montserrat, Helvetica, sans-serif"
+    "name_font": "Montserrat, Helvetica, sans-serif",
+    "entrance_lamps": [
+      {
+        "kind": "bulkhead",
+        "x": 125,
+        "y": 429,
+        "z": 26.5,
+        "top": 29.6,
+        "rgb": "255, 200, 110"
+      },
+      {
+        "kind": "bulkhead",
+        "x": 250,
+        "y": 429,
+        "z": 26.5,
+        "top": 29.6,
+        "rgb": "255, 200, 110"
+      },
+      {
+        "kind": "bulkhead",
+        "x": 375,
+        "y": 429,
+        "z": 26.5,
+        "top": 29.6,
+        "rgb": "255, 200, 110"
+      }
+    ]
   },
   "dr_yins": {
     "colors": {
@@ -134,7 +178,39 @@
       "lobby": 14,
       "hero": 1.5
     },
-    "font": "Montserrat, Helvetica, sans-serif"
+    "font": "Montserrat, Helvetica, sans-serif",
+    "entrance_lamps": [
+      {
+        "kind": "pylon",
+        "x": 46,
+        "y": 416,
+        "z": 13,
+        "size": 1.5,
+        "rgb": "120, 255, 236",
+        "glass": "#2f5a58",
+        "cap": "#7affd8"
+      },
+      {
+        "kind": "pylon",
+        "x": 204,
+        "y": 416,
+        "z": 13,
+        "size": 1.5,
+        "rgb": "120, 255, 236",
+        "glass": "#2f5a58",
+        "cap": "#7affd8"
+      },
+      {
+        "kind": "pylon",
+        "x": 258,
+        "y": 416,
+        "z": 10,
+        "size": 1.5,
+        "rgb": "120, 255, 236",
+        "glass": "#2f5a58",
+        "cap": "#7affd8"
+      }
+    ]
   },
   "neural_systems": {
     "colors": {
@@ -164,7 +240,23 @@
       "vitrine": 14,
       "hero": 1.5
     },
-    "font": "Georgia, serif"
+    "font": "Georgia, serif",
+    "entrance_lamps": [
+      {
+        "kind": "crystal",
+        "x": 107,
+        "y": 417,
+        "z": 17,
+        "rgb": "150, 196, 255"
+      },
+      {
+        "kind": "crystal",
+        "x": 293,
+        "y": 417,
+        "z": 17,
+        "rgb": "150, 196, 255"
+      }
+    ]
   },
   "torque_auto": {
     "colors": {
@@ -223,7 +315,83 @@
       ]
     },
     "font": "Orbitron, monospace",
-    "script_font": "\"Great Vibes\", cursive"
+    "script_font": "\"Great Vibes\", cursive",
+    "entrance_lamps": [
+      {
+        "kind": "gooseneck",
+        "x": 58,
+        "y": 350,
+        "z": 26.5,
+        "out": 9,
+        "rgb": "255, 160, 70",
+        "band": "#ff9a2a"
+      },
+      {
+        "kind": "gooseneck",
+        "x": 128,
+        "y": 350,
+        "z": 26.5,
+        "out": 9,
+        "rgb": "255, 160, 70",
+        "band": "#ff9a2a"
+      },
+      {
+        "kind": "gooseneck",
+        "x": 372,
+        "y": 350,
+        "z": 26.5,
+        "out": 9,
+        "rgb": "255, 160, 70",
+        "band": "#ff9a2a"
+      },
+      {
+        "kind": "gooseneck",
+        "x": 442,
+        "y": 350,
+        "z": 26.5,
+        "out": 9,
+        "rgb": "255, 160, 70",
+        "band": "#ff9a2a"
+      },
+      {
+        "kind": "gooseneck",
+        "x": 178,
+        "y": 350,
+        "z": 18,
+        "out": 6,
+        "rgb": "255, 160, 70",
+        "band": "#ff9a2a"
+      },
+      {
+        "kind": "gooseneck",
+        "x": 322,
+        "y": 350,
+        "z": 18,
+        "out": 6,
+        "rgb": "255, 160, 70",
+        "band": "#ff9a2a"
+      },
+      {
+        "kind": "sconce",
+        "x": 506,
+        "y": 350,
+        "z": 12,
+        "out": 2.5,
+        "rgb": "255, 196, 170",
+        "metal": "#b88a76",
+        "metal_hi": "#f4b49a"
+      },
+      {
+        "kind": "sconce",
+        "x": 694,
+        "y": 350,
+        "z": 12,
+        "out": 2.5,
+        "rgb": "255, 196, 170",
+        "metal": "#b88a76",
+        "metal_hi": "#f4b49a"
+      }
+    ]
   },
   "biggs_park": {
     "colors": {
@@ -251,7 +419,41 @@
       "hero": 1.5
     },
     "font": "Orbitron, monospace",
-    "script_font": "\"Great Vibes\", cursive"
+    "script_font": "\"Great Vibes\", cursive",
+    "entrance_lamps": [
+      {
+        "kind": "carnival",
+        "x": 182,
+        "y": 414,
+        "z": 17,
+        "arms": 2,
+        "rgb": "255, 212, 150"
+      },
+      {
+        "kind": "carnival",
+        "x": 268,
+        "y": 414,
+        "z": 17,
+        "arms": 2,
+        "rgb": "255, 212, 150"
+      },
+      {
+        "kind": "carnival",
+        "x": 62,
+        "y": 414,
+        "z": 14,
+        "arms": 0,
+        "rgb": "255, 212, 150"
+      },
+      {
+        "kind": "carnival",
+        "x": 388,
+        "y": 414,
+        "z": 14,
+        "arms": 0,
+        "rgb": "255, 212, 150"
+      }
+    ]
   },
   "enni_cole": {
     "colors": {

@@ -146,7 +146,7 @@ function canopyRoof(art, glow, t) {
 export function drYins(record) {
     const ledge = (z, lip) => ({ z, out: 2.4, th: 2.4, top: C.teal_hi, band: [24, 44, 44], lip }), shade = [6, 16, 18];
     return {
-        plan: { W: P.w, D: P.d }, hero: P.hero, facing: record?.facing === 'N' ? 'N' : 'S',
+        plan: { W: P.w, D: P.d }, hero: P.hero, lamps: LOOK.entrance_lamps, facing: record?.facing === 'N' ? 'N' : 'S',
         tiers: [
             { id: 'ward', rect: [0, 0, 250, 400], z0: 0, z1: P.ward, fill: C.teal, paint: ward, shade, ledges: [ledge(P.lobby, 'rgba(0,243,255,.8)'), ledge(P.ward, 'rgba(122,255,216,.7)')], roof_glow: true, roof: wardRoof },
             { id: 'wing', rect: [250, 150, 250, 250], z0: 0, z1: P.wing, fill: C.teal_lo, paint: wing, shade, ledges: [ledge(P.wing, 'rgba(200,240,240,.7)')], roof_glow: true, roof: gardenRoof },

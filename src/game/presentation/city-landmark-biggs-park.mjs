@@ -171,7 +171,7 @@ function ground(scene, b) {
 export function biggsPark() {
     const brass = (z, out) => ({ z, out, th: 2.4, top: '#c7a377', band: [120, 90, 56], lip: '#f0d39a' }), shade = [24, 8, 14];
     return {
-        plan: { W: P.w, D: P.d }, hero: P.hero, facing: 'S', ground,
+        plan: { W: P.w, D: P.d }, hero: P.hero, lamps: LOOK.entrance_lamps, facing: 'S', ground,
         tiers: [
             { id: 'pavilion', rect: [0, 0, 450, 250], z0: 0, z1: P.pavilion, fill: C.wine, paint: pavilion, shade, ledges: [brass(P.pavilion, 3)], roof_glow: true, roof: pavilionRoof },
             { id: 'lantern', on: 'pavilion', solid: false, rect: P.lantern, z0: P.pavilion, z1: P.pavilion + P.lantern_h, fill: '#314952', paint: lantern, shade, ledges: [brass(P.pavilion + P.lantern_h, 2)], roof_glow: true, roof: lanternRoof },

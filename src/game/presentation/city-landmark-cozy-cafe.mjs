@@ -235,7 +235,7 @@ export function cozyCafe() {
     const [za, zb] = P.awning_z;
     const awning = i => ({ id: 'awning' + i, solid: false, rect: [P.awnings[i][0], P.d + 1, P.awnings[i][1], 20], z0: za, z1: zb, fill: T.stripe_a, paint: awningWall, shade: [30, 14, 8], roof: awningRoof });
     return {
-        plan: { W: P.w, D: P.d }, hero: P.hero, facing: 'S', ground,
+        plan: { W: P.w, D: P.d }, hero: P.hero, lamps: LOOK.entrance_lamps, facing: 'S', ground,
         tiers: [
             { id: 'house', rect: [0, 0, P.w, P.d], z0: 0, z1: P.house, fill: T.brick, paint: wall, shade: [30, 14, 8],
               ledges: [{ z: P.house, out: 2, th: 1.6, top: T.wood, band: [58, 33, 22], lip: 'rgba(239,220,182,.7)' }], roof: houseRoof, top },

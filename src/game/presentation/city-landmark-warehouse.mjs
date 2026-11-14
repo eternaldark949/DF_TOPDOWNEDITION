@@ -99,7 +99,7 @@ function ground(scene, b) {
 export function warehouse(record) {
     const ledge = z => ({ z, out: 2, th: 2, top: '#4a4c52', band: [30, 31, 34], lip: 'rgba(255,255,255,.18)' }), name = record?.label || 'Warehouse';
     return {
-        plan: { W: P.w, D: P.d }, hero: P.hero, facing: record?.facing === 'N' ? 'N' : 'S', ground,
+        plan: { W: P.w, D: P.d }, hero: P.hero, lamps: LOOK.entrance_lamps, facing: record?.facing === 'N' ? 'N' : 'S', ground,
         tiers: [
             { id: 'shed', name, rect: [0, 0, P.w, P.d], z0: 0, z1: P.shed, fill: C.steel, paint: shed, shade: [12, 12, 14], ledges: [ledge(P.shed)], roof_glow: true, roof: shedRoof },
             { id: 'monitor', on: 'shed', solid: false, rect: [60, 140, 380, 120], z0: P.shed, z1: P.shed + P.monitor, fill: C.steel, paint: monitor, shade: [12, 12, 14], ledges: [ledge(P.shed + P.monitor)], roof: monitorRoof },

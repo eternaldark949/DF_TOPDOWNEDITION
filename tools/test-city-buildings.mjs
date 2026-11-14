@@ -84,3 +84,16 @@ test('a tall landmark keeps its walls in chunks, and stamps none off the screen'
     const all = buildings.houses.find(h => h.id === 'silver_queen').draws(new heightView({ camera: at, eye: buildings.eye(1) }), { time: 3 }).filter(e => e.picture?.key.startsWith('city_tier:silver_queen'));
     assert.ok(all.length > stamps.length, 'the tiles off the screen are left out');
 });
+
+test('the landmarks light their entrances with lamps of their own kind', () => {
+    const kinds = new Map(buildings.houses.filter(h => h.lamps?.length).map(h => [h.id, new Set(h.lamps.map(s => s.kind))]));
+    assert.deepEqual([...kinds.get('cozy_cafe')], ['lantern']);
+    assert.deepEqual([...kinds.get('torque_auto')].sort(), ['gooseneck', 'sconce']);
+    const cafe = buildings.houses.find(h => h.id === 'cozy_cafe'), at = [4890, 2260], base = new heightView({ camera: at, eye: buildings.eye(1) });
+    const day = cafe.draws(base, { time: 3 }), night = cafe.glowDraws(base, { time: 3, dark: .9 });
+    const lamps = cafe.lamps; cafe.lamps = [];
+    const bare = [cafe.draws(base, { time: 3 }).length, cafe.glowDraws(base, { time: 3, dark: .9 }).length]; cafe.lamps = lamps;
+    assert.ok(day.length > bare[0], 'their pieces stand in front of the walls');
+    assert.ok(night.length > bare[1], 'and their glass shines by night');
+    submit(day.filter(e => !e.picture)); submit(night.filter(e => !e.picture));
+});

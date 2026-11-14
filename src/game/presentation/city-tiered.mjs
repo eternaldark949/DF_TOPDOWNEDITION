@@ -1,4 +1,5 @@
 import { artScene, rect, linear } from '../../engine/basement/rendering/index.mjs';
+import { entranceLamps, lampAt } from './city-entrance-lamps.mjs';
 
 /**
  * The city's landmarks as stacks of tiers, each a prism of its own: any polygon plan, its own base z0 and
@@ -9,7 +10,7 @@ import { artScene, rect, linear } from '../../engine/basement/rendering/index.mj
  * the plan; each tier's roof is a picture in the plane of its top (`roof(art, emissive, tier, building)`),
  * what stands on it is drawn live (`top(art, emissive, tier, building, view, time)`).
  *
- * The definition (one per landmark, `city-landmark-*.mjs`) is `{plan: {W, D}, hero, facing, origin, tiers, ground, ground_area, shade, order, glow}`
+ * The definition (one per landmark, `city-landmark-*.mjs`) is `{plan: {W, D}, hero, facing, origin, tiers, ground, ground_area, shade, order, glow, lamps}`
  * (`origin`: where the plan's corner sits from the record's x, y; `shade`: `{offset, color}`, its own shade on the ground
  * in place of the usual one; `ground_area`: [x, y, w, h] in the plan, how far
  * its `ground(scene, building)` reaches; `glow(art, building, view, time)`: what it adds to its glow after its tiers):
@@ -63,6 +64,7 @@ export class tieredBuilding {
         }
         this.reach = [this.bounds[0] - 1200, this.bounds[1] - 1200, this.bounds[2] + 1200, this.bounds[3] + 1200];
         this.strips = this.tiers.map(t => this.#strip(t));
+        this.lamps = def.lamps ?? [];
     }
 
     /* ---------------- geometry: tiers in the world, their faces, mitres ---------------- */
@@ -155,6 +157,7 @@ export class tieredBuilding {
     }
     box(base) {
         const view = this.view(base), pts = this.tiers.flatMap(t => this.hull(view, t)), [x0, y0, x1, y1] = this.bounds, k = view.k(this.crown_z / this.hero);
+        for (const s of this.lamps) { const [x, y] = lampAt(this, s); for (const [dx, dy] of [[-30, -30], [30, 50]]) pts.push(this.at(view, x + dx, y + dy, 0), this.at(view, x + dx, y + dy, s.z * 1.5 + 10)); }   // a lamp stands out in front, with its halo
         pts.push(view.scaled(x0, y0, k), view.scaled(x1, y1, k));
         return boxOf(pts);
     }
@@ -226,6 +229,7 @@ export class tieredBuilding {
             if (t.roof) out.push({ picture: this.#roof(view, t, false) });
             if (t.top) { const art = new artScene(); t.top(art, false, t, this, view, time); out.push(...art.finish()); }
         }
+        if (this.lamps.length) { const art = new artScene(); entranceLamps(art, this, view, this.lamps, false); out.push(...art.finish()); }   // the entrance lamps stand in front of its walls
         return out;
     }
     /** A ledge round a tier at its height along the faces seen: mitred slabs, each front shaded by its turn. */
@@ -266,6 +270,7 @@ export class tieredBuilding {
             if (t.top) { const top = new artScene(); top.enter({}, { blend: 'add', opacity: glow }); t.top(top, true, t, this, view, time); top.leave(); out.push(...top.finish()); }
         }
         if (this.def.glow) { const art = new artScene(); art.enter({}, { blend: 'add', opacity: glow }); this.def.glow(art, this, view, time); art.leave(); out.push(...art.finish()); }
+        if (this.lamps.length) { const art = new artScene(); art.enter({}, { blend: 'add' }); entranceLamps(art, this, view, this.lamps, true, glow); art.leave(); out.push(...art.finish()); }
         return out;
     }
 

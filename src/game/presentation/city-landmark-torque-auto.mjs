@@ -158,7 +158,7 @@ function ground(scene, b) {
 export function torqueAuto() {
     const eave = (z, lip) => ({ z, out: 2.4, th: 2.4, top: '#34343c', band: [38, 38, 44], lip }), shade = [10, 10, 14];
     return {
-        plan: { W: P.w, D: P.d }, hero: P.hero, facing: 'S', ground,
+        plan: { W: P.w, D: P.d }, hero: P.hero, lamps: LOOK.entrance_lamps, facing: 'S', ground,
         tiers: [
             { id: 'hall', rect: [0, 0, 500, 350], z0: 0, z1: P.hall, fill: C.wall, paint: hall, shade, ledges: [eave(P.hall, C.amber)], roof_glow: true, roof: hallRoof },
             { id: 'wing', rect: [500, 50, 200, 300], z0: 0, z1: P.wing, fill: C.wall, paint: wing, shade, ledges: [eave(P.wing, C.rose_gold)], roof_glow: true, roof: wingRoof }
