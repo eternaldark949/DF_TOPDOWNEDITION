@@ -23,3 +23,18 @@ test('a wall casts an exact shadow; ghosts, moving bodies and a wall holding the
     const withProps = p.getVisibilityPolygon({ origin: [0, 0], radius: 100, include_groups: 1 | 8 }).points;
     assert.ok(withProps.some(q => Math.abs(q[0]) < 1 && Math.abs(q[1] + 40) < .5), 'asked, it does');
 });
+test('blocks_light: a moving body that blocks casts a shadow and is listed as moving, glass never blocks', () => {
+    const p = new physicsSystem();
+    const leaf = p.createEntity({ entity_type: 'prop', physics_type: 'kinematic', blocks_light: true, position: [50, 0], collision_shape: { shape_type: 'box', dimensions: [10, 40] } });
+    p.createEntity({ entity_type: 'static', blocks_light: false, position: [-50, 0], collision_shape: { shape_type: 'box', dimensions: [10, 40] } });
+    const reach = (points, angle) => { let best = null, d = Infinity; for (const q of points) { const e = Math.abs(Math.atan2(q[1], q[0]) - angle); if (e < d) { d = e; best = q; } } return Math.hypot(...best); };
+    const cast = p.getVisibilityPolygon({ origin: [0, 0], radius: 100 });
+    assert.ok(Math.abs(reach(cast.points, 0) - 45) < 1e-6, 'the leaf stops the light');
+    assert.ok(Math.abs(reach(cast.points, Math.PI) - 100) < 1e-6, 'glass does not');
+    assert.equal(cast.moving.length, 1, 'the leaf is listed as moving');
+    assert.deepEqual(p.getMovingLightBlockers({ origin: [0, 0], radius: 100 }), cast.moving, 'the same blockers without casting');
+    assert.ok(Math.abs(reach(p.getVisibilityPolygon({ origin: [0, 0], radius: 100, include_moving: false }).points, 0) - 100) < 1e-6, 'static only, it does not');
+    leaf.updateBody({ position: [0, 60] });
+    const moved = p.getMovingLightBlockers({ origin: [0, 0], radius: 100 });
+    assert.deepEqual(moved[0].position, [0, 60], 'its pose follows it');
+});

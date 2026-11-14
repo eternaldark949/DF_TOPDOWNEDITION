@@ -143,7 +143,7 @@
           "ec_tall_aisle": {"defaults": {"color": "#3c2530", "decor": {"aisle": 1, "cat": "BAKERY & CEREAL", "kinds": ["box", "box", "can"], "run": 0, "sign": 580}, "decorType": "ec_tall_aisle", "height": 360, "mass": 10000000, "visible": false, "width": 40}},
           "ec_topiary": {"defaults": {"color": "#3c2530", "decorType": "ec_topiary", "family": "cypress_planter", "height": 40, "mass": 10000000, "width": 40}},
           "ec_tvwall": {"defaults": {"color": "#3c2530", "decorType": "ec_tvwall", "family": "screen_wall", "height": 62, "mass": 10000000, "width": 380}},
-          "ec_vending": {"defaults": {"color": "#3c2530", "decorType": "ec_vending", "family": "snack_vending", "height": 64, "interactionType": "vending_machine", "mass": 10000000, "width": 44}},
+          "ec_vending": {"defaults": {"color": "#3c2530", "decorType": "ec_vending", "family": "snack_vending", "height": 64, "interactionType": "vending_machine", "mass": 10000000, "width": 44}, "light": {"radius": 175, "color": "#00f3ff", "intensity": 0.4, "shadows": "none", "animation": {"kind": "pulse", "rate": 20, "depth": 0.04}}},
           "ec_void": {"defaults": {"color": "#3c2530", "decorType": "ec_void", "family": "gallery_void", "height": 300, "mass": 10000000, "width": 480}},
           "ec_wine": {"defaults": {"color": "#3c2530", "decorType": "ec_wine", "family": "wine_plinth", "height": 62, "mass": 10000000, "width": 300}},
           "hod_altar": {"defaults": {"color": "#2a1a22", "decorType": "hod_altar", "family": "crystal_altar", "height": 40, "mass": 10000000, "width": 120}},
@@ -195,7 +195,7 @@
           "mc_suite_couch": {"defaults": {"color": "#1a0e22", "decorType": "mc_suite_couch", "family": "suite_couch", "height": 200, "mass": 10000000, "width": 56}},
           "mc_urinal": {"defaults": {"color": "#1a0e22", "decorType": "mc_urinal", "family": "urinal", "height": 20, "mass": 10000000, "width": 26}},
           "mc_vanity": {"defaults": {"color": "#1a0e22", "decorType": "mc_vanity", "family": "bulb_vanity", "height": 40, "mass": 10000000, "width": 230}},
-          "medbay_refill": {"defaults": {"color": "#0f0", "family": "health_station", "height": 60, "interactionType": "medbay_refill", "mass": 10000000, "width": 40}},
+          "medbay_refill": {"defaults": {"color": "#0f0", "family": "health_station", "height": 60, "interactionType": "medbay_refill", "mass": 10000000, "width": 40}, "light": {"radius": 175, "color": "#00ff00", "intensity": 0.4, "shadows": "none", "animation": {"kind": "pulse", "rate": 2.5, "depth": 0.1}}},
           "monitor": {"defaults": {"color": "#ccc", "decorType": "monitor", "family": "vitals_monitor", "height": 20, "mass": 10000000, "width": 22}},
           "ns_console": {"defaults": {"decorType": "ns_console", "family": "styling_console", "height": 80, "mass": 100000, "width": 60}},
           "ns_counter": {"defaults": {"color": "#1a1a3a", "decorType": "ns_counter", "family": "sapphire_counter", "height": 30, "interactionType": "neural_counter", "mass": 100000, "width": 200}},
@@ -248,7 +248,7 @@
           "ta_tires": {"defaults": {"color": "#2a2a30", "decorType": "ta_tires", "family": "tyre_stack", "height": 44, "mass": 10000000, "width": 44}},
           "ta_turntable": {"defaults": {"color": "#2a2a30", "decorType": "ta_turntable", "height": 132, "mass": 10000000, "width": 132}},
           "ta_wrap": {"defaults": {"color": "#2a2a30", "decorType": "ta_wrap", "height": 96, "mass": 10000000, "width": 190}},
-          "vending_machine": {"defaults": {"color": "#00f3ff", "family": "mini_spree", "height": 60, "interactionType": "vending_machine", "mass": 10000000, "width": 40}}
+          "vending_machine": {"defaults": {"color": "#00f3ff", "family": "mini_spree", "height": 60, "interactionType": "vending_machine", "mass": 10000000, "width": 40}, "light": {"radius": 175, "color": "#00f3ff", "intensity": 0.4, "shadows": "none", "animation": {"kind": "pulse", "rate": 20, "depth": 0.04}}}
         },
         "families": {
           "bentwood_chair": {"description": "A bentwood cafe chair seen from above: a round seat in a wooden ring, a curved back. Turns to its face.", "look": {

@@ -101,7 +101,7 @@ export function doorLeaves(d, key, kind, base) {
             closed_rotation: 0, open_rotation: hinge ? Math.PI / 2 : 0, open: false };
         const packet = { ...base, position,
             ...(hinge ? { physics_type: 'rigid', mass: joint.mass, angular_damping: joint.damping, linear_damping: 0 } : {}),
-            collision_shape: { shape_type: 'box', dimensions: horizontal ? [size, across] : [across, size], local_position: along(centre - pivot) }, collision_mask: DOOR_MASK, data };
+            collision_shape: { shape_type: 'box', dimensions: horizontal ? [size, across] : [across, size], local_position: along(centre - pivot) }, collision_mask: DOOR_MASK, blocks_light: true, data };
         return { packet, joints: hinge ? [{ constraint_type: 'hinge', world_target: [...position], local_anchor_a: [0, 0], target_rotation: 0, min_rotation: -joint.swing_limit, max_rotation: joint.swing_limit, spring_stiffness: joint.closing_stiffness, spring_damping: 0 }] : undefined };
     });
 }

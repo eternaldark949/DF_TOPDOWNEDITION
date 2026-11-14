@@ -24,8 +24,8 @@ Every section is optional. Rectangles are top-left: `{x, y, w, h}` for walls, tr
 | `map_id`, `kind` | `kind` is `'interior'` (default) or `'exterior'`: a label for the game (and `decorate`), never a loading path. |
 | `size: [w, h]`, `boundary: {thickness}` | A ring of four walls just outside the map. |
 | `walls`, `wall_openings` | Static walls. Doors and openings are cut out of them. |
-| `placements` | Props: `{type, x, y, width, height, rotation?, movable?, light?: {radius, position?}, template?, data?}`. `prop_types[type].movable` is the default for `movable`. |
-| `lights` | Free lamps: `{position, radius, render_radius = 20}`. A light carried by a prop is that placement's `light`. |
+| `placements` | Props: `{type, x, y, width, height, rotation?, movable?, blocks_light?, light?, template?, data?}`. `prop_types[type]` gives the defaults for `movable`, `blocks_light` (a big prop that casts a shadow) and `light`. |
+| `lights` | Free lamps: `{position, radius, render_radius = 20, ...light}`. A light carried by a prop is that placement's `light`. |
 | `triggers` | Exits, rooms, zones: `{x, y, w, h, role, authored_id?, data?}`. |
 | `rooms` | `{id: {x, y, w, h} or {rects: [...]}, type: 'indoor' or 'outdoor', label}`. One ghost volume per rectangle, in the shared grid. |
 | `doors` | `{x, y, w, h, orientation: 'H' or 'V', type?, hingeSide?, hinge?, rooms?: [a, b]}`. `type` names a door kind (default `plain`; see *Door kinds*). `hingeSide: 'right'` mirrors the kind end to end; `hinge` overrides a hinged leaf's `HINGE` values. `rooms` links the two rooms it joins. |
@@ -33,6 +33,20 @@ Every section is optional. Rectangles are top-left: `{x, y, w, h}` for walls, tr
 | `cloths` | Hanging strips with a cloth mesh: `{x, y, width, length, segments = 5, role?}`. |
 | `spawn: [x, y]` | Returned as `map.spawn`. |
 | `regions: {size = 1024, radius = 4096, keep = size}` | Region size, how far round a focus regions are built, and how much further they stay before release. |
+
+### Lights
+
+A light is declared the same way on a lamp, a placement or a catalog type: `{radius | size + round + soft, position | dx + dy, color, intensity, shadows, animation}`. The builder turns each into `declaredLight(light)`, kept on the packet as `data.emission`, with a matching `light_shape`:
+
+| Field | Meaning |
+|---|---|
+| `shape` | `'point'` (a `radius`) or `'strip'` (a `size: [w, h]` with `round` and `soft`, a rounded rectangle). |
+| `position` | Offset from its body's centre. |
+| `color`, `intensity` | `null` when unset, for the game's look to choose. |
+| `shadows` | `'dynamic'` (default): walls and every body that blocks light; `'static'`: walls only; `'none'`: no shadow. |
+| `animation` | `{kind: 'steady' \| 'flicker' \| 'pulse', rate, depth}`: `rate` in rad/s, `depth` the pulse's swing. The older `flicker: rate` is a flicker. |
+
+Door leaves always block light (`blocks_light: true`). A placement blocks light when it or its type sets `blocks_light`; ghosts never do.
 
 Ids are `wall_<i>`, `prop_<i>`, `lamp_<i>`, `door_<i>` (`door_<i>_right` for the second leaf), `<role>_<i>` for cloths, or the entry's own `authored_id`. The same definition always gives the same ids, which saves and region memory rely on.
 

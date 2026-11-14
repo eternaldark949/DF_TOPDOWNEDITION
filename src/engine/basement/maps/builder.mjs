@@ -13,6 +13,30 @@ export { DOOR_KINDS, HINGE, validateDoorKind } from './doors.mjs';
 const finite = (value, name) => { if (!Number.isFinite(value)) throw new TypeError(`Map ${name} must be a finite number`); return value; };
 const box = (x, y, w, h) => ({ position: [finite(x, 'x') + finite(w, 'width') / 2, finite(y, 'y') + finite(h, 'height') / 2], collision_shape: { shape_type: 'box', dimensions: [w, h] } });
 
+export const LIGHT_SHADOWS = Object.freeze(['static', 'dynamic', 'none']);
+export const LIGHT_ANIMATIONS = Object.freeze(['steady', 'flicker', 'pulse']);
+/**
+ * A declared light, as a lamp, a placement or a catalog type gives it, in its one runtime form:
+ * `{shape: 'point' | 'strip', radius | size + round + soft, position, color, intensity, shadows, animation}`.
+ *  position   offset from its body's centre ([dx, dy], or the authored `dx` / `dy`)
+ *  shadows    'dynamic' (default): walls and every body that blocks light, kept until one in reach moves;
+ *             'static': walls only; 'none': a pool with no shadow
+ *  animation  {kind: 'steady' | 'flicker' | 'pulse', rate (rad/s), depth (pulse: the swing, 0..1)};
+ *             the older `flicker: rate` is a flicker
+ * `color` and `intensity` stay null when unset, for the look to choose.
+ */
+export function declaredLight(light, { shadows = 'dynamic' } = {}) {
+    const a = light.animation ?? (light.flicker ? { kind: 'flicker', rate: light.flicker } : { kind: 'steady' });
+    if (!LIGHT_ANIMATIONS.includes(a.kind)) throw new TypeError(`Unknown light animation: ${a.kind}`);
+    const shade = light.shadows ?? shadows;
+    if (!LIGHT_SHADOWS.includes(shade)) throw new TypeError(`Unknown light shadows: ${shade}`);
+    const animation = a.kind === 'steady' ? { kind: 'steady' } : { kind: a.kind, rate: finite(a.rate ?? 1, 'light rate'), ...(a.kind === 'pulse' ? { depth: finite(a.depth ?? .1, 'light depth') } : {}) };
+    const shape = light.size ? { shape: 'strip', size: [finite(light.size[0], 'light width'), finite(light.size[1], 'light height')], round: light.round ?? null, soft: !!light.soft }
+        : { shape: 'point', radius: finite(light.radius, 'light radius') };
+    return { ...shape, position: light.position ? [...light.position] : [light.dx ?? 0, light.dy ?? 0], color: light.color ?? null, intensity: light.intensity ?? null, shadows: shade, animation };
+}
+const lightShape = l => l.shape === 'strip' ? { shape_type: 'box', dimensions: l.size, local_position: l.position } : { shape_type: 'circle', radius: l.radius, local_position: l.position };
+
 export const MAP_KINDS = Object.freeze(['interior', 'exterior']);
 /** Without a template, each section uses one of the engine's own entity types. */
 export const DEFAULT_KINDS = Object.freeze({ wall: { entity_type: 'static' }, prop: { entity_type: 'prop', physics_type: 'static' }, light: { entity_type: 'decoration' },
@@ -50,14 +74,17 @@ export function buildMapPackets(definition, { templates = {}, decorate = null, p
                 movable: !!(p.movable ?? prop_types[p.type]?.movable), home_position: null, home_rotation: p.rotation ?? 0, ...p.data } };
         packet.data.home_position = [...packet.position];
         if (p.rotation) packet.rotation = p.rotation;
-        if (p.light) packet.light_shape = { shape_type: 'circle', radius: finite(p.light.radius, 'light radius'), local_position: p.light.position ?? [0, 0] };
+        const light = p.light ?? prop_types[p.type]?.light, blocks = p.blocks_light ?? prop_types[p.type]?.blocks_light;
+        if (light) { packet.data.emission = declaredLight(light); packet.light_shape = lightShape(packet.data.emission); }
+        if (blocks !== undefined) packet.blocks_light = !!blocks;
         push('placements', i, p, packet);
     });
 
     // Free-standing lights (a light carried by a prop is that placement's `light`).
-    (definition.lights ?? []).forEach((l, i) => push('lights', i, l, { ...kind_of('light', l.template), position: [finite(l.position[0], 'x'), finite(l.position[1], 'y')],
-        render_shape: { shape_type: 'circle', radius: l.render_radius ?? 20 }, light_shape: { shape_type: 'circle', radius: finite(l.radius, 'light radius') },
-        data: { role: l.role ?? 'lamp', authored_id: l.authored_id ?? `lamp_${i}`, ...l.data } }));
+    (definition.lights ?? []).forEach((l, i) => { const emission = declaredLight({ ...l, position: null });
+        push('lights', i, l, { ...kind_of('light', l.template), position: [finite(l.position[0], 'x'), finite(l.position[1], 'y')],
+            render_shape: { shape_type: 'circle', radius: l.render_radius ?? 20 }, light_shape: lightShape(emission),
+            data: { role: l.role ?? 'lamp', authored_id: l.authored_id ?? `lamp_${i}`, emission, ...l.data } }); });
 
     // Triggers: exits, rooms, zones. Each names its role.
     (definition.triggers ?? []).forEach((r, i) => push('triggers', i, r, { ...kind_of('trigger', r.template), ...box(r.x, r.y, r.w, r.h),

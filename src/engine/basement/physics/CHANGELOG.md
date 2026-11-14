@@ -1,5 +1,9 @@
 # Changelog
 
+## Light blockers — 2026-11-14
+
+- Bodies take `blocks_light`: `true` always blocks light (door leaves, big props), `false` never, `null` by the query's groups as before. `getVisibilityPolygon` returns the blockers that are not static as `moving`, and `getMovingLightBlockers` lists them without casting, so a kept polygon can be checked each frame. `include_moving:false` casts against static bodies only.
+
 ## Visibility polygons — 2026-11-13
 
 - `getVisibilityPolygon({origin, radius, resolution, ...filters})` returns what a point light reaches: every ray stopped at the first blocking body (static by default). Extra rays at blocking corners keep shadow edges exact. The light layer uses it for lamp shadows.

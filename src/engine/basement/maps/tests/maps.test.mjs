@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { physicsSystem, BODY_GROUP } from '../../physics/index.mjs';
-import { buildMapPackets, mapInstance, mapSystem } from '../index.mjs';
+import { buildMapPackets, declaredLight, mapInstance, mapSystem } from '../index.mjs';
 
 const room = {
     map_id: 'test_room', kind: 'interior', size: [400, 300], boundary: { thickness: 20 }, spawn: [50, 50],
@@ -294,4 +294,20 @@ test('getDoors lists every door with its opening and live leaves, arches include
     assert.deepEqual(doors[0].opening, { position: [200, 155], length: 40, across: 10, rotation: 0 });
     assert.equal(doors[0].leaves[1], map.entity('door_0_right')); assert.deepEqual(doors[2].leaves[0].data.opening, doors[2].opening);
     doors[1].opening.position[0] = 999; assert.equal(map.getDoors()[1].opening.position[0], 110, 'callers get copies');
+});
+
+test('lights are declared one way on a lamp, a placement or a catalog type, and door leaves and big props block light', () => {
+    const prop_types = { vending: { light: { radius: 175, color: '#00f3ff', shadows: 'none', animation: { kind: 'pulse', rate: 20, depth: .04 } } }, shelf: { blocks_light: true }, chair: {} };
+    const { entries } = buildMapPackets({ lights: [{ position: [10, 10], radius: 120, color: '#fff', flicker: 3 }],
+        placements: [{ type: 'vending', x: 0, y: 0, width: 40, height: 60 }, { type: 'shelf', x: 100, y: 0, width: 80, height: 20 }, { type: 'chair', x: 200, y: 0, width: 10, height: 10, light: { radius: 50, dx: 2, size: null } }],
+        doors: [{ x: 300, y: 0, w: 40, h: 8, orientation: 'H', type: 'sliding' }] }, { prop_types });
+    const [lamp] = entries.filter(e => e.section === 'lights').map(e => e.packet), [vending, shelf, chair] = entries.filter(e => e.section === 'placements').map(e => e.packet);
+    assert.deepEqual(lamp.data.emission, { shape: 'point', radius: 120, position: [0, 0], color: '#fff', intensity: null, shadows: 'dynamic', animation: { kind: 'flicker', rate: 3 } });
+    assert.deepEqual(vending.data.emission.animation, { kind: 'pulse', rate: 20, depth: .04 }, 'the type gives its light');
+    assert.equal(vending.light_shape.radius, 175);
+    assert.deepEqual(chair.data.emission.position, [2, 0]);
+    assert.equal(shelf.blocks_light, true, 'the type says the shelf blocks light'); assert.equal(chair.blocks_light, undefined);
+    assert.ok(entries.filter(e => e.section === 'doors').every(e => e.packet.blocks_light === true), 'every door leaf blocks light');
+    assert.throws(() => declaredLight({ radius: 10, animation: { kind: 'strobe' } }), /animation/);
+    assert.throws(() => declaredLight({ radius: 10, shadows: 'soft' }), /shadows/);
 });

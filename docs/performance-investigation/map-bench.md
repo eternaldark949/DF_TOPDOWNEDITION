@@ -77,3 +77,15 @@ channel. Re-recorded (this machine ran about 15% slower than the day before: com
 |---|---|---|
 | apartment-night | 16.0 ms (was 25.3) | 3.2 ms (was 13.7) |
 | apartment-door | 14.6 ms (was 28.1) | 2.0 ms (was 14.2) |
+
+## November 14, later: doors block lamplight (phase 2)
+
+Door leaves now block light, so a lamp near a swinging door recasts its shadow every frame the leaf
+moves (about 0.6 ms a lamp in the apartment) and is drawn live until the leaf has rested 0.3 s. The
+door scene keeps its door always swinging past eight lamps, so its light layer went from 2.0 to about
+12 ms; its baseline was re-recorded for that scene alone. The still apartment is unchanged within noise.
+Phase 3 (the one-sweep shadow cast and per-frame budgets) is where this cost comes back down.
+
+| Scene | Frame CPU | Light layer |
+|---|---|---|
+| apartment-door | 26.8 ms (was 14.6) | 12.0 ms (was 2.0) |

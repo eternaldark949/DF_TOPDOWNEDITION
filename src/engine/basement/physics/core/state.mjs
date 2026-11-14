@@ -28,7 +28,7 @@ export function bodyConfig(packet = {}) {
         linear_damping: number(p.linear_damping ?? 0, 'linear_damping', 0), angular_damping: number(p.angular_damping ?? 0, 'angular_damping', 0),
         collision_group: mask(p.collision_group ?? BODY_GROUP.PROP, 'collision_group'),
         collision_mask: mask(p.collision_mask ?? BODY_GROUP.ALL, 'collision_mask'), query_mask: mask(p.query_mask ?? BODY_GROUP.ALL, 'query_mask'),
-        ghost: !!p.ghost, continuous_collision: p.continuous_collision !== false, sleep_enabled: p.sleep_enabled !== false,
+        ghost: !!p.ghost, blocks_light: p.blocks_light == null ? null : !!p.blocks_light, continuous_collision: p.continuous_collision !== false, sleep_enabled: p.sleep_enabled !== false,
         active: p.active !== false,
         axis_lock: { x: !!lock.x, y: !!lock.y, rotation: !!lock.rotation },
     };

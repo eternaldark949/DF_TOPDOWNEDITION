@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '77c954d33c77';
+        const DFAB_BUILD = '247982ba6f4f';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="16482">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="16543">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -9617,7 +9617,7 @@ function bodyConfig(packet = {}) {
         linear_damping: number(p.linear_damping ?? 0, 'linear_damping', 0), angular_damping: number(p.angular_damping ?? 0, 'angular_damping', 0),
         collision_group: mask(p.collision_group ?? BODY_GROUP.PROP, 'collision_group'),
         collision_mask: mask(p.collision_mask ?? BODY_GROUP.ALL, 'collision_mask'), query_mask: mask(p.query_mask ?? BODY_GROUP.ALL, 'query_mask'),
-        ghost: !!p.ghost, continuous_collision: p.continuous_collision !== false, sleep_enabled: p.sleep_enabled !== false,
+        ghost: !!p.ghost, blocks_light: p.blocks_light == null ? null : !!p.blocks_light, continuous_collision: p.continuous_collision !== false, sleep_enabled: p.sleep_enabled !== false,
         active: p.active !== false,
         axis_lock: { x: !!lock.x, y: !!lock.y, rotation: !!lock.rotation },
     };
@@ -9964,17 +9964,19 @@ class physicsQueries {
     }
     /**
      * What a point light at `origin` can reach: the polygon of every ray out to `radius` stopped at the
-     * first blocking body (static bodies by default; ghosts never block). Points run by angle. A body
-     * that holds the origin does not block it. `resolution` rays round the circle, plus three at every
-     * blocking corner in reach, so shadow edges are exact.
+     * first blocking body. A body blocks light by its `blocks_light`: true always (a door leaf, a big prop),
+     * false never (glass), null (the default) when it is in `include_groups` (static bodies by default).
+     * Ghosts never block, nor does a body that holds the origin. `include_moving: false` leaves out every
+     * body that is not static. `resolution` rays round the circle, plus three at every blocking corner in
+     * reach, so shadow edges are exact. `moving` lists the blockers that are not static, with their poses.
      */
     getVisibilityPolygon(packet) {
         const origin = vector(packet.origin), radius = number(packet.radius, 'radius', EPS), resolution = number(packet.resolution ?? 64, 'resolution', 8, 4096);
-        const options = { include_groups: BODY_GROUP.STATIC, include_ghosts: false, ...packet }, segments = [];
+        const segments = [], moving = [];
         const inside = points => { let hit = false; for (let i = 0, j = points.length - 1; i < points.length; j = i++) { const [xi, yi] = points[i], [xj, yj] = points[j]; if ((yi > origin[1]) !== (yj > origin[1]) && origin[0] < (xj - xi) * (origin[1] - yi) / (yj - yi) + xi) hit = !hit; } return hit; };
-        for (const b of this.world.spatial_grid.queryRadius(origin, radius)) {
-            if (!accepts(this.world, b, options)) continue;
+        for (const b of this.#lightBlockers(origin, radius, packet)) {
             const r = this.world._record(b);
+            if (r.config.physics_type !== 'static') moving.push({ body_id: r.id, position: [...r.position], rotation: r.rotation });
             for (const piece of pieces(r.shape, r.position, r.rotation)) {
                 const points = piece.points ?? Array.from({ length: 16 }, (_, k) => [piece.center[0] + piece.radius * Math.cos(k * Math.PI / 8), piece.center[1] + piece.radius * Math.sin(k * Math.PI / 8)]);
                 if (inside(points)) continue;
@@ -9995,7 +9997,27 @@ class physicsQueries {
             const last = points.at(-1), point = [origin[0] + dx * reach, origin[1] + dy * reach];
             if (!last || Math.hypot(point[0] - last[0], point[1] - last[1]) > 1e-6) points.push(point);
         }
-        return { origin, radius, points };
+        return { origin, radius, points, moving };
+    }
+    /**
+     * The blockers that are not static within `radius` of `origin`, with their poses, by the same rules
+     * as getVisibilityPolygon: compare them with its `moving` to know when a kept polygon is stale.
+     */
+    getMovingLightBlockers(packet) {
+        const origin = vector(packet.origin), radius = number(packet.radius, 'radius', EPS), out = [];
+        for (const b of this.#lightBlockers(origin, radius, packet)) {
+            const r = this.world._record(b);
+            if (r.config.physics_type !== 'static') out.push({ body_id: r.id, position: [...r.position], rotation: r.rotation });
+        }
+        return out;
+    }
+    *#lightBlockers(origin, radius, packet) {
+        const options = { include_groups: BODY_GROUP.STATIC, ...packet, include_ghosts: false }, always = { ...options, include_groups: BODY_GROUP.ALL };
+        for (const b of this.world.spatial_grid.queryRadius(origin, radius)) {
+            const c = this.world._record(b).config;
+            if (c.blocks_light === false || (packet.include_moving === false && c.physics_type !== 'static')) continue;
+            if (accepts(this.world, b, c.blocks_light ? always : options)) yield b;
+        }
     }
     overlapShape(packet, results = []) {
         const shape = new collisionShape(packet.collision_shape), p = { position: vector(packet.position), rotation: number(packet.rotation ?? 0, 'rotation') }, hits = [];
@@ -14045,6 +14067,7 @@ class physicsSystem {
     shapeCast(packet, results) { return this.#queries.shapeCast(packet, results); }
     overlapShape(packet, results) { return this.#queries.overlapShape(packet, results); }
     getVisibilityPolygon(packet) { return this.#queries.getVisibilityPolygon(packet); }
+    getMovingLightBlockers(packet) { return this.#queries.getMovingLightBlockers(packet); }
     isPlacementClear(body_or_shape, position, options) { return this.#queries.isPlacementClear(body_or_shape, position, options); }
     findClearPlacement(packet, result) { return this.#queries.findClearPlacement(packet, result); }
     findPath(packet, result) { const path = this.navigation.findPath(packet); return path && result ? Object.assign(result, path) : path; }
@@ -14344,7 +14367,7 @@ const m43 = (()=>{
 // DATA STRUCTURES: what each kind of library resource looks like, and the checks that an entry is
 // well formed. A structure names fields, units and defaults; it never says what the data does.
 //
-// prop_catalog   { types: { <type>: { defaults: {...authored options}, movable?: boolean } }, families?: { <family>: { look } } }
+// prop_catalog   { types: { <type>: { defaults: {...authored options}, movable?: boolean, blocks_light?: boolean, light?: {radius, ...} } }, families?: { <family>: { look } } }
 //                One entry per prop type. A placement names its type and lists only what differs.
 //                A family is a kind of piece drawn by one artist (a bentwood chair, a round table);
 //                its `look` is a schema, { <field>: { kind, default, min?, max?, values?, note? } },
@@ -14372,7 +14395,7 @@ const m43 = (()=>{
 const {plain} = m42;
 
 const STRUCTURES = Object.freeze({
-    prop_catalog: 'A catalog of prop types and the families they are presets of: { types: { <type>: { defaults, movable? } }, families?: { <family>: { look: { <field>: { kind, default } } } } }.',
+    prop_catalog: 'A catalog of prop types and the families they are presets of: { types: { <type>: { defaults, movable?, blocks_light?, light? } }, families?: { <family>: { look: { <field>: { kind, default } } } } }.',
     map_layout: 'A map\'s placements over a prop catalog: { props: [{ type, x, y, ...fields }], ... }.',
     skeleton: 'A rig hierarchy: { rig_id, joints: [{ name, parent?, position?, rotation?, scale?, limits? }], anchors? }.',
     clip_set: 'Animation clips for one skeleton: { clips: [{ clip_id, duration, tracks, markers? }] }.',
@@ -14420,6 +14443,8 @@ function validatePropCatalog(data, where = 'prop_catalog') {
     for (const [type, entry] of Object.entries(data.types)) {
         if (!plain(entry) || !plain(entry.defaults)) fail(where, `type ${type} requires a defaults object`);
         if (entry.movable !== undefined && typeof entry.movable !== 'boolean') fail(where, `type ${type}: movable must be a boolean`);
+        if (entry.blocks_light !== undefined && typeof entry.blocks_light !== 'boolean') fail(where, `type ${type}: blocks_light must be a boolean`);
+        if (entry.light !== undefined && (!plain(entry.light) || !(Number.isFinite(entry.light.radius) || Array.isArray(entry.light.size)))) fail(where, `type ${type}: a light needs a radius or a size`);
         const { family, look } = entry.defaults;
         if (family !== undefined && !Object.hasOwn(data.families ?? {}, family)) fail(where, `type ${type}: unknown family ${family}`);
         if (look !== undefined) { if (family === undefined) fail(where, `type ${type}: a look needs a family`); checkLook(data.families[family], look, `${where}: type ${type}`); }
@@ -18092,7 +18117,7 @@ const m70 = Object.freeze({default:{
           "ec_tall_aisle": {"defaults": {"color": "#3c2530", "decor": {"aisle": 1, "cat": "BAKERY & CEREAL", "kinds": ["box", "box", "can"], "run": 0, "sign": 580}, "decorType": "ec_tall_aisle", "height": 360, "mass": 10000000, "visible": false, "width": 40}},
           "ec_topiary": {"defaults": {"color": "#3c2530", "decorType": "ec_topiary", "family": "cypress_planter", "height": 40, "mass": 10000000, "width": 40}},
           "ec_tvwall": {"defaults": {"color": "#3c2530", "decorType": "ec_tvwall", "family": "screen_wall", "height": 62, "mass": 10000000, "width": 380}},
-          "ec_vending": {"defaults": {"color": "#3c2530", "decorType": "ec_vending", "family": "snack_vending", "height": 64, "interactionType": "vending_machine", "mass": 10000000, "width": 44}},
+          "ec_vending": {"defaults": {"color": "#3c2530", "decorType": "ec_vending", "family": "snack_vending", "height": 64, "interactionType": "vending_machine", "mass": 10000000, "width": 44}, "light": {"radius": 175, "color": "#00f3ff", "intensity": 0.4, "shadows": "none", "animation": {"kind": "pulse", "rate": 20, "depth": 0.04}}},
           "ec_void": {"defaults": {"color": "#3c2530", "decorType": "ec_void", "family": "gallery_void", "height": 300, "mass": 10000000, "width": 480}},
           "ec_wine": {"defaults": {"color": "#3c2530", "decorType": "ec_wine", "family": "wine_plinth", "height": 62, "mass": 10000000, "width": 300}},
           "hod_altar": {"defaults": {"color": "#2a1a22", "decorType": "hod_altar", "family": "crystal_altar", "height": 40, "mass": 10000000, "width": 120}},
@@ -18144,7 +18169,7 @@ const m70 = Object.freeze({default:{
           "mc_suite_couch": {"defaults": {"color": "#1a0e22", "decorType": "mc_suite_couch", "family": "suite_couch", "height": 200, "mass": 10000000, "width": 56}},
           "mc_urinal": {"defaults": {"color": "#1a0e22", "decorType": "mc_urinal", "family": "urinal", "height": 20, "mass": 10000000, "width": 26}},
           "mc_vanity": {"defaults": {"color": "#1a0e22", "decorType": "mc_vanity", "family": "bulb_vanity", "height": 40, "mass": 10000000, "width": 230}},
-          "medbay_refill": {"defaults": {"color": "#0f0", "family": "health_station", "height": 60, "interactionType": "medbay_refill", "mass": 10000000, "width": 40}},
+          "medbay_refill": {"defaults": {"color": "#0f0", "family": "health_station", "height": 60, "interactionType": "medbay_refill", "mass": 10000000, "width": 40}, "light": {"radius": 175, "color": "#00ff00", "intensity": 0.4, "shadows": "none", "animation": {"kind": "pulse", "rate": 2.5, "depth": 0.1}}},
           "monitor": {"defaults": {"color": "#ccc", "decorType": "monitor", "family": "vitals_monitor", "height": 20, "mass": 10000000, "width": 22}},
           "ns_console": {"defaults": {"decorType": "ns_console", "family": "styling_console", "height": 80, "mass": 100000, "width": 60}},
           "ns_counter": {"defaults": {"color": "#1a1a3a", "decorType": "ns_counter", "family": "sapphire_counter", "height": 30, "interactionType": "neural_counter", "mass": 100000, "width": 200}},
@@ -18197,7 +18222,7 @@ const m70 = Object.freeze({default:{
           "ta_tires": {"defaults": {"color": "#2a2a30", "decorType": "ta_tires", "family": "tyre_stack", "height": 44, "mass": 10000000, "width": 44}},
           "ta_turntable": {"defaults": {"color": "#2a2a30", "decorType": "ta_turntable", "height": 132, "mass": 10000000, "width": 132}},
           "ta_wrap": {"defaults": {"color": "#2a2a30", "decorType": "ta_wrap", "height": 96, "mass": 10000000, "width": 190}},
-          "vending_machine": {"defaults": {"color": "#00f3ff", "family": "mini_spree", "height": 60, "interactionType": "vending_machine", "mass": 10000000, "width": 40}}
+          "vending_machine": {"defaults": {"color": "#00f3ff", "family": "mini_spree", "height": 60, "interactionType": "vending_machine", "mass": 10000000, "width": 40}, "light": {"radius": 175, "color": "#00f3ff", "intensity": 0.4, "shadows": "none", "animation": {"kind": "pulse", "rate": 20, "depth": 0.04}}}
         },
         "families": {
           "bentwood_chair": {"description": "A bentwood cafe chair seen from above: a round seat in a wooden ring, a curved back. Turns to its face.", "look": {
@@ -27193,7 +27218,7 @@ function doorLeaves(d, key, kind, base) {
             closed_rotation: 0, open_rotation: hinge ? Math.PI / 2 : 0, open: false };
         const packet = { ...base, position,
             ...(hinge ? { physics_type: 'rigid', mass: joint.mass, angular_damping: joint.damping, linear_damping: 0 } : {}),
-            collision_shape: { shape_type: 'box', dimensions: horizontal ? [size, across] : [across, size], local_position: along(centre - pivot) }, collision_mask: DOOR_MASK, data };
+            collision_shape: { shape_type: 'box', dimensions: horizontal ? [size, across] : [across, size], local_position: along(centre - pivot) }, collision_mask: DOOR_MASK, blocks_light: true, data };
         return { packet, joints: hinge ? [{ constraint_type: 'hinge', world_target: [...position], local_anchor_a: [0, 0], target_rotation: 0, min_rotation: -joint.swing_limit, max_rotation: joint.swing_limit, spring_stiffness: joint.closing_stiffness, spring_damping: 0 }] : undefined };
     });
 }
@@ -27216,6 +27241,30 @@ const {resolveDoorKinds,doorKind,doorLeaves,doorOpening,leafIds} = m142;
  */
 const finite = (value, name) => { if (!Number.isFinite(value)) throw new TypeError(`Map ${name} must be a finite number`); return value; };
 const box = (x, y, w, h) => ({ position: [finite(x, 'x') + finite(w, 'width') / 2, finite(y, 'y') + finite(h, 'height') / 2], collision_shape: { shape_type: 'box', dimensions: [w, h] } });
+
+const LIGHT_SHADOWS = Object.freeze(['static', 'dynamic', 'none']);
+const LIGHT_ANIMATIONS = Object.freeze(['steady', 'flicker', 'pulse']);
+/**
+ * A declared light, as a lamp, a placement or a catalog type gives it, in its one runtime form:
+ * `{shape: 'point' | 'strip', radius | size + round + soft, position, color, intensity, shadows, animation}`.
+ *  position   offset from its body's centre ([dx, dy], or the authored `dx` / `dy`)
+ *  shadows    'dynamic' (default): walls and every body that blocks light, kept until one in reach moves;
+ *             'static': walls only; 'none': a pool with no shadow
+ *  animation  {kind: 'steady' | 'flicker' | 'pulse', rate (rad/s), depth (pulse: the swing, 0..1)};
+ *             the older `flicker: rate` is a flicker
+ * `color` and `intensity` stay null when unset, for the look to choose.
+ */
+function declaredLight(light, { shadows = 'dynamic' } = {}) {
+    const a = light.animation ?? (light.flicker ? { kind: 'flicker', rate: light.flicker } : { kind: 'steady' });
+    if (!LIGHT_ANIMATIONS.includes(a.kind)) throw new TypeError(`Unknown light animation: ${a.kind}`);
+    const shade = light.shadows ?? shadows;
+    if (!LIGHT_SHADOWS.includes(shade)) throw new TypeError(`Unknown light shadows: ${shade}`);
+    const animation = a.kind === 'steady' ? { kind: 'steady' } : { kind: a.kind, rate: finite(a.rate ?? 1, 'light rate'), ...(a.kind === 'pulse' ? { depth: finite(a.depth ?? .1, 'light depth') } : {}) };
+    const shape = light.size ? { shape: 'strip', size: [finite(light.size[0], 'light width'), finite(light.size[1], 'light height')], round: light.round ?? null, soft: !!light.soft }
+        : { shape: 'point', radius: finite(light.radius, 'light radius') };
+    return { ...shape, position: light.position ? [...light.position] : [light.dx ?? 0, light.dy ?? 0], color: light.color ?? null, intensity: light.intensity ?? null, shadows: shade, animation };
+}
+const lightShape = l => l.shape === 'strip' ? { shape_type: 'box', dimensions: l.size, local_position: l.position } : { shape_type: 'circle', radius: l.radius, local_position: l.position };
 
 const MAP_KINDS = Object.freeze(['interior', 'exterior']);
 /** Without a template, each section uses one of the engine's own entity types. */
@@ -27254,14 +27303,17 @@ function buildMapPackets(definition, { templates = {}, decorate = null, prop_typ
                 movable: !!(p.movable ?? prop_types[p.type]?.movable), home_position: null, home_rotation: p.rotation ?? 0, ...p.data } };
         packet.data.home_position = [...packet.position];
         if (p.rotation) packet.rotation = p.rotation;
-        if (p.light) packet.light_shape = { shape_type: 'circle', radius: finite(p.light.radius, 'light radius'), local_position: p.light.position ?? [0, 0] };
+        const light = p.light ?? prop_types[p.type]?.light, blocks = p.blocks_light ?? prop_types[p.type]?.blocks_light;
+        if (light) { packet.data.emission = declaredLight(light); packet.light_shape = lightShape(packet.data.emission); }
+        if (blocks !== undefined) packet.blocks_light = !!blocks;
         push('placements', i, p, packet);
     });
 
     // Free-standing lights (a light carried by a prop is that placement's `light`).
-    (definition.lights ?? []).forEach((l, i) => push('lights', i, l, { ...kind_of('light', l.template), position: [finite(l.position[0], 'x'), finite(l.position[1], 'y')],
-        render_shape: { shape_type: 'circle', radius: l.render_radius ?? 20 }, light_shape: { shape_type: 'circle', radius: finite(l.radius, 'light radius') },
-        data: { role: l.role ?? 'lamp', authored_id: l.authored_id ?? `lamp_${i}`, ...l.data } }));
+    (definition.lights ?? []).forEach((l, i) => { const emission = declaredLight({ ...l, position: null });
+        push('lights', i, l, { ...kind_of('light', l.template), position: [finite(l.position[0], 'x'), finite(l.position[1], 'y')],
+            render_shape: { shape_type: 'circle', radius: l.render_radius ?? 20 }, light_shape: lightShape(emission),
+            data: { role: l.role ?? 'lamp', authored_id: l.authored_id ?? `lamp_${i}`, emission, ...l.data } }); });
 
     // Triggers: exits, rooms, zones. Each names its role.
     (definition.triggers ?? []).forEach((r, i) => push('triggers', i, r, { ...kind_of('trigger', r.template), ...box(r.x, r.y, r.w, r.h),
@@ -27297,7 +27349,7 @@ function buildMapPackets(definition, { templates = {}, decorate = null, prop_typ
     return { kind, entries, openings, spawn: definition.spawn ? [...definition.spawn] : null, door_kinds: kinds };
 }
 
-return Object.freeze({get DOOR_KINDS(){return m142.DOOR_KINDS;},get HINGE(){return m142.HINGE;},get validateDoorKind(){return m142.validateDoorKind;},get MAP_KINDS(){return MAP_KINDS;},get DEFAULT_KINDS(){return DEFAULT_KINDS;},get buildMapPackets(){return buildMapPackets;}});
+return Object.freeze({get DOOR_KINDS(){return m142.DOOR_KINDS;},get HINGE(){return m142.HINGE;},get validateDoorKind(){return m142.validateDoorKind;},get LIGHT_SHADOWS(){return LIGHT_SHADOWS;},get LIGHT_ANIMATIONS(){return LIGHT_ANIMATIONS;},get declaredLight(){return declaredLight;},get MAP_KINDS(){return MAP_KINDS;},get DEFAULT_KINDS(){return DEFAULT_KINDS;},get buildMapPackets(){return buildMapPackets;}});
 })();
 // src/engine/basement/maps/rooms.mjs
 const m144 = (()=>{
@@ -27655,7 +27707,7 @@ const m140 = (()=>{
 
 
 
-return Object.freeze({get buildMapPackets(){return m141.buildMapPackets;},get MAP_KINDS(){return m141.MAP_KINDS;},get DEFAULT_KINDS(){return m141.DEFAULT_KINDS;},get DOOR_KINDS(){return m141.DOOR_KINDS;},get HINGE(){return m141.HINGE;},get validateDoorKind(){return m141.validateDoorKind;},get mapInstance(){return m143.mapInstance;},get mapSystem(){return m143.mapSystem;},get roomGraph(){return m144.roomGraph;}});
+return Object.freeze({get buildMapPackets(){return m141.buildMapPackets;},get declaredLight(){return m141.declaredLight;},get LIGHT_SHADOWS(){return m141.LIGHT_SHADOWS;},get LIGHT_ANIMATIONS(){return m141.LIGHT_ANIMATIONS;},get MAP_KINDS(){return m141.MAP_KINDS;},get DEFAULT_KINDS(){return m141.DEFAULT_KINDS;},get DOOR_KINDS(){return m141.DOOR_KINDS;},get HINGE(){return m141.HINGE;},get validateDoorKind(){return m141.validateDoorKind;},get mapInstance(){return m143.mapInstance;},get mapSystem(){return m143.mapSystem;},get roomGraph(){return m144.roomGraph;}});
 })();
 // src/game/levels/apartment-definition.mjs
 const m139 = (()=>{
@@ -27689,10 +27741,11 @@ function interiorMapDefinition({ map_id, map, rooms = null }) {
             walls: map.walls ?? [],
             placements: layout.props.map((p, index) => {
                 const lamp = layout.lamps.find(l => l.parent_prop === index);
-                const emission = p.light ? { radius: p.light.radius, color: p.light.color, position: [p.light.dx ?? 0, p.light.dy ?? 0] } : lamp ? { radius: lamp.lightRadius, color: lamp.color, position: [0, 0] } : null;
-                return { type: layout.prop_types[index], x: p.x, y: p.y, width: p.width, height: p.height, ...(emission ? { light: emission } : {}), source: p, emission };
+                // A prop's own light is a shadowless pool; a lamp standing on it is a shadowed fixture.
+                const light = p.light ? { ...p.light, shadows: p.light.shadows ?? 'none' } : lamp ? { radius: lamp.lightRadius, color: lamp.color, intensity: lamp.intensity } : null;
+                return { type: layout.prop_types[index], x: p.x, y: p.y, width: p.width, height: p.height, ...(light ? { light } : {}), source: p };
             }),
-            lights: layout.lamps.filter(l => l.parent_prop === undefined).map(l => ({ position: [l.x, l.y], radius: l.lightRadius, source: l })),
+            lights: layout.lamps.filter(l => l.parent_prop === undefined).map(l => ({ position: [l.x, l.y], radius: l.lightRadius, color: l.color, intensity: l.intensity, source: l })),
             triggers: (map.transitions ?? []).map((r, index) => ({ ...r, role: 'transition', authored_id: `exit_${index}`, data: { target: r.target, label: r.label ?? null } })),
             rooms: rooms.rooms ?? {},
             doors: (rooms.doors ?? []).map(d => ({ ...d, source: d })),
@@ -27707,7 +27760,6 @@ function decorate(packet, { section, source }) {
     if (section === 'placements') {
         const p = source.source;
         Object.assign(data, { appearance: structuredClone(p), interaction_type: p.interactionType ?? null, room_id: p.roomId ?? null, note_id: p.noteId ?? null });
-        if (source.emission) data.emission = source.emission;
     }
     if (section === 'lights') data.appearance = structuredClone(source.source);
     if (section === 'doors' || section === 'cloths') data.appearance = source.source;
@@ -34400,7 +34452,7 @@ return Object.freeze({get PROP_FAMILIES(){return PROP_FAMILIES;},get hasPropArt(
 const m210 = Object.freeze({default:{
  "indoor": { "tint": "rgb(22, 10, 48)", "darkness": 0.95, "lamp_glow": 0.08 },
  "outdoor": { "lamp_glow": 0.22 },
- "lamp": { "inner_radius": 10, "cut": [[0, 1], [1, 0]], "glow_stops": [[0, "#ffffff"], [0.1, "$color"], [0.6, "$color"], [1, "rgba(0,0,0,0)"]], "resolution": 64 },
+ "lamp": { "inner_radius": 10, "cut": [[0, 1], [1, 0]], "glow_stops": [[0, "#ffffff"], [0.1, "$color"], [0.6, "$color"], [1, "rgba(0,0,0,0)"]], "resolution": 64, "settle": 0.3 },
  "soft": { "cut": [[0, 1], [0.45, 0.45], [1, 0]], "glow": 0.22, "glow_stops": [[0, "$color"], [1, "rgba(0,0,0,0)"]], "color": "#ffd9b0", "intensity": 0.8 },
  "area": { "cut": [[0, 1], [0.5, 0.9], [1, 0]], "soft_cut": [[0, 1], [0.3, 0.85], [0.7, 0.35], [1, 0]], "glow": 0.22, "glow_stops": [[0, "$color"], [0.55, "$color"], [1, "rgba(0,0,0,0)"]] },
  "flicker": { "floor": 0.82, "swing": 0.18 }
@@ -34409,28 +34461,42 @@ const m210 = Object.freeze({default:{
 const m209 = (()=>{
 const LIGHTING = m210.default;
 const {createLightLayer,createLightLayerParts} = m154;
+const {declaredLight} = m140;
 
 const stops=(list,color)=>list.map(([o,c])=>[o,c==='$color'?color:c]);
 /**
  * The game's lighting look over the Basement light layer. A scene gives its rooms and its lights;
- * this keeps each shadowed lamp's visibility polygon (rebuilt only when the lamp moves or changes
- * reach) and returns the layer's packets with the strength to draw it at.
+ * this keeps each shadowed light's visibility polygon and returns the layer's packets with the strength
+ * to draw it at.
  *
- * Lights: {id, kind: 'lamp' | 'soft', position, radius | size + round + soft, color, intensity, flicker, lit}
- *  lamp  a fixture: shadowed by walls, a warm glow over its reach
- *  soft  a pool of light with no shadow (a candle, a screen, sun through a window); with `size` it is a
- *        rounded strip. `flicker` (rad/s) makes it breathe.
+ * Lights are the engine's declared lights (maps `declaredLight`) placed in the world:
+ *  {id, position, shape: 'point' | 'strip', radius | size + round + soft, color, intensity, shadows, animation, lit}
+ *  shadows 'dynamic' | 'static'  a fixture: shadowed (by walls, and with 'dynamic' by every body that
+ *                                blocks light, a door leaf), a warm glow over its reach
+ *  shadows 'none'                a pool of light with no shadow (a candle, a screen, a vending machine);
+ *                                a strip is a rounded rectangle
+ *  animation  steady, flicker (the light breathes at `rate`) or pulse (1 ± `depth` at `rate` rad/s)
  * `lit` (0..1) is the room's light switch. Rooms: {rects, type: 'outdoor' | 'indoor', fill, lit}:
  * an outdoor room shows the sky's darkness, a room with `fill` is no darker than that while lit.
+ *
+ * A polygon is kept until its light moves or changes reach, or (dynamic shadows) a blocker in reach
+ * moves; a light stays a still picture once its blockers have been at rest for `look.lamp.settle` s.
  */
 class sceneLighting{
     #world;#polygons=new Map();
     constructor(world,{look=LIGHTING}={}){this.#world=world;this.look=look;}
-    #polygon(light){
-        const key=light.id??`${light.position}`,at=`${light.position[0]},${light.position[1]},${light.radius}`,cached=this.#polygons.get(key);
-        if(cached?.at===at)return cached.points;
-        const points=this.#world.getVisibilityPolygon({origin:light.position,radius:light.radius,resolution:this.look.lamp.resolution}).points;
-        this.#polygons.set(key,{at,points});return points;
+    #polygon(light,time){
+        const key=light.id??`${light.position}`,at=`${light.position[0]},${light.position[1]},${light.radius},${light.shadows}`,cached=this.#polygons.get(key);
+        const query={origin:light.position,radius:light.radius,include_moving:light.shadows==='dynamic'};
+        if(cached?.at===at&&(!query.include_moving||same(cached.moving,this.#world.getMovingLightBlockers(query))))return cached;
+        const {points,moving}=this.#world.getVisibilityPolygon({...query,resolution:this.look.lamp.resolution});
+        const next={at,points,moving,changed_at:cached?time:-Infinity};this.#polygons.set(key,next);return next;
+    }
+    #animate(l,time){
+        const a=l.animation;
+        if(a?.kind==='flicker')return this.look.flicker.floor+this.look.flicker.swing*Math.sin(time*a.rate+l.position[0]*.7)*Math.sin(time*a.rate*.37+l.position[1]);
+        if(a?.kind==='pulse')return 1+a.depth*Math.sin(time*a.rate+phase(l.id));
+        return 1;
     }
     /**
      * The layer's packets and the strength to draw it at. With `extent` (the map's {left, top, right,
@@ -34444,11 +34510,14 @@ class sceneLighting{
         const out=[];
         for(const l of lights){
             const lit=l.lit??1;if(lit<.01)continue;
-            if(l.kind==='lamp'){const k=(l.intensity??1)*lit;out.push({still:true,position:l.position,radius:l.radius,inner_radius:look.lamp.inner_radius,polygon:this.#polygon(l),intensity:k,cut:look.lamp.cut,color:l.color,glow:base*Math.min(1,k),glow_stops:stops(look.lamp.glow_stops,l.color)});continue;}
-            const f=l.flicker?look.flicker.floor+look.flicker.swing*Math.sin(time*l.flicker+l.position[0]*.7)*Math.sin(time*l.flicker*.37+l.position[1]):1;
+            const f=this.#animate(l,time),steady=(l.animation?.kind??'steady')==='steady';
+            if(l.shadows!=='none'){
+                const shadow=this.#polygon(l,time),k=(l.intensity??1)*lit*f,still=steady&&time-shadow.changed_at>=look.lamp.settle;
+                out.push({still,position:l.position,radius:l.radius,inner_radius:look.lamp.inner_radius,polygon:shadow.points,intensity:k,cut:look.lamp.cut,color:l.color,glow:base*Math.min(1,k),glow_stops:stops(look.lamp.glow_stops,l.color)});continue;
+            }
             const a=(l.intensity??look.soft.intensity)*f*lit,color=l.color??look.soft.color;
-            if(l.size)out.push({still:!l.flicker,shape:'area',position:l.position,size:l.size,round:l.round,intensity:a,cut:l.soft?look.area.soft_cut:look.area.cut,color,glow:Math.min(1,look.area.glow*a),glow_stops:stops(look.area.glow_stops,color)});
-            else out.push({still:!l.flicker,position:l.position,radius:l.radius,intensity:a,cut:look.soft.cut,color,glow:Math.min(1,look.soft.glow*a),glow_stops:stops(look.soft.glow_stops,color)});
+            if(l.shape==='strip')out.push({still:steady,shape:'area',position:l.position,size:l.size,round:l.round,intensity:a,cut:l.soft?look.area.soft_cut:look.area.cut,color,glow:Math.min(1,look.area.glow*a),glow_stops:stops(look.area.glow_stops,color)});
+            else out.push({still:steady,position:l.position,radius:l.radius,intensity:a,cut:look.soft.cut,color,glow:Math.min(1,look.soft.glow*a),glow_stops:stops(look.soft.glow_stops,color)});
         }
         // Lamps cut first, then the soft lights, as the classic layer did.
         out.sort((a,b)=>(a.polygon?0:1)-(b.polygon?0:1));
@@ -34456,19 +34525,17 @@ class sceneLighting{
         return {packets:createLightLayer({bounds,tint:look.indoor.tint,areas,lights:out}),opacity:ambient};
     }
 }
-/** A native level's lights: its lamps, the props that carry a light, and the layout's soft lights. */
+/** A native level's lights: its lamps and the props that carry a light (their declared `emission`), and the layout's soft lights. */
 function levelLights(level,{blend=1,lightAt=()=>1}={}){
-    const lights=[],reach=body=>{const b=level.physics.getBodyBounds(body,{bounds_type:'light'});return (b.right-b.left)/2;};
-    for(const lamp of level.lamps){const a=lamp.data.appearance??{},p=lamp.getRenderState(blend).position;lights.push({id:lamp.data.authored_id,kind:'lamp',position:[...p],radius:reach(lamp),color:a.color,intensity:a.intensity??1,lit:lightAt(...p)});}
-    for(const prop of level.props){
-        const e=prop.data.emission;if(!e||prop.visible===false)continue;
-        const p=prop.getRenderState(blend).position,at=[p[0]+(e.position?.[0]??0),p[1]+(e.position?.[1]??0)],soft=prop.data.appearance?.light;
-        lights.push(soft?{id:prop.data.authored_id,kind:'soft',position:at,radius:e.radius,color:soft.color,intensity:soft.intensity,flicker:soft.flicker,lit:lightAt(...at)}
-            :{id:prop.data.authored_id,kind:'lamp',position:at,radius:e.radius,color:e.color,lit:lightAt(...at)});
-    }
-    (level.definition.soft_lights??[]).forEach((s,i)=>lights.push({id:`soft_${i}`,kind:'soft',position:[s.x,s.y],...(s.w?{size:[s.w,s.h],round:s.round,soft:!!s.soft}:{radius:s.radius}),color:s.color,intensity:s.intensity,flicker:s.flicker,lit:lightAt(s.x,s.y)}));
+    const lights=[],place=(id,e,p)=>{const at=[p[0]+e.position[0],p[1]+e.position[1]];lights.push({...e,id,position:at,lit:lightAt(...at)});};
+    for(const lamp of level.lamps)place(lamp.data.authored_id,lamp.data.emission,lamp.getRenderState(blend).position);
+    for(const prop of level.props)if(prop.data.emission&&prop.visible!==false)place(prop.data.authored_id,prop.data.emission,prop.getRenderState(blend).position);
+    (level.definition.soft_lights??[]).forEach((s,i)=>place(`soft_${i}`,declaredLight({...s,...(s.w?{size:[s.w,s.h]}:{}),shadows:'none'}),[s.x,s.y]));
     return lights;
 }
+const same=(a,b)=>a.length===b.length&&a.every((m,i)=>m.body_id===b[i].body_id&&m.rotation===b[i].rotation&&m.position[0]===b[i].position[0]&&m.position[1]===b[i].position[1]);
+/** A steady phase for a light's pulse from its id, so lights pulse out of step and keep their beat when pushed. */
+function phase(id=''){let h=2166136261;for(const c of String(id))h=Math.imul(h^c.charCodeAt(0),16777619);return (h>>>0)/2**32*Math.PI*2;}
 
 return Object.freeze({get LIGHTING(){return LIGHTING;},get sceneLighting(){return sceneLighting;},get levelLights(){return levelLights;}});
 })();

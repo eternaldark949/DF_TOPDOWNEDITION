@@ -28,10 +28,11 @@ export function interiorMapDefinition({ map_id, map, rooms = null }) {
             walls: map.walls ?? [],
             placements: layout.props.map((p, index) => {
                 const lamp = layout.lamps.find(l => l.parent_prop === index);
-                const emission = p.light ? { radius: p.light.radius, color: p.light.color, position: [p.light.dx ?? 0, p.light.dy ?? 0] } : lamp ? { radius: lamp.lightRadius, color: lamp.color, position: [0, 0] } : null;
-                return { type: layout.prop_types[index], x: p.x, y: p.y, width: p.width, height: p.height, ...(emission ? { light: emission } : {}), source: p, emission };
+                // A prop's own light is a shadowless pool; a lamp standing on it is a shadowed fixture.
+                const light = p.light ? { ...p.light, shadows: p.light.shadows ?? 'none' } : lamp ? { radius: lamp.lightRadius, color: lamp.color, intensity: lamp.intensity } : null;
+                return { type: layout.prop_types[index], x: p.x, y: p.y, width: p.width, height: p.height, ...(light ? { light } : {}), source: p };
             }),
-            lights: layout.lamps.filter(l => l.parent_prop === undefined).map(l => ({ position: [l.x, l.y], radius: l.lightRadius, source: l })),
+            lights: layout.lamps.filter(l => l.parent_prop === undefined).map(l => ({ position: [l.x, l.y], radius: l.lightRadius, color: l.color, intensity: l.intensity, source: l })),
             triggers: (map.transitions ?? []).map((r, index) => ({ ...r, role: 'transition', authored_id: `exit_${index}`, data: { target: r.target, label: r.label ?? null } })),
             rooms: rooms.rooms ?? {},
             doors: (rooms.doors ?? []).map(d => ({ ...d, source: d })),
@@ -46,7 +47,6 @@ function decorate(packet, { section, source }) {
     if (section === 'placements') {
         const p = source.source;
         Object.assign(data, { appearance: structuredClone(p), interaction_type: p.interactionType ?? null, room_id: p.roomId ?? null, note_id: p.noteId ?? null });
-        if (source.emission) data.emission = source.emission;
     }
     if (section === 'lights') data.appearance = structuredClone(source.source);
     if (section === 'doors' || section === 'cloths') data.appearance = source.source;

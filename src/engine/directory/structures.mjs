@@ -2,7 +2,7 @@
 // DATA STRUCTURES: what each kind of library resource looks like, and the checks that an entry is
 // well formed. A structure names fields, units and defaults; it never says what the data does.
 //
-// prop_catalog   { types: { <type>: { defaults: {...authored options}, movable?: boolean } }, families?: { <family>: { look } } }
+// prop_catalog   { types: { <type>: { defaults: {...authored options}, movable?: boolean, blocks_light?: boolean, light?: {radius, ...} } }, families?: { <family>: { look } } }
 //                One entry per prop type. A placement names its type and lists only what differs.
 //                A family is a kind of piece drawn by one artist (a bentwood chair, a round table);
 //                its `look` is a schema, { <field>: { kind, default, min?, max?, values?, note? } },
@@ -30,7 +30,7 @@
 import { plain } from './values.mjs';
 
 export const STRUCTURES = Object.freeze({
-    prop_catalog: 'A catalog of prop types and the families they are presets of: { types: { <type>: { defaults, movable? } }, families?: { <family>: { look: { <field>: { kind, default } } } } }.',
+    prop_catalog: 'A catalog of prop types and the families they are presets of: { types: { <type>: { defaults, movable?, blocks_light?, light? } }, families?: { <family>: { look: { <field>: { kind, default } } } } }.',
     map_layout: 'A map\'s placements over a prop catalog: { props: [{ type, x, y, ...fields }], ... }.',
     skeleton: 'A rig hierarchy: { rig_id, joints: [{ name, parent?, position?, rotation?, scale?, limits? }], anchors? }.',
     clip_set: 'Animation clips for one skeleton: { clips: [{ clip_id, duration, tracks, markers? }] }.',
@@ -78,6 +78,8 @@ export function validatePropCatalog(data, where = 'prop_catalog') {
     for (const [type, entry] of Object.entries(data.types)) {
         if (!plain(entry) || !plain(entry.defaults)) fail(where, `type ${type} requires a defaults object`);
         if (entry.movable !== undefined && typeof entry.movable !== 'boolean') fail(where, `type ${type}: movable must be a boolean`);
+        if (entry.blocks_light !== undefined && typeof entry.blocks_light !== 'boolean') fail(where, `type ${type}: blocks_light must be a boolean`);
+        if (entry.light !== undefined && (!plain(entry.light) || !(Number.isFinite(entry.light.radius) || Array.isArray(entry.light.size)))) fail(where, `type ${type}: a light needs a radius or a size`);
         const { family, look } = entry.defaults;
         if (family !== undefined && !Object.hasOwn(data.families ?? {}, family)) fail(where, `type ${type}: unknown family ${family}`);
         if (look !== undefined) { if (family === undefined) fail(where, `type ${type}: a look needs a family`); checkLook(data.families[family], look, `${where}: type ${type}`); }

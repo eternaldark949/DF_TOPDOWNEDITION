@@ -56,6 +56,7 @@ Constructor options:
 | `linear_damping`, `angular_damping` | `0`, `0`; nonnegative exponential decay rates per second. |
 | `collision_group`, `collision_mask`, `query_mask` | Default role group, `BODY_GROUP.ALL`, `BODY_GROUP.ALL`. |
 | `ghost`, `continuous_collision`, `sleep_enabled`, `active` | `false`, `true`, `true`, `true`. |
+| `blocks_light` | `null`: blocks light when a visibility query's groups include it (static bodies by default). `true` always blocks (a door leaf, a big prop), `false` never (glass). Ghosts never block. |
 | `axis_lock` | `{ x:false, y:false, rotation:false }`. Character contacts do not impart spin, independently of heading control. |
 | `render_shape`, `light_shape` | Optional independent shape packets; absent values fall back to collision bounds. All extents use the same index. |
 | `contact_priority` | `0`; higher-priority movable bodies make lower-priority movable bodies yield. Static scenery always remains immovable. |
@@ -132,7 +133,8 @@ Filter options: `include_groups=ALL`, `exclude_groups=0`, `query_bit=ALL`, `igno
 | `peruseNearbyEntities(reference, options={}, results=[])` | `near_range:400` default, centre-distance filter. Hits contain `body`, `body_id`, `distance`, `direction`. Self is ignored by default. |
 | `findNearestEntity(reference, options={})` | Nearest hit or `null`. |
 | `raycast({from,to,...filters}, result={})` | Nearest thin-cast contact or `null`. |
-| `getVisibilityPolygon({origin,radius,resolution=64,...filters})` | `{origin,radius,points}`: what a point light reaches, every ray stopped at the first blocking body (static by default; ghosts never block; a body holding the origin does not block it). Points run by angle; extra rays at each corner keep shadow edges exact. |
+| `getVisibilityPolygon({origin,radius,resolution=64,include_moving=true,...filters})` | `{origin,radius,points,moving}`: what a point light reaches, every ray stopped at the first blocking body (by `blocks_light`, else static by default; ghosts never block; a body holding the origin does not block it). Points run by angle; extra rays at each corner keep shadow edges exact. `include_moving:false` leaves out bodies that are not static; `moving` lists those that blocked, `{body_id,position,rotation}`. |
+| `getMovingLightBlockers({origin,radius,include_moving,...filters})` | The same query's blockers that are not static, with their poses, without casting: compare with a kept polygon's `moving` to know when it is stale. |
 | `shapeCast({collision_shape,from,to,from_rotation=0,to_rotation=from_rotation,...filters}, results=[])` | Contacts with `fraction`, `distance`, `normal`, `world_point`, `penetration_depth`, `body`, `body_id`. |
 | `overlapShape({collision_shape,position,rotation=0,...filters}, results=[])` | Exact overlap contacts. |
 | `isPlacementClear(body_or_shape, position, options={})` | Boolean. Touching counts as occupied within tolerance. |

@@ -97,30 +97,30 @@
     },
     "apartment-door": {
       "title": "A door swinging open and shut beside the apartment lamps",
-      "calibration_ms": 51.6,
+      "calibration_ms": 56.1,
       "door_lamps": 8,
-      "frames": 305,
-      "fps": 38.1,
+      "frames": 208,
+      "fps": 25.9,
       "cpu": {
-        "mean": 14.55049180327762,
-        "p95": 21
+        "mean": 26.81826923077908,
+        "p95": 37.3000000002794
       },
       "lighting": {
-        "mean": 2.0416393442625242,
-        "p95": 2.700000000069849
+        "mean": 11.983173076907406,
+        "p95": 16.299999999813735
       },
       "top": [
         {
           "label": "Render:Total",
-          "mean": 10.713
+          "mean": 21.071
         },
         {
           "label": "Render:Lighting",
-          "mean": 2.042
+          "mean": 11.983
         },
         {
           "label": "Audio:Ambience",
-          "mean": 0.007
+          "mean": 0.008
         }
       ],
       "map": "apt_949",
@@ -130,8 +130,8 @@
         "pedestrians": 0
       },
       "relative": {
-        "cpu": 0.282,
-        "lighting": 0.0396
+        "cpu": 0.478,
+        "lighting": 0.2136
       },
       "errors": []
     },
