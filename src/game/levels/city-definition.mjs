@@ -12,9 +12,9 @@ export function cityMapDefinition({ map, regions = { size: 1024, radius: 3072 } 
     if (!map) throw new TypeError('Unknown map: sdc');
     const city = structuredClone(CITY);
     if (city.size[0] !== map.width || city.size[1] !== map.height) throw new Error(`The exported city is ${city.size.join('×')} px, the map record ${map.width}×${map.height}: run node tools/export-city.mjs`);
-    const { roads, blocks, pavements, crosswalks, floor_zones, pools, buildings, neon, foliage, props } = city;
+    const { roads, streets, blocks, pavements, crosswalks, floor_zones, pools, buildings, neon, foliage, props } = city;
     return {
-        map, city: { roads, blocks, pavements, crosswalks, floor_zones, pools, buildings, neon, foliage, props },
+        map, city: { roads, streets, blocks, pavements, crosswalks, floor_zones, pools, buildings, neon, foliage, props },
         definition: {
             map_id: 'sdc', kind: 'exterior', size: [map.width, map.height], boundary: { thickness: 20 }, spawn: [map.spawn.x, map.spawn.y], regions,
             walls: [...city.colliders, ...city.walls],

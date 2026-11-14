@@ -1,5 +1,5 @@
 {
-  "createdAt": "2026-11-14T14:13:48.520Z",
+  "createdAt": "2026-11-14T14:24:57.504Z",
   "duration": 8000,
   "warmup": 3000,
   "viewport": [
@@ -290,15 +290,23 @@
     },
     "light-city": {
       "title": "The native light layer over the city at night, standing on Crimson Blvd",
-      "calibration_ms": 54.2,
+      "calibration_ms": 57,
       "frames": 481,
       "cpu": {
-        "mean": 2.4316008315957007,
+        "mean": 2.54033264032567,
         "p95": 3.2000000001862645
       },
       "lighting": {
-        "mean": 2.4316008315957007,
+        "mean": 2.54033264032567,
         "p95": 3.2000000001862645
+      },
+      "paints_per_s": {
+        "light": 0,
+        "ground": 0
+      },
+      "tiles_mb": {
+        "light": 18,
+        "ground": 0
       },
       "shadows": {
         "mean": 0,
@@ -308,33 +316,115 @@
       "lights": 444,
       "map": "sdc",
       "relative": {
-        "cpu": 0.0449,
-        "lighting": 0.0449
+        "cpu": 0.0446,
+        "lighting": 0.0446
       },
       "errors": []
     },
     "light-city-drive": {
       "title": "The native light layer over the city at night, driving Crimson Blvd at 500 px/s",
-      "calibration_ms": 55.8,
+      "calibration_ms": 54.6,
       "frames": 481,
       "cpu": {
-        "mean": 4.39002079002534,
-        "p95": 6
+        "mean": 4.200831600827922,
+        "p95": 5.300000000279397
       },
       "lighting": {
-        "mean": 4.39002079002534,
-        "p95": 6
+        "mean": 4.200831600827922,
+        "p95": 5.300000000279397
+      },
+      "paints_per_s": {
+        "light": 2.3,
+        "ground": 0
+      },
+      "tiles_mb": {
+        "light": 24,
+        "ground": 0
       },
       "shadows": {
-        "mean": 0.012,
+        "mean": 0.01,
         "p95": 0
       },
       "live_lights": 0,
       "lights": 515,
       "map": "sdc",
       "relative": {
-        "cpu": 0.0787,
-        "lighting": 0.0787
+        "cpu": 0.0769,
+        "lighting": 0.0769
+      },
+      "errors": []
+    },
+    "city-native": {
+      "title": "The native city at night, ground and light, standing on Crimson Blvd",
+      "calibration_ms": 53,
+      "frames": 481,
+      "cpu": {
+        "mean": 7.012058212058793,
+        "p95": 9.300000000279397
+      },
+      "lighting": {
+        "mean": 5.53762993761561,
+        "p95": 7.5
+      },
+      "ground": {
+        "mean": 1.4744282744431834,
+        "p95": 1.7999999998137355
+      },
+      "paints_per_s": {
+        "light": 0,
+        "ground": 0
+      },
+      "tiles_mb": {
+        "light": 18,
+        "ground": 20
+      },
+      "shadows": {
+        "mean": 0,
+        "p95": 0
+      },
+      "live_lights": 0,
+      "lights": 444,
+      "map": "sdc",
+      "relative": {
+        "cpu": 0.1323,
+        "lighting": 0.1045
+      },
+      "errors": []
+    },
+    "city-native-drive": {
+      "title": "The native city at night, ground and light, driving Crimson Blvd at 500 px/s",
+      "calibration_ms": 55.5,
+      "frames": 458,
+      "cpu": {
+        "mean": 13.214410480354836,
+        "p95": 22.40000000037253
+      },
+      "lighting": {
+        "mean": 7.49606986899909,
+        "p95": 9.799999999813735
+      },
+      "ground": {
+        "mean": 5.718340611355745,
+        "p95": 11.100000000093132
+      },
+      "paints_per_s": {
+        "light": 2.3,
+        "ground": 4
+      },
+      "tiles_mb": {
+        "light": 24,
+        "ground": 20
+      },
+      "shadows": {
+        "mean": 0.021,
+        "p95": 0
+      },
+      "live_lights": 0,
+      "lights": 515,
+      "map": "sdc",
+      "relative": {
+        "cpu": 0.2381,
+        "lighting": 0.1351
       },
       "errors": []
     }

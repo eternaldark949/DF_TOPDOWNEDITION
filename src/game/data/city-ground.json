@@ -1,0 +1,15 @@
+{
+ "tile_size": 512,
+ "tile_ahead": 256,
+ "lot": "#221e28", "lot_grain": ["rgba(255, 240, 255, 0.022)", "rgba(0, 0, 0, 0.14)"], "lot_grain_count": 420,
+ "zone_tint": 0.45,
+ "lawn": "#15281b", "lawn_hi": "#20402a", "lawn_lo": "rgba(6, 18, 10, 0.7)", "lawn_hollow": "rgba(4, 14, 8, 0.35)",
+ "asphalt": "#16141b", "asphalt_hi": "#1e1b25", "asphalt_grain": ["rgba(255, 240, 255, 0.03)", "rgba(0, 0, 0, 0.18)"],
+ "wheel_path": "rgba(0, 0, 0, 0.16)",
+ "dash": "rgba(232, 200, 140, 0.62)", "dash_pattern": [22, 18], "centre": "rgba(196, 168, 255, 0.55)", "edge": "rgba(226, 214, 240, 0.16)",
+ "road_name": { "colour": "rgba(232, 214, 190, 0.22)", "font": { "family": "Montserrat, sans-serif", "size": 11, "weight": 600 }, "every": 600 },
+ "junction_edge": "rgba(0, 0, 0, 0.25)", "manhole": "#1d1a22", "manhole_rim": "rgba(232, 200, 140, 0.18)", "manhole_grill": "rgba(0, 0, 0, 0.4)",
+ "pave_a": "#2b2731", "pave_b": "#27232d", "pave_hi": "rgba(255, 236, 250, 0.035)", "pave_size": 25, "seam": "rgba(8, 6, 12, 0.55)",
+ "kerb": "#3b3542", "kerb_lit": "rgba(232, 200, 140, 0.22)", "drain": "#141218", "drain_grill": "rgba(120, 110, 130, 0.35)",
+ "stripe": "rgba(234, 226, 212, 0.6)", "stripe_wear": "rgba(22, 20, 27, 0.55)"
+}

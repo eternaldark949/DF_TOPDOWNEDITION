@@ -1,3 +1,5 @@
 # Game data
 
 Dimensions Freelancer's content, in the shapes the Directory defines: the prop catalog, map layouts, `GAME_DB`, character builds, items, weapons, vehicles and balance numbers. Data only, no behaviour. Game boot registers these libraries into the Directory's registry, and the single-file build packs them into `DFAB V8.html`.
+
+`game-assets/generated/sdc-city.json` is the city as its seeded classic generator made it, exported once by `node tools/export-city.mjs` (`--check` fails when the generator no longer makes the same file): roads and their streets as the traffic network lays them out, blocks, pavements, crossings, floor zones, buildings, walls, lamps, neon, foliage, decor and doors. Generated, so it is not edited by hand. `game-lighting.json` and `city-ground.json` are the looks of the native light layer and the city's ground.

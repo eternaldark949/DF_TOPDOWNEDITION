@@ -33,9 +33,24 @@ function exportCity() {
             vertical: layout.verticalRoads.map(o => plain(o, ['name', 'lanes', 'centerX', 'roadWidth', 'footprint', 'leftPavement', 'rightPavement'])),
             angled: layout.angledRoads.map(o => ({ ...plain(o, ['name', 'lanes', 'thickness', 'curved']), points: o.points.map(point) }))
         },
+        // The streets as the traffic network lays them out: each road's outline, and its centre line as stops
+        // (where a line along it turns), each with the offset of one pixel across it, so any line along the road
+        // is the stops moved across by its offset. Intersections are where roads meet.
+        streets: {
+            roads: game.traffic.network.roads.map(road => {
+                const stops = road.path ? [0, ...road.path.bends(), road.length] : [0, road.length];
+                return { id: road.id, name: road.name ?? null, lanes: road.numLanes, symmetrical: !!road.symmetrical, lane_width: road.laneWidth, thickness: r(road.thickness), ...rect(road),
+                    outline: road.getCorners().map(point), stops: stops.map(t => {
+                        const p = road.paramToWorld(t, 0), q = road.paramToWorld(t, 1), far = road.paramToWorld(t, 100);
+                        if (Math.abs(far.x - p.x - 100 * (q.x - p.x)) > .05 || Math.abs(far.y - p.y - 100 * (q.y - p.y)) > .05) throw new Error(`Road ${road.id}: a line along it is not its centre moved across`);
+                        return [r(p.x), r(p.y), Math.round((q.x - p.x) * 1e4) / 1e4, Math.round((q.y - p.y) * 1e4) / 1e4];
+                    }) };
+            }),
+            intersections: game.traffic.network.intersections.map(i => ({ x: r(i.x), y: r(i.y), w: r(i.width), h: r(i.height), ...(i.poly ? { poly: i.poly.map(point) } : {}) }))
+        },
         blocks: layout.blocks.map(b => ({ name: b.name, row: b.row, col: b.col, type: b.type, ...rect(b) })),
         pavements: m.pavements.map(p => ({ ...rect(p), ...(p.poly ? { poly: p.poly.map(point) } : {}), ...(p.road ? { road: p.road } : {}) })),
-        crosswalks: m.crosswalks.map(c => ({ ...rect(c), orientation: c.orientation })),
+        crosswalks: m.crosswalks.map(c => ({ ...rect(c), orientation: c.orientation, ...(c.axis ? { poly: c.poly.map(point), axis: Object.fromEntries(['ux', 'uy', 'nx', 'ny', 'ox', 'oy', 'a0', 'a1', 'hT'].map(k => [k, Math.round(c.axis[k] * 1e4) / 1e4])) } : {}) })),
         floor_zones: m.floorZones.map(z => ({ ...rect(z), color: z.color, ...(z.biggs ? { biggs: true } : {}) })),
         pools: m.pools.map(p => plain(p, ['x', 'y', 'r', 'park'])),
         buildings: layout.placedBuildings.map((p, i) => {

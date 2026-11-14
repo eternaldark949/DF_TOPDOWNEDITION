@@ -157,3 +157,28 @@ What made the difference, all in the shared code:
 Driving still costs 2 ms more than standing: that is the tiles ahead being painted, about 40 lamp gradients
 each, on Chromium's software canvas, close to one tile pair per 1000 px.
 
+## Phase 4, step 3: the city's ground drawn natively
+
+The export now carries the streets as the traffic network lays them out (each road's outline and its centre
+line as stops with their offset across, the junctions, angled crossings' frames). `src/game/presentation/city-ground.mjs`
+draws the ground from it, with the classic look in `src/game/data/city-ground.json`: the lots and their grain, floor
+zones and lawns, roads (wheel paths, lane dashes, the centre line, edges, names), junctions with manholes,
+pavements with kerbs and drains, and worn crossings. It is painted once per 512 px tile through a pictureCache,
+the tiles in view stamped and those 256 px ahead readied, as the classic ground baker did. Lot grounds round
+the buildings and the parks come with the buildings in step 5.
+
+Two scenes draw the ground at full size with the light layer over it through drawLayer's half-size surface,
+as a native host would: `city-native` (standing) and `city-native-drive` (500 px/s). They hold `cpu`, the two
+together.
+
+| Scene | Ground + light | Ground | Light | Tiles painted a second | Baked tiles in use |
+|---|---|---|---|---|---|
+| city-native | 7.0 ms | 1.5 ms | 5.5 ms | 0 | light 18 MB, ground 20 MB |
+| city-native-drive | 13.2 ms (p95 22) | 5.7 ms | 7.5 ms | light 2.3, ground 4 | light 24 MB, ground 20 MB |
+| classic city-night | 108 ms frame | | 40 ms | | |
+
+On this software canvas the light layer costs about 3 ms more over a full-size canvas than over a half-size
+one: drawLayer scales its half-size surface up over the whole view. Driving, a ground tile takes tens of
+milliseconds to paint here. The baked tiles in use come to about 44 MB, over the 32 MB target; the light
+layer's tiles ahead (512 px, snapped out to whole 1024 px tiles) are most of its share.
+

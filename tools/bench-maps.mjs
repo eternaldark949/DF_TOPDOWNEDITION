@@ -40,7 +40,10 @@ const SCENES = [
     { id: 'light-street', title: 'The native light layer over a dense test street: 72 lamps, 8 doors sliding, 12 vending machines, the camera panning', light: 'street', hold: ['lighting'] },
     // Phase 4's gate: the city from its exported map file, streamed round the camera, lit as one outdoor room at night.
     { id: 'light-city', title: 'The native light layer over the city at night, standing on Crimson Blvd', light: 'city', hold: ['lighting'] },
-    { id: 'light-city-drive', title: 'The native light layer over the city at night, driving Crimson Blvd at 500 px/s', light: 'city-drive', hold: ['lighting'] }
+    { id: 'light-city-drive', title: 'The native light layer over the city at night, driving Crimson Blvd at 500 px/s', light: 'city-drive', hold: ['lighting'] },
+    // The city's ground tiles under its light layer, both as a native host draws them: `cpu` is the two together.
+    { id: 'city-native', title: 'The native city at night, ground and light, standing on Crimson Blvd', light: 'city', ground: true, hold: ['cpu'] },
+    { id: 'city-native-drive', title: 'The native city at night, ground and light, driving Crimson Blvd at 500 px/s', light: 'city-drive', ground: true, hold: ['cpu'] }
 ];
 
 const args = process.argv.slice(2), flag = name => args.includes(name);
@@ -76,14 +79,14 @@ function calibrate() {
  * layer every frame for `duration` ms after `warmup`, as the native apartment host does. Returns the layer's
  * cost a frame (`lighting`, and `cpu` the same), the shadow rebuilds' share, and how many lights stayed live.
  */
-async function measureLight({ scene, duration, warmup }) {
+async function measureLight({ scene, ground: with_ground = false, duration, warmup }) {
     const { physicsSystem } = await import('/src/engine/basement/physics/index.mjs');
     const { mapInstance } = await import('/src/engine/basement/maps/index.mjs');
     const { canvasRenderer, pictureCache } = await import('/src/engine/basement/rendering/index.mjs');
     const { sceneLighting, levelLights } = await import('/src/game/presentation/lighting.mjs');
     const { PROP_TYPES } = await import('/src/game/data/game-maps.mjs');
     const physics = new physicsSystem(), W = 1280, H = 720, scale = .5;
-    let definition, options = { prop_types: PROP_TYPES }, camera, doors = [], kind = 'indoor', rooms = [], sky_darkness = 0;
+    let definition, options = { prop_types: PROP_TYPES }, camera, doors = [], kind = 'indoor', rooms = [], sky_darkness = 0, ground = null;
     if (scene.startsWith('city')) {
         const { cityMapDefinition, cityRooms } = await import('/src/game/levels/city-definition.mjs');
         const places = (await import('/src/game/data/game-db/places.json', { with: { type: 'json' } })).default;
@@ -91,6 +94,7 @@ async function measureLight({ scene, duration, warmup }) {
         kind = 'outdoor'; rooms = cityRooms(places.maps.sdc); sky_darkness = .6;   // (the classic sky at 22:00)
         camera = scene === 'city' ? () => [3300, 2500] : t => [1500 + (t * .5) % 9000, 2500];
         options = { prop_types: PROP_TYPES, focus: camera(0) };
+        if (with_ground) { const { cityGround } = await import('/src/game/presentation/city-ground.mjs'); ground = new cityGround(cityMapDefinition({ map: places.maps.sdc }).city, { size: definition.size }); }
     } else if (scene === 'cafe') {
         const { interiorMapDefinition, APARTMENT_MAP_OPTIONS } = await import('/src/game/levels/apartment-definition.mjs');
         const places = (await import('/src/game/data/game-db/places.json', { with: { type: 'json' } })).default;
@@ -112,7 +116,11 @@ async function measureLight({ scene, duration, warmup }) {
     const level = { physics, lamps: map.entities('lamp'), props: map.entities('prop'), definition };
     const lighting = new sceneLighting(physics), pictures = new pictureCache({ max_bytes: 32 * 1048576, budget_ms: 12, densities: [.125, .25, .5, 1, 2] });
     const extent = { left: 0, top: 0, right: definition.size[0], bottom: definition.size[1] };
-    const canvas = Object.assign(document.createElement('canvas'), { width: W * scale, height: H * scale }), ctx = canvas.getContext('2d');
+    // (with the ground, the canvas is full size: the ground at 1:1 and the light layer through drawLayer's half-size surface, as a host draws them)
+    const canvas = Object.assign(document.createElement('canvas'), ground ? { width: W, height: H } : { width: W * scale, height: H * scale }), ctx = canvas.getContext('2d');
+    const tiles = ground && new pictureCache({ max_bytes: 32 * 1048576, budget_ms: 4, densities: [.25, .5, 1, 2] }), grounds = [];
+    const paints = { ground: 0, light: 0 }, held = { ground: 0, light: 0 };   // (tiles painted, and the most baked bytes one frame draws or readies)
+    const paint = pictures.draw.bind(pictures); pictures.draw = (...a) => { const how = paint(...a); if (how === 'paint') paints.light++; return how; };
     let shadow_ms = 0; const cast = physics.getVisibilityPolygon.bind(physics);
     physics.getVisibilityPolygon = p => { const t0 = performance.now(), r = cast(p); shadow_ms += performance.now() - t0; return r; };
     const homes = doors.map(d => [...d.position]), frames = [], shadows = [], live = [];
@@ -124,22 +132,32 @@ async function measureLight({ scene, duration, warmup }) {
             const [cx, cy] = camera(t);
             map.setFocus([cx, cy]); level.lamps = map.entities('lamp'); level.props = map.entities('prop');   // (the map streams round the camera, outside the light layer's time)
             const view = { left: cx - W / 2, top: cy - H / 2, right: cx + W / 2, bottom: cy + H / 2 };
+            let ground_ms = 0; if (t < warmup) { paints.ground = paints.light = 0; held.ground = held.light = 0; }   // (counted over the measured window)
+            ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (ground) {
+                const g0 = performance.now(); tiles.beginFrame(); ctx.setTransform(1, 0, 0, 1, -view.left, -view.top);
+                let bytes = 0;
+                for (const d of ground.createDraws({ view })) { bytes += d.bounds[2] * d.bounds[3] * 4; if (tiles.draw(ctx, { ...d, stamp: !d.prepare }, d.build) === 'paint') paints.ground++; }
+                held.ground = Math.max(held.ground, bytes);
+                ctx.getImageData(0, 0, 1, 1); ground_ms = performance.now() - g0;
+            }
             shadow_ms = 0; const t0 = performance.now();
             pictures.beginFrame();
             const layer = lighting.createLayer({ extent, bounds: view, kind, rooms, sky_darkness, lights: levelLights(level), time: t / 1000 });
-            ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.setTransform(scale, 0, 0, scale, -view.left * scale, -view.top * scale);
-            canvasRenderer.drawLayer(ctx, layer.packets, { opacity: layer.opacity, pictures });
+            held.light = Math.max(held.light, layer.packets.filter(p => p.picture).reduce((n, p) => n + p.picture.bounds[2] * p.picture.bounds[3] * scale * scale * 4, 0));
+            if (ground) { ctx.setTransform(1, 0, 0, 1, -view.left, -view.top); canvasRenderer.drawLayer(ctx, layer.packets, { opacity: layer.opacity, pictures, scale }); }
+            else { ctx.setTransform(scale, 0, 0, scale, -view.left * scale, -view.top * scale); canvasRenderer.drawLayer(ctx, layer.packets, { opacity: layer.opacity, pictures }); }
             ctx.getImageData(0, 0, 1, 1);
             const ms = performance.now() - t0;
-            if (t >= warmup) { frames.push(ms); shadows.push(shadow_ms); live.push(layer.live); }
+            if (t >= warmup) { frames.push(ms); grounds.push(ground_ms); shadows.push(shadow_ms); live.push(layer.live); }
             if (t < warmup + duration) requestAnimationFrame(frame); else done();
         };
         requestAnimationFrame(frame);
     });
     const stat = list => { const sorted = [...list].sort((a, b) => a - b); return { mean: list.reduce((a, b) => a + b, 0) / list.length, p95: sorted[Math.floor(sorted.length * .95)] }; };
-    const lit = stat(frames);
-    return { frames: frames.length, cpu: lit, lighting: lit, shadows: { mean: +stat(shadows).mean.toFixed(3), p95: +stat(shadows).p95.toFixed(3) }, live_lights: +stat(live).mean.toFixed(1), lights: levelLights(level).length, map: definition.map_id };
+    const lit = stat(frames), both = stat(frames.map((ms, i) => ms + grounds[i]));
+    return { frames: frames.length, cpu: ground ? both : lit, lighting: lit, ...(ground && { ground: stat(grounds) }), paints_per_s: { light: +(paints.light / (duration / 1000)).toFixed(1), ground: +(paints.ground / (duration / 1000)).toFixed(1) },
+        tiles_mb: { light: +(held.light / 1048576).toFixed(1), ground: +(held.ground / 1048576).toFixed(1) }, shadows: { mean: +stat(shadows).mean.toFixed(3), p95: +stat(shadows).p95.toFixed(3) }, live_lights: +stat(live).mean.toFixed(1), lights: levelLights(level).length, map: definition.map_id };
 }
 
 /** In the page: load the scene's map at night and put the player (or her car, or a door) to work. */
@@ -211,7 +229,7 @@ try {
         if (scene.light) {
             await page.goto(`http://127.0.0.1:${server.address().port}/tools/fixtures/blank.html`).catch(() => {});
             calibration = await page.evaluate(calibrate);
-            result = await page.evaluate(measureLight, { scene: scene.light, duration, warmup });
+            result = await page.evaluate(measureLight, { scene: scene.light, ground: !!scene.ground, duration, warmup });
         } else {
             await page.goto(`http://127.0.0.1:${server.address().port}/DFAB%20V8.html`, { waitUntil: 'load' });
             await page.waitForFunction("typeof game!=='undefined' && typeof PerformanceBench!=='undefined'");
