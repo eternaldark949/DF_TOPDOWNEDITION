@@ -60,6 +60,26 @@ test('every map layout builds into a native world through the Basement map build
     }
 });
 
+test('every map loads through the one streaming loader: a map inside its radius whole at once, the city round its focus', async () => {
+    const { mapInstance } = await import('../src/engine/basement/maps/index.mjs');
+    const library = createGameAssetLibrary();
+    for (const id of MAP_IDS) {
+        const map = places.maps[id], layout = resolveMapLayout(id), spawn = map.spawn ? [map.spawn.x, map.spawn.y] : undefined;
+        const definition = { map_id: id, size: [map.width, map.height], spawn, boundary: { thickness: 20 }, walls: map.walls ?? [],
+            placements: layout.props.map((p, i) => ({ type: layout.prop_types[i], x: p.x, y: p.y, width: p.width ?? 20, height: p.height ?? 20 })),
+            lights: layout.lamps.map(l => ({ position: [l.x, l.y], radius: l.lightRadius ?? 100 })) };
+        const instance = new mapInstance(new physicsSystem({ asset_library: library }), definition, { prop_types: PROP_TYPES }), entries = instance.packets().length;
+        if (Math.max(map.width, map.height) <= 4096) assert.equal(instance.entities().length, entries, `${id} is whole from the start`);
+        else {                                                         // (the city: its streets become data in phase 4; its size streams today)
+            const far = [map.width - 100, map.height - 100], step = instance.setFocus([far], { budget_ms: Infinity });
+            assert.equal(step.pending, 0, `${id}: the focus can cross the whole map`);
+            const back = instance.setFocus([spawn ?? [0, 0]], { budget_ms: Infinity });
+            assert.equal(back.pending, 0);
+        }
+        instance.destroy();
+    }
+});
+
 test('every map with rooms builds a room graph whose doors join known rooms', async () => {
     const { mapInstance } = await import('../src/engine/basement/maps/index.mjs');
     for (const [id, def] of Object.entries(places.rooms)) {

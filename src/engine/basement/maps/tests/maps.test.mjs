@@ -60,7 +60,7 @@ test('an interior builds every entity at load, finds them by id and role, and op
     for (let i = 0; i < 20; i++) physics.updateState();
     assert.equal(door.data.open, false);
     assert.ok(Math.hypot(door.position[0] - closed[0], door.position[1] - closed[1]) < 1e-6, 'and closed again');
-    assert.deepEqual(map.setFocus([0, 0]), { loaded: 0, unloaded: 0 }, 'interiors do not stream');
+    assert.deepEqual(map.setFocus([0, 0]), { loaded: 0, unloaded: 0, pending: 0 }, 'a map smaller than its radius is whole from the start, so focus changes nothing');
     map.destroy();
     assert.equal(physics.elements.getEntities().filter(e => e.data?.authored_id).length, 0);
 });
@@ -68,15 +68,13 @@ test('an interior builds every entity at load, finds them by id and role, and op
 const city = () => {
     const placements = [];
     for (let x = 0; x < 8; x++) for (let y = 0; y < 8; y++) placements.push({ type: 'bin', x: x * 500 + 10, y: y * 500 + 10, width: 20, height: 20, movable: true });
-    return { map_id: 'city', kind: 'exterior', size: [4000, 4000], boundary: { thickness: 50 }, regions: { size: 1000 }, placements, walls: [{ x: 0, y: 1990, w: 4000, h: 20 }] };
+    return { map_id: 'city', kind: 'exterior', size: [4000, 4000], boundary: { thickness: 50 }, regions: { size: 1000, radius: 500, keep: 500 }, spawn: [100, 100], placements, walls: [{ x: 0, y: 1990, w: 4000, h: 20 }] };
 };
 
-test('an exterior streams regions around the focus and keeps large entries loaded', () => {
+test('a map larger than its radius streams regions around the focus and keeps large entries loaded', () => {
     const physics = new physicsSystem(), map = new mapInstance(physics, city());
-    const persistent = map.entities().length;
-    assert.equal(persistent, 5, 'the boundary ring and the long wall stay loaded');
-    const first = map.setFocus([100, 100], { radius: 500, keep: 500 });
-    assert.ok(first.loaded >= 1);
+    assert.equal(map.entities().filter(e => e.data.role !== 'prop').length, 5, 'the boundary ring and the long wall stay loaded');
+    assert.deepEqual(map.loaded_regions, ['0,0'], 'built round its spawn at construction');
     assert.ok(map.entity('prop_0'), 'the bin next to the focus exists');
     assert.equal(map.entity('prop_63'), null, 'a far bin is not built');
     const before = map.entities('prop').length;
@@ -87,6 +85,26 @@ test('an exterior streams regions around the focus and keeps large entries loade
     assert.equal(physics.spatial_grid, physics.spatial_grid, 'one world index throughout');
     const stats = map.getStatistics();
     assert.ok(stats.region_loads >= 2 && stats.region_unloads >= 1 && stats.regions === 16);
+    assert.equal(map.kind, 'exterior', 'kind is kept as a label; the loader never branches on it');
+});
+
+test('streaming follows several focuses, reaches ahead of a moving one, spreads its building over calls and drives every tier', () => {
+    const physics = new physicsSystem(), map = new mapInstance(physics, city());
+    map.setFocus([[100, 100], [3900, 3900]], { budget_ms: Infinity });
+    assert.ok(map.entity('prop_0') && map.entity('prop_63'), 'two focuses keep both corners built');
+    map.setFocus([{ position: [100, 100], velocity: [2000, 0] }], { budget_ms: Infinity });
+    assert.ok(map.entity('prop_32'), 'a focus moving east builds the region a second ahead of it');
+    assert.equal(map.entity('prop_63'), null, 'and the far corner is released');
+    let clock = 0; const now = () => (clock += 2);                  // (each region costs 2 ms on this clock)
+    const first = map.setFocus([2000, 2000], { radius: 1500, budget_ms: 3, now });
+    assert.ok(first.loaded >= 1 && first.pending > 0, `a 3 ms budget leaves regions for the next call (${JSON.stringify(first)})`);
+    let calls = 1; while (map.setFocus([2000, 2000], { radius: 1500, budget_ms: 3, now }).pending) calls++;
+    assert.ok(calls > 1 && map.loaded_regions.length === 16, 'the rest build over later calls');
+    const ground = []; map.addTier('ground', { radius: 0, keep: 0, load: key => ground.push(`+${key}`), release: key => ground.push(`-${key}`) });
+    map.setFocus([500, 500], { budget_ms: Infinity }); map.setFocus([1500, 500], { budget_ms: Infinity });
+    assert.deepEqual(ground, ['+0,0', '-0,0', '+1,0'], 'a tier loads and releases its own regions at its own radius');
+    assert.throws(() => map.addTier('ground', { radius: 0, load() {}, release() {} }), /new name/);
+    map.destroy(); assert.equal(ground.at(-1), '-1,0', 'and lets go of them with the map');
 });
 
 test('a moved movable entity keeps its pose across unloads and saves', () => {

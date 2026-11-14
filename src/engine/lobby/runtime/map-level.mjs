@@ -23,8 +23,20 @@ export class mapLevel extends gameLevel {
         this.definition = prepared.definition;
         const travellers = prepared.travellers.map(id => context.api.elements.fetchEntity(id)).filter(e => e && !e.destroyed);
         if (travellers.length) this.placeTravellers(context, travellers, this.arrivalPose(context, prepared.arrival?.from ?? null, travellers[0]));
+        this.map.setFocus(this.mapFocuses(context), { budget_ms: Infinity });   // (the arriving regions, whole, behind the level change)
     }
-    afterPhysics(context, seconds) { this.map.updateState(this.mapUpdateOptions(context)); }
+    afterPhysics(context, seconds) { this.map.setFocus(this.mapFocuses(context), { budget_ms: this.mapStreamBudget(context) }); this.map.updateState(this.mapUpdateOptions(context)); }
+    /**
+     * What the map streams round: `[x, y]` points or `{position, velocity}`. By default every active
+     * character body (so no one walks where walls are not built), or the map's spawn when there is none.
+     * A level overrides it to stream round fewer (the player, companions, a pinned mission point).
+     */
+    mapFocuses(context) {
+        const focuses = context.api.physics.elements.getEntities().filter(e => e.active !== false && !e.destroyed && e.body?.getState().physics_type === 'character').map(e => ({ position: e.position, velocity: e.linear_velocity }));
+        return focuses.length ? focuses : [this.map.spawn ?? this.definition.size.map(v => v / 2)];
+    }
+    /** Milliseconds a step may spend building regions (the rest wait for the next step). */
+    mapStreamBudget(context) { return 3; }
     /** What `map.updateState` is given each step (door ranges, who opens doors). */
     mapUpdateOptions(context) { return {}; }
     leave(context) { this.map?.destroy(); this.map = null; }

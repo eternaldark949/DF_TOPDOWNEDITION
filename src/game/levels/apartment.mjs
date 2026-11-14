@@ -49,6 +49,7 @@ export class ApartmentLevel {
     getRoster(){return this.companions.map(rosterRecord);}
     updateState() {
         for(const c of this.companions)if(c.active!==!!(c.recruited&&!c.dead)){if(c.recruited&&!c.dead)c.activate();else c.deactivate();}
+        this.map.setFocus([{position:this.player.position,velocity:this.player.linear_velocity},...this.companions.filter(c=>c.active).map(c=>c.position)]);   // (the apartment fits its radius: this builds nothing, but every map streams the same way)
         this.map.updateState({near_range:door=>door.data.appearance.triggerRadius??90,duration:this.definition.rules.DOOR_DURATION,include_groups:2});
         this.physics.updateState();
     }

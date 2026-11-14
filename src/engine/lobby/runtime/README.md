@@ -76,6 +76,7 @@ Except `prepare`, hooks must be synchronous. Levels can omit hooks via the base 
 `mapLevel` (`map-level.mjs`) is a `gameLevel` that is one Basement map. A subclass gives `mapDefinition({assets}, options)`, returning `{definition, map_options}`. The level then:
 
 - builds the map on `enter` and releases it on `leave`;
+- streams the map after each step round `mapFocuses(context)` (default: every active character body, else the spawn) within `mapStreamBudget(context)` milliseconds (default 3), and builds the arriving regions whole on `enter`;
 - runs `map.updateState(mapUpdateOptions(context))` after each step, so doors and rooms stay current;
 - lists its exits with `getExits()`: the map's triggers whose data names a `target` level, as `{entity, target, label, auto, bounds}`. `exitAt(body)` gives the exit a body stands in.
 

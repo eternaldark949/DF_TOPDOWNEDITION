@@ -1,6 +1,6 @@
 # Basement map system
 
-`mapSystem` builds one map into one physics world from plain data. It handles interiors (built whole) and exteriors (streamed by region). It knows no game names: the Directory supplies the data, the entity templates, and a `decorate` hook for game fields.
+`mapSystem` builds one map into one physics world from plain data. Every map loads the same way, a cafe or a city: it is streamed by region round its focuses, and a map smaller than its streaming radius is simply whole. It knows no game names: the Directory supplies the data, the entity templates, and a `decorate` hook for game fields.
 
 ```js
 import { physicsSystem } from '../physics/index.mjs';
@@ -12,7 +12,7 @@ const map = maps.load(definition, { templates, prop_types, decorate });
 map.entity('door_0');            // live entity by authored id
 map.entities('prop');            // live entities by role, in build order
 map.updateState({ near_range: door => 90, duration: 0.35 });
-map.setFocus(player.position);   // exteriors: build near regions, release far ones
+map.setFocus([{position: player.position, velocity: player.linear_velocity}]);   // build near regions, release far ones
 ```
 
 ## Map definition
@@ -21,7 +21,7 @@ Every section is optional. Rectangles are top-left: `{x, y, w, h}` for walls, tr
 
 | Field | Meaning |
 |---|---|
-| `map_id`, `kind` | `kind` is `'interior'` (default) or `'exterior'`. |
+| `map_id`, `kind` | `kind` is `'interior'` (default) or `'exterior'`: a label for the game (and `decorate`), never a loading path. |
 | `size: [w, h]`, `boundary: {thickness}` | A ring of four walls just outside the map. |
 | `walls`, `wall_openings` | Static walls. Doors and openings are cut out of them. |
 | `placements` | Props: `{type, x, y, width, height, rotation?, movable?, light?: {radius, position?}, template?, data?}`. `prop_types[type].movable` is the default for `movable`. |
@@ -32,7 +32,7 @@ Every section is optional. Rectangles are top-left: `{x, y, w, h}` for walls, tr
 | `room_links` | Extra links without a door (a wide wall gap): `{rooms: [a, b], openness = 1}`. |
 | `cloths` | Hanging strips with a cloth mesh: `{x, y, width, length, segments = 5, role?}`. |
 | `spawn: [x, y]` | Returned as `map.spawn`. |
-| `regions: {size = 1024}` | Exterior region size. |
+| `regions: {size = 1024, radius = 4096, keep = size}` | Region size, how far round a focus regions are built, and how much further they stay before release. |
 
 Ids are `wall_<i>`, `prop_<i>`, `lamp_<i>`, `door_<i>` (`door_<i>_right` for the second leaf), `<role>_<i>` for cloths, or the entry's own `authored_id`. The same definition always gives the same ids, which saves and region memory rely on.
 
@@ -48,11 +48,16 @@ Without `templates[section]`, each section uses the engine's own types: walls `s
 - **Occupancy:** `track(body)` follows any body; `updateState()` re-reads tracked bodies (a body still inside its room costs one rectangle test, no grid query). `roomOf(body)`, `occupants(id)`, and `onRoomChange(fn)` for `{entity, from, to}`. With `keep_in_gaps` (default) a body standing in a doorway stays in its last room.
 - **Flags:** `setFlag(id, key, value)` / `getFlag` for per-room game state such as lights off. They save with `map.saveState()`.
 
-## Interiors and exteriors
+## Streaming
 
-- **Interior:** every entity is built at load. After a physics snapshot is restored, `reconnect()` re-links ids to the restored entities.
-- **Exterior:** entries are bucketed by the region of their centre. An entry larger than one region (the boundary, a long wall, a big building) stays loaded. `setFocus(point, {radius, keep})` builds regions within `radius` and releases regions beyond `radius + keep`, so walking back and forth across a border does not thrash.
-- **Region memory:** a released entity that was moved (a pushed bin, a knocked-over sign) keeps its pose. It is rebuilt there when its region loads again. `saveState()` / `loadState()` carry that memory as plain data.
+One path for every map:
+
+- **Regions:** entries are bucketed by the region their centre falls in. An entry larger than one region (the boundary, a long wall, a big building) stays loaded.
+- **Focuses:** `setFocus(focuses, {radius, keep, budget_ms = 3, lead = 1})` takes points `[x, y]` or moving focuses `{position, velocity}`; a moving focus also reaches `lead` seconds ahead. Regions within `radius` of the nearest focus are built, nearest first; regions past `radius + keep` are released, so walking along a border does not thrash. It returns `{loaded, unloaded, pending}`.
+- **Budget:** building stops once `budget_ms` is spent, and `pending` regions wait for the next call. The constructor builds round `options.focus` (default: the spawn, else the map's centre) all at once, as a level change does behind its fade. A map that fits inside the radius is therefore whole from the start, built in authored order.
+- **Tiers:** `addTier(name, {radius, keep, load(key, bounds), release(key, bounds)})` adds per-region work beside the bodies (ground tiles, baked light, navigation), each tier at its own radius. The bodies are the `entities` tier.
+- **Region memory:** a released entity that was moved (a pushed bin, a knocked-over sign) keeps its pose. It is rebuilt there when its region loads again. `saveState()` / `loadState()` carry that memory as plain data, and `loadState` puts an already-built entity back where it was left.
+- **Snapshots:** after a physics snapshot is restored, `reconnect()` re-links ids to the restored entities; regions the snapshot held count as loaded, and the rest build as a focus reaches them.
 
 The map system uses the world's one spatial grid and navigation field. It never keeps its own index of bodies; it only remembers which entity it built for each authored id.
 
@@ -68,7 +73,7 @@ The map system uses the world's one spatial grid and navigation field. It never 
 | `mapInstance.updateState({near_range, duration, easing, include_groups})` | Opens and closes sliding and plain doors by proximity, with timed kinematic moves, then updates room occupancy. Hinged doors are skipped: they are physical. |
 | `HINGE` | Defaults for a hinged leaf: `{mass: 12, damping: 7.7, closing_stiffness: 64.8, swing_limit: π − 0.25}`. A kind's leaf `hinge`, then the door's `hinge` field, override them. |
 | `DOOR_KINDS` / `validateDoorKind(kind, name?)` | The built-in kinds / the check every kind passes before it is built. |
-| `mapInstance.setFocus(point, {radius, keep})` | Exterior streaming. Returns `{loaded, unloaded}`. |
+| `mapInstance.setFocus(focuses, {radius, keep, budget_ms, lead})` / `.addTier(name, {radius, keep, load, release})` / `.loaded_regions` / `.region_size` | Streaming (see above). `setFocus` returns `{loaded, unloaded, pending}`. |
 | `mapInstance.reconnect()` / `.saveState()` / `.loadState(state)` / `.getStatistics()` / `.destroy()` | Lifecycle. |
 
 ## Game data
