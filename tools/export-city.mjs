@@ -26,6 +26,20 @@ function exportCity() {
     const m = game.activeMap, layout = m.cityLayout, r = v => Math.round(v * 100) / 100;
     const point = p => [r(p.x), r(p.y)], rect = o => ({ x: r(o.x), y: r(o.y), w: r(o.w), h: r(o.h) });
     const plain = (o, keys) => Object.fromEntries(keys.filter(k => o[k] !== undefined && o[k] !== null).map(k => [k, typeof o[k] === 'number' ? r(o[k]) : o[k]]));
+    // What a building looks like, as the generator resolved it: its sections (world rects), colours, height, the
+    // street it fronts and its entrance there, its sign, its roof and facade features and its street variant's picks.
+    const look = b => {
+        const E = b._entrance?.(), v = b.variant, s = b.attachedSign;
+        return {
+            sections: b.sections.map(q => rect({ x: b.x + q.x, y: b.y + q.y, w: q.w, h: q.h })),
+            colors: plain(b.colors, ['roof', 'roofLight', 'wall', 'accent', 'windowLit']), shopfront: b._shopfront ?? false,
+            ...(E ? { entrance: plain(E, ['cx', 'cy', 'nx', 'ny', 'ux', 'uy']) } : {}),
+            ...(s ? { sign: { x: r(s.x), y: r(s.y), text: s.text, color: s.color, size: r(s.fontSize), font: s.fontFamily } } : {}),
+            ...plain(b, ['roofFeatures', 'facadeFeature', 'sills', 'leanHero', 'crownZ', 'roundR']),
+            ...(b.style ? {} : { roof_props: b.roofProps.map(q => plain(q, ['type', 'section', 'x', 'y', 'w', 'h', 'r'])) }),
+            ...(v ? { variant: { kind: v.kind, id: v.id, seed: v.seed, ...plain(v, ['name', 'awning', 'neon']), ...(v.tone ? { tone: v.tone } : {}), ...(v.door ? { door: v.door } : {}) } } : {})
+        };
+    };
     return {
         map_id: 'sdc', generator: 'CityLayout, seeded 949 (legacy/engine/map-loading.js)', size: [m.width, m.height],
         roads: {
@@ -57,7 +71,7 @@ function exportCity() {
             const b = m.buildings[i] ?? {};
             if (Math.abs((b.x ?? p.x) - p.x) > 60 || Math.abs((b.y ?? p.y) - p.y) > 60) throw new Error(`Building ${i} (${p.templateId}) is not where it was placed`);
             return { template: p.templateId, block: p.blockName ?? null, ...rect(p), ...(Object.keys(p.options ?? {}).length ? { options: p.options } : {}),
-                ...plain(b, ['id', 'label', 'type', 'style', 'facing', 'floors', '_seed']), kind: b.constructor?.name ?? null };
+                ...plain(b, ['id', 'label', 'type', 'style', 'facing', 'floors', '_seed']), kind: b.constructor?.name ?? null, ...(b.isV2 ? { look: look(b) } : {}) };
         }),
         colliders: m.buildingColliders.map(rect).filter(c => c.w > 0 && c.h > 0),   // (the generator leaves one empty strip)
         walls: m.walls.map(w => ({ ...rect(w), ...(w.style ? { style: w.style } : {}) })),
