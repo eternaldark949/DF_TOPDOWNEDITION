@@ -1,5 +1,5 @@
 {
-  "createdAt": "2026-11-14T14:43:05.102Z",
+  "createdAt": "2026-11-14T20:03:01.655Z",
   "duration": 8000,
   "warmup": 3000,
   "viewport": [
@@ -478,6 +478,98 @@
       "relative": {
         "cpu": 0.3171,
         "lighting": 0.2165
+      },
+      "errors": []
+    },
+    "city-native-full": {
+      "title": "The native city at night, ground, buildings, plants, light and glow, standing on Crimson Blvd",
+      "calibration_ms": 56.5,
+      "frames": 330,
+      "cpu": {
+        "mean": 23.047575757576322,
+        "p95": 34.40000000037253
+      },
+      "lighting": {
+        "mean": 6.1930303030478004,
+        "p95": 9.599999999627471
+      },
+      "ground": {
+        "mean": 1.4569696969578438,
+        "p95": 2.099999999627471
+      },
+      "buildings": {
+        "mean": 8.504242424257663,
+        "p95": 13.299999999813735
+      },
+      "glow": {
+        "mean": 6.893333333313014,
+        "p95": 9.899999999441206
+      },
+      "building_pictures_mb": 3.6,
+      "paints_per_s": {
+        "light": 0,
+        "ground": 0
+      },
+      "tiles_mb": {
+        "light": 8.9,
+        "ground": 12
+      },
+      "shadows": {
+        "mean": 0,
+        "p95": 0
+      },
+      "live_lights": 1,
+      "lights": 696,
+      "map": "sdc",
+      "relative": {
+        "cpu": 0.4079,
+        "lighting": 0.1096
+      },
+      "errors": []
+    },
+    "city-native-full-drive": {
+      "title": "The native city at night, ground, buildings, plants, light and glow, driving Crimson Blvd at 500 px/s",
+      "calibration_ms": 59,
+      "frames": 206,
+      "cpu": {
+        "mean": 37.26407766996349,
+        "p95": 59.60000000055879
+      },
+      "lighting": {
+        "mean": 9.047087378610033,
+        "p95": 13.900000000372529
+      },
+      "ground": {
+        "mean": 6.136407767038214,
+        "p95": 15.5
+      },
+      "buildings": {
+        "mean": 13.148543689327623,
+        "p95": 24.899999999441206
+      },
+      "glow": {
+        "mean": 8.932038834987624,
+        "p95": 12.099999999627471
+      },
+      "building_pictures_mb": 25.4,
+      "paints_per_s": {
+        "light": 3.5,
+        "ground": 3
+      },
+      "tiles_mb": {
+        "light": 13.6,
+        "ground": 15
+      },
+      "shadows": {
+        "mean": 0.034,
+        "p95": 0
+      },
+      "live_lights": 1.9,
+      "lights": 849,
+      "map": "sdc",
+      "relative": {
+        "cpu": 0.6316,
+        "lighting": 0.1533
       },
       "errors": []
     }

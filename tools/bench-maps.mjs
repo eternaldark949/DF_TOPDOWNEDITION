@@ -45,8 +45,13 @@ const SCENES = [
     { id: 'city-native', title: 'The native city at night, ground and light, standing on Crimson Blvd', light: 'city', ground: true, hold: ['cpu'] },
     { id: 'city-native-drive', title: 'The native city at night, ground and light, driving Crimson Blvd at 500 px/s', light: 'city-drive', ground: true, hold: ['cpu'] },
     // Phase 4, step 4: what moves lights the night too. Eight cars with their headlights, shots, a laser sight, and rain on the street.
-    { id: 'city-native-busy', title: 'The native city at night in the rain, driving Crimson Blvd among eight cars, shots and a laser sight', light: 'city-drive', ground: true, busy: true, hold: ['cpu'] }
+    { id: 'city-native-busy', title: 'The native city at night in the rain, driving Crimson Blvd among eight cars, shots and a laser sight', light: 'city-drive', ground: true, busy: true, hold: ['cpu'] },
+    // Phase 4, step 5: the whole native city as a host draws it: ground, buildings and plants, the light layer, then what shines over it.
+    { id: 'city-native-full', title: 'The native city at night, ground, buildings, plants, light and glow, standing on Crimson Blvd', light: 'city', ground: true, buildings: true, hold: ['cpu'] },
+    { id: 'city-native-full-drive', title: 'The native city at night, ground, buildings, plants, light and glow, driving Crimson Blvd at 500 px/s', light: 'city-drive', ground: true, buildings: true, hold: ['cpu'] }
 ];
+/** The buildings' picture cache, as the native city host keeps it: their wall strips (in chunks) and roofs, and the plants' canopies. */
+const BUILDING_PICTURES = { max_bytes: 64 * 1048576, budget_ms: 6 };
 
 const args = process.argv.slice(2), flag = name => args.includes(name);
 const option = (name, fallback) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : fallback; };
@@ -81,14 +86,14 @@ function calibrate() {
  * layer every frame for `duration` ms after `warmup`, as the native apartment host does. Returns the layer's
  * cost a frame (`lighting`, and `cpu` the same), the shadow rebuilds' share, and how many lights stayed live.
  */
-async function measureLight({ scene, ground: with_ground = false, busy = false, duration, warmup }) {
+async function measureLight({ scene, ground: with_ground = false, buildings: with_buildings = false, building_pictures, busy = false, duration, warmup }) {
     const { physicsSystem } = await import('/src/engine/basement/physics/index.mjs');
     const { mapInstance } = await import('/src/engine/basement/maps/index.mjs');
     const { canvasRenderer, pictureCache, aheadOf } = await import('/src/engine/basement/rendering/index.mjs');
     const { sceneLighting, levelLights } = await import('/src/game/presentation/lighting.mjs');
     const { PROP_TYPES } = await import('/src/game/data/game-maps.mjs');
     const physics = new physicsSystem(), W = 1280, H = 720, scale = .5;
-    let definition, options = { prop_types: PROP_TYPES }, camera, doors = [], kind = 'indoor', rooms = [], sky_darkness = 0, ground = null, ground_ahead = 0;
+    let definition, options = { prop_types: PROP_TYPES }, camera, doors = [], kind = 'indoor', rooms = [], sky_darkness = 0, ground = null, ground_ahead = 0, buildings = null, foliage = null;
     if (scene.startsWith('city')) {
         const { cityMapDefinition, cityRooms } = await import('/src/game/levels/city-definition.mjs');
         const places = (await import('/src/game/data/game-db/places.json', { with: { type: 'json' } })).default;
@@ -96,7 +101,12 @@ async function measureLight({ scene, ground: with_ground = false, busy = false, 
         kind = 'outdoor'; rooms = cityRooms(places.maps.sdc); sky_darkness = .6;   // (the classic sky at 22:00)
         camera = scene === 'city' ? () => [3300, 2500] : t => [1500 + (t * .5) % 9000, 2500];
         options = { prop_types: PROP_TYPES, focus: camera(0) };
-        if (with_ground) { const { cityGround } = await import('/src/game/presentation/city-ground.mjs'); ground_ahead = (await import('/src/game/data/city-ground.json', { with: { type: 'json' } })).default.tile_ahead; ground = new cityGround(cityMapDefinition({ map: places.maps.sdc }).city, { size: definition.size }); }
+        const { city } = cityMapDefinition({ map: places.maps.sdc });
+        if (with_buildings) {
+            const { cityBuildings } = await import('/src/game/presentation/city-buildings.mjs'), { cityFoliage } = await import('/src/game/presentation/city-foliage.mjs');
+            buildings = new cityBuildings(city); foliage = new cityFoliage(city);
+        }
+        if (with_ground) { const { cityGround } = await import('/src/game/presentation/city-ground.mjs'); ground_ahead = (await import('/src/game/data/city-ground.json', { with: { type: 'json' } })).default.tile_ahead; ground = new cityGround(city, { size: definition.size, ...(buildings && { buildings }) }); }
     } else if (scene === 'cafe') {
         const { interiorMapDefinition, APARTMENT_MAP_OPTIONS } = await import('/src/game/levels/apartment-definition.mjs');
         const places = (await import('/src/game/data/game-db/places.json', { with: { type: 'json' } })).default;
@@ -134,6 +144,7 @@ async function measureLight({ scene, ground: with_ground = false, busy = false, 
     // (with the ground, the canvas is full size: the ground at 1:1 and the light layer through drawLayer's half-size surface, as a host draws them)
     const canvas = Object.assign(document.createElement('canvas'), ground ? { width: W, height: H } : { width: W * scale, height: H * scale }), ctx = canvas.getContext('2d');
     const tiles = ground && new pictureCache({ max_bytes: 32 * 1048576, budget_ms: 4, densities: [.25, .5, 1, 2] }), grounds = [];
+    const art = buildings && new pictureCache(building_pictures), arts = [], glows = [];
     const paints = { ground: 0, light: 0 }, held = { ground: 0, light: 0 };   // (tiles painted, and the most baked bytes one frame draws or readies)
     const paint = pictures.draw.bind(pictures); pictures.draw = (...a) => { const how = paint(...a); if (how === 'paint') paints.light++; return how; };
     let shadow_ms = 0; const cast = physics.getVisibilityPolygon.bind(physics);
@@ -156,6 +167,13 @@ async function measureLight({ scene, ground: with_ground = false, busy = false, 
                 held.ground = Math.max(held.ground, bytes);
                 ctx.getImageData(0, 0, 1, 1); ground_ms = performance.now() - g0;
             }
+            let art_ms = 0;
+            if (buildings) {   // (the buildings over the people, then the plants, kept behind the roofs taller than each)
+                const a0 = performance.now(); art.beginFrame(); ctx.setTransform(1, 0, 0, 1, -view.left, -view.top);
+                canvasRenderer.drawEntries(ctx, buildings.createDraws({ view, camera: [cx, cy], time: t / 1000 }), { pictures: art });
+                canvasRenderer.drawEntries(ctx, foliage.createDraws({ view, camera: [cx, cy], time: t / 1000, covers: buildings.covers(view, [cx, cy]) }), { pictures: art });
+                ctx.getImageData(0, 0, 1, 1); art_ms = performance.now() - a0;
+            }
             shadow_ms = 0; const t0 = performance.now();
             pictures.beginFrame();
             const placed = [...levelLights(level), ...extras(t)], lights = dynamic ? [...placed, ...dynamic.wetLights(placed, .8)] : placed;
@@ -165,14 +183,20 @@ async function measureLight({ scene, ground: with_ground = false, busy = false, 
             else { ctx.setTransform(scale, 0, 0, scale, -view.left * scale, -view.top * scale); canvasRenderer.drawLayer(ctx, layer.packets, { opacity: layer.opacity, pictures }); }
             ctx.getImageData(0, 0, 1, 1);
             const ms = performance.now() - t0;
-            if (t >= warmup) { frames.push(ms); grounds.push(ground_ms); shadows.push(shadow_ms); live.push(layer.live); }
+            let glow_ms = 0;
+            if (buildings) {   // (what shines after the light layer: lit windows, signs and lamps)
+                const w0 = performance.now(); ctx.setTransform(1, 0, 0, 1, -view.left, -view.top);
+                canvasRenderer.drawLayer(ctx, buildings.createGlow({ view, camera: [cx, cy], time: t / 1000, dark: .9 }), { blend: 'add', pictures: art });
+                ctx.getImageData(0, 0, 1, 1); glow_ms = performance.now() - w0;
+            }
+            if (t >= warmup) { frames.push(ms); grounds.push(ground_ms); arts.push(art_ms); glows.push(glow_ms); shadows.push(shadow_ms); live.push(layer.live); }
             if (t < warmup + duration) requestAnimationFrame(frame); else done();
         };
         requestAnimationFrame(frame);
     });
     const stat = list => { const sorted = [...list].sort((a, b) => a - b); return { mean: list.reduce((a, b) => a + b, 0) / list.length, p95: sorted[Math.floor(sorted.length * .95)] }; };
-    const lit = stat(frames), both = stat(frames.map((ms, i) => ms + grounds[i]));
-    return { frames: frames.length, cpu: ground ? both : lit, lighting: lit, ...(ground && { ground: stat(grounds) }), paints_per_s: { light: +(paints.light / (duration / 1000)).toFixed(1), ground: +(paints.ground / (duration / 1000)).toFixed(1) },
+    const lit = stat(frames), both = stat(frames.map((ms, i) => ms + grounds[i] + arts[i] + glows[i]));
+    return { frames: frames.length, cpu: ground ? both : lit, lighting: lit, ...(ground && { ground: stat(grounds) }), ...(buildings && { buildings: stat(arts), glow: stat(glows), building_pictures_mb: +(art.statistics.bytes / 1048576).toFixed(1) }), paints_per_s: { light: +(paints.light / (duration / 1000)).toFixed(1), ground: +(paints.ground / (duration / 1000)).toFixed(1) },
         tiles_mb: { light: +(held.light / 1048576).toFixed(1), ground: +(held.ground / 1048576).toFixed(1) }, shadows: { mean: +stat(shadows).mean.toFixed(3), p95: +stat(shadows).p95.toFixed(3) }, live_lights: +stat(live).mean.toFixed(1), lights: levelLights(level).length, map: definition.map_id };
 }
 
@@ -245,7 +269,7 @@ try {
         if (scene.light) {
             await page.goto(`http://127.0.0.1:${server.address().port}/tools/fixtures/blank.html`).catch(() => {});
             calibration = await page.evaluate(calibrate);
-            result = await page.evaluate(measureLight, { scene: scene.light, ground: !!scene.ground, busy: !!scene.busy, duration, warmup });
+            result = await page.evaluate(measureLight, { scene: scene.light, ground: !!scene.ground, buildings: !!scene.buildings, building_pictures: BUILDING_PICTURES, busy: !!scene.busy, duration, warmup });
         } else {
             await page.goto(`http://127.0.0.1:${server.address().port}/DFAB%20V8.html`, { waitUntil: 'load' });
             await page.waitForFunction("typeof game!=='undefined' && typeof PerformanceBench!=='undefined'");

@@ -309,3 +309,20 @@ court, where most of the tower and both wings are in view, the pictures in view 
 default densities (up to 4): with a 48 MB cache some still repaint (about 115 ms a frame), with 64 MB about 27 ms
 to stamp, 6 ms to draw and 29 ms of glow. The native city boot's building picture budget has to cover that, or
 cap the densities.
+
+## November 14, evening: the whole native city (phase 4, step 5)
+
+With the buildings, landmarks, entrance lamps and plants drawn natively, the bench draws the whole city as a native
+host would: the ground tiles, the buildings and plants over them, the light layer, then the glow (lit windows, signs
+and lamps) added on top. The buildings and plants share one picture cache of 64 MB, 6 ms of painting a frame
+(`BUILDING_PICTURES` in `tools/bench-maps.mjs`).
+
+| Scene (headless Chromium, software canvas) | Frame | Ground | Buildings and plants | Light | Glow | Building pictures |
+|---|---|---|---|---|---|---|
+| `city-native-full`, standing on Crimson Blvd | 23 ms (p95 34) | 1.5 ms | 8.5 ms | 6.2 ms | 6.9 ms | 3.6 MB |
+| `city-native-full-drive`, at 500 px/s | 37 ms (p95 60) | 6.1 ms | 13 ms | 9.0 ms | 8.9 ms | 25 MB |
+
+The classic city on the same machine: 108 ms standing (`city-night`), 138 ms driving (`city-drive`). The drive's
+p95 is buildings coming into view: a wall chunk or roof waiting for the frame's painting budget draws as vector,
+and its first draw also makes its strip's art. Painting them ahead of the camera, as the ground and light tiles
+are, is the next thing to take off that spike.
