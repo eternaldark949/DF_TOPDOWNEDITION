@@ -1,13 +1,14 @@
-// Native level change: interiors as runtime levels, exits between them, and the travellers carried
+// Native level change: maps as runtime levels, exits between them, and the travellers carried
 // across (the player first, an adopted cat behind), placed inside the exit leading back.
 // Run: node --test tools/test-level-travel.mjs
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGameRuntime } from '../src/game/boot/game-runtime.mjs';
-import { registerInteriorLevels } from '../src/game/levels/interior-level.mjs';
+import { registerMapLevels } from '../src/game/levels/game-map-level.mjs';
+import { MAP_IDS } from '../src/game/data/game-maps.mjs';
 
-async function runtime(first = 'hotel_lobby') {
-    const engine = createGameRuntime({ schedule_frame: null }); registerInteriorLevels(engine);
+async function runtime(first = 'hotel_lobby', maps = MAP_IDS) {
+    const engine = createGameRuntime({ schedule_frame: null }); registerMapLevels(engine, maps);
     await engine.loadLevel(first); engine.start();
     return { engine, api: engine.api, player: engine.api.session.player, tick: (n = 1) => { for (let i = 0; i < n; i++) engine.updateState(); } };
 }
@@ -21,7 +22,7 @@ test('every interior with a layout builds as a runtime level and lists its exits
 });
 
 test('standing in an exit offers it; travel carries the player and her cat and lands them just inside the way back', async () => {
-    const { engine, api, player, tick } = await runtime();
+    const { engine, api, player, tick } = await runtime('hotel_lobby', MAP_IDS.filter(id => id !== 'sdc'));
     const cat = api.actors.spawn({ kind: 'velvet_cat', position: [520, 1000] }); cat.adopt(); tick(2);
     const offers = []; api.travel.onExitChanged(exit => offers.push(exit?.target ?? null));
     const elevator = engine.active_level.getExits().find(e => e.target === 'hotel_suite');
@@ -29,7 +30,7 @@ test('standing in an exit offers it; travel carries the player and her cat and l
     assert.deepEqual(api.travel.exit, { target: 'hotel_suite', label: 'Use Elevator', auto: false, available: true });
     const city = engine.active_level.getExits().find(e => e.target === 'sdc');
     api.physics.updateBody(player, { position: [(city.bounds.left + city.bounds.right) / 2, (city.bounds.top + city.bounds.bottom) / 2] }); tick();
-    assert.equal(api.travel.exit.available, false, 'the city is not a native level yet, so its exit is offered as unavailable');
+    assert.equal(api.travel.exit.available, false, 'an exit to a map that is not registered here is offered as unavailable');
     await assert.rejects(api.travel.travel(), /no exit/);
     api.physics.updateBody(player, { position: [(elevator.bounds.left + elevator.bounds.right) / 2, (elevator.bounds.top + elevator.bounds.bottom) / 2] }); tick();
     const suite = await api.travel.travel();
@@ -56,4 +57,20 @@ test('an unknown arrival lands at the map spawn, and a traveller that is not kep
     assert.deepEqual(player.position.map(Math.round), api.assets.getResource('df:map_definitions').data.apt_949.spawn ? [api.assets.getResource('df:map_definitions').data.apt_949.spawn.x, api.assets.getResource('df:map_definitions').data.apt_949.spawn.y] : null, 'no exit leads back to the cafe, so she lands at the spawn');
     assert.ok(stray.destroyed, 'an unadopted cat stays (and goes) with its level');
     engine.dispose();
+});
+test('every map loads through the one map level, and its switches say what runs on it', async () => {
+    const { mapSwitches, MAP_SWITCHES } = await import('../src/game/data/game-maps.mjs');
+    const engine = createGameRuntime({ schedule_frame: null }); registerMapLevels(engine);
+    try {
+        for (const id of MAP_IDS) {
+            const level = await engine.loadLevel(id), on = mapSwitches(id);
+            assert.ok(level.map && level.definition.size[0] > 0, id);
+            assert.equal(!!level.street, on.traffic || on.walkers, `${id}: street life only where traffic or walkers are on`);
+            assert.equal(!!level.scene, on.ground || on.buildings || on.plants || on.lighting, `${id}: drawn only where a drawing switch is on`);
+        }
+        assert.ok(mapSwitches('sdc').traffic && !mapSwitches('hotel_lobby').traffic, 'the city has traffic, the lobby has none');
+        assert.deepEqual(Object.keys(MAP_SWITCHES).sort(), ['buildings', 'ground', 'lighting', 'plants', 'traffic', 'walkers']);
+        assert.throws(() => mapSwitches('x', { x: { switches: { trafic: true } } }), /Unknown map switch/);
+        assert.throws(() => mapSwitches('x', { x: { switches: { traffic: 'yes' } } }), /true or false/);
+    } finally { engine.dispose(); }
 });

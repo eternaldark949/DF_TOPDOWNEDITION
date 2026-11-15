@@ -82,8 +82,8 @@ test('every map loads through the one streaming loader: a map inside its radius 
 
 test('the city from its exported map file streams through the one loader: its buildings, lamps and doors near the focus, the rest as it moves', async () => {
     const { mapInstance } = await import('../src/engine/basement/maps/index.mjs');
-    const { cityMapDefinition } = await import('../src/game/levels/city-definition.mjs');
-    const { definition, city } = cityMapDefinition({ map: places.maps.sdc });
+    const { mapDefinition } = await import('../src/game/levels/map-definition.mjs');
+    const { definition, sections: city } = mapDefinition({ map_id: 'sdc', map: places.maps.sdc });
     assert.ok(definition.walls.length > 600 && definition.lights.length > 1800 && city.buildings.length > 600, 'the whole city is in the file');
     for (const w of definition.walls) assert.ok(w.w > 0 && w.h > 0, 'every wall has an area');
     assert.ok(definition.triggers.some(t => t.data.target === 'apt_949'), 'her apartment door is an exit');

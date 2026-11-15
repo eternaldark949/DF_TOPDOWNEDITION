@@ -95,23 +95,23 @@ async function measureLight({ scene, ground: with_ground = false, buildings: wit
     const physics = new physicsSystem(), W = 1280, H = 720, scale = .5;
     let definition, options = { prop_types: PROP_TYPES }, camera, doors = [], kind = 'indoor', rooms = [], sky_darkness = 0, ground = null, ground_ahead = 0, buildings = null, foliage = null;
     if (scene.startsWith('city')) {
-        const { cityMapDefinition, cityRooms } = await import('/src/game/levels/city-definition.mjs');
+        const { mapDefinition, lightingRooms } = await import('/src/game/levels/map-definition.mjs');
         const places = (await import('/src/game/data/game-db/places.json', { with: { type: 'json' } })).default;
-        ({ definition } = cityMapDefinition({ map: places.maps.sdc }));
-        kind = 'outdoor'; rooms = cityRooms(places.maps.sdc); sky_darkness = .6;   // (the classic sky at 22:00)
+        ({ definition } = mapDefinition({ map_id: 'sdc', map: places.maps.sdc }));
+        kind = 'outdoor'; rooms = lightingRooms(definition); sky_darkness = .6;   // (the classic sky at 22:00)
         camera = scene === 'city' ? () => [3300, 2500] : t => [1500 + (t * .5) % 9000, 2500];
         options = { prop_types: PROP_TYPES, focus: camera(0) };
-        const { city } = cityMapDefinition({ map: places.maps.sdc });
+        const { sections: city } = mapDefinition({ map_id: 'sdc', map: places.maps.sdc });
         if (with_buildings) {
             const { cityBuildings } = await import('/src/game/presentation/city-buildings.mjs'), { cityFoliage } = await import('/src/game/presentation/city-foliage.mjs');
             buildings = new cityBuildings(city); foliage = new cityFoliage(city);
         }
         if (with_ground) { const { cityGround } = await import('/src/game/presentation/city-ground.mjs'); ground_ahead = (await import('/src/game/data/city-ground.json', { with: { type: 'json' } })).default.tile_ahead; ground = new cityGround(city, { size: definition.size, ...(buildings && { buildings }) }); }
     } else if (scene === 'cafe') {
-        const { interiorMapDefinition, APARTMENT_MAP_OPTIONS } = await import('/src/game/levels/apartment-definition.mjs');
+        const { mapDefinition, MAP_OPTIONS } = await import('/src/game/levels/map-definition.mjs');
         const places = (await import('/src/game/data/game-db/places.json', { with: { type: 'json' } })).default;
-        ({ definition } = interiorMapDefinition({ map_id: 'cozy_cafe_interior', map: places.maps.cozy_cafe_interior, rooms: places.rooms.cozy_cafe_interior }));
-        options = { ...APARTMENT_MAP_OPTIONS, templates: {} };
+        ({ definition } = mapDefinition({ map_id: 'cozy_cafe_interior', map: places.maps.cozy_cafe_interior, rooms: places.rooms.cozy_cafe_interior }));
+        options = { ...MAP_OPTIONS, templates: {} };
         camera = t => [definition.spawn[0], definition.spawn[1]];
     } else {
         // A street 6000 px long: shopfronts on both sides with a doorway each 500 px, a lamp every 160 px on each kerb,

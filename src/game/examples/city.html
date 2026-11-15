@@ -4,22 +4,22 @@
 <style>html,body{margin:0;height:100%;background:#0a0812;color:#eef2ff;font:14px system-ui;overflow:hidden}canvas{display:block;width:100vw;height:100vh}#hud{position:fixed;left:12px;top:10px;background:#0a0812cc;padding:8px 10px;border-radius:6px;white-space:pre;pointer-events:none}</style>
 <canvas id="scene"></canvas><div id="hud">Loading the city…</div>
 <script type="module">
-// The city on the native runtime: one map level, drawn by cityScene at night. WASD walks; E takes the wheel of the car parked by the spawn.
+// The city on the native runtime: one map level, the map loader and its switches (mapScene draws it at night). WASD walks; E takes the wheel of the car parked by the spawn.
 import { canvasRenderer } from '../../engine/basement/rendering/index.mjs';
 import { createGameRuntime } from '../boot/game-runtime.mjs';
-import { CityLevel } from '../levels/city-level.mjs';
-import { CITY_PICTURES } from '../presentation/city-scene.mjs';
+import { GameMapLevel } from '../levels/game-map-level.mjs';
+import { MAP_PICTURES } from '../presentation/map-scene.mjs';
 import { drivingSystem } from '../mechanics/driving-system.mjs';
 import { createGameVehicle } from '../boot/game-vehicle-factory.mjs';
 const surface = document.getElementById('scene'), hud = document.getElementById('hud');
 const places = (await import('../data/game-db/places.json', { with: { type: 'json' } })).default, spawn = places.maps.sdc.spawn;
 const engine = createGameRuntime({ surface, player: { template: 'df:player_949', entity_type: 'df_player', position: [spawn.x, spawn.y] } });
-class cityCanvas extends canvasRenderer { constructor(options = {}) { super({ ...options, pictures: CITY_PICTURES }); } }
+class cityCanvas extends canvasRenderer { constructor(options = {}) { super({ ...options, pictures: MAP_PICTURES }); } }
 engine.api.render.registerRenderer('city-canvas', cityCanvas);
 const size = () => engine.api.render.resize({ width: innerWidth, height: innerHeight, pixel_ratio: Math.min(2, devicePixelRatio) });
 size(); addEventListener('resize', size);
 await engine.api.render.setRenderer('city-canvas', { surface });
-engine.registerLevel('sdc', CityLevel);
+engine.registerLevel('sdc', GameMapLevel);
 await engine.loadLevel('sdc');
 const player = engine.api.session.player, driving = new drivingSystem({ get_player: () => engine.api.session.player });
 engine.registerSystem('driving', driving);

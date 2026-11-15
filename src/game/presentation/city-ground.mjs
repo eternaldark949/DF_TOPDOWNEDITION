@@ -5,7 +5,7 @@ import { artScene, rect, polygon, polyline, circle, radial, seededRandom, hash2,
  * The city's ground as art, painted once per tile: the lots with their grain, the floor zones and lawns,
  * the roads (asphalt, wheel paths, lane dashes, the centre line, edges and names), the junctions, the
  * pavements with their kerbs and drains, and the crossings. It reads the city's exported data
- * (`cityMapDefinition().city`) and the look in `data/city-ground.json`; given the city's `buildings`
+ * (`mapDefinition().sections`) and the look in `data/city-ground.json`; given the city's `buildings`
  * (`cityBuildings`), their shadows, footprints and pavement dressing are painted into the tiles too.
  *
  * `createDraws({view, ahead})` gives one draw per tile meeting the view, then (marked `prepare`) those

@@ -5,10 +5,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import places from '../src/game/data/game-db/places.json' with { type: 'json' };
 import GROUND from '../src/game/data/city-ground.json' with { type: 'json' };
-import { cityMapDefinition } from '../src/game/levels/city-definition.mjs';
+import { mapDefinition } from '../src/game/levels/map-definition.mjs';
 import { cityGround } from '../src/game/presentation/city-ground.mjs';
 
-const { city, definition } = cityMapDefinition({ map: places.maps.sdc });
+const { sections: city, definition } = mapDefinition({ map_id: 'sdc', map: places.maps.sdc });
 const ground = new cityGround(city, { size: definition.size });
 const colours = packets => new Set(packets.flatMap(p => [p.material?.fill, p.material?.stroke]).filter(c => typeof c === 'string'));
 

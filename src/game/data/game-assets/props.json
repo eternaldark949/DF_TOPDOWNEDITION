@@ -46,7 +46,7 @@
           "armory": {"defaults": {"color": "#2a2a3a", "family": "loadout_locker", "height": 50, "interactionType": "armory", "width": 44}},
           "bed": {"defaults": {"color": "#ccc", "decorType": "bed", "family": "hospital_bed", "height": 56, "mass": 10000000, "width": 120}},
           "bench": {"defaults": {"color": "#ccc", "decorType": "bench", "family": "waiting_bench", "height": 34, "mass": 10000000, "width": 150}},
-          "block": {"defaults": {}},
+          "block": {"defaults": {"width": 20, "height": 20}},
           "cabinet": {"defaults": {"color": "#ccc", "decorType": "cabinet", "family": "pharmacy_cabinet", "height": 30, "mass": 10000000, "width": 118}},
           "cc_armchair": {"defaults": {"color": "#3a2418", "decorType": "cc_armchair", "face": "S", "family": "upholstered_seat", "height": 46, "mass": 10000000, "width": 50}},
           "cc_bench": {"defaults": {"color": "#3a2418", "decorType": "cc_bench", "face": "N", "family": "cushion_bench", "height": 36, "mass": 10000000, "width": 360}},

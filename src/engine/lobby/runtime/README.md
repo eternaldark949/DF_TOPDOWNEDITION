@@ -90,7 +90,7 @@ Arrival: `loadLevel(id, {arrival: {from}, travellers: [entity ids]})` places the
 - **Travel.** `travel(target?)` loads the target with the travellers, resolves to the new level and records `previous_level`. Every traveller must be a session or retained entity, because the runtime retires level entities on the way out.
 - **Saving.** `saveState()` / `loadState()` carry `{level_id, previous_level}`.
 
-The game composes it with the player first and adopted companions on foot behind (`api.travel`). Every interior with a layout is registered as an `InteriorLevel` by `registerInteriorLevels(engine)`. The city is a `CityLevel` (`game/levels/city-level.mjs`), registered under its map id `sdc`.
+The game composes it with the player first and adopted companions on foot behind (`api.travel`). Every map with a layout, the city included, is registered as a `GameMapLevel` (`game/levels/game-map-level.mjs`) by `registerMapLevels(engine)`, under its map id.
 
 ### Composed systems
 

@@ -1,5 +1,8 @@
 {
   "map_id": "sdc",
+  "generated": "sdc-city",
+  "switches": {"traffic": true, "walkers": true, "ground": true, "buildings": true, "plants": true, "lighting": true},
+  "regions": {"size": 1024, "radius": 3072},
   "props": [
     {"type": "block", "x": 1900, "y": 1330},
     {"type": "block", "x": 2100, "y": 1330}

@@ -47,11 +47,28 @@ export const isMovableProp = (type, types = PROP_TYPES) => isMovable(type, types
 export const mapHost = (map_id, layouts = LAYOUTS) => layouts[map_id]?.host ?? 'classic';
 
 /**
- * A map's layout with every placement resolved: { props, prop_types, lamps, npcs, soft_lights? }.
+ * Which of the game's systems run on a map, from its layout file's `switches`: each is on (`true`) or off
+ * (`false`, the default). `traffic` (cars on the map's roads), `walkers` (people on its sidewalks), `ground`,
+ * `buildings` and `plants` (drawn from its sections), `lighting` (the night's light layer).
+ */
+export const MAP_SWITCHES = Object.freeze({ traffic: false, walkers: false, ground: false, buildings: false, plants: false, lighting: false });
+export function mapSwitches(map_id, layouts = LAYOUTS) {
+    const given = layouts[map_id]?.switches ?? {};
+    for (const [key, value] of Object.entries(given)) {
+        if (!(key in MAP_SWITCHES)) throw new TypeError(`Unknown map switch on ${map_id}: ${key}`);
+        if (typeof value !== 'boolean') throw new TypeError(`Map switch ${map_id}.${key} must be true or false`);
+    }
+    return { ...MAP_SWITCHES, ...given };
+}
+/** The generated file a map's sections come from (its layout's `generated`), or null. */
+export const mapGenerated = (map_id, layouts = LAYOUTS) => layouts[map_id]?.generated ?? null;
+
+/**
+ * A map's layout with every placement resolved: { props, prop_types, lamps, npcs, soft_lights?, regions? }.
  * `prop_types[i]` names the type of `props[i]`. Every value is a detached copy.
  */
 export function resolveMapLayout(map_id, { layouts = LAYOUTS, types = PROP_TYPES } = {}) {
     const layout = layouts[map_id];
     if (!layout) return { props: [], prop_types: [], lamps: [], npcs: [] };
-    return resolveLayout(layout, types, { omit: ['map_id', 'host'] });
+    return resolveLayout(layout, types, { omit: ['map_id', 'host', 'switches', 'generated'] });
 }

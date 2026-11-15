@@ -2,12 +2,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createGameRuntime } from '../src/game/boot/game-runtime.mjs';
-import { CityLevel } from '../src/game/levels/city-level.mjs';
+import { GameMapLevel } from '../src/game/levels/game-map-level.mjs';
 
 test('the city level draws the ground, the people, the buildings and its light and glow layers', async () => {
     const engine = createGameRuntime({ player: { template: 'df:player_949', entity_type: 'df_player', position: [1200, 550] }, schedule_frame: null, cancel_frame: null });
     try {
-        engine.api.render.resize({ width: 1280, height: 720 }); engine.registerLevel('sdc', CityLevel); await engine.loadLevel('sdc');
+        engine.api.render.resize({ width: 1280, height: 720 }); engine.registerLevel('sdc', GameMapLevel); await engine.loadLevel('sdc');
         const player = engine.api.session.player; engine.api.camera.follow(player, { snap: true });
         engine.start(); for (let i = 0; i < 3; i++) engine.updateState();
         assert.ok(engine.active_level.map.entities('lamp').length > 0, 'the lamps round the player streamed in');
@@ -27,7 +27,7 @@ test('the player takes the wheel, drives, brakes into reverse and steps out to p
     const { drivingSystem } = await import('../src/game/mechanics/driving-system.mjs'), { createGameVehicle } = await import('../src/game/boot/game-vehicle-factory.mjs');
     const engine = createGameRuntime({ player: { template: 'df:player_949', entity_type: 'df_player', position: [1200, 700] }, schedule_frame: null, cancel_frame: null });
     try {
-        engine.registerLevel('sdc', CityLevel); await engine.loadLevel('sdc'); engine.start();
+        engine.registerLevel('sdc', GameMapLevel); await engine.loadLevel('sdc'); engine.start();
         const player = engine.api.session.player, driving = new drivingSystem({ get_player: () => engine.api.session.player });
         const car = createGameVehicle(engine.api.physics, { purpose: 'owned', control_mode: 'PARKED', position: [1200, 800], rotation: -Math.PI / 2 });
         let move = [0, 0], interact = false;
@@ -46,7 +46,7 @@ test('the player takes the wheel, drives, brakes into reverse and steps out to p
 test('cars drive trips on the lanes through the lights without locking, and walkers walk the sidewalks', async () => {
     const engine = createGameRuntime({ player: { template: 'df:player_949', entity_type: 'df_player', position: [3300, 2500] }, schedule_frame: null, cancel_frame: null });
     try {
-        engine.registerLevel('sdc', CityLevel); await engine.loadLevel('sdc'); engine.start();
+        engine.registerLevel('sdc', GameMapLevel); await engine.loadLevel('sdc'); engine.start();
         const street = engine.active_level.street, still = new Map(), seen = new Set(); let walked = 0;
         for (let i = 0; i < 1800; i++) {   // (30 s)
             engine.updateState();

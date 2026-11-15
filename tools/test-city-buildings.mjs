@@ -4,11 +4,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import places from '../src/game/data/game-db/places.json' with { type: 'json' };
-import { cityMapDefinition } from '../src/game/levels/city-definition.mjs';
+import { mapDefinition } from '../src/game/levels/map-definition.mjs';
 import { cityBuildings } from '../src/game/presentation/city-buildings.mjs';
 import { renderFrame, cameraSystem, heightView } from '../src/engine/basement/rendering/index.mjs';
 
-const { city, definition } = cityMapDefinition({ map: places.maps.sdc });
+const { sections: city, definition } = mapDefinition({ map_id: 'sdc', map: places.maps.sdc });
 const buildings = new cityBuildings(city);
 const view = { left: 3010, top: 890, right: 4290, bottom: 1610 }, camera = [3650, 1250];
 const submit = packets => {

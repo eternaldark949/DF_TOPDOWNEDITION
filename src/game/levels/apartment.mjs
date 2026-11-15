@@ -7,7 +7,8 @@ import {importActorAbilities} from '../mechanics/abilities/ability-loadout.mjs';
 import {registerGameEntityTypes} from '../boot/game-entity-types.mjs';
 import { physicsSystem } from '../../engine/basement/physics/index.mjs';
 import { createApartmentAssetLibrary } from '../data/apartment-assets.mjs';
-import { resolveApartmentDefinition, resolveApartmentDyer, APARTMENT_MAP_OPTIONS } from './apartment-definition.mjs';
+import { resolveApartmentDefinition, resolveApartmentDyer } from './apartment-definition.mjs';
+import { MAP_OPTIONS } from './map-definition.mjs';
 import { mapInstance } from '../../engine/basement/maps/index.mjs';
 import {NPC,rosterRecord} from '../entities/npc.mjs';
 import {createActorPacket} from '../boot/game-actor-factory.mjs';
@@ -19,7 +20,7 @@ export class ApartmentLevel {
         this.physics = new physicsSystem({ asset_library: library });
         registerGameEntityTypes(this.physics);
         this.definition = resolveApartmentDefinition(library, game_db);
-        this.map = new mapInstance(this.physics, this.definition.definition, APARTMENT_MAP_OPTIONS);   // the Basement map system builds the scene
+        this.map = new mapInstance(this.physics, this.definition.definition, MAP_OPTIONS);   // the Basement map system builds the scene
         this.player = this.physics.createEntity({...this.definition.player,...(spawn?{position:spawn}:{})});
         this.reconnect(); this.restoreLayout(layout); this.restoreRoster(roster,game_db);
         for(const owner of this.curtains)owner.data.cloth_id=this.physics.createCloth({owner,...owner.data.mesh,mass:.1,damping:4,stiffness:30,wind:[.15,0]});

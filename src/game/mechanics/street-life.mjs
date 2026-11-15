@@ -5,8 +5,9 @@ import RULES from '../data/game-street-life.json' with { type: 'json' };
 const scratch = {};   // (a body's pose read without copying its whole state)
 
 /**
- * The city's traffic and walkers round a focus (the player). Cars come on in a ring past the view on a
- * lane, drive a trip on the city's lane network (Basement navigation) to another lane and go when it ends
+ * Traffic and walkers round a focus (the player), on any map whose `traffic` or `walkers` switch is on. Cars
+ * come on in a ring past the view on a lane, drive a trip on the map's lane network (Basement navigation) to
+ * another lane and go when it ends
  * or when they fall far behind; walkers come on at sidewalk waypoints in a ring of their own and wander the
  * sidewalks and crossings (`PedestrianManager`). A car stood still past `stall_seconds` out of sight
  * goes too, and past `stall_limit` anywhere (cars that lock each other at a crossing would wait for ever). Trips never U-turn inside a junction. Every junction has lights in two phases, one for the lanes
@@ -15,13 +16,14 @@ const scratch = {};   // (a body's pose read without copying its whole state)
  * time, so cars turning across each other never lock). Walkers cross at a junction's crosswalks with the
  * phase going their way (starting only until `walk_close` seconds before its end), and cars stop before a
  * crosswalk while anyone is on it. The numbers are Directory data (`game-street-life.json`).
- * `new cityStreetLife(world, {navigation, sidewalks, random})` takes the exported city's `navigation` and
- * `sidewalks`; `updateState(seconds, {focus, time})` runs a step.
+ * `new streetLife(world, {navigation, sidewalks, intersections, traffic, walkers, random})` takes the map's
+ * `navigation` (its lane graph), `sidewalks` and junctions, and whether cars (`traffic`) and walkers
+ * (`walkers`) come on; `updateState(seconds, {focus, time})` runs a step.
  */
-export class cityStreetLife {
-    #world; #rules; #random; #spawnable = []; #junctions = new Map(); #turns = new Map(); #routes = new Map(); #walkable = []; #signals = new Map(); #trips = 0; #still = new Map(); #walkways;
-    constructor(world, { navigation, sidewalks, intersections = [], rules = RULES, random = Math.random }) {
-        this.#world = world; this.#rules = rules; this.#random = random; registerStreetEntityTypes(world);
+export class streetLife {
+    #world; #rules; #random; #spawnable = []; #junctions = new Map(); #turns = new Map(); #routes = new Map(); #walkable = []; #signals = new Map(); #trips = 0; #still = new Map(); #walkways; #on;
+    constructor(world, { navigation = { nodes: [], lanes: [] }, sidewalks = [], intersections = [], traffic = true, walkers = true, rules = RULES, random = Math.random }) {
+        this.#world = world; this.#rules = rules; this.#random = random; this.#on = { traffic: !!traffic, walkers: !!walkers }; registerStreetEntityTypes(world);
         this.traffic = new TrafficManager(world); this.pedestrians = new PedestrianManager(world, { random });
         const roads = world.navigation.roads, first = navigation.lanes[0]?.lane_id;
         if (first && !roads.getLane(first)) loadRoadNavigation(roads, navigation);   // (the world outlives the level: its roads are loaded once)
@@ -103,13 +105,13 @@ export class cityStreetLife {
             if (d > R.despawn || still > R.stall_seconds && d > R.view_reach || still > R.stall_limit) { this.#still.delete(car); car.destroy(); }
         }
         for (const [car, route_id] of this.#routes) if (car.destroyed && this.#world.traffic.releaseRoute(route_id)) { this.#routes.delete(car); this.#still.delete(car); }
-        for (let i = 0; i < R.spawn_tries && this.traffic.getAmbientVehicles().length < R.cars; i++) {
+        for (let i = 0; this.#on.traffic && i < R.spawn_tries && this.traffic.getAmbientVehicles().length < R.cars; i++) {
             const route_id = this.#trip(focus); if (!route_id) continue;
             const car = this.traffic.spawn({ route_id });
             if (car) this.#routes.set(car, route_id); else this.#world.traffic.releaseRoute(route_id);
         }
         for (const walker of this.pedestrians.getPedestrians()) if (far(walker)) walker.destroy();
-        for (let i = 0; i < R.spawn_tries && this.pedestrians.getPedestrians().length < R.pedestrians; i++) {
+        for (let i = 0; this.#on.walkers && i < R.spawn_tries && this.pedestrians.getPedestrians().length < R.pedestrians; i++) {
             const node = this.#ring(this.#walkable, focus, R.walker_ring, n => [n.x, n.y]); if (node) this.pedestrians.spawnAtNode(node.id);
         }
         this.pedestrians.updateState(seconds);

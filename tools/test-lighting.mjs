@@ -84,11 +84,11 @@ test('gate: a closed door shadows a lamp, the shadow moves as the leaf swings, a
 });
 
 test('gate: vending machines and health stations glow and pulse from their catalog light in the cafe and the clinic', async () => {
-    const { interiorMapDefinition, APARTMENT_MAP_OPTIONS } = await import('../src/game/levels/apartment-definition.mjs');
+    const { mapDefinition, MAP_OPTIONS } = await import('../src/game/levels/map-definition.mjs');
     const places = (await import('../src/game/data/game-db/places.json', { with: { type: 'json' } })).default;
     for (const [map_id, type, color] of [['cozy_cafe_interior', 'vending_machine', '#00f3ff'], ['medbay_sw', 'medbay_refill', '#00ff00']]) {
-        const physics = new physicsSystem(), { definition } = interiorMapDefinition({ map_id, map: places.maps[map_id], rooms: places.rooms[map_id] });
-        const map = new mapInstance(physics, definition, { ...APARTMENT_MAP_OPTIONS, templates: {} }), level = { physics, lamps: map.entities('lamp'), props: map.entities('prop'), definition };
+        const physics = new physicsSystem(), { definition } = mapDefinition({ map_id, map: places.maps[map_id], rooms: places.rooms[map_id] });
+        const map = new mapInstance(physics, definition, { ...MAP_OPTIONS, templates: {} }), level = { physics, lamps: map.entities('lamp'), props: map.entities('prop'), definition };
         const emitters = map.entities('prop').filter(p => p.data.prop_type === type);
         assert.ok(emitters.length, `${map_id} has a ${type}`);
         const lights = levelLights(level), glow = lights.filter(l => emitters.some(e => e.data.authored_id === l.id));
@@ -122,13 +122,13 @@ test('shadow rebuilds share a budget a frame, nearest the view first; a light pa
 
 test('the city at night: street lamps light a pool, signs colour without lifting the dark, the faulty ones stutter, and the dark goes deeper', async () => {
     const places = (await import('../src/game/data/game-db/places.json', { with: { type: 'json' } })).default;
-    const { cityMapDefinition, cityRooms } = await import('../src/game/levels/city-definition.mjs');
-    const { definition } = cityMapDefinition({ map: places.maps.sdc });
+    const { mapDefinition, lightingRooms } = await import('../src/game/levels/map-definition.mjs');
+    const { definition } = mapDefinition({ map_id: 'sdc', map: places.maps.sdc });
     const lamps = definition.lights.filter(l => l.role !== 'neon'), signs = definition.lights.filter(l => l.role === 'neon');
     assert.ok(lamps.filter(l => l.look === 'street').length > 1000 && signs.length > 1000, 'standing lamps take the street pool; every sign is a light');
     const faulty = definition.lights.filter(l => l.animation?.kind === 'stutter').length / definition.lights.length;
     assert.ok(faulty > .05 && faulty < .15, `about one in ten stutters (${faulty.toFixed(3)})`);
-    const physics = new physicsSystem(), lighting = new sceneLighting(physics), rooms = cityRooms(places.maps.sdc);
+    const physics = new physicsSystem(), lighting = new sceneLighting(physics), rooms = lightingRooms(definition);
     const lamp = { id: 'l', position: [500, 500], radius: 300, color: '#ff9944', look: 'street', shadows: 'static', animation: { kind: 'steady' } };
     const sign = { id: 's', position: [900, 500], radius: 150, color: '#ff00aa', intensity: 0, glow: 1.5, shadows: 'none', animation: { kind: 'steady' } };
     const layer = lighting.createLayer({ bounds: { left: 0, top: 0, right: 1200, bottom: 1000 }, kind: 'outdoor', rooms, sky_darkness: .6, lights: [lamp, sign] }).packets;

@@ -130,7 +130,7 @@ dropped: the extra surfaces cost more than the pixels they saved.
 ## Phase 4, step 2: the city at night through the native light layer
 
 The classic city is exported once from its seeded generator to `src/game/data/game-assets/generated/sdc-city.json`
-(`node tools/export-city.mjs`, `--check` to compare). `src/game/levels/city-definition.mjs` makes it a map
+(`node tools/export-city.mjs`, `--check` to compare). `src/game/levels/map-definition.mjs` (then `city-definition.mjs`) makes it a map
 definition: 677 building and yard walls, 1843 lamps, 10 doors as exits, streamed in 1024 px regions 3072 px
 round the camera. Two scenes light it as one outdoor room at the classic sky's 22:00 darkness:
 `light-city` (standing on Crimson Blvd) and `light-city-drive` (the camera along it at 500 px/s).

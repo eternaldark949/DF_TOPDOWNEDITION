@@ -9,7 +9,7 @@ export { gameEngine } from '../../engine/lobby/runtime/game-engine.mjs';
 export { gameLevel } from '../../engine/lobby/runtime/game-level.mjs';
 export { mapLevel } from '../../engine/lobby/runtime/map-level.mjs';
 export { travelSystem } from '../../engine/lobby/runtime/travel-system.mjs';
-export { InteriorLevel, registerInteriorLevels } from '../levels/interior-level.mjs';
+export { GameMapLevel, registerMapLevels } from '../levels/game-map-level.mjs';
 export { levelLobby } from '../../engine/lobby/level-lobby.mjs';
 export { createGameRuntime } from './game-runtime.mjs';
 export { controlSystem, controlsSystem, inputInstance, keyboardInstance, mouseInstance, touchInstance, touchStick, gamepadInstance, TAP, DOUBLETAP, HELD, PRESS, REPEAT, RELEASE } from '../../engine/basement/controls/index.mjs';

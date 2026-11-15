@@ -5,12 +5,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import places from '../src/game/data/game-db/places.json' with { type: 'json' };
 import LOOK from '../src/game/data/city-foliage.json' with { type: 'json' };
-import { cityMapDefinition } from '../src/game/levels/city-definition.mjs';
+import { mapDefinition } from '../src/game/levels/map-definition.mjs';
 import { cityBuildings } from '../src/game/presentation/city-buildings.mjs';
 import { cityFoliage, canopyPicture } from '../src/game/presentation/city-foliage.mjs';
 import { renderFrame, cameraSystem } from '../src/engine/basement/rendering/index.mjs';
 
-const { city, definition } = cityMapDefinition({ map: places.maps.sdc });
+const { sections: city, definition } = mapDefinition({ map_id: 'sdc', map: places.maps.sdc });
 const foliage = new cityFoliage(city), buildings = new cityBuildings(city);
 const camera = [1920, 5400], view = { left: 1280, top: 5040, right: 2560, bottom: 5760 };
 const submit = packets => {
