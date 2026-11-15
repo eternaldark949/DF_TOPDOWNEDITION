@@ -82,7 +82,7 @@ The map system uses the world's one spatial grid and navigation field. It never 
 |---|---|
 | `buildMapPackets(definition, {templates, prop_types, decorate, door_kinds})` | `{kind, spawn, entries, openings, door_kinds}`. `openings` lists every door, arches included: `{door_key, index, type, opening, leaf_ids}`. Each entry is `{section, index, source, packet, joints?}`; `joints` are constraint packets the map creates with the entity (a hinged door's hinge). Pure, no world. |
 | `new mapSystem(physics)` / `.load(definition, options)` / `.unload()` / `.current` | One active map per world. Loading releases the previous map. |
-| `mapInstance.entity(id)` / `.entities(role?)` / `.packets()` | Lookups. |
+| `mapInstance.entity(id)` / `.entities(role?, {section}?)` / `.packets()` | Lookups. `entities` reads lists sorted by role and by section (`walls`, `placements`, `lights`, `triggers`, ...) when the map is built, so it walks only its own entries. |
 | `mapInstance.getDoors()` | Every door, arches included, in authored order: `{door_key, index, type, opening, leaves}`. `opening` is `{position, length, across, rotation}` (centre, along, the wall's thickness, and the turn that lays +x along it); `leaves` holds each leaf's live entity, or null while it is unloaded. Each leaf's `data.opening` carries the same opening. Artists draw doors from this. |
 | `mapInstance(physics, definition, {…, door_kinds})` | `door_kinds` adds kinds or replaces built-in ones, for both the leaves and the room links. |
 | `mapInstance.updateState({near_range, duration, easing, include_groups})` | Opens and closes sliding and plain doors by proximity, with timed kinematic moves, then updates room occupancy. Hinged doors are skipped: they are physical. |

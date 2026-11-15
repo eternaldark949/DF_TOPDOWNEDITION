@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '72426bafbfdc';
+        const DFAB_BUILD = '7a23c339e52e';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="17132">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="17153">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -11776,7 +11776,7 @@ const builtins = { entity: gameEntity, character: gameCharacter, vehicle: gameVe
 
 /** Identity registry, never a physical-state cache or another spatial index. */
 class gameElements {
-    #entities = new Map(); #types = new Map(Object.entries(builtins)); #construction = null; #restore = null;
+    #entities = new Map(); #byType = new Map(); #types = new Map(Object.entries(builtins)); #construction = null; #restore = null;
     constructor(world, { asset_library = EMPTY_DATA_SOURCE } = {}) {
         if (!world || typeof world._createEntityComponents !== 'function' || typeof world._mutate !== 'function') throw new TypeError('gameElements requires its physicsSystem owner');
         if (world.elements) throw new Error('The world already owns its authoritative gameElements registry');
@@ -11829,10 +11829,22 @@ class gameElements {
     }
     listEntityTypes() { return [...this.#types.keys()]; }
     fetchEntity(entity_id) { return this.#entities.get(entity_id) ?? null; }
-    getEntities({ entity_type, active } = {}, results = []) {
+    /**
+     * Live entities, in registration order. `entity_type` lists one type, `instance_of` every type whose
+     * class is or extends that class (type by type, each in registration order): both read the type's own
+     * list, kept as entities come and go, so they cost what they return and not the world's entity count.
+     */
+    getEntities({ entity_type, instance_of, active } = {}, results = []) {
         results.length = 0;
-        for (const entity of this.#entities.values()) if ((!entity_type || entity.entity_type === entity_type) && (active === undefined || entity.active === active)) results.push(entity);
+        if (instance_of !== undefined && typeof instance_of !== 'function') throw new TypeError('instance_of must be a class');
+        const is = type => { const C = this.#types.get(type); return instance_of === undefined || C === instance_of || C?.prototype instanceof instance_of; };
+        if (entity_type !== undefined) { if (is(entity_type)) this.#push(this.#byType.get(entity_type), active, results); }
+        else if (instance_of !== undefined) { for (const type of this.#types.keys()) if (is(type)) this.#push(this.#byType.get(type), active, results); }
+        else this.#push(this.#entities, active, results);
         return results;
+    }
+    #push(list, active, results) {
+        if (list) for (const entity of list.values()) if (active === undefined || entity.active === active) results.push(entity);
     }
     getEntityForBody(body) { return this.fetchEntity(this.world._record(body).id); }
     peruseNearbyEntities(reference, options = {}, results = []) { return this.world.peruseNearbyEntities(reference, { ...options, spatial_entities: true }, results); }
@@ -11851,7 +11863,8 @@ class gameElements {
         this.world._mutate(() => {
             if (record.destroyed) return;
             if (this.#entities.has(record.body.body_id)) throw new Error('Duplicate entity identity');
-            record.registered = true; this.#entities.set(record.body.body_id, entity);this.world._emit('entityRegistered',{entity,body:record.body});
+            record.registered = true; this.#entities.set(record.body.body_id, entity);
+            let list = this.#byType.get(type); if (!list) this.#byType.set(type, list = new Map()); list.set(record.body.body_id, entity);this.world._emit('entityRegistered',{entity,body:record.body});
         });
         return record;
     }
@@ -11876,7 +11889,7 @@ class gameElements {
     _bodyRemoved(body_id) {
         const entity = this.#entities.get(body_id); if (!entity) return;
         const r = entityRecord(entity); r.destroyed = true; r.registered = false;
-        for (const drop of [...r.subscriptions]) drop();this.world._emit('entityRemoved',{entity,body:r.body}); this.#entities.delete(body_id);
+        for (const drop of [...r.subscriptions]) drop();this.world._emit('entityRemoved',{entity,body:r.body}); this.#entities.delete(body_id); this.#byType.get(r.entity_type)?.delete(body_id);
     }
     _bodyUpdated(body_id, config) {
         const entity = this.#entities.get(body_id); if (!entity) return;
@@ -27759,7 +27772,7 @@ const moved = (entity, packet) => Math.hypot(entity.position[0] - packet.positio
  * baked light, navigation) joins through `addTier`, each tier with its own radius.
  */
 class mapInstance {
-    #physics; #entries; #openings; #byId = new Map(); #regions = new Map(); #memory = new Map(); #region_size; #tiers = new Map(); #queue = [];
+    #physics; #entries; #openings; #byId = new Map(); #byRole = new Map(); #bySection = new Map(); #regions = new Map(); #memory = new Map(); #region_size; #tiers = new Map(); #queue = [];
     #stats = { region_loads: 0, region_unloads: 0, created: 0, destroyed: 0 };
     constructor(physics, definition, options = {}) {
         this.#physics = physics; this.map_id = definition.map_id ?? null;
@@ -27775,6 +27788,10 @@ class mapInstance {
             entry.region = extentOf(entry.packet) <= size ? this.#regionKey(entry.packet.position) : null;
             if (entry.region !== null) { if (!this.#regions.has(entry.region)) this.#regions.set(entry.region, []); this.#regions.get(entry.region).push(entry); }
             if (id !== undefined) this.#byId.set(id, entry);
+            // Sorted once by role and section, so a lookup walks only its own entries.
+            for (const [index, key] of [[this.#byRole, entry.packet.data?.role], [this.#bySection, entry.section]]) {
+                let list = index.get(key); if (!list) index.set(key, list = []); list.push(entry);
+            }
         });
         for (const entry of this.#entries) if (entry.region === null) this.#create(entry);
         // The entities tier: the bodies themselves, the one tier every map has.
@@ -27809,8 +27826,17 @@ class mapInstance {
 
     /** The live entity built for an authored id, or null (unloaded region, destroyed). */
     entity(authored_id) { const e = this.#byId.get(authored_id)?.entity; return e && !e.destroyed ? e : null; }
-    /** Live entities with this data role ('wall', 'prop', 'lamp', 'door', ...), in build order. */
-    entities(role) { const out = []; for (const entry of this.#entries) if (entry.entity && !entry.entity.destroyed && (role === undefined || entry.packet.data?.role === role)) out.push(entry.entity); return out; }
+    /**
+     * Live entities with this data role ('wall', 'prop', 'lamp', 'door', ...), in build order; with
+     * `{section}`, only those built from that part of the definition ('walls', 'placements', 'lights',
+     * 'triggers', ...). Entries are sorted by role and section when the map is built, so a lookup walks
+     * only its own.
+     */
+    entities(role, { section } = {}) {
+        const list = role !== undefined ? this.#byRole.get(role) : section !== undefined ? this.#bySection.get(section) : this.#entries, out = [];
+        if (list) for (const entry of list) if (entry.entity && !entry.entity.destroyed && (section === undefined || entry.section === section)) out.push(entry.entity);
+        return out;
+    }
     /**
      * Every door, arches included, in authored order: `{door_key, index, type, opening, leaves}`, where
      * `leaves` holds each leaf's live entity (null while unloaded) in kind order. For artists and tools.
@@ -30263,7 +30289,8 @@ class mapLevel extends gameLevel {
      * A level overrides it to stream round fewer (the player, companions, a pinned mission point).
      */
     mapFocuses(context) {
-        const focuses = context.api.physics.elements.getEntities().filter(e => e.active !== false && !e.destroyed && e instanceof gameCharacter)   // (by class: reading a body's state copies it).map(e => ({ position: e.position, velocity: e.linear_velocity }));
+        // By class, from the characters' own list: reading a body's state would copy it.
+        const focuses = context.api.physics.elements.getEntities({ instance_of: gameCharacter }).filter(e => e.active !== false && !e.destroyed).map(e => ({ position: e.position, velocity: e.linear_velocity }));
         return focuses.length ? focuses : [this.map.spawn ?? this.definition.size.map(v => v / 2)];
     }
     /** Milliseconds a step may spend building regions (the rest wait for the next step). */
@@ -30274,13 +30301,14 @@ class mapLevel extends gameLevel {
     /** Every exit: `{entity, target, label, auto, bounds}`. */
     getExits() {
         if (!this.map) return [];
-        return this.map.entities().filter(e => typeof e.data?.target === 'string').map(entity => {
+        return this.map.entities(undefined, { section: 'triggers' }).filter(e => typeof e.data?.target === 'string').map(entity => {
             const b = entity.physics_system.getBodyBounds(entity); return { entity, target: entity.data.target, label: entity.data.label ?? null, auto: !!entity.data.auto, bounds: b };
         });
     }
     /** The exit a body stands in, or null. */
     exitAt(body) {
-        for (const exit of this.getExits()) if (exit.entity.physics_system.containsPoint(exit.entity, body.position)) return exit;
+        const [x, y] = body.position;
+        for (const exit of this.getExits()) { const b = exit.bounds; if (x >= b.left && x <= b.right && y >= b.top && y <= b.bottom && exit.entity.physics_system.containsPoint(exit.entity, body.position)) return exit; }
         return null;
     }
     /** Where someone arriving from `from` stands: inside the exit leading back there, else the map's spawn. */

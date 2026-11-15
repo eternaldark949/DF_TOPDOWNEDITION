@@ -29,7 +29,7 @@ export class CityLevel extends mapLevel {
     }
     async prepare(context, options = {}) { return { ...await super.prepare(context, options), street: options.street ?? true }; }
     mapFocuses(context) {
-        const focuses = context.api.physics.elements.getEntities().filter(e => e.active !== false && !e.destroyed && !(e instanceof Pedestrian) && e instanceof gameCharacter).map(e => ({ position: e.position, velocity: e.linear_velocity }));
+        const focuses = context.api.physics.elements.getEntities({ instance_of: gameCharacter }).filter(e => e.active !== false && !e.destroyed && !(e instanceof Pedestrian)).map(e => ({ position: e.position, velocity: e.linear_velocity }));
         return focuses.length ? focuses : [this.definition.spawn];
     }
     afterPhysics(context, seconds) {

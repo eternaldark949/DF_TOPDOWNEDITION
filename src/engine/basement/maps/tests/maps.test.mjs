@@ -48,6 +48,7 @@ test('an interior builds every entity at load, finds them by id and role, and op
     const physics = new physicsSystem(), map = new mapInstance(physics, room);
     assert.equal(map.entities().length, map.packets().length);
     assert.equal(map.entities('door').length, 1); assert.equal(map.entities('door_panel').length, 1);
+    assert.deepEqual(map.entities(undefined, { section: 'triggers' }).map(e => e.data.authored_id), ['exit_0']); assert.equal(map.entities('wall', { section: 'walls' }).length, 6); assert.deepEqual(map.entities('wall', { section: 'triggers' }), []);
     assert.equal(map.entity('exit_0').data.target, 'street');
     const door = map.entity('door_0'), closed = [...door.position];
     const walker = physics.elements.createCharacter({ position: [200, 120], collision_shape: { shape_type: 'circle', radius: 8 } });

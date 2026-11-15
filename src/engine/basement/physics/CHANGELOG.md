@@ -1,5 +1,9 @@
 # Changelog
 
+## Entities filed by type — 2026-11-15
+
+- The entity registry files each entity under its type as it registers and drops it as it goes. `getEntities({entity_type})` reads that type's list instead of scanning every entity, and the new `instance_of` reads every type whose class is or extends a class (a level's characters, a driver's cars).
+
 ## Group buckets in the spatial grid — 2026-11-15
 
 - Each grid cell sorts its entries into buckets by group when they are registered: a body under its collision group, a group-less body under a loose bucket, and navigation lanes and spatial instances under an instance bucket. A move only shuffles an entry between cells; a change of collision group re-sorts it.

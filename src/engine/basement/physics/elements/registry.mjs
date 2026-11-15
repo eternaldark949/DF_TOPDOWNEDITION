@@ -8,7 +8,7 @@ const builtins = { entity: gameEntity, character: gameCharacter, vehicle: gameVe
 
 /** Identity registry, never a physical-state cache or another spatial index. */
 export class gameElements {
-    #entities = new Map(); #types = new Map(Object.entries(builtins)); #construction = null; #restore = null;
+    #entities = new Map(); #byType = new Map(); #types = new Map(Object.entries(builtins)); #construction = null; #restore = null;
     constructor(world, { asset_library = EMPTY_DATA_SOURCE } = {}) {
         if (!world || typeof world._createEntityComponents !== 'function' || typeof world._mutate !== 'function') throw new TypeError('gameElements requires its physicsSystem owner');
         if (world.elements) throw new Error('The world already owns its authoritative gameElements registry');
@@ -61,10 +61,22 @@ export class gameElements {
     }
     listEntityTypes() { return [...this.#types.keys()]; }
     fetchEntity(entity_id) { return this.#entities.get(entity_id) ?? null; }
-    getEntities({ entity_type, active } = {}, results = []) {
+    /**
+     * Live entities, in registration order. `entity_type` lists one type, `instance_of` every type whose
+     * class is or extends that class (type by type, each in registration order): both read the type's own
+     * list, kept as entities come and go, so they cost what they return and not the world's entity count.
+     */
+    getEntities({ entity_type, instance_of, active } = {}, results = []) {
         results.length = 0;
-        for (const entity of this.#entities.values()) if ((!entity_type || entity.entity_type === entity_type) && (active === undefined || entity.active === active)) results.push(entity);
+        if (instance_of !== undefined && typeof instance_of !== 'function') throw new TypeError('instance_of must be a class');
+        const is = type => { const C = this.#types.get(type); return instance_of === undefined || C === instance_of || C?.prototype instanceof instance_of; };
+        if (entity_type !== undefined) { if (is(entity_type)) this.#push(this.#byType.get(entity_type), active, results); }
+        else if (instance_of !== undefined) { for (const type of this.#types.keys()) if (is(type)) this.#push(this.#byType.get(type), active, results); }
+        else this.#push(this.#entities, active, results);
         return results;
+    }
+    #push(list, active, results) {
+        if (list) for (const entity of list.values()) if (active === undefined || entity.active === active) results.push(entity);
     }
     getEntityForBody(body) { return this.fetchEntity(this.world._record(body).id); }
     peruseNearbyEntities(reference, options = {}, results = []) { return this.world.peruseNearbyEntities(reference, { ...options, spatial_entities: true }, results); }
@@ -83,7 +95,8 @@ export class gameElements {
         this.world._mutate(() => {
             if (record.destroyed) return;
             if (this.#entities.has(record.body.body_id)) throw new Error('Duplicate entity identity');
-            record.registered = true; this.#entities.set(record.body.body_id, entity);this.world._emit('entityRegistered',{entity,body:record.body});
+            record.registered = true; this.#entities.set(record.body.body_id, entity);
+            let list = this.#byType.get(type); if (!list) this.#byType.set(type, list = new Map()); list.set(record.body.body_id, entity);this.world._emit('entityRegistered',{entity,body:record.body});
         });
         return record;
     }
@@ -108,7 +121,7 @@ export class gameElements {
     _bodyRemoved(body_id) {
         const entity = this.#entities.get(body_id); if (!entity) return;
         const r = entityRecord(entity); r.destroyed = true; r.registered = false;
-        for (const drop of [...r.subscriptions]) drop();this.world._emit('entityRemoved',{entity,body:r.body}); this.#entities.delete(body_id);
+        for (const drop of [...r.subscriptions]) drop();this.world._emit('entityRemoved',{entity,body:r.body}); this.#entities.delete(body_id); this.#byType.get(r.entity_type)?.delete(body_id);
     }
     _bodyUpdated(body_id, config) {
         const entity = this.#entities.get(body_id); if (!entity) return;

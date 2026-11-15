@@ -88,3 +88,18 @@ test('end events retain an official destroyed identity rather than an orphan rep
     p.on('contactEnd', e => ended = e); step(p); character.destroy(); step(p);
     assert.ok([ended.entity_a, ended.entity_b].includes(character)); assert.equal(character.destroyed, true);
 });
+test('getEntities reads each type\'s own list, kept as entities come and go', () => {
+    const p = new physicsSystem();
+    class Walker extends gameCharacter {} class Runner extends Walker {}
+    p.elements.registerEntityType('walker', Walker); p.elements.registerEntityType('runner', Runner);
+    const car = p.createVehicle(), w1 = p.createEntity({ entity_type: 'walker' }), r = p.createEntity({ entity_type: 'runner' }), c = p.createCharacter(), w2 = p.createEntity({ entity_type: 'walker' });
+    assert.deepEqual(p.elements.getEntities(), [car, w1, r, c, w2]);
+    assert.deepEqual(p.elements.getEntities({ entity_type: 'walker' }), [w1, w2]);
+    assert.deepEqual(p.elements.getEntities({ instance_of: Walker }), [w1, w2, r]);
+    assert.deepEqual(p.elements.getEntities({ instance_of: gameCharacter }).sort((a, b) => a.entity_id - b.entity_id), [w1, r, c, w2]);
+    assert.deepEqual(p.elements.getEntities({ entity_type: 'walker', instance_of: gameVehicle }), []);
+    assert.deepEqual(p.elements.getEntities({ instance_of: gameVehicle }), [car]);
+    w1.destroy(); step(p);
+    assert.deepEqual(p.elements.getEntities({ entity_type: 'walker' }), [w2]); assert.deepEqual(p.elements.getEntities({ instance_of: Walker }), [w2, r]);
+    assert.throws(() => p.elements.getEntities({ instance_of: 'walker' }), /instance_of/);
+});

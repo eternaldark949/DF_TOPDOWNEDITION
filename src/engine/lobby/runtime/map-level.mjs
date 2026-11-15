@@ -33,7 +33,8 @@ export class mapLevel extends gameLevel {
      * A level overrides it to stream round fewer (the player, companions, a pinned mission point).
      */
     mapFocuses(context) {
-        const focuses = context.api.physics.elements.getEntities().filter(e => e.active !== false && !e.destroyed && e instanceof gameCharacter)   // (by class: reading a body's state copies it).map(e => ({ position: e.position, velocity: e.linear_velocity }));
+        // By class, from the characters' own list: reading a body's state would copy it.
+        const focuses = context.api.physics.elements.getEntities({ instance_of: gameCharacter }).filter(e => e.active !== false && !e.destroyed).map(e => ({ position: e.position, velocity: e.linear_velocity }));
         return focuses.length ? focuses : [this.map.spawn ?? this.definition.size.map(v => v / 2)];
     }
     /** Milliseconds a step may spend building regions (the rest wait for the next step). */
@@ -44,13 +45,14 @@ export class mapLevel extends gameLevel {
     /** Every exit: `{entity, target, label, auto, bounds}`. */
     getExits() {
         if (!this.map) return [];
-        return this.map.entities().filter(e => typeof e.data?.target === 'string').map(entity => {
+        return this.map.entities(undefined, { section: 'triggers' }).filter(e => typeof e.data?.target === 'string').map(entity => {
             const b = entity.physics_system.getBodyBounds(entity); return { entity, target: entity.data.target, label: entity.data.label ?? null, auto: !!entity.data.auto, bounds: b };
         });
     }
     /** The exit a body stands in, or null. */
     exitAt(body) {
-        for (const exit of this.getExits()) if (exit.entity.physics_system.containsPoint(exit.entity, body.position)) return exit;
+        const [x, y] = body.position;
+        for (const exit of this.getExits()) { const b = exit.bounds; if (x >= b.left && x <= b.right && y >= b.top && y <= b.bottom && exit.entity.physics_system.containsPoint(exit.entity, body.position)) return exit; }
         return null;
     }
     /** Where someone arriving from `from` stands: inside the exit leading back there, else the map's spawn. */

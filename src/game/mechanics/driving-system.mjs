@@ -1,3 +1,4 @@
+import { gameVehicle } from '../../engine/basement/physics/index.mjs';
 import DRIVING from '../data/game-driving.json' with { type: 'json' };
 
 /**
@@ -14,7 +15,7 @@ export class drivingSystem {
     nearestVehicle(context) {
         const player = this.#get_player(); if (!player) return null;
         let best = null, dist = this.#rules.reach;
-        for (const car of context.api.physics.elements.getEntities()) {
+        for (const car of context.api.physics.elements.getEntities({ instance_of: gameVehicle })) {
             if (typeof car.assignDriver !== 'function' || car.destroyed || car.data.control_mode === 'AI' || car.data.occupants?.[0] != null) continue;
             const d = Math.hypot(car.position[0] - player.position[0], car.position[1] - player.position[1]);
             if (d < dist) { dist = d; best = car; }

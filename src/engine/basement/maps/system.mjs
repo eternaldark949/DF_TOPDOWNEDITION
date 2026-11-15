@@ -20,7 +20,7 @@ const moved = (entity, packet) => Math.hypot(entity.position[0] - packet.positio
  * baked light, navigation) joins through `addTier`, each tier with its own radius.
  */
 export class mapInstance {
-    #physics; #entries; #openings; #byId = new Map(); #regions = new Map(); #memory = new Map(); #region_size; #tiers = new Map(); #queue = [];
+    #physics; #entries; #openings; #byId = new Map(); #byRole = new Map(); #bySection = new Map(); #regions = new Map(); #memory = new Map(); #region_size; #tiers = new Map(); #queue = [];
     #stats = { region_loads: 0, region_unloads: 0, created: 0, destroyed: 0 };
     constructor(physics, definition, options = {}) {
         this.#physics = physics; this.map_id = definition.map_id ?? null;
@@ -36,6 +36,10 @@ export class mapInstance {
             entry.region = extentOf(entry.packet) <= size ? this.#regionKey(entry.packet.position) : null;
             if (entry.region !== null) { if (!this.#regions.has(entry.region)) this.#regions.set(entry.region, []); this.#regions.get(entry.region).push(entry); }
             if (id !== undefined) this.#byId.set(id, entry);
+            // Sorted once by role and section, so a lookup walks only its own entries.
+            for (const [index, key] of [[this.#byRole, entry.packet.data?.role], [this.#bySection, entry.section]]) {
+                let list = index.get(key); if (!list) index.set(key, list = []); list.push(entry);
+            }
         });
         for (const entry of this.#entries) if (entry.region === null) this.#create(entry);
         // The entities tier: the bodies themselves, the one tier every map has.
@@ -70,8 +74,17 @@ export class mapInstance {
 
     /** The live entity built for an authored id, or null (unloaded region, destroyed). */
     entity(authored_id) { const e = this.#byId.get(authored_id)?.entity; return e && !e.destroyed ? e : null; }
-    /** Live entities with this data role ('wall', 'prop', 'lamp', 'door', ...), in build order. */
-    entities(role) { const out = []; for (const entry of this.#entries) if (entry.entity && !entry.entity.destroyed && (role === undefined || entry.packet.data?.role === role)) out.push(entry.entity); return out; }
+    /**
+     * Live entities with this data role ('wall', 'prop', 'lamp', 'door', ...), in build order; with
+     * `{section}`, only those built from that part of the definition ('walls', 'placements', 'lights',
+     * 'triggers', ...). Entries are sorted by role and section when the map is built, so a lookup walks
+     * only its own.
+     */
+    entities(role, { section } = {}) {
+        const list = role !== undefined ? this.#byRole.get(role) : section !== undefined ? this.#bySection.get(section) : this.#entries, out = [];
+        if (list) for (const entry of list) if (entry.entity && !entry.entity.destroyed && (section === undefined || entry.section === section)) out.push(entry.entity);
+        return out;
+    }
     /**
      * Every door, arches included, in authored order: `{door_key, index, type, opening, leaves}`, where
      * `leaves` holds each leaf's live entity (null while unloaded) in kind order. For artists and tools.

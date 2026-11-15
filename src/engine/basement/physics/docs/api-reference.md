@@ -218,7 +218,7 @@ Entity properties are read-only: `entity_id`, `body_id` (same root identity), `e
 | `listEntityTypes()` | Registered names, including built-ins. |
 | `fetchEntity(entity_id)` | Entity or `null`; pending/destroyed entities are absent. |
 | `getEntityForBody(body)` | Official root entity or `null` for an anonymous mechanical body. |
-| `getEntities({entity_type?,active?}={},results=[])` | Identity-registry enumeration for lifecycle/tools/save, not a spatial query. Inactive entities remain registered. |
+| `getEntities({entity_type?,instance_of?,active?}={},results=[])` | Identity-registry enumeration for lifecycle/tools/save, not a spatial query. Inactive entities remain registered. The registry files each entity under its type when it registers, so `entity_type` (one type) and `instance_of` (every registered type whose class is or extends that class, type by type) walk only those types' lists; with neither, every entity in registration order. |
 | `peruseNearbyEntities(reference,options={},results=[])` | Shared-index nearby query including registered nonphysical entities; each hit contains `entity` and `body`. |
 | `getStatistics()` | Entity and registered-type counts. |
 
