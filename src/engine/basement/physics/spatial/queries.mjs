@@ -163,8 +163,9 @@ export class physicsQueries {
     peruseNearbyEntities(reference, options = {}, results = []) {
         const at = referencePosition(this.world, reference), range = number(options.near_range ?? 400, 'near_range', 0), hits = [];
         const ignore = options.ignore_body ?? (Array.isArray(reference) ? undefined : referenceBody(reference));
+        const filter = { ...options, ignore_body: ignore };
         for (const b of this.world.spatial_grid.queryRadius(at, range)) {
-            if (!accepts(this.world, b, { ...options, ignore_body: ignore })) continue;
+            if (!accepts(this.world, b, filter)) continue;
             const r = this.world._record(b), d = sub(r.position, at), distance = length(d);
             if (distance <= range) hits.push({ body: b, body_id: r.id, entity: this.world.elements.fetchEntity(r.id), distance, direction: distance > EPS ? scale(d, 1 / distance) : [0, 0] });
         }
@@ -213,6 +214,7 @@ export class physicsQueries {
     *#lightBlockers(origin, radius, packet) {
         const options = { include_groups: BODY_GROUP.STATIC, ...packet, include_ghosts: false }, always = { ...options, include_groups: BODY_GROUP.ALL };
         for (const b of this.world.spatial_grid.queryRadius(origin, radius)) {
+            if (!b?.body_id) continue;   // (the grid also holds what is not a body: a navigation lane, a spatial instance)
             const c = this.world._record(b).config;
             if (c.blocks_light === false || (packet.include_moving === false && c.physics_type !== 'static')) continue;
             if (accepts(this.world, b, c.blocks_light ? always : options)) yield b;

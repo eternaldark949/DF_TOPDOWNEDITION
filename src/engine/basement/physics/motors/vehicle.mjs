@@ -3,6 +3,9 @@ import { massProperties, ownInertia, impulseCenter, changeAngularSpeed } from '.
 import { bodyRecord, changeVelocity, inverseMass, inverseInertia } from '../core/state.mjs';
 import { number, dot, sub, length, scale, clamp, angleDelta, clone, add, cross } from '../core/values.mjs';
 
+/** The share of its speed a car keeps through the tightest bend. */
+const CRAWL = 0.15;
+
 export class pathMotor {
     constructor(body) { this.body = body; this.path = null; this.index = 1; this.options = {}; }
     followPath(path, options = {}) {
@@ -16,10 +19,29 @@ export class pathMotor {
         if (!path) { r.world._emit('movementBlocked', { body: this.body, reason: 'no_path' }); return null; }
         return this.followPath(path, options);
     }
+    /**
+     * The fastest the car may go now and still take the bends ahead within `reach` slowly enough: at a point
+     * where the path has turned by an angle from the way it leads now, the speed is `max` times the square of
+     * the half angle's cosine (a right angle, half; a hairpin, the crawl), reached by braking from here.
+     */
+    #cornering(position, max, braking, reach) {
+        const path = this.path; let from = position, walked = 0, limit = Infinity;
+        const lead = sub(path[this.index], position), heading = Math.atan2(lead[1], lead[0]);
+        for (let k = this.index; k < path.length - 1 && walked < reach; k++) {
+            walked += length(sub(path[k], from)); from = path[k];
+            const next = sub(path[k + 1], path[k]); if (length(next) < 1e-9) continue;
+            const turn = Math.abs(angleDelta(heading, Math.atan2(next[1], next[0]))), corner = max * Math.max(CRAWL, Math.cos(turn / 2) ** 2);
+            limit = Math.min(limit, Math.sqrt(corner * corner + 2 * braking * walked));
+        }
+        return limit;
+    }
     _controls(motor) {
         if (!this.path) return null;
         const r = bodyRecord(this.body), cfg = motor.config, point = this.path[this.index], delta = sub(point, r.position), d = length(delta);
-        if (d < Math.max(this.options.arrival_distance ?? 3, Math.abs(dot(r.velocity, [Math.cos(r.rotation), Math.sin(r.rotation)])) / 30)) {
+        // A point is reached within the arrival distance, or once the car is past it along the path's segment into
+        // it: a car that misses a point by a hair drives on rather than circling back for it.
+        const before = this.path[this.index - 1], passed = before && dot(sub(r.position, point), sub(point, before)) >= 0;
+        if (passed || d < Math.max(this.options.arrival_distance ?? 3, Math.abs(dot(r.velocity, [Math.cos(r.rotation), Math.sin(r.rotation)])) / 30)) {
             if (this.index === this.path.length - 1) { this.path = null; Object.assign(motor.inputs, { throttle: 0, brake: 1, steer: 0 }); r.world._emit('destinationReached', { body: this.body, position: [...r.position] }); return { throttle: 0, brake: 1, steer: 0 }; }
             this.index++;
         }
@@ -32,7 +54,7 @@ export class pathMotor {
         const clearance = r.world.getPathClearance({ body: this.body, from: r.position, to, from_rotation: r.rotation, include_ghosts: false });
         const safe = clearance.clear ? max : Math.sqrt(2 * braking * Math.max(0, clearance.distance - (this.options.following_distance ?? 4)));
         const end = this.index === this.path.length - 1 ? Math.sqrt(2 * braking * Math.max(0, length(target) - 2)) : max;
-        const desired = Math.min(r.world.traffic.getSpeedCap(this.body), max * Math.max(0.15, 1 - Math.abs(error) / Math.PI), safe, end);
+        const desired = Math.min(r.world.traffic.getSpeedCap(this.body), max * Math.max(0.15, 1 - Math.abs(error) / Math.PI), safe, end, this.#cornering(r.position, max, braking, stop + cfg.wheel_base * 2));
         return { steer, throttle: speed < desired - 0.5 ? 1 : 0, brake: speed > desired + 0.5 ? 1 : 0 };
     }
 }

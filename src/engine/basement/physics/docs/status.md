@@ -20,7 +20,7 @@ See [six-group migration ledger](six-groups.md) for the explicit cutover status.
 ## Native behavior limits
 
 - Collision shapes are centered with optional local offsets. Noncircle mass properties use enclosing rectangles; compounds resolve one deepest child contact per iteration.
-- CCD clips at first impact; it does not simulate all remaining time. General sweeps have a convergence budget and can throw for difficult near-tangent/rotating configurations. Linear circle sweeps have an analytic path.
+- CCD clips at first impact; it does not simulate all remaining time. General sweeps count two shapes within 0.01 units as touching, and when a rotating pair stays close past the convergence budget they report a contact (`stalled: true`) where the advance stalled, never a clear path. Linear circle sweeps have an analytic path.
 - Teleport interval union handles constant-orientation translation with numerical clearance. It can cross solids but never returns an occupied fallback. It does not search rotating placements.
 - Traffic reservations conservatively serialize shared conflict resources in registration order. Passing uses authored alternative itineraries; it does not invent road geometry or forecast every future driver decision.
 - Scripted rigid/character motion can be blocked; kinematic motion is prescribed moving geometry. Timeline completion reports requested completion, so clients must inspect actual poses if arrival matters.

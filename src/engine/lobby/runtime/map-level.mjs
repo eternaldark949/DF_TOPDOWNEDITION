@@ -1,6 +1,7 @@
 // ===== LV1 LOBBY =====
 import { gameLevel } from './game-level.mjs';
 import { mapInstance } from '../../basement/maps/index.mjs';
+import { gameCharacter } from '../../basement/physics/index.mjs';
 
 /**
  * A level that is one Basement map. A subclass says which map with `mapDefinition`; the level builds
@@ -32,7 +33,7 @@ export class mapLevel extends gameLevel {
      * A level overrides it to stream round fewer (the player, companions, a pinned mission point).
      */
     mapFocuses(context) {
-        const focuses = context.api.physics.elements.getEntities().filter(e => e.active !== false && !e.destroyed && e.body?.getState().physics_type === 'character').map(e => ({ position: e.position, velocity: e.linear_velocity }));
+        const focuses = context.api.physics.elements.getEntities().filter(e => e.active !== false && !e.destroyed && e instanceof gameCharacter)   // (by class: reading a body's state copies it).map(e => ({ position: e.position, velocity: e.linear_velocity }));
         return focuses.length ? focuses : [this.map.spawn ?? this.definition.size.map(v => v / 2)];
     }
     /** Milliseconds a step may spend building regions (the rest wait for the next step). */

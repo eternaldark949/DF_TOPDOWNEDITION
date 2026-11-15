@@ -68,6 +68,9 @@ export class Pedestrian extends gameCharacter {
             this.moveTo(target, { direct: true, avoid_groups: BODY_GROUP.CHARACTER, speed: crossing ? rules.crossing_speed : undefined, personal_space: rules.personal_space, face_movement: true });
             d.state = crossing ? 'crossing' : 'walking';
         }
+        // A walker looks out for cars a few times a second, not every step: a car is seconds away when first seen.
+        d.sense_seconds = (d.sense_seconds ?? 0) - seconds; if (d.sense_seconds > 0) return;
+        d.sense_seconds = rules.sense_seconds ?? 0;
         const threats = this.physics_system.predictMovementContacts({ body: this, seconds: rules.prediction_seconds, include_groups: BODY_GROUP.VEHICLE, max_results: 1 });
         if (threats.length && this.evadeBody(threats[0].body, { distance: rules.dodge_distance, speed: rules.dodge_speed })) {
             d.state = 'dodging'; d.state_seconds = rules.dodge_seconds; this.say('Look out!');

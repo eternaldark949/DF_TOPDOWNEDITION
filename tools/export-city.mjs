@@ -62,7 +62,7 @@ function exportCity() {
                         return [r(p.x), r(p.y), Math.round((q.x - p.x) * 1e4) / 1e4, Math.round((q.y - p.y) * 1e4) / 1e4];
                     }) };
             }),
-            intersections: game.traffic.network.intersections.map(i => ({ x: r(i.x), y: r(i.y), w: r(i.width), h: r(i.height), ...(i.poly ? { poly: i.poly.map(point) } : {}) }))
+            intersections: game.traffic.network.intersections.map(i => ({ id: i.id, x: r(i.x), y: r(i.y), w: r(i.width), h: r(i.height), ...(i.poly ? { poly: i.poly.map(point) } : {}) }))
         },
         blocks: layout.blocks.map(b => ({ name: b.name, row: b.row, col: b.col, type: b.type, ...rect(b) })),
         pavements: m.pavements.map(p => ({ ...rect(p), ...(p.poly ? { poly: p.poly.map(point) } : {}), ...(p.road ? { road: p.road } : {}) })),
@@ -81,7 +81,19 @@ function exportCity() {
         neon: (game.neonSigns ?? []).map(n => plain(n, ['x', 'y', 'text', 'color', 'fontSize', 'fontFamily', 'flickerOffset'])),
         foliage: m.foliage.map(f => snake(plain(f, ['x', 'y', 'type', 'size', 'phaseOffset', 'swayMultiplier', 'isGlowing', 'glowColor', 'leafColor', 'trunkColor']))),
         props: m.props.filter(p => p.decorType).map(p => ({ decorType: p.decorType, x: r(p.x), y: r(p.y), width: r(p.width), height: r(p.height), color: p.color, mass: p.mass, ...(p.decor?.variant ? { variant: p.decor.variant } : {}) })),
-        transitions: m.transitions.map(t => ({ ...rect(t), target: t.target, label: t.label }))
+        transitions: m.transitions.map(t => ({ ...rect(t), target: t.target, label: t.label })),
+        // The lanes as Basement navigation road data (a turn's lane id starts with its junction's id), and the
+        // walkers' network: sidewalk waypoints, each with its neighbours, a crossing's two kerbs marked with its index.
+        navigation: (() => {
+            const { nodes, lanes } = DFNative.roadNavigationData(game.traffic.network);
+            return { nodes: nodes.map(n => ({ node_id: n.node_id, position: n.position.map(r) })),
+                lanes: lanes.map(l => ({ ...l, ...(l.points ? { points: l.points.map(p => p.map(r)) } : {}) })) };
+        })(),
+        sidewalks: (() => {
+            const net = layout.generateSidewalkNetwork(), crossings = new Map();
+            return net.nodes.map(n => ({ id: n.id, x: r(n.x), y: r(n.y), connections: n.connections,
+                ...(n.crosswalkData ? { crossing: crossings.get(n.crosswalkData) ?? (crossings.set(n.crosswalkData, crossings.size), crossings.size - 1) } : {}) }));
+        })()
     };
 }
 

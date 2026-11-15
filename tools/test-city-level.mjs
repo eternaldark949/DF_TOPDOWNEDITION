@@ -42,3 +42,21 @@ test('the player takes the wheel, drives, brakes into reverse and steps out to p
         assert.equal(engine.api.physics.getAttachmentState(player), null); assert.equal(car.data.control_mode, 'PARKED');
     } finally { engine.dispose(); }
 });
+
+test('cars drive trips on the lanes through the lights without locking, and walkers walk the sidewalks', async () => {
+    const engine = createGameRuntime({ player: { template: 'df:player_949', entity_type: 'df_player', position: [3300, 2500] }, schedule_frame: null, cancel_frame: null });
+    try {
+        engine.registerLevel('sdc', CityLevel); await engine.loadLevel('sdc'); engine.start();
+        const street = engine.active_level.street, still = new Map(), seen = new Set(); let walked = 0;
+        for (let i = 0; i < 1800; i++) {   // (30 s)
+            engine.updateState();
+            for (const car of street.traffic.getAmbientVehicles()) { seen.add(car); still.set(car, Math.abs(car.getSpeed()) < 5 ? (still.get(car) ?? 0) + 1 : 0); }
+            if (i % 60 === 0) walked = Math.max(walked, street.pedestrians.getPedestrians().filter(p => Math.hypot(...p.linear_velocity) > 20).length);
+        }
+        const cars = street.traffic.getAmbientVehicles();
+        assert.ok(cars.length >= 10 && seen.size > cars.length, `cars come and go (${seen.size} seen, ${cars.length} now)`);
+        assert.ok(cars.filter(car => (still.get(car) ?? 0) > 12 * 60).length <= 3, 'hardly any stands still past the stall time');
+        assert.ok(walked >= 10, `walkers walk (${walked} at once)`);
+        assert.ok(engine.active_level.mapFocuses({ api: engine.api }).length === 1, 'the map streams round the player, not the walkers');
+    } finally { engine.dispose(); }
+});

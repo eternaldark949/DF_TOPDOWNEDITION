@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '6e3d4d05803f';
+        const DFAB_BUILD = '78e82a09b4d2';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="17028">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="17083">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -9694,6 +9694,11 @@ return Object.freeze({get bodyRecord(){return bodyRecord;},get bindBody(){return
 const m10 = (()=>{
 // ===== LV0 BASEMENT =====
 const {EPS,dot,sub,add,scale,unit,length} = m7;
+
+/** How near two shapes in a sweep must come to count as touching (world units). */
+const TOUCH = 0.01;
+/** A touching contact between two poses a hair apart (no contact manifold to read: the normal runs centre to centre). */
+const near = (a, b, gap) => ({ normal: unit(sub(b.position, a.position)), penetration_depth: 0, separation: gap, world_point: add(a.position, scale(sub(b.position, a.position), .5)) });
 const {pieces,shapeReach} = m6;
 
 function axesOf(p) {
@@ -9840,10 +9845,15 @@ class collisionDetector {
             if (c) return { ...c, fraction: t };
             if (rate <= EPS) return null;
             const gap = this.separation(shape_a, a, shape_b, b);
+            // Within a hair of touching counts as touching: a grazing pair would otherwise creep on by EPS for ever.
+            if (gap <= TOUCH) return { ...near(a, b, gap), fraction: t };
             t += Math.max(EPS / rate, gap / rate * 0.95);
             if (t > 1) return null;
         }
-        throw new Error('Sweep convergence limit reached; shorten the motion or simplify the shape');
+        // Two shapes that stay close while one turns fast advance by tiny steps and the budget runs out: they
+        // are as good as touching where it stalled, so say so (never claim the rest of the motion is clear).
+        const a = at(from_a, da, ra, t), b = at(from_b, db, rb, t);
+        return { ...near(a, b, this.separation(shape_a, a, shape_b, b)), fraction: t, stalled: true };
     }
 }
 
@@ -10016,8 +10026,9 @@ class physicsQueries {
     peruseNearbyEntities(reference, options = {}, results = []) {
         const at = referencePosition(this.world, reference), range = number(options.near_range ?? 400, 'near_range', 0), hits = [];
         const ignore = options.ignore_body ?? (Array.isArray(reference) ? undefined : referenceBody(reference));
+        const filter = { ...options, ignore_body: ignore };
         for (const b of this.world.spatial_grid.queryRadius(at, range)) {
-            if (!accepts(this.world, b, { ...options, ignore_body: ignore })) continue;
+            if (!accepts(this.world, b, filter)) continue;
             const r = this.world._record(b), d = sub(r.position, at), distance = length(d);
             if (distance <= range) hits.push({ body: b, body_id: r.id, entity: this.world.elements.fetchEntity(r.id), distance, direction: distance > EPS ? scale(d, 1 / distance) : [0, 0] });
         }
@@ -10066,6 +10077,7 @@ class physicsQueries {
     *#lightBlockers(origin, radius, packet) {
         const options = { include_groups: BODY_GROUP.STATIC, ...packet, include_ghosts: false }, always = { ...options, include_groups: BODY_GROUP.ALL };
         for (const b of this.world.spatial_grid.queryRadius(origin, radius)) {
+            if (!b?.body_id) continue;   // (the grid also holds what is not a body: a navigation lane, a spatial instance)
             const c = this.world._record(b).config;
             if (c.blocks_light === false || (packet.include_moving === false && c.physics_type !== 'static')) continue;
             if (accepts(this.world, b, c.blocks_light ? always : options)) yield b;
@@ -11373,6 +11385,9 @@ const {massProperties,ownInertia,impulseCenter,changeAngularSpeed} = m5;
 const {bodyRecord,changeVelocity,inverseMass,inverseInertia} = m8;
 const {number,dot,sub,length,scale,clamp,angleDelta,clone,add,cross} = m7;
 
+/** The share of its speed a car keeps through the tightest bend. */
+const CRAWL = 0.15;
+
 class pathMotor {
     constructor(body) { this.body = body; this.path = null; this.index = 1; this.options = {}; }
     followPath(path, options = {}) {
@@ -11386,10 +11401,29 @@ class pathMotor {
         if (!path) { r.world._emit('movementBlocked', { body: this.body, reason: 'no_path' }); return null; }
         return this.followPath(path, options);
     }
+    /**
+     * The fastest the car may go now and still take the bends ahead within `reach` slowly enough: at a point
+     * where the path has turned by an angle from the way it leads now, the speed is `max` times the square of
+     * the half angle's cosine (a right angle, half; a hairpin, the crawl), reached by braking from here.
+     */
+    #cornering(position, max, braking, reach) {
+        const path = this.path; let from = position, walked = 0, limit = Infinity;
+        const lead = sub(path[this.index], position), heading = Math.atan2(lead[1], lead[0]);
+        for (let k = this.index; k < path.length - 1 && walked < reach; k++) {
+            walked += length(sub(path[k], from)); from = path[k];
+            const next = sub(path[k + 1], path[k]); if (length(next) < 1e-9) continue;
+            const turn = Math.abs(angleDelta(heading, Math.atan2(next[1], next[0]))), corner = max * Math.max(CRAWL, Math.cos(turn / 2) ** 2);
+            limit = Math.min(limit, Math.sqrt(corner * corner + 2 * braking * walked));
+        }
+        return limit;
+    }
     _controls(motor) {
         if (!this.path) return null;
         const r = bodyRecord(this.body), cfg = motor.config, point = this.path[this.index], delta = sub(point, r.position), d = length(delta);
-        if (d < Math.max(this.options.arrival_distance ?? 3, Math.abs(dot(r.velocity, [Math.cos(r.rotation), Math.sin(r.rotation)])) / 30)) {
+        // A point is reached within the arrival distance, or once the car is past it along the path's segment into
+        // it: a car that misses a point by a hair drives on rather than circling back for it.
+        const before = this.path[this.index - 1], passed = before && dot(sub(r.position, point), sub(point, before)) >= 0;
+        if (passed || d < Math.max(this.options.arrival_distance ?? 3, Math.abs(dot(r.velocity, [Math.cos(r.rotation), Math.sin(r.rotation)])) / 30)) {
             if (this.index === this.path.length - 1) { this.path = null; Object.assign(motor.inputs, { throttle: 0, brake: 1, steer: 0 }); r.world._emit('destinationReached', { body: this.body, position: [...r.position] }); return { throttle: 0, brake: 1, steer: 0 }; }
             this.index++;
         }
@@ -11402,7 +11436,7 @@ class pathMotor {
         const clearance = r.world.getPathClearance({ body: this.body, from: r.position, to, from_rotation: r.rotation, include_ghosts: false });
         const safe = clearance.clear ? max : Math.sqrt(2 * braking * Math.max(0, clearance.distance - (this.options.following_distance ?? 4)));
         const end = this.index === this.path.length - 1 ? Math.sqrt(2 * braking * Math.max(0, length(target) - 2)) : max;
-        const desired = Math.min(r.world.traffic.getSpeedCap(this.body), max * Math.max(0.15, 1 - Math.abs(error) / Math.PI), safe, end);
+        const desired = Math.min(r.world.traffic.getSpeedCap(this.body), max * Math.max(0.15, 1 - Math.abs(error) / Math.PI), safe, end, this.#cornering(r.position, max, braking, stop + cfg.wheel_base * 2));
         return { steer, throttle: speed < desired - 0.5 ? 1 : 0, brake: speed > desired + 0.5 ? 1 : 0 };
     }
 }
@@ -12081,9 +12115,17 @@ return Object.freeze({get motionController(){return motionController;}});
 const m32 = (()=>{
 // ===== LV0 BASEMENT =====
 const {massProperties} = m5;
-const {number,vector,clone,freeze,sub,dot,length,scale,clamp} = m7;
+const {number,vector,clone,freeze,sub,dot,length,scale,clamp,add,BODY_GROUP} = m7;
+const {shapeReach} = m6;
 const {referenceBody} = m9;
 const {vehicleMotor} = m24;
+
+/** The speed (units a second) of others a driver allows for when it looks for what it may hit. */
+const PREDICTION_PACE = 240;
+/** Below this speed a vehicle past a crossing is queued there, and a driver waits rather than follow it in. */
+const QUEUED_SPEED = 30;
+/** Room left for a body turning while it closes (its course is not quite straight). */
+const REACH_SLACK = 20;
 
 /** Route topology and reservations are scheduling data. Geometry queries use the world's index. */
 class trafficController {
@@ -12116,6 +12158,22 @@ class trafficController {
         stops.sort((a, b) => a.distance - b.distance);
         const config = freeze({ points, stops, speed_limit: number(packet.speed_limit ?? 180, 'speed_limit', 0), loop: !!packet.loop });
         this.#routes.set(route_id, { config, segments, length: route_length }); return route_id;
+    }
+    /** True when a vehicle other than `id`, nearly still, stands within `reach` of the point `distance` along `route`. */
+    #queued(route, distance, id, reach) {
+        const s = route.segments.find(g => distance <= g.start + g.length) ?? route.segments.at(-1), along = clamp(distance - s.start, 0, s.length);
+        const at = [s.from[0] + s.direction[0] * along, s.from[1] + s.direction[1] * along];
+        for (const hit of this.world.peruseNearbyEntities(at, { near_range: reach, include_ghosts: false })) {
+            const other = this.world._record(hit.body);
+            if (other.id !== id && other.motor instanceof vehicleMotor && Math.abs(other.motor.getSpeed()) < QUEUED_SPEED) return true;
+        }
+        return false;
+    }
+    /** Forgets a route no driver follows (a one-trip route once its car is gone); false while one does, or when unknown. */
+    releaseRoute(route_id) {
+        if (!this.#routes.has(route_id)) return false;
+        for (const d of this.#drivers.values()) if (d.config.route_id === route_id) return false;
+        this.world._mutate(() => this.#routes.delete(route_id)); return true;
     }
     getSignal(signal_id) { return this.#signals.get(signal_id) ?? 'stop'; }
     getRouteStart(route_id) {
@@ -12209,6 +12267,8 @@ class trafficController {
                 const signal_ok = !stop.signal_id || this.#signals.get(stop.signal_id) === 'go';
                 const owner = this.#reservations.get(stop.conflict_id);
                 let admitted = signal_ok && (!stop.conflict_id || owner === undefined || owner === id);
+                // Don't block the box: a car only takes a crossing when the road past it has room for it.
+                if (admitted && stop.conflict_id && owner !== id && this.#queued(route, stop.distance + stop.clearance_distance, id, motor.config.wheel_base)) admitted = false;
                 if (admitted && stop.conflict_id && remaining <= horizon) this.#reservations.set(stop.conflict_id, id);
                 if (!admitted) d.speed_cap = Math.min(d.speed_cap, Math.sqrt(2 * braking * Math.max(0, remaining - motor.config.wheel_base / 2 - d.config.following_distance)));
                 break;
@@ -12216,12 +12276,17 @@ class trafficController {
             // Predict moving bodies found through the shared spatial grid. Static forward clearance
             // is handled by pathMotor, with the same masks and physical shapes.
             const horizon = d.config.prediction_seconds;
-            const radius = motor.config.max_speed * horizon + motor.config.wheel_base * 2;
-            for (const hit of this.world.peruseNearbyEntities(d.body, { near_range: radius, query_body: d.body, include_ghosts: false })) {
+            // The reach is what this car covers at its own speed (a slow or waiting car looks only near), plus room
+            // for what comes at it at a walking-to-street pace: bodies faster than that are found by their own drivers.
+            const radius = (speed + PREDICTION_PACE) * horizon + motor.config.wheel_base * 2;
+            for (const hit of this.world.peruseNearbyEntities(d.body, { near_range: radius, query_body: d.body, include_ghosts: false, exclude_groups: BODY_GROUP.STATIC, sort_by: 'none' })) {
                 const other = this.world._record(hit.body);
                 if (other.config.physics_type === 'static') continue;
                 const relative = sub(other.position, r.position), ahead = dot(relative, [Math.cos(r.rotation), Math.sin(r.rotation)]);
                 if (ahead < 0) continue;
+                // Two bodies whose bounding circles never meet on their straight courses cannot touch: skip the sweep.
+                const v = sub(other.velocity, r.velocity), vv = dot(v, v), t = vv > 1e-9 ? clamp(-dot(relative, v) / vv, 0, horizon) : 0;
+                if (length(add(relative, scale(v, t))) > shapeReach(r.shape) + shapeReach(other.shape) + REACH_SLACK) continue;
                 const contact = this.world.predictCollision({ body_a: d.body, body_b: hit.body, seconds: horizon });
                 if (!contact) continue;
                 const distance = Math.max(0, speed * contact.seconds - d.config.following_distance);
@@ -18013,6 +18078,7 @@ const m69 = Object.freeze({default:{
       "kind": "street_rules",
       "data": {
         "prediction_seconds": 1.5,
+        "sense_seconds": 0.1,
         "dodge_distance": 50,
         "dodge_speed": 360,
         "dodge_seconds": 0.45,
@@ -26960,6 +27026,9 @@ class Pedestrian extends gameCharacter {
             this.moveTo(target, { direct: true, avoid_groups: BODY_GROUP.CHARACTER, speed: crossing ? rules.crossing_speed : undefined, personal_space: rules.personal_space, face_movement: true });
             d.state = crossing ? 'crossing' : 'walking';
         }
+        // A walker looks out for cars a few times a second, not every step: a car is seconds away when first seen.
+        d.sense_seconds = (d.sense_seconds ?? 0) - seconds; if (d.sense_seconds > 0) return;
+        d.sense_seconds = rules.sense_seconds ?? 0;
         const threats = this.physics_system.predictMovementContacts({ body: this, seconds: rules.prediction_seconds, include_groups: BODY_GROUP.VEHICLE, max_results: 1 });
         if (threats.length && this.evadeBody(threats[0].body, { distance: rules.dodge_distance, speed: rules.dodge_speed })) {
             d.state = 'dodging'; d.state_seconds = rules.dodge_seconds; this.say('Look out!');
@@ -30105,6 +30174,7 @@ const m166 = (()=>{
 // ===== LV1 LOBBY =====
 const {gameLevel} = m149;
 const {mapInstance} = m141;
+const {gameCharacter} = m1;
 
 /**
  * A level that is one Basement map. A subclass says which map with `mapDefinition`; the level builds
@@ -30136,7 +30206,7 @@ class mapLevel extends gameLevel {
      * A level overrides it to stream round fewer (the player, companions, a pinned mission point).
      */
     mapFocuses(context) {
-        const focuses = context.api.physics.elements.getEntities().filter(e => e.active !== false && !e.destroyed && e.body?.getState().physics_type === 'character').map(e => ({ position: e.position, velocity: e.linear_velocity }));
+        const focuses = context.api.physics.elements.getEntities().filter(e => e.active !== false && !e.destroyed && e instanceof gameCharacter)   // (by class: reading a body's state copies it).map(e => ({ position: e.position, velocity: e.linear_velocity }));
         return focuses.length ? focuses : [this.map.spawn ?? this.definition.size.map(v => v / 2)];
     }
     /** Milliseconds a step may spend building regions (the rest wait for the next step). */

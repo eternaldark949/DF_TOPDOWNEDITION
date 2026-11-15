@@ -168,3 +168,24 @@ test('motor requests against an existing wall contact preserve tangential walkin
     actor.setMovement([1, 1], { speed: 60 }); step(p, 30);
     assert.ok(actor.position[0] <= 1e-5); assert.ok(actor.position[1] > 5);
 });
+test('a one-trip route is released once no driver follows it', () => {
+    const p = new physicsSystem(), v = p.createVehicle({ vehicle_template: { max_speed: 40, wheel_base: 4, braking: 40 } });
+    p.traffic.registerRoute('trip', { points: [[0, 0], [100, 0]] }); p.traffic.addVehicle(v, { route_id: 'trip' });
+    assert.equal(p.traffic.releaseRoute('trip'), false, 'a driver still follows it'); assert.equal(p.traffic.releaseRoute('nowhere'), false);
+    p.traffic.removeVehicle(v); assert.equal(p.traffic.releaseRoute('trip'), true); assert.throws(() => p.traffic.getRouteStart('trip'), /Unknown route/);
+});
+test('a driver waits short of a crossing while the road past it is queued, then goes', () => {
+    const p = new physicsSystem(), v = p.createVehicle({ vehicle_template: { max_speed: 40, wheel_base: 4, braking: 40 } });
+    const queued = p.createVehicle({ position: [80, 0], vehicle_template: { wheel_base: 4 } });
+    p.traffic.registerRoute('a', { points: [[0, 0], [120, 0]], speed_limit: 40, stops: [{ distance: 40, conflict_id: 'box', clearance_distance: 40 }] });
+    p.traffic.addVehicle(v, { route_id: 'a', following_distance: 2 }); step(p, 240);
+    assert.ok(v.position[0] < 40, `stopped short of the box at ${v.position[0]}`);
+    p.removeBody(queued); step(p, 240); assert.ok(v.position[0] > 90, 'the box cleared, it went');
+});
+test('a sweep of two close shapes, one turning fast, ends in a contact or a clear path and never throws', () => {
+    const p = new physicsSystem(), box = { shape_type: 'box', dimensions: [95, 44] };
+    const a = p.createVehicle({ position: [0, 0], collision_shape: box, angular_velocity: 40, vehicle_template: { wheel_base: 40 } });
+    const b = p.createVehicle({ position: [0, 44.02], collision_shape: box, linear_velocity: [300, 0], vehicle_template: { wheel_base: 40 } });
+    let contact; assert.doesNotThrow(() => { contact = p.predictCollision({ body_a: a, body_b: b, seconds: 2 }); });
+    assert.ok(contact && contact.seconds < .1, 'touching (a hair apart) counts from the start');
+});

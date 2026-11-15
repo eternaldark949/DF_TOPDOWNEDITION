@@ -1,5 +1,10 @@
 // ===== LV0 BASEMENT =====
 import { EPS, dot, sub, add, scale, unit, length } from '../core/values.mjs';
+
+/** How near two shapes in a sweep must come to count as touching (world units). */
+const TOUCH = 0.01;
+/** A touching contact between two poses a hair apart (no contact manifold to read: the normal runs centre to centre). */
+const near = (a, b, gap) => ({ normal: unit(sub(b.position, a.position)), penetration_depth: 0, separation: gap, world_point: add(a.position, scale(sub(b.position, a.position), .5)) });
 import { pieces, shapeReach } from './shape.mjs';
 
 function axesOf(p) {
@@ -146,9 +151,14 @@ export class collisionDetector {
             if (c) return { ...c, fraction: t };
             if (rate <= EPS) return null;
             const gap = this.separation(shape_a, a, shape_b, b);
+            // Within a hair of touching counts as touching: a grazing pair would otherwise creep on by EPS for ever.
+            if (gap <= TOUCH) return { ...near(a, b, gap), fraction: t };
             t += Math.max(EPS / rate, gap / rate * 0.95);
             if (t > 1) return null;
         }
-        throw new Error('Sweep convergence limit reached; shorten the motion or simplify the shape');
+        // Two shapes that stay close while one turns fast advance by tiny steps and the budget runs out: they
+        // are as good as touching where it stalled, so say so (never claim the rest of the motion is clear).
+        const a = at(from_a, da, ra, t), b = at(from_b, db, rb, t);
+        return { ...near(a, b, this.separation(shape_a, a, shape_b, b)), fraction: t, stalled: true };
     }
 }

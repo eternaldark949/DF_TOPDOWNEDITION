@@ -5,6 +5,7 @@
       "kind": "street_rules",
       "data": {
         "prediction_seconds": 1.5,
+        "sense_seconds": 0.1,
         "dodge_distance": 50,
         "dodge_speed": 360,
         "dodge_seconds": 0.45,

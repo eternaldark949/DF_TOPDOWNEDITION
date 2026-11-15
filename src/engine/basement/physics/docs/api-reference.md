@@ -258,7 +258,8 @@ Every world owns `physics.navigation`, a `navigationSystem` with two layers: a c
 
 Every world owns `physics.traffic`, a `trafficController`; it owns route/signal/reservation data and no spatial index. Its methods are:
 
-- `registerRoute(route_id,{points,speed_limit=180,stops=[],loop=false})`: cache nonzero-length route segments; 2–4096 points. Loops must be authored closed. Stops contain `distance` along the route, `signal_id` and/or `conflict_id`, and `clearance_distance:20` after the line.
+- `registerRoute(route_id,{points,speed_limit=180,stops=[],loop=false})`: cache nonzero-length route segments; 2–4096 points. Loops must be authored closed. Stops contain `distance` along the route, `signal_id` and/or `conflict_id`, and `clearance_distance:20` after the line. A driver admitted to a stop with a `conflict_id` also waits while a nearly still vehicle stands at its `clearance_distance` past the stop, so it never takes a crossing it cannot leave.
+- `releaseRoute(route_id)`: forgets a route that no driver follows, so one-trip routes do not pile up; returns false while a driver follows it or when it is unknown.
 - `addVehicle(vehicle,{route_id,following_distance=8,prediction_seconds=2,arrival_distance=3})`: attach the existing official vehicle motor to an itinerary.
 - `setSignal(signal_id,'stop'|'go')`: signal policy supplied by the game; uninitialized signals stop traffic.
 - `getSpeedCap(body)`: engine-consumed cap; infinity for unattached vehicles.

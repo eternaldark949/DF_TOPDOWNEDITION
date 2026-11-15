@@ -24,7 +24,7 @@ Call `updateState` once for each fixed Lobby step. This package does not create 
 
 Normal external commands commit immediately between steps. Commands made inside event delivery commit at the beginning of the next step, in request order. New bodies can be returned immediately as reserved handles, but do not appear in world lookup/spatial queries until that boundary. Saves/loads reject pending commands. Removed handles cannot mutate a later body that reuses an ID after clearing a world.
 
-Events are emitted after contacts/constraints have finished. Listeners cannot rewrite vectors or contact information. They may issue requests for next step. Listener failures are reported together after all listeners run. A simulation/geometry convergence failure throws rather than silently claiming clear space; the world does not promise rollback of an already-started simulation step after an internal exception.
+Events are emitted after contacts/constraints have finished. Listeners cannot rewrite vectors or contact information. They may issue requests for next step. Listener failures are reported together after all listeners run. A simulation/geometry convergence failure throws, or (a sweep) reports a contact where it stalled, rather than silently claiming clear space; the world does not promise rollback of an already-started simulation step after an internal exception.
 
 ## Continuous detection and sleeping
 
