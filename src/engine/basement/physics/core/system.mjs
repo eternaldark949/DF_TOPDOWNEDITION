@@ -116,7 +116,8 @@ export class physicsSystem {
         // the collision pose/sweep as well as the shared grid's revision.
         if(!cache||cache.x!==x||cache.y!==y||cache.rotation!==rotation||cache.shape!==r.shape||cache.swept!==swept
             ||swept&&(cache.px!==px||cache.py!==py||cache.previous_rotation!==r.previous_rotation))this.#broadphaseEpoch++;
-        if(r.indexed&&cache&&cache.x===x&&cache.y===y&&cache.rotation===rotation&&cache.shape===r.shape&&cache.render===render&&cache.light===light
+        const group=r.config.collision_group;
+        if(r.indexed&&r.grid_group===group&&cache&&cache.x===x&&cache.y===y&&cache.rotation===rotation&&cache.shape===r.shape&&cache.render===render&&cache.light===light
             &&cache.swept===swept&&(!swept||cache.px===px&&cache.py===py&&cache.previous_rotation===r.previous_rotation)){
             if(configChanged)this.#lightTouch(r,true);
             this.#stats.spatial_sync_skips++;return;
@@ -125,8 +126,10 @@ export class physicsSystem {
         let bounds=swept?sweptBounds(r):liveBounds(r);
         if(render)bounds=unionBounds(bounds,bodyBounds(r,'render'));
         if(light)bounds=unionBounds(bounds,bodyBounds(r,'light'));
-        if(r.indexed)this.spatial_grid.updateInstance(r.id,bounds);
-        else{this.spatial_grid.registerInstance(r.id,bounds,r.handle);r.indexed=true;}
+        // Sorted into its group's bucket once, here; later syncs only move it, or re-sort it when its group changes.
+        if(r.indexed)this.spatial_grid.updateInstance(r.id,bounds,group);
+        else{this.spatial_grid.registerInstance(r.id,bounds,r.handle,group);r.indexed=true;}
+        r.grid_group=group;
         if(cache){cache.x=x;cache.y=y;cache.rotation=rotation;cache.shape=r.shape;cache.render=render;cache.light=light;cache.swept=swept;cache.px=px;cache.py=py;cache.previous_rotation=r.previous_rotation;}
         else r.spatial_cache={x,y,rotation,shape:r.shape,render,light,swept,px,py,previous_rotation:r.previous_rotation};
     }
@@ -349,7 +352,7 @@ export class physicsSystem {
             const motor = r.motor; if (!(motor instanceof projectileMotor) || r.parent_mount || !bodyActive(r)) continue;
             const hits = [];
             const reach = shapeReach(r.shape), from = previousPose(r), to = pose(r);
-            for (const body of this.spatial_grid.querySweep({ from: from.position, to: to.position, radius: reach })) {
+            for (const body of this.spatial_grid.querySweep({ from: from.position, to: to.position, radius: reach }, [], { groups: r.config.collision_mask })) {
                 if (!body.body_id || body === r.handle || motor.hit_bodies.has(body.body_id) || body.body_id === motor.config.owner_id) continue;
                 const target = this._record(body); if (!this.#meets(r, target) || target.motor instanceof projectileMotor) continue;
                 this.#stats.narrow_checks++;
@@ -398,8 +401,10 @@ export class physicsSystem {
         if(cache&&cache.revision===revision&&cache.epoch===this.#broadphaseEpoch){candidates=cache.pairs;this.#stats.broadphase_reuses++;}
         else{
             const sources=moving.filter(r=>physical(r)&&r.config.collision_mask&&!(r.motor instanceof projectileMotor));
+            // Only the buckets some source's mask can meet are walked.
+            let wanted=0;for(const r of sources)wanted|=r.config.collision_mask;
             candidates=this.spatial_grid.collectCandidatePairs(sources.map(r=>({id:r.id,bounds:this.#collisionBounds(r)})),[],
-                (a,b)=>boundsMeet(this.#collisionBounds(this._record(a)),this.#collisionBounds(this._record(b)))&&this.#meets(this._record(a),this._record(b))&&!(this._record(b).motor instanceof projectileMotor));
+                (a,b)=>boundsMeet(this.#collisionBounds(this._record(a)),this.#collisionBounds(this._record(b)))&&this.#meets(this._record(a),this._record(b))&&!(this._record(b).motor instanceof projectileMotor),{groups:wanted});
             this.#candidateCache={revision,epoch:this.#broadphaseEpoch,pairs:candidates};this.#stats.broadphase_builds++;
         }
         this.#stats.candidate_pairs += candidates.length;

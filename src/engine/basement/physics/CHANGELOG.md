@@ -1,5 +1,12 @@
 # Changelog
 
+## Group buckets in the spatial grid — 2026-11-15
+
+- Each grid cell sorts its entries into buckets by group when they are registered: a body under its collision group, a group-less body under a loose bucket, and navigation lanes and spatial instances under an instance bucket. A move only shuffles an entry between cells; a change of collision group re-sorts it.
+- `queryBounds`, `queryRadius`, `querySegment`, `querySweep` and `collectCandidatePairs` take a selection `{groups, skip, loose, instances}` and walk only the buckets it names; with none they walk every bucket, as before. `registerInstance` and `updateInstance` take a `group`. `exportInstances()` adds `group`; `getStatistics()` adds `bucket_skips`.
+- The world's queries, the broadphase, projectile sweeps, the navigation field and lane snapping now select by their filters. In the city, entries visited by queries fell about 24× and the street step about a fifth.
+- `benchmarks/grid.mjs` adds a case that files walls, people and road lanes in buckets and searches for people: about 2× faster than walking every entry. A query with no selection walks one more list level per cell and runs about 15% slower on the old cases; every query in the engine now passes a selection.
+
 ## Faster light revisions — 2026-11-14
 
 - Change counters key their cells by number instead of by text: `getLightRevision` reads about twice as fast, the same revisions.

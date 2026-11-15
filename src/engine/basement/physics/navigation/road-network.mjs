@@ -11,7 +11,7 @@ import { pathGeometry } from '../motion/path-geometry.mjs';
  * Routes minimise travel time and are cached per (profile, node pair) until the
  * network changes.
  */
-const SPATIAL = 'navigation:lane:';
+const SPATIAL = 'navigation:lane:', LANES = Object.freeze({ instances: true });
 export class roadNetwork {
     #world; #nodes = new Map(); #lanes = new Map(); #out = new Map(); #revision = 0; #cache = new Map(); #fastest = 0; #found = [];
     #stats = { route_requests: 0, route_cache_hits: 0, route_searches: 0, expanded_nodes: 0, snaps: 0 };
@@ -70,7 +70,7 @@ export class roadNetwork {
     snapToLane(position, { profile = 'car', near_range = 200 } = {}, results = null) {
         const at = vector(position, 'position'); number(near_range, 'near_range', 0);
         this.#stats.snaps++;
-        const found = this.#world.spatial_grid.queryRadius(at, near_range, this.#found), hits = [];
+        const found = this.#world.spatial_grid.queryRadius(at, near_range, this.#found, LANES), hits = [];
         for (const value of found) {
             const lane = value?.navigation_lane !== undefined ? this.#lanes.get(value.navigation_lane) : null;
             if (!lane || !lane.open || !lane.profiles.has(profile)) continue;

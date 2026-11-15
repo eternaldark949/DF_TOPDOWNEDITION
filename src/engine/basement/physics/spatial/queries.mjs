@@ -22,6 +22,14 @@ function accepts(world, body, options) {
     const ignore = options.ignore_body;
     return !(Array.isArray(ignore) ? ignore.some(v => referenceBody(v) === body) : referenceBody(ignore) === body);
 }
+/**
+ * The grid buckets a query with these options can accept from (see accepts): its included groups
+ * less its excluded ones, and the loose bucket (bodies with no group) only when it takes group-less
+ * spatial entities. Never the lanes and spatial instances, which are not bodies.
+ */
+function gridSelect(options) {
+    return { groups: options.include_groups ?? BODY_GROUP.ALL, skip: options.exclude_groups ?? 0, loose: !!options.spatial_entities && options.include_groups === undefined };
+}
 function finish(hits, options, results) {
     if (options.sort_by !== 'none') hits.sort((a, b) => (a.fraction ?? a.distance ?? 0) - (b.fraction ?? b.distance ?? 0) || a.body_id - b.body_id);
     const max = options.max_results ?? Infinity;
@@ -145,10 +153,11 @@ export class physicsQueries {
         const bounds = validBounds(packet.bounds), hits = [], seen = new Set();
         const bounds_type = packet.bounds_type ?? 'render';
         if (!['collision', 'render', 'light'].includes(bounds_type)) throw new TypeError('Invalid bounds_type');
-        for (const body of this.world.spatial_grid.queryBounds(bounds)) {
+        const filter = { ...packet, spatial_entities: true };
+        for (const body of this.world.spatial_grid.queryBounds(bounds, [], gridSelect(filter))) {
             if (!body?.body_id || seen.has(body.body_id)) continue;
             seen.add(body.body_id);
-            if (!accepts(this.world, body, { ...packet, spatial_entities: true })) continue;
+            if (!accepts(this.world, body, filter)) continue;
             const extent = this.getBodyBounds(body, { bounds_type });
             if (boundsMeet(bounds, extent)) hits.push({ body, body_id: body.body_id, entity: this.world.elements.fetchEntity(body.body_id), bounds: extent });
         }
@@ -164,7 +173,7 @@ export class physicsQueries {
         const at = referencePosition(this.world, reference), range = number(options.near_range ?? 400, 'near_range', 0), hits = [];
         const ignore = options.ignore_body ?? (Array.isArray(reference) ? undefined : referenceBody(reference));
         const filter = { ...options, ignore_body: ignore };
-        for (const b of this.world.spatial_grid.queryRadius(at, range)) {
+        for (const b of this.world.spatial_grid.queryRadius(at, range, [], gridSelect(filter))) {
             if (!accepts(this.world, b, filter)) continue;
             const r = this.world._record(b), d = sub(r.position, at), distance = length(d);
             if (distance <= range) hits.push({ body: b, body_id: r.id, entity: this.world.elements.fetchEntity(r.id), distance, direction: distance > EPS ? scale(d, 1 / distance) : [0, 0] });
@@ -179,7 +188,7 @@ export class physicsQueries {
         const reach = shapeReach(shape), hits = [], delta = sub(to.position, from.position), distance = length(delta);
         const envelope=seconds?this.world._getMotionEnvelope():null;
         const search=reach+(envelope?envelope.max_speed*seconds+envelope.max_reach:0);
-        for (const b of this.world.spatial_grid.querySweep({ from: from.position, to: to.position, radius: search })) {
+        for (const b of this.world.spatial_grid.querySweep({ from: from.position, to: to.position, radius: search }, [], gridSelect(packet))) {
             if (!accepts(this.world, b, packet)) continue;
             const r = this.world._record(b), c = collisionDetector.sweep(shape, from, to, r.shape, pose(r), seconds?{position:add(r.position,scale(r.velocity,seconds)),rotation:r.rotation+r.angular_velocity*seconds}:pose(r));
             if (c) hits.push({ ...c, body: b, body_id: r.id, entity: this.world.elements.fetchEntity(r.id), distance: distance * c.fraction });
@@ -213,8 +222,10 @@ export class physicsQueries {
     }
     *#lightBlockers(origin, radius, packet) {
         const options = { include_groups: BODY_GROUP.STATIC, ...packet, include_ghosts: false }, always = { ...options, include_groups: BODY_GROUP.ALL };
-        for (const b of this.world.spatial_grid.queryRadius(origin, radius)) {
-            if (!b?.body_id) continue;   // (the grid also holds what is not a body: a navigation lane, a spatial instance)
+        // A body that always blocks light may be in any group, so every grouped body's bucket is walked
+        // (never the lanes and spatial instances, which are not bodies).
+        for (const b of this.world.spatial_grid.queryRadius(origin, radius, [], { groups: BODY_GROUP.ALL, skip: packet.exclude_groups ?? 0 })) {
+            if (!b?.body_id) continue;
             const c = this.world._record(b).config;
             if (c.blocks_light === false || (packet.include_moving === false && c.physics_type !== 'static')) continue;
             if (accepts(this.world, b, c.blocks_light ? always : options)) yield b;
@@ -222,7 +233,7 @@ export class physicsQueries {
     }
     overlapShape(packet, results = []) {
         const shape = new collisionShape(packet.collision_shape), p = { position: vector(packet.position), rotation: number(packet.rotation ?? 0, 'rotation') }, hits = [];
-        for (const b of this.world.spatial_grid.queryBounds(shapeBounds(shape, p.position, p.rotation))) {
+        for (const b of this.world.spatial_grid.queryBounds(shapeBounds(shape, p.position, p.rotation), [], gridSelect(packet))) {
             if (!accepts(this.world, b, packet)) continue;
             const r = this.world._record(b), c = collisionDetector.contact(shape, p, r.shape, pose(r));
             if (c) hits.push({ ...c, body: b, body_id: r.id, entity: this.world.elements.fetchEntity(r.id), distance: length(sub(r.position, p.position)) });
@@ -279,7 +290,7 @@ export class physicsQueries {
             ? { shape_type: 'circle', radius: p.radius, local_position: p.center }
             : { shape_type: 'polygon', points: p.points }));
         const sourcePieces = convex(shape), a = { position: from, rotation }, b = { position: to, rotation };
-        for (const candidate of this.world.spatial_grid.querySweep({ from, to, radius: shapeReach(shape) })) {
+        for (const candidate of this.world.spatial_grid.querySweep({ from, to, radius: shapeReach(shape) }, [], gridSelect(options))) {
             if (!accepts(this.world, candidate, options)) continue;
             const r = this.world._record(candidate), target = pose(r);
             for (const source of sourcePieces) for (const obstacle of convex(r.shape)) {
@@ -325,8 +336,9 @@ export class physicsQueries {
         const envelope = this.world._getMotionEnvelope(), reach = envelope.max_speed * seconds + envelope.max_reach + shapeReach(r.shape);
         const bounds = unionBounds(shapeBounds(r.shape, from.position, from.rotation), shapeBounds(r.shape, to.position, to.rotation));
         const search = { left: bounds.left - reach, right: bounds.right + reach, top: bounds.top - reach, bottom: bounds.bottom + reach }, hits = [];
-        for (const body of this.world.spatial_grid.queryBounds(search)) {
-            if (!accepts(this.world, body, { ...packet, include_ghosts: false, query_body: r.handle, ignore_body: r.handle })) continue;
+        const filter = { ...packet, include_ghosts: false, query_body: r.handle, ignore_body: r.handle };
+        for (const body of this.world.spatial_grid.queryBounds(search, [], gridSelect(filter))) {
+            if (!accepts(this.world, body, filter)) continue;
             const target = this.world._record(body), end = { position: add(target.position, scale(target.velocity, seconds)), rotation: target.rotation + target.angular_velocity * seconds };
             const contact = collisionDetector.sweep(r.shape, from, to, target.shape, pose(target), end);
             if (contact) hits.push({ ...contact, seconds: contact.fraction * seconds, body, body_id: target.id, entity: this.world.elements.fetchEntity(target.id) });

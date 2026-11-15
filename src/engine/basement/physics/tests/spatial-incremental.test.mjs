@@ -168,3 +168,40 @@ test('segments ending at grid corners never step beyond an axis that already rea
   assert.ok(grid.querySweep({from,to,radius:1}).includes(body));
  }
 });
+
+test('entries are sorted into group buckets on insertion and a selection walks only the buckets it names',()=>{
+ const g=new spatialGrid({cell_size:10}),wall={body_id:1},car={body_id:2},lamp={body_id:3},lane={navigation_lane:'a'};
+ g.registerInstance(1,bounds(0,0,5,5),wall,BODY_GROUP.STATIC);g.registerInstance(2,bounds(1,1,4,4),car,BODY_GROUP.VEHICLE);
+ g.registerInstance(3,bounds(2,2,3,3),lamp,0);g.registerInstance('lane',bounds(0,0,9,9),lane);
+ const box=bounds(0,0,9,9),sorted=list=>[...list].sort((a,b)=>(a.body_id??9)-(b.body_id??9));
+ assert.deepEqual(sorted(g.queryBounds(box)),[wall,car,lamp,lane]);
+ const before=g.getStatistics();assert.deepEqual(g.queryBounds(box,[],{groups:BODY_GROUP.VEHICLE}),[car]);
+ const after=g.getStatistics();assert.equal(delta(after,before,'candidate_visits'),1);assert.equal(delta(after,before,'bucket_skips'),3);
+ assert.deepEqual(g.queryBounds(box,[],{groups:BODY_GROUP.ALL,skip:BODY_GROUP.STATIC}),[car]);
+ assert.deepEqual(g.queryBounds(box,[],{loose:true}),[lamp]);assert.deepEqual(g.queryBounds(box,[],{instances:true}),[lane]);
+ assert.deepEqual(g.queryRadius([5,5],10,[],{groups:BODY_GROUP.STATIC}),[wall]);
+ assert.deepEqual(g.querySweep({from:[0,0],to:[9,9],radius:1},[],{groups:BODY_GROUP.VEHICLE}),[car]);
+ assert.deepEqual(g.querySegment([0,0],[9,9],[],{instances:true}),[lane]);
+ assert.throws(()=>g.registerInstance(4,box,{},-3),/collision group/);
+});
+
+test('a move keeps an entry in its bucket and a change of group re-sorts it in every cell it covers',()=>{
+ const g=new spatialGrid({cell_size:10}),v={body_id:1};g.registerInstance(1,bounds(0,0,15,5),v,BODY_GROUP.PROP);
+ g.updateInstance(1,bounds(10,0,25,5));assert.deepEqual(g.queryBounds(bounds(0,0,30,9),[],{groups:BODY_GROUP.PROP}),[v]);
+ const before=g.getStatistics();g.updateInstance(1,bounds(10,0,25,5),BODY_GROUP.PROP);assert.equal(g.getStatistics().cell_additions,before.cell_additions);
+ g.updateInstance(1,bounds(10,0,25,5),BODY_GROUP.CHARACTER);const after=g.getStatistics();
+ assert.equal(delta(after,before,'cell_removals'),2);assert.equal(delta(after,before,'cell_additions'),2);
+ assert.deepEqual(g.queryBounds(bounds(0,0,30,9),[],{groups:BODY_GROUP.PROP}),[]);assert.deepEqual(g.queryBounds(bounds(0,0,30,9),[],{groups:BODY_GROUP.CHARACTER}),[v]);
+ assert.equal(g.exportInstances()[0].group,BODY_GROUP.CHARACTER);
+ g.removeInstance(1);assert.equal(g.getStatistics().cells,0);
+});
+
+test('a body is filed under its collision group and moves bucket when the group changes',()=>{
+ const p=new physicsSystem(),a=ball(p,[0,0],{collision_group:BODY_GROUP.CHARACTER}),b=ball(p,[1,0],{collision_group:BODY_GROUP.PROP});
+ const of=body=>p.spatial_grid.exportInstances().find(e=>e.value===body).group;
+ assert.equal(of(a),BODY_GROUP.CHARACTER);assert.equal(of(b),BODY_GROUP.PROP);
+ assert.deepEqual(p.peruseNearbyEntities([0,0],{near_range:5,include_groups:BODY_GROUP.PROP}).map(h=>h.body),[b]);
+ p.updateBody(b,{collision_group:BODY_GROUP.CHARACTER});steps(p);assert.equal(of(b),BODY_GROUP.CHARACTER);
+ assert.deepEqual(p.peruseNearbyEntities([0,0],{near_range:5,include_groups:BODY_GROUP.PROP}),[]);
+ assert.equal(p.peruseNearbyEntities([0,0],{near_range:5,include_groups:BODY_GROUP.CHARACTER}).length,2);
+});

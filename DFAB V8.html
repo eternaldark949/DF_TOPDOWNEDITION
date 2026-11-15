@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '78e82a09b4d2';
+        const DFAB_BUILD = '72426bafbfdc';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="17083">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="17132">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -9885,6 +9885,14 @@ function accepts(world, body, options) {
     const ignore = options.ignore_body;
     return !(Array.isArray(ignore) ? ignore.some(v => referenceBody(v) === body) : referenceBody(ignore) === body);
 }
+/**
+ * The grid buckets a query with these options can accept from (see accepts): its included groups
+ * less its excluded ones, and the loose bucket (bodies with no group) only when it takes group-less
+ * spatial entities. Never the lanes and spatial instances, which are not bodies.
+ */
+function gridSelect(options) {
+    return { groups: options.include_groups ?? BODY_GROUP.ALL, skip: options.exclude_groups ?? 0, loose: !!options.spatial_entities && options.include_groups === undefined };
+}
 function finish(hits, options, results) {
     if (options.sort_by !== 'none') hits.sort((a, b) => (a.fraction ?? a.distance ?? 0) - (b.fraction ?? b.distance ?? 0) || a.body_id - b.body_id);
     const max = options.max_results ?? Infinity;
@@ -10008,10 +10016,11 @@ class physicsQueries {
         const bounds = validBounds(packet.bounds), hits = [], seen = new Set();
         const bounds_type = packet.bounds_type ?? 'render';
         if (!['collision', 'render', 'light'].includes(bounds_type)) throw new TypeError('Invalid bounds_type');
-        for (const body of this.world.spatial_grid.queryBounds(bounds)) {
+        const filter = { ...packet, spatial_entities: true };
+        for (const body of this.world.spatial_grid.queryBounds(bounds, [], gridSelect(filter))) {
             if (!body?.body_id || seen.has(body.body_id)) continue;
             seen.add(body.body_id);
-            if (!accepts(this.world, body, { ...packet, spatial_entities: true })) continue;
+            if (!accepts(this.world, body, filter)) continue;
             const extent = this.getBodyBounds(body, { bounds_type });
             if (boundsMeet(bounds, extent)) hits.push({ body, body_id: body.body_id, entity: this.world.elements.fetchEntity(body.body_id), bounds: extent });
         }
@@ -10027,7 +10036,7 @@ class physicsQueries {
         const at = referencePosition(this.world, reference), range = number(options.near_range ?? 400, 'near_range', 0), hits = [];
         const ignore = options.ignore_body ?? (Array.isArray(reference) ? undefined : referenceBody(reference));
         const filter = { ...options, ignore_body: ignore };
-        for (const b of this.world.spatial_grid.queryRadius(at, range)) {
+        for (const b of this.world.spatial_grid.queryRadius(at, range, [], gridSelect(filter))) {
             if (!accepts(this.world, b, filter)) continue;
             const r = this.world._record(b), d = sub(r.position, at), distance = length(d);
             if (distance <= range) hits.push({ body: b, body_id: r.id, entity: this.world.elements.fetchEntity(r.id), distance, direction: distance > EPS ? scale(d, 1 / distance) : [0, 0] });
@@ -10042,7 +10051,7 @@ class physicsQueries {
         const reach = shapeReach(shape), hits = [], delta = sub(to.position, from.position), distance = length(delta);
         const envelope=seconds?this.world._getMotionEnvelope():null;
         const search=reach+(envelope?envelope.max_speed*seconds+envelope.max_reach:0);
-        for (const b of this.world.spatial_grid.querySweep({ from: from.position, to: to.position, radius: search })) {
+        for (const b of this.world.spatial_grid.querySweep({ from: from.position, to: to.position, radius: search }, [], gridSelect(packet))) {
             if (!accepts(this.world, b, packet)) continue;
             const r = this.world._record(b), c = collisionDetector.sweep(shape, from, to, r.shape, pose(r), seconds?{position:add(r.position,scale(r.velocity,seconds)),rotation:r.rotation+r.angular_velocity*seconds}:pose(r));
             if (c) hits.push({ ...c, body: b, body_id: r.id, entity: this.world.elements.fetchEntity(r.id), distance: distance * c.fraction });
@@ -10076,8 +10085,10 @@ class physicsQueries {
     }
     *#lightBlockers(origin, radius, packet) {
         const options = { include_groups: BODY_GROUP.STATIC, ...packet, include_ghosts: false }, always = { ...options, include_groups: BODY_GROUP.ALL };
-        for (const b of this.world.spatial_grid.queryRadius(origin, radius)) {
-            if (!b?.body_id) continue;   // (the grid also holds what is not a body: a navigation lane, a spatial instance)
+        // A body that always blocks light may be in any group, so every grouped body's bucket is walked
+        // (never the lanes and spatial instances, which are not bodies).
+        for (const b of this.world.spatial_grid.queryRadius(origin, radius, [], { groups: BODY_GROUP.ALL, skip: packet.exclude_groups ?? 0 })) {
+            if (!b?.body_id) continue;
             const c = this.world._record(b).config;
             if (c.blocks_light === false || (packet.include_moving === false && c.physics_type !== 'static')) continue;
             if (accepts(this.world, b, c.blocks_light ? always : options)) yield b;
@@ -10085,7 +10096,7 @@ class physicsQueries {
     }
     overlapShape(packet, results = []) {
         const shape = new collisionShape(packet.collision_shape), p = { position: vector(packet.position), rotation: number(packet.rotation ?? 0, 'rotation') }, hits = [];
-        for (const b of this.world.spatial_grid.queryBounds(shapeBounds(shape, p.position, p.rotation))) {
+        for (const b of this.world.spatial_grid.queryBounds(shapeBounds(shape, p.position, p.rotation), [], gridSelect(packet))) {
             if (!accepts(this.world, b, packet)) continue;
             const r = this.world._record(b), c = collisionDetector.contact(shape, p, r.shape, pose(r));
             if (c) hits.push({ ...c, body: b, body_id: r.id, entity: this.world.elements.fetchEntity(r.id), distance: length(sub(r.position, p.position)) });
@@ -10142,7 +10153,7 @@ class physicsQueries {
             ? { shape_type: 'circle', radius: p.radius, local_position: p.center }
             : { shape_type: 'polygon', points: p.points }));
         const sourcePieces = convex(shape), a = { position: from, rotation }, b = { position: to, rotation };
-        for (const candidate of this.world.spatial_grid.querySweep({ from, to, radius: shapeReach(shape) })) {
+        for (const candidate of this.world.spatial_grid.querySweep({ from, to, radius: shapeReach(shape) }, [], gridSelect(options))) {
             if (!accepts(this.world, candidate, options)) continue;
             const r = this.world._record(candidate), target = pose(r);
             for (const source of sourcePieces) for (const obstacle of convex(r.shape)) {
@@ -10188,8 +10199,9 @@ class physicsQueries {
         const envelope = this.world._getMotionEnvelope(), reach = envelope.max_speed * seconds + envelope.max_reach + shapeReach(r.shape);
         const bounds = unionBounds(shapeBounds(r.shape, from.position, from.rotation), shapeBounds(r.shape, to.position, to.rotation));
         const search = { left: bounds.left - reach, right: bounds.right + reach, top: bounds.top - reach, bottom: bounds.bottom + reach }, hits = [];
-        for (const body of this.world.spatial_grid.queryBounds(search)) {
-            if (!accepts(this.world, body, { ...packet, include_ghosts: false, query_body: r.handle, ignore_body: r.handle })) continue;
+        const filter = { ...packet, include_ghosts: false, query_body: r.handle, ignore_body: r.handle };
+        for (const body of this.world.spatial_grid.queryBounds(search, [], gridSelect(filter))) {
+            if (!accepts(this.world, body, filter)) continue;
             const target = this.world._record(body), end = { position: add(target.position, scale(target.velocity, seconds)), rotation: target.rotation + target.angular_velocity * seconds };
             const contact = collisionDetector.sweep(r.shape, from, to, target.shape, pose(target), end);
             if (contact) hits.push({ ...contact, seconds: contact.fraction * seconds, body, body_id: target.id, entity: this.world.elements.fetchEntity(target.id) });
@@ -11129,7 +11141,7 @@ return Object.freeze({get contactSolver(){return contactSolver;}});
 // src/engine/basement/physics/spatial/grid.mjs
 const m22 = (()=>{
 // ===== LV0 BASEMENT =====
-const {validBounds,number,vector} = m7;
+const {validBounds,number,vector,BODY_GROUP} = m7;
 
 /**
  * One incremental hash for physical and nonphysical instances. No per-consumer copies.
@@ -11141,7 +11153,18 @@ const {validBounds,number,vector} = m7;
  *    coarse cells instead of dozens of fine ones and are rechecked far less often.
  * Cells are keyed by integers and store plain arrays; queries run as plain loops and
  * reuse scratch sets, so steady-state use allocates nothing per cell or per pair.
+ *
+ * Each cell sorts its entries into buckets by group, given when the entry is registered: a
+ * body's collision group (0 for a body with none, a loose body), or null for what is not a
+ * body (a navigation lane, a spatial instance). The sorting is done once, on insertion: a move
+ * only shuffles an entry between cells, and only a change of group moves it between buckets.
+ * A query may name what it wants with a selection `{groups, skip, loose, instances}`: a grouped
+ * bucket is visited when its group meets `groups` and misses `skip`, the loose bucket when
+ * `loose`, the instance bucket when `instances`. So a search for cars never walks the walls, the
+ * lamps or the road lanes beside them. A selection names only what it wants (an unnamed part is
+ * left out); with no selection every bucket is visited.
  */
+const INSTANCE = -1, EVERYTHING = Object.freeze({ groups: BODY_GROUP.ALL, skip: 0, loose: true, instances: true });
 // Keys stay below 2^52: cell coordinates must lie within ±LIMIT on each axis.
 const COARSE = 8, BIG_CELLS = 16, OFFSET = 2 ** 25, SPAN = 2 ** 26, LIMIT = 2 ** 25 - 1;
 // Near the origin, keys are small integers (fast map hashing); far cells use a separate, larger key range.
@@ -11162,10 +11185,17 @@ function segmentMeetsBox(box, ax, ay, bx, by, pad) {
     return t0 <= t1;
 }
 
+/** A bucket key: a collision group (0 for a loose body), or INSTANCE for null (what is not a body). */
+function bucket(group) {
+    if (group === null || group === undefined) return INSTANCE;
+    if (!Number.isInteger(group) || group < 0 || group > BODY_GROUP.ALL) throw new TypeError('A grid group must be a collision group mask, or null');
+    return group;
+}
+
 class spatialGrid {
     #levels; #entries = new Map(); #stamp = 0; #revision = 0;
-    #nearby = []; #pairStamp = 0; #pairKeys = new Set();
-    #stats = { updates: 0, membership_changes: 0, queries: 0, candidate_visits: 0, pairs: 0, cell_additions: 0, cell_removals: 0, query_cells: 0 };
+    #nearby = []; #pairStamp = 0; #pairKeys = new Set(); #all = true; #groups = 0; #skip = 0; #loose = false; #instances = false;
+    #stats = { updates: 0, membership_changes: 0, queries: 0, candidate_visits: 0, pairs: 0, cell_additions: 0, cell_removals: 0, query_cells: 0, bucket_skips: 0 };
     constructor({ cell_size = 128 } = {}) {
         this.cell_size = number(cell_size, 'cell_size', 1);
         this.#levels = [{ size: this.cell_size, cells: new Map(), count: 0 }, { size: this.cell_size * COARSE, cells: new Map(), count: 0 }];
@@ -11186,19 +11216,25 @@ class spatialGrid {
         return { level: 1, range: this.#range(b, this.cell_size * COARSE) };
     }
     #add(level, x0, x1, y0, y1, e) {
-        const cells = this.#levels[level].cells;
+        const cells = this.#levels[level].cells, group = e.group;
         for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
             const key = cellKey(x, y); let cell = cells.get(key);
-            if (!cell) cells.set(key, cell = { items: [], mark: 0 });
-            cell.items.push(e); this.#stats.cell_additions++;
+            if (!cell) cells.set(key, cell = { groups: [], lists: [], mark: 0 });
+            const k = cell.groups[0] === group ? 0 : cell.groups.indexOf(group);
+            if (k < 0) { cell.groups.push(group); cell.lists.push([e]); } else cell.lists[k].push(e);
+            this.#stats.cell_additions++;
         }
     }
     #remove(level, x0, x1, y0, y1, e) {
-        const cells = this.#levels[level].cells;
+        const cells = this.#levels[level].cells, group = e.group;
         for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
-            const key = cellKey(x, y), items = cells.get(key).items, i = items.indexOf(e), last = items.pop();
+            const key = cellKey(x, y), cell = cells.get(key), k = cell.groups[0] === group ? 0 : cell.groups.indexOf(group), items = cell.lists[k], i = items.indexOf(e), last = items.pop();
             if (last !== e) items[i] = last;
-            if (!items.length) cells.delete(key);
+            if (!items.length) {
+                const lastGroup = cell.groups.pop(), lastList = cell.lists.pop();
+                if (k < cell.groups.length) { cell.groups[k] = lastGroup; cell.lists[k] = lastList; }
+                if (!cell.groups.length) cells.delete(key);
+            }
             this.#stats.cell_removals++;
         }
     }
@@ -11212,19 +11248,23 @@ class spatialGrid {
         if (y1 + 1 <= a.y1) this.#strip(level, adding, x0, x1, y1 + 1, a.y1, e);
     }
     #strip(level, adding, x0, x1, y0, y1, e) { if (adding) this.#add(level, x0, x1, y0, y1, e); else this.#remove(level, x0, x1, y0, y1, e); }
-    registerInstance(id, bounds, value) {
+    /** Adds an entry under a group: a body's collision group, or null (the default) for what is not a body. */
+    registerInstance(id, bounds, value, group = null) {
         if (this.#entries.has(id)) throw new Error(`Duplicate spatial id: ${id}`);
-        const b = validBounds(bounds), { level, range } = this.#place(b), e = { id, bounds: b, value, range, level, stamp: 0 };
+        const b = validBounds(bounds), { level, range } = this.#place(b), e = { id, bounds: b, value, range, level, group: bucket(group), stamp: 0 };
         this.#entries.set(id, e); this.#levels[level].count++;
         this.#add(level, range.x0, range.x1, range.y0, range.y1, e);
         this.#stats.membership_changes++; this.#revision++;
     }
-    updateInstance(id, bounds) {
+    /** Moves an entry; with a new `group` it also changes bucket (in every cell it covers). */
+    updateInstance(id, bounds, group) {
         const e = this.#entries.get(id); if (!e) throw new Error(`Unknown spatial id: ${id}`);
-        if (e.bounds.left === bounds.left && e.bounds.right === bounds.right && e.bounds.top === bounds.top && e.bounds.bottom === bounds.bottom) return;
+        const regroup = group !== undefined && bucket(group) !== e.group;
+        if (!regroup && e.bounds.left === bounds.left && e.bounds.right === bounds.right && e.bounds.top === bounds.top && e.bounds.bottom === bounds.bottom) return;
         const b = validBounds(bounds), { level, range } = this.#place(b), old = e.range;
-        if (level !== e.level) {
+        if (level !== e.level || regroup) {
             this.#remove(e.level, old.x0, old.x1, old.y0, old.y1, e); this.#levels[e.level].count--;
+            if (regroup) e.group = bucket(group);
             this.#add(level, range.x0, range.x1, range.y0, range.y1, e); this.#levels[level].count++;
             e.level = level; e.range = range; this.#stats.membership_changes++;
         } else if (old.x0 !== range.x0 || old.x1 !== range.x1 || old.y0 !== range.y0 || old.y1 !== range.y1) {
@@ -11245,35 +11285,47 @@ class spatialGrid {
         if (!(Math.abs(x) <= LIMIT && Math.abs(y) <= LIMIT && Math.abs(ex) <= LIMIT && Math.abs(ey) <= LIMIT)) throw new RangeError('Cell coordinates must be safe integers');
         if (Math.abs(ex - x) + Math.abs(ey - y) > 1e6) throw new RangeError('Segment crosses over one million cells');
     }
-    #nextStamp() { this.#stats.queries++; return ++this.#stamp; }
+    /** Starts a query: a new stamp, and the buckets its selection names (read by #collect). */
+    #nextStamp(select) {
+        this.#all = select === EVERYTHING;
+        if (!this.#all) { this.#groups = select.groups ?? 0; this.#skip = select.skip ?? 0; this.#loose = !!select.loose; this.#instances = !!select.instances; }
+        this.#stats.queries++; return ++this.#stamp;
+    }
     /** Visits a cell rectangle of one level, pushing unseen entries (optionally bounds-filtered). */
+    /** Visits a cell rectangle of one level, pushing unseen entries of the wanted buckets (optionally bounds-filtered). */
     #collect(level, x0, x1, y0, y1, stamp, results, b, segment) {
-        const cells = this.#levels[level].cells, stats = this.#stats;
+        const cells = this.#levels[level].cells, stats = this.#stats, all = this.#all, groups = this.#groups, skip = this.#skip, loose = this.#loose, instances = this.#instances;
         for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) {
             stats.query_cells++;
             const cell = cells.get(cellKey(x, y)); if (!cell || cell.mark === stamp) continue;
             cell.mark = stamp;
-            const items = cell.items;
-            for (let i = 0; i < items.length; i++) {
-                const e = items[i]; if (e.stamp === stamp) continue;
-                e.stamp = stamp; stats.candidate_visits++;
-                if (b ? (b.left <= e.bounds.right && b.right >= e.bounds.left && b.top <= e.bounds.bottom && b.bottom >= e.bounds.top)
-                    : !segment || segmentMeetsBox(e.bounds, segment[0], segment[1], segment[2], segment[3], segment[4])) results.push(e.value);
+            const kinds = cell.groups;
+            for (let k = 0; k < kinds.length; k++) {
+                const g = kinds[k];
+                if (!all && (g > 0 ? !(g & groups) || (g & skip) : g === 0 ? !loose : !instances)) { stats.bucket_skips++; continue; }
+                const items = cell.lists[k];
+                for (let i = 0; i < items.length; i++) {
+                    const e = items[i]; if (e.stamp === stamp) continue;
+                    e.stamp = stamp; stats.candidate_visits++;
+                    if (b ? (b.left <= e.bounds.right && b.right >= e.bounds.left && b.top <= e.bounds.bottom && b.bottom >= e.bounds.top)
+                        : !segment || segmentMeetsBox(e.bounds, segment[0], segment[1], segment[2], segment[3], segment[4])) results.push(e.value);
+                }
             }
         }
     }
-    queryBounds(bounds, results = []) {
-        const b = validBounds(bounds), stamp = this.#nextStamp(); results.length = 0;
+    /** Entries meeting `bounds`, from the buckets `select` names (every bucket by default). */
+    queryBounds(bounds, results = [], select = EVERYTHING) {
+        const b = validBounds(bounds), stamp = this.#nextStamp(select); results.length = 0;
         for (let level = 0; level < 2; level++) {
             if (!this.#levels[level].count) continue;
             const r = this.#range(b, this.#levels[level].size);
-            this.#collect(level, r.x0, r.x1, r.y0, r.y1, stamp, results, b);
+            this.#collect(level, r.x0, r.x1, r.y0, r.y1, stamp, results, b, null);
         }
         return results;
     }
-    queryRadius(position, radius, results = []) {
+    queryRadius(position, radius, results = [], select = EVERYTHING) {
         number(radius, 'radius', 0); const [x, y] = position;
-        return this.queryBounds({ left: x - radius, right: x + radius, top: y - radius, bottom: y + radius }, results);
+        return this.queryBounds({ left: x - radius, right: x + radius, top: y - radius, bottom: y + radius }, results, select);
     }
     /** DDA over one level's cells crossed by a segment, including both neighbours at corner crossings. */
     #segmentCells(size, from, to, visit) {
@@ -11293,20 +11345,20 @@ class spatialGrid {
             visit(x, y);
         }
     }
-    querySegment(from, to, results = []) {
+    querySegment(from, to, results = [], select = EVERYTHING) {
         from = vector(from); to = vector(to); this.#checkSegment(from, to);
-        results.length = 0; const stamp = this.#nextStamp(), segment = [from[0], from[1], to[0], to[1], 0];
+        results.length = 0; const stamp = this.#nextStamp(select), segment = [from[0], from[1], to[0], to[1], 0];
         for (let level = 0; level < 2; level++) {
             if (!this.#levels[level].count) continue;
             this.#segmentCells(this.#levels[level].size, from, to, (x, y) => this.#collect(level, x, x, y, y, stamp, results, null, segment));
         }
         return results;
     }
-    querySweep(packet, results = []) {
-        if (packet.left !== undefined) return this.queryBounds(packet, results);
+    querySweep(packet, results = [], select = EVERYTHING) {
+        if (packet.left !== undefined) return this.queryBounds(packet, results, select);
         const from = vector(packet.from), to = vector(packet.to), radius = number(packet.radius ?? 0, 'radius', 0); this.#checkSegment(from, to);
         if (Math.ceil(radius / this.cell_size) > 1000) throw new RangeError('Sweep radius exceeds one thousand cells');
-        results.length = 0; const stamp = this.#nextStamp(), segment = [from[0], from[1], to[0], to[1], radius];
+        results.length = 0; const stamp = this.#nextStamp(select), segment = [from[0], from[1], to[0], to[1], radius];
         // Cells already visited this query carry its stamp, so overlapping neighbourhoods cost one lookup each.
         for (let level = 0; level < 2; level++) {
             if (!this.#levels[level].count) continue;
@@ -11315,7 +11367,7 @@ class spatialGrid {
         }
         return results;
     }
-    collectCandidatePairs(instances, results = [], accepts = () => true) {
+    collectCandidatePairs(instances, results = [], accepts = () => true, select = EVERYTHING) {
         // A pair with an unlisted body can only be found from its listed side, so only
         // pairs of two listed instances need the (numeric) duplicate check.
         results.length = 0; const nearby = this.#nearby, seen = this.#pairKeys, mark = ++this.#pairStamp;
@@ -11323,7 +11375,7 @@ class spatialGrid {
         for (const { id } of instances) { const a = this.#entries.get(id); if (a) a.listed = mark; }
         for (const { id, bounds } of instances) {
             const a = this.#entries.get(id); if (!a) continue;
-            this.queryBounds(bounds ?? a.bounds, nearby);
+            this.queryBounds(bounds ?? a.bounds, nearby, select);
             for (let i = 0; i < nearby.length; i++) {
                 const b = nearby[i], other = b.body_id;
                 if (a.value === b || !other) continue;
@@ -11340,7 +11392,7 @@ class spatialGrid {
         this.#stats.pairs += results.length; return results;
     }
     getStatistics() { return { ...this.#stats, instances: this.#entries.size, cells: this.#levels[0].cells.size + this.#levels[1].cells.size, coarse_instances: this.#levels[1].count }; }
-    exportInstances() { return [...this.#entries.values()].map(e => ({ id: e.id, bounds: { ...e.bounds }, value: e.value })); }
+    exportInstances() { return [...this.#entries.values()].map(e => ({ id: e.id, bounds: { ...e.bounds }, value: e.value, group: e.group })); }
     clear() {
         this.#revision++; this.#entries.clear();
         for (const level of this.#levels) { level.cells.clear(); level.count = 0; }
@@ -12831,7 +12883,7 @@ const OFFSET = 2 ** 20, SPAN = 2 ** 21;
 const chunkKey = (cx, cy) => (cx + OFFSET) * SPAN + (cy + OFFSET);
 
 class navigationField {
-    #world; #chunks = new Map(); #revision = 0; #found = [];
+    #world; #chunks = new Map(); #revision = 0; #found = []; #select;
     #stats = { chunk_builds: 0, chunk_reuses: 0, cells_built: 0, piece_cells: 0, dirty_marks: 0, obstacle_updates: 0, exact_checks: 0 };
     constructor(world, { cell_size = 8, chunk_cells = 32, max_clearance = 64, obstacle_groups = BODY_GROUP.STATIC | BODY_GROUP.PROP } = {}) {
         this.#world = world;
@@ -12839,7 +12891,7 @@ class navigationField {
         this.chunk_cells = number(chunk_cells, 'chunk_cells', 4, 256);
         if (!Number.isInteger(chunk_cells)) throw new TypeError('chunk_cells must be integral');
         this.max_clearance = number(max_clearance, 'max_clearance', cell_size, cell_size * 64);
-        this.obstacle_groups = mask(obstacle_groups, 'obstacle_groups');
+        this.obstacle_groups = mask(obstacle_groups, 'obstacle_groups'); this.#select = { groups: this.obstacle_groups };
         this.chunk_size = this.cell_size * this.chunk_cells;
         Object.freeze(this);
     }
@@ -12903,7 +12955,7 @@ class navigationField {
         const n = this.chunk_cells, cell = this.cell_size, cap = this.max_clearance, clearance = chunk.clearance;
         const ox = chunk.cx * n, oy = chunk.cy * n, left = ox * cell, top = oy * cell, right = left + this.chunk_size, bottom = top + this.chunk_size;
         clearance.fill(cap);
-        const world = this.#world, found = world.spatial_grid.queryBounds({ left: left - cap, right: right + cap, top: top - cap, bottom: bottom + cap }, this.#found);
+        const world = this.#world, found = world.spatial_grid.queryBounds({ left: left - cap, right: right + cap, top: top - cap, bottom: bottom + cap }, this.#found, this.#select);
         for (const handle of found) {
             if (!handle?.body_id) continue;
             const r = world._record(handle);
@@ -12971,7 +13023,7 @@ class navigationField {
     /** Exact distance from a segment (or point) to field obstacles, capped at limit. Reads the shared grid. */
     exactSegmentClearance(a, b, limit = this.max_clearance) {
         const found = this.#world.spatial_grid.queryBounds({ left: Math.min(a[0], b[0]) - limit, right: Math.max(a[0], b[0]) + limit,
-            top: Math.min(a[1], b[1]) - limit, bottom: Math.max(a[1], b[1]) + limit }, this.#found);
+            top: Math.min(a[1], b[1]) - limit, bottom: Math.max(a[1], b[1]) + limit }, this.#found, this.#select);
         let best = limit;
         this.#stats.exact_checks++;
         for (const handle of found) {
@@ -13222,7 +13274,7 @@ const {pathGeometry} = m19;
  * Routes minimise travel time and are cached per (profile, node pair) until the
  * network changes.
  */
-const SPATIAL = 'navigation:lane:';
+const SPATIAL = 'navigation:lane:', LANES = Object.freeze({ instances: true });
 class roadNetwork {
     #world; #nodes = new Map(); #lanes = new Map(); #out = new Map(); #revision = 0; #cache = new Map(); #fastest = 0; #found = [];
     #stats = { route_requests: 0, route_cache_hits: 0, route_searches: 0, expanded_nodes: 0, snaps: 0 };
@@ -13281,7 +13333,7 @@ class roadNetwork {
     snapToLane(position, { profile = 'car', near_range = 200 } = {}, results = null) {
         const at = vector(position, 'position'); number(near_range, 'near_range', 0);
         this.#stats.snaps++;
-        const found = this.#world.spatial_grid.queryRadius(at, near_range, this.#found), hits = [];
+        const found = this.#world.spatial_grid.queryRadius(at, near_range, this.#found, LANES), hits = [];
         for (const value of found) {
             const lane = value?.navigation_lane !== undefined ? this.#lanes.get(value.navigation_lane) : null;
             if (!lane || !lane.open || !lane.profiles.has(profile)) continue;
@@ -13681,7 +13733,8 @@ class physicsSystem {
         // the collision pose/sweep as well as the shared grid's revision.
         if(!cache||cache.x!==x||cache.y!==y||cache.rotation!==rotation||cache.shape!==r.shape||cache.swept!==swept
             ||swept&&(cache.px!==px||cache.py!==py||cache.previous_rotation!==r.previous_rotation))this.#broadphaseEpoch++;
-        if(r.indexed&&cache&&cache.x===x&&cache.y===y&&cache.rotation===rotation&&cache.shape===r.shape&&cache.render===render&&cache.light===light
+        const group=r.config.collision_group;
+        if(r.indexed&&r.grid_group===group&&cache&&cache.x===x&&cache.y===y&&cache.rotation===rotation&&cache.shape===r.shape&&cache.render===render&&cache.light===light
             &&cache.swept===swept&&(!swept||cache.px===px&&cache.py===py&&cache.previous_rotation===r.previous_rotation)){
             if(configChanged)this.#lightTouch(r,true);
             this.#stats.spatial_sync_skips++;return;
@@ -13690,8 +13743,10 @@ class physicsSystem {
         let bounds=swept?sweptBounds(r):liveBounds(r);
         if(render)bounds=unionBounds(bounds,bodyBounds(r,'render'));
         if(light)bounds=unionBounds(bounds,bodyBounds(r,'light'));
-        if(r.indexed)this.spatial_grid.updateInstance(r.id,bounds);
-        else{this.spatial_grid.registerInstance(r.id,bounds,r.handle);r.indexed=true;}
+        // Sorted into its group's bucket once, here; later syncs only move it, or re-sort it when its group changes.
+        if(r.indexed)this.spatial_grid.updateInstance(r.id,bounds,group);
+        else{this.spatial_grid.registerInstance(r.id,bounds,r.handle,group);r.indexed=true;}
+        r.grid_group=group;
         if(cache){cache.x=x;cache.y=y;cache.rotation=rotation;cache.shape=r.shape;cache.render=render;cache.light=light;cache.swept=swept;cache.px=px;cache.py=py;cache.previous_rotation=r.previous_rotation;}
         else r.spatial_cache={x,y,rotation,shape:r.shape,render,light,swept,px,py,previous_rotation:r.previous_rotation};
     }
@@ -13914,7 +13969,7 @@ class physicsSystem {
             const motor = r.motor; if (!(motor instanceof projectileMotor) || r.parent_mount || !bodyActive(r)) continue;
             const hits = [];
             const reach = shapeReach(r.shape), from = previousPose(r), to = pose(r);
-            for (const body of this.spatial_grid.querySweep({ from: from.position, to: to.position, radius: reach })) {
+            for (const body of this.spatial_grid.querySweep({ from: from.position, to: to.position, radius: reach }, [], { groups: r.config.collision_mask })) {
                 if (!body.body_id || body === r.handle || motor.hit_bodies.has(body.body_id) || body.body_id === motor.config.owner_id) continue;
                 const target = this._record(body); if (!this.#meets(r, target) || target.motor instanceof projectileMotor) continue;
                 this.#stats.narrow_checks++;
@@ -13963,8 +14018,10 @@ class physicsSystem {
         if(cache&&cache.revision===revision&&cache.epoch===this.#broadphaseEpoch){candidates=cache.pairs;this.#stats.broadphase_reuses++;}
         else{
             const sources=moving.filter(r=>physical(r)&&r.config.collision_mask&&!(r.motor instanceof projectileMotor));
+            // Only the buckets some source's mask can meet are walked.
+            let wanted=0;for(const r of sources)wanted|=r.config.collision_mask;
             candidates=this.spatial_grid.collectCandidatePairs(sources.map(r=>({id:r.id,bounds:this.#collisionBounds(r)})),[],
-                (a,b)=>boundsMeet(this.#collisionBounds(this._record(a)),this.#collisionBounds(this._record(b)))&&this.#meets(this._record(a),this._record(b))&&!(this._record(b).motor instanceof projectileMotor));
+                (a,b)=>boundsMeet(this.#collisionBounds(this._record(a)),this.#collisionBounds(this._record(b)))&&this.#meets(this._record(a),this._record(b))&&!(this._record(b).motor instanceof projectileMotor),{groups:wanted});
             this.#candidateCache={revision,epoch:this.#broadphaseEpoch,pairs:candidates};this.#stats.broadphase_builds++;
         }
         this.#stats.candidate_pairs += candidates.length;

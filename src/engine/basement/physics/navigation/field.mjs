@@ -18,7 +18,7 @@ const OFFSET = 2 ** 20, SPAN = 2 ** 21;
 export const chunkKey = (cx, cy) => (cx + OFFSET) * SPAN + (cy + OFFSET);
 
 export class navigationField {
-    #world; #chunks = new Map(); #revision = 0; #found = [];
+    #world; #chunks = new Map(); #revision = 0; #found = []; #select;
     #stats = { chunk_builds: 0, chunk_reuses: 0, cells_built: 0, piece_cells: 0, dirty_marks: 0, obstacle_updates: 0, exact_checks: 0 };
     constructor(world, { cell_size = 8, chunk_cells = 32, max_clearance = 64, obstacle_groups = BODY_GROUP.STATIC | BODY_GROUP.PROP } = {}) {
         this.#world = world;
@@ -26,7 +26,7 @@ export class navigationField {
         this.chunk_cells = number(chunk_cells, 'chunk_cells', 4, 256);
         if (!Number.isInteger(chunk_cells)) throw new TypeError('chunk_cells must be integral');
         this.max_clearance = number(max_clearance, 'max_clearance', cell_size, cell_size * 64);
-        this.obstacle_groups = mask(obstacle_groups, 'obstacle_groups');
+        this.obstacle_groups = mask(obstacle_groups, 'obstacle_groups'); this.#select = { groups: this.obstacle_groups };
         this.chunk_size = this.cell_size * this.chunk_cells;
         Object.freeze(this);
     }
@@ -90,7 +90,7 @@ export class navigationField {
         const n = this.chunk_cells, cell = this.cell_size, cap = this.max_clearance, clearance = chunk.clearance;
         const ox = chunk.cx * n, oy = chunk.cy * n, left = ox * cell, top = oy * cell, right = left + this.chunk_size, bottom = top + this.chunk_size;
         clearance.fill(cap);
-        const world = this.#world, found = world.spatial_grid.queryBounds({ left: left - cap, right: right + cap, top: top - cap, bottom: bottom + cap }, this.#found);
+        const world = this.#world, found = world.spatial_grid.queryBounds({ left: left - cap, right: right + cap, top: top - cap, bottom: bottom + cap }, this.#found, this.#select);
         for (const handle of found) {
             if (!handle?.body_id) continue;
             const r = world._record(handle);
@@ -158,7 +158,7 @@ export class navigationField {
     /** Exact distance from a segment (or point) to field obstacles, capped at limit. Reads the shared grid. */
     exactSegmentClearance(a, b, limit = this.max_clearance) {
         const found = this.#world.spatial_grid.queryBounds({ left: Math.min(a[0], b[0]) - limit, right: Math.max(a[0], b[0]) + limit,
-            top: Math.min(a[1], b[1]) - limit, bottom: Math.max(a[1], b[1]) + limit }, this.#found);
+            top: Math.min(a[1], b[1]) - limit, bottom: Math.max(a[1], b[1]) + limit }, this.#found, this.#select);
         let best = limit;
         this.#stats.exact_checks++;
         for (const handle of found) {

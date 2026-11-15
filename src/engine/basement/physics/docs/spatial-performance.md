@@ -9,6 +9,7 @@ The native world owns one persistent `spatialGrid`. Ordinary simulation steps pr
 - Entries retain integer cell ranges. Bounds changes inside the same range create no membership changes. Crossing a boundary updates only entering/leaving strips; cells shared by both ranges retain their existing membership.
 - Queries traverse cell coordinates directly, without allocating an array of every cell key. Segment/sweep queries retain corridor traversal and deduplication.
 - **Two levels.** An entry spanning more than 16 cells on either axis (a building, a road lane, a big light) is stored on a coarse level with cells 8× larger, so it occupies a handful of cells instead of hundreds. Every query reads both levels; the coarse level is skipped while empty. Entries switch levels when resized. This keeps dense small-object cells cheap without a tree.
+- **Group buckets.** Each cell sorts its entries by group when they are registered: a body under its collision group, a group-less body under the loose bucket, a lane or spatial instance under the instance bucket. Moving shuffles an entry between cells and never re-sorts it; only a change of collision group does. A query's selection names the buckets it walks, so a pedestrian looking for people, or a car looking for traffic, never visits the walls, lamps and road lanes sharing its cells. In the city that cut entries visited by queries about 24× (545k to 22k over 50 steps) and the street step about a fifth.
 - Cells use numeric keys (small integers near the origin, a separate range far out) and array buckets with swap-remove. Query deduplication uses per-entry and per-cell stamps instead of sets, and pair generation needs a duplicate check only for pairs of two moving bodies.
 - `querySegment` and `querySweep` return only entries whose bounds actually meet the (padded) segment, not everything in the visited cells.
 - The native broadphase reuses its candidate-pair result while the shared index and physical candidate inputs remain valid. Exact contact detection/response and begin/stay/end events continue using current state.
@@ -38,6 +39,7 @@ The simulation still visits bodies to advance controllers and physical policies.
 | `spatial.cell_additions` / `spatial.cell_removals` | Actual entry-to-cell insertions/removals, including lifecycle clear |
 | `spatial.query_cells` | Cell lookups performed by queries |
 | `spatial.candidate_visits` | Deduplicated entries visited by queries |
+| `spatial.bucket_skips` | Cell buckets a query's selection left unwalked |
 
 `spatialGrid.revision` changes on registration, actual bounds change, removal and clear. Queries and identical updates leave it unchanged. `cell_additions - cell_removals` counts current entry/cell memberships; `cells` counts nonempty cells on both levels and `coarse_instances` counts entries stored on the coarse level. `spatial.pairs` counts generated pairs, while world `candidate_pairs` includes pairs processed through reused broadphase results.
 
