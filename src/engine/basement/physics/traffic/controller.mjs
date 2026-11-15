@@ -16,11 +16,13 @@ const REACH_SLACK = 20;
  * Route topology and reservations are scheduling data. A route laid along the road network's lanes
  * (`lanes`) puts its drivers on those lanes: each step the controller files every such driver under the
  * lane it is on and how far along, so a driver follows the one ahead of it on its own lanes and waits for
- * a queue past a crossing by reading those lists, and sweeps only against what is not on the lanes (a
- * walker, the player's car). Other geometry queries use the world's index.
+ * a queue past a crossing by reading those lists. A walkway (a crosswalk) is a list too: those on foot
+ * enter and leave it, and a car stops before one that is in use. So a driver on the lanes never searches
+ * round itself; its forward clearance cast catches whatever else stands in its lane. Other drivers
+ * predict against what the world's index finds near them.
  */
 export class trafficController {
-    #routes = new Map(); #drivers = new Map(); #signals = new Map(); #reservations = new Map(); #occupancy = new Map(); #onLanes = new Set();
+    #routes = new Map(); #drivers = new Map(); #signals = new Map(); #reservations = new Map(); #occupancy = new Map(); #onLanes = new Set(); #walkways = new Map();
     constructor(world) {
         if (!world || typeof world._mutate !== 'function') throw new TypeError('Controller requires its physicsSystem owner');
         if (world.traffic) throw new Error('The world already owns its traffic controller');
@@ -43,8 +45,8 @@ export class trafficController {
         for (const stop of stops) {
             number(stop.distance, 'stop distance', 0, route_length);
             number(stop.clearance_distance ??= 20, 'clearance_distance', 0);
-            if (!stop.signal_id && !stop.conflict_id) throw new TypeError('Stop needs a signal_id or conflict_id');
-            for (const key of ['signal_id', 'conflict_id']) if (stop[key] !== undefined && (typeof stop[key] !== 'string' || !stop[key])) throw new TypeError(`Invalid ${key}`);
+            if (!stop.signal_id && !stop.conflict_id && !stop.walkway_id) throw new TypeError('Stop needs a signal_id, conflict_id or walkway_id');
+            for (const key of ['signal_id', 'conflict_id', 'walkway_id']) if (stop[key] !== undefined && (typeof stop[key] !== 'string' || !stop[key])) throw new TypeError(`Invalid ${key}`);
         }
         stops.sort((a, b) => a.distance - b.distance);
         // Lane spans, in order, as the road network gives them (findRoute's `spans`): each covers [from, to] along its lane.
@@ -88,6 +90,24 @@ export class trafficController {
         if (!this.#routes.has(route_id)) return false;
         for (const d of this.#drivers.values()) if (d.config.route_id === route_id) return false;
         this.world._mutate(() => this.#routes.delete(route_id)); return true;
+    }
+    /** `body` (someone on foot) is on the walkway now: cars stop before it until it leaves. */
+    enterWalkway(walkway_id, body) {
+        if (typeof walkway_id !== 'string' || !walkway_id) throw new TypeError('Walkway needs an id');
+        const id = this.world._record(referenceBody(body)).id;
+        this.world._mutate(() => { let on = this.#walkways.get(walkway_id); if (!on) this.#walkways.set(walkway_id, on = new Set()); on.add(id); });
+    }
+    leaveWalkway(walkway_id, body) {
+        const id = typeof body === 'number' ? body : this.world._record(referenceBody(body)).id;
+        this.world._mutate(() => { const on = this.#walkways.get(walkway_id); if (on?.delete(id) && !on.size) this.#walkways.delete(walkway_id); });
+    }
+    /** Body ids on a walkway now. */
+    getWalkway(walkway_id) { return [...this.#walkways.get(walkway_id) ?? []]; }
+    /** Is anyone (still in the world) on the walkway? */
+    #walkwayInUse(walkway_id) {
+        const on = this.#walkways.get(walkway_id); if (!on) return false;
+        for (const id of on) { if (this.world.fetchBody(id)) return true; on.delete(id); }
+        this.#walkways.delete(walkway_id); return false;
     }
     getSignal(signal_id) { return this.#signals.get(signal_id) ?? 'stop'; }
     getRouteStart(route_id) {
@@ -202,20 +222,29 @@ export class trafficController {
             d.progress = s.start + clamp(dot(sub(r.position, s.from), s.direction), 0, s.length);
             d.speed_cap = route.config.speed_limit;
             const motor = r.motor, speed = Math.max(0, motor.getSpeed()), braking = motor.config.braking * r.config.mass / massProperties(r).mass;
-            for (; d.stop_index < route.config.stops.length; d.stop_index++) {
-                const stop = route.config.stops[d.stop_index], remaining = stop.distance - d.progress;
+            const stops = route.config.stops;
+            for (; d.stop_index < stops.length && stops[d.stop_index].distance - d.progress < -stops[d.stop_index].clearance_distance; d.stop_index++)
+                if (this.#reservations.get(stops[d.stop_index].conflict_id) === id) this.#reservations.delete(stops[d.stop_index].conflict_id);
+            for (let k = d.stop_index; k < stops.length; k++) {
+                const stop = stops[k], remaining = stop.distance - d.progress;
                 if (remaining < -stop.clearance_distance) {
                     if (this.#reservations.get(stop.conflict_id) === id) this.#reservations.delete(stop.conflict_id);
                     continue;
                 }
-                // Once over the line, finish clearing the crossing even if the signal changes.
-                if (remaining < 0) break;
+                // Once over the line, finish clearing the crossing even if the signal changes, and heed the next stop
+                // (a crossing just past a crosswalk, a crosswalk inside a crossing).
+                if (remaining < 0) continue;
                 const horizon = speed * speed / (2 * braking) + motor.config.wheel_base + d.config.following_distance;
                 const signal_ok = !stop.signal_id || this.#signals.get(stop.signal_id) === 'go';
                 const owner = this.#reservations.get(stop.conflict_id);
                 // A car holding the crossing that can no longer stop before the line goes on through a change to red.
                 const committed = owner === id && remaining <= speed * speed / (2 * braking) + motor.config.wheel_base / 2;
-                let admitted = (signal_ok || committed) && (!stop.conflict_id || owner === undefined || owner === id);
+                let admitted = (signal_ok || committed) && (!stop.conflict_id || owner === undefined || owner === id) && (!stop.walkway_id || committed || !this.#walkwayInUse(stop.walkway_id));
+                // A crossing is taken only when the walkways inside it and just past it are clear, so no car waits in the box for walkers.
+                if (admitted && stop.conflict_id && owner !== id) for (let j = k + 1; j < stops.length; j++) {
+                    const next = stops[j]; if (next.distance > stop.distance + stop.clearance_distance) break;
+                    if (next.walkway_id && this.#walkwayInUse(next.walkway_id)) { admitted = false; break; }
+                }
                 // Don't block the box: a car only takes a crossing when the road past it has room for it.
                 if (admitted && stop.conflict_id && owner !== id && this.#queued(route, stop.distance + stop.clearance_distance, id, motor.config.wheel_base)) admitted = false;
                 if (admitted && stop.conflict_id && remaining <= horizon) this.#reservations.set(stop.conflict_id, id);
@@ -234,16 +263,17 @@ export class trafficController {
                     d.speed_cap = Math.min(d.speed_cap, Math.sqrt(2 * braking * Math.max(0, room)));
                 }
             }
-            // Predict moving bodies found through the shared spatial grid; a driver on the lanes leaves out the
-            // others on the lanes, which it follows above or meets only at reserved crossings. Static forward
-            // clearance is handled by pathMotor, with the same masks and physical shapes.
+            // A driver off the lanes predicts the moving bodies the shared spatial grid finds near it. One on the
+            // lanes needs no search: it follows the others on the lanes above, meets them only at reserved
+            // crossings, stops before walkways in use, and pathMotor's forward clearance cast (same masks and
+            // physical shapes) catches anything else standing in its lane.
             const horizon = d.config.prediction_seconds;
             // The reach is what this car covers at its own speed (a slow or waiting car looks only near), plus room
             // for what comes at it at a walking-to-street pace: bodies faster than that are found by their own drivers.
             const radius = (speed + PREDICTION_PACE) * horizon + motor.config.wheel_base * 2;
-            for (const hit of this.world.peruseNearbyEntities(d.body, { near_range: radius, query_body: d.body, include_ghosts: false, exclude_groups: BODY_GROUP.STATIC, sort_by: 'none' })) {
+            if (!lanes) for (const hit of this.world.peruseNearbyEntities(d.body, { near_range: radius, query_body: d.body, include_ghosts: false, exclude_groups: BODY_GROUP.STATIC, sort_by: 'none' })) {
                 const other = this.world._record(hit.body);
-                if (other.config.physics_type === 'static' || lanes && this.#onLanes.has(other.id)) continue;
+                if (other.config.physics_type === 'static') continue;
                 const relative = sub(other.position, r.position), ahead = dot(relative, [Math.cos(r.rotation), Math.sin(r.rotation)]);
                 if (ahead < 0) continue;
                 // Two bodies whose bounding circles never meet on their straight courses cannot touch: skip the sweep.
@@ -265,8 +295,8 @@ export class trafficController {
             }
         }
     }
-    _clear() { this.#drivers.clear(); this.#reservations.clear(); this.#routes.clear(); this.#signals.clear(); this.#occupancy.clear(); this.#onLanes.clear(); }
-    _saveState() { return { routes: [...this.#routes].map(([id, r]) => [id, clone(r.config)]), signals: [...this.#signals], reservations: [...this.#reservations], drivers: [...this.#drivers].map(([id, d]) => [id, { ...clone(d), body: undefined }]) }; }
+    _clear() { this.#walkways.clear(); this.#drivers.clear(); this.#reservations.clear(); this.#routes.clear(); this.#signals.clear(); this.#occupancy.clear(); this.#onLanes.clear(); }
+    _saveState() { return { routes: [...this.#routes].map(([id, r]) => [id, clone(r.config)]), signals: [...this.#signals], reservations: [...this.#reservations], walkways: [...this.#walkways].map(([id, on]) => [id, [...on]]), drivers: [...this.#drivers].map(([id, d]) => [id, { ...clone(d), body: undefined }]) }; }
     _loadState(packet) {
         if (!packet) return;
         for (const [id, cfg] of packet.routes) this.registerRoute(id, cfg);
@@ -279,6 +309,7 @@ export class trafficController {
             if (![d.segment, d.stop_index, d.span].every(Number.isInteger)) throw new TypeError('Invalid traffic cursor');
             this.#drivers.set(id, { ...clone(d), body: r.handle });
         }
+        for (const [walkway_id, ids] of packet.walkways ?? []) this.#walkways.set(walkway_id, new Set(ids.map(id => { number(id, 'walkway body', 0); return id; })));
         for (const [key, id] of packet.reservations) { if (!this.#drivers.has(id)) throw new TypeError('Reservation has no driver'); this.#reservations.set(key, id); }
     }
 }

@@ -47,13 +47,14 @@ export class Pedestrian extends gameCharacter {
         this.fleeTarget(source, { safety_distance: 200, face_movement: true });
         this.data.state = 'fleeing'; this.data.state_seconds = 1.5; this.say('What was that?');
     }
-    updateState(seconds, { target, crossing = false, signal = 'go', wait_at = null } = {}) {
+    updateState(seconds, { target, crossing = false, started = false, signal = 'go', wait_at = null } = {}) {
         if (this.destroyed || !this.active) return;
         if (!Number.isFinite(seconds) || seconds < 0 || seconds > 0.1) throw new TypeError('Invalid gameplay step');
         const d = this.data, rules = this.getAsset('street_rules').data;
         d.damage_grace = Math.max(0, d.damage_grace - seconds);
         d.quip_seconds = Math.max(0, d.quip_seconds - seconds); if (!d.quip_seconds) d.quip = null;
         if (d.state === 'dead' || this.physics_system.getAttachmentState(this)) return;
+        const dodged = d.state === 'dodging';
         if (['sprawled', 'recovering', 'dodging', 'fleeing'].includes(d.state)) {
             d.state_seconds = Math.max(0, d.state_seconds - seconds);
             if (d.state_seconds) return;
@@ -66,11 +67,13 @@ export class Pedestrian extends gameCharacter {
         const sense = d.sense_seconds <= 0; if (sense) d.sense_seconds = rules.sense_seconds ?? 0;
         // A walker in the way of a car stood still gets out of it (each would wait for the other).
         if (sense && getOutOfTheWay(this, rules)) return;
-        if (crossing && d.state !== 'crossing') {
+        // One already out on the crossing (back from a dodge) carries on over: turning back would walk the road again.
+        if (crossing && !started && d.state !== 'crossing') {
             const hits = this.physics_system.predictMovementContacts({ body: this, to: target, speed: rules.crossing_speed, seconds: rules.prediction_seconds, include_groups: BODY_GROUP.VEHICLE, max_results: 1 });
             if (signal !== 'go' || hits.length) {
-                // It waits a step back from the kerb (`wait_at`), so it never stands in a turning car's way.
-                if (d.state !== 'waiting') { if (wait_at) this.moveTo(wait_at, { direct: true, avoid_groups: BODY_GROUP.CHARACTER, personal_space: rules.personal_space, face_movement: false }); else this.stopMovement(); }
+                // It waits a step back from the kerb (`wait_at`), so it never stands in a turning car's way; one that
+                // has just stepped out of a car's way waits where it is (going back could put it in the way again).
+                if (d.state !== 'waiting') { if (wait_at && !dodged) this.moveTo(wait_at, { direct: true, avoid_groups: BODY_GROUP.CHARACTER, personal_space: rules.personal_space, face_movement: false }); else this.stopMovement(); }
                 d.state = 'waiting'; return;
             }
         }
@@ -78,6 +81,8 @@ export class Pedestrian extends gameCharacter {
             this.moveTo(target, { direct: true, avoid_groups: BODY_GROUP.CHARACTER, speed: crossing ? rules.crossing_speed : undefined, personal_space: rules.personal_space, face_movement: true });
             d.state = crossing ? 'crossing' : 'walking';
         }
+        // Within `crossing_arrival` of the far kerb is over: walkers about the kerb would hold one short of the point.
+        if (d.state === 'crossing') { const [x, y] = this.position; if ((x - target[0]) ** 2 + (y - target[1]) ** 2 <= rules.crossing_arrival ** 2) { d.arrived = true; return; } }
         if (!sense) return;
         const threats = this.physics_system.predictMovementContacts({ body: this, seconds: rules.prediction_seconds, include_groups: BODY_GROUP.VEHICLE, max_results: 1 });
         if (threats.length && this.evadeBody(threats[0].body, { distance: rules.dodge_distance, speed: rules.dodge_speed })) {

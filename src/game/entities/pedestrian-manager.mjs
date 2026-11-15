@@ -62,10 +62,17 @@ export class PedestrianManager {
             }
             const to = this.#network.get(d.target_node_id), crossing = !!to && from.crossing_id !== null && from.crossing_id === to.crossing_id;
             const signal_id = from.signal_id ?? to?.signal_id;
-            // Where a walker waits to cross: a step back from the kerb toward where it came from, out of turning cars' way.
-            const back = this.#network.get(d.previous_node_id)?.position;
-            const wait_at = crossing && step > 0 && back && (back[0] !== from.position[0] || back[1] !== from.position[1]) ? pathGeometry.pointOnPath([from.position, back], step, { end_clearance: step }).position : null;
-            p.updateState(seconds, { target: to?.position, crossing, signal: signal_id ? this.physics.traffic.getSignal(signal_id) : 'go', wait_at });
+            // Where a walker waits to cross: a step back from the kerb, straight away from the road it will cross (out of
+            // turning cars' way; back toward where it came from could be the road it has just crossed).
+            const wait_at = crossing && step > 0 ? pathGeometry.pointOnPath([from.position, [2 * from.position[0] - to.position[0], 2 * from.position[1] - to.position[1]]], step).position : null;
+            p.updateState(seconds, { target: to?.position, crossing, started: crossing && d.walkway === from.crossing_id, signal: signal_id ? this.physics.traffic.getSignal(signal_id) : 'go', wait_at });
+            // A walker crossing (or dodging while it does) is on the crosswalk's walkway, so cars stop before it.
+            const on = crossing && (d.state === 'crossing' || d.state === 'dodging' && d.walkway === from.crossing_id) ? from.crossing_id : null;
+            if ((d.walkway ?? null) !== on) {
+                if (d.walkway) this.physics.traffic.leaveWalkway(d.walkway, p);
+                if (on) this.physics.traffic.enterWalkway(on, p);
+                d.walkway = on;
+            }
         }
     }
     clearStreet() { for (const p of this.getPedestrians()) p.destroy(); }

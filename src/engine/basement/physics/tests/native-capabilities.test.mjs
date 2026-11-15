@@ -128,6 +128,28 @@ test('drivers on the lanes are filed by lane, and follow the one ahead without a
     assert.throws(() => p.traffic.registerRoute('bad', { points: [[0, 0], [1, 0]], lanes: [] }), /lanes/);
     assert.throws(() => p.traffic.registerRoute('bad', { points: [[0, 0], [1, 0]], lanes: [{ from: 0, to: 1 }] }), /lane_id/);
 });
+test('cars stop before a walkway while anyone is on it, and take a crossing only when the walkways in it are clear', () => {
+    const p = new physicsSystem(), template = { max_speed: 60, wheel_base: 10, braking: 80 };
+    const car = position => p.createVehicle({ position, vehicle_template: template, collision_shape: { shape_type: 'box', dimensions: [30, 14] } });
+    const walker = p.createCharacter({ position: [150, 200], collision_shape: { shape_type: 'circle', radius: 4 } });
+    const lane = { lane_id: 'ab', from: 0, to: 400 };
+    p.traffic.registerRoute('walk', { points: [[0, 0], [400, 0]], lanes: [lane], speed_limit: 60, stops: [{ distance: 150, walkway_id: 'zebra', clearance_distance: 40 }] });
+    p.traffic.registerRoute('box', { points: [[0, 60], [400, 60]], lanes: [{ ...lane, lane_id: 'cd' }], speed_limit: 60,
+        stops: [{ distance: 150, signal_id: 'light', conflict_id: 'box', clearance_distance: 80 }, { distance: 200, walkway_id: 'past', clearance_distance: 40 }] });
+    const a = car([0, 0]), b = car([0, 60]);
+    p.traffic.setSignal('light', 'go'); p.traffic.addVehicle(a, { route_id: 'walk' }); p.traffic.addVehicle(b, { route_id: 'box' });
+    p.traffic.enterWalkway('zebra', walker); p.traffic.enterWalkway('past', walker);
+    assert.deepEqual(p.traffic.getWalkway('zebra'), [walker.body_id]);
+    step(p, 600);
+    assert.ok(a.position[0] < 150 && a.position[0] > 100, `it waits before the walkway (${a.position[0]})`);
+    assert.ok(b.position[0] < 150 && b.position[0] > 100, `it waits before the crossing, not in it (${b.position[0]})`);
+    assert.ok(!p.traffic._saveState().reservations.length, 'and does not hold the crossing');
+    p.traffic.leaveWalkway('zebra', walker); p.traffic.leaveWalkway('past', walker);
+    assert.deepEqual(p.traffic.getWalkway('zebra'), []);
+    step(p, 600);
+    assert.ok(a.position[0] > 300 && b.position[0] > 300, `both go on once it is clear (${a.position[0]}, ${b.position[0]})`);
+    assert.throws(() => p.traffic.registerRoute('bad', { points: [[0, 0], [1, 0]], stops: [{ distance: 0, walkway_id: '' }] }), /walkway_id|Stop/);
+});
 test('Flit finds the furthest free interval even when a fixed sample scan would miss it', () => {
     const p = new physicsSystem(), actor = p.createCharacter({ collision_shape: { shape_type: 'circle', radius: 0.01 } });
     p.elements.createStatic({ position: [99.95, 0], collision_shape: { shape_type: 'box', dimensions: [0.1, 1] } });

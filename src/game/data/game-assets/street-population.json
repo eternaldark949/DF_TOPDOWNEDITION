@@ -15,6 +15,7 @@
         "recovery_seconds": 0.5,
         "damage_grace_seconds": 0.5,
         "crossing_speed": 240,
+        "crossing_arrival": 24,
         "personal_space": 48,
         "curb_back": 30,
         "max_pedestrians": 40,

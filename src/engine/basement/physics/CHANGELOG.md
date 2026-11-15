@@ -1,5 +1,11 @@
 # Changelog
 
+## Walkways for traffic — 2026-11-15
+
+- The traffic controller keeps walkways (crosswalks): `enterWalkway(walkway_id, body)`, `leaveWalkway(walkway_id, body)` and `getWalkway(walkway_id)`. A route stop can name a `walkway_id`; a car waits before it while anyone is on it, and takes a crossing only when the walkways with stops inside the crossing's clearance are clear, so it never waits in the box for walkers. Walkways are saved.
+- A driver on the lanes makes no nearby search at all now: it meets other cars on the lanes at reserved crossings, walkers at walkways, and its forward clearance cast catches anything else in its lane. Drivers off the lanes still predict against the bodies near them. In the city the street step fell from about 3.9 ms to about 2.6 ms.
+- A driver past a stop line heeds the next stop on its route (a crossing just past a crosswalk, a crosswalk inside a crossing) instead of only the first one it has not cleared.
+
 ## Lane occupancy for traffic — 2026-11-15
 
 - `navigation.findRoute` adds `spans`: `[{lane_id, from, to}]`, the stretch of each lane the route covers.

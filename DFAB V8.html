@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '2b8619305803';
+        const DFAB_BUILD = 'b983543f5ee2';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="17250">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="17289">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -12215,11 +12215,13 @@ const REACH_SLACK = 20;
  * Route topology and reservations are scheduling data. A route laid along the road network's lanes
  * (`lanes`) puts its drivers on those lanes: each step the controller files every such driver under the
  * lane it is on and how far along, so a driver follows the one ahead of it on its own lanes and waits for
- * a queue past a crossing by reading those lists, and sweeps only against what is not on the lanes (a
- * walker, the player's car). Other geometry queries use the world's index.
+ * a queue past a crossing by reading those lists. A walkway (a crosswalk) is a list too: those on foot
+ * enter and leave it, and a car stops before one that is in use. So a driver on the lanes never searches
+ * round itself; its forward clearance cast catches whatever else stands in its lane. Other drivers
+ * predict against what the world's index finds near them.
  */
 class trafficController {
-    #routes = new Map(); #drivers = new Map(); #signals = new Map(); #reservations = new Map(); #occupancy = new Map(); #onLanes = new Set();
+    #routes = new Map(); #drivers = new Map(); #signals = new Map(); #reservations = new Map(); #occupancy = new Map(); #onLanes = new Set(); #walkways = new Map();
     constructor(world) {
         if (!world || typeof world._mutate !== 'function') throw new TypeError('Controller requires its physicsSystem owner');
         if (world.traffic) throw new Error('The world already owns its traffic controller');
@@ -12242,8 +12244,8 @@ class trafficController {
         for (const stop of stops) {
             number(stop.distance, 'stop distance', 0, route_length);
             number(stop.clearance_distance ??= 20, 'clearance_distance', 0);
-            if (!stop.signal_id && !stop.conflict_id) throw new TypeError('Stop needs a signal_id or conflict_id');
-            for (const key of ['signal_id', 'conflict_id']) if (stop[key] !== undefined && (typeof stop[key] !== 'string' || !stop[key])) throw new TypeError(`Invalid ${key}`);
+            if (!stop.signal_id && !stop.conflict_id && !stop.walkway_id) throw new TypeError('Stop needs a signal_id, conflict_id or walkway_id');
+            for (const key of ['signal_id', 'conflict_id', 'walkway_id']) if (stop[key] !== undefined && (typeof stop[key] !== 'string' || !stop[key])) throw new TypeError(`Invalid ${key}`);
         }
         stops.sort((a, b) => a.distance - b.distance);
         // Lane spans, in order, as the road network gives them (findRoute's `spans`): each covers [from, to] along its lane.
@@ -12287,6 +12289,24 @@ class trafficController {
         if (!this.#routes.has(route_id)) return false;
         for (const d of this.#drivers.values()) if (d.config.route_id === route_id) return false;
         this.world._mutate(() => this.#routes.delete(route_id)); return true;
+    }
+    /** `body` (someone on foot) is on the walkway now: cars stop before it until it leaves. */
+    enterWalkway(walkway_id, body) {
+        if (typeof walkway_id !== 'string' || !walkway_id) throw new TypeError('Walkway needs an id');
+        const id = this.world._record(referenceBody(body)).id;
+        this.world._mutate(() => { let on = this.#walkways.get(walkway_id); if (!on) this.#walkways.set(walkway_id, on = new Set()); on.add(id); });
+    }
+    leaveWalkway(walkway_id, body) {
+        const id = typeof body === 'number' ? body : this.world._record(referenceBody(body)).id;
+        this.world._mutate(() => { const on = this.#walkways.get(walkway_id); if (on?.delete(id) && !on.size) this.#walkways.delete(walkway_id); });
+    }
+    /** Body ids on a walkway now. */
+    getWalkway(walkway_id) { return [...this.#walkways.get(walkway_id) ?? []]; }
+    /** Is anyone (still in the world) on the walkway? */
+    #walkwayInUse(walkway_id) {
+        const on = this.#walkways.get(walkway_id); if (!on) return false;
+        for (const id of on) { if (this.world.fetchBody(id)) return true; on.delete(id); }
+        this.#walkways.delete(walkway_id); return false;
     }
     getSignal(signal_id) { return this.#signals.get(signal_id) ?? 'stop'; }
     getRouteStart(route_id) {
@@ -12401,20 +12421,29 @@ class trafficController {
             d.progress = s.start + clamp(dot(sub(r.position, s.from), s.direction), 0, s.length);
             d.speed_cap = route.config.speed_limit;
             const motor = r.motor, speed = Math.max(0, motor.getSpeed()), braking = motor.config.braking * r.config.mass / massProperties(r).mass;
-            for (; d.stop_index < route.config.stops.length; d.stop_index++) {
-                const stop = route.config.stops[d.stop_index], remaining = stop.distance - d.progress;
+            const stops = route.config.stops;
+            for (; d.stop_index < stops.length && stops[d.stop_index].distance - d.progress < -stops[d.stop_index].clearance_distance; d.stop_index++)
+                if (this.#reservations.get(stops[d.stop_index].conflict_id) === id) this.#reservations.delete(stops[d.stop_index].conflict_id);
+            for (let k = d.stop_index; k < stops.length; k++) {
+                const stop = stops[k], remaining = stop.distance - d.progress;
                 if (remaining < -stop.clearance_distance) {
                     if (this.#reservations.get(stop.conflict_id) === id) this.#reservations.delete(stop.conflict_id);
                     continue;
                 }
-                // Once over the line, finish clearing the crossing even if the signal changes.
-                if (remaining < 0) break;
+                // Once over the line, finish clearing the crossing even if the signal changes, and heed the next stop
+                // (a crossing just past a crosswalk, a crosswalk inside a crossing).
+                if (remaining < 0) continue;
                 const horizon = speed * speed / (2 * braking) + motor.config.wheel_base + d.config.following_distance;
                 const signal_ok = !stop.signal_id || this.#signals.get(stop.signal_id) === 'go';
                 const owner = this.#reservations.get(stop.conflict_id);
                 // A car holding the crossing that can no longer stop before the line goes on through a change to red.
                 const committed = owner === id && remaining <= speed * speed / (2 * braking) + motor.config.wheel_base / 2;
-                let admitted = (signal_ok || committed) && (!stop.conflict_id || owner === undefined || owner === id);
+                let admitted = (signal_ok || committed) && (!stop.conflict_id || owner === undefined || owner === id) && (!stop.walkway_id || committed || !this.#walkwayInUse(stop.walkway_id));
+                // A crossing is taken only when the walkways inside it and just past it are clear, so no car waits in the box for walkers.
+                if (admitted && stop.conflict_id && owner !== id) for (let j = k + 1; j < stops.length; j++) {
+                    const next = stops[j]; if (next.distance > stop.distance + stop.clearance_distance) break;
+                    if (next.walkway_id && this.#walkwayInUse(next.walkway_id)) { admitted = false; break; }
+                }
                 // Don't block the box: a car only takes a crossing when the road past it has room for it.
                 if (admitted && stop.conflict_id && owner !== id && this.#queued(route, stop.distance + stop.clearance_distance, id, motor.config.wheel_base)) admitted = false;
                 if (admitted && stop.conflict_id && remaining <= horizon) this.#reservations.set(stop.conflict_id, id);
@@ -12433,16 +12462,17 @@ class trafficController {
                     d.speed_cap = Math.min(d.speed_cap, Math.sqrt(2 * braking * Math.max(0, room)));
                 }
             }
-            // Predict moving bodies found through the shared spatial grid; a driver on the lanes leaves out the
-            // others on the lanes, which it follows above or meets only at reserved crossings. Static forward
-            // clearance is handled by pathMotor, with the same masks and physical shapes.
+            // A driver off the lanes predicts the moving bodies the shared spatial grid finds near it. One on the
+            // lanes needs no search: it follows the others on the lanes above, meets them only at reserved
+            // crossings, stops before walkways in use, and pathMotor's forward clearance cast (same masks and
+            // physical shapes) catches anything else standing in its lane.
             const horizon = d.config.prediction_seconds;
             // The reach is what this car covers at its own speed (a slow or waiting car looks only near), plus room
             // for what comes at it at a walking-to-street pace: bodies faster than that are found by their own drivers.
             const radius = (speed + PREDICTION_PACE) * horizon + motor.config.wheel_base * 2;
-            for (const hit of this.world.peruseNearbyEntities(d.body, { near_range: radius, query_body: d.body, include_ghosts: false, exclude_groups: BODY_GROUP.STATIC, sort_by: 'none' })) {
+            if (!lanes) for (const hit of this.world.peruseNearbyEntities(d.body, { near_range: radius, query_body: d.body, include_ghosts: false, exclude_groups: BODY_GROUP.STATIC, sort_by: 'none' })) {
                 const other = this.world._record(hit.body);
-                if (other.config.physics_type === 'static' || lanes && this.#onLanes.has(other.id)) continue;
+                if (other.config.physics_type === 'static') continue;
                 const relative = sub(other.position, r.position), ahead = dot(relative, [Math.cos(r.rotation), Math.sin(r.rotation)]);
                 if (ahead < 0) continue;
                 // Two bodies whose bounding circles never meet on their straight courses cannot touch: skip the sweep.
@@ -12464,8 +12494,8 @@ class trafficController {
             }
         }
     }
-    _clear() { this.#drivers.clear(); this.#reservations.clear(); this.#routes.clear(); this.#signals.clear(); this.#occupancy.clear(); this.#onLanes.clear(); }
-    _saveState() { return { routes: [...this.#routes].map(([id, r]) => [id, clone(r.config)]), signals: [...this.#signals], reservations: [...this.#reservations], drivers: [...this.#drivers].map(([id, d]) => [id, { ...clone(d), body: undefined }]) }; }
+    _clear() { this.#walkways.clear(); this.#drivers.clear(); this.#reservations.clear(); this.#routes.clear(); this.#signals.clear(); this.#occupancy.clear(); this.#onLanes.clear(); }
+    _saveState() { return { routes: [...this.#routes].map(([id, r]) => [id, clone(r.config)]), signals: [...this.#signals], reservations: [...this.#reservations], walkways: [...this.#walkways].map(([id, on]) => [id, [...on]]), drivers: [...this.#drivers].map(([id, d]) => [id, { ...clone(d), body: undefined }]) }; }
     _loadState(packet) {
         if (!packet) return;
         for (const [id, cfg] of packet.routes) this.registerRoute(id, cfg);
@@ -12478,6 +12508,7 @@ class trafficController {
             if (![d.segment, d.stop_index, d.span].every(Number.isInteger)) throw new TypeError('Invalid traffic cursor');
             this.#drivers.set(id, { ...clone(d), body: r.handle });
         }
+        for (const [walkway_id, ids] of packet.walkways ?? []) this.#walkways.set(walkway_id, new Set(ids.map(id => { number(id, 'walkway body', 0); return id; })));
         for (const [key, id] of packet.reservations) { if (!this.#drivers.has(id)) throw new TypeError('Reservation has no driver'); this.#reservations.set(key, id); }
     }
 }
@@ -18254,6 +18285,7 @@ const m69 = Object.freeze({default:{
         "recovery_seconds": 0.5,
         "damage_grace_seconds": 0.5,
         "crossing_speed": 240,
+        "crossing_arrival": 24,
         "personal_space": 48,
         "curb_back": 30,
         "max_pedestrians": 40,
@@ -27172,13 +27204,14 @@ class Pedestrian extends gameCharacter {
         this.fleeTarget(source, { safety_distance: 200, face_movement: true });
         this.data.state = 'fleeing'; this.data.state_seconds = 1.5; this.say('What was that?');
     }
-    updateState(seconds, { target, crossing = false, signal = 'go', wait_at = null } = {}) {
+    updateState(seconds, { target, crossing = false, started = false, signal = 'go', wait_at = null } = {}) {
         if (this.destroyed || !this.active) return;
         if (!Number.isFinite(seconds) || seconds < 0 || seconds > 0.1) throw new TypeError('Invalid gameplay step');
         const d = this.data, rules = this.getAsset('street_rules').data;
         d.damage_grace = Math.max(0, d.damage_grace - seconds);
         d.quip_seconds = Math.max(0, d.quip_seconds - seconds); if (!d.quip_seconds) d.quip = null;
         if (d.state === 'dead' || this.physics_system.getAttachmentState(this)) return;
+        const dodged = d.state === 'dodging';
         if (['sprawled', 'recovering', 'dodging', 'fleeing'].includes(d.state)) {
             d.state_seconds = Math.max(0, d.state_seconds - seconds);
             if (d.state_seconds) return;
@@ -27191,11 +27224,13 @@ class Pedestrian extends gameCharacter {
         const sense = d.sense_seconds <= 0; if (sense) d.sense_seconds = rules.sense_seconds ?? 0;
         // A walker in the way of a car stood still gets out of it (each would wait for the other).
         if (sense && getOutOfTheWay(this, rules)) return;
-        if (crossing && d.state !== 'crossing') {
+        // One already out on the crossing (back from a dodge) carries on over: turning back would walk the road again.
+        if (crossing && !started && d.state !== 'crossing') {
             const hits = this.physics_system.predictMovementContacts({ body: this, to: target, speed: rules.crossing_speed, seconds: rules.prediction_seconds, include_groups: BODY_GROUP.VEHICLE, max_results: 1 });
             if (signal !== 'go' || hits.length) {
-                // It waits a step back from the kerb (`wait_at`), so it never stands in a turning car's way.
-                if (d.state !== 'waiting') { if (wait_at) this.moveTo(wait_at, { direct: true, avoid_groups: BODY_GROUP.CHARACTER, personal_space: rules.personal_space, face_movement: false }); else this.stopMovement(); }
+                // It waits a step back from the kerb (`wait_at`), so it never stands in a turning car's way; one that
+                // has just stepped out of a car's way waits where it is (going back could put it in the way again).
+                if (d.state !== 'waiting') { if (wait_at && !dodged) this.moveTo(wait_at, { direct: true, avoid_groups: BODY_GROUP.CHARACTER, personal_space: rules.personal_space, face_movement: false }); else this.stopMovement(); }
                 d.state = 'waiting'; return;
             }
         }
@@ -27203,6 +27238,8 @@ class Pedestrian extends gameCharacter {
             this.moveTo(target, { direct: true, avoid_groups: BODY_GROUP.CHARACTER, speed: crossing ? rules.crossing_speed : undefined, personal_space: rules.personal_space, face_movement: true });
             d.state = crossing ? 'crossing' : 'walking';
         }
+        // Within `crossing_arrival` of the far kerb is over: walkers about the kerb would hold one short of the point.
+        if (d.state === 'crossing') { const [x, y] = this.position; if ((x - target[0]) ** 2 + (y - target[1]) ** 2 <= rules.crossing_arrival ** 2) { d.arrived = true; return; } }
         if (!sense) return;
         const threats = this.physics_system.predictMovementContacts({ body: this, seconds: rules.prediction_seconds, include_groups: BODY_GROUP.VEHICLE, max_results: 1 });
         if (threats.length && this.evadeBody(threats[0].body, { distance: rules.dodge_distance, speed: rules.dodge_speed })) {
@@ -27292,10 +27329,17 @@ class PedestrianManager {
             }
             const to = this.#network.get(d.target_node_id), crossing = !!to && from.crossing_id !== null && from.crossing_id === to.crossing_id;
             const signal_id = from.signal_id ?? to?.signal_id;
-            // Where a walker waits to cross: a step back from the kerb toward where it came from, out of turning cars' way.
-            const back = this.#network.get(d.previous_node_id)?.position;
-            const wait_at = crossing && step > 0 && back && (back[0] !== from.position[0] || back[1] !== from.position[1]) ? pathGeometry.pointOnPath([from.position, back], step, { end_clearance: step }).position : null;
-            p.updateState(seconds, { target: to?.position, crossing, signal: signal_id ? this.physics.traffic.getSignal(signal_id) : 'go', wait_at });
+            // Where a walker waits to cross: a step back from the kerb, straight away from the road it will cross (out of
+            // turning cars' way; back toward where it came from could be the road it has just crossed).
+            const wait_at = crossing && step > 0 ? pathGeometry.pointOnPath([from.position, [2 * from.position[0] - to.position[0], 2 * from.position[1] - to.position[1]]], step).position : null;
+            p.updateState(seconds, { target: to?.position, crossing, started: crossing && d.walkway === from.crossing_id, signal: signal_id ? this.physics.traffic.getSignal(signal_id) : 'go', wait_at });
+            // A walker crossing (or dodging while it does) is on the crosswalk's walkway, so cars stop before it.
+            const on = crossing && (d.state === 'crossing' || d.state === 'dodging' && d.walkway === from.crossing_id) ? from.crossing_id : null;
+            if ((d.walkway ?? null) !== on) {
+                if (d.walkway) this.physics.traffic.leaveWalkway(d.walkway, p);
+                if (on) this.physics.traffic.enterWalkway(on, p);
+                d.walkway = on;
+            }
         }
     }
     clearStreet() { for (const p of this.getPedestrians()) p.destroy(); }
