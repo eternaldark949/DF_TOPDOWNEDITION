@@ -1,4 +1,4 @@
-import { gameCharacter, gameVehicle, BODY_GROUP } from '../../engine/basement/physics/index.mjs';
+import { gameCharacter, gameVehicle, BODY_GROUP, pathGeometry } from '../../engine/basement/physics/index.mjs';
 const bindings = new WeakMap();
 /** Civilian decisions and reactions. Movement, prediction and impacts stay in Basement. */
 export class Pedestrian extends gameCharacter {
@@ -61,14 +61,11 @@ export class Pedestrian extends gameCharacter {
             d.state = 'idle';
         }
         if (!target) { this.stopMovement(); d.state = 'idle'; return; }
-        // A walker waiting at the kerb with a car stood at it gets out of the car's way (each would wait for the other).
-        if (d.state === 'waiting' && (d.sense_seconds = (d.sense_seconds ?? 0) - seconds) <= 0) {
-            d.sense_seconds = rules.sense_seconds ?? 0;
-            const near = this.physics_system.peruseNearbyEntities(this, { near_range: rules.personal_space * 2, include_groups: BODY_GROUP.VEHICLE, max_results: 1 })[0];
-            if (near && Math.abs(near.entity?.getSpeed?.() ?? 0) < 30 && this.evadeBody(near.body, { distance: rules.dodge_distance, speed: rules.crossing_speed })) {
-                d.state = 'dodging'; d.state_seconds = rules.dodge_seconds; return;
-            }
-        }
+        // A walker looks out for cars a few times a second, not every step: a car is seconds away when first seen.
+        d.sense_seconds = (d.sense_seconds ?? 0) - seconds;
+        const sense = d.sense_seconds <= 0; if (sense) d.sense_seconds = rules.sense_seconds ?? 0;
+        // A walker in the way of a car stood still gets out of it (each would wait for the other).
+        if (sense && getOutOfTheWay(this, rules)) return;
         if (crossing && d.state !== 'crossing') {
             const hits = this.physics_system.predictMovementContacts({ body: this, to: target, speed: rules.crossing_speed, seconds: rules.prediction_seconds, include_groups: BODY_GROUP.VEHICLE, max_results: 1 });
             if (signal !== 'go' || hits.length) {
@@ -81,12 +78,23 @@ export class Pedestrian extends gameCharacter {
             this.moveTo(target, { direct: true, avoid_groups: BODY_GROUP.CHARACTER, speed: crossing ? rules.crossing_speed : undefined, personal_space: rules.personal_space, face_movement: true });
             d.state = crossing ? 'crossing' : 'walking';
         }
-        // A walker looks out for cars a few times a second, not every step: a car is seconds away when first seen.
-        d.sense_seconds = (d.sense_seconds ?? 0) - seconds; if (d.sense_seconds > 0) return;
-        d.sense_seconds = rules.sense_seconds ?? 0;
+        if (!sense) return;
         const threats = this.physics_system.predictMovementContacts({ body: this, seconds: rules.prediction_seconds, include_groups: BODY_GROUP.VEHICLE, max_results: 1 });
         if (threats.length && this.evadeBody(threats[0].body, { distance: rules.dodge_distance, speed: rules.dodge_speed })) {
             d.state = 'dodging'; d.state_seconds = rules.dodge_seconds; this.say('Look out!');
         }
     }
+}
+
+/** Steps out of the way of a car stood still with this walker in front of it (in the car's own forward cast); true when it does. */
+function getOutOfTheWay(walker, rules) {
+    const world = walker.physics_system;
+    for (const near of world.peruseNearbyEntities(walker, { near_range: rules.personal_space * 3, include_groups: BODY_GROUP.VEHICLE })) {
+        const car = near.entity; if (!(car instanceof gameVehicle) || Math.abs(car.getSpeed()) >= rules.vehicle_hit_speed / 3) continue;
+        const pose = { position: car.position, rotation: car.rotation }, ahead = pathGeometry.transformPose(pose, { local_position: [rules.personal_space * 3, 0] }).position;
+        if (world.getPathClearance({ body: car.body, from: pose.position, to: ahead, from_rotation: pose.rotation, include_ghosts: false }).hit?.entity !== walker) continue;
+        if (!walker.evadeBody(car.body, { distance: rules.dodge_distance, speed: rules.crossing_speed })) continue;
+        walker.data.state = 'dodging'; walker.data.state_seconds = rules.dodge_seconds; return true;
+    }
+    return false;
 }
