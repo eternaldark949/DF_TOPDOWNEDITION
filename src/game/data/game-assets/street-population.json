@@ -16,6 +16,7 @@
         "damage_grace_seconds": 0.5,
         "crossing_speed": 240,
         "personal_space": 48,
+        "curb_back": 30,
         "max_pedestrians": 40,
         "max_vehicles": 40
       }

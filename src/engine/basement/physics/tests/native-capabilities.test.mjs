@@ -106,6 +106,28 @@ test('crossing reservations serialize conflicting routes and survive save/load',
     step(p, 250); step(q, 250); assert.deepEqual(q.fetchBody(a.body_id).position, a.position); assert.deepEqual(q.fetchBody(b.body_id).position, b.position);
     assert.ok(a.position[0] > 25); assert.ok(b.position[1] > 25);
 });
+test('drivers on the lanes are filed by lane, and follow the one ahead without a sweep', () => {
+    const p = new physicsSystem(), r = p.navigation.roads;
+    r.addNode('a', { position: [0, 0] }); r.addNode('b', { position: [200, 0] }); r.addNode('c', { position: [400, 0] });
+    r.addLane('ab', { from: 'a', to: 'b' }); r.addLane('bc', { from: 'b', to: 'c' });
+    const route = p.navigation.findRoute({ from: 'a', to: 'c' });
+    assert.deepEqual(route.spans.map(s => [s.lane_id, s.from, Math.round(s.to)]), [['ab', 0, 200], ['bc', 0, 200]]);
+    const template = { max_speed: 60, wheel_base: 10, braking: 80 };
+    const car = position => p.createVehicle({ position, vehicle_template: template, collision_shape: { shape_type: 'box', dimensions: [30, 14] } });
+    const lead = car([60, 0]), back = car([0, 0]);
+    p.traffic.registerRoute('lead', { points: [[60, 0], [200, 0], [400, 0]], lanes: [{ lane_id: 'ab', from: 60, to: 200 }, { lane_id: 'bc', from: 0, to: 200 }], speed_limit: 60,
+        stops: [{ distance: 200, signal_id: 'light', conflict_id: 'box', clearance_distance: 20 }] });
+    p.traffic.registerRoute('back', { points: route.points, lanes: route.spans, speed_limit: 60 });
+    p.traffic.setSignal('light', 'stop'); p.traffic.addVehicle(lead, { route_id: 'lead' }); p.traffic.addVehicle(back, { route_id: 'back' });
+    step(p, 2);
+    const filed = p.traffic.getLaneOccupancy('ab');
+    assert.deepEqual(filed.map(o => o.body_id), [back.body_id, lead.body_id]); assert.ok(filed[1].along > 59);
+    step(p, 600);
+    assert.ok(lead.position[0] < 255 && lead.position[0] > 200, 'the lead waits at its light');
+    assert.ok(back.position[0] < lead.position[0] - 35 && back.position[0] > lead.position[0] - 70, `the one behind queues behind it (${back.position[0]}, ${lead.position[0]})`);
+    assert.throws(() => p.traffic.registerRoute('bad', { points: [[0, 0], [1, 0]], lanes: [] }), /lanes/);
+    assert.throws(() => p.traffic.registerRoute('bad', { points: [[0, 0], [1, 0]], lanes: [{ from: 0, to: 1 }] }), /lane_id/);
+});
 test('Flit finds the furthest free interval even when a fixed sample scan would miss it', () => {
     const p = new physicsSystem(), actor = p.createCharacter({ collision_shape: { shape_type: 'circle', radius: 0.01 } });
     p.elements.createStatic({ position: [99.95, 0], collision_shape: { shape_type: 'box', dimensions: [0.1, 1] } });

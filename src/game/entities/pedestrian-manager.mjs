@@ -1,3 +1,4 @@
+import { pathGeometry } from '../../engine/basement/physics/index.mjs';
 import { Pedestrian } from './pedestrians.mjs';
 /** Population and waypoint policy only. No positions, obstacle cache or sensing grid. */
 export class PedestrianManager {
@@ -47,6 +48,7 @@ export class PedestrianManager {
     }
     reconnectGameplay() { for (const p of this.getPedestrians()) p.connectGameplay(this.hooks); }
     updateState(seconds) {
+        const step = this.physics.elements.asset_library.getResource('df_street:rules').data.curb_back ?? 0;
         for (const p of this.getPedestrians()) {
             if (!p.active || p.data.state === 'dead') continue;
             if (this.physics.getAttachmentState(p)) { p.updateState(seconds); continue; }
@@ -60,7 +62,10 @@ export class PedestrianManager {
             }
             const to = this.#network.get(d.target_node_id), crossing = !!to && from.crossing_id !== null && from.crossing_id === to.crossing_id;
             const signal_id = from.signal_id ?? to?.signal_id;
-            p.updateState(seconds, { target: to?.position, crossing, signal: signal_id ? this.physics.traffic.getSignal(signal_id) : 'go' });
+            // Where a walker waits to cross: a step back from the kerb toward where it came from, out of turning cars' way.
+            const back = this.#network.get(d.previous_node_id)?.position;
+            const wait_at = crossing && step > 0 && back && (back[0] !== from.position[0] || back[1] !== from.position[1]) ? pathGeometry.pointOnPath([from.position, back], step, { end_clearance: step }).position : null;
+            p.updateState(seconds, { target: to?.position, crossing, signal: signal_id ? this.physics.traffic.getSignal(signal_id) : 'go', wait_at });
         }
     }
     clearStreet() { for (const p of this.getPedestrians()) p.destroy(); }

@@ -320,7 +320,7 @@ export class physicsQueries {
 
     getPathClearance(packet, result = {}) {
         const r = packet.body ? this.world._record(referenceBody(packet.body)) : null;
-        const hits = this.shapeCast({ ...packet, from_rotation: packet.from_rotation ?? r?.rotation ?? 0, collision_shape: packet.collision_shape ?? r?.config.collision_shape,
+        const hits = this.shapeCast({ ...packet, from_rotation: packet.from_rotation ?? r?.rotation ?? 0, collision_shape: packet.collision_shape ?? r?.shape,
             query_body: r?.handle, ignore_body: packet.ignore_body ?? r?.handle, max_results: 1 });
         const hit = hits[0] ?? null, total = length(sub(packet.to, packet.from));
         return Object.assign(result, { clear: !hit, distance: hit?.distance ?? total, fraction: hit?.fraction ?? 1, hit });

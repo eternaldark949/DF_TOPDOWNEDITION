@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '7a23c339e52e';
+        const DFAB_BUILD = '8defbc77173b';
     </script>
     <script type="text/dfab" data-src="legacy/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="17153">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="17244">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -10183,7 +10183,7 @@ class physicsQueries {
 
     getPathClearance(packet, result = {}) {
         const r = packet.body ? this.world._record(referenceBody(packet.body)) : null;
-        const hits = this.shapeCast({ ...packet, from_rotation: packet.from_rotation ?? r?.rotation ?? 0, collision_shape: packet.collision_shape ?? r?.config.collision_shape,
+        const hits = this.shapeCast({ ...packet, from_rotation: packet.from_rotation ?? r?.rotation ?? 0, collision_shape: packet.collision_shape ?? r?.shape,
             query_body: r?.handle, ignore_body: packet.ignore_body ?? r?.handle, max_results: 1 });
         const hit = hits[0] ?? null, total = length(sub(packet.to, packet.from));
         return Object.assign(result, { clear: !hit, distance: hit?.distance ?? total, fraction: hit?.fraction ?? 1, hit });
@@ -11063,14 +11063,15 @@ return Object.freeze({get normalizeEmitter(){return normalizeEmitter;},get mount
 // src/engine/basement/physics/core/body.mjs
 const m20 = (()=>{
 // ===== LV0 BASEMENT =====
-const {bodyRecord,bindBody,immutableState} = m8;
+const {bodyRecord,bindBody} = m8;
 
 /** A handle, never a second mutable copy of physical state. */
 class physicsBody {
     constructor(record) { bindBody(this, record); Object.defineProperty(this, 'body_id', { value: record.id, enumerable: true }); Object.freeze(this); }
-    get position() { return immutableState(bodyRecord(this)).position; }
+    // Frozen copies of just the vector: reading a position never copies the whole state.
+    get position() { return Object.freeze([...bodyRecord(this).position]); }
     get rotation() { return bodyRecord(this).rotation; }
-    get linear_velocity() { return immutableState(bodyRecord(this)).linear_velocity; }
+    get linear_velocity() { return Object.freeze([...bodyRecord(this).velocity]); }
     get angular_velocity() { return bodyRecord(this).angular_velocity; }
     getState(result = {}) { return bodyRecord(this).world._readBody(this, result); }
     getRenderState(blend, result = {}) { return bodyRecord(this).world._renderBody(this, blend, result); }
@@ -11439,6 +11440,8 @@ const {number,dot,sub,length,scale,clamp,angleDelta,clone,add,cross} = m7;
 
 /** The share of its speed a car keeps through the tightest bend. */
 const CRAWL = 0.15;
+/** How far ahead along its path a car steers for, in seconds at its speed (never under two wheel bases). */
+const AIM_SECONDS = 0.6;
 
 class pathMotor {
     constructor(body) { this.body = body; this.path = null; this.index = 1; this.options = {}; }
@@ -11469,6 +11472,21 @@ class pathMotor {
         }
         return limit;
     }
+    /**
+     * The point `ahead` along the path past the car's place on its current leg: the car steers for it, so it
+     * keeps to the line through a bend and back onto it after one, instead of aiming at the next corner.
+     */
+    #aim(position, ahead) {
+        const path = this.path, b = path[this.index], a = path[this.index - 1] ?? position, ab = sub(b, a), len2 = dot(ab, ab);
+        const t = len2 > 1e-12 ? clamp(dot(sub(position, a), ab) / len2, 0, 1) : 1;
+        let at = [a[0] + ab[0] * t, a[1] + ab[1] * t], left = ahead;
+        for (let k = this.index; k < path.length; k++) {
+            const leg = sub(path[k], at), d = length(leg);
+            if (d >= left) return [at[0] + leg[0] * left / d, at[1] + leg[1] * left / d];
+            left -= d; at = path[k];
+        }
+        return path[path.length - 1];
+    }
     _controls(motor) {
         if (!this.path) return null;
         const r = bodyRecord(this.body), cfg = motor.config, point = this.path[this.index], delta = sub(point, r.position), d = length(delta);
@@ -11480,7 +11498,8 @@ class pathMotor {
             this.index++;
         }
         const target = sub(this.path[this.index], r.position), facing = [Math.cos(r.rotation), Math.sin(r.rotation)], speed = Math.max(0, dot(r.velocity, facing));
-        const error = angleDelta(r.rotation, Math.atan2(target[1], target[0]));
+        const aim = sub(this.#aim(r.position, Math.max(cfg.wheel_base * 2, speed * AIM_SECONDS)), r.position);
+        const error = angleDelta(r.rotation, Math.atan2(aim[1], aim[0]));
         const steer = clamp(error * 2, -1, 1), max = this.options.speed ?? cfg.max_speed;
         const braking = cfg.braking * r.config.mass / massProperties(r).mass;
         const stop = speed * speed / (2 * braking) + cfg.wheel_base;
@@ -12192,9 +12211,15 @@ const QUEUED_SPEED = 30;
 /** Room left for a body turning while it closes (its course is not quite straight). */
 const REACH_SLACK = 20;
 
-/** Route topology and reservations are scheduling data. Geometry queries use the world's index. */
+/**
+ * Route topology and reservations are scheduling data. A route laid along the road network's lanes
+ * (`lanes`) puts its drivers on those lanes: each step the controller files every such driver under the
+ * lane it is on and how far along, so a driver follows the one ahead of it on its own lanes and waits for
+ * a queue past a crossing by reading those lists, and sweeps only against what is not on the lanes (a
+ * walker, the player's car). Other geometry queries use the world's index.
+ */
 class trafficController {
-    #routes = new Map(); #drivers = new Map(); #signals = new Map(); #reservations = new Map();
+    #routes = new Map(); #drivers = new Map(); #signals = new Map(); #reservations = new Map(); #occupancy = new Map(); #onLanes = new Set();
     constructor(world) {
         if (!world || typeof world._mutate !== 'function') throw new TypeError('Controller requires its physicsSystem owner');
         if (world.traffic) throw new Error('The world already owns its traffic controller');
@@ -12221,11 +12246,34 @@ class trafficController {
             for (const key of ['signal_id', 'conflict_id']) if (stop[key] !== undefined && (typeof stop[key] !== 'string' || !stop[key])) throw new TypeError(`Invalid ${key}`);
         }
         stops.sort((a, b) => a.distance - b.distance);
-        const config = freeze({ points, stops, speed_limit: number(packet.speed_limit ?? 180, 'speed_limit', 0), loop: !!packet.loop });
-        this.#routes.set(route_id, { config, segments, length: route_length }); return route_id;
+        // Lane spans, in order, as the road network gives them (findRoute's `spans`): each covers [from, to] along its lane.
+        const lanes = [];
+        if (packet.lanes !== undefined) {
+            if (packet.loop || !Array.isArray(packet.lanes) || !packet.lanes.length) throw new TypeError('Route lanes must be a nonempty list on a route that does not loop');
+            let start = 0;
+            for (const span of packet.lanes) {
+                if (typeof span?.lane_id !== 'string' || !span.lane_id) throw new TypeError('Route lane needs a lane_id');
+                const first = number(span.from, 'lane span start', 0), last = number(span.to, 'lane span end', first);
+                lanes.push(freeze({ lane_id: span.lane_id, from: first, to: last, start })); start += last - first;
+            }
+        }
+        const config = freeze({ points, stops, speed_limit: number(packet.speed_limit ?? 180, 'speed_limit', 0), loop: !!packet.loop, ...(lanes.length ? { lanes: freeze(lanes) } : {}) });
+        this.#routes.set(route_id, { config, segments, length: route_length, lanes }); return route_id;
+    }
+    /** The lane span of `route` holding `distance` along it, from `index` on (spans are in route order). */
+    #span(route, distance, index = 0) {
+        const lanes = route.lanes; let i = Math.min(index, lanes.length - 1);
+        while (i < lanes.length - 1 && distance > lanes[i].start + lanes[i].to - lanes[i].from) i++;
+        return i;
     }
     /** True when a vehicle other than `id`, nearly still, stands within `reach` of the point `distance` along `route`. */
     #queued(route, distance, id, reach) {
+        if (route.lanes.length) {
+            // On the lanes: read who is filed on the lane at that point, near it.
+            const span = route.lanes[this.#span(route, distance)], along = span.from + distance - span.start;
+            for (const o of this.#occupancy.get(span.lane_id) ?? []) if (o.id !== id && Math.abs(o.along - along) <= reach + o.reach && o.speed < QUEUED_SPEED) return true;
+            return false;
+        }
         const s = route.segments.find(g => distance <= g.start + g.length) ?? route.segments.at(-1), along = clamp(distance - s.start, 0, s.length);
         const at = [s.from[0] + s.direction[0] * along, s.from[1] + s.direction[1] * along];
         for (const hit of this.world.peruseNearbyEntities(at, { near_range: reach, include_ghosts: false })) {
@@ -12253,7 +12301,7 @@ class trafficController {
             prediction_seconds: number(packet.prediction_seconds ?? 2, 'prediction_seconds', 0, 10),
             arrival_distance: number(packet.arrival_distance ?? 3, 'arrival_distance', 0) });
         this.world._mutate(() => {
-            this.removeVehicle(body); this.#drivers.set(body.body_id, { body, config, segment: 0, progress: 0, speed_cap: route.config.speed_limit, stop_index: 0, finished: false, suspended: false });
+            this.removeVehicle(body); this.#drivers.set(body.body_id, { body, config, segment: 0, span: 0, progress: 0, speed_cap: route.config.speed_limit, stop_index: 0, finished: false, suspended: false });
             r.motor.path_controller.path = clone(route.config.points); r.motor.path_controller.index = 1;
             r.motor.path_controller.options = { speed: route.config.speed_limit, following_distance: config.following_distance, arrival_distance: config.arrival_distance };
             r.sleeping = false;
@@ -12302,7 +12350,40 @@ class trafficController {
         const d = this.#drivers.get(this.world._record(referenceBody(vehicle)).id);
         return d ? { ...clone(d.config), progress: d.progress, speed_cap: d.speed_cap, finished: d.finished, suspended: !!d.suspended, body_id: d.body.body_id } : null;
     }
+    /** Files every driver on a lane route under its lane and how far along, nearest the lane's start first. */
+    #fileOnLanes() {
+        for (const list of this.#occupancy.values()) list.length = 0;
+        this.#onLanes.clear();
+        for (const [id, d] of this.#drivers) {
+            const route = this.#routes.get(d.config.route_id); if (!route?.lanes.length || d.finished || d.suspended || !this.world.fetchBody(id)) continue;
+            const r = this.world._record(d.body); let s = route.segments[d.segment];
+            while (d.segment < route.segments.length - 1 && dot(sub(r.position, s.from), s.direction) >= s.length) s = route.segments[++d.segment];
+            d.progress = s.start + clamp(dot(sub(r.position, s.from), s.direction), 0, s.length);
+            d.span = this.#span(route, d.progress, d.span ?? 0);
+            const span = route.lanes[d.span];
+            let list = this.#occupancy.get(span.lane_id); if (!list) this.#occupancy.set(span.lane_id, list = []);
+            list.push({ id, along: span.from + d.progress - span.start, speed: Math.max(0, r.motor.getSpeed()), reach: shapeReach(r.shape) });
+            this.#onLanes.add(id);
+        }
+        for (const list of this.#occupancy.values()) list.sort((a, b) => a.along - b.along || a.id - b.id);
+    }
+    /** The nearest driver ahead of `d` on its own lanes within `look`: `{gap, other}` (centre to centre, along the route), or null. */
+    #ahead(route, d, id, look) {
+        for (let i = d.span; i < route.lanes.length; i++) {
+            const span = route.lanes[i], from = i === d.span ? span.from + d.progress - span.start : span.from;
+            if (span.start - d.progress > look) break;
+            for (const o of this.#occupancy.get(span.lane_id) ?? []) {
+                if (o.id === id || o.along < from || o.along > span.to) continue;
+                const gap = span.start + o.along - span.from - d.progress;
+                return gap <= look ? { gap, other: o } : null;
+            }
+        }
+        return null;
+    }
+    /** Lane positions of the drivers on lane routes, nearest the lane's start first: `[{body_id, along, speed}]`. */
+    getLaneOccupancy(lane_id) { return (this.#occupancy.get(lane_id) ?? []).map(o => ({ body_id: o.id, along: o.along, speed: o.speed })); }
     _update() {
+        this.#fileOnLanes();
         // Stable order makes an unreserved crossing deterministic. No pairwise driver scan.
         for (const [id, d] of this.#drivers) {
             if (!this.world.fetchBody(id)) { this.removeVehicle(id); continue; }
@@ -12331,22 +12412,37 @@ class trafficController {
                 const horizon = speed * speed / (2 * braking) + motor.config.wheel_base + d.config.following_distance;
                 const signal_ok = !stop.signal_id || this.#signals.get(stop.signal_id) === 'go';
                 const owner = this.#reservations.get(stop.conflict_id);
-                let admitted = signal_ok && (!stop.conflict_id || owner === undefined || owner === id);
+                // A car holding the crossing that can no longer stop before the line goes on through a change to red.
+                const committed = owner === id && remaining <= speed * speed / (2 * braking) + motor.config.wheel_base / 2;
+                let admitted = (signal_ok || committed) && (!stop.conflict_id || owner === undefined || owner === id);
                 // Don't block the box: a car only takes a crossing when the road past it has room for it.
                 if (admitted && stop.conflict_id && owner !== id && this.#queued(route, stop.distance + stop.clearance_distance, id, motor.config.wheel_base)) admitted = false;
                 if (admitted && stop.conflict_id && remaining <= horizon) this.#reservations.set(stop.conflict_id, id);
+                // One that must wait gives the crossing back, so it never holds a junction it is not in.
+                if (!admitted && owner === id) this.#reservations.delete(stop.conflict_id);
                 if (!admitted) d.speed_cap = Math.min(d.speed_cap, Math.sqrt(2 * braking * Math.max(0, remaining - motor.config.wheel_base / 2 - d.config.following_distance)));
                 break;
             }
-            // Predict moving bodies found through the shared spatial grid. Static forward clearance
-            // is handled by pathMotor, with the same masks and physical shapes.
+            const lanes = this.#onLanes.has(id);
+            if (lanes) {
+                // Follow the car ahead on the lanes: room to stop behind where it could stop.
+                const look = speed * speed / (2 * braking) + motor.config.wheel_base * 2 + d.config.following_distance + PREDICTION_PACE;
+                const next = this.#ahead(route, d, id, look);
+                if (next) {
+                    const room = next.gap - shapeReach(r.shape) - next.other.reach - d.config.following_distance + next.other.speed * next.other.speed / (2 * braking);
+                    d.speed_cap = Math.min(d.speed_cap, Math.sqrt(2 * braking * Math.max(0, room)));
+                }
+            }
+            // Predict moving bodies found through the shared spatial grid; a driver on the lanes leaves out the
+            // others on the lanes, which it follows above or meets only at reserved crossings. Static forward
+            // clearance is handled by pathMotor, with the same masks and physical shapes.
             const horizon = d.config.prediction_seconds;
             // The reach is what this car covers at its own speed (a slow or waiting car looks only near), plus room
             // for what comes at it at a walking-to-street pace: bodies faster than that are found by their own drivers.
             const radius = (speed + PREDICTION_PACE) * horizon + motor.config.wheel_base * 2;
             for (const hit of this.world.peruseNearbyEntities(d.body, { near_range: radius, query_body: d.body, include_ghosts: false, exclude_groups: BODY_GROUP.STATIC, sort_by: 'none' })) {
                 const other = this.world._record(hit.body);
-                if (other.config.physics_type === 'static') continue;
+                if (other.config.physics_type === 'static' || lanes && this.#onLanes.has(other.id)) continue;
                 const relative = sub(other.position, r.position), ahead = dot(relative, [Math.cos(r.rotation), Math.sin(r.rotation)]);
                 if (ahead < 0) continue;
                 // Two bodies whose bounding circles never meet on their straight courses cannot touch: skip the sweep.
@@ -12368,7 +12464,7 @@ class trafficController {
             }
         }
     }
-    _clear() { this.#drivers.clear(); this.#reservations.clear(); this.#routes.clear(); this.#signals.clear(); }
+    _clear() { this.#drivers.clear(); this.#reservations.clear(); this.#routes.clear(); this.#signals.clear(); this.#occupancy.clear(); this.#onLanes.clear(); }
     _saveState() { return { routes: [...this.#routes].map(([id, r]) => [id, clone(r.config)]), signals: [...this.#signals], reservations: [...this.#reservations], drivers: [...this.#drivers].map(([id, d]) => [id, { ...clone(d), body: undefined }]) }; }
     _loadState(packet) {
         if (!packet) return;
@@ -12378,8 +12474,8 @@ class trafficController {
             const r = this.world._record(id);
             if (!(r.motor instanceof vehicleMotor) || !this.#routes.has(d.config.route_id)) throw new TypeError('Invalid saved traffic driver');
             number(d.segment, 'segment', 0, this.#routes.get(d.config.route_id).segments.length - 1);
-            number(d.progress, 'progress', 0); number(d.speed_cap, 'speed_cap', 0); number(d.stop_index, 'stop_index', 0);
-            if (![d.segment, d.stop_index].every(Number.isInteger)) throw new TypeError('Invalid traffic cursor');
+            number(d.progress, 'progress', 0); number(d.speed_cap, 'speed_cap', 0); number(d.stop_index, 'stop_index', 0); number(d.span ??= 0, 'span', 0);
+            if (![d.segment, d.stop_index, d.span].every(Number.isInteger)) throw new TypeError('Invalid traffic cursor');
             this.#drivers.set(id, { ...clone(d), body: r.handle });
         }
         for (const [key, id] of packet.reservations) { if (!this.#drivers.has(id)) throw new TypeError('Reservation has no driver'); this.#reservations.set(key, id); }
@@ -13425,26 +13521,26 @@ class roadNetwork {
         for (const s of starts) {
             if (s.lane) keep(sources, s.lane.to, seconds(s.lane, s.lane.length - s.along), s); else keep(sources, s.node_id, 0, s);
             for (const t of goals) if (s.lane && t.lane && s.lane === t.lane && s.along <= t.along)
-                consider(seconds(s.lane, t.along - s.along), () => ({ lanes: [s.lane.lane_id], points: this.#slice(s.lane, s.along, t.along) }));
+                consider(seconds(s.lane, t.along - s.along), () => ({ lanes: [s.lane.lane_id], spans: [{ lane_id: s.lane.lane_id, from: s.along, to: t.along }], points: this.#slice(s.lane, s.along, t.along) }));
         }
         for (const t of goals) { if (t.lane) keep(targets, t.lane.from, seconds(t.lane, t.along), t); else keep(targets, t.node_id, 0, t); }
         const found = this.#search(sources, targets, profile);
         if (found) {
             const s = sources.get(found.source).end, t = targets.get(found.target).end;
             consider(found.seconds, () => {
-                const lanes = [], points = [];
+                const lanes = [], spans = [], points = [];
                 const append = list => { for (const p of list) { const last = points.at(-1); if (!last || last[0] !== p[0] || last[1] !== p[1]) points.push([p[0], p[1]]); } };
-                if (s.lane) { lanes.push(s.lane.lane_id); append(this.#slice(s.lane, s.along, s.lane.length)); } else append([s.position]);
-                for (const id of found.lanes) { lanes.push(id); append(this.#lanes.get(id).points); }
-                if (t.lane) { lanes.push(t.lane.lane_id); append(this.#slice(t.lane, 0, t.along)); } else append([t.position]);
-                return { lanes, points };
+                if (s.lane) { lanes.push(s.lane.lane_id); spans.push({ lane_id: s.lane.lane_id, from: s.along, to: s.lane.length }); append(this.#slice(s.lane, s.along, s.lane.length)); } else append([s.position]);
+                for (const id of found.lanes) { lanes.push(id); spans.push({ lane_id: id, from: 0, to: this.#lanes.get(id).length }); append(this.#lanes.get(id).points); }
+                if (t.lane) { lanes.push(t.lane.lane_id); spans.push({ lane_id: t.lane.lane_id, from: 0, to: t.along }); append(this.#slice(t.lane, 0, t.along)); } else append([t.position]);
+                return { lanes, spans, points };
             });
         }
         if (!best) return null;
-        const { lanes, points } = best.build();
+        const { lanes, spans, points } = best.build();
         if (points.length < 2) points.push([...points[0]]);
         let length = 0; for (let i = 1; i < points.length; i++) length += Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]);
-        return { points, lanes, length, travel_seconds: best.seconds, revision: this.#revision };
+        return { points, lanes, spans, length, travel_seconds: best.seconds, revision: this.#revision };
     }
     #slice(lane, a, b) {
         const out = [pathGeometry.pointOnPath(lane.points, a).position];
@@ -18159,6 +18255,7 @@ const m69 = Object.freeze({default:{
         "damage_grace_seconds": 0.5,
         "crossing_speed": 240,
         "personal_space": 48,
+        "curb_back": 30,
         "max_pedestrians": 40,
         "max_vehicles": 40
       }
@@ -27047,7 +27144,8 @@ class Pedestrian extends gameCharacter {
         if (event.sensor_only || this.data.state === 'dead' || this.data.damage_grace > 0) return;
         const other = event.entity_a === this ? event.entity_b : event.entity_a;
         const rules = this.getAsset('street_rules').data;
-        if (!(other instanceof gameVehicle) || event.relative_speed < rules.vehicle_hit_speed) return;
+        // A car hits a walker by driving into it: walking into a car standing still is no hit.
+        if (!(other instanceof gameVehicle) || event.relative_speed < rules.vehicle_hit_speed || Math.abs(other.getSpeed()) < rules.vehicle_hit_speed / 2) return;
         this.takeDamage(rules.vehicle_damage);
         if (this.data.state !== 'dead') {
             this.data.state = 'sprawled'; this.data.state_seconds = rules.sprawl_seconds;
@@ -27074,7 +27172,7 @@ class Pedestrian extends gameCharacter {
         this.fleeTarget(source, { safety_distance: 200, face_movement: true });
         this.data.state = 'fleeing'; this.data.state_seconds = 1.5; this.say('What was that?');
     }
-    updateState(seconds, { target, crossing = false, signal = 'go' } = {}) {
+    updateState(seconds, { target, crossing = false, signal = 'go', wait_at = null } = {}) {
         if (this.destroyed || !this.active) return;
         if (!Number.isFinite(seconds) || seconds < 0 || seconds > 0.1) throw new TypeError('Invalid gameplay step');
         const d = this.data, rules = this.getAsset('street_rules').data;
@@ -27088,9 +27186,21 @@ class Pedestrian extends gameCharacter {
             d.state = 'idle';
         }
         if (!target) { this.stopMovement(); d.state = 'idle'; return; }
+        // A walker waiting at the kerb with a car stood at it gets out of the car's way (each would wait for the other).
+        if (d.state === 'waiting' && (d.sense_seconds = (d.sense_seconds ?? 0) - seconds) <= 0) {
+            d.sense_seconds = rules.sense_seconds ?? 0;
+            const near = this.physics_system.peruseNearbyEntities(this, { near_range: rules.personal_space * 2, include_groups: BODY_GROUP.VEHICLE, max_results: 1 })[0];
+            if (near && Math.abs(near.entity?.getSpeed?.() ?? 0) < 30 && this.evadeBody(near.body, { distance: rules.dodge_distance, speed: rules.crossing_speed })) {
+                d.state = 'dodging'; d.state_seconds = rules.dodge_seconds; return;
+            }
+        }
         if (crossing && d.state !== 'crossing') {
             const hits = this.physics_system.predictMovementContacts({ body: this, to: target, speed: rules.crossing_speed, seconds: rules.prediction_seconds, include_groups: BODY_GROUP.VEHICLE, max_results: 1 });
-            if (signal !== 'go' || hits.length) { if (d.state !== 'waiting') this.stopMovement(); d.state = 'waiting'; return; }
+            if (signal !== 'go' || hits.length) {
+                // It waits a step back from the kerb (`wait_at`), so it never stands in a turning car's way.
+                if (d.state !== 'waiting') { if (wait_at) this.moveTo(wait_at, { direct: true, avoid_groups: BODY_GROUP.CHARACTER, personal_space: rules.personal_space, face_movement: false }); else this.stopMovement(); }
+                d.state = 'waiting'; return;
+            }
         }
         if (d.state !== 'walking' && d.state !== 'crossing') {
             this.moveTo(target, { direct: true, avoid_groups: BODY_GROUP.CHARACTER, speed: crossing ? rules.crossing_speed : undefined, personal_space: rules.personal_space, face_movement: true });
@@ -27110,6 +27220,7 @@ return Object.freeze({get Pedestrian(){return Pedestrian;}});
 })();
 // src/game/entities/pedestrian-manager.mjs
 const m137 = (()=>{
+const {pathGeometry} = m1;
 const {Pedestrian} = m136;
 /** Population and waypoint policy only. No positions, obstacle cache or sensing grid. */
 class PedestrianManager {
@@ -27159,6 +27270,7 @@ class PedestrianManager {
     }
     reconnectGameplay() { for (const p of this.getPedestrians()) p.connectGameplay(this.hooks); }
     updateState(seconds) {
+        const step = this.physics.elements.asset_library.getResource('df_street:rules').data.curb_back ?? 0;
         for (const p of this.getPedestrians()) {
             if (!p.active || p.data.state === 'dead') continue;
             if (this.physics.getAttachmentState(p)) { p.updateState(seconds); continue; }
@@ -27172,7 +27284,10 @@ class PedestrianManager {
             }
             const to = this.#network.get(d.target_node_id), crossing = !!to && from.crossing_id !== null && from.crossing_id === to.crossing_id;
             const signal_id = from.signal_id ?? to?.signal_id;
-            p.updateState(seconds, { target: to?.position, crossing, signal: signal_id ? this.physics.traffic.getSignal(signal_id) : 'go' });
+            // Where a walker waits to cross: a step back from the kerb toward where it came from, out of turning cars' way.
+            const back = this.#network.get(d.previous_node_id)?.position;
+            const wait_at = crossing && step > 0 && back && (back[0] !== from.position[0] || back[1] !== from.position[1]) ? pathGeometry.pointOnPath([from.position, back], step, { end_clearance: step }).position : null;
+            p.updateState(seconds, { target: to?.position, crossing, signal: signal_id ? this.physics.traffic.getSignal(signal_id) : 'go', wait_at });
         }
     }
     clearStreet() { for (const p of this.getPedestrians()) p.destroy(); }

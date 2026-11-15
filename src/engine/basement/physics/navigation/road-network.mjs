@@ -149,26 +149,26 @@ export class roadNetwork {
         for (const s of starts) {
             if (s.lane) keep(sources, s.lane.to, seconds(s.lane, s.lane.length - s.along), s); else keep(sources, s.node_id, 0, s);
             for (const t of goals) if (s.lane && t.lane && s.lane === t.lane && s.along <= t.along)
-                consider(seconds(s.lane, t.along - s.along), () => ({ lanes: [s.lane.lane_id], points: this.#slice(s.lane, s.along, t.along) }));
+                consider(seconds(s.lane, t.along - s.along), () => ({ lanes: [s.lane.lane_id], spans: [{ lane_id: s.lane.lane_id, from: s.along, to: t.along }], points: this.#slice(s.lane, s.along, t.along) }));
         }
         for (const t of goals) { if (t.lane) keep(targets, t.lane.from, seconds(t.lane, t.along), t); else keep(targets, t.node_id, 0, t); }
         const found = this.#search(sources, targets, profile);
         if (found) {
             const s = sources.get(found.source).end, t = targets.get(found.target).end;
             consider(found.seconds, () => {
-                const lanes = [], points = [];
+                const lanes = [], spans = [], points = [];
                 const append = list => { for (const p of list) { const last = points.at(-1); if (!last || last[0] !== p[0] || last[1] !== p[1]) points.push([p[0], p[1]]); } };
-                if (s.lane) { lanes.push(s.lane.lane_id); append(this.#slice(s.lane, s.along, s.lane.length)); } else append([s.position]);
-                for (const id of found.lanes) { lanes.push(id); append(this.#lanes.get(id).points); }
-                if (t.lane) { lanes.push(t.lane.lane_id); append(this.#slice(t.lane, 0, t.along)); } else append([t.position]);
-                return { lanes, points };
+                if (s.lane) { lanes.push(s.lane.lane_id); spans.push({ lane_id: s.lane.lane_id, from: s.along, to: s.lane.length }); append(this.#slice(s.lane, s.along, s.lane.length)); } else append([s.position]);
+                for (const id of found.lanes) { lanes.push(id); spans.push({ lane_id: id, from: 0, to: this.#lanes.get(id).length }); append(this.#lanes.get(id).points); }
+                if (t.lane) { lanes.push(t.lane.lane_id); spans.push({ lane_id: t.lane.lane_id, from: 0, to: t.along }); append(this.#slice(t.lane, 0, t.along)); } else append([t.position]);
+                return { lanes, spans, points };
             });
         }
         if (!best) return null;
-        const { lanes, points } = best.build();
+        const { lanes, spans, points } = best.build();
         if (points.length < 2) points.push([...points[0]]);
         let length = 0; for (let i = 1; i < points.length; i++) length += Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]);
-        return { points, lanes, length, travel_seconds: best.seconds, revision: this.#revision };
+        return { points, lanes, spans, length, travel_seconds: best.seconds, revision: this.#revision };
     }
     #slice(lane, a, b) {
         const out = [pathGeometry.pointOnPath(lane.points, a).position];

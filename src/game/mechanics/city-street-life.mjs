@@ -69,7 +69,7 @@ export class cityStreetLife {
             const distance = nearest(turn.position) - this.#rules.stop_before_turn;
             if (distance > 0) stops.push(open = { distance, signal_id: turn.signal_id, conflict_id: turn.conflict_id, clearance_distance: clear - distance }); else open = null;
         }
-        const route_id = `city_trip:${++this.#trips}`; this.#world.traffic.registerRoute(route_id, { points, stops }); return route_id;
+        const route_id = `city_trip:${++this.#trips}`; this.#world.traffic.registerRoute(route_id, { points, stops, lanes: route.spans }); return route_id;
     }
     updateState(seconds, { focus, time }) {
         const R = this.#rules, far = e => { const [x, y] = e.getRenderState(1, scratch).position; return Math.hypot(x - focus[0], y - focus[1]) > R.despawn; };

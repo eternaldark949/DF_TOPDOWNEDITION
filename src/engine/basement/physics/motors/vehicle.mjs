@@ -5,6 +5,8 @@ import { number, dot, sub, length, scale, clamp, angleDelta, clone, add, cross }
 
 /** The share of its speed a car keeps through the tightest bend. */
 const CRAWL = 0.15;
+/** How far ahead along its path a car steers for, in seconds at its speed (never under two wheel bases). */
+const AIM_SECONDS = 0.6;
 
 export class pathMotor {
     constructor(body) { this.body = body; this.path = null; this.index = 1; this.options = {}; }
@@ -35,6 +37,21 @@ export class pathMotor {
         }
         return limit;
     }
+    /**
+     * The point `ahead` along the path past the car's place on its current leg: the car steers for it, so it
+     * keeps to the line through a bend and back onto it after one, instead of aiming at the next corner.
+     */
+    #aim(position, ahead) {
+        const path = this.path, b = path[this.index], a = path[this.index - 1] ?? position, ab = sub(b, a), len2 = dot(ab, ab);
+        const t = len2 > 1e-12 ? clamp(dot(sub(position, a), ab) / len2, 0, 1) : 1;
+        let at = [a[0] + ab[0] * t, a[1] + ab[1] * t], left = ahead;
+        for (let k = this.index; k < path.length; k++) {
+            const leg = sub(path[k], at), d = length(leg);
+            if (d >= left) return [at[0] + leg[0] * left / d, at[1] + leg[1] * left / d];
+            left -= d; at = path[k];
+        }
+        return path[path.length - 1];
+    }
     _controls(motor) {
         if (!this.path) return null;
         const r = bodyRecord(this.body), cfg = motor.config, point = this.path[this.index], delta = sub(point, r.position), d = length(delta);
@@ -46,7 +63,8 @@ export class pathMotor {
             this.index++;
         }
         const target = sub(this.path[this.index], r.position), facing = [Math.cos(r.rotation), Math.sin(r.rotation)], speed = Math.max(0, dot(r.velocity, facing));
-        const error = angleDelta(r.rotation, Math.atan2(target[1], target[0]));
+        const aim = sub(this.#aim(r.position, Math.max(cfg.wheel_base * 2, speed * AIM_SECONDS)), r.position);
+        const error = angleDelta(r.rotation, Math.atan2(aim[1], aim[0]));
         const steer = clamp(error * 2, -1, 1), max = this.options.speed ?? cfg.max_speed;
         const braking = cfg.braking * r.config.mass / massProperties(r).mass;
         const stop = speed * speed / (2 * braking) + cfg.wheel_base;

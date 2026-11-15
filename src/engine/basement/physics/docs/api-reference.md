@@ -120,7 +120,7 @@ Character `movement` defaults: `max_speed:180`, `acceleration:900`, `braking:120
 
 `accelerateVehicle(amount=1)`, `brakeVehicle(amount=1)`, `reverseVehicle(amount=1)`, `setHandbrake(amount)` take 0–1; `steerVehicle(amount)` takes −1–1. `realignSteering()` requests centred steering. Inputs persist until changed. Manual input cancels the current autonomous path. `stopVehicle()` requests braking; `parkVehicle()` also clears motion immediately. These return the controller.
 
-`followPath(path, options={})` accepts `{points:[...]}` or a point array. `driveTo(position, options={})` asks the engine to find a route; returns controller or `null`. Options include `speed`, `following_distance` (4 default), `arrival_distance` (3 default). The engine calculates forward clearance and braking. `getSpeed()` returns signed longitudinal speed; `getVehicleState(result={})` includes body state, steering and path status. `pathMotor` implements `followPath` and `driveTo` as an engine component.
+`followPath(path, options={})` accepts `{points:[...]}` or a point array. `driveTo(position, options={})` asks the engine to find a route; returns controller or `null`. Options include `speed`, `following_distance` (4 default), `arrival_distance` (3 default). The engine calculates forward clearance and braking. The car steers for a point ahead along the path (0.6 s at its speed, never under two wheel bases) past its place on the current leg, so it keeps to the line through a bend and comes back onto it after one. `getSpeed()` returns signed longitudinal speed; `getVehicleState(result={})` includes body state, steering and path status. `pathMotor` implements `followPath` and `driveTo` as an engine component.
 
 ## Queries and awareness
 
@@ -260,7 +260,9 @@ Every world owns `physics.navigation`, a `navigationSystem` with two layers: a c
 
 Every world owns `physics.traffic`, a `trafficController`; it owns route/signal/reservation data and no spatial index. Its methods are:
 
-- `registerRoute(route_id,{points,speed_limit=180,stops=[],loop=false})`: cache nonzero-length route segments; 2–4096 points. Loops must be authored closed. Stops contain `distance` along the route, `signal_id` and/or `conflict_id`, and `clearance_distance:20` after the line. A driver admitted to a stop with a `conflict_id` also waits while a nearly still vehicle stands at its `clearance_distance` past the stop, so it never takes a crossing it cannot leave.
+- `registerRoute(route_id,{points,speed_limit=180,stops=[],loop=false,lanes?})`: cache nonzero-length route segments; 2–4096 points. Loops must be authored closed. Stops contain `distance` along the route, `signal_id` and/or `conflict_id`, and `clearance_distance:20` after the line. A driver admitted to a stop with a `conflict_id` also waits while a nearly still vehicle stands at its `clearance_distance` past the stop, so it never takes a crossing it cannot leave.
+- A route may say which road-network lanes it runs along with `lanes`: `[{lane_id, from, to}]` in order, each the stretch of its lane the route covers (the `spans` of `navigation.findRoute`). Its drivers are then *on the lanes*: each step the controller files them under the lane they are on and how far along. A driver on the lanes slows for the one ahead of it on its own lanes (room to stop behind where that one could stop), reads the don't-block-the-box check from the lane past the stop, and sweeps only against what is not on the lanes (a walker, a car driven by hand); others on the lanes it meets only at reserved crossings. Not allowed on a loop.
+- `getLaneOccupancy(lane_id)`: the drivers filed on a lane this step, nearest its start first, as `[{body_id, along, speed}]`.
 - `releaseRoute(route_id)`: forgets a route that no driver follows, so one-trip routes do not pile up; returns false while a driver follows it or when it is unknown.
 - `addVehicle(vehicle,{route_id,following_distance=8,prediction_seconds=2,arrival_distance=3})`: attach the existing official vehicle motor to an itinerary.
 - `setSignal(signal_id,'stop'|'go')`: signal policy supplied by the game; uninitialized signals stop traffic.
@@ -269,7 +271,7 @@ Every world owns `physics.traffic`, a `trafficController`; it owns route/signal/
 - `removeVehicle(vehicle_or_body_id)`: release route ownership and crossing/passing reservations. Destroying a body and manual driving inputs also release them.
 - `requestPassingRoute(vehicle,{route_id,reservation_id?,...driver_options})`: validate an authored alternative/merge itinerary through shape clearance queries and reserve its passing resource. Returns false when blocked; accepted event-time requests recheck when committed. This does not invent an overtaking lane or predict every future driver's decisions.
 
-Traffic uses shared-index nearby-body prediction, path clearance and braking. Stops sharing `conflict_id` serialize their crossing, releasing after the authored clearance distance. Admission is deterministic in driver registration order. It is a conservative reservation model, not the current game's full signal timing/driver personality model. Save/load retains route cursors, signals and reservations.
+Traffic uses lane occupancy for drivers on the lanes, shared-index nearby-body prediction for the rest, path clearance and braking. Stops sharing `conflict_id` serialize their crossing, releasing after the authored clearance distance. Admission is deterministic in driver registration order. It is a conservative reservation model, not the current game's full signal timing/driver personality model. Save/load retains route cursors, signals and reservations.
 
 Events: `trafficRouteCompleted`, `passingRouteAccepted`, `passingRouteBlocked`, each with `body`, `entity`, `route_id` and simulation tick.
 

@@ -1,12 +1,13 @@
 // ===== LV0 BASEMENT =====
-import { bodyRecord, bindBody, immutableState } from './state.mjs';
+import { bodyRecord, bindBody } from './state.mjs';
 
 /** A handle, never a second mutable copy of physical state. */
 export class physicsBody {
     constructor(record) { bindBody(this, record); Object.defineProperty(this, 'body_id', { value: record.id, enumerable: true }); Object.freeze(this); }
-    get position() { return immutableState(bodyRecord(this)).position; }
+    // Frozen copies of just the vector: reading a position never copies the whole state.
+    get position() { return Object.freeze([...bodyRecord(this).position]); }
     get rotation() { return bodyRecord(this).rotation; }
-    get linear_velocity() { return immutableState(bodyRecord(this)).linear_velocity; }
+    get linear_velocity() { return Object.freeze([...bodyRecord(this).velocity]); }
     get angular_velocity() { return bodyRecord(this).angular_velocity; }
     getState(result = {}) { return bodyRecord(this).world._readBody(this, result); }
     getRenderState(blend, result = {}) { return bodyRecord(this).world._renderBody(this, blend, result); }

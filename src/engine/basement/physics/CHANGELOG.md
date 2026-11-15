@@ -1,5 +1,13 @@
 # Changelog
 
+## Lane occupancy for traffic — 2026-11-15
+
+- `navigation.findRoute` adds `spans`: `[{lane_id, from, to}]`, the stretch of each lane the route covers.
+- A traffic route can take those as `lanes`. Its drivers are then filed each step under the lane they are on and how far along (`getLaneOccupancy(lane_id)`). A driver on the lanes slows for the one ahead on its own lanes, with no sweep, and reads the don't-block-the-box check from the lane past its stop. It sweeps only against what is not on the lanes, such as walkers or a car driven by hand.
+- A driver that must stop at a crossing it had reserved gives the reservation back, unless it is too close to stop before the line. Before this, a car caught by a red after reserving held the junction and every other car waited.
+- `pathMotor` steers for a point ahead along the path instead of the next corner, so a car no longer swings wide out of a bend into the oncoming lane.
+- `physicsBody.position` and `linear_velocity` copy only their vector instead of the whole body state. `getPathClearance` reuses the body's built shape.
+
 ## Entities filed by type — 2026-11-15
 
 - The entity registry files each entity under its type as it registers and drops it as it goes. `getEntities({entity_type})` reads that type's list instead of scanning every entity, and the new `instance_of` reads every type whose class is or extends a class (a level's characters, a driver's cars).

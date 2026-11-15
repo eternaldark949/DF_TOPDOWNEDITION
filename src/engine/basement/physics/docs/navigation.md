@@ -84,7 +84,7 @@ Constructor options come from `new physicsSystem({ navigation: { field: {...}, m
 |---|---|
 | `navigate(body, to, {profile?, speed?, arrival_distance?, radius?, ...findPath options})` | Plans and starts travel. Characters on the field call `moveTo` on their motor. Vehicles follow a road route, or a field path with a field profile. Returns `{layer, points, ...}`, or `null` after emitting `movementBlocked` (`no_path` / `no_route`). `to` is a point, or a body for field travel. |
 | `findPath({body OR collision_shape OR radius, from?, to, max_nodes=20000, search_margin?, allow_partial=false, heuristic_weight=1.2, smooth=true, reuse?})` | `{points, length, partial, visited_nodes, goal, radius, reused, dependencies}`, or `null`. `physics.findPath` is the same method. |
-| `findRoute({body OR from (point or node id), to (point or node id), profile='car', near_range?, max_candidates=4})` | `{points, lanes, length, travel_seconds, revision}`, or `null`. |
+| `findRoute({body OR from (point or node id), to (point or node id), profile='car', near_range?, max_candidates=4})` | `{points, lanes, spans, length, travel_seconds, revision}`, or `null`. `spans` is `[{lane_id, from, to}]`: the stretch of each lane the route covers, ready for a traffic route's `lanes`. |
 | `registerProfile(name, {layer:'field'|'road', near_range=200, radius?})` / `getProfile(name)` | Named travel profiles; saved with the world. |
 | `agentRadius(body_or_shape)` | Radius used for field planning: a circle's radius (plus offset), otherwise the shape's reach. |
 | `configureField({cell_size, chunk_cells, max_clearance, obstacle_groups})` | Replaces field settings; cached chunks are discarded. Returns the active config. |
