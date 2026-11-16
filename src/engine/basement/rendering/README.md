@@ -273,6 +273,7 @@ Screen coordinates are logical viewport units; client conversions account for th
 | `onFrameRendered(handler)` | Successful backend frame completion with immutable written `targets`; cache bookkeeping only, no resource mutation during callbacks. |
 | `onSurfaceChanged(handler)` | Platform composition notification; returns unsubscribe. The notification contains the host-supplied surface, never its context. |
 | `getVisibleEntities({blend,margin,...filters})` | Native shared-index query using render extents. |
+| `pickAllAt([x,y],{bounds,kind,tag,property,xray=true,ignore})`, `pickAt([x,y],options)` | What is at a world point, top first as a ray from the camera meets it: higher `look.layer`, then the taller entity (`entity.height`), then the later one. Each hit is `{entity,body,position,height,layer}`; `bounds` is `collision` (default) or `render`, tested exactly with `containsPoint`. `pickAt` is the top hit or null and defaults to `xray: false`, so a top thing that fails the filters blocks it. |
 | `beginFrame(blend)`, `endFrame()`, `abortFrame()` | Runtime orchestration; one flush per render call. |
 | `getFrameSnapshot()` | Explicit detached/frozen copy of the current packet buffer for inspection/export. No copy is made for every production frame. |
 | `getStatistics()` | Packet/pass counts and storage capacity, resource count and renderer ID. |

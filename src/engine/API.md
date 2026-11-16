@@ -353,6 +353,30 @@ new gameEngine({ controls: {
 | `controls.bind(action, ...bindings)` / `controls.setKeymap(keymap)` | Changes bindings |
 | `controls.touch.button(element, 'touchFire')` / `controls.touch.stick('move', { zone })` | Wires on-screen touch buttons and sticks |
 
+#### Hits: what a click or tap lands on
+
+Like UPBGE's mouse-over sensor: the camera casts a ray down through the screen point, and the first thing it meets is the hit. Top-down, that is the thing drawn on top: the higher `look.layer`, then the taller entity (its components' highest top), then the one made later. A finger on the screen itself (not on a touch button) is the input `touchScreen`, so `select: ['mouseLeft', 'touchScreen']` covers both.
+
+| Call | What it does |
+|---|---|
+| `controls.hit(filters)` | What the mouse is over now (UPBGE's `hitObject`), or null: `{ entity, body, position, height, layer }`, `position` in the world |
+| `controls.hitAt([x, y], filters)` | The same for any point on the page |
+| `controls.hitOf(action)` | What the last click or tap of `action` landed on, while it waits in the queue |
+| `controls.onHover(handler, filters)` | `handler({ entity, hit, previous })` whenever what the mouse is over changes; returns a call that stops |
+| `render.pickAt([x, y], filters)` / `render.pickAllAt([x, y], filters)` | The same picks from a world point: the top hit, or every hit top first |
+
+Filters: `kind`, `tag`, `property` (it must have that property, like UPBGE's `propName`), `ignore` (entities to look past), `bounds` (`collision`, the default, or `render`), and `xray`. Without `xray` the top thing blocks the ray: a crate under a roof can't be clicked through it. With `xray: true` the ray passes everything that fails the filters.
+
+Entities hear it too, with no wiring: `entity.on('pointerHit', ({ action, position }) => ...)` when a fired action's click or tap lands on it, and `pointerEnter` and `pointerLeave` as the mouse moves over and off.
+
+```js
+const door = context.createEntity({ kind: 'static', name: 'door', data: { usable: true }, /* ... */ });
+door.on('pointerHit', ({ action }) => { if (action === 'select') door.set('open', !door.get('open')); });
+const hit = controls.hitOf('select');                 // or ask in a system
+if (hit?.entity.has('usable')) hit.entity.set('open', true);
+controls.hit({ property: 'usable', xray: true });     // what usable thing is under the mouse, through anything else
+```
+
 Input contexts and rumble templates from the API spec are documented here when built.
 
 Reference: [controls README](basement/controls/README.md).

@@ -43,6 +43,10 @@ export class mouseInstance extends inputInstance {
         if(target!==system.event_target)listen(system.event_target,'mousemove',event=>{if(this.input_active.size)sample(event);},{passive:true});
         listen(target,'mousedown',event=>{if(event.sourceCapabilities?.firesTouchEvents)return;const input=buttons[event.button];if(input){sample(event);system.press(this,input,system.ev('mouse',input,event));}});
         listen(system.event_target,'mouseup',event=>{const input=buttons[event.button];if(input){if(this.input_active.has(input))sample(event);system.release(this,input,system.ev('mouse',input,event));}});
+        // A finger or pen on the screen itself (not on a touch button) is the input touchScreen: a tap on the world.
+        const screen=new Set(),lift=(event,cancel)=>{if(!screen.delete(event.pointerId??'pointer')||screen.size)return;cancel?system.cancelInput(system.touch,'touchScreen'):system.release(system.touch,'touchScreen',system.ev('touch','touchScreen',event));};
+        listen(target,'pointerdown',event=>{if(!['touch','pen'].includes(event.pointerType)||event.button>0||system.muted||system.claimed(event))return;screen.add(event.pointerId??'pointer');if(screen.size===1)system.press(system.touch,'touchScreen',system.ev('touch','touchScreen',event));});
+        listen(system.event_target,'pointerup',event=>lift(event,false));listen(system.event_target,'pointercancel',event=>lift(event,true));
         listen(target,'wheel',event=>{const unit=event.deltaMode===1?16:event.deltaMode===2?(target.innerHeight||800):1;this.wheel[0]+=event.deltaX*unit;this.wheel[1]+=event.deltaY*unit;system.active_device='mouse';},{passive:true});
     }
     dispose(){this.releaseAll();this.disposers.splice(0).forEach(drop=>drop());}
@@ -62,7 +66,7 @@ export class touchInstance extends inputInstance {
         const down=event=>{
             if(event.button>0||this.system.muted)return;if(event.cancelable)event.preventDefault();const id=event.pointerId??'pointer';pointers.add(id);
             try{if(event.pointerId!==undefined)el.setPointerCapture(event.pointerId);}catch{}
-            el.classList.add('held');if(pointers.size===1)this.system.press(this,input,this.system.ev('touch',input,event));
+            this.system.claim(event);el.classList.add('held');if(pointers.size===1)this.system.press(this,input,this.system.ev('touch',input,event));
         };
         const up=(event,cancel=false)=>{
             if(!pointers.delete(event.pointerId??'pointer')||pointers.size)return;el.classList.remove('held');

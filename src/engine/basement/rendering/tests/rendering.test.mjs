@@ -270,3 +270,22 @@ test('only the Canvas backend touches Canvas, only the WebGL backend touches Web
   if(name!=='webgl.mjs')for(const word of ['webgl2','WebGL2RenderingContext','gl.drawArrays'])assert.equal(code.includes(word),false,`${name} uses ${word}`);
  }
 });
+
+test('a pick meets what is drawn at a point top first: layer, then height, and filters with or without x-ray',()=>{
+ const {world,render}=fixture(),E=world.elements;
+ const box=(name,extra={})=>E.createEntity({kind:'static',name,position:[50,50],collision_shape:{shape_type:'box',dimensions:[20,20]},...extra});
+ const floor=box('floor',{components:[{name:'slab',layers:[{layer:0,height:0,thickness:5,steps:[]}]}]});
+ const tower=box('tower',{tags:['tall'],components:[{name:'body',layers:[{layer:0,height:0,thickness:300,steps:[]}]}]});
+ const crate=box('crate',{data:{look:{layer:-1},loot:true}});
+ const flag=box('flag',{position:[90,90]});
+ world.updateState(1/60);
+ assert.deepEqual(render.pickAllAt([50,50]).map(h=>h.entity.name),['tower','floor','crate'],'a higher layer first, then the taller');
+ assert.equal(render.pickAt([50,50]).entity,tower);assert.equal(render.pickAt([50,50]).height,300);
+ assert.equal(render.pickAt([50,50],{property:'loot'}),null,'without x-ray the tower blocks the crate');
+ assert.equal(render.pickAt([50,50],{property:'loot',xray:true}).entity,crate);
+ assert.equal(render.pickAt([50,50],{ignore:[tower]}).entity,floor);
+ assert.equal(render.pickAt([50,50],{tag:'tall'}).entity,tower);assert.equal(render.pickAt([50,50],{kind:'prop'}),null);
+ assert.equal(render.pickAt([90,90]).entity,flag);assert.equal(render.pickAt([200,200]),null);
+ assert.throws(()=>render.pickAt([0,0],{bounds:'light'}),/collision or render/);
+ render.dispose();
+});

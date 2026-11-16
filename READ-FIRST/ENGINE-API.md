@@ -154,6 +154,7 @@ The Basement `controlSystem` already works this way. What is left is input conte
 | `controls.useContext(name)` | Switches which bindings are live: `gameplay`, `menu`, `dialogue`, `vehicle` | missing |
 | `controls.rebind(context, action, inputs)` and `controls.saveBindings()` | Player rebinding, kept in the save | partly: `bind` exists, no save |
 | `controls.rumble(name)` | Plays a vibration template from data (`punch`, `bad_fall`, `explosion_near`), as in the Python templates | partly: a raw `rumble(ms, strength)` |
+| `controls.hit()` / `hitOf(action)` / `entity.on('pointerHit')` | What a click or tap lands on: the top thing drawn there, like UPBGE's mouse-over sensor, with kind, tag, property and x-ray filters | have: picks through the camera, `touchScreen` for taps, hover enter and leave |
 
 ## Drawing backend
 

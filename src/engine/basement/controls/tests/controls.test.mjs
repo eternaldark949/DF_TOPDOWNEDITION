@@ -173,3 +173,24 @@ test('tap and double-tap bindings take their own thresholds',()=>{
  time(2);input.setInput('keyboard','d',true);time(2.05);input.setInput('keyboard','d',false);time(2.5);input.updateState();input.setInput('keyboard','d',true);
  assert.equal(input.readQueue('dash',DOUBLETAP),true);input.dispose();
 });
+
+test('a click or a tap is a hit: the picker says what it landed on, the hover follows the mouse',()=>{
+ const {input,window,time}=fixture({keymap:{select:['mouseLeft','touchScreen']}}),asked=[];
+ assert.throws(()=>input.hitAt([1,2]),/No picker/);
+ input.setPicker((point,options)=>{asked.push(point);return point[0]>50?{entity:{name:'crate'},position:point,options}:null;});
+ assert.equal(input.hit(),null,'the mouse has not been seen');
+ emit(window,'mousemove',{clientX:80,clientY:10});assert.equal(input.hit().entity.name,'crate');assert.equal(input.hitAt([10,10]),null);
+ assert.equal(input.hitAt([60,0],{kind:'prop'}).options.kind,'prop');
+ const fired=[];input.on_fire.push((action,type,ev)=>fired.push([action,ev.position,ev.hit?.entity.name??null]));
+ time(1);emit(window,'mousedown',{button:0,clientX:70,clientY:20});time(1.05);emit(window,'mouseup',{button:0,clientX:70,clientY:20});
+ assert.deepEqual(fired[0],['select',[70,20],'crate']);assert.equal(input.hitOf('select').entity.name,'crate');
+ time(5);assert.equal(input.hitOf('select'),null,'a hit waits as long as its action does');
+ const changes=[];const stop=input.onHover(({entity,previous})=>changes.push([entity?.name??null,previous?.name??null]));
+ input.updateState();emit(window,'mousemove',{clientX:10,clientY:10});input.updateState();input.updateState();
+ assert.deepEqual(changes,[['crate',null],[null,'crate']]);stop();emit(window,'mousemove',{clientX:90,clientY:10});input.updateState();assert.equal(changes.length,2);
+ fired.length=0;time(6);emit(window,'pointerdown',{pointerType:'touch',pointerId:7,button:0,clientX:90,clientY:40});time(6.05);emit(window,'pointerup',{pointerType:'touch',pointerId:7,clientX:90,clientY:40});
+ assert.deepEqual(fired.map(f=>f.slice(0,1).concat(f[2])),[['select','crate']],'a finger on the screen is touchScreen');
+ const button=new Element();input.touch.button(button,'touchFire');fired.length=0;time(7);
+ emit(button,'pointerdown',{pointerType:'touch',pointerId:8,button:0,clientX:90,clientY:40});
+ assert.equal(input.touch.isActive('touchScreen'),false,'a touch button keeps its press to itself');input.dispose();
+});

@@ -79,6 +79,10 @@ Optional stick settings preserve the existing generic frontend hooks: `base`, `b
 
 Touch rebinding retires old listeners. Returned button disposers and stick `dispose()` are idempotent. No HUD IDs or game policy are embedded in Basement.
 
+## Pointer hits
+
+A press or release from a pointer carries `ev.position` (page pixels) and `ev.hit`, worked out once when first read. The controls know nothing of the world: `setPicker(picker)` gives them `picker(client_point, options)`, which returns `{entity, body, position, height, layer}` or null, and the engine wires the camera and the render system's `pickAt` to it. `hitAt(point, options)` asks the picker for any point (it throws with no picker), `hit(options)` for where the mouse is (null before the mouse is seen), and `hitOf(action)` gives the hit of the action's last pointer press while that press waits in the queue. `onHover(handler, options)` runs a hook every poll and calls `handler({entity, hit, previous})` when the entity under the mouse changes; it returns a call that stops it. A finger or pen on the mouse target that is not on a touch button is the input `touchScreen`; a touch button `claim(event)`s the pointer events it takes (`claimed(event)` tells), so the screen under it hears nothing.
+
 ## Polling and lifecycle
 
 In the new runtime, input is sampled before each simulation tick. Every before/after-physics consumer sees the same edges; the runtime calls `generateGhostImage()` after that tick. Paused/no-level frames still poll gamepads and input timing for menus. Start the runtime without a level to run a menu; physics remains idle. Pause/resume, stop and level commits clear pending gameplay gestures. Inputs held through those boundaries must return to neutral before reactivation.

@@ -93,6 +93,28 @@ export class renderSystem {
         }
         return drawn;
     }
+    /**
+     * Everything at a world point, top first, the way a ray from the camera meets it: higher `look.layer`
+     * first, then the taller entity (its components' highest top), then the one made later. Each hit is
+     * {entity, body, position, height, layer}. `bounds` is `collision` (default) or `render`; `kind`,
+     * `tag` and `property` (an entity property it must have, like UPBGE's propName) filter. Without
+     * `xray` the first thing met blocks the ray: only it can be hit. `ignore` lists entities to look past.
+     */
+    pickAllAt(point,{bounds='collision',kind,tag,property,xray=true,ignore=[],blend=1}={}){
+        this.#live();const [x,y]=point;finite(x,'pick x');finite(y,'pick y');
+        if(!['collision','render'].includes(bounds))throw new TypeError('Pick bounds are collision or render');
+        const skip=new Set((Array.isArray(ignore)?ignore:[ignore]).map(e=>e?.entity_id??e)),hits=[];
+        for(const {entity,body} of this.#world.queryEntitiesInBounds({bounds:{left:x-.5,top:y-.5,right:x+.5,bottom:y+.5},bounds_type:bounds},[])){
+            if(!entity||skip.has(entity.entity_id)||!this.#world.containsPoint(body,[x,y],{bounds_type:bounds}))continue;
+            hits.push({entity,body,position:[x,y],height:entity.height??0,layer:entity.get('look',{}).layer??0});
+        }
+        hits.sort((a,b)=>b.layer-a.layer||b.height-a.height||b.entity.entity_id-a.entity.entity_id);
+        const passes=h=>(kind===undefined||h.entity.kind===kind)&&(tag===undefined||h.entity.tags.includes(tag))&&(property===undefined||h.entity.has(property));
+        if(!xray)return hits.length&&passes(hits[0])?[hits[0]]:[];
+        return hits.filter(passes);
+    }
+    /** The top thing at a world point that passes the filters (see pickAllAt), or null. Without `xray: true`, something on top that fails them blocks the pick. */
+    pickAt(point,options={}){return this.pickAllAt(point,{xray:false,...options})[0]??null;}
     beginFrame(blend=1){this.#live();if(this.#collecting)throw new Error('A render frame is already open');this.#collecting=true;try{return this.#frame.begin(this.#camera.getView(blend));}catch(error){this.#collecting=false;throw error;}}
     endFrame(){
         this.#live();if(!this.#collecting)throw new Error('No open render frame');

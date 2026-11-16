@@ -9,6 +9,7 @@ export class controlSystem {
     #activated = new Set(); #released = new Set();
     #vectorActive = new Map(); #vectorTime = new Map(); #pointers = new Map(); #lastTap = new Map();
     #disposed = false;
+    #picker = null; #lastEv = new Map(); #claimed = new WeakSet();
     /** { keymap, actions: [ACTION ROW...], context: () => the game (handed to when / run), timing } */
     constructor({ keymap = {}, actions = [], context = () => null, timing = {}, vectors = {},
         now = controlSystem.now, auto_update = false, query_actions = true,
@@ -150,6 +151,36 @@ export class controlSystem {
         const instance=this[device];if(!instance||this.instanceOf(input)!==instance)throw new TypeError('Input does not belong to that device');
         const event=this.ev(device,input);pressed?this.press(instance,input,event):this.release(instance,input,event);
     }
+    /** A touch button marks the pointer events it takes, so the screen under it does not also hear a tap. */
+    claim(event) { if (event && typeof event === 'object') this.#claimed.add(event); }
+    claimed(event) { return !!event && this.#claimed.has(event); }
+    // ── Pointer hits: what a click or a tap lands on (like UPBGE's mouse-over sensor) ──
+    /**
+     * Sets how a screen point becomes a hit: `picker(client_point, options)` returns
+     * {entity, body, position, height, layer} or null. The engine wires the camera and the render
+     * system's pick to it; the controls themselves know nothing of the world.
+     */
+    setPicker(picker) { if (picker !== null && typeof picker !== 'function') throw new TypeError('A picker is a function of a client point and options, or null'); this.#picker = picker; return this; }
+    /** What is at a client point ([x, y] in page pixels): the top thing drawn there that passes the filters (see the render system's pickAt). */
+    hitAt(point, options = {}) { if (!this.#picker) throw new Error('No picker is set: an engine wires one'); if (!Array.isArray(point) || point.length !== 2 || !point.every(Number.isFinite)) throw new TypeError('A client point is [x, y]'); return this.#picker([point[0], point[1]], options); }
+    /** What the mouse is over now (UPBGE's hitObject), or null when the mouse has not been seen. */
+    hit(options = {}) { return this.mouse.known ? this.hitAt([this.mouse.x, this.mouse.y], options) : null; }
+    /** What the last press of `action` landed on, while it waits in the queue (the action's ev.hit). */
+    hitOf(action) { const ev = this.#lastEv.get(action); return ev && this.now() - ev.time <= this.queue_wait_time ? ev.hit : null; }
+    /**
+     * Follows what the mouse is over, every frame: `handler({entity, hit, previous})` is called when it
+     * changes (null when it leaves everything). `options` are pickAt's filters. Returns a call that stops.
+     */
+    onHover(handler, options = {}) {
+        if (typeof handler !== 'function') throw new TypeError('A hover handler is a function');
+        let last = null;
+        const hook = () => {
+            const hit = this.#picker && this.mouse.known ? this.#picker([this.mouse.x, this.mouse.y], options) : null, entity = hit?.entity ?? null;
+            if (entity !== last) { const previous = last; last = entity; handler({ entity, hit, previous }); }
+        };
+        this.hooks.push(hook);
+        return () => { const i = this.hooks.indexOf(hook); if (i >= 0) this.hooks.splice(i, 1); };
+    }
     pointer() { return Object.freeze({position:Object.freeze([this.mouse.x,this.mouse.y]),delta:Object.freeze([...this.mouse.delta]),wheel:Object.freeze([...this.mouse.wheel]),known:this.mouse.known}); }
     changeInput(input,change) {
         const actions=[...new Set((this.bindings[input]??[]).map(binding=>binding[0]))],before=actions.map(action=>this.active(action));
@@ -174,7 +205,7 @@ export class controlSystem {
         cleanupAll([...Object.values(this.touch.sticks).map(stick=>()=>stick.cancel()),()=>{
         for (const i of this.touch.input_active) this.touch.elements[i]?.classList.remove('held');
         for (const inst of [this.keyboard, this.mouse, this.touch, this.gamepad]) { for (const i of inst.input_active) inst.spent.add(i); inst.armed = Object.create(null); }
-        this.pending.length = 0;this.#lastTap.clear();
+        this.pending.length = 0;this.#lastTap.clear();this.#lastEv.clear();
         this.queue.length = 0;this.gamepad.suppressAnalog();this.gamepad.suppressButtons();this.refreshVectors();this.generateAll();
         }],'Input clearing failed');
     }
@@ -194,7 +225,11 @@ export class controlSystem {
     // ── Firing ──────────────────────────────────────────────────────────
     static now() { return (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000; }
     ev(device, input, e = null) {
-        return { device, input, type: null, time: this.now(), event: e, repeat: !!e?.repeat,
+        const touch = e?.changedTouches?.[0], x = e?.clientX ?? touch?.clientX, y = e?.clientY ?? touch?.clientY;
+        const position = Number.isFinite(x) && Number.isFinite(y) ? Object.freeze([x, y]) : null, system = this; let hit;
+        return { device, input, type: null, time: this.now(), event: e, repeat: !!e?.repeat, position,
+            /** What the press landed on (see hitAt), worked out once, when first asked. Null off a pointer or with no picker. */
+            get hit() { if (hit === undefined) hit = position && system.#picker ? system.#picker(position, {}) : null; return hit; },
             typing: device === 'keyboard' && !!e && keyboardInstance.editable(e.target), shift: !!e?.shiftKey, ctrl: !!(e?.ctrlKey || e?.metaKey),
             preventDefault: () => e?.cancelable && e.preventDefault(), stop: () => { e?.stopPropagation?.(); e?.stopImmediatePropagation?.(); } };
     }
@@ -203,7 +238,7 @@ export class controlSystem {
         if (!this.can(action, ev)) return false;
         ev.type = type;
         for (const fn of this.before_fire) fn(action, type, ev);
-        this.queue.push([action, type, ev.time]);
+        this.queue.push([action, type, ev.time]); if (ev.position) this.#lastEv.set(action, ev);
         this.actions[action]?.[1]?.(this.context(), ev);
         for (const fn of this.on_fire) fn(action, type, ev);   // a recorder listening (legacy/basement/recorder-kit.js)
         return true;

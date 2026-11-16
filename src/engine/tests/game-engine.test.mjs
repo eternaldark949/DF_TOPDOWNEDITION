@@ -197,3 +197,20 @@ test('the engine registers its backends and switches between them with one call'
     assert.equal(render.getRenderer(), 'recording');
     assert.deepEqual(made.map(surface => surface.id), ['recording']);
 });
+
+test('a click on an entity reaches it: pointerHit, and pointerEnter and pointerLeave as the mouse moves', async () => {
+    const window = new EventTarget(), document = new EventTarget(); document.hidden = false;
+    const emit = (type, p) => { const e = new Event(type, { cancelable: true }); Object.assign(e, p); window.dispatchEvent(e); };
+    const engine = await ready({ controls: { event_target: window, document, keymap: { select: ['mouseLeft'] } }, camera: { position: [0, 0], viewport: { width: 100, height: 100 } } });
+    const { elements, controls } = engine.basement;
+    const crate = elements.createEntity({ kind: 'static', name: 'crate', position: [0, 0], collision_shape: { shape_type: 'box', dimensions: [20, 20] } });
+    engine.start(); engine.updateState();
+    const heard = []; for (const type of ['pointerHit', 'pointerEnter', 'pointerLeave']) crate.on(type, event => heard.push(type + (event.action ? `:${event.action}` : '')));
+    emit('mousemove', { clientX: 50, clientY: 50 }); controls.updateState();
+    assert.equal(controls.hit().entity, crate, 'the middle of the screen is the camera position');
+    emit('mousedown', { button: 0, clientX: 50, clientY: 50 }); emit('mouseup', { button: 0, clientX: 50, clientY: 50 });
+    emit('mousemove', { clientX: 5, clientY: 5 }); controls.updateState();
+    engine.updateState();
+    assert.deepEqual(heard, ['pointerEnter', 'pointerHit:select', 'pointerLeave']);
+    engine.dispose();
+});

@@ -31,6 +31,13 @@ export class gameEngine {
         const view = new cameraSystem(camera), input = new controlSystem({ ...controls, auto_update: false });
         const draw = new renderSystem({ physics_system: world, camera: view, create_surface: render.create_surface ?? null })
             .registerRenderer('canvas', canvasRenderer).registerRenderer('webgl', webglRenderer).registerRenderer('recording', recordingRenderer);
+        // A click or tap becomes a hit through the camera and the render system's pick, and entities hear it.
+        input.setPicker((client, options) => draw.pickAt(view.clientToWorld(client, draw.getSurfaceBounds()), options));
+        input.on_fire.push((action, type, ev) => { const hit = ev.position ? ev.hit : null; if (hit) world._emit('pointerHit', { body: hit.body, entity: hit.entity, action, input_type: type, position: hit.position }); });
+        input.onHover(({ hit, previous }) => {
+            if (previous && !previous.destroyed) world._emit('pointerLeave', { body: previous.body, entity: previous });
+            if (hit) world._emit('pointerEnter', { body: hit.body, entity: hit.entity, position: hit.position });
+        });
         this.#basement = Object.freeze({ physics: world, elements: world.elements, rigs: world.rigs, motion: world.motion,
             traffic: world.traffic, controls: input, camera: view, render: draw, units: UNITS });
         this.#directory = Object.freeze({ ...DIRECTORY, assets: world.elements.asset_library });
