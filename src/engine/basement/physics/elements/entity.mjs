@@ -1,5 +1,6 @@
 // ===== LV0 BASEMENT =====
 import {bodyActive} from '../core/state.mjs';
+import {entityComponent,readComponent,componentSpan} from './components.mjs';
 /** Entity metadata/lifecycle only. Physical state lives exclusively in the engine body. */
 const records = new WeakMap();
 const BLOCKED = ['__proto__', 'constructor', 'prototype'];
@@ -20,7 +21,7 @@ function initializeEntity(entity, elements, packet) {
     records.set(entity, elements._construct(entity, packet));
     // A subclass field initializer cannot replace identity, a component or the live pose.
     for (const key of ['entity_id', 'body_id', 'kind', 'template_id', 'name', 'tags', 'assets', 'data', 'physics_system', 'body', 'motor', 'awareness', 'registered', 'pending', 'destroyed', 'active', 'position', 'rotation',
-        'linear_velocity', 'angular_velocity', 'mass', 'physics_type', 'collision_shape', 'collision_group', 'collision_mask', 'query_mask', 'axis_lock', 'ghost', 'parent', 'children']) {
+        'linear_velocity', 'angular_velocity', 'mass', 'physics_type', 'collision_shape', 'collision_group', 'collision_mask', 'query_mask', 'axis_lock', 'ghost', 'parent', 'children', 'components', 'height']) {
         const getter = Object.getOwnPropertyDescriptor(gameEntity.prototype, key).get;
         Object.defineProperty(entity, key, { get: getter, configurable: false, enumerable: false });
     }
@@ -73,6 +74,20 @@ export class gameEntity {
         if (value === undefined) delete r.data[key]; else r.data[key] = value;
         r.elements.world._emit('propertyChanged', { body: r.body, entity: this, key, value, previous }); return this;
     }
+    // ----- Components: the parts it is made of, each with layers at their own heights. -----
+    /** Its components, in order, as live views (see entityComponent). */
+    get components() { return (this.get('components') ?? []).map(c => new entityComponent(this, c.name)); }
+    getComponent(name) { return (this.get('components') ?? []).some(c => c.name === name) ? new entityComponent(this, name) : null; }
+    hasComponent(name) { return (this.get('components') ?? []).some(c => c.name === name); }
+    /** Adds a component ({name, at, rotation, joint, layers}); its name must be new. Returns its view. */
+    addComponent(packet) {
+        const component = readComponent(packet), list = this.get('components') ?? [];
+        if (list.some(c => c.name === component.name)) throw new TypeError(`There is already a component named ${component.name}`);
+        this.set('components', [...structuredClone(list), component]); return new entityComponent(this, component.name);
+    }
+    removeComponent(name) { const list = this.get('components') ?? []; if (!list.some(c => c.name === name)) return false; this.set('components', structuredClone(list.filter(c => c.name !== name))); return true; }
+    /** How tall it stands: the highest top among its components (0 with none). */
+    get height() { const list = this.get('components') ?? []; return list.length ? Math.max(0, ...list.map(c => componentSpan(c).top)) : 0; }
     // ----- Placement: readable verbs over the body. -----
     moveTo(x, y, options) { return this.setPosition(Array.isArray(x) ? x : [x, y], Array.isArray(x) ? y : options); }
     rotateTo(angle, options) { return this.setRotation(angle, options); }

@@ -9,4 +9,4 @@ export {artScene,DRAWING,MATERIAL,readValues,circle,ellipse,polyline,polygon,rec
 export {createLightLayer,createLightLayerParts,LIGHT_CUT} from './lighting.mjs';
 export {heightScale,heightView,boxFaces} from './height.mjs';
 export {depthBatches} from './depth.mjs';
-export {BOUNDS,fitBounds,drawingReach,drawingOutline,drawLook,qualifyResource} from './looks.mjs';
+export {BOUNDS,fitBounds,drawingReach,drawingOutline,drawLook,drawComponents,componentSteps,qualifyResource} from './looks.mjs';

@@ -64,6 +64,39 @@ export function drawLook(scene,entity,source,blend=1){
     scene.draw(drawing.steps,{at:pose.position,rotation:pose.rotation,scale:look.scale??1,values:look.values??{},materials:name=>resource(source,qualifyResource(name,drawing_id),'material')});
     return true;
 }
+/**
+ * The steps of an entity's components, placed in the entity's own space, as one drawing: each layer a
+ * group at its component's `at` and `rotation`. `solid_only` keeps the solid layers (for collision
+ * bounds). A component on a rig joint is placed at rest, on the entity's origin.
+ */
+export function componentSteps(components,source,{solid_only=false}={}){
+    const out=[];
+    for(const c of components)for(const layer of c.layers)if(!solid_only||layer.solid)out.push({shape:'group',x:c.at[0],y:c.at[1],rotation:c.rotation,steps:layerSteps(layer,source)});
+    return out;
+}
+/**
+ * Draws an entity's components, one scene per visible layer, lowest first: [{height, layer, component,
+ * packets}]. A component on a joint is placed by `joints(name)` ({position, rotation} in the world),
+ * when it gives one; otherwise it rides the entity's pose. Layers are drawn by base height, then layer
+ * number, then component order, so taller parts cover lower ones.
+ */
+export function drawComponents(entity,source,blend=1,{joints=()=>null}={}){
+    const components=entity.get('components')??[];if(!components.length)return [];
+    const look=entity.get('look',{});if(look.visible===false)return [];
+    const pose=entity.getRenderState(blend),scale=look.scale??1,values=look.values??{},out=[];
+    for(const {component:c,layer} of layersByHeight(components)){
+        const joint=c.joint?joints(c.joint):null,base=joint??{position:pose.position,rotation:pose.rotation},k=joint?1:scale;
+        const cos=Math.cos(base.rotation),sin=Math.sin(base.rotation),x=c.at[0]*k,y=c.at[1]*k;
+        const scene=new artScene();
+        scene.draw(layerSteps(layer,source),{at:[base.position[0]+x*cos-y*sin,base.position[1]+x*sin+y*cos],rotation:base.rotation+c.rotation,scale,values,
+            materials:name=>resource(source,qualifyResource(name,layer.drawing??entity.template_id??name),'material')});
+        out.push({height:layer.height,layer:layer.layer,component:c.name,packets:scene.finish()});
+    }
+    return out;
+}
+// Lowest first: by base height, then layer number, then component order (the physics package's layersByHeight).
+function layersByHeight(components){const out=[];components.forEach((component,order)=>{for(const layer of component.layers)if(layer.visible!==false)out.push({component,layer,order});});return out.sort((a,b)=>a.layer.height-b.layer.height||a.layer.layer-b.layer.layer||a.order-b.order);}
+function layerSteps(layer,source){return layer.steps??resource(source,layer.drawing,'drawing').steps;}
 function resource(source,id,kind){const value=source.getResource(id);if(value.kind!==kind)throw new TypeError(`${id} is a ${value.kind}, not a ${kind}`);return value;}
 
 // ----- Geometry -------------------------------------------------------------------------------------

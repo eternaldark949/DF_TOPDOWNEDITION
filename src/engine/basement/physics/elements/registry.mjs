@@ -1,4 +1,5 @@
 // ===== LV0 BASEMENT =====
+import { readComponents } from './components.mjs';
 import { clone, freeze } from '../core/values.mjs';
 import { EMPTY_DATA_SOURCE, isDataSource } from './data-source.mjs';
 import { gameEntity, entityRecord, restoreEntity } from './entity.mjs';
@@ -70,7 +71,8 @@ export class gameElements {
     peruseNearbyEntities(reference, options = {}, results = []) { return this.world.peruseNearbyEntities(reference, { ...options, spatial_entities: true }, results); }
     getStatistics() { return { entities: this.#entities.size, kinds: this.#kinds.size }; }
     _construct(entity, packet) {
-        const definition = this.#resolve(packet), kind = definition.kind ?? 'entity', preset = this.getKind(kind);
+        const { components: parts, ...definition } = this.#resolve(packet), kind = definition.kind ?? 'entity', preset = this.getKind(kind);
+        if (parts !== undefined) definition.data = { ...(definition.data ?? {}), components: readComponents(parts) };
         const motor = definition.motor === undefined ? preset.motor : definition.motor, awareness = definition.awareness ?? preset.awareness;
         if (motor !== null && !MOTORS.includes(motor)) throw new TypeError(`A motor is ${MOTORS.join(', ')} or null`);
         // Plain construction and save restoration use the same base, but normal callers cannot adopt a pre-existing body.

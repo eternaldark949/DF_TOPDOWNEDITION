@@ -185,6 +185,10 @@ An entity has a look when its `drawing` asset names a drawing resource (`{kind: 
 
 `fitBounds(steps, bounds, {values})` fits the collision shape to a drawing, like Blender's collision bounds: `bounds` is one of `BOUNDS` (`circle`, `box`, `capsule`, `hull`). It reads only the solid steps: the ones marked `solid: true`, or, when no step is marked, every shape except glows, ground shadows, text and lines. `drawingReach(steps, {values})` is the circle round everything painted, glows included, used as the body's render bounds so the camera keeps drawing it. `drawingOutline(steps, {values})` is the outline points of each step with its solid flag.
 
+### Components (`drawComponents`, `componentSteps`)
+
+An entity made of components (see the physics API's Components) is drawn by `drawLooks` too: `drawComponents(entity, source, blend, {joints})` gives one `{height, layer, component, packets}` per visible layer, lowest base first, each placed at its component's `at` and `rotation` from the entity's pose (scaled by `look.scale`), or from the world pose `joints(name)` gives for a component on a rig joint. `drawLooks` submits each at `look.depth` plus its height, so taller parts draw over lower ones, across entities too. `componentSteps(components, source, {solid_only})` turns the components into one drawing in the entity's space (each layer a group), which `fitBounds` and `drawingReach` read; a component on a joint is placed at rest.
+
 ## Height (`height.mjs`)
 
 Art that stands up from the ground under a camera above it. A point at height `z` draws at `camera + (point - camera) * k(z)`; `heightScale(z, eye)` is that `k` for a camera `eye` above the ground (`eye / (eye - z)`, with heights past 86% of the eye held there). At one height that is a uniform scale about the camera, so flat things up there are drawn in world units under one matrix.

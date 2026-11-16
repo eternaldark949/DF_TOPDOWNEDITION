@@ -11,6 +11,7 @@ export { vehicleMotor, pathMotor } from './motors/vehicle.mjs';
 export { projectileMotor } from './motors/projectile.mjs';
 export { particlePhysics } from './particles/particles.mjs';
 export { gameEntity } from './elements/entity.mjs';
+export { entityComponent, readComponent, readComponents, readLayer, componentSpan, layersByHeight } from './elements/components.mjs';
 export { gameElements } from './elements/registry.mjs';
 export { EMPTY_DATA_SOURCE, isDataSource } from './elements/data-source.mjs';
 export { KINDS, MOTORS, awarenessMatrix } from './elements/elements.mjs';

@@ -7,9 +7,12 @@
 //   bounds        circle | box | capsule | hull: collision bounds fitted from the drawing's solid steps
 //   collision_shape  an explicit shape, which always wins over `bounds`
 //   assets.material  a material resource whose `surface` sets the body's friction and restitution
+//   components    the parts it is made of: [{name, at, rotation, joint, layers: [{layer, height, thickness, steps | drawing, solid, visible}]}]
+//                 Fitted bounds take every solid layer of every component, with the drawing's solid steps.
 //   data          its starting properties
 // Nothing here knows which record it is making.
-import { fitBounds, drawingReach } from '../../basement/rendering/index.mjs';
+import { fitBounds, drawingReach, componentSteps, qualifyResource } from '../../basement/rendering/index.mjs';
+import { readComponents } from '../../basement/physics/index.mjs';
 import { validateDrawing, validateMaterial } from '../../directory/index.mjs';
 
 const SURFACE = Object.freeze(['friction', 'restitution']);
@@ -25,15 +28,21 @@ export function objectPacket(source, record, at = [0, 0], overrides = {}) {
         if (!look || typeof look !== 'object' || Array.isArray(look)) throw new TypeError('A look is {values, scale, layer, depth, visible}');
         extra.data = { ...(packet.data ?? {}), look };
     }
-    const drawing_id = resolved.assets?.drawing;
-    if (resolved.bounds !== undefined && !drawing_id) throw new TypeError('Fitted bounds need a drawing asset');
-    if (drawing_id) {
-        const drawing = source.getResource(drawing_id);
-        if (drawing.kind !== 'drawing') throw new TypeError(`${drawing_id} is not a drawing`);
-        validateDrawing(drawing, drawing_id);
-        const values = look?.values ?? {};
-        if (resolved.bounds !== undefined && resolved.collision_shape === undefined) extra.collision_shape = fitBounds(drawing.steps, resolved.bounds, { values });
-        if (resolved.render_shape === undefined) extra.render_shape = drawingReach(drawing.steps, { values });
+    const drawing_id = resolved.assets?.drawing, components = resolved.components === undefined ? null : readComponents(resolved.components);
+    // A layer's bare drawing name is in its record's own library.
+    if (components && typeof packet.template === 'string') for (const c of components) for (const layer of c.layers) if (layer.drawing) layer.drawing = qualifyResource(layer.drawing, packet.template);
+    if (resolved.bounds !== undefined && !drawing_id && !components) throw new TypeError('Fitted bounds need a drawing asset or components');
+    if (drawing_id || components) {
+        let drawing = null;
+        if (drawing_id) {
+            drawing = source.getResource(drawing_id);
+            if (drawing.kind !== 'drawing') throw new TypeError(`${drawing_id} is not a drawing`);
+            validateDrawing(drawing, drawing_id);
+        }
+        if (components) { extra.components = components; for (const c of components) for (const layer of c.layers) if (layer.drawing) validateDrawing(source.getResource(layer.drawing), layer.drawing); }
+        const values = look?.values ?? {}, own = drawing?.steps ?? [];
+        if (resolved.bounds !== undefined && resolved.collision_shape === undefined) extra.collision_shape = fitBounds([...own, ...(components ? componentSteps(components, source, { solid_only: true }) : [])], resolved.bounds, { values });
+        if (resolved.render_shape === undefined) extra.render_shape = drawingReach([...own, ...(components ? componentSteps(components, source) : [])], { values });
     }
     const material_id = resolved.assets?.material;
     if (material_id) {

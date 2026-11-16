@@ -3,7 +3,7 @@ import {renderFrame} from './frame.mjs';
 import {geometry,material,requirements} from './packets.mjs';
 import {finite,identifier,freezeData,CAPABILITIES} from './values.mjs';
 import {artScene} from './art.mjs';
-import {drawLook} from './looks.mjs';
+import {drawLook,drawComponents} from './looks.mjs';
 
 function normalizeResource(description){
     if(!description||typeof description!=='object')throw new TypeError('A data resource descriptor is required');
@@ -77,15 +77,19 @@ export class renderSystem {
         try{this.#backend?.resize(this.#camera.viewport);}catch(error){this.#camera.setViewport(old);throw error;}return this;
     }
     getVisibleEntities({blend=1,margin=0,...options}={},results=[]){this.#live();return this.#world.queryEntitiesInBounds({...options,bounds:this.#camera.getVisibleBounds({blend,margin}),bounds_type:'render'},results);}
-    /** Draws every visible entity that has a look (a `drawing` asset) into the open frame, at its `look.layer` and `look.depth`. Returns how many it drew. */
+    /** Draws every visible entity's look (a `drawing` asset) and its components into the open frame, at its `look.layer` and `look.depth`; a component layer's depth adds its height, so higher parts draw over lower ones. Returns how many entities it drew. */
     drawLooks(blend=1){
         this.#live();if(!this.#collecting)throw new Error('Draw looks inside an open render frame');
         const source=this.#world.elements.asset_library;let drawn=0;
         for(const {entity} of this.getVisibleEntities({blend},this.#visible)){
-            if(!entity?.assets?.drawing)continue;
-            const scene=new artScene();if(!drawLook(scene,entity,source,blend))continue;
-            const look=entity.get('look',{}),layer=look.layer??0,depth=look.depth??0;
-            for(const packet of scene.finish())this.#frame.submit({...packet,layer,depth});drawn++;
+            if(!entity)continue;
+            const look=entity.get('look',{}),layer=look.layer??0,depth=look.depth??0;let drew=false;
+            if(entity.assets?.drawing){const scene=new artScene();if(drawLook(scene,entity,source,blend)){for(const packet of scene.finish())this.#frame.submit({...packet,layer,depth});drew=true;}}
+            if(entity.has('components')){
+                let pose;const rigs=this.#world.rigs,joints=name=>{pose??=rigs?.getRig(entity)?rigs.getPose(entity,{blend,world_space:true}):null;return pose?.joints[name]??null;};
+                for(const part of drawComponents(entity,source,blend,{joints})){for(const packet of part.packets)this.#frame.submit({...packet,layer,depth:depth+part.height});drew=true;}
+            }
+            if(drew)drawn++;
         }
         return drawn;
     }

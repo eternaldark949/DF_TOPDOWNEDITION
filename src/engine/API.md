@@ -184,6 +184,9 @@ Every object in the world is a `gameEntity`, the way every object in a Blender g
 | `entity.attach(child, {at, rotation})` | Parents `child` at a local offset; the child rides along until it is detached |
 | `entity.detach()` / `entity.detach(child)` | Lets go of its parent, or of one child. Returns `false` when there was nothing to leave or no clear spot to leave at |
 | `entity.parent` / `entity.children` | Its parent entity (or `null`) and its attached children |
+| `entity.components` / `entity.getComponent(name)` | The parts it is made of (see [Components](#components)) |
+| `entity.addComponent({...})` / `entity.removeComponent(name)` | Adds or removes a part |
+| `entity.height` | How tall it stands: the highest top among its components |
 | `entity.on(event, handler)` | Events on this entity, such as `propertyChanged` or a contact; returns a call that stops listening |
 | `entity.activate()` / `entity.deactivate()` / `entity.destroy()` | Turns it on or off, or removes it |
 
@@ -436,6 +439,7 @@ One call makes anything: `engine.createObject(record, at)`. A record is a templa
 | `bounds` | Collision bounds fitted from the drawing's solid steps: `circle`, `box`, `capsule` or `hull` |
 | `collision_shape` | An exact shape; it always wins over `bounds` |
 | `assets.material` | A material whose `surface` sets the body's friction and restitution |
+| `components` | The parts it is made of, with layers at their own heights (see [Components](#components)); `bounds` fits every solid layer |
 | `data` | Its starting properties |
 
 ```js

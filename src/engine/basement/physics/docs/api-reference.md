@@ -211,6 +211,23 @@ Entity properties are read-only: `entity_id`, `body_id` (same root identity), `k
 | `attach(child,{at=[0,0],rotation=0,combine_mass=false,rig_anchor=null})` | Parents a child entity or body at a local offset through `attachBody`; returns the parent. |
 | `detach(child=null,{exit_points,inherit_velocity})` | With no child, detaches this entity from its parent; with a child, detaches that child and throws if it is not attached here. Exits at its current local offset unless `exit_points` are given. Returns `true` when it left and `false` when it had no parent or no exit was clear. |
 | `parent`, `children` | Read-only: the parent entity or `null`, and the attached child entities. |
+| `components`, `getComponent(name)`, `hasComponent(name)` | Its parts, as live `entityComponent` views in order; a missing name gives `null`. |
+| `addComponent(packet)`, `removeComponent(name)` | Adds a component (a new name; returns its view) or removes one (`true` when it was there). |
+| `height` | Read-only: the highest top among its components, 0 with none. |
+
+### Components
+
+An entity is made of components, kept as plain data in its `components` property (so they save, load and emit `propertyChanged` like any property). A packet or template may give `components: [...]`; each is `{name, at=[0,0], rotation=0, joint=null, layers}`. `at` and `rotation` place it from the entity's origin, or from the rig joint `joint` names when the entity has a rig. `layers` is one or more `{layer, height=0, thickness=0, steps | drawing, solid=true, visible=true}`: an integer layer, its base `height` above the component's layer 0 and its `thickness`, in world units, and its shapes as drawing steps or a drawing resource id. Solid layers are what fitted collision bounds take; every visible layer is drawn, lowest base first. `readComponent(packet)`, `readComponents(list)` and `readLayer(packet)` check and normalise them (unknown fields, repeated names or layers, and non-integer layers throw; lengths must already be world units, which the Directory gives when it loads "3 m"). `componentSpan(component)` is `{base, top}` and `layersByHeight(components,{visible_only=true})` lists `[{component, layer, order}]` lowest first: by height, then layer, then list order.
+
+| entityComponent member | Contract |
+|---|---|
+| `entity`, `name`, `at`, `rotation`, `joint`, `layers` | Read-only copies of its data. A view of a removed component throws on use. |
+| `base`, `top` | Its lowest layer's base height, and its highest layer's base plus thickness. |
+| `getLayer(layer)`, `hasLayer(layer)` | A copy of one layer, or `null`; whether it has it. |
+| `moveTo(x,y)` or `moveTo([x,y])`, `rotateTo(angle)`, `setJoint(joint)` | Place it on the entity, or on a rig joint (`null` for the origin). |
+| `setLayer(packet)`, `removeLayer(layer)` | Add or replace a layer by number; remove one (a component keeps at least one). |
+| `setLayerVisible(layer,b)`, `setLayerSolid(layer,b)`, `setLayerHeight(layer,height,thickness)` | Change one layer. |
+| `toEntity([x,y])` | A point in its own space in the entity's space. |
 
 `physics.elements` is a `gameElements`. Its read-only `world` and `asset_library` identify its owner and definitions. It maps identities, not positions; there is no second spatial index. A world cannot have a second `gameElements` owner; use its existing `elements` service.
 
