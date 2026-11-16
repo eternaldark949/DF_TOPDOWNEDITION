@@ -89,7 +89,7 @@ engineMixin({
         this._apartmentExit=exit;uiKit.toggle(this.transitionBtn,!!exit,'flex');if(exit)setActionPill(this.transitionBtn,'Exit','City','F');
     },
     _installNativeCombat(previous){
-        const cleanups=[],context={engine:this,api:{physics:this.physics_system,elements:this.physics_system.elements,items:this.items},createEntity:packet=>this.physics_system.createEntity(packet),defer:fn=>cleanups.push(fn)};
+        const cleanups=[],context={engine:this,basement:{physics:this.physics_system,elements:this.physics_system.elements},game:{items:this.items},createEntity:packet=>this.physics_system.createEntity(packet),defer:fn=>cleanups.push(fn)};
         this._nativeCombatCleanups=cleanups;
         this.combat=new DFNative.combatSystem({policy:{incoming_multiplier:target=>target===this.player&&this.weapons?.guarding?.75:1,on_event:(event,detail)=>{
             if(event==='weapon:fired'){audioSys.sfx('shoot');this.triggerShake(this.currentWeapon?.stats.recoil??2);}
