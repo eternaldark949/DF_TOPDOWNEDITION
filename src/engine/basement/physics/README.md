@@ -2,22 +2,23 @@
 
 A standalone, dependency-free 2D engine, developed separately before DF_TOPDOWNEDITION is migrated. This folder is the shareable package: implementation, API documentation, executable examples, tests and benchmarks.
 
-**Version 0.3.0 — native migration capabilities.** All specialized game elements inherit `gameEntity` and register by construction. Directory-owned asset libraries supply definitions. The complete native runtime is now bundled into the playable game and owns the apartment scene. Other scenes retain legacy ownership. See the apartment cutover (game checkout: `docs/migration/cutovers/APARTMENT-CUTOVER.md`) and [implementation status and limits](docs/status.md).
+**Version 0.3.0 — native migration capabilities.** Every game element is one `gameEntity` whose kind and parts are data, registered by construction. Directory-owned asset libraries supply definitions. The complete native runtime is now bundled into the playable game and owns the apartment scene. Other scenes retain legacy ownership. See the apartment cutover (game checkout: `docs/migration/cutovers/APARTMENT-CUTOVER.md`) and [implementation status and limits](docs/status.md).
 
 ```js
 import { physicsSystem } from './index.mjs';
 
 const physics = new physicsSystem();
-const character = physics.createCharacter({
+const character = physics.createEntity({
+    kind: 'character',
     name: 'Walker',
     position: [100, 100],
     collision_shape: { shape_type: 'circle', radius: 12 },
     movement: { max_speed: 150 }
 });
 
-character.setMovement([1, 0]);
+character.motor.setMovement([1, 0]);
 physics.updateState(); // one fixed step; normally called by the Lobby
-console.log(character.physics_controller.body.getState());
+console.log(character.body.getState());
 ```
 
 Methods/classes use lower camel case; properties and packet keywords use snake_case. All positions are centres. Units are world units, seconds, kilograms and radians. Gameplay defines objects and sends intentions; the engine owns spatial membership and physical outcomes.

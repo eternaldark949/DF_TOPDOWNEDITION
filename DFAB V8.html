@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '731ff45d0a63';
+        const DFAB_BUILD = 'ccb6a6eafb90';
     </script>
     <script type="text/dfab" data-src="classic/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="50941">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="50918">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -9867,7 +9867,7 @@ const {collisionShape,shapeBounds,shapeReach,pieces} = m6;
 const {collisionDetector} = m10;
 const {vector,number,sub,add,scale,unit,length,BODY_GROUP,EPS,validBounds,boundsMeet,unionBounds,angleDelta,rotate} = m7;
 
-function referenceBody(value) { return value?.physics_controller?.body ?? value?.body ?? value; }
+function referenceBody(value) { return value?.motor?.body ?? value?.body ?? value; }
 function referencePosition(world, value) {
     if (Array.isArray(value)) return vector(value);
     return [...world._record(referenceBody(value)).position];
@@ -11634,8 +11634,75 @@ class projectileMotor {
 
 return Object.freeze({get projectileMotor(){return projectileMotor;}});
 })();
+// src/engine/basement/physics/elements/elements.mjs
+const m26 = (()=>{
+// ===== LV0 BASEMENT =====
+const {BODY_GROUP} = m7;
+
+/**
+ * THE KINDS: what an object is to physics, as data. A kind is a preset of body defaults plus the
+ * parts it switches on: `motor` (character, vehicle, projectile or null) and `awareness`. A record
+ * names its kind and may override any default. There are no entity classes: every object is a gameEntity.
+ */
+const KINDS = Object.freeze({
+    entity: { body: { physics_type: 'static', collision_group: 0, collision_mask: 0, query_mask: 0 }, motor: null, awareness: false },
+    decoration: { body: { physics_type: 'static', collision_group: 0, collision_mask: 0, query_mask: 0 }, motor: null, awareness: false },
+    character: { body: { physics_type: 'character', collision_group: BODY_GROUP.CHARACTER }, motor: 'character', awareness: true },
+    vehicle: { body: { physics_type: 'rigid', collision_group: BODY_GROUP.VEHICLE }, motor: 'vehicle', awareness: false },
+    projectile: { body: { physics_type: 'rigid', collision_group: BODY_GROUP.PROJECTILE, friction: 0, linear_damping: 0, angular_damping: 0 }, motor: 'projectile', awareness: false },
+    prop: { body: { physics_type: 'rigid', collision_group: BODY_GROUP.PROP }, motor: null, awareness: false },
+    static: { body: { physics_type: 'static', collision_group: BODY_GROUP.STATIC }, motor: null, awareness: false },
+    trigger: { body: { physics_type: 'static', collision_group: BODY_GROUP.SENSOR, ghost: true }, motor: null, awareness: false },
+});
+/** The motors a kind or a record can switch on. */
+const MOTORS = Object.freeze(['character', 'vehicle', 'projectile']);
+
+class awarenessMatrix {
+    constructor(world, body) { this.world = world; this.body = body; this.options = {}; }
+    analyzeSurroundings(options = {}) { this.options = { ...options }; return this.getNearbyEntities(); }
+    getNearbyEntities(results = []) { return this.world.peruseNearbyEntities(this.body, this.options, results); }
+    getNearestObstacle() { return this.world.findNearestEntity(this.body, { ...this.options, include_ghosts: false }); }
+    getMovementClearance(packet, result = {}) { return this.world.getPathClearance({ ...packet, body: this.body, from: this.body.position }, result); }
+}
+
+return Object.freeze({get KINDS(){return KINDS;},get MOTORS(){return MOTORS;},get awarenessMatrix(){return awarenessMatrix;}});
+})();
+// src/engine/basement/physics/elements/data-source.mjs
+const m28 = (()=>{
+// ===== LV0 BASEMENT =====
+// THE DATA SOURCE CONTRACT: what the Basement needs from wherever its data lives. The Directory's
+// registry (engine/directory/registry.mjs) provides it; the Basement never imports the Directory,
+// it is handed a source as `new physicsSystem({ asset_library })`. Two calls:
+//   resolveTemplate(template_id, packet) -> the packet resolved over its template, a detached copy
+//   getResource(resource_id)             -> a frozen typed resource {kind, ...}, or throws
+// With no source, a world has no templates and no resources: packets are used as they are.
+
+const plain = value => value !== null && typeof value === 'object' && (Object.getPrototypeOf(value) === null || Object.getPrototypeOf(Object.getPrototypeOf(value)) === null);
+const UNSAFE = ['__proto__', 'prototype', 'constructor'];
+
+function isDataSource(source) { return !!source && typeof source.resolveTemplate === 'function' && typeof source.getResource === 'function'; }
+
+/** The source of a world given none: no templates, no resources. */
+const EMPTY_DATA_SOURCE = Object.freeze({
+    resolveTemplate(template_id, packet = {}) {
+        if (template_id) throw new Error(`Unknown entity template: ${template_id}`);
+        const value = {};
+        for (const [key, entry] of Object.entries(packet)) {
+            if (UNSAFE.includes(key)) throw new TypeError(`Unsafe asset key: ${key}`);
+            value[key] = structuredClone(entry);
+        }
+        if (!plain(value.assets ?? {})) throw new TypeError('Entity assets must be a slot-to-resource object');
+        if (!plain(value.data ?? {})) throw new TypeError('Entity data must be an object');
+        for (const id of Object.values(value.assets ?? {})) this.getResource(id);
+        return value;
+    },
+    getResource(resource_id) { throw new Error(`Unknown asset resource: ${resource_id}`); }
+});
+
+return Object.freeze({get isDataSource(){return isDataSource;},get EMPTY_DATA_SOURCE(){return EMPTY_DATA_SOURCE;}});
+})();
 // src/engine/basement/physics/elements/entity.mjs
-const m27 = (()=>{
+const m29 = (()=>{
 // ===== LV0 BASEMENT =====
 const {bodyActive} = m8;
 /** Entity metadata/lifecycle only. Physical state lives exclusively in the engine body. */
@@ -11653,11 +11720,11 @@ function entityRecord(entity) {
     if (!record) throw new TypeError('Expected a gameEntity');
     return record;
 }
-function initializeEntity(entity, elements, packet, Constructor) {
+function initializeEntity(entity, elements, packet) {
     if (!elements || typeof elements._construct !== 'function') throw new TypeError('Construct entities through a gameElements owner');
-    records.set(entity, elements._construct(entity, packet, Constructor));
+    records.set(entity, elements._construct(entity, packet));
     // A subclass field initializer cannot replace identity, a component or the live pose.
-    for (const key of ['entity_id', 'body_id', 'entity_type', 'template_id', 'name', 'tags', 'assets', 'data', 'physics_system', 'body', 'physics_controller', 'awareness', 'registered', 'pending', 'destroyed', 'active', 'position', 'rotation',
+    for (const key of ['entity_id', 'body_id', 'kind', 'template_id', 'name', 'tags', 'assets', 'data', 'physics_system', 'body', 'motor', 'awareness', 'registered', 'pending', 'destroyed', 'active', 'position', 'rotation',
         'linear_velocity', 'angular_velocity', 'mass', 'physics_type', 'collision_shape', 'collision_group', 'collision_mask', 'query_mask', 'axis_lock', 'ghost', 'parent', 'children']) {
         const getter = Object.getOwnPropertyDescriptor(gameEntity.prototype, key).get;
         Object.defineProperty(entity, key, { get: getter, configurable: false, enumerable: false });
@@ -11666,16 +11733,16 @@ function initializeEntity(entity, elements, packet, Constructor) {
     return entity;
 }
 // Save restoration uses the same base initialization without replaying arbitrary gameplay constructors.
-function restoreEntity(elements, packet, Constructor) { return initializeEntity(Object.create(Constructor.prototype), elements, packet, Constructor); }
+function restoreEntity(elements, packet) { return initializeEntity(Object.create(gameEntity.prototype), elements, packet); }
 class gameEntity {
-    static entity_type = 'entity';
-    static physics_role = 'entity';
     constructor(elements, packet = {}) {
-        initializeEntity(this, elements, packet, new.target);
+        if (new.target !== gameEntity) throw new TypeError('There are no entity subclasses: an object is a gameEntity, and its kind, parts and properties are data');
+        initializeEntity(this, elements, packet);
     }
     get entity_id() { return entityRecord(this).body.body_id; }
     get body_id() { return this.entity_id; }
-    get entity_type() { return entityRecord(this).entity_type; }
+    /** What it is to physics: the kind preset it was made from. */
+    get kind() { return entityRecord(this).kind; }
     get template_id() { return entityRecord(this).template_id; }
     get name() { return entityRecord(this).name; }
     get tags() { return entityRecord(this).tags; }
@@ -11683,7 +11750,8 @@ class gameEntity {
     get data() { return entityRecord(this).data; }
     get physics_system() { return entityRecord(this).elements.world; }
     get body() { return entityRecord(this).body; }
-    get physics_controller() { return entityRecord(this).controller; }
+    /** Its motor part (a character, vehicle or projectile motor), or null. */
+    get motor() { return entityRecord(this).motor; }
     get awareness() { return entityRecord(this).awareness; }
     get registered() { return entityRecord(this).registered; }
     get pending() { const r = entityRecord(this); return !r.registered && !r.destroyed; }
@@ -11735,7 +11803,8 @@ class gameEntity {
     destroy() { const r = entityRecord(this); if (!r.destroyed) r.elements.world.removeBody(r.body); return this; }
     updateBody(changes) { const r = entityRecord(this); r.elements._requireLive(this); r.elements.world.updateBody(r.body, changes); return this; }
     setPosition(position, options) { this.body.setPosition(position, options); return this; }
-    setRotation(rotation, options) { this.body.setRotation(rotation, options); return this; }
+    /** Turns it; a character motor turns it its own way (facing, not an instant snap of the body). */
+    setRotation(rotation, options) { (typeof entityRecord(this).motor?.setRotation === 'function' ? entityRecord(this).motor : this.body).setRotation(rotation, options); return this; }
     getState(result = {}) { return entityRecord(this).elements._snapshotEntity(this, result); }
     getRenderState(blend, result = {}) { return this.body.getRenderState(blend, result); }
     getAsset(slot) {
@@ -11750,85 +11819,28 @@ class gameEntity {
 
 return Object.freeze({get entityRecord(){return entityRecord;},get restoreEntity(){return restoreEntity;},get gameEntity(){return gameEntity;}});
 })();
-// src/engine/basement/physics/elements/elements.mjs
-const m26 = (()=>{
-// ===== LV0 BASEMENT =====
-const {gameEntity} = m27;
-
-/** Official element inheritance. Base construction creates and registers the components. */
-class gameCharacter extends gameEntity { static entity_type = 'character'; static physics_role = 'character'; }
-class gameVehicle extends gameEntity { static entity_type = 'vehicle'; static physics_role = 'vehicle'; }
-class gameProjectile extends gameEntity { static entity_type = 'projectile'; static physics_role = 'projectile'; }
-class gameProp extends gameEntity { static entity_type = 'prop'; static physics_role = 'prop'; }
-class gameStatic extends gameEntity { static entity_type = 'static'; static physics_role = 'static'; }
-class gameTrigger extends gameEntity { static entity_type = 'trigger'; static physics_role = 'trigger'; }
-class gameDecoration extends gameEntity { static entity_type = 'decoration'; static physics_role = 'decoration'; }
-for (const method of ['suspendMovement', 'evadeBody', 'setMovement', 'setRotation', 'moveTo', 'followTarget', 'orbitTarget', 'fleeTarget', 'lookAtTarget', 'lookInDirection', 'clearFacing', 'teleportInDirection', 'teleportToward', 'dashTo', 'teleportTo', 'stopMovement', 'cancelMovement', 'getMovementState']) {
-    Object.defineProperty(gameCharacter.prototype, method, { value: function (...args) { return this.physics_controller[method](...args); } });
-}
-for (const method of ['assembleVehicle', 'setSurface', 'accelerateVehicle', 'brakeVehicle', 'reverseVehicle', 'steerVehicle', 'realignSteering', 'setHandbrake', 'followPath', 'driveTo', 'stopVehicle', 'parkVehicle', 'getSpeed', 'getVehicleState']) {
-    Object.defineProperty(gameVehicle.prototype, method, { value: function (...args) { return this.physics_controller[method](...args); } });
-}
-for (const method of ['launchProjectile', 'redirectProjectile', 'removeProjectile']) {
-    Object.defineProperty(gameProjectile.prototype, method, { value: function (...args) { return this.physics_controller[method](...args); } });
-}
-class awarenessMatrix {
-    constructor(world, body) { this.world = world; this.body = body; this.options = {}; }
-    analyzeSurroundings(options = {}) { this.options = { ...options }; return this.getNearbyEntities(); }
-    getNearbyEntities(results = []) { return this.world.peruseNearbyEntities(this.body, this.options, results); }
-    getNearestObstacle() { return this.world.findNearestEntity(this.body, { ...this.options, include_ghosts: false }); }
-    getMovementClearance(packet, result = {}) { return this.world.getPathClearance({ ...packet, body: this.body, from: this.body.position }, result); }
-}
-
-return Object.freeze({get gameCharacter(){return gameCharacter;},get gameVehicle(){return gameVehicle;},get gameProjectile(){return gameProjectile;},get gameProp(){return gameProp;},get gameStatic(){return gameStatic;},get gameTrigger(){return gameTrigger;},get gameDecoration(){return gameDecoration;},get awarenessMatrix(){return awarenessMatrix;}});
-})();
-// src/engine/basement/physics/elements/data-source.mjs
-const m29 = (()=>{
-// ===== LV0 BASEMENT =====
-// THE DATA SOURCE CONTRACT: what the Basement needs from wherever its data lives. The Directory's
-// registry (engine/directory/registry.mjs) provides it; the Basement never imports the Directory,
-// it is handed a source as `new physicsSystem({ asset_library })`. Two calls:
-//   resolveTemplate(template_id, packet) -> the packet resolved over its template, a detached copy
-//   getResource(resource_id)             -> a frozen typed resource {kind, ...}, or throws
-// With no source, a world has no templates and no resources: packets are used as they are.
-
-const plain = value => value !== null && typeof value === 'object' && (Object.getPrototypeOf(value) === null || Object.getPrototypeOf(Object.getPrototypeOf(value)) === null);
-const UNSAFE = ['__proto__', 'prototype', 'constructor'];
-
-function isDataSource(source) { return !!source && typeof source.resolveTemplate === 'function' && typeof source.getResource === 'function'; }
-
-/** The source of a world given none: no templates, no resources. */
-const EMPTY_DATA_SOURCE = Object.freeze({
-    resolveTemplate(template_id, packet = {}) {
-        if (template_id) throw new Error(`Unknown entity template: ${template_id}`);
-        const value = {};
-        for (const [key, entry] of Object.entries(packet)) {
-            if (UNSAFE.includes(key)) throw new TypeError(`Unsafe asset key: ${key}`);
-            value[key] = structuredClone(entry);
-        }
-        if (!plain(value.assets ?? {})) throw new TypeError('Entity assets must be a slot-to-resource object');
-        if (!plain(value.data ?? {})) throw new TypeError('Entity data must be an object');
-        for (const id of Object.values(value.assets ?? {})) this.getResource(id);
-        return value;
-    },
-    getResource(resource_id) { throw new Error(`Unknown asset resource: ${resource_id}`); }
-});
-
-return Object.freeze({get isDataSource(){return isDataSource;},get EMPTY_DATA_SOURCE(){return EMPTY_DATA_SOURCE;}});
-})();
 // src/engine/basement/physics/elements/registry.mjs
-const m28 = (()=>{
+const m27 = (()=>{
 // ===== LV0 BASEMENT =====
 const {clone,freeze} = m7;
-const {EMPTY_DATA_SOURCE,isDataSource} = m29;
-const {gameEntity,entityRecord,restoreEntity} = m27;
-const {gameCharacter,gameVehicle,gameProjectile,gameProp,gameStatic,gameTrigger,gameDecoration,awarenessMatrix} = m26;
+const {EMPTY_DATA_SOURCE,isDataSource} = m28;
+const {gameEntity,entityRecord,restoreEntity} = m29;
+const {KINDS,MOTORS} = m26;
 
-const builtins = { entity: gameEntity, character: gameCharacter, vehicle: gameVehicle, projectile: gameProjectile, prop: gameProp, static: gameStatic, trigger: gameTrigger, decoration: gameDecoration };
+const UNSAFE = ['__proto__', 'constructor', 'prototype'];
+function checkKind(kind, preset) {
+    if (typeof kind !== 'string' || !kind || UNSAFE.includes(kind)) throw new TypeError('A kind is named by a non-empty string');
+    const { body = {}, motor = null, awareness = false, ...rest } = preset ?? {};
+    if (Object.keys(rest).length) throw new TypeError(`Unknown kind field: ${Object.keys(rest).join(', ')} (a kind is {body, motor, awareness})`);
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new TypeError('A kind\'s body is an object of body defaults');
+    if (motor !== null && !MOTORS.includes(motor)) throw new TypeError(`A motor is ${MOTORS.join(', ')} or null`);
+    if (typeof awareness !== 'boolean') throw new TypeError('awareness is true or false');
+    return freeze(clone({ body, motor, awareness }));
+}
 
-/** Identity registry, never a physical-state cache or another spatial index. */
+/** Identity registry, never a physical-state cache or another spatial index. Every object is one gameEntity; its kind is data. */
 class gameElements {
-    #entities = new Map(); #byType = new Map(); #types = new Map(Object.entries(builtins)); #construction = null; #restore = null;
+    #entities = new Map(); #byKind = new Map(); #byTag = new Map(); #kinds = new Map(Object.entries(KINDS).map(([k, v]) => [k, checkKind(k, v)])); #construction = null; #restore = null;
     constructor(world, { asset_library = EMPTY_DATA_SOURCE } = {}) {
         if (!world || typeof world._createEntityComponents !== 'function' || typeof world._mutate !== 'function') throw new TypeError('gameElements requires its physicsSystem owner');
         if (world.elements) throw new Error('The world already owns its authoritative gameElements registry');
@@ -11836,7 +11848,7 @@ class gameElements {
         Object.defineProperties(this, { world: { value: world }, asset_library: { value: asset_library, enumerable: true } });
     }
     #resolve(packet) {
-        for (const key of ['body', 'physics_controller', 'entity_id', 'body_id', 'linked_object', 'linked_entity']) {
+        for (const key of ['body', 'motor_instance', 'entity_id', 'body_id', 'linked_object', 'linked_entity']) {
             if (Object.hasOwn(packet, key)) throw new TypeError(`Entity construction cannot adopt or override ${key}`);
         }
         // Runtime target handles are commands, not serializable asset definitions.
@@ -11845,13 +11857,11 @@ class gameElements {
         if (target !== undefined) resolved.target = target;
         return resolved;
     }
+    /** Makes any object: `kind` (default 'entity') presets its body and parts; every other field is the record's. */
     createEntity(packet = {}) {
-        const resolved = this.#resolve(packet), type = resolved.entity_type ?? 'entity', Constructor = this.#types.get(type);
-        if (!Constructor) throw new Error(`Unknown entity type: ${type}`);
         const previous = this.#construction, context = { entities: [] }; this.#construction = context;
         try {
-            const entity = new Constructor(this, { ...resolved, entity_type: type });
-            if (!(entity instanceof Constructor) || !context.entities.includes(entity)) throw new TypeError('Entity constructor must initialize its gameEntity base');
+            const entity = new gameEntity(this, packet);
             if (previous) previous.entities.push(...context.entities);
             return entity;
         }
@@ -11861,38 +11871,19 @@ class gameElements {
         }
         finally { this.#construction = previous; }
     }
-    createCharacter(packet = {}) { return this.#createKind('character', packet); }
-    createVehicle(packet = {}) { return this.#createKind('vehicle', packet); }
-    createProjectile(packet = {}) { return this.#createKind('projectile', packet); }
-    createProp(packet = {}) { return this.#createKind('prop', packet); }
-    createStatic(packet = {}) { return this.#createKind('static', packet); }
-    createTrigger(packet = {}) { return this.#createKind('trigger', packet); }
-    createDecoration(packet = {}) { return this.#createKind('decoration', packet); }
-    #createKind(role, packet) {
-        const resolved = this.#resolve(packet), type = resolved.entity_type ?? role, Constructor = this.#types.get(type);
-        if (!Constructor || Constructor.physics_role !== role) throw new TypeError(`Entity type ${type} is not a ${role}`);
-        return this.createEntity({ ...packet, entity_type: type });
-    }
-    registerEntityType(entity_type, Constructor) {
-        if (typeof entity_type !== 'string' || !entity_type || typeof Constructor !== 'function' || !(Constructor.prototype instanceof gameEntity)) throw new TypeError('Entity classes must extend gameEntity');
-        if (this.#types.has(entity_type)) throw new Error(`Entity type already registered: ${entity_type}`);
-        if (!Object.hasOwn(builtins, Constructor.physics_role)) throw new TypeError('Unsupported physics_role');
-        this.#types.set(entity_type, Constructor); return this;
-    }
-    listEntityTypes() { return [...this.#types.keys()]; }
+    /** Adds a kind: `{body, motor, awareness}` — body defaults, the motor it switches on (or null), and whether it is aware of its surroundings. */
+    defineKind(kind, preset) { if (this.#kinds.has(kind)) throw new Error(`Kind already defined: ${kind}`); this.#kinds.set(kind, checkKind(kind, preset)); return this; }
+    getKind(kind) { const preset = this.#kinds.get(kind); if (!preset) throw new Error(`Unknown kind: ${kind} (one of ${[...this.#kinds.keys()].join(', ')})`); return preset; }
+    listKinds() { return [...this.#kinds.keys()]; }
     fetchEntity(entity_id) { return this.#entities.get(entity_id) ?? null; }
     /**
-     * Live entities, in registration order. `entity_type` lists one type, `instance_of` every type whose
-     * class is or extends that class (type by type, each in registration order): both read the type's own
-     * list, kept as entities come and go, so they cost what they return and not the world's entity count.
+     * Live entities, in registration order: all of them, one `kind`, or those carrying `tag`. Each reads
+     * its own list, kept as entities come and go, so it costs what it returns and not the world's count.
      */
-    getEntities({ entity_type, instance_of, active } = {}, results = []) {
+    getEntities({ kind, tag, active } = {}, results = []) {
         results.length = 0;
-        if (instance_of !== undefined && typeof instance_of !== 'function') throw new TypeError('instance_of must be a class');
-        const is = type => { const C = this.#types.get(type); return instance_of === undefined || C === instance_of || C?.prototype instanceof instance_of; };
-        if (entity_type !== undefined) { if (is(entity_type)) this.#push(this.#byType.get(entity_type), active, results); }
-        else if (instance_of !== undefined) { for (const type of this.#types.keys()) if (is(type)) this.#push(this.#byType.get(type), active, results); }
-        else this.#push(this.#entities, active, results);
+        if (kind !== undefined && tag !== undefined) { for (const entity of this.#byKind.get(kind)?.values() ?? []) if (entity.tags.includes(tag) && (active === undefined || entity.active === active)) results.push(entity); return results; }
+        this.#push(kind !== undefined ? this.#byKind.get(kind) : tag !== undefined ? this.#byTag.get(tag) : this.#entities, active, results);
         return results;
     }
     #push(list, active, results) {
@@ -11900,24 +11891,27 @@ class gameElements {
     }
     getEntityForBody(body) { return this.fetchEntity(this.world._record(body).id); }
     peruseNearbyEntities(reference, options = {}, results = []) { return this.world.peruseNearbyEntities(reference, { ...options, spatial_entities: true }, results); }
-    getStatistics() { return { entities: this.#entities.size, entity_types: this.#types.size }; }
-    _construct(entity, packet, Constructor) {
-        const definition = this.#resolve(packet), type = definition.entity_type ?? Constructor.entity_type;
-        if (this.#types.get(type) !== Constructor) throw new TypeError('Construct a registered entity class through its declared entity_type');
+    getStatistics() { return { entities: this.#entities.size, kinds: this.#kinds.size }; }
+    _construct(entity, packet) {
+        const definition = this.#resolve(packet), kind = definition.kind ?? 'entity', preset = this.getKind(kind);
+        const motor = definition.motor === undefined ? preset.motor : definition.motor, awareness = definition.awareness ?? preset.awareness;
+        if (motor !== null && !MOTORS.includes(motor)) throw new TypeError(`A motor is ${MOTORS.join(', ')} or null`);
         // Plain construction and save restoration use the same base, but normal callers cannot adopt a pre-existing body.
         const restored = this.#restore;
-        const components = restored ? this.world._restoreEntityComponents(restored.entity_id, Constructor.physics_role) : this.world._createEntityComponents(Constructor.physics_role, definition);
+        const components = restored ? this.world._restoreEntityComponents(restored.entity_id, { motor, awareness }) : this.world._createEntityComponents({ ...clone(preset.body), ...definition, motor, awareness });
         const bodyState = components.body.getState();
-        const record = { elements: this, body: components.body, controller: components.controller, awareness: components.awareness ?? null,
-            entity_type: type, template_id: definition.template ?? null, name: bodyState.name, tags: freeze(bodyState.tags),
+        const record = { elements: this, body: components.body, motor: components.motor, awareness: components.awareness ?? null,
+            kind, motor_name: motor, aware: awareness, template_id: definition.template ?? null, name: bodyState.name, tags: freeze(bodyState.tags),
             assets: freeze(clone(definition.assets ?? {})), data: clone(definition.data ?? {}), registered: false, destroyed: false, subscriptions: new Set() };
         this.#construction?.entities.push(entity);
         this.world._mutate(() => {
             if (record.destroyed) return;
             if (this.#entities.has(record.body.body_id)) throw new Error('Duplicate entity identity');
             record.registered = true; this.#entities.set(record.body.body_id, entity);
-            let list = this.#byType.get(type); if (!list) this.#byType.set(type, list = new Map()); list.set(record.body.body_id, entity);this.world._emit('entityRegistered',{entity,body:record.body});
+            this.#index(this.#byKind, kind, record.body.body_id, entity); for (const tag of record.tags) this.#index(this.#byTag, tag, record.body.body_id, entity);
+            this.world._emit('entityRegistered',{entity,body:record.body});
         });
+
         return record;
     }
     _requireLive(entity) {
@@ -11941,16 +11935,18 @@ class gameElements {
     _bodyRemoved(body_id) {
         const entity = this.#entities.get(body_id); if (!entity) return;
         const r = entityRecord(entity); r.destroyed = true; r.registered = false;
-        for (const drop of [...r.subscriptions]) drop();this.world._emit('entityRemoved',{entity,body:r.body}); this.#entities.delete(body_id); this.#byType.get(r.entity_type)?.delete(body_id);
+        for (const drop of [...r.subscriptions]) drop();this.world._emit('entityRemoved',{entity,body:r.body}); this.#entities.delete(body_id); this.#byKind.get(r.kind)?.delete(body_id); for (const tag of r.tags) this.#byTag.get(tag)?.delete(body_id);
     }
     _bodyUpdated(body_id, config) {
         const entity = this.#entities.get(body_id); if (!entity) return;
-        const r = entityRecord(entity); r.name = config.name; r.tags = freeze(clone(config.tags));
+        const r = entityRecord(entity); r.name = config.name;
+        if (r.registered) for (const tag of r.tags) this.#byTag.get(tag)?.delete(body_id);
+        r.tags = freeze(clone(config.tags)); if (r.registered) for (const tag of r.tags) this.#index(this.#byTag, tag, body_id, entity);
     }
     _clear() { for (const id of [...this.#entities.keys()]) this._bodyRemoved(id); }
     _snapshotEntity(entity, result = {}) {
         const r = entityRecord(entity);
-        return Object.assign(result, { entity_id: entity.entity_id, entity_type: r.entity_type, template: r.template_id, name: r.name,
+        return Object.assign(result, { entity_id: entity.entity_id, kind: r.kind, motor: r.motor_name, awareness: r.aware, template: r.template_id, name: r.name,
             tags: clone(r.tags), assets: clone(r.assets), data: clone(r.data), registered: r.registered, destroyed: r.destroyed,
             body: r.destroyed ? null : r.body.getState() });
     }
@@ -11961,13 +11957,13 @@ class gameElements {
             if (!Number.isSafeInteger(state.entity_id) || seen.has(state.entity_id)) throw new TypeError('Invalid saved entity identity');
             seen.add(state.entity_id); this.#restore = state;
             try {
-                const Constructor = this.#types.get(state.entity_type);
-                if (!Constructor) throw new TypeError(`Register saved entity type before loading: ${state.entity_type}`);
-                restoreEntity(this, { entity_type: state.entity_type, template: state.template ?? undefined, name: state.name, tags: state.tags, assets: state.assets, data: state.data }, Constructor);
+                this.getKind(state.kind);
+                restoreEntity(this, { kind: state.kind, template: state.template ?? undefined, name: state.name, tags: state.tags, assets: state.assets, data: state.data, ...(state.motor !== undefined ? { motor: state.motor } : {}), ...(state.awareness !== undefined ? { awareness: state.awareness } : {}) });
             } finally { this.#restore = null; }
         }
     }
-    _copyTypesTo(elements) { for (const [type, Constructor] of this.#types) if (!Object.hasOwn(builtins, type)) elements.registerEntityType(type, Constructor); }
+    _copyKindsTo(elements) { for (const [kind, preset] of this.#kinds) if (!Object.hasOwn(KINDS, kind)) elements.defineKind(kind, preset); }
+    #index(map, key, id, entity) { let list = map.get(key); if (!list) map.set(key, list = new Map()); list.set(id, entity); }
 }
 
 return Object.freeze({get gameElements(){return gameElements;}});
@@ -13805,7 +13801,7 @@ const {characterMotor} = m4;
 const {vehicleMotor} = m24;
 const {projectileMotor} = m25;
 const {awarenessMatrix} = m26;
-const {gameElements} = m28;
+const {gameElements} = m27;
 const {physicsConstraint,constraintRecord,updateConstraint,constraintSolver} = m30;
 const {motionController} = m31;
 const {trafficController} = m32;
@@ -13936,58 +13932,44 @@ class physicsSystem {
         return r.handle;
     }
     createEntity(packet = {}) { return this.elements.createEntity(packet); }
-    createCharacter(packet = {}) { return this.elements.createCharacter(packet); }
-    createVehicle(packet = {}) { return this.elements.createVehicle(packet); }
     createProjectileFrom(source, { local_position = [0,0], target, direction, angle, angle_offset=0, ...packet } = {}) {
         const r = this._record(referenceBody(source));
         if(this.getAttachmentState(source)){
             const resolved=this.elements.asset_library.resolveTemplate(packet.template,packet),state=this.getMountedLaunchState(source,{local_position,target,direction,angle,angle_offset,collision_shape:resolved.collision_shape});
             if(!state.allowed)return null;
             const deferred=this.#stepping||this.#dispatching||this.#queue.length>0;
-            const projectile=this.createProjectile({...packet,position:state.position,rotation:state.launch_rotation,owner_id:r.id});
+            const projectile=this.elements.createEntity({kind:'projectile',...packet,position:state.position,rotation:state.launch_rotation,owner_id:r.id});
             if(deferred){this._mutate(()=>{
                 if(!this.fetchBody(projectile.body_id))return;
                 const targetId=target!==undefined&&!Array.isArray(target)?(typeof target==='number'?target:referenceBody(target)?.body_id):null;
                 const current=!this.fetchBody(r.id)?{allowed:false,reason:'source_removed'}:targetId!==null&&!this.fetchBody(targetId)?{allowed:false,reason:'target_removed'}:this.getMountedLaunchState(source,{local_position,target,direction,angle,angle_offset,collision_shape:resolved.collision_shape});
                 if(current.allowed&&(current.attachment_id!==state.attachment_id||current.revision!==state.revision)){current.allowed=false;current.reason='attachment_changed';}
                 if(!current.allowed){this._emit('projectileLaunchBlocked',{body:projectile.body,source_body:r.handle,reason:current.reason});this.removeBody(projectile);return;}
-                projectile.updateBody({position:current.position,rotation:current.launch_rotation});projectile.launchProjectile(current.direction,{inherited_velocity:current.carrier_velocity});
+                projectile.updateBody({position:current.position,rotation:current.launch_rotation});projectile.motor.launchProjectile(current.direction,{inherited_velocity:current.carrier_velocity});
             });return projectile;}
-            try{projectile.launchProjectile(state.direction,{inherited_velocity:state.carrier_velocity});return projectile;}catch(error){this.removeBody(projectile);throw error;}
+            try{projectile.motor.launchProjectile(state.direction,{inherited_velocity:state.carrier_velocity});return projectile;}catch(error){this.removeBody(projectile);throw error;}
         }
         const pose = this.getBodyPoint(source, local_position);
-        const projectile = this.createProjectile({ ...packet, position:r.position, owner_id:r.id });
+        const projectile = this.elements.createEntity({ kind:'projectile', ...packet, position:r.position, owner_id:r.id });
         try {
             const path = this.getPathClearance({body:projectile,from:r.position,to:pose.position,ignore_body:[r.handle,projectile],include_ghosts:false});
             if(path.clear)projectile.body.setPosition(pose.position);
-            projectile.launchProjectile(direction ?? [Math.cos(r.rotation),Math.sin(r.rotation)],{...(target===undefined?{}:{target}),...(angle===undefined?{}:{angle}),angle_offset});
+            projectile.motor.launchProjectile(direction ?? [Math.cos(r.rotation),Math.sin(r.rotation)],{...(target===undefined?{}:{target}),...(angle===undefined?{}:{angle}),angle_offset});
             return projectile;
         } catch(error) { this.removeBody(projectile); throw error; }
     }
     getMountedLaunchState(source, options) { return mountedLaunchState(this,source,options); }
     setAttachmentEmitter(body, emitter) { return this.#attachments.setAttachmentEmitter(body,emitter); }
-    createProjectile(packet = {}) { return this.elements.createProjectile(packet); }
-    _createEntityComponents(role, packet) {
-        // Mechanical roles only. Concrete shapes, tuning, assets and gameplay data come from definitions.
-        const roles = {
-            entity: { physics_type: 'static', collision_group: 0, collision_mask: 0, query_mask: 0 },
-            decoration: { physics_type: 'static', collision_group: 0, collision_mask: 0, query_mask: 0 },
-            character: { physics_type: 'character', collision_group: BODY_GROUP.CHARACTER },
-            vehicle: { physics_type: 'rigid', collision_group: BODY_GROUP.VEHICLE },
-            projectile: { physics_type: 'rigid', collision_group: BODY_GROUP.PROJECTILE, friction: 0, linear_damping: 0, angular_damping: 0 },
-            prop: { physics_type: 'rigid', collision_group: BODY_GROUP.PROP },
-            static: { physics_type: 'static', collision_group: BODY_GROUP.STATIC },
-            trigger: { physics_type: 'static', collision_group: BODY_GROUP.SENSOR, ghost: true },
-        };
-        if (!roles[role]) throw new TypeError(`Unknown physics_role: ${role}`);
-        const motor = role === 'character' ? new characterMotor(null, packet.movement)
-            : role === 'vehicle' ? new vehicleMotor(null, packet.vehicle_template)
-            : role === 'projectile' ? new projectileMotor(null, packet) : null;
-        const body = this.createBody({ ...roles[role], ...packet });
+    /** The body and parts of a new entity. `packet` already carries its kind's body defaults, `motor` (a name or null) and `awareness`. */
+    _createEntityComponents({ motor: motor_name = null, awareness = false, ...packet }) {
+        const motor = motor_name === 'character' ? new characterMotor(null, packet.movement)
+            : motor_name === 'vehicle' ? new vehicleMotor(null, packet.vehicle_template)
+            : motor_name === 'projectile' ? new projectileMotor(null, packet) : null;
+        const body = this.createBody(packet);
         if (motor) {
             motor.body = body; this._record(body).motor = motor;
-            if (role === 'vehicle') motor.path_controller.body = body;
-            if (role === 'projectile') {
+            if (motor_name === 'vehicle') motor.path_controller.body = body;
+            if (motor_name === 'projectile') {
                 try { motor.launchProjectile(packet.direction ?? [1, 0], { target: packet.target }); }
                 catch (error) { this.removeBody(body); throw error; }
             }
@@ -14004,14 +13986,13 @@ class physicsSystem {
                 else throw new TypeError('Invalid motion_type');
             }
         } catch (error) { this.removeBody(body); throw error; }
-        return { body, controller: motor ?? body, awareness: role === 'character' ? new awarenessMatrix(this, body) : null };
+        return { body, motor, awareness: awareness ? new awarenessMatrix(this, body) : null };
     }
-    _restoreEntityComponents(body_id, role) {
-        const record = this._record(body_id), motor = record.motor;
-        if ((role === 'character' && !(motor instanceof characterMotor)) || (role === 'vehicle' && !(motor instanceof vehicleMotor))
-            || (role === 'projectile' && !(motor instanceof projectileMotor))) throw new TypeError('Saved entity role does not match its body controller');
-        if (!['character', 'vehicle', 'projectile'].includes(role) && motor) throw new TypeError('Saved entity unexpectedly owns a specialized motor');
-        return { body: record.handle, controller: motor ?? record.handle, awareness: role === 'character' ? new awarenessMatrix(this, record.handle) : null };
+    _restoreEntityComponents(body_id, { motor: motor_name = null, awareness = false } = {}) {
+        const record = this._record(body_id), motor = record.motor ?? null;
+        const expected = { character: characterMotor, vehicle: vehicleMotor, projectile: projectileMotor }[motor_name];
+        if (expected ? !(motor instanceof expected) : motor) throw new TypeError('Saved entity motor does not match its body');
+        return { body: record.handle, motor, awareness: awareness ? new awarenessMatrix(this, record.handle) : null };
     }
     fetchBody(body_id) { return this.#bodies.get(body_id)?.handle ?? null; }
     removeBody(value) {
@@ -14439,11 +14420,11 @@ class physicsSystem {
         results.length=0;
         for(const hit of hits){if(line_of_sight&&this.raycast({from:r.position,to:hit.body.position,include_groups:occlusion_groups,include_ghosts:false,ignore_body:[r.handle,hit.body]}))continue;results.push(hit);}return results;
     }
-    createHitVolume(packet) { return this.elements.createTrigger({ ...packet, ghost: true, physics_type: 'kinematic', collision_group: packet.collision_group ?? BODY_GROUP.SENSOR }); }
+    createHitVolume(packet) { return this.elements.createEntity({ kind: 'trigger', ...packet, ghost: true, physics_type: 'kinematic', collision_group: packet.collision_group ?? BODY_GROUP.SENSOR }); }
     sweepHitVolume(body, to, options = {}, results = []) { const r = this._record(body); return this.shapeCast({ ...options, collision_shape: r.config.collision_shape, from: r.position, to, from_rotation: r.rotation, ignore_body: r.handle }, results); }
     removeHitVolume(body) { this.removeBody(body); }
-    launchProjectile(projectile, direction, options) { return projectile.launchProjectile(direction, options); }
-    redirectProjectile(projectile, direction, options) { return projectile.redirectProjectile(direction, options); }
+    launchProjectile(projectile, direction, options) { return (projectile.motor ?? projectile).launchProjectile(direction, options); }
+    redirectProjectile(projectile, direction, options) { return (projectile.motor ?? projectile).redirectProjectile(direction, options); }
     removeProjectile(projectile) { this.removeBody(projectile.body); }
     registerSpatialInstance(instance_id, bounds, data = {}) {
         const id = `spatial:${instance_id}`, value = freeze({ instance_id, ...clone(data) });
@@ -14526,7 +14507,7 @@ class physicsSystem {
         // Validate the whole exchange in a disposable independent world before replacing this one.
         if (JSON.stringify(saved.config) !== JSON.stringify(this.config)) throw new TypeError('Load into a physicsSystem constructed with the saved config');
         const trial = new physicsSystem({ ...saved.config, asset_library: this.elements.asset_library });
-        this.elements._copyTypesTo(trial.elements); trial._importState(saved);
+        this.elements._copyKindsTo(trial.elements); trial._importState(saved);
         this.clearWorld(); this._importState(saved);
     }
     _importState(saved) {
@@ -14612,7 +14593,7 @@ const m1 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m2.physicsSystem;},get physicsBody(){return m20.physicsBody;},get collisionShape(){return m6.collisionShape;},get collisionDetector(){return m10.collisionDetector;},get contactSolver(){return m21.contactSolver;},get spatialGrid(){return m22.spatialGrid;},get physicsConstraint(){return m30.physicsConstraint;},get constraintSolver(){return m30.constraintSolver;},get characterMotor(){return m4.characterMotor;},get vehicleMotor(){return m24.vehicleMotor;},get pathMotor(){return m24.pathMotor;},get projectileMotor(){return m25.projectileMotor;},get particlePhysics(){return m35.particlePhysics;},get gameEntity(){return m27.gameEntity;},get gameElements(){return m28.gameElements;},get EMPTY_DATA_SOURCE(){return m29.EMPTY_DATA_SOURCE;},get isDataSource(){return m29.isDataSource;},get gameCharacter(){return m26.gameCharacter;},get gameVehicle(){return m26.gameVehicle;},get gameProjectile(){return m26.gameProjectile;},get gameProp(){return m26.gameProp;},get gameStatic(){return m26.gameStatic;},get gameTrigger(){return m26.gameTrigger;},get gameDecoration(){return m26.gameDecoration;},get awarenessMatrix(){return m26.awarenessMatrix;},get BODY_GROUP(){return m7.BODY_GROUP;},get QUERY_GROUP(){return m7.QUERY_GROUP;},get PHYSICS_TYPES(){return m7.PHYSICS_TYPES;},get trafficController(){return m32.trafficController;},get motionController(){return m31.motionController;},get pathGeometry(){return m19.pathGeometry;},get navigationSystem(){return m36.navigationSystem;},get navigationField(){return m37.navigationField;},get roadNetwork(){return m40.roadNetwork;},get layoutGeometry(){return m34.layoutGeometry;},get rigDefinition(){return m13.rigDefinition;},get rigPose(){return m12.rigPose;},get animationClip(){return m15.animationClip;},get animationController(){return m11.animationController;},get rigSystem(){return m3.rigSystem;},get IK_SOLVERS(){return m16.IK_SOLVERS;},get ikGoal(){return m16.ikGoal;},get solveIk(){return m16.solveIk;}});
+return Object.freeze({get physicsSystem(){return m2.physicsSystem;},get physicsBody(){return m20.physicsBody;},get collisionShape(){return m6.collisionShape;},get collisionDetector(){return m10.collisionDetector;},get contactSolver(){return m21.contactSolver;},get spatialGrid(){return m22.spatialGrid;},get physicsConstraint(){return m30.physicsConstraint;},get constraintSolver(){return m30.constraintSolver;},get characterMotor(){return m4.characterMotor;},get vehicleMotor(){return m24.vehicleMotor;},get pathMotor(){return m24.pathMotor;},get projectileMotor(){return m25.projectileMotor;},get particlePhysics(){return m35.particlePhysics;},get gameEntity(){return m29.gameEntity;},get gameElements(){return m27.gameElements;},get EMPTY_DATA_SOURCE(){return m28.EMPTY_DATA_SOURCE;},get isDataSource(){return m28.isDataSource;},get KINDS(){return m26.KINDS;},get MOTORS(){return m26.MOTORS;},get awarenessMatrix(){return m26.awarenessMatrix;},get BODY_GROUP(){return m7.BODY_GROUP;},get QUERY_GROUP(){return m7.QUERY_GROUP;},get PHYSICS_TYPES(){return m7.PHYSICS_TYPES;},get trafficController(){return m32.trafficController;},get motionController(){return m31.motionController;},get pathGeometry(){return m19.pathGeometry;},get navigationSystem(){return m36.navigationSystem;},get navigationField(){return m37.navigationField;},get roadNetwork(){return m40.roadNetwork;},get layoutGeometry(){return m34.layoutGeometry;},get rigDefinition(){return m13.rigDefinition;},get rigPose(){return m12.rigPose;},get animationClip(){return m15.animationClip;},get animationController(){return m11.animationController;},get rigSystem(){return m3.rigSystem;},get IK_SOLVERS(){return m16.IK_SOLVERS;},get ikGoal(){return m16.ikGoal;},get solveIk(){return m16.solveIk;}});
 })();
 // src/engine/directory/values.mjs
 const m43 = (()=>{
@@ -14717,7 +14698,7 @@ class assetLibrary {
             identifier(local, 'template_id'); resolving.add(full);
             const { extends: parent, ...fields } = entry;
             const value = parent ? mergeDefinition(resolveTemplate(parent), fields) : clone(fields);
-            if (typeof value.entity_type !== 'string') throw new TypeError(`Template ${full} requires entity_type`);
+            if (typeof value.kind !== 'string') throw new TypeError(`Template ${full} requires a kind`);
             if (!plain(value.assets ?? {})) throw new TypeError(`Template ${full} assets must be an object`);
             for (const [slot, resource] of Object.entries(value.assets ?? {})) {
                 if (typeof resource !== 'string') throw new TypeError(`Asset slot ${slot} requires a resource ID`);
@@ -14745,7 +14726,7 @@ class assetLibrary {
         for (const id of Object.values(value.assets ?? {})) this.getResource(id);
         return value;
     }
-    listTemplates({ entity_type } = {}) { return [...this.#templates].filter(([, value]) => !entity_type || value.entity_type === entity_type).map(([id]) => id); }
+    listTemplates({ kind } = {}) { return [...this.#templates].filter(([, value]) => !kind || value.kind === kind).map(([id]) => id); }
     getResource(resource_id) {
         const value = this.#resources.get(resource_id);
         if (!value) throw new Error(`Unknown asset resource: ${resource_id}`);
@@ -17008,14 +16989,14 @@ const m58 = Object.freeze({default:{
  },
  "templates": {
   "entity": {
-   "entity_type": "entity",
+   "kind": "entity",
    "tags": [],
    "assets": {},
    "data": {}
   },
   "character": {
    "extends": "entity",
-   "entity_type": "character",
+   "kind": "character",
    "physics_type": "character",
    "collision_group": 2,
    "collision_mask": 2147483647,
@@ -17033,7 +17014,7 @@ const m58 = Object.freeze({default:{
   },
   "prop": {
    "extends": "entity",
-   "entity_type": "prop",
+   "kind": "prop",
    "physics_type": "rigid",
    "collision_group": 8,
    "collision_mask": 2147483647,
@@ -17048,7 +17029,7 @@ const m58 = Object.freeze({default:{
   },
   "static": {
    "extends": "entity",
-   "entity_type": "static",
+   "kind": "static",
    "physics_type": "static",
    "collision_group": 1,
    "collision_mask": 2147483647,
@@ -17062,7 +17043,7 @@ const m58 = Object.freeze({default:{
   },
   "trigger": {
    "extends": "entity",
-   "entity_type": "trigger",
+   "kind": "trigger",
    "physics_type": "static",
    "ghost": true,
    "collision_group": 32,
@@ -17077,7 +17058,7 @@ const m58 = Object.freeze({default:{
   },
   "decoration": {
    "extends": "entity",
-   "entity_type": "decoration",
+   "kind": "decoration",
    "physics_type": "static",
    "collision_group": 0,
    "collision_mask": 0,
@@ -29137,8 +29118,8 @@ const lightShape = l => l.shape === 'strip' ? { shape_type: 'box', dimensions: l
 
 const MAP_KINDS = Object.freeze(['interior', 'exterior']);
 /** Without a template, each section uses one of the engine's own entity types. */
-const DEFAULT_KINDS = Object.freeze({ wall: { entity_type: 'static' }, prop: { entity_type: 'prop', physics_type: 'static' }, light: { entity_type: 'decoration' },
-    trigger: { entity_type: 'trigger', ghost: true }, room: { entity_type: 'trigger', ghost: true, collision_mask: 0 }, door: { entity_type: 'prop', physics_type: 'kinematic' }, cloth: { entity_type: 'decoration' } });
+const DEFAULT_KINDS = Object.freeze({ wall: { kind: 'static' }, prop: { kind: 'prop', physics_type: 'static' }, light: { kind: 'decoration' },
+    trigger: { kind: 'trigger', ghost: true }, room: { kind: 'trigger', ghost: true, collision_mask: 0 }, door: { kind: 'prop', physics_type: 'kinematic' }, cloth: { kind: 'decoration' } });
 
 /**
  * Returns `{ entries, spawn }`. Each entry is `{ section, index, source, packet }`, in build order:
@@ -46854,7 +46835,7 @@ class humanoid {
             if (!Number.isFinite(height) || height <= 0) throw new TypeError('A humanoid height is a positive number');
             const definition = strip(structuredClone(skeleton)), root = definition.joints.find(joint => joint.parent == null);
             root.scale = (root.scale ?? [1, 1]).map(v => v * height);
-            this.entity = physics.elements.createCharacter({ ...packet, template });
+            this.entity = physics.elements.createEntity({ ...packet, template });
             this.rig = physics.rigs.createRig(this.entity, { definition, clips: clips.clips });
             this.rig.play(this.#kit.locomotion.idle);
         }
@@ -46918,7 +46899,7 @@ const m172 = (()=>{
 // ===== LV3 PENTHOUSE =====
 // OBJECTS: one way to make anything in the world from a catalog record. A record is a Directory
 // template (or an inline record) whose fields switch its parts on:
-//   entity_type   what it is to physics (prop, character, vehicle, ...)
+//   kind   what it is to physics (prop, character, vehicle, ...)
 //   assets.drawing  its look: a drawing resource, drawn every frame by the render system
 //   look          {values, scale, layer, depth, visible}: the values the drawing reads, kept as the `look` property
 //   bounds        circle | box | capsule | hull: collision bounds fitted from the drawing's solid steps
@@ -47064,7 +47045,6 @@ const m173 = (()=>{
 // ===== LV1 LOBBY =====
 const {gameLevel} = m169;
 const {mapInstance} = m153;
-const {gameCharacter} = m1;
 
 /**
  * A level that is one Basement map. A subclass says which map with `mapDefinition`; the level builds
@@ -47097,7 +47077,7 @@ class mapLevel extends gameLevel {
      */
     mapFocuses(context) {
         // By class, from the characters' own list: reading a body's state would copy it.
-        const focuses = context.basement.physics.elements.getEntities({ instance_of: gameCharacter }).filter(e => e.active !== false && !e.destroyed).map(e => ({ position: e.position, velocity: e.linear_velocity }));
+        const focuses = context.basement.physics.elements.getEntities({ kind: 'character' }).filter(e => e.active !== false && !e.destroyed).map(e => ({ position: e.position, velocity: e.linear_velocity }));
         return focuses.length ? focuses : [this.map.spawn ?? this.definition.size.map(v => v / 2)];
     }
     /** Milliseconds a step may spend building regions (the rest wait for the next step). */

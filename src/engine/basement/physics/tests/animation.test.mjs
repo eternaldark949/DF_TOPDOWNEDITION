@@ -48,7 +48,7 @@ test('distance synchronized clips use actual travel instead of wall clock time',
     c.advance(.1,{distance:25});near(c.getJoint('hand').position[0],12.5);
 });
 test('world owns the animation clock and joints add no bodies or grid instances',()=>{
-    const w=new physicsSystem(),body=w.createCharacter(),c=w.rigs.createRig(body,{definition,clips:[clip]});c.play('reach');
+    const w=new physicsSystem(),body=w.createEntity({ kind: 'character' }),c=w.rigs.createRig(body,{definition,clips:[clip]});c.play('reach');
     assert.throws(()=>c.advance(.1),/owning world/);for(let i=0;i<6;i++)w.updateState();near(c.getJoint('hand').position[0],11);
     assert.equal(w.getStatistics().bodies,1);assert.equal(w.getStatistics().spatial.instances,1);
     const before=w.savePhysicsState();for(let i=0;i<100;i++)w.rigs.getPose(body,{blend:.5});assert.deepEqual(w.savePhysicsState(),before);
@@ -85,11 +85,11 @@ test('root tracks unwrap loops and restore their portable authored data',()=>{
     assert.throws(()=>c.play('stride',{root_motion:true,distance_per_cycle:10}));
 });
 test('root motion requests the native motor and respects walls, axis locks, and cancellation ownership',()=>{
-    const w=new physicsSystem(),body=w.createCharacter({collision_shape:{shape_type:'circle',radius:2}}),c=w.rigs.createRig(body,{definition,clips:[rootClip]});
-    w.elements.createStatic({position:[20,0],collision_shape:{shape_type:'box',dimensions:[2,100]}});
+    const w=new physicsSystem(),body=w.createEntity({ kind: 'character', collision_shape:{shape_type:'circle',radius:2}}),c=w.rigs.createRig(body,{definition,clips:[rootClip]});
+    w.elements.createEntity({ kind: 'static', position:[20,0],collision_shape:{shape_type:'box',dimensions:[2,100]}});
     c.play('stride',{root_motion:true});for(let i=0;i<90;i++)w.updateState();assert.ok(body.position[0]>2&&body.position[0]<18);
-    c.stop();body.setMovement([-1,0],{speed:20});w.updateState();assert.equal(body.physics_controller.intent.rig_motion_owner,undefined);
-    body.setMovement([0,1],{speed:10});w.rigs.removeRig(body);assert.deepEqual(body.physics_controller.intent.direction,[0,1]);
+    c.stop();body.motor.setMovement([-1,0],{speed:20});w.updateState();assert.equal(body.motor.intent.rig_motion_owner,undefined);
+    body.motor.setMovement([0,1],{speed:10});w.rigs.removeRig(body);assert.deepEqual(body.motor.intent.direction,[0,1]);
 });
 test('marker payload validation and unknown tracks cannot partially mutate a controller',()=>{
     assert.throws(()=>new animationClip({...clip,markers:[{name:'bad',time:.5,data:{x:NaN}}]}));
@@ -107,13 +107,13 @@ test('loading an owned controller invalidates interpolated pose caches',()=>{
     assert.ok(w.rigs.getAnchor(body,'grip',{blend:.5,world_space:false}).position[0]>first);
 });
 test('root movement and world-space anchors honor native axis locks and body rotation',()=>{
-    const w=new physicsSystem(),body=w.createCharacter({rotation:Math.PI/2,axis_lock:{y:true}}),c=w.rigs.createRig(body,{definition,clips:[rootClip]});c.play('stride',{root_motion:true});
+    const w=new physicsSystem(),body=w.createEntity({ kind: 'character', rotation:Math.PI/2,axis_lock:{y:true}}),c=w.rigs.createRig(body,{definition,clips:[rootClip]});c.play('stride',{root_motion:true});
     for(let i=0;i<5;i++)w.updateState();near(body.position[1],0);const a=w.rigs.getAnchor(body,'grip');near(a.position[0],body.position[0]);near(a.position[1],12);
 });
 test('invalid root-motion owners reject at selection and mounting suspends translation safely',()=>{
-    const w=new physicsSystem(),prop=w.createBody({collision_mask:0}),p=w.createCharacter(),c=w.rigs.createRig(prop,{definition,clips:[rootClip]});
+    const w=new physicsSystem(),prop=w.createBody({collision_mask:0}),p=w.createEntity({ kind: 'character' }),c=w.rigs.createRig(prop,{definition,clips:[rootClip]});
     const before=c.getSnapshot();assert.throws(()=>c.play('stride',{root_motion:true}),/character motor/);assert.deepEqual(c.getSnapshot(),before);
-    const rig=w.rigs.createRig(p,{definition,clips:[rootClip]});rig.play('stride',{root_motion:true});w.updateState();w.attachBody(p,{parent_body:prop,local_position:[0,20]});w.updateState();assert.deepEqual(p.position,[prop.position[0],prop.position[1]+20]);assert.equal(p.physics_controller.intent,null);
+    const rig=w.rigs.createRig(p,{definition,clips:[rootClip]});rig.play('stride',{root_motion:true});w.updateState();w.attachBody(p,{parent_body:prop,local_position:[0,20]});w.updateState();assert.deepEqual(p.position,[prop.position[0],prop.position[1]+20]);assert.equal(p.motor.intent,null);
 });
 test('a non-humanoid example uses the same animation and body attachment API',async()=>{
     const {createRigExample}=await import('../examples/rig.mjs'),{world,base,load}=createRigExample();let markers=0;world.on('animationMarker',()=>markers++);
@@ -159,17 +159,17 @@ test('IK solves after clips at partial weight and survives a snapshot',()=>{
     c.removeIkGoal('hand');assert.deepEqual(c.getIkGoals(),{});
 });
 test('an owned rig solves world-space goals against its body, and the goal saves with the world',()=>{
-    const p=new physicsSystem(),body=p.elements.createCharacter({position:[100,50],rotation:Math.PI/2,collision_shape:{shape_type:'circle',radius:4}});
+    const p=new physicsSystem(),body=p.elements.createEntity({ kind: 'character', position:[100,50],rotation:Math.PI/2,collision_shape:{shape_type:'circle',radius:4}});
     const rig=p.rigs.createRig(body,{definition:limb});rig.setIkGoal('hand',{solver:'two_bone',joints:['shoulder','elbow','wrist'],target:[88,62],space:'world'});
     const hand=p.rigs.getPose(body,{world_space:true}).joints.wrist.position;near(hand[0],88);near(hand[1],62);
-    body.teleportTo([102,52]);p.updateState();const moved=p.rigs.getPose(body,{world_space:true}).joints.wrist.position;near(moved[0],88);near(moved[1],62);
+    body.motor.teleportTo([102,52]);p.updateState();const moved=p.rigs.getPose(body,{world_space:true}).joints.wrist.position;near(moved[0],88);near(moved[1],62);
     const copy=new physicsSystem();copy.loadPhysicsState(p.savePhysicsState());
     const again=copy.rigs.getPose(copy.elements.getEntities()[0],{world_space:true}).joints.wrist.position;near(again[0],88);near(again[1],62);
 });
 
 const tail={rig_id:'tail',joints:[{name:'base'},{name:'a',parent:'base',position:[-10,0]},{name:'b',parent:'a',position:[-10,0],limits:{min_rotation:-.6,max_rotation:.6}},{name:'c',parent:'b',position:[-10,0]},{name:'tip',parent:'c',position:[-10,0]}]};
 const sway={clip_id:'sway',duration:1,tracks:[{joint:'a',channel:'rotation',keys:[{time:0,value:-.4},{time:.5,value:.4},{time:1,value:-.4}]}]};
-const tailWorld=()=>{const p=new physicsSystem(),body=p.elements.createCharacter({position:[100,100],mass:10,collision_shape:{shape_type:'circle',radius:6}});const rig=p.rigs.createRig(body,{definition:tail,clips:[sway]});return {p,body,rig,chain:p.rigs.createPhysicalChain(body,{chain_id:'tail',joints:['a','b','c','tip']})};};
+const tailWorld=()=>{const p=new physicsSystem(),body=p.elements.createEntity({ kind: 'character', position:[100,100],mass:10,collision_shape:{shape_type:'circle',radius:6}});const rig=p.rigs.createRig(body,{definition:tail,clips:[sway]});return {p,body,rig,chain:p.rigs.createPhysicalChain(body,{chain_id:'tail',joints:['a','b','c','tip']})};};
 const tipOf=(p,body)=>p.rigs.getPose(body,{world_space:true}).joints.tip.position;
 const animatedTip=(rig,body)=>rig.getAnimatedJoint('tip',{root:{position:body.position,rotation:body.rotation}}).position;
 test('a physical chain is one hinged capsule per bone that never collides with its owner or itself',()=>{
@@ -199,7 +199,7 @@ test('a chain saves with the world and goes when a segment, the rig or the body 
     copy.rigs.removeRig(twin);for(const id of chain.segments)assert.equal(copy.fetchBody(id),null);
 });
 test('a chain with reaction false follows its body but never pushes it; a one-way hinge leaves body B alone',()=>{
-    const drift=reaction=>{const p=new physicsSystem(),body=p.elements.createCharacter({position:[100,100],mass:.2,linear_damping:0,collision_shape:{shape_type:'circle',radius:6}});
+    const drift=reaction=>{const p=new physicsSystem(),body=p.elements.createEntity({ kind: 'character', position:[100,100],mass:.2,linear_damping:0,collision_shape:{shape_type:'circle',radius:6}});
         const rig=p.rigs.createRig(body,{definition:tail,clips:[sway]});p.rigs.createPhysicalChain(body,{chain_id:'tail',joints:['a','b','c','tip'],mass:1,reaction});rig.play('sway');
         let most=0;for(let i=0;i<60;i++){p.updateState();most=Math.max(most,Math.hypot(body.position[0]-100,body.position[1]-100));}return {most,p,body};};
     assert.ok(drift(true).most>.05,'a heavy tail on a light body swings the body');

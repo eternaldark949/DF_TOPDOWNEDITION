@@ -87,9 +87,9 @@ test('event-time combination remains reserved until commit and validates its fla
 });
 test('vehicle and character motors accelerate loaded assemblies more slowly with the same tuning', () => {
     for (const role of ['Vehicle', 'Character']) {
-        const p = new physicsSystem(), a = p[`create${role}`]({ mass: 10, position: [0, -100], collision_mask: 0 }), b = p[`create${role}`]({ mass: 10, position: [0, 100], collision_mask: 0 });
+        const p = new physicsSystem(), a = p.createEntity({ kind: role.toLowerCase(), mass: 10, position: [0, -100], collision_mask: 0 }), b = p.createEntity({ kind: role.toLowerCase(), mass: 10, position: [0, 100], collision_mask: 0 });
         const weight = body(p, { position: [0, 100] }); p.attachBody(weight, { parent_body: b, combine_mass: true });
-        if (role === 'Vehicle') { a.accelerateVehicle(1); b.accelerateVehicle(1); } else { a.setMovement([1, 0]); b.setMovement([1, 0]); }
+        if (role === 'Vehicle') { a.motor.accelerateVehicle(1); b.motor.accelerateVehicle(1); } else { a.motor.setMovement([1, 0]); b.motor.setMovement([1, 0]); }
         step(p); near(a.linear_velocity[0], b.linear_velocity[0] * 2);
     }
 });
@@ -122,12 +122,12 @@ test('inactive mounted weight neither contributes mass nor routes forces into an
     b.applyImpulse([0, 20]); b.applyForce([0, 20]); step(p); assert.deepEqual(a.linear_velocity, [0, 0]);
 });
 test('physical character turning uses a torque budget and an offset backpack resists rapid turns', () => {
-    const p = new physicsSystem(), plain = p.createCharacter({ position: [0, -100], mass: 10, collision_mask: 0, movement: { physical_turning: true } });
-    const loaded = p.createCharacter({ position: [0, 100], mass: 10, collision_mask: 0, movement: { physical_turning: true } });
+    const p = new physicsSystem(), plain = p.createEntity({ kind: 'character',  position: [0, -100], mass: 10, collision_mask: 0, movement: { physical_turning: true } });
+    const loaded = p.createEntity({ kind: 'character',  position: [0, 100], mass: 10, collision_mask: 0, movement: { physical_turning: true } });
     const backpack = body(p, { mass: 100, position: [-20, 100] });
     p.attachBody(backpack, { parent_body: loaded, local_position: [-20, 0], combine_mass: true });
     const center = p.getMassProperties(loaded).center;
-    plain.lookAtTarget([0, 0]); loaded.lookAtTarget([0, 200]); step(p);
+    plain.motor.lookAtTarget([0, 0]); loaded.motor.lookAtTarget([0, 200]); step(p);
     assert.ok(plain.angular_velocity > loaded.angular_velocity); assert.ok(loaded.angular_velocity > 0);
     near(p.getMassProperties(loaded).center[0], center[0]); near(p.getMassProperties(loaded).center[1], center[1]);
     assert.notEqual(loaded.position[1], 100);
@@ -149,6 +149,6 @@ test('gravity and point impulses respect the support inertia of a pinned loaded 
 test('capture respects a pinned assembly and the default upright character response', () => {
     const p = new physicsSystem(), pinned = body(p, { axis_lock: { x: true, y: true } }), weight = body(p, { position: [10, 0], linear_velocity: [0, 2] });
     p.attachBody(weight, { parent_body: pinned, local_position: [10, 0], combine_mass: true }); near(pinned.angular_velocity, 200 / 1040);
-    const person = p.createCharacter({ position: [100, 0], collision_mask: 0 }), bag = body(p, { position: [110, 0], linear_velocity: [0, 2] });
+    const person = p.createEntity({ kind: 'character',  position: [100, 0], collision_mask: 0 }), bag = body(p, { position: [110, 0], linear_velocity: [0, 2] });
     p.attachBody(bag, { parent_body: person, local_position: [10, 0], combine_mass: true }); near(person.angular_velocity, 0);
 });

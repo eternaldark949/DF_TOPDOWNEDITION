@@ -38,11 +38,11 @@ import { gameLevel } from './engine/lobby/runtime/game-level.mjs';
 
 class Room extends gameLevel {
     enter(context) {
-        this.hero = context.basement.physics.createCharacter({ position: [100, 100] });
+        this.hero = context.createEntity({ kind: 'character', position: [100, 100] });
     }
     beforePhysics(context, seconds) {
         const [x, y] = context.basement.controls.direction('move');
-        // steer this.hero with [x, y]
+        this.hero.motor.setMovement([x, y]);
     }
 }
 
@@ -121,9 +121,7 @@ The systems and operations. Everything here runs on its own, without a game. Rea
 
 | Call | What it does |
 |---|---|
-| `physics.createCharacter(packet)` | A character body and entity |
-| `physics.createVehicle(packet)` / `physics.createProjectile(packet)` | A vehicle or a projectile |
-| `physics.createEntity(packet)` | Any registered entity type |
+| `physics.createEntity(packet)` | Any entity; `kind` says what it is (see [Elements and entities](#elements-and-entities)) |
 | `physics.createConstraint(packet)` / `physics.createChain(packet)` / `physics.createCloth(packet)` | Joints, chains and cloth |
 | `physics.emitParticles(pool, packet)` | Particles from a pool made with `createParticlePool` |
 | `physics.attachBody(body, packet)` / `physics.detachBody(body)` / `physics.getAttachmentState(body)` | Riding one body on another, such as a driver in a car |
@@ -135,13 +133,25 @@ Reference: [physics README](basement/physics/README.md) and [physics API referen
 
 ### Elements and entities
 
-`basement.elements` is the registry of every entity in the world. An entity is a game object with a body, a position, a rotation and properties. The built-in types are `gameCharacter`, `gameVehicle`, `gameProjectile`, `gameProp`, `gameStatic`, `gameTrigger` and `gameDecoration`.
+`basement.elements` is the registry of every entity in the world. Every entity is one `gameEntity`: a body, a position, a rotation, properties and parts. There are no entity classes to extend. What an object is comes from its `kind`, a preset of body defaults and parts:
+
+| Kind | What it is | Parts |
+|---|---|---|
+| `prop` | A rigid thing that can be pushed | none |
+| `static` | A wall or anything fixed | none |
+| `character` | Something that walks | character `motor`, `awareness` |
+| `vehicle` | Something that drives | vehicle `motor` |
+| `projectile` | Something that flies | projectile `motor` |
+| `trigger` | An invisible sensor | none |
+| `decoration`, `entity` | Something that touches nothing | none |
+
+A record may override any of it: `{kind: 'prop', physics_type: 'static'}`, or `{kind: 'prop', motor: 'character'}` for a walking crate. Motor calls go through the part: `entity.motor.setMovement([1, 0])`, `entity.motor.steerVehicle(0.2)`.
 
 | Call | What it does |
 |---|---|
-| `elements.createProp(packet)` / `createStatic` / `createTrigger` / `createDecoration` | One of the built-in types |
-| `elements.registerEntityType(type, Class)` | Adds your own type (a subclass of a built-in one) |
-| `elements.getEntities({instance_of})` / `elements.fetchEntity(id)` | Finds entities |
+| `elements.createEntity({kind, ...packet})` | Any entity (`engine.createObject` makes one from a catalog record) |
+| `elements.defineKind(name, {body, motor, awareness})` | Adds your own kind, as data |
+| `elements.getEntities({kind, tag})` / `elements.fetchEntity(id)` | Finds entities by kind, by tag, or by id |
 | `entity.destroy()` | Removes it from the world |
 
 #### gameEntity
@@ -150,7 +160,8 @@ Every object in the world is a `gameEntity`, the way every object in a Blender g
 
 | Call | What it does |
 |---|---|
-| `entity.name`, `entity.entity_id`, `entity.entity_type`, `entity.tags` | Who it is |
+| `entity.name`, `entity.entity_id`, `entity.kind`, `entity.tags` | Who it is |
+| `entity.motor`, `entity.awareness` | Its parts, or `null` |
 | `entity.position`, `entity.rotation`, `entity.linear_velocity` | Where it is and how it moves (read only; change them with the calls below) |
 | `entity.get(key, fallback)` / `entity.has(key)` | Reads a property |
 | `entity.set(key, value)` | Writes a property; `undefined` removes it. Fires `propertyChanged` with `{key, value, previous}` on the next step |
@@ -164,8 +175,8 @@ Every object in the world is a `gameEntity`, the way every object in a Blender g
 | `entity.activate()` / `entity.deactivate()` / `entity.destroy()` | Turns it on or off, or removes it |
 
 ```js
-const lamp = elements.createProp({ name: 'lamp', position: [0, 0], data: { on: true } });
-const car = elements.createProp({ name: 'car', position: [100, 40] });
+const lamp = elements.createEntity({ kind: 'prop', name: 'lamp', position: [0, 0], data: { on: true } });
+const car = elements.createEntity({ kind: 'prop', name: 'car', position: [100, 40] });
 car.attach(lamp, { at: [12, 0] });
 lamp.on('propertyChanged', ({ key, value }) => console.log(key, value));
 lamp.set('on', false);
@@ -404,7 +415,7 @@ One call makes anything: `engine.createObject(record, at)`. A record is a templa
 
 | Field | What it switches on |
 |---|---|
-| `entity_type` | What it is to physics: `prop`, `static`, `character`, `vehicle`, `trigger`, … |
+| `kind` | What it is to physics: `prop`, `static`, `character`, `vehicle`, `trigger`, … |
 | `assets.drawing` | Its look: a drawing resource, drawn every frame |
 | `look` | `{values, scale, layer, depth, visible}`, kept as the object's `look` property |
 | `bounds` | Collision bounds fitted from the drawing's solid steps: `circle`, `box`, `capsule` or `hull` |
@@ -423,7 +434,7 @@ engine.directory.assets.registerLibrary({
     brass: { kind: 'material', fill: '#b5a642', stroke: '#5a4f1c', surface: { friction: 0.3 } }
   },
   templates: {
-    lamp: { entity_type: 'prop', assets: { drawing: 'lamp', material: 'brass' },
+    lamp: { kind: 'prop', assets: { drawing: 'lamp', material: 'brass' },
             look: { values: { light: '#ffd27f' }, layer: 2 }, bounds: 'circle', data: { on: true } }
   }
 });

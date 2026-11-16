@@ -40,7 +40,7 @@ test('rotated view bounds clamp to authored bounds and a small map centers witho
 });
 
 test('camera follows the official body with fixed-step smoothing/interpolation and never writes physics',()=>{
- const {world,camera}=fixture(),person=world.createCharacter({position:[10,20]});camera.follow(person,{smoothing:0});person.setMovement([1,0]);world.updateState();camera.updateState(world.config.fixed_step);
+ const {world,camera}=fixture(),person=world.createEntity({ kind: 'character', position:[10,20]});camera.follow(person,{smoothing:0});person.motor.setMovement([1,0]);world.updateState();camera.updateState(world.config.fixed_step);
  const before=world.savePhysicsState(),a=camera.getView(0).position,b=camera.getView(1).position;near(a[0],10);near(b[0],person.position[0]);assert.ok(b[0]>a[0]);camera.getView(.5);assert.deepEqual(world.savePhysicsState(),before);
  person.destroy();camera.updateState(1/60);assert.doesNotThrow(()=>camera.getView());
 });
@@ -65,7 +65,7 @@ test('data packets reject Canvas callbacks, DOM/image handles and unsupported pa
 });
 
 test('visibility reads render bounds from the single native grid',()=>{
- const {world,render}=fixture();const e=world.elements.createDecoration({position:[150,50],render_shape:{shape_type:'box',dimensions:[200,10]}});const original=world.queryEntitiesInBounds.bind(world),queries=[];
+ const {world,render}=fixture();const e=world.elements.createEntity({ kind: 'decoration', position:[150,50],render_shape:{shape_type:'box',dimensions:[200,10]}});const original=world.queryEntitiesInBounds.bind(world),queries=[];
  world.queryEntitiesInBounds=(packet,results)=>{queries.push(packet);return original(packet,results);};
  assert.equal(render.getVisibleEntities()[0].entity,e);assert.equal(queries[0].bounds_type,'render');assert.deepEqual(queries[0].bounds,{left:0,top:0,right:100,bottom:100});render.dispose();
 });

@@ -13,7 +13,7 @@ export { particlePhysics } from './particles/particles.mjs';
 export { gameEntity } from './elements/entity.mjs';
 export { gameElements } from './elements/registry.mjs';
 export { EMPTY_DATA_SOURCE, isDataSource } from './elements/data-source.mjs';
-export { gameCharacter, gameVehicle, gameProjectile, gameProp, gameStatic, gameTrigger, gameDecoration, awarenessMatrix } from './elements/elements.mjs';
+export { KINDS, MOTORS, awarenessMatrix } from './elements/elements.mjs';
 export { BODY_GROUP, QUERY_GROUP, PHYSICS_TYPES } from './core/values.mjs';
 export { trafficController } from './traffic/controller.mjs';
 export { motionController } from './motion/controller.mjs';

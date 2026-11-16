@@ -1,7 +1,7 @@
 // ===== LV3 PENTHOUSE =====
 // OBJECTS: one way to make anything in the world from a catalog record. A record is a Directory
 // template (or an inline record) whose fields switch its parts on:
-//   entity_type   what it is to physics (prop, character, vehicle, ...)
+//   kind   what it is to physics (prop, character, vehicle, ...)
 //   assets.drawing  its look: a drawing resource, drawn every frame by the render system
 //   look          {values, scale, layer, depth, visible}: the values the drawing reads, kept as the `look` property
 //   bounds        circle | box | capsule | hull: collision bounds fitted from the drawing's solid steps

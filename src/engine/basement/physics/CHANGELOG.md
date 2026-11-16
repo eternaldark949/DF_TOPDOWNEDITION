@@ -1,5 +1,12 @@
 # Changelog
 
+## One entity class — 2026-11-16
+
+- Breaking: there are no entity subclasses. `gameCharacter`, `gameVehicle`, `gameProjectile`, `gameProp`, `gameStatic`, `gameTrigger` and `gameDecoration` are gone, with `registerEntityType`, `listEntityTypes`, `physics_role` and the typed factories (`createCharacter`, `createVehicle`, `createProjectile`, `createProp`, `createStatic`, `createTrigger`, `createDecoration`, also on `physicsSystem`). Constructing a subclass of `gameEntity` throws.
+- A kind is data: `KINDS` presets body defaults, a `motor` (`character`, `vehicle`, `projectile` or null) and `awareness`. `createEntity({kind})` applies it; a record overrides any of it. `defineKind`, `getKind` and `listKinds` add and read kinds. `entity_type` is renamed `kind` everywhere, Directory templates included.
+- `entity.physics_controller` is renamed `entity.motor` (null without one); motor calls go through it (`entity.motor.setMovement(...)`). `setRotation` still uses a character motor's facing.
+- `getEntities({kind, tag})` reads the kind's and the tag's own lists; `instance_of` is gone. Saves record each entity's kind, motor and awareness.
+
 ## Walkways for traffic — 2026-11-15
 
 - The traffic controller keeps walkways (crosswalks): `enterWalkway(walkway_id, body)`, `leaveWalkway(walkway_id, body)` and `getWalkway(walkway_id)`. A route stop can name a `walkway_id`; a car waits before it while anyone is on it, and takes a crossing only when the walkways with stops inside the crossing's clearance are clear, so it never waits in the box for walkers. Walkways are saved.

@@ -78,7 +78,7 @@ test('unchanged paths are reused for free and only invalidated by nearby obstacl
 
 test('moving characters never dirty the field; chunk rebuilds stay local to the change', () => {
     const p = new physicsSystem(); doorway(p, 40);
-    for (let i = 0; i < 20; i++) p.createCharacter({ position: [-300 + i * 30, 300] }).setMovement([0, -1]);
+    for (let i = 0; i < 20; i++) p.createEntity({ kind: 'character',  position: [-300 + i * 30, 300] }).motor.setMovement([0, -1]);
     p.navigation.findPath({ from: [-200, -300], to: [200, -300], radius: 10 });
     const built = p.navigation.getStatistics().field.chunk_builds;
     tick(p, 30);
@@ -102,7 +102,7 @@ test('a moved goal repairs only the last leg of a reused path', () => {
 test('characters walk through a maze to their destination with navigate', () => {
     const p = new physicsSystem();
     wall(p, [100, -60], [10, 280]); wall(p, [200, 60], [10, 280]);
-    const actor = p.createCharacter({ position: [0, 0], collision_shape: { shape_type: 'circle', radius: 8 }, movement: { max_speed: 160 } });
+    const actor = p.createEntity({ kind: 'character',  position: [0, 0], collision_shape: { shape_type: 'circle', radius: 8 }, movement: { max_speed: 160 } });
     let arrived = 0; p.on('destinationReached', () => arrived++);
     const plan = p.navigation.navigate(actor, [300, 0]);
     assert.equal(plan.layer, 'field'); assert.ok(plan.points.length > 2);
@@ -161,7 +161,7 @@ test('lanes use the shared spatial grid but are not saved as generic spatial ins
 
 test('vehicles drive a navigated lane route to the destination', () => {
     const p = new physicsSystem(); grid(p);
-    const car = p.createVehicle({ position: [20, 0], vehicle_template: { max_speed: 400, acceleration: 300, braking: 400 } });
+    const car = p.createEntity({ kind: 'vehicle',  position: [20, 0], vehicle_template: { max_speed: 400, acceleration: 300, braking: 400 } });
     let arrived = 0; p.on('destinationReached', () => arrived++);
     const plan = p.navigation.navigate(car, [480, 500], { arrival_distance: 12 });
     assert.equal(plan.layer, 'road');

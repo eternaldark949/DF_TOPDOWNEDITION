@@ -45,7 +45,7 @@ Each call is one line. **Today** says what exists now: *have* means it works and
 
 ### Objects
 
-An object is like Blender's `KX_GameObject`: a name, an id, a position, a rotation, a parent, properties, and parts (look, body, light, sound, behaviour) switched on by data. A light is an object. A human is an object with a human look and a behaviour.
+An object is like Blender's `KX_GameObject`: a name, an id, a position, a rotation, a parent, properties, and parts (look, body, light, sound, behaviour) switched on by data. A light is an object. A human is an object with a human look and a behaviour. There is one object class, `gameEntity`, and no subclasses: `kind` is a preset of body defaults and parts (a `motor` for walking, driving or flying, `awareness`), a record overrides any of it, and objects are sorted by `kind` and `tags`.
 
 | Call | What it does | Today |
 | --- | --- | --- |

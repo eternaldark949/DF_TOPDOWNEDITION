@@ -6,33 +6,33 @@ Import `physicsSystem` and constants from `../index.mjs` (adjust relative paths 
 
 ```js
 const physics = new physicsSystem();
-const actor = physics.createCharacter({
+const actor = physics.createEntity({ kind: 'character',
     position: [100, 100], mass: 15,
     collision_shape: { shape_type: 'circle', radius: 12 },
     movement: { max_speed: 150, acceleration: 600 }
 });
-actor.setMovement([1, 0]);
+actor.motor.setMovement([1, 0]);
 physics.updateState();
-actor.moveTo([250, 100]);
-actor.followTarget([300, 120], { arrival_distance: 30 });
-actor.lookAtTarget([300, 120]);
-actor.dashTo([200, 100], { speed: 400 });
-actor.teleportTo([400, 100]);
+actor.motor.moveTo([250, 100]);
+actor.motor.followTarget([300, 120], { arrival_distance: 30 });
+actor.motor.lookAtTarget([300, 120]);
+actor.motor.dashTo([200, 100], { speed: 400 });
+actor.motor.teleportTo([400, 100]);
 ```
 
-For a hit, use `actor.physics_controller.body.applyImpact({source_body, strength:120, world_point})`. The engine computes direction, mass response and torque. Gameplay chooses the configured strength and damage separately. `cancelMovement()` cancels steering; `stopMovement()` also clears current motion.
+For a hit, use `actor.body.applyImpact({source_body, strength:120, world_point})`. The engine computes direction, mass response and torque. Gameplay chooses the configured strength and damage separately. `cancelMovement()` cancels steering; `stopMovement()` also clears current motion.
 
 ## Vehicles and a route
 
 ```js
-const vehicle = physics.createVehicle({
+const vehicle = physics.createEntity({ kind: 'vehicle',
     position: [100, 300], mass: 1000,
     collision_shape: { shape_type: 'box', dimensions: [64, 34] },
     vehicle_template: { max_speed: 180, acceleration: 80, braking: 150 }
 });
-vehicle.accelerateVehicle(0.7);
-vehicle.steerVehicle(0.2);
-vehicle.followPath([[100, 300], [300, 300], [300, 450]], {
+vehicle.motor.accelerateVehicle(0.7);
+vehicle.motor.steerVehicle(0.2);
+vehicle.motor.followPath([[100, 300], [300, 300], [300, 450]], {
     speed: 100, following_distance: 8
 });
 ```
@@ -47,14 +47,14 @@ physics.on('projectileHit', hit => {
     // Tell the game's combat/effects systems using target_body.body_id,
     // world_point and impact_scale. Do not push target positions here.
 });
-const shot = physics.createProjectile({
-    position: actor.physics_controller.body.position,
+const shot = physics.createEntity({ kind: 'projectile',
+    position: actor.body.position,
     target: [500, 100], owner_id: actor.body_id,
     speed: 600, lifetime: 2, impact_strength: 120,
     penetration_count: 1, penetration_loss: 0.25,
     collision_shape: { shape_type: 'circle', radius: 2 }
 });
-shot.redirectProjectile([0, 1]);
+shot.motor.redirectProjectile([0, 1]);
 ```
 
 The engine calculates the initial direction from `target`. Physical masks, owner exclusion, penetration order, repeat suppression and impulse application all live inside it.
@@ -65,7 +65,7 @@ The engine calculates the initial direction from `target`. Physical masks, owner
 const nearby = physics.peruseNearbyEntities(actor, { near_range: 200 });
 const ray = physics.raycast({ from: [100, 100], to: [500, 100] });
 const clear = physics.getPathClearance({
-    body: actor, from: actor.physics_controller.body.position, to: [300, 100]
+    body: actor, from: actor.body.position, to: [300, 100]
 });
 const crate = physics.createBody({
     position: [300, 200], mass: 10,

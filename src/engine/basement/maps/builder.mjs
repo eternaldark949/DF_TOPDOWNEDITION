@@ -45,8 +45,8 @@ const lightShape = l => l.shape === 'strip' ? { shape_type: 'box', dimensions: l
 
 export const MAP_KINDS = Object.freeze(['interior', 'exterior']);
 /** Without a template, each section uses one of the engine's own entity types. */
-export const DEFAULT_KINDS = Object.freeze({ wall: { entity_type: 'static' }, prop: { entity_type: 'prop', physics_type: 'static' }, light: { entity_type: 'decoration' },
-    trigger: { entity_type: 'trigger', ghost: true }, room: { entity_type: 'trigger', ghost: true, collision_mask: 0 }, door: { entity_type: 'prop', physics_type: 'kinematic' }, cloth: { entity_type: 'decoration' } });
+export const DEFAULT_KINDS = Object.freeze({ wall: { kind: 'static' }, prop: { kind: 'prop', physics_type: 'static' }, light: { kind: 'decoration' },
+    trigger: { kind: 'trigger', ghost: true }, room: { kind: 'trigger', ghost: true, collision_mask: 0 }, door: { kind: 'prop', physics_type: 'kinematic' }, cloth: { kind: 'decoration' } });
 
 /**
  * Returns `{ entries, spawn }`. Each entry is `{ section, index, source, packet }`, in build order:

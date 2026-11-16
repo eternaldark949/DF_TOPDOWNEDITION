@@ -27,10 +27,10 @@ test('a humanoid boots on the engine defaults with a body, a rig and an idle pos
 test('it walks when its body moves, stepping on distance, and stands again when it stops', () => {
     const p = world(), person = new humanoid(p, { position: [100, 100] }), steps_heard = [];
     p.on('animationMarker', e => steps_heard.push(e.name));
-    person.entity.setMovement([1, 0]); steps(p, person, 90);
+    person.entity.motor.setMovement([1, 0]); steps(p, person, 90);
     assert.equal(person.rig.getState().layers.base.clip_id, 'walk');
     assert.ok(steps_heard.includes('footstep_l') && steps_heard.includes('footstep_r'), `footsteps (${steps_heard})`);
-    person.entity.setMovement([0, 0]); steps(p, person, 90);
+    person.entity.motor.setMovement([0, 0]); steps(p, person, 90);
     assert.equal(person.rig.getState().layers.base.clip_id, 'idle');
 });
 

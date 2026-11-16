@@ -33,7 +33,7 @@ export class humanoid {
             if (!Number.isFinite(height) || height <= 0) throw new TypeError('A humanoid height is a positive number');
             const definition = strip(structuredClone(skeleton)), root = definition.joints.find(joint => joint.parent == null);
             root.scale = (root.scale ?? [1, 1]).map(v => v * height);
-            this.entity = physics.elements.createCharacter({ ...packet, template });
+            this.entity = physics.elements.createEntity({ ...packet, template });
             this.rig = physics.rigs.createRig(this.entity, { definition, clips: clips.clips });
             this.rig.play(this.#kit.locomotion.idle);
         }

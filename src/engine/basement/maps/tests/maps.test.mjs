@@ -51,12 +51,12 @@ test('an interior builds every entity at load, finds them by id and role, and op
     assert.deepEqual(map.entities(undefined, { section: 'triggers' }).map(e => e.data.authored_id), ['exit_0']); assert.equal(map.entities('wall', { section: 'walls' }).length, 6); assert.deepEqual(map.entities('wall', { section: 'triggers' }), []);
     assert.equal(map.entity('exit_0').data.target, 'street');
     const door = map.entity('door_0'), closed = [...door.position];
-    const walker = physics.elements.createCharacter({ position: [200, 120], collision_shape: { shape_type: 'circle', radius: 8 } });
+    const walker = physics.elements.createEntity({ kind: 'character',  position: [200, 120], collision_shape: { shape_type: 'circle', radius: 8 } });
     map.updateState({ duration: 0.1 });
     for (let i = 0; i < 20; i++) physics.updateState();
     assert.equal(door.data.open, true);
     assert.ok(Math.abs(door.position[0] - closed[0]) > 10, 'the leaf moved');
-    walker.teleportTo([50, 280]);
+    walker.motor.teleportTo([50, 280]);
     map.updateState({ duration: 0.1 });
     for (let i = 0; i < 20; i++) physics.updateState();
     assert.equal(door.data.open, false);
@@ -182,7 +182,7 @@ test('room links report live openness, routes and exposure', () => {
     assert.equal(rooms.openness('hall', 'yard'), 1);
     assert.equal(rooms.openness('yard', 'study'), 0, 'not directly linked');
     assert.equal(rooms.route('yard', 'vault'), null, 'shut door blocks the only way');
-    physics.elements.createCharacter({ position: [290, 60], collision_shape: { shape_type: 'circle', radius: 8 } });
+    physics.elements.createEntity({ kind: 'character',  position: [290, 60], collision_shape: { shape_type: 'circle', radius: 8 } });
     map.updateState({ duration: 0.1 });
     for (let i = 0; i < 4; i++) physics.updateState();
     const partly = rooms.openness('hall', 'study');
@@ -197,13 +197,13 @@ test('room links report live openness, routes and exposure', () => {
 
 test('occupancy tracks any body, keeps it in its room across doorways and reports changes', () => {
     const physics = new physicsSystem(), map = new mapInstance(physics, house), rooms = map.rooms, changes = [];
-    const cat = physics.elements.createCharacter({ position: [50, 50], collision_shape: { shape_type: 'circle', radius: 4 } });
-    const guest = physics.elements.createCharacter({ position: [500, 300], collision_shape: { shape_type: 'circle', radius: 4 } });
+    const cat = physics.elements.createEntity({ kind: 'character',  position: [50, 50], collision_shape: { shape_type: 'circle', radius: 4 } });
+    const guest = physics.elements.createEntity({ kind: 'character',  position: [500, 300], collision_shape: { shape_type: 'circle', radius: 4 } });
     const stop = rooms.onRoomChange(c => changes.push([c.from, c.to]));
     assert.equal(rooms.track(cat).id, 'hall'); assert.equal(rooms.track(guest).id, 'vault');
-    cat.teleportTo([304, 60]); rooms.updateState();
+    cat.motor.teleportTo([304, 60]); rooms.updateState();
     assert.equal(rooms.roomOf(cat).id, 'hall', 'in the doorway, still the hall');
-    cat.teleportTo([400, 60]); rooms.updateState();
+    cat.motor.teleportTo([400, 60]); rooms.updateState();
     assert.equal(rooms.roomOf(cat).id, 'study');
     assert.deepEqual(rooms.occupants('study'), [cat]);
     assert.deepEqual(changes, [['hall', 'study']]);
@@ -226,14 +226,14 @@ test('a hinged door is a physical leaf: a body pushes it open, its spring swings
     assert.equal(door.data.hinged, true);
     assert.equal(physics.getBodyConstraints(door).length, 1, 'the map built its hinge');
     // An actor-weight walker (the game's people weigh 8 to 12); a 1 kg body cannot shift a 12 kg leaf.
-    const walker = physics.elements.createCharacter({ position: [205, 110], mass: 10, collision_shape: { shape_type: 'circle', radius: 8 }, movement: { max_speed: 90 } });
+    const walker = physics.elements.createEntity({ kind: 'character',  position: [205, 110], mass: 10, collision_shape: { shape_type: 'circle', radius: 8 }, movement: { max_speed: 90 } });
     let widest = 0, passed = false;
-    walker.setMovement([0, 1]);
+    walker.motor.setMovement([0, 1]);
     for (let i = 0; i < 120; i++) { map.updateState(); physics.updateState(); widest = Math.max(widest, Math.abs(door.rotation)); if (walker.position[1] > 180) { passed = true; break; } }
     assert.ok(passed, `the walker got through (at ${walker.position[1].toFixed(1)})`);
     assert.ok(widest > 0.5, `the walker swung the leaf open (${widest.toFixed(2)} rad)`);
     assert.ok(map.rooms.openness('north', 'south') > 0, 'the open leaf opens the room link');
-    walker.setMovement([0, 0]); walker.teleportTo([60, 260]);
+    walker.motor.setMovement([0, 0]); walker.motor.teleportTo([60, 260]);
     for (let i = 0; i < 300; i++) { map.updateState(); physics.updateState(); widest = Math.max(widest, Math.abs(door.rotation)); }
     assert.ok(widest <= Math.PI - 0.25 + 1e-3, 'it never folds back flat against the wall');
     assert.ok(Math.abs(door.rotation) < 0.05, `and the spring swung it shut (${door.rotation.toFixed(3)} rad)`);
@@ -266,8 +266,8 @@ test('door kinds are data: a double door is two hinged leaves, and a game may ad
     assert.deepEqual([left.position, right.position], [[160, 155], [240, 155]], 'each leaf hangs on its own end');
     assert.equal(physics.getBodyConstraints(left).length + physics.getBodyConstraints(right).length, 2);
     assert.equal(map.rooms.openness('north', 'south'), 0);
-    const walker = physics.elements.createCharacter({ position: [200, 110], mass: 10, collision_shape: { shape_type: 'circle', radius: 8 }, movement: { max_speed: 90 } });
-    walker.setMovement([0, 1]); let passed = false;
+    const walker = physics.elements.createEntity({ kind: 'character',  position: [200, 110], mass: 10, collision_shape: { shape_type: 'circle', radius: 8 }, movement: { max_speed: 90 } });
+    walker.motor.setMovement([0, 1]); let passed = false;
     for (let i = 0; i < 120 && !passed; i++) { map.updateState(); physics.updateState(); passed = walker.position[1] > 180; }
     assert.ok(passed, `the walker parts both leaves (at ${walker.position[1].toFixed(1)})`);
     assert.ok(Math.abs(left.rotation) > .3 && Math.abs(right.rotation) > .3, `both leaves swing (${left.rotation.toFixed(2)}, ${right.rotation.toFixed(2)})`);

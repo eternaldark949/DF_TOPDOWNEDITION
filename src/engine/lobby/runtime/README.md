@@ -112,12 +112,12 @@ import { gameLevel } from './game-level.mjs';
 
 class Room extends gameLevel {
     enter(context) {
-        context.createEntity({entity_type:'static', position:[200,100]});
+        context.createEntity({kind:'static', position:[200,100]});
     }
 }
 const engine = createGameRuntime();
 engine.registerLevel('room', Room);
-const player = engine.createEntity({template:'df:player_949', entity_type:'df_player'}, {lifetime:'session'});
+const player = engine.createEntity({template:'df:player_949', kind:'character'}, {lifetime:'session'});
 engine.registerSystem('input', {
     beforePhysics() { player.setMovement([1,0]); }
 });
@@ -129,7 +129,7 @@ Serve the checkout over HTTP and open `src/game/examples/`. The two example leve
 
 ## Verification and next conversions
 
-Run `node --test tools/test-game-engine.mjs tools/test-native-bundle.mjs` and `python tools/test-game-engine-browser.py`. The tests exercise ownership, stable identity/grid, hook ordering, queued event-time creation, cleanup, transition failures, disposal during loading, pause, stop/restart races and bundled execution without legacy globals.
+Run `node --test src/engine/tests/game-engine.test.mjs` and `python tools/test-game-engine-browser.py`. The tests exercise ownership, stable identity/grid, hook ordering, queued event-time creation, cleanup, transition failures, disposal during loading, pause, stop/restart races and bundled execution without legacy globals.
 
 Shared session/player control and production vitals ownership are implemented. Next convert the remaining game-specific input callers, level construction/lifecycle, population/vehicle ownership, combat/abilities, story/interactions, presentation and persistence into explicit registered systems. Keep game-specific policy in those classes and add missing physical capability inside Basement. Remove each old mixin as its responsibilities and callers are converted. Replacing the production boot happens against that shared class composition, not by adding more map-specific bypasses.
 

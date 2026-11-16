@@ -19,8 +19,8 @@ const library = {
         wood: { kind: 'material', fill: '#8a5a2b', surface: { friction: .9, restitution: .1, footstep: 'wood' } }
     },
     templates: {
-        lamp: { entity_type: 'prop', assets: { drawing: 'lamp' }, look: { values: { light: '#ffd27f' }, layer: 2 }, bounds: 'circle', data: { on: true } },
-        crate: { entity_type: 'prop', assets: { drawing: 'crate', material: 'wood' }, bounds: 'box' },
+        lamp: { kind: 'prop', assets: { drawing: 'lamp' }, look: { values: { light: '#ffd27f' }, layer: 2 }, bounds: 'circle', data: { on: true } },
+        crate: { kind: 'prop', assets: { drawing: 'crate', material: 'wood' }, bounds: 'box' },
         boxed_lamp: { extends: 'lamp', collision_shape: { shape_type: 'box', dimensions: [4, 4] } }
     }
 };
@@ -44,7 +44,7 @@ test('every bounds kind fits, an explicit shape wins, and a material sets the su
     assert.equal(createObject(p.elements, 'toys:lamp', [0, 0], { bounds: 'capsule' }).collision_shape.shape_type, 'capsule');
     const hull = createObject(p.elements, 'toys:crate', [0, 0], { bounds: 'hull' }).collision_shape;
     assert.equal(hull.shape_type, 'polygon'); assert.equal(hull.points.length, 4);
-    assert.throws(() => objectPacket(p.elements.asset_library, { entity_type: 'prop', bounds: 'circle' }), /need a drawing/);
+    assert.throws(() => objectPacket(p.elements.asset_library, { kind: 'prop', bounds: 'circle' }), /need a drawing/);
     assert.throws(() => createObject(p.elements, 'toys:lamp', [0, 0], { bounds: 'blob' }), /Collision bounds/);
 });
 test('a look draws at the entity pose with its materials, and the record refuses bad data', () => {

@@ -48,7 +48,7 @@ test('all relative documentation links resolve inside the shareable folder', () 
 test('example client runs using only public engine requests and produces an impact', () => {
     const s = createSandbox(); s.walk([1, 0]); step(s.physics, 30); s.walk([0, 0]);
     s.shoot([540, 150]); step(s.physics, 90);
-    assert.ok(s.character.physics_controller.body.position[0] > 120); assert.ok(s.impacts.length > 0);
+    assert.ok(s.character.motor.body.position[0] > 120); assert.ok(s.impacts.length > 0);
 });
 test('seeded rotated/offset geometry grid candidates match an exhaustive test oracle', () => {
     const p = new api.physicsSystem({ cell_size: 13 }), bodies = [], states = [];
@@ -79,12 +79,12 @@ test('sensor hits do not consume projectile penetration and lifetime truncates m
     const p = new api.physicsSystem();
     for (const [x, ghost] of [[5, true], [10, false], [15, false]]) p.createBody({ position: [x, 0], ghost, physics_type: 'static' });
     const hits = []; p.on('projectileHit', e => hits.push(e));
-    p.createProjectile({ speed: 2000, direction: [1, 0], penetration_count: 1 }); step(p);
+    p.createEntity({ kind: 'projectile',  speed: 2000, direction: [1, 0], penetration_count: 1 }); step(p);
     assert.deepEqual(hits.map(h => h.sensor_only), [true, false, false]);
     const q = new api.physicsSystem(); q.createBody({ position: [50, 0], physics_type: 'static' }); let count = 0; q.on('projectileHit', () => count++);
-    q.createProjectile({ lifetime: 0.005, speed: 10000 }); step(q); assert.equal(count, 1);
+    q.createEntity({ kind: 'projectile',  lifetime: 0.005, speed: 10000 }); step(q); assert.equal(count, 1);
     const r = new api.physicsSystem(); r.createBody({ position: [70, 0], physics_type: 'static' }); r.on('projectileHit', () => count++);
-    r.createProjectile({ lifetime: 0.005, speed: 10000 }); step(r); assert.equal(count, 1);
+    r.createEntity({ kind: 'projectile',  lifetime: 0.005, speed: 10000 }); step(r); assert.equal(count, 1);
 });
 test('body clearances honor physical masks while independent sensor queries can still find geometry', () => {
     const p = new api.physicsSystem(), body = p.createBody({ collision_mask: 0 });
@@ -103,21 +103,21 @@ test('render interpolation is detached from authoritative motion', () => {
     pose.position[0] = 1000; assert.ok(Math.abs(b.position[0] - 1) < 1e-8);
 });
 test('facing works by default; removing a follow target cancels safely', () => {
-    const p = new api.physicsSystem(), a = p.createCharacter(), b = p.createBody({ position: [0, 100] });
-    a.lookAtTarget(b); step(p, 20); assert.ok(a.physics_controller.body.rotation > 1);
-    a.followTarget(b); p.removeBody(b); assert.doesNotThrow(() => step(p));
-    assert.equal(a.getMovementState().mode, 'idle');
+    const p = new api.physicsSystem(), a = p.createEntity({ kind: 'character' }), b = p.createBody({ position: [0, 100] });
+    a.motor.lookAtTarget(b); step(p, 20); assert.ok(a.motor.body.rotation > 1);
+    a.motor.followTarget(b); p.removeBody(b); assert.doesNotThrow(() => step(p));
+    assert.equal(a.motor.getMovementState().mode, 'idle');
 });
 test('autonomous vehicle follows an unobstructed route and emits arrival', () => {
-    const p = new api.physicsSystem(), v = p.createVehicle({ vehicle_template: { max_speed: 40 } }); let arrived = 0;
-    p.on('destinationReached', () => arrived++); v.followPath([[0, 0], [60, 0]], { speed: 40 }); step(p, 300);
-    assert.equal(arrived, 1); assert.ok(Math.abs(v.physics_controller.body.position[0] - 60) < 5);
+    const p = new api.physicsSystem(), v = p.createEntity({ kind: 'vehicle',  vehicle_template: { max_speed: 40 } }); let arrived = 0;
+    p.on('destinationReached', () => arrived++); v.motor.followPath([[0, 0], [60, 0]], { speed: 40 }); step(p, 300);
+    assert.equal(arrived, 1); assert.ok(Math.abs(v.motor.body.position[0] - 60) < 5);
 });
 test('sleeping is observable and new requests wake bodies without alternate motion paths', () => {
     const p = new api.physicsSystem(), b = p.createBody(); step(p, 40); assert.equal(b.getState().sleeping, true);
     b.applyImpulse([10, 0]); step(p); assert.equal(b.getState().sleeping, false); assert.ok(b.position[0] > 0);
-    const a = p.createCharacter({ position: [100, 0] }); a.physics_controller.body.sleepBody(); const before = a.physics_controller.body.position;
-    step(p); assert.deepEqual(a.physics_controller.body.position, before); a.setMovement([1, 0]); step(p); assert.ok(a.physics_controller.body.position[0] > before[0]);
+    const a = p.createEntity({ kind: 'character',  position: [100, 0] }); a.motor.body.sleepBody(); const before = a.motor.body.position;
+    step(p); assert.deepEqual(a.motor.body.position, before); a.motor.setMovement([1, 0]); step(p); assert.ok(a.motor.body.position[0] > before[0]);
 });
 test('query budgets reject invalid or unbounded work rather than loop indefinitely', () => {
     const p = new api.physicsSystem();

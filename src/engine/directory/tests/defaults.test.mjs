@@ -7,7 +7,7 @@ test('the engine registry holds the base entity kinds and a default humanoid', (
     const registry = createEngineRegistry();
     for (const kind of ['entity', 'character', 'prop', 'static', 'trigger', 'decoration', 'humanoid']) assert.ok(registry.hasTemplate('engine:' + kind), kind);
     const person = registry.resolveTemplate('engine:humanoid');
-    assert.equal(person.entity_type, 'character');
+    assert.equal(person.kind, 'character');
     assert.deepEqual(Object.keys(person.assets).sort(), ['clips', 'figure', 'locomotion', 'skeleton']);
     assert.equal(registry.getResource(person.assets.skeleton).kind, 'skeleton');
     assert.ok(Object.isFrozen(ENGINE_LIBRARIES[0].resources.humanoid_skeleton.joints[0]));

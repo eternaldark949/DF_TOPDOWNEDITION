@@ -51,14 +51,14 @@ A game registers its own libraries beside it (`createEngineRegistry({libraries: 
 | `hasTemplate(template_id)` | Boolean. |
 | `getTemplate(template_id)` | Immutable, fully resolved template; an unknown id throws. |
 | `resolveTemplate(template_id, overrides={})` | Detached copy of the template merged with `overrides`, resource bindings validated. With no id, `overrides` is used alone. |
-| `listTemplates({entity_type?}={})` | Qualified template ids. |
+| `listTemplates({kind?}={})` | Qualified template ids. |
 | `getResource(resource_id)` | Immutable resource `{kind, ...}`; an unknown id throws. |
 | `listResources({kind?}={})` | Qualified resource ids. |
 | `exportLibraries()` | Detached copies of the registered library packets. |
 
 `mergeDefinition(base, changes)` is the merge rule templates use: plain objects merge recursively, arrays and other values replace, nothing shared is mutated.
 
-A template needs `entity_type`; its `assets` map slots to resource ids, qualified against its own library when written bare.
+A template needs a `kind` (see the Basement's kinds); its `assets` map slots to resource ids, qualified against its own library when written bare.
 
 ## Structures
 

@@ -4,7 +4,7 @@ import { collisionShape, shapeBounds, shapeReach, pieces } from '../collision/sh
 import { collisionDetector } from '../collision/detector.mjs';
 import { vector, number, sub, add, scale, unit, length, BODY_GROUP, EPS, validBounds, boundsMeet, unionBounds, angleDelta, rotate } from '../core/values.mjs';
 
-export function referenceBody(value) { return value?.physics_controller?.body ?? value?.body ?? value; }
+export function referenceBody(value) { return value?.motor?.body ?? value?.body ?? value; }
 export function referencePosition(world, value) {
     if (Array.isArray(value)) return vector(value);
     return [...world._record(referenceBody(value)).position];

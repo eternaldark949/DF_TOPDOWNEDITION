@@ -2,13 +2,22 @@
 import { clone, freeze } from '../core/values.mjs';
 import { EMPTY_DATA_SOURCE, isDataSource } from './data-source.mjs';
 import { gameEntity, entityRecord, restoreEntity } from './entity.mjs';
-import { gameCharacter, gameVehicle, gameProjectile, gameProp, gameStatic, gameTrigger, gameDecoration, awarenessMatrix } from './elements.mjs';
+import { KINDS, MOTORS } from './elements.mjs';
 
-const builtins = { entity: gameEntity, character: gameCharacter, vehicle: gameVehicle, projectile: gameProjectile, prop: gameProp, static: gameStatic, trigger: gameTrigger, decoration: gameDecoration };
+const UNSAFE = ['__proto__', 'constructor', 'prototype'];
+function checkKind(kind, preset) {
+    if (typeof kind !== 'string' || !kind || UNSAFE.includes(kind)) throw new TypeError('A kind is named by a non-empty string');
+    const { body = {}, motor = null, awareness = false, ...rest } = preset ?? {};
+    if (Object.keys(rest).length) throw new TypeError(`Unknown kind field: ${Object.keys(rest).join(', ')} (a kind is {body, motor, awareness})`);
+    if (!body || typeof body !== 'object' || Array.isArray(body)) throw new TypeError('A kind\'s body is an object of body defaults');
+    if (motor !== null && !MOTORS.includes(motor)) throw new TypeError(`A motor is ${MOTORS.join(', ')} or null`);
+    if (typeof awareness !== 'boolean') throw new TypeError('awareness is true or false');
+    return freeze(clone({ body, motor, awareness }));
+}
 
-/** Identity registry, never a physical-state cache or another spatial index. */
+/** Identity registry, never a physical-state cache or another spatial index. Every object is one gameEntity; its kind is data. */
 export class gameElements {
-    #entities = new Map(); #byType = new Map(); #types = new Map(Object.entries(builtins)); #construction = null; #restore = null;
+    #entities = new Map(); #byKind = new Map(); #byTag = new Map(); #kinds = new Map(Object.entries(KINDS).map(([k, v]) => [k, checkKind(k, v)])); #construction = null; #restore = null;
     constructor(world, { asset_library = EMPTY_DATA_SOURCE } = {}) {
         if (!world || typeof world._createEntityComponents !== 'function' || typeof world._mutate !== 'function') throw new TypeError('gameElements requires its physicsSystem owner');
         if (world.elements) throw new Error('The world already owns its authoritative gameElements registry');
@@ -16,7 +25,7 @@ export class gameElements {
         Object.defineProperties(this, { world: { value: world }, asset_library: { value: asset_library, enumerable: true } });
     }
     #resolve(packet) {
-        for (const key of ['body', 'physics_controller', 'entity_id', 'body_id', 'linked_object', 'linked_entity']) {
+        for (const key of ['body', 'motor_instance', 'entity_id', 'body_id', 'linked_object', 'linked_entity']) {
             if (Object.hasOwn(packet, key)) throw new TypeError(`Entity construction cannot adopt or override ${key}`);
         }
         // Runtime target handles are commands, not serializable asset definitions.
@@ -25,13 +34,11 @@ export class gameElements {
         if (target !== undefined) resolved.target = target;
         return resolved;
     }
+    /** Makes any object: `kind` (default 'entity') presets its body and parts; every other field is the record's. */
     createEntity(packet = {}) {
-        const resolved = this.#resolve(packet), type = resolved.entity_type ?? 'entity', Constructor = this.#types.get(type);
-        if (!Constructor) throw new Error(`Unknown entity type: ${type}`);
         const previous = this.#construction, context = { entities: [] }; this.#construction = context;
         try {
-            const entity = new Constructor(this, { ...resolved, entity_type: type });
-            if (!(entity instanceof Constructor) || !context.entities.includes(entity)) throw new TypeError('Entity constructor must initialize its gameEntity base');
+            const entity = new gameEntity(this, packet);
             if (previous) previous.entities.push(...context.entities);
             return entity;
         }
@@ -41,38 +48,19 @@ export class gameElements {
         }
         finally { this.#construction = previous; }
     }
-    createCharacter(packet = {}) { return this.#createKind('character', packet); }
-    createVehicle(packet = {}) { return this.#createKind('vehicle', packet); }
-    createProjectile(packet = {}) { return this.#createKind('projectile', packet); }
-    createProp(packet = {}) { return this.#createKind('prop', packet); }
-    createStatic(packet = {}) { return this.#createKind('static', packet); }
-    createTrigger(packet = {}) { return this.#createKind('trigger', packet); }
-    createDecoration(packet = {}) { return this.#createKind('decoration', packet); }
-    #createKind(role, packet) {
-        const resolved = this.#resolve(packet), type = resolved.entity_type ?? role, Constructor = this.#types.get(type);
-        if (!Constructor || Constructor.physics_role !== role) throw new TypeError(`Entity type ${type} is not a ${role}`);
-        return this.createEntity({ ...packet, entity_type: type });
-    }
-    registerEntityType(entity_type, Constructor) {
-        if (typeof entity_type !== 'string' || !entity_type || typeof Constructor !== 'function' || !(Constructor.prototype instanceof gameEntity)) throw new TypeError('Entity classes must extend gameEntity');
-        if (this.#types.has(entity_type)) throw new Error(`Entity type already registered: ${entity_type}`);
-        if (!Object.hasOwn(builtins, Constructor.physics_role)) throw new TypeError('Unsupported physics_role');
-        this.#types.set(entity_type, Constructor); return this;
-    }
-    listEntityTypes() { return [...this.#types.keys()]; }
+    /** Adds a kind: `{body, motor, awareness}` — body defaults, the motor it switches on (or null), and whether it is aware of its surroundings. */
+    defineKind(kind, preset) { if (this.#kinds.has(kind)) throw new Error(`Kind already defined: ${kind}`); this.#kinds.set(kind, checkKind(kind, preset)); return this; }
+    getKind(kind) { const preset = this.#kinds.get(kind); if (!preset) throw new Error(`Unknown kind: ${kind} (one of ${[...this.#kinds.keys()].join(', ')})`); return preset; }
+    listKinds() { return [...this.#kinds.keys()]; }
     fetchEntity(entity_id) { return this.#entities.get(entity_id) ?? null; }
     /**
-     * Live entities, in registration order. `entity_type` lists one type, `instance_of` every type whose
-     * class is or extends that class (type by type, each in registration order): both read the type's own
-     * list, kept as entities come and go, so they cost what they return and not the world's entity count.
+     * Live entities, in registration order: all of them, one `kind`, or those carrying `tag`. Each reads
+     * its own list, kept as entities come and go, so it costs what it returns and not the world's count.
      */
-    getEntities({ entity_type, instance_of, active } = {}, results = []) {
+    getEntities({ kind, tag, active } = {}, results = []) {
         results.length = 0;
-        if (instance_of !== undefined && typeof instance_of !== 'function') throw new TypeError('instance_of must be a class');
-        const is = type => { const C = this.#types.get(type); return instance_of === undefined || C === instance_of || C?.prototype instanceof instance_of; };
-        if (entity_type !== undefined) { if (is(entity_type)) this.#push(this.#byType.get(entity_type), active, results); }
-        else if (instance_of !== undefined) { for (const type of this.#types.keys()) if (is(type)) this.#push(this.#byType.get(type), active, results); }
-        else this.#push(this.#entities, active, results);
+        if (kind !== undefined && tag !== undefined) { for (const entity of this.#byKind.get(kind)?.values() ?? []) if (entity.tags.includes(tag) && (active === undefined || entity.active === active)) results.push(entity); return results; }
+        this.#push(kind !== undefined ? this.#byKind.get(kind) : tag !== undefined ? this.#byTag.get(tag) : this.#entities, active, results);
         return results;
     }
     #push(list, active, results) {
@@ -80,24 +68,27 @@ export class gameElements {
     }
     getEntityForBody(body) { return this.fetchEntity(this.world._record(body).id); }
     peruseNearbyEntities(reference, options = {}, results = []) { return this.world.peruseNearbyEntities(reference, { ...options, spatial_entities: true }, results); }
-    getStatistics() { return { entities: this.#entities.size, entity_types: this.#types.size }; }
-    _construct(entity, packet, Constructor) {
-        const definition = this.#resolve(packet), type = definition.entity_type ?? Constructor.entity_type;
-        if (this.#types.get(type) !== Constructor) throw new TypeError('Construct a registered entity class through its declared entity_type');
+    getStatistics() { return { entities: this.#entities.size, kinds: this.#kinds.size }; }
+    _construct(entity, packet) {
+        const definition = this.#resolve(packet), kind = definition.kind ?? 'entity', preset = this.getKind(kind);
+        const motor = definition.motor === undefined ? preset.motor : definition.motor, awareness = definition.awareness ?? preset.awareness;
+        if (motor !== null && !MOTORS.includes(motor)) throw new TypeError(`A motor is ${MOTORS.join(', ')} or null`);
         // Plain construction and save restoration use the same base, but normal callers cannot adopt a pre-existing body.
         const restored = this.#restore;
-        const components = restored ? this.world._restoreEntityComponents(restored.entity_id, Constructor.physics_role) : this.world._createEntityComponents(Constructor.physics_role, definition);
+        const components = restored ? this.world._restoreEntityComponents(restored.entity_id, { motor, awareness }) : this.world._createEntityComponents({ ...clone(preset.body), ...definition, motor, awareness });
         const bodyState = components.body.getState();
-        const record = { elements: this, body: components.body, controller: components.controller, awareness: components.awareness ?? null,
-            entity_type: type, template_id: definition.template ?? null, name: bodyState.name, tags: freeze(bodyState.tags),
+        const record = { elements: this, body: components.body, motor: components.motor, awareness: components.awareness ?? null,
+            kind, motor_name: motor, aware: awareness, template_id: definition.template ?? null, name: bodyState.name, tags: freeze(bodyState.tags),
             assets: freeze(clone(definition.assets ?? {})), data: clone(definition.data ?? {}), registered: false, destroyed: false, subscriptions: new Set() };
         this.#construction?.entities.push(entity);
         this.world._mutate(() => {
             if (record.destroyed) return;
             if (this.#entities.has(record.body.body_id)) throw new Error('Duplicate entity identity');
             record.registered = true; this.#entities.set(record.body.body_id, entity);
-            let list = this.#byType.get(type); if (!list) this.#byType.set(type, list = new Map()); list.set(record.body.body_id, entity);this.world._emit('entityRegistered',{entity,body:record.body});
+            this.#index(this.#byKind, kind, record.body.body_id, entity); for (const tag of record.tags) this.#index(this.#byTag, tag, record.body.body_id, entity);
+            this.world._emit('entityRegistered',{entity,body:record.body});
         });
+
         return record;
     }
     _requireLive(entity) {
@@ -121,16 +112,18 @@ export class gameElements {
     _bodyRemoved(body_id) {
         const entity = this.#entities.get(body_id); if (!entity) return;
         const r = entityRecord(entity); r.destroyed = true; r.registered = false;
-        for (const drop of [...r.subscriptions]) drop();this.world._emit('entityRemoved',{entity,body:r.body}); this.#entities.delete(body_id); this.#byType.get(r.entity_type)?.delete(body_id);
+        for (const drop of [...r.subscriptions]) drop();this.world._emit('entityRemoved',{entity,body:r.body}); this.#entities.delete(body_id); this.#byKind.get(r.kind)?.delete(body_id); for (const tag of r.tags) this.#byTag.get(tag)?.delete(body_id);
     }
     _bodyUpdated(body_id, config) {
         const entity = this.#entities.get(body_id); if (!entity) return;
-        const r = entityRecord(entity); r.name = config.name; r.tags = freeze(clone(config.tags));
+        const r = entityRecord(entity); r.name = config.name;
+        if (r.registered) for (const tag of r.tags) this.#byTag.get(tag)?.delete(body_id);
+        r.tags = freeze(clone(config.tags)); if (r.registered) for (const tag of r.tags) this.#index(this.#byTag, tag, body_id, entity);
     }
     _clear() { for (const id of [...this.#entities.keys()]) this._bodyRemoved(id); }
     _snapshotEntity(entity, result = {}) {
         const r = entityRecord(entity);
-        return Object.assign(result, { entity_id: entity.entity_id, entity_type: r.entity_type, template: r.template_id, name: r.name,
+        return Object.assign(result, { entity_id: entity.entity_id, kind: r.kind, motor: r.motor_name, awareness: r.aware, template: r.template_id, name: r.name,
             tags: clone(r.tags), assets: clone(r.assets), data: clone(r.data), registered: r.registered, destroyed: r.destroyed,
             body: r.destroyed ? null : r.body.getState() });
     }
@@ -141,11 +134,11 @@ export class gameElements {
             if (!Number.isSafeInteger(state.entity_id) || seen.has(state.entity_id)) throw new TypeError('Invalid saved entity identity');
             seen.add(state.entity_id); this.#restore = state;
             try {
-                const Constructor = this.#types.get(state.entity_type);
-                if (!Constructor) throw new TypeError(`Register saved entity type before loading: ${state.entity_type}`);
-                restoreEntity(this, { entity_type: state.entity_type, template: state.template ?? undefined, name: state.name, tags: state.tags, assets: state.assets, data: state.data }, Constructor);
+                this.getKind(state.kind);
+                restoreEntity(this, { kind: state.kind, template: state.template ?? undefined, name: state.name, tags: state.tags, assets: state.assets, data: state.data, ...(state.motor !== undefined ? { motor: state.motor } : {}), ...(state.awareness !== undefined ? { awareness: state.awareness } : {}) });
             } finally { this.#restore = null; }
         }
     }
-    _copyTypesTo(elements) { for (const [type, Constructor] of this.#types) if (!Object.hasOwn(builtins, type)) elements.registerEntityType(type, Constructor); }
+    _copyKindsTo(elements) { for (const [kind, preset] of this.#kinds) if (!Object.hasOwn(KINDS, kind)) elements.defineKind(kind, preset); }
+    #index(map, key, id, entity) { let list = map.get(key); if (!list) map.set(key, list = new Map()); list.set(id, entity); }
 }

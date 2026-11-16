@@ -4,7 +4,7 @@ One `physicsSystem` is one world. It constructs exactly one `spatialGrid`. Indep
 
 ```mermaid
 flowchart TD
-    G[Gameplay definitions and intentions] --> E[gameCharacter / gameVehicle]
+    G[Gameplay definitions and intentions] --> E[gameEntity with a motor part]
     G --> P[physicsSystem]
     E --> M[Engine motors and awarenessMatrix]
     M --> P
@@ -40,7 +40,7 @@ flowchart TD
 | `examples/` | Clients of the public API; they contain rendering/input glue, not physics responses. |
 | `tests/`, `benchmarks/` | Executable contract checks, geometry/grid equivalence and measurements. |
 
-`physicsBody` is a handle. Its authoritative data is held in a module-private WeakMap. Its public identity is immutable, position/velocity properties return frozen snapshots, and `getState` returns a detached copy. There is no writable mirror on a game element. `gameCharacter.physics_controller.body` and `fetchBody(id)` refer to that same body.
+`physicsBody` is a handle. Its authoritative data is held in a module-private WeakMap. Its public identity is immutable, position/velocity properties return frozen snapshots, and `getState` returns a detached copy. There is no writable mirror on a game element. `entity.body` and `fetchBody(id)` refer to that same body.
 
 `gameEntity` is the official world-element base, with automatic component creation/registration, lifecycle, scoped events and asset bindings. `gameElements` owns the identity registry. Specialized elements inherit the base instead of wrapping old game objects. Their root entity/body IDs coincide, and the identity registry contains no physical-state copies or geometry. Its data comes from a data source it is handed, normally the Directory's registry; the Basement never imports the Directory. See [entities](entities.md).
 

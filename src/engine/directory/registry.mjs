@@ -60,7 +60,7 @@ export class assetLibrary {
             identifier(local, 'template_id'); resolving.add(full);
             const { extends: parent, ...fields } = entry;
             const value = parent ? mergeDefinition(resolveTemplate(parent), fields) : clone(fields);
-            if (typeof value.entity_type !== 'string') throw new TypeError(`Template ${full} requires entity_type`);
+            if (typeof value.kind !== 'string') throw new TypeError(`Template ${full} requires a kind`);
             if (!plain(value.assets ?? {})) throw new TypeError(`Template ${full} assets must be an object`);
             for (const [slot, resource] of Object.entries(value.assets ?? {})) {
                 if (typeof resource !== 'string') throw new TypeError(`Asset slot ${slot} requires a resource ID`);
@@ -88,7 +88,7 @@ export class assetLibrary {
         for (const id of Object.values(value.assets ?? {})) this.getResource(id);
         return value;
     }
-    listTemplates({ entity_type } = {}) { return [...this.#templates].filter(([, value]) => !entity_type || value.entity_type === entity_type).map(([id]) => id); }
+    listTemplates({ kind } = {}) { return [...this.#templates].filter(([, value]) => !kind || value.kind === kind).map(([id]) => id); }
     getResource(resource_id) {
         const value = this.#resources.get(resource_id);
         if (!value) throw new Error(`Unknown asset resource: ${resource_id}`);

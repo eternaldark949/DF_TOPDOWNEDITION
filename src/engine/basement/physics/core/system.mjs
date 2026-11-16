@@ -146,58 +146,44 @@ export class physicsSystem {
         return r.handle;
     }
     createEntity(packet = {}) { return this.elements.createEntity(packet); }
-    createCharacter(packet = {}) { return this.elements.createCharacter(packet); }
-    createVehicle(packet = {}) { return this.elements.createVehicle(packet); }
     createProjectileFrom(source, { local_position = [0,0], target, direction, angle, angle_offset=0, ...packet } = {}) {
         const r = this._record(referenceBody(source));
         if(this.getAttachmentState(source)){
             const resolved=this.elements.asset_library.resolveTemplate(packet.template,packet),state=this.getMountedLaunchState(source,{local_position,target,direction,angle,angle_offset,collision_shape:resolved.collision_shape});
             if(!state.allowed)return null;
             const deferred=this.#stepping||this.#dispatching||this.#queue.length>0;
-            const projectile=this.createProjectile({...packet,position:state.position,rotation:state.launch_rotation,owner_id:r.id});
+            const projectile=this.elements.createEntity({kind:'projectile',...packet,position:state.position,rotation:state.launch_rotation,owner_id:r.id});
             if(deferred){this._mutate(()=>{
                 if(!this.fetchBody(projectile.body_id))return;
                 const targetId=target!==undefined&&!Array.isArray(target)?(typeof target==='number'?target:referenceBody(target)?.body_id):null;
                 const current=!this.fetchBody(r.id)?{allowed:false,reason:'source_removed'}:targetId!==null&&!this.fetchBody(targetId)?{allowed:false,reason:'target_removed'}:this.getMountedLaunchState(source,{local_position,target,direction,angle,angle_offset,collision_shape:resolved.collision_shape});
                 if(current.allowed&&(current.attachment_id!==state.attachment_id||current.revision!==state.revision)){current.allowed=false;current.reason='attachment_changed';}
                 if(!current.allowed){this._emit('projectileLaunchBlocked',{body:projectile.body,source_body:r.handle,reason:current.reason});this.removeBody(projectile);return;}
-                projectile.updateBody({position:current.position,rotation:current.launch_rotation});projectile.launchProjectile(current.direction,{inherited_velocity:current.carrier_velocity});
+                projectile.updateBody({position:current.position,rotation:current.launch_rotation});projectile.motor.launchProjectile(current.direction,{inherited_velocity:current.carrier_velocity});
             });return projectile;}
-            try{projectile.launchProjectile(state.direction,{inherited_velocity:state.carrier_velocity});return projectile;}catch(error){this.removeBody(projectile);throw error;}
+            try{projectile.motor.launchProjectile(state.direction,{inherited_velocity:state.carrier_velocity});return projectile;}catch(error){this.removeBody(projectile);throw error;}
         }
         const pose = this.getBodyPoint(source, local_position);
-        const projectile = this.createProjectile({ ...packet, position:r.position, owner_id:r.id });
+        const projectile = this.elements.createEntity({ kind:'projectile', ...packet, position:r.position, owner_id:r.id });
         try {
             const path = this.getPathClearance({body:projectile,from:r.position,to:pose.position,ignore_body:[r.handle,projectile],include_ghosts:false});
             if(path.clear)projectile.body.setPosition(pose.position);
-            projectile.launchProjectile(direction ?? [Math.cos(r.rotation),Math.sin(r.rotation)],{...(target===undefined?{}:{target}),...(angle===undefined?{}:{angle}),angle_offset});
+            projectile.motor.launchProjectile(direction ?? [Math.cos(r.rotation),Math.sin(r.rotation)],{...(target===undefined?{}:{target}),...(angle===undefined?{}:{angle}),angle_offset});
             return projectile;
         } catch(error) { this.removeBody(projectile); throw error; }
     }
     getMountedLaunchState(source, options) { return mountedLaunchState(this,source,options); }
     setAttachmentEmitter(body, emitter) { return this.#attachments.setAttachmentEmitter(body,emitter); }
-    createProjectile(packet = {}) { return this.elements.createProjectile(packet); }
-    _createEntityComponents(role, packet) {
-        // Mechanical roles only. Concrete shapes, tuning, assets and gameplay data come from definitions.
-        const roles = {
-            entity: { physics_type: 'static', collision_group: 0, collision_mask: 0, query_mask: 0 },
-            decoration: { physics_type: 'static', collision_group: 0, collision_mask: 0, query_mask: 0 },
-            character: { physics_type: 'character', collision_group: BODY_GROUP.CHARACTER },
-            vehicle: { physics_type: 'rigid', collision_group: BODY_GROUP.VEHICLE },
-            projectile: { physics_type: 'rigid', collision_group: BODY_GROUP.PROJECTILE, friction: 0, linear_damping: 0, angular_damping: 0 },
-            prop: { physics_type: 'rigid', collision_group: BODY_GROUP.PROP },
-            static: { physics_type: 'static', collision_group: BODY_GROUP.STATIC },
-            trigger: { physics_type: 'static', collision_group: BODY_GROUP.SENSOR, ghost: true },
-        };
-        if (!roles[role]) throw new TypeError(`Unknown physics_role: ${role}`);
-        const motor = role === 'character' ? new characterMotor(null, packet.movement)
-            : role === 'vehicle' ? new vehicleMotor(null, packet.vehicle_template)
-            : role === 'projectile' ? new projectileMotor(null, packet) : null;
-        const body = this.createBody({ ...roles[role], ...packet });
+    /** The body and parts of a new entity. `packet` already carries its kind's body defaults, `motor` (a name or null) and `awareness`. */
+    _createEntityComponents({ motor: motor_name = null, awareness = false, ...packet }) {
+        const motor = motor_name === 'character' ? new characterMotor(null, packet.movement)
+            : motor_name === 'vehicle' ? new vehicleMotor(null, packet.vehicle_template)
+            : motor_name === 'projectile' ? new projectileMotor(null, packet) : null;
+        const body = this.createBody(packet);
         if (motor) {
             motor.body = body; this._record(body).motor = motor;
-            if (role === 'vehicle') motor.path_controller.body = body;
-            if (role === 'projectile') {
+            if (motor_name === 'vehicle') motor.path_controller.body = body;
+            if (motor_name === 'projectile') {
                 try { motor.launchProjectile(packet.direction ?? [1, 0], { target: packet.target }); }
                 catch (error) { this.removeBody(body); throw error; }
             }
@@ -214,14 +200,13 @@ export class physicsSystem {
                 else throw new TypeError('Invalid motion_type');
             }
         } catch (error) { this.removeBody(body); throw error; }
-        return { body, controller: motor ?? body, awareness: role === 'character' ? new awarenessMatrix(this, body) : null };
+        return { body, motor, awareness: awareness ? new awarenessMatrix(this, body) : null };
     }
-    _restoreEntityComponents(body_id, role) {
-        const record = this._record(body_id), motor = record.motor;
-        if ((role === 'character' && !(motor instanceof characterMotor)) || (role === 'vehicle' && !(motor instanceof vehicleMotor))
-            || (role === 'projectile' && !(motor instanceof projectileMotor))) throw new TypeError('Saved entity role does not match its body controller');
-        if (!['character', 'vehicle', 'projectile'].includes(role) && motor) throw new TypeError('Saved entity unexpectedly owns a specialized motor');
-        return { body: record.handle, controller: motor ?? record.handle, awareness: role === 'character' ? new awarenessMatrix(this, record.handle) : null };
+    _restoreEntityComponents(body_id, { motor: motor_name = null, awareness = false } = {}) {
+        const record = this._record(body_id), motor = record.motor ?? null;
+        const expected = { character: characterMotor, vehicle: vehicleMotor, projectile: projectileMotor }[motor_name];
+        if (expected ? !(motor instanceof expected) : motor) throw new TypeError('Saved entity motor does not match its body');
+        return { body: record.handle, motor, awareness: awareness ? new awarenessMatrix(this, record.handle) : null };
     }
     fetchBody(body_id) { return this.#bodies.get(body_id)?.handle ?? null; }
     removeBody(value) {
@@ -649,11 +634,11 @@ export class physicsSystem {
         results.length=0;
         for(const hit of hits){if(line_of_sight&&this.raycast({from:r.position,to:hit.body.position,include_groups:occlusion_groups,include_ghosts:false,ignore_body:[r.handle,hit.body]}))continue;results.push(hit);}return results;
     }
-    createHitVolume(packet) { return this.elements.createTrigger({ ...packet, ghost: true, physics_type: 'kinematic', collision_group: packet.collision_group ?? BODY_GROUP.SENSOR }); }
+    createHitVolume(packet) { return this.elements.createEntity({ kind: 'trigger', ...packet, ghost: true, physics_type: 'kinematic', collision_group: packet.collision_group ?? BODY_GROUP.SENSOR }); }
     sweepHitVolume(body, to, options = {}, results = []) { const r = this._record(body); return this.shapeCast({ ...options, collision_shape: r.config.collision_shape, from: r.position, to, from_rotation: r.rotation, ignore_body: r.handle }, results); }
     removeHitVolume(body) { this.removeBody(body); }
-    launchProjectile(projectile, direction, options) { return projectile.launchProjectile(direction, options); }
-    redirectProjectile(projectile, direction, options) { return projectile.redirectProjectile(direction, options); }
+    launchProjectile(projectile, direction, options) { return (projectile.motor ?? projectile).launchProjectile(direction, options); }
+    redirectProjectile(projectile, direction, options) { return (projectile.motor ?? projectile).redirectProjectile(direction, options); }
     removeProjectile(projectile) { this.removeBody(projectile.body); }
     registerSpatialInstance(instance_id, bounds, data = {}) {
         const id = `spatial:${instance_id}`, value = freeze({ instance_id, ...clone(data) });
@@ -736,7 +721,7 @@ export class physicsSystem {
         // Validate the whole exchange in a disposable independent world before replacing this one.
         if (JSON.stringify(saved.config) !== JSON.stringify(this.config)) throw new TypeError('Load into a physicsSystem constructed with the saved config');
         const trial = new physicsSystem({ ...saved.config, asset_library: this.elements.asset_library });
-        this.elements._copyTypesTo(trial.elements); trial._importState(saved);
+        this.elements._copyKindsTo(trial.elements); trial._importState(saved);
         this.clearWorld(); this._importState(saved);
     }
     _importState(saved) {

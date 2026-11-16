@@ -4,11 +4,11 @@ All methods below exist in the independent package. Their **baseline behavior** 
 
 ## Types and constants
 
-`physicsSystem`, `physicsBody`, `collisionShape`, `collisionDetector`, `contactSolver`, `spatialGrid`, `physicsConstraint`, `constraintSolver`, `characterMotor`, `vehicleMotor`, `pathMotor`, `projectileMotor`, `particlePhysics`, `trafficController`, `motionController`, `gameEntity`, `gameElements`, `EMPTY_DATA_SOURCE`, `isDataSource`, `gameCharacter`, `gameVehicle`, `gameProjectile`, `gameProp`, `gameStatic`, `gameTrigger`, `gameDecoration`, `awarenessMatrix`.
+`physicsSystem`, `physicsBody`, `collisionShape`, `collisionDetector`, `contactSolver`, `spatialGrid`, `physicsConstraint`, `constraintSolver`, `characterMotor`, `vehicleMotor`, `pathMotor`, `projectileMotor`, `particlePhysics`, `trafficController`, `motionController`, `gameEntity`, `gameElements`, `EMPTY_DATA_SOURCE`, `isDataSource`, `KINDS`, `MOTORS`, `awarenessMatrix`.
 
 `BODY_GROUP`: `STATIC=1`, `CHARACTER=2`, `VEHICLE=4`, `PROP=8`, `PROJECTILE=16`, `SENSOR=32`, `ALL=2147483647`. Combine bits with `|`; user-defined bits are allowed through bit 30. `QUERY_GROUP.ALL` has the same value. `PHYSICS_TYPES` lists `static`, `rigid`, `kinematic`, `character`, `no_collision`.
 
-Vectors are `[x, y]`; rotations are scalar radians. A body reference accepts a `physicsBody`, `gameCharacter`, `gameVehicle`, a controller exposing `.body`, or, on world methods, a numeric body ID. References cannot cross worlds. Spatial reference points can also be vectors.
+Vectors are `[x, y]`; rotations are scalar radians. A body reference accepts a `physicsBody`, a `gameEntity`, a motor exposing `.body`, or, on world methods, a numeric body ID. References cannot cross worlds. Spatial reference points can also be vectors.
 
 ## physicsSystem
 
@@ -28,10 +28,7 @@ Constructor options:
 | Method | Returns / contract |
 |---|---|
 | `createBody(body_packet)` | Registered `physicsBody`. |
-| `createEntity(entity_packet)` | Registered official `gameEntity` subclass selected by `entity_type` or template. |
-| `createCharacter(character_packet)` | `gameCharacter` with character motor and awareness. |
-| `createVehicle(vehicle_packet)` | `gameVehicle` with vehicle/path motors. |
-| `createProjectile(projectile_packet)` | `gameProjectile` inheriting `gameEntity`, with `.body` and `.physics_controller`. |
+| `createEntity(entity_packet)` | A registered `gameEntity`; its `kind` (`character`, `vehicle`, `projectile`, `prop`, …) presets the body and switches on its `motor` and `awareness`. |
 | `fetchBody(body_id)` | Handle, or `null`. Pending event-created bodies appear next step. |
 | `updateBody(body, changes)` | Handle. Validates and atomically replaces changed configuration/state fields. Unknown changes throw. |
 | `activateBody(body)`, `deactivateBody(body)` | Handle. Inactive bodies leave simulation and index. |
@@ -94,7 +91,7 @@ Body mutators return the handle. Commands from event callbacks are queued, so a 
 
 ## Character interface
 
-Both `gameCharacter` and `characterMotor` expose these methods; body access is `character.physics_controller.body`.
+`characterMotor` exposes these methods, reached on an entity as `character.motor`; body access is `character.body`.
 
 | Method | Meaning / result |
 |---|---|
@@ -114,7 +111,7 @@ Character `movement` defaults: `max_speed:180`, `acceleration:900`, `braking:120
 
 ## Vehicle/path interface
 
-`gameVehicle` delegates to `vehicleMotor`:
+A vehicle's `motor` is a `vehicleMotor`:
 
 `assembleVehicle(vehicle_template)` configures the engine motor. Defaults are `max_speed:300`, `reverse_speed:90`, `acceleration:100`, `braking:240`, `wheel_base:40`, `max_steering:0.6` radians, `steering_rate:2` radians/s, `lateral_grip:12` per second, `drag:0.1` per second.
 
@@ -155,13 +152,13 @@ Any constraint takes `one_way` (default `false`). A one-way constraint corrects 
 
 `setConstraintTarget(constraint,world_target)`, `setConstraintMotor(constraint,changes)`, `removeConstraint(constraint)` update/remove a joint. `beginDrag(body,packet={})` creates a drag constraint; `setDragTarget(constraint,position)`, `rotateDraggedBody(constraint,angle)`, `endDrag(constraint)` provide furniture requests. The rotation request is an explicit placement and can request an overlapping orientation; query clearance before accepting an interaction that must remain clear.
 
-`createHitVolume(packet)` returns a registered `gameTrigger` with a ghost kinematic body; `sweepHitVolume(body,to,options={},results=[])` accepts the entity/body and queries its swept shape; `removeHitVolume(body)` removes it. Gameplay selects whom a melee hit damages; it does not calculate segment/capsule intersections.
+`createHitVolume(packet)` returns a registered `trigger`-kind entity with a ghost kinematic body; `sweepHitVolume(body,to,options={},results=[])` accepts the entity/body and queries its swept shape; `removeHitVolume(body)` removes it. Gameplay selects whom a melee hit damages; it does not calculate segment/capsule intersections.
 
 ## Projectiles
 
-`createProjectile(packet)` accepts body keywords plus `direction:[1,0]` or `target` (point/body), `speed:600`, `lifetime:3`, `owner_id:null`, `penetration_count:0`, `penetration_loss:0` (0–1), `impact_strength:0` (momentum). The engine ignores the owner body, orders impacts, suppresses repeat hits and applies the shared impulse operation. `penetration_count` counts additional solid hits allowed after the first; ghosts do not consume it. `impact_scale` is multiplied by `1-penetration_loss` after a penetrated solid.
+`createEntity({kind: 'projectile', ...packet})` accepts body keywords plus `direction:[1,0]` or `target` (point/body), `speed:600`, `lifetime:3`, `owner_id:null`, `penetration_count:0`, `penetration_loss:0` (0–1), `impact_strength:0` (momentum). The engine ignores the owner body, orders impacts, suppresses repeat hits and applies the shared impulse operation. `penetration_count` counts additional solid hits allowed after the first; ghosts do not consume it. `impact_scale` is multiplied by `1-penetration_loss` after a penetrated solid.
 
-The returned `gameProjectile` owns a `projectileMotor` as `physics_controller` and delegates `launchProjectile(direction,{speed?,target?})`, `redirectProjectile(direction,{speed?,target?,owner_id?})`, `removeProjectile()`. Its `.body` is the controller's body. The world also forwards `launchProjectile(projectile,direction,options)`, `redirectProjectile(projectile,direction,options)`, `removeProjectile(projectile)`. Redirecting clears prior hit tracking. Lifetime motion is truncated to the remaining seconds; spent bodies and entities are removed at the next command boundary. Game damage is selected in the event handler, using the returned impact scale if appropriate.
+The returned entity's `motor` is a `projectileMotor`, with `launchProjectile(direction,{speed?,target?})`, `redirectProjectile(direction,{speed?,target?,owner_id?})`, `removeProjectile()`. Its `.body` is the controller's body. The world also forwards `launchProjectile(projectile,direction,options)`, `redirectProjectile(projectile,direction,options)`, `removeProjectile(projectile)`. Redirecting clears prior hit tracking. Lifetime motion is truncated to the remaining seconds; spent bodies and entities are removed at the next command boundary. Game damage is selected in the event handler, using the returned impact scale if appropriate.
 
 Named `impact_profile` and general `response_profile` presets are **proposed**, not accepted settings in this baseline. Use the concrete `impact_strength`, material and motor keywords above.
 
@@ -191,16 +188,16 @@ Event packets and vector fields are immutable. Handle references permit requests
 
 ## gameEntity and gameElements
 
-The [entity design](entities.md) defines the official lifecycle/inheritance contract. Every game element extends `gameEntity`; construction registers its body and identity automatically. `gameCharacter`, `gameVehicle`, `gameProjectile`, `gameProp`, `gameStatic`, `gameTrigger` and `gameDecoration` are the built-in subclasses. Their static `entity_type` and `physics_role` identify factory selection and mechanical role. A concrete game entity is never a wrapper adopted around an existing game object/body.
+The [entity design](entities.md) defines the lifecycle and the kinds. Every game element is one `gameEntity`; there are no subclasses, and constructing one throws. Construction registers its body and identity automatically. A concrete game entity is never a wrapper adopted around an existing game object/body.
 
-`gameEntity(elements, packet={})` can be constructed directly with an owner, but factories are the preferred route, especially for custom subclasses. Packet fields include `entity_type`, `template` (qualified template ID), `name`, `tags`, `assets` (slot→qualified resource ID), `data` (declared gameplay state), and the body/controller keywords above. Per-instance definitions override immutable templates.
+`gameEntity(elements, packet={})` can be constructed directly with an owner, but `elements.createEntity` is the preferred route. Packet fields include `kind` (a kind from `KINDS` or `defineKind`, default `entity`), `motor` (`character`, `vehicle`, `projectile` or `null`; default from the kind), `awareness` (boolean; default from the kind), `template` (qualified template ID), `name`, `tags`, `assets` (slot→qualified resource ID), `data` (declared gameplay state), and the body/motor keywords above. The kind's body defaults come first, then the template, then the packet. `KINDS` is the frozen table of built-in presets and `MOTORS` the motor names.
 
-Entity properties are read-only: `entity_id`, `body_id` (same root identity), `entity_type`, `template_id`, `name`, `tags`, `assets`, `body`, `physics_controller`, `awareness`, `registered`, `pending`, `destroyed`, `active`, `position`, `rotation`, `linear_velocity`, `angular_velocity`, `mass`, `physics_type`, `collision_shape`, `collision_group`, `collision_mask`, `query_mask`, `axis_lock`, `ghost`. Physical getters read the engine body, not entity copies. `data` is a non-replaceable property whose object contains mutable, serializable gameplay state. Physical fields cannot be shadowed on subclasses. Legacy per-axis aliases throw instead of accepting shadow writes.
+Entity properties are read-only: `entity_id`, `body_id` (same root identity), `kind`, `template_id`, `name`, `tags`, `assets`, `body`, `motor` (the motor part, or `null`), `awareness` (an awareness part, or `null`), `registered`, `pending`, `destroyed`, `active`, `position`, `rotation`, `linear_velocity`, `angular_velocity`, `mass`, `physics_type`, `collision_shape`, `collision_group`, `collision_mask`, `query_mask`, `axis_lock`, `ghost`. Physical getters read the engine body, not entity copies. `data` is a non-replaceable property whose object contains mutable, serializable gameplay state. Physical fields cannot be shadowed. Legacy per-axis aliases throw instead of accepting shadow writes. Motor calls go through `entity.motor`.
 
 | Entity method | Contract |
 |---|---|
 | `activate()`, `deactivate()`, `destroy()` | Lifecycle requests; return the entity. Destroy is idempotent and cleans body/joints/scoped subscriptions/registry. |
-| `updateBody(changes)`, `setPosition(position,options)`, `setRotation(angle,options)` | Engine requests; return entity. `gameCharacter.setRotation` uses its character-controller behavior described above. |
+| `updateBody(changes)`, `setPosition(position,options)`, `setRotation(angle,options)` | Engine requests; return entity. With a character motor, `setRotation` uses the motor's facing behaviour described above. |
 | `getState(result={})` | Detached entity metadata/data plus body state; destroyed entity has `body:null`. |
 | `getRenderState(blend,result={})` | Delegates to authoritative body's render state. |
 | `getAsset(slot)` | Immutable resource definition from the owning library. Missing slot throws. |
@@ -219,17 +216,16 @@ Entity properties are read-only: `entity_id`, `body_id` (same root identity), `e
 
 | gameElements method | Contract |
 |---|---|
-| `createEntity(packet={})` | Select registered class by `entity_type` or template; return official entity. Failed subclass factory construction rolls back its root and nested children. |
-| `createCharacter`, `createVehicle`, `createProjectile`, `createProp`, `createStatic`, `createTrigger`, `createDecoration` | Typed factories taking a packet. Reject a template/custom type with a conflicting mechanical role before creating bodies. |
-| `registerEntityType(entity_type,Constructor)` | Register a gameplay subclass of `gameEntity`, normally one of its specialized bases. No duplicate names or non-entity classes. Returns the owner. |
-| `listEntityTypes()` | Registered names, including built-ins. |
+| `createEntity(packet={})` | Makes one `gameEntity` from its kind, template and packet. Failed construction rolls back its root and any entities made during it. |
+| `defineKind(kind,{body={},motor=null,awareness=false})` | Adds a kind: body defaults, the motor it switches on and whether it is aware. No duplicates or unknown fields. Returns the owner. |
+| `getKind(kind)`, `listKinds()` | A kind's frozen preset (unknown kinds throw), and every kind's name. |
 | `fetchEntity(entity_id)` | Entity or `null`; pending/destroyed entities are absent. |
 | `getEntityForBody(body)` | Official root entity or `null` for an anonymous mechanical body. |
-| `getEntities({entity_type?,instance_of?,active?}={},results=[])` | Identity-registry enumeration for lifecycle/tools/save, not a spatial query. Inactive entities remain registered. The registry files each entity under its type when it registers, so `entity_type` (one type) and `instance_of` (every registered type whose class is or extends that class, type by type) walk only those types' lists; with neither, every entity in registration order. |
+| `getEntities({kind?,tag?,active?}={},results=[])` | Identity-registry enumeration for lifecycle/tools/save, not a spatial query. Inactive entities remain registered. The registry files each entity under its kind and each of its tags when it registers (and refiles tags when they change), so `kind` or `tag` walks only that list; both together walk the kind's list and keep those with the tag; with neither, every entity in registration order. |
 | `peruseNearbyEntities(reference,options={},results=[])` | Shared-index nearby query including registered nonphysical entities; each hit contains `entity` and `body`. |
-| `getStatistics()` | Entity and registered-type counts. |
+| `getStatistics()` | Entity and kind counts. |
 
-Physical query hits also contain `entity` where a root is registered. World events additionally expose `entity`, `entity_a`, `entity_b`, `target_entity` as applicable. In `projectileHit`, `projectile` is now the official `gameProjectile`. Snapshot format 2 saves the registry without replaying gameplay constructors on load. Re-register custom classes/Directory libraries before load; reconnect gameplay subscriptions afterward. Anonymous physics bodies/particles remain low-level mechanics, not game-entity surrogates.
+Physical query hits also contain `entity` where a root is registered. World events additionally expose `entity`, `entity_a`, `entity_b`, `target_entity` as applicable. In `projectileHit`, `projectile` is the projectile entity. Snapshot format 2 saves the registry without replaying construction on load. Re-register custom classes/Directory libraries before load; reconnect gameplay subscriptions afterward. Anonymous physics bodies/particles remain low-level mechanics, not game-entity surrogates.
 
 ## Data source
 
@@ -257,7 +253,7 @@ Entity packets/templates may include `constraints:[joint_packet,...]`. The engin
 
 `vehicle_template.tyre_model` is `bicycle` (default) or `two_axle`. Two-axle parameters are `front_grip:1`, `rear_grip:1`, `cornering_stiffness:12`, `max_lateral_acceleration:500`, `load_transfer:0.15`, `load_rate:5`. Front/rear tyre impulses act at separate axle points through the common body mass/inertia rules; steering does not assign a heading directly. Braking/throttle shift axle load and handbraking reduces rear grip. This is a new model whose tuning must be evaluated in the game; it does not claim identical feel to the old per-tick model.
 
-`vehicleMotor.setSurface({grip=1,wetness=0})` and `gameVehicle.setSurface` accept a nonnegative grip multiplier and wetness in 0–1. `getVehicleState` also returns detached `axles:{load,front_slip,rear_slip}` and `surface`. These values survive save/load. Effects can consume this telemetry instead of calculating tyre slip themselves.
+`vehicleMotor.setSurface({grip=1,wetness=0})` (a vehicle's `motor.setSurface`) accepts a nonnegative grip multiplier and wetness in 0–1. `getVehicleState` also returns detached `axles:{load,front_slip,rear_slip}` and `surface`. These values survive save/load. Effects can consume this telemetry instead of calculating tyre slip themselves.
 
 ## Navigation
 
@@ -311,7 +307,7 @@ Bodies must be nonstatic. Scripts suspend the normal motor/force integration whi
 
 `predictMovementContacts({body,to?,speed?,seconds=1,...filters},results=[])` forecasts shape contacts along the body's current velocity, or a proposed path toward `to` at positive `speed`. Horizon is bounded to 0–10 seconds and clipped to proposed arrival. Hits contain `seconds` to contact, body/entity and contact geometry. Shared-grid candidates include approaching bodies outside the proposed corridor, using a cached world motion envelope; no private sensing index is created. Predictions assume constant velocities/angular velocities and do not forecast future control changes.
 
-`characterMotor.suspendMovement(seconds)` / `gameCharacter.suspendMovement` temporarily suspend motor control while the normal engine force/damping/contact pipeline retains knockback. The suspension timer survives save/load. `evadeBody(threat,{distance=50,speed=2*max_speed,min_distance=4,teleport=false})` chooses and checks a perpendicular dodge inside the engine; it tries both sides and returns the motor or null. `teleport:true` performs an immediate checked evasion instead of installing a dash intent. Neither command asks game code to calculate a direction or displacement.
+`characterMotor.suspendMovement(seconds)` (a character's `motor.suspendMovement`) temporarily suspends motor control while the normal engine force/damping/contact pipeline retains knockback. The suspension timer survives save/load. `evadeBody(threat,{distance=50,speed=2*max_speed,min_distance=4,teleport=false})` chooses and checks a perpendicular dodge inside the engine; it tries both sides and returns the motor or null. `teleport:true` performs an immediate checked evasion instead of installing a dash intent. Neither command asks game code to calculate a direction or displacement.
 
 `trafficController.getSignal(signal_id)` returns the world signal state (`stop` if uninitialized). `getRouteStart(route_id)` returns an engine-calculated `{position,rotation}` for a registered route, suitable for entity creation. Contact events additionally expose `relative_speed`, computed by the shared collision pipeline so gameplay can apply damage thresholds without reconstructing velocity math.
 
@@ -363,7 +359,7 @@ Characters can opt into torque-limited facing with `movement:{physical_turning:t
 
 `layoutGeometry.cutWallOpenings(walls,openings,{margin=2})` compiles authored `{x,y,w,h}` wall rectangles into segments around openings, without mutating the definitions. This is a level-construction operation, not a runtime obstacle index. Whole maps (walls, props, lights, rooms, doors, cloths, exterior streaming and the room graph) are built by the separate Basement map package; its API is in `src/engine/basement/maps/README.md` in the game checkout. `layoutGeometry.boxGrip(shape,pose,{near,side?,direction?,gap=0})` returns a box face's `{side,position,local_position,rotation,distance}`; sides 0–3 are +x,+y,-x,-y. A world-space direction can select the face. `getBodyGrip(body,options)` evaluates this geometry using the canonical body's current shape/pose. `distance` is distance from `near` to the box surface.
 
-Character `lookInDirection(direction,options={})` requests facing through the motor. `teleportInDirection(direction,{distance,angle?,...placement_options})` computes a directional destination and uses the existing checked teleport pipeline. Undefined direction uses `angle` when supplied, otherwise the body's current rotation. An explicitly supplied zero heading returns null rather than choosing a fallback direction; `findDirectionalPlacement` follows the same rule. These commands are also exposed by `gameCharacter`.
+Character `motor.lookInDirection(direction,options={})` requests facing through the motor. `teleportInDirection(direction,{distance,angle?,...placement_options})` computes a directional destination and uses the existing checked teleport pipeline. Undefined direction uses `angle` when supplied, otherwise the body's current rotation. An explicitly supplied zero heading returns null rather than choosing a fallback direction; `findDirectionalPlacement` follows the same rule. These commands are also exposed by `gameCharacter`.
 
 Motion `rotateBodyBy(body,{angle,duration=0.2,easing='smooth'})` requests a relative rotation through the ordinary scripted-motion/CCD pipeline. Obstructions may stop the motion short; it does not promise a successful full turn.
 
@@ -431,7 +427,7 @@ Event-time accepted launches are pending native commands. They revalidate emitte
 
 `applyImpulseBetween(...,{if_supported:true})` returns null for targets behind any noncombining attachment link, without applying an impulse. The default retains strict rejection. Combined links still route impulse through the native composite mass/inertia calculation. This lets a confirmed hit request optional physical knockback without duplicating attachment traversal in gameplay.
 
-`characterMotor.orbitTarget(target,{radius,angular_speed=.5,phase=0,slot_index=0,slot_count=1,...movement_options})` / `gameCharacter.orbitTarget` follows a moving world-space circular goal using ordinary native pathing, braking, collision and personal-space queries. Slot geometry and trigonometry stay in Basement. Phase starts from the world's simulation time and persists with the motor; identical requests reuse the current path and phase. Slot counts/indices must be integral and in range. A logical squad coordinator may assign slots without calculating physical goal positions or maintaining another spatial index.
+`characterMotor.orbitTarget(target,{radius,angular_speed=.5,phase=0,slot_index=0,slot_count=1,...movement_options})` (a character's `motor.orbitTarget`) follows a moving world-space circular goal using ordinary native pathing, braking, collision and personal-space queries. Slot geometry and trigonometry stay in Basement. Phase starts from the world's simulation time and persists with the motor; identical requests reuse the current path and phase. Slot counts/indices must be integral and in range. A logical squad coordinator may assign slots without calculating physical goal positions or maintaining another spatial index.
 
 ### Native impact regions, beams and motion samples
 

@@ -153,7 +153,7 @@ test('persistent candidate reuse matches an exhaustive contact oracle across cha
 
 test('spatial budget errors leave creation, body updates and transform commands atomic',()=>{
  const p=new physicsSystem({cell_size:1}),a=ball(p,[10,10]);steps(p);const before=p.savePhysicsState();
- assert.throws(()=>ball(p,[1e20,0]),/safe integers/);assert.throws(()=>p.createCharacter({position:[1e20,0]}));assert.equal(p.elements.getStatistics().entities,0);assert.equal(p.getStatistics().bodies,1);assert.equal(p.spatial_grid.getStatistics().instances,1);
+ assert.throws(()=>ball(p,[1e20,0]),/safe integers/);assert.throws(()=>p.createEntity({ kind: 'character', position:[1e20,0]}));assert.equal(p.elements.getStatistics().entities,0);assert.equal(p.getStatistics().bodies,1);assert.equal(p.spatial_grid.getStatistics().instances,1);
  const state=p.savePhysicsState(); // Failed creation consumes an ID, but creates no body/index entry.
  assert.throws(()=>p.updateBody(a,{position:[1e20,0]}),/safe integers/);assert.deepEqual(p.savePhysicsState(),state);
  assert.throws(()=>a.setPosition([1e20,0]),/safe integers/);assert.deepEqual(p.savePhysicsState(),state);
