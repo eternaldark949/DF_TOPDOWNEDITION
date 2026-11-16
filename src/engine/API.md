@@ -249,7 +249,9 @@ Reference: [maps README](basement/maps/README.md).
 
 ### Rendering
 
-`basement.render` draws frames through a backend. Each frame it hands your `render` hooks a `frame` to draw into. The backend is a light switch: the engine registers `canvas` and `recording` (headless, keeps frames as data), a WebGL backend registers the same way, and nothing above the backend knows which one is drawing. Give `new gameEngine({ render: { create_surface: id => freshCanvas } })` and a switch is just `setRenderer(id)`.
+`basement.render` draws frames through a backend. Each frame it hands your `render` hooks a `frame` to draw into. The backend is a light switch: the engine registers `canvas`, `webgl` (WebGL 2) and `recording` (headless, keeps frames as data), and nothing above the backend knows which one is drawing. Give `new gameEngine({ render: { create_surface: id => freshCanvas } })` and a switch is just `setRenderer('webgl')` or `setRenderer('canvas')`.
+
+`webgl` draws the same frames as `canvas` (checked pixel by pixel in `tools/test-webgl-pixels.mjs`), except for what it does not declare yet: `shadow`, and the blends `overlay`, `soft-light`, `lighten`, `darken`, `source-in`, `source-out` and `destination-in`. A frame that asks for one of those is refused before it is drawn, so check `render.getCapabilities()` or keep to the rest. `WEBGL_CAPABILITIES` lists what it draws.
 
 | Call | What it does |
 |---|---|

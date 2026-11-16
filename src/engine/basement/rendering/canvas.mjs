@@ -286,3 +286,29 @@ export class pictureCache{
     release(prefix=''){for(const [id,entry]of [...this.#entries])if(id.startsWith(prefix)){if(entry.surface)this.#free(entry);this.#entries.delete(id);}}
     clear(){this.release();}
 }
+
+/**
+ * Canvas's text drawing for backends that have none (WebGL draws text as a picture of it). One line of
+ * `text` in `font`, aligned on its origin by `align` and `baseline`, painted with `material` (colour or
+ * gradient fill and stroke, in local units) at `scale` device pixels per local unit. Returns
+ * `{surface, x, y, width, height}`: a surface holding the line and the local box it covers, or null
+ * when nothing would show. The caller uploads the surface and lets it go (`surface.width = 0`).
+ */
+export function rasterizeCanvasText(text,font,{align='left',baseline='alphabetic',material},scale,{create_surface=createSurface,max_size=4096}={}){
+    const fontText=`${font.style??'normal'} ${font.weight??400} ${font.size??16}px ${font.family??'sans-serif'}`,spacing=font.letter_spacing??0;
+    measurer??=create_surface(1,1).getContext('2d');
+    const setup=ctx=>{ctx.font=fontText;ctx.textAlign=align;ctx.textBaseline=baseline;if('letterSpacing' in ctx)ctx.letterSpacing=`${spacing}px`;};
+    setup(measurer);const m=measurer.measureText(String(text));if('letterSpacing' in measurer)measurer.letterSpacing='0px';
+    const stroked=material.stroke!==null&&material.stroke_width>0,pad=(stroked?material.stroke_width:0)+2;
+    const x=-(m.actualBoundingBoxLeft??0)-pad,y=-(m.actualBoundingBoxAscent??font.size??16)-pad,width=(m.actualBoundingBoxLeft??0)+(m.actualBoundingBoxRight??m.width)+pad*2,height=(m.actualBoundingBoxAscent??0)+(m.actualBoundingBoxDescent??0)+pad*2;
+    if(!(width>0&&height>0))return null;
+    scale=Math.min(scale,max_size/width,max_size/height);
+    const W=Math.max(1,Math.ceil(width*scale)),H=Math.max(1,Math.ceil(height*scale)),surface=create_surface(W,H),ctx=surface.getContext('2d');if(!ctx)throw new Error('Text surface unavailable');
+    ctx.setTransform(W/width,0,0,H/height,-x*W/width,-y*H/height);setup(ctx);
+    const paint=p=>{if(typeof p==='string')return p;if(p.type==='pattern')throw new Error('Text cannot be filled with a pattern in this backend');const g=p.type==='linear'?ctx.createLinearGradient(...p.from,...p.to):ctx.createRadialGradient(...p.from,p.inner_radius,...p.to,p.outer_radius);for(const [offset,color]of p.stops)g.addColorStop(offset,color);return g;};
+    if(material.fill!==null){ctx.fillStyle=paint(material.fill);ctx.fillText(String(text),0,0);}
+    if(stroked){ctx.strokeStyle=paint(material.stroke);ctx.lineWidth=material.stroke_width;ctx.lineCap=material.line_cap;ctx.lineJoin=material.line_join;ctx.setLineDash(material.dash);ctx.lineDashOffset=material.dash_offset;ctx.strokeText(String(text),0,0);}
+    return {surface,x,y,width,height};
+}
+/** Canvas's text measuring, for backends that have none: the same numbers as canvasRenderer.measureText. */
+export function measureCanvasText(text,font={},options={}){return measureText(text,font,options);}

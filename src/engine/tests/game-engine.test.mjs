@@ -192,7 +192,7 @@ test('the engine registers its backends and switches between them with one call'
     const made = [];
     const engine = new gameEngine({ render: { create_surface: id => { const surface = { id }; made.push(surface); return surface; } } });
     const render = engine.basement.render;
-    assert.deepEqual(render.listRenderers(), ['canvas', 'recording']);
+    assert.deepEqual(render.listRenderers(), ['canvas', 'webgl', 'recording']);
     await render.setRenderer('recording');
     assert.equal(render.getRenderer(), 'recording');
     assert.deepEqual(made.map(surface => surface.id), ['recording']);

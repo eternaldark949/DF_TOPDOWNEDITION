@@ -36,5 +36,8 @@ jobs:
       - name: Check the drawing on a real canvas
         run: node --test tools/test-art-pixels.mjs
 
+      - name: Check the WebGL drawing against Canvas
+        run: node --test tools/test-webgl-pixels.mjs
+
       - name: Check the migration inventory covers every classic script
         run: node tools/migration-inventory.mjs --check

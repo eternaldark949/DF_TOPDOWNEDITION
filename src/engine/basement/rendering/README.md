@@ -1,8 +1,8 @@
 # Shared rendering and camera API
 
-`renderSystem` owns the active backend and rendering resources. `cameraSystem` owns the view and coordinate conversions. `renderFrame` collects data packets. `canvasRenderer` is the first real backend and `recordingRenderer` the headless one; a WebGL backend registers beside them. These live in Basement and are exposed as `engine.basement.render` and `engine.basement.camera`.
+`renderSystem` owns the active backend and rendering resources. `cameraSystem` owns the view and coordinate conversions. `renderFrame` collects data packets. `canvasRenderer` and `webglRenderer` are the drawing backends and `recordingRenderer` the headless one. These live in Basement and are exposed as `engine.basement.render` and `engine.basement.camera`.
 
-The new runtime and its appearance example use this contract now. The classic playable game still draws most procedural artwork through old Canvas paths. Drone and VelvetCat have now moved to portable packets through this backend; other artist conversions remain. This batch establishes and verifies the destination. It does not claim all game drawing has migrated or that a WebGL backend exists.
+The new runtime and its appearance example use this contract now. The classic playable game still draws most procedural artwork through old Canvas paths. Drone and VelvetCat have now moved to portable packets through this backend; other artist conversions remain. It does not claim all game drawing has migrated.
 
 ## Decisions and boundaries
 
@@ -76,7 +76,7 @@ Common packet fields:
 ]}
 ```
 
-A `sprite` supplies `resource_id`, `size:[w,h]`, optional atlas `source:[sx,sy,sw,sh]`, and normalized `origin:[.5,.5]` (default center; `[0,0]` is top-left). Resource IDs reference an image or an offscreen target. A `text` packet supplies a string, `font:{family,size,weight,style}`, `align:left|center|right`, and `baseline:top|middle|bottom|alphabetic`. Font families are resolved by the platform's loaded fonts; glyph atlases/font resource loading for WebGL remain backend implementation work.
+A `sprite` supplies `resource_id`, `size:[w,h]`, optional atlas `source:[sx,sy,sw,sh]`, and normalized `origin:[.5,.5]` (default center; `[0,0]` is top-left). Resource IDs reference an image or an offscreen target. A `text` packet supplies a string, `font:{family,size,weight,style}`, `align:left|center|right`, and `baseline:top|middle|bottom|alphabetic`. Font families are resolved by the platform's loaded fonts; WebGL draws each line as a texture the platform rasterized.
 
 Materials accept `fill`/`stroke` color strings or gradient data; `null` disables that paint. Other fields are `stroke_width`, `line_cap`, `line_join`, `dash`, `dash_offset`, and `shadow:{color,blur,offset:[x,y]}`. Shadow blur/offset use pass-logical screen units, independent of camera zoom, scaled for the actual target resolution. Colors use CSS color notation; a future backend must parse/implement the supported color contract.
 
@@ -288,7 +288,21 @@ A registered backend class supplies `capabilities` (names from `CAPABILITIES`), 
 
 `canvasRenderer({create_surface,decode_image,create_path})` optionally accepts platform adapters for headless/embedded use. Decoded images are backend-owned and their `close()` method is invoked on release when available. Defaults use browser Canvas, Image and Path2D APIs.
 
-Canvas implements the supported packet/material/target contract. A future WebGL renderer must implement buffer/texture upload, path tessellation, clips/masks, fonts/glyphs, gradients, blending, shadows and framebuffer targets for the capabilities it declares. It can start with a declared subset; unsupported frames fail explicitly. No WebGL renderer or Canvas-to-texture compatibility wrapper is included in this batch.
+Canvas implements the whole packet/material/target contract. WebGL implements the subset in `WEBGL_CAPABILITIES` (see below); unsupported frames fail explicitly.
+
+### WebGL backend (`webgl.mjs`)
+
+`new webglRenderer({decode_image, create_surface, max_picture_bytes = 64 MB, densities = [1, 1.5, 2, 3, 4]})` draws the packet contract with WebGL 2 on a fresh canvas (`initialize` asks it for a `webgl2` context with a stencil and throws when there is none, so the render system keeps the old backend). The engine registers it as `webgl`. `WEBGL_CAPABILITIES` is what it declares: every packet type, geometry, both gradients, patterns, clips, dashes, targets, layers and pictures, and the blends `normal`, `add`, `multiply`, `screen`, `source-atop`, `destination-out` and `destination-over`. Not yet: `shadow` (needs a blur pass), the blends that read the destination per pixel (`overlay`, `soft-light`, `lighten`, `darken`) and those Canvas applies to the whole surface outside the shape (`source-in`, `source-out`, `destination-in`). `multiply` is exact over an opaque destination, which is where the engine uses it (a light layer over the scene).
+
+How it draws, so its results match Canvas:
+
+- **Shapes** are stencil-then-cover. The outline is cut into lines (`paths.mjs`: `flattenGeometry` follows Canvas's path rules, curves within a quarter device pixel), its fan of triangles counts winding into the stencil (`nonzero` up and down by face, `evenodd` flipping), and one quad over the shape paints the marked pixels once and clears them. A stroke (`strokeTriangles`, with Canvas's caps, joins and miter limit 10; `dashPaths` for dashes) is marked the same way, so overlapping triangles never double its paint. The stencil's top bit is the clip; each clip narrows it.
+- **Paint** is premultiplied. Colours are CSS strings read by `colors.mjs` (`readColor`: names, hex, `rgb()`, `hsl()`); an unreadable colour throws. Gradients are a 256-step ramp (`gradientRamp`, interpolated without premultiplying, as Canvas does), radial ones Canvas's two-circle cone. Patterns repeat their image in the shape's local space.
+- **Targets, layers and pictures** are framebuffers, multisampled where the GPU allows and resolved after each pass. A picture is painted once per key at the density the view needs (`densities`), into its own surface, and stamped; one whose packets blend other than normal and that is not `layered` is drawn as vector, kept to its bounds, as Canvas does. Pictures are kept up to `max_picture_bytes`, least recently stamped going first. There is no per-frame painting budget yet: a missing picture is painted when first stamped.
+- **Text** is a texture of the line, rasterized by the platform through canvas.mjs's `rasterizeCanvasText` (the one place 2D Canvas is used for WebGL) at the view's scale, and cached; `measureText` is `measureCanvasText`, the same numbers as Canvas. Text cannot be filled with a pattern.
+- `statistics` gives `{pictures, picture_bytes, texts, ramps, resources}`.
+
+`tools/test-webgl-pixels.mjs` draws one scene through `renderSystem` on Canvas, switches to WebGL on a fresh canvas, draws it again and compares them pixel by pixel (also at DPR 2 under a turned, zoomed camera), then switches back. `tests/webgl.test.mjs` checks the colour reading, outlines, strokes, dashes and the declared subset without a GPU.
 
 Surface notifications are for platform wiring/queries; await the mount Promise before another resource/backend mutation.
 
@@ -328,4 +342,4 @@ Light shapes besides `point`: `{shape: 'area', rects | polygon, rotation}` is a 
 
 The context parameter exists only at this transitional host/backend boundary. Artists never receive it. They emit normal geometry/material/transform/clip packets, and a native `renderSystem` backend can consume the exact same packets directly. New native render hooks should call `frame.submit`, not this adapter. Renderer replacement still requires the ordinary fresh-surface lifecycle.
 
-Drone and VelvetCat now use the packet contract in both the playable host and native runtime presentation. Other classic artists remain on their original direct Canvas paths. This does not claim a whole-game renderer cutover or a WebGL implementation.
+Drone and VelvetCat now use the packet contract in both the playable host and native runtime presentation. Other classic artists remain on their original direct Canvas paths. This does not claim a whole-game renderer cutover.

@@ -260,10 +260,13 @@ test('switching backends is a light switch: one call, resources carried, the sam
  render.dispose();
 });
 
-test('only the Canvas backend touches Canvas: every other rendering module is backend-free',async()=>{
+test('only the Canvas backend touches Canvas, only the WebGL backend touches WebGL, every other rendering module is backend-free',async()=>{
  const {readFileSync,readdirSync}=await import('node:fs'),dir=new URL('../',import.meta.url);
  for(const name of readdirSync(dir).filter(n=>n.endsWith('.mjs')&&n!=='canvas.mjs')){
-  const code=readFileSync(new URL(name,dir),'utf8');
+  let code=readFileSync(new URL(name,dir),'utf8');
+  // the WebGL backend asks its surface for a WebGL 2 context and nothing else; its text is rasterized by canvas.mjs
+  if(name==='webgl.mjs'){assert.equal(code.match(/getContext\(/g).length,1);assert.match(code,/getContext\('webgl2'/);code=code.replace("getContext('webgl2'",'').replace("typeof surface.getContext",'').replace('getContextAttributes','');}
   for(const word of ['getContext','globalCompositeOperation','Path2D','OffscreenCanvas','drawImage',"'source-over'","'lighter'"])assert.equal(code.includes(word),false,`${name} uses ${word}`);
+  if(name!=='webgl.mjs')for(const word of ['webgl2','WebGL2RenderingContext','gl.drawArrays'])assert.equal(code.includes(word),false,`${name} uses ${word}`);
  }
 });
