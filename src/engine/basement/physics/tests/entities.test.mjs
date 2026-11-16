@@ -103,3 +103,28 @@ test('getEntities reads each type\'s own list, kept as entities come and go', ()
     assert.deepEqual(p.elements.getEntities({ entity_type: 'walker' }), [w2]); assert.deepEqual(p.elements.getEntities({ instance_of: Walker }), [w2, r]);
     assert.throws(() => p.elements.getEntities({ instance_of: 'walker' }), /instance_of/);
 });
+test('an object reads and writes properties by key and says when one changes', () => {
+    const p = new physicsSystem(), e = p.elements.createProp({ position: [0, 0], data: { health: 10 } }), heard = [];
+    e.on('propertyChanged', ({ key, value, previous }) => heard.push([key, value, previous]));
+    assert.equal(e.get('health'), 10); assert.equal(e.get('armor', 3), 3); assert.equal(e.has('armor'), false);
+    e.set('health', 4).set('on', false).set('health', 4); step(p);
+    assert.deepEqual(heard, [['health', 4, 10], ['on', false, undefined]]); assert.equal(e.getState().data.health, 4);
+    e.set('on', undefined); assert.equal(e.has('on'), false);
+    assert.throws(() => e.set('__proto__', 1), /property key/); assert.throws(() => e.get(''), /property key/);
+});
+test('an object places itself and converts points between its frame and the world', () => {
+    const p = new physicsSystem(), e = p.elements.createProp({ position: [0, 0] }), close = (a, b) => a.forEach((v, i) => assert.ok(Math.abs(v - b[i]) < 1e-9, `${a} != ${b}`));
+    e.moveTo(10, 20).rotateTo(Math.PI / 2); step(p);
+    close(e.position, [10, 20]); close(e.toWorld([5, 0]), [10, 25]); close(e.toLocal([10, 25]), [5, 0]);
+    assert.equal(e.distanceTo([13, 24]), 5); close(e.directionTo([13, 24]), [.6, .8]); assert.deepEqual(e.directionTo([10, 20]), [0, 0]);
+    const other = p.elements.createProp({ position: [10, 30] }); assert.equal(e.distanceTo(other), 10);
+});
+test('an object parents children at a local offset and lets them go', () => {
+    const p = new physicsSystem(), car = p.elements.createProp({ position: [0, 0], collision_group: 0 }), lamp = p.elements.createProp({ position: [50, 50], collision_group: 0 });
+    car.attach(lamp, { at: [5, 0] }); step(p);
+    assert.equal(lamp.parent, car); assert.deepEqual(car.children, [lamp]); assert.deepEqual([...lamp.position], [5, 0]);
+    car.moveTo(100, 0); step(p); assert.deepEqual([...lamp.position], [105, 0]);
+    assert.throws(() => lamp.detach(car), /not attached/);
+    assert.equal(car.detach(lamp), true); step(p);
+    assert.equal(lamp.parent, null); assert.deepEqual(car.children, []); assert.equal(lamp.detach(), false);
+});

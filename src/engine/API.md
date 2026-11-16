@@ -141,12 +141,36 @@ Reference: [physics README](basement/physics/README.md) and [physics API referen
 | `elements.createProp(packet)` / `createStatic` / `createTrigger` / `createDecoration` | One of the built-in types |
 | `elements.registerEntityType(type, Class)` | Adds your own type (a subclass of a built-in one) |
 | `elements.getEntities({instance_of})` / `elements.fetchEntity(id)` | Finds entities |
-| `entity.get(key)` / `entity.set(key, value)` | Reads or writes a property |
-| `entity.setPosition([x, y])` / `entity.setRotation(angle)` | Places or turns it |
-| `entity.on(event, handler)` | Events on this entity |
 | `entity.destroy()` | Removes it from the world |
 
-`gameEntity` gets its own section here when the single `createObject` from the API spec is built.
+#### gameEntity
+
+Every object in the world is a `gameEntity`, the way every object in a Blender game is a `KX_GameObject`. It has a name, an id, a position, a rotation, a parent, children and properties. Every call that changes it returns the entity, so calls chain.
+
+| Call | What it does |
+|---|---|
+| `entity.name`, `entity.entity_id`, `entity.entity_type`, `entity.tags` | Who it is |
+| `entity.position`, `entity.rotation`, `entity.linear_velocity` | Where it is and how it moves (read only; change them with the calls below) |
+| `entity.get(key, fallback)` / `entity.has(key)` | Reads a property |
+| `entity.set(key, value)` | Writes a property; `undefined` removes it. Fires `propertyChanged` with `{key, value, previous}` on the next step |
+| `entity.moveTo(x, y)` / `entity.rotateTo(angle)` | Places or turns it |
+| `entity.toWorld([x, y])` / `entity.toLocal([x, y])` | Turns a point in its own frame into a world point, and back |
+| `entity.distanceTo(target)` / `entity.directionTo(target)` | Distance and unit direction to a point or another entity |
+| `entity.attach(child, {at, rotation})` | Parents `child` at a local offset; the child rides along until it is detached |
+| `entity.detach()` / `entity.detach(child)` | Lets go of its parent, or of one child. Returns `false` when there was nothing to leave or no clear spot to leave at |
+| `entity.parent` / `entity.children` | Its parent entity (or `null`) and its attached children |
+| `entity.on(event, handler)` | Events on this entity, such as `propertyChanged` or a contact; returns a call that stops listening |
+| `entity.activate()` / `entity.deactivate()` / `entity.destroy()` | Turns it on or off, or removes it |
+
+```js
+const lamp = elements.createProp({ name: 'lamp', position: [0, 0], data: { on: true } });
+const car = elements.createProp({ name: 'car', position: [100, 40] });
+car.attach(lamp, { at: [12, 0] });
+lamp.on('propertyChanged', ({ key, value }) => console.log(key, value));
+lamp.set('on', false);
+car.moveTo(200, 40);           // the lamp follows at [212, 40] after the next step
+car.distanceTo([200, 70]);     // 30
+```
 
 Reference: [entities](basement/physics/docs/entities.md).
 

@@ -207,6 +207,13 @@ Entity properties are read-only: `entity_id`, `body_id` (same root identity), `e
 | `setAsset(slot,resource_id)` | Validates and updates a resource binding, never edits a shared template. |
 | `on(event_name,handler)` | Entity-scoped subscription, handler's `this` is the entity; returns unsubscribe and cleans on destroy. |
 | `createConstraint(packet={})` | Creates an engine constraint with this entity as `body_a`. |
+| `get(key,fallback)`, `has(key)`, `set(key,value)` | Properties: read and write the entity's `data` by key. `set` returns the entity, deletes the key when `value` is `undefined`, ignores a write of the same value, and emits `propertyChanged` `{body,entity,key,value,previous}` on the next step. Keys are non-empty strings other than `__proto__`, `constructor`, `prototype`. |
+| `moveTo(x,y,options)` or `moveTo([x,y],options)`, `rotateTo(angle,options)` | Readable names for `setPosition` and `setRotation`; return the entity. |
+| `toWorld([x,y])`, `toLocal([x,y])` | Convert a point between the entity's frame (position plus rotation) and the world. |
+| `distanceTo(target)`, `directionTo(target)` | Distance and unit direction to a point or anything with a `position`; the direction to its own position is `[0,0]`. |
+| `attach(child,{at=[0,0],rotation=0,combine_mass=false,rig_anchor=null})` | Parents a child entity or body at a local offset through `attachBody`; returns the parent. |
+| `detach(child=null,{exit_points,inherit_velocity})` | With no child, detaches this entity from its parent; with a child, detaches that child and throws if it is not attached here. Exits at its current local offset unless `exit_points` are given. Returns `true` when it left and `false` when it had no parent or no exit was clear. |
+| `parent`, `children` | Read-only: the parent entity or `null`, and the attached child entities. |
 
 `physics.elements` is a `gameElements`. Its read-only `world` and `asset_library` identify its owner and definitions. It maps identities, not positions; there is no second spatial index. A world cannot have a second `gameElements` owner; use its existing `elements` service.
 

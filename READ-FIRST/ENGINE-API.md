@@ -50,9 +50,10 @@ An object is like Blender's `KX_GameObject`: a name, an id, a position, a rotati
 | Call | What it does | Today |
 | --- | --- | --- |
 | `createObject(record, at)` | Makes an object from a catalog record at a position | partly: Basement entities and map placements, but each family has its own path |
-| `object.get(key)` / `object.set(key, value)` | Reads or writes a property | partly |
+| `object.get(key)` / `object.set(key, value)` | Reads or writes a property; `set` fires `propertyChanged` | have: `gameEntity.get`, `has`, `set` |
 | `object.moveTo(x, y)` / `object.rotateTo(angle)` | Places or turns it | have |
-| `object.attach(child, at)` | Parents one object to another at a local offset | missing |
+| `object.attach(child, at)` | Parents one object to another at a local offset | have: `gameEntity.attach`, `detach`, `parent`, `children` |
+| `object.toWorld(p)` / `toLocal(p)` / `distanceTo(t)` / `directionTo(t)` | Frame and distance helpers | have |
 | `object.on(event, fn)` | Runs `fn` on touch, use, enter, leave, hit, death | partly: triggers and interactions, not one event list |
 | `findObjects({near, radius, kind, property})` | Asks the spatial grid what is around | have: grid awareness and lookups |
 | `removeObject(object)` | Takes it out of the world and every system | have |
