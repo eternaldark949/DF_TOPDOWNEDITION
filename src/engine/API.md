@@ -206,7 +206,28 @@ Reference: [maps README](basement/maps/README.md).
 | `render.resize({ width, height, pixel_ratio })` | Matches the screen |
 | `render.getVisibleEntities()` | What is on screen |
 
-The art toolkit (`basement/rendering/art.mjs`) builds shapes for a frame: `rect`, `roundRect`, `circle`, `ellipse`, `capsule`, `polyline`, `polygon`, `smoothShape`, gradients (`linear`, `radial`), `glow` and `groundShadow`, plus colour helpers (`rgba`, `mix`, `shade`). The light layer (`createLightLayer`) draws lights and shadows. The readable `drawRectangle` / `drawCircle` calls and looks as data from the API spec are documented here when built.
+**Drawing.** Draw in an `artScene` with readable calls, each placed around the scene's origin, then hand `finish()` to the frame:
+
+```js
+const art = new artScene();
+art.drawRectangle({ x: -10, y: -6, width: 20, height: 12, radius: 2, fill: '#5a4632' });
+art.drawCircle({ x: 0, y: 0, radius: 3, fill: '#c9b28a', alpha: 0.8 });
+art.drawLine({ points: [[-8, 6], [8, 6]], stroke: '#2b2118', line_width: 1 });
+for (const packet of art.finish()) frame.submit(packet);
+```
+
+The calls are `drawRectangle`, `drawCircle`, `drawEllipse`, `drawCapsule`, `drawLine`, `drawPolygon`, `drawCurve`, `drawText`, `drawGlow` and `drawGroundShadow`. Paint fields on any of them: `fill`, `stroke`, `line_width`, `alpha`, `blend`, `shadow`, and gradients through `linear` and `radial`.
+
+**Drawings as data.** The same shapes can be a list of steps in data, so a thing's appearance needs no code. `art.draw(steps, { at, rotation, scale, values })` paints them; a `group` step nests steps at its own offset, turn and size, and a value `"$name"` is read from `values` (a look's fields), so one drawing serves every variant:
+
+```json
+[
+  { "shape": "rectangle", "x": -10, "y": -6, "width": 20, "height": 12, "radius": 2, "fill": "$body" },
+  { "shape": "group", "x": 5, "rotation": 1.57, "steps": [{ "shape": "circle", "radius": 3, "fill": "$lamp" }] }
+]
+```
+
+The light layer (`createLightLayer`) draws lights and shadows. Colour helpers: `rgba`, `mix`, `shade`, `hexToRgb`.
 
 Reference: [rendering README](basement/rendering/README.md).
 

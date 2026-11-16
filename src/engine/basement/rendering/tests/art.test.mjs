@@ -62,3 +62,30 @@ test('rounded boxes take the canvas outline, and text is a packet the frame acce
     assert.equal(label.type,'text');assert.equal(label.text,'latte');assert.deepEqual(label.transform.slice(4),[12,8]);assert.equal(label.font.weight,600);assert.equal(label.align,'center');
     assert.deepEqual(label.clips[0].transform.slice(4),[-2,-3],'the clip stays where it was drawn');
 });
+
+test('the readable drawing calls make the same packets as the shapes they name', () => {
+    const a=new artScene().drawRectangle({x:-10,y:-6,width:20,height:12,radius:2,fill:'#5a4632',stroke:'#000',line_width:2}).finish();
+    const b=new artScene().paint(roundRect(-10,-6,20,12,2),{fill:'#5a4632',stroke:'#000',stroke_width:2}).finish();
+    assert.deepEqual(a,b);
+    const s=new artScene().drawCircle({x:1,y:2,radius:3,fill:'#fff'}).drawEllipse({radius_x:2,radius_y:1}).drawCapsule({from:[0,0],to:[5,0],radius:1})
+        .drawLine({points:[[0,0],[3,3]]}).drawPolygon({points:[[0,0],[1,0],[0,1]]}).drawCurve({points:[[0,0],[2,0],[2,2]]})
+        .drawText({text:'hi',x:1,y:1,size:10}).drawGlow({radius:4,color:'#ff8000'}).drawGroundShadow({radius_x:4,radius_y:2});
+    const packets=accepted(s.finish());assert.equal(packets.length,9);
+    assert.deepEqual([packets[3].material.fill,packets[3].material.stroke],[null,'#000'],'a line is stroked by default');
+    assert.equal(new artScene().drawCircle({radius:1,alpha:.5}).finish()[0].opacity,.5);
+    assert.throws(()=>new artScene().drawCircle({radius:1,colour:'#fff'}),/Unknown drawing field: colour/);
+});
+
+test('a drawing is data: steps in local space, groups, and $values from a look', () => {
+    const drawing=[
+        {shape:'rectangle',x:-10,y:-6,width:20,height:12,fill:'$body'},
+        {shape:'group',x:5,y:0,rotation:Math.PI/2,steps:[{shape:'circle',radius:3,fill:'$lamp',alpha:.8}]},
+        {shape:'line',points:[[-8,6],[8,6]],stroke:'#2b2118',line_width:1}
+    ];
+    const [box,lamp,line]=accepted(new artScene().draw(drawing,{at:[100,50],rotation:0,scale:2,values:{body:'#5a4632',lamp:'#c9b28a'}}).finish());
+    assert.equal(box.material.fill,'#5a4632');assert.equal(lamp.material.fill,'#c9b28a');assert.equal(lamp.opacity,.8);assert.equal(line.material.stroke,'#2b2118');
+    const m=new artScene().draw(drawing,{at:[100,50],scale:2,values:{body:'#000',lamp:'#fff'}}).finish()[1].matrix.map(v=>+v.toFixed(9));
+    assert.deepEqual(m,[0,2,-2,0,110,50],'the group sits at its offset, scaled and turned with its parent');
+    assert.throws(()=>new artScene().draw([{shape:'star'}]),/Unknown drawing shape: star/);
+    assert.throws(()=>new artScene().draw(drawing,{values:{body:'#000'}}),/reads \$lamp/);
+});

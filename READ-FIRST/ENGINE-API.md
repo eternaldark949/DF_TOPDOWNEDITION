@@ -151,30 +151,30 @@ The Basement `controlSystem` already works this way. What is left is input conte
 
 ## Drawing backend
 
-One Canvas backend in the Basement. It draws the essential shapes, and a look is a list of those shapes as data, around the object's origin. Nobody writes canvas code to add a prop, a character or an effect.
+One Canvas backend in the Basement. It draws the essential shapes, and a **drawing** is a list of those shapes as data, around the object's origin. A thing's **look** is the values its drawing reads (`"$body"`), so one drawing serves every variant. Nobody writes canvas code to add a prop, a character or an effect.
 
-**A look as data:**
+**A drawing as data:**
 
 ```json
-"look": [
-  {"shape": "rectangle", "x": -10, "y": -6, "width": 20, "height": 12, "radius": 2, "fill": "#5a4632"},
-  {"shape": "circle", "x": 0, "y": 0, "radius": 3, "fill": "#c9b28a", "glow": 0.4},
-  {"shape": "line", "points": [[-8, 6], [8, 6]], "stroke": "#2b2118", "width": 1}
+"drawing": [
+  {"shape": "rectangle", "x": -10, "y": -6, "width": 20, "height": 12, "radius": 2, "fill": "$body"},
+  {"shape": "circle", "x": 0, "y": 0, "radius": 3, "fill": "#c9b28a", "alpha": 0.8},
+  {"shape": "line", "points": [[-8, 6], [8, 6]], "stroke": "#2b2118", "line_width": 1}
 ]
 ```
 
 | Call | What it does | Today |
 | --- | --- | --- |
-| `drawRectangle({x, y, width, height, radius, fill, stroke})` | A box, rounded when `radius` is set | partly: `rect`, `roundRect` in `basement/rendering/art.mjs` |
-| `drawCircle`, `drawEllipse`, `drawCapsule` | Round shapes | partly: `circle`, `ellipse`, `capsule` |
-| `drawLine`, `drawPolygon`, `drawCurve` | Lines and outlines | partly: `polyline`, `polygon`, `smoothShape` |
-| `drawText`, `drawImage` | Words and pictures | partly |
+| `drawRectangle({x, y, width, height, radius, fill, stroke})` | A box, rounded when `radius` is set | have |
+| `drawCircle`, `drawEllipse`, `drawCapsule` | Round shapes | have |
+| `drawLine`, `drawPolygon`, `drawCurve` | Lines and outlines | have |
+| `drawText`, `drawImage` | Words and pictures | have `drawText`; `drawImage` missing |
 | `fill` and `stroke`: a colour or a gradient (`linear`, `radial`) | How a shape is painted | have |
-| `glow`, `shadow`, `layer`, `alpha` on a step | Light, cast shadow, draw order, see-through | partly |
-| `drawLook(look, {at, rotation, scale})` | Draws a whole look in the object's local space | missing: the command runner exists in `canvas.mjs`, the look format does not |
-| Variants: `"variant": {"color": ["#5a4632", "#3c2f22"]}` | The same look in different colours or sizes, chosen per object | missing |
+| `shadow`, `alpha`, `blend` on a step; `glow` and `ground_shadow` steps | Shadow, see-through, blending, light | have |
+| `scene.draw(drawing, {at, rotation, scale, values})` | Draws a whole drawing in the object's local space, `group` steps nested, `"$name"` values from its look | have |
+| Variants | The same drawing in different colours or sizes: a look's values, chosen per object | have, through `values` |
 
-**Made efficient by the backend, never by the game:** a look is compiled once into paths and cached; looks that never move are baked into a layer image once; steps with the same paint are drawn together; the grid skips anything off screen.
+**Made efficient by the backend, never by the game:** a drawing is compiled once into paths and cached; drawings that never move are baked into a layer image once; steps with the same paint are drawn together; the grid skips anything off screen.
 
 ## UI system
 
@@ -218,7 +218,7 @@ Each step makes later steps smaller. A step is done when the game uses the new c
 
 1. **Lobby.** `pausable` systems, time scale, `step`, timers and engine events.
 2. **Controls as data.** Input contexts, chords and rumble templates, with every binding in one file.
-3. **Drawing backend.** The readable drawing calls and `look` lists in local space; then prop looks move out of code into the catalog, one family at a time.
+3. **Drawing backend.** The readable drawing calls and drawings as data in local space (done); then prop drawings move out of code into the catalog, one family at a time.
 4. **UI system.** The overlay with items, states, styles and transitions; then the main menu, pause and its pages, and the HUD as data.
 5. **Objects.** One `createObject` from a catalog record, with parts switched on by data. Every placement, light and character goes through it.
 6. **One map drawer.** Ground, buildings, plants and interiors drawn by one drawer that reads the map's sections and switches. Drop the city names. Spawn layout characters on load.

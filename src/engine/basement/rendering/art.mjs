@@ -71,7 +71,76 @@ export class artScene{
         this.packets.push({type:'text',text:String(string),matrix:m,font:{...font},align,baseline,material:{fill:null,stroke:null,stroke_width,line_cap,line_join,dash:[...dash],...copy(material)},opacity:this.style.opacity,blend:this.style.blend,clips:this.clips.map(clip=>({geometry:clip.geometry,transform:multiply(inv,clip.matrix),rule:clip.rule}))});return this;
     }
     finish(){if(this.#stack.length)throw new Error('Unclosed art group');return this.packets;}
+
+    // ----- Readable drawing calls: one shape each, in the group's local space ----------------------
+    // Every call takes one object: where the shape sits (around the group's origin) and how it is
+    // painted (`fill`, `stroke`, `line_width`, `alpha`, `blend`, `shadow`). See DRAWING below.
+    /** A box with its top-left corner at (x, y), rounded when `radius` is set. */
+    drawRectangle({x=0,y=0,width,height,radius=0,...paint}){return this.#draw(radius?roundRect(x,y,width,height,radius):rect(x,y,width,height),paint);}
+    /** A circle round (x, y). */
+    drawCircle({x=0,y=0,radius,...paint}){return this.#draw([circle(x,y,radius)],paint);}
+    /** An ellipse round (x, y), turned by `rotation`. */
+    drawEllipse({x=0,y=0,radius_x,radius_y,rotation=0,...paint}){return this.#draw([ellipse(x,y,radius_x,radius_y,rotation)],paint);}
+    /** A stadium from `from` to `to` with round ends of `radius`. */
+    drawCapsule({from,to,radius,...paint}){return this.#draw(capsule(from,to,radius),paint);}
+    /** An open line through `points`; it is stroked (black, 1 wide, unless told). */
+    drawLine({points,...paint}){return this.#draw(polyline(points),{stroke:'#000',...paint});}
+    /** A closed polygon through `points`. */
+    drawPolygon({points,...paint}){return this.#draw(polygon(points),paint);}
+    /** A closed shape through `points` with its corners rounded. */
+    drawCurve({points,...paint}){return this.#draw(smoothShape(points),paint);}
+    /** One line of `text` at (x, y): `size`, `family`, `weight`, `style`, `align`, `baseline`. */
+    drawText({text,x=0,y=0,size=16,family='sans-serif',weight=400,style='normal',align='left',baseline='alphabetic',...paint}){
+        const {material,opacity,blend}=drawPaint({fill:'#000',...paint});
+        return this.#styled(opacity,blend,()=>this.text(text,x,y,{font:{family,size,weight,style},align,baseline},material));
+    }
+    /** A soft round light round (x, y): `color` as '#rrggbb' or 'r,g,b', bright in the middle (`core`), gone at `radius`. */
+    drawGlow({x=0,y=0,radius,color,core=.35,alpha=1,blend}){glow(this,x,y,radius,rgbString(color),core,{alpha,...(blend?{blend}:{})});return this;}
+    /** The soft dark ellipse that sets something on the floor. */
+    drawGroundShadow({x=0,y=0,radius_x,radius_y,strength=1}){groundShadow(this,x,y,radius_x,radius_y,{strength});return this;}
+    /**
+     * Draws a drawing (a list of steps, see DRAWING) moved to `at`, turned by `rotation` and sized by
+     * `scale` (a number or [x, y]). A step's string value `"$name"` is read from `values` (a look's
+     * fields), so one drawing serves every variant of a thing.
+     */
+    draw(steps,{at=[0,0],rotation=0,scale=1,values={}}={}){
+        if(!Array.isArray(steps))throw new TypeError('A drawing is a list of steps');
+        this.enter({position:at,rotation,scale:typeof scale==='number'?[scale,scale]:scale});
+        try{for(const step of steps)this.#step(resolveValues(step,values),values);}finally{this.leave();}
+        return this;
+    }
+    #step(step,values){
+        const {shape,...fields}=step??{};
+        if(shape==='group'){const {steps,x=0,y=0,rotation=0,scale=1}=fields;return this.draw(steps,{at:[x,y],rotation,scale,values});}
+        const call=DRAWING[shape];if(!call)throw new TypeError(`Unknown drawing shape: ${shape} (one of ${Object.keys(DRAWING).join(', ')}, group)`);
+        return this[call](fields);
+    }
+    #draw(commands,paint){const {material,opacity,blend}=drawPaint(paint);return this.#styled(opacity,blend,()=>this.paint(commands,material));}
+    #styled(opacity,blend,fn){if(opacity===1&&blend===undefined)return fn();this.enter({},{opacity:this.style.opacity*opacity,...(blend?{blend}:{})});try{fn();}finally{this.leave();}return this;}
 }
+
+/** The shapes a drawing step may name, and the readable call each one is. */
+export const DRAWING=Object.freeze({rectangle:'drawRectangle',circle:'drawCircle',ellipse:'drawEllipse',capsule:'drawCapsule',line:'drawLine',polygon:'drawPolygon',curve:'drawCurve',text:'drawText',glow:'drawGlow',ground_shadow:'drawGroundShadow'});
+const PAINT_KEYS=new Set(['fill','stroke','line_width','line_cap','line_join','dash','alpha','blend','shadow']);
+/** A step's paint fields as a material, its opacity and its blend. Unknown fields are refused, so a typo never draws silently wrong. */
+function drawPaint({fill=null,stroke=null,line_width,line_cap,line_join,dash,alpha=1,blend,shadow,...rest}){
+    const unknown=Object.keys(rest);if(unknown.length)throw new TypeError(`Unknown drawing field: ${unknown.join(', ')} (paint is ${[...PAINT_KEYS].join(', ')})`);
+    if(fill===null&&stroke===null)fill='#000';
+    const material={fill,stroke};if(line_width!==undefined)material.stroke_width=line_width;if(line_cap)material.line_cap=line_cap;if(line_join)material.line_join=line_join;if(dash)material.dash=dash;
+    if(shadow)material.shadow={color:shadow.color??'rgba(0,0,0,.5)',blur:shadow.blur??0,offset:shadow.offset??[0,0]};
+    if(!(alpha>=0&&alpha<=1))throw new TypeError('alpha must be in [0,1]');
+    return {material,opacity:alpha,blend};
+}
+/** A copy of `step` with every "$name" string read from `values`; groups keep theirs for their own steps. */
+function resolveValues(step,values){
+    const read=value=>{
+        if(typeof value==='string'&&value.startsWith('$')){const key=value.slice(1);if(!Object.hasOwn(values,key))throw new TypeError(`The drawing reads ${value}, which its values do not have`);return values[key];}
+        if(Array.isArray(value))return value.map(read);
+        return value;
+    };
+    return Object.fromEntries(Object.entries(step??{}).map(([k,v])=>[k,k==='steps'?v:read(v)]));
+}
+const rgbString=colour=>typeof colour==='string'&&colour.startsWith('#')?hexToRgb(colour).join(','):colour;
 
 // ----- Effects -------------------------------------------------------------------------------------
 /** A soft round light: `rgb` as 'r,g,b', bright at the centre, gone at `r`. It takes the group's blend unless given one (`'add'` brightens). */

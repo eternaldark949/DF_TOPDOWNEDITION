@@ -141,6 +141,38 @@ Colour: `hexToRgb(hex)` gives `[r, g, b]`; `rgbToHex(rgb)`; `rgba(hex or rgb, a)
 
 Seeded randomness, for procedural detail that is the same every frame: `seededRandom(seed)` returns a function giving numbers in [0, 1); `hash2(x, y, seed)` is a repeatable number in [0, 1) for a grid cell.
 
+### Drawing calls and drawings as data
+
+The readable way to draw. Each call takes one object: where the shape sits in the group's local space (around its origin) and how it is painted. A **drawing** is the same thing as data: a list of steps, each naming its `shape`, that `draw` paints, so a prop, a character part or an effect needs no drawing code.
+
+```js
+const art = new artScene();
+art.drawRectangle({ x: -10, y: -6, width: 20, height: 12, radius: 2, fill: '#5a4632' });
+art.draw([
+    { shape: 'rectangle', x: -10, y: -6, width: 20, height: 12, radius: 2, fill: '$body' },
+    { shape: 'group', x: 5, rotation: 1.57, steps: [{ shape: 'circle', radius: 3, fill: '$lamp', alpha: 0.8 }] },
+    { shape: 'line', points: [[-8, 6], [8, 6]], stroke: '#2b2118', line_width: 1 }
+], { at: [x, y], rotation, scale: 1, values: { body: '#5a4632', lamp: '#c9b28a' } });
+```
+
+| Call | Step `shape` | Fields |
+|---|---|---|
+| `drawRectangle` | `rectangle` | `x`, `y` (top-left), `width`, `height`, `radius` |
+| `drawCircle` | `circle` | `x`, `y`, `radius` |
+| `drawEllipse` | `ellipse` | `x`, `y`, `radius_x`, `radius_y`, `rotation` |
+| `drawCapsule` | `capsule` | `from`, `to`, `radius` |
+| `drawLine` | `line` | `points` (open; stroked black, 1 wide, unless told) |
+| `drawPolygon` | `polygon` | `points` (closed) |
+| `drawCurve` | `curve` | `points` (closed, corners rounded) |
+| `drawText` | `text` | `text`, `x`, `y`, `size`, `family`, `weight`, `style`, `align`, `baseline` |
+| `drawGlow` | `glow` | `x`, `y`, `radius`, `color` ('#rrggbb' or 'r,g,b'), `core`, `alpha`, `blend` |
+| `drawGroundShadow` | `ground_shadow` | `x`, `y`, `radius_x`, `radius_y`, `strength` |
+| `draw(steps, {at, rotation, scale, values})` | `group` | `x`, `y`, `rotation`, `scale`, `steps` |
+
+Paint fields on any shape: `fill` and `stroke` (a colour or a `linear` / `radial` gradient; black fill when neither is given), `line_width`, `line_cap`, `line_join`, `dash`, `alpha` (0 to 1), `blend`, `shadow` (`{color, blur, offset}`). An unknown field is refused, so a typo never draws silently wrong. `DRAWING` lists every step shape and the call it is.
+
+A string value `"$name"` in a step is read from `values`, usually a look's fields, so one drawing serves every variant of a thing.
+
 ## Height (`height.mjs`)
 
 Art that stands up from the ground under a camera above it. A point at height `z` draws at `camera + (point - camera) * k(z)`; `heightScale(z, eye)` is that `k` for a camera `eye` above the ground (`eye / (eye - z)`, with heights past 86% of the eye held there). At one height that is a uniform scale about the camera, so flat things up there are drawn in world units under one matrix.
