@@ -62,7 +62,8 @@ export function drawLook(scene,entity,source,blend=1){
     const drawing_id=entity.assets?.drawing;if(!drawing_id)return false;
     const look=entity.get('look',{});if(look.visible===false)return false;
     const drawing=resource(source,drawing_id,'drawing'),pose=entity.getRenderState(blend);
-    scene.draw(drawing.steps,{at:pose.position,rotation:pose.rotation,scale:look.scale??1,values:look.values??{},materials:name=>resource(source,qualifyResource(name,drawing_id),'material')});
+    const [wx,wy]=entity.world_scale??[1,1],k=look.scale??1;
+    scene.draw(drawing.steps,{at:pose.position,rotation:pose.rotation,scale:[wx*k,wy*k],values:look.values??{},materials:name=>resource(source,qualifyResource(name,drawing_id),'material')});
     return true;
 }
 /**
@@ -85,18 +86,20 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null}
     if(view!==null&&!(view instanceof heightView))throw new TypeError('A height view is a heightView or null');
     const components=entity.get('components')??[];if(!components.length)return [];
     const look=entity.get('look',{});if(look.visible===false)return [];
-    const pose=entity.getRenderState(blend),scale=look.scale??1,values=look.values??{},out=[];
+    const pose=entity.getRenderState(blend),scale=look.scale??1,[wx,wy,wz]=entity.world_scale??[1,1,1],values=look.values??{},out=[];
     for(const {component:c,layer} of layersByHeight(components)){
-        const joint=c.joint?joints(c.joint):null,base=joint??{position:pose.position,rotation:pose.rotation},k=joint?1:scale;
-        const size=joint?.scale?[joint.scale[0]*scale,joint.scale[1]*scale]:scale;   // a joint's scale (a taller rig) sizes what rides it
-        const cos=Math.cos(base.rotation),sin=Math.sin(base.rotation),x=c.at[0]*k,y=c.at[1]*k;
+        // A joint's world pose carries the rig's scale (a taller rig, a scaled entity); off a joint the entity's scale and the look's apply.
+        const joint=c.joint?joints(c.joint):null,base=joint??{position:pose.position,rotation:pose.rotation};
+        const size=joint?.scale?[joint.scale[0]*scale,joint.scale[1]*scale]:[wx*scale,wy*scale],kx=joint?1:wx*scale,ky=joint?1:wy*scale;
+        const cos=Math.cos(base.rotation),sin=Math.sin(base.rotation),x=c.at[0]*kx,y=c.at[1]*ky;
         const scene=new artScene(),steps=layerSteps(layer,source),place={at:[base.position[0]+x*cos-y*sin,base.position[1]+x*sin+y*cos],rotation:base.rotation+c.rotation,scale:size};
         // Leaning toward the camera: the walls from the layer's base to its top, then its shapes in the plane of its top.
-        if(view&&layer.sides)drawSides(scene,steps,place,values,readValues({fill:layer.sides},values).fill,view,layer.height,layer.height+layer.thickness);
-        if(view)scene.enter({matrix:view.plane(view.k(layer.height+layer.thickness))});
+        const z0=layer.height*wz,z1=(layer.height+layer.thickness)*wz;
+        if(view&&layer.sides)drawSides(scene,steps,place,values,readValues({fill:layer.sides},values).fill,view,z0,z1);
+        if(view)scene.enter({matrix:view.plane(view.k(z1))});
         scene.draw(steps,{...place,values,materials:name=>resource(source,qualifyResource(name,layer.drawing??entity.template_id??name),'material')});
         if(view)scene.leave();
-        out.push({height:layer.height,layer:layer.layer,component:c.name,packets:scene.finish()});
+        out.push({height:layer.height*wz,layer:layer.layer,component:c.name,packets:scene.finish()});
     }
     return out;
 }

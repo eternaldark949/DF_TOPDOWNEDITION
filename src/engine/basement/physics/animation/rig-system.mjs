@@ -19,7 +19,9 @@ export class rigSystem {
         entry.controller=new animationController({definition,clips,authority:this.#authority,guard,root_motion_guard:()=>{if(!(record.motor instanceof characterMotor)||record.parent_mount)throw new Error('Root motion requires an unmounted character motor');}});
         this.#place(entry);entry.previous=entry.controller.getPose();this.#rigs.set(record.id,entry);return entry.controller;
     }
-    #place(entry){entry.controller._setRoot({position:[...entry.record.position],rotation:entry.record.rotation},this.#authority);}
+    /** The rig's root in the world: its body's pose, at its entity's scale. */
+    #root(entry,pose={position:entry.record.position,rotation:entry.record.rotation}){const s=this.#world.elements.fetchEntity(entry.record.id)?.world_scale;return {position:[...pose.position],rotation:pose.rotation,...(s&&(s[0]!==1||s[1]!==1)?{scale:[s[0],s[1]]}:{})};}
+    #place(entry){entry.controller._setRoot(this.#root(entry),this.#authority);}
     getRig(body){return this.#rigs.get(this.#record(body).id)?.controller??null;}
     removeRig(body){
         this.#guard();const record=this.#record(body);
@@ -52,7 +54,7 @@ export class rigSystem {
     getPose(body,{blend=1,world_space=false,relative_to=null}={}){
         if(typeof world_space!=='boolean')throw new TypeError('world_space must be boolean');
         const entry=this.#entry(body),pose=this.#pose(entry,blend),root=world_space?entry.record.handle.getRenderState(blend):null;
-        const options=root?{root:{position:root.position,rotation:root.rotation}}:undefined;
+        const options=root?{root:this.#root(entry,root)}:undefined;
         if(relative_to!==null&&world_space)throw new TypeError('Choose world space or a relative joint');
         const relative=relative_to===null?null:inverse(pose.getJoint(relative_to).matrix),project=value=>relative?describe(multiply(relative,value.matrix)):value;
         return {rig_id:entry.controller.definition.rig_id,joints:Object.fromEntries(entry.controller.definition.getJointNames().map(id=>[id,project(pose.getJoint(id,options))])),anchors:Object.fromEntries(entry.controller.definition.getAnchorNames().map(id=>[id,project(pose.getAnchor(id,options))]))};
@@ -60,7 +62,7 @@ export class rigSystem {
     getAnchor(body,anchor,{blend=1,world_space=true}={}){
         name(anchor);if(typeof world_space!=='boolean')throw new TypeError('world_space must be boolean');
         const entry=this.#entry(body),pose=this.#pose(entry,blend),root=world_space?entry.record.handle.getRenderState(blend):null;
-        return pose.getAnchor(anchor,root?{root:{position:root.position,rotation:root.rotation}}:undefined);
+        return pose.getAnchor(anchor,root?{root:this.#root(entry,root)}:undefined);
     }
     _beforeStep(seconds){
         const requests=[];

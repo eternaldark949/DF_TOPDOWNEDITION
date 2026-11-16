@@ -76,3 +76,19 @@ test('the Penthouse imports only the Basement and the Directory', () => {
     for (const file of files(root)) for (const [, path] of readFileSync(file, 'utf8').matchAll(/from\s+'([^']+)'/g))
         if (path.startsWith('.')) assert.ok(!/(lobby|game|legacy)\//.test(path), `${file} imports ${path}`);
 });
+
+test('a humanoid scales whole, Alice-style: its rig, its parts, its height and its hitbox grow together', () => {
+    const p = world(), alice = new humanoid(p, { position: [0, 0] }), radius = alice.entity.collision_shape.radius;
+    p.updateState();
+    const joints = () => p.rigs.getPose(alice.entity, { world_space: true }).joints;
+    const head = () => drawComponents(alice.entity, p.elements.asset_library, 1, { joints: name => joints()[name] }).find(part => part.component === 'head').packets[0].matrix;
+    const span = () => { const j = joints(); return Math.hypot(j.shoulder_l.position[0] - j.shoulder_r.position[0], j.shoulder_l.position[1] - j.shoulder_r.position[1]); };
+    const before = { head: head(), shoulders: span() };
+    alice.entity.scaleTo(4); p.updateState();
+    assert.equal(alice.entity.height, 350, 'she stands 7 m'); assert.deepEqual([...alice.entity.body.getState().height_span], [0, 350]);
+    assert.equal(alice.entity.collision_shape.radius, radius * 4);
+    const after = { head: head(), shoulders: span() };
+    assert.ok(Math.abs(Math.hypot(after.head[0], after.head[1]) / Math.hypot(before.head[0], before.head[1]) - 4) < 0.01, 'her head draws four times the size');
+    assert.ok(Math.abs(after.shoulders / before.shoulders - 4) < 0.01, 'her shoulders are four times as wide (give or take her breathing)');
+    alice.entity.scaleTo(0.25); p.updateState(); assert.equal(alice.entity.height, 87.5 / 4, 'and shrinks as well');
+});

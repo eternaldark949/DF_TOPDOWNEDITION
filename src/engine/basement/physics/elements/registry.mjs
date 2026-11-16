@@ -1,5 +1,6 @@
 // ===== LV0 BASEMENT =====
 import { readComponents, solidSpan } from './components.mjs';
+import { readScale, multiplyScale, massFactor, scaleShape, scaleSpan } from './scale.mjs';
 import { clone, freeze } from '../core/values.mjs';
 import { EMPTY_DATA_SOURCE, isDataSource } from './data-source.mjs';
 import { gameEntity, entityRecord, restoreEntity } from './entity.mjs';
@@ -71,7 +72,8 @@ export class gameElements {
     peruseNearbyEntities(reference, options = {}, results = []) { return this.world.peruseNearbyEntities(reference, { ...options, spatial_entities: true }, results); }
     getStatistics() { return { entities: this.#entities.size, kinds: this.#kinds.size }; }
     _construct(entity, packet) {
-        const { components: parts, look, ...definition } = this.#resolve(packet), kind = definition.kind ?? 'entity', preset = this.getKind(kind);
+        const { components: parts, look, scale: own_scale, mass_scales, ...definition } = this.#resolve(packet), kind = definition.kind ?? 'entity', preset = this.getKind(kind);
+        const restored = this.#restore;
         let auto_span = false;
         // A record's look is its starting `look` property, as its components are its `components`.
         if (look !== undefined && definition.data?.look === undefined) definition.data = { ...(definition.data ?? {}), look };
@@ -82,14 +84,19 @@ export class gameElements {
         }
         const motor = definition.motor === undefined ? preset.motor : definition.motor, awareness = definition.awareness ?? preset.awareness;
         if (motor !== null && !MOTORS.includes(motor)) throw new TypeError(`A motor is ${MOTORS.join(', ')} or null`);
+        // The rest size: the body as the record makes it. The body itself is that times the scale.
+        const body = { ...clone(preset.body), ...definition }, scale = readScale(own_scale ?? 1), rule = mass_scales ?? false;
+        massFactor(scale, rule);
+        const rest = restored?.rest ?? { collision_shape: body.collision_shape ?? { shape_type: 'circle', radius: 1 }, render_shape: body.render_shape ?? null, light_shape: body.light_shape ?? null, mass: body.mass ?? 1, height_span: body.height_span ?? null };
+        Object.assign(body, sizedBody(rest, scale, rule));
         // Plain construction and save restoration use the same base, but normal callers cannot adopt a pre-existing body.
-        const restored = this.#restore;
-        const components = restored ? this.world._restoreEntityComponents(restored.entity_id, { motor, awareness }) : this.world._createEntityComponents({ ...clone(preset.body), ...definition, motor, awareness });
+        const components = restored ? this.world._restoreEntityComponents(restored.entity_id, { motor, awareness }) : this.world._createEntityComponents({ ...body, motor, awareness });
         const bodyState = components.body.getState();
-        if (restored && definition.data?.components) { const span = solidSpan(definition.data.components), own = bodyState.height_span; auto_span = span === null ? own === null : !!own && own[0] === span[0] && own[1] === span[1]; }
+        if (restored) auto_span = restored.auto_span ?? false;
         const record = { elements: this, body: components.body, motor: components.motor, awareness: components.awareness ?? null,
             kind, motor_name: motor, aware: awareness, template_id: definition.template ?? null, name: bodyState.name, tags: freeze(bodyState.tags),
-            assets: freeze(clone(definition.assets ?? {})), data: clone(definition.data ?? {}), registered: false, destroyed: false, subscriptions: new Set(), auto_span };
+            assets: freeze(clone(definition.assets ?? {})), data: clone(definition.data ?? {}), registered: false, destroyed: false, subscriptions: new Set(), auto_span,
+            scale: restored?.scale ?? scale, mass_scales: restored?.mass_scales ?? rule, rest: clone(rest), world_scale: restored?.world_scale ?? scale };
         this.#construction?.entities.push(entity);
         this.world._mutate(() => {
             if (record.destroyed) return;
@@ -100,6 +107,23 @@ export class gameElements {
         });
 
         return record;
+    }
+    /**
+     * Fits an entity's body to its world scale (its own times `parent_scale`): the rest shapes, mass
+     * and height span, scaled. Its attached children follow, their offsets stretched by the change.
+     */
+    _refit(entity, parent_scale = null) {
+        const r = entityRecord(entity), parent = parent_scale ?? (entity.parent ? entityRecord(entity.parent).world_scale : [1, 1, 1]);
+        const previous = r.world_scale, next = multiplyScale(r.scale, parent);
+        const span = r.auto_span ? solidSpan(r.data.components ?? []) : r.rest.height_span;
+        r.world_scale = next;
+        this.world.updateBody(r.body, sizedBody({ ...r.rest, height_span: span }, next, r.mass_scales));
+        for (const child of entity.children) {
+            const mount = this.world.getAttachmentState(child.body);
+            if (mount) this.world.setAttachmentPose(child.body, { local_position: [mount.local_position[0] * next[0] / previous[0], mount.local_position[1] * next[1] / previous[1]] });
+            this._refit(child, next);
+        }
+        if (previous.some((v, i) => v !== next[i])) this.world._emit('entityScaled', { body: r.body, entity, scale: [...next], previous: [...previous] });
     }
     _requireLive(entity) {
         const r = entityRecord(entity);
@@ -135,6 +159,7 @@ export class gameElements {
         const r = entityRecord(entity);
         return Object.assign(result, { entity_id: entity.entity_id, kind: r.kind, motor: r.motor_name, awareness: r.aware, template: r.template_id, name: r.name,
             tags: clone(r.tags), assets: clone(r.assets), data: clone(r.data), registered: r.registered, destroyed: r.destroyed,
+            scale: [...r.scale], world_scale: [...r.world_scale], mass_scales: r.mass_scales, rest: clone(r.rest), auto_span: r.auto_span,
             body: r.destroyed ? null : r.body.getState() });
     }
     _saveState() { return this.getEntities().map(entity => { const { body, registered, destroyed, ...state } = this._snapshotEntity(entity); return state; }); }
@@ -151,4 +176,11 @@ export class gameElements {
     }
     _copyKindsTo(elements) { for (const [kind, preset] of this.#kinds) if (!Object.hasOwn(KINDS, kind)) elements.defineKind(kind, preset); }
     #index(map, key, id, entity) { let list = map.get(key); if (!list) map.set(key, list = new Map()); list.set(id, entity); }
+}
+
+/** The body fields a rest size gives at a world scale. */
+function sizedBody(rest, scale, rule) {
+    const flat = [scale[0], scale[1]];
+    return { collision_shape: scaleShape(rest.collision_shape, flat), render_shape: rest.render_shape ? scaleShape(rest.render_shape, flat) : null,
+        light_shape: rest.light_shape ? scaleShape(rest.light_shape, flat) : null, mass: rest.mass * massFactor(scale, rule), height_span: scaleSpan(rest.height_span, scale[2]) };
 }

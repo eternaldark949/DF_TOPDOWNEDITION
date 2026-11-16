@@ -187,6 +187,7 @@ Every object in the world is a `gameEntity`, the way every object in a Blender g
 | `entity.components` / `entity.getComponent(name)` | The parts it is made of (see [Components](#components)) |
 | `entity.addComponent({...})` / `entity.removeComponent(name)` | Adds or removes a part |
 | `entity.height` | How tall it stands: the highest top among its components |
+| `entity.scaleTo(2)` / `entity.scaleBy([1, 1, 3])` / `entity.scale` / `entity.world_scale` | Resizes it whole (see [Scale](#scale)) |
 | `entity.on(event, handler)` | Events on this entity, such as `propertyChanged` or a contact; returns a call that stops listening |
 | `entity.activate()` / `entity.deactivate()` / `entity.destroy()` | Turns it on or off, or removes it |
 
@@ -466,6 +467,7 @@ One call makes anything: `engine.createObject(record, at)`. A record is a templa
 | `collision_shape` | An exact shape; it always wins over `bounds` |
 | `assets.material` | A material whose `surface` sets the body's friction and restitution |
 | `components` | The parts it is made of, with layers at their own heights (see [Components](#components)); `bounds` fits every solid layer |
+| `scale`, `mass_scales` | Its size against the record (a number or `[x, y, height]`), and whether mass follows it (`'area'`, `'volume'` or false) (see [Scale](#scale)) |
 | `data` | Its starting properties |
 
 ```js

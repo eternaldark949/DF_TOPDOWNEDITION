@@ -1,6 +1,7 @@
 // ===== LV0 BASEMENT =====
 import {bodyActive} from '../core/state.mjs';
-import {entityComponent,readComponent,componentSpan,solidSpan} from './components.mjs';
+import {entityComponent,readComponent,componentSpan} from './components.mjs';
+import {readScale} from './scale.mjs';
 /** Entity metadata/lifecycle only. Physical state lives exclusively in the engine body. */
 const records = new WeakMap();
 const BLOCKED = ['__proto__', 'constructor', 'prototype'];
@@ -21,7 +22,7 @@ function initializeEntity(entity, elements, packet) {
     records.set(entity, elements._construct(entity, packet));
     // A subclass field initializer cannot replace identity, a component or the live pose.
     for (const key of ['entity_id', 'body_id', 'kind', 'template_id', 'name', 'tags', 'assets', 'data', 'physics_system', 'body', 'motor', 'awareness', 'registered', 'pending', 'destroyed', 'active', 'position', 'rotation',
-        'linear_velocity', 'angular_velocity', 'mass', 'physics_type', 'collision_shape', 'collision_group', 'collision_mask', 'query_mask', 'axis_lock', 'ghost', 'parent', 'children', 'components', 'height']) {
+        'linear_velocity', 'angular_velocity', 'mass', 'physics_type', 'collision_shape', 'collision_group', 'collision_mask', 'query_mask', 'axis_lock', 'ghost', 'parent', 'children', 'components', 'height', 'scale', 'world_scale']) {
         const getter = Object.getOwnPropertyDescriptor(gameEntity.prototype, key).get;
         Object.defineProperty(entity, key, { get: getter, configurable: false, enumerable: false });
     }
@@ -72,7 +73,7 @@ export class gameEntity {
         const r = entityRecord(this); r.elements._requireLive(this); propertyKey(key);
         const previous = r.data[key]; if (Object.is(previous, value) && Object.hasOwn(r.data, key)) return this;
         if (value === undefined) delete r.data[key]; else r.data[key] = value;
-        if (key === 'components' && (r.auto_span || previous === undefined && !r.elements.world._record(r.body).config.height_span)) { r.auto_span = true; r.elements.world.updateBody(r.body, { height_span: solidSpan(value ?? []) }); }
+        if (key === 'components' && (r.auto_span || previous === undefined && !r.rest.height_span)) { r.auto_span = true; r.elements._refit(this); }
         r.elements.world._emit('propertyChanged', { body: r.body, entity: this, key, value, previous }); return this;
     }
     // ----- Components: the parts it is made of, each with layers at their own heights. -----
@@ -88,7 +89,20 @@ export class gameEntity {
     }
     removeComponent(name) { const list = this.get('components') ?? []; if (!list.some(c => c.name === name)) return false; this.set('components', structuredClone(list.filter(c => c.name !== name))); return true; }
     /** How tall it stands: the highest top among its components (0 with none). */
-    get height() { const list = this.get('components') ?? []; return list.length ? Math.max(0, ...list.map(c => componentSpan(c).top)) : 0; }
+    get height() { const list = this.get('components') ?? []; return list.length ? Math.max(0, ...list.map(c => componentSpan(c).top)) * entityRecord(this).world_scale[2] : 0; }
+    // ----- Scale: its size against its record, [x, y, height]. -----
+    /** Its own scale, [x, y, height] (1 is the size its record makes). */
+    get scale() { return [...entityRecord(this).scale]; }
+    /** Its scale in the world: its own times its parent's, as its body, look, components and rig are sized. */
+    get world_scale() { return [...entityRecord(this).world_scale]; }
+    /**
+     * Resizes it: a number, or [x, y, height]. Its collision, render and light shapes, its height span,
+     * its look, its components and its rig all follow, and so do its attached children (their offsets
+     * stretch with it). Mass changes only under the record's `mass_scales` switch. Emits `entityScaled`.
+     */
+    scaleTo(scale) { const r = entityRecord(this); r.elements._requireLive(this); r.scale = readScale(scale); r.elements._refit(this); return this; }
+    /** Resizes it by a factor of its own scale (a number, or [x, y, height]). */
+    scaleBy(factor) { const f = readScale(factor), s = entityRecord(this).scale; return this.scaleTo([s[0] * f[0], s[1] * f[1], s[2] * f[2]]); }
     // ----- Placement: readable verbs over the body. -----
     moveTo(x, y, options) { return this.setPosition(Array.isArray(x) ? x : [x, y], Array.isArray(x) ? y : options); }
     rotateTo(angle, options) { return this.setRotation(angle, options); }
@@ -101,13 +115,18 @@ export class gameEntity {
     get children() { const r = entityRecord(this); return r.elements.world.getAttachedBodies(r.body).map(body => r.elements.getEntityForBody(body)).filter(Boolean); }
     attach(child, { at = [0, 0], rotation = 0, combine_mass = false, rig_anchor = null } = {}) {
         const r = entityRecord(this); r.elements._requireLive(this);
-        r.elements.world.attachBody(bodyOf(child), { parent_body: r.body, local_position: at, local_rotation: rotation, combine_mass, rig_anchor }); return this;
+        r.elements.world.attachBody(bodyOf(child), { parent_body: r.body, local_position: at, local_rotation: rotation, combine_mass, rig_anchor });
+        if (child instanceof gameEntity) r.elements._refit(child, r.world_scale);   // a child takes its parent's scale
+        return this;
     }
     detach(child = null, { exit_points, inherit_velocity } = {}) {   // true when it left; false when no exit point was clear
         const r = entityRecord(this), body = child === null ? r.body : bodyOf(child), mount = r.elements.world.getAttachmentState(body);
         if (child !== null && mount?.parent_body_id !== this.entity_id) throw new Error('That object is not attached to this one');
         if (!mount) return false;
-        return r.elements.world.detachBody(body, { exit_points: exit_points ?? [mount.local_position], inherit_velocity }) !== null;
+        const left = r.elements.world.detachBody(body, { exit_points: exit_points ?? [mount.local_position], inherit_velocity }) !== null;
+        const gone = child === null ? this : child instanceof gameEntity ? child : r.elements.getEntityForBody(body);
+        if (left && gone) r.elements._refit(gone, [1, 1, 1]);
+        return left;
     }
     activate() { const r = entityRecord(this); r.elements._requireLive(this); r.elements.world.activateBody(r.body); return this; }
     deactivate() { const r = entityRecord(this); r.elements._requireLive(this); r.elements.world.deactivateBody(r.body); return this; }

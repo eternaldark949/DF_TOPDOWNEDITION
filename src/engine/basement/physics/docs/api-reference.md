@@ -214,7 +214,13 @@ Entity properties are read-only: `entity_id`, `body_id` (same root identity), `k
 | `parent`, `children` | Read-only: the parent entity or `null`, and the attached child entities. |
 | `components`, `getComponent(name)`, `hasComponent(name)` | Its parts, as live `entityComponent` views in order; a missing name gives `null`. |
 | `addComponent(packet)`, `removeComponent(name)` | Adds a component (a new name; returns its view) or removes one (`true` when it was there). |
-| `height` | Read-only: the highest top among its components, 0 with none. |
+| `height` | Read-only: the highest top among its components times its height scale, 0 with none. |
+| `scale`, `world_scale` | Read-only `[x, y, height]`: its own scale, and that times its parent's (what its body, look, components and rig are sized by). |
+| `scaleTo(scale)`, `scaleBy(factor)` | Resizes it (a positive number, or `[x, y, height]`); returns the entity. Its collision, render and light shapes, height span, look, components and rig follow, and so do attached children, whose offsets stretch with it. Mass changes only under `mass_scales`. Emits `entityScaled` `{body, entity, scale, previous}` (world scales). |
+
+### Scale
+
+A packet or template may give `scale` (a positive number, or `[x, y, height]`; default 1) and `mass_scales` (`false`, the default, `'area'` to scale mass by x × y, or `'volume'` by x × y × height). The entity keeps its rest size, the shapes, mass and height span its record makes, and its body is always that times its world scale, so scaling back to 1 restores it exactly. A uniform scale keeps a shape's kind; a stretched circle, capsule or turned box becomes its convex polygon. An attached child's world scale is its own times its parent's; attaching takes the parent's, detaching returns to its own. A rig's world pose carries the scale (its root is scaled), so components on joints and IK follow; a physical chain keeps the size it was made at. Saves keep the scale, the rest size and the switch.
 
 ### Components
 
