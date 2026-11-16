@@ -6,6 +6,7 @@
 // registry as an object (`new physicsSystem({ asset_library })`) and calls only resolveTemplate()
 // and getResource() on it.
 import { clone, freeze, plain } from './values.mjs';
+import { readLengths } from '../basement/units/index.mjs';
 function validateData(value) {
     if (Array.isArray(value)) { for (const entry of value) validateData(entry); return; }
     if (plain(value)) {
@@ -38,7 +39,7 @@ export class assetLibrary {
     #libraries = new Map(); #templates = new Map(); #resources = new Map();
     constructor({ libraries = [] } = {}) { for (const library of libraries) this.registerLibrary(library); }
     registerLibrary(definition) {
-        const library = clone(definition); validateData(library);
+        validateData(definition); const library = readLengths(clone(definition));   // lengths written "3 m" or "24 cm" become world units here
         if (!plain(library) || !plain(library.templates ?? {}) || !plain(library.resources ?? {})) throw new TypeError('A library requires object definitions/resources');
         const id = identifier(library.library_id, 'library_id');
         if (this.#libraries.has(id)) throw new Error(`Library already registered: ${id}`);

@@ -43,6 +43,10 @@ The flow for any map is always the same: `loadMap(id)` reads the map's data, cre
 
 Each call is one line. **Today** says what exists now: *have* means it works and only needs the name or shape below, *partly* means part of it is there, *missing* means it has to be built.
 
+### Units
+
+One length unit everywhere, the world unit: **50 world units make a metre** (one unit is 2 cm), in `basement/units`. Data may write `"1.75 m"` or `"24 cm"`; the Directory converts at registration, so nothing past loading sees a metre. Mass is kilograms, time seconds, angles radians.
+
 ### Objects
 
 An object is like Blender's `KX_GameObject`: a name, an id, a position, a rotation, a parent, properties, and parts (look, body, light, sound, behaviour) switched on by data. A light is an object. A human is an object with a human look and a behaviour. There is one object class, `gameEntity`, and no subclasses: `kind` is a preset of body defaults and parts (a `motor` for walking, driving or flying, `awareness`), a record overrides any of it, and objects are sorted by `kind` and `tags`.

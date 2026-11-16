@@ -61,3 +61,14 @@ test('plain JSON libraries from another realm are accepted while class instances
  const data=vm.runInNewContext('({library_id:"foreign",templates:{prop:{kind:"prop",mass:1}}})');assert.ok(new assetLibrary({libraries:[data]}));
  assert.throws(()=>new assetLibrary({libraries:[{library_id:'bad',resources:{date:{kind:'bad',data:new Date()}}}]}),/plain JSON/);
 });
+
+test('a library writes lengths in metres or centimetres and the registry holds world units', async () => {
+    const { metres, centimetres } = await import('../../basement/units/index.mjs'), { createEngineRegistry } = await import('../index.mjs');
+    const assets = createEngineRegistry({ libraries: [{ library_id: 'yard', resources: { lamp: { kind: 'drawing', steps: [{ shape: 'circle', radius: '24 cm', solid: true }] } },
+        templates: { post: { kind: 'static', collision_shape: { shape_type: 'box', dimensions: ['30 cm', '3 m'] }, data: { label: 'tall 3 m' } } } }] });
+    assert.equal(assets.getResource('yard:lamp').steps[0].radius, centimetres(24));
+    assert.deepEqual(assets.getTemplate('yard:post').collision_shape.dimensions, [centimetres(30), metres(3)]);
+    assert.equal(assets.getTemplate('yard:post').data.label, 'tall 3 m');
+    const p = new physicsSystem({ asset_library: assets }), post = p.createEntity({ template: 'yard:post' });
+    assert.deepEqual(post.collision_shape.dimensions, [15, 150]);
+});

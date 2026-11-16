@@ -6,6 +6,7 @@
 import engine from './engine.json' with { type: 'json' };
 import { assetLibrary } from '../registry.mjs';
 import { validateLibrary } from '../structures.mjs';
+import { readLengths } from '../../basement/units/index.mjs';
 
 const deepFreeze = value => { if (value && typeof value === 'object') { for (const child of Object.values(value)) deepFreeze(child); Object.freeze(value); } return value; };
 
@@ -14,5 +15,5 @@ export const ENGINE_LIBRARIES = deepFreeze([validateLibrary(engine)]);
 
 /** A registry holding the engine's defaults, then `libraries` (each validated) in order. */
 export function createEngineRegistry({ libraries = [] } = {}) {
-    return new assetLibrary({ libraries: [...ENGINE_LIBRARIES, ...libraries.map(validateLibrary)] });
+    return new assetLibrary({ libraries: [...ENGINE_LIBRARIES, ...libraries.map(library => validateLibrary(readLengths(library)))] });
 }

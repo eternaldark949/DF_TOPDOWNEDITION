@@ -6,11 +6,13 @@ import { physicsSystem } from './basement/physics/index.mjs';
 import { controlSystem } from './basement/controls/index.mjs';
 import { cameraSystem, renderSystem } from './basement/rendering/index.mjs';
 import { gameLoop } from './lobby/game-loop.mjs';
+import { UNITS_PER_METRE, metres, centimetres, toMetres, isLength, readLength, readLengths } from './basement/units/index.mjs';
 import { assetLibrary, mergeDefinition, identifier, nonnegative, jsonCopy, STRUCTURES, validatePropCatalog, validateMapLayout, checkLook, validateSkeleton, validateClipSet, validateLocomotion, validateFigure, validateDoorKind, validateDrawing, validateMaterial, validateLibrary, doorKindsOf, ENGINE_LIBRARIES, createEngineRegistry, resolvePlacement, resolveLayout, resolvePropLook, isMovable } from './directory/index.mjs';
 import { humanoid, objectPacket, createObject } from './penthouse/index.mjs';
 
 /** What each jack carries besides the running systems: the Directory's functions and the Penthouse's prefabs. */
 const DIRECTORY = Object.freeze({ assetLibrary, mergeDefinition, identifier, nonnegative, jsonCopy, STRUCTURES, validatePropCatalog, validateMapLayout, checkLook, validateSkeleton, validateClipSet, validateLocomotion, validateFigure, validateDoorKind, validateDrawing, validateMaterial, validateLibrary, doorKindsOf, ENGINE_LIBRARIES, createEngineRegistry, resolvePlacement, resolveLayout, resolvePropLook, isMovable });
+const UNITS = Object.freeze({ UNITS_PER_METRE, metres, centimetres, toMetres, isLength, readLength, readLengths });
 const PENTHOUSE = Object.freeze({ humanoid, objectPacket, createObject });
 
 /**
@@ -29,7 +31,7 @@ export class gameEngine {
         const view = new cameraSystem(camera), input = new controlSystem({ ...controls, auto_update: false });
         const draw = new renderSystem({ physics_system: world, camera: view });
         this.#basement = Object.freeze({ physics: world, elements: world.elements, rigs: world.rigs, motion: world.motion,
-            traffic: world.traffic, controls: input, camera: view, render: draw });
+            traffic: world.traffic, controls: input, camera: view, render: draw, units: UNITS });
         this.#directory = Object.freeze({ ...DIRECTORY, assets: world.elements.asset_library });
         this.#penthouse = Object.freeze({ ...PENTHOUSE });
         this.#game = Object.freeze({ ...services });
@@ -38,7 +40,7 @@ export class gameEngine {
             step_world: seconds => world.updateState(seconds, authority), clock, frame_clock,
             ...(schedule_frame !== undefined ? { schedule_frame } : {}), ...(cancel_frame !== undefined ? { cancel_frame } : {}) });
     }
-    /** LV0: the running systems (physics, elements, rigs, motion, traffic, controls, camera, render). */
+    /** LV0: the running systems (physics, elements, rigs, motion, traffic, controls, camera, render) and the units. */
     get basement() { return this.#basement; }
     /** LV1: the game loop (its clock is `lobby.clock`). */
     get lobby() { return this.#loop; }

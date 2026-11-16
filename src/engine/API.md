@@ -64,10 +64,10 @@ Each level plugs in through one jack. Every jack is frozen.
 
 | Jack | What it holds |
 |---|---|
-| `engine.basement` | The running systems: `physics`, `elements`, `rigs`, `motion`, `traffic`, `controls`, `camera`, `render` |
+| `engine.basement` | The running systems: `physics`, `elements`, `rigs`, `motion`, `traffic`, `controls`, `camera`, `render`, and `units` |
 | `engine.lobby` | The game loop: levels, systems, pausing and the clock (`lobby.clock`) |
 | `engine.directory` | The data functions (`assetLibrary`, `validateMapLayout`, `resolvePlacement`, …) plus `assets`, this engine's registry |
-| `engine.penthouse` | The prefabs: `humanoid` |
+| `engine.penthouse` | The prefabs: `createObject`, `objectPacket`, `humanoid` |
 | `engine.game` | The services your game passes in as `services` |
 
 Levels and systems get a **context** with the same jacks (`context.basement`, `context.lobby`, `context.directory`, `context.penthouse`, `context.game`), plus:
@@ -112,6 +112,19 @@ Hooks must be synchronous. Load anything slow in a level's `prepare`.
 ---
 
 ## Basement (LV0)
+
+### Units
+
+The engine has one length unit, the **world unit**, used by every position, size, radius, speed and height. **50 world units make a metre** (`basement.units.UNITS_PER_METRE`), so one unit is 2 cm. Mass is in kilograms, time in seconds, angles in radians.
+
+| Call | What it does |
+|---|---|
+| `units.metres(n)` / `units.centimetres(n)` | World units in a length |
+| `units.toMetres(n)` | Metres in a number of world units |
+| `units.readLength(value)` | A number, or a string such as `"1.75 m"` or `"24 cm"`, as world units |
+
+Data can write lengths in metres or centimetres: `"radius": "24 cm"`, `"dimensions": ["30 cm", "3 m"]`. The Directory turns them into world units when a library is registered, so the rest of the engine only sees world units. A plain number is already world units.
+
 
 The systems and operations. Everything here runs on its own, without a game. Reach it through `engine.basement` or `context.basement`.
 

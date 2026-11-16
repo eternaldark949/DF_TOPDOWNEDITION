@@ -1,5 +1,5 @@
 // ===== LV0 BASEMENT =====
-/** Units: world units, seconds, kilograms and radians. No game globals. */
+/** Units: world units (see basement/units: UNITS_PER_METRE), seconds, kilograms and radians. No game globals. */
 export const BODY_GROUP = Object.freeze({ STATIC: 1, CHARACTER: 2, VEHICLE: 4, PROP: 8, PROJECTILE: 16, SENSOR: 32, PARTICLE: 64, ALL: 0x7fffffff });
 export const QUERY_GROUP = Object.freeze({ ALL: 0x7fffffff });
 export const PHYSICS_TYPES = Object.freeze(['static', 'rigid', 'kinematic', 'character', 'no_collision']);
