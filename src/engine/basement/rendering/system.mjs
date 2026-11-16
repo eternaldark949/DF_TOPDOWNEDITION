@@ -1,7 +1,7 @@
 // ===== LV0 BASEMENT =====
 import {renderFrame} from './frame.mjs';
 import {geometry,material,requirements} from './packets.mjs';
-import {finite,identifier,freezeData} from './values.mjs';
+import {finite,identifier,freezeData,CAPABILITIES} from './values.mjs';
 import {artScene} from './art.mjs';
 import {drawLook} from './looks.mjs';
 
@@ -17,13 +17,19 @@ function normalizeResource(description){
     const data=description.pixels;if((!Array.isArray(data)&&!ArrayBuffer.isView(data))||data.length!==width*height*4||Array.prototype.some.call(data,v=>!Number.isFinite(v)||v<0||v>255))throw new TypeError('Expected width*height*4 RGBA bytes');
     return Object.freeze({type,width,height,pixels:new Uint8ClampedArray(data)});
 }
-const methods=['initialize','resize','render','registerResource','releaseResource','getSurfaceBounds','dispose'];
+const methods=['initialize','resize','render','registerResource','releaseResource','getSurfaceBounds','measureText','dispose'];
 
-/** Backend selection and frame orchestration. Visibility uses the existing native world index. */
+/**
+ * Backend selection and frame orchestration. Visibility uses the existing native world index.
+ * Backends are a light switch: register each once, then `setRenderer(id)` swaps to it between frames,
+ * carrying every resource across. Give `create_surface(renderer_id)` (the host makes a fresh canvas
+ * for that backend and puts it on screen) and a switch needs no surface; `onSurfaceChanged` tells the
+ * host which surface is live.
+ */
 export class renderSystem {
-    #world;#camera;#frame=new renderFrame();#renderers=new Map();#resources=new Map();#backend=null;#backendId=null;#surface=null;
+    #createSurface=null;#world;#camera;#frame=new renderFrame();#renderers=new Map();#resources=new Map();#backend=null;#backendId=null;#surface=null;
     #collecting=false;#busy=false;#disposed=false;#generation=0;#last=null;#surfaceListeners=new Set();#frameListeners=new Set();#requirements=[];#visible=[];
-    constructor({physics_system,camera}={}){if(!physics_system?.queryEntitiesInBounds||!camera?.getView)throw new TypeError('renderSystem requires native world and camera');this.#world=physics_system;this.#camera=camera;}
+    constructor({physics_system,camera,create_surface=null}={}){if(create_surface!==null&&typeof create_surface!=='function')throw new TypeError('create_surface makes a surface for a renderer id');this.#createSurface=create_surface;if(!physics_system?.queryEntitiesInBounds||!camera?.getView)throw new TypeError('renderSystem requires native world and camera');this.#world=physics_system;this.#camera=camera;}
     get renderer_id(){return this.#backendId;}
     get disposed(){return this.#disposed;}
     #live(){if(this.#disposed)throw new Error('renderSystem is disposed');}
@@ -34,13 +40,17 @@ export class renderSystem {
     getSurfaceBounds(){this.#live();return this.#backend?.getSurfaceBounds()??Object.freeze({left:0,top:0,width:this.#camera.viewport.width,height:this.#camera.viewport.height});}
     onSurfaceChanged(handler){this.#boundary();if(typeof handler!=='function')throw new TypeError('Surface handler must be a function');this.#surfaceListeners.add(handler);return ()=>this.#surfaceListeners.delete(handler);}
     onFrameRendered(handler){this.#boundary();if(typeof handler!=='function')throw new TypeError('Frame handler must be a function');this.#frameListeners.add(handler);return ()=>this.#frameListeners.delete(handler);}
+    /** The backend now drawing, or null. */
+    getRenderer(){this.#live();return this.#backendId;}
     async setRenderer(renderer_id,{surface}={}){
         this.#boundary();const Constructor=this.#renderers.get(renderer_id);if(!Constructor)throw new Error('Unknown renderer');
-        if(this.#backend&&surface===this.#surface){if(renderer_id===this.#backendId)return;throw new Error('A different backend requires a fresh surface; context types cannot share a canvas');}
+        if(renderer_id===this.#backendId&&surface===undefined)return;
+        if(surface===undefined&&this.#createSurface)surface=this.#createSurface(renderer_id);
+        if(this.#backend&&surface!=null&&surface===this.#surface){if(renderer_id===this.#backendId)return;throw new Error('A different backend requires a fresh surface; context types cannot share a canvas');}
         this.#busy=true;const generation=this.#generation;let next=null,installed=false;
         try{
             next=new Constructor();for(const method of methods)if(typeof next[method]!=='function')throw new TypeError(`Renderer is missing ${method}`);
-            if(!Array.isArray(next.capabilities)||next.capabilities.some(v=>typeof v!=='string'))throw new TypeError('Renderer must declare capabilities');
+            if(!Array.isArray(next.capabilities)||next.capabilities.some(v=>!CAPABILITIES.includes(v)))throw new TypeError(`Renderer must declare capabilities among ${CAPABILITIES.join(', ')}`);
             await next.initialize(surface,{viewport:this.#camera.viewport});
             for(const [id,resource]of this.#resources)await next.registerResource(id,resource);
             if(this.#disposed||generation!==this.#generation)throw new Error('Renderer preparation was cancelled');
@@ -57,6 +67,8 @@ export class renderSystem {
         finally{this.#busy=false;}return resource_id;
     }
     releaseResource(resource_id){this.#boundary();if(!this.#resources.has(resource_id))return false;this.#backend?.releaseResource(resource_id);return this.#resources.delete(resource_id);}
+    /** One line of text's width, ascent and descent ({width, ascent, descent}) as the live backend draws it. */
+    measureText(text,font={}){this.#live();if(!this.#backend)throw new Error('Measure text with a renderer set');return this.#backend.measureText(String(text),font);}
     listResources(){return [...this.#resources.keys()];}
     #resource(id,types){const data=this.#resources.get(id);if(!data||!(Array.isArray(types)?types:[types]).includes(data.type))throw new Error(`Missing or incompatible rendering resource: ${id}`);return data;}
     resize(dimensions){

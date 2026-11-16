@@ -4,7 +4,7 @@
 // `engine.game` (the services a game plugs in). Lifecycle contexts carry the same jacks.
 import { physicsSystem } from './basement/physics/index.mjs';
 import { controlSystem } from './basement/controls/index.mjs';
-import { cameraSystem, renderSystem } from './basement/rendering/index.mjs';
+import { cameraSystem, renderSystem, canvasRenderer, recordingRenderer } from './basement/rendering/index.mjs';
 import { gameLoop } from './lobby/game-loop.mjs';
 import { UNITS_PER_METRE, metres, centimetres, toMetres, isLength, readLength, readLengths } from './basement/units/index.mjs';
 import { assetLibrary, mergeDefinition, identifier, nonnegative, jsonCopy, STRUCTURES, validatePropCatalog, validateMapLayout, checkLook, validateSkeleton, validateClipSet, validateLocomotion, validateFigure, validateDoorKind, validateDrawing, validateMaterial, validateLibrary, doorKindsOf, ENGINE_LIBRARIES, createEngineRegistry, resolvePlacement, resolveLayout, resolvePropLook, isMovable } from './directory/index.mjs';
@@ -22,14 +22,15 @@ const PENTHOUSE = Object.freeze({ humanoid, objectPacket, createObject });
 export class gameEngine {
     #authority = Symbol('runtime simulation clock'); #basement; #directory; #penthouse; #game; #loop;
 
-    constructor({ asset_library, physics = {}, controls = {}, camera = {}, clock = {}, frame_clock, schedule_frame, cancel_frame, render_target, services = {} } = {}) {
+    constructor({ asset_library, physics = {}, controls = {}, camera = {}, clock = {}, frame_clock, schedule_frame, cancel_frame, render = {}, render_target, services = {} } = {}) {
         if (!services || typeof services !== 'object' || Array.isArray(services) || Object.keys(services).some(key => ['__proto__','constructor','prototype'].includes(key))) throw new TypeError('Game services are a plain object of named services');
         if (render_target !== undefined) throw new TypeError('Mount a renderer surface through basement.render.setRenderer; render hooks receive a frame');
         if (Object.hasOwn(physics, 'step_authority') || Object.hasOwn(physics, 'asset_library')) throw new TypeError('The runtime owns physics authority and its asset library');
         if (controls.auto_update) throw new TypeError('The runtime owns control polling');
         const world = new physicsSystem({ ...physics, asset_library, step_authority: this.#authority });
         const view = new cameraSystem(camera), input = new controlSystem({ ...controls, auto_update: false });
-        const draw = new renderSystem({ physics_system: world, camera: view });
+        const draw = new renderSystem({ physics_system: world, camera: view, create_surface: render.create_surface ?? null })
+            .registerRenderer('canvas', canvasRenderer).registerRenderer('recording', recordingRenderer);
         this.#basement = Object.freeze({ physics: world, elements: world.elements, rigs: world.rigs, motion: world.motion,
             traffic: world.traffic, controls: input, camera: view, render: draw, units: UNITS });
         this.#directory = Object.freeze({ ...DIRECTORY, assets: world.elements.asset_library });

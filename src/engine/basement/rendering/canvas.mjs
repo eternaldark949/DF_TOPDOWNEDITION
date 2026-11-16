@@ -1,6 +1,9 @@
 // ===== LV0 BASEMENT =====
 import {renderFrame} from './frame.mjs';
-import {BLENDS} from './values.mjs';
+import {BLENDS,CAPABILITIES} from './values.mjs';
+
+/** Canvas's own composite operation for each engine blend name. */
+const COMPOSITE=Object.freeze({normal:'source-over',add:'lighter',multiply:'multiply',screen:'screen','source-in':'source-in','source-out':'source-out','destination-in':'destination-in','destination-out':'destination-out','source-atop':'source-atop','destination-over':'destination-over',overlay:'overlay','soft-light':'soft-light',lighten:'lighten',darken:'darken'});
 import {geometry} from './packets.mjs';
 
 function createSurface(width,height){
@@ -24,7 +27,7 @@ function buildPath(target,g){
     }
 }
 const overlays=new WeakMap(),layers=new WeakMap();
-const capabilities=Object.freeze(['shape','sprite','text','geometry:rect','geometry:ellipse','geometry:path','gradient:linear','gradient:radial','pattern','clip','shadow','dash','target','picture','layer',...Object.keys(BLENDS).map(name=>`blend:${name}`)]);
+const capabilities=CAPABILITIES;   // Canvas draws the whole vocabulary
 
 /** Canvas implementation of the packet contract. Contexts and Canvas/GPU-like handles stay private. */
 export class canvasRenderer {
@@ -53,7 +56,7 @@ export class canvasRenderer {
      */
     static drawLayer(context,packets,{opacity=1,blend='normal',scale=1,pictures}={}){
         if(!context?.canvas||typeof context.getTransform!=='function')throw new TypeError('A host Canvas context is required');
-        if(!Object.hasOwn(BLENDS,blend))throw new TypeError('Unsupported blend');if(!(scale>0&&scale<=1))throw new TypeError('Layer scale is in (0, 1]');if(!(opacity>=0&&opacity<=1))throw new TypeError('Opacity must be in [0,1]');
+        if(!BLENDS.includes(blend))throw new TypeError('Unsupported blend');if(!(scale>0&&scale<=1))throw new TypeError('Layer scale is in (0, 1]');if(!(opacity>=0&&opacity<=1))throw new TypeError('Opacity must be in [0,1]');
         const canvas=context.canvas,w=Math.max(1,Math.round(canvas.width*scale)),h=Math.max(1,Math.round(canvas.height*scale));
         let layer=layers.get(context);if(!layer){const surface=createSurface(w,h);layer={surface,context:surface.getContext('2d')};layers.set(context,layer);}
         if(layer.surface.width!==w)layer.surface.width=w;if(layer.surface.height!==h)layer.surface.height=h;
@@ -62,7 +65,7 @@ export class canvasRenderer {
         lc.setTransform(m.a*sx,m.b*sy,m.c*sx,m.d*sy,m.e*sx,m.f*sy);
         const count=canvasRenderer.drawEntries(lc,packets,{pictures,layered:true});
         context.save();
-        try{context.setTransform(1,0,0,1,0,0);context.globalAlpha=opacity;context.globalCompositeOperation=BLENDS[blend];context.imageSmoothingEnabled=true;context.drawImage(layer.surface,0,0,canvas.width,canvas.height);}
+        try{context.setTransform(1,0,0,1,0,0);context.globalAlpha=opacity;context.globalCompositeOperation=COMPOSITE[blend];context.imageSmoothingEnabled=true;context.drawImage(layer.surface,0,0,canvas.width,canvas.height);}
         finally{context.restore();}
         return count;
     }
@@ -79,11 +82,11 @@ export class canvasRenderer {
         try{
             for(const entry of entries){
                 if(!entry.picture){run.push(entry);continue;}
-                flush();if(!pictures)throw new TypeError('Entries with pictures need a pictureCache');if(!Object.hasOwn(BLENDS,entry.blend??'normal'))throw new TypeError('Unsupported blend');
+                flush();if(!pictures)throw new TypeError('Entries with pictures need a pictureCache');if(!BLENDS.includes(entry.blend??'normal'))throw new TypeError('Unsupported blend');
                 const clips=!entry.prepare&&entry.clips?.length?entry.clips:null;
                 if(clips!==open){close();if(clips){context.save();for(const clip of clips){buildPath(context,geometry(clip.geometry));context.clip(clip.geometry.fill_rule??'nonzero');}open=clips;}}
                 const composite=context.globalCompositeOperation,alpha=context.globalAlpha;
-                context.globalCompositeOperation=BLENDS[entry.blend??'normal'];context.globalAlpha=alpha*finiteOpacity(entry.opacity??1);
+                context.globalCompositeOperation=COMPOSITE[entry.blend??'normal'];context.globalAlpha=alpha*finiteOpacity(entry.opacity??1);
                 try{pictures.draw(context,{...entry.picture,layered:layered||entry.picture.layered===true,stamp:!entry.prepare,blend:entry.blend??null},entry.picture.build);if(!entry.prepare)count++;}finally{context.globalCompositeOperation=composite;context.globalAlpha=alpha;}
             }
             flush();
@@ -91,6 +94,8 @@ export class canvasRenderer {
         return count;
     }
     get capabilities(){return capabilities;}
+    /** One line of text's width, ascent and descent, as this backend draws it. */
+    measureText(text,font={}){return measureText(text,font,{create_surface:this.#createSurface});}
     initialize(surface,{viewport}){
         if(this.#disposed||this.#context)throw new Error('Renderer cannot initialize twice');
         if(!surface||typeof surface.getContext!=='function')throw new TypeError('Canvas renderer requires a surface');
@@ -133,7 +138,7 @@ export class canvasRenderer {
     #set={};
     #style(ctx,m,draw,sx,sy){
         const st=this.#set,set=(key,value)=>{if(st[key]!==value){ctx[key]=value;st[key]=value;}};
-        set('globalAlpha',draw.opacity);set('globalCompositeOperation',BLENDS[draw.blend]);
+        set('globalAlpha',draw.opacity);set('globalCompositeOperation',COMPOSITE[draw.blend]);
         if(typeof m.fill==='object'&&m.fill!==null){ctx.fillStyle=this.#paint(ctx,m.fill);st.fillStyle=null;}else set('fillStyle',m.fill??'transparent');
         if(typeof m.stroke==='object'&&m.stroke!==null){ctx.strokeStyle=this.#paint(ctx,m.stroke);st.strokeStyle=null;}else set('strokeStyle',m.stroke??'transparent');
         set('lineWidth',m.stroke_width||1);set('lineCap',m.line_cap);set('lineJoin',m.line_join);
@@ -149,7 +154,7 @@ export class canvasRenderer {
     }
     // A picture stamped from the cache under the packet's transform; inside a layer its own base comes with it.
     #picture(ctx,draw,layered){
-        const st=this.#set,alpha=draw.opacity,composite=BLENDS[draw.blend];
+        const st=this.#set,alpha=draw.opacity,composite=COMPOSITE[draw.blend];
         if(st.globalAlpha!==alpha){ctx.globalAlpha=alpha;st.globalAlpha=alpha;}if(st.globalCompositeOperation!==composite){ctx.globalCompositeOperation=composite;st.globalCompositeOperation=composite;}
         const p=draw.picture,ask=this.#ask;ask.key=p.key;ask.bounds=p.bounds;ask.matrix=p.matrix;ask.source=p.source;ask.layered=layered||p.layered;ask.stamp=!draw.prepare;ask.blend=draw.blend;
         if(this.#pictures.draw(ctx,ask,draw.build)==='vector')this.#set={};   // the vector fallback drew packets of its own
@@ -188,7 +193,7 @@ export class canvasRenderer {
             }finally{ctx.restore();this.#set={};}
             if(layer){
                 const out=into.context;out.save();
-                try{out.setTransform(1,0,0,1,0,0);out.globalAlpha=layer.opacity;out.globalCompositeOperation=BLENDS[layer.blend];out.shadowColor='transparent';out.shadowBlur=0;out.imageSmoothingEnabled=true;out.drawImage(target.surface,0,0,into.surface.width,into.surface.height);}
+                try{out.setTransform(1,0,0,1,0,0);out.globalAlpha=layer.opacity;out.globalCompositeOperation=COMPOSITE[layer.blend];out.shadowColor='transparent';out.shadowBlur=0;out.imageSmoothingEnabled=true;out.drawImage(target.surface,0,0,into.surface.width,into.surface.height);}
                 finally{out.restore();}
             }
         }
@@ -203,9 +208,9 @@ export class canvasRenderer {
 }
 
 let measurer=null;
-/** The width and the ascent/descent above and below the baseline of one line of text in `font`
+/** Canvas's measuring, behind canvasRenderer.measureText. The width and the ascent/descent above and below the baseline of one line of text in `font`
  *  {family, size, weight, style, letter_spacing}, as the Canvas backend would draw it. */
-export function measureText(text,font={},{create_surface=createSurface}={}){
+function measureText(text,font={},{create_surface=createSurface}={}){
     measurer??=create_surface(1,1).getContext('2d');
     measurer.font=`${font.style??'normal'} ${font.weight??400} ${font.size??16}px ${font.family??'sans-serif'}`;
     const m=measurer.measureText(String(text));

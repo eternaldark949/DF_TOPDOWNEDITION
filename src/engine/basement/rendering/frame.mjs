@@ -25,7 +25,7 @@ export class renderFrame {
         let spec=null;
         if(layer!==null){
             if(target_id!==null||viewport)throw new TypeError('A layer pass draws over its enclosing pass: give it no target or viewport');
-            const {scale=1,blend='normal',opacity=1}=layer;if(!(scale>0&&scale<=1))throw new TypeError('Layer scale is in (0, 1]');if(!Object.hasOwn(BLENDS,blend))throw new TypeError('Unsupported blend');if(!(opacity>=0&&opacity<=1))throw new TypeError('Opacity must be in [0,1]');
+            const {scale=1,blend='normal',opacity=1}=layer;if(!(scale>0&&scale<=1))throw new TypeError('Layer scale is in (0, 1]');if(!BLENDS.includes(blend))throw new TypeError('Unsupported blend');if(!(opacity>=0&&opacity<=1))throw new TypeError('Opacity must be in [0,1]');
             spec={scale,blend,opacity,into:previous.target_id};
         }
         this.#stack.push(previous);

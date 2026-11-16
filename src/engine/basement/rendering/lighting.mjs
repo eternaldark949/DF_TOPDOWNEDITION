@@ -2,7 +2,7 @@
 // THE LIGHT LAYER: darkness over the scene with light cut out of it. A layer is built as frame packets:
 // the dark (a tint over the bounds), areas where the dark is thinner (a lit room, an open sky), each
 // light's cut (its reach, shadowed by an optional visibility polygon), then each light's colour, added.
-// Draw it over the finished scene at the dark's strength (canvasRenderer.drawLayer, or a render target).
+// Draw it over the finished scene at the dark's strength (a layer pass in the frame, which every backend draws).
 import {artScene,rect,polygon,circle,radial,linear} from './art.mjs';
 import {viewAhead} from './camera.mjs';
 
@@ -69,7 +69,7 @@ export function createLightLayer({bounds,tint,areas=[],lights=[]},{scene=new art
  * The same layer, split so what holds still between frames is painted once. Lights marked `still: true`
  * go into pictures over `extent` ({left, top, right, bottom}: the whole map, not the view): the dark with
  * their cuts and the areas' thinning, and their colour. The other lights stay live packets. Returns the parts for
- * canvasRenderer.drawLayer, in order: the dark pictures, the live cuts, the colour pictures (added), the
+ * a layer pass (each picture part as a picture packet), in order: the dark pictures, the live cuts, the colour pictures (added), the
  * live colour. Cuts (destination-out) and colour (add) each commute, so it is the layer createLightLayer
  * draws.
  *

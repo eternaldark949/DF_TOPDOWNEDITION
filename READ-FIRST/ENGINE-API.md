@@ -156,7 +156,7 @@ The Basement `controlSystem` already works this way. What is left is input conte
 
 ## Drawing backend
 
-One Canvas backend in the Basement. It draws the essential shapes, and a **drawing** is a list of those shapes as data, around the object's origin. A thing's **look** is the values its drawing reads (`"$body"`), so one drawing serves every variant. Nobody writes canvas code to add a prop, a character or an effect.
+One drawing contract in the Basement, with Canvas as its first backend and WebGL to follow: switching is one call, `setRenderer(id)`, and no caller knows which backend draws. It draws the essential shapes, and a **drawing** is a list of those shapes as data, around the object's origin. A thing's **look** is the values its drawing reads (`"$body"`), so one drawing serves every variant. Nobody writes canvas code to add a prop, a character or an effect.
 
 **A drawing as data:**
 

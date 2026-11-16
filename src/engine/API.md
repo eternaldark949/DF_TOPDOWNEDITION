@@ -246,12 +246,14 @@ Reference: [maps README](basement/maps/README.md).
 
 ### Rendering
 
-`basement.render` draws frames through a renderer you register, such as the Canvas backend. Each frame it hands your `render` hooks a `frame` to draw into.
+`basement.render` draws frames through a backend. Each frame it hands your `render` hooks a `frame` to draw into. The backend is a light switch: the engine registers `canvas` and `recording` (headless, keeps frames as data), a WebGL backend registers the same way, and nothing above the backend knows which one is drawing. Give `new gameEngine({ render: { create_surface: id => freshCanvas } })` and a switch is just `setRenderer(id)`.
 
 | Call | What it does |
 |---|---|
 | `render.registerRenderer(id, Class)` | Adds a backend, such as `canvasRenderer` |
-| `await render.setRenderer(id, { surface })` | Mounts it on a canvas |
+| `await render.setRenderer(id, { surface })` | Switches to it between frames, resources and all (the surface may be left out with `create_surface`) |
+| `render.getRenderer()`, `render.getCapabilities()` | Which backend is drawing, and what it can draw |
+| `render.measureText(text, font)` | One line's width, ascent and descent, as that backend draws it |
 | `render.resize({ width, height, pixel_ratio })` | Matches the screen |
 | `render.getVisibleEntities()` | What is on screen |
 

@@ -37,7 +37,7 @@ export function material(packet={},out={}){
 export function packet(input,out={}){
     if(!input||!['shape','sprite','text','picture'].includes(input.type))throw new TypeError('Expected a shape, sprite, text or picture packet');out.type=input.type;
     out.layer=finite(input.layer??0,'layer');out.depth=finite(input.depth??0,'depth');out.space=input.space??'world';if(!['world','screen'].includes(out.space))throw new TypeError('Invalid coordinate space');
-    out.opacity=finite(input.opacity??1,'opacity',0);if(out.opacity>1)throw new TypeError('Opacity must be in [0,1]');out.blend=input.blend??'normal';if(!Object.hasOwn(BLENDS,out.blend))throw new TypeError('Unsupported blend');
+    out.opacity=finite(input.opacity??1,'opacity',0);if(out.opacity>1)throw new TypeError('Opacity must be in [0,1]');out.blend=input.blend??'normal';if(!BLENDS.includes(out.blend))throw new TypeError('Unsupported blend');
     out.transform=transform(input,out.transform);out.material_id=input.material_id===undefined?null:identifier(input.material_id);out.material=out.material_id||input.type==='picture'?null:material(input.material,out.material??{});
     if(input.type==='picture'){if(input.material_id!==undefined||input.material!==undefined)throw new TypeError('A picture carries its own paint');picture(input,out);}else{out.picture=null;out.prepare=false;if(out.build)out.build=null;}
     out.geometry_id=null;out.geometry=null;out.resource_id=null;out.text=null;

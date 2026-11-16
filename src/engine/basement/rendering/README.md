@@ -1,12 +1,13 @@
 # Shared rendering and camera API
 
-`renderSystem` owns the active backend and rendering resources. `cameraSystem` owns the view and coordinate conversions. `renderFrame` collects data packets. `canvasRenderer` is the first real backend. These live in Basement and are exposed as `engine.basement.render` and `engine.basement.camera`.
+`renderSystem` owns the active backend and rendering resources. `cameraSystem` owns the view and coordinate conversions. `renderFrame` collects data packets. `canvasRenderer` is the first real backend and `recordingRenderer` the headless one; a WebGL backend registers beside them. These live in Basement and are exposed as `engine.basement.render` and `engine.basement.camera`.
 
 The new runtime and its appearance example use this contract now. The classic playable game still draws most procedural artwork through old Canvas paths. Drone and VelvetCat have now moved to portable packets through this backend; other artist conversions remain. This batch establishes and verifies the destination. It does not claim all game drawing has migrated or that a WebGL backend exists.
 
 ## Decisions and boundaries
 
 - Only the backend obtains Canvas contexts or creates device-specific drawing handles. Game appearance classes submit geometry, materials, resource IDs and transforms. No Canvas callback, Canvas context, Path2D, native entity or image handle is carried through a frame packet.
+- Switching backends is a light switch: `setRenderer(id)` between frames. Nothing upstream knows which backend draws: callers submit packets, ask `measureText` of the render system and read `getCapabilities()`. Blend names (`BLENDS`) and capability names (`CAPABILITIES`) are the engine's own; each backend maps them to its operations (Canvas's composite operations live inside `canvas.mjs`).
 - One renderer is active. A replacement prepares on a new surface while the old one remains usable, then commits between synchronous calls. Switching backend IDs on the current surface rejects before initialization: browsers cannot give one canvas both a 2D and WebGL context. Disposing a context does not remove that browser restriction.
 - Backends declare features. Unsupported geometry, gradients, clips, dashes, blend operations or targets reject before a frame is drawn. There is no automatic Canvas fallback disguised as another backend.
 - Directory asset definitions remain the authoring source. The render service stores normalized descriptors; each backend owns decoded images, compiled geometry and offscreen/GPU handles. Backend replacement reconstructs resources from descriptors, not from a screenshot of the old renderer.
@@ -21,9 +22,12 @@ The new runtime and its appearance example use this contract now. The classic pl
 const engine = createGameRuntime({surface}); // Directory composition; no getContext call
 engine.basement.render.resize({width:800,height:600,pixel_ratio:devicePixelRatio});
 await engine.basement.render.setRenderer('canvas',{surface});
+// later, between frames: await engine.basement.render.setRenderer('webgl',{surface: freshCanvas});
 await engine.loadLevel('some_registered_level');
 engine.start();
 ```
+
+The engine registers `canvas` and `recording`. A host that passes `new gameEngine({render: {create_surface}})` (a function of the renderer id that makes a fresh canvas and puts it on screen) switches with `setRenderer(id)` alone; `onSurfaceChanged` tells it which surface is live. Resources move to the new backend from their descriptors.
 
 `surface` in the Directory factory selects the initial mouse input target. Successful surface changes retarget that shared mouse adapter automatically; a custom `controls.mouse_target` can instead be a stable viewport container. No game drawing class handles DOM listeners. The host measures/resizes its viewport and calls `basement.render.resize`; the service does not install its own animation clock or resize observer.
 
@@ -255,7 +259,9 @@ Screen coordinates are logical viewport units; client conversions account for th
 | Method/member | Purpose |
 |---|---|
 | `registerRenderer(id, Constructor)`, `listRenderers()` | Register backend classes without constructing a surface/context. |
-| `setRenderer(id,{surface})` | Prepare and install a backend; returns a Promise. |
+| `setRenderer(id,{surface})` | Prepare and install a backend; returns a Promise. With `create_surface` given to the render system the surface may be left out. Setting the live id again does nothing. |
+| `getRenderer()` | The id of the backend now drawing, or null. |
+| `measureText(text, font)` | `{width, ascent, descent}` of one line as the live backend draws it. |
 | `renderer_id`, `getCapabilities()` | Currently installed backend ID and a frozen feature-name snapshot. |
 | `registerResource(id,descriptor)`, `releaseResource(id)`, `listResources()` | Backend-owned graphics resource lifecycle. |
 | `resize({width,height,pixel_ratio})` | Update the camera viewport and active backend dimensions. |
@@ -272,7 +278,9 @@ Frames declare `format_version:1`; the Canvas backend rejects unknown versions. 
 
 ## Backend contract and WebGL work
 
-A registered backend class supplies `capabilities` (an array), `initialize(surface,{viewport})`, `resize(viewport)`, `getSurfaceBounds()`, `registerResource(id,descriptor)`, `releaseResource(id)`, synchronous `render(frame)` and `dispose()`. Initialization/upload may be asynchronous. Native resources belong to the backend and must be rebuilt when it is installed on another surface.
+A registered backend class supplies `capabilities` (names from `CAPABILITIES`), `initialize(surface,{viewport})`, `resize(viewport)`, `getSurfaceBounds()`, `registerResource(id,descriptor)`, `releaseResource(id)`, synchronous `render(frame)`, `measureText(text, font)` and `dispose()`. Initialization/upload may be asynchronous. Native resources belong to the backend and must be rebuilt when it is installed on another surface.
+
+`new recordingRenderer({keep = 1, capabilities = CAPABILITIES})` draws nothing and keeps its last `keep` frames as data (`frames`) and its `resources`: the backend for servers, tests and replays, and the proof that the contract stands without Canvas. It measures text at 0.6 of the size per character.
 
 `canvasRenderer({create_surface,decode_image,create_path})` optionally accepts platform adapters for headless/embedded use. Decoded images are backend-owned and their `close()` method is invoked on release when available. Defaults use browser Canvas, Image and Path2D APIs.
 
@@ -302,7 +310,9 @@ Verified batch: **217 combined engine/controls/rendering/Directory/runtime tests
 
 `new pictureCache({max_bytes = 48 MB, budget_ms = 3, densities = [1, 1.5, 2, 3, 4]})` is the same boundary for art that rarely changes: paint once, stamp every frame. `draw(context, {key, bounds, layered, matrix, source}, build)` stamps the picture named `key` (only the part inside `source` [x, y, w, h], local units, when given: a tile of a strip) (the packets `build()` returns, in local units inside `bounds` `[x, y, w, h]`) under the context's transform times `matrix`, and returns `'stamp'`, `'paint'` or `'vector'`. A picture is painted at the first density (device pixels per local unit) at or above what the view needs, so zooming in paints a sharper one, and past the last density it draws as vector. `beginFrame()` starts a fresh painting budget; a picture still waiting draws as vector meanwhile, clipped to its bounds. A tile (a picture stamped with a `source`) never waits: as vector it would draw the whole picture under its clip, which costs more than painting it, so it is painted past the budget. With `stamp: false` it only paints the picture ahead of need when the budget allows, and draws nothing (`'paint'`, `'kept'` or `'later'`). A picture with any blend but normal always draws as vector, because inside a picture a blend has nothing under it to act on, unless it is `layered`: it paints its own base first, so its blends act on that and it is cached like any other (a light layer's dark with its cuts). When `max_bytes` would be passed, the least recently stamped pictures go first. `release(prefix)` lets go of the pictures whose keys start with `prefix` (`clear()` all of them), and `statistics` gives `{pictures, bytes}`. The key must name everything the picture shows: the cache never looks inside `build`. A shadow's blur is in device pixels, so a picture keeps the blur it was painted with. Under `renderSystem`, the same picture is a `target` resource drawn back as a sprite.
 
-`measureText(text, font)` gives `{width, ascent, descent}` for one line in `font` `{family, size, weight, style, letter_spacing}`, as the Canvas backend would draw it, for art that fits a label to a box.
+`render.measureText(text, font)` gives `{width, ascent, descent}` for one line in `font` `{family, size, weight, style, letter_spacing}`, as the live backend draws it, for art that fits a label to a box.
+
+These `canvasRenderer` statics are Canvas-only host tools, not the contract: under `renderSystem` the same packets go into layer passes and `picture` packets, which every backend draws.
 
 ## Light layer
 

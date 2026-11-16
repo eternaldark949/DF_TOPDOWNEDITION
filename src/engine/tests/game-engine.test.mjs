@@ -187,3 +187,13 @@ test('the engine makes objects with level lifetime and the loop draws their look
     assert.equal(engine.basement.render.getStatistics().packets, 3, 'the glow, the head and the post');
     await engine.unloadLevel(); assert.equal(made.destroyed, true, 'level objects leave with their level');
 });
+
+test('the engine registers its backends and switches between them with one call', async () => {
+    const made = [];
+    const engine = new gameEngine({ render: { create_surface: id => { const surface = { id }; made.push(surface); return surface; } } });
+    const render = engine.basement.render;
+    assert.deepEqual(render.listRenderers(), ['canvas', 'recording']);
+    await render.setRenderer('recording');
+    assert.equal(render.getRenderer(), 'recording');
+    assert.deepEqual(made.map(surface => surface.id), ['recording']);
+});

@@ -1,7 +1,7 @@
 // ===== LV0 BASEMENT =====
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {cameraSystem,renderSystem,renderFrame,canvasRenderer,pictureCache,measureText} from '../index.mjs';
+import {cameraSystem,renderSystem,renderFrame,canvasRenderer,pictureCache} from '../index.mjs';
 import {physicsSystem} from '../../physics/index.mjs';
 
 const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-7,`${a} != ${b}`);
@@ -17,6 +17,7 @@ class Capture {
  registerResource(id,data){this.resources.set(id,data);}
  releaseResource(id){this.resources.delete(id);}
  render(frame){this.frames.push(structuredClone(frame));}
+ measureText(text){return {width:text.length,ascent:1,descent:0};}
  dispose(){this.disposed=true;this.resources.clear();}
 }
 
@@ -165,7 +166,7 @@ test('the picture cache keeps to its time and memory budgets and never bakes a b
 
 test('text is measured as the backend draws it',()=>{
  let font;const ctx={set font(v){font=v;},get font(){return font;},measureText:s=>({width:s.length*3,actualBoundingBoxAscent:4,actualBoundingBoxDescent:1})};
- const size=measureText('honey',{family:'Georgia, serif',size:5,weight:600},{create_surface:()=>({getContext:()=>ctx})});
+ const size=new canvasRenderer({create_surface:()=>({getContext:()=>ctx})}).measureText('honey',{family:'Georgia, serif',size:5,weight:600});
  assert.deepEqual({...size},{width:15,ascent:4,descent:1});assert.equal(font,'normal 600 5px Georgia, serif');
 });
 
@@ -200,7 +201,7 @@ test('picture packets are stamped from the backend\'s cache and keep their build
  render.beginFrame().submit({type:'picture',picture,prepare:true});render.endFrame();assert.equal(main.ctx.calls.filter(c=>c[0]==='drawImage'&&c[1]===made[0]).length,3,'a prepare packet draws nothing');
  const frame=render.beginFrame();assert.throws(()=>frame.submit({type:'picture',picture:{key:'x',bounds:[0,0,1,1]}}),/build/);assert.throws(()=>frame.submit({type:'picture',picture,material:{fill:'#fff'}}),/own paint/);render.abortFrame();
  render.dispose();
- const plain=fixture();class Old{constructor(){this.capabilities=['shape','blend:normal'];}initialize(){}resize(){}render(){}registerResource(){}releaseResource(){}getSurfaceBounds(){}dispose(){}}
+ const plain=fixture();class Old{constructor(){this.capabilities=['shape','blend:normal'];}initialize(){}resize(){}render(){}registerResource(){}releaseResource(){}getSurfaceBounds(){}measureText(){}dispose(){}}
  plain.render.registerRenderer('old',Old);await plain.render.setRenderer('old',{surface:{}});plain.render.beginFrame().submit({type:'picture',picture});assert.throws(()=>plain.render.endFrame(),/capability unavailable: picture/);plain.render.dispose();
 });
 
@@ -235,4 +236,34 @@ test('a pattern fill repeats a registered image and the frame refuses one it doe
  assert.deepEqual(patterns,[['bricks.png','repeat-x']]);
  render.beginFrame().submit(rect({type:'pattern',image:'missing'}));assert.throws(()=>render.endFrame(),/missing/);
  assert.throws(()=>new renderFrame().begin(view().getView()).submit(rect({type:'pattern',image:'bricks',repeat:'mirror'})),/repeat/);
+});
+
+test('switching backends is a light switch: one call, resources carried, the same frame drawn',async()=>{
+ const {recordingRenderer,CAPABILITIES}=await import('../index.mjs');
+ const made=[],world=new physicsSystem(),camera=view();
+ const render=new renderSystem({physics_system:world,camera,create_surface:id=>{const s=surface();s.id=id;made.push(s);return s;}});
+ class Canvas extends canvasRenderer{constructor(){super({create_surface:()=>surface(),create_path:()=>null});}}
+ class Recording extends recordingRenderer{static last;constructor(){super();Recording.last=this;}}
+ render.registerRenderer('canvas',Canvas).registerRenderer('recording',Recording);
+ const seen=[];render.onSurfaceChanged(({renderer_id})=>seen.push(renderer_id));
+ await render.registerResource('box',{type:'geometry',geometry:{type:'rect',size:[10,10]}});
+ const draw=()=>{render.beginFrame().submit({type:'shape',geometry_id:'box',position:[50,50],material:{fill:'#0f0',stroke:'#000'},blend:'add'});return render.endFrame();};
+ for(const id of ['recording','canvas','recording','canvas','recording']){await render.setRenderer(id);assert.equal(render.getRenderer(),id);assert.equal(draw(),1);}
+ assert.deepEqual(seen,['recording','canvas','recording','canvas','recording']);assert.equal(made.length,5,'each switch got a fresh surface');
+ const last=Recording.last;assert.deepEqual([...last.resources.keys()],['box']);assert.equal(last.frames.length,1);assert.equal(last.frames[0].passes[0].packets[0].blend,'add','blend names stay the engine\'s own');
+ await render.setRenderer('recording');assert.equal(Recording.last,last,'setting the live backend again does nothing');
+ assert.equal(render.measureText('abc',{size:10}).width,18);
+ assert.ok(new Canvas().capabilities.every(need=>CAPABILITIES.includes(need)));
+ class Unknown extends recordingRenderer{constructor(){super();this.capabilities=['shape','webgl:instancing'];}}render.registerRenderer('unknown',Unknown);
+ await assert.rejects(render.setRenderer('unknown'),/capabilities among/);assert.equal(render.getRenderer(),'recording');
+ assert.throws(()=>new recordingRenderer({capabilities:['bloom']}),/Capabilities are among/);
+ render.dispose();
+});
+
+test('only the Canvas backend touches Canvas: every other rendering module is backend-free',async()=>{
+ const {readFileSync,readdirSync}=await import('node:fs'),dir=new URL('../',import.meta.url);
+ for(const name of readdirSync(dir).filter(n=>n.endsWith('.mjs')&&n!=='canvas.mjs')){
+  const code=readFileSync(new URL(name,dir),'utf8');
+  for(const word of ['getContext','globalCompositeOperation','Path2D','OffscreenCanvas','drawImage',"'source-over'","'lighter'"])assert.equal(code.includes(word),false,`${name} uses ${word}`);
+ }
 });
