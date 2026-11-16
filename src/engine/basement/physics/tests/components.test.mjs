@@ -61,3 +61,43 @@ test('components save and load with their entity', () => {
     const back = q.elements.fetchEntity(e.entity_id);
     assert.equal(back.height, metres(7.5)); assert.equal(back.getComponent('tower').getLayer(0).visible, false);
 });
+
+test('collision knows heights: a shot flies over a low wall, a high shot misses, rays ask at a height', () => {
+    const wall = () => ({ kind: 'static', position: [60, 0], collision_shape: { shape_type: 'box', dimensions: [10, 100] },
+        components: [{ name: 'wall', layers: [{ layer: 0, height: 0, thickness: metres(1), steps: [] }, { layer: 1, height: metres(1), thickness: metres(2), steps: [], solid: false }] }] });
+    const shoot = height => {
+        const p = new physicsSystem(), w = p.elements.createEntity(wall()), hits = [];
+        p.on('projectileHit', e => hits.push(e.target_body?.body_id ?? e.body_b?.body_id));
+        p.elements.createEntity({ kind: 'projectile', position: [0, 0], speed: 2000, direction: [1, 0], height_span: [height, height] });
+        for (let i = 0; i < 6; i++) p.updateState(1 / 60);
+        return { p, w, hits };
+    };
+    const { w } = shoot(0); assert.deepEqual([...w.body.getState().height_span], [0, metres(1)], 'the body reaches as high as its solid layers');
+    assert.ok(shoot(metres(0.5)).hits.length >= 1, 'a shot at 50 cm hits a 1 m wall');
+    assert.equal(shoot(metres(1.5)).hits.length, 0, 'a shot at 1.5 m flies over it: the non-solid layer above does not block');
+    const p = new physicsSystem(); p.elements.createEntity(wall()); p.updateState(1 / 60);
+    assert.ok(p.raycast({ from: [0, 0], to: [120, 0] }), 'a ray with no height meets it');
+    assert.ok(p.raycast({ from: [0, 0], to: [120, 0], at_height: metres(0.5) }));
+    assert.equal(p.raycast({ from: [0, 0], to: [120, 0], at_height: metres(1.5) }), null);
+    assert.equal(p.raycast({ from: [0, 0], to: [120, 0], height_span: [metres(1.2), metres(3)] }), null);
+    assert.throws(() => p.raycast({ from: [0, 0], to: [120, 0], height_span: [3, 1] }), /base no higher/);
+});
+
+test('bodies at different heights pass each other; a span follows its components unless the packet set one', () => {
+    const p = new physicsSystem(), E = p.elements;
+    const bridge = E.createEntity({ kind: 'static', position: [0, 0], collision_shape: { shape_type: 'box', dimensions: [40, 40] }, components: [{ name: 'deck', layers: [{ layer: 0, height: metres(4), thickness: metres(0.5), steps: [] }] }] });
+    const car = E.createEntity({ kind: 'prop', position: [-60, 0], linear_velocity: [300, 0], collision_shape: { shape_type: 'circle', radius: 10 }, height_span: [0, metres(1.5)] });
+    for (let i = 0; i < 30; i++) p.updateState(1 / 60);
+    assert.ok(car.position[0] > 40, 'the car drives under the bridge');
+    bridge.getComponent('deck').setLayerHeight(0, 0, metres(4.5)); p.updateState(1 / 60);
+    assert.deepEqual([...bridge.body.getState().height_span], [0, metres(4.5)], 'changing a layer moves the span');
+    const fixed = E.createEntity({ kind: 'static', position: [300, 0], height_span: [0, 10], components: [{ name: 'c', layers: [{ layer: 0, height: 0, thickness: 500, steps: [] }] }] });
+    fixed.getComponent('c').setLayerHeight(0, 0, 900); p.updateState(1 / 60);
+    assert.deepEqual([...fixed.body.getState().height_span], [0, 10], 'an explicit span is kept');
+    const plain = E.createEntity({ kind: 'static', position: [500, 0] }); assert.equal(plain.body.getState().height_span, null, 'no components: every height');
+    plain.addComponent({ name: 'post', layers: [{ layer: 0, height: 0, thickness: 100, steps: [] }] }); p.updateState(1 / 60);
+    assert.deepEqual([...plain.body.getState().height_span], [0, 100]);
+    const q = new physicsSystem(); q.loadPhysicsState(structuredClone(p.savePhysicsState()));
+    const back = q.elements.fetchEntity(bridge.entity_id); back.getComponent('deck').setLayerHeight(0, metres(5), metres(0.5)); q.updateState(1 / 60);
+    assert.deepEqual([...back.body.getState().height_span], [metres(5), metres(5.5)], 'a loaded entity still follows its components');
+});

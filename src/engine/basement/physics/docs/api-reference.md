@@ -52,6 +52,7 @@ Constructor options:
 | `friction`, `restitution` | `0.5`, `0`; nonnegative friction, restitution in 0–1. |
 | `linear_damping`, `angular_damping` | `0`, `0`; nonnegative exponential decay rates per second. |
 | `collision_group`, `collision_mask`, `query_mask` | Default role group, `BODY_GROUP.ALL`, `BODY_GROUP.ALL`. |
+| `height_span` | `null` (every height) or `[base, top]` above the ground in world units. Two bodies touch only when their spans overlap, as well as their masks allowing it: a shot at 1.5 m passes over a 1 m wall, a car under a bridge deck. An entity made of components gets the span its solid layers fill unless the packet gives one, and keeps following them as they change. |
 | `ghost`, `continuous_collision`, `sleep_enabled`, `active` | `false`, `true`, `true`, `true`. |
 | `blocks_light` | `null`: blocks light when a visibility query's groups include it (static bodies by default). `true` always blocks (a door leaf, a big prop), `false` never (glass). Ghosts never block. |
 | `axis_lock` | `{ x:false, y:false, rotation:false }`. Character contacts do not impart spin, independently of heading control. |
@@ -123,7 +124,7 @@ A vehicle's `motor` is a `vehicleMotor`:
 
 Queries return fresh arrays/objects unless a `results` array or `result` object is provided. Empty lists are `[]`, a missing single result is `null`.
 
-Filter options: `include_groups=ALL`, `exclude_groups=0`, `query_bit=ALL`, `ignore_body` (one body/element or an array), `include_ghosts=true`, `max_results`, `sort_by:'distance'|'none'`. Casts always order by impact fraction unless `'none'` is specified. Physical body-clearance requests additionally use reciprocal collision masks.
+Filter options: `include_groups=ALL`, `exclude_groups=0`, `query_bit=ALL`, `ignore_body` (one body/element or an array), `include_ghosts=true`, `at_height` (a height the hit must reach: a ray at 1.5 m passes under nothing lower) or `height_span` (`[base, top]` it must overlap), `max_results`, `sort_by:'distance'|'none'`. Casts always order by impact fraction unless `'none'` is specified. Physical body-clearance requests additionally use reciprocal collision masks.
 
 | Method | Packet/result |
 |---|---|
@@ -217,7 +218,7 @@ Entity properties are read-only: `entity_id`, `body_id` (same root identity), `k
 
 ### Components
 
-An entity is made of components, kept as plain data in its `components` property (so they save, load and emit `propertyChanged` like any property). A packet or template may give `components: [...]`; each is `{name, at=[0,0], rotation=0, joint=null, layers}`. `at` and `rotation` place it from the entity's origin, or from the rig joint `joint` names when the entity has a rig. `layers` is one or more `{layer, height=0, thickness=0, steps | drawing, solid=true, visible=true}`: an integer layer, its base `height` above the component's layer 0 and its `thickness`, in world units, and its shapes as drawing steps or a drawing resource id. Solid layers are what fitted collision bounds take; every visible layer is drawn, lowest base first. `readComponent(packet)`, `readComponents(list)` and `readLayer(packet)` check and normalise them (unknown fields, repeated names or layers, and non-integer layers throw; lengths must already be world units, which the Directory gives when it loads "3 m"). `componentSpan(component)` is `{base, top}` and `layersByHeight(components,{visible_only=true})` lists `[{component, layer, order}]` lowest first: by height, then layer, then list order.
+An entity is made of components, kept as plain data in its `components` property (so they save, load and emit `propertyChanged` like any property). A packet or template may give `components: [...]`; each is `{name, at=[0,0], rotation=0, joint=null, layers}`. `at` and `rotation` place it from the entity's origin, or from the rig joint `joint` names when the entity has a rig. `layers` is one or more `{layer, height=0, thickness=0, steps | drawing, solid=true, visible=true}`: an integer layer, its base `height` above the component's layer 0 and its `thickness`, in world units, and its shapes as drawing steps or a drawing resource id. Solid layers are what fitted collision bounds take; every visible layer is drawn, lowest base first. `readComponent(packet)`, `readComponents(list)` and `readLayer(packet)` check and normalise them (unknown fields, repeated names or layers, and non-integer layers throw; lengths must already be world units, which the Directory gives when it loads "3 m"). `solidSpan(components)` is the `[base, top]` their solid layers fill (or null), which becomes the body's `height_span`. `componentSpan(component)` is `{base, top}` and `layersByHeight(components,{visible_only=true})` lists `[{component, layer, order}]` lowest first: by height, then layer, then list order.
 
 | entityComponent member | Contract |
 |---|---|

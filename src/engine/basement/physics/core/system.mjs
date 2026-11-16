@@ -3,7 +3,7 @@ import {rigSystem} from '../animation/rig-system.mjs';
 import {mountedLaunchState} from '../attachments/emitter.mjs';
 import { massProperties, massCenter, invalidateMass, integrateAtCenter, changeAngularSpeed, centerVelocity, setCenterVelocity } from './mass.mjs';
 import { BODY_GROUP, EPS, vector, number, clone, freeze, validBounds, boundsMeet, sub, add, dot, scale, length, unit, rotate, unionBounds } from './values.mjs';
-import { bodyConfig, bodyRecord, pose, previousPose, liveBounds, bodyBounds, sweptBounds, snapshot, bodyActive, movable, physical, changeVelocity, enforceLocks, inverseInertia } from './state.mjs';
+import { bodyConfig, bodyRecord, pose, previousPose, liveBounds, bodyBounds, sweptBounds, snapshot, bodyActive, spansMeet, movable, physical, changeVelocity, enforceLocks, inverseInertia } from './state.mjs';
 import { physicsBody } from './body.mjs';
 import { collisionShape, shapeReach, shapeBounds } from '../collision/shape.mjs';
 import { collisionDetector } from '../collision/detector.mjs';
@@ -96,7 +96,7 @@ export class physicsSystem {
         if(r.broadphase_config!==r.config||r.broadphase_mount!==r.parent_mount){
             const old=r.broadphase_config,next=r.config;
             if(!old||old.physics_type!==next.physics_type||old.active!==next.active||old.collision_group!==next.collision_group||old.collision_mask!==next.collision_mask
-                ||old.collision_exclusions!==next.collision_exclusions||r.broadphase_mount!==r.parent_mount)this.#broadphaseEpoch++;
+                ||old.collision_exclusions!==next.collision_exclusions||old.height_span?.[0]!==next.height_span?.[0]||old.height_span?.[1]!==next.height_span?.[1]||r.broadphase_mount!==r.parent_mount)this.#broadphaseEpoch++;
             r.broadphase_config=next;r.broadphase_mount=r.parent_mount;
         }
         this.navigation._bodySynced(r);
@@ -308,7 +308,7 @@ export class physicsSystem {
             enforceLocks(r); this.#motionEnvelope = null; this.#attachments._syncDescendants(r, action === 'position' || action === 'rotation');
         }); return b;
     }
-    #meets(a, b, unmounted_a = false) { return (unmounted_a ? a.config.physics_type !== 'no_collision' : physical(a)) && physical(b) && !a.config.collision_exclusions.includes(b.id) && !b.config.collision_exclusions.includes(a.id) && !!(a.config.collision_mask & b.config.collision_group) && !!(b.config.collision_mask & a.config.collision_group); }
+    #meets(a, b, unmounted_a = false) { return (unmounted_a ? a.config.physics_type !== 'no_collision' : physical(a)) && physical(b) && !a.config.collision_exclusions.includes(b.id) && !b.config.collision_exclusions.includes(a.id) && !!(a.config.collision_mask & b.config.collision_group) && !!(b.config.collision_mask & a.config.collision_group) && spansMeet(a.config.height_span, b.config.height_span); }
     _canCollide(a, b, { unmounted_a = false } = {}) { return this.#meets(this._record(a), this._record(b), unmounted_a); }
     #report(a, b, contact, response = {}) {
         const lo = a.id < b.id, key = lo ? `${a.id}:${b.id}` : `${b.id}:${a.id}`;

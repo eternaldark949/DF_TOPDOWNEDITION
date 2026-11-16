@@ -56,6 +56,12 @@ export function readComponents(list) {
 /** The lowest base and the highest top of a component's layers. */
 export function componentSpan(component) { return { base: Math.min(...component.layers.map(l => l.height)), top: Math.max(...component.layers.map(l => l.height + l.thickness)) }; }
 
+/** The span its solid layers fill, [base, top] across every component, or null when none is solid: the body's height_span. */
+export function solidSpan(components) {
+    const layers = components.flatMap(c => c.layers.filter(l => l.solid));
+    return layers.length ? [Math.min(...layers.map(l => l.height)), Math.max(...layers.map(l => l.height + l.thickness))] : null;
+}
+
 /** A component's layers to draw, lowest first: [{component, layer}] across the list, by height, then layer, then list order. */
 export function layersByHeight(components, { visible_only = true } = {}) {
     const out = [];

@@ -31,8 +31,21 @@ export function bodyConfig(packet = {}) {
         ghost: !!p.ghost, blocks_light: p.blocks_light == null ? null : !!p.blocks_light, continuous_collision: p.continuous_collision !== false, sleep_enabled: p.sleep_enabled !== false,
         active: p.active !== false,
         axis_lock: { x: !!lock.x, y: !!lock.y, rotation: !!lock.rotation },
+        height_span: heightSpan(p.height_span),
     };
 }
+/**
+ * How high a body reaches: [base, top] above the ground in world units, or null for every height
+ * (the default: a flat world, where everything meets everything). Two bodies only touch when their
+ * spans overlap, so a shot at 1.5 m flies over a 1 m wall.
+ */
+export function heightSpan(value) {
+    if (value == null) return null;
+    if (!Array.isArray(value) || value.length !== 2 || !value.every(Number.isFinite) || value[0] > value[1]) throw new TypeError('height_span is [base, top] in world units, base no higher than top, or null');
+    return [value[0], value[1]];
+}
+/** Whether two spans overlap (null reaches every height). Touching ends count. */
+export const spansMeet = (a, b) => !a || !b || (a[0] <= b[1] && b[0] <= a[1]);
 export function bodyActive(r) {
     for (let current = r; current; current = current.parent_mount?.parent) if (!current.config.active || current.removed) return false;
     return true;

@@ -1,5 +1,5 @@
 // ===== LV0 BASEMENT =====
-import { readComponents } from './components.mjs';
+import { readComponents, solidSpan } from './components.mjs';
 import { clone, freeze } from '../core/values.mjs';
 import { EMPTY_DATA_SOURCE, isDataSource } from './data-source.mjs';
 import { gameEntity, entityRecord, restoreEntity } from './entity.mjs';
@@ -72,16 +72,22 @@ export class gameElements {
     getStatistics() { return { entities: this.#entities.size, kinds: this.#kinds.size }; }
     _construct(entity, packet) {
         const { components: parts, ...definition } = this.#resolve(packet), kind = definition.kind ?? 'entity', preset = this.getKind(kind);
-        if (parts !== undefined) definition.data = { ...(definition.data ?? {}), components: readComponents(parts) };
+        let auto_span = false;
+        if (parts !== undefined) {
+            const components = readComponents(parts); definition.data = { ...(definition.data ?? {}), components };
+            // The body reaches as high as its solid layers, unless the packet says otherwise.
+            if (definition.height_span === undefined) { definition.height_span = solidSpan(components); auto_span = true; }
+        }
         const motor = definition.motor === undefined ? preset.motor : definition.motor, awareness = definition.awareness ?? preset.awareness;
         if (motor !== null && !MOTORS.includes(motor)) throw new TypeError(`A motor is ${MOTORS.join(', ')} or null`);
         // Plain construction and save restoration use the same base, but normal callers cannot adopt a pre-existing body.
         const restored = this.#restore;
         const components = restored ? this.world._restoreEntityComponents(restored.entity_id, { motor, awareness }) : this.world._createEntityComponents({ ...clone(preset.body), ...definition, motor, awareness });
         const bodyState = components.body.getState();
+        if (restored && definition.data?.components) { const span = solidSpan(definition.data.components), own = bodyState.height_span; auto_span = span === null ? own === null : !!own && own[0] === span[0] && own[1] === span[1]; }
         const record = { elements: this, body: components.body, motor: components.motor, awareness: components.awareness ?? null,
             kind, motor_name: motor, aware: awareness, template_id: definition.template ?? null, name: bodyState.name, tags: freeze(bodyState.tags),
-            assets: freeze(clone(definition.assets ?? {})), data: clone(definition.data ?? {}), registered: false, destroyed: false, subscriptions: new Set() };
+            assets: freeze(clone(definition.assets ?? {})), data: clone(definition.data ?? {}), registered: false, destroyed: false, subscriptions: new Set(), auto_span };
         this.#construction?.entities.push(entity);
         this.world._mutate(() => {
             if (record.destroyed) return;

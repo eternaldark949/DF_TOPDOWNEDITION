@@ -1,5 +1,5 @@
 // ===== LV0 BASEMENT =====
-import { pose, physical, bodyBounds } from '../core/state.mjs';
+import { pose, physical, bodyBounds, spansMeet, heightSpan } from '../core/state.mjs';
 import { collisionShape, shapeBounds, shapeReach, pieces } from '../collision/shape.mjs';
 import { collisionDetector } from '../collision/detector.mjs';
 import { vector, number, sub, add, scale, unit, length, BODY_GROUP, EPS, validBounds, boundsMeet, unionBounds, angleDelta, rotate } from '../core/values.mjs';
@@ -18,6 +18,10 @@ function accepts(world, body, options) {
         ? true : !!(c.collision_group & (options.include_groups ?? BODY_GROUP.ALL));
     if (!included || (c.collision_group & (options.exclude_groups ?? 0))) return false;
     if ((!spatialEntity && !(c.query_mask & (options.query_bit ?? BODY_GROUP.ALL))) || (options.include_ghosts === false && c.ghost)) return false;
+    if (options.at_height !== undefined || options.height_span !== undefined) {
+        const span = heightSpan(options.height_span ?? [number(options.at_height, 'at_height'), options.at_height]);
+        if (!spansMeet(span, c.height_span)) return false;
+    }
     if (options.query_body && !world._canCollide(referenceBody(options.query_body), body, { unmounted_a: !!options.query_unmounted })) return false;
     const ignore = options.ignore_body;
     return !(Array.isArray(ignore) ? ignore.some(v => referenceBody(v) === body) : referenceBody(ignore) === body);

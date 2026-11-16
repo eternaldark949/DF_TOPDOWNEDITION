@@ -1,6 +1,6 @@
 // ===== LV0 BASEMENT =====
 import {bodyActive} from '../core/state.mjs';
-import {entityComponent,readComponent,componentSpan} from './components.mjs';
+import {entityComponent,readComponent,componentSpan,solidSpan} from './components.mjs';
 /** Entity metadata/lifecycle only. Physical state lives exclusively in the engine body. */
 const records = new WeakMap();
 const BLOCKED = ['__proto__', 'constructor', 'prototype'];
@@ -72,6 +72,7 @@ export class gameEntity {
         const r = entityRecord(this); r.elements._requireLive(this); propertyKey(key);
         const previous = r.data[key]; if (Object.is(previous, value) && Object.hasOwn(r.data, key)) return this;
         if (value === undefined) delete r.data[key]; else r.data[key] = value;
+        if (key === 'components' && (r.auto_span || previous === undefined && !r.elements.world._record(r.body).config.height_span)) { r.auto_span = true; r.elements.world.updateBody(r.body, { height_span: solidSpan(value ?? []) }); }
         r.elements.world._emit('propertyChanged', { body: r.body, entity: this, key, value, previous }); return this;
     }
     // ----- Components: the parts it is made of, each with layers at their own heights. -----
