@@ -221,14 +221,36 @@ Reference: [rendering README](basement/rendering/README.md).
 
 ### Controls
 
-`basement.controls` gives one API for keyboard, mouse, gamepad and touch. Your code asks about **actions**, never keys. Taps, double taps and holds are timed for you.
+`basement.controls` gives one API for keyboard, mouse, gamepad (buttons, triggers and sticks) and touch (buttons and sticks). Your code asks about **actions**, never keys or devices. Taps, double taps, holds and drags are recognised for you, each above a threshold you can set.
+
+A binding is an input name (`'e'`, `'space'`, `'mouseLeft'`, `'gamepadA'`, `'gamepadRTrigger'`, `'touchFire'`), or `[input, type, threshold]`:
+
+| Type | Fires when | Threshold (third value) | Default |
+|---|---|---|---|
+| `PRESS` | the input goes down | — | |
+| `RELEASE` | it comes up | — | |
+| `REPEAT` | it goes down, and again on each key repeat | — | |
+| `TAP` | it is pressed and let go quickly | longest tap, seconds | `tap_threshold` 0.195 |
+| `DOUBLETAP` | it is tapped twice in a row | longest gap between the taps, seconds | `tap_wait_time` 0.25 |
+| `HELD` | it stays down long enough | shortest hold, seconds | `hold_wait_time` 1.0 |
+| `DRAG` | a pointer press (mouse button or touch button) moves far enough before it is let go | shortest drag, pixels | `drag_threshold` 8 |
+
+A press that became a hold or a drag is not also a tap. The defaults are changed for every binding at once with `timing`.
 
 ```js
-new gameEngine({ controls: { keymap: {
-    interact: ['e', 'gamepadA'],
-    dash: [['space', DOUBLETAP]],
-    move_left: ['a'], move_right: ['d'], move_up: ['w'], move_down: ['s']
-}, vectors: { move: { gamepad: 'left', touch: 'move', dead_zone: 0.15 } } } });
+import { TAP, DOUBLETAP, HELD, DRAG } from './engine/basement/controls/index.mjs';
+
+new gameEngine({ controls: {
+    keymap: {
+        interact: ['e', 'gamepadA', 'touchInteract'],
+        dash: [['space', DOUBLETAP, 0.3]],
+        charge: [['mouseRight', HELD, 0.5]],
+        pan: [['mouseLeft', DRAG, 12]],
+        move_left: ['a'], move_right: ['d'], move_up: ['w'], move_down: ['s']
+    },
+    vectors: { move: { gamepad: 'left', touch: 'move', dead_zone: 0.15 } },
+    timing: { tap_threshold: 0.2, drag_threshold: 10 }
+} });
 ```
 
 | Call | What it does |
@@ -237,12 +259,14 @@ new gameEngine({ controls: { keymap: {
 | `controls.justActivated(action)` / `controls.justReleased(action)` | Pressed or let go this tick |
 | `controls.held(action)` | Seconds held |
 | `controls.value(action)` | 0 to 1, for triggers |
-| `controls.direction(name)` | One `[x, y]` from keys, stick or touch stick |
-| `controls.readQueue(action, type)` | Takes a recognised `TAP`, `DOUBLETAP` or `HELD` off the queue |
-| `controls.bind(action, ...inputs)` / `controls.setKeymap(keymap)` | Changes bindings |
+| `controls.direction(name)` | One `[x, y]` from keys, gamepad stick or touch stick, with dead zones |
+| `controls.readQueue(action, type)` | Takes a recognised `TAP`, `DOUBLETAP`, `HELD` or `DRAG` off the queue (true or false) |
+| `controls.drag(action)` | While a drag is under way: `{ origin, position, delta, distance }` in screen pixels; otherwise null |
 | `controls.pointer()` | Mouse position, movement and wheel |
+| `controls.bind(action, ...bindings)` / `controls.setKeymap(keymap)` | Changes bindings |
+| `controls.touch.button(element, 'touchFire')` / `controls.touch.stick('move', { zone })` | Wires on-screen touch buttons and sticks |
 
-Input types: `PRESS`, `RELEASE`, `TAP`, `DOUBLETAP`, `HELD`, `REPEAT`. Input contexts, chords and rumble templates from the API spec are documented here when built.
+Input contexts and rumble templates from the API spec are documented here when built.
 
 Reference: [controls README](basement/controls/README.md).
 

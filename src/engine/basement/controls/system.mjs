@@ -1,5 +1,5 @@
 // ===== LV0 BASEMENT =====
-import { TAP, DOUBLETAP, HELD, PRESS, REPEAT, RELEASE } from './values.mjs';
+import { TAP, DOUBLETAP, HELD, PRESS, REPEAT, RELEASE, DRAG } from './values.mjs';
 import { radialStick, cleanupAll } from './values.mjs';
 import { keyboardInstance, mouseInstance, touchInstance, gamepadInstance } from './devices.mjs';
 
@@ -7,7 +7,7 @@ export class controlSystem {
     #listeners = new Set();
     #frameHandle = null;
     #activated = new Set(); #released = new Set();
-    #vectorActive = new Map(); #vectorTime = new Map();
+    #vectorActive = new Map(); #vectorTime = new Map(); #pointers = new Map(); #lastTap = new Map();
     #disposed = false;
     /** { keymap, actions: [ACTION ROW...], context: () => the game (handed to when / run), timing } */
     constructor({ keymap = {}, actions = [], context = () => null, timing = {}, vectors = {},
@@ -28,6 +28,7 @@ export class controlSystem {
             tap_wait_time: 0.25,    // s: after a tap, how long a second press makes it a double tap
             hold_wait_time: 1.0,    // s: held this long, it is a hold
             queue_wait_time: 0.8,   // s: how long a fired action waits in the queue to be read
+            drag_threshold: 8,      // px: a press that moves this far before it is let go is a drag
         };
         for(const [name,value] of Object.entries(timing))if(!Object.hasOwn(defaults,name)||!Number.isFinite(value)||value<0)throw new TypeError('Invalid input timing');
         Object.assign(this,defaults,timing);
@@ -46,6 +47,9 @@ export class controlSystem {
         this.mouse = new mouseInstance(this, mouse_target);
         this.touch = new touchInstance(this);
         this.gamepad = new gamepadInstance(this);
+        // Where every pointer (mouse, finger, pen) is, so any press made with one can become a drag.
+        const point=event=>{if(Number.isFinite(event.clientX)&&Number.isFinite(event.clientY))this.#pointers.set(event.pointerId??'mouse',[event.clientX,event.clientY]);};
+        this.listen(event_target,'pointerdown',point,{passive:true,capture:true});this.listen(event_target,'pointermove',point,{passive:true,capture:true});
         this.listen(event_target,'blur',()=>this.cancel());
         this.listen(document_target,'visibilitychange',()=>{if(document_target.hidden)this.cancel();});
         this.frame = this.frame.bind(this);
@@ -69,7 +73,9 @@ export class controlSystem {
           if(!Array.isArray(next[action]))throw new TypeError('Action bindings must be arrays');
           for (const b of next[action]) {
             const [input, type = PRESS, hold] = Array.isArray(b) ? b : [b];
-            if(typeof input!=='string'||!input||![TAP,DOUBLETAP,HELD,PRESS,REPEAT,RELEASE].includes(type)||hold!==undefined&&(!Number.isFinite(hold)||hold<0))throw new TypeError('Invalid input binding');
+            // The third value is the binding's own threshold: seconds for TAP (longest tap), DOUBLETAP
+            // (longest gap between the taps) and HELD (shortest hold); pixels for DRAG.
+            if(typeof input!=='string'||!input||![TAP,DOUBLETAP,HELD,PRESS,REPEAT,RELEASE,DRAG].includes(type)||hold!==undefined&&(!Number.isFinite(hold)||hold<0))throw new TypeError('Invalid input binding');
             (bindings[input] ||= []).push([action, type, hold]);
             (inputs[action] ||= []).push(input);
           }
@@ -87,6 +93,29 @@ export class controlSystem {
     justReleased(action) { return this.#released.has(action); }
     /** How long (s) the action's input has been held (0: not held). */
     held(action) { if(this.vectors[action])return this.active(action)?Math.max(0,this.now()-(this.#vectorTime.get(action)??this.now())):0;const t = Math.min(...(this.inputs[action] || []).filter(i => this.instanceOf(i).isActive(i)).map(i => this.instanceOf(i).input_time[i])); return isFinite(t) ? Math.max(0,this.now() - t) : 0; }
+    /** While an action's input is held and has moved past its drag threshold: `{origin, position, delta, distance}`; otherwise null. */
+    drag(action) {
+        for (const input of this.inputs[action] ?? []) {
+            const inst = this.instanceOf(input), track = inst.drags?.[input];
+            if (!track?.dragging || !inst.isActive(input)) continue;
+            const position = this.#pointerAt(track), delta = [position[0] - track.origin[0], position[1] - track.origin[1]];
+            return Object.freeze({ origin: Object.freeze([...track.origin]), position: Object.freeze(position), delta: Object.freeze(delta), distance: Math.hypot(...delta) });
+        }
+        return null;
+    }
+    /** The longest gap between two taps that a DOUBLETAP binding of this input allows. */
+    #doubleWindow(list) { const doubles = list.filter(b => b[1] === DOUBLETAP); return doubles.length ? Math.max(...doubles.map(b => b[2] ?? this.tap_wait_time)) : 0; }
+    #pointerAt(track) { return [...(this.#pointers.get(track.pointer) ?? track.origin)]; }
+    /** Starts a drag for every DRAG binding of `input` whose threshold the pointer has passed. */
+    #checkDrag(inst, input, ev, armed = inst.armed[input]) {
+        const track = inst.drags?.[input]; if (!track || !armed) return;
+        const [x, y] = this.#pointerAt(track), distance = Math.hypot(x - track.origin[0], y - track.origin[1]);
+        for (const [a, t, pixels] of this.bindings[input] || []) {
+            if (t !== DRAG || !armed.has(a) || armed['drag_' + a] || distance < (pixels ?? this.drag_threshold)) continue;
+            armed['drag_' + a] = armed.dragged = track.dragging = true;
+            this.fire(a, t, ev);
+        }
+    }
     axis(neg, pos) { return (this.active(pos) ? 1 : 0) - (this.active(neg) ? 1 : 0); }
     /** [x, y] from `${name}_left/_right/_up/_down` (screen y: up is -1). */
     direction(name) {
@@ -145,15 +174,15 @@ export class controlSystem {
         cleanupAll([...Object.values(this.touch.sticks).map(stick=>()=>stick.cancel()),()=>{
         for (const i of this.touch.input_active) this.touch.elements[i]?.classList.remove('held');
         for (const inst of [this.keyboard, this.mouse, this.touch, this.gamepad]) { for (const i of inst.input_active) inst.spent.add(i); inst.armed = Object.create(null); }
-        this.pending.length = 0;
+        this.pending.length = 0;this.#lastTap.clear();
         this.queue.length = 0;this.gamepad.suppressAnalog();this.gamepad.suppressButtons();this.refreshVectors();this.generateAll();
         }],'Input clearing failed');
     }
     /** Focus loss/cancellation is not a tap, release action, or completed hold. */
     cancelInput(instance,input) {
         const active=instance.isActive(input);
-        this.changeInput(input,()=>{instance.input_active.delete(input);instance.spent.delete(input);delete instance.armed[input];if(active)instance.input_just_released.add(input);});
-        this.pending=this.pending.filter(row=>row[0]!==input);
+        this.changeInput(input,()=>{instance.input_active.delete(input);instance.spent.delete(input);delete instance.armed[input];if(instance.drags)delete instance.drags[input];if(active)instance.input_just_released.add(input);});
+        this.pending=this.pending.filter(row=>row[0]!==input);this.#lastTap.delete(input);
     }
     cancel() { cleanupAll([()=>this.touch.cancel(),...[this.keyboard,this.mouse,this.gamepad].map(instance=>()=>instance.releaseAll()),()=>{this.gamepad.suppressAnalog();this.gamepad.suppressButtons();this.refreshVectors();this.mouse.delta=[0,0];this.mouse.wheel=[0,0];this.pending.length=0;this.queue.length=0;}],'Input cancellation failed'); }
     dispose() {
@@ -185,10 +214,17 @@ export class controlSystem {
         const list = this.bindings[input] || [];
         if (inst.input_active.has(input)) { for (const [a, t] of list) if (t === REPEAT) this.fire(a, t, { ...ev, repeat: true }); return; }
         if (!ev.typing) this.changeInput(input,()=>{inst.input_active.add(input); inst.input_just_activated.add(input); inst.input_time[input] = ev.time; inst.armed[input] = new Set(list.filter(b => this.can(b[0], ev)).map(b => b[0]));});
+        if (list.some(b => b[1] === DRAG)) {
+            const e = ev.event, pointer = e?.pointerId ?? (inst.device === 'mouse' ? 'mouse' : null);
+            if (e && Number.isFinite(e.clientX) && Number.isFinite(e.clientY) && pointer !== null) this.#pointers.set(pointer, [e.clientX, e.clientY]);
+            const origin = pointer !== null ? this.#pointers.get(pointer) : null;
+            (inst.drags ||= Object.create(null))[input] = origin ? { pointer, origin: [...origin], dragging: false } : null;
+        }
         this.active_device=inst.device;
         // A second press soon after a tap: a double tap (and that tap is dropped)
-        const p = this.pending.findIndex(q => q[0] === input && ev.time - q[2].time <= this.tap_wait_time);
-        if (p >= 0) { this.pending = this.pending.filter(q => q[0] !== input); inst.armed[input] && (inst.armed[input].double = true); for (const [a, t] of list) if (t === DOUBLETAP) this.fire(a, t, ev); }
+        const p = this.pending.findIndex(q => q[0] === input && ev.time - q[2].time <= (q[3] ?? this.tap_wait_time));
+        const last = this.#lastTap.get(input); this.#lastTap.delete(input);
+        if (p >= 0 || last !== undefined && ev.time - last <= this.#doubleWindow(list)) { this.pending = this.pending.filter(q => q[0] !== input); inst.armed[input] && (inst.armed[input].double = true); for (const [a, t] of list) if (t === DOUBLETAP) this.fire(a, t, ev); }
         for (const [a, t] of list) if (t === PRESS || t === REPEAT) this.fire(a, t, ev);
     }
     release(inst, input, ev) {
@@ -201,13 +237,16 @@ export class controlSystem {
         inst.input_just_released.add(input);
         if (!armed) return;
         const list = this.bindings[input] || [], dur = ev.time - since;
+        if (inst.drags?.[input]) { this.#checkDrag(inst, input, ev, armed); delete inst.drags[input]; }   // a drag made between two ticks
         for (const [a, t, hold] of list) if (t === HELD && armed.has(a) && !armed['held_' + a] && dur >= (hold ?? this.hold_wait_time)) { armed['held_' + a] = armed.held = true; this.fire(a, t, ev); }   // a hold that ended between two frames
         const hold = list.filter(b => b[1] === HELD).map(b => b[2] ?? this.hold_wait_time), short = dur <= (hold.length ? Math.min(...hold) : this.tap_threshold);
-        const double = list.some(b => b[1] === DOUBLETAP);
-        for (const [a, t] of list) {
+        const window = this.#doubleWindow(list), double = window > 0;
+        if (double && short && !armed.held && !armed.double && !armed.dragged) this.#lastTap.set(input, ev.time);   // the first tap of a possible double
+        for (const [a, t, limit] of list) {
             if (!armed.has(a)) continue;
             if (t === RELEASE) this.fire(a, t, ev);
-            if (t === TAP && short && !armed.held && !armed.double) double ? this.pending.push([input, a, ev]) : this.fire(a, t, ev);
+            const tap = limit === undefined ? short : dur <= limit;
+            if (t === TAP && tap && !armed.held && !armed.double && !armed.dragged) double ? this.pending.push([input, a, ev, window]) : this.fire(a, t, ev);
         }
     }
 
@@ -224,8 +263,9 @@ export class controlSystem {
                 armed['held_' + a] = armed.held = true;
                 this.fire(a, t, {...this.ev(inst.device, input),time:now});
             }
+            if (inst.drags?.[input]) this.#checkDrag(inst, input, {...this.ev(inst.device, input),time:now});
         }
-        this.pending = this.pending.filter(([, a, ev]) => now - ev.time <= this.tap_wait_time || (this.fire(a, TAP, ev), false));
+        this.pending = this.pending.filter(([, a, ev, window]) => now - ev.time <= (window ?? this.tap_wait_time) || (this.fire(a, TAP, ev), false));
         this.queue = this.queue.filter(q => now - q[2] <= this.queue_wait_time);
         for (const fn of this.hooks) fn(this, now);
         if(advance)this.generateAll();

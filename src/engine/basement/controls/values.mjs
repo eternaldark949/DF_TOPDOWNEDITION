@@ -5,6 +5,7 @@ export const HELD = 2;
 export const PRESS = 3;
 export const REPEAT = 4;
 export const RELEASE = 5;
+export const DRAG = 6;
 
 export function cleanupAll(tasks,message) {
     const errors=[];for(const task of tasks)try{task();}catch(error){errors.push(error);}

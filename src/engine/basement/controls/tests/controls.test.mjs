@@ -1,7 +1,7 @@
 // ===== LV0 BASEMENT =====
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { controlSystem, controlsSystem, TAP, DOUBLETAP, HELD, REPEAT } from '../index.mjs';
+import { controlSystem, controlsSystem, TAP, DOUBLETAP, HELD, REPEAT, DRAG } from '../index.mjs';
 
 class Element extends EventTarget {
  constructor(rect={left:0,top:0,width:100,height:100}){super();this.rect=rect;const classes=new Set();this.classList={add:x=>classes.add(x),remove:x=>classes.delete(x)};this.style={setProperty(){}};}
@@ -143,4 +143,33 @@ test('surface retargeting cancels old mouse input and removes old listeners with
  emit(old,'mousedown',{button:0,clientX:1,clientY:2});assert.equal(input.active('fire'),true);input.setMouseTarget(next);assert.equal(input.active('fire'),false);assert.equal(input.readQueue('fire'),false);
  emit(old,'mousemove',{clientX:100,clientY:100});assert.equal(input.pointer().known,false);emit(next,'mousemove',{clientX:20,clientY:30});assert.deepEqual(input.pointer().position,[20,30]);
  input.dispose();emit(next,'mousedown',{button:0,clientX:20,clientY:30});assert.equal(input.active('fire'),false);
+});
+
+test('a mouse press that moves past its drag threshold is a drag, reports where it went, and is no tap',()=>{
+ const {input,time,emit}=fixture({keymap:{pan:[['mouseLeft',DRAG,20]],click:[['mouseLeft',TAP]]}});
+ emit('mousemove',{clientX:100,clientY:100});emit('mousedown',{button:0,clientX:100,clientY:100});
+ emit('pointermove',{clientX:110,clientY:100});time(.05);input.updateState();
+ assert.equal(input.drag('pan'),null);assert.equal(input.readQueue('pan',DRAG),false);
+ emit('pointermove',{clientX:130,clientY:100});time(.1);input.updateState();
+ assert.equal(input.readQueue('pan',DRAG),true);const d=input.drag('pan');
+ assert.deepEqual([...d.origin],[100,100]);assert.deepEqual([...d.position],[130,100]);assert.deepEqual([...d.delta],[30,0]);assert.equal(d.distance,30);
+ emit('mouseup',{button:0,clientX:130,clientY:100});time(.12);input.updateState();
+ assert.equal(input.drag('pan'),null);assert.equal(input.readQueue('click',TAP),false);input.dispose();
+});
+
+test('a touch button drag follows its own finger, and the default threshold comes from timing',()=>{
+ const {input,time,emit}=fixture({keymap:{swipe:[['touchFire',DRAG]]},timing:{drag_threshold:5}});
+ const el=new Element();input.touch.button(el,'touchFire');
+ emit('pointerdown',{pointerId:7,clientX:10,clientY:10});el.dispatchEvent(Object.assign(new Event('pointerdown',{cancelable:true}),{pointerId:7,button:0,clientX:10,clientY:10}));
+ emit('pointermove',{pointerId:8,clientX:90,clientY:90});input.updateState();assert.equal(input.drag('swipe'),null);
+ emit('pointermove',{pointerId:7,clientX:10,clientY:16});time(.03);input.updateState();
+ assert.deepEqual([...input.drag('swipe').delta],[0,6]);input.dispose();
+});
+
+test('tap and double-tap bindings take their own thresholds',()=>{
+ const {input,time}=fixture({keymap:{quick:[['q',TAP,.05]],slow:[['s',TAP,.5]],dash:[['d',DOUBLETAP,.6]]}});
+ input.setInput('keyboard','q',true);time(.1);input.setInput('keyboard','q',false);input.updateState();assert.equal(input.readQueue('quick',TAP),false);
+ time(1);input.setInput('keyboard','s',true);time(1.4);input.setInput('keyboard','s',false);input.updateState();assert.equal(input.readQueue('slow',TAP),true);
+ time(2);input.setInput('keyboard','d',true);time(2.05);input.setInput('keyboard','d',false);time(2.5);input.updateState();input.setInput('keyboard','d',true);
+ assert.equal(input.readQueue('dash',DOUBLETAP),true);input.dispose();
 });
