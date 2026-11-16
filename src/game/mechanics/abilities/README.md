@@ -15,7 +15,7 @@ The progression-defined projectile abilities are Fireball, Shadow Bolt and Ember
 | Damage and team rules | Existing combat and projectile-impact policy |
 | Spell shape/glow packets | `abilityPresentation` |
 
-Abilities are innate/learned capabilities, not inventory items. They consume no carried slot and create no fictional weapon instance. NPCs expose `abilities`; any supported actor, including the real session Player, can use `api.abilities.getLoadout(actor)`. The attack controller must belong to that same official actor/world. There is no surrogate caster, duplicate simulation clock or ability collision index.
+Abilities are innate/learned capabilities, not inventory items. They consume no carried slot and create no fictional weapon instance. NPCs expose `abilities`; any supported actor, including the real session Player, can use `game.abilities.getLoadout(actor)`. The attack controller must belong to that same official actor/world. There is no surrogate caster, duplicate simulation clock or ability collision index.
 
 ## Loadout API
 
@@ -46,10 +46,10 @@ Abilities are innate/learned capabilities, not inventory items. They consume no 
 
 ## Casting API
 
-Directory's `createGameRuntime({ability_policy?, ...options})` installs `engine.api.abilities`. The native apartment host composes the same class. `new abilitySystem({weapons,combat,get_player,policy={}})` needs the existing world weapon service and combat policy. Optional callbacks: `random()`, `spread(actor,baseSpread)`, `can_cast(actor,abilityId)`.
+Directory's `createGameRuntime({ability_policy?, ...options})` installs `engine.game.abilities`. The native apartment host composes the same class. `new abilitySystem({weapons,combat,get_player,policy={}})` needs the existing world weapon service and combat policy. Optional callbacks: `random()`, `spread(actor,baseSpread)`, `can_cast(actor,abilityId)`.
 
 ```js
-const ally = engine.api.actors.spawn({
+const ally = engine.game.actors.spawn({
     kind: 'npc', role: 'red_demon_dancer', name: 'Scarlet',
     position: [150,180],
     data: {recruited:true, hireType:'permanent', alliance:'friendly'}
@@ -57,7 +57,7 @@ const ally = engine.api.actors.spawn({
 // This role starts with the existing Fireball capability.
 ally.abilities.learnAbility('shadow_bolt');
 ally.abilities.equipAbility('shadow_bolt');
-engine.api.abilities.requestCast(ally, 'shadow_bolt', {target:[300,180]});
+engine.game.abilities.requestCast(ally, 'shadow_bolt', {target:[300,180]});
 ```
 
 | API | Contract |
@@ -104,7 +104,7 @@ Tests: `node --test tools/test-ability-systems.mjs`, `node tools/test-ability-ca
 
 ## Universal attack registration
 
-Abilities are now registered alongside firearm and melee attacks through [attackRegistry and attackSystem](../attacks/README.md). For ordinary player/actor input, select `ability:fireball` and call `api.attacks.requestAttack(actor, aim)`. Player input and native NPC/Ganger callers use that shared entry point. The lower `abilitySystem` remains the executor and compatibility API. Plain gameCharacter subclasses are connected automatically; the service no longer requires a particular actor subclass to provide an items property.
+Abilities are now registered alongside firearm and melee attacks through [attackRegistry and attackSystem](../attacks/README.md). For ordinary player/actor input, select `ability:fireball` and call `game.attacks.requestAttack(actor, aim)`. Player input and native NPC/Ganger callers use that shared entry point. The lower `abilitySystem` remains the executor and compatibility API. Plain gameCharacter subclasses are connected automatically; the service no longer requires a particular actor subclass to provide an items property.
 
 Mounted firearms and abilities now share native aperture/arc/clearance and velocity-inheritance requests. Preparation uses the existing attack clock. See [mounted attacks](../attacks/MOUNTED-ATTACKS.md). Direct lower-level casting remains an execution API and does not run the universal service’s aim-preparation policy.
 
@@ -136,7 +136,7 @@ This is a reusable firing-mode action, not duplicated gun physics or a general a
 
 ## Shared timed bolts, beams and grapples
 
-Any registered native character may learn `drone_bolt`, `drone_lance`, `drone_beam`, `drone_grapple` and `drone_landing`, then use `api.attacks.executeAttack(actor,{attack_id:'ability:drone_grapple',target:target.entity_id})`. These are learned capabilities rather than owned inventory weapons. They honor common cooldown, holster, pause, defeat, mounting and stagger rules.
+Any registered native character may learn `drone_bolt`, `drone_lance`, `drone_beam`, `drone_grapple` and `drone_landing`, then use `game.attacks.executeAttack(actor,{attack_id:'ability:drone_grapple',target:target.entity_id})`. These are learned capabilities rather than owned inventory weapons. They honor common cooldown, holster, pause, defeat, mounting and stagger rules.
 
 `delivery:'bolt'` adds a tell to the existing projectile/contact/damage backend. `delivery:'beam'` tracks aim until `tell_seconds-lock_seconds`, fires one native finite-width beam, then retains detached endpoints during `fire_seconds` for presentation. Cover penetration is explicit. `delivery:'grapple'` uses the same tracking/lock phase, a real projectile flight, then a native spring on confirmed hostile, unmounted, non-Flitting contact. Held damage ticks use the one weapon clock. Flit, timeout, cancellation, lost capability, mounting, source/target removal and level departure release owned resources. Spring ownership metadata and exact body endpoints prevent cleanup from deleting unrelated joints. No per-actor world listener or constraint scan is added.
 
@@ -150,4 +150,4 @@ Boss patterns are ordinary learned capabilities; see the [encounter API](../enco
 
 `cast(actor,id,aim,{channel:'secondary'})` accepts only explicitly allowed pattern definitions. Primary and secondary actions each have their own cooldown readiness, using the same `weapon_state.elapsed` time source. The secondary channel stores `ability_secondary_state` and `ability_secondary_ready_at` in the actor's canonical data; it can wind up alongside a primary burst without replacing that burst or its actual firearm instance. It does not grant permission to bypass weapon firing readiness. `getActionState(actor,{channel:'primary'|'secondary'})` defaults to primary. `cancelAction(actor,{channel:'all'|'primary'|'secondary'})` defaults to both channels.
 
-The normal universal attack entry still selects the primary channel. Explicit concurrent spell requests use `api.abilities.cast`. New secondary actions honor common holster, mounted, paused, staggered and learned-capability checks. `validateBossRecord` additionally preflights specialized actor/effect data and secondary eligibility before production map/currency mutation. The same validator runs for native ApartmentLevel snapshots.
+The normal universal attack entry still selects the primary channel. Explicit concurrent spell requests use `game.abilities.cast`. New secondary actions honor common holster, mounted, paused, staggered and learned-capability checks. `validateBossRecord` additionally preflights specialized actor/effect data and secondary eligibility before production map/currency mutation. The same validator runs for native ApartmentLevel snapshots.

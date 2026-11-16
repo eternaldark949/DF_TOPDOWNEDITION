@@ -6,7 +6,7 @@ Code that defines and runs Dimensions Freelancer's behaviour: combat rules, abil
 
 ## Session and native player API
 
-Directory's `createGameRuntime()` installs `gameSession`, `PlayerStateSystem` and `PlayerControlSystem` as real lifecycle systems. They are available through `engine.api.items`, `engine.api.session`, `engine.api.player_state` and `engine.api.player_controls`. The factory registers native types first, then creates **one persistent Player**. Callers obtain `api.session.player`; they must not create another player for each level.
+Directory's `createGameRuntime()` installs `gameSession`, `PlayerStateSystem` and `PlayerControlSystem` as real lifecycle systems. They are available through `engine.game.items`, `engine.game.session`, `engine.game.player_state` and `engine.game.player_controls`. The factory registers native types first, then creates **one persistent Player**. Callers obtain `game.session.player`; they must not create another player for each level.
 
 These are game classes, outside Basement. Basement owns bodies, movement, velocities, impulses, attachment mass, collision detection, checked placement and the one spatial grid. Gameplay owns health, ability costs and timers, inventory and quest rules. No converted class uses the old GameEngine, DOM, Canvas or a second physical index.
 
@@ -19,7 +19,7 @@ These are game classes, outside Basement. Basement owns bodies, movement, veloci
 | Attunement, Flit/invulnerability timers, sneak, buffs, regeneration timers | `playerVitals` referencing `Player.data.player_state` (format 1) |
 | Item instances, equipment, mounts, per-item state | `itemSystem`, exposed by `gameSession.items` |
 | Currency, quests, roster records, progression | `gameSession` |
-| Player reference | Session stores only the native numeric `player_entity_id`; lookup uses `api.elements` |
+| Player reference | Session stores only the native numeric `player_entity_id`; lookup uses `basement.elements` |
 | Input devices, held state, edges, normalization, dead zones | Basement `controlSystem` |
 | Control-block tokens and injected callbacks | Runtime lifetime; not save data |
 | Tuning | Directory's `game-player-rules.json` and `game-control-profile.json` |
@@ -34,7 +34,7 @@ Roster records are persistent domain records, not another registry of live bodie
 |---|---|
 | `player`, `player_entity_id`, `currency` | Current official entity, numeric reference, current funds |
 | `changeCurrency(amount)` | Finite signed change; rejects a negative resulting balance |
-| `items` | The authoritative [itemSystem](items/README.md), also exposed as `api.items` |
+| `items` | The authoritative [itemSystem](items/README.md), also exposed as `game.items` |
 | `getRecord(collection, key)` | Detached copy, or undefined if absent |
 | `setRecord(collection, key, value)` | Set JSON data in quests/roster/progression; item/equipment mutations use `items` |
 | `snapshot()` | Detached, versioned JSON records; no physical state or health copy |
@@ -147,15 +147,15 @@ Run `node --test tools/test-player-systems.mjs tools/test-player-vitals.mjs` for
 
 ## Shared actors
 
-`Player`, `NPC` and `Ganger` now inherit native `gameActor`. `playerVitals extends actorVitals` shares canonical health operations with native and remaining legacy actors. `api.actors` connects their behavior and owned weapon execution to the existing runtime. See [the actor API, ownership contracts and removal ledger](actors/README.md). Specialized actor subclasses and the classic city callers remain conversion work.
+`Player`, `NPC` and `Ganger` now inherit native `gameActor`. `playerVitals extends actorVitals` shares canonical health operations with native and remaining legacy actors. `game.actors` connects their behavior and owned weapon execution to the existing runtime. See [the actor API, ownership contracts and removal ledger](actors/README.md). Specialized actor subclasses and the classic city callers remain conversion work.
 
 ## Shared abilities
 
-Directory now also installs `api.abilities`. `abilityLoadout` owns learned/equipped capabilities; `abilitySystem` executes all three existing projectile abilities through native launches and the shared combat impact policy. Weapon and spell readiness/cooldown share one attack controller. Native and remaining classic NPCs use the same capability record. See [ability API and migration boundaries](abilities/README.md).
+Directory now also installs `game.abilities`. `abilityLoadout` owns learned/equipped capabilities; `abilitySystem` executes all three existing projectile abilities through native launches and the shared combat impact policy. Weapon and spell readiness/cooldown share one attack controller. Native and remaining classic NPCs use the same capability record. See [ability API and migration boundaries](abilities/README.md).
 
 ## Universal attacks
 
-`api.attacks` now exposes the common registered firearm/melee/ability interface for Player, NPC, Ganger and arbitrary native gameCharacter subclasses. `selectAttack`, `canAttack`, `requestAttack` and `executeAttack` use canonical inventory/capability ownership and the existing cooldown. Normal input and native AI use this path. See [attack API, extensibility, persistence and boundaries](attacks/README.md).
+`game.attacks` now exposes the common registered firearm/melee/ability interface for Player, NPC, Ganger and arbitrary native gameCharacter subclasses. `selectAttack`, `canAttack`, `requestAttack` and `executeAttack` use canonical inventory/capability ownership and the existing cooldown. Normal input and native AI use this path. See [attack API, extensibility, persistence and boundaries](attacks/README.md).
 
 Native mounted attacks now run through that same API. Directory supplies seat emitters; Basement computes all launch geometry and inherited motion; gameplay uses its existing attack clock for preparation. [Mounted attack API and remaining work](attacks/MOUNTED-ATTACKS.md).
 

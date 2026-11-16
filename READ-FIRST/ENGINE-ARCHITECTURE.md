@@ -79,7 +79,7 @@ Each level below lists what it is, what it owns, what it may import, what it mus
 - the interpolation blend used for drawing;
 - the frame schedule;
 - the ordered list of update phases;
-- the application coordinator that registers levels and systems and runs their hooks in order. That coordinator is `engine/lobby/runtime/game-engine.mjs` (`gameEngine`).
+- the application coordinator that registers levels and systems and runs their hooks in order. That coordinator is `engine/game-engine.mjs` at the engine root (`gameEngine`), which plugs each level in through its jack: `engine.basement`, `engine.lobby`, `engine.directory`, `engine.penthouse`, plus `engine.game` for the services a game plugs in.
 
 **The jacks:** `levelLobby.plugIn({...})` takes the following jacks:
 - `isRunning`, `beginFrame`, `frameRateLimit`, `acceptFrame`, `timeScale`, `isPaused`;

@@ -13,13 +13,13 @@ class RuntimeExampleLevel extends gameLevel {
 
 export function createRuntimeExample(options = {}) {
     const engine = createGameRuntime({player:{template:'df:player_949',entity_type:'df_player',position:[100,180]},...options});
-    engine.api.assets.registerLibrary(definitions);
+    engine.directory.assets.registerLibrary(definitions);
     engine.registerLevel('room_a', RuntimeExampleLevel).registerLevel('room_b', RuntimeExampleLevel);
-    const player = engine.api.session.player;
+    const player = engine.game.session.player;
     engine.registerSystem('appearance', {
         render(context, blend, frame) {
             frame.clear(context.engine.active_level.definition.background);
-            const hits = context.api.render.getVisibleEntities({blend});
+            const hits = context.basement.render.getVisibleEntities({blend});
             for (const { entity } of hits) {
                 if(entity.data.role==='projectile'||entity.data.role==='world_loot'||['df_drone','df_velvet_cat'].includes(entity.entity_type))continue;
                 const pose = entity.getRenderState(blend), shape = entity.collision_shape;

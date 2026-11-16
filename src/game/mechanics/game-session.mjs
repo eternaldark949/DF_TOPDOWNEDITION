@@ -31,12 +31,12 @@ export class gameSession {
     }
     get items(){return this.#items;}
     get player_entity_id() { return this.#state.player_entity_id; }
-    get player() { return this.#context?.api.elements.fetchEntity(this.player_entity_id) ?? null; }
+    get player() { return this.#context?.basement.elements.fetchEntity(this.player_entity_id) ?? null; }
     get currency() { return this.#state.currency; }
     attach(context) {
         if (this.#context) throw new Error('Session is already attached');
         if (this.player_entity_id !== null) {
-            const existing = context.api.elements.fetchEntity(this.player_entity_id);
+            const existing = context.basement.elements.fetchEntity(this.player_entity_id);
             if (!existing || existing.entity_type !== 'df_player' || existing.destroyed) throw new Error('Session player must resolve to an official live Player');
             context.engine.retainEntity(existing);
         } else {

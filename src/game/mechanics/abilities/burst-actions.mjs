@@ -11,21 +11,21 @@ export function validateBurstAction(state,catalog,{clock}={}){
 }
 export function beginBurst(actor,definition,ability_id,aim,controller,items,api,combat){
  const weapon=items.getEquippedWeapon();if(weapon?.definition_id!==definition.required_weapon_id)return false;
- const logical=Object.fromEntries(['target','direction','angle'].filter(key=>aim[key]!==undefined).map(key=>[key,aim[key]])),heading=api.physics.resolveAim(actor,logical).rotation,now=controller.state.elapsed,tuning=actor.data.burst_tuning??{};
+ const logical=Object.fromEntries(['target','direction','angle'].filter(key=>aim[key]!==undefined).map(key=>[key,aim[key]])),heading=api.basement.physics.resolveAim(actor,logical).rotation,now=controller.state.elapsed,tuning=actor.data.burst_tuning??{};
  const state={format_version:1,ability_id,phase:'tell',started_at:now,phase_started_at:now,heading,aim:jsonCopy(logical),weapon_instance_id:weapon.instance_id,shots_fired:0,burst_limit:tuning.burst_count??definition.burst_count,reload_seconds:tuning.reload_seconds??definition.reload_seconds,round_seconds:tuning.round_seconds??null,cancel_requested:false};
  validateBurstAction(state,{[ability_id]:definition},{clock:now});actor.data.ability_action_state=state;controller.setCooldown(definition.tell_seconds);combat.emit('ability:cast',{entity_id:actor.entity_id,ability_id,action:true});return jsonCopy(state);
 }
 export function advanceBurst(actor,definition,controller,items,api,combat,{known=true,policy=null}={}){
  const state=actor.data.ability_action_state;if(!state)return false;
  if(actor.destroyed||actor.dead||!actor.active){actor.data.ability_action_state=null;return false;}
- const now=controller.state.elapsed,world=api.physics,weapon=items.getEquippedWeapon();
+ const now=controller.state.elapsed,world=api.basement.physics,weapon=items.getEquippedWeapon();
  const reload=()=>{state.phase='reload';state.phase_started_at=now;state.cancel_requested=false;controller.setCooldown(Math.max(controller.cooldown_seconds,state.reload_seconds));};
  if(state.phase!=='reload'&&(state.cancel_requested||!known||policy?.blocked||actor.data.dormant||world.getAttachmentState(actor)||actor.data.combat_state?.stagger_remaining>0||controller.holstered||weapon?.instance_id!==state.weapon_instance_id))reload();
  let aim;
  if(state.phase!=='reload')try{
   aim=policy?.aim??state.aim;
   if(aim.target!==undefined){
-   const target=Array.isArray(aim.target)?null:api.elements.fetchEntity(aim.target);
+   const target=Array.isArray(aim.target)?null:api.basement.elements.fetchEntity(aim.target);
    if(target&&(target.dead||target.visible===false))reload();else{
     const view=world.observeTarget(actor,aim.target,{near_range:definition.range});
     if(definition.require_sight&&(!policy?.bypass_sight&&!view.line_clear||!view.in_range))reload();else{const lead=Array.isArray(aim.target)?view:world.predictTargetPosition(actor,aim.target,{projectile_speed:(weapon.stats.projectileSpeed??24)*60});aim={target:lead.position};}

@@ -1,6 +1,6 @@
 # Items and equipment API
 
-`itemSystem` is the authoritative carried-item model. Directory installs the session's exact instance as `engine.api.items`, also available as `engine.api.session.items`. The classic playable host uses this same class through `game.items`; its `InventoryView` owns DOM presentation and drag order only. `currentWeapon` and `weaponMode` are derived getters. There are no writable inventory/equipment mirrors or `InventoryItem` action closures.
+`itemSystem` is the authoritative carried-item model. Directory installs the session's exact instance as `engine.game.items`, also available as `engine.game.session.items`. The classic playable host uses this same class through `game.items`; its `InventoryView` owns DOM presentation and drag order only. `currentWeapon` and `weaponMode` are derived getters. There are no writable inventory/equipment mirrors or `InventoryItem` action closures.
 
 Definitions live in Directory: `game-db/items.json`, the `createItemCatalog()` adapter, and `game-item-rules.json`. Weapons/attachments keep their existing catalog IDs. Consumables use `consumable:bubbleTea`, `consumable:jeanSoda`, and `consumable:stellarLemonade`; notes use `note:<note_id>`. Augments, cosmetics, furniture, pets and garage ownership remain their existing domain registries, displayed alongside carried items by the inventory view.
 

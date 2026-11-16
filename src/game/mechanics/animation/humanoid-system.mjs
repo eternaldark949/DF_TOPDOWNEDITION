@@ -6,19 +6,19 @@ export class humanoidSystem {
     constructor({get_stance=actor=>actor.data.humanoid_stance??'idle',get_appearance=actor=>actor.data.appearance??actor.data}={}){this.#stance=get_stance;this.#appearance=get_appearance;}
     attach(context){
         if(this.#context)throw new Error('Humanoid system already attached');this.#context=context;
-        this.#off.push(context.api.physics.on('entityRegistered',({entity})=>this.#bind(entity)),context.api.physics.on('entityRemoved',({entity})=>{if(this.#people.get(entity.entity_id)?.actor===entity)this.#people.delete(entity.entity_id);}));
-        for(const actor of context.api.elements.getEntities())this.#bind(actor);
+        this.#off.push(context.basement.physics.on('entityRegistered',({entity})=>this.#bind(entity)),context.basement.physics.on('entityRemoved',({entity})=>{if(this.#people.get(entity.entity_id)?.actor===entity)this.#people.delete(entity.entity_id);}));
+        for(const actor of context.basement.elements.getEntities())this.#bind(actor);
     }
     #bind(actor){
         if(!actor||actor.destroyed||!humanoids.has(actor.entity_type)||this.#people.get(actor.entity_id)?.actor===actor)return;
-        const world=this.#context.api.physics,appearance=this.#appearance(actor)??{},assets=getHumanoidRigAssets(appearance.gender,appearance);
+        const world=this.#context.basement.physics,appearance=this.#appearance(actor)??{},assets=getHumanoidRigAssets(appearance.gender,appearance);
         const controller=world.rigs.getRig(actor)??world.rigs.createRig(actor,assets);
         if(!controller.getState().layers.base)controller.play('idle');
         this.#people.set(actor.entity_id,{actor,assets,controller});
     }
-    levelEntered(){for(const actor of this.#context.api.elements.getEntities())this.#bind(actor);}
+    levelEntered(){for(const actor of this.#context.basement.elements.getEntities())this.#bind(actor);}
     beforePhysics(){
-        const world=this.#context.api.physics;
+        const world=this.#context.basement.physics;
         for(const [id,entry] of this.#people){
             const {actor,assets,controller}=entry;
             if(world.elements.fetchEntity(actor.entity_id)!==actor){this.#people.delete(id);continue;}

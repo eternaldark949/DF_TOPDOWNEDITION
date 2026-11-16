@@ -5,7 +5,7 @@ export { createGameAssetLibrary } from '../data/game-assets.mjs';
 export { resolveMapLayout, resolvePlacement, isMovableProp, mapHost, createMapLibraries, PROP_TYPES, MAP_IDS } from '../data/game-maps.mjs';
 export { ApartmentLevel } from '../levels/apartment.mjs';
 export { APARTMENT_RULES } from '../data/apartment-assets.mjs';
-export { gameEngine } from '../../engine/lobby/runtime/game-engine.mjs';
+export { gameEngine } from '../../engine/game-engine.mjs';
 export { gameLevel } from '../../engine/lobby/runtime/game-level.mjs';
 export { mapLevel } from '../../engine/lobby/runtime/map-level.mjs';
 export { travelSystem } from '../../engine/lobby/runtime/travel-system.mjs';

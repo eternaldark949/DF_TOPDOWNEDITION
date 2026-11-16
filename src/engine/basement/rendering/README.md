@@ -1,6 +1,6 @@
 # Shared rendering and camera API
 
-`renderSystem` owns the active backend and rendering resources. `cameraSystem` owns the view and coordinate conversions. `renderFrame` collects data packets. `canvasRenderer` is the first real backend. These live in Basement and are exposed as `engine.api.render` and `engine.api.camera`.
+`renderSystem` owns the active backend and rendering resources. `cameraSystem` owns the view and coordinate conversions. `renderFrame` collects data packets. `canvasRenderer` is the first real backend. These live in Basement and are exposed as `engine.basement.render` and `engine.basement.camera`.
 
 The new runtime and its appearance example use this contract now. The classic playable game still draws most procedural artwork through old Canvas paths. Drone and VelvetCat have now moved to portable packets through this backend; other artist conversions remain. This batch establishes and verifies the destination. It does not claim all game drawing has migrated or that a WebGL backend exists.
 
@@ -19,13 +19,13 @@ The new runtime and its appearance example use this contract now. The classic pl
 
 ```js
 const engine = createGameRuntime({surface}); // Directory composition; no getContext call
-engine.api.render.resize({width:800,height:600,pixel_ratio:devicePixelRatio});
-await engine.api.render.setRenderer('canvas',{surface});
+engine.basement.render.resize({width:800,height:600,pixel_ratio:devicePixelRatio});
+await engine.basement.render.setRenderer('canvas',{surface});
 await engine.loadLevel('some_registered_level');
 engine.start();
 ```
 
-`surface` in the Directory factory selects the initial mouse input target. Successful surface changes retarget that shared mouse adapter automatically; a custom `controls.mouse_target` can instead be a stable viewport container. No game drawing class handles DOM listeners. The host measures/resizes its viewport and calls `api.render.resize`; the service does not install its own animation clock or resize observer.
+`surface` in the Directory factory selects the initial mouse input target. Successful surface changes retarget that shared mouse adapter automatically; a custom `controls.mouse_target` can instead be a stable viewport container. No game drawing class handles DOM listeners. The host measures/resizes its viewport and calls `basement.render.resize`; the service does not install its own animation clock or resize observer.
 
 The earlier `render_target` constructor option was removed from the new runtime. Render hooks now receive `(context, blend, frame)`, with a packet builder as the third argument. They never receive the Canvas. This intentional new-runtime API change does not switch the classic playable boot.
 
@@ -34,7 +34,7 @@ The earlier `render_target` constructor option was removed from the new runtime.
 ```js
 render(context, blend, frame) {
     frame.clear('#101018'); // before any packets in this pass
-    for (const {entity} of context.api.render.getVisibleEntities({blend})) {
+    for (const {entity} of context.basement.render.getVisibleEntities({blend})) {
         const pose = entity.getRenderState(blend);
         frame.submit({
             type:'shape', geometry_id:'character:silhouette',
@@ -167,18 +167,18 @@ Things that stand up toward the camera (trunk faces, posts, canopies) are painte
 ## Rendering resources
 
 ```js
-await api.render.registerResource('coat:mesh',{
+await basement.render.registerResource('coat:mesh',{
     type:'geometry',geometry:{type:'path',commands:[/* ... */]}
 });
-await api.render.registerResource('coat:paint',{
+await basement.render.registerResource('coat:paint',{
     type:'material',material:{fill:'#9c64cc'}
 });
-await api.render.registerResource('coat:atlas',{type:'image',url:'data:image/png;base64,...'});
-await api.render.registerResource('icon:pixel',{
+await basement.render.registerResource('coat:atlas',{type:'image',url:'data:image/png;base64,...'});
+await basement.render.registerResource('icon:pixel',{
     type:'image',width:1,height:1,pixels:[255,0,0,255]
 });
-await api.render.registerResource('lighting:buffer',{type:'target',width:400,height:300});
-context.defer(()=>api.render.releaseResource('lighting:buffer'));
+await basement.render.registerResource('lighting:buffer',{type:'target',width:400,height:300});
+context.defer(()=>basement.render.releaseResource('lighting:buffer'));
 ```
 
 Preparation/upload is asynchronous and awaited at a resource boundary. Lifecycle hooks remain synchronous; prepare graphics in an application preload stage, then let level/system entry reference those prepared IDs. Resources used across levels can live for the session. The service rejects overlapping resource/backend mutations instead of guessing ownership/order; await registrations sequentially. Resource definitions are copied, and image decoding/upload completes before replacement. A failed image replacement retains the previous image. Disposing during preparation prevents a late install and releases late decoded resources.
@@ -188,21 +188,21 @@ The service does not implicitly adopt raw canvases, HTML images or old sprite ca
 ## Camera API
 
 ```js
-api.camera.setView({position:[320,180],zoom:1,rotation:0});
-api.camera.setBounds({left:0,top:0,right:1400,bottom:900}); // or null
-api.camera.follow(player,{offset:[0,-20],smoothing:0.15,snap:true});
-api.camera.stopFollowing();
-api.camera.worldToScreen([x,y],blend);
-api.camera.screenToWorld([x,y],blend);
-api.camera.clientToWorld(api.controls.pointer().position,api.render.getSurfaceBounds(),blend);
-api.camera.worldToClient([x,y],api.render.getSurfaceBounds(),blend);
-api.camera.getView(blend);
-api.camera.getVisibleBounds({blend,margin:100});
+basement.camera.setView({position:[320,180],zoom:1,rotation:0});
+basement.camera.setBounds({left:0,top:0,right:1400,bottom:900}); // or null
+basement.camera.follow(player,{offset:[0,-20],smoothing:0.15,snap:true});
+basement.camera.stopFollowing();
+basement.camera.worldToScreen([x,y],blend);
+basement.camera.screenToWorld([x,y],blend);
+basement.camera.clientToWorld(basement.controls.pointer().position,basement.render.getSurfaceBounds(),blend);
+basement.camera.worldToClient([x,y],basement.render.getSurfaceBounds(),blend);
+basement.camera.getView(blend);
+basement.camera.getVisibleBounds({blend,margin:100});
 ```
 
 `aheadOf({margin, velocity, lead})` gives how far past each side of the view to ready what the camera shows next: `margin` all round and `lead` seconds of `velocity` on the side it is moving toward, as `{left, top, right, bottom}`. `viewAhead(view, ahead)` grows a view by those margins, or by a number of px all round. Tiled layers (`createLightLayerParts`, the game's ground) take either as their `ahead`, so a moving camera readies only what it is heading for.
 
-`cameraSystem({position,zoom,rotation,viewport,bounds})` can be used independently. Its `viewport` getter is immutable; `setViewport(packet)` updates a standalone camera. When a backend is mounted, use `api.render.resize` to keep camera and backing dimensions together.
+`cameraSystem({position,zoom,rotation,viewport,bounds})` can be used independently. Its `viewport` getter is immutable; `setViewport(packet)` updates a standalone camera. When a backend is mounted, use `basement.render.resize` to keep camera and backing dimensions together.
 
 Screen coordinates are logical viewport units; client conversions account for the surface's CSS bounds and scaling. DPR changes backing pixels, not gameplay coordinates. Camera rotation and zoom are included in both directions. Native mouse events may quantize client positions to whole CSS pixels.
 

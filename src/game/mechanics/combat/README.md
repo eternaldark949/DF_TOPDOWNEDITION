@@ -1,6 +1,6 @@
 # Combat, weapons and physical loot
 
-Directory installs `api.combat`, `api.weapons` and `api.loot` in the existing `gameEngine` world. They run from the runtime's fixed step, use `api.items`, and never create another world or grid. The native apartment host composes the same classes against its existing scene world. Its earlier `_fireApartmentWeapon` implementation is deleted.
+Directory installs `game.combat`, `game.weapons` and `game.loot` in the existing `gameEngine` world. They run from the runtime's fixed step, use `game.items`, and never create another world or grid. The native apartment host composes the same classes against its existing scene world. Its earlier `_fireApartmentWeapon` implementation is deleted.
 
 Directory owns balance and geometry: `game-combat-rules.json`, `game-db/items.json`, `combat-profiles.mjs`, and `weapon-appearance.mjs`. The original catalog's ticks/speeds convert from its declared authoring frequency to seconds/units per second at execution. Guns retain unlimited ammunition behavior; arbitrary per-item `state.ammo` remains saved data, not an invented ammunition rule. Critical chance, blade perks and mirror tuning are shared with remaining classic callers through `COMBAT_RULES`.
 

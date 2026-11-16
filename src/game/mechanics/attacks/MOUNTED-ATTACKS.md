@@ -17,13 +17,13 @@ Native passengers and drivers use the same `attackSystem` API as characters on f
 `TrafficVehicle.assignSeat`, `assignDriver` and `assignPassenger` install this emitter on the real native attachment. Optional `combine_mass` continues to use the same engine hierarchy/mass calculation. `setSeatAttackEnabled(seat_index,enabled)` updates the occupied attachment's emitter and revision; it does not change the immutable seat definition. `releasePassenger` still requests checked native exit placement and optional velocity inheritance.
 
 ```js
-const car = createGameVehicle(engine.api.physics, {
+const car = createGameVehicle(engine.basement.physics, {
     purpose:'owned', control_mode:'PLAYER', position:[220,120]
 });
-car.assignDriver(engine.api.session.player);
+car.assignDriver(engine.game.session.player);
 car.assignPassenger(companion, {combine_mass:true});
 
-engine.api.attacks.requestAttack(companion, {target:enemy.position});
+engine.game.attacks.requestAttack(companion, {target:enemy.position});
 // The runtime advances preparation and dispatch; no separate timer or collision loop.
 car.setSeatAttackEnabled(1, false); // pending old window requests become stale
 ```

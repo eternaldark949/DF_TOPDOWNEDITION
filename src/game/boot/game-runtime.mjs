@@ -4,7 +4,7 @@ import {attackSystem} from '../mechanics/attacks/attack-system.mjs';
 import {abilitySystem} from '../mechanics/abilities/ability-system.mjs';
 import {actorSystem} from '../mechanics/actors/actor-system.mjs';
 import {registerGameEntityTypes} from './game-entity-types.mjs';
-import { gameEngine } from '../../engine/lobby/runtime/game-engine.mjs';
+import { gameEngine } from '../../engine/game-engine.mjs';
 import { travelSystem } from '../../engine/lobby/runtime/travel-system.mjs';
 import { createApartmentAssetLibrary } from '../data/apartment-assets.mjs';
 import controlProfile from '../data/game-control-profile.json' with { type: 'json' };
@@ -36,11 +36,11 @@ export function createGameRuntime({ game_db, surface, session_state, player, wea
     const loot=new lootSystem({items:session.items,get_player:()=>session.player,on_event:(event,detail)=>session.emit(event,detail)});
     if(options.services && ['session','items','player_state','player_controls','combat','weapons','loot','actors','abilities','attacks','encounters','humanoids','travel'].some(key=>Object.hasOwn(options.services,key)))throw new TypeError('Directory owns player services');
     const engine = new gameEngine({ ...options, services:{...options.services,session,items:session.items,player_state,player_controls,combat,weapons,loot,actors,abilities,attacks,encounters,humanoids,travel}, controls:{...controlProfile,...(surface?.addEventListener?{mouse_target:surface}:{}),...options.controls}, asset_library });
-    engine.api.render.registerRenderer('canvas',canvasRenderer);
+    engine.basement.render.registerRenderer('canvas',canvasRenderer);
     engine.registerSystem('surface-input',{
-        attach(context){context.defer(context.api.render.onSurfaceChanged(({surface})=>context.api.controls.setMouseTarget(options.controls?.mouse_target??surface)));}
+        attach(context){context.defer(context.basement.render.onSurfaceChanged(({surface})=>context.basement.controls.setMouseTarget(options.controls?.mouse_target??surface)));}
     });
-    registerGameEntityTypes(engine.api.physics);
+    registerGameEntityTypes(engine.basement.physics);
     try {
         engine.registerSystem('session',session);
         engine.registerSystem('items',session.items);

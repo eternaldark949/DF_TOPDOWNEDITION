@@ -10,7 +10,7 @@ const team=entity=>entity?.alliance??entity?.data?.alliance??entity?.data?.team?
 export class combatSystem{
  #context=null;#targets=new Set();#session;#rules;#policy;
  constructor({session,rules:settings=rules,policy={}}={}){this.#session=session;this.#rules=jsonCopy(settings);this.#policy=policy;}
- attach(context){if(this.#context)throw new Error('Combat is already attached');this.#context=context;context.defer(context.api.physics.on('contactBegin',event=>this.#contact(event)));this.reconnectGameplay();}
+ attach(context){if(this.#context)throw new Error('Combat is already attached');this.#context=context;context.defer(context.basement.physics.on('contactBegin',event=>this.#contact(event)));this.reconnectGameplay();}
  detach(){this.#targets.clear();this.#context=null;}
  emit(event,detail){this.#session?.emit(event,detail);this.#policy.on_event?.(event,detail);}
  canDamage(source,target,{source_alliance}={}){if(!target||isCombatDead(target)||source===target)return false;if(this.#policy.can_damage)return !!this.#policy.can_damage(source,target);const a=team(source)??source_alliance,b=team(target);if(target.data?.player_protected&&a==='friendly')return false;return !(a&&b&&a===b)&& (typeof target.takeDamage==='function'||typeof target.data?.health==='number');}
@@ -18,7 +18,7 @@ export class combatSystem{
   if(this.#context?.engine?.phase==='render')throw new Error('Rendering cannot deal damage');
   nonnegative(amount,'damage');if(isCombatDead(target)||!amount)return false;
   amount*=this.#policy.incoming_multiplier?.(target,type)??1;nonnegative(amount,'modified damage');
-  const source=source_id===null?null:this.#context.api.elements.fetchEntity(source_id);
+  const source=source_id===null?null:this.#context.basement.elements.fetchEntity(source_id);
   let applied;if(typeof target.takeDamage==='function')applied=target.takeDamage(amount,{...detail,source:source_id,type,crit,bypass_invulnerability});else if(typeof target.data.health==='number'){target.data.health=Math.max(0,target.data.health-amount);applied=true;}else return false;
   if(applied===false)return false;target.data.last_hit={source_id,type,crit};
   this.emit('combat:hit',{target_id:target.entity_id,source_id,amount,type,crit,...detail});
@@ -46,15 +46,15 @@ export class combatSystem{
   const obstacle=other.getState();if(obstacle.physics_type!=='static'&&!(obstacle.collision_group&BODY_GROUP.PROP))continue;
   state.slam=null;this.damage(entity,slam.damage,{source_id:slam.source_id,type:'slam',bypass_invulnerability:true});this.emit('combat:slam',{target_id:entity.entity_id});
  }}
- afterPhysics(context){this.advance(context.api.physics.config.fixed_step);}
- advance(seconds){nonnegative(seconds,'combat step');if(this.#context?.engine?.phase==='render')throw new Error('Rendering cannot advance combat');if(this.#context?.engine?.paused)return;for(const id of this.#targets){const target=this.#context.api.elements.fetchEntity(id);if(isCombatDead(target)){this.#targets.delete(id);continue;}const state=stateFor(target),b=state.bleed;
+ afterPhysics(context){this.advance(context.basement.physics.config.fixed_step);}
+ advance(seconds){nonnegative(seconds,'combat step');if(this.#context?.engine?.phase==='render')throw new Error('Rendering cannot advance combat');if(this.#context?.engine?.paused)return;for(const id of this.#targets){const target=this.#context.basement.elements.fetchEntity(id);if(isCombatDead(target)){this.#targets.delete(id);continue;}const state=stateFor(target),b=state.bleed;
   if(b){b.remaining-=seconds;b.next-=seconds;while(b.next<=1e-9&&b.remaining-b.next>=-1e-9){b.next+=this.#rules.bleed.interval_seconds;this.damage(target,b.dps*this.#rules.bleed.interval_seconds*b.stacks,{source_id:b.source_id,type:'bleed',bypass_invulnerability:true});if(isCombatDead(target))break;}if(b.remaining<=1e-9)state.bleed=null;}
   for(const orb of state.orbs){if(orb.extinguish_on_flit&&(target.data.player_state?.flit_remaining>0||(target.data.player_state?.last_flit_at??null)!==orb.flit_stamp)){orb.ticks=0;continue;}orb.next-=seconds;while(orb.next<=1e-9&&orb.ticks>0&&!isCombatDead(target)){orb.next+=orb.interval_seconds;orb.ticks--;this.damage(target,orb.damage,{source_id:orb.source_id,type:'burn',bypass_invulnerability:true});}}state.orbs=state.orbs.filter(orb=>orb.ticks>0);
   if(state.revealed_remaining!==undefined)state.revealed_remaining=Math.max(0,state.revealed_remaining-seconds);if(state.guard_remaining!==undefined)state.guard_remaining=Math.max(0,state.guard_remaining-seconds);
   state.stagger_remaining=Math.max(0,state.stagger_remaining-seconds);state.boss_resist_remaining=Math.max(0,state.boss_resist_remaining-seconds);if(state.slam){state.slam.remaining-=seconds;if(state.slam.remaining<=0)state.slam=null;}
   if(!state.bleed&&!state.orbs.length&&!state.stagger_remaining&&!state.boss_resist_remaining&&!state.slam&&!state.revealed_remaining&&!state.guard_remaining)this.#targets.delete(id);
  }}
- reconnectGameplay(){this.#targets.clear();for(const entity of this.#context.api.elements.getEntities())if(entity.data.combat_state){const state=entity.data.combat_state;jsonCopy(state);if(!Array.isArray(state.orbs))throw new TypeError('Invalid orb state');
+ reconnectGameplay(){this.#targets.clear();for(const entity of this.#context.basement.elements.getEntities())if(entity.data.combat_state){const state=entity.data.combat_state;jsonCopy(state);if(!Array.isArray(state.orbs))throw new TypeError('Invalid orb state');
   for(const key of ['stagger_remaining','boss_resist_remaining'])nonnegative(state[key],key);for(const key of ['revealed_remaining','guard_remaining'])if(state[key]!==undefined)nonnegative(state[key],key);
   if(state.bleed){nonnegative(state.bleed.dps,'bleed DPS');nonnegative(state.bleed.remaining,'bleed duration');if(!Number.isSafeInteger(state.bleed.stacks)||state.bleed.stacks<1||!Number.isFinite(state.bleed.next))throw new TypeError('Invalid bleed state');}
   for(const orb of state.orbs){nonnegative(orb.damage,'orb damage');nonnegative(orb.interval_seconds,'orb interval');if(!orb.interval_seconds||!Number.isSafeInteger(orb.ticks)||orb.ticks<1||!Number.isFinite(orb.next))throw new TypeError('Invalid orb state');}

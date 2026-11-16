@@ -6,10 +6,10 @@ This is the canonical implementation for both runtimes. The classic `controlsSys
 
 ## Requesting input
 
-The new `gameEngine` constructs one service and exposes it through `engine.api.controls`:
+The new `gameEngine` constructs one service and exposes it through `engine.basement.controls`:
 
 ```js
-const input = engine.api.controls;
+const input = engine.basement.controls;
 input.active('fire');            // held now, boolean
 input.justActivated('interact'); // edge available to every consumer this simulation step
 input.justReleased('interact');

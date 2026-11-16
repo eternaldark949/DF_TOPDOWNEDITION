@@ -81,20 +81,20 @@
 
 ## Shared renderer/camera boundary — 2026-11-10
 
-- Added the separate Basement rendering package and exposed `api.render` / `api.camera` in the new runtime. Only the Canvas backend owns contexts; appearance producers submit pooled data packets and ordered passes.
+- Added the separate Basement rendering package and exposed `basement.render` / `basement.camera` in the new runtime. Only the Canvas backend owns contexts; appearance producers submit pooled data packets and ordered passes.
 - Added cached geometry/materials, image/target ownership, clips, gradients, text, shadows, dashes, capability checks and fresh-surface backend preparation. Visibility queries use the same physical world index.
 - Camera following and coordinate conversion are independent of drawing and physical state. Surface changes retarget the central mouse adapter. The regular new-runtime example now draws by packets.
 - Existing classic artwork and production boot still need class conversions. No WebGL implementation is claimed. The complete contract is in `src/engine/basement/rendering/README.md` in the checkout.
 
 ## Shared controls service — 2026-11-10
 
-- The game runtime now owns the canonical Basement `controlSystem` through `api.controls`; the controls package is separate from physical simulation. Its API is documented in `src/engine/basement/controls/README.md` in the game checkout.
+- The game runtime now owns the canonical Basement `controlSystem` through `basement.controls`; the controls package is separate from physical simulation. Its API is documented in `src/engine/basement/controls/README.md` in the game checkout.
 - Classic callers use the same class under the existing name. New runtime polling, edge lifetime, focus/cancellation, touch ownership and held-input suppression are centralized; old game-specific input policy conversion remains pending.
 
 ## Runtime coordinator — 2026-11-10
 
 - Added optional private `step_authority` for runtime-owned worlds; direct unauthorized stepping rejects before commands or time advance. Standalone callers remain unchanged, and physical saves do not serialize or release clock authority.
-- The game checkout now contains `src/engine/lobby/runtime/game-engine.mjs` and its level/system lifecycle API, executable multi-level example and acceptance tests. This coordinator uses the canonical Lobby and one native world; production class conversion/boot replacement remains pending.
+- The game checkout now contains `src/engine/game-engine.mjs (engine root)` and its level/system lifecycle API, executable multi-level example and acceptance tests. This coordinator uses the canonical Lobby and one native world; production class conversion/boot replacement remains pending.
 
 ## Playable apartment cutover — 2026-11-10
 

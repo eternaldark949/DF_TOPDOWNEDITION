@@ -10,15 +10,15 @@ Authored weapon materials, parts, muzzle/rail metadata and visual signatures liv
 
 ```js
 import {weaponAppearance} from './weapon-appearance.mjs';
-const art = await new weaponAppearance().prepare(engine.api.render);
+const art = await new weaponAppearance().prepare(engine.basement.render);
 engine.registerSystem('held-weapon', {
     render(context, blend, frame) {
-        const weapon=context.api.items.getEquippedWeapon();
+        const weapon=context.game.items.getEquippedWeapon();
         if (!weapon) return;
-        const pose=context.api.session.player.getRenderState(blend);
+        const pose=context.game.session.player.getRenderState(blend);
         art.draw(frame,weapon.definition_id,{
             position:pose.position,rotation:pose.rotation,scale:[1,1],
-            laser:context.api.items.hasAttachment('laser_sight'),layer:20
+            laser:context.game.items.hasAttachment('laser_sight'),layer:20
         });
     }
 });
@@ -51,9 +51,9 @@ Verification: `node --test tools/test-weapon-appearance.mjs` and `python tools/t
 
 `abilityPresentation` submits spell color/shape/glow packets from visible official projectiles. It is installed in the native runtime example; combatPresentation skips those bodies to prevent duplicate drawing. Authored definitions remain in Directory, and entity/ability classes contain no Canvas instructions. Full classic casting animation, fire trails and audio remain presentation work.
 
-Shared held-weapon presentation now reads inventory through `api.attacks.getItems(entity)`. Plain native characters and custom subclasses need no items-property wrapper to use the same artist. The runtime example’s Attack menu routes ordinary player fire through the selected registered attack, including learned abilities.
+Shared held-weapon presentation now reads inventory through `game.attacks.getItems(entity)`. Plain native characters and custom subclasses need no items-property wrapper to use the same artist. The runtime example’s Attack menu routes ordinary player fire through the selected registered attack, including learned abilities.
 
-For seated characters, held-weapon packets use `api.attacks.getMountedAttackPose(actor,{blend})`: interpolated native grip/heading plus shared-clock lean opacity. The body remains in its authoritative seat. Full humanoid/cabin/window art is still pending; these packets add no physical transforms or simulation clock.
+For seated characters, held-weapon packets use `game.attacks.getMountedAttackPose(actor,{blend})`: interpolated native grip/heading plus shared-clock lean opacity. The body remains in its authoritative seat. Full humanoid/cabin/window art is still pending; these packets add no physical transforms or simulation clock.
 
 `door.mjs` draws doors natively. `doorPresentation(door,{blend})` takes one entry of the map's `getDoors()` and reads each leaf's interpolated pose and box; `createDoorPackets(packet,{appearance})` turns it into frame packets on the art toolkit. A hinged leaf is a panel with shadow, sheen, outline, brass handles and pin, with a faint floor sweep once it is open; sliding leaves are panes over a track along the opening; a door with no leaves is an arch. Any kind works, so `double` and `saloon` draw both their leaves, and a door hinged on the right swings from its right end. The look is `data/game-door-appearance.json`, replaceable part by part; each door's authored `color` colours its leaves. The native apartment renderer draws each door once per frame when any of its leaves is in view, and arches by their opening. The classic city's own door objects still use the classic `indoor-door.js`.
 

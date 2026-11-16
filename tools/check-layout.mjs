@@ -23,7 +23,8 @@ const ALLOWED = {   // section 3 of the architecture file: which engine levels e
     basement: ['basement'],
     lobby: ['basement', 'lobby'],
     directory: ['basement', 'directory'],
-    penthouse: ['basement', 'directory', 'penthouse']
+    penthouse: ['basement', 'directory', 'penthouse'],
+    'game-engine.mjs': ['basement', 'lobby', 'directory', 'penthouse']   // the engine file: plugs every level in through its jack
 };
 const GAME_NAMES = /\bdf_|\bapartment|\bGAME_DB\b|\bDFNative\b|\bganger|\bvelvet|Dimensions Freelancer/i;
 const importsOf = source => [...source.matchAll(/(?:^|[\s;])(?:import|export)\s[^'"`]*?from\s*['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]\s*\)|^\s*import\s*['"]([^'"]+)['"]/gm)].map(m => m[1] ?? m[2] ?? m[3]);
@@ -46,6 +47,7 @@ for (const f of files) {
         else if (!ALLOWED[level]?.includes(tlevel)) problems.push(`${f.rel}: ${level} may not import ${tlevel} (${target})`);
     }
     const [root, level] = f.rel.split('/');
+    if (f.rel === 'engine/game-engine.mjs') { if (!source.startsWith('// ===== ENGINE =====')) problems.push(`${f.rel}: must start with // ===== ENGINE =====`); const m = source.match(GAME_NAMES); if (m) problems.push(`${f.rel}: the engine names the game ("${m[0]}")`); }
     if (root === 'engine' && LEVELS[level]) {
         if (!source.startsWith(`// ===== ${LEVELS[level]} =====`)) problems.push(`${f.rel}: must start with // ===== ${LEVELS[level]} =====`);
         if (!f.rel.includes('/tests/')) { const m = source.match(GAME_NAMES); if (m) problems.push(`${f.rel}: the engine names the game ("${m[0]}")`); }

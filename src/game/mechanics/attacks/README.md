@@ -1,6 +1,6 @@
 # Universal character attacks
 
-`attackRegistry` registers attack types and immutable attack definitions. `attackSystem` is the common character-facing API for selecting, checking, requesting and executing them. Player, NPC, Ganger and plain native `gameCharacter` subclasses use it. Directory installs `api.attacks` in `createGameRuntime`; the production native apartment composes the same service.
+`attackRegistry` registers attack types and immutable attack definitions. `attackSystem` is the common character-facing API for selecting, checking, requesting and executing them. Player, NPC, Ganger and plain native `gameCharacter` subclasses use it. Directory installs `game.attacks` in `createGameRuntime`; the production native apartment composes the same service.
 
 The registry is gameplay infrastructure. Basement continues to own bodies, trajectories, native hit volumes/sweeps, contacts, impulses, attachments and the single spatial grid. Registering an attack creates no physical body, inventory item, learned ability, clock or spatial index.
 
@@ -19,15 +19,15 @@ Types use trusted synchronous game callbacks. Their physical requests must use B
 ## Same API for every character
 
 ```js
-const player = engine.api.session.player;
-const attacks = engine.api.attacks;
+const player = engine.game.session.player;
+const attacks = engine.game.attacks;
 
-engine.api.abilities.getLoadout(player).learnAbility('fireball');
+engine.game.abilities.getLoadout(player).learnAbility('fireball');
 attacks.selectAttack(player, 'ability:fireball');
 attacks.requestAttack(player, {target:[300,180]});
 
 // No actor-specific wrapper, surrogate player or second body is required.
-const character = engine.api.physics.createCharacter({position:[200,240]});
+const character = engine.basement.physics.createCharacter({position:[200,240]});
 const gun = attacks.getItems(character).grantItem('pistol_fpx');
 attacks.selectAttack(character, 'weapon:pistol_fpx', {instance_id:gun.instance_id});
 attacks.requestAttack(character, {direction:[1,0]});
@@ -83,7 +83,7 @@ Lower-level `weapons.fire`/`requestActorFire` and `abilities.cast`/`requestCast`
 ## Registering an additional type
 
 ```js
-const registry = engine.api.attacks.registry;
+const registry = engine.game.attacks.registry;
 registry.registerAttackType('signal', {
     validateDefinition(definition) {
         if (typeof definition.signal !== 'string') throw new TypeError('Missing signal');
@@ -99,7 +99,7 @@ registry.registerAttack({
     attack_id:'signal:warning', attack_type:'signal', name:'Warning',
     range:100, signal:'warning'
 });
-engine.api.attacks.selectAttack(player,'signal:warning');
+engine.game.attacks.selectAttack(player,'signal:warning');
 ```
 
 `attackRegistry` exposes `registerAttackType`, `registerAttack`, `getAttackType`, `getAttack`, `hasAttack`, `listAttackTypes`, `listAttacks`. Type registration requires synchronous `execute`, with optional synchronous `canUse` and `validateDefinition`. Duplicates, unknown types, malformed definitions and asynchronous callbacks reject. Definition data is detached/frozen; executable functions stay in registered game code, never serialized in Directory resources or character snapshots.
@@ -120,7 +120,7 @@ Player capabilities/selection and NPC selection now survive the production save 
 
 Registry execution applies to official native characters. Legacy city `ActorEntity`/`PlayerEntity` and their solvers remain explicit conversion work. They preserve portable choice/capability data but still execute their old city combat rules. No legacy object is wrapped in a second native character to pretend otherwise.
 
-Presentation remains separate. The runtime example now has a selectable Attack menu and an explicit Learn demo abilities action. Its ordinary fire control demonstrates player casting. Shared held-weapon presentation requests inventory through `api.attacks.getItems(entity)`, so custom characters need no `.items` property or actor-specific artist wrapper. Rendering does not execute attacks or advance cooldowns.
+Presentation remains separate. The runtime example now has a selectable Attack menu and an explicit Learn demo abilities action. Its ordinary fire control demonstrates player casting. Shared held-weapon presentation requests inventory through `game.attacks.getItems(entity)`, so custom characters need no `.items` property or actor-specific artist wrapper. Rendering does not execute attacks or advance cooldowns.
 
 Verification: `tools/test-attack-systems.mjs`, `tools/test-attack-callers.cjs`, `tools/test-attacks-browser.py`, plus the actor, ability, combat, player, rendering, apartment and gameplay regression suites. Tests cover universal source classes, actual owned copies, custom types, one input/one attack, cooldown and stale-input rules, saves/lifetimes, generic-character presentation, quick-draw selection and real player keyboard casting through the example UI.
 

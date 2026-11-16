@@ -18,7 +18,7 @@ export class weaponSystem{
  get active_swing(){return this.state?.swing??null;}
  get guarding(){const state=this.state;return !(this.#player()?.data.combat_state?.guard_remaining>0)&&!!state?.swing&&!state.holstered&&state.elapsed-state.swing.started<=state.swing.seconds;}
  attach(context){if(this.#context)throw new Error('Weapons already attached');this.#context=context;this.reconnectGameplay();
-  if(this.#projectileEvents)this.#unsubscribes.push(context.api.physics.on('projectileHit',event=>this.#projectileHit(event)),context.api.physics.on('projectileRedirected',event=>{const data=event.projectile?.data;if(!data)return;data.source_id=event.owner_id;const owner=context.api.elements.fetchEntity(event.owner_id);data.source_alliance=owner?.alliance??owner?.data.alliance??null;if(data.pending_deflection){data.deflected=data.pending_deflection;delete data.pending_deflection;this.#emit('weapon:deflected',{projectile_id:event.projectile.entity_id,by:data.deflected});}}),context.api.physics.onProjectileContact(event=>this.#contactPolicy(event)));
+  if(this.#projectileEvents)this.#unsubscribes.push(context.basement.physics.on('projectileHit',event=>this.#projectileHit(event)),context.basement.physics.on('projectileRedirected',event=>{const data=event.projectile?.data;if(!data)return;data.source_id=event.owner_id;const owner=context.basement.elements.fetchEntity(event.owner_id);data.source_alliance=owner?.alliance??owner?.data.alliance??null;if(data.pending_deflection){data.deflected=data.pending_deflection;delete data.pending_deflection;this.#emit('weapon:deflected',{projectile_id:event.projectile.entity_id,by:data.deflected});}}),context.basement.physics.onProjectileContact(event=>this.#contactPolicy(event)));
   if(this.#session&&this.#inputEvents)this.#unsubscribes.push(this.#session.on('player:fire',event=>this.requestFire(event.aim??{})),this.#session.on('player:fire-released',event=>{if(this.quick_draw)this.requestQuickDraw(Object.keys(event.aim??{}).length?event.aim:this.#lastAim);}));
   if(this.#session)this.#unsubscribes.push(this.#session.on('player:controls-blocked',()=>this.gameplayPaused()));
   for(const event of ['items:equipped','items:unequipped','items:loaded'])this.#unsubscribes.push(this.#items.on(event,()=>{const s=this.state;if(s){s.swing=null;s.quick_draw=null;s.drawn_at=s.elapsed;s.draw_shot_used=false;}this.#pending=false;}));
@@ -35,16 +35,16 @@ export class weaponSystem{
  setHolstered(value){const state=this.state;if(!state)return false;const was=state.holstered;state.holstered=!!value;if(was&&!value){state.drawn_at=state.elapsed;state.draw_shot_used=false;}if(value)state.swing=null;return true;}
  setCooldown(seconds){nonnegative(seconds,'weapon cooldown');if(this.state)this.state.cooldown=seconds;}
  getSwingPose(){const state=this.state,s=state?.swing;return s?sampleMeleeSwing(state.elapsed-s.started,s.side,{},s.seconds,s.style):null;}
- armQuickDraw(){const player=this.#player(),weapon=this.#items.getEquippedWeapon();if(!player||isCombatDead(player)||this.#context.api.physics.getAttachmentState(player)||!weapon||!['normal','sniper'].includes(weapon.weaponMode)||this.#context.engine?.paused||this.#policy.can_fire?.()===false)return false;this.state.quick_draw={weapon_instance_id:weapon.instance_id,phase:'ready',remaining:0,aim:null};this.setHolstered(true);this.#pending=false;return true;}
+ armQuickDraw(){const player=this.#player(),weapon=this.#items.getEquippedWeapon();if(!player||isCombatDead(player)||this.#context.basement.physics.getAttachmentState(player)||!weapon||!['normal','sniper'].includes(weapon.weaponMode)||this.#context.engine?.paused||this.#policy.can_fire?.()===false)return false;this.state.quick_draw={weapon_instance_id:weapon.instance_id,phase:'ready',remaining:0,aim:null};this.setHolstered(true);this.#pending=false;return true;}
  cancelQuickDraw(){if(!this.quick_draw)return false;this.state.quick_draw=null;this.setHolstered(true);this.#pending=false;return true;}
  interruptQuickDraw(){const q=this.quick_draw;if(!q)return false;q.phase='ready';q.remaining=0;q.aim=null;this.setHolstered(true);this.#pending=false;return true;}
  requestQuickDraw(aim={}){const q=this.quick_draw;if(!q||q.phase!=='ready'||this.cooldown_seconds>1e-9||this.#context.engine?.paused||this.#policy.can_fire?.()===false)return false;q.aim=jsonCopy(aim);q.phase='draw';q.remaining=this.#rules.quick_draw.draw_seconds;this.setHolstered(false);return true;}
  requestFire(aim={}){if(this.#context?.engine?.paused)return false;this.#lastAim=jsonCopy(aim);this.#pending=true;return true;}
- beforePhysics(context){this.advance(context.api.physics.config.fixed_step);if(this.#pending){this.#pending=false;this.fire(this.#lastAim);}for(const [id,entry] of this.#controllers){if(entry.actor.destroyed){this.unregisterActor(id);continue;}entry.controller.beforePhysics(context);}}
+ beforePhysics(context){this.advance(context.basement.physics.config.fixed_step);if(this.#pending){this.#pending=false;this.fire(this.#lastAim);}for(const [id,entry] of this.#controllers){if(entry.actor.destroyed){this.unregisterActor(id);continue;}entry.controller.beforePhysics(context);}}
  advance(seconds){nonnegative(seconds,'weapon step');if(this.#context?.engine?.phase==='render')throw new Error('Rendering cannot advance weapons');if(this.#context?.engine?.paused)return;const player=this.#player();if(!player||!this.#context)return;const state=stateFor(player,this.#rules);state.elapsed+=seconds;state.cooldown=Math.max(0,state.cooldown-seconds);state.shield.since_hit+=seconds;
   if(this.#glass()&&(state.shield.spent||state.shield.since_hit>=this.#rules.mirror.regen_delay_seconds)){state.shield.charge=Math.min(this.#rules.mirror.shield,state.shield.charge+this.#rules.mirror.shield/this.#rules.mirror.recharge_seconds*seconds);if(state.shield.charge>=this.#rules.mirror.shield-1e-8){state.shield.charge=this.#rules.mirror.shield;state.shield.spent=false;}}
   const q=state.quick_draw;if(q){
-   if(isCombatDead(player)||this.#items.equipped_weapon_id!==q.weapon_instance_id||this.#context.api.physics.getAttachmentState(player))this.cancelQuickDraw();
+   if(isCombatDead(player)||this.#items.equipped_weapon_id!==q.weapon_instance_id||this.#context.basement.physics.getAttachmentState(player))this.cancelQuickDraw();
    else if(q.phase!=='ready'){
     if(q.aim?.target)player.lookAtTarget(q.aim.target);else if(q.aim?.angle!==undefined)player.setRotation(q.aim.angle,{preserve_velocity:true});else if(q.aim?.direction)player.lookInDirection(q.aim.direction);
     q.remaining-=seconds;if(q.remaining<=1e-9){if(q.phase==='draw'){
@@ -57,7 +57,7 @@ export class weaponSystem{
  }
  canExecute({ignore_action=false,ignore_cooldown=false}={}){
   const actor=this.#player(),state=this.state,context=this.#context;
-  return !!context&&context.engine?.running!==false&&context.engine?.active_level!==null&&(!state?.quick_draw||this.#quickFiring)&&!!actor&&!isCombatDead(actor)&&(!actor.data.ability_action_state||this.#actionFiring||ignore_action)&&actor.active!==false&&actor.visible!==false&&(ignore_cooldown||state.cooldown<=1e-9)&&!state.holstered&&!context.engine?.paused&&(!(actor.data.combat_state?.guard_remaining>0)||!['melee','fists'].includes(this.#items.getEquippedWeapon()?.weaponMode??'fists'))&&this.#policy.can_fire?.()!==false&&(!context.api.physics.getAttachmentState(actor)||context.api.physics.getMountedLaunchState(actor,{check_clearance:false}).allowed);
+  return !!context&&context.engine?.running!==false&&context.engine?.active_level!==null&&(!state?.quick_draw||this.#quickFiring)&&!!actor&&!isCombatDead(actor)&&(!actor.data.ability_action_state||this.#actionFiring||ignore_action)&&actor.active!==false&&actor.visible!==false&&(ignore_cooldown||state.cooldown<=1e-9)&&!state.holstered&&!context.engine?.paused&&(!(actor.data.combat_state?.guard_remaining>0)||!['melee','fists'].includes(this.#items.getEquippedWeapon()?.weaponMode??'fists'))&&this.#policy.can_fire?.()!==false&&(!context.basement.physics.getAttachmentState(actor)||context.basement.physics.getMountedLaunchState(actor,{check_clearance:false}).allowed);
  }
  fireActionRound(action,aim={}){
   const actor=this.#player();if(!action||actor?.data.ability_action_state!==action||action.phase!=='burst'||this.#items.getEquippedWeapon()?.instance_id!==action.weapon_instance_id)return false;
@@ -68,9 +68,9 @@ export class weaponSystem{
   const player=this.#player(),state=this.state,context=this.#context;
   if(!this.canExecute())return false;
   const weapon=this.#items.getEquippedWeapon(),stats=weapon?.stats??{},mode=weapon?.weaponMode??'none',flit=this.#flit(player);
-  if(context.api.physics.getAttachmentState(player)&&['melee','none','fists'].includes(mode))return false;
+  if(context.basement.physics.getAttachmentState(player)&&['melee','none','fists'].includes(mode))return false;
   if(mode==='melee')return this.#startSwing(player,state,weapon,stats,flit);
-  const punch=mode==='none'||mode==='fists',R=this.#rules,world=context.api.physics;
+  const punch=mode==='none'||mode==='fists',R=this.#rules,world=context.basement.physics;
   let hay=false,damage,crit,nextCombo=state.combo,consumeDrawBonus=false;
   if(punch){
    if(state.elapsed-state.last_punch_at>R.knuckles.combo_reset_seconds)nextCombo=0;nextCombo++;
@@ -99,7 +99,7 @@ export class weaponSystem{
   state.cooldown=punch&&mode==='none'?R.bare_punch.duration_ticks/R.authoring_hz:this.#cooldown(stats,punch?15:20);if(punch)state.punch_duration=state.cooldown;
   this.#emit('weapon:fired',{entity_id:player.entity_id,projectile_id:projectile.entity_id,definition_id:weapon?.definition_id??null,mode,haymaker:hay,crit:crit>1});this.#policy.on_fired?.(projectile,{action:this.#actionFiring});return projectile;
  }
- #stepIn(player,profile){const world=this.#context.api.physics;const hits=world.sweepAttachedShape(player,{collision_shape:profile.blade_shape,from_local_position:[20,0],to_local_position:[46,0],include_groups:BODY_GROUP.CHARACTER,line_of_sight:true});if(hits.some(hit=>this.#combat.canDamage(player,hit.entity)))world.advanceBody(player,{distance:this.#rules.blade.step_distance});}
+ #stepIn(player,profile){const world=this.#context.basement.physics;const hits=world.sweepAttachedShape(player,{collision_shape:profile.blade_shape,from_local_position:[20,0],to_local_position:[46,0],include_groups:BODY_GROUP.CHARACTER,line_of_sight:true});if(hits.some(hit=>this.#combat.canDamage(player,hit.entity)))world.advanceBody(player,{distance:this.#rules.blade.step_distance});}
  #startSwing(player,state,weapon,stats,flit){
   const profile=getCombatProfile(weapon.definition_id),edge=this.#effect('crimson_edge');state.side=-state.side;
   state.swing={weapon_instance_id:weapon.instance_id,definition_id:weapon.definition_id,started:state.elapsed,seconds:stats.swingSecs??this.#rules.blade.duration_seconds,side:state.side,style:profile.swing_style,next_sample:0,struck:[],damage:(stats.damage??25)*this.#multiplier()*(edge?.bladeDamageMult??1)*(flit?(this.#policy.flit_multiplier?.()??1):1),flit,bleed_max:edge?.bleedMax??this.#rules.bleed.max_stacks,stats:jsonCopy(stats)};
@@ -107,8 +107,8 @@ export class weaponSystem{
  }
  #updateSwing(player,state,seconds){
   const swing=state.swing;if(!swing)return;
-  if(isCombatDead(player)||state.holstered||this.#items.equipped_weapon_id!==swing.weapon_instance_id||this.#context.api.physics.getAttachmentState(player)){state.swing=null;return;}
-  const ph=swingPhases(swing.style),age=state.elapsed-swing.started,progress=(age/swing.seconds-ph.windup)/(ph.cutEnd-ph.windup),samples=this.#rules.blade.samples,world=this.#context.api.physics,profile=getCombatProfile(swing.definition_id);
+  if(isCombatDead(player)||state.holstered||this.#items.equipped_weapon_id!==swing.weapon_instance_id||this.#context.basement.physics.getAttachmentState(player)){state.swing=null;return;}
+  const ph=swingPhases(swing.style),age=state.elapsed-swing.started,progress=(age/swing.seconds-ph.windup)/(ph.cutEnd-ph.windup),samples=this.#rules.blade.samples,world=this.#context.basement.physics,profile=getCombatProfile(swing.definition_id);
   for(;swing.next_sample<=samples&&swing.next_sample<=progress*samples+1e-9;swing.next_sample++){
    const k=swing.next_sample,sample=index=>sampleMeleeSwing((ph.windup+(ph.cutEnd-ph.windup)*index/samples)*swing.seconds,swing.side,{},swing.seconds,swing.style),from=sample(Math.max(0,k-1)),to=sample(k);
    const packet={collision_shape:profile.blade_shape,from_local_position:[from.handX,from.handY],to_local_position:[to.handX,to.handY],from_local_rotation:from.a,to_local_rotation:to.a,line_of_sight:true};
@@ -125,7 +125,7 @@ export class weaponSystem{
  }
  #contactPolicy(event){const child=this.#controllers.get(event.target_entity?.entity_id)?.controller;return child?child.#applyContactPolicy(event):this.#applyContactPolicy(event);}
  #applyContactPolicy({projectile,target_entity}){
-  if(!projectile)return null;const player=this.#player(),data=projectile.data,source=this.#context.api.elements.fetchEntity(data.source_id);
+  if(!projectile)return null;const player=this.#player(),data=projectile.data,source=this.#context.basement.elements.fetchEntity(data.source_id);
   if(target_entity&&!this.#combat.canDamage(source,target_entity,{source_alliance:data.source_alliance})&&target_entity.collision_group&BODY_GROUP.CHARACTER)return {action:'ignore'};
   if(target_entity===player&&source!==player&&this.#glass()&&!this.state.shield.spent){
    const shield=this.state.shield;shield.charge=Math.max(0,shield.charge-(data.damage??0));shield.spent=shield.charge<=0;shield.since_hit=0;
@@ -135,14 +135,14 @@ export class weaponSystem{
  }
  #reflect(projectile,player,by,fraction){
   if(!projectile||projectile.destroyed||projectile.data.source_id===player.entity_id)return false;
-  const source=this.#context.api.elements.fetchEntity(projectile.data.source_id);if(source&&!this.#combat.canDamage(source,player))return false;
+  const source=this.#context.basement.elements.fetchEntity(projectile.data.source_id);if(source&&!this.#combat.canDamage(source,player))return false;
   projectile.redirectProjectile(undefined,{...(source&&!isCombatDead(source)?{target:source}:{reverse:true}),owner_id:player.entity_id,at_fraction:fraction,min_lifetime:this.#rules.mirror.minimum_projectile_lifetime});projectile.data.pending_deflection=by;
   return true;
  }
  #projectileHit(event){const child=this.#controllers.get(event.projectile?.data.source_id)?.controller;return child?child.#applyProjectileHit(event):this.#applyProjectileHit(event);}
  #applyProjectileHit(event){
   if(event.sensor_only)return;const data=event.projectile?.data,target=event.target_entity;if(!data||!target||!Number.isFinite(data.damage))return;
-  const source=this.#context.api.elements.fetchEntity(data.source_id);if(!this.#combat.canDamage(source,target,{source_alliance:data.source_alliance}))return;
+  const source=this.#context.basement.elements.fetchEntity(data.source_id);if(!this.#combat.canDamage(source,target,{source_alliance:data.source_alliance}))return;
   if(target.interceptProjectile?.(event))return;
   const damage=Math.round(data.damage*event.impact_scale);if(!this.#combat.damage(target,damage,{hit_position:event.world_point,hit_radius:event.projectile.collision_shape.radius??0,source_id:data.source_id,type:data.damage_type??(data.melee?'melee':'ballistic'),crit:data.crit,bypass_invulnerability:!!data.melee,...(data.ability_id?{ability_id:data.ability_id}:{})}))return;
   if(data.sticky)this.#combat.attachOrb(target,{damage:data.dot_damage,interval_seconds:data.dot_interval,ticks:data.dot_ticks,max_orbs:data.max_orbs,source_id:data.source_id});
@@ -153,7 +153,7 @@ export class weaponSystem{
  }
  registerActor(actor,{items=actor.items,policy={}}={}){
   if(!this.#projectileEvents)throw new Error('Register actors through the world weapon service');if(actor===this.#player())throw new Error('The controlled player already has a weapon controller');
-  if(!this.#context||!actor||actor.destroyed||actor.physics_system!==this.#context.api.physics)throw new TypeError('Register an actor in this weapon world');
+  if(!this.#context||!actor||actor.destroyed||actor.physics_system!==this.#context.basement.physics)throw new TypeError('Register an actor in this weapon world');
   if(this.#controllers.has(actor.entity_id))throw new Error('Actor already has a weapon controller');
   const controller=new weaponSystem({items,combat:this.#combat,get_player:()=>actor,rules:this.#rules,policy:{random:this.#policy.random,...policy},projectile_events:false});controller.attach(this.#context);this.#controllers.set(actor.entity_id,{actor,controller});return controller;
  }

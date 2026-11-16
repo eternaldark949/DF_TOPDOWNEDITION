@@ -6,25 +6,25 @@ export class encounterSystem{
  #context=null;#combat;#random;#actors=null;#effects=new Map();#owners=new Map();#off=[];#wardens=new Map();#orders=new Map();#squads=new Map();#decoys=new Map();
  constructor({combat,random=Math.random}={}){this.#combat=combat;this.#random=random;}
  setActors(actors){this.#actors=actors;}
- attach(context){this.#context=context;this.#off.push(context.api.physics.on('entityRegistered',({entity})=>this.#track(entity)),context.api.physics.on('entityRemoved',({entity})=>{this.clearOwner(entity.entity_id);this.#drop(entity.entity_id);this.untrackActor(entity);}));this.reconnectGameplay();}
+ attach(context){this.#context=context;this.#off.push(context.basement.physics.on('entityRegistered',({entity})=>this.#track(entity)),context.basement.physics.on('entityRemoved',({entity})=>{this.clearOwner(entity.entity_id);this.#drop(entity.entity_id);this.untrackActor(entity);}));this.reconnectGameplay();}
  detach(){this.levelLeaving();for(const off of this.#off.splice(0))off();this.#context=null;}
  #writable(){if(this.#context?.engine?.phase==='render')throw new Error('Rendering cannot change encounters');}
- #rules(){return this.#context.api.physics.elements.asset_library.getResource('df:actor_rules').data.bosses;}
+ #rules(){return this.#context.basement.physics.elements.asset_library.getResource('df:actor_rules').data.bosses;}
  #track(entity){if(!(entity instanceof BossEffect)||entity.destroyed||this.#effects.has(entity.entity_id))return;entity.validateEffect();this.#effects.set(entity.entity_id,entity);let ids=this.#owners.get(entity.data.owner_id);if(!ids)this.#owners.set(entity.data.owner_id,ids=new Set());ids.add(entity.entity_id);}
  #drop(id){const effect=this.#effects.get(id);if(!effect)return;this.#owners.get(effect.data.owner_id)?.delete(id);this.#effects.delete(id);if(!this.#owners.get(effect.data.owner_id)?.size)this.#owners.delete(effect.data.owner_id);}
  addEffect(owner,kind,position,extra={}){
-  this.#writable();if(!owner||owner.destroyed||owner.physics_system!==this.#context.api.physics)throw new TypeError('Use an official live effect owner');const H=this.#rules().hazards;
+  this.#writable();if(!owner||owner.destroyed||owner.physics_system!==this.#context.basement.physics)throw new TypeError('Use an official live effect owner');const H=this.#rules().hazards;
   const specs={sigil:{radius:H.SIGIL_R,duration:H.SIGIL_ARM,damage:H.SIGIL_HIT},fire:{radius:H.SIGIL_R*.8,duration:H.FIRE_SECS,burn_dps:8},smoke:{radius:H.CENSER_SMOKE_R,duration:H.CENSER_SMOKE_SECS},censer:{radius:H.CENSER_FIRE_R,duration:H.CENSER_FLIGHT,damage:H.CENSER_HIT},hymn:{radius:0,radius_to:H.HYMN_RANGE,duration:H.HYMN_SECS,damage:H.HYMN_HIT},rite:{radius:this.#rules().duel.RITE_R0,radius_to:this.#rules().duel.RITE_R1,duration:H.RITE_SECS,burn_dps:H.RITE_DPS}};
   if(!specs[kind])throw new TypeError('Unknown encounter effect');const data={format_version:1,role:'boss_effect',kind,owner_id:owner.entity_id,owner_alliance:owner.alliance,age:0,next_tick:0,hit_ids:[],radius:0,radius_to:0,damage:0,burn_dps:0,...specs[kind],...jsonCopy(extra)};
   const effect=this.#context.createEntity({template:'df:boss_effect',position,collision_shape:{shape_type:'circle',radius:Math.max(1,data.radius,data.radius_to)},render_shape:{shape_type:'circle',radius:Math.max(1,data.radius,data.radius_to)},data});try{this.#track(effect);return effect;}catch(error){effect.destroy();throw error;}
  }
  getEffects(){return [...this.#effects.values()];}
  clearOwner(owner){const id=typeof owner==='number'?owner:owner.entity_id;for(const effectId of [...(this.#owners.get(id)??[])]){const effect=this.#effects.get(effectId);this.#drop(effectId);if(effect&&!effect.destroyed)effect.destroy();}}
- smokeBlocks(source,target){const world=this.#context.api.physics,to=Array.isArray(target)?target:target.position;return world.shapeCast({from:source.position,to,collision_shape:{shape_type:'circle',radius:.001},include_groups:BODY_GROUP.SENSOR,include_ghosts:true,ignore_body:source}).some(hit=>hit.entity instanceof BossEffect&&hit.entity.data.kind==='smoke'&&hit.entity.data.age<hit.entity.data.duration);}
- #eligible(owner,target){return target&&!target.destroyed&&!target.dead&&!(target.data.player_state?.flit_remaining>0)&&!this.#context.api.physics.getAttachmentState(target)&&this.#combat.canDamage(owner,target);}
+ smokeBlocks(source,target){const world=this.#context.basement.physics,to=Array.isArray(target)?target:target.position;return world.shapeCast({from:source.position,to,collision_shape:{shape_type:'circle',radius:.001},include_groups:BODY_GROUP.SENSOR,include_ghosts:true,ignore_body:source}).some(hit=>hit.entity instanceof BossEffect&&hit.entity.data.kind==='smoke'&&hit.entity.data.age<hit.entity.data.duration);}
+ #eligible(owner,target){return target&&!target.destroyed&&!target.dead&&!(target.data.player_state?.flit_remaining>0)&&!this.#context.basement.physics.getAttachmentState(target)&&this.#combat.canDamage(owner,target);}
  #burn(owner,target,dps,seconds){this.#combat.attachOrb(target,{damage:dps*.5,interval_seconds:.5,ticks:Math.ceil(seconds/.5),max_orbs:1,source_id:owner.entity_id,extinguish_on_flit:true});}
  executePattern(actor,definition,state){
-  this.#writable();const world=this.#context.api.physics,target=state.aim.target===undefined?null:Array.isArray(state.aim.target)?state.aim.target:world.elements.fetchEntity(state.aim.target),point=Array.isArray(target)?target:target?.position??world.getBodyPoint(actor,[definition.range,0]).position,D=this.#rules().duel;
+  this.#writable();const world=this.#context.basement.physics,target=state.aim.target===undefined?null:Array.isArray(state.aim.target)?state.aim.target:world.elements.fetchEntity(state.aim.target),point=Array.isArray(target)?target:target?.position??world.getBodyPoint(actor,[definition.range,0]).position,D=this.#rules().duel;
   switch(definition.effect){
    case 'fan':for(let i=0;i<definition.count;i++)world.createProjectileFrom(actor,{template:'df:projectile',local_position:[16,0],angle:state.heading,angle_offset:(i-(definition.count-1)/2)*definition.spread,speed:definition.speed,lifetime:definition.lifetime,collision_shape:{shape_type:'circle',radius:definition.radius},collision_mask:BODY_GROUP.STATIC|BODY_GROUP.PROP|BODY_GROUP.VEHICLE|BODY_GROUP.CHARACTER,data:{role:'projectile',source_id:actor.entity_id,source_alliance:actor.alliance,damage:definition.damage,damage_type:'energy',color:'#ff5a1a',ability_id:state.ability_id}});break;
    case 'whip':case 'gale':{
@@ -44,9 +44,9 @@ export class encounterSystem{
    }
   }
  }
- beforePhysics(context,seconds=context.api.physics.config.fixed_step){
+ beforePhysics(context,seconds=context.basement.physics.config.fixed_step){
   if(context.engine?.paused)return;this.#writable();this.#updateOrders();
-  const world=context.api.physics,H=this.#rules().hazards;
+  const world=context.basement.physics,H=this.#rules().hazards;
   for(const effect of [...this.#effects.values()]){
    if(effect.destroyed){this.#drop(effect.entity_id);continue;}const d=effect.data,owner=world.elements.fetchEntity(d.owner_id);if(!owner||owner.dead){this.clearOwner(d.owner_id);continue;}const previous=d.age;d.age=Math.min(d.duration,d.age+seconds);let hits=[];
    if(d.kind==='hymn')hits=world.queryRadialRegion(effect,{radius:0,radius_to:d.radius_to,progress:d.age/d.duration,previous_progress:previous/d.duration,thickness:22}).hits;
@@ -61,7 +61,7 @@ export class encounterSystem{
  untrackActor(actor){const decoys=this.#decoys.get(actor.data.mirror_owner_id);decoys?.delete(actor.entity_id);if(decoys&&!decoys.size)this.#decoys.delete(actor.data.mirror_owner_id);this.#wardens.delete(actor.entity_id);this.#orders.delete(actor.entity_id);const squad=this.#squads.get(actor.data.squad_id);squad?.delete(actor.entity_id);if(squad&&!squad.size)this.#squads.delete(actor.data.squad_id);}
  actorDefeated(actor){this.clearOwner(actor.entity_id);if(actor.data.decoy)return;if(this.#wardens.has(actor.entity_id)){for(const other of this.#squads.get(actor.data.squad_id)?.values()??[])if(other!==actor&&!other.dead)other.enrage();}if(actor.entity_type==='df_demoness')for(const decoy of this.#decoys.get(actor.entity_id)?.values()??[])if(!decoy.destroyed)decoy.die();}
  #updateOrders(){
-  const world=this.#context.api.physics,W=this.#rules().warden;this.#orders.clear();
+  const world=this.#context.basement.physics,W=this.#rules().warden;this.#orders.clear();
   for(const squad of this.#squads.values()){
    let flanker=null,hiddenFor=Infinity,notReloading=0;const living=[];
    for(const actor of squad.values())if(!actor.destroyed&&!actor.dead&&!actor.dormant){living.push(actor);const state=actor.warden_state,target=world.elements.fetchEntity(state.target_id);if(!target||target.dead||target.visible===false)continue;const view=world.observeTarget(actor,target,{near_range:900}),revealed=(target.data.combat_state?.revealed_remaining??0)>0,sight=view.line_clear&&!this.smokeBlocks(actor,target);if(sight||revealed){state.seen_position=[...target.position];state.hidden_seconds=0;}else state.hidden_seconds+=world.config.fixed_step;if(state.seen_position)hiddenFor=Math.min(hiddenFor,state.hidden_seconds);if(actor.data.ability_action_state?.phase!=='reload')notReloading++;this.#orders.set(actor.entity_id,{sight,revealed,cover:!sight&&!!state.seen_position&&(revealed||actor.data.ability_action_state?.phase==='burst'&&state.hidden_seconds<W.COVER_FIRE),aim:sight||revealed?target.entity_id:state.seen_position,flank:false,extend:false});}
@@ -70,7 +70,7 @@ export class encounterSystem{
  }
  getWardenOrders(actor){return this.#orders.get(actor.entity_id)??null;}
  getBurstPolicy(actor){if(!this.#wardens.has(actor.entity_id))return null;const order=this.getWardenOrders(actor);return {blocked:!order||!(order.sight||order.cover||order.revealed),aim:order?.aim===null?undefined:{target:order?.aim},bypass_sight:!!(order?.cover||order?.revealed),extend:!!order?.extend,extend_by:this.#rules().warden.EXTEND};}
- reconnectGameplay(){this.#effects.clear();this.#owners.clear();if(this.#context)for(const entity of this.#context.api.elements.getEntities())this.#track(entity);this.#orders.clear();}
+ reconnectGameplay(){this.#effects.clear();this.#owners.clear();if(this.#context)for(const entity of this.#context.basement.elements.getEntities())this.#track(entity);this.#orders.clear();}
  levelEntered(){this.reconnectGameplay();}
  levelLeaving(){for(const effect of [...this.#effects.values()]){this.#drop(effect.entity_id);if(!effect.destroyed)effect.destroy();}this.#wardens.clear();this.#squads.clear();this.#decoys.clear();this.#orders.clear();}
 }

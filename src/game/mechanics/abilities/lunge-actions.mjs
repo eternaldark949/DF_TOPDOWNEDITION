@@ -11,7 +11,7 @@ export function validateAbilityAction(state,catalog,{clock}={}){
 }
 export function beginLunge(actor,definition,ability_id,aim,controller,api,combat){
  const logical=Object.fromEntries(['target','direction','angle'].filter(key=>aim[key]!==undefined).map(key=>[key,aim[key]]));
- const heading=api.physics.resolveAim(actor,logical).rotation,now=controller.state.elapsed;
+ const heading=api.basement.physics.resolveAim(actor,logical).rotation,now=controller.state.elapsed;
  const state={format_version:1,ability_id,phase:'tell',started_at:now,phase_started_at:now,heading,aim:jsonCopy(logical),hit_ids:[],cancel_requested:false};
  actor.cancelMovement();actor.data.ability_action_state=state;controller.setCooldown(definition.cooldown_seconds);combat.emit('ability:cast',{entity_id:actor.entity_id,ability_id,action:true});return jsonCopy(state);
 }
@@ -19,7 +19,7 @@ export function clearLunge(actor){if(!actor.destroyed){actor.cancelMovement();ac
 export function advanceLunge(actor,definition,controller,api,combat,{known=true}={}){
  const state=actor.data.ability_action_state;if(!state)return false;
  if(actor.destroyed||actor.dead||!actor.active){clearLunge(actor);return false;}
- const world=api.physics,now=controller.state.elapsed;
+ const world=api.basement.physics,now=controller.state.elapsed;
  const recover=()=>{state.phase='recover';state.phase_started_at=now;state.cancel_requested=false;actor.cancelMovement();actor.clearFacing();};
  if(state.cancel_requested||!known||world.getAttachmentState(actor)||actor.data.combat_state?.stagger_remaining>0){if(state.phase!=='recover')recover();}
  if(state.phase==='tell'){

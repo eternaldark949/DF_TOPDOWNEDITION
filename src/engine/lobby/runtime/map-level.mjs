@@ -20,9 +20,9 @@ export class mapLevel extends gameLevel {
         return { definition, map_options, arrival: options.arrival ?? null, travellers: [...(options.travellers ?? [])] };
     }
     enter(context, prepared) {
-        this.map = new mapInstance(context.api.physics, prepared.definition, prepared.map_options);
+        this.map = new mapInstance(context.basement.physics, prepared.definition, prepared.map_options);
         this.definition = prepared.definition;
-        const travellers = prepared.travellers.map(id => context.api.elements.fetchEntity(id)).filter(e => e && !e.destroyed);
+        const travellers = prepared.travellers.map(id => context.basement.elements.fetchEntity(id)).filter(e => e && !e.destroyed);
         if (travellers.length) this.placeTravellers(context, travellers, this.arrivalPose(context, prepared.arrival?.from ?? null, travellers[0]));
         this.map.setFocus(this.mapFocuses(context), { budget_ms: Infinity });   // (the arriving regions, whole, behind the level change)
     }
@@ -34,7 +34,7 @@ export class mapLevel extends gameLevel {
      */
     mapFocuses(context) {
         // By class, from the characters' own list: reading a body's state would copy it.
-        const focuses = context.api.physics.elements.getEntities({ instance_of: gameCharacter }).filter(e => e.active !== false && !e.destroyed).map(e => ({ position: e.position, velocity: e.linear_velocity }));
+        const focuses = context.basement.physics.elements.getEntities({ instance_of: gameCharacter }).filter(e => e.active !== false && !e.destroyed).map(e => ({ position: e.position, velocity: e.linear_velocity }));
         return focuses.length ? focuses : [this.map.spawn ?? this.definition.size.map(v => v / 2)];
     }
     /** Milliseconds a step may spend building regions (the rest wait for the next step). */
@@ -57,7 +57,7 @@ export class mapLevel extends gameLevel {
     }
     /** Where someone arriving from `from` stands: inside the exit leading back there, else the map's spawn. */
     arrivalPose(context, from, body) {
-        const world = context.api.physics, [width, height] = this.definition.size, spawn = this.definition.spawn ?? [width / 2, height / 2];
+        const world = context.basement.physics, [width, height] = this.definition.size, spawn = this.definition.spawn ?? [width / 2, height / 2];
         const gate = from === null ? null : this.getExits().find(exit => exit.target === from);
         if (!gate) return { position: [...spawn], rotation: -Math.PI / 2 };
         const b = gate.bounds, cx = (b.left + b.right) / 2, cy = (b.top + b.bottom) / 2;
@@ -72,7 +72,7 @@ export class mapLevel extends gameLevel {
     }
     /** The leader at the pose; each follower in the nearest clear spot beside it or further in, never in an exit. */
     placeTravellers(context, [leader, ...followers], pose) {
-        const world = context.api.physics, ahead = [Math.cos(pose.rotation), Math.sin(pose.rotation)], side = [-ahead[1], ahead[0]];
+        const world = context.basement.physics, ahead = [Math.cos(pose.rotation), Math.sin(pose.rotation)], side = [-ahead[1], ahead[0]];
         const put = (body, position) => world.updateBody(body, { position, rotation: pose.rotation, linear_velocity: [0, 0], angular_velocity: 0 });
         const inExit = p => this.getExits().some(exit => world.containsPoint(exit.entity, p));
         put(leader, pose.position);

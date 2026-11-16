@@ -1,9 +1,18 @@
-// ===== LV1 LOBBY =====
-import { physicsSystem } from '../../basement/physics/index.mjs';
-import { levelLobby } from '../level-lobby.mjs';
-import { gameLevel } from './game-level.mjs';
-import { controlSystem } from '../../basement/controls/index.mjs';
-import { cameraSystem, renderSystem } from '../../basement/rendering/index.mjs';
+// ===== ENGINE =====
+// The game engine: every level plugged in through one jack each. `engine.basement` (systems and operations),
+// `engine.lobby` (the loop's clock), `engine.directory` (the data), `engine.penthouse` (prefabs) and
+// `engine.game` (the services a game plugs in). Lifecycle contexts carry the same jacks.
+import { physicsSystem } from './basement/physics/index.mjs';
+import { controlSystem } from './basement/controls/index.mjs';
+import { cameraSystem, renderSystem } from './basement/rendering/index.mjs';
+import { levelLobby } from './lobby/level-lobby.mjs';
+import { gameLevel } from './lobby/runtime/game-level.mjs';
+import { assetLibrary, mergeDefinition, identifier, nonnegative, jsonCopy, STRUCTURES, validatePropCatalog, validateMapLayout, checkLook, validateSkeleton, validateClipSet, validateLocomotion, validateFigure, validateDoorKind, validateLibrary, doorKindsOf, ENGINE_LIBRARIES, createEngineRegistry, resolvePlacement, resolveLayout, resolvePropLook, isMovable } from './directory/index.mjs';
+import { humanoid } from './penthouse/index.mjs';
+
+/** What each jack carries besides the running systems: the Directory's functions and the Penthouse's prefabs. */
+const DIRECTORY = Object.freeze({ assetLibrary, mergeDefinition, identifier, nonnegative, jsonCopy, STRUCTURES, validatePropCatalog, validateMapLayout, checkLook, validateSkeleton, validateClipSet, validateLocomotion, validateFigure, validateDoorKind, validateLibrary, doorKindsOf, ENGINE_LIBRARIES, createEngineRegistry, resolvePlacement, resolveLayout, resolvePropLook, isMovable });
+const PENTHOUSE = Object.freeze({ humanoid });
 
 const hooks = ['attach', 'detach', 'beforePhysics', 'afterPhysics', 'render', 'levelEntered', 'levelLeaving','gameplayPaused'];
 function synchronous(fn, receiver, args) {
@@ -22,7 +31,7 @@ function failures(errors, message) { if (errors.length) throw new AggregateError
 
 /** Application coordinator. Basement supplies all physical behavior; the Lobby supplies time. */
 export class gameEngine {
-    #world; #authority = Symbol('runtime simulation clock'); #api; #lobby; #controls; #camera; #render;
+    #world; #authority = Symbol('runtime simulation clock'); #basement; #directory; #penthouse; #game; #lobby; #controls; #camera; #render;
     #levels = new Map(); #systems = new Map(); #active = null; #persistent = new Set();
     #running = false; #destroyed = false; #phase = 'idle'; #loading = false; #pauses = new Map();
     #schedule; #cancel; #frame = null; #generation = 0;
@@ -31,8 +40,8 @@ export class gameEngine {
         schedule_frame = typeof requestAnimationFrame === 'function' ? callback => requestAnimationFrame(callback) : null,
         cancel_frame = typeof cancelAnimationFrame === 'function' ? handle => cancelAnimationFrame(handle) : null,
         render_target, services = {} } = {}) {
-        if (!services || typeof services !== 'object' || Array.isArray(services) || Object.keys(services).some(key => ['rigs','physics','elements','assets','motion','traffic','controls','camera','render','__proto__','constructor','prototype'].includes(key))) throw new TypeError('Game services must not replace runtime APIs');
-        if(render_target!==undefined)throw new TypeError('Mount a renderer surface through api.render.setRenderer; render hooks receive a frame');
+        if (!services || typeof services !== 'object' || Array.isArray(services) || Object.keys(services).some(key => ['__proto__','constructor','prototype'].includes(key))) throw new TypeError('Game services are a plain object of named services');
+        if(render_target!==undefined)throw new TypeError('Mount a renderer surface through basement.render.setRenderer; render hooks receive a frame');
         if (Object.hasOwn(physics, 'step_authority') || Object.hasOwn(physics, 'asset_library')) throw new TypeError('The runtime owns physics authority and its asset library');
         if (schedule_frame !== null && typeof schedule_frame !== 'function' || cancel_frame !== null && typeof cancel_frame !== 'function') throw new TypeError('Frame scheduling requires functions');
         this.#world = new physicsSystem({ ...physics, asset_library, step_authority: this.#authority });
@@ -44,8 +53,11 @@ export class gameEngine {
         this.#camera = new cameraSystem(camera);
         this.#controls = new controlSystem({ ...controls, auto_update:false });
         this.#render = new renderSystem({physics_system:this.#world,camera:this.#camera});
-        this.#api = Object.freeze({ ...services, physics: this.#world, elements: this.#world.elements, assets: this.#world.elements.asset_library,
-            rigs:this.#world.rigs, motion: this.#world.motion, traffic: this.#world.traffic, controls:this.#controls, camera:this.#camera, render:this.#render });
+        this.#basement = Object.freeze({ physics: this.#world, elements: this.#world.elements, rigs: this.#world.rigs, motion: this.#world.motion,
+            traffic: this.#world.traffic, controls: this.#controls, camera: this.#camera, render: this.#render });
+        this.#directory = Object.freeze({ ...DIRECTORY, assets: this.#world.elements.asset_library });
+        this.#penthouse = Object.freeze({ ...PENTHOUSE });
+        this.#game = Object.freeze({ ...services });
         this.#schedule = schedule_frame; this.#cancel = cancel_frame;
         this.#lobby = new levelLobby(Object.freeze(config), frame_clock);
         this.#lobby.plugIn({ isRunning: () => this.running, isPaused: () => this.paused || !this.active_level,
@@ -53,9 +65,16 @@ export class gameEngine {
             simulateStep: () => this.updateState(), renderFrame: blend => this.render(blend),
             scheduleNextFrame: () => this.#queueFrame() });
     }
-    get api() { return this.#api; }
-    get physics_system() { return this.#world; }
+    /** LV0: the running systems (physics, elements, rigs, motion, traffic, controls, camera, render). */
+    get basement() { return this.#basement; }
+    /** LV1: the loop's clock. */
     get lobby() { return this.#lobby; }
+    /** LV2: the data layer's functions, plus `assets`, this runtime's registry. */
+    get directory() { return this.#directory; }
+    /** LV3: the prefabs. */
+    get penthouse() { return this.#penthouse; }
+    /** The services the game plugged in. */
+    get game() { return this.#game; }
     get active_level() { return this.#active?.level ?? null; }
     get running() { return this.#running; }
     get loading() { return this.#loading; }
@@ -71,7 +90,7 @@ export class gameEngine {
         let live = true;
         cleanups.push(() => { live = false; });
         const requireLive = () => { this.#live(); if (!live) throw new Error('Lifecycle context has been retired'); };
-        return Object.freeze({ engine: this, api: this.api,
+        return Object.freeze({ engine: this, basement: this.#basement, lobby: this.#lobby, directory: this.#directory, penthouse: this.#penthouse, game: this.#game,
             createEntity: (packet, options) => { requireLive(); return this.createEntity(packet, options); },
             on: (event, handler) => {
                 requireLive();
@@ -129,7 +148,7 @@ export class gameEngine {
     retainEntity(entity) {
         this.#live();
         if(!['idle','registration','input','beforePhysics','afterPhysics','transition'].includes(this.#phase))throw new Error('Retain entities at a runtime or registration boundary');
-        if (!entity || this.api.elements.fetchEntity(entity.entity_id) !== entity) throw new Error('Retain an official entity belonging to this runtime');
+        if (!entity || this.#basement.elements.fetchEntity(entity.entity_id) !== entity) throw new Error('Retain an official entity belonging to this runtime');
         this.#persistent.add(entity); return entity;
     }
     releaseEntity(entity) {
@@ -146,7 +165,7 @@ export class gameEngine {
         try {
             candidate = new Level({ level_id });
             if (candidate.level_id !== level_id) throw new Error('Level identity does not match registration');
-            prepared = await candidate.prepare(Object.freeze({ assets: this.api.assets }), options);
+            prepared = await candidate.prepare(Object.freeze({ assets: this.#directory.assets }), options);
             this.#idle(); this.#phase = 'transition';
             this.#controls.clear();
             this.#world.commitCommands();
@@ -172,7 +191,7 @@ export class gameEngine {
         this.#clean(active.cleanups, errors);
         // The official registry is the source of truth, including entities spawned by raw
         // native factories. This is lifecycle filtering, not another entity/spatial registry.
-        for (const entity of this.api.elements.getEntities()) if (!this.#persistent.has(entity)) attempt(errors, () => entity.destroy());
+        for (const entity of this.#basement.elements.getEntities()) if (!this.#persistent.has(entity)) attempt(errors, () => entity.destroy());
         for (const entity of this.#persistent) if (entity.destroyed) this.#persistent.delete(entity);
         this.#active = null;
         attempt(errors, () => this.#world.commitCommands());

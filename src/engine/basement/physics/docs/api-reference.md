@@ -452,7 +452,7 @@ Event-time accepted launches are pending native commands. They revalidate emitte
 
 ## Rigs and animation
 
-`physics.rigs` is the world's `rigSystem`; the application runtime also exposes the same instance as `api.rigs`. It shares the world's fixed step, body registry, persistence and spatial grid. Ordinary joints and anchors create **zero physics bodies**. Animation data is in `animation/`; this folder remains usable when copied out of the game.
+`physics.rigs` is the world's `rigSystem`; the application runtime also exposes the same instance as `basement.rigs`. It shares the world's fixed step, body registry, persistence and spatial grid. Ordinary joints and anchors create **zero physics bodies**. Animation data is in `animation/`; this folder remains usable when copied out of the game.
 
 ### `rigDefinition`
 

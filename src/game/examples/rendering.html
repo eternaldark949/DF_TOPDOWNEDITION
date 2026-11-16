@@ -8,8 +8,8 @@ import {createRuntimeExample} from './runtime-example.mjs';
 import {installRenderingExample} from './rendering-example.mjs';
 const surface=document.getElementById('scene');
 const {engine,player}=createRuntimeExample({surface,camera:{position:[0,0],zoom:2,rotation:Math.PI/2,viewport:{width:320,height:240,pixel_ratio:devicePixelRatio}}});
-await engine.api.render.setRenderer('canvas',{surface});
+await engine.basement.render.setRenderer('canvas',{surface});
 await engine.loadLevel('room_a');await installRenderingExample(engine);
-engine.registerSystem('status',{render(context){document.getElementById('status').textContent=JSON.stringify({renderer:context.api.render.renderer_id,...context.api.render.getStatistics()},null,2);}});
+engine.registerSystem('status',{render(context){document.getElementById('status').textContent=JSON.stringify({renderer:context.basement.render.renderer_id,...context.basement.render.getStatistics()},null,2);}});
 engine.start();globalThis.renderingExample={engine,player};
 </script></html>

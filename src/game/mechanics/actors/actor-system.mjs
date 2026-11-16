@@ -15,7 +15,7 @@ import {createActorPacket} from '../../boot/game-actor-factory.mjs';
 export class actorSystem{
  #context=null;#actors=new Map();#attacks;#abilities;#encounters;#combat;#player;#session;#policy;#off=[];#pendingLifetime=new Map();#squads=new Map();
  constructor({attacks,abilities,encounters,combat,session,get_player=()=>session?.player,policy={}}={}){this.#attacks=attacks;this.#abilities=abilities;this.#encounters=encounters;this.#combat=combat;this.#player=get_player;this.#session=session;this.#policy=policy;}
- attach(context){if(this.#context)throw new Error('Actors already attached');this.#context=context;this.#off.push(context.api.physics.on('contactBegin',event=>{if(event.sensor_only)return;for(const [actor,other] of [[event.entity_a,event.entity_b],[event.entity_b,event.entity_a]])if(actor instanceof VelvetCat&&(other?.collision_group&BODY_GROUP.VEHICLE))actor.onVehicleImpact(event.relative_speed);}),context.api.physics.on('entityRegistered',event=>this.#track(event.entity)),context.api.physics.on('entityRemoved',event=>this.#untrack(event.entity.entity_id)));this.reconnectGameplay();}
+ attach(context){if(this.#context)throw new Error('Actors already attached');this.#context=context;this.#off.push(context.basement.physics.on('contactBegin',event=>{if(event.sensor_only)return;for(const [actor,other] of [[event.entity_a,event.entity_b],[event.entity_b,event.entity_a]])if(actor instanceof VelvetCat&&(other?.collision_group&BODY_GROUP.VEHICLE))actor.onVehicleImpact(event.relative_speed);}),context.basement.physics.on('entityRegistered',event=>this.#track(event.entity)),context.basement.physics.on('entityRemoved',event=>this.#untrack(event.entity.entity_id)));this.reconnectGameplay();}
  detach(){for(const off of this.#off.splice(0))off();for(const id of [...this.#actors.keys()])this.#untrack(id);this.#context=null;}
  #lifetime(actor,retain){if(this.#context.engine?.phase==='physics'){this.#pendingLifetime.set(actor.entity_id,retain);return;}this.#context.engine?.[retain?'retainEntity':'releaseEntity']?.(actor);}
  #event(event,detail){const actor=this.#actors.get(detail.entity_id);if(event==='actor:defeated'&&actor)this.#encounters?.actorDefeated(actor);if(['npc:hired','cat:adopted'].includes(event)&&actor)this.#lifetime(actor,true);if(['actor:defeated','actor:revived'].includes(event)&&actor instanceof GatlingGunner){const squad=this.#squads.get(actor.data.squad_id);if(squad){squad.alive.set(actor.entity_id,!actor.dead);squad.dirty=true;}}if(['npc:released','cat:released'].includes(event)&&actor)this.#lifetime(actor,false);if(event==='actor:cooldown-requested'&&actor){this.#attacks.getController(actor)?.setCooldown(detail.seconds);delete actor.data.weapon_cooldown_seconds;}this.#session?.emit(event,detail);this.#policy.on_event?.(event,detail);if(event==='actor:inventory-loaded'){const actor=this.#actors.get(detail.entity_id);if(actor)this.#attacks.reconnectActor(actor);}}
@@ -39,11 +39,11 @@ export class actorSystem{
  setSquad(actor,{squad_id,formation_order=actor.data.formation_order}={}){if(!(actor instanceof GatlingGunner)||this.#actors.get(actor.entity_id)!==actor||typeof squad_id!=='string'||!squad_id||!Number.isFinite(formation_order))throw new TypeError('Use a registered gunner and valid squad');if(this.#context.engine?.phase==='render')throw new Error('Rendering cannot change squads');this.#encounters?.untrackActor(actor);this.#leaveSquad(actor);Object.assign(actor.data,{squad_id,formation_order});this.#joinSquad(actor);this.#encounters?.trackActor(actor);}
  #formation(actor){const squad=this.#squads.get(actor.data.squad_id);if(squad.dirty){const order=[...squad.members.values()].filter(member=>!member.dead).sort((a,b)=>a.data.formation_order-b.data.formation_order||a.entity_id-b.entity_id);squad.slots=new Map(order.map((member,index)=>[member.entity_id,{index,count:order.length}]));squad.dirty=false;}return squad.slots.get(actor.entity_id)??{index:0,count:1};}
  getActors(){return [...this.#actors.values()];}
- spawn(packet={},options={}){if(!this.#context)throw new Error('Actor system is detached');const actor=this.#context.createEntity(createActorPacket(this.#context.api.physics,packet),options);try{this.#track(actor);return actor;}catch(error){this.#attacks.unregisterActor(actor.entity_id);actor.disconnectActor();this.#context.engine?.releaseEntity?.(actor);actor.destroy();throw error;}}
- beforePhysics(context,seconds=context.api.physics.config.fixed_step){
+ spawn(packet={},options={}){if(!this.#context)throw new Error('Actor system is detached');const actor=this.#context.createEntity(createActorPacket(this.#context.basement.physics,packet),options);try{this.#track(actor);return actor;}catch(error){this.#attacks.unregisterActor(actor.entity_id);actor.disconnectActor();this.#context.engine?.releaseEntity?.(actor);actor.destroy();throw error;}}
+ beforePhysics(context,seconds=context.basement.physics.config.fixed_step){
   if(context.engine?.phase==='render')throw new Error('Rendering cannot advance actors');if(context.engine?.paused)return;
   this.#flushLifetimes();
-  const player=this.#player(),world=context.api.physics;
+  const player=this.#player(),world=context.basement.physics;
   for(const actor of this.#actors.values()){
    if(actor.destroyed){this.#untrack(actor.entity_id);continue;}actor.advanceActor(seconds);
    if(actor instanceof GatlingGunner){const squad=this.#squads.get(actor.data.squad_id),alive=!actor.dead;if(squad&&squad.alive.get(actor.entity_id)!==alive){squad.alive.set(actor.entity_id,alive);squad.dirty=true;}}
@@ -58,9 +58,9 @@ export class actorSystem{
   }
  }
  #flushLifetimes(){for(const [id,retain] of this.#pendingLifetime){const actor=this.#actors.get(id);if(actor&&!actor.destroyed)this.#lifetime(actor,retain);}this.#pendingLifetime.clear();}
- afterPhysics(context,seconds=context.api.physics.config.fixed_step){this.#flushLifetimes();for(const actor of this.#actors.values())if(actor instanceof VelvetCat)actor.advanceAnimation(seconds,this.#player());}
- hearNoise(position,{near_range=400,strength=1}={}){if(this.#context.engine?.paused)return 0;let heard=0;for(const hit of this.#context.api.physics.peruseNearbyEntities(position,{near_range,include_groups:BODY_GROUP.CHARACTER}))if(hit.entity instanceof Ganger&&hit.entity.hearNoise(position,{strength}))heard++;return heard;}
- reconnectGameplay(){for(const id of [...this.#actors.keys()])this.#untrack(id);for(const actor of this.#context.api.elements.getEntities())this.#track(actor);}
+ afterPhysics(context,seconds=context.basement.physics.config.fixed_step){this.#flushLifetimes();for(const actor of this.#actors.values())if(actor instanceof VelvetCat)actor.advanceAnimation(seconds,this.#player());}
+ hearNoise(position,{near_range=400,strength=1}={}){if(this.#context.engine?.paused)return 0;let heard=0;for(const hit of this.#context.basement.physics.peruseNearbyEntities(position,{near_range,include_groups:BODY_GROUP.CHARACTER}))if(hit.entity instanceof Ganger&&hit.entity.hearNoise(position,{strength}))heard++;return heard;}
+ reconnectGameplay(){for(const id of [...this.#actors.keys()])this.#untrack(id);for(const actor of this.#context.basement.elements.getEntities())this.#track(actor);}
  levelEntered(){this.reconnectGameplay();}
  levelLeaving(){this.#flushLifetimes();for(const id of [...this.#actors.keys()])this.#untrack(id);}
 }

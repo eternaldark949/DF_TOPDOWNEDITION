@@ -15,7 +15,7 @@ export class drivingSystem {
     nearestVehicle(context) {
         const player = this.#get_player(); if (!player) return null;
         let best = null, dist = this.#rules.reach;
-        for (const car of context.api.physics.elements.getEntities({ instance_of: gameVehicle })) {
+        for (const car of context.basement.physics.elements.getEntities({ instance_of: gameVehicle })) {
             if (typeof car.assignDriver !== 'function' || car.destroyed || car.data.control_mode === 'AI' || car.data.occupants?.[0] != null) continue;
             const d = Math.hypot(car.position[0] - player.position[0], car.position[1] - player.position[1]);
             if (d < dist) { dist = d; best = car; }
@@ -38,8 +38,8 @@ export class drivingSystem {
         car.setControlMode('PARKED'); this.vehicle = null; return true;
     }
     beforePhysics(context) {
-        const player = this.#get_player(), input = context.api.controls; if (!player) return;
-        if (this.vehicle && (this.vehicle.destroyed || context.api.physics.getAttachmentState(player)?.parent_body_id !== this.vehicle.body_id)) this.vehicle = null;
+        const player = this.#get_player(), input = context.basement.controls; if (!player) return;
+        if (this.vehicle && (this.vehicle.destroyed || context.basement.physics.getAttachmentState(player)?.parent_body_id !== this.vehicle.body_id)) this.vehicle = null;
         if (input.justActivated('interact')) { if (this.vehicle) this.leave(); else { const car = this.nearestVehicle(context); if (car) this.enter(car); } }
         const car = this.vehicle; if (!car) return;
         const [x, y] = input.direction('move'), ahead = -y, speed = car.getSpeed(), r = this.#rules;

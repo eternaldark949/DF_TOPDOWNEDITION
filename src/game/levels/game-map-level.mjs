@@ -30,8 +30,8 @@ export class GameMapLevel extends mapLevel {
     async prepare(context, options = {}) { return { ...await super.prepare(context, options), street: options.street ?? true }; }
     enter(context, prepared) {
         super.enter(context, prepared);
-        const [width, height] = this.definition.size, s = this.switches, world = context.api.physics;
-        context.api.camera.setBounds({ left: 0, top: 0, right: width, bottom: height });
+        const [width, height] = this.definition.size, s = this.switches, world = context.basement.physics;
+        context.basement.camera.setBounds({ left: 0, top: 0, right: width, bottom: height });
         if (s.ground || s.buildings || s.plants || s.lighting)
             this.scene = new mapScene({ sections: this.sections, definition: this.definition, physics: world, rooms: lightingRooms(this.definition), switches: s, soft_lights: this.soft_lights });
         if (prepared.street !== false && (s.traffic || s.walkers))
@@ -40,24 +40,24 @@ export class GameMapLevel extends mapLevel {
     mapUpdateOptions() { return { near_range: door => door.data.appearance?.triggerRadius ?? 90, duration: this.rules.DOOR_DURATION, include_groups: 2 }; }
     /** Every character but the street's walkers (they come and go round the player; the map need not build round them). */
     mapFocuses(context) {
-        const focuses = context.api.physics.elements.getEntities({ instance_of: gameCharacter }).filter(e => e.active !== false && !e.destroyed && !(e instanceof Pedestrian)).map(e => ({ position: e.position, velocity: e.linear_velocity }));
+        const focuses = context.basement.physics.elements.getEntities({ instance_of: gameCharacter }).filter(e => e.active !== false && !e.destroyed && !(e instanceof Pedestrian)).map(e => ({ position: e.position, velocity: e.linear_velocity }));
         return focuses.length ? focuses : [this.definition.spawn];
     }
     afterPhysics(context, seconds) {
         super.afterPhysics(context, seconds);
         if (!this.street) return;
-        const world = context.api.physics, focus = context.api.session?.player?.position ?? this.mapFocuses(context)[0].position ?? this.definition.spawn;
+        const world = context.basement.physics, focus = context.game.session?.player?.position ?? this.mapFocuses(context)[0].position ?? this.definition.spawn;
         this.street.updateState(seconds, { focus, time: world.simulation_tick * world.config.fixed_step });
     }
     render(context, blend, frame) {
         if (!this.scene) return;
-        const view = context.api.camera.getView(blend), world = context.api.physics;
+        const view = context.basement.camera.getView(blend), world = context.basement.physics;
         this.scene.render(frame, { view: view.bounds, zoom: view.zoom, time: world.simulation_tick * world.config.fixed_step,
             lamps: [...this.map.entities('lamp'), ...this.map.entities('neon')], props: this.map.entities('prop'), bodies: f => this.drawBodies(context, blend, f) });
     }
     /** Each vehicle in view, then each character on foot or at a wheel, as its collision shape. */
     drawBodies(context, blend, frame) {
-        const hits = context.api.render.getVisibleEntities({ blend }).map(hit => hit.entity).filter(e => e.visible !== false);
+        const hits = context.basement.render.getVisibleEntities({ blend }).map(hit => hit.entity).filter(e => e.visible !== false);
         const cars = hits.filter(e => typeof e.getVehicleState === 'function'), people = hits.filter(e => e instanceof gameCharacter);
         for (const entity of [...cars, ...people]) {
             const pose = entity.getRenderState(blend), shape = entity.collision_shape, car = cars.includes(entity);
