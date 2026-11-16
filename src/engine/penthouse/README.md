@@ -14,7 +14,7 @@ Section 2 of [READ-FIRST/ENGINE-ARCHITECTURE.md](../../../READ-FIRST/ENGINE-ARCH
 
 ## `humanoid`
 
-A person made of engine parts: a character body from the `engine:humanoid` template, a rig built from its `skeleton` and `clip_set`, Basement IK and physical chains, and the `figure` turned into render packets. It boots with no game:
+A person made of engine parts: a character body from the `engine:humanoid` template, a rig built from its `skeleton` and `clip_set`, Basement IK and physical chains. Its body is made of components on the rig's joints (feet, upper arms, forearms, hands, torso, a head with hair as a second layer), each layer at its own height in the template's data, so the render system draws it like any entity, its look values (`skin`, `shirt`, `shoes`, `hair`) colour it, and its collision reaches 1.75 m tall. It boots with no game:
 
 ```js
 import { physicsSystem } from '../basement/physics/index.mjs';
@@ -28,13 +28,12 @@ person.entity.setMovement([1, 0]);
 
 | Member | Contract |
 |---|---|
-| `new humanoid(physics, {template:'engine:humanoid', height:1, entity:null, ...packet})` | Creates the body (the rest of the packet: position, rotation, name, data…) and its rig, playing the idle clip. The world's data source must hold `template` and its `skeleton`, `clips`, `locomotion` and `figure` assets. `height` scales the skeleton. Pass a restored `entity` instead to take over a humanoid loaded from a save. |
+| `new humanoid(physics, {template:'engine:humanoid', height:1, entity:null, ...packet})` | Creates the body (the rest of the packet: position, rotation, name, data…) and its rig, playing the idle clip. The world's data source must hold `template` and its `skeleton`, `clips` and `locomotion` assets; every component's joint must be in the skeleton. `height` scales the skeleton. Pass a restored `entity` instead to take over a humanoid loaded from a save. |
 | `entity`, `rig` | The character entity and its animation controller. |
 | `updateState()` | Plays the walk clip, on distance travelled, while the body moves faster than the locomotion's `moving_speed`, otherwise idle. Call it once per step before the world steps. |
 | `reachFor(hand, target, {weight})` / `release(hand)` | Two-bone IK puts hand `l` or `r` on a world point, elbow outward / removes it. |
 | `lookAt(target, {max_angle:1.2, weight})` / `stopLooking()` | Turns the head toward a world point. |
 | `setPhysicalArm(arm, on, {follow_rate:20, follow_torque:1e5, mass:1})` / `physical_arms` | Makes an arm two hinged bodies that follow the pose, trail and take hits; `follow_torque:0` is limp. |
-| `getRenderPacket({blend:1})` | `{entity_id, position, rotation, parts}` in world space, back to front: `{part, shape, center, rotation, radius \| radii}` or, for a capsule, `{part, shape, from, to, radius}`. Reading advances nothing. |
 | `remove()` | Destroys the entity, its rig, goals and arms. |
 
 Tests: `node --test src/engine/penthouse/tests/*.test.mjs`.

@@ -35,9 +35,9 @@ The Basement never imports the Directory. It defines the contract it needs (a *d
 | `engine:humanoid` | A character (mass 15, radius 12) whose assets are the four resources below. The Penthouse humanoid boots from it. |
 | `engine:humanoid_skeleton` | `skeleton`: root, pelvis, torso, head, and per side shoulder → elbow → hand and hip → knee → foot. Anchors `hand_l`, `hand_r`, `head`, `back`, `seat`. |
 | `engine:humanoid_clips` | `clip_set`: `idle` (breathing, head bob) and `walk` (steps, arm swing, torso sway, `footstep_l`/`footstep_r` markers). |
+| `engine:humanoid` components | The person's parts as data: feet, arms, hands, torso, head and hair on the skeleton's joints, with heights from the floor to 1.75 m and colours from its look values. |
 | `engine:humanoid_locomotion` | `locomotion`: idle `idle`, walk `walk`, stride 36 px, moving above 4 px/s. |
 | `engine:door_double`, `engine:door_saloon` | `door_kind`s `double` (two hinged leaves, 7 kg each) and `saloon` (two light, fast-closing leaves). |
-| `engine:humanoid_figure` | `figure`: feet, arms, hands, torso and head as circles, ellipses and capsules, back to front. |
 
 A game registers its own libraries beside it (`createEngineRegistry({libraries: [...]})`), and its templates may extend `engine:` ones.
 
@@ -70,7 +70,6 @@ A template needs a `kind` (see the Basement's kinds); its `assets` map slots to 
 | `clip_set` | `{ clips: [...] }`: the Basement's `animationClip` packets for one skeleton. |
 | `locomotion` | `{ idle, walk, stride, moving_speed }`: the standing and walking clip ids, px per walk cycle, and the px/s above which a body is moving. |
 | `door_kind` | `{ name, leaves: [{ from, to, motion: 'slide' \| 'hinge', travel?, pivot?, hinge?, side?, suffix? }] }`: the leaves that fill a door's opening. A map door names it in `type`. The Basement maps README has the full rules. |
-| `figure` | `{ parts: [{ part, shape: 'circle' \| 'ellipse' \| 'capsule', joint, to?, radius?, radii? }] }`: how a rigged body is drawn, back to front. A capsule runs from `joint` to `to`. Sizes are px before the rig's scale. |
 
 `validatePropCatalog`, `validateSkeleton`, `validateClipSet`, `validateLocomotion` and `validateFigure` (each `(data, where?)`) and `validateMapLayout(layout, types?, where?, families?)` (with `families`, every placement's `look` is checked against its family too) throw a `TypeError` naming the first problem, and return their input when it is well formed. `validateDoorKind(data, where?)` checks a `door_kind`, and `doorKindsOf(registry)` returns a registry's door kinds by name for the map builder's `door_kinds` option. `validateLibrary(library)` runs the matching check on every resource whose kind has one. `STRUCTURES` describes each kind in one line.
 

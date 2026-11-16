@@ -71,8 +71,10 @@ export class gameElements {
     peruseNearbyEntities(reference, options = {}, results = []) { return this.world.peruseNearbyEntities(reference, { ...options, spatial_entities: true }, results); }
     getStatistics() { return { entities: this.#entities.size, kinds: this.#kinds.size }; }
     _construct(entity, packet) {
-        const { components: parts, ...definition } = this.#resolve(packet), kind = definition.kind ?? 'entity', preset = this.getKind(kind);
+        const { components: parts, look, ...definition } = this.#resolve(packet), kind = definition.kind ?? 'entity', preset = this.getKind(kind);
         let auto_span = false;
+        // A record's look is its starting `look` property, as its components are its `components`.
+        if (look !== undefined && definition.data?.look === undefined) definition.data = { ...(definition.data ?? {}), look };
         if (parts !== undefined) {
             const components = readComponents(parts); definition.data = { ...(definition.data ?? {}), components };
             // The body reaches as high as its solid layers, unless the packet says otherwise.

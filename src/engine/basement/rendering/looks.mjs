@@ -76,7 +76,7 @@ export function componentSteps(components,source,{solid_only=false}={}){
 }
 /**
  * Draws an entity's components, one scene per visible layer, lowest first: [{height, layer, component,
- * packets}]. A component on a joint is placed by `joints(name)` ({position, rotation} in the world),
+ * packets}]. A component on a joint is placed by `joints(name)` ({position, rotation, scale} in the world),
  * when it gives one; otherwise it rides the entity's pose. Layers are drawn by base height, then layer
  * number, then component order, so taller parts cover lower ones.
  */
@@ -86,9 +86,10 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null}={}){
     const pose=entity.getRenderState(blend),scale=look.scale??1,values=look.values??{},out=[];
     for(const {component:c,layer} of layersByHeight(components)){
         const joint=c.joint?joints(c.joint):null,base=joint??{position:pose.position,rotation:pose.rotation},k=joint?1:scale;
+        const size=joint?.scale?[joint.scale[0]*scale,joint.scale[1]*scale]:scale;   // a joint's scale (a taller rig) sizes what rides it
         const cos=Math.cos(base.rotation),sin=Math.sin(base.rotation),x=c.at[0]*k,y=c.at[1]*k;
         const scene=new artScene();
-        scene.draw(layerSteps(layer,source),{at:[base.position[0]+x*cos-y*sin,base.position[1]+x*sin+y*cos],rotation:base.rotation+c.rotation,scale,values,
+        scene.draw(layerSteps(layer,source),{at:[base.position[0]+x*cos-y*sin,base.position[1]+x*sin+y*cos],rotation:base.rotation+c.rotation,scale:size,values,
             materials:name=>resource(source,qualifyResource(name,layer.drawing??entity.template_id??name),'material')});
         out.push({height:layer.height,layer:layer.layer,component:c.name,packets:scene.finish()});
     }

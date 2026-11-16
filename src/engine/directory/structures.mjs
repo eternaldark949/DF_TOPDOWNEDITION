@@ -24,9 +24,6 @@
 //                The leaves that fill a door's opening, positions as [fraction of the opening, px]
 //                from its start. A map door names the kind in its `type`. The Basement map builder
 //                has the full rules and the built-in kinds (plain, sliding, hinged, arch).
-// figure         { parts: [{ part, shape: 'circle'|'ellipse'|'capsule', joint, to?, radius?, radii? }] }
-//                How a rigged body is drawn, back to front: a circle or ellipse at a joint, or a
-//                capsule from `joint` to `to`. Sizes in px before the rig's own scale.
 import { plain } from './values.mjs';
 import { DRAWING, MATERIAL } from '../basement/rendering/index.mjs';
 
@@ -37,7 +34,6 @@ export const STRUCTURES = Object.freeze({
     clip_set: 'Animation clips for one skeleton: { clips: [{ clip_id, duration, tracks, markers? }] }.',
     locomotion: 'Which clips stand and walk: { idle, walk, stride (px per cycle), moving_speed (px/s) }.',
     door_kind: 'The leaves that fill a door\'s opening: { name, leaves: [{ from, to, motion, travel?, pivot?, hinge?, suffix? }] }.',
-    figure: 'How a rigged body is drawn, back to front: { parts: [{ part, shape, joint, to?, radius?, radii? }] }.',
     drawing: 'An object\'s art in its own space, back to front: { steps: [{ shape, material?, solid?, ...fields }] }; shape is a drawing shape or group ({ shape: "group", x?, y?, rotation?, scale?, steps }). "$name" values are read from the object\'s look.',
     material: 'How a substance looks and behaves: { fill?, stroke?, line_width?, line_cap?, line_join?, dash?, alpha?, blend?, shadow?, surface?: { friction?, restitution?, hit_sound?, hit_effect?, footstep? } }; fill may be a colour, a gradient or a pattern { type: "pattern", image, repeat? }.'
 });
@@ -138,16 +134,6 @@ export function validateLocomotion(data, where = 'locomotion') {
     return data;
 }
 
-/** Throws unless `data` is a figure: named parts of a known shape, with the sizes that shape needs. Returns it. */
-export function validateFigure(data, where = 'figure') {
-    if (!plain(data) || !Array.isArray(data.parts)) fail(where, 'requires a parts list');
-    for (const p of data.parts) {
-        if (!plain(p) || !name(p.part) || !name(p.joint)) fail(where, `part ${p?.part} needs a name and a joint`);
-        if (p.shape === 'capsule' ? !name(p.to) || !(p.radius > 0) : p.shape === 'circle' ? !(p.radius > 0) : p.shape === 'ellipse' ? !Array.isArray(p.radii) || !p.radii.every(r => r > 0) : true) fail(where, `part ${p.part}: a ${p.shape} needs its sizes`);
-    }
-    return data;
-}
-
 /** Throws unless `data` is a door_kind: a name and leaves that each span the opening and slide or hinge. Returns it. */
 export function validateDoorKind(data, where = 'door_kind') {
     if (!plain(data) || !name(data.name) || !Array.isArray(data.leaves)) fail(where, 'requires a name and a leaves list');
@@ -187,7 +173,7 @@ export function validateMaterial(material, where = 'material') {
     }
     return material;
 }
-const VALIDATORS = { drawing: validateDrawing, material: validateMaterial, prop_catalog: validatePropCatalog, skeleton: validateSkeleton, clip_set: validateClipSet, locomotion: validateLocomotion, figure: validateFigure, door_kind: validateDoorKind };
+const VALIDATORS = { drawing: validateDrawing, material: validateMaterial, prop_catalog: validatePropCatalog, skeleton: validateSkeleton, clip_set: validateClipSet, locomotion: validateLocomotion, door_kind: validateDoorKind };
 /** Validates every resource of a library whose kind has a structure here; other kinds pass through. Returns the library. */
 export function validateLibrary(library) {
     for (const [id, resource] of Object.entries(library?.resources ?? {})) VALIDATORS[resource?.kind]?.(resource, `${library.library_id}:${id}`);

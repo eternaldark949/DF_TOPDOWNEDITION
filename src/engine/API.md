@@ -451,7 +451,7 @@ Prefabs built only from the levels below, through `engine.penthouse`.
 |---|---|
 | `createObject(elements, record, at, overrides)` | Any object from a catalog record (see [Objects](#objects)); `engine.createObject` is the same with level lifetime |
 | `objectPacket(assets, record, at, overrides)` | The entity packet a record makes, without making it |
-| `humanoid` | A procedural humanoid with a rig, IK and physical arms |
+| `humanoid` | A procedural humanoid with a rig, IK and physical arms, its body made of components on the rig's joints |
 
 ### Objects
 

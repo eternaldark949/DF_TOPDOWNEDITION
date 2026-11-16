@@ -1,10 +1,11 @@
 // ===== LV3 PENTHOUSE =====
 // THE PROCEDURAL HUMANOID: a person made only of engine parts. A character body, a rig on it, the
-// Directory's skeleton, clips, locomotion and figure, and Basement IK and physical chains. It
-// stands, walks when its body moves, reaches, looks, can go limp in the arms, and draws itself as
-// plain render packets. It is stepped by whoever owns it (`updateState()`), and never steps a world.
+// Directory's skeleton, clips and locomotion, and Basement IK and physical chains. Its body is made of
+// components on the rig's joints (feet, arms, hands, torso, head, hair), each layer at its own height,
+// so the render system draws it like any other entity and its collision reaches as tall as it stands.
+// It stands, walks when its body moves, reaches, looks and can go limp in the arms. It is stepped by whoever owns it (`updateState()`), and never steps a world.
 import { physicsSystem } from '../../basement/physics/index.mjs';
-import { validateSkeleton, validateClipSet, validateLocomotion, validateFigure } from '../../directory/index.mjs';
+import { validateSkeleton, validateClipSet, validateLocomotion } from '../../directory/index.mjs';
 
 const SIDES = Object.freeze(['l', 'r']);
 const side = value => { if (!SIDES.includes(value)) throw new TypeError('A side is l or r'); return value; };
@@ -22,9 +23,9 @@ export class humanoid {
         this.#physics = physics;
         const source = physics.elements.asset_library;
         const assets = entity ? entity.assets : source.resolveTemplate(template).assets ?? {};
-        for (const slot of ['skeleton', 'clips', 'locomotion', 'figure']) if (!assets[slot]) throw new TypeError(`Template ${template} has no ${slot} asset`);
+        for (const slot of ['skeleton', 'clips', 'locomotion']) if (!assets[slot]) throw new TypeError(`Template ${template} has no ${slot} asset`);
         const skeleton = validateSkeleton(source.getResource(assets.skeleton)), clips = validateClipSet(source.getResource(assets.clips));
-        this.#kit = { locomotion: validateLocomotion(source.getResource(assets.locomotion)), figure: validateFigure(source.getResource(assets.figure)) };
+        this.#kit = { locomotion: validateLocomotion(source.getResource(assets.locomotion)) };
         if (entity) {
             this.entity = entity; this.rig = physics.rigs.getRig(entity);
             if (!this.rig) throw new TypeError('The restored entity has no rig');
@@ -38,7 +39,7 @@ export class humanoid {
             this.rig.play(this.#kit.locomotion.idle);
         }
         const joints = new Set(this.rig.definition.getJointNames());
-        for (const part of this.#kit.figure.parts) if (!joints.has(part.joint) || (part.to && !joints.has(part.to))) throw new TypeError(`Figure part ${part.part} names a joint the skeleton lacks`);
+        for (const part of this.entity.components) if (part.joint && !joints.has(part.joint)) throw new TypeError(`Component ${part.name} rides a joint the skeleton lacks: ${part.joint}`);
     }
 
     /** Stands or walks by how fast the body is going; walking runs on distance, so a blocked body stops stepping. */
@@ -70,21 +71,6 @@ export class humanoid {
         return this;
     }
     get physical_arms() { return [...this.#arms]; }
-
-    /**
-     * The figure as render packets in world space, back to front: `{part, shape, center, rotation,
-     * radius | radii}` for circles and ellipses and `{part, shape, from, to, radius}` for capsules.
-     * Sizes carry the rig's scale. Reading never advances anything.
-     */
-    getRenderPacket({ blend = 1 } = {}) {
-        const pose = this.#physics.rigs.getPose(this.entity, { blend, world_space: true }).joints, state = this.entity.getRenderState(blend);
-        const parts = this.#kit.figure.parts.map(p => {
-            const at = pose[p.joint], size = Math.abs(at.scale[1]);
-            if (p.shape === 'capsule') return { part: p.part, shape: 'capsule', from: at.position, to: pose[p.to].position, radius: p.radius * size };
-            return { part: p.part, shape: p.shape, center: at.position, rotation: at.rotation, ...(p.shape === 'circle' ? { radius: p.radius * size } : { radii: [p.radii[0] * Math.abs(at.scale[0]), p.radii[1] * size] }) };
-        });
-        return { entity_id: this.entity.entity_id, position: state.position, rotation: state.rotation, parts };
-    }
 
     /** Removes the body, which removes its rig, IK goals and physical arms. */
     remove() { this.entity.destroy(); }

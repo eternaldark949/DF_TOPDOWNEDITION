@@ -512,84 +512,6 @@
    "stride": 36,
    "moving_speed": 4
   },
-  "humanoid_figure": {
-   "kind": "figure",
-   "parts": [
-    {
-     "part": "foot_l",
-     "shape": "ellipse",
-     "joint": "foot_l",
-     "radii": [
-      3.5,
-      2.2
-     ]
-    },
-    {
-     "part": "foot_r",
-     "shape": "ellipse",
-     "joint": "foot_r",
-     "radii": [
-      3.5,
-      2.2
-     ]
-    },
-    {
-     "part": "upper_arm_l",
-     "shape": "capsule",
-     "joint": "shoulder_l",
-     "to": "elbow_l",
-     "radius": 3.2
-    },
-    {
-     "part": "forearm_l",
-     "shape": "capsule",
-     "joint": "elbow_l",
-     "to": "hand_l",
-     "radius": 2.6
-    },
-    {
-     "part": "hand_l",
-     "shape": "circle",
-     "joint": "hand_l",
-     "radius": 2.2
-    },
-    {
-     "part": "upper_arm_r",
-     "shape": "capsule",
-     "joint": "shoulder_r",
-     "to": "elbow_r",
-     "radius": 3.2
-    },
-    {
-     "part": "forearm_r",
-     "shape": "capsule",
-     "joint": "elbow_r",
-     "to": "hand_r",
-     "radius": 2.6
-    },
-    {
-     "part": "hand_r",
-     "shape": "circle",
-     "joint": "hand_r",
-     "radius": 2.2
-    },
-    {
-     "part": "torso",
-     "shape": "ellipse",
-     "joint": "torso",
-     "radii": [
-      7,
-      12
-     ]
-    },
-    {
-     "part": "head",
-     "shape": "circle",
-     "joint": "head",
-     "radius": 6.5
-    }
-   ]
-  },
   "door_double": {
    "kind": "door_kind",
    "name": "double",
@@ -761,8 +683,246 @@
    "assets": {
     "skeleton": "humanoid_skeleton",
     "clips": "humanoid_clips",
-    "locomotion": "humanoid_locomotion",
-    "figure": "humanoid_figure"
+    "locomotion": "humanoid_locomotion"
+   },
+   "components": [
+    {
+     "name": "foot_l",
+     "joint": "foot_l",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "0 m",
+       "thickness": "10 cm",
+       "steps": [
+        {
+         "shape": "ellipse",
+         "radius_x": 3.5,
+         "radius_y": 2.2,
+         "fill": "$shoes"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "foot_r",
+     "joint": "foot_r",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "0 m",
+       "thickness": "10 cm",
+       "steps": [
+        {
+         "shape": "ellipse",
+         "radius_x": 3.5,
+         "radius_y": 2.2,
+         "fill": "$shoes"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "upper_arm_l",
+     "joint": "shoulder_l",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "1 m",
+       "thickness": "40 cm",
+       "steps": [
+        {
+         "shape": "capsule",
+         "from": [
+          0,
+          0
+         ],
+         "to": [
+          3,
+          -3
+         ],
+         "radius": 3.2,
+         "fill": "$shirt"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "forearm_l",
+     "joint": "elbow_l",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "95 cm",
+       "thickness": "30 cm",
+       "steps": [
+        {
+         "shape": "capsule",
+         "from": [
+          0,
+          0
+         ],
+         "to": [
+          7,
+          4
+         ],
+         "radius": 2.6,
+         "fill": "$skin"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "hand_l",
+     "joint": "hand_l",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "90 cm",
+       "thickness": "10 cm",
+       "steps": [
+        {
+         "shape": "circle",
+         "radius": 2.2,
+         "fill": "$skin"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "upper_arm_r",
+     "joint": "shoulder_r",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "1 m",
+       "thickness": "40 cm",
+       "steps": [
+        {
+         "shape": "capsule",
+         "from": [
+          0,
+          0
+         ],
+         "to": [
+          3,
+          3
+         ],
+         "radius": 3.2,
+         "fill": "$shirt"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "forearm_r",
+     "joint": "elbow_r",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "95 cm",
+       "thickness": "30 cm",
+       "steps": [
+        {
+         "shape": "capsule",
+         "from": [
+          0,
+          0
+         ],
+         "to": [
+          7,
+          -4
+         ],
+         "radius": 2.6,
+         "fill": "$skin"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "hand_r",
+     "joint": "hand_r",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "90 cm",
+       "thickness": "10 cm",
+       "steps": [
+        {
+         "shape": "circle",
+         "radius": 2.2,
+         "fill": "$skin"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "torso",
+     "joint": "torso",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "1.1 m",
+       "thickness": "40 cm",
+       "steps": [
+        {
+         "shape": "ellipse",
+         "radius_x": 7,
+         "radius_y": 12,
+         "fill": "$shirt"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "head",
+     "joint": "head",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "1.5 m",
+       "thickness": "20 cm",
+       "steps": [
+        {
+         "shape": "circle",
+         "radius": 6.5,
+         "fill": "$skin"
+        }
+       ]
+      },
+      {
+       "layer": 1,
+       "height": "1.7 m",
+       "thickness": "5 cm",
+       "steps": [
+        {
+         "shape": "ellipse",
+         "x": -1.5,
+         "radius_x": 5.5,
+         "radius_y": 6,
+         "fill": "$hair"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "look": {
+    "values": {
+     "skin": "#d9a57a",
+     "shirt": "#3d6b8f",
+     "shoes": "#2b2b2b",
+     "hair": "#3b2a1e"
+    }
    }
   }
  }
