@@ -5,6 +5,7 @@
 // ({kind: 'material', fill, stroke, ..., surface}). `fitBounds` turns a drawing into the collision
 // shape that matches it, the way Blender's collision bounds are worked out from a mesh.
 import {artScene,DRAWING,readValues} from './art.mjs';
+import {heightView} from './height.mjs';
 
 /** The collision bounds a drawing can be fitted to. */
 export const BOUNDS=Object.freeze(['circle','box','capsule','hull']);
@@ -80,7 +81,8 @@ export function componentSteps(components,source,{solid_only=false}={}){
  * when it gives one; otherwise it rides the entity's pose. Layers are drawn by base height, then layer
  * number, then component order, so taller parts cover lower ones.
  */
-export function drawComponents(entity,source,blend=1,{joints=()=>null}={}){
+export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null}={}){
+    if(view!==null&&!(view instanceof heightView))throw new TypeError('A height view is a heightView or null');
     const components=entity.get('components')??[];if(!components.length)return [];
     const look=entity.get('look',{});if(look.visible===false)return [];
     const pose=entity.getRenderState(blend),scale=look.scale??1,values=look.values??{},out=[];
@@ -88,15 +90,31 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null}={}){
         const joint=c.joint?joints(c.joint):null,base=joint??{position:pose.position,rotation:pose.rotation},k=joint?1:scale;
         const size=joint?.scale?[joint.scale[0]*scale,joint.scale[1]*scale]:scale;   // a joint's scale (a taller rig) sizes what rides it
         const cos=Math.cos(base.rotation),sin=Math.sin(base.rotation),x=c.at[0]*k,y=c.at[1]*k;
-        const scene=new artScene();
-        scene.draw(layerSteps(layer,source),{at:[base.position[0]+x*cos-y*sin,base.position[1]+x*sin+y*cos],rotation:base.rotation+c.rotation,scale:size,values,
-            materials:name=>resource(source,qualifyResource(name,layer.drawing??entity.template_id??name),'material')});
+        const scene=new artScene(),steps=layerSteps(layer,source),place={at:[base.position[0]+x*cos-y*sin,base.position[1]+x*sin+y*cos],rotation:base.rotation+c.rotation,scale:size};
+        // Leaning toward the camera: the walls from the layer's base to its top, then its shapes in the plane of its top.
+        if(view&&layer.sides)drawSides(scene,steps,place,values,readValues({fill:layer.sides},values).fill,view,layer.height,layer.height+layer.thickness);
+        if(view)scene.enter({matrix:view.plane(view.k(layer.height+layer.thickness))});
+        scene.draw(steps,{...place,values,materials:name=>resource(source,qualifyResource(name,layer.drawing??entity.template_id??name),'material')});
+        if(view)scene.leave();
         out.push({height:layer.height,layer:layer.layer,component:c.name,packets:scene.finish()});
     }
     return out;
 }
 // Lowest first: by base height, then layer number, then component order (the physics package's layersByHeight).
 function layersByHeight(components){const out=[];components.forEach((component,order)=>{for(const layer of component.layers)if(layer.visible!==false)out.push({component,layer,order});});return out.sort((a,b)=>a.layer.height-b.layer.height||a.layer.layer-b.layer.layer||a.order-b.order);}
+/** A layer's walls, seen from above: each face of the hull of its shapes that the camera sees, from the plane of its base to the plane of its top. */
+function drawSides(scene,steps,{at,rotation,scale},values,fill,view,z0,z1){
+    if(z1<=z0)return;
+    const [sx,sy]=typeof scale==='number'?[scale,scale]:scale,points=drawingOutline([{shape:'group',x:at[0],y:at[1],rotation,scale:[sx,sy],steps}],{values}).flatMap(part=>part.points),hull=convexHull(points);
+    if(hull.length<3)return;
+    const cx=hull.reduce((t,p)=>t+p[0],0)/hull.length,cy=hull.reduce((t,p)=>t+p[1],0)/hull.length,k0=view.k(z0),k1=view.k(z1);
+    for(let i=0;i<hull.length;i++){
+        const a=hull[i],b=hull[(i+1)%hull.length],mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;let nx=b[1]-a[1],ny=a[0]-b[0];if(nx*(mx-cx)+ny*(my-cy)<0){nx=-nx;ny=-ny;}
+        if(!view.sees({x1:a[0],y1:a[1],x2:b[0],y2:b[1],nx,ny}))continue;
+        const [p,q,r,t]=[view.scaled(a[0],a[1],k0),view.scaled(b[0],b[1],k0),view.scaled(b[0],b[1],k1),view.scaled(a[0],a[1],k1)];
+        scene.fill([['move',...p],['line',...q],['line',...r],['line',...t],['close']],fill);
+    }
+}
 function layerSteps(layer,source){return layer.steps??resource(source,layer.drawing,'drawing').steps;}
 function resource(source,id,kind){const value=source.getResource(id);if(value.kind!==kind)throw new TypeError(`${id} is a ${value.kind}, not a ${kind}`);return value;}
 

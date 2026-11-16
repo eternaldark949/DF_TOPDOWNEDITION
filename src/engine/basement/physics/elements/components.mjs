@@ -2,13 +2,14 @@
 // COMPONENTS: the parts an entity is made of. A component is like a mesh: shapes, placed at `at`
 // (turned by `rotation`) from the entity's origin, or from a rig joint when it names one. Its shapes
 // sit on integer layers; each layer has its own base `height` above the component's layer 0 and its
-// own `thickness`, in world units, so a floor slab, a gap and a roof are three layers. The entity's
+// own `thickness`, in world units, so a floor slab, a gap and a roof are three layers. A layer with
+// `sides` (a paint) shows its walls when the render system leans heights toward the camera. The entity's
 // height is the highest top among its components. Components are plain data, kept in the entity's
 // `components` property, so they save, load and change like any property. Lengths are world units:
 // data written in metres is turned into units by the Directory when it loads.
 
 const COMPONENT = Object.freeze(['name', 'at', 'rotation', 'joint', 'layers']);
-const LAYER = Object.freeze(['layer', 'height', 'thickness', 'steps', 'drawing', 'solid', 'visible']);
+const LAYER = Object.freeze(['layer', 'height', 'thickness', 'steps', 'drawing', 'solid', 'visible', 'sides']);
 const SAFE = value => typeof value === 'string' && value && !['__proto__', 'prototype', 'constructor'].includes(value);
 const plain = value => value && typeof value === 'object' && !Array.isArray(value);
 const only = (value, allowed, where) => { const extra = Object.keys(value).find(key => !allowed.includes(key)); if (extra) throw new TypeError(`${where} has no field ${extra} (one of ${allowed.join(', ')})`); };
@@ -22,10 +23,11 @@ export function readLayer(packet, where = 'A layer') {
     if ((packet.steps === undefined) === (packet.drawing === undefined)) throw new TypeError(`${where} has its shapes as steps or names a drawing, one of the two`);
     if (packet.steps !== undefined && !Array.isArray(packet.steps)) throw new TypeError(`${where}'s steps are a list of drawing steps`);
     if (packet.drawing !== undefined && !SAFE(packet.drawing)) throw new TypeError(`${where}'s drawing is a resource id`);
+    if (packet.sides !== undefined && (typeof packet.sides !== 'string' || !packet.sides)) throw new TypeError(`${where}'s sides are a paint colour (or a "$look" value)`);
     for (const flag of ['solid', 'visible']) if (packet[flag] !== undefined && typeof packet[flag] !== 'boolean') throw new TypeError(`${where}'s ${flag} is true or false`);
     return { layer: packet.layer, height: length(packet.height ?? 0, `${where}'s height`, -Infinity), thickness: length(packet.thickness ?? 0, `${where}'s thickness`),
         ...(packet.steps !== undefined ? { steps: structuredClone(packet.steps) } : { drawing: packet.drawing }),
-        solid: packet.solid ?? true, visible: packet.visible ?? true };
+        solid: packet.solid ?? true, visible: packet.visible ?? true, ...(packet.sides !== undefined ? { sides: packet.sides } : {}) };
 }
 
 /** One component, checked, with its layers in layer order: {name, at, rotation, joint, layers}. */

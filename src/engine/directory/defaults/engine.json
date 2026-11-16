@@ -924,6 +924,17 @@
      "hair": "#3b2a1e"
     }
    }
+  },
+  "building": {
+   "extends": "entity",
+   "kind": "static",
+   "physics_type": "static",
+   "collision_group": 1,
+   "collision_mask": 2147483647,
+   "tags": [
+    "building"
+   ],
+   "bounds": "box"
   }
  }
 }

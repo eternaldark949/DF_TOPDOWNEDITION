@@ -35,6 +35,7 @@ The Basement never imports the Directory. It defines the contract it needs (a *d
 | `engine:humanoid` | A character (mass 15, radius 12) whose assets are the four resources below. The Penthouse humanoid boots from it. |
 | `engine:humanoid_skeleton` | `skeleton`: root, pelvis, torso, head, and per side shoulder → elbow → hand and hip → knee → foot. Anchors `hand_l`, `hand_r`, `head`, `back`, `seat`. |
 | `engine:humanoid_clips` | `clip_set`: `idle` (breathing, head bob) and `walk` (steps, arm swing, torso sway, `footstep_l`/`footstep_r` markers). |
+| `engine:building` | A static, `building`-tagged template whose collision box fits every solid floor of its components: a building is one entity with a component per wing and a layer per floor. |
 | `engine:humanoid` components | The person's parts as data: feet, arms, hands, torso, head and hair on the skeleton's joints, with heights from the floor to 1.75 m and colours from its look values. |
 | `engine:humanoid_locomotion` | `locomotion`: idle `idle`, walk `walk`, stride 36 px, moving above 4 px/s. |
 | `engine:door_double`, `engine:door_saloon` | `door_kind`s `double` (two hinged leaves, 7 kg each) and `saloon` (two light, fast-closing leaves). |

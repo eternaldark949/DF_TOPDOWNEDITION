@@ -4,6 +4,7 @@ import {geometry,material,requirements} from './packets.mjs';
 import {finite,identifier,freezeData,CAPABILITIES} from './values.mjs';
 import {artScene} from './art.mjs';
 import {drawLook,drawComponents} from './looks.mjs';
+import {heightView} from './height.mjs';
 
 function normalizeResource(description){
     if(!description||typeof description!=='object')throw new TypeError('A data resource descriptor is required');
@@ -27,7 +28,7 @@ const methods=['initialize','resize','render','registerResource','releaseResourc
  * host which surface is live.
  */
 export class renderSystem {
-    #createSurface=null;#world;#camera;#frame=new renderFrame();#renderers=new Map();#resources=new Map();#backend=null;#backendId=null;#surface=null;
+    #createSurface=null;#lean=null;#world;#camera;#frame=new renderFrame();#renderers=new Map();#resources=new Map();#backend=null;#backendId=null;#surface=null;
     #collecting=false;#busy=false;#disposed=false;#generation=0;#last=null;#surfaceListeners=new Set();#frameListeners=new Set();#requirements=[];#visible=[];
     constructor({physics_system,camera,create_surface=null}={}){if(create_surface!==null&&typeof create_surface!=='function')throw new TypeError('create_surface makes a surface for a renderer id');this.#createSurface=create_surface;if(!physics_system?.queryEntitiesInBounds||!camera?.getView)throw new TypeError('renderSystem requires native world and camera');this.#world=physics_system;this.#camera=camera;}
     get renderer_id(){return this.#backendId;}
@@ -77,17 +78,24 @@ export class renderSystem {
         try{this.#backend?.resize(this.#camera.viewport);}catch(error){this.#camera.setViewport(old);throw error;}return this;
     }
     getVisibleEntities({blend=1,margin=0,...options}={},results=[]){this.#live();return this.#world.queryEntitiesInBounds({...options,bounds:this.#camera.getVisibleBounds({blend,margin}),bounds_type:'render'},results);}
+    /**
+     * Leans heights toward the camera, the way a camera `eye` world units above the ground sees them:
+     * each component layer draws in the plane of its top, scaled about the camera, and a layer with
+     * `sides` shows its walls. `lean` exaggerates (or softens) it. null draws everything flat.
+     */
+    setHeightView(options){this.#live();if(options===null){this.#lean=null;return this;}const {eye,lean=1}=options??{};new heightView({camera:[0,0],eye,lean}).k(0);if(!(eye>0))throw new RangeError('A height view needs an eye above the ground');this.#lean={eye,lean};return this;}
+    getHeightView(){return this.#lean?{...this.#lean}:null;}
     /** Draws every visible entity's look (a `drawing` asset) and its components into the open frame, at its `look.layer` and `look.depth`; a component layer's depth adds its height, so higher parts draw over lower ones. Returns how many entities it drew. */
     drawLooks(blend=1){
         this.#live();if(!this.#collecting)throw new Error('Draw looks inside an open render frame');
-        const source=this.#world.elements.asset_library;let drawn=0;
+        const source=this.#world.elements.asset_library,view=this.#lean?new heightView({camera:this.#camera.getView(blend).position,...this.#lean}):null;let drawn=0;
         for(const {entity} of this.getVisibleEntities({blend},this.#visible)){
             if(!entity)continue;
             const look=entity.get('look',{}),layer=look.layer??0,depth=look.depth??0;let drew=false;
             if(entity.assets?.drawing){const scene=new artScene();if(drawLook(scene,entity,source,blend)){for(const packet of scene.finish())this.#frame.submit({...packet,layer,depth});drew=true;}}
             if(entity.has('components')){
                 let pose;const rigs=this.#world.rigs,joints=name=>{pose??=rigs?.getRig(entity)?rigs.getPose(entity,{blend,world_space:true}):null;return pose?.joints[name]??null;};
-                for(const part of drawComponents(entity,source,blend,{joints})){for(const packet of part.packets)this.#frame.submit({...packet,layer,depth:depth+part.height});drew=true;}
+                for(const part of drawComponents(entity,source,blend,{joints,view})){for(const packet of part.packets)this.#frame.submit({...packet,layer,depth:depth+part.height});drew=true;}
             }
             if(drew)drawn++;
         }
