@@ -5796,7 +5796,7 @@
         </defs>
     </svg>
     <script type="text/dfab" data-src="@build" data-cost="1">
-        const DFAB_BUILD = '20c7c3e4dfa8';
+        const DFAB_BUILD = '1284e7f182f3';
     </script>
     <script type="text/dfab" data-src="classic/basement/frame-clock.js" data-cost="33">
         // ===== LV0 BASEMENT =====
@@ -9366,7 +9366,7 @@
             }
         };
     </script>
-    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="50592">
+    <script type="text/dfab" data-src="game/boot/native-entry.mjs" data-cost="50633">
 const DFNative = (()=>{
 'use strict';
 // src/engine/basement/physics/core/values.mjs
@@ -46084,7 +46084,7 @@ const m155 = (()=>{
 return Object.freeze({get cameraSystem(){return m156.cameraSystem;},get aheadOf(){return m156.aheadOf;},get viewAhead(){return m156.viewAhead;},get renderFrame(){return m158.renderFrame;},get renderSystem(){return m160.renderSystem;},get canvasRenderer(){return m161.canvasRenderer;},get pictureCache(){return m161.pictureCache;},get measureText(){return m161.measureText;},get artScene(){return m162.artScene;},get circle(){return m162.circle;},get ellipse(){return m162.ellipse;},get polyline(){return m162.polyline;},get polygon(){return m162.polygon;},get rect(){return m162.rect;},get roundRect(){return m162.roundRect;},get capsule(){return m162.capsule;},get smoothShape(){return m162.smoothShape;},get linear(){return m162.linear;},get radial(){return m162.radial;},get glow(){return m162.glow;},get groundShadow(){return m162.groundShadow;},get hexToRgb(){return m162.hexToRgb;},get rgbToHex(){return m162.rgbToHex;},get rgba(){return m162.rgba;},get mix(){return m162.mix;},get shade(){return m162.shade;},get seededRandom(){return m162.seededRandom;},get hash2(){return m162.hash2;},get createLightLayer(){return m163.createLightLayer;},get createLightLayerParts(){return m163.createLightLayerParts;},get LIGHT_CUT(){return m163.LIGHT_CUT;},get heightScale(){return m164.heightScale;},get heightView(){return m164.heightView;},get boxFaces(){return m164.boxFaces;},get depthBatches(){return m165.depthBatches;}});
 })();
 // src/engine/lobby/level-lobby.mjs
-const m166 = (()=>{
+const m167 = (()=>{
 // ===== LV1 LOBBY =====
 // The engine's game loop. The Lobby keeps the clock and nothing else: it knows when a frame is due,
 // how many fixed simulation steps that frame owes, and how far the drawn frame sits between two steps.
@@ -46221,7 +46221,7 @@ class levelLobby {
 return Object.freeze({get levelLobby(){return levelLobby;}});
 })();
 // src/engine/lobby/runtime/game-level.mjs
-const m167 = (()=>{
+const m168 = (()=>{
 // ===== LV1 LOBBY =====
 /** Content/lifecycle contract. A level never owns a world, clock or collision solver. */
 class gameLevel {
@@ -46241,8 +46241,267 @@ class gameLevel {
 
 return Object.freeze({get gameLevel(){return gameLevel;}});
 })();
+// src/engine/lobby/game-loop.mjs
+const m166 = (()=>{
+// ===== LV1 LOBBY =====
+// The game loop: time and order. It runs levels and systems through their hooks in a fixed order each
+// tick (input, before physics, physics, after physics, camera, then render), keeps the pause reasons,
+// loads and unloads levels between ticks, and drives the clock (levelLobby). It is handed the Basement's
+// running systems and the other jacks; it builds none of them and knows nothing about the game.
+const {levelLobby} = m167;
+const {gameLevel} = m168;
+
+const hooks = ['attach', 'detach', 'beforePhysics', 'afterPhysics', 'render', 'levelEntered', 'levelLeaving','gameplayPaused'];
+function synchronous(fn, receiver, args) {
+    if (fn && ['AsyncFunction', 'GeneratorFunction', 'AsyncGeneratorFunction'].includes(fn.constructor.name)) throw new TypeError('Runtime hooks must be synchronous; load assets in level.prepare');
+    const result = fn?.apply(receiver, args);
+    if (result && typeof result.then === 'function') {
+        // Reject the contract while observing a returned rejection; do not leak an
+        // unhandled asynchronous error after the caller's synchronous cleanup.
+        Promise.resolve(result).catch(() => {});
+        throw new TypeError('Runtime hooks must be synchronous; load assets in level.prepare');
+    }
+    return result;
+}
+function attempt(errors, fn) { try { fn(); } catch (error) { errors.push(error); } }
+function failures(errors, message) { if (errors.length) throw new AggregateError(errors, message); }
+
+
+class gameLoop {
+    #engine; #jacks; #world; #step; #controls; #camera; #render; #clock;
+    #levels = new Map(); #systems = new Map(); #active = null; #persistent = new Set();
+    #running = false; #destroyed = false; #phase = 'idle'; #loading = false; #pauses = new Map();
+    #schedule; #cancel; #frame = null; #generation = 0;
+
+    /**
+     * `engine` is what contexts call `engine`; `jacks` are `{basement, directory, penthouse, game}`;
+     * `step_world(seconds)` advances the physics world one fixed step (only the loop may).
+     */
+    constructor({ engine, jacks, step_world, clock = {}, frame_clock,
+        schedule_frame = typeof requestAnimationFrame === 'function' ? callback => requestAnimationFrame(callback) : null,
+        cancel_frame = typeof cancelAnimationFrame === 'function' ? handle => cancelAnimationFrame(handle) : null }) {
+        if (schedule_frame !== null && typeof schedule_frame !== 'function' || cancel_frame !== null && typeof cancel_frame !== 'function') throw new TypeError('Frame scheduling requires functions');
+        if (typeof step_world !== 'function') throw new TypeError('The loop needs step_world');
+        this.#engine = engine; this.#jacks = jacks; this.#step = step_world;
+        const { physics, controls, camera, render } = jacks.basement;
+        this.#world = physics; this.#controls = controls; this.#camera = camera; this.#render = render;
+        this.#world.rigs._setGuard(()=>{if(this.#phase==='render')throw new Error('Render hooks cannot change animation');});
+        const config = { STEP_MS: this.#world.config.fixed_step * 1000, MAX_FRAME_MS: 100, MAX_STEPS: 6, GAME_SPEED: 1, ...clock };
+        if (config.STEP_MS !== this.#world.config.fixed_step * 1000) throw new TypeError('Lobby and physics fixed steps must match');
+        if (![config.MAX_FRAME_MS, config.MAX_STEPS, config.GAME_SPEED].every(v => Number.isFinite(v) && v > 0) || !Number.isInteger(config.MAX_STEPS)) throw new TypeError('Invalid Lobby clock configuration');
+        this.#schedule = schedule_frame; this.#cancel = cancel_frame;
+        this.#clock = new levelLobby(Object.freeze(config), frame_clock);
+        this.#clock.plugIn({ isRunning: () => this.running, isPaused: () => this.paused || !this.active_level,
+            beginFrame: () => { if(this.paused || !this.active_level)this.#pollControls(); },
+            simulateStep: () => this.updateState(), renderFrame: blend => this.render(blend),
+            scheduleNextFrame: () => this.#queueFrame() });
+    }
+    /** The clock: fixed steps, frames drawn between them. */
+    get clock() { return this.#clock; }
+    get active_level() { return this.#active?.level ?? null; }
+    get running() { return this.#running; }
+    get loading() { return this.#loading; }
+    get paused() { return this.#pauses.size > 0; }
+    get pause_reasons() { return [...this.#pauses.values()]; }
+    get phase() { return this.#phase; }
+    get destroyed() { return this.#destroyed; }
+    listLevels() { return [...this.#levels.keys()]; }
+    listSystems() { return [...this.#systems.keys()]; }
+    #live() { if (this.#destroyed) throw new Error('Runtime is disposed'); }
+    #idle() { this.#live(); if (this.#phase !== 'idle') throw new Error(`Operation requires a runtime boundary; current phase: ${this.#phase}`); }
+    #context(cleanups) {
+        let live = true;
+        cleanups.push(() => { live = false; });
+        const requireLive = () => { this.#live(); if (!live) throw new Error('Lifecycle context has been retired'); };
+        return Object.freeze({ engine: this.#engine, basement: this.#jacks.basement, lobby: this, directory: this.#jacks.directory, penthouse: this.#jacks.penthouse, game: this.#jacks.game,
+            createEntity: (packet, options) => { requireLive(); return this.createEntity(packet, options); },
+            on: (event, handler) => {
+                requireLive();
+                const unsubscribe = this.#world.on(event, handler); cleanups.push(unsubscribe); return unsubscribe;
+            },
+            defer: cleanup => { requireLive(); if (typeof cleanup !== 'function') throw new TypeError('Cleanup must be a function'); cleanups.push(cleanup); }
+        });
+    }
+    #clean(cleanups, errors) { for (const cleanup of cleanups.splice(0).reverse()) attempt(errors, cleanup); }
+    #callSystems(hook, ...args) {
+        for (const entry of this.#systems.values()) synchronous(entry.system[hook], entry.system, [entry.context, ...args]);
+    }
+    registerLevel(level_id, Level) {
+        this.#idle();
+        if (typeof level_id !== 'string' || !level_id.trim() || typeof Level !== 'function' || !(Level.prototype instanceof gameLevel) && Level !== gameLevel) throw new TypeError('Register a level_id and gameLevel class');
+        if (this.#levels.has(level_id)) throw new Error(`Level already registered: ${level_id}`);
+        this.#levels.set(level_id, Level); return this;
+    }
+    registerSystem(system_id, system) {
+        this.#idle();
+        if (typeof system_id !== 'string' || !system_id.trim() || !system || typeof system !== 'object') throw new TypeError('Register a system_id and system instance');
+        if (this.#systems.has(system_id)) throw new Error(`System already registered: ${system_id}`);
+        for (const name of hooks) if (system[name] !== undefined && typeof system[name] !== 'function') throw new TypeError(`Invalid system hook: ${name}`);
+        const cleanups = [], entry = { system, cleanups, context: this.#context(cleanups) };
+        this.#phase = 'registration';
+        try {
+            synchronous(system.attach, system, [entry.context]);
+            if (this.active_level) synchronous(system.levelEntered, system, [entry.context, this.active_level]);
+            this.#systems.set(system_id, entry);
+        } catch (error) {
+            const errors = [error]; attempt(errors, () => synchronous(system.detach, system, [entry.context])); this.#clean(cleanups, errors);
+            failures(errors, `Failed to attach system: ${system_id}`);
+        } finally { this.#phase = 'idle'; }
+        return this;
+    }
+    removeSystem(system_id) {
+        this.#idle(); const entry = this.#systems.get(system_id); if (!entry) return false;
+        this.#phase = 'registration'; const errors = []; this.#systems.delete(system_id);
+        try {
+            if (this.active_level) attempt(errors, () => synchronous(entry.system.levelLeaving, entry.system, [entry.context, this.active_level]));
+            attempt(errors, () => synchronous(entry.system.detach, entry.system, [entry.context])); this.#clean(entry.cleanups, errors);
+            failures(errors, `Failed to remove system: ${system_id}`);
+        } finally { this.#phase = 'idle'; }
+        return true;
+    }
+    createEntity(packet = {}, { lifetime = 'level' } = {}) {
+        this.#live();
+        if (this.#phase === 'render') throw new Error('Render hooks cannot create entities');
+        if (!['level', 'session'].includes(lifetime)) throw new TypeError('lifetime must be level or session');
+        if (lifetime === 'level' && !this.active_level) throw new Error('Level entities require an active level; use session lifetime for persistent actors');
+        const entity = this.#world.createEntity(packet);
+        if (lifetime === 'session') this.#persistent.add(entity);
+        return entity;
+    }
+    retainEntity(entity) {
+        this.#live();
+        if(!['idle','registration','input','beforePhysics','afterPhysics','transition'].includes(this.#phase))throw new Error('Retain entities at a runtime or registration boundary');
+        if (!entity || this.#jacks.basement.elements.fetchEntity(entity.entity_id) !== entity) throw new Error('Retain an official entity belonging to this runtime');
+        this.#persistent.add(entity); return entity;
+    }
+    releaseEntity(entity) {
+        this.#live();
+        if(!['idle','registration','input','beforePhysics','afterPhysics','transition'].includes(this.#phase))throw new Error('Release entities at a runtime or registration boundary');
+        return this.#persistent.delete(entity);
+    }
+    async loadLevel(level_id, options = {}) {
+        this.#live();
+        if (!['idle', 'input', 'beforePhysics', 'physics', 'afterPhysics'].includes(this.#phase)) throw new Error('Level loading is not allowed during rendering or lifecycle hooks');
+        if (this.#loading) throw new Error('A level load is already in progress');
+        const Level = this.#levels.get(level_id); if (!Level) throw new Error(`Unknown level: ${level_id}`);
+        this.#loading = true; let candidate, prepared, entered = false;
+        try {
+            candidate = new Level({ level_id });
+            if (candidate.level_id !== level_id) throw new Error('Level identity does not match registration');
+            prepared = await candidate.prepare(Object.freeze({ assets: this.#jacks.directory.assets }), options);
+            this.#idle(); this.#phase = 'transition';
+            this.#controls.clear();
+            this.#world.commitCommands();
+            this.#unload();
+            const cleanups = [], context = this.#context(cleanups);
+            this.#active = { level: candidate, context, cleanups, prepared }; entered = true;
+            synchronous(candidate.enter, candidate, [context, prepared]);
+            this.#world.commitCommands();
+            this.#callSystems('levelEntered', candidate);
+            return candidate;
+        } catch (error) {
+            const errors = [error];
+            if (entered) attempt(errors, () => this.#unload());
+            else if (candidate) attempt(errors, () => synchronous(candidate.disposePrepared, candidate, [prepared]));
+            failures(errors, `Failed to load level: ${level_id}`);
+        } finally { if (this.#phase === 'transition') this.#phase = 'idle'; this.#loading = false; }
+    }
+    #unload() {
+        const active = this.#active; if (!active) return;
+        const errors = [];
+        for (const entry of [...this.#systems.values()].reverse()) attempt(errors, () => synchronous(entry.system.levelLeaving, entry.system, [entry.context, active.level]));
+        attempt(errors, () => synchronous(active.level.leave, active.level, [active.context]));
+        this.#clean(active.cleanups, errors);
+        // The official registry is the source of truth, including entities spawned by raw
+        // native factories. This is lifecycle filtering, not another entity/spatial registry.
+        for (const entity of this.#jacks.basement.elements.getEntities()) if (!this.#persistent.has(entity)) attempt(errors, () => entity.destroy());
+        for (const entity of this.#persistent) if (entity.destroyed) this.#persistent.delete(entity);
+        this.#active = null;
+        attempt(errors, () => this.#world.commitCommands());
+        attempt(errors, () => synchronous(active.level.disposePrepared, active.level, [active.prepared]));
+        failures(errors, 'Failed to unload level');
+    }
+    unloadLevel() {
+        this.#idle(); if (this.#loading) throw new Error('A level load is in progress');
+        this.#phase = 'transition'; try { this.#unload(); } finally { this.#phase = 'idle'; }
+    }
+    pause(reason = 'manual') {
+        this.#live(); if (typeof reason !== 'string' || !reason) throw new TypeError('Pause requires a reason');
+        const token = Symbol(reason); this.#pauses.set(token, reason);
+        try { this.#controls.clear();this.#callSystems('gameplayPaused'); } catch(error) { this.#pauses.delete(token); throw error; }
+        return () => { const released=this.#pauses.delete(token);if(released&&!this.paused)this.#controls.clear();return released; };
+    }
+    updateState() {
+        this.#idle(); if (!this.running) return false;
+        this.#pollControls();
+        if (this.paused || !this.#active) return false;
+        const { level, context } = this.#active, seconds = this.#world.config.fixed_step;
+        try {
+            this.#phase = 'beforePhysics';
+            this.#callSystems('beforePhysics', seconds); synchronous(level.beforePhysics, level, [context, seconds]);
+            this.#phase = 'physics'; this.#step(seconds);
+            this.#phase = 'afterPhysics';
+            synchronous(level.afterPhysics, level, [context, seconds]); this.#callSystems('afterPhysics', seconds);this.#world.commitCommands();
+            this.#camera.updateState(seconds);
+            return true;
+        } catch (error) { this.stop(); throw error; }
+        finally { this.#controls.generateGhostImage();this.#phase = 'idle'; }
+    }
+    #pollControls() {
+        this.#phase='input';
+        try { this.#controls.updateState(); }
+        catch(error){this.stop();throw error;}
+        finally{this.#phase='idle';}
+    }
+    render(blend = 1) {
+        this.#idle(); if (!Number.isFinite(blend) || blend < 0 || blend > 1) throw new TypeError('Render blend must be between 0 and 1');
+        if (!this.#active) return false;
+        const { level, context } = this.#active;
+        try {
+            this.#phase = 'render'; const alpha = this.paused ? 1 : blend;
+            const frame=this.#render.beginFrame(alpha);
+            synchronous(level.render, level, [context, alpha, frame]); this.#callSystems('render', alpha, frame);
+            this.#render.endFrame();
+            return true;
+        } catch (error) { this.#render.abortFrame();this.stop(); throw error; }
+        finally { this.#phase = 'idle'; }
+    }
+    #queueFrame() {
+        if (!this.#schedule || !this.running || this.#frame !== null) return;
+        const generation = this.#generation;
+        this.#frame = this.#schedule(() => { if (generation !== this.#generation) return; this.#frame = null; if (this.running) this.#clock.runEngine(); });
+    }
+    start() {
+        this.#idle(); if (this.running) return false;
+        this.#running = true; this.#clock.last_frame_time = undefined; this.#clock.accumulator = 0; this.#clock.next_draw_due = undefined;
+        this.#queueFrame(); return true;
+    }
+    stop() {
+        this.#running = false; this.#generation++;
+        try { this.#controls.clear(); }
+        finally { try { if (this.#frame !== null && this.#cancel) this.#cancel(this.#frame); } finally { this.#frame = null; } }
+    }
+    dispose() {
+        this.#idle(); const errors = []; attempt(errors,()=>this.stop());this.#phase = 'disposal';
+        try {
+            attempt(errors, () => this.#unload());
+            for (const entry of [...this.#systems.values()].reverse()) {
+                attempt(errors, () => synchronous(entry.system.detach, entry.system, [entry.context])); this.#clean(entry.cleanups, errors);
+            }
+            this.#systems.clear(); this.#persistent.clear(); this.#pauses.clear();
+            attempt(errors, () => this.#controls.dispose());
+            attempt(errors, () => this.#render.dispose());
+            attempt(errors, () => this.#camera.stopFollowing());
+            attempt(errors, () => this.#world.clearWorld()); this.#levels.clear();
+        } finally { this.#destroyed = true; this.#phase = 'disposed'; }
+        failures(errors, 'Runtime disposal failed');
+    }
+}
+
+return Object.freeze({get gameLoop(){return gameLoop;}});
+})();
 // src/engine/penthouse/humanoid/humanoid.mjs
-const m169 = (()=>{
+const m170 = (()=>{
 // ===== LV3 PENTHOUSE =====
 // THE PROCEDURAL HUMANOID: a person made only of engine parts. A character body, a rig on it, the
 // Directory's skeleton, clips, locomotion and figure, and Basement IK and physical chains. It
@@ -46338,298 +46597,96 @@ class humanoid {
 return Object.freeze({get humanoid(){return humanoid;}});
 })();
 // src/engine/penthouse/index.mjs
-const m168 = (()=>{
+const m169 = (()=>{
 // ===== LV3 PENTHOUSE =====
 // Prefab toys built only from the Basement and the Directory. See README.md.
 
 
-return Object.freeze({get humanoid(){return m169.humanoid;}});
+return Object.freeze({get humanoid(){return m170.humanoid;}});
 })();
 // src/engine/game-engine.mjs
 const m149 = (()=>{
 // ===== ENGINE =====
 // The game engine: every level plugged in through one jack each. `engine.basement` (systems and operations),
-// `engine.lobby` (the loop's clock), `engine.directory` (the data), `engine.penthouse` (prefabs) and
+// `engine.lobby` (the game loop), `engine.directory` (the data), `engine.penthouse` (prefabs) and
 // `engine.game` (the services a game plugs in). Lifecycle contexts carry the same jacks.
 const {physicsSystem} = m1;
 const {controlSystem} = m150;
 const {cameraSystem,renderSystem} = m155;
-const {levelLobby} = m166;
-const {gameLevel} = m167;
+const {gameLoop} = m166;
 const {assetLibrary,mergeDefinition,identifier,nonnegative,jsonCopy,STRUCTURES,validatePropCatalog,validateMapLayout,checkLook,validateSkeleton,validateClipSet,validateLocomotion,validateFigure,validateDoorKind,validateLibrary,doorKindsOf,ENGINE_LIBRARIES,createEngineRegistry,resolvePlacement,resolveLayout,resolvePropLook,isMovable} = m41;
-const {humanoid} = m168;
+const {humanoid} = m169;
 
 /** What each jack carries besides the running systems: the Directory's functions and the Penthouse's prefabs. */
 const DIRECTORY = Object.freeze({ assetLibrary, mergeDefinition, identifier, nonnegative, jsonCopy, STRUCTURES, validatePropCatalog, validateMapLayout, checkLook, validateSkeleton, validateClipSet, validateLocomotion, validateFigure, validateDoorKind, validateLibrary, doorKindsOf, ENGINE_LIBRARIES, createEngineRegistry, resolvePlacement, resolveLayout, resolvePropLook, isMovable });
 const PENTHOUSE = Object.freeze({ humanoid });
 
-const hooks = ['attach', 'detach', 'beforePhysics', 'afterPhysics', 'render', 'levelEntered', 'levelLeaving','gameplayPaused'];
-function synchronous(fn, receiver, args) {
-    if (fn && ['AsyncFunction', 'GeneratorFunction', 'AsyncGeneratorFunction'].includes(fn.constructor.name)) throw new TypeError('Runtime hooks must be synchronous; load assets in level.prepare');
-    const result = fn?.apply(receiver, args);
-    if (result && typeof result.then === 'function') {
-        // Reject the contract while observing a returned rejection; do not leak an
-        // unhandled asynchronous error after the caller's synchronous cleanup.
-        Promise.resolve(result).catch(() => {});
-        throw new TypeError('Runtime hooks must be synchronous; load assets in level.prepare');
-    }
-    return result;
-}
-function attempt(errors, fn) { try { fn(); } catch (error) { errors.push(error); } }
-function failures(errors, message) { if (errors.length) throw new AggregateError(errors, message); }
-
-/** Application coordinator. Basement supplies all physical behavior; the Lobby supplies time. */
+/**
+ * The game engine: builds the Basement's running systems and plugs every level in through its jack. The
+ * Lobby's game loop runs them; the engine's own calls (`loadLevel`, `start`, `pause`, …) are the loop's.
+ */
 class gameEngine {
-    #world; #authority = Symbol('runtime simulation clock'); #basement; #directory; #penthouse; #game; #lobby; #controls; #camera; #render;
-    #levels = new Map(); #systems = new Map(); #active = null; #persistent = new Set();
-    #running = false; #destroyed = false; #phase = 'idle'; #loading = false; #pauses = new Map();
-    #schedule; #cancel; #frame = null; #generation = 0;
+    #authority = Symbol('runtime simulation clock'); #basement; #directory; #penthouse; #game; #loop;
 
-    constructor({ asset_library, physics = {}, controls = {}, camera = {}, clock = {}, frame_clock,
-        schedule_frame = typeof requestAnimationFrame === 'function' ? callback => requestAnimationFrame(callback) : null,
-        cancel_frame = typeof cancelAnimationFrame === 'function' ? handle => cancelAnimationFrame(handle) : null,
-        render_target, services = {} } = {}) {
+    constructor({ asset_library, physics = {}, controls = {}, camera = {}, clock = {}, frame_clock, schedule_frame, cancel_frame, render_target, services = {} } = {}) {
         if (!services || typeof services !== 'object' || Array.isArray(services) || Object.keys(services).some(key => ['__proto__','constructor','prototype'].includes(key))) throw new TypeError('Game services are a plain object of named services');
-        if(render_target!==undefined)throw new TypeError('Mount a renderer surface through basement.render.setRenderer; render hooks receive a frame');
+        if (render_target !== undefined) throw new TypeError('Mount a renderer surface through basement.render.setRenderer; render hooks receive a frame');
         if (Object.hasOwn(physics, 'step_authority') || Object.hasOwn(physics, 'asset_library')) throw new TypeError('The runtime owns physics authority and its asset library');
-        if (schedule_frame !== null && typeof schedule_frame !== 'function' || cancel_frame !== null && typeof cancel_frame !== 'function') throw new TypeError('Frame scheduling requires functions');
-        this.#world = new physicsSystem({ ...physics, asset_library, step_authority: this.#authority });
-        this.#world.rigs._setGuard(()=>{if(this.#phase==='render')throw new Error('Render hooks cannot change animation');});
-        const config = { STEP_MS: this.#world.config.fixed_step * 1000, MAX_FRAME_MS: 100, MAX_STEPS: 6, GAME_SPEED: 1, ...clock };
-        if (config.STEP_MS !== this.#world.config.fixed_step * 1000) throw new TypeError('Lobby and physics fixed steps must match');
-        if (![config.MAX_FRAME_MS, config.MAX_STEPS, config.GAME_SPEED].every(v => Number.isFinite(v) && v > 0) || !Number.isInteger(config.MAX_STEPS)) throw new TypeError('Invalid Lobby clock configuration');
-        if(controls.auto_update)throw new TypeError('The runtime owns control polling');
-        this.#camera = new cameraSystem(camera);
-        this.#controls = new controlSystem({ ...controls, auto_update:false });
-        this.#render = new renderSystem({physics_system:this.#world,camera:this.#camera});
-        this.#basement = Object.freeze({ physics: this.#world, elements: this.#world.elements, rigs: this.#world.rigs, motion: this.#world.motion,
-            traffic: this.#world.traffic, controls: this.#controls, camera: this.#camera, render: this.#render });
-        this.#directory = Object.freeze({ ...DIRECTORY, assets: this.#world.elements.asset_library });
+        if (controls.auto_update) throw new TypeError('The runtime owns control polling');
+        const world = new physicsSystem({ ...physics, asset_library, step_authority: this.#authority });
+        const view = new cameraSystem(camera), input = new controlSystem({ ...controls, auto_update: false });
+        const draw = new renderSystem({ physics_system: world, camera: view });
+        this.#basement = Object.freeze({ physics: world, elements: world.elements, rigs: world.rigs, motion: world.motion,
+            traffic: world.traffic, controls: input, camera: view, render: draw });
+        this.#directory = Object.freeze({ ...DIRECTORY, assets: world.elements.asset_library });
         this.#penthouse = Object.freeze({ ...PENTHOUSE });
         this.#game = Object.freeze({ ...services });
-        this.#schedule = schedule_frame; this.#cancel = cancel_frame;
-        this.#lobby = new levelLobby(Object.freeze(config), frame_clock);
-        this.#lobby.plugIn({ isRunning: () => this.running, isPaused: () => this.paused || !this.active_level,
-            beginFrame: () => { if(this.paused || !this.active_level)this.#pollControls(); },
-            simulateStep: () => this.updateState(), renderFrame: blend => this.render(blend),
-            scheduleNextFrame: () => this.#queueFrame() });
+        const authority = this.#authority;
+        this.#loop = new gameLoop({ engine: this, jacks: { basement: this.#basement, directory: this.#directory, penthouse: this.#penthouse, game: this.#game },
+            step_world: seconds => world.updateState(seconds, authority), clock, frame_clock,
+            ...(schedule_frame !== undefined ? { schedule_frame } : {}), ...(cancel_frame !== undefined ? { cancel_frame } : {}) });
     }
     /** LV0: the running systems (physics, elements, rigs, motion, traffic, controls, camera, render). */
     get basement() { return this.#basement; }
-    /** LV1: the loop's clock. */
-    get lobby() { return this.#lobby; }
+    /** LV1: the game loop (its clock is `lobby.clock`). */
+    get lobby() { return this.#loop; }
     /** LV2: the data layer's functions, plus `assets`, this runtime's registry. */
     get directory() { return this.#directory; }
     /** LV3: the prefabs. */
     get penthouse() { return this.#penthouse; }
     /** The services the game plugged in. */
     get game() { return this.#game; }
-    get active_level() { return this.#active?.level ?? null; }
-    get running() { return this.#running; }
-    get loading() { return this.#loading; }
-    get paused() { return this.#pauses.size > 0; }
-    get pause_reasons() { return [...this.#pauses.values()]; }
-    get phase() { return this.#phase; }
-    get destroyed() { return this.#destroyed; }
-    listLevels() { return [...this.#levels.keys()]; }
-    listSystems() { return [...this.#systems.keys()]; }
-    #live() { if (this.#destroyed) throw new Error('Runtime is disposed'); }
-    #idle() { this.#live(); if (this.#phase !== 'idle') throw new Error(`Operation requires a runtime boundary; current phase: ${this.#phase}`); }
-    #context(cleanups) {
-        let live = true;
-        cleanups.push(() => { live = false; });
-        const requireLive = () => { this.#live(); if (!live) throw new Error('Lifecycle context has been retired'); };
-        return Object.freeze({ engine: this, basement: this.#basement, lobby: this.#lobby, directory: this.#directory, penthouse: this.#penthouse, game: this.#game,
-            createEntity: (packet, options) => { requireLive(); return this.createEntity(packet, options); },
-            on: (event, handler) => {
-                requireLive();
-                const unsubscribe = this.#world.on(event, handler); cleanups.push(unsubscribe); return unsubscribe;
-            },
-            defer: cleanup => { requireLive(); if (typeof cleanup !== 'function') throw new TypeError('Cleanup must be a function'); cleanups.push(cleanup); }
-        });
-    }
-    #clean(cleanups, errors) { for (const cleanup of cleanups.splice(0).reverse()) attempt(errors, cleanup); }
-    #callSystems(hook, ...args) {
-        for (const entry of this.#systems.values()) synchronous(entry.system[hook], entry.system, [entry.context, ...args]);
-    }
-    registerLevel(level_id, Level) {
-        this.#idle();
-        if (typeof level_id !== 'string' || !level_id.trim() || typeof Level !== 'function' || !(Level.prototype instanceof gameLevel) && Level !== gameLevel) throw new TypeError('Register a level_id and gameLevel class');
-        if (this.#levels.has(level_id)) throw new Error(`Level already registered: ${level_id}`);
-        this.#levels.set(level_id, Level); return this;
-    }
-    registerSystem(system_id, system) {
-        this.#idle();
-        if (typeof system_id !== 'string' || !system_id.trim() || !system || typeof system !== 'object') throw new TypeError('Register a system_id and system instance');
-        if (this.#systems.has(system_id)) throw new Error(`System already registered: ${system_id}`);
-        for (const name of hooks) if (system[name] !== undefined && typeof system[name] !== 'function') throw new TypeError(`Invalid system hook: ${name}`);
-        const cleanups = [], entry = { system, cleanups, context: this.#context(cleanups) };
-        this.#phase = 'registration';
-        try {
-            synchronous(system.attach, system, [entry.context]);
-            if (this.active_level) synchronous(system.levelEntered, system, [entry.context, this.active_level]);
-            this.#systems.set(system_id, entry);
-        } catch (error) {
-            const errors = [error]; attempt(errors, () => synchronous(system.detach, system, [entry.context])); this.#clean(cleanups, errors);
-            failures(errors, `Failed to attach system: ${system_id}`);
-        } finally { this.#phase = 'idle'; }
-        return this;
-    }
-    removeSystem(system_id) {
-        this.#idle(); const entry = this.#systems.get(system_id); if (!entry) return false;
-        this.#phase = 'registration'; const errors = []; this.#systems.delete(system_id);
-        try {
-            if (this.active_level) attempt(errors, () => synchronous(entry.system.levelLeaving, entry.system, [entry.context, this.active_level]));
-            attempt(errors, () => synchronous(entry.system.detach, entry.system, [entry.context])); this.#clean(entry.cleanups, errors);
-            failures(errors, `Failed to remove system: ${system_id}`);
-        } finally { this.#phase = 'idle'; }
-        return true;
-    }
-    createEntity(packet = {}, { lifetime = 'level' } = {}) {
-        this.#live();
-        if (this.#phase === 'render') throw new Error('Render hooks cannot create entities');
-        if (!['level', 'session'].includes(lifetime)) throw new TypeError('lifetime must be level or session');
-        if (lifetime === 'level' && !this.active_level) throw new Error('Level entities require an active level; use session lifetime for persistent actors');
-        const entity = this.#world.createEntity(packet);
-        if (lifetime === 'session') this.#persistent.add(entity);
-        return entity;
-    }
-    retainEntity(entity) {
-        this.#live();
-        if(!['idle','registration','input','beforePhysics','afterPhysics','transition'].includes(this.#phase))throw new Error('Retain entities at a runtime or registration boundary');
-        if (!entity || this.#basement.elements.fetchEntity(entity.entity_id) !== entity) throw new Error('Retain an official entity belonging to this runtime');
-        this.#persistent.add(entity); return entity;
-    }
-    releaseEntity(entity) {
-        this.#live();
-        if(!['idle','registration','input','beforePhysics','afterPhysics','transition'].includes(this.#phase))throw new Error('Release entities at a runtime or registration boundary');
-        return this.#persistent.delete(entity);
-    }
-    async loadLevel(level_id, options = {}) {
-        this.#live();
-        if (!['idle', 'input', 'beforePhysics', 'physics', 'afterPhysics'].includes(this.#phase)) throw new Error('Level loading is not allowed during rendering or lifecycle hooks');
-        if (this.#loading) throw new Error('A level load is already in progress');
-        const Level = this.#levels.get(level_id); if (!Level) throw new Error(`Unknown level: ${level_id}`);
-        this.#loading = true; let candidate, prepared, entered = false;
-        try {
-            candidate = new Level({ level_id });
-            if (candidate.level_id !== level_id) throw new Error('Level identity does not match registration');
-            prepared = await candidate.prepare(Object.freeze({ assets: this.#directory.assets }), options);
-            this.#idle(); this.#phase = 'transition';
-            this.#controls.clear();
-            this.#world.commitCommands();
-            this.#unload();
-            const cleanups = [], context = this.#context(cleanups);
-            this.#active = { level: candidate, context, cleanups, prepared }; entered = true;
-            synchronous(candidate.enter, candidate, [context, prepared]);
-            this.#world.commitCommands();
-            this.#callSystems('levelEntered', candidate);
-            return candidate;
-        } catch (error) {
-            const errors = [error];
-            if (entered) attempt(errors, () => this.#unload());
-            else if (candidate) attempt(errors, () => synchronous(candidate.disposePrepared, candidate, [prepared]));
-            failures(errors, `Failed to load level: ${level_id}`);
-        } finally { if (this.#phase === 'transition') this.#phase = 'idle'; this.#loading = false; }
-    }
-    #unload() {
-        const active = this.#active; if (!active) return;
-        const errors = [];
-        for (const entry of [...this.#systems.values()].reverse()) attempt(errors, () => synchronous(entry.system.levelLeaving, entry.system, [entry.context, active.level]));
-        attempt(errors, () => synchronous(active.level.leave, active.level, [active.context]));
-        this.#clean(active.cleanups, errors);
-        // The official registry is the source of truth, including entities spawned by raw
-        // native factories. This is lifecycle filtering, not another entity/spatial registry.
-        for (const entity of this.#basement.elements.getEntities()) if (!this.#persistent.has(entity)) attempt(errors, () => entity.destroy());
-        for (const entity of this.#persistent) if (entity.destroyed) this.#persistent.delete(entity);
-        this.#active = null;
-        attempt(errors, () => this.#world.commitCommands());
-        attempt(errors, () => synchronous(active.level.disposePrepared, active.level, [active.prepared]));
-        failures(errors, 'Failed to unload level');
-    }
-    unloadLevel() {
-        this.#idle(); if (this.#loading) throw new Error('A level load is in progress');
-        this.#phase = 'transition'; try { this.#unload(); } finally { this.#phase = 'idle'; }
-    }
-    pause(reason = 'manual') {
-        this.#live(); if (typeof reason !== 'string' || !reason) throw new TypeError('Pause requires a reason');
-        const token = Symbol(reason); this.#pauses.set(token, reason);
-        try { this.#controls.clear();this.#callSystems('gameplayPaused'); } catch(error) { this.#pauses.delete(token); throw error; }
-        return () => { const released=this.#pauses.delete(token);if(released&&!this.paused)this.#controls.clear();return released; };
-    }
-    updateState() {
-        this.#idle(); if (!this.running) return false;
-        this.#pollControls();
-        if (this.paused || !this.#active) return false;
-        const { level, context } = this.#active, seconds = this.#world.config.fixed_step;
-        try {
-            this.#phase = 'beforePhysics';
-            this.#callSystems('beforePhysics', seconds); synchronous(level.beforePhysics, level, [context, seconds]);
-            this.#phase = 'physics'; this.#world.updateState(seconds, this.#authority);
-            this.#phase = 'afterPhysics';
-            synchronous(level.afterPhysics, level, [context, seconds]); this.#callSystems('afterPhysics', seconds);this.#world.commitCommands();
-            this.#camera.updateState(seconds);
-            return true;
-        } catch (error) { this.stop(); throw error; }
-        finally { this.#controls.generateGhostImage();this.#phase = 'idle'; }
-    }
-    #pollControls() {
-        this.#phase='input';
-        try { this.#controls.updateState(); }
-        catch(error){this.stop();throw error;}
-        finally{this.#phase='idle';}
-    }
-    render(blend = 1) {
-        this.#idle(); if (!Number.isFinite(blend) || blend < 0 || blend > 1) throw new TypeError('Render blend must be between 0 and 1');
-        if (!this.#active) return false;
-        const { level, context } = this.#active;
-        try {
-            this.#phase = 'render'; const alpha = this.paused ? 1 : blend;
-            const frame=this.#render.beginFrame(alpha);
-            synchronous(level.render, level, [context, alpha, frame]); this.#callSystems('render', alpha, frame);
-            this.#render.endFrame();
-            return true;
-        } catch (error) { this.#render.abortFrame();this.stop(); throw error; }
-        finally { this.#phase = 'idle'; }
-    }
-    #queueFrame() {
-        if (!this.#schedule || !this.running || this.#frame !== null) return;
-        const generation = this.#generation;
-        this.#frame = this.#schedule(() => { if (generation !== this.#generation) return; this.#frame = null; if (this.running) this.#lobby.runEngine(); });
-    }
-    start() {
-        this.#idle(); if (this.running) return false;
-        this.#running = true; this.#lobby.last_frame_time = undefined; this.#lobby.accumulator = 0; this.#lobby.next_draw_due = undefined;
-        this.#queueFrame(); return true;
-    }
-    stop() {
-        this.#running = false; this.#generation++;
-        try { this.#controls.clear(); }
-        finally { try { if (this.#frame !== null && this.#cancel) this.#cancel(this.#frame); } finally { this.#frame = null; } }
-    }
-    dispose() {
-        this.#idle(); const errors = []; attempt(errors,()=>this.stop());this.#phase = 'disposal';
-        try {
-            attempt(errors, () => this.#unload());
-            for (const entry of [...this.#systems.values()].reverse()) {
-                attempt(errors, () => synchronous(entry.system.detach, entry.system, [entry.context])); this.#clean(entry.cleanups, errors);
-            }
-            this.#systems.clear(); this.#persistent.clear(); this.#pauses.clear();
-            attempt(errors, () => this.#controls.dispose());
-            attempt(errors, () => this.#render.dispose());
-            attempt(errors, () => this.#camera.stopFollowing());
-            attempt(errors, () => this.#world.clearWorld()); this.#levels.clear();
-        } finally { this.#destroyed = true; this.#phase = 'disposed'; }
-        failures(errors, 'Runtime disposal failed');
-    }
+    get active_level() { return this.#loop.active_level; }
+    get running() { return this.#loop.running; }
+    get loading() { return this.#loop.loading; }
+    get paused() { return this.#loop.paused; }
+    get pause_reasons() { return this.#loop.pause_reasons; }
+    get phase() { return this.#loop.phase; }
+    get destroyed() { return this.#loop.destroyed; }
+    registerLevel(...args) { const result = this.#loop.registerLevel(...args); return result === this.#loop ? this : result; }
+    registerSystem(...args) { const result = this.#loop.registerSystem(...args); return result === this.#loop ? this : result; }
+    removeSystem(...args) { const result = this.#loop.removeSystem(...args); return result === this.#loop ? this : result; }
+    createEntity(...args) { const result = this.#loop.createEntity(...args); return result === this.#loop ? this : result; }
+    retainEntity(...args) { const result = this.#loop.retainEntity(...args); return result === this.#loop ? this : result; }
+    releaseEntity(...args) { const result = this.#loop.releaseEntity(...args); return result === this.#loop ? this : result; }
+    loadLevel(...args) { const result = this.#loop.loadLevel(...args); return result === this.#loop ? this : result; }
+    unloadLevel(...args) { const result = this.#loop.unloadLevel(...args); return result === this.#loop ? this : result; }
+    pause(...args) { const result = this.#loop.pause(...args); return result === this.#loop ? this : result; }
+    updateState(...args) { const result = this.#loop.updateState(...args); return result === this.#loop ? this : result; }
+    render(...args) { const result = this.#loop.render(...args); return result === this.#loop ? this : result; }
+    start(...args) { const result = this.#loop.start(...args); return result === this.#loop ? this : result; }
+    stop(...args) { const result = this.#loop.stop(...args); return result === this.#loop ? this : result; }
+    listLevels(...args) { const result = this.#loop.listLevels(...args); return result === this.#loop ? this : result; }
+    listSystems(...args) { const result = this.#loop.listSystems(...args); return result === this.#loop ? this : result; }
+    dispose() { return this.#loop.dispose(); }
 }
 
 return Object.freeze({get gameEngine(){return gameEngine;}});
 })();
 // src/engine/lobby/runtime/map-level.mjs
-const m170 = (()=>{
+const m171 = (()=>{
 // ===== LV1 LOBBY =====
-const {gameLevel} = m167;
+const {gameLevel} = m168;
 const {mapInstance} = m141;
 const {gameCharacter} = m1;
 
@@ -46715,7 +46772,7 @@ class mapLevel extends gameLevel {
 return Object.freeze({get mapLevel(){return mapLevel;}});
 })();
 // src/engine/lobby/runtime/travel-system.mjs
-const m171 = (()=>{
+const m172 = (()=>{
 // ===== LV1 LOBBY =====
 /**
  * Travel between levels through their exits. Each step it notes the exit the leading traveller
@@ -46769,7 +46826,7 @@ class travelSystem {
 
 return Object.freeze({get travelSystem(){return travelSystem;}});
 })();
-const m175 = Object.freeze({default:{
+const m176 = Object.freeze({default:{
  "tile_size": 512,
  "tile_ahead": 128,
  "lot": "#221e28", "lot_grain": ["rgba(255, 240, 255, 0.022)", "rgba(0, 0, 0, 0.14)"], "lot_grain_count": 420,
@@ -46785,8 +46842,8 @@ const m175 = Object.freeze({default:{
  "stripe": "rgba(234, 226, 212, 0.6)", "stripe_wear": "rgba(22, 20, 27, 0.55)"
 }});
 // src/game/presentation/city-ground.mjs
-const m174 = (()=>{
-const GROUND = m175.default;
+const m175 = (()=>{
+const GROUND = m176.default;
 const {artScene,rect,polygon,polyline,circle,radial,seededRandom,hash2,viewAhead} = m155;
 
 /**
@@ -46961,7 +47018,7 @@ function pointAlong(road, d) {
 
 return Object.freeze({get cityGround(){return cityGround;}});
 })();
-const m177 = Object.freeze({default:{
+const m178 = Object.freeze({default:{
  "eye": {
   "height": 700,
   "ref_zoom": 1,
@@ -47306,7 +47363,7 @@ const m177 = Object.freeze({default:{
  }
 }});
 // src/game/presentation/city-building-art.mjs
-const m178 = (()=>{
+const m179 = (()=>{
 /**
  * The small vocabulary the city's building artists share: the classic hash their picks come from, the
  * classic colour helpers (absolute RGB steps, not the toolkit's blends), and path builders that add to a
@@ -47357,9 +47414,9 @@ const wallTools = (G, H) => ({
 return Object.freeze({get buildingHash(){return buildingHash;},get classicRandom(){return classicRandom;},get darken(){return darken;},get lighten(){return lighten;},get rgbOf(){return rgbOf;},get alpha(){return alpha;},get moveLine(){return moveLine;},get quadPath(){return quadPath;},get boxPath(){return boxPath;},get polyPath(){return polyPath;},get dotPath(){return dotPath;},get arcPath(){return arcPath;},get fillIf(){return fillIf;},get strokeIf(){return strokeIf;},get wallTools(){return wallTools;}});
 })();
 // src/game/presentation/city-street-shops.mjs
-const m179 = (()=>{
+const m180 = (()=>{
 const {artScene,rect,roundRect,circle,ellipse,linear,radial} = m155;
-const {darken,alpha,boxPath,dotPath,moveLine,quadPath,polyPath,fillIf,strokeIf,wallTools} = m178;
+const {darken,alpha,boxPath,dotPath,moveLine,quadPath,polyPath,fillIf,strokeIf,wallTools} = m179;
 
 /**
  * The city's small shops (the street variants bakery, florist, boutique and lounge): their walls' material,
@@ -47668,9 +47725,9 @@ function paintRoof(c, S, fw, fd) {
 return Object.freeze({get streetShop(){return streetShop;}});
 })();
 // src/game/presentation/city-street-arcade.mjs
-const m180 = (()=>{
+const m181 = (()=>{
 const {artScene,rect,circle,radial,linear} = m155;
-const {buildingHash,alpha,boxPath,dotPath,moveLine,quadPath,polyPath,fillIf,strokeIf,wallTools} = m178;
+const {buildingHash,alpha,boxPath,dotPath,moveLine,quadPath,polyPath,fillIf,strokeIf,wallTools} = m179;
 
 /**
  * The city's shopping arcades in limestone (the street variant most shops take): tall arched shopfronts
@@ -47894,9 +47951,9 @@ function paintRoof(h, c, fw, fd) {
 return Object.freeze({get streetArcade(){return streetArcade;}});
 })();
 // src/game/presentation/city-street-apartments.mjs
-const m181 = (()=>{
+const m182 = (()=>{
 const {rect,circle,roundRect} = m155;
-const {buildingHash,lighten,darken,alpha,boxPath,dotPath,moveLine,polyPath,fillIf,strokeIf,wallTools} = m178;
+const {buildingHash,lighten,darken,alpha,boxPath,dotPath,moveLine,polyPath,fillIf,strokeIf,wallTools} = m179;
 
 /**
  * The city's apartment houses (the street variants brownstone, deco, terrace and loft), built like the
@@ -48321,7 +48378,7 @@ function faceLoft(h, art, f, G, emissive) {
 return Object.freeze({get streetApartment(){return streetApartment;}});
 })();
 // src/game/presentation/city-entrance-lamps.mjs
-const m183 = (()=>{
+const m184 = (()=>{
 const {circle,radial,glow} = m155;
 
 /**
@@ -48528,9 +48585,9 @@ function entranceLamps(art, b, view, lamps, lit, g = 1) {
 return Object.freeze({get SIZE(){return SIZE;},get lampAt(){return lampAt;},get entranceLamps(){return entranceLamps;}});
 })();
 // src/game/presentation/city-tiered.mjs
-const m182 = (()=>{
+const m183 = (()=>{
 const {artScene,rect,linear} = m155;
-const {entranceLamps,lampAt} = m183;
+const {entranceLamps,lampAt} = m184;
 
 /**
  * The city's landmarks as stacks of tiers, each a prism of its own: any polygon plan, its own base z0 and
@@ -48820,7 +48877,7 @@ class tieredBuilding {
 
 return Object.freeze({get bayPlan(){return bayPlan;},get TIER(){return TIER;},get tieredBuilding(){return tieredBuilding;}});
 })();
-const m185 = Object.freeze({default:{
+const m186 = Object.freeze({default:{
   "cozy_cafe": {
     "colors": {
       "brick": "#6a3426",
@@ -49702,11 +49759,11 @@ const m185 = Object.freeze({default:{
   }
 }});
 // src/game/presentation/city-landmark-cozy-cafe.mjs
-const m184 = (()=>{
-const LANDMARKS = m185.default;
+const m185 = (()=>{
+const LANDMARKS = m186.default;
 const {rect,roundRect,circle,ellipse,linear,radial} = m155;
-const {classicRandom,dotPath,polyPath,moveLine} = m178;
-const {TIER} = m182;
+const {classicRandom,dotPath,polyPath,moveLine} = m179;
+const {TIER} = m183;
 
 /**
  * The Cozy Cafe, the hub's corner cafe on Crimson Blvd, as a tiered building (`city-tiered.mjs`): a brick
@@ -49952,10 +50009,10 @@ function cozyCafe() {
 return Object.freeze({get cozyCafe(){return cozyCafe;}});
 })();
 // src/game/presentation/city-landmark-warehouse.mjs
-const m186 = (()=>{
-const LANDMARKS = m185.default;
+const m187 = (()=>{
+const LANDMARKS = m186.default;
 const {rect,circle,linear,radial} = m155;
-const {classicRandom,moveLine} = m178;
+const {classicRandom,moveLine} = m179;
 
 /**
  * The Warehouse, the hub's storage hall, as a tiered building (`city-tiered.mjs`): a shed of ribbed steel
@@ -50066,10 +50123,10 @@ function warehouse(record) {
 return Object.freeze({get warehouse(){return warehouse;}});
 })();
 // src/game/presentation/city-landmark-dr-yins.mjs
-const m187 = (()=>{
-const LANDMARKS = m185.default;
+const m188 = (()=>{
+const LANDMARKS = m186.default;
 const {rect,circle,ellipse,polygon,linear,radial} = m155;
-const {moveLine} = m178;
+const {moveLine} = m179;
 
 /**
  * Dr. Yin's, the clinic on the hub's south-west corner, as a tiered building (`city-tiered.mjs`), in dark teal
@@ -50228,10 +50285,10 @@ function drYins(record) {
 return Object.freeze({get drYins(){return drYins;}});
 })();
 // src/game/presentation/city-landmark-neural-systems.mjs
-const m188 = (()=>{
-const LANDMARKS = m185.default;
+const m189 = (()=>{
+const LANDMARKS = m186.default;
 const {rect,roundRect,polygon,circle,linear} = m155;
-const {classicRandom,moveLine} = m178;
+const {classicRandom,moveLine} = m179;
 
 /**
  * Neural Systems, a luxury department store carved from dark sapphire, as a tiered building (`city-tiered.mjs`):
@@ -50408,10 +50465,10 @@ function neuralSystems(record) {
 return Object.freeze({get neuralSystems(){return neuralSystems;}});
 })();
 // src/game/presentation/city-landmark-torque-auto.mjs
-const m189 = (()=>{
-const LANDMARKS = m185.default;
+const m190 = (()=>{
+const LANDMARKS = m186.default;
 const {rect,roundRect,polygon,circle,linear,radial} = m155;
-const {moveLine} = m178;
+const {moveLine} = m179;
 
 /**
  * Torque Auto, Crimson Blvd's garage beside the Cozy Cafe, as a tiered building (`city-tiered.mjs`): the garage
@@ -50580,10 +50637,10 @@ function torqueAuto() {
 return Object.freeze({get torqueAuto(){return torqueAuto;}});
 })();
 // src/game/presentation/city-landmark-biggs-park.mjs
-const m190 = (()=>{
-const LANDMARKS = m185.default;
+const m191 = (()=>{
+const LANDMARKS = m186.default;
 const {rect,roundRect,polygon,circle,ellipse,linear,radial} = m155;
-const {moveLine} = m178;
+const {moveLine} = m179;
 
 /**
  * Biggs Park, a lacquer-and-brass fairground pavilion, as a tiered building (`city-tiered.mjs`): the pavilion
@@ -50766,10 +50823,10 @@ function biggsPark() {
 return Object.freeze({get biggsPark(){return biggsPark;}});
 })();
 // src/game/presentation/city-landmark-enni-cole.mjs
-const m191 = (()=>{
-const LANDMARKS = m185.default;
+const m192 = (()=>{
+const LANDMARKS = m186.default;
 const {rect,roundRect,polygon,circle,ellipse,linear,radial} = m155;
-const {classicRandom,moveLine} = m178;
+const {classicRandom,moveLine} = m179;
 
 /**
  * Enni Cole, the luxury department store on Clinic Way, as a tiered building (`city-tiered.mjs`): a two-storey
@@ -51097,7 +51154,7 @@ function enniCole() {
 return Object.freeze({get cypress(){return cypress;},get enniCole(){return enniCole;}});
 })();
 // src/game/presentation/city-ornament.mjs
-const m193 = (()=>{
+const m194 = (()=>{
 const {rect,polygon,ellipse,circle,linear,radial} = m155;
 
 /**
@@ -51210,12 +51267,12 @@ function ornament(C) {
 return Object.freeze({get ornament(){return ornament;}});
 })();
 // src/game/presentation/city-landmark-ashgrove.mjs
-const m192 = (()=>{
-const LANDMARKS = m185.default;
+const m193 = (()=>{
+const LANDMARKS = m186.default;
 const {rect,polygon,circle,ellipse,linear,radial} = m155;
-const {classicRandom,moveLine} = m178;
-const {ornament} = m193;
-const {bayPlan} = m182;
+const {classicRandom,moveLine} = m179;
+const {ornament} = m194;
+const {bayPlan} = m183;
 
 /**
  * The Ashgrove, a mansion block across Ashgrove St from Biggs Park, as a tiered building (`city-tiered.mjs`):
@@ -51557,11 +51614,11 @@ function ashgrove(record) {
 return Object.freeze({get ashgrove(){return ashgrove;}});
 })();
 // src/game/presentation/city-landmark-double-nights.mjs
-const m194 = (()=>{
-const LANDMARKS = m185.default;
+const m195 = (()=>{
+const LANDMARKS = m186.default;
 const {rect,polygon,circle,ellipse,linear,radial,glow} = m155;
-const {classicRandom,moveLine} = m178;
-const {bayPlan} = m182;
+const {classicRandom,moveLine} = m179;
+const {bayPlan} = m183;
 
 /**
  * The Double Nights Hotel, the city's grand hotel, as a tiered building (`city-tiered.mjs`): warm limestone,
@@ -52145,11 +52202,11 @@ function doubleNights() {
 return Object.freeze({get doubleNights(){return doubleNights;}});
 })();
 // src/game/presentation/city-landmark-moon-city.mjs
-const m195 = (()=>{
-const LANDMARKS = m185.default;
+const m196 = (()=>{
+const LANDMARKS = m186.default;
 const {rect,polygon,circle,ellipse,linear,radial,glow} = m155;
-const {classicRandom,moveLine} = m178;
-const {bayPlan} = m182;
+const {classicRandom,moveLine} = m179;
+const {bayPlan} = m183;
 
 /**
  * Moon City, the nightclub, as a tiered building (`city-tiered.mjs`), in black lacquer, violet neon and
@@ -52759,13 +52816,13 @@ function moonCity() {
 return Object.freeze({get moonCity(){return moonCity;}});
 })();
 // src/game/presentation/city-landmark-silver-queen.mjs
-const m196 = (()=>{
-const LANDMARKS = m185.default;
+const m197 = (()=>{
+const LANDMARKS = m186.default;
 const {rect,polygon,circle,ellipse,linear,radial,glow} = m155;
-const {classicRandom,moveLine} = m178;
-const {ornament} = m193;
-const {bayPlan} = m182;
-const {cypress} = m191;
+const {classicRandom,moveLine} = m179;
+const {ornament} = m194;
+const {bayPlan} = m183;
+const {cypress} = m192;
 
 /**
  * The Silver Queen, an Art Deco apartment house in pale silver stone stepping up toward its middle, as a tiered
@@ -53321,25 +53378,25 @@ function silverQueen() {
 return Object.freeze({get silverQueen(){return silverQueen;}});
 })();
 // src/game/presentation/city-buildings.mjs
-const m176 = (()=>{
-const LOOK = m177.default;
+const m177 = (()=>{
+const LOOK = m178.default;
 const {artScene,rect,circle,ellipse,linear,radial,heightView,boxFaces,measureText} = m155;
-const {buildingHash,darken,lighten,alpha,rgbOf,boxPath,dotPath,moveLine,fillIf,strokeIf} = m178;
-const {streetShop} = m179;
-const {streetArcade} = m180;
-const {streetApartment} = m181;
-const {tieredBuilding} = m182;
-const {cozyCafe} = m184;
-const {warehouse} = m186;
-const {drYins} = m187;
-const {neuralSystems} = m188;
-const {torqueAuto} = m189;
-const {biggsPark} = m190;
-const {enniCole} = m191;
-const {ashgrove} = m192;
-const {doubleNights} = m194;
-const {moonCity} = m195;
-const {silverQueen} = m196;
+const {buildingHash,darken,lighten,alpha,rgbOf,boxPath,dotPath,moveLine,fillIf,strokeIf} = m179;
+const {streetShop} = m180;
+const {streetArcade} = m181;
+const {streetApartment} = m182;
+const {tieredBuilding} = m183;
+const {cozyCafe} = m185;
+const {warehouse} = m187;
+const {drYins} = m188;
+const {neuralSystems} = m189;
+const {torqueAuto} = m190;
+const {biggsPark} = m191;
+const {enniCole} = m192;
+const {ashgrove} = m193;
+const {doubleNights} = m195;
+const {moonCity} = m196;
+const {silverQueen} = m197;
 
 /**
  * The city's street buildings as art, from the looks its generator resolved (the `look` of each exported
@@ -53694,7 +53751,7 @@ class house {
 
 return Object.freeze({get cityBuildings(){return cityBuildings;}});
 })();
-const m198 = Object.freeze({default:{
+const m199 = Object.freeze({default:{
   "kinds": {
     "tree":        { "base": "#153524", "mid": "#245a38", "hi": "#5d9a68", "dark": "#0c2016" },
     "glow_pink":   { "base": "#4a1f3e", "mid": "#9a4a78", "hi": "#f4b0d4", "dark": "#2a0f22", "petals": ["#ffd3ea", "#ff9fcf", "#fff4fa"] },
@@ -53717,9 +53774,9 @@ const m198 = Object.freeze({default:{
   "palm_rib": "#9b9b5c"
 }});
 // src/game/presentation/city-foliage.mjs
-const m197 = (()=>{
-const LOOK = m198.default;
-const {classicRandom} = m178;
+const m198 = (()=>{
+const LOOK = m199.default;
+const {classicRandom} = m179;
 const {artScene,circle,ellipse,radial,heightView,depthBatches} = m155;
 
 /**
@@ -53907,7 +53964,7 @@ class cityFoliage {
 
 return Object.freeze({get canopyPicture(){return canopyPicture;},get cityFoliage(){return cityFoliage;}});
 })();
-const m200 = Object.freeze({default:{
+const m201 = Object.freeze({default:{
  "tile_size": 1024,
  "tile_ahead": 128,
  "indoor": { "tint": "rgb(22, 10, 48)", "darkness": 0.95, "lamp_glow": 0.08 },
@@ -53928,8 +53985,8 @@ const m200 = Object.freeze({default:{
  "flicker": { "floor": 0.82, "swing": 0.18 }
 }});
 // src/game/presentation/lighting.mjs
-const m199 = (()=>{
-const LIGHTING = m200.default;
+const m200 = (()=>{
+const LIGHTING = m201.default;
 const {createLightLayer,createLightLayerParts,viewAhead} = m155;
 const {declaredLight} = m141;
 
@@ -54073,13 +54130,13 @@ function phase(id=''){let h=2166136261;for(const c of String(id))h=Math.imul(h^c
 return Object.freeze({get LIGHTING(){return LIGHTING;},get sceneLighting(){return sceneLighting;},get levelLights(){return levelLights;}});
 })();
 // src/game/presentation/map-scene.mjs
-const m173 = (()=>{
+const m174 = (()=>{
 const {aheadOf} = m155;
-const {cityGround} = m174;
-const {cityBuildings} = m176;
-const {cityFoliage} = m197;
-const {sceneLighting,levelLights} = m199;
-const GROUND = m175.default;
+const {cityGround} = m175;
+const {cityBuildings} = m177;
+const {cityFoliage} = m198;
+const {sceneLighting,levelLights} = m200;
+const GROUND = m176.default;
 
 /**
  * What a map's pictures need from the backend's picture cache (`new canvasRenderer({pictures})`): room
@@ -54138,7 +54195,7 @@ function submitEntries(frame, entries) {
 return Object.freeze({get MAP_PICTURES(){return MAP_PICTURES;},get mapScene(){return mapScene;},get submitEntries(){return submitEntries;}});
 })();
 // src/game/data/road-navigation.mjs
-const m202 = (()=>{
+const m203 = (()=>{
 /**
  * The city's lane network as Basement navigation road data.
  *
@@ -54180,7 +54237,7 @@ function loadRoadNavigation(roads, data) {
 
 return Object.freeze({get roadNavigationData(){return roadNavigationData;},get loadRoadNavigation(){return loadRoadNavigation;}});
 })();
-const m203 = Object.freeze({default:{
+const m204 = Object.freeze({default:{
   "cars": 14,
   "pedestrians": 24,
   "car_ring": [700, 1500],
@@ -54201,10 +54258,10 @@ const m203 = Object.freeze({default:{
   "view_reach": 900
 }});
 // src/game/mechanics/street-life.mjs
-const m201 = (()=>{
+const m202 = (()=>{
 const {TrafficManager,PedestrianManager,registerStreetEntityTypes} = m131;
-const {loadRoadNavigation} = m202;
-const RULES = m203.default;
+const {loadRoadNavigation} = m203;
+const RULES = m204.default;
 
 const scratch = {};   // (a body's pose read without copying its whole state)
 
@@ -54391,14 +54448,14 @@ function junctionGroups(intersections, gap) {
 return Object.freeze({get streetLife(){return streetLife;}});
 })();
 // src/game/levels/game-map-level.mjs
-const m172 = (()=>{
-const {mapLevel} = m170;
+const m173 = (()=>{
+const {mapLevel} = m171;
 const {gameCharacter} = m1;
 const {mapDefinition,lightingRooms,MAP_OPTIONS} = m146;
 const {MAP_IDS} = m70;
 
-const {mapScene} = m173;
-const {streetLife} = m201;
+const {mapScene} = m174;
+const {streetLife} = m202;
 const {Pedestrian} = m136;
 
 /**
@@ -54471,7 +54528,7 @@ function registerMapLevels(engine, map_ids = MAP_IDS) {
 
 return Object.freeze({get GameMapLevel(){return GameMapLevel;},get registerMapLevels(){return registerMapLevels;}});
 })();
-const m207 = Object.freeze({default:{
+const m208 = Object.freeze({default:{
   "slim": {
     "w": 0.88,
     "d": 0.92,
@@ -54502,7 +54559,7 @@ const m207 = Object.freeze({default:{
     "hip": 1.1
   }
 }});
-const m208 = Object.freeze({default:{
+const m209 = Object.freeze({default:{
   "female": {
     "sh": 10.5,
     "del": 4,
@@ -54629,9 +54686,9 @@ const m208 = Object.freeze({default:{
   }
 }});
 // src/game/data/humanoid/rig-assets.mjs
-const m206 = (()=>{
-const builds = m207.default;
-const bodyCanon = m208.default;
+const m207 = (()=>{
+const builds = m208.default;
+const bodyCanon = m209.default;
 const {rigDefinition,animationClip} = m1;
 const immutable=value=>{if(value&&typeof value==='object'){for(const child of Object.values(value))immutable(child);Object.freeze(value);}return value;};
 const humanoidBodyCanon=immutable(bodyCanon);
@@ -54678,8 +54735,8 @@ function getHumanoidRigAssets(gender='androgynous',{build=null,height=1}={}){
 return Object.freeze({get humanoidBodyCanon(){return humanoidBodyCanon;},get humanoidBuilds(){return humanoidBuilds;},get getHumanoidRigAssets(){return getHumanoidRigAssets;}});
 })();
 // src/game/mechanics/animation/humanoid-system.mjs
-const m205 = (()=>{
-const {getHumanoidRigAssets} = m206;
+const m206 = (()=>{
+const {getHumanoidRigAssets} = m207;
 const humanoids=new Set(['df_player','df_npc','df_ganger','df_hunter','df_demoness']);
 /** Game policy chooses authored poses; Basement resolves and advances every joint. */
 class humanoidSystem {
@@ -54727,7 +54784,7 @@ function humanoidPresentation(actor,blend=1){
 return Object.freeze({get humanoidSystem(){return humanoidSystem;},get humanoidPresentation(){return humanoidPresentation;}});
 })();
 // src/game/mechanics/encounters/encounter-system.mjs
-const m209 = (()=>{
+const m210 = (()=>{
 const {BossEffect} = m110;
 const {BODY_GROUP} = m1;
 const {jsonCopy} = m41;
@@ -54808,7 +54865,7 @@ class encounterSystem{
 return Object.freeze({get encounterSystem(){return encounterSystem;}});
 })();
 // src/game/data/weapon-models.mjs
-const m212 = (()=>{
+const m213 = (()=>{
 /* =====================================================================
    WEAPON MODELS — every gun as data: parts in the gun's own frame (+x down
    the barrel, the grip hand near 0,0, +y to the holder's right), each in a
@@ -55034,8 +55091,8 @@ function weaponModel(id) {
 return Object.freeze({get GUN_MATERIALS(){return GUN_MATERIALS;},get WEAPON_MODELS(){return WEAPON_MODELS;},get LASER_MODULE(){return LASER_MODULE;},get weaponModel(){return weaponModel;}});
 })();
 // src/game/data/combat-profiles.mjs
-const m211 = (()=>{
-const {weaponModel} = m212;
+const m212 = (()=>{
+const {weaponModel} = m213;
 /** Shape authoring belongs with the visual assets. Runtime collision calculations stay in Basement. */
 function getCombatProfile(definition_id){
  const model=weaponModel(definition_id),edge=model.edge??[19.4,2.6];
@@ -55045,9 +55102,9 @@ function getCombatProfile(definition_id){
 return Object.freeze({get getCombatProfile(){return getCombatProfile;}});
 })();
 // src/game/mechanics/attacks/attack-system.mjs
-const m210 = (()=>{
+const m211 = (()=>{
 const attackRules = m65.default;
-const {getCombatProfile} = m211;
+const {getCombatProfile} = m212;
 const {prepareMountedAttack,mountedAttackState,validateMountedAttack} = m115;
 const combatRules = m64.default;
 const {gameCharacter} = m1;
@@ -55169,7 +55226,7 @@ class attackSystem{
 return Object.freeze({get attackSystem(){return attackSystem;}});
 })();
 // src/game/mechanics/abilities/ability-system.mjs
-const m213 = (()=>{
+const m214 = (()=>{
 const {beginPattern,advancePattern,clearPattern} = m111;
 const {beginTimedAction,advanceTimedAction,hitGrapple,clearTimedAction} = m113;
 const {beginBurst,advanceBurst} = m114;
@@ -55231,7 +55288,7 @@ class abilitySystem{
 return Object.freeze({get abilitySystem(){return abilitySystem;}});
 })();
 // src/game/mechanics/actors/actor-system.mjs
-const m214 = (()=>{
+const m215 = (()=>{
 const {Demoness} = m98;
 const {Warden} = m108;
 const {Drone} = m118;
@@ -55301,7 +55358,7 @@ class actorSystem{
 
 return Object.freeze({get actorSystem(){return actorSystem;}});
 })();
-const m215 = Object.freeze({default:{
+const m216 = Object.freeze({default:{
   "keymap": {
     "move_up":["w","ArrowUp"],"move_down":["s","ArrowDown"],"move_left":["a","ArrowLeft"],"move_right":["d","ArrowRight"],
     "fire":["mouseLeft","space","gamepadRTrigger","touchFire"],
@@ -55315,7 +55372,7 @@ const m215 = Object.freeze({default:{
   }
 }});
 // src/game/mechanics/game-session.mjs
-const m216 = (()=>{
+const m217 = (()=>{
 const {itemSystem} = m105;
 const {createItemCatalog} = m59;
 const itemRules = m106.default;
@@ -55392,7 +55449,7 @@ class gameSession {
 return Object.freeze({get gameSession(){return gameSession;}});
 })();
 // src/game/mechanics/player-state-system.mjs
-const m217 = (()=>{
+const m218 = (()=>{
 const {nonnegative,jsonCopy} = m41;
 
 /** Game rules only. The native entity/body remains the sole owner of physical state. */
@@ -55448,7 +55505,7 @@ class PlayerStateSystem {
 return Object.freeze({get PlayerStateSystem(){return PlayerStateSystem;}});
 })();
 // src/game/mechanics/player-control-system.mjs
-const m218 = (()=>{
+const m219 = (()=>{
 /** Turns input terminology into native motor requests and gameplay intents. No physical math. */
 class PlayerControlSystem {
     #session; #state; #blocked = new Set(); #placement; #context = null;
@@ -55488,7 +55545,7 @@ class PlayerControlSystem {
 return Object.freeze({get PlayerControlSystem(){return PlayerControlSystem;}});
 })();
 // src/game/mechanics/combat/combat-system.mjs
-const m219 = (()=>{
+const m220 = (()=>{
 const rules = m64.default;
 const {BODY_GROUP} = m1;
 const {nonnegative,jsonCopy} = m41;
@@ -55558,7 +55615,7 @@ class combatSystem{
 return Object.freeze({get isCombatDead(){return isCombatDead;},get combatSystem(){return combatSystem;}});
 })();
 // src/game/mechanics/combat/melee-poses.mjs
-const m221 = (()=>{
+const m222 = (()=>{
 // Authored local animation poses, shared by presentation and native swept queries.
 const rules = m64.default;
 const MELEE_SWING={duration:rules.blade.duration_seconds,windup:rules.blade.windup_seconds,cutEnd:rules.blade.cut_end_seconds};
@@ -55634,12 +55691,12 @@ function sampleMeleeSwing(age, side, out = {}, secs = MELEE_SWING.duration, styl
 return Object.freeze({get MELEE_SWING(){return MELEE_SWING;},get WIDE_SWING(){return WIDE_SWING;},get sampleWideSwing(){return sampleWideSwing;},get wideGrip(){return wideGrip;},get swingPhases(){return swingPhases;},get sampleMeleeSwing(){return sampleMeleeSwing;}});
 })();
 // src/game/mechanics/combat/weapon-system.mjs
-const m220 = (()=>{
+const m221 = (()=>{
 const rules = m64.default;
-const {getCombatProfile} = m211;
+const {getCombatProfile} = m212;
 const {BODY_GROUP} = m1;
-const {sampleMeleeSwing,swingPhases} = m221;
-const {isCombatDead} = m219;
+const {sampleMeleeSwing,swingPhases} = m222;
+const {isCombatDead} = m220;
 const {jsonCopy,nonnegative} = m41;
 
 const stateFor=(player,settings=rules)=>player.data.weapon_state??={format_version:1,elapsed:0,cooldown:0,holstered:false,drawn_at:null,draw_shot_used:false,quick_draw:null,punch_side:'right',haymaker:false,combo:0,last_punch_at:-99,swing:null,side:1,shield:{charge:settings.mirror.shield,spent:false,since_hit:999}};
@@ -55811,7 +55868,7 @@ class weaponSystem{
 return Object.freeze({get weaponSystem(){return weaponSystem;}});
 })();
 // src/game/mechanics/items/loot-system.mjs
-const m222 = (()=>{
+const m223 = (()=>{
 const {WorldLoot} = m130;
 const rules = m64.default;
 const {BODY_GROUP} = m1;
@@ -55865,24 +55922,24 @@ class lootSystem{
 return Object.freeze({get lootSystem(){return lootSystem;}});
 })();
 // src/game/boot/game-runtime.mjs
-const m204 = (()=>{
-const {humanoidSystem} = m205;
-const {encounterSystem} = m209;
-const {attackSystem} = m210;
-const {abilitySystem} = m213;
-const {actorSystem} = m214;
+const m205 = (()=>{
+const {humanoidSystem} = m206;
+const {encounterSystem} = m210;
+const {attackSystem} = m211;
+const {abilitySystem} = m214;
+const {actorSystem} = m215;
 const {registerGameEntityTypes} = m117;
 const {gameEngine} = m149;
-const {travelSystem} = m171;
+const {travelSystem} = m172;
 const {createApartmentAssetLibrary} = m138;
-const controlProfile = m215.default;
-const {gameSession} = m216;
-const {PlayerStateSystem} = m217;
-const {PlayerControlSystem} = m218;
+const controlProfile = m216.default;
+const {gameSession} = m217;
+const {PlayerStateSystem} = m218;
+const {PlayerControlSystem} = m219;
 const playerRules = m67.default;
-const {combatSystem} = m219;
-const {weaponSystem} = m220;
-const {lootSystem} = m222;
+const {combatSystem} = m220;
+const {weaponSystem} = m221;
+const {lootSystem} = m223;
 const {canvasRenderer} = m155;
 
 /** Explicit game composition. Importing this file never starts a second runtime. */
@@ -55922,8 +55979,8 @@ function createGameRuntime({ game_db, surface, session_state, player, weapon_pol
 return Object.freeze({get createGameRuntime(){return createGameRuntime;}});
 })();
 // src/game/presentation/weapon-appearance.mjs
-const m223 = (()=>{
-const {GUN_MATERIALS,WEAPON_MODELS,LASER_MODULE,weaponModel} = m212;
+const m224 = (()=>{
+const {GUN_MATERIALS,WEAPON_MODELS,LASER_MODULE,weaponModel} = m213;
 
 const polygon=points=>({type:'path',commands:[...points.map(([x,y],i)=>[i?'line':'move',x,y]),['close']]});
 function shape(part){
@@ -56006,7 +56063,7 @@ class weaponAppearance {
 return Object.freeze({get weaponAppearance(){return weaponAppearance;}});
 })();
 // src/game/data/game-combat.mjs
-const m224 = (()=>{
+const m225 = (()=>{
 const data = m64.default;
 const freeze=value=>{if(value&&typeof value==='object'){Object.values(value).forEach(freeze);Object.freeze(value);}return value;};
 const COMBAT_RULES=freeze(structuredClone(data));
@@ -56014,7 +56071,7 @@ const COMBAT_RULES=freeze(structuredClone(data));
 return Object.freeze({get COMBAT_RULES(){return COMBAT_RULES;}});
 })();
 // src/game/presentation/drone.mjs
-const m225 = (()=>{
+const m226 = (()=>{
 const enemies = m50.default;
 const {artScene,circle,ellipse,radial,glow} = m155;
 const DRONE=enemies.drone;
@@ -56197,7 +56254,7 @@ return Object.assign({},{x:pose.position[0],y:pose.position[1],angle:pose.rotati
 return Object.freeze({get droneLift(){return droneLift;},get droneArmPose(){return droneArmPose;},get createDronePackets(){return createDronePackets;},get dronePresentation(){return dronePresentation;}});
 })();
 // src/game/presentation/demoness.mjs
-const m226 = (()=>{
+const m227 = (()=>{
 const enemies = m50.default;
 const DUEL=enemies.duel;
 /** Retained Canvas art over a detached record; body art is supplied by the host. */
@@ -56262,7 +56319,7 @@ function demonessPresentation(entity,blend=1){const pose=entity.getRenderState(b
 return Object.freeze({get demonessAppearance(){return demonessAppearance;},get demonessPresentation(){return demonessPresentation;}});
 })();
 // src/game/presentation/boss-effects.mjs
-const m227 = (()=>{
+const m228 = (()=>{
 const enemies = m50.default;
 const HAZARD=enemies.hazards;
 const bossEffectAppearance={
@@ -56400,7 +56457,7 @@ function bossEffectPresentation(effects,clock){return effects.filter(effect=>!ef
 return Object.freeze({get bossEffectAppearance(){return bossEffectAppearance;},get bossEffectPresentation(){return bossEffectPresentation;}});
 })();
 // src/game/presentation/velvet-cat.mjs
-const m228 = (()=>{
+const m229 = (()=>{
 const {artScene,circle,ellipse,radial,linear,groundShadow} = m155;
 const {velvetCatAnimation,velvetFrame,velvetLegGait,velvetJoints,VELVET_LEG_JOINTS} = m120;
 const {VELVET_CAT_PALETTES,VELVET_T,VELVET_PROFILES,VELVET_TAIL_SEGS} = m121;
@@ -56689,7 +56746,7 @@ function createVelvetCatPackets(state,{pass='body',darkness=.8}={}){if(!['body',
 
 return Object.freeze({get createVelvetCatArt(){return createVelvetCatArt;},get createVelvetEyePackets(){return createVelvetEyePackets;},get createVelvetCatPackets(){return createVelvetCatPackets;}});
 })();
-const m230 = Object.freeze({default:{
+const m231 = Object.freeze({default:{
  "hinge": {
   "color": "#4a3a30",
   "sweep": "rgba(255,217,176,0.12)", "sweep_dash": [3, 4], "sweep_min_angle": 0.17,
@@ -56704,8 +56761,8 @@ const m230 = Object.freeze({default:{
  }
 }});
 // src/game/presentation/door.mjs
-const m229 = (()=>{
-const DOOR_APPEARANCE = m230.default;
+const m230 = (()=>{
+const DOOR_APPEARANCE = m231.default;
 const {artScene,rect,circle,ellipse,polygon} = m155;
 
 /**
@@ -56760,7 +56817,7 @@ function createDoorPackets(packet,{appearance=DOOR_APPEARANCE,scene=new artScene
 return Object.freeze({get DOOR_APPEARANCE(){return DOOR_APPEARANCE;},get doorPresentation(){return doorPresentation;},get createDoorPackets(){return createDoorPackets;}});
 })();
 // src/game/presentation/props/draw.mjs
-const m233 = (()=>{
+const m234 = (()=>{
 // The drawing helpers every prop artist repeats, on the art toolkit: the classic art's rounded box,
 // disc and line runs, a choice by the piece's number, and turning a piece to its face.
 const {circle,seededRandom} = m155;
@@ -56800,14 +56857,14 @@ function classicRandom(seed){let h=2166136261;for(const ch of String(seed)){h^=c
 return Object.freeze({get FACE(){return FACE;},get box(){return box;},get disc(){return disc;},get dots(){return dots;},get lines(){return lines;},get choose(){return choose;},get turned(){return turned;},get crescent(){return crescent;},get classicRandom(){return classicRandom;}});
 })();
 // src/game/presentation/props/cafe.mjs
-const m232 = (()=>{
+const m233 = (()=>{
 // The cafe's furniture families, drawn on the art toolkit. Each artist draws one piece from its
 // top-left corner (0, 0) to (width, height), in the look its family declares in the prop catalog
 // (game-assets/props.json). `piece.pick(k)` is a repeatable number for the piece (the same seed the
 // classic art used, so every piece keeps the look it always had). Still parts go in `art.still`, and
 // parts that move with `piece.time` go in `art.live`, in drawing order; still runs are painted once.
 const {rect,circle,ellipse,polygon} = m155;
-const {box,disc,lines,choose,turned} = m233;
+const {box,disc,lines,choose,turned} = m234;
 
 // Tableware on the cafe's tables and counter: the same cups and candle jars everywhere.
 const CUP={saucer:'#e8dcc4',rim:'rgba(120,90,60,0.6)',cup:'#f3e4c6',coffee:'#6b4423',gleam:'rgba(240,220,190,0.75)'};
@@ -57018,12 +57075,12 @@ const CAFE_ARTISTS={
 return Object.freeze({get CAFE_ARTISTS(){return CAFE_ARTISTS;}});
 })();
 // src/game/presentation/props/fixtures.mjs
-const m235 = (()=>{
+const m236 = (()=>{
 // Lamp fixtures that stand on furniture, seen from above: the pleated fabric shades of a table or
 // floor lamp, unlit (their light is drawn after the darkness, by the lighting) or burning (the hotel
 // lobby's), and a spun-brass pendant. Each draws centred on (0, 0) in the scene's current group, at its own size.
 const {circle,ellipse,radial,linear} = m155;
-const {lines} = m233;
+const {lines} = m234;
 
 const BRASS=['#f0d79a','#c9a46a','#8d6a32'],BRONZE='#2a211c',TAU=Math.PI*2;
 /** The fixtures by name, as the lamp library has them: the shades' radius, the top ring's, their pleats, fabric and trim. */
@@ -57080,7 +57137,7 @@ function fixtureAt(s,x,y,scale,fn){s.enter({position:[x,y],scale:[scale,scale]})
 return Object.freeze({get SHADES(){return SHADES;},get fixtureColor(){return fixtureColor;},get fabricShade(){return fabricShade;},get brassPendant(){return brassPendant;},get fixtureAt(){return fixtureAt;}});
 })();
 // src/game/presentation/props/apartment.mjs
-const m234 = (()=>{
+const m235 = (()=>{
 // The apartment's furniture families (apt_949, and the pieces the hotel and the House of Death borrow
 // from it), drawn on the art toolkit. As the cafe's: each artist draws one piece from its top-left
 // corner (0, 0) to (width, height) in the look its family declares in the prop catalog
@@ -57088,8 +57145,8 @@ const m234 = (()=>{
 // `art.live`, in drawing order. The table lamps, the floor lamps and the island's pendants wear the
 // lamp library's fixtures, unlit (their light is drawn after the darkness).
 const {rect,circle,ellipse,polyline,linear} = m155;
-const {box,disc,lines} = m233;
-const {SHADES,fabricShade,brassPendant,fixtureAt,fixtureColor} = m235;
+const {box,disc,lines} = m234;
+const {SHADES,fabricShade,brassPendant,fixtureAt,fixtureColor} = m236;
 
 /** Where the bar island's pendants hang along it (the lighting hangs its lights there too). */
 const ISLAND_PENDANTS=[.17,.5,.83];
@@ -57414,12 +57471,12 @@ const APARTMENT_ARTISTS={
 return Object.freeze({get ISLAND_PENDANTS(){return ISLAND_PENDANTS;},get APARTMENT_ARTISTS(){return APARTMENT_ARTISTS;}});
 })();
 // src/game/presentation/props/house.mjs
-const m236 = (()=>{
+const m237 = (()=>{
 // The House of Death's furniture families (the gauntlet's mansion: black marble, oxblood wood, gold,
 // violet glass, cyan holograms), drawn on the art toolkit as the cafe's and the apartment's are. Its
 // candles burn live: each flame breathes on its own beat, keyed to where it stands, as the classic did.
 const {rect,circle,ellipse,polygon} = m155;
-const {box,disc,lines} = m233;
+const {box,disc,lines} = m234;
 
 const TAU=Math.PI*2;
 const rects=list=>list.flatMap(([x,y,w,h])=>rect(x,y,w,h));
@@ -57573,13 +57630,13 @@ const HOUSE_ARTISTS={
 return Object.freeze({get HOUSE_ARTISTS(){return HOUSE_ARTISTS;}});
 })();
 // src/game/presentation/props/hotel.mjs
-const m237 = (()=>{
+const m238 = (()=>{
 // The Double Nights hotel's furniture families: the lobby (dn_*) and the penthouse suite (ps_*), in
 // the hotel's black marble, gold, silver and crimson velvet. Drawn on the art toolkit as the other
 // venues' are. The lobby's floating seats hang and bob on a hover-glow, live; the suite is left as
 // the Dark Maker left it (one glass drunk, the chess game unfinished, the wardrobe open).
 const {rect,circle,ellipse,polyline,linear} = m155;
-const {box,disc,lines,crescent,dots} = m233;
+const {box,disc,lines,crescent,dots} = m234;
 
 const TAU=Math.PI*2;
 const rects=list=>list.flatMap(([x,y,w,h])=>rect(x,y,w,h));
@@ -57803,12 +57860,12 @@ const HOTEL_ARTISTS={
 return Object.freeze({get HOTEL_ARTISTS(){return HOTEL_ARTISTS;}});
 })();
 // src/game/presentation/props/club.mjs
-const m238 = (()=>{
+const m239 = (()=>{
 // Moon City Nightclub's furniture families (mc_*): black lacquer, chrome, violet and lavender neon,
 // gold, rose-wine velvet. Drawn on the art toolkit as the other venues' are. The stage, the booth and
 // the speakers keep the music's kick: `piece.beat` is its beat count, and each piece pulses on the beat.
 const {rect,circle,ellipse,radial} = m155;
-const {box,disc,lines,crescent,dots} = m233;
+const {box,disc,lines,crescent,dots} = m234;
 
 const rects=list=>list.flatMap(([x,y,w,h])=>rect(x,y,w,h));
 /** How hard the kick lands now: 1 on the beat, falling away to 0 before the next. */
@@ -58005,12 +58062,12 @@ const CLUB_ARTISTS={
 return Object.freeze({get CLUB_ARTISTS(){return CLUB_ARTISTS;}});
 })();
 // src/game/presentation/props/sanctum.mjs
-const m239 = (()=>{
+const m240 = (()=>{
 // The Sanctum's furniture families (sc_*): weathered stone, black iron, crimson cloth, candle wax,
 // rain-dark and mossed. Drawn on the art toolkit as the other venues' are; candle flames and the
 // brazier's coals are live. The colonnade's pillars are the cover the Triumvirate's fire respects.
 const {rect,circle,ellipse,linear,radial} = m155;
-const {box,disc,lines} = m233;
+const {box,disc,lines} = m234;
 
 const TAU=Math.PI*2;
 /** Moss on stone: n tufts round (mx, my), their spread seeded by `phase` (the classic art's world x). */
@@ -58102,11 +58159,11 @@ const SANCTUM_ARTISTS={
 return Object.freeze({get SANCTUM_ARTISTS(){return SANCTUM_ARTISTS;}});
 })();
 // src/game/presentation/props/clinic.mjs
-const m240 = (()=>{
+const m241 = (()=>{
 // The clinic's furniture families (medbay_sw): white enamel, steel, teal. Drawn on the art toolkit as
 // the other venues' are; the vitals monitor's trace scrolls and the plant sways, live.
 const {rect,circle,ellipse} = m155;
-const {box,disc} = m233;
+const {box,disc} = m234;
 
 const TAU=Math.PI*2;
 
@@ -58186,12 +58243,12 @@ const CLINIC_ARTISTS={
 return Object.freeze({get CLINIC_ARTISTS(){return CLINIC_ARTISTS;}});
 })();
 // src/game/presentation/props/neural.mjs
-const m241 = (()=>{
+const m242 = (()=>{
 // Neural Systems' furniture families (ns_*): a sapphire-crystal department store, its vitrines,
 // polished facets and private styling suites. Drawn on the art toolkit as the other venues' are.
 // Each piece lies on its own soft drop shadow, as the store's classic art drew it.
 const {rect,circle,ellipse,polygon,radial} = m155;
-const {box} = m233;
+const {box} = m234;
 
 const TAU=Math.PI*2,FACETS=['#28588a','#15345b','#0b1b3c','#1b4374','#456d9b'],PALE='#e5e6df',METAL='#9baebe';
 /** The drop shadow under each piece, 3 right and 4 down. */
@@ -58273,13 +58330,13 @@ const NEURAL_ARTISTS={
 return Object.freeze({get NEURAL_ARTISTS(){return NEURAL_ARTISTS;}});
 })();
 // src/game/presentation/props/torque.mjs
-const m242 = (()=>{
+const m243 = (()=>{
 // Torque Auto's furniture families (ta_*): the service bay's tool chests, bench and tyres, the parts
 // room's shelving, the showroom's steel counter and cognac leather. Amber is the house colour. Drawn on
 // the art toolkit as the other venues' are. (The two lifts, the wrap bay and the plinth carry cars, so
 // they wait for the vehicles' own art.)
 const {rect,circle,linear,radial} = m155;
-const {box,disc,lines} = m233;
+const {box,disc,lines} = m234;
 
 const TAU=Math.PI*2,STEEL_HI='#dfe3ea',STEEL='#9aa3ad',STEEL_LO='#4a5059',AMBER='#ff9a2a',RUBBER='#141416';
 /** Brushed steel along (x0, y0) to (x1, y1). */
@@ -58391,12 +58448,12 @@ const TORQUE_ARTISTS={
 return Object.freeze({get TORQUE_ARTISTS(){return TORQUE_ARTISTS;}});
 })();
 // src/game/presentation/props/palace.mjs
-const m243 = (()=>{
+const m244 = (()=>{
 // The Demoness Palace's furniture families (dp_*): obsidian, blood-red velvet and gold, her throne
 // and her pool of blood, the rose beds, the braziers. Drawn on the art toolkit as the other venues'
 // are; the pool's ripples, the flames, the embers and the altar's floating crystal are live.
 const {rect,circle,ellipse,polygon,radial} = m155;
-const {box,disc,classicRandom} = m233;
+const {box,disc,classicRandom} = m234;
 
 const TAU=Math.PI*2,GOLD='#ffc64b',GOLD_DIM='rgba(255,190,58,0.65)';
 const drop=(s,w,h,r=4)=>box(s,3,3,w,h,r,'rgba(0,0,0,0.4)');
@@ -58518,12 +58575,12 @@ const PALACE_ARTISTS={
 return Object.freeze({get PALACE_ARTISTS(){return PALACE_ARTISTS;}});
 })();
 // src/game/presentation/props/enni.mjs
-const m244 = (()=>{
+const m245 = (()=>{
 // Enni Cole's furniture families (ec_*): a department store in rose stone, walnut and brass, both
 // floors. Drawn on the art toolkit as the other venues' are. The store's goods (bottles, garments,
 // aisle stock) are arranged by the piece's number, so a map picks a counter's stock as it did.
 const {rect,circle,ellipse,polygon,linear,radial} = m155;
-const {box,disc,lines,turned} = m233;
+const {box,disc,lines,turned} = m234;
 
 const TAU=Math.PI*2,BRASS='#b0844c',BRIGHT='#ead5a6',ROSE='#2b2328',DARK='#262328',WALNUT='#493428',CREAM='#e8ddd0',IVORY='#f4eadc';
 /** A brass-ringed disc, as the classic art's `dot`: its outline a hairline. */
@@ -58907,12 +58964,12 @@ const HANGS=['#e9dcc4','#cdb48a','#a3815a','#2a2428','#5a1a2a','#8c2b3e','#2f5a4
 return Object.freeze({get ENNI_ARTISTS(){return ENNI_ARTISTS;}});
 })();
 // src/game/presentation/props/lost.mjs
-const m245 = (()=>{
+const m246 = (()=>{
 // Lost things round the city: a case, a coat, a purse, a cash tin, searched once a day for what is
 // in them. Each is drawn closed and full, or lying open and emptied once `piece.state.searched` (its
 // host sets it; the open and the closed piece are kept as separate pictures).
 const {rect,circle,ellipse} = m155;
-const {box,disc,crescent} = m233;
+const {box,disc,crescent} = m234;
 
 const GOLD='#e8c27a',GOLD_DARK='#a8823e',CREAM='#f3e6c8',CRIMSON_LIGHT='#b8203a';
 const STASH_GOLD='#e8c26a',STASH_GOLD_DARK='#9a7a32';
@@ -59026,12 +59083,12 @@ const LOST_ARTISTS={
 return Object.freeze({get LOST_ARTISTS(){return LOST_ARTISTS;}});
 })();
 // src/game/presentation/props/machines.mjs
-const m246 = (()=>{
+const m247 = (()=>{
 // The machines every map shares: MiniSpree's vending machine, Dr. Yin's health station, the loadout
 // locker, a room's light switch and a note left lying. Their still bodies are pictures; what hums,
 // glows, refills or runs across a screen is live. A light switch reads `piece.state.lit`.
 const {rect,circle,polygon,linear} = m155;
-const {box} = m233;
+const {box} = m234;
 
 const MACHINE_ARTISTS={
     mini_spree:{draw(art,piece,look){                                    // the city's vending brand: glossy black, a lit window of cans, a pink-and-cyan marquee
@@ -59095,7 +59152,7 @@ const MACHINE_ARTISTS={
 return Object.freeze({get MACHINE_ARTISTS(){return MACHINE_ARTISTS;}});
 })();
 // src/game/presentation/props/index.mjs
-const m231 = (()=>{
+const m232 = (()=>{
 // Props drawn natively, by family. A prop type in the catalog (game-assets/props.json) that names a
 // `family` is a preset of it; its look is the family's defaults, then the type's look, then the
 // placement's, checked against the family's schema. `propArtPacket` gathers what one piece shows,
@@ -59104,19 +59161,19 @@ const m231 = (()=>{
 const PROPS = m71.default;
 const {resolvePropLook} = m41;
 const {artScene,groundShadow,canvasRenderer,measureText} = m155;
-const {CAFE_ARTISTS} = m232;
-const {APARTMENT_ARTISTS} = m234;
-const {HOUSE_ARTISTS} = m236;
-const {HOTEL_ARTISTS} = m237;
-const {CLUB_ARTISTS} = m238;
-const {SANCTUM_ARTISTS} = m239;
-const {CLINIC_ARTISTS} = m240;
-const {NEURAL_ARTISTS} = m241;
-const {TORQUE_ARTISTS} = m242;
-const {PALACE_ARTISTS} = m243;
-const {ENNI_ARTISTS} = m244;
-const {LOST_ARTISTS} = m245;
-const {MACHINE_ARTISTS} = m246;
+const {CAFE_ARTISTS} = m233;
+const {APARTMENT_ARTISTS} = m235;
+const {HOUSE_ARTISTS} = m237;
+const {HOTEL_ARTISTS} = m238;
+const {CLUB_ARTISTS} = m239;
+const {SANCTUM_ARTISTS} = m240;
+const {CLINIC_ARTISTS} = m241;
+const {NEURAL_ARTISTS} = m242;
+const {TORQUE_ARTISTS} = m243;
+const {PALACE_ARTISTS} = m244;
+const {ENNI_ARTISTS} = m245;
+const {LOST_ARTISTS} = m246;
+const {MACHINE_ARTISTS} = m247;
 
 const PROP_FAMILIES=PROPS.resources.catalog.data.families;
 /** Every venue's artists under one name each: a family drawn by two venues would silently lose one. */
@@ -59290,7 +59347,7 @@ const m0 = (()=>{
 
 
 
-return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m41.assetLibrary;},get createGameAssetLibrary(){return m48.createGameAssetLibrary;},get resolveMapLayout(){return m70.resolveMapLayout;},get resolvePlacement(){return m70.resolvePlacement;},get isMovableProp(){return m70.isMovableProp;},get mapHost(){return m70.mapHost;},get createMapLibraries(){return m70.createMapLibraries;},get PROP_TYPES(){return m70.PROP_TYPES;},get MAP_IDS(){return m70.MAP_IDS;},get ApartmentLevel(){return m96.ApartmentLevel;},get APARTMENT_RULES(){return m138.APARTMENT_RULES;},get gameEngine(){return m149.gameEngine;},get gameLevel(){return m167.gameLevel;},get mapLevel(){return m170.mapLevel;},get travelSystem(){return m171.travelSystem;},get GameMapLevel(){return m172.GameMapLevel;},get registerMapLevels(){return m172.registerMapLevels;},get levelLobby(){return m166.levelLobby;},get createGameRuntime(){return m204.createGameRuntime;},get controlSystem(){return m150.controlSystem;},get controlsSystem(){return m150.controlsSystem;},get inputInstance(){return m150.inputInstance;},get keyboardInstance(){return m150.keyboardInstance;},get mouseInstance(){return m150.mouseInstance;},get touchInstance(){return m150.touchInstance;},get touchStick(){return m150.touchStick;},get gamepadInstance(){return m150.gamepadInstance;},get TAP(){return m150.TAP;},get DOUBLETAP(){return m150.DOUBLETAP;},get HELD(){return m150.HELD;},get PRESS(){return m150.PRESS;},get REPEAT(){return m150.REPEAT;},get RELEASE(){return m150.RELEASE;},get renderSystem(){return m155.renderSystem;},get renderFrame(){return m155.renderFrame;},get canvasRenderer(){return m155.canvasRenderer;},get pictureCache(){return m155.pictureCache;},get measureText(){return m155.measureText;},get cameraSystem(){return m155.cameraSystem;},get gameSession(){return m216.gameSession;},get PlayerStateSystem(){return m217.PlayerStateSystem;},get PlayerControlSystem(){return m218.PlayerControlSystem;},get Player(){return m124.Player;},get playerVitals(){return m125.playerVitals;},get itemSystem(){return m105.itemSystem;},get createItemCatalog(){return m59.createItemCatalog;},get GUN_MATERIALS(){return m212.GUN_MATERIALS;},get WEAPON_MODELS(){return m212.WEAPON_MODELS;},get LASER_MODULE(){return m212.LASER_MODULE;},get weaponModel(){return m212.weaponModel;},get weaponAppearance(){return m223.weaponAppearance;},get combatSystem(){return m219.combatSystem;},get weaponSystem(){return m220.weaponSystem;},get lootSystem(){return m222.lootSystem;},get WorldLoot(){return m130.WorldLoot;},get MELEE_SWING(){return m221.MELEE_SWING;},get WIDE_SWING(){return m221.WIDE_SWING;},get sampleMeleeSwing(){return m221.sampleMeleeSwing;},get sampleWideSwing(){return m221.sampleWideSwing;},get swingPhases(){return m221.swingPhases;},get wideGrip(){return m221.wideGrip;},get COMBAT_RULES(){return m224.COMBAT_RULES;},get registerGameEntityTypes(){return m117.registerGameEntityTypes;},get actorVitals(){return m103.actorVitals;},get gameActor(){return m101.gameActor;},get NPC(){return m128.NPC;},get rosterRecord(){return m128.rosterRecord;},get ROSTER_FIELDS(){return m128.ROSTER_FIELDS;},get Ganger(){return m100.Ganger;},get actorSystem(){return m214.actorSystem;},get actorItems(){return m104.actorItems;},get restoreActorItems(){return m104.restoreActorItems;},get resolveEmoteLines(){return m129.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m129.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m116.abilityLoadout;},get actorAbilities(){return m116.actorAbilities;},get importActorAbilities(){return m116.importActorAbilities;},get abilitySystem(){return m213.abilitySystem;},get createAbilityCatalog(){return m61.createAbilityCatalog;},get attackRegistry(){return m102.attackRegistry;},get validateAttackState(){return m102.validateAttackState;},get attackSystem(){return m210.attackSystem;},get createAttackCatalog(){return m58.createAttackCatalog;},get validateMountedAttack(){return m115.validateMountedAttack;},get TrafficVehicle(){return m131.TrafficVehicle;},get createGameVehicle(){return m131.createGameVehicle;},get Hunter(){return m99.Hunter;},get createHunterAppearance(){return m57.createHunterAppearance;},get Marionette(){return m123.Marionette;},get MARIONETTE_RULES(){return m55.MARIONETTE_RULES;},get validateAbilityAction(){return m112.validateAbilityAction;},get GatlingGunner(){return m109.GatlingGunner;},get Drone(){return m118.Drone;},get VelvetCat(){return m119.VelvetCat;},get velvetCatAnimation(){return m120.velvetCatAnimation;},get createVelvetAnimation(){return m120.createVelvetAnimation;},get velvetPresentation(){return m120.velvetPresentation;},get droneLift(){return m225.droneLift;},get droneArmPose(){return m225.droneArmPose;},get dronePresentation(){return m225.dronePresentation;},get VELVET_CAT_PALETTES(){return m121.VELVET_CAT_PALETTES;},get VELVET_T(){return m121.VELVET_T;},get VELVET_PROFILES(){return m121.VELVET_PROFILES;},get VELVET_GAITS(){return m121.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m121.VELVET_TAIL_SEGS;},get Demoness(){return m98.Demoness;},get Warden(){return m108.Warden;},get Vesper(){return m108.Vesper;},get Matins(){return m108.Matins;},get Compline(){return m108.Compline;},get BossEffect(){return m110.BossEffect;},get encounterSystem(){return m209.encounterSystem;},get createBossAbilities(){return m49.createBossAbilities;},get createDemonessAppearance(){return m49.createDemonessAppearance;},get demonessAppearance(){return m226.demonessAppearance;},get demonessPresentation(){return m226.demonessPresentation;},get bossEffectAppearance(){return m227.bossEffectAppearance;},get bossEffectPresentation(){return m227.bossEffectPresentation;},get validateBossRecord(){return m97.validateBossRecord;},get createDronePackets(){return m225.createDronePackets;},get createVelvetCatArt(){return m228.createVelvetCatArt;},get createVelvetCatPackets(){return m228.createVelvetCatPackets;},get createVelvetEyePackets(){return m228.createVelvetEyePackets;},get doorPresentation(){return m229.doorPresentation;},get createDoorPackets(){return m229.createDoorPackets;},get DOOR_APPEARANCE(){return m229.DOOR_APPEARANCE;},get PROP_FAMILIES(){return m231.PROP_FAMILIES;},get hasPropArt(){return m231.hasPropArt;},get propArtPacket(){return m231.propArtPacket;},get createPropDraws(){return m231.createPropDraws;},get drawPropArt(){return m231.drawPropArt;},get sceneLighting(){return m199.sceneLighting;},get levelLights(){return m199.levelLights;},get LIGHTING(){return m199.LIGHTING;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m205.humanoidSystem;},get humanoidPresentation(){return m205.humanoidPresentation;},get humanoidBodyCanon(){return m206.humanoidBodyCanon;},get humanoidBuilds(){return m206.humanoidBuilds;},get getHumanoidRigAssets(){return m206.getHumanoidRigAssets;},get roadNavigationData(){return m202.roadNavigationData;},get loadRoadNavigation(){return m202.loadRoadNavigation;}});
+return Object.freeze({get physicsSystem(){return m1.physicsSystem;},get gameCharacter(){return m1.gameCharacter;},get gameProp(){return m1.gameProp;},get gameStatic(){return m1.gameStatic;},get gameTrigger(){return m1.gameTrigger;},get gameDecoration(){return m1.gameDecoration;},get gameVehicle(){return m1.gameVehicle;},get gameProjectile(){return m1.gameProjectile;},get pathGeometry(){return m1.pathGeometry;},get layoutGeometry(){return m1.layoutGeometry;},get BODY_GROUP(){return m1.BODY_GROUP;},get assetLibrary(){return m41.assetLibrary;},get createGameAssetLibrary(){return m48.createGameAssetLibrary;},get resolveMapLayout(){return m70.resolveMapLayout;},get resolvePlacement(){return m70.resolvePlacement;},get isMovableProp(){return m70.isMovableProp;},get mapHost(){return m70.mapHost;},get createMapLibraries(){return m70.createMapLibraries;},get PROP_TYPES(){return m70.PROP_TYPES;},get MAP_IDS(){return m70.MAP_IDS;},get ApartmentLevel(){return m96.ApartmentLevel;},get APARTMENT_RULES(){return m138.APARTMENT_RULES;},get gameEngine(){return m149.gameEngine;},get gameLevel(){return m168.gameLevel;},get mapLevel(){return m171.mapLevel;},get travelSystem(){return m172.travelSystem;},get GameMapLevel(){return m173.GameMapLevel;},get registerMapLevels(){return m173.registerMapLevels;},get levelLobby(){return m167.levelLobby;},get createGameRuntime(){return m205.createGameRuntime;},get controlSystem(){return m150.controlSystem;},get controlsSystem(){return m150.controlsSystem;},get inputInstance(){return m150.inputInstance;},get keyboardInstance(){return m150.keyboardInstance;},get mouseInstance(){return m150.mouseInstance;},get touchInstance(){return m150.touchInstance;},get touchStick(){return m150.touchStick;},get gamepadInstance(){return m150.gamepadInstance;},get TAP(){return m150.TAP;},get DOUBLETAP(){return m150.DOUBLETAP;},get HELD(){return m150.HELD;},get PRESS(){return m150.PRESS;},get REPEAT(){return m150.REPEAT;},get RELEASE(){return m150.RELEASE;},get renderSystem(){return m155.renderSystem;},get renderFrame(){return m155.renderFrame;},get canvasRenderer(){return m155.canvasRenderer;},get pictureCache(){return m155.pictureCache;},get measureText(){return m155.measureText;},get cameraSystem(){return m155.cameraSystem;},get gameSession(){return m217.gameSession;},get PlayerStateSystem(){return m218.PlayerStateSystem;},get PlayerControlSystem(){return m219.PlayerControlSystem;},get Player(){return m124.Player;},get playerVitals(){return m125.playerVitals;},get itemSystem(){return m105.itemSystem;},get createItemCatalog(){return m59.createItemCatalog;},get GUN_MATERIALS(){return m213.GUN_MATERIALS;},get WEAPON_MODELS(){return m213.WEAPON_MODELS;},get LASER_MODULE(){return m213.LASER_MODULE;},get weaponModel(){return m213.weaponModel;},get weaponAppearance(){return m224.weaponAppearance;},get combatSystem(){return m220.combatSystem;},get weaponSystem(){return m221.weaponSystem;},get lootSystem(){return m223.lootSystem;},get WorldLoot(){return m130.WorldLoot;},get MELEE_SWING(){return m222.MELEE_SWING;},get WIDE_SWING(){return m222.WIDE_SWING;},get sampleMeleeSwing(){return m222.sampleMeleeSwing;},get sampleWideSwing(){return m222.sampleWideSwing;},get swingPhases(){return m222.swingPhases;},get wideGrip(){return m222.wideGrip;},get COMBAT_RULES(){return m225.COMBAT_RULES;},get registerGameEntityTypes(){return m117.registerGameEntityTypes;},get actorVitals(){return m103.actorVitals;},get gameActor(){return m101.gameActor;},get NPC(){return m128.NPC;},get rosterRecord(){return m128.rosterRecord;},get ROSTER_FIELDS(){return m128.ROSTER_FIELDS;},get Ganger(){return m100.Ganger;},get actorSystem(){return m215.actorSystem;},get actorItems(){return m104.actorItems;},get restoreActorItems(){return m104.restoreActorItems;},get resolveEmoteLines(){return m129.resolveEmoteLines;},get NPC_EMOTE_REACTIONS(){return m129.NPC_EMOTE_REACTIONS;},get abilityLoadout(){return m116.abilityLoadout;},get actorAbilities(){return m116.actorAbilities;},get importActorAbilities(){return m116.importActorAbilities;},get abilitySystem(){return m214.abilitySystem;},get createAbilityCatalog(){return m61.createAbilityCatalog;},get attackRegistry(){return m102.attackRegistry;},get validateAttackState(){return m102.validateAttackState;},get attackSystem(){return m211.attackSystem;},get createAttackCatalog(){return m58.createAttackCatalog;},get validateMountedAttack(){return m115.validateMountedAttack;},get TrafficVehicle(){return m131.TrafficVehicle;},get createGameVehicle(){return m131.createGameVehicle;},get Hunter(){return m99.Hunter;},get createHunterAppearance(){return m57.createHunterAppearance;},get Marionette(){return m123.Marionette;},get MARIONETTE_RULES(){return m55.MARIONETTE_RULES;},get validateAbilityAction(){return m112.validateAbilityAction;},get GatlingGunner(){return m109.GatlingGunner;},get Drone(){return m118.Drone;},get VelvetCat(){return m119.VelvetCat;},get velvetCatAnimation(){return m120.velvetCatAnimation;},get createVelvetAnimation(){return m120.createVelvetAnimation;},get velvetPresentation(){return m120.velvetPresentation;},get droneLift(){return m226.droneLift;},get droneArmPose(){return m226.droneArmPose;},get dronePresentation(){return m226.dronePresentation;},get VELVET_CAT_PALETTES(){return m121.VELVET_CAT_PALETTES;},get VELVET_T(){return m121.VELVET_T;},get VELVET_PROFILES(){return m121.VELVET_PROFILES;},get VELVET_GAITS(){return m121.VELVET_GAITS;},get VELVET_TAIL_SEGS(){return m121.VELVET_TAIL_SEGS;},get Demoness(){return m98.Demoness;},get Warden(){return m108.Warden;},get Vesper(){return m108.Vesper;},get Matins(){return m108.Matins;},get Compline(){return m108.Compline;},get BossEffect(){return m110.BossEffect;},get encounterSystem(){return m210.encounterSystem;},get createBossAbilities(){return m49.createBossAbilities;},get createDemonessAppearance(){return m49.createDemonessAppearance;},get demonessAppearance(){return m227.demonessAppearance;},get demonessPresentation(){return m227.demonessPresentation;},get bossEffectAppearance(){return m228.bossEffectAppearance;},get bossEffectPresentation(){return m228.bossEffectPresentation;},get validateBossRecord(){return m97.validateBossRecord;},get createDronePackets(){return m226.createDronePackets;},get createVelvetCatArt(){return m229.createVelvetCatArt;},get createVelvetCatPackets(){return m229.createVelvetCatPackets;},get createVelvetEyePackets(){return m229.createVelvetEyePackets;},get doorPresentation(){return m230.doorPresentation;},get createDoorPackets(){return m230.createDoorPackets;},get DOOR_APPEARANCE(){return m230.DOOR_APPEARANCE;},get PROP_FAMILIES(){return m232.PROP_FAMILIES;},get hasPropArt(){return m232.hasPropArt;},get propArtPacket(){return m232.propArtPacket;},get createPropDraws(){return m232.createPropDraws;},get drawPropArt(){return m232.drawPropArt;},get sceneLighting(){return m200.sceneLighting;},get levelLights(){return m200.levelLights;},get LIGHTING(){return m200.LIGHTING;},get rigDefinition(){return m1.rigDefinition;},get rigPose(){return m1.rigPose;},get animationClip(){return m1.animationClip;},get animationController(){return m1.animationController;},get rigSystem(){return m1.rigSystem;},get humanoidSystem(){return m206.humanoidSystem;},get humanoidPresentation(){return m206.humanoidPresentation;},get humanoidBodyCanon(){return m207.humanoidBodyCanon;},get humanoidBuilds(){return m207.humanoidBuilds;},get getHumanoidRigAssets(){return m207.getHumanoidRigAssets;},get roadNavigationData(){return m203.roadNavigationData;},get loadRoadNavigation(){return m203.loadRoadNavigation;}});
 })();
 return m0;
 })();

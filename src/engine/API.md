@@ -65,7 +65,7 @@ Each level plugs in through one jack. Every jack is frozen.
 | Jack | What it holds |
 |---|---|
 | `engine.basement` | The running systems: `physics`, `elements`, `rigs`, `motion`, `traffic`, `controls`, `camera`, `render` |
-| `engine.lobby` | The loop's clock |
+| `engine.lobby` | The game loop: levels, systems, pausing and the clock (`lobby.clock`) |
 | `engine.directory` | The data functions (`assetLibrary`, `validateMapLayout`, `resolvePlacement`, …) plus `assets`, this engine's registry |
 | `engine.penthouse` | The prefabs: `humanoid` |
 | `engine.game` | The services your game passes in as `services` |
@@ -254,7 +254,7 @@ The game loop. It owns time and runs every system in order each tick: input, bef
 
 ### The clock and pausing
 
-`engine.lobby` is the clock: a fixed step, with frames drawn between steps.
+`engine.lobby` is the game loop, and `engine.lobby.clock` its clock: a fixed step, with frames drawn between steps. The engine's own loop calls (`loadLevel`, `start`, `pause`, …) are the loop's.
 
 `engine.pause(reason)` pauses for a named reason and returns that reason's own `resume`. The game runs again only when every reason is released, so a menu and a lost window focus can both pause without fighting.
 
