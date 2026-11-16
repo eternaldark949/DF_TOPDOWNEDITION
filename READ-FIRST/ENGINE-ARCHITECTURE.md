@@ -24,7 +24,7 @@ The engine knows nothing about the game, and it runs standalone.
 
 ```
             ┌──────────────────────────────────────────────┐
-            │  GAME  (Dimensions Freelancer)  src/game/    │  mechanics, audio, data, levels,
+            │  GAME  (Dimensions Freelancer, to rewrite)   │  mechanics, audio, data, levels,
             │  defines and executes game behaviour         │  entities, presentation, UI, boot
             └───────────────┬──────────────────────────────┘
                             │ uses (imports) ↓    never the reverse
@@ -108,7 +108,7 @@ Each level below lists what it is, what it owns, what it may import, what it mus
 3. **Loading.** Reading library files and resolving them once, at load time: placements over their type's defaults (with `null` removing a default), whole map layouts, template `extends`, authored units converted to engine units. Loading only reshapes data and holds no world state, so it does not break the no-behaviour rule. It is `engine/directory/loading.mjs`, with the shapes it reads in `structures.mjs`.
 4. **The engine's own default libraries.** The data the engine needs to run with no game installed: the default entity kinds (static, prop, ghost trigger, decoration and so on), default materials, a default humanoid skeleton, builds and base clips, and later default plant species. These are what let the Penthouse prefabs boot standalone.
 
-**It does not hold the game's content.** Dimensions Freelancer's catalogs, maps, `GAME_DB`, character builds and balance numbers live in `game/data`. Game boot registers them into the Directory. The single-file build packs both the Directory and `game/data` into `DFAB V8.html`.
+**It does not hold the game's content.** Dimensions Freelancer's catalogs, maps, `GAME_DB`, character builds and balance numbers belong to the game, which registers them into the Directory at boot. The classic `GAME_DB` is kept for reference in `reference/classic/game-db/`.
 
 **Mechanics versus libraries.** This is the most important distinction in the project.
 - **A library** is a catalog that can be used but does not define behaviour, only parameters. "A shotgun has 6 pellets, spread 0.3 and range 220" is a library entry.
@@ -178,7 +178,7 @@ The Basement and the Lobby use the Directory's registry without importing it: th
 
 Two consequences:
 - **The engine runs standalone.** Everything in `src/engine/` (Basement, Lobby, Directory with its default libraries, Penthouse) can be loaded, stepped and tested with no `src/game/` present. Their tests and examples must prove it: `basement/maps/tests/maps.test.mjs` already rejects imports from game code.
-- **The game is replaceable.** Deleting `src/game/` must leave a working engine, and the engine's tests must pass without it.
+- **The game is replaceable.** The engine's tests pass with no game present. The old `src/game/` was cut on 2026-11-16 because it did not follow these rules; a game is written again on the engine, to them.
 
 ---
 
@@ -244,15 +244,15 @@ A file that seems to fit two answers is really two files. Split it. Example: `di
 
 ## 7. The single-file build, `main`, and the classic code
 
-- **Single-file build.** `node tools/build.mjs` builds `DFAB V8.html`, the whole game in one offline file. It concatenates the classic scripts listed in `SCRIPTS` and bundles the new modules through `@native` (`game/boot/native-entry.mjs`). CI runs `node tools/build.mjs --check`, so a change to `src` must be committed together with the rebuilt HTML.
+- **The classic build is frozen.** `DFAB V8.html` is the last build of the classic game, kept as the playable reference; it is no longer rebuilt, and `tools/build.mjs` is gone with `src/game/`.
 - **`main` is the original.** `main` holds the original classic code. Compare against it whenever you need to know what the game did before, for example how hinged doors swung. Don't change behaviour silently: if the new engine changes how something feels, say so and get ETERNAL's agreement.
 - **Pull request 178 is intentionally unmerged.** It began the native engine, but parts of its layering break these rules (see section 9). Work stacked on it must fix those breaches, not copy them.
-- **Classic code is read-only reference in `reference/classic/`.** Every classic script, stylesheet and the page shell (`reference/classic/index.html`) was quarantined unchanged on 2026-11-12 in `src/legacy/`, at its original path (`reference/classic/engine/loop.js` is `src/engine/loop.js` on `main`), and moved out of `src/` to `reference/classic/` on 2026-11-15 so that `src/` holds only code that follows [ENGINE-API.md](ENGINE-API.md). It runs on the old `GameEngine`, and the shipped build still reads it (`classic/...` in `SCRIPTS`). The rules:
+- **Classic code is read-only reference in `reference/classic/`.** Every classic script, stylesheet and the page shell (`reference/classic/index.html`) was quarantined unchanged on 2026-11-12 in `src/legacy/`, at its original path (`reference/classic/engine/loop.js` is `src/engine/loop.js` on `main`), and moved out of `src/` to `reference/classic/` on 2026-11-15 so that `src/` holds only code that follows [ENGINE-API.md](ENGINE-API.md). It runs on the old `GameEngine`; the frozen `DFAB V8.html` is its last build. The rules:
   1. Nothing in `src/` imports from `reference/`.
-  2. Classic code reaches the new engine only through the bundled `DFNative` object; classic scripts import nothing.
+  2. Classic scripts import nothing, and nothing new is built from them.
   3. No classic `.js`, `.cjs` or `.css` file exists anywhere in `src`, and no new code is added to `reference/classic/`.
   4. Classic code is read only for how something looked, sounded or felt, never for how to build it. Its per-map, per-venue and per-screen shape is what the API replaces.
-  5. A file leaves `reference/classic/` only by being **rewritten** to the API at its proper level in `src/engine/` or `src/game/`; then it is deleted from `reference/classic/` and its row is removed. Nothing is moved back as it is.
+  5. A file leaves `reference/classic/` only by being **rewritten** to the API at its proper level in `src/engine/` or in a game written on it; then it is deleted from `reference/classic/` and its row is removed. Nothing is moved back as it is.
 
   Every classic script has exactly one row in `docs/migration/inventory.json` saying where it goes, and CI fails if a row is missing (`node tools/migration-inventory.mjs --check`). **No band-aid adapters** that make classic code look native.
 
@@ -260,7 +260,7 @@ A file that seems to fit two answers is really two files. Split it. Example: `di
 
 ## 8. Folder structure
 
-ETERNAL's layout (2026-11-12, classic code moved out 2026-11-15): `src/` holds two roots, `engine/` and `game/`, and nothing else. Classic code is in `reference/classic/` (section 7). Entries marked *(to build)* do not exist yet.
+ETERNAL's layout (2026-11-12, classic code moved out 2026-11-15, the old `src/game/` cut 2026-11-16): `src/` holds `engine/` and nothing else until a game is written on it. Classic code is in `reference/classic/` (section 7). Entries marked *(to build)* do not exist yet.
 
 ```
 src/
@@ -276,35 +276,21 @@ src/
       runtime/                         gameEngine and gameLevel: the coordinator that runs the phases
     directory/                    LV2  the data layer: registry.mjs, structures.mjs, loading.mjs (to build: defaults)
     penthouse/                    LV3  prefabs (to build: humanoid/, foliage/)
-  game/                           Dimensions Freelancer
-    boot/                         composes the runtime: native-entry.mjs (the DFNative bundle's entry),
-                                  game-runtime.mjs, entity-type registration, actor and vehicle factories
-    mechanics/                    game systems: abilities, actors, animation choice, attacks, combat,
-                                  encounters, items, player control and state, session, traffic manager
-    entities/                     the game's entity classes (player, NPCs, bosses, drones, traffic vehicle)
-    levels/                       every map through one loader and one level: map-definition.mjs and
-                                  game-map-level.mjs (GameMapLevel), plus the apartment (apartment.mjs)
-    presentation/                 appearance producers -> render packets
-    audio/                        (empty) the game's sounds and music, through the Basement audio service
-    data/                         the game's content: GAME_DB (game-db/), game-assets/ (props, maps,
-                                  libraries), humanoid builds, weapon models, rules JSON, catalog modules
-    examples/                     runnable pages that boot the game runtime in a browser
 reference/
-  classic/                        read-only classic code at its original paths (section 7)
+  classic/                        read-only classic code at its original paths (section 7), and the classic GAME_DB (game-db/)
 ```
 
 Migration notes that described earlier cutovers are in `docs/migration/cutovers/`.
 
 ## 9. Known mismatches today
 
-Audited on 2026-11-12, after the native code was sorted into `src/engine/` and `src/game/`. `tools/check-layout.mjs` passes: every engine file carries its level banner, imports only what section 3 allows, and names no game. What remains is work that needs real changes, not moves. Each item is fixed by rewriting code at its level, never by adding an exception.
+Audited on 2026-11-12, after the native code was sorted into `src/engine/` and `src/game/` (since cut). `tools/check-layout.mjs` passes: every engine file carries its level banner, imports only what section 3 allows, and names no game. What remains is work that needs real changes, not moves. Each item is fixed by rewriting code at its level, never by adding an exception.
 
 1. **The engine's default libraries are a start.** `engine/directory/defaults/engine.json` holds the base entity kinds and a default humanoid (skeleton, clips, locomotion, figure). Materials and plant species are still to come.
-2. **The humanoid exists twice.** The Penthouse `humanoid` boots on the engine alone, with IK and physical arms. The game still runs its own: motion from `game/data/humanoid/` and `game/mechanics/animation/humanoid-system.mjs`, and drawing in classic code (`reference/classic/penthouse/procedural-humanoid.js`, `gl-humanoid.js`, `garment-kit.js`, and `reference/classic/ui/humanoid-render.js`, `bodies.js`, `wardrobe.js`, `poses.js`). Next: the game's body canon and builds become a Directory library in the same structures, the game drives the Penthouse humanoid, and the drawing is rewritten on its render packets.
+2. **The humanoid's drawing is still classic.** The Penthouse `humanoid` boots on the engine alone, with IK and physical arms. Its look is drawn in classic code (`reference/classic/penthouse/procedural-humanoid.js`, `gl-humanoid.js`, `garment-kit.js`, and `reference/classic/ui/humanoid-render.js`, `bodies.js`, `wardrobe.js`, `poses.js`). Next: it is rewritten as an entity made of components on the drawing data.
 3. **Behaviour still in classic code.** The classic Directory scripts that hold behaviour (`reference/classic/directory/venue-crowd.js`, `cafe-life.js`, `club-life.js`, `lobby-life.js`, `game-sound.js`, `effects-system.js`, `collision-system.js`, `world-session.js`, `world-query.js`, `game-controls.js`, `new-game-state.js`) are quarantined. They are rewritten as game mechanics, not moved.
-4. **Classic city doors still use classic art.** Native doors are drawn natively: `game/presentation/door.mjs` draws every door from the map's `getDoors()` (its opening and its leaves' bodies) on the art toolkit, whatever its kind, with the look in `game/data/game-door-appearance.json`; it matches the classic artwork pixel for pixel (`tools/test-door-art.mjs`). The classic city's own door objects (`reference/classic/world/rooms.js`) still call the classic artwork in `reference/classic/presentation/indoor-door.js` until that runtime migrates. Next: retire it with them.
-5. **Most art still draws straight to a canvas.** The Basement's packet contract, Canvas backend and art toolkit (`basement/rendering/art.mjs`: groups, shapes, glow, ground shadow, colour and seeded-random helpers) are in place, with a picture cache for art that rarely changes (`basement/rendering/canvas.mjs` `pictureCache`). The drone, the cat, doors, the light layer and the furniture of every bundled map use them but Torque's car carriers (they wait for native vehicle art); furniture is drawn by family, with each family's look schema in the prop catalog (`game/presentation/props/`). The classic furniture drawers in `reference/classic/entities/props-decor.js` and the venue art files remain only as the parity reference. The rest of the classic art is about 4,500 direct canvas calls. Biggest first: `reference/classic/entities/props-decor.js` (the graveyard and the parity reference), `reference/classic/ui/humanoid-render.js`, `reference/classic/ui/wardrobe.js`, `reference/classic/buildings/silver-queen.js`. Each artist is rewritten on the toolkit, not wrapped.
-6. **The controls system can still drive itself.** `controlSystem` keeps an `auto_update` option that polls on its own animation-frame loop. Only the classic client (`reference/classic/directory/game-controls.js`) uses it; the Lobby refuses it and calls `updateState()` itself. Remove the option when that script is rewritten.
+4. **The classic art draws straight to a canvas.** The Basement's packet contract, Canvas backend, art toolkit, drawings as data, materials and looks are in place. The classic art is about 4,500 direct canvas calls; biggest first: `reference/classic/entities/props-decor.js`, `reference/classic/ui/humanoid-render.js`, `reference/classic/ui/wardrobe.js`, `reference/classic/buildings/silver-queen.js`. Each is rewritten as drawing data, not wrapped.
+5. **The controls system can still drive itself.** `controlSystem` keeps an `auto_update` option that polls on its own animation-frame loop. Only the classic client (`reference/classic/directory/game-controls.js`) uses it; the Lobby refuses it and calls `updateState()` itself. Remove the option when that script is rewritten.
 
 When one of these is fixed, remove it from this list in the same commit.
 
@@ -313,17 +299,15 @@ When one of these is fixed, remove it from this list in the same commit.
 ## 10. Checks that enforce this
 
 In CI (`.github/workflows/build.yml`):
-- the build check;
-- the Directory, Penthouse, physics, maps, controls and rendering tests, including the maps package's game-neutral import check;
+- every engine test (`src/engine/tests`, each level's `tests/`), run with no game present;
 - the migration-inventory check;
 - **the layout check, `node tools/check-layout.mjs`.** It fails when:
   - a classic `.js`, `.cjs` or `.css` file sits outside `reference/classic/`, or a page outside `reference/classic/` is not an example;
   - any file outside `reference/classic/` imports from it, or a classic script imports a module;
   - a file in `src/engine/` imports outside `src/engine/`, or imports a level that section 3 forbids;
-  - a file in `src/game/data/` imports anything outside `src/game/data/` and the engine (data never depends on mechanics or presentation);
   - a `.mjs` file in `src/engine/` lacks its level banner on the first line, or names the game (`df_`, `apartment`, `GAME_DB`, `DFNative` and so on) outside its tests.
 
-Still to add: **a standalone check** that runs the engine's tests with `src/game/` and `reference/classic/` absent. Inside `src/game/`, reviewers apply sections 2 and 6 by hand: the check enforces only the engine's rules and the quarantine there.
+`src/` holds only `engine/`, so the engine's tests already run with no game present.
 
 ---
 

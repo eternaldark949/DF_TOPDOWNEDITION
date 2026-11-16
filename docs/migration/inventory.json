@@ -77,13 +77,6 @@
   "note": ""
  },
  {
-  "file": "@native",
-  "area": "native",
-  "status": "native",
-  "target": "the native ESM graph (Basement + Directory + gameplay)",
-  "note": ""
- },
- {
   "file": "classic/basement/controls-system.js",
   "area": "controls",
   "status": "replaced",
@@ -168,70 +161,70 @@
   "note": "Stays; native code reads the same JSON."
  },
  {
-  "file": "game/data/game-db/items.json",
+  "file": "classic/game-db/items.json",
   "area": "data",
   "status": "data",
   "target": "Directory GAME_DB chapter",
   "note": "Read by native code too."
  },
  {
-  "file": "game/data/game-db/shops.json",
+  "file": "classic/game-db/shops.json",
   "area": "data",
   "status": "data",
   "target": "Directory GAME_DB chapter",
   "note": "Read by native code too."
  },
  {
-  "file": "game/data/game-db/progression.json",
+  "file": "classic/game-db/progression.json",
   "area": "data",
   "status": "data",
   "target": "Directory GAME_DB chapter",
   "note": "Read by native code too."
  },
  {
-  "file": "game/data/game-db/audio.json",
+  "file": "classic/game-db/audio.json",
   "area": "data",
   "status": "data",
   "target": "Directory GAME_DB chapter",
   "note": "Read by native code too."
  },
  {
-  "file": "game/data/game-db/enemies.json",
+  "file": "classic/game-db/enemies.json",
   "area": "data",
   "status": "data",
   "target": "Directory GAME_DB chapter",
   "note": "Read by native code too."
  },
  {
-  "file": "game/data/game-db/vehicles.json",
+  "file": "classic/game-db/vehicles.json",
   "area": "data",
   "status": "data",
   "target": "Directory GAME_DB chapter",
   "note": "Read by native code too."
  },
  {
-  "file": "game/data/game-db/places.json",
+  "file": "classic/game-db/places.json",
   "area": "data",
   "status": "data",
   "target": "Directory GAME_DB chapter",
   "note": "Read by native code too."
  },
  {
-  "file": "game/data/game-db/story.json",
+  "file": "classic/game-db/story.json",
   "area": "data",
   "status": "data",
   "target": "Directory GAME_DB chapter",
   "note": "Read by native code too."
  },
  {
-  "file": "game/data/game-db/dialogue.json",
+  "file": "classic/game-db/dialogue.json",
   "area": "data",
   "status": "data",
   "target": "Directory GAME_DB chapter",
   "note": "Read by native code too."
  },
  {
-  "file": "game/data/game-db/cast.json",
+  "file": "classic/game-db/cast.json",
   "area": "data",
   "status": "data",
   "target": "Directory GAME_DB chapter",
@@ -1636,5 +1629,40 @@
   "status": "replaced",
   "target": "basement/controls gamepadInstance",
   "note": ""
+ },
+ {
+  "file": "classic/app/boot-loader.js",
+  "area": "unlinked",
+  "status": "unlinked",
+  "target": "",
+  "note": "Not linked by the last classic build; reference only."
+ },
+ {
+  "file": "classic/buildings/town-gate.js",
+  "area": "unlinked",
+  "status": "unlinked",
+  "target": "",
+  "note": "Not linked by the last classic build; reference only."
+ },
+ {
+  "file": "classic/penthouse/garment-kit.js",
+  "area": "unlinked",
+  "status": "unlinked",
+  "target": "",
+  "note": "Not linked by the last classic build; reference only."
+ },
+ {
+  "file": "classic/penthouse/gl-humanoid.js",
+  "area": "unlinked",
+  "status": "unlinked",
+  "target": "",
+  "note": "Not linked by the last classic build; reference only."
+ },
+ {
+  "file": "classic/story/talks.js",
+  "area": "unlinked",
+  "status": "unlinked",
+  "target": "",
+  "note": "Not linked by the last classic build; reference only."
  }
 ]

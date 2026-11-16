@@ -8,7 +8,7 @@ The libraries every engine level reads from. Four jobs:
 4. **Default libraries** (`defaults/`): the data the engine needs to run with no game installed. Today: the base entity kinds and a default humanoid. Materials and plants come later.
 
 - **May import:** `src/engine/directory/`, and types and constants from `src/engine/basement/`.
-- **Must never:** contain behaviour, contain game content or a game name (a game's data lives in its own data folder, here `src/game/data/`), import the Lobby, the Penthouse or the game, or create entities or worlds.
+- **Must never:** contain behaviour, contain game content or a game name (a game's data lives in its own data folder), import the Lobby, the Penthouse or the game, or create entities or worlds.
 - **Banner:** every `.mjs` file starts with `// ===== LV2 DIRECTORY =====`.
 
 Section 2 of [READ-FIRST/ENGINE-ARCHITECTURE.md](../../../READ-FIRST/ENGINE-ARCHITECTURE.md) has the full rules. Import everything from `index.mjs`. Tests: `node --test src/engine/directory/tests/*.test.mjs`.

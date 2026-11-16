@@ -1,11 +1,10 @@
 // Enforces the folder rules in READ-FIRST/ENGINE-ARCHITECTURE.md:
-//   0. src/ holds only engine/ and game/: code that follows the Engine API spec
+//   0. src/ holds only engine/: code that follows the Engine API spec (a game is written on it, to the same rules)
 //   1. classic code lives only in reference/classic/, read-only (no .js, .cjs or .css in src; .html only in examples/)
 //   2. nothing in src/ imports from reference/, and classic scripts import nothing (they reach the
 //      new engine only through the bundled DFNative object)
-//   2a. src/game/data/ is data: it imports only src/game/data/ and the engine, never mechanics or presentation
 //   3. src/engine/ runs standalone: each level imports only the levels the dependency table allows,
-//      never src/game/, reference/classic/ or an unsorted folder, carries its level banner, and names no game
+//      never reference/classic/ or an unsorted folder, carries its level banner, and names no game
 //   node tools/check-layout.mjs
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, dirname, resolve, sep } from 'node:path';
@@ -30,7 +29,7 @@ const GAME_NAMES = /\bdf_|\bapartment|\bGAME_DB\b|\bDFNative\b|\bganger|\bvelvet
 const importsOf = source => [...source.matchAll(/(?:^|[\s;])(?:import|export)\s[^'"`]*?from\s*['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]\s*\)|^\s*import\s*['"]([^'"]+)['"]/gm)].map(m => m[1] ?? m[2] ?? m[3]);
 
 for (const f of files) {
-    if (!/^(engine|game)\//.test(f.rel) && f.rel !== 'README.md') problems.push(`${f.rel}: src/ holds only engine/ and game/`);
+    if (!/^engine\//.test(f.rel) && f.rel !== 'README.md') problems.push(`${f.rel}: src/ holds only engine/`);
     if (/\.(js|cjs|css)$/.test(f.rel)) problems.push(`${f.rel}: classic file in src/ (new code is .mjs; classic code is in reference/classic/)`);
     if (f.rel.endsWith('.html') && !f.rel.includes('/examples/')) problems.push(`${f.rel}: page in src/ that is not an example`);
     if (!f.rel.endsWith('.mjs')) continue;
@@ -39,7 +38,6 @@ for (const f of files) {
         if (!spec.startsWith('.')) continue;
         const target = rel(resolve(dirname(f.path), spec));
         if (target.startsWith('../')) problems.push(`${f.rel}: imports ${target}, outside src/ (reference/ is read-only)`);
-        if (f.rel.startsWith('game/data/') && !target.startsWith('game/data/') && !target.startsWith('engine/')) problems.push(`${f.rel}: game data may import only game/data and the engine, not ${target}`);
         const [root, level] = f.rel.split('/');
         if (root !== 'engine' || f.rel.includes('/tests/')) continue;
         const [troot, tlevel] = target.split('/');
@@ -61,4 +59,4 @@ for (const p of classic) if (/\.(js|cjs)$/.test(p)) {
 
 if (problems.length) { console.error(problems.join('\n')); process.exit(1); }
 const count = prefix => files.filter(f => f.rel.startsWith(prefix)).length;
-console.log(`Layout holds: ${classic.length} files in reference/classic, ${count('engine/')} in src/engine, ${count('game/')} in src/game.`);
+console.log(`Layout holds: ${classic.length} files in reference/classic, ${count('engine/')} in src/engine.`);

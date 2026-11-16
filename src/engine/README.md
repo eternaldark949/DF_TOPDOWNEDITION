@@ -1,6 +1,6 @@
 # src/engine: the engine
 
-The four engine levels. Everything here runs standalone: nothing in `src/engine/` may import `src/game/`, `reference/classic/` or any other folder outside `src/engine/`. Read [READ-FIRST/ENGINE-ARCHITECTURE.md](../../READ-FIRST/ENGINE-ARCHITECTURE.md) before adding anything.
+The four engine levels. Everything here runs standalone: nothing in `src/engine/` may import a game, `reference/classic/` or any other folder outside `src/engine/`. Read [READ-FIRST/ENGINE-ARCHITECTURE.md](../../READ-FIRST/ENGINE-ARCHITECTURE.md) before adding anything.
 
 | Folder | Level | Holds |
 |---|---|---|

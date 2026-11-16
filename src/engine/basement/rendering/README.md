@@ -286,7 +286,7 @@ A committed replacement is not rolled back if an old-backend disposer or surface
 
 `tests/rendering.test.mjs` checks camera transforms, interpolation, bounds, packet reuse/sorting, data-only validation, native culling, passes, capabilities, replacement/disposal, image atomicity and Canvas state balance. The tests use the sibling physics package as a fixture; runtime rendering modules import only this folder. `tools/test-rendering-browser.py` checks actual pixels at DPR 2, curved paths, gradients, masks, sprites, text, shadows, offscreen composition, camera pointer conversion and fresh-surface replacement/input retargeting. It verifies unchanged physics and no page/console errors.
 
-The Directory fixture is `src/game/data/game-assets/rendering-example.json` and its composition module. Open `src/game/examples/rendering.html` over HTTP to inspect it. `src/game/examples/runtime-example.mjs` now submits packets and contains no Canvas calls.
+`tools/test-art-pixels.mjs` draws the toolkit on a real Canvas in Chromium and checks it pixel by pixel.
 
 Next convert shared appearance/animation and game drawing classes to this contract, including the player, humanoids, props/buildings, lighting/reflection passes and effects. The old `drawList`/`renderQueue`/Canvas artists remain until their callers are converted and visual/performance parity is checked. Session/player gameplay and persistence conversions remain separate pending work.
 

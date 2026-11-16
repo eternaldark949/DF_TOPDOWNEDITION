@@ -30,7 +30,7 @@ The source is sampled centrally; querying does not poll hardware or create anoth
 
 ## Directory definitions
 
-Bindings belong to the game's Directory. The new runtime uses `src/game/data/game-control-profile.json`; the existing classic action policy remains in `game-controls.js` pending shared class conversions.
+Bindings belong to the game's Directory, as data.
 
 ```js
 const input = new controlSystem({

@@ -7,8 +7,8 @@ This is a reference for how things looked, sounded and felt, never for how to bu
 The rules (enforced by `tools/check-layout.mjs` in CI):
 
 1. Nothing in `src/` imports from here.
-2. Classic code reaches the new engine only through the bundled `DFNative` object.
+2. Classic code reaches nothing new: the playable `DFAB V8.html` at the repo root is its last build, frozen.
 3. No new code is added here, and classic files may not be added anywhere else.
-4. A file leaves only by being rewritten to the API at its proper level in `src/engine/` or `src/game/`, after which it is deleted here and its row is removed from `docs/migration/inventory.json`. Nothing is ever moved back as it is.
+4. A file leaves only by being rewritten to the API at its proper level in `src/engine/` or in a game written on it, after which it is deleted here and its row is removed from `docs/migration/inventory.json`. Nothing is ever moved back as it is.
 
-Fixes to the playable game that cannot wait for a rewrite may still be made here; keep them minimal and mention them in the commit.
+`game-db/` holds the classic game's `GAME_DB` (items, enemies, places, story and the rest) as it last shipped, for reference.

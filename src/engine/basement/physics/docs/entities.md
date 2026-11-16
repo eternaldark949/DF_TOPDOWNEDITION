@@ -52,7 +52,7 @@ The `entity` and `decoration` kinds are static with zero collision/query groups.
 
 ## Data lives in the Directory
 
-The Basement owns no data definitions. A world receives a data source (`asset_library`) and uses only `resolveTemplate()` and `getResource()` on it; see [the data source contract](api-reference.md#data-source). The engine's data source is the Directory's registry (`engine/directory/registry.mjs`): immutable definitions, namespaced IDs, `extends` inheritance and resource resolution. A game registers its own libraries into it at boot; this game's live in `src/game/data/game-assets/`, assembled by `src/game/data/game-assets.mjs`.
+The Basement owns no data definitions. A world receives a data source (`asset_library`) and uses only `resolveTemplate()` and `getResource()` on it; see [the data source contract](api-reference.md#data-source). The engine's data source is the Directory's registry (`engine/directory/registry.mjs`): immutable definitions, namespaced IDs, `extends` inheritance and resource resolution. A game registers its own libraries into it at boot.
 
 ## Save/load
 

@@ -1,21 +1,19 @@
-name: Build game file
+name: Engine checks
 
-# Rebuilds "DFAB V8.html" from src/ and assets/.
-#  - On main: if the built file changed (e.g. an image was uploaded to assets/ from the
-#    GitHub website), commit the fresh build back to main.
-#  - On pull requests: fail if the committed build is out of date.
+# Checks the engine in src/engine: every level's tests, run with no game present, the real-canvas pixel
+# tests in Chromium, the folder rules and the classic-code inventory. The classic game is frozen in
+# "DFAB V8.html" and reference/classic, and is not rebuilt.
 on:
   push:
     branches: [main]
-    paths: ['src/**', 'assets/**', 'tools/**', 'DFAB V8.html', '.github/workflows/build.yml']
   pull_request:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  build:
+  engine:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,80 +21,20 @@ jobs:
         with:
           node-version: 20
 
-      - name: Install Chromium through Playwright (the pixel tests and the map bench run in it)
+      - name: Install Chromium through Playwright (the pixel tests run in it)
         run: |
           npm install --no-save --prefix "$RUNNER_TEMP/pw" playwright@1.63.0
           "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
           echo "NODE_PATH=$RUNNER_TEMP/pw/node_modules" >> "$GITHUB_ENV"
 
-      - name: Check build is up to date (pull requests)
-        if: github.event_name == 'pull_request'
-        run: node tools/build.mjs --check
+      - name: Check the folder rules (src holds only the engine, classic code in reference/classic)
+        run: node tools/check-layout.mjs
 
-      - name: Build game (main)
-        if: github.event_name != 'pull_request'
-        run: node tools/build.mjs
+      - name: Check the engine (every level, standalone)
+        run: node --test src/engine/tests/*.test.mjs src/engine/*/tests/*.test.mjs src/engine/basement/*/tests/*.test.mjs
 
-      - name: Check the game data (src/game/data/game-db)
-        run: node tools/test-game-db.cjs
-
-      - name: Check the world queries (rooms, seats, NPCs, buildings)
-        run: node tools/test-world-query.cjs
-
-      - name: Check the render system and the frame's canvas-call budget
-        run: node tools/test-render-system.cjs
-
-      - name: Check native systems, runtime and player ownership
-        run: >-
-          node --test src/engine/directory/tests/*.test.mjs src/engine/penthouse/tests/*.test.mjs src/engine/basement/physics/tests/*.test.mjs src/engine/basement/maps/tests/*.test.mjs tools/test-map-layouts.mjs tools/test-city-ground.mjs tools/test-city-buildings.mjs tools/test-city-foliage.mjs tools/test-city-level.mjs tools/test-art-pixels.mjs tools/test-door-art.mjs tools/test-lighting.mjs tools/test-level-travel.mjs tools/test-prop-art.mjs
-          src/engine/basement/controls/tests/*.test.mjs src/engine/basement/rendering/tests/*.test.mjs
-          tools/test-game-physics-scenarios.mjs tools/test-entity-assets.mjs
-          tools/test-street-population.mjs tools/test-player-systems.mjs tools/test-player-vitals.mjs
-          tools/test-game-engine.mjs tools/test-native-bundle.mjs
-          tools/test-item-system.mjs tools/test-weapon-appearance.mjs tools/test-combat-systems.mjs
-          tools/test-actor-systems.mjs tools/test-ability-systems.mjs tools/test-attack-systems.mjs tools/test-mounted-attacks.mjs tools/test-hunter-systems.mjs tools/test-marionette-systems.mjs tools/test-gunner-systems.mjs tools/test-drone-cat-systems.mjs tools/test-boss-systems.mjs tools/test-actor-art-packets.mjs tools/test-humanoid-system.mjs
-
-      - name: Check player-state callers in the playable build
-        run: |
-          node tools/test-player-state-callers.cjs
-          node tools/test-item-callers.cjs
-          node tools/test-native-combat-callers.cjs
-          node tools/test-actor-callers.cjs
-          node tools/test-hunter-callers.cjs
-          node tools/test-marionette-callers.cjs
-          node tools/test-gunner-callers.cjs
-          node tools/test-drone-cat-callers.cjs
-          node tools/test-boss-callers.cjs
-          node tools/test-humanoid-callers.cjs
-          node tools/test-apartment-parity.cjs
-          node tools/test-ability-callers.cjs
-          node tools/test-attack-callers.cjs
-          node tools/test-mounted-attack-callers.cjs
+      - name: Check the drawing on a real canvas
+        run: node --test tools/test-art-pixels.mjs
 
       - name: Check the migration inventory covers every classic script
         run: node tools/migration-inventory.mjs --check
-
-      - name: Check the folder rules (classic code in reference/classic, standalone engine levels)
-        run: node tools/check-layout.mjs
-
-      - name: Check the city's lane network routes on Basement navigation
-        run: node tools/test-road-navigation.cjs
-
-      - name: Check gameplay and rendering regressions
-        run: node tools/test-game-regressions.cjs
-
-      - name: Check the maps' frame and light-layer cost against the baseline (tools/bench-maps-baseline.json)
-        run: node tools/bench-maps.mjs --check
-
-      - name: Commit rebuilt game (main)
-        if: github.event_name != 'pull_request'
-        run: |
-          if git diff --quiet -- "DFAB V8.html"; then
-            echo "Game file already up to date."
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add "DFAB V8.html"
-            git commit -m "Rebuild DFAB V8.html"
-            git push
-          fi

@@ -93,7 +93,7 @@ The map system uses the world's one spatial grid and navigation field. It never 
 
 ## Game data
 
-The game's prop catalog and per-map layouts live in the Directory: `src/game/data/game-assets/props.json` and `src/game/data/game-assets/maps/<map_id>.json`, read through `src/game/data/game-maps.mjs`. The apartment builds through this system (`directory/apartment-definition.mjs`). Each map file's `host` field (`native` or `classic`) records which host owns it.
+A game's prop catalog and per-map layouts are Directory libraries it registers at boot.
 
 Run `node --test src/engine/basement/maps/tests/*.test.mjs tools/test-map-layouts.mjs`.
 

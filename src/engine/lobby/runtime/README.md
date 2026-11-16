@@ -125,7 +125,7 @@ await engine.loadLevel('room');
 engine.start();
 ```
 
-Serve the checkout over HTTP and open `src/game/examples/`. The two example levels are authored in `directory/game-assets/runtime-example.json`; they are explicitly demonstration content, not converted city/apartment levels. Keyboard input, native pushing/contact, two-level transitions, pause, scheduling and disposal run through the real new coordinator.
+`src/engine/tests/game-engine.test.mjs` runs the coordinator end to end with no game present: levels, transitions, pause, scheduling, objects and disposal.
 
 ## Verification and next conversions
 
