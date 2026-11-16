@@ -49,7 +49,7 @@ An object is like Blender's `KX_GameObject`: a name, an id, a position, a rotati
 
 | Call | What it does | Today |
 | --- | --- | --- |
-| `createObject(record, at)` | Makes an object from a catalog record at a position | partly: Basement entities and map placements, but each family has its own path |
+| `createObject(record, at)` | Makes an object from a catalog record at a position: its look, fitted bounds and surface switched on by the record's fields | have: `engine.createObject`; map placements still have their own path |
 | `object.get(key)` / `object.set(key, value)` | Reads or writes a property; `set` fires `propertyChanged` | have: `gameEntity.get`, `has`, `set` |
 | `object.moveTo(x, y)` / `object.rotateTo(angle)` | Places or turns it | have |
 | `object.attach(child, at)` | Parents one object to another at a local offset | have: `gameEntity.attach`, `detach`, `parent`, `children` |
@@ -173,6 +173,10 @@ One Canvas backend in the Basement. It draws the essential shapes, and a **drawi
 | `fill` and `stroke`: a colour or a gradient (`linear`, `radial`) | How a shape is painted | have |
 | `shadow`, `alpha`, `blend` on a step; `glow` and `ground_shadow` steps | Shadow, see-through, blending, light | have |
 | `scene.draw(drawing, {at, rotation, scale, values})` | Draws a whole drawing in the object's local space, `group` steps nested, `"$name"` values from its look | have |
+| `material: "brass"` on a step | Names a material record: paint fields plus a physical `surface` (friction, restitution, hit sound, hit effect, footstep); unknown fields refused | have |
+| `fill: {type: "pattern", image, repeat}` | A texture: a registered image repeated across the shape, moving with its object | have |
+| An object's `drawing` asset and `look` property | The render system draws every visible look each frame at the object's pose | have |
+| `bounds: circle, box, capsule, hull` | Collision bounds fitted once from the drawing's solid steps; an explicit `collision_shape` wins | have |
 | Variants | The same drawing in different colours or sizes: a look's values, chosen per object | have, through `values` |
 
 **Made efficient by the backend, never by the game:** a drawing is compiled once into paths and cached; drawings that never move are baked into a layer image once; steps with the same paint are drawn together; the grid skips anything off screen.
@@ -221,7 +225,7 @@ Each step makes later steps smaller. A step is done when the game uses the new c
 2. **Controls as data.** Input contexts, chords and rumble templates, with every binding in one file.
 3. **Drawing backend.** The readable drawing calls and drawings as data in local space (done); then prop drawings move out of code into the catalog, one family at a time.
 4. **UI system.** The overlay with items, states, styles and transitions; then the main menu, pause and its pages, and the HUD as data.
-5. **Objects.** One `createObject` from a catalog record, with parts switched on by data. Every placement, light and character goes through it.
+5. **Objects.** One `createObject` from a catalog record, with parts switched on by data (done: look, materials, fitted bounds, surface). Next, every placement, light and character goes through it.
 6. **One map drawer.** Ground, buildings, plants and interiors drawn by one drawer that reads the map's sections and switches. Drop the city names. Spawn layout characters on load.
 7. **Agents and one network.** Merge the walker network into the navigation network with profiles. Run cars and walkers on one agent loop with behaviour tables.
 8. **Audio and saves.** Built once each, on the game clock and the object properties.

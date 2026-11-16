@@ -225,3 +225,14 @@ test('a tile of a picture is painted past the frame budget, since as vector it d
  assert.equal(cache.draw(host,{key:'strip',bounds:[0,0,40,10],source:[0,0,10,10]},slow),'paint','a tile does not');
  assert.equal(cache.draw(host,{key:'later',bounds:[0,0,40,10],source:[0,0,10,10],stamp:false},slow),'later','one only readied ahead still waits');
 });
+
+test('a pattern fill repeats a registered image and the frame refuses one it does not have',async()=>{
+ const {render}=fixture(),main=surface(),patterns=[];main.ctx.createPattern=(image,repeat)=>{patterns.push([image.id,repeat]);return {pattern:image.id};};
+ class Canvas extends canvasRenderer{constructor(){super({decode_image:url=>Promise.resolve({id:url,close(){}}),create_surface:()=>surface()});}}
+ render.registerRenderer('canvas',Canvas);await render.setRenderer('canvas',{surface:main});await render.registerResource('bricks',{type:'image',url:'bricks.png'});
+ assert.ok(render.getCapabilities().includes('pattern'));
+ render.beginFrame().submit(rect({type:'pattern',image:'bricks',repeat:'repeat-x'}));render.endFrame();
+ assert.deepEqual(patterns,[['bricks.png','repeat-x']]);
+ render.beginFrame().submit(rect({type:'pattern',image:'missing'}));assert.throws(()=>render.endFrame(),/missing/);
+ assert.throws(()=>new renderFrame().begin(view().getView()).submit(rect({type:'pattern',image:'bricks',repeat:'mirror'})),/repeat/);
+});

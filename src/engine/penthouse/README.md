@@ -1,12 +1,16 @@
 # LV3 Penthouse: prefab toys
 
-The proof that the levels below work. A prefab invents no mechanism: it is built only from Basement systems and Directory data, and boots on the Directory's default libraries with no game present. Built: `humanoid/`. Planned: `foliage/`.
+The proof that the levels below work. A prefab invents no mechanism: it is built only from Basement systems and Directory data, and boots on the Directory's default libraries with no game present. Built: `objects/`, `humanoid/`. Planned: `foliage/`.
 
 - **May import:** `src/engine/basement/`, `src/engine/directory/` and `src/engine/penthouse/`.
 - **Must never:** import the Lobby or the game, contain game rules, or contain a mechanism the Basement lacks. A missing mechanism is added to the Basement first.
 - **Banner:** every `.mjs` file starts with `// ===== LV3 PENTHOUSE =====`.
 
 Section 2 of [READ-FIRST/ENGINE-ARCHITECTURE.md](../../../READ-FIRST/ENGINE-ARCHITECTURE.md) has the full rules.
+
+## `objects`
+
+`createObject(elements, record, at, overrides)` makes any object from a catalog record; `objectPacket(assets, record, at, overrides)` is the packet it would make. The record's fields switch its parts on: `entity_type`, `assets.drawing` (its look), `look` (kept as the `look` property), `bounds` (collision bounds fitted from the drawing's solid steps with the Basement's `fitBounds`), `collision_shape` (always wins), `assets.material` (its `surface` sets friction and restitution) and `data`. The drawing and material are checked with the Directory's `validateDrawing` and `validateMaterial`. The engine file exposes it as `engine.createObject(record, at, overrides, {lifetime})`, which goes through the Lobby so level objects leave with their level. The user guide is [Objects in src/engine/API.md](../API.md#objects).
 
 ## `humanoid`
 

@@ -101,19 +101,22 @@ export class artScene{
     /**
      * Draws a drawing (a list of steps, see DRAWING) moved to `at`, turned by `rotation` and sized by
      * `scale` (a number or [x, y]). A step's string value `"$name"` is read from `values` (a look's
-     * fields), so one drawing serves every variant of a thing.
+     * fields), so one drawing serves every variant of a thing. A step's `material` names a material
+     * record (see MATERIAL) read through `materials`, an object or a function of the name; the step's
+     * own paint fields win over the material's. `solid` marks the steps that collision bounds fit.
      */
-    draw(steps,{at=[0,0],rotation=0,scale=1,values={}}={}){
+    draw(steps,{at=[0,0],rotation=0,scale=1,values={},materials=NO_MATERIALS}={}){
         if(!Array.isArray(steps))throw new TypeError('A drawing is a list of steps');
         this.enter({position:at,rotation,scale:typeof scale==='number'?[scale,scale]:scale});
-        try{for(const step of steps)this.#step(resolveValues(step,values),values);}finally{this.leave();}
+        try{for(const step of steps)this.#step(readValues(step,values),values,materials);}finally{this.leave();}
         return this;
     }
-    #step(step,values){
-        const {shape,...fields}=step??{};
-        if(shape==='group'){const {steps,x=0,y=0,rotation=0,scale=1}=fields;return this.draw(steps,{at:[x,y],rotation,scale,values});}
+    #step(step,values,materials){
+        const {shape,material,solid,...fields}=step??{};
+        if(shape==='group'){const {steps,x=0,y=0,rotation=0,scale=1}=fields;return this.draw(steps,{at:[x,y],rotation,scale,values,materials});}
         const call=DRAWING[shape];if(!call)throw new TypeError(`Unknown drawing shape: ${shape} (one of ${Object.keys(DRAWING).join(', ')}, group)`);
-        return this[call](fields);
+        if(solid!==undefined&&typeof solid!=='boolean')throw new TypeError('solid is true or false');
+        return this[call](material===undefined?fields:{...materialPaint(material,materials),...fields});
     }
     #draw(commands,paint){const {material,opacity,blend}=drawPaint(paint);return this.#styled(opacity,blend,()=>this.paint(commands,material));}
     #styled(opacity,blend,fn){if(opacity===1&&blend===undefined)return fn();this.enter({},{opacity:this.style.opacity*opacity,...(blend?{blend}:{})});try{fn();}finally{this.leave();}return this;}
@@ -122,6 +125,18 @@ export class artScene{
 /** The shapes a drawing step may name, and the readable call each one is. */
 export const DRAWING=Object.freeze({rectangle:'drawRectangle',circle:'drawCircle',ellipse:'drawEllipse',capsule:'drawCapsule',line:'drawLine',polygon:'drawPolygon',curve:'drawCurve',text:'drawText',glow:'drawGlow',ground_shadow:'drawGroundShadow'});
 const PAINT_KEYS=new Set(['fill','stroke','line_width','line_cap','line_join','dash','alpha','blend','shadow']);
+const NO_MATERIALS=Object.freeze({});
+/** The fields a material record may hold: its paint, plus `kind` and the physical `surface` that drawing ignores. */
+export const MATERIAL=Object.freeze({paint:Object.freeze([...PAINT_KEYS]),other:Object.freeze(['kind','surface'])});
+/** A material record's paint fields, read by name. A material with an unknown field is refused. */
+function materialPaint(name,materials){
+    if(typeof name!=='string'||!name)throw new TypeError('A step names its material by id');
+    const record=typeof materials==='function'?materials(name):Object.hasOwn(materials,name)?materials[name]:undefined;
+    if(!record||typeof record!=='object')throw new TypeError(`Unknown material: ${name}`);
+    const paint={};
+    for(const [key,value] of Object.entries(record)){if(PAINT_KEYS.has(key))paint[key]=value;else if(!MATERIAL.other.includes(key))throw new TypeError(`Unknown material field: ${key} in ${name} (a material holds ${[...PAINT_KEYS,...MATERIAL.other].join(', ')})`);}
+    return paint;
+}
 /** A step's paint fields as a material, its opacity and its blend. Unknown fields are refused, so a typo never draws silently wrong. */
 function drawPaint({fill=null,stroke=null,line_width,line_cap,line_join,dash,alpha=1,blend,shadow,...rest}){
     const unknown=Object.keys(rest);if(unknown.length)throw new TypeError(`Unknown drawing field: ${unknown.join(', ')} (paint is ${[...PAINT_KEYS].join(', ')})`);
@@ -132,7 +147,7 @@ function drawPaint({fill=null,stroke=null,line_width,line_cap,line_join,dash,alp
     return {material,opacity:alpha,blend};
 }
 /** A copy of `step` with every "$name" string read from `values`; groups keep theirs for their own steps. */
-function resolveValues(step,values){
+export function readValues(step,values){
     const read=value=>{
         if(typeof value==='string'&&value.startsWith('$')){const key=value.slice(1);if(!Object.hasOwn(values,key))throw new TypeError(`The drawing reads ${value}, which its values do not have`);return values[key];}
         if(Array.isArray(value))return value.map(read);

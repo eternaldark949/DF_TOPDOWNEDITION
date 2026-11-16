@@ -6,12 +6,12 @@ import { physicsSystem } from './basement/physics/index.mjs';
 import { controlSystem } from './basement/controls/index.mjs';
 import { cameraSystem, renderSystem } from './basement/rendering/index.mjs';
 import { gameLoop } from './lobby/game-loop.mjs';
-import { assetLibrary, mergeDefinition, identifier, nonnegative, jsonCopy, STRUCTURES, validatePropCatalog, validateMapLayout, checkLook, validateSkeleton, validateClipSet, validateLocomotion, validateFigure, validateDoorKind, validateLibrary, doorKindsOf, ENGINE_LIBRARIES, createEngineRegistry, resolvePlacement, resolveLayout, resolvePropLook, isMovable } from './directory/index.mjs';
-import { humanoid } from './penthouse/index.mjs';
+import { assetLibrary, mergeDefinition, identifier, nonnegative, jsonCopy, STRUCTURES, validatePropCatalog, validateMapLayout, checkLook, validateSkeleton, validateClipSet, validateLocomotion, validateFigure, validateDoorKind, validateDrawing, validateMaterial, validateLibrary, doorKindsOf, ENGINE_LIBRARIES, createEngineRegistry, resolvePlacement, resolveLayout, resolvePropLook, isMovable } from './directory/index.mjs';
+import { humanoid, objectPacket, createObject } from './penthouse/index.mjs';
 
 /** What each jack carries besides the running systems: the Directory's functions and the Penthouse's prefabs. */
-const DIRECTORY = Object.freeze({ assetLibrary, mergeDefinition, identifier, nonnegative, jsonCopy, STRUCTURES, validatePropCatalog, validateMapLayout, checkLook, validateSkeleton, validateClipSet, validateLocomotion, validateFigure, validateDoorKind, validateLibrary, doorKindsOf, ENGINE_LIBRARIES, createEngineRegistry, resolvePlacement, resolveLayout, resolvePropLook, isMovable });
-const PENTHOUSE = Object.freeze({ humanoid });
+const DIRECTORY = Object.freeze({ assetLibrary, mergeDefinition, identifier, nonnegative, jsonCopy, STRUCTURES, validatePropCatalog, validateMapLayout, checkLook, validateSkeleton, validateClipSet, validateLocomotion, validateFigure, validateDoorKind, validateDrawing, validateMaterial, validateLibrary, doorKindsOf, ENGINE_LIBRARIES, createEngineRegistry, resolvePlacement, resolveLayout, resolvePropLook, isMovable });
+const PENTHOUSE = Object.freeze({ humanoid, objectPacket, createObject });
 
 /**
  * The game engine: builds the Basement's running systems and plugs every level in through its jack. The
@@ -58,6 +58,8 @@ export class gameEngine {
     registerLevel(...args) { const result = this.#loop.registerLevel(...args); return result === this.#loop ? this : result; }
     registerSystem(...args) { const result = this.#loop.registerSystem(...args); return result === this.#loop ? this : result; }
     removeSystem(...args) { const result = this.#loop.removeSystem(...args); return result === this.#loop ? this : result; }
+    /** Makes any object from a catalog record (a template id or a record) at `at`; `lifetime` is level (default) or session. */
+    createObject(record, at = [0, 0], overrides = {}, options) { return this.#loop.createEntity(objectPacket(this.#basement.elements.asset_library, record, at, overrides), options); }
     createEntity(...args) { const result = this.#loop.createEntity(...args); return result === this.#loop ? this : result; }
     retainEntity(...args) { const result = this.#loop.retainEntity(...args); return result === this.#loop ? this : result; }
     releaseEntity(...args) { const result = this.#loop.releaseEntity(...args); return result === this.#loop ? this : result; }

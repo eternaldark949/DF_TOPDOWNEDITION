@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { gameEngine } from '../src/engine/game-engine.mjs';
 import { gameLevel } from '../src/engine/lobby/runtime/game-level.mjs';
+import { createEngineRegistry } from '../src/engine/directory/index.mjs';
 import { createGameRuntime } from '../src/game/boot/game-runtime.mjs';
 
 const runtime = options => new gameEngine({ schedule_frame:null, ...options });
@@ -182,4 +183,18 @@ test('engine alone: map levels with exits, an auto exit, and travellers carried 
     await travel.travel(); assert.equal(e.active_level.level_id, 'hall');
     assert.ok(walker.position[0] < 360 && walker.position[0] > 300, `back in the hall beside its east exit (${walker.position})`);
     e.dispose();
+});
+
+const toys = { library_id: 'toys', resources: {
+    lamp: { kind: 'drawing', steps: [{ shape: 'glow', radius: 60, color: '#ffd27f' }, { shape: 'circle', radius: 10, material: 'brass', solid: true }, { shape: 'rectangle', x: -2, y: 10, width: 4, height: 30, material: 'brass', solid: true }] },
+    brass: { kind: 'material', fill: '#b5a642' } },
+    templates: { lamp: { entity_type: 'prop', assets: { drawing: 'lamp' }, bounds: 'circle' } } };
+test('the engine makes objects with level lifetime and the loop draws their looks every frame', async () => {
+    const engine = new gameEngine({ asset_library: createEngineRegistry({ libraries: [toys] }), schedule_frame: null });
+    let made = null;
+    engine.registerLevel('yard', class extends gameLevel { enter(context) { made = context.engine.createObject('toys:lamp', [0, 0]); } });
+    await engine.loadLevel('yard'); engine.updateState(1 / 60);
+    assert.equal(engine.render(1), true);
+    assert.equal(engine.basement.render.getStatistics().packets, 3, 'the glow, the head and the post');
+    await engine.unloadLevel(); assert.equal(made.destroyed, true, 'level objects leave with their level');
 });

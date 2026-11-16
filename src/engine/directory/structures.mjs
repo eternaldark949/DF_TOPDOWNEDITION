@@ -28,6 +28,7 @@
 //                How a rigged body is drawn, back to front: a circle or ellipse at a joint, or a
 //                capsule from `joint` to `to`. Sizes in px before the rig's own scale.
 import { plain } from './values.mjs';
+import { DRAWING, MATERIAL } from '../basement/rendering/index.mjs';
 
 export const STRUCTURES = Object.freeze({
     prop_catalog: 'A catalog of prop types and the families they are presets of: { types: { <type>: { defaults, movable?, blocks_light?, light? } }, families?: { <family>: { look: { <field>: { kind, default } } } } }.',
@@ -36,7 +37,9 @@ export const STRUCTURES = Object.freeze({
     clip_set: 'Animation clips for one skeleton: { clips: [{ clip_id, duration, tracks, markers? }] }.',
     locomotion: 'Which clips stand and walk: { idle, walk, stride (px per cycle), moving_speed (px/s) }.',
     door_kind: 'The leaves that fill a door\'s opening: { name, leaves: [{ from, to, motion, travel?, pivot?, hinge?, suffix? }] }.',
-    figure: 'How a rigged body is drawn, back to front: { parts: [{ part, shape, joint, to?, radius?, radii? }] }.'
+    figure: 'How a rigged body is drawn, back to front: { parts: [{ part, shape, joint, to?, radius?, radii? }] }.',
+    drawing: 'An object\'s art in its own space, back to front: { steps: [{ shape, material?, solid?, ...fields }] }; shape is a drawing shape or group ({ shape: "group", x?, y?, rotation?, scale?, steps }). "$name" values are read from the object\'s look.',
+    material: 'How a substance looks and behaves: { fill?, stroke?, line_width?, line_cap?, line_join?, dash?, alpha?, blend?, shadow?, surface?: { friction?, restitution?, hit_sound?, hit_effect?, footstep? } }; fill may be a colour, a gradient or a pattern { type: "pattern", image, repeat? }.'
 });
 
 const fail = (where, message) => { throw new TypeError(`${where}: ${message}`); };
@@ -157,7 +160,34 @@ export function validateDoorKind(data, where = 'door_kind') {
     return data;
 }
 
-const VALIDATORS = { prop_catalog: validatePropCatalog, skeleton: validateSkeleton, clip_set: validateClipSet, locomotion: validateLocomotion, figure: validateFigure, door_kind: validateDoorKind };
+/** A drawing resource: a list of steps, each a known shape or a group of steps. */
+export function validateDrawing(drawing, where = 'drawing') {
+    if (!plain(drawing) || !Array.isArray(drawing.steps)) fail(where, 'a drawing is { steps: [...] }');
+    const walk = (steps, at) => steps.forEach((step, i) => {
+        const here = `${at}[${i}]`;
+        if (!plain(step) || typeof step.shape !== 'string') fail(here, 'a step is { shape, ... }');
+        if (step.shape === 'group') { if (!Array.isArray(step.steps)) fail(here, 'a group holds steps'); walk(step.steps, `${here}.steps`); }
+        else if (!Object.hasOwn(DRAWING, step.shape)) fail(here, `unknown shape ${step.shape} (one of ${Object.keys(DRAWING).join(', ')}, group)`);
+        if (step.solid !== undefined && typeof step.solid !== 'boolean') fail(here, 'solid is true or false');
+        if (step.material !== undefined && (typeof step.material !== 'string' || !step.material)) fail(here, 'material names a material resource');
+    });
+    walk(drawing.steps, `${where}.steps`); return drawing;
+}
+const SURFACE_FIELDS = ['friction', 'restitution', 'hit_sound', 'hit_effect', 'footstep'];
+/** A material resource: paint fields and an optional physical surface, nothing else. */
+export function validateMaterial(material, where = 'material') {
+    if (!plain(material)) fail(where, 'a material is an object');
+    for (const key of Object.keys(material)) if (!MATERIAL.paint.includes(key) && !MATERIAL.other.includes(key)) fail(where, `unknown field ${key} (a material holds ${[...MATERIAL.paint, ...MATERIAL.other].join(', ')})`);
+    if (material.surface !== undefined) {
+        if (!plain(material.surface)) fail(where, 'surface is an object');
+        for (const [key, value] of Object.entries(material.surface)) {
+            if (!SURFACE_FIELDS.includes(key)) fail(where, `unknown surface field ${key} (one of ${SURFACE_FIELDS.join(', ')})`);
+            if (['friction', 'restitution'].includes(key) && !(Number.isFinite(value) && value >= 0 && (key !== 'restitution' || value <= 1))) fail(where, `${key} is a number${key === 'restitution' ? ' in [0, 1]' : ' of 0 or more'}`);
+        }
+    }
+    return material;
+}
+const VALIDATORS = { drawing: validateDrawing, material: validateMaterial, prop_catalog: validatePropCatalog, skeleton: validateSkeleton, clip_set: validateClipSet, locomotion: validateLocomotion, figure: validateFigure, door_kind: validateDoorKind };
 /** Validates every resource of a library whose kind has a structure here; other kinds pass through. Returns the library. */
 export function validateLibrary(library) {
     for (const [id, resource] of Object.entries(library?.resources ?? {})) VALIDATORS[resource?.kind]?.(resource, `${library.library_id}:${id}`);

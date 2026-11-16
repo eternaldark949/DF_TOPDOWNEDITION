@@ -88,7 +88,8 @@ Levels and systems get a **context** with the same jacks (`context.basement`, `c
 | `engine.registerSystem(id, system)` / `engine.removeSystem(id)` | Adds or removes a system that runs every tick (see [Systems](#systems)) |
 | `engine.start()` / `engine.stop()` | Starts or stops the loop |
 | `const resume = engine.pause(reason)` | Pauses for a reason; call `resume()` to release it (see [The clock and pausing](#the-clock-and-pausing)) |
-| `engine.createEntity(packet, {lifetime})` | Makes an entity outside a context |
+| `engine.createObject(record, at, overrides, {lifetime})` | Makes any object from a catalog record (a template id or a record) at `at`; it leaves with the level unless `lifetime` is `session` (see [Objects](#objects)) |
+| `engine.createEntity(packet, {lifetime})` | Makes an entity outside a context from a raw packet |
 | `engine.retainEntity(entity)` / `engine.releaseEntity(entity)` | Keeps an entity across level changes, or lets it go |
 | `engine.updateState()` / `engine.render(blend)` | Runs one tick or one frame by hand (the loop does this for you) |
 | `engine.dispose()` | Shuts everything down |
@@ -251,6 +252,16 @@ The calls are `drawRectangle`, `drawCircle`, `drawEllipse`, `drawCapsule`, `draw
 ]
 ```
 
+**Materials and textures.** A step's `material` names a material record, so many drawings share one substance. A material holds paint fields (`fill`, `stroke`, `line_width`, `alpha`, `blend`, `shadow`, …) and an optional `surface` (`friction`, `restitution`, `hit_sound`, `hit_effect`, `footstep`); any other field is refused. A step's own paint wins over its material's. A texture is a fill: `{ "type": "pattern", "image": "bricks", "repeat": "repeat" }` repeats a registered image and moves with its object.
+
+**Looks.** An entity whose `drawing` asset names a drawing is drawn by the engine every frame at its own position and rotation; nothing else is needed. Its `look` property (`{values, scale, layer, depth, visible}`) says what the drawing reads and where it sits, so `entity.set('look', {...})` changes how it looks and `entity.setAsset('drawing', id)` swaps its art.
+
+| Call | What it does |
+|---|---|
+| `render.drawLooks(blend)` | Draws every visible look into the open frame (the loop calls it for you) |
+| `fitBounds(steps, bounds)` | The collision shape that fits a drawing's solid steps: `circle`, `box`, `capsule` or `hull` |
+| `drawingReach(steps)` | The circle round everything a drawing paints, glows included |
+
 The light layer (`createLightLayer`) draws lights and shadows. Colour helpers: `rgba`, `mix`, `shade`, `hexToRgb`.
 
 Reference: [rendering README](basement/rendering/README.md).
@@ -370,7 +381,7 @@ The data layer, through `engine.directory`. It defines what each kind of data lo
 | `directory.assets` | This engine's registry |
 | `assets.registerLibrary(library)` | Adds a library of templates and resources |
 | `assets.getTemplate(id)` / `assets.getResource(id)` / `assets.listTemplates()` | Finds data by id |
-| `directory.validateMapLayout(layout)`, `validatePropCatalog`, `validateSkeleton`, … | Checks data against its structure |
+| `directory.validateMapLayout(layout)`, `validatePropCatalog`, `validateSkeleton`, `validateDrawing`, `validateMaterial`, … | Checks data against its structure (a library is checked when it is registered) |
 | `directory.resolvePlacement`, `resolveLayout`, `resolvePropLook` | Turns layout data into what the map builder reads |
 
 Reference: [Directory README](directory/README.md).
@@ -383,6 +394,43 @@ Prefabs built only from the levels below, through `engine.penthouse`.
 
 | Prefab | What it is |
 |---|---|
+| `createObject(elements, record, at, overrides)` | Any object from a catalog record (see [Objects](#objects)); `engine.createObject` is the same with level lifetime |
+| `objectPacket(assets, record, at, overrides)` | The entity packet a record makes, without making it |
 | `humanoid` | A procedural humanoid with a rig, IK and physical arms |
+
+### Objects
+
+One call makes anything: `engine.createObject(record, at)`. A record is a template in a library (or an inline record), and its fields switch its parts on. Nothing in the call knows which record it is.
+
+| Field | What it switches on |
+|---|---|
+| `entity_type` | What it is to physics: `prop`, `static`, `character`, `vehicle`, `trigger`, … |
+| `assets.drawing` | Its look: a drawing resource, drawn every frame |
+| `look` | `{values, scale, layer, depth, visible}`, kept as the object's `look` property |
+| `bounds` | Collision bounds fitted from the drawing's solid steps: `circle`, `box`, `capsule` or `hull` |
+| `collision_shape` | An exact shape; it always wins over `bounds` |
+| `assets.material` | A material whose `surface` sets the body's friction and restitution |
+| `data` | Its starting properties |
+
+```js
+engine.directory.assets.registerLibrary({
+  library_id: 'yard',
+  resources: {
+    lamp: { kind: 'drawing', steps: [
+      { shape: 'glow', radius: 60, color: '$light' },
+      { shape: 'circle', radius: 10, material: 'brass', solid: true },
+      { shape: 'rectangle', x: -2, y: 10, width: 4, height: 30, material: 'brass', solid: true }] },
+    brass: { kind: 'material', fill: '#b5a642', stroke: '#5a4f1c', surface: { friction: 0.3 } }
+  },
+  templates: {
+    lamp: { entity_type: 'prop', assets: { drawing: 'lamp', material: 'brass' },
+            look: { values: { light: '#ffd27f' }, layer: 2 }, bounds: 'circle', data: { on: true } }
+  }
+});
+// In a level's enter(context), or with { lifetime: 'session' } outside one:
+const lamp = context.engine.createObject('yard:lamp', [100, 50]);   // drawn every frame; its hitbox fits the head and post, not the glow
+```
+
+A drawing step is solid when it says `solid: true`; when no step says so, every shape but glows, ground shadows, text and lines is. Bounds are fitted once, from the drawing at rest, so an animation never changes the hitbox.
 
 Reference: [Penthouse README](penthouse/README.md).

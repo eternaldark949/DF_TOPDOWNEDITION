@@ -2,6 +2,8 @@
 import {renderFrame} from './frame.mjs';
 import {geometry,material,requirements} from './packets.mjs';
 import {finite,identifier,freezeData} from './values.mjs';
+import {artScene} from './art.mjs';
+import {drawLook} from './looks.mjs';
 
 function normalizeResource(description){
     if(!description||typeof description!=='object')throw new TypeError('A data resource descriptor is required');
@@ -20,7 +22,7 @@ const methods=['initialize','resize','render','registerResource','releaseResourc
 /** Backend selection and frame orchestration. Visibility uses the existing native world index. */
 export class renderSystem {
     #world;#camera;#frame=new renderFrame();#renderers=new Map();#resources=new Map();#backend=null;#backendId=null;#surface=null;
-    #collecting=false;#busy=false;#disposed=false;#generation=0;#last=null;#surfaceListeners=new Set();#frameListeners=new Set();#requirements=[];
+    #collecting=false;#busy=false;#disposed=false;#generation=0;#last=null;#surfaceListeners=new Set();#frameListeners=new Set();#requirements=[];#visible=[];
     constructor({physics_system,camera}={}){if(!physics_system?.queryEntitiesInBounds||!camera?.getView)throw new TypeError('renderSystem requires native world and camera');this.#world=physics_system;this.#camera=camera;}
     get renderer_id(){return this.#backendId;}
     get disposed(){return this.#disposed;}
@@ -63,6 +65,18 @@ export class renderSystem {
         try{this.#backend?.resize(this.#camera.viewport);}catch(error){this.#camera.setViewport(old);throw error;}return this;
     }
     getVisibleEntities({blend=1,margin=0,...options}={},results=[]){this.#live();return this.#world.queryEntitiesInBounds({...options,bounds:this.#camera.getVisibleBounds({blend,margin}),bounds_type:'render'},results);}
+    /** Draws every visible entity that has a look (a `drawing` asset) into the open frame, at its `look.layer` and `look.depth`. Returns how many it drew. */
+    drawLooks(blend=1){
+        this.#live();if(!this.#collecting)throw new Error('Draw looks inside an open render frame');
+        const source=this.#world.elements.asset_library;let drawn=0;
+        for(const {entity} of this.getVisibleEntities({blend},this.#visible)){
+            if(!entity?.assets?.drawing)continue;
+            const scene=new artScene();if(!drawLook(scene,entity,source,blend))continue;
+            const look=entity.get('look',{}),layer=look.layer??0,depth=look.depth??0;
+            for(const packet of scene.finish())this.#frame.submit({...packet,layer,depth});drawn++;
+        }
+        return drawn;
+    }
     beginFrame(blend=1){this.#live();if(this.#collecting)throw new Error('A render frame is already open');this.#collecting=true;try{return this.#frame.begin(this.#camera.getView(blend));}catch(error){this.#collecting=false;throw error;}}
     endFrame(){
         this.#live();if(!this.#collecting)throw new Error('No open render frame');

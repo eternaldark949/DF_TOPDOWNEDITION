@@ -215,6 +215,7 @@ export class gameLoop {
         try {
             this.#phase = 'render'; const alpha = this.paused ? 1 : blend;
             const frame=this.#render.beginFrame(alpha);
+            this.#render.drawLooks(alpha);
             synchronous(level.render, level, [context, alpha, frame]); this.#callSystems('render', alpha, frame);
             this.#render.endFrame();
             return true;

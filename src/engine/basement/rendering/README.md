@@ -167,11 +167,19 @@ art.draw([
 | `drawText` | `text` | `text`, `x`, `y`, `size`, `family`, `weight`, `style`, `align`, `baseline` |
 | `drawGlow` | `glow` | `x`, `y`, `radius`, `color` ('#rrggbb' or 'r,g,b'), `core`, `alpha`, `blend` |
 | `drawGroundShadow` | `ground_shadow` | `x`, `y`, `radius_x`, `radius_y`, `strength` |
-| `draw(steps, {at, rotation, scale, values})` | `group` | `x`, `y`, `rotation`, `scale`, `steps` |
+| `draw(steps, {at, rotation, scale, values, materials})` | `group` | `x`, `y`, `rotation`, `scale`, `steps` |
 
 Paint fields on any shape: `fill` and `stroke` (a colour or a `linear` / `radial` gradient; black fill when neither is given), `line_width`, `line_cap`, `line_join`, `dash`, `alpha` (0 to 1), `blend`, `shadow` (`{color, blur, offset}`). An unknown field is refused, so a typo never draws silently wrong. `DRAWING` lists every step shape and the call it is.
 
 A string value `"$name"` in a step is read from `values`, usually a look's fields, so one drawing serves every variant of a thing.
+
+### Materials, textures and looks (`looks.mjs`)
+
+A step's `material` names a material record, read through `draw`'s `materials` (an object, or a function of the name). `MATERIAL` lists what a material may hold: its `paint` fields (the same as a step's) and `other` (`kind`, and the physical `surface` that drawing ignores). A step's own paint fields win over its material's; an unknown material field is refused. A texture is a fill: `{type: 'pattern', image, repeat}` repeats a registered image resource (`repeat`, `repeat-x`, `repeat-y` or `no-repeat`) and follows the shape's transform, so it turns and moves with its object. Backends declare it as the `pattern` capability. `readValues(step, values)` is the `"$name"` lookup on its own.
+
+An entity has a look when its `drawing` asset names a drawing resource (`{kind: 'drawing', steps}`). `renderSystem.drawLooks(blend)` draws every visible one into the open frame at its render pose, reading the `look` property: `{values, scale, layer, depth, visible}`. The Lobby calls it at the start of every frame. `drawLook(scene, entity, source, blend)` draws one. A bare material name in a drawing is in the drawing's own library (`qualifyResource(name, drawing_id)`).
+
+`fitBounds(steps, bounds, {values})` fits the collision shape to a drawing, like Blender's collision bounds: `bounds` is one of `BOUNDS` (`circle`, `box`, `capsule`, `hull`). It reads only the solid steps: the ones marked `solid: true`, or, when no step is marked, every shape except glows, ground shadows, text and lines. `drawingReach(steps, {values})` is the circle round everything painted, glows included, used as the body's render bounds so the camera keeps drawing it. `drawingOutline(steps, {values})` is the outline points of each step with its solid flag.
 
 ## Height (`height.mjs`)
 
@@ -241,6 +249,8 @@ Screen coordinates are logical viewport units; client conversions account for th
 `getView` returns a detached frozen packet with position, rotation, zoom, logical viewport dimensions, DPR, forward/inverse affine matrices and the conservative world AABB. Bounds clamp the rotated view; a map smaller than the view centers. Following uses world-space offsets and optional exponential smoothing. `updateState(seconds)` belongs to the runtime's fixed step; consumers read interpolated views. These are camera poses, not writable mirrors of an entity's physical state.
 
 ## Public renderSystem API
+
+`drawLooks(blend=1)` draws every visible entity's look into the open frame and returns how many it drew (see Materials, textures and looks).
 
 | Method/member | Purpose |
 |---|---|
