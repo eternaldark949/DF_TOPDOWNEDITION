@@ -1,76 +1,76 @@
 [
  {
-  "file": "legacy/basement/frame-clock.js",
+  "file": "classic/basement/frame-clock.js",
   "area": "runtime",
   "status": "replaced",
   "target": "engine/lobby/level-lobby.mjs clock in engine/lobby/runtime/game-engine.mjs",
   "note": ""
  },
  {
-  "file": "legacy/basement/timer-kit.js",
+  "file": "classic/basement/timer-kit.js",
   "area": "runtime",
   "status": "partly",
   "target": "runtime lifecycle hooks",
   "note": "Gameplay timers need a runtime-owned timer service or level hooks."
  },
  {
-  "file": "legacy/basement/canvas-kit.js",
+  "file": "classic/basement/canvas-kit.js",
   "area": "rendering",
   "status": "replaced",
   "target": "basement/rendering canvasRenderer",
   "note": ""
  },
  {
-  "file": "legacy/basement/life-kit.js",
+  "file": "classic/basement/life-kit.js",
   "area": "runtime",
   "status": "partly",
   "target": "gameEntity lifetime / level scope",
   "note": ""
  },
  {
-  "file": "legacy/basement/sound-kit.js",
+  "file": "classic/basement/sound-kit.js",
   "area": "audio",
   "status": "to_build",
   "target": "a Basement audio service (none yet)",
   "note": "No Basement audio package exists."
  },
  {
-  "file": "legacy/basement/sound-system.js",
+  "file": "classic/basement/sound-system.js",
   "area": "audio",
   "status": "to_build",
   "target": "a Basement audio service (none yet)",
   "note": "Channels, inserts, reverb and volume dials need a Basement home."
  },
  {
-  "file": "legacy/basement/entity-base.js",
+  "file": "classic/basement/entity-base.js",
   "area": "entities",
   "status": "replaced",
   "target": "basement/physics gameEntity",
   "note": "Delete once every subclass is rewritten."
  },
  {
-  "file": "legacy/basement/shape-kit.js",
+  "file": "classic/basement/shape-kit.js",
   "area": "physics",
   "status": "replaced",
   "target": "basement/physics collision shapes and geometry",
   "note": ""
  },
  {
-  "file": "legacy/basement/spatial-grid.js",
+  "file": "classic/basement/spatial-grid.js",
   "area": "physics",
   "status": "replaced",
   "target": "basement/physics spatialGrid",
   "note": "RenderGrid/EffectRenderGrid/TransitionGrid indexes go too."
  },
  {
-  "file": "legacy/basement/collision-kit.js",
+  "file": "classic/basement/collision-kit.js",
   "area": "physics",
   "status": "replaced",
   "target": "basement/physics collision and contacts",
   "note": ""
  },
  {
-  "file": "legacy/basement/vehicle-kit.js",
+  "file": "classic/basement/vehicle-kit.js",
   "area": "vehicles",
   "status": "replaced",
   "target": "basement/physics vehicleMotor",
@@ -84,84 +84,84 @@
   "note": ""
  },
  {
-  "file": "legacy/basement/controls-system.js",
+  "file": "classic/basement/controls-system.js",
   "area": "controls",
   "status": "replaced",
   "target": "basement/controls controlSystem",
   "note": "Shim only."
  },
  {
-  "file": "legacy/basement/recorder-kit.js",
+  "file": "classic/basement/recorder-kit.js",
   "area": "tools",
   "status": "partly",
   "target": "physics snapshots + controls recording",
   "note": "Review: input/replay recorder."
  },
  {
-  "file": "legacy/basement/lane-rail-kit.js",
+  "file": "classic/basement/lane-rail-kit.js",
   "area": "traffic",
   "status": "replaced",
   "target": "basement/physics navigation roadNetwork and traffic",
   "note": ""
  },
  {
-  "file": "legacy/basement/ui-kit.js",
+  "file": "classic/basement/ui-kit.js",
   "area": "ui",
   "status": "to_build",
   "target": "a Basement UI/HUD layer (none yet)",
   "note": ""
  },
  {
-  "file": "legacy/basement/draw-list.js",
+  "file": "classic/basement/draw-list.js",
   "area": "rendering",
   "status": "replaced",
   "target": "basement/rendering renderFrame packets",
   "note": ""
  },
  {
-  "file": "legacy/basement/material-kit.js",
+  "file": "classic/basement/material-kit.js",
   "area": "rendering",
   "status": "partly",
   "target": "basement/rendering materials",
   "note": ""
  },
  {
-  "file": "legacy/basement/virtual-child.js",
+  "file": "classic/basement/virtual-child.js",
   "area": "physics",
   "status": "replaced",
   "target": "basement/physics mounted bodies",
   "note": ""
  },
  {
-  "file": "legacy/basement/angle-kit.js",
+  "file": "classic/basement/angle-kit.js",
   "area": "physics",
   "status": "replaced",
   "target": "basement/physics values",
   "note": ""
  },
  {
-  "file": "legacy/basement/query-kit.js",
+  "file": "classic/basement/query-kit.js",
   "area": "physics",
   "status": "replaced",
   "target": "basement/physics world queries",
   "note": ""
  },
  {
-  "file": "legacy/basement/render-system.js",
+  "file": "classic/basement/render-system.js",
   "area": "rendering",
   "status": "replaced",
   "target": "basement/rendering renderSystem",
   "note": ""
  },
  {
-  "file": "legacy/basement/awareness-kit.js",
+  "file": "classic/basement/awareness-kit.js",
   "area": "ai",
   "status": "replaced",
   "target": "basement/physics awareness",
   "note": ""
  },
  {
-  "file": "legacy/directory/game-db/game-db.js",
+  "file": "classic/directory/game-db/game-db.js",
   "area": "data",
   "status": "data",
   "target": "Directory GAME_DB chapters",
@@ -238,7 +238,7 @@
   "note": "Read by native code too."
  },
  {
-  "file": "legacy/core/config.js",
+  "file": "classic/core/config.js",
   "area": "data",
   "status": "partly",
   "target": "Directory rules JSON",
@@ -252,1386 +252,1386 @@
   "note": ""
  },
  {
-  "file": "legacy/core/assets.js",
+  "file": "classic/core/assets.js",
   "area": "assets",
   "status": "partly",
   "target": "Directory asset libraries + renderSystem images",
   "note": ""
  },
  {
-  "file": "legacy/core/registries.js",
+  "file": "classic/core/registries.js",
   "area": "gameplay",
   "status": "game_logic",
   "target": "gameplay systems (cosmetics, buffs)",
   "note": ""
  },
  {
-  "file": "legacy/directory/game-materials.js",
+  "file": "classic/directory/game-materials.js",
   "area": "data",
   "status": "data",
   "target": "Directory",
   "note": ""
  },
  {
-  "file": "legacy/core/resonance.js",
+  "file": "classic/core/resonance.js",
   "area": "gameplay",
   "status": "game_logic",
   "target": "gameplay (progression)",
   "note": ""
  },
  {
-  "file": "legacy/core/utils.js",
+  "file": "classic/core/utils.js",
   "area": "shared",
   "status": "partly",
   "target": "split into Basement values / Directory helpers",
   "note": "Review per function."
  },
  {
-  "file": "legacy/world/navigation.js",
+  "file": "classic/world/navigation.js",
   "area": "navigation",
   "status": "replaced",
   "target": "basement/physics navigation (field + roads)",
   "note": "NavGrid retires with the city move."
  },
  {
-  "file": "legacy/world/walker.js",
+  "file": "classic/world/walker.js",
   "area": "navigation",
   "status": "replaced",
   "target": "basement/physics navigation + characterMotor",
   "note": ""
  },
  {
-  "file": "legacy/core/draw-helpers.js",
+  "file": "classic/core/draw-helpers.js",
   "area": "rendering",
   "status": "art",
   "target": "render packet helpers",
   "note": ""
  },
  {
-  "file": "legacy/core/cache-db.js",
+  "file": "classic/core/cache-db.js",
   "area": "assets",
   "status": "partly",
   "target": "renderSystem resource caches",
   "note": ""
  },
  {
-  "file": "legacy/core/appearances.js",
+  "file": "classic/core/appearances.js",
   "area": "data",
   "status": "data",
   "target": "Directory cast appearances",
   "note": ""
  },
  {
-  "file": "legacy/core/settings.js",
+  "file": "classic/core/settings.js",
   "area": "ui",
   "status": "game_logic",
   "target": "settings / ObjectPool",
   "note": "ObjectPool can go once native pools are used."
  },
  {
-  "file": "legacy/story/story-db.js",
+  "file": "classic/story/story-db.js",
   "area": "story",
   "status": "game_logic",
   "target": "story data and hooks",
   "note": ""
  },
  {
-  "file": "legacy/story/captions.js",
+  "file": "classic/story/captions.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer",
   "note": ""
  },
  {
-  "file": "legacy/directory/game-sound.js",
+  "file": "classic/directory/game-sound.js",
   "area": "audio",
   "status": "to_build",
   "target": "Basement audio service + Directory sound data",
   "note": "Room-aware music now reads map rooms in the apartment."
  },
  {
-  "file": "legacy/directory/game-controls.js",
+  "file": "classic/directory/game-controls.js",
   "area": "controls",
   "status": "partly",
   "target": "basement/controls profiles",
   "note": ""
  },
  {
-  "file": "legacy/world/weather.js",
+  "file": "classic/world/weather.js",
   "area": "effects",
   "status": "to_build",
   "target": "Basement weather/effects on particles + rendering",
   "note": ""
  },
  {
-  "file": "legacy/world/weather-response.js",
+  "file": "classic/world/weather-response.js",
   "area": "effects",
   "status": "game_logic",
   "target": "Directory weather policy",
   "note": ""
  },
  {
-  "file": "legacy/world/particles-decals.js",
+  "file": "classic/world/particles-decals.js",
   "area": "effects",
   "status": "partly",
   "target": "basement/physics particles + render packets",
   "note": "Decals need a render-side home."
  },
  {
-  "file": "legacy/presentation/indoor-door.js",
+  "file": "classic/presentation/indoor-door.js",
   "area": "art",
   "status": "art",
   "target": "door appearance producer",
   "note": ""
  },
  {
-  "file": "legacy/world/rooms.js",
+  "file": "classic/world/rooms.js",
   "area": "maps",
   "status": "partly",
   "target": "basement/maps roomGraph",
   "note": "Rooms, links and occupancy are ported; windows, linens, lighting veil and drawing are not."
  },
  {
-  "file": "legacy/world/maps.js",
+  "file": "classic/world/maps.js",
   "area": "maps",
   "status": "partly",
   "target": "Directory places.json + game-maps.mjs",
   "note": ""
  },
  {
-  "file": "legacy/world/map-entities.js",
+  "file": "classic/world/map-entities.js",
   "area": "maps",
   "status": "partly",
   "target": "Directory props.json + maps/*.json + basement/maps",
   "note": "Now data-driven; remove when every map is native."
  },
  {
-  "file": "legacy/directory/collision-system.js",
+  "file": "classic/directory/collision-system.js",
   "area": "physics",
   "status": "replaced",
   "target": "basement/physics",
   "note": "Legacy collision routing."
  },
  {
-  "file": "legacy/entities/props-decor.js",
+  "file": "classic/entities/props-decor.js",
   "area": "entities",
   "status": "partly",
   "target": "Directory prop catalog + gameProp; art to render packets",
   "note": "StaticEntity/PropEntity classes and ~2,900 lines of prop art."
  },
  {
-  "file": "legacy/entities/prop-sprites.js",
+  "file": "classic/entities/prop-sprites.js",
   "area": "art",
   "status": "art",
   "target": "prop appearance producers",
   "note": ""
  },
  {
-  "file": "legacy/entities/vehicles-minigames.js",
+  "file": "classic/entities/vehicles-minigames.js",
   "area": "vehicles",
   "status": "partly",
   "target": "gameVehicle + vehicleMotor; minigame rules to gameplay",
   "note": "Bumper cars, Ferris wheel."
  },
  {
-  "file": "legacy/entities/lamps.js",
+  "file": "classic/entities/lamps.js",
   "area": "entities",
   "status": "partly",
   "target": "Directory lamp templates + light shapes; art to packets",
   "note": ""
  },
  {
-  "file": "legacy/entities/actors.js",
+  "file": "classic/entities/actors.js",
   "area": "entities",
   "status": "replaced",
   "target": "gameCharacter / player.mjs / projectiles",
   "note": "ActorEntity, PlayerEntity, ProjectileEntity, TriggerEntity."
  },
  {
-  "file": "legacy/entities/static-builders-profiler.js",
+  "file": "classic/entities/static-builders-profiler.js",
   "area": "tools",
   "status": "game_logic",
   "target": "profiling",
   "note": ""
  },
  {
-  "file": "legacy/entities/performance-bench.js",
+  "file": "classic/entities/performance-bench.js",
   "area": "tools",
   "status": "game_logic",
   "target": "benchmarks",
   "note": ""
  },
  {
-  "file": "legacy/entities/street-objects.js",
+  "file": "classic/entities/street-objects.js",
   "area": "entities",
   "status": "partly",
   "target": "Directory templates (signs, loot, pavement, foliage)",
   "note": ""
  },
  {
-  "file": "legacy/entities/npc.js",
+  "file": "classic/entities/npc.js",
   "area": "entities",
   "status": "replaced",
   "target": "game/entities/npc.mjs",
   "note": ""
  },
  {
-  "file": "legacy/entities/pedestrians.js",
+  "file": "classic/entities/pedestrians.js",
   "area": "entities",
   "status": "replaced",
   "target": "game/entities/pedestrians.mjs + pedestrian-manager.mjs",
   "note": "Production callers pending."
  },
  {
-  "file": "legacy/directory/venue-crowd.js",
+  "file": "classic/directory/venue-crowd.js",
   "area": "gameplay",
   "status": "game_logic",
   "target": "venue life on native NPCs",
   "note": ""
  },
  {
-  "file": "legacy/directory/lobby-life.js",
+  "file": "classic/directory/lobby-life.js",
   "area": "gameplay",
   "status": "game_logic",
   "target": "venue life on native NPCs",
   "note": ""
  },
  {
-  "file": "legacy/directory/club-life.js",
+  "file": "classic/directory/club-life.js",
   "area": "gameplay",
   "status": "game_logic",
   "target": "venue life on native NPCs",
   "note": ""
  },
  {
-  "file": "legacy/directory/cafe-life.js",
+  "file": "classic/directory/cafe-life.js",
   "area": "gameplay",
   "status": "game_logic",
   "target": "venue life on native NPCs",
   "note": ""
  },
  {
-  "file": "legacy/directory/world-query.js",
+  "file": "classic/directory/world-query.js",
   "area": "maps",
   "status": "partly",
   "target": "physics world queries + roomGraph",
   "note": ""
  },
  {
-  "file": "legacy/engine/furniture.js",
+  "file": "classic/engine/furniture.js",
   "area": "gameplay",
   "status": "partly",
   "target": "native furniture grip (apartment)",
   "note": "Generalise for every map."
  },
  {
-  "file": "legacy/presentation/gatling-gunner.js",
+  "file": "classic/presentation/gatling-gunner.js",
   "area": "art",
   "status": "art",
   "target": "actor appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/presentation/classic-actor-packets.js",
+  "file": "classic/presentation/classic-actor-packets.js",
   "area": "art",
   "status": "art",
   "target": "actor appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/entities/enemies.js",
+  "file": "classic/entities/enemies.js",
   "area": "entities",
   "status": "partly",
   "target": "native enemy classes (ganger.mjs, gatling-gunner.mjs, velvet-cat.mjs ...)",
   "note": "RestrictedZone, HordeGauntlet, LastKnownMarker still classic."
  },
  {
-  "file": "legacy/entities/hunters.js",
+  "file": "classic/entities/hunters.js",
   "area": "entities",
   "status": "replaced",
   "target": "game/entities/hunter.mjs, demoness.mjs",
   "note": ""
  },
  {
-  "file": "legacy/entities/drones.js",
+  "file": "classic/entities/drones.js",
   "area": "entities",
   "status": "replaced",
   "target": "game/entities/drone.mjs",
   "note": ""
  },
  {
-  "file": "legacy/presentation/marionette.js",
+  "file": "classic/presentation/marionette.js",
   "area": "art",
   "status": "art",
   "target": "actor appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/entities/marionettes.js",
+  "file": "classic/entities/marionettes.js",
   "area": "entities",
   "status": "replaced",
   "target": "game/entities/marionette.mjs",
   "note": ""
  },
  {
-  "file": "legacy/buildings/building-v1.js",
+  "file": "classic/buildings/building-v1.js",
   "area": "buildings",
   "status": "art",
   "target": "compound statics + building appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/building-v2.js",
+  "file": "classic/buildings/building-v2.js",
   "area": "buildings",
   "status": "art",
   "target": "compound statics + building appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/landmark-kit.js",
+  "file": "classic/buildings/landmark-kit.js",
   "area": "buildings",
   "status": "art",
   "target": "compound statics + building appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/ornament-kit.js",
+  "file": "classic/buildings/ornament-kit.js",
   "area": "buildings",
   "status": "art",
   "target": "compound statics + building appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/tiered-kit.js",
+  "file": "classic/buildings/tiered-kit.js",
   "area": "buildings",
   "status": "art",
   "target": "compound statics + building appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/entrance-lamps.js",
+  "file": "classic/buildings/entrance-lamps.js",
   "area": "buildings",
   "status": "art",
   "target": "compound statics + building appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/silver-queen.js",
+  "file": "classic/buildings/silver-queen.js",
   "area": "buildings",
   "status": "art",
   "target": "compound statics + building appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/double-nights.js",
+  "file": "classic/buildings/double-nights.js",
   "area": "buildings",
   "status": "art",
   "target": "compound statics + building appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/moon-city.js",
+  "file": "classic/buildings/moon-city.js",
   "area": "buildings",
   "status": "art",
   "target": "compound statics + building appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/cozy-cafe.js",
+  "file": "classic/buildings/cozy-cafe.js",
   "area": "buildings",
   "status": "art",
   "target": "compound statics + building appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/street-variants.js",
+  "file": "classic/buildings/street-variants.js",
   "area": "buildings",
   "status": "art",
   "target": "compound statics + building appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/street-arcade.js",
+  "file": "classic/buildings/street-arcade.js",
   "area": "buildings",
   "status": "art",
   "target": "compound statics + building appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/street-apartments.js",
+  "file": "classic/buildings/street-apartments.js",
   "area": "buildings",
   "status": "art",
   "target": "compound statics + building appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/sky-craft.js",
+  "file": "classic/buildings/sky-craft.js",
   "area": "buildings",
   "status": "art",
   "target": "compound statics + building appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/sky-layer.js",
+  "file": "classic/buildings/sky-layer.js",
   "area": "rendering",
   "status": "art",
   "target": "render packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/factories.js",
+  "file": "classic/buildings/factories.js",
   "area": "buildings",
   "status": "art",
   "target": "compound statics + building appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/city-view.js",
+  "file": "classic/buildings/city-view.js",
   "area": "rendering",
   "status": "art",
   "target": "render packets / baked layers",
   "note": ""
  },
  {
-  "file": "legacy/buildings/registry-v3.js",
+  "file": "classic/buildings/registry-v3.js",
   "area": "buildings",
   "status": "partly",
   "target": "compound statics + map exterior placements + render packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/biggs-park.js",
+  "file": "classic/buildings/biggs-park.js",
   "area": "buildings",
   "status": "art",
   "target": "compound statics + building appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/neural-systems.js",
+  "file": "classic/buildings/neural-systems.js",
   "area": "buildings",
   "status": "art",
   "target": "compound statics + building appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/torque-auto.js",
+  "file": "classic/buildings/torque-auto.js",
   "area": "buildings",
   "status": "art",
   "target": "compound statics + building appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/dr-yins.js",
+  "file": "classic/buildings/dr-yins.js",
   "area": "buildings",
   "status": "art",
   "target": "compound statics + building appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/warehouse-hall.js",
+  "file": "classic/buildings/warehouse-hall.js",
   "area": "buildings",
   "status": "art",
   "target": "compound statics + building appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/suburb-house.js",
+  "file": "classic/buildings/suburb-house.js",
   "area": "buildings",
   "status": "art",
   "target": "compound statics + building appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/ashgrove.js",
+  "file": "classic/buildings/ashgrove.js",
   "area": "buildings",
   "status": "art",
   "target": "compound statics + building appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/enni-cole.js",
+  "file": "classic/buildings/enni-cole.js",
   "area": "buildings",
   "status": "art",
   "target": "compound statics + building appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/silver-queen-deco.js",
+  "file": "classic/buildings/silver-queen-deco.js",
   "area": "buildings",
   "status": "art",
   "target": "compound statics + building appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/buildings/moon-city-deco.js",
+  "file": "classic/buildings/moon-city-deco.js",
   "area": "buildings",
   "status": "art",
   "target": "compound statics + building appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/traffic/roads.js",
+  "file": "classic/traffic/roads.js",
   "area": "traffic",
   "status": "partly",
   "target": "navigation roadNetwork (+ game/data/road-navigation.mjs)",
   "note": "Topology loads into roads; lanes, gates and intersections logic still classic."
  },
  {
-  "file": "legacy/traffic/garage-zib.js",
+  "file": "classic/traffic/garage-zib.js",
   "area": "vehicles",
   "status": "game_logic",
   "target": "garage/Zib gameplay on gameVehicle",
   "note": ""
  },
  {
-  "file": "legacy/traffic/zen-art.js",
+  "file": "classic/traffic/zen-art.js",
   "area": "art",
   "status": "art",
   "target": "vehicle appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/traffic/car-art.js",
+  "file": "classic/traffic/car-art.js",
   "area": "art",
   "status": "art",
   "target": "vehicle appearance packets",
   "note": ""
  },
  {
-  "file": "legacy/traffic/traffic-vehicle.js",
+  "file": "classic/traffic/traffic-vehicle.js",
   "area": "traffic",
   "status": "replaced",
   "target": "game/entities/traffic-vehicle.mjs",
   "note": ""
  },
  {
-  "file": "legacy/directory/game-vehicles.js",
+  "file": "classic/directory/game-vehicles.js",
   "area": "data",
   "status": "data",
   "target": "Directory",
   "note": ""
  },
  {
-  "file": "legacy/traffic/vehicle-occupants.js",
+  "file": "classic/traffic/vehicle-occupants.js",
   "area": "vehicles",
   "status": "partly",
   "target": "mounted bodies",
   "note": ""
  },
  {
-  "file": "legacy/traffic/traffic-people.js",
+  "file": "classic/traffic/traffic-people.js",
   "area": "traffic",
   "status": "partly",
   "target": "pedestrians.mjs + traffic controller crossings",
   "note": ""
  },
  {
-  "file": "legacy/traffic/traffic-signals.js",
+  "file": "classic/traffic/traffic-signals.js",
   "area": "traffic",
   "status": "partly",
   "target": "trafficController signals",
   "note": ""
  },
  {
-  "file": "legacy/traffic/lane-runner.js",
+  "file": "classic/traffic/lane-runner.js",
   "area": "traffic",
   "status": "partly",
   "target": "navigation roads + followPath",
   "note": ""
  },
  {
-  "file": "legacy/traffic/traffic-manager.js",
+  "file": "classic/traffic/traffic-manager.js",
   "area": "traffic",
   "status": "replaced",
   "target": "game/mechanics/traffic-manager.mjs",
   "note": "Has its own SpatialGrid: retires with it."
  },
  {
-  "file": "legacy/traffic/traffic-profiler.js",
+  "file": "classic/traffic/traffic-profiler.js",
   "area": "tools",
   "status": "game_logic",
   "target": "profiling",
   "note": ""
  },
  {
-  "file": "legacy/world/parks.js",
+  "file": "classic/world/parks.js",
   "area": "maps",
   "status": "partly",
   "target": "exterior map data",
   "note": ""
  },
  {
-  "file": "legacy/world/lot-grounds.js",
+  "file": "classic/world/lot-grounds.js",
   "area": "maps",
   "status": "partly",
   "target": "exterior map data + render",
   "note": ""
  },
  {
-  "file": "legacy/world/ground-baker.js",
+  "file": "classic/world/ground-baker.js",
   "area": "rendering",
   "status": "art",
   "target": "render target bakes",
   "note": ""
  },
  {
-  "file": "legacy/ui/map-icons.js",
+  "file": "classic/ui/map-icons.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer (needs a Basement UI/HUD service)",
   "note": ""
  },
  {
-  "file": "legacy/ui/ui-system.js",
+  "file": "classic/ui/ui-system.js",
   "area": "ui",
   "status": "to_build",
   "target": "Basement UI/HUD layer",
   "note": ""
  },
  {
-  "file": "legacy/ui/music-widget.js",
+  "file": "classic/ui/music-widget.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer (needs a Basement UI/HUD service)",
   "note": ""
  },
  {
-  "file": "legacy/story/narrative-cutscenes.js",
+  "file": "classic/story/narrative-cutscenes.js",
   "area": "story",
   "status": "partly",
   "target": "scene system on native entities",
   "note": "Cutscene actors/props still classic."
  },
  {
-  "file": "legacy/ui/poses.js",
+  "file": "classic/ui/poses.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer (needs a Basement UI/HUD service)",
   "note": ""
  },
  {
-  "file": "legacy/ui/expressions.js",
+  "file": "classic/ui/expressions.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer (needs a Basement UI/HUD service)",
   "note": ""
  },
  {
-  "file": "legacy/ui/bodies.js",
+  "file": "classic/ui/bodies.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer (needs a Basement UI/HUD service)",
   "note": ""
  },
  {
-  "file": "legacy/ui/cloth.js",
+  "file": "classic/ui/cloth.js",
   "area": "effects",
   "status": "partly",
   "target": "basement/physics cloth",
   "note": "Wardrobe cloth not fitted."
  },
  {
-  "file": "legacy/ui/wardrobe.js",
+  "file": "classic/ui/wardrobe.js",
   "area": "ui",
   "status": "game_logic",
   "target": "wardrobe UI + cloth",
   "note": ""
  },
  {
-  "file": "legacy/ui/color-picker.js",
+  "file": "classic/ui/color-picker.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer (needs a Basement UI/HUD service)",
   "note": ""
  },
  {
-  "file": "legacy/ui/weapon-models.js",
+  "file": "classic/ui/weapon-models.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer (needs a Basement UI/HUD service)",
   "note": ""
  },
  {
-  "file": "legacy/ui/humanoid-render.js",
+  "file": "classic/ui/humanoid-render.js",
   "area": "art",
   "status": "art",
   "target": "humanoid appearance packets (rig system)",
   "note": ""
  },
  {
-  "file": "legacy/penthouse/procedural-humanoid.js",
+  "file": "classic/penthouse/procedural-humanoid.js",
   "area": "art",
   "status": "partly",
   "target": "basement/physics rigs + humanoid-system.mjs",
   "note": ""
  },
  {
-  "file": "legacy/ui/portrait-real.js",
+  "file": "classic/ui/portrait-real.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer (needs a Basement UI/HUD service)",
   "note": ""
  },
  {
-  "file": "legacy/ui/face-cache.js",
+  "file": "classic/ui/face-cache.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer (needs a Basement UI/HUD service)",
   "note": ""
  },
  {
-  "file": "legacy/ui/comms.js",
+  "file": "classic/ui/comms.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer (needs a Basement UI/HUD service)",
   "note": ""
  },
  {
-  "file": "legacy/ui/crowd-impostors.js",
+  "file": "classic/ui/crowd-impostors.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer (needs a Basement UI/HUD service)",
   "note": ""
  },
  {
-  "file": "legacy/ui/silhouette-fx.js",
+  "file": "classic/ui/silhouette-fx.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer (needs a Basement UI/HUD service)",
   "note": ""
  },
  {
-  "file": "legacy/world/city-layout.js",
+  "file": "classic/world/city-layout.js",
   "area": "maps",
   "status": "to_build",
   "target": "exterior map generator writing map data",
   "note": "Random block fill must become seeded data for the exterior map system."
  },
  {
-  "file": "legacy/world/scrapyard.js",
+  "file": "classic/world/scrapyard.js",
   "area": "maps",
   "status": "partly",
   "target": "map data",
   "note": ""
  },
  {
-  "file": "legacy/world/billboards.js",
+  "file": "classic/world/billboards.js",
   "area": "entities",
   "status": "partly",
   "target": "Directory billboard templates + packets",
   "note": ""
  },
  {
-  "file": "legacy/ui/inventory-augments.js",
+  "file": "classic/ui/inventory-augments.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer (needs a Basement UI/HUD service)",
   "note": ""
  },
  {
-  "file": "legacy/gameplay/abilities/legacy-ability-launch.js",
+  "file": "classic/gameplay/abilities/legacy-ability-launch.js",
   "area": "gameplay",
   "status": "glue",
   "target": "ability-system.mjs",
   "note": "Classic launch shim."
  },
  {
-  "file": "legacy/ui/action-dock.js",
+  "file": "classic/ui/action-dock.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer (needs a Basement UI/HUD service)",
   "note": ""
  },
  {
-  "file": "legacy/world/bokeh.js",
+  "file": "classic/world/bokeh.js",
   "area": "effects",
   "status": "art",
   "target": "render packets",
   "note": ""
  },
  {
-  "file": "legacy/story/missions.js",
+  "file": "classic/story/missions.js",
   "area": "story",
   "status": "game_logic",
   "target": "story logic on the new runtime",
   "note": ""
  },
  {
-  "file": "legacy/story/dialogue-bonding.js",
+  "file": "classic/story/dialogue-bonding.js",
   "area": "story",
   "status": "game_logic",
   "target": "story logic on the new runtime",
   "note": ""
  },
  {
-  "file": "legacy/story/npc-dialogue.js",
+  "file": "classic/story/npc-dialogue.js",
   "area": "story",
   "status": "game_logic",
   "target": "story logic on the new runtime",
   "note": ""
  },
  {
-  "file": "legacy/story/scene-vision.js",
+  "file": "classic/story/scene-vision.js",
   "area": "story",
   "status": "game_logic",
   "target": "story logic on the new runtime",
   "note": ""
  },
  {
-  "file": "legacy/ui/cinematic-dialogue.js",
+  "file": "classic/ui/cinematic-dialogue.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer (needs a Basement UI/HUD service)",
   "note": ""
  },
  {
-  "file": "legacy/ui/hud-reveal.js",
+  "file": "classic/ui/hud-reveal.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer (needs a Basement UI/HUD service)",
   "note": ""
  },
  {
-  "file": "legacy/ui/coach.js",
+  "file": "classic/ui/coach.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer (needs a Basement UI/HUD service)",
   "note": ""
  },
  {
-  "file": "legacy/story/scene-runner.js",
+  "file": "classic/story/scene-runner.js",
   "area": "story",
   "status": "partly",
   "target": "motion timelines + native scene actors",
   "note": ""
  },
  {
-  "file": "legacy/story/scenes/cast.js",
+  "file": "classic/story/scenes/cast.js",
   "area": "story",
   "status": "game_logic",
   "target": "story logic on the new runtime",
   "note": ""
  },
  {
-  "file": "legacy/story/scenes/prologue.js",
+  "file": "classic/story/scenes/prologue.js",
   "area": "story",
   "status": "game_logic",
   "target": "story logic on the new runtime",
   "note": ""
  },
  {
-  "file": "legacy/story/scenes/van.js",
+  "file": "classic/story/scenes/van.js",
   "area": "story",
   "status": "game_logic",
   "target": "story logic on the new runtime",
   "note": ""
  },
  {
-  "file": "legacy/lobby/level-lobby.js",
+  "file": "classic/lobby/level-lobby.js",
   "area": "runtime",
   "status": "replaced",
   "target": "engine/lobby/level-lobby.mjs",
   "note": ""
  },
  {
-  "file": "legacy/lobby/level-pause.js",
+  "file": "classic/lobby/level-pause.js",
   "area": "runtime",
   "status": "partly",
   "target": "runtime pause",
   "note": ""
  },
  {
-  "file": "legacy/lobby/level-stages.js",
+  "file": "classic/lobby/level-stages.js",
   "area": "runtime",
   "status": "partly",
   "target": "runtime stages",
   "note": ""
  },
  {
-  "file": "legacy/engine/pause-system.js",
+  "file": "classic/engine/pause-system.js",
   "area": "runtime",
   "status": "partly",
   "target": "runtime pause",
   "note": ""
  },
  {
-  "file": "legacy/directory/effects-system.js",
+  "file": "classic/directory/effects-system.js",
   "area": "effects",
   "status": "partly",
   "target": "particles + render packets",
   "note": ""
  },
  {
-  "file": "legacy/engine/game-engine.js",
+  "file": "classic/engine/game-engine.js",
   "area": "runtime",
   "status": "glue",
   "target": "engine/lobby/runtime/game-engine.mjs",
   "note": "The classic GameEngine and its mixins go when the new runtime boots the game."
  },
  {
-  "file": "legacy/engine/events.js",
+  "file": "classic/engine/events.js",
   "area": "gameplay",
   "status": "game_logic",
   "target": "a runtime system",
   "note": "Classic GameEngine mixin; review"
  },
  {
-  "file": "legacy/engine/combat-effects.js",
+  "file": "classic/engine/combat-effects.js",
   "area": "effects",
   "status": "partly",
   "target": "combat presentation + particles",
   "note": ""
  },
  {
-  "file": "legacy/engine/breach-fx.js",
+  "file": "classic/engine/breach-fx.js",
   "area": "art",
   "status": "art",
   "target": "map/effect appearance producers",
   "note": ""
  },
  {
-  "file": "legacy/engine/quick-draw.js",
+  "file": "classic/engine/quick-draw.js",
   "area": "gameplay",
   "status": "game_logic",
   "target": "a runtime system",
   "note": "Classic GameEngine mixin; review"
  },
  {
-  "file": "legacy/engine/player-fire.js",
+  "file": "classic/engine/player-fire.js",
   "area": "gameplay",
   "status": "partly",
   "target": "weaponSystem / attackSystem",
   "note": ""
  },
  {
-  "file": "legacy/engine/combat-fx.js",
+  "file": "classic/engine/combat-fx.js",
   "area": "art",
   "status": "art",
   "target": "map/effect appearance producers",
   "note": ""
  },
  {
-  "file": "legacy/engine/boss-intro.js",
+  "file": "classic/engine/boss-intro.js",
   "area": "art",
   "status": "art",
   "target": "map/effect appearance producers",
   "note": ""
  },
  {
-  "file": "legacy/engine/boss-hazards.js",
+  "file": "classic/engine/boss-hazards.js",
   "area": "gameplay",
   "status": "game_logic",
   "target": "a runtime system",
   "note": "Classic GameEngine mixin; review"
  },
  {
-  "file": "legacy/engine/noise.js",
+  "file": "classic/engine/noise.js",
   "area": "ai",
   "status": "partly",
   "target": "awareness / hearing (room exposure can drive it)",
   "note": ""
  },
  {
-  "file": "legacy/world/map-edge.js",
+  "file": "classic/world/map-edge.js",
   "area": "maps",
   "status": "partly",
   "target": "map boundary + render",
   "note": ""
  },
  {
-  "file": "legacy/engine/finisher.js",
+  "file": "classic/engine/finisher.js",
   "area": "gameplay",
   "status": "game_logic",
   "target": "a runtime system",
   "note": "Classic GameEngine mixin; review"
  },
  {
-  "file": "legacy/engine/reflections.js",
+  "file": "classic/engine/reflections.js",
   "area": "rendering",
   "status": "to_build",
   "target": "Basement lighting/reflection pass",
   "note": ""
  },
  {
-  "file": "legacy/engine/street-mist.js",
+  "file": "classic/engine/street-mist.js",
   "area": "art",
   "status": "art",
   "target": "map/effect appearance producers",
   "note": ""
  },
  {
-  "file": "legacy/engine/shopfront-light.js",
+  "file": "classic/engine/shopfront-light.js",
   "area": "art",
   "status": "art",
   "target": "map/effect appearance producers",
   "note": ""
  },
  {
-  "file": "legacy/engine/paving-inlays.js",
+  "file": "classic/engine/paving-inlays.js",
   "area": "art",
   "status": "art",
   "target": "map/effect appearance producers",
   "note": ""
  },
  {
-  "file": "legacy/engine/footsteps.js",
+  "file": "classic/engine/footsteps.js",
   "area": "audio",
   "status": "game_logic",
   "target": "audio service",
   "note": ""
  },
  {
-  "file": "legacy/engine/status-effects.js",
+  "file": "classic/engine/status-effects.js",
   "area": "gameplay",
   "status": "game_logic",
   "target": "gameplay",
   "note": ""
  },
  {
-  "file": "legacy/engine/executions.js",
+  "file": "classic/engine/executions.js",
   "area": "gameplay",
   "status": "game_logic",
   "target": "a runtime system",
   "note": "Classic GameEngine mixin; review"
  },
  {
-  "file": "legacy/engine/sneak.js",
+  "file": "classic/engine/sneak.js",
   "area": "gameplay",
   "status": "game_logic",
   "target": "a runtime system",
   "note": "Classic GameEngine mixin; review"
  },
  {
-  "file": "legacy/engine/npc-posts.js",
+  "file": "classic/engine/npc-posts.js",
   "area": "gameplay",
   "status": "game_logic",
   "target": "a runtime system",
   "note": "Classic GameEngine mixin; review"
  },
  {
-  "file": "legacy/engine/spills.js",
+  "file": "classic/engine/spills.js",
   "area": "art",
   "status": "art",
   "target": "map/effect appearance producers",
   "note": ""
  },
  {
-  "file": "legacy/engine/dyer.js",
+  "file": "classic/engine/dyer.js",
   "area": "gameplay",
   "status": "game_logic",
   "target": "a runtime system",
   "note": "Classic GameEngine mixin; review"
  },
  {
-  "file": "legacy/engine/knuckles.js",
+  "file": "classic/engine/knuckles.js",
   "area": "gameplay",
   "status": "game_logic",
   "target": "a runtime system",
   "note": "Classic GameEngine mixin; review"
  },
  {
-  "file": "legacy/engine/pools.js",
+  "file": "classic/engine/pools.js",
   "area": "art",
   "status": "art",
   "target": "map/effect appearance producers",
   "note": ""
  },
  {
-  "file": "legacy/ui/dev-overlay.js",
+  "file": "classic/ui/dev-overlay.js",
   "area": "tools",
   "status": "game_logic",
   "target": "dev overlay",
   "note": ""
  },
  {
-  "file": "legacy/ui/render-layers.js",
+  "file": "classic/ui/render-layers.js",
   "area": "rendering",
   "status": "partly",
   "target": "renderSystem layers",
   "note": ""
  },
  {
-  "file": "legacy/engine/scope.js",
+  "file": "classic/engine/scope.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer",
   "note": ""
  },
  {
-  "file": "legacy/engine/tuning-ui.js",
+  "file": "classic/engine/tuning-ui.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer",
   "note": ""
  },
  {
-  "file": "legacy/engine/shops-menus.js",
+  "file": "classic/engine/shops-menus.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer",
   "note": ""
  },
  {
-  "file": "legacy/engine/daytime-flit.js",
+  "file": "classic/engine/daytime-flit.js",
   "area": "gameplay",
   "status": "game_logic",
   "target": "a runtime system",
   "note": "Classic GameEngine mixin; review"
  },
  {
-  "file": "legacy/engine/screens-ui.js",
+  "file": "classic/engine/screens-ui.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer",
   "note": ""
  },
  {
-  "file": "legacy/engine/save-load.js",
+  "file": "classic/engine/save-load.js",
   "area": "saves",
   "status": "to_build",
   "target": "runtime-wide save envelope over physics snapshots",
   "note": "Per-scene native saves exist; no game-wide envelope yet."
  },
  {
-  "file": "legacy/engine/map-loading.js",
+  "file": "classic/engine/map-loading.js",
   "area": "maps",
   "status": "partly",
   "target": "basement/maps + Directory layouts",
   "note": "The classic loader; shrinks as maps go native."
  },
  {
-  "file": "legacy/engine/world-state.js",
+  "file": "classic/engine/world-state.js",
   "area": "gameplay",
   "status": "game_logic",
   "target": "a runtime system",
   "note": "Classic GameEngine mixin; review"
  },
  {
-  "file": "legacy/engine/cars.js",
+  "file": "classic/engine/cars.js",
   "area": "vehicles",
   "status": "partly",
   "target": "gameVehicle + driving",
   "note": ""
  },
  {
-  "file": "legacy/engine/markers.js",
+  "file": "classic/engine/markers.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer",
   "note": ""
  },
  {
-  "file": "legacy/engine/update.js",
+  "file": "classic/engine/update.js",
   "area": "runtime",
   "status": "glue",
   "target": "runtime systems",
   "note": ""
  },
  {
-  "file": "legacy/engine/overhead.js",
+  "file": "classic/engine/overhead.js",
   "area": "rendering",
   "status": "art",
   "target": "render pass ordering",
   "note": ""
  },
  {
-  "file": "legacy/engine/draw.js",
+  "file": "classic/engine/draw.js",
   "area": "rendering",
   "status": "glue",
   "target": "renderSystem passes",
   "note": ""
  },
  {
-  "file": "legacy/engine/interiors.js",
+  "file": "classic/engine/interiors.js",
   "area": "art",
   "status": "art",
   "target": "interior floor/decor appearance producers",
   "note": "Per-map interior art."
  },
  {
-  "file": "legacy/engine/biggs-art.js",
+  "file": "classic/engine/biggs-art.js",
   "area": "art",
   "status": "art",
   "target": "map/effect appearance producers",
   "note": ""
  },
  {
-  "file": "legacy/engine/palace-art.js",
+  "file": "classic/engine/palace-art.js",
   "area": "art",
   "status": "art",
   "target": "map/effect appearance producers",
   "note": ""
  },
  {
-  "file": "legacy/engine/neural-art.js",
+  "file": "classic/engine/neural-art.js",
   "area": "art",
   "status": "art",
   "target": "map/effect appearance producers",
   "note": ""
  },
  {
-  "file": "legacy/engine/torque-art.js",
+  "file": "classic/engine/torque-art.js",
   "area": "art",
   "status": "art",
   "target": "map/effect appearance producers",
   "note": ""
  },
  {
-  "file": "legacy/engine/keeper-art.js",
+  "file": "classic/engine/keeper-art.js",
   "area": "art",
   "status": "art",
   "target": "map/effect appearance producers",
   "note": ""
  },
  {
-  "file": "legacy/engine/van-art.js",
+  "file": "classic/engine/van-art.js",
   "area": "art",
   "status": "art",
   "target": "map/effect appearance producers",
   "note": ""
  },
  {
-  "file": "legacy/engine/lighting.js",
+  "file": "classic/engine/lighting.js",
   "area": "rendering",
   "status": "to_build",
   "target": "a Basement lighting pass (light shapes exist, no renderer)",
   "note": "Room light, veil, darkness."
  },
  {
-  "file": "legacy/engine/daylight.js",
+  "file": "classic/engine/daylight.js",
   "area": "rendering",
   "status": "to_build",
   "target": "Basement lighting pass",
   "note": ""
  },
  {
-  "file": "legacy/engine/player-draw-input.js",
+  "file": "classic/engine/player-draw-input.js",
   "area": "gameplay",
   "status": "game_logic",
   "target": "a runtime system",
   "note": "Classic GameEngine mixin; review"
  },
  {
-  "file": "legacy/directory/new-game-state.js",
+  "file": "classic/directory/new-game-state.js",
   "area": "saves",
   "status": "game_logic",
   "target": "new game state",
   "note": ""
  },
  {
-  "file": "legacy/directory/world-session.js",
+  "file": "classic/directory/world-session.js",
   "area": "runtime",
   "status": "partly",
   "target": "gameSession",
   "note": ""
  },
  {
-  "file": "legacy/engine/loop.js",
+  "file": "classic/engine/loop.js",
   "area": "runtime",
   "status": "glue",
   "target": "runtime frame scheduling",
   "note": ""
  },
  {
-  "file": "legacy/engine/apartment-rooms.js",
+  "file": "classic/engine/apartment-rooms.js",
   "area": "maps",
   "status": "replaced",
   "target": "basement/maps roomGraph",
   "note": "Thin shim over the room graph."
  },
  {
-  "file": "legacy/engine/apartment-renderer.js",
+  "file": "classic/engine/apartment-renderer.js",
   "area": "rendering",
   "status": "partly",
   "target": "render packets for the native apartment",
   "note": ""
  },
  {
-  "file": "legacy/engine/apartment-level.js",
+  "file": "classic/engine/apartment-level.js",
   "area": "runtime",
   "status": "partly",
   "target": "native scene host",
   "note": "Generalise into a native map host for every map."
  },
  {
-  "file": "legacy/app/menu-wiring.js",
+  "file": "classic/app/menu-wiring.js",
   "area": "runtime",
   "status": "glue",
   "target": "runtime boot",
   "note": ""
  },
  {
-  "file": "legacy/ui/phone.js",
+  "file": "classic/ui/phone.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer (needs a Basement UI/HUD service)",
   "note": ""
  },
  {
-  "file": "legacy/ui/app-launch.js",
+  "file": "classic/ui/app-launch.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer (needs a Basement UI/HUD service)",
   "note": ""
  },
  {
-  "file": "legacy/ui/messages.js",
+  "file": "classic/ui/messages.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer (needs a Basement UI/HUD service)",
   "note": ""
  },
  {
-  "file": "legacy/ui/amber-app.js",
+  "file": "classic/ui/amber-app.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer (needs a Basement UI/HUD service)",
   "note": ""
  },
  {
-  "file": "legacy/story/crew-nights.js",
+  "file": "classic/story/crew-nights.js",
   "area": "story",
   "status": "game_logic",
   "target": "story logic on the new runtime",
   "note": ""
  },
  {
-  "file": "legacy/ui/screens.js",
+  "file": "classic/ui/screens.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer (needs a Basement UI/HUD service)",
   "note": ""
  },
  {
-  "file": "legacy/ui/sidebars.js",
+  "file": "classic/ui/sidebars.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer (needs a Basement UI/HUD service)",
   "note": ""
  },
  {
-  "file": "legacy/ui/pause-look.js",
+  "file": "classic/ui/pause-look.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer (needs a Basement UI/HUD service)",
   "note": ""
  },
  {
-  "file": "legacy/ui/save-slots-pause-menu.js",
+  "file": "classic/ui/save-slots-pause-menu.js",
   "area": "ui",
   "status": "game_logic",
   "target": "UI layer (needs a Basement UI/HUD service)",
   "note": ""
  },
  {
-  "file": "legacy/app/boot.js",
+  "file": "classic/app/boot.js",
   "area": "runtime",
   "status": "glue",
   "target": "runtime boot (createGameRuntime)",
   "note": ""
  },
  {
-  "file": "legacy/ui/gamepad.js",
+  "file": "classic/ui/gamepad.js",
   "area": "controls",
   "status": "replaced",
   "target": "basement/controls gamepadInstance",

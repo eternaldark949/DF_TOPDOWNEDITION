@@ -41,7 +41,7 @@ const BEAT = 7.3;
 const piecesOf = map => map.props.filter(p => hasPropArt(resolvePlacement(p, TYPES).family)).map(p => ({ placement: p, ...resolvePlacement(p, TYPES) }));
 const PIECES = piecesOf(CAFE);
 // (Enni Cole's tall aisles are no prop art at all: the floor draws them, the prop is only their collision.)
-const DECOR = '/src/legacy/entities/props-decor.js';
+const DECOR = '/reference/classic/entities/props-decor.js';
 const STILL_CLASSIC = /^ec_tall_aisle$|^ta_(lift|wrap|turntable)$|^block$/;
 // The apartment's pieces, and the clothing dyer's station once it is made (placed by the level, not the map)
 const DYER = resolveApartmentDyer({ places: PLACES }).data.appearance;
@@ -137,7 +137,7 @@ async function compare(pieces, venue) {
     return inChromium(async ({ cells, time, beat, venue }) => {
         for (const list of Object.values(venue.cuts)) for (const c of list) c.splice(0, 2, ...c.slice(0, 2).map(f => (0, eval)(f)));
         const { createPropDraws } = await import('/src/game/presentation/props/index.mjs'), { canvasRenderer } = await import('/src/engine/basement/rendering/index.mjs');
-        const text = async url => (await fetch(url)).text(), source = await text(venue.file), lamps = await text('/src/legacy/entities/lamps.js');
+        const text = async url => (await fetch(url)).text(), source = await text(venue.file), lamps = await text('/reference/classic/entities/lamps.js');
         const cut = (src, from, to) => src.slice(src.indexOf(from), to ? src.indexOf(to, src.indexOf(from)) : undefined);
         let prelude = ''; for (const [file, from, to] of venue.prelude) prelude += file ? cut(await text(file), from, to) : from;
         const drinks = (await (await fetch('/src/game/data/game-db/items.json')).json()).drinks;
@@ -158,7 +158,7 @@ async function compare(pieces, venue) {
             let at = null; for (let k = 0; k < a.length; k++) if (!cut(k) && Math.abs(a[k] - b[k]) === worst && worst) { const i = k >> 2; at = [i % W - PAD, (i / W | 0) - PAD, [...a.slice(i * 4, i * 4 + 4)], [...b.slice(i * 4, i * 4 + 4)]]; break; }
             return { type: cell.type, worst, off, inked, at };
         });
-    }, { cells, time: TIME, beat: BEAT, venue: { from: venue.from, to: venue.to, drawer: venue.drawer, cuts: venue.cuts ?? {}, file: venue.file ?? '/src/legacy/entities/props-decor.js', prelude: venue.prelude ?? [] } });
+    }, { cells, time: TIME, beat: BEAT, venue: { from: venue.from, to: venue.to, drawer: venue.drawer, cuts: venue.cuts ?? {}, file: venue.file ?? '/reference/classic/entities/props-decor.js', prelude: venue.prelude ?? [] } });
 }
 // Pieces whose classic art ruled hairlines (1 to 1.5 px, or under one, as a gondola's spine and highlight
 // rails) with fillRect at fractional heights: the canvas covers a fillRect's edge rows differently from a
@@ -216,13 +216,13 @@ for (const [name, map, from, to, drawer, more] of [
     ['the Moon City Nightclub', CLUB, '        const MC = {', '        /* The hub graveyard', 'drawClubDecorProp', { only: /^mc_/ }],
     ['the Sanctum', SANCTUM, '        /* The Sanctum (sc_*)', '        /* =====', 'drawSanctumDecorProp'],
     ['the clinic', CLINIC, '        function drawClinicDecorProp', '        /** Pure prop artwork.', 'drawClinicDecorProp', { classic: CLINIC_CLASSIC }],
-    ['Neural Systems', NEURAL, 'function drawNeuralDecorProp', '// The artificial trees', 'drawNeuralDecorProp', { classic: NEURAL_CLASSIC, file: '/src/legacy/engine/neural-art.js',
-        prelude: [['/src/legacy/buildings/neural-systems.js', 'const NEURAL = {', 'const _nsFront']] }],
-    ["Torque's auto shop", TORQUE, 'function drawTorqueDecorProp', 'engineMixin({', 'drawTorqueDecorProp', { classic: TORQUE_CLASSIC, file: '/src/legacy/engine/torque-art.js',
-        prelude: [['/src/legacy/engine/torque-art.js', 'const TQ = {', '// The cars on show'], ['/src/legacy/engine/torque-art.js', 'const TorqueArt = {', '    /** One of TQ_CARS'], [null, '};']] }],
-    ['the Demoness Palace', PALACE, '        function drawPalaceDecorProp', null, 'drawPalaceDecorProp', { file: '/src/legacy/engine/palace-art.js',
-        prelude: [['/src/legacy/engine/palace-art.js', '        const PALACE = {', '        // Fixed lights'], ['/src/legacy/engine/palace-art.js', '        function palaceFlowers', '        function palaceFlowerGlow'],
-            ['/src/legacy/core/utils.js', '        function seededRandom', '        const pickFrom']] }],
+    ['Neural Systems', NEURAL, 'function drawNeuralDecorProp', '// The artificial trees', 'drawNeuralDecorProp', { classic: NEURAL_CLASSIC, file: '/reference/classic/engine/neural-art.js',
+        prelude: [['/reference/classic/buildings/neural-systems.js', 'const NEURAL = {', 'const _nsFront']] }],
+    ["Torque's auto shop", TORQUE, 'function drawTorqueDecorProp', 'engineMixin({', 'drawTorqueDecorProp', { classic: TORQUE_CLASSIC, file: '/reference/classic/engine/torque-art.js',
+        prelude: [['/reference/classic/engine/torque-art.js', 'const TQ = {', '// The cars on show'], ['/reference/classic/engine/torque-art.js', 'const TorqueArt = {', '    /** One of TQ_CARS'], [null, '};']] }],
+    ['the Demoness Palace', PALACE, '        function drawPalaceDecorProp', null, 'drawPalaceDecorProp', { file: '/reference/classic/engine/palace-art.js',
+        prelude: [['/reference/classic/engine/palace-art.js', '        const PALACE = {', '        // Fixed lights'], ['/reference/classic/engine/palace-art.js', '        function palaceFlowers', '        function palaceFlowerGlow'],
+            ['/reference/classic/core/utils.js', '        function seededRandom', '        const pickFrom']] }],
     ['the machines every map shares', { props: MAP_IDS.flatMap(id => createMapLibraries()[1].resources[id].data.props) }, null, null, 'drawMachine', { only: /^(vending_machine|medbay_refill|armory|light_switch|read_note)$/, file: null,
         // the classic drew them inline in drawPropAppearance, by what each is for: that chain, cut round its other branches
         prelude: [[DECOR, '        function drawMiniSpree', '        // Moon City Nightclub:'],

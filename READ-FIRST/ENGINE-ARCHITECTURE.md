@@ -5,6 +5,7 @@ This is the governing description of how Dimensions Freelancer and its engine ar
 - If any other document disagrees with this one, this one wins.
 - If code disagrees with this one, the code is wrong. Fix the code, or list the mismatch under [Known mismatches](#9-known-mismatches-today), but don't quietly work around it.
 - Only ETERNAL changes the rules here. If a task seems to need a rule changed, stop and ask them first.
+- **The API is [ENGINE-API.md](ENGINE-API.md).** Every system, call and build step follows it, whatever the classic code does. Only ETERNAL changes it.
 - New code must follow these rules from its first commit. Don't add a temporary breach to fix later: that is how a structure gets plagued by an issue snowball.
 
 ---
@@ -246,11 +247,12 @@ A file that seems to fit two answers is really two files. Split it. Example: `di
 - **Single-file build.** `node tools/build.mjs` builds `DFAB V8.html`, the whole game in one offline file. It concatenates the classic scripts listed in `SCRIPTS` and bundles the new modules through `@native` (`game/boot/native-entry.mjs`). CI runs `node tools/build.mjs --check`, so a change to `src` must be committed together with the rebuilt HTML.
 - **`main` is the original.** `main` holds the original classic code. Compare against it whenever you need to know what the game did before, for example how hinged doors swung. Don't change behaviour silently: if the new engine changes how something feels, say so and get ETERNAL's agreement.
 - **Pull request 178 is intentionally unmerged.** It began the native engine, but parts of its layering break these rules (see section 9). Work stacked on it must fix those breaches, not copy them.
-- **Classic code is quarantined in `src/legacy/`.** Every classic script, stylesheet and the page shell (`legacy/index.html`) was moved there unchanged on 2026-11-12, at its original path: `legacy/engine/loop.js` is `src/engine/loop.js` on `main`. It runs on the old `GameEngine`. The quarantine rules:
-  1. Nothing outside `src/legacy/` imports from it.
-  2. Legacy code reaches the new engine only through the bundled `DFNative` object; legacy scripts import nothing.
-  3. No classic `.js`, `.cjs` or `.css` file exists anywhere else in `src`, and no new code is added to `src/legacy/`.
-  4. A file leaves quarantine only by being **rewritten** at its proper level in `src/engine/` or `src/game/`; then it is deleted from `src/legacy/` and its row is removed. Nothing is moved back out as it is.
+- **Classic code is read-only reference in `reference/classic/`.** Every classic script, stylesheet and the page shell (`reference/classic/index.html`) was quarantined unchanged on 2026-11-12 in `src/legacy/`, at its original path (`reference/classic/engine/loop.js` is `src/engine/loop.js` on `main`), and moved out of `src/` to `reference/classic/` on 2026-11-15 so that `src/` holds only code that follows [ENGINE-API.md](ENGINE-API.md). It runs on the old `GameEngine`, and the shipped build still reads it (`classic/...` in `SCRIPTS`). The rules:
+  1. Nothing in `src/` imports from `reference/`.
+  2. Classic code reaches the new engine only through the bundled `DFNative` object; classic scripts import nothing.
+  3. No classic `.js`, `.cjs` or `.css` file exists anywhere in `src`, and no new code is added to `reference/classic/`.
+  4. Classic code is read only for how something looked, sounded or felt, never for how to build it. Its per-map, per-venue and per-screen shape is what the API replaces.
+  5. A file leaves `reference/classic/` only by being **rewritten** to the API at its proper level in `src/engine/` or `src/game/`; then it is deleted from `reference/classic/` and its row is removed. Nothing is moved back as it is.
 
   Every classic script has exactly one row in `docs/migration/inventory.json` saying where it goes, and CI fails if a row is missing (`node tools/migration-inventory.mjs --check`). **No band-aid adapters** that make classic code look native.
 
@@ -258,7 +260,7 @@ A file that seems to fit two answers is really two files. Split it. Example: `di
 
 ## 8. Folder structure
 
-ETERNAL's layout (2026-11-12): `src/` holds two roots, `engine/` and `game/`, plus the quarantine `legacy/`. Everything native now lives in `engine/` or `game/`. Entries marked *(to build)* do not exist yet.
+ETERNAL's layout (2026-11-12, classic code moved out 2026-11-15): `src/` holds two roots, `engine/` and `game/`, and nothing else. Classic code is in `reference/classic/` (section 7). Entries marked *(to build)* do not exist yet.
 
 ```
 src/
@@ -280,14 +282,15 @@ src/
     mechanics/                    game systems: abilities, actors, animation choice, attacks, combat,
                                   encounters, items, player control and state, session, traffic manager
     entities/                     the game's entity classes (player, NPCs, bosses, drones, traffic vehicle)
-    levels/                       the apartment (apartment.mjs) and its map definition, and interior-level.mjs: every
-                                  interior as a runtime map level
+    levels/                       every map through one loader and one level: map-definition.mjs and
+                                  game-map-level.mjs (GameMapLevel), plus the apartment (apartment.mjs)
     presentation/                 appearance producers -> render packets
     audio/                        (empty) the game's sounds and music, through the Basement audio service
     data/                         the game's content: GAME_DB (game-db/), game-assets/ (props, maps,
                                   libraries), humanoid builds, weapon models, rules JSON, catalog modules
     examples/                     runnable pages that boot the game runtime in a browser
-  legacy/                         quarantined classic code at its original paths (section 7)
+reference/
+  classic/                        read-only classic code at its original paths (section 7)
 ```
 
 Migration notes that described earlier cutovers are in `docs/migration/cutovers/`.
@@ -297,11 +300,11 @@ Migration notes that described earlier cutovers are in `docs/migration/cutovers/
 Audited on 2026-11-12, after the native code was sorted into `src/engine/` and `src/game/`. `tools/check-layout.mjs` passes: every engine file carries its level banner, imports only what section 3 allows, and names no game. What remains is work that needs real changes, not moves. Each item is fixed by rewriting code at its level, never by adding an exception.
 
 1. **The engine's default libraries are a start.** `engine/directory/defaults/engine.json` holds the base entity kinds and a default humanoid (skeleton, clips, locomotion, figure). Materials and plant species are still to come.
-2. **The humanoid exists twice.** The Penthouse `humanoid` boots on the engine alone, with IK and physical arms. The game still runs its own: motion from `game/data/humanoid/` and `game/mechanics/animation/humanoid-system.mjs`, and drawing in classic code (`legacy/penthouse/procedural-humanoid.js`, `gl-humanoid.js`, `garment-kit.js`, and `legacy/ui/humanoid-render.js`, `bodies.js`, `wardrobe.js`, `poses.js`). Next: the game's body canon and builds become a Directory library in the same structures, the game drives the Penthouse humanoid, and the drawing is rewritten on its render packets.
-3. **Behaviour still in classic code.** The classic Directory scripts that hold behaviour (`legacy/directory/venue-crowd.js`, `cafe-life.js`, `club-life.js`, `lobby-life.js`, `game-sound.js`, `effects-system.js`, `collision-system.js`, `world-session.js`, `world-query.js`, `game-controls.js`, `new-game-state.js`) are quarantined. They are rewritten as game mechanics, not moved.
-4. **Classic city doors still use classic art.** Native doors are drawn natively: `game/presentation/door.mjs` draws every door from the map's `getDoors()` (its opening and its leaves' bodies) on the art toolkit, whatever its kind, with the look in `game/data/game-door-appearance.json`; it matches the classic artwork pixel for pixel (`tools/test-door-art.mjs`). The classic city's own door objects (`legacy/world/rooms.js`) still call the classic artwork in `legacy/presentation/indoor-door.js` until that runtime migrates. Next: retire it with them.
-5. **Most art still draws straight to a canvas.** The Basement's packet contract, Canvas backend and art toolkit (`basement/rendering/art.mjs`: groups, shapes, glow, ground shadow, colour and seeded-random helpers) are in place, with a picture cache for art that rarely changes (`basement/rendering/canvas.mjs` `pictureCache`). The drone, the cat, doors, the light layer and the furniture of every bundled map use them but Torque's car carriers (they wait for native vehicle art); furniture is drawn by family, with each family's look schema in the prop catalog (`game/presentation/props/`). The classic furniture drawers in `legacy/entities/props-decor.js` and the venue art files remain only as the parity reference. The rest of the classic art is about 4,500 direct canvas calls. Biggest first: `legacy/entities/props-decor.js` (the graveyard and the parity reference), `legacy/ui/humanoid-render.js`, `legacy/ui/wardrobe.js`, `legacy/buildings/silver-queen.js`. Each artist is rewritten on the toolkit, not wrapped.
-6. **The controls system can still drive itself.** `controlSystem` keeps an `auto_update` option that polls on its own animation-frame loop. Only the classic client (`legacy/directory/game-controls.js`) uses it; the Lobby refuses it and calls `updateState()` itself. Remove the option when that script is rewritten.
+2. **The humanoid exists twice.** The Penthouse `humanoid` boots on the engine alone, with IK and physical arms. The game still runs its own: motion from `game/data/humanoid/` and `game/mechanics/animation/humanoid-system.mjs`, and drawing in classic code (`reference/classic/penthouse/procedural-humanoid.js`, `gl-humanoid.js`, `garment-kit.js`, and `reference/classic/ui/humanoid-render.js`, `bodies.js`, `wardrobe.js`, `poses.js`). Next: the game's body canon and builds become a Directory library in the same structures, the game drives the Penthouse humanoid, and the drawing is rewritten on its render packets.
+3. **Behaviour still in classic code.** The classic Directory scripts that hold behaviour (`reference/classic/directory/venue-crowd.js`, `cafe-life.js`, `club-life.js`, `lobby-life.js`, `game-sound.js`, `effects-system.js`, `collision-system.js`, `world-session.js`, `world-query.js`, `game-controls.js`, `new-game-state.js`) are quarantined. They are rewritten as game mechanics, not moved.
+4. **Classic city doors still use classic art.** Native doors are drawn natively: `game/presentation/door.mjs` draws every door from the map's `getDoors()` (its opening and its leaves' bodies) on the art toolkit, whatever its kind, with the look in `game/data/game-door-appearance.json`; it matches the classic artwork pixel for pixel (`tools/test-door-art.mjs`). The classic city's own door objects (`reference/classic/world/rooms.js`) still call the classic artwork in `reference/classic/presentation/indoor-door.js` until that runtime migrates. Next: retire it with them.
+5. **Most art still draws straight to a canvas.** The Basement's packet contract, Canvas backend and art toolkit (`basement/rendering/art.mjs`: groups, shapes, glow, ground shadow, colour and seeded-random helpers) are in place, with a picture cache for art that rarely changes (`basement/rendering/canvas.mjs` `pictureCache`). The drone, the cat, doors, the light layer and the furniture of every bundled map use them but Torque's car carriers (they wait for native vehicle art); furniture is drawn by family, with each family's look schema in the prop catalog (`game/presentation/props/`). The classic furniture drawers in `reference/classic/entities/props-decor.js` and the venue art files remain only as the parity reference. The rest of the classic art is about 4,500 direct canvas calls. Biggest first: `reference/classic/entities/props-decor.js` (the graveyard and the parity reference), `reference/classic/ui/humanoid-render.js`, `reference/classic/ui/wardrobe.js`, `reference/classic/buildings/silver-queen.js`. Each artist is rewritten on the toolkit, not wrapped.
+6. **The controls system can still drive itself.** `controlSystem` keeps an `auto_update` option that polls on its own animation-frame loop. Only the classic client (`reference/classic/directory/game-controls.js`) uses it; the Lobby refuses it and calls `updateState()` itself. Remove the option when that script is rewritten.
 
 When one of these is fixed, remove it from this list in the same commit.
 
@@ -314,13 +317,13 @@ In CI (`.github/workflows/build.yml`):
 - the Directory, Penthouse, physics, maps, controls and rendering tests, including the maps package's game-neutral import check;
 - the migration-inventory check;
 - **the layout check, `node tools/check-layout.mjs`.** It fails when:
-  - a classic `.js`, `.cjs` or `.css` file sits outside `src/legacy/`, or a page outside `src/legacy/` is not an example;
-  - any file outside `src/legacy/` imports from it, or a legacy script imports a module;
+  - a classic `.js`, `.cjs` or `.css` file sits outside `reference/classic/`, or a page outside `reference/classic/` is not an example;
+  - any file outside `reference/classic/` imports from it, or a classic script imports a module;
   - a file in `src/engine/` imports outside `src/engine/`, or imports a level that section 3 forbids;
   - a file in `src/game/data/` imports anything outside `src/game/data/` and the engine (data never depends on mechanics or presentation);
   - a `.mjs` file in `src/engine/` lacks its level banner on the first line, or names the game (`df_`, `apartment`, `GAME_DB`, `DFNative` and so on) outside its tests.
 
-Still to add: **a standalone check** that runs the engine's tests with `src/game/` and `src/legacy/` absent. Inside `src/game/`, reviewers apply sections 2 and 6 by hand: the check enforces only the engine's rules and the quarantine there.
+Still to add: **a standalone check** that runs the engine's tests with `src/game/` and `reference/classic/` absent. Inside `src/game/`, reviewers apply sections 2 and 6 by hand: the check enforces only the engine's rules and the quarantine there.
 
 ---
 

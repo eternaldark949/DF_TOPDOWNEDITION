@@ -19,7 +19,8 @@ const STATUS = {
     data: 'Data. Stays; native code reads the same files.',
     native: 'Already the new engine.'
 };
-const lines = file => file.startsWith('@') || file.endsWith('.json') || !existsSync(new URL(`src/${file}`, root)) ? 0 : read(`src/${file}`).split('\n').length;
+const at = file => file.startsWith("classic/") ? `reference/${file}` : `src/${file}`;
+const lines = file => file.startsWith("@") || file.endsWith(".json") || !existsSync(new URL(at(file), root)) ? 0 : read(at(file)).split("\n").length;
 
 const problems = [];
 const known = new Set(rows.map(r => r.file));
@@ -44,14 +45,14 @@ The classic build links **${rows.length} scripts, ${total.toLocaleString('en-US'
 
 These have no Basement or Directory home yet, so the scripts that need them cannot move until they exist:
 
-1. **Audio.** \`legacy/basement/sound-system.js\`, \`sound-kit.js\`, \`legacy/directory/game-sound.js\`: channels, reverb, music by room. The room graph's \`exposure\` can drive through-door attenuation.
-2. **UI and HUD.** \`legacy/ui/ui-system.js\`, \`legacy/basement/ui-kit.js\` and the menus, phone, inventory and dialogue screens. They need a Basement UI layer that draws through the render system and reads controls.
-3. **Lighting.** \`legacy/engine/lighting.js\`, \`daylight.js\`, \`reflections.js\`, and the classic RoomSystem's veil and darkness. Light shapes are in the grid already; there is no lighting pass in the renderer.
-4. **Game-wide saves.** \`legacy/engine/save-load.js\`. Physics snapshots exist per world; a runtime-wide save envelope does not.
-5. **Weather, decals and screen effects.** \`legacy/world/weather.js\`, \`particles-decals.js\`, \`legacy/engine/combat-effects.js\`. Particles exist; decals and weather layers do not.
-6. **City generation.** \`legacy/world/city-layout.js\` fills blocks at random on load. It must become seeded generation into exterior map data for the map system.
-7. **A native map host for every map.** \`legacy/engine/apartment-level.js\` hosts one map. It needs to become the host for any map whose layout file says \`"host": "native"\`.
-8. **Timers.** \`legacy/basement/timer-kit.js\`: gameplay timers need a runtime-owned service.
+1. **Audio.** \`classic/basement/sound-system.js\`, \`sound-kit.js\`, \`classic/directory/game-sound.js\`: channels, reverb, music by room. The room graph's \`exposure\` can drive through-door attenuation.
+2. **UI and HUD.** \`classic/ui/ui-system.js\`, \`classic/basement/ui-kit.js\` and the menus, phone, inventory and dialogue screens. They need a Basement UI layer that draws through the render system and reads controls.
+3. **Lighting.** \`classic/engine/lighting.js\`, \`daylight.js\`, \`reflections.js\`, and the classic RoomSystem's veil and darkness. Light shapes are in the grid already; there is no lighting pass in the renderer.
+4. **Game-wide saves.** \`classic/engine/save-load.js\`. Physics snapshots exist per world; a runtime-wide save envelope does not.
+5. **Weather, decals and screen effects.** \`classic/world/weather.js\`, \`particles-decals.js\`, \`classic/engine/combat-effects.js\`. Particles exist; decals and weather layers do not.
+6. **City generation.** \`classic/world/city-layout.js\` fills blocks at random on load. It must become seeded generation into exterior map data for the map system.
+7. **A native map host for every map.** \`classic/engine/apartment-level.js\` hosts one map. It needs to become the host for any map whose layout file says \`"host": "native"\`.
+8. **Timers.** \`classic/basement/timer-kit.js\`: gameplay timers need a runtime-owned service.
 
 ## By status
 

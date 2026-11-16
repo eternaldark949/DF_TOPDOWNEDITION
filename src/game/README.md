@@ -1,6 +1,6 @@
 # src/game: Dimensions Freelancer
 
-The game's own modules, on top of the engine. The game may import any engine level; nothing in `src/engine/` may import the game. Nothing here may import `src/legacy/`. Read [READ-FIRST/ENGINE-ARCHITECTURE.md](../../READ-FIRST/ENGINE-ARCHITECTURE.md) before adding anything.
+The game's own modules, on top of the engine. The game may import any engine level; nothing in `src/engine/` may import the game. Nothing here may import `reference/classic/`. Read [READ-FIRST/ENGINE-ARCHITECTURE.md](../../READ-FIRST/ENGINE-ARCHITECTURE.md) before adding anything.
 
 | Folder | Holds |
 |---|---|

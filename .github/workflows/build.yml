@@ -76,7 +76,7 @@ jobs:
       - name: Check the migration inventory covers every classic script
         run: node tools/migration-inventory.mjs --check
 
-      - name: Check the folder rules (legacy quarantine, standalone engine levels)
+      - name: Check the folder rules (classic code in reference/classic, standalone engine levels)
         run: node tools/check-layout.mjs
 
       - name: Check the city's lane network routes on Basement navigation

@@ -8,14 +8,14 @@ The classic build links **234 scripts, 92,077 lines**. The physics-specific reti
 
 These have no Basement or Directory home yet, so the scripts that need them cannot move until they exist:
 
-1. **Audio.** `legacy/basement/sound-system.js`, `sound-kit.js`, `legacy/directory/game-sound.js`: channels, reverb, music by room. The room graph's `exposure` can drive through-door attenuation.
-2. **UI and HUD.** `legacy/ui/ui-system.js`, `legacy/basement/ui-kit.js` and the menus, phone, inventory and dialogue screens. They need a Basement UI layer that draws through the render system and reads controls.
-3. **Lighting.** `legacy/engine/lighting.js`, `daylight.js`, `reflections.js`, and the classic RoomSystem's veil and darkness. Light shapes are in the grid already; there is no lighting pass in the renderer.
-4. **Game-wide saves.** `legacy/engine/save-load.js`. Physics snapshots exist per world; a runtime-wide save envelope does not.
-5. **Weather, decals and screen effects.** `legacy/world/weather.js`, `particles-decals.js`, `legacy/engine/combat-effects.js`. Particles exist; decals and weather layers do not.
-6. **City generation.** `legacy/world/city-layout.js` fills blocks at random on load. It must become seeded generation into exterior map data for the map system.
-7. **A native map host for every map.** `legacy/engine/apartment-level.js` hosts one map. It needs to become the host for any map whose layout file says `"host": "native"`.
-8. **Timers.** `legacy/basement/timer-kit.js`: gameplay timers need a runtime-owned service.
+1. **Audio.** `classic/basement/sound-system.js`, `sound-kit.js`, `classic/directory/game-sound.js`: channels, reverb, music by room. The room graph's `exposure` can drive through-door attenuation.
+2. **UI and HUD.** `classic/ui/ui-system.js`, `classic/basement/ui-kit.js` and the menus, phone, inventory and dialogue screens. They need a Basement UI layer that draws through the render system and reads controls.
+3. **Lighting.** `classic/engine/lighting.js`, `daylight.js`, `reflections.js`, and the classic RoomSystem's veil and darkness. Light shapes are in the grid already; there is no lighting pass in the renderer.
+4. **Game-wide saves.** `classic/engine/save-load.js`. Physics snapshots exist per world; a runtime-wide save envelope does not.
+5. **Weather, decals and screen effects.** `classic/world/weather.js`, `particles-decals.js`, `classic/engine/combat-effects.js`. Particles exist; decals and weather layers do not.
+6. **City generation.** `classic/world/city-layout.js` fills blocks at random on load. It must become seeded generation into exterior map data for the map system.
+7. **A native map host for every map.** `classic/engine/apartment-level.js` hosts one map. It needs to become the host for any map whose layout file says `"host": "native"`.
+8. **Timers.** `classic/basement/timer-kit.js`: gameplay timers need a runtime-owned service.
 
 ## By status
 
@@ -62,30 +62,30 @@ These have no Basement or Directory home yet, so the scripts that need them cann
 
 | Script | Lines | Area | Status | Goes to | Notes |
 |---|---:|---|---|---|---|
-| `legacy/basement/frame-clock.js` | 50 | runtime | `replaced` | engine/lobby/level-lobby.mjs clock in engine/lobby/runtime/game-engine.mjs |  |
-| `legacy/basement/timer-kit.js` | 62 | runtime | `partly` | runtime lifecycle hooks | Gameplay timers need a runtime-owned timer service or level hooks. |
-| `legacy/basement/canvas-kit.js` | 76 | rendering | `replaced` | basement/rendering canvasRenderer |  |
-| `legacy/basement/life-kit.js` | 19 | runtime | `partly` | gameEntity lifetime / level scope |  |
-| `legacy/basement/sound-kit.js` | 168 | audio | `to_build` | a Basement audio service (none yet) | No Basement audio package exists. |
-| `legacy/basement/sound-system.js` | 388 | audio | `to_build` | a Basement audio service (none yet) | Channels, inserts, reverb and volume dials need a Basement home. |
-| `legacy/basement/entity-base.js` | 424 | entities | `replaced` | basement/physics gameEntity | Delete once every subclass is rewritten. |
-| `legacy/basement/shape-kit.js` | 540 | physics | `replaced` | basement/physics collision shapes and geometry |  |
-| `legacy/basement/spatial-grid.js` | 392 | physics | `replaced` | basement/physics spatialGrid | RenderGrid/EffectRenderGrid/TransitionGrid indexes go too. |
-| `legacy/basement/collision-kit.js` | 1018 | physics | `replaced` | basement/physics collision and contacts |  |
-| `legacy/basement/vehicle-kit.js` | 420 | vehicles | `replaced` | basement/physics vehicleMotor |  |
+| `classic/basement/frame-clock.js` | 50 | runtime | `replaced` | engine/lobby/level-lobby.mjs clock in engine/lobby/runtime/game-engine.mjs |  |
+| `classic/basement/timer-kit.js` | 62 | runtime | `partly` | runtime lifecycle hooks | Gameplay timers need a runtime-owned timer service or level hooks. |
+| `classic/basement/canvas-kit.js` | 76 | rendering | `replaced` | basement/rendering canvasRenderer |  |
+| `classic/basement/life-kit.js` | 19 | runtime | `partly` | gameEntity lifetime / level scope |  |
+| `classic/basement/sound-kit.js` | 168 | audio | `to_build` | a Basement audio service (none yet) | No Basement audio package exists. |
+| `classic/basement/sound-system.js` | 388 | audio | `to_build` | a Basement audio service (none yet) | Channels, inserts, reverb and volume dials need a Basement home. |
+| `classic/basement/entity-base.js` | 424 | entities | `replaced` | basement/physics gameEntity | Delete once every subclass is rewritten. |
+| `classic/basement/shape-kit.js` | 540 | physics | `replaced` | basement/physics collision shapes and geometry |  |
+| `classic/basement/spatial-grid.js` | 392 | physics | `replaced` | basement/physics spatialGrid | RenderGrid/EffectRenderGrid/TransitionGrid indexes go too. |
+| `classic/basement/collision-kit.js` | 1018 | physics | `replaced` | basement/physics collision and contacts |  |
+| `classic/basement/vehicle-kit.js` | 420 | vehicles | `replaced` | basement/physics vehicleMotor |  |
 | `@native` | 0 | native | `native` | the native ESM graph (Basement + Directory + gameplay) |  |
-| `legacy/basement/controls-system.js` | 4 | controls | `replaced` | basement/controls controlSystem | Shim only. |
-| `legacy/basement/recorder-kit.js` | 110 | tools | `partly` | physics snapshots + controls recording | Review: input/replay recorder. |
-| `legacy/basement/lane-rail-kit.js` | 71 | traffic | `replaced` | basement/physics navigation roadNetwork and traffic |  |
-| `legacy/basement/ui-kit.js` | 59 | ui | `to_build` | a Basement UI/HUD layer (none yet) |  |
-| `legacy/basement/draw-list.js` | 165 | rendering | `replaced` | basement/rendering renderFrame packets |  |
-| `legacy/basement/material-kit.js` | 63 | rendering | `partly` | basement/rendering materials |  |
-| `legacy/basement/virtual-child.js` | 56 | physics | `replaced` | basement/physics mounted bodies |  |
-| `legacy/basement/angle-kit.js` | 20 | physics | `replaced` | basement/physics values |  |
-| `legacy/basement/query-kit.js` | 79 | physics | `replaced` | basement/physics world queries |  |
-| `legacy/basement/render-system.js` | 271 | rendering | `replaced` | basement/rendering renderSystem |  |
-| `legacy/basement/awareness-kit.js` | 110 | ai | `replaced` | basement/physics awareness |  |
-| `legacy/directory/game-db/game-db.js` | 36 | data | `data` | Directory GAME_DB chapters | Stays; native code reads the same JSON. |
+| `classic/basement/controls-system.js` | 4 | controls | `replaced` | basement/controls controlSystem | Shim only. |
+| `classic/basement/recorder-kit.js` | 110 | tools | `partly` | physics snapshots + controls recording | Review: input/replay recorder. |
+| `classic/basement/lane-rail-kit.js` | 71 | traffic | `replaced` | basement/physics navigation roadNetwork and traffic |  |
+| `classic/basement/ui-kit.js` | 59 | ui | `to_build` | a Basement UI/HUD layer (none yet) |  |
+| `classic/basement/draw-list.js` | 165 | rendering | `replaced` | basement/rendering renderFrame packets |  |
+| `classic/basement/material-kit.js` | 63 | rendering | `partly` | basement/rendering materials |  |
+| `classic/basement/virtual-child.js` | 56 | physics | `replaced` | basement/physics mounted bodies |  |
+| `classic/basement/angle-kit.js` | 20 | physics | `replaced` | basement/physics values |  |
+| `classic/basement/query-kit.js` | 79 | physics | `replaced` | basement/physics world queries |  |
+| `classic/basement/render-system.js` | 271 | rendering | `replaced` | basement/rendering renderSystem |  |
+| `classic/basement/awareness-kit.js` | 110 | ai | `replaced` | basement/physics awareness |  |
+| `classic/directory/game-db/game-db.js` | 36 | data | `data` | Directory GAME_DB chapters | Stays; native code reads the same JSON. |
 | `game/data/game-db/items.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
 | `game/data/game-db/shops.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
 | `game/data/game-db/progression.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
@@ -96,203 +96,203 @@ These have no Basement or Directory home yet, so the scripts that need them cann
 | `game/data/game-db/story.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
 | `game/data/game-db/dialogue.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
 | `game/data/game-db/cast.json` | 0 | data | `data` | Directory GAME_DB chapter | Read by native code too. |
-| `legacy/core/config.js` | 505 | data | `partly` | Directory rules JSON | Tuning constants should move to Directory data. |
+| `classic/core/config.js` | 505 | data | `partly` | Directory rules JSON | Tuning constants should move to Directory data. |
 | `@assets` | 0 | assets | `data` | Directory assets |  |
-| `legacy/core/assets.js` | 56 | assets | `partly` | Directory asset libraries + renderSystem images |  |
-| `legacy/core/registries.js` | 432 | gameplay | `game_logic` | gameplay systems (cosmetics, buffs) |  |
-| `legacy/directory/game-materials.js` | 16 | data | `data` | Directory |  |
-| `legacy/core/resonance.js` | 196 | gameplay | `game_logic` | gameplay (progression) |  |
-| `legacy/core/utils.js` | 433 | shared | `partly` | split into Basement values / Directory helpers | Review per function. |
-| `legacy/world/navigation.js` | 668 | navigation | `replaced` | basement/physics navigation (field + roads) | NavGrid retires with the city move. |
-| `legacy/world/walker.js` | 105 | navigation | `replaced` | basement/physics navigation + characterMotor |  |
-| `legacy/core/draw-helpers.js` | 337 | rendering | `art` | render packet helpers |  |
-| `legacy/core/cache-db.js` | 49 | assets | `partly` | renderSystem resource caches |  |
-| `legacy/core/appearances.js` | 326 | data | `data` | Directory cast appearances |  |
-| `legacy/core/settings.js` | 489 | ui | `game_logic` | settings / ObjectPool | ObjectPool can go once native pools are used. |
-| `legacy/story/story-db.js` | 191 | story | `game_logic` | story data and hooks |  |
-| `legacy/story/captions.js` | 487 | ui | `game_logic` | UI layer |  |
-| `legacy/directory/game-sound.js` | 645 | audio | `to_build` | Basement audio service + Directory sound data | Room-aware music now reads map rooms in the apartment. |
-| `legacy/directory/game-controls.js` | 141 | controls | `partly` | basement/controls profiles |  |
-| `legacy/world/weather.js` | 1331 | effects | `to_build` | Basement weather/effects on particles + rendering |  |
-| `legacy/world/weather-response.js` | 104 | effects | `game_logic` | Directory weather policy |  |
-| `legacy/world/particles-decals.js` | 516 | effects | `partly` | basement/physics particles + render packets | Decals need a render-side home. |
-| `legacy/presentation/indoor-door.js` | 69 | art | `art` | door appearance producer |  |
-| `legacy/world/rooms.js` | 1052 | maps | `partly` | basement/maps roomGraph | Rooms, links and occupancy are ported; windows, linens, lighting veil and drawing are not. |
-| `legacy/world/maps.js` | 23 | maps | `partly` | Directory places.json + game-maps.mjs |  |
-| `legacy/world/map-entities.js` | 75 | maps | `partly` | Directory props.json + maps/*.json + basement/maps | Now data-driven; remove when every map is native. |
-| `legacy/directory/collision-system.js` | 343 | physics | `replaced` | basement/physics | Legacy collision routing. |
-| `legacy/entities/props-decor.js` | 2969 | entities | `partly` | Directory prop catalog + gameProp; art to render packets | StaticEntity/PropEntity classes and ~2,900 lines of prop art. |
-| `legacy/entities/prop-sprites.js` | 305 | art | `art` | prop appearance producers |  |
-| `legacy/entities/vehicles-minigames.js` | 1389 | vehicles | `partly` | gameVehicle + vehicleMotor; minigame rules to gameplay | Bumper cars, Ferris wheel. |
-| `legacy/entities/lamps.js` | 802 | entities | `partly` | Directory lamp templates + light shapes; art to packets |  |
-| `legacy/entities/actors.js` | 1160 | entities | `replaced` | gameCharacter / player.mjs / projectiles | ActorEntity, PlayerEntity, ProjectileEntity, TriggerEntity. |
-| `legacy/entities/static-builders-profiler.js` | 510 | tools | `game_logic` | profiling |  |
-| `legacy/entities/performance-bench.js` | 218 | tools | `game_logic` | benchmarks |  |
-| `legacy/entities/street-objects.js` | 584 | entities | `partly` | Directory templates (signs, loot, pavement, foliage) |  |
-| `legacy/entities/npc.js` | 910 | entities | `replaced` | game/entities/npc.mjs |  |
-| `legacy/entities/pedestrians.js` | 1218 | entities | `replaced` | game/entities/pedestrians.mjs + pedestrian-manager.mjs | Production callers pending. |
-| `legacy/directory/venue-crowd.js` | 199 | gameplay | `game_logic` | venue life on native NPCs |  |
-| `legacy/directory/lobby-life.js` | 167 | gameplay | `game_logic` | venue life on native NPCs |  |
-| `legacy/directory/club-life.js` | 165 | gameplay | `game_logic` | venue life on native NPCs |  |
-| `legacy/directory/cafe-life.js` | 136 | gameplay | `game_logic` | venue life on native NPCs |  |
-| `legacy/directory/world-query.js` | 128 | maps | `partly` | physics world queries + roomGraph |  |
-| `legacy/engine/furniture.js` | 56 | gameplay | `partly` | native furniture grip (apartment) | Generalise for every map. |
-| `legacy/presentation/gatling-gunner.js` | 190 | art | `art` | actor appearance packets |  |
-| `legacy/presentation/classic-actor-packets.js` | 9 | art | `art` | actor appearance packets |  |
-| `legacy/entities/enemies.js` | 1878 | entities | `partly` | native enemy classes (ganger.mjs, gatling-gunner.mjs, velvet-cat.mjs ...) | RestrictedZone, HordeGauntlet, LastKnownMarker still classic. |
-| `legacy/entities/hunters.js` | 340 | entities | `replaced` | game/entities/hunter.mjs, demoness.mjs |  |
-| `legacy/entities/drones.js` | 258 | entities | `replaced` | game/entities/drone.mjs |  |
-| `legacy/presentation/marionette.js` | 107 | art | `art` | actor appearance packets |  |
-| `legacy/entities/marionettes.js` | 126 | entities | `replaced` | game/entities/marionette.mjs |  |
-| `legacy/buildings/building-v1.js` | 229 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/buildings/building-v2.js` | 1617 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/buildings/landmark-kit.js` | 210 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/buildings/ornament-kit.js` | 145 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/buildings/tiered-kit.js` | 551 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/buildings/entrance-lamps.js` | 234 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/buildings/silver-queen.js` | 1144 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/buildings/double-nights.js` | 828 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/buildings/moon-city.js` | 688 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/buildings/cozy-cafe.js` | 442 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/buildings/street-variants.js` | 690 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/buildings/street-arcade.js` | 365 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/buildings/street-apartments.js` | 658 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/buildings/sky-craft.js` | 274 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/buildings/sky-layer.js` | 141 | rendering | `art` | render packets |  |
-| `legacy/buildings/factories.js` | 235 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/buildings/city-view.js` | 370 | rendering | `art` | render packets / baked layers |  |
-| `legacy/buildings/registry-v3.js` | 656 | buildings | `partly` | compound statics + map exterior placements + render packets |  |
-| `legacy/buildings/biggs-park.js` | 291 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/buildings/neural-systems.js` | 226 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/buildings/torque-auto.js` | 237 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/buildings/dr-yins.js` | 190 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/buildings/warehouse-hall.js` | 146 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/buildings/suburb-house.js` | 280 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/buildings/ashgrove.js` | 418 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/buildings/enni-cole.js` | 381 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/buildings/silver-queen-deco.js` | 674 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/buildings/moon-city-deco.js` | 827 | buildings | `art` | compound statics + building appearance packets |  |
-| `legacy/traffic/roads.js` | 2396 | traffic | `partly` | navigation roadNetwork (+ game/data/road-navigation.mjs) | Topology loads into roads; lanes, gates and intersections logic still classic. |
-| `legacy/traffic/garage-zib.js` | 800 | vehicles | `game_logic` | garage/Zib gameplay on gameVehicle |  |
-| `legacy/traffic/zen-art.js` | 147 | art | `art` | vehicle appearance packets |  |
-| `legacy/traffic/car-art.js` | 679 | art | `art` | vehicle appearance packets |  |
-| `legacy/traffic/traffic-vehicle.js` | 2503 | traffic | `replaced` | game/entities/traffic-vehicle.mjs |  |
-| `legacy/directory/game-vehicles.js` | 30 | data | `data` | Directory |  |
-| `legacy/traffic/vehicle-occupants.js` | 107 | vehicles | `partly` | mounted bodies |  |
-| `legacy/traffic/traffic-people.js` | 250 | traffic | `partly` | pedestrians.mjs + traffic controller crossings |  |
-| `legacy/traffic/traffic-signals.js` | 437 | traffic | `partly` | trafficController signals |  |
-| `legacy/traffic/lane-runner.js` | 384 | traffic | `partly` | navigation roads + followPath |  |
-| `legacy/traffic/traffic-manager.js` | 420 | traffic | `replaced` | game/mechanics/traffic-manager.mjs | Has its own SpatialGrid: retires with it. |
-| `legacy/traffic/traffic-profiler.js` | 61 | tools | `game_logic` | profiling |  |
-| `legacy/world/parks.js` | 108 | maps | `partly` | exterior map data |  |
-| `legacy/world/lot-grounds.js` | 177 | maps | `partly` | exterior map data + render |  |
-| `legacy/world/ground-baker.js` | 344 | rendering | `art` | render target bakes |  |
-| `legacy/ui/map-icons.js` | 473 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
-| `legacy/ui/ui-system.js` | 1247 | ui | `to_build` | Basement UI/HUD layer |  |
-| `legacy/ui/music-widget.js` | 204 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
-| `legacy/story/narrative-cutscenes.js` | 625 | story | `partly` | scene system on native entities | Cutscene actors/props still classic. |
-| `legacy/ui/poses.js` | 155 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
-| `legacy/ui/expressions.js` | 85 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
-| `legacy/ui/bodies.js` | 432 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
-| `legacy/ui/cloth.js` | 244 | effects | `partly` | basement/physics cloth | Wardrobe cloth not fitted. |
-| `legacy/ui/wardrobe.js` | 1034 | ui | `game_logic` | wardrobe UI + cloth |  |
-| `legacy/ui/color-picker.js` | 105 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
-| `legacy/ui/weapon-models.js` | 106 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
-| `legacy/ui/humanoid-render.js` | 2157 | art | `art` | humanoid appearance packets (rig system) |  |
-| `legacy/penthouse/procedural-humanoid.js` | 1255 | art | `partly` | basement/physics rigs + humanoid-system.mjs |  |
-| `legacy/ui/portrait-real.js` | 1609 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
-| `legacy/ui/face-cache.js` | 123 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
-| `legacy/ui/comms.js` | 87 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
-| `legacy/ui/crowd-impostors.js` | 451 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
-| `legacy/ui/silhouette-fx.js` | 146 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
-| `legacy/world/city-layout.js` | 1615 | maps | `to_build` | exterior map generator writing map data | Random block fill must become seeded data for the exterior map system. |
-| `legacy/world/scrapyard.js` | 107 | maps | `partly` | map data |  |
-| `legacy/world/billboards.js` | 143 | entities | `partly` | Directory billboard templates + packets |  |
-| `legacy/ui/inventory-augments.js` | 571 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
-| `legacy/gameplay/abilities/legacy-ability-launch.js` | 13 | gameplay | `glue` | ability-system.mjs | Classic launch shim. |
-| `legacy/ui/action-dock.js` | 59 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
-| `legacy/world/bokeh.js` | 93 | effects | `art` | render packets |  |
-| `legacy/story/missions.js` | 559 | story | `game_logic` | story logic on the new runtime |  |
-| `legacy/story/dialogue-bonding.js` | 330 | story | `game_logic` | story logic on the new runtime |  |
-| `legacy/story/npc-dialogue.js` | 201 | story | `game_logic` | story logic on the new runtime |  |
-| `legacy/story/scene-vision.js` | 173 | story | `game_logic` | story logic on the new runtime |  |
-| `legacy/ui/cinematic-dialogue.js` | 298 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
-| `legacy/ui/hud-reveal.js` | 86 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
-| `legacy/ui/coach.js` | 134 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
-| `legacy/story/scene-runner.js` | 363 | story | `partly` | motion timelines + native scene actors |  |
-| `legacy/story/scenes/cast.js` | 8 | story | `game_logic` | story logic on the new runtime |  |
-| `legacy/story/scenes/prologue.js` | 115 | story | `game_logic` | story logic on the new runtime |  |
-| `legacy/story/scenes/van.js` | 210 | story | `game_logic` | story logic on the new runtime |  |
-| `legacy/lobby/level-lobby.js` | 3 | runtime | `replaced` | engine/lobby/level-lobby.mjs |  |
-| `legacy/lobby/level-pause.js` | 52 | runtime | `partly` | runtime pause |  |
-| `legacy/lobby/level-stages.js` | 40 | runtime | `partly` | runtime stages |  |
-| `legacy/engine/pause-system.js` | 21 | runtime | `partly` | runtime pause |  |
-| `legacy/directory/effects-system.js` | 464 | effects | `partly` | particles + render packets |  |
-| `legacy/engine/game-engine.js` | 309 | runtime | `glue` | engine/lobby/runtime/game-engine.mjs | The classic GameEngine and its mixins go when the new runtime boots the game. |
-| `legacy/engine/events.js` | 252 | gameplay | `game_logic` | a runtime system | Classic GameEngine mixin; review |
-| `legacy/engine/combat-effects.js` | 609 | effects | `partly` | combat presentation + particles |  |
-| `legacy/engine/breach-fx.js` | 80 | art | `art` | map/effect appearance producers |  |
-| `legacy/engine/quick-draw.js` | 89 | gameplay | `game_logic` | a runtime system | Classic GameEngine mixin; review |
-| `legacy/engine/player-fire.js` | 85 | gameplay | `partly` | weaponSystem / attackSystem |  |
-| `legacy/engine/combat-fx.js` | 160 | art | `art` | map/effect appearance producers |  |
-| `legacy/engine/boss-intro.js` | 139 | art | `art` | map/effect appearance producers |  |
-| `legacy/engine/boss-hazards.js` | 244 | gameplay | `game_logic` | a runtime system | Classic GameEngine mixin; review |
-| `legacy/engine/noise.js` | 194 | ai | `partly` | awareness / hearing (room exposure can drive it) |  |
-| `legacy/world/map-edge.js` | 189 | maps | `partly` | map boundary + render |  |
-| `legacy/engine/finisher.js` | 207 | gameplay | `game_logic` | a runtime system | Classic GameEngine mixin; review |
-| `legacy/engine/reflections.js` | 1258 | rendering | `to_build` | Basement lighting/reflection pass |  |
-| `legacy/engine/street-mist.js` | 135 | art | `art` | map/effect appearance producers |  |
-| `legacy/engine/shopfront-light.js` | 135 | art | `art` | map/effect appearance producers |  |
-| `legacy/engine/paving-inlays.js` | 184 | art | `art` | map/effect appearance producers |  |
-| `legacy/engine/footsteps.js` | 93 | audio | `game_logic` | audio service |  |
-| `legacy/engine/status-effects.js` | 432 | gameplay | `game_logic` | gameplay |  |
-| `legacy/engine/executions.js` | 105 | gameplay | `game_logic` | a runtime system | Classic GameEngine mixin; review |
-| `legacy/engine/sneak.js` | 39 | gameplay | `game_logic` | a runtime system | Classic GameEngine mixin; review |
-| `legacy/engine/npc-posts.js` | 50 | gameplay | `game_logic` | a runtime system | Classic GameEngine mixin; review |
-| `legacy/engine/spills.js` | 123 | art | `art` | map/effect appearance producers |  |
-| `legacy/engine/dyer.js` | 169 | gameplay | `game_logic` | a runtime system | Classic GameEngine mixin; review |
-| `legacy/engine/knuckles.js` | 150 | gameplay | `game_logic` | a runtime system | Classic GameEngine mixin; review |
-| `legacy/engine/pools.js` | 161 | art | `art` | map/effect appearance producers |  |
-| `legacy/ui/dev-overlay.js` | 396 | tools | `game_logic` | dev overlay |  |
-| `legacy/ui/render-layers.js` | 166 | rendering | `partly` | renderSystem layers |  |
-| `legacy/engine/scope.js` | 135 | ui | `game_logic` | UI layer |  |
-| `legacy/engine/tuning-ui.js` | 141 | ui | `game_logic` | UI layer |  |
-| `legacy/engine/shops-menus.js` | 496 | ui | `game_logic` | UI layer |  |
-| `legacy/engine/daytime-flit.js` | 599 | gameplay | `game_logic` | a runtime system | Classic GameEngine mixin; review |
-| `legacy/engine/screens-ui.js` | 1490 | ui | `game_logic` | UI layer |  |
-| `legacy/engine/save-load.js` | 862 | saves | `to_build` | runtime-wide save envelope over physics snapshots | Per-scene native saves exist; no game-wide envelope yet. |
-| `legacy/engine/map-loading.js` | 1758 | maps | `partly` | basement/maps + Directory layouts | The classic loader; shrinks as maps go native. |
-| `legacy/engine/world-state.js` | 880 | gameplay | `game_logic` | a runtime system | Classic GameEngine mixin; review |
-| `legacy/engine/cars.js` | 300 | vehicles | `partly` | gameVehicle + driving |  |
-| `legacy/engine/markers.js` | 293 | ui | `game_logic` | UI layer |  |
-| `legacy/engine/update.js` | 1129 | runtime | `glue` | runtime systems |  |
-| `legacy/engine/overhead.js` | 122 | rendering | `art` | render pass ordering |  |
-| `legacy/engine/draw.js` | 1536 | rendering | `glue` | renderSystem passes |  |
-| `legacy/engine/interiors.js` | 1469 | art | `art` | interior floor/decor appearance producers | Per-map interior art. |
-| `legacy/engine/biggs-art.js` | 72 | art | `art` | map/effect appearance producers |  |
-| `legacy/engine/palace-art.js` | 486 | art | `art` | map/effect appearance producers |  |
-| `legacy/engine/neural-art.js` | 173 | art | `art` | map/effect appearance producers |  |
-| `legacy/engine/torque-art.js` | 386 | art | `art` | map/effect appearance producers |  |
-| `legacy/engine/keeper-art.js` | 376 | art | `art` | map/effect appearance producers |  |
-| `legacy/engine/van-art.js` | 162 | art | `art` | map/effect appearance producers |  |
-| `legacy/engine/lighting.js` | 915 | rendering | `to_build` | a Basement lighting pass (light shapes exist, no renderer) | Room light, veil, darkness. |
-| `legacy/engine/daylight.js` | 236 | rendering | `to_build` | Basement lighting pass |  |
-| `legacy/engine/player-draw-input.js` | 455 | gameplay | `game_logic` | a runtime system | Classic GameEngine mixin; review |
-| `legacy/directory/new-game-state.js` | 208 | saves | `game_logic` | new game state |  |
-| `legacy/directory/world-session.js` | 135 | runtime | `partly` | gameSession |  |
-| `legacy/engine/loop.js` | 81 | runtime | `glue` | runtime frame scheduling |  |
-| `legacy/engine/apartment-rooms.js` | 16 | maps | `replaced` | basement/maps roomGraph | Thin shim over the room graph. |
-| `legacy/engine/apartment-renderer.js` | 110 | rendering | `partly` | render packets for the native apartment |  |
-| `legacy/engine/apartment-level.js` | 113 | runtime | `partly` | native scene host | Generalise into a native map host for every map. |
-| `legacy/app/menu-wiring.js` | 86 | runtime | `glue` | runtime boot |  |
-| `legacy/ui/phone.js` | 1112 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
-| `legacy/ui/app-launch.js` | 144 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
-| `legacy/ui/messages.js` | 1279 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
-| `legacy/ui/amber-app.js` | 234 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
-| `legacy/story/crew-nights.js` | 437 | story | `game_logic` | story logic on the new runtime |  |
-| `legacy/ui/screens.js` | 104 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
-| `legacy/ui/sidebars.js` | 190 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
-| `legacy/ui/pause-look.js` | 39 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
-| `legacy/ui/save-slots-pause-menu.js` | 1389 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
-| `legacy/app/boot.js` | 352 | runtime | `glue` | runtime boot (createGameRuntime) |  |
-| `legacy/ui/gamepad.js` | 224 | controls | `replaced` | basement/controls gamepadInstance |  |
+| `classic/core/assets.js` | 56 | assets | `partly` | Directory asset libraries + renderSystem images |  |
+| `classic/core/registries.js` | 432 | gameplay | `game_logic` | gameplay systems (cosmetics, buffs) |  |
+| `classic/directory/game-materials.js` | 16 | data | `data` | Directory |  |
+| `classic/core/resonance.js` | 196 | gameplay | `game_logic` | gameplay (progression) |  |
+| `classic/core/utils.js` | 433 | shared | `partly` | split into Basement values / Directory helpers | Review per function. |
+| `classic/world/navigation.js` | 668 | navigation | `replaced` | basement/physics navigation (field + roads) | NavGrid retires with the city move. |
+| `classic/world/walker.js` | 105 | navigation | `replaced` | basement/physics navigation + characterMotor |  |
+| `classic/core/draw-helpers.js` | 337 | rendering | `art` | render packet helpers |  |
+| `classic/core/cache-db.js` | 49 | assets | `partly` | renderSystem resource caches |  |
+| `classic/core/appearances.js` | 326 | data | `data` | Directory cast appearances |  |
+| `classic/core/settings.js` | 489 | ui | `game_logic` | settings / ObjectPool | ObjectPool can go once native pools are used. |
+| `classic/story/story-db.js` | 191 | story | `game_logic` | story data and hooks |  |
+| `classic/story/captions.js` | 487 | ui | `game_logic` | UI layer |  |
+| `classic/directory/game-sound.js` | 645 | audio | `to_build` | Basement audio service + Directory sound data | Room-aware music now reads map rooms in the apartment. |
+| `classic/directory/game-controls.js` | 141 | controls | `partly` | basement/controls profiles |  |
+| `classic/world/weather.js` | 1331 | effects | `to_build` | Basement weather/effects on particles + rendering |  |
+| `classic/world/weather-response.js` | 104 | effects | `game_logic` | Directory weather policy |  |
+| `classic/world/particles-decals.js` | 516 | effects | `partly` | basement/physics particles + render packets | Decals need a render-side home. |
+| `classic/presentation/indoor-door.js` | 69 | art | `art` | door appearance producer |  |
+| `classic/world/rooms.js` | 1052 | maps | `partly` | basement/maps roomGraph | Rooms, links and occupancy are ported; windows, linens, lighting veil and drawing are not. |
+| `classic/world/maps.js` | 23 | maps | `partly` | Directory places.json + game-maps.mjs |  |
+| `classic/world/map-entities.js` | 75 | maps | `partly` | Directory props.json + maps/*.json + basement/maps | Now data-driven; remove when every map is native. |
+| `classic/directory/collision-system.js` | 343 | physics | `replaced` | basement/physics | Legacy collision routing. |
+| `classic/entities/props-decor.js` | 2969 | entities | `partly` | Directory prop catalog + gameProp; art to render packets | StaticEntity/PropEntity classes and ~2,900 lines of prop art. |
+| `classic/entities/prop-sprites.js` | 305 | art | `art` | prop appearance producers |  |
+| `classic/entities/vehicles-minigames.js` | 1389 | vehicles | `partly` | gameVehicle + vehicleMotor; minigame rules to gameplay | Bumper cars, Ferris wheel. |
+| `classic/entities/lamps.js` | 802 | entities | `partly` | Directory lamp templates + light shapes; art to packets |  |
+| `classic/entities/actors.js` | 1160 | entities | `replaced` | gameCharacter / player.mjs / projectiles | ActorEntity, PlayerEntity, ProjectileEntity, TriggerEntity. |
+| `classic/entities/static-builders-profiler.js` | 510 | tools | `game_logic` | profiling |  |
+| `classic/entities/performance-bench.js` | 218 | tools | `game_logic` | benchmarks |  |
+| `classic/entities/street-objects.js` | 584 | entities | `partly` | Directory templates (signs, loot, pavement, foliage) |  |
+| `classic/entities/npc.js` | 910 | entities | `replaced` | game/entities/npc.mjs |  |
+| `classic/entities/pedestrians.js` | 1218 | entities | `replaced` | game/entities/pedestrians.mjs + pedestrian-manager.mjs | Production callers pending. |
+| `classic/directory/venue-crowd.js` | 199 | gameplay | `game_logic` | venue life on native NPCs |  |
+| `classic/directory/lobby-life.js` | 167 | gameplay | `game_logic` | venue life on native NPCs |  |
+| `classic/directory/club-life.js` | 165 | gameplay | `game_logic` | venue life on native NPCs |  |
+| `classic/directory/cafe-life.js` | 136 | gameplay | `game_logic` | venue life on native NPCs |  |
+| `classic/directory/world-query.js` | 128 | maps | `partly` | physics world queries + roomGraph |  |
+| `classic/engine/furniture.js` | 56 | gameplay | `partly` | native furniture grip (apartment) | Generalise for every map. |
+| `classic/presentation/gatling-gunner.js` | 190 | art | `art` | actor appearance packets |  |
+| `classic/presentation/classic-actor-packets.js` | 9 | art | `art` | actor appearance packets |  |
+| `classic/entities/enemies.js` | 1878 | entities | `partly` | native enemy classes (ganger.mjs, gatling-gunner.mjs, velvet-cat.mjs ...) | RestrictedZone, HordeGauntlet, LastKnownMarker still classic. |
+| `classic/entities/hunters.js` | 340 | entities | `replaced` | game/entities/hunter.mjs, demoness.mjs |  |
+| `classic/entities/drones.js` | 258 | entities | `replaced` | game/entities/drone.mjs |  |
+| `classic/presentation/marionette.js` | 107 | art | `art` | actor appearance packets |  |
+| `classic/entities/marionettes.js` | 126 | entities | `replaced` | game/entities/marionette.mjs |  |
+| `classic/buildings/building-v1.js` | 229 | buildings | `art` | compound statics + building appearance packets |  |
+| `classic/buildings/building-v2.js` | 1617 | buildings | `art` | compound statics + building appearance packets |  |
+| `classic/buildings/landmark-kit.js` | 210 | buildings | `art` | compound statics + building appearance packets |  |
+| `classic/buildings/ornament-kit.js` | 145 | buildings | `art` | compound statics + building appearance packets |  |
+| `classic/buildings/tiered-kit.js` | 551 | buildings | `art` | compound statics + building appearance packets |  |
+| `classic/buildings/entrance-lamps.js` | 234 | buildings | `art` | compound statics + building appearance packets |  |
+| `classic/buildings/silver-queen.js` | 1144 | buildings | `art` | compound statics + building appearance packets |  |
+| `classic/buildings/double-nights.js` | 828 | buildings | `art` | compound statics + building appearance packets |  |
+| `classic/buildings/moon-city.js` | 688 | buildings | `art` | compound statics + building appearance packets |  |
+| `classic/buildings/cozy-cafe.js` | 442 | buildings | `art` | compound statics + building appearance packets |  |
+| `classic/buildings/street-variants.js` | 690 | buildings | `art` | compound statics + building appearance packets |  |
+| `classic/buildings/street-arcade.js` | 365 | buildings | `art` | compound statics + building appearance packets |  |
+| `classic/buildings/street-apartments.js` | 658 | buildings | `art` | compound statics + building appearance packets |  |
+| `classic/buildings/sky-craft.js` | 274 | buildings | `art` | compound statics + building appearance packets |  |
+| `classic/buildings/sky-layer.js` | 141 | rendering | `art` | render packets |  |
+| `classic/buildings/factories.js` | 235 | buildings | `art` | compound statics + building appearance packets |  |
+| `classic/buildings/city-view.js` | 370 | rendering | `art` | render packets / baked layers |  |
+| `classic/buildings/registry-v3.js` | 656 | buildings | `partly` | compound statics + map exterior placements + render packets |  |
+| `classic/buildings/biggs-park.js` | 291 | buildings | `art` | compound statics + building appearance packets |  |
+| `classic/buildings/neural-systems.js` | 226 | buildings | `art` | compound statics + building appearance packets |  |
+| `classic/buildings/torque-auto.js` | 237 | buildings | `art` | compound statics + building appearance packets |  |
+| `classic/buildings/dr-yins.js` | 190 | buildings | `art` | compound statics + building appearance packets |  |
+| `classic/buildings/warehouse-hall.js` | 146 | buildings | `art` | compound statics + building appearance packets |  |
+| `classic/buildings/suburb-house.js` | 280 | buildings | `art` | compound statics + building appearance packets |  |
+| `classic/buildings/ashgrove.js` | 418 | buildings | `art` | compound statics + building appearance packets |  |
+| `classic/buildings/enni-cole.js` | 381 | buildings | `art` | compound statics + building appearance packets |  |
+| `classic/buildings/silver-queen-deco.js` | 674 | buildings | `art` | compound statics + building appearance packets |  |
+| `classic/buildings/moon-city-deco.js` | 827 | buildings | `art` | compound statics + building appearance packets |  |
+| `classic/traffic/roads.js` | 2396 | traffic | `partly` | navigation roadNetwork (+ game/data/road-navigation.mjs) | Topology loads into roads; lanes, gates and intersections logic still classic. |
+| `classic/traffic/garage-zib.js` | 800 | vehicles | `game_logic` | garage/Zib gameplay on gameVehicle |  |
+| `classic/traffic/zen-art.js` | 147 | art | `art` | vehicle appearance packets |  |
+| `classic/traffic/car-art.js` | 679 | art | `art` | vehicle appearance packets |  |
+| `classic/traffic/traffic-vehicle.js` | 2503 | traffic | `replaced` | game/entities/traffic-vehicle.mjs |  |
+| `classic/directory/game-vehicles.js` | 30 | data | `data` | Directory |  |
+| `classic/traffic/vehicle-occupants.js` | 107 | vehicles | `partly` | mounted bodies |  |
+| `classic/traffic/traffic-people.js` | 250 | traffic | `partly` | pedestrians.mjs + traffic controller crossings |  |
+| `classic/traffic/traffic-signals.js` | 437 | traffic | `partly` | trafficController signals |  |
+| `classic/traffic/lane-runner.js` | 384 | traffic | `partly` | navigation roads + followPath |  |
+| `classic/traffic/traffic-manager.js` | 420 | traffic | `replaced` | game/mechanics/traffic-manager.mjs | Has its own SpatialGrid: retires with it. |
+| `classic/traffic/traffic-profiler.js` | 61 | tools | `game_logic` | profiling |  |
+| `classic/world/parks.js` | 108 | maps | `partly` | exterior map data |  |
+| `classic/world/lot-grounds.js` | 177 | maps | `partly` | exterior map data + render |  |
+| `classic/world/ground-baker.js` | 344 | rendering | `art` | render target bakes |  |
+| `classic/ui/map-icons.js` | 473 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
+| `classic/ui/ui-system.js` | 1247 | ui | `to_build` | Basement UI/HUD layer |  |
+| `classic/ui/music-widget.js` | 204 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
+| `classic/story/narrative-cutscenes.js` | 625 | story | `partly` | scene system on native entities | Cutscene actors/props still classic. |
+| `classic/ui/poses.js` | 155 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
+| `classic/ui/expressions.js` | 85 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
+| `classic/ui/bodies.js` | 432 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
+| `classic/ui/cloth.js` | 244 | effects | `partly` | basement/physics cloth | Wardrobe cloth not fitted. |
+| `classic/ui/wardrobe.js` | 1034 | ui | `game_logic` | wardrobe UI + cloth |  |
+| `classic/ui/color-picker.js` | 105 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
+| `classic/ui/weapon-models.js` | 106 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
+| `classic/ui/humanoid-render.js` | 2157 | art | `art` | humanoid appearance packets (rig system) |  |
+| `classic/penthouse/procedural-humanoid.js` | 1255 | art | `partly` | basement/physics rigs + humanoid-system.mjs |  |
+| `classic/ui/portrait-real.js` | 1609 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
+| `classic/ui/face-cache.js` | 123 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
+| `classic/ui/comms.js` | 87 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
+| `classic/ui/crowd-impostors.js` | 451 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
+| `classic/ui/silhouette-fx.js` | 146 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
+| `classic/world/city-layout.js` | 1615 | maps | `to_build` | exterior map generator writing map data | Random block fill must become seeded data for the exterior map system. |
+| `classic/world/scrapyard.js` | 107 | maps | `partly` | map data |  |
+| `classic/world/billboards.js` | 143 | entities | `partly` | Directory billboard templates + packets |  |
+| `classic/ui/inventory-augments.js` | 571 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
+| `classic/gameplay/abilities/legacy-ability-launch.js` | 13 | gameplay | `glue` | ability-system.mjs | Classic launch shim. |
+| `classic/ui/action-dock.js` | 59 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
+| `classic/world/bokeh.js` | 93 | effects | `art` | render packets |  |
+| `classic/story/missions.js` | 559 | story | `game_logic` | story logic on the new runtime |  |
+| `classic/story/dialogue-bonding.js` | 330 | story | `game_logic` | story logic on the new runtime |  |
+| `classic/story/npc-dialogue.js` | 201 | story | `game_logic` | story logic on the new runtime |  |
+| `classic/story/scene-vision.js` | 173 | story | `game_logic` | story logic on the new runtime |  |
+| `classic/ui/cinematic-dialogue.js` | 298 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
+| `classic/ui/hud-reveal.js` | 86 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
+| `classic/ui/coach.js` | 134 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
+| `classic/story/scene-runner.js` | 363 | story | `partly` | motion timelines + native scene actors |  |
+| `classic/story/scenes/cast.js` | 8 | story | `game_logic` | story logic on the new runtime |  |
+| `classic/story/scenes/prologue.js` | 115 | story | `game_logic` | story logic on the new runtime |  |
+| `classic/story/scenes/van.js` | 210 | story | `game_logic` | story logic on the new runtime |  |
+| `classic/lobby/level-lobby.js` | 3 | runtime | `replaced` | engine/lobby/level-lobby.mjs |  |
+| `classic/lobby/level-pause.js` | 52 | runtime | `partly` | runtime pause |  |
+| `classic/lobby/level-stages.js` | 40 | runtime | `partly` | runtime stages |  |
+| `classic/engine/pause-system.js` | 21 | runtime | `partly` | runtime pause |  |
+| `classic/directory/effects-system.js` | 464 | effects | `partly` | particles + render packets |  |
+| `classic/engine/game-engine.js` | 309 | runtime | `glue` | engine/lobby/runtime/game-engine.mjs | The classic GameEngine and its mixins go when the new runtime boots the game. |
+| `classic/engine/events.js` | 252 | gameplay | `game_logic` | a runtime system | Classic GameEngine mixin; review |
+| `classic/engine/combat-effects.js` | 609 | effects | `partly` | combat presentation + particles |  |
+| `classic/engine/breach-fx.js` | 80 | art | `art` | map/effect appearance producers |  |
+| `classic/engine/quick-draw.js` | 89 | gameplay | `game_logic` | a runtime system | Classic GameEngine mixin; review |
+| `classic/engine/player-fire.js` | 85 | gameplay | `partly` | weaponSystem / attackSystem |  |
+| `classic/engine/combat-fx.js` | 160 | art | `art` | map/effect appearance producers |  |
+| `classic/engine/boss-intro.js` | 139 | art | `art` | map/effect appearance producers |  |
+| `classic/engine/boss-hazards.js` | 244 | gameplay | `game_logic` | a runtime system | Classic GameEngine mixin; review |
+| `classic/engine/noise.js` | 194 | ai | `partly` | awareness / hearing (room exposure can drive it) |  |
+| `classic/world/map-edge.js` | 189 | maps | `partly` | map boundary + render |  |
+| `classic/engine/finisher.js` | 207 | gameplay | `game_logic` | a runtime system | Classic GameEngine mixin; review |
+| `classic/engine/reflections.js` | 1258 | rendering | `to_build` | Basement lighting/reflection pass |  |
+| `classic/engine/street-mist.js` | 135 | art | `art` | map/effect appearance producers |  |
+| `classic/engine/shopfront-light.js` | 135 | art | `art` | map/effect appearance producers |  |
+| `classic/engine/paving-inlays.js` | 184 | art | `art` | map/effect appearance producers |  |
+| `classic/engine/footsteps.js` | 93 | audio | `game_logic` | audio service |  |
+| `classic/engine/status-effects.js` | 432 | gameplay | `game_logic` | gameplay |  |
+| `classic/engine/executions.js` | 105 | gameplay | `game_logic` | a runtime system | Classic GameEngine mixin; review |
+| `classic/engine/sneak.js` | 39 | gameplay | `game_logic` | a runtime system | Classic GameEngine mixin; review |
+| `classic/engine/npc-posts.js` | 50 | gameplay | `game_logic` | a runtime system | Classic GameEngine mixin; review |
+| `classic/engine/spills.js` | 123 | art | `art` | map/effect appearance producers |  |
+| `classic/engine/dyer.js` | 169 | gameplay | `game_logic` | a runtime system | Classic GameEngine mixin; review |
+| `classic/engine/knuckles.js` | 150 | gameplay | `game_logic` | a runtime system | Classic GameEngine mixin; review |
+| `classic/engine/pools.js` | 161 | art | `art` | map/effect appearance producers |  |
+| `classic/ui/dev-overlay.js` | 396 | tools | `game_logic` | dev overlay |  |
+| `classic/ui/render-layers.js` | 166 | rendering | `partly` | renderSystem layers |  |
+| `classic/engine/scope.js` | 135 | ui | `game_logic` | UI layer |  |
+| `classic/engine/tuning-ui.js` | 141 | ui | `game_logic` | UI layer |  |
+| `classic/engine/shops-menus.js` | 496 | ui | `game_logic` | UI layer |  |
+| `classic/engine/daytime-flit.js` | 599 | gameplay | `game_logic` | a runtime system | Classic GameEngine mixin; review |
+| `classic/engine/screens-ui.js` | 1490 | ui | `game_logic` | UI layer |  |
+| `classic/engine/save-load.js` | 862 | saves | `to_build` | runtime-wide save envelope over physics snapshots | Per-scene native saves exist; no game-wide envelope yet. |
+| `classic/engine/map-loading.js` | 1758 | maps | `partly` | basement/maps + Directory layouts | The classic loader; shrinks as maps go native. |
+| `classic/engine/world-state.js` | 880 | gameplay | `game_logic` | a runtime system | Classic GameEngine mixin; review |
+| `classic/engine/cars.js` | 300 | vehicles | `partly` | gameVehicle + driving |  |
+| `classic/engine/markers.js` | 293 | ui | `game_logic` | UI layer |  |
+| `classic/engine/update.js` | 1129 | runtime | `glue` | runtime systems |  |
+| `classic/engine/overhead.js` | 122 | rendering | `art` | render pass ordering |  |
+| `classic/engine/draw.js` | 1536 | rendering | `glue` | renderSystem passes |  |
+| `classic/engine/interiors.js` | 1469 | art | `art` | interior floor/decor appearance producers | Per-map interior art. |
+| `classic/engine/biggs-art.js` | 72 | art | `art` | map/effect appearance producers |  |
+| `classic/engine/palace-art.js` | 486 | art | `art` | map/effect appearance producers |  |
+| `classic/engine/neural-art.js` | 173 | art | `art` | map/effect appearance producers |  |
+| `classic/engine/torque-art.js` | 386 | art | `art` | map/effect appearance producers |  |
+| `classic/engine/keeper-art.js` | 376 | art | `art` | map/effect appearance producers |  |
+| `classic/engine/van-art.js` | 162 | art | `art` | map/effect appearance producers |  |
+| `classic/engine/lighting.js` | 915 | rendering | `to_build` | a Basement lighting pass (light shapes exist, no renderer) | Room light, veil, darkness. |
+| `classic/engine/daylight.js` | 236 | rendering | `to_build` | Basement lighting pass |  |
+| `classic/engine/player-draw-input.js` | 455 | gameplay | `game_logic` | a runtime system | Classic GameEngine mixin; review |
+| `classic/directory/new-game-state.js` | 208 | saves | `game_logic` | new game state |  |
+| `classic/directory/world-session.js` | 135 | runtime | `partly` | gameSession |  |
+| `classic/engine/loop.js` | 81 | runtime | `glue` | runtime frame scheduling |  |
+| `classic/engine/apartment-rooms.js` | 16 | maps | `replaced` | basement/maps roomGraph | Thin shim over the room graph. |
+| `classic/engine/apartment-renderer.js` | 110 | rendering | `partly` | render packets for the native apartment |  |
+| `classic/engine/apartment-level.js` | 113 | runtime | `partly` | native scene host | Generalise into a native map host for every map. |
+| `classic/app/menu-wiring.js` | 86 | runtime | `glue` | runtime boot |  |
+| `classic/ui/phone.js` | 1112 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
+| `classic/ui/app-launch.js` | 144 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
+| `classic/ui/messages.js` | 1279 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
+| `classic/ui/amber-app.js` | 234 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
+| `classic/story/crew-nights.js` | 437 | story | `game_logic` | story logic on the new runtime |  |
+| `classic/ui/screens.js` | 104 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
+| `classic/ui/sidebars.js` | 190 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
+| `classic/ui/pause-look.js` | 39 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
+| `classic/ui/save-slots-pause-menu.js` | 1389 | ui | `game_logic` | UI layer (needs a Basement UI/HUD service) |  |
+| `classic/app/boot.js` | 352 | runtime | `glue` | runtime boot (createGameRuntime) |  |
+| `classic/ui/gamepad.js` | 224 | controls | `replaced` | basement/controls gamepadInstance |  |

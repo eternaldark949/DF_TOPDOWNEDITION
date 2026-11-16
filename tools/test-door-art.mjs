@@ -77,7 +77,7 @@ test('native door art matches the classic artwork pixel for pixel', { skip: !chr
         await page.goto(`http://127.0.0.1:${server.address().port}/tools/fixtures/blank.html`).catch(() => {});
         const results = await page.evaluate(async cells => {
             const { canvasRenderer } = await import('/src/engine/basement/rendering/index.mjs');
-            const classic = (0, eval)(await (await fetch('/src/legacy/presentation/indoor-door.js')).text() + ';drawIndoorDoorAppearance');
+            const classic = (0, eval)(await (await fetch('/reference/classic/presentation/indoor-door.js')).text() + ';drawIndoorDoorAppearance');
             const draw = (i, paint) => { const canvas = Object.assign(document.createElement('canvas'), { width: 160, height: 160 }), ctx = canvas.getContext('2d');
                 ctx.fillStyle = '#20202a'; ctx.fillRect(0, 0, 160, 160); ctx.translate(-160 * i, 0); paint(ctx); return ctx.getImageData(0, 0, 160, 160).data; };
             return cells.map((cell, i) => {

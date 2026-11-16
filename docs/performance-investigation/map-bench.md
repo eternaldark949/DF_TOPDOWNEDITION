@@ -53,7 +53,7 @@ What it says:
 
 The native light layer drew at full resolution whatever the settings, while the classic layer draws at
 Lighting Quality × ½ for soft shadows (half resolution by default). Both now read `game.lightLayerScale()`
-(src/legacy/engine/lighting.js). Re-recorded baseline:
+(reference/classic/engine/lighting.js). Re-recorded baseline:
 
 | Scene | Frame CPU | Light layer |
 |---|---|---|

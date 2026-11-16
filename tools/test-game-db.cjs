@@ -29,7 +29,7 @@ test('Every chapter is valid JSON, listed in the build, and says what each of it
 
 test('Items: the loadout, schematics and consumable hooks point at things that exist',()=>{
  const it=load('items.json');
- const registries=fs.readFileSync(join(ROOT,'src','legacy','core','registries.js'),'utf8');
+ const registries=fs.readFileSync(join(ROOT,'reference','classic','core','registries.js'),'utf8');
  const cosmetics=load('cast.json').cosmetics, cosmetic=id=>!!cosmetics[id];
  for(const id of it.default_loadout) assert.ok(it.gear[id],`default_loadout: no gear '${id}'`);
  unique(it.augments,'augments');unique(it.furniture,'furniture');unique(it.schematics,'schematics');
@@ -244,7 +244,7 @@ test('Places: maps, rooms, doors, fireplaces and notes point at things that exis
 
 test('Story: steps are named once, point at real maps and checks, crew nights at real places, and step code attaches',()=>{
  const st=load('story.json'), maps=new Set(Object.keys(load('places.json').maps));
- const checker=fs.readFileSync(join(ROOT,'src','legacy','story','narrative-cutscenes.js'),'utf8');
+ const checker=fs.readFileSync(join(ROOT,'reference','classic','story','narrative-cutscenes.js'),'utf8');
  const checks=new Set([...checker.slice(checker.indexOf('checkCondition(')).matchAll(/case "([A-Z_0-9]+)"/g)].map(m=>m[1]));
  const known=c=>c===null||checks.has(c)||/^TIMER_\d+$/.test(c)||(c.startsWith('LOC_')&&maps.has(c.slice(4).toLowerCase()));
  const steps=[];
@@ -350,7 +350,7 @@ test('Cast and looks: every speaker and look exists, colours are hex, palette na
   assert.ok(d.appearances[C.look],`scene_cast.${id}: no look '${C.look}'`);
   assert.ok(C.side==='left'||C.side==='right',`scene_cast.${id}: side is left or right`);
  }
- const poses=fs.readFileSync(join(ROOT,'src','legacy','ui','poses.js'),'utf8');
+ const poses=fs.readFileSync(join(ROOT,'reference','classic','ui','poses.js'),'utf8');
  for(const [who,p] of Object.entries(d.apartment_idle)){
   assert.ok(d.appearances[who],`apartment_idle.${who}: no such character`);
   assert.ok(Number.isFinite(p.x)&&Number.isFinite(p.y)&&poses.includes(p.pose),`apartment_idle.${who}: x, y and a real pose`);
