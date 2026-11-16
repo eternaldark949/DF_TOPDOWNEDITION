@@ -10,3 +10,5 @@ The four engine levels. Everything here runs standalone: nothing in `src/engine/
 | [penthouse/](penthouse/) | LV3 | Prefab toys built only from the Basement and the Directory: the humanoid, foliage |
 
 `tools/check-layout.mjs` (run in CI) enforces the import rules and the level banners.
+
+How to use the engine, by level and system: [API.md](API.md).

@@ -2,6 +2,8 @@
 
 Written with ETERNAL on 2026-11-15. Read it after [ENGINE-ARCHITECTURE.md](ENGINE-ARCHITECTURE.md), which says where each system lives. This file says what each system does and how it is called. Every change follows it, whatever the code in `reference/classic/` does. Only ETERNAL changes it.
 
+How to use what exists today is in [src/engine/API.md](../src/engine/API.md), split by level and system. Every engine change that adds or changes a call updates that guide in the same commit.
+
 ## Where things live
 
 - **Basement (LV0)** holds the systems and operations: objects, the drawing backend, physics, the spatial grid, navigation, agents, controls, UI, audio.
