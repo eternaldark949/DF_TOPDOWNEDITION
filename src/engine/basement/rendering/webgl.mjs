@@ -10,7 +10,7 @@
 import {CAPABILITIES} from './values.mjs';
 import {packet as normalizePacket,requirements} from './packets.mjs';
 import {premultiplied,gradientRamp,readColor} from './colors.mjs';
-import {GRAIN_SIZE,grainPixels,grainOffset} from './effects.mjs';
+import {GRAIN_SIZE,grainPixels,grainOffset,GLOWS,glowPlan,glowSizes} from './effects.mjs';
 import {flattenGeometry,fillTriangles,strokeTriangles,dashPaths} from './paths.mjs';
 import {rasterizeCanvasText,measureCanvasText} from './canvas.mjs';
 
@@ -33,7 +33,7 @@ const BLEND_FUNCTIONS=Object.freeze({
  * per pixel (`overlay`, `soft-light`, `lighten`, `darken`) and the ones Canvas applies to the whole
  * surface outside the shape (`source-in`, `source-out`, `destination-in`).
  */
-export const WEBGL_CAPABILITIES=Object.freeze(['shape','sprite','text','picture','geometry:rect','geometry:ellipse','geometry:path','gradient:linear','gradient:radial','pattern','clip','shadow','blur','dash','target','layer','effect:grade','effect:vignette','effect:grain',...Object.keys(BLEND_FUNCTIONS).map(name=>`blend:${name}`)]);
+export const WEBGL_CAPABILITIES=Object.freeze(['shape','sprite','text','picture','geometry:rect','geometry:ellipse','geometry:path','gradient:linear','gradient:radial','pattern','clip','shadow','blur','dash','target','layer','effect:grade','effect:vignette','effect:grain','effect:bloom','effect:fog_glow','effect:star_glow',...Object.keys(BLEND_FUNCTIONS).map(name=>`blend:${name}`)]);
 if(WEBGL_CAPABILITIES.some(need=>!CAPABILITIES.includes(need)))throw new Error('WebGL declares a capability the engine does not name');
 
 const VERTEX=`#version 300 es
@@ -66,11 +66,14 @@ void main(){
 // the surface's rows bottom-up. Taps past the region repeat its edge, which the caller pads with clear pixels.
 const MAX_TAPS=24;
 const BLUR_FRAGMENT=`#version 300 es
-precision highp float;in vec2 v_local;uniform sampler2D u_texture;uniform vec2 u_size,u_region,u_dir;uniform float u_sigma;out vec4 color;
+precision highp float;in vec2 v_local;uniform sampler2D u_texture;uniform vec2 u_size,u_region,u_dir;uniform float u_sigma,u_edge;out vec4 color;
 void main(){
  vec2 lo=vec2(.5,u_size.y-u_region.y+.5),hi=vec2(u_region.x-.5,u_size.y-.5),at=vec2(v_local.x,u_size.y-v_local.y);
  int r=int(ceil(u_sigma*3.));vec4 sum=vec4(0);float total=0.;
- for(int i=-${MAX_TAPS};i<=${MAX_TAPS};i++){if(i<-r||i>r)continue;float w=exp(-float(i*i)/(2.*u_sigma*u_sigma));sum+=texture(u_texture,clamp(at+u_dir*float(i),lo,hi)/u_size)*w;total+=w;}
+ for(int i=-${MAX_TAPS};i<=${MAX_TAPS};i++){if(i<-r||i>r)continue;float w=exp(-float(i*i)/(2.*u_sigma*u_sigma));vec2 q=at+u_dir*float(i);
+  // past the region: its edge (u_edge 0), or clear, mixed in as a linear read past the last pixel would (u_edge 1)
+  vec2 inside=u_edge>.5?clamp(q-lo+1.,0.,1.)*clamp(hi+1.-q,0.,1.):vec2(1);
+  sum+=texture(u_texture,clamp(q,lo,hi)/u_size)*w*inside.x*inside.y;total+=w;}
  color=sum/total;
 }`;
 const BLUR_SIGMA=MAX_TAPS/3;   // a wider blur is drawn smaller and stretched back
@@ -78,13 +81,21 @@ const BLUR_SIGMA=MAX_TAPS/3;   // a wider blur is drawn smaller and stretched ba
 // One effect over a whole surface, pixel for pixel, matching Canvas's compositing (effects.mjs says what each does).
 // u_type 0 grade: u_a (2^exposure, contrast, saturation, tint amount × tint alpha), u_b the tint.
 // 1 vignette: u_a (inner, outer radius in pixels, strength), u_b the colour. 2 grain: u_a (amount, size, offset).
+// The light effects' steps, each read linearly from a surface of another size: 3 the bright part, u_a (threshold,
+// tinted), u_b the tint (as Canvas's multiply then destination-in does it); 4 a copy times u_a.x (a level halved, or a spread summed);
+// 5 the surface plus the four u_glow surfaces at weights u_a, clamped as Canvas's lighter is.
 const POST_FRAGMENT=`#version 300 es
-precision highp float;uniform sampler2D u_texture,u_grain;uniform int u_type;uniform vec2 u_size;uniform vec4 u_a,u_b;out vec4 color;
+precision highp float;uniform sampler2D u_texture,u_grain,u_glow0,u_glow1,u_glow2,u_glow3;uniform int u_type;uniform vec2 u_size;uniform vec4 u_a,u_b;out vec4 color;
 vec3 overlay(vec3 b,vec3 s){return mix(2.*b*s,1.-2.*(1.-b)*(1.-s),step(.5,b));}
 // Canvas: a source of straight colour s and alpha k composited by blend result m over the pixel, then kept to the pixel's shape
 vec4 over(vec3 c,float a,vec3 s,float k,vec3 m){vec3 rgb=s*k*(1.-a)+c*a*(1.-k)+k*a*m;return vec4(rgb,k+a-k*a)*a;}
 void main(){
+ vec2 uv=gl_FragCoord.xy/u_size;
+ if(u_type==4){color=texture(u_texture,uv)*u_a.x;return;}
+ if(u_type==3){vec4 s=texture(u_texture,uv);if(s.a<=0.){color=vec4(0);return;}float a=s.a;vec3 g=clamp((s.rgb/a-u_a.x)/(1.-u_a.x),0.,1.)*a;
+  color=vec4(u_a.y>.5?u_b.rgb*(a*(1.-a)+a*g):g,a);return;}
  vec4 src=texelFetch(u_texture,ivec2(gl_FragCoord.xy),0);vec2 at=vec2(gl_FragCoord.x,u_size.y-gl_FragCoord.y);
+ if(u_type==5){color=min(src+u_a.x*texture(u_glow0,uv)+u_a.y*texture(u_glow1,uv)+u_a.z*texture(u_glow2,uv)+u_a.w*texture(u_glow3,uv),1.);return;}
  if(u_type==1){float d=distance(at,u_size*.5),t=clamp((d-u_a.x)/max(u_a.y-u_a.x,1e-6),0.,1.),k=u_a.z*t*u_b.a;color=vec4(u_b.rgb*k,k)+src*(1.-k);return;}
  if(src.a<=0.){color=src;return;}
  vec3 c=src.rgb/src.a;
@@ -114,7 +125,7 @@ function touch(map,key){const value=map.get(key);if(value!==undefined){map.delet
 export class webglRenderer {
     #surface=null;#gl=null;#viewport=null;#main=null;#program=null;#uniforms={};#buffer=null;#vao=null;#samplers=null;#samples=0;#maxTexture=4096;
     #resources=new Map();#ramps=new Map();#texts=new Map();#pictures=new Map();#pictureBytes=0;#vectorPictures=new Set();#layer=null;#bound=null;
-    #decodeImage;#createSurface;#maxPictureBytes;#densities;#disposed=false;#generation=0;#blurProgram=null;#blurUniforms={};#scratch=null;#postProgram=null;#postUniforms={};#post=null;#spare=null;#grain=null;#frames=0;
+    #decodeImage;#createSurface;#maxPictureBytes;#densities;#disposed=false;#generation=0;#blurProgram=null;#blurUniforms={};#scratch=null;#postProgram=null;#postUniforms={};#post=null;#spare=null;#grain=null;#frames=0;#glows=new Map();
     /**
      * `decode_image(url)` gives an image WebGL can upload (default: the browser's Image); `create_surface(w, h)`
      * makes the 2D surfaces text is rasterized on (default: canvas.mjs's). Pictures are painted at the first of
@@ -143,10 +154,10 @@ export class webglRenderer {
         this.#program=program;
         const blur=gl.createProgram();gl.attachShader(blur,shader(gl.VERTEX_SHADER,VERTEX));gl.attachShader(blur,shader(gl.FRAGMENT_SHADER,BLUR_FRAGMENT));gl.bindAttribLocation(blur,0,'a_position');gl.linkProgram(blur);
         if(!gl.getProgramParameter(blur,gl.LINK_STATUS))throw new Error(`WebGL program: ${gl.getProgramInfoLog(blur)}`);
-        this.#blurProgram=blur;gl.useProgram(blur);for(const name of ['u_row0','u_row1','u_texture','u_size','u_region','u_dir','u_sigma'])this.#blurUniforms[name]=gl.getUniformLocation(blur,name);gl.uniform1i(this.#blurUniforms.u_texture,0);
+        this.#blurProgram=blur;gl.useProgram(blur);for(const name of ['u_row0','u_row1','u_texture','u_size','u_region','u_dir','u_sigma','u_edge'])this.#blurUniforms[name]=gl.getUniformLocation(blur,name);gl.uniform1i(this.#blurUniforms.u_texture,0);
         const post=gl.createProgram();gl.attachShader(post,shader(gl.VERTEX_SHADER,VERTEX));gl.attachShader(post,shader(gl.FRAGMENT_SHADER,POST_FRAGMENT));gl.bindAttribLocation(post,0,'a_position');gl.linkProgram(post);
         if(!gl.getProgramParameter(post,gl.LINK_STATUS))throw new Error(`WebGL program: ${gl.getProgramInfoLog(post)}`);
-        this.#postProgram=post;gl.useProgram(post);for(const name of ['u_row0','u_row1','u_texture','u_grain','u_type','u_size','u_a','u_b'])this.#postUniforms[name]=gl.getUniformLocation(post,name);gl.uniform1i(this.#postUniforms.u_texture,0);gl.uniform1i(this.#postUniforms.u_grain,1);
+        this.#postProgram=post;gl.useProgram(post);for(const name of ['u_row0','u_row1','u_texture','u_grain','u_type','u_size','u_a','u_b','u_glow0','u_glow1','u_glow2','u_glow3'])this.#postUniforms[name]=gl.getUniformLocation(post,name);gl.uniform1i(this.#postUniforms.u_texture,0);gl.uniform1i(this.#postUniforms.u_grain,1);for(let i=0;i<4;i++)gl.uniform1i(this.#postUniforms[`u_glow${i}`],2+i);
         gl.useProgram(program);
         for(const name of ['u_row0','u_row1','u_mode','u_color','u_points','u_uv','u_radii','u_repeat','u_opacity','u_texture'])this.#uniforms[name]=gl.getUniformLocation(program,name);
         gl.uniform1i(this.#uniforms.u_texture,0);
@@ -406,8 +417,8 @@ export class webglRenderer {
      * The top-left w by h of `from` blurred into `into` by each [direction, sigma] in turn (pixels; a direction
      * on the surface, y down), through the second scratch surface between passes. Returns `into`.
      */
-    #blurred(from,into,w,h,passes){
-        const gl=this.#gl,u=this.#blurUniforms,between=this.#scratch[1],steps=passes.filter(([,sigma])=>sigma>.05);if(!steps.length)steps.push(passes[0]);
+    #blurred(from,into,w,h,passes,between=this.#scratch[1],edge=0){
+        const gl=this.#gl,u=this.#blurUniforms,steps=passes.filter(([,sigma])=>sigma>.05);if(!steps.length)steps.push(passes[0]);
         gl.useProgram(this.#blurProgram);
         try{
             gl.blendEquation(gl.FUNC_ADD);gl.blendFuncSeparate(gl.ONE,gl.ZERO,gl.ONE,gl.ZERO);gl.activeTexture(gl.TEXTURE0);gl.bindSampler(0,this.#samplers.clamp);
@@ -417,7 +428,7 @@ export class webglRenderer {
                 this.#bind(target);this.#clearRegion(w,h);this.#direct(false);
                 const W=target.width,H=target.height;gl.uniform3f(u.u_row0,2/W,0,-1);gl.uniform3f(u.u_row1,0,-2/H,1);
                 // the surface's rows run bottom-up, so a direction down the screen is up the texture
-                gl.bindTexture(gl.TEXTURE_2D,source.texture);gl.uniform2f(u.u_size,source.width,source.height);gl.uniform2f(u.u_region,w,h);gl.uniform2f(u.u_dir,dir[0],-dir[1]);gl.uniform1f(u.u_sigma,Math.max(sigma,1e-3));
+                gl.bindTexture(gl.TEXTURE_2D,source.texture);gl.uniform2f(u.u_size,source.width,source.height);gl.uniform2f(u.u_region,w,h);gl.uniform2f(u.u_dir,dir[0],-dir[1]);gl.uniform1f(u.u_sigma,Math.max(sigma,1e-3));gl.uniform1f(u.u_edge,edge);
                 this.#draw(quad(0,0,w,h));this.#resolve(target);source=target;
             });
         }finally{gl.useProgram(this.#program);}
@@ -437,22 +448,53 @@ export class webglRenderer {
     #effects(source,stack,sx,final){
         const gl=this.#gl,u=this.#postUniforms,W=source.width,H=source.height;let current=source;
         if(!this.#grain)this.#grain=this.#texture(GRAIN_SIZE,GRAIN_SIZE,{pixels:grainPixels()});
-        gl.useProgram(this.#postProgram);
         try{
-            gl.blendEquation(gl.FUNC_ADD);gl.blendFuncSeparate(gl.ONE,gl.ZERO,gl.ONE,gl.ZERO);gl.disable(gl.STENCIL_TEST);
-            gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.#grain);gl.activeTexture(gl.TEXTURE0);
-            gl.uniform3f(u.u_row0,2/W,0,-1);gl.uniform3f(u.u_row1,0,-2/H,1);gl.uniform2f(u.u_size,W,H);
             stack.forEach((e,i)=>{
+                const glows=GLOWS.includes(e.type)?this.#glowSpreads(current,e,sx):null;
                 const into=i===stack.length-1&&final?final:current===source?(this.#spare=this.#sized(this.#spare,W,H,false)):source;
-                gl.bindFramebuffer(gl.FRAMEBUFFER,into===this.#main?null:into.resolve);gl.viewport(0,0,W,H);this.#bound=null;
-                gl.bindTexture(gl.TEXTURE_2D,current.texture);
+                this.#postOver(into===this.#main?null:into.resolve,W,H);
+                gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.#grain);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,current.texture);
                 if(e.type==='grade'){const t=readColor(e.tint);gl.uniform1i(u.u_type,0);gl.uniform4f(u.u_a,2**e.exposure,e.contrast,e.saturation,e.tint_amount*t[3]);gl.uniform4f(u.u_b,t[0],t[1],t[2],1);}
                 else if(e.type==='vignette'){const reach=Math.hypot(W,H)/2,c=readColor(e.color);gl.uniform1i(u.u_type,1);gl.uniform4f(u.u_a,e.radius*reach,(e.radius+e.softness)*reach,e.strength,0);gl.uniform4f(u.u_b,...c);}
-                else{const [ox,oy]=grainOffset(this.#frames,e.animated);gl.uniform1i(u.u_type,2);gl.uniform4f(u.u_a,e.amount,e.size*sx,ox,oy);}
+                else if(e.type==='grain'){const [ox,oy]=grainOffset(this.#frames,e.animated);gl.uniform1i(u.u_type,2);gl.uniform4f(u.u_a,e.amount,e.size*sx,ox,oy);}
+                else{
+                    const weights=[0,0,0,0];glows.forEach(([target,weight],k)=>{weights[k]=weight;gl.activeTexture(gl.TEXTURE2+k);gl.bindTexture(gl.TEXTURE_2D,target.texture);gl.bindSampler(2+k,this.#samplers.clamp);});
+                    for(let k=glows.length;k<4;k++){gl.activeTexture(gl.TEXTURE2+k);gl.bindTexture(gl.TEXTURE_2D,this.#grain);}
+                    gl.activeTexture(gl.TEXTURE0);gl.uniform1i(u.u_type,5);gl.uniform4f(u.u_a,...weights);
+                }
                 this.#draw(quad(0,0,W,H));current=into;
+                // a glow surface left bound would be a loop when the next light effect draws into it
+                if(glows){for(let k=2;k<6;k++){gl.activeTexture(gl.TEXTURE0+k);gl.bindTexture(gl.TEXTURE_2D,null);}gl.activeTexture(gl.TEXTURE0);}
             });
-        }finally{gl.enable(gl.STENCIL_TEST);gl.useProgram(this.#program);this.#bound=null;}
+        }finally{for(let k=2;k<6;k++)gl.bindSampler(k,null);gl.activeTexture(gl.TEXTURE0);gl.enable(gl.STENCIL_TEST);gl.useProgram(this.#program);this.#bound=null;}
         return current;
+    }
+    // The effect program drawing over the whole of a w by h framebuffer (null: the screen), replacing it.
+    #postOver(fbo,w,h){
+        const gl=this.#gl,u=this.#postUniforms;gl.useProgram(this.#postProgram);gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);gl.viewport(0,0,w,h);this.#bound=null;
+        gl.blendEquation(gl.FUNC_ADD);gl.blendFuncSeparate(gl.ONE,gl.ZERO,gl.ONE,gl.ZERO);gl.disable(gl.STENCIL_TEST);
+        gl.uniform3f(u.u_row0,2/w,0,-1);gl.uniform3f(u.u_row1,0,-2/h,1);gl.uniform2f(u.u_size,w,h);
+    }
+    #glowTarget(key,w,h){const t=this.#sized(this.#glows.get(key),w,h,false);this.#glows.set(key,t);return t;}
+    /** A light effect's spreads of `source` (glowPlan), each [surface, weight × strength], as canvas.mjs makes them. */
+    #glowSpreads(source,e,sx){
+        const gl=this.#gl,u=this.#postUniforms,plan=glowPlan(e,sx),sizes=glowSizes(source.width,source.height,plan.levels),levels=[source],[r,g,b]=readColor(plan.color);
+        gl.activeTexture(gl.TEXTURE0);gl.bindSampler(0,this.#samplers.clamp);
+        for(let l=1;l<=plan.levels;l++){
+            const [w,h]=sizes[l],t=this.#glowTarget(`level${l}`,w,h);this.#postOver(t.resolve,w,h);gl.bindTexture(gl.TEXTURE_2D,levels[l-1].texture);
+            if(l===1){gl.uniform1i(u.u_type,3);gl.uniform4f(u.u_a,plan.threshold,r<1||g<1||b<1?1:0,0,0);gl.uniform4f(u.u_b,r,g,b,1);}else{gl.uniform1i(u.u_type,4);gl.uniform4f(u.u_a,1,0,0,0);}
+            this.#draw(quad(0,0,w,h));levels.push(t);
+        }
+        const spreads=plan.spreads.map((sp,i)=>{
+            const [w,h]=sizes[sp.level],out=this.#glowTarget(`spread${i}`,w,h),between=this.#glowTarget(`between${sp.level}`,w,h);
+            this.#blurred(levels[sp.level],out,w,h,sp.dir?[[sp.dir,sp.sigma]]:[[[1,0],sp.sigma],[[0,1],sp.sigma]],between,1);
+            return [out,sp.weight*plan.strength];
+        });
+        // summed at the largest spread's size, added up and clamped as Canvas's lighter is
+        const [sw,sh]=sizes[plan.sum],sum=this.#glowTarget('sum',sw,sh);this.#postOver(sum.resolve,sw,sh);gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.blendFuncSeparate(gl.ONE,gl.ONE,gl.ONE,gl.ONE);gl.uniform1i(u.u_type,4);gl.activeTexture(gl.TEXTURE0);gl.bindSampler(0,this.#samplers.clamp);
+        for(const [out,weight] of spreads){gl.bindTexture(gl.TEXTURE_2D,out.texture);gl.uniform4f(u.u_a,weight,0,0,0);this.#draw(quad(0,0,sw,sh));}
+        return [[sum,1]];
     }
     #clear(color){const gl=this.#gl,[r,g,b,a]=color===false?[0,0,0,0]:premultiplied(color);gl.colorMask(true,true,true,true);gl.stencilMask(0xff);gl.clearColor(r,g,b,a);gl.clearStencil(0);gl.clear(color===false?gl.STENCIL_BUFFER_BIT:gl.COLOR_BUFFER_BIT|gl.STENCIL_BUFFER_BIT);}
     render(frame){
@@ -492,10 +534,10 @@ export class webglRenderer {
         if(this.#disposed)return;this.#disposed=true;this.#generation++;const gl=this.#gl;
         if(gl){
             for(const entry of this.#resources.values())this.#release(entry);for(const texture of this.#ramps.values())gl.deleteTexture(texture);
-            for(const line of this.#texts.values())if(line)gl.deleteTexture(line.texture);for(const entry of this.#pictures.values())this.#freeTarget(entry.target);if(this.#layer)this.#freeTarget(this.#layer);for(const t of [...this.#scratch??[],this.#post,this.#spare])if(t)this.#freeTarget(t);if(this.#grain)gl.deleteTexture(this.#grain);gl.deleteProgram(this.#blurProgram);gl.deleteProgram(this.#postProgram);
+            for(const line of this.#texts.values())if(line)gl.deleteTexture(line.texture);for(const entry of this.#pictures.values())this.#freeTarget(entry.target);if(this.#layer)this.#freeTarget(this.#layer);for(const t of [...this.#scratch??[],this.#post,this.#spare,...this.#glows.values()])if(t)this.#freeTarget(t);if(this.#grain)gl.deleteTexture(this.#grain);gl.deleteProgram(this.#blurProgram);gl.deleteProgram(this.#postProgram);
             gl.deleteBuffer(this.#buffer);gl.deleteVertexArray(this.#vao);gl.deleteProgram(this.#program);for(const sampler of Object.values(this.#samplers??{}))gl.deleteSampler(sampler);
             gl.getExtension('WEBGL_lose_context')?.loseContext();
         }
-        this.#resources.clear();this.#ramps.clear();this.#texts.clear();this.#pictures.clear();this.#vectorPictures.clear();this.#layer=null;this.#scratch=null;this.#post=null;this.#spare=null;this.#grain=null;this.#gl=null;this.#surface=null;this.#bound=null;
+        this.#resources.clear();this.#ramps.clear();this.#texts.clear();this.#pictures.clear();this.#vectorPictures.clear();this.#layer=null;this.#scratch=null;this.#post=null;this.#spare=null;this.#grain=null;this.#glows.clear();this.#gl=null;this.#surface=null;this.#bound=null;
     }
 }

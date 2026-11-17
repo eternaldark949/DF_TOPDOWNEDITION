@@ -6,7 +6,7 @@ import {BLENDS,CAPABILITIES} from './values.mjs';
 const COMPOSITE=Object.freeze({normal:'source-over',add:'lighter',multiply:'multiply',screen:'screen','source-in':'source-in','source-out':'source-out','destination-in':'destination-in','destination-out':'destination-out','source-atop':'source-atop','destination-over':'destination-over',overlay:'overlay','soft-light':'soft-light',lighten:'lighten',darken:'darken'});
 import {geometry} from './packets.mjs';
 import {flattenGeometry,pathBounds} from './paths.mjs';
-import {GRAIN_SIZE,grainPixels,grainOffset} from './effects.mjs';
+import {GRAIN_SIZE,grainPixels,grainOffset,GLOWS,glowPlan,glowSizes,thresholdFilter} from './effects.mjs';
 import {readColor} from './colors.mjs';
 
 function createSurface(width,height){
@@ -256,7 +256,35 @@ export class canvasRenderer {
         if(frame.effects?.length)this.#applyEffects(main,frame.effects,main.surface.width/frame.view.width,opaqueFrame(frame));
         this.#frames++;
     }
-    #frames=0;#copy=null;#grain=null;
+    #frames=0;#copy=null;#grain=null;#glows=new Map();
+    // Kept surfaces for the light effects, by name; each is resized as needed.
+    #glowSurface(key,w,h){
+        let s=this.#glows.get(key);if(!s){const surface=this.#createSurface(w,h);s={surface,context:surface.getContext('2d')};this.#glows.set(key,s);}
+        if(s.surface.width!==w)s.surface.width=w;if(s.surface.height!==h)s.surface.height=h;
+        const c=s.context;c.setTransform(1,0,0,1,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';c.filter='none';c.shadowColor='transparent';c.shadowBlur=0;c.imageSmoothingEnabled=true;c.clearRect(0,0,w,h);return s;
+    }
+    // The bright part of `surface` spread as glowPlan says, added to it (see effects.mjs).
+    #glow(surface,ctx,e,sx,opaque){
+        const W=surface.width,H=surface.height,plan=glowPlan(e,sx),sizes=glowSizes(W,H,plan.levels),levels=[null],[r,g,b]=readColor(plan.color),tinted=r<1||g<1||b<1;
+        for(let l=1;l<=plan.levels;l++){
+            const [w,h]=sizes[l],s=this.#glowSurface(`level${l}`,w,h),c=s.context;
+            if(l===1){c.filter=thresholdFilter(plan.threshold);c.drawImage(surface,0,0,w,h);c.filter='none';
+                if(tinted){const shape=opaque?null:this.#glowSurface('shape',w,h);if(shape)shape.context.drawImage(s.surface,0,0);
+                    c.globalCompositeOperation='multiply';c.fillStyle=`rgb(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)})`;c.fillRect(0,0,w,h);if(shape){c.globalCompositeOperation='destination-in';c.drawImage(shape.surface,0,0);}c.globalCompositeOperation='source-over';}}
+            else c.drawImage(levels[l-1].surface,0,0,w,h);
+            levels.push(s);
+        }
+        const spreads=plan.spreads.map((sp,i)=>{
+            const [w,h]=sizes[sp.level],from=levels[sp.level].surface,o=this.#glowSurface(`spread${i}`,w,h),c=o.context;
+            if(!sp.dir){c.filter=`blur(${sp.sigma}px)`;c.drawImage(from,0,0);c.filter='none';}
+            else{const n=Math.ceil(sp.sigma*3),weights=steps255(n,sp.sigma);
+                c.globalCompositeOperation='lighter';for(let k=-n;k<=n;k++)if(weights[k+n]){c.globalAlpha=weights[k+n]/255;c.drawImage(from,k*sp.dir[0],k*sp.dir[1]);}}
+            return [o.surface,sp.weight];
+        });
+        const [sw,sh]=sizes[plan.sum],sum=this.#glowSurface('sum',sw,sh),c=sum.context;c.globalCompositeOperation='lighter';
+        for(const [o,weight] of spreads)for(let k=plan.strength*weight;k>1e-4;k-=1){c.globalAlpha=Math.min(1,k);c.drawImage(o,0,0,sw,sh);}
+        ctx.setTransform(1,0,0,1,0,0);ctx.globalCompositeOperation='lighter';ctx.imageSmoothingEnabled=true;ctx.globalAlpha=1;ctx.drawImage(sum.surface,0,0,W,H);
+    }
     // A copy of a surface's pixels, on a kept surface the same size.
     #copyOf(surface){
         if(!this.#copy){const s=this.#createSurface(surface.width,surface.height);this.#copy={surface:s,context:s.getContext('2d')};}
@@ -283,7 +311,7 @@ export class canvasRenderer {
                     ctx.imageSmoothingEnabled=false;ctx.globalCompositeOperation='overlay';ctx.globalAlpha=e.amount;ctx.fillStyle=pattern;
                     ctx.setTransform(size,0,0,size,-ox*size,-oy*size);ctx.fillRect(ox,oy,W/size,H/size);
                     if(shape){ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='destination-in';ctx.drawImage(shape,0,0);}
-                }
+                }else if(GLOWS.includes(e.type))this.#glow(surface,ctx,e,sx,opaque);
             }
         }finally{ctx.restore();this.#set={};}
     }
@@ -293,9 +321,17 @@ export class canvasRenderer {
         if(!this.#layer){const surface=this.#createSurface(w,h),context=surface.getContext('2d');if(!context)throw new Error('Layer surface unavailable');this.#layer={surface,context};}
         if(this.#layer.surface.width!==w)this.#layer.surface.width=w;if(this.#layer.surface.height!==h)this.#layer.surface.height=h;return this.#layer;
     }
-    dispose(){if(this.#disposed)return;this.#disposed=true;this.#generation++;for(const entry of this.#resources.values())this.#release(entry);this.#resources.clear();this.#pictures.clear();if(this.#layer)this.#release(this.#layer);this.#layer=null;this.#scratch=null;this.#context=null;this.#surface=null;}
+    dispose(){if(this.#disposed)return;this.#disposed=true;this.#generation++;for(const entry of this.#resources.values())this.#release(entry);this.#resources.clear();this.#pictures.clear();if(this.#layer)this.#release(this.#layer);this.#layer=null;this.#scratch=null;this.#glows.clear();this.#copy=null;this.#context=null;this.#surface=null;}
 }
 
+// A Gaussian's 2n+1 weights in 255ths summing to exactly 255: Canvas keeps an opacity in 255ths, so weights
+// rounded one by one would add up to more or less than the whole and brighten or dim a streak.
+function steps255(n,sigma){
+    const raw=[];let total=0;for(let k=-n;k<=n;k++){const v=Math.exp(-k*k/(2*sigma*sigma));raw.push(v);total+=v;}
+    const exact=raw.map(v=>v/total*255),out=exact.map(Math.floor);let left=255-out.reduce((a,b)=>a+b,0);
+    for(const i of exact.map((v,i)=>[v-Math.floor(v),i]).sort((a,b)=>b[0]-a[0]).map(([,i])=>i)){if(left<=0)break;out[i]++;left--;}
+    return out;
+}
 // Whether a frame's screen ends fully opaque: cleared to an opaque colour first, and nothing drawn on it cuts
 // holes. Then effects need not keep its shape, which saves two copies of the screen each.
 const CUTS=new Set(['source-in','source-out','destination-in','destination-out']);

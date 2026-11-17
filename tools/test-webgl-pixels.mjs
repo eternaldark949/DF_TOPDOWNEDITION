@@ -164,3 +164,39 @@ test('WebGL draws effects as Canvas does: a grade and grain on one layer, a vign
         assert.ok(mean < 2.5, `mean channel difference ${mean.toFixed(2)} (${JSON.stringify(options)})`); assert.ok(share < .02, `${(share * 100).toFixed(2)}% of pixels differ by more than 24, worst ${worst} (${JSON.stringify(options)})`);
     }
 });
+
+// Light: bright lamps on a dark street, with bloom, fog glow or star glow on the frame, or a tinted bloom on one layer.
+const lights = async ({ pixel_ratio = 1, frame = [], layer = null } = {}) => {
+    const R = await import('/src/engine/basement/rendering/index.mjs'), { physicsSystem } = await import('/src/engine/basement/physics/index.mjs');
+    const W = 160 * pixel_ratio, H = 120 * pixel_ratio, surfaces = [];
+    const camera = new R.cameraSystem({ position: [80, 60], viewport: { width: 160, height: 120, pixel_ratio } });
+    const render = new R.renderSystem({ physics_system: new physicsSystem(), camera, create_surface: () => { const c = Object.assign(document.createElement('canvas'), { width: W, height: H }); surfaces.push(c); return c; } });
+    render.registerRenderer('canvas', R.canvasRenderer).registerRenderer('webgl', R.webglRenderer);
+    await render.setRenderer('canvas'); render.setEffects(frame); if (layer) render.setLayerEffects(2, layer);
+    const draw = () => {
+        const f = render.beginFrame(); f.clear('#10141c');
+        f.submit({ type: 'shape', geometry: { type: 'rect', size: [160, 30] }, position: [80, 105], material: { fill: '#2a2e38' } });
+        for (const [x, y, r, c] of [[30, 40, 5, '#fff6d0'], [80, 30, 3, '#ffffff'], [130, 45, 6, '#ff60c0'], [60, 90, 2, '#a0e0ff']]) f.submit({ type: 'shape', layer: 2, geometry: { type: 'ellipse', radii: [r, r] }, position: [x, y], material: { fill: c } });
+        f.submit({ type: 'shape', geometry: { type: 'rect', size: [50, 6] }, position: [110, 80], material: { fill: '#40ffe0' } });
+        render.endFrame();
+    };
+    const grab = () => { const c = surfaces.at(-1), out = Object.assign(document.createElement('canvas'), { width: W, height: H }), ctx = out.getContext('2d'); ctx.drawImage(c, 0, 0); return [...ctx.getImageData(0, 0, W, H).data]; };
+    draw(); const canvas = grab(); await render.setRenderer('webgl'); draw(); const webgl = grab(); render.dispose();
+    return { W, H, canvas, webgl };
+};
+const LIGHT_CASES = [
+    { frame: [{ type: 'bloom' }] },
+    { frame: [{ type: 'fog_glow', strength: 1.5 }] },
+    { frame: [{ type: 'star_glow', rays: 6 }] },
+    { layer: [{ type: 'bloom', color: '#ffb060', strength: 1.2, threshold: .3 }], frame: [{ type: 'bloom', radius: 2 }] },
+    { pixel_ratio: 2, frame: [{ type: 'bloom', radius: 6 }, { type: 'star_glow', length: 30 }] },
+];
+
+test('WebGL adds light as Canvas does: bloom, fog glow, star glow, a tinted bloom on one layer, and at twice the density', { skip: !chromium && 'Playwright is not installed' }, async () => {
+    for (const options of LIGHT_CASES) {
+        // Canvas adds light in 8-bit steps, each rounded to the nearest 255th, which leans up: a streak, some
+        // fifty stamps of a few 255ths each, ends about 5% brighter on Canvas (measured), so star glow is held to less
+        const { mean, share, worst } = compare(await inBrowser(lights, options)), streaks = options.frame.some(e => e.type === 'star_glow');
+        assert.ok(mean < (streaks ? 5 : 3.5), `mean channel difference ${mean.toFixed(2)} (${JSON.stringify(options)})`); assert.ok(share < .02, `${(share * 100).toFixed(2)}% of pixels differ by more than 24, worst ${worst} (${JSON.stringify(options)})`);
+    }
+});

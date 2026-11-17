@@ -597,6 +597,12 @@
    "kind": "effects",
    "effects": [
     {
+     "type": "bloom",
+     "threshold": 0.55,
+     "strength": 1.6,
+     "radius": 10
+    },
+    {
      "type": "grade",
      "exposure": -0.2,
      "contrast": 1.25,
@@ -616,6 +622,12 @@
   "foggy_dawn": {
    "kind": "effects",
    "effects": [
+    {
+     "type": "fog_glow",
+     "threshold": 0.55,
+     "strength": 0.6,
+     "radius": 48
+    },
     {
      "type": "grade",
      "exposure": 0.25,

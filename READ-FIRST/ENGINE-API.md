@@ -179,7 +179,7 @@ One drawing contract in the Basement, with Canvas as its first backend and WebGL
 | `drawText`, `drawImage` | Words and pictures | have `drawText`; `drawImage` missing |
 | `fill` and `stroke`: a colour or a gradient (`linear`, `radial`) | How a shape is painted | have |
 | `shadow`, `blur`, `alpha`, `blend` on a step; `glow` and `ground_shadow` steps | Shadow, see-through, blending, light | have |
-| `render.setEffects(stack)`, `render.setLayerEffects(layer, stack)`; `effects` presets in the Directory | Post effects on the whole picture or one layer, as data: colour grade, vignette, film grain; bloom, glow and bokeh to come | have grade, vignette, grain on Canvas and WebGL |
+| `render.setEffects(stack)`, `render.setLayerEffects(layer, stack)`; `effects` presets in the Directory | Post effects on the whole picture or one layer, as data: colour grade, vignette, film grain, bloom, fog glow, star glow; bokeh to come | have all but bokeh on Canvas and WebGL |
 | `scene.draw(drawing, {at, rotation, scale, values})` | Draws a whole drawing in the object's local space, `group` steps nested, `"$name"` values from its look | have |
 | `material: "brass"` on a step | Names a material record: paint fields plus a physical `surface` (friction, restitution, hit sound, hit effect, footstep); unknown fields refused | have |
 | `fill: {type: "pattern", image, repeat}` | A texture: a registered image repeated across the shape, moving with its object | have |
