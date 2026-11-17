@@ -32,7 +32,15 @@ export function material(packet={},out={}){
     out.line_cap=packet.line_cap??'butt';out.line_join=packet.line_join??'miter';if(!['butt','round','square'].includes(out.line_cap)||!['miter','bevel','round'].includes(out.line_join))throw new TypeError('Invalid line style');
     const dash=packet.dash??[];if(!Array.isArray(dash))throw new TypeError('Dash must be an array');out.dash??=[];out.dash.length=dash.length;dash.forEach((v,i)=>{out.dash[i]=finite(v,'dash length',0);});out.dash_offset=finite(packet.dash_offset??0,'dash offset');
     if(packet.shadow){out.shadow??={};out.shadow.color=color(packet.shadow.color);out.shadow.blur=finite(packet.shadow.blur??0,'shadow blur',0);out.shadow.offset=vector(packet.shadow.offset??[0,0],'shadow offset',out.shadow.offset);}else out.shadow=null;
-    out.blur=finite(packet.blur??0,'blur',0);
+    // A blur spreads the same every way (a number), or {spread: along | [along, across], angle}: along `angle` in
+    // the packet's own frame and across it, for a streak. `blur` is the widest spread, 0 for none.
+    const blur=packet.blur??0;
+    if(typeof blur==='number'){out.blur=finite(blur,'blur',0);out.blur_spread=[out.blur,out.blur];out.blur_angle=0;}
+    else if(blur&&typeof blur==='object'){
+        const spread=blur.spread??0,[along,across]=Array.isArray(spread)?spread:[spread,0];
+        if(Array.isArray(spread)&&spread.length!==2)throw new TypeError('A blur spread is a number or [along, across]');
+        out.blur_spread=[finite(along,'blur along',0),finite(across,'blur across',0)];out.blur_angle=finite(blur.angle??0,'blur angle');out.blur=Math.max(...out.blur_spread);
+    }else throw new TypeError('A blur is a number or {spread, angle}');
     return out;
 }
 export function packet(input,out={}){

@@ -333,21 +333,28 @@ export class webglRenderer {
     }
     /**
      * A blurred or shadowed packet: drawn sharp on a scratch surface around it (smaller when the blur is wide),
-     * blurred there in two passes, then laid on the surface under the packet's clips and blend: the shadow in its
-     * colour at its offset first, then the packet itself, blurred or sharp. Blurs are Canvas's: `blur` is the
-     * spread, a shadow's `blur` twice it, both in pass units.
+     * blurred there one direction at a time, then laid on the surface under the packet's clips and blend: the
+     * shadow in its colour at its offset first, then the packet itself, blurred or sharp. Blurs are Canvas's: a
+     * blur's spread, a shadow's `blur` twice it, both in pass units. A directional blur spreads `along` its
+     * angle (in the packet's own frame) and `across` it; the shadow is cast from the blurred packet.
      */
     #soft(d,m,material,clips,opacity,blend,context){
         const back=this.#bound,k=Math.max(context.sx,context.sy),shadow=material.shadow,box=this.#extent(d,m,material);
-        const blur=material.blur*k,cast=shadow?Math.hypot(shadow.blur*k/2,blur):0,sigma=Math.max(blur,cast),pad=Math.ceil(3*sigma)+2;
+        const [along,across]=material.blur?material.blur_spread.map(v=>v*k):[0,0],cast=shadow?shadow.blur*k/2:0,sigma=Math.max(along,across,Math.hypot(cast,Math.max(along,across))),pad=Math.ceil(3*sigma)+2;
         const ox=shadow?shadow.offset[0]*context.sx:0,oy=shadow?shadow.offset[1]*context.sy:0;
         if(box){
             const x0=Math.floor(Math.max(box[0]-pad,-pad-Math.abs(ox))),y0=Math.floor(Math.max(box[1]-pad,-pad-Math.abs(oy))),x1=Math.ceil(Math.min(box[2]+pad,back.width+pad+Math.abs(ox))),y1=Math.ceil(Math.min(box[3]+pad,back.height+pad+Math.abs(oy)));
             if(x1>x0&&y1>y0){
                 const most=Math.min(this.#maxTexture,2048),s=Math.min(1,sigma>BLUR_SIGMA?BLUR_SIGMA/sigma:1,most/(x1-x0),most/(y1-y0)),w=Math.ceil((x1-x0)*s),h=Math.ceil((y1-y0)*s);
-                const [a]=this.#scratchFor(w,h);
+                const [a,,c,e]=this.#scratchFor(w,h);
                 try{
                     this.#bind(a);this.#clearRegion(w,h);this.#plain(d,multiply([s,0,0,s,-x0*s,-y0*s],m),material,[],1,'normal');this.#resolve(a);
+                    // the packet's own blur: along its angle and across it, or the same both ways
+                    let content=a;
+                    if(material.blur&&Math.max(along,across)*s>.05){
+                        const t=material.blur_angle,dx=m[0]*Math.cos(t)+m[2]*Math.sin(t),dy=m[1]*Math.cos(t)+m[3]*Math.sin(t),l=Math.hypot(dx,dy)||1,dir=along===across?[1,0]:[dx/l,dy/l];
+                        content=this.#blurred(a,c,w,h,[[dir,along*s],[[-dir[1],dir[0]],across*s]]);
+                    }
                     const lay=(surface,mode,dx,dy)=>{
                         this.#bind(back);const clipped=clips.length>0;if(clipped)this.#clip(clips);
                         try{this.#blend(blend);this.#rows([1/s,0,0,1/s,x0+dx,y0+dy]);this.#direct(clipped);this.#texturePaint(surface.texture,[1/surface.width,-1/surface.height,0,1],opacity);
@@ -355,33 +362,40 @@ export class webglRenderer {
                             this.#draw(quad(0,0,w,h));}
                         finally{if(clipped)this.#clearStencil();}
                     };
-                    if(shadow&&premultiplied(shadow.color,1)[3]>0)lay(cast*s>.05?this.#blurred(w,h,cast*s):a,5,ox,oy);
-                    if(blur*s>.05){lay(this.#blurred(w,h,blur*s),4,0,0);return;}
+                    if(shadow&&premultiplied(shadow.color,1)[3]>0)lay(cast*s>.05?this.#blurred(content,e,w,h,[[[1,0],cast*s],[[0,1],cast*s]]):content,5,ox,oy);
+                    if(content!==a){lay(content,4,0,0);return;}
                 }finally{this.#bind(back);}
             }
         }
         if(!material.blur)this.#plain(d,m,material,clips,opacity,blend);
     }
     #clearRegion(w,h){const gl=this.#gl;gl.enable(gl.SCISSOR_TEST);gl.scissor(0,this.#bound.height-h,w,h);gl.colorMask(true,true,true,true);gl.stencilMask(0xff);gl.clearColor(0,0,0,0);gl.clearStencil(0);gl.clear(gl.COLOR_BUFFER_BIT|gl.STENCIL_BUFFER_BIT);gl.disable(gl.SCISSOR_TEST);}
-    // Three scratch surfaces at least w by h, grown in steps of 256 and kept.
+    // Four scratch surfaces at least w by h (sharp, between passes, blurred, shadow), grown in steps of 256 and kept.
     #scratchFor(w,h){
         const sc=this.#scratch;if(sc&&sc[0].width>=w&&sc[0].height>=h)return sc;
         const W=Math.ceil(Math.max(w,sc?.[0].width??0)/256)*256,H=Math.ceil(Math.max(h,sc?.[0].height??0)/256)*256;
-        if(sc)for(const t of sc)this.#freeTarget(t);this.#scratch=null;this.#scratch=[this.#target(W,H),this.#target(W,H),this.#target(W,H)];return this.#scratch;
+        if(sc)for(const t of sc)this.#freeTarget(t);this.#scratch=null;this.#scratch=[0,1,2,3].map(()=>this.#target(W,H));return this.#scratch;
     }
-    // The first scratch surface's top-left w by h blurred by sigma (pixels) into the third, through the second.
-    #blurred(w,h,sigma){
-        const gl=this.#gl,u=this.#blurUniforms,[a,b,c]=this.#scratch;gl.useProgram(this.#blurProgram);
+    /**
+     * The top-left w by h of `from` blurred into `into` by each [direction, sigma] in turn (pixels; a direction
+     * on the surface, y down), through the second scratch surface between passes. Returns `into`.
+     */
+    #blurred(from,into,w,h,passes){
+        const gl=this.#gl,u=this.#blurUniforms,between=this.#scratch[1],steps=passes.filter(([,sigma])=>sigma>.05);if(!steps.length)steps.push(passes[0]);
+        gl.useProgram(this.#blurProgram);
         try{
             gl.blendEquation(gl.FUNC_ADD);gl.blendFuncSeparate(gl.ONE,gl.ZERO,gl.ONE,gl.ZERO);gl.activeTexture(gl.TEXTURE0);gl.bindSampler(0,this.#samplers.clamp);
-            for(const [from,into,dir] of [[a,b,[1,0]],[b,c,[0,1]]]){
-                this.#bind(into);this.#clearRegion(w,h);this.#direct(false);
-                const W=into.width,H=into.height;gl.uniform3f(u.u_row0,2/W,0,-1);gl.uniform3f(u.u_row1,0,-2/H,1);
-                gl.bindTexture(gl.TEXTURE_2D,from.texture);gl.uniform2f(u.u_size,from.width,from.height);gl.uniform2f(u.u_region,w,h);gl.uniform2f(u.u_dir,...dir);gl.uniform1f(u.u_sigma,sigma);
-                this.#draw(quad(0,0,w,h));this.#resolve(into);
-            }
+            let source=from;
+            steps.forEach(([dir,sigma],i)=>{
+                const target=i===steps.length-1?into:(source===between?into:between);
+                this.#bind(target);this.#clearRegion(w,h);this.#direct(false);
+                const W=target.width,H=target.height;gl.uniform3f(u.u_row0,2/W,0,-1);gl.uniform3f(u.u_row1,0,-2/H,1);
+                // the surface's rows run bottom-up, so a direction down the screen is up the texture
+                gl.bindTexture(gl.TEXTURE_2D,source.texture);gl.uniform2f(u.u_size,source.width,source.height);gl.uniform2f(u.u_region,w,h);gl.uniform2f(u.u_dir,dir[0],-dir[1]);gl.uniform1f(u.u_sigma,Math.max(sigma,1e-3));
+                this.#draw(quad(0,0,w,h));this.#resolve(target);source=target;
+            });
         }finally{gl.useProgram(this.#program);}
-        return c;
+        return into;
     }
     #clear(color){const gl=this.#gl,[r,g,b,a]=color===false?[0,0,0,0]:premultiplied(color);gl.colorMask(true,true,true,true);gl.stencilMask(0xff);gl.clearColor(r,g,b,a);gl.clearStencil(0);gl.clear(color===false?gl.STENCIL_BUFFER_BIT:gl.COLOR_BUFFER_BIT|gl.STENCIL_BUFFER_BIT);}
     render(frame){

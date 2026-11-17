@@ -5,6 +5,7 @@ import {BLENDS,CAPABILITIES} from './values.mjs';
 /** Canvas's own composite operation for each engine blend name. */
 const COMPOSITE=Object.freeze({normal:'source-over',add:'lighter',multiply:'multiply',screen:'screen','source-in':'source-in','source-out':'source-out','destination-in':'destination-in','destination-out':'destination-out','source-atop':'source-atop','destination-over':'destination-over',overlay:'overlay','soft-light':'soft-light',lighten:'lighten',darken:'darken'});
 import {geometry} from './packets.mjs';
+import {flattenGeometry,pathBounds} from './paths.mjs';
 
 function createSurface(width,height){
     if(typeof OffscreenCanvas!=='undefined')return new OffscreenCanvas(width,height);
@@ -144,7 +145,7 @@ export class canvasRenderer {
         set('lineWidth',m.stroke_width||1);set('lineCap',m.line_cap);set('lineJoin',m.line_join);
         const dash=m.dash.length?m.dash.join(','):'';if(st.dash!==dash){ctx.setLineDash(m.dash);st.dash=dash;}set('lineDashOffset',m.dash_offset);
         set('shadowColor',m.shadow?.color??'transparent');set('shadowBlur',(m.shadow?.blur??0)*Math.max(sx,sy));set('shadowOffsetX',(m.shadow?.offset[0]??0)*sx);set('shadowOffsetY',(m.shadow?.offset[1]??0)*sy);
-        set('filter',m.blur?`blur(${m.blur*Math.max(sx,sy)}px)`:'none');
+        set('filter',m.blur&&m.blur_spread[0]===m.blur_spread[1]?`blur(${m.blur*Math.max(sx,sy)}px)`:'none');
     }
     #geometry(id,inline){return id?this.#resources.get(id):{descriptor:{geometry:inline},path:null};}
     #shape(ctx,entry,m){
@@ -168,7 +169,13 @@ export class canvasRenderer {
             const m=draw.space==='world'?view.world_to_screen:[1,0,0,1,0,0];ctx.setTransform(m[0]*sx,m[1]*sy,m[2]*sx,m[3]*sy,m[4]*sx,m[5]*sy);ctx.transform(...draw.transform);
             for(const clip of draw.clips){ctx.transform(...clip.transform);const entry=this.#geometry(clip.geometry_id,clip.geometry);if(entry.path)ctx.clip(entry.path,clip.rule);else{buildPath(ctx,entry.descriptor.geometry);ctx.clip(clip.rule);}ctx.transform(...clip.inverse);}
             if(draw.type==='picture'){this.#picture(ctx,draw,layered);return;}
-            const material=draw.material_id?this.#resources.get(draw.material_id).descriptor.material:draw.material;this.#style(ctx,material,draw,sx,sy);
+            const material=draw.material_id?this.#resources.get(draw.material_id).descriptor.material:draw.material;
+            if(material.blur&&material.blur_spread[0]!==material.blur_spread[1]){this.#streak(ctx,draw,material,sx,sy);return;}
+            this.#style(ctx,material,draw,sx,sy);this.#paint2d(ctx,draw,material);
+        }finally{if(clipped){ctx.restore();this.#set={};}}
+    }
+    // What a packet draws, with the context already placed and styled.
+    #paint2d(ctx,draw,material){
             if(draw.type==='shape')this.#shape(ctx,this.#geometry(draw.geometry_id,draw.geometry),material);
             else if(draw.type==='sprite'){
                 const image=this.#resources.get(draw.resource_id).image,[w,h]=draw.size;
@@ -178,7 +185,51 @@ export class canvasRenderer {
                 if(material.fill!==null)ctx.fillText(draw.text,0,0);if(material.stroke!==null&&material.stroke_width>0)ctx.strokeText(draw.text,0,0);
                 if(f.letter_spacing&&'letterSpacing' in ctx)ctx.letterSpacing='0px';
             }
-        }finally{if(clipped){ctx.restore();this.#set={};}}
+    }
+    /**
+     * A directional blur, which Canvas's blur filter cannot spread: the packet is drawn sharp on a scratch surface
+     * around it (smaller when the blur is wide), stamped along its angle and then across it with Gaussian weights
+     * (the sum the WebGL backend's passes take), then laid on the context under its clips, blend and shadow.
+     */
+    #streak(ctx,draw,m,sx,sy){
+        const T=ctx.getTransform(),M=[T.a,T.b,T.c,T.d,T.e,T.f],k=Math.max(sx,sy),[along,across]=m.blur_spread.map(v=>v*k),sigma=Math.max(along,across),pad=Math.ceil(3*sigma)+2;
+        const ox=m.shadow?m.shadow.offset[0]*sx:0,oy=m.shadow?m.shadow.offset[1]*sy:0,box=this.#extent(draw,m,M);if(!box)return;
+        const x0=Math.floor(Math.max(box[0]-pad,-pad-Math.abs(ox))),y0=Math.floor(Math.max(box[1]-pad,-pad-Math.abs(oy))),x1=Math.ceil(Math.min(box[2]+pad,ctx.canvas.width+pad+Math.abs(ox))),y1=Math.ceil(Math.min(box[3]+pad,ctx.canvas.height+pad+Math.abs(oy)));
+        if(!(x1>x0&&y1>y0))return;
+        const s=Math.min(1,sigma>8?8/sigma:1,2048/(x1-x0),2048/(y1-y0)),w=Math.ceil((x1-x0)*s),h=Math.ceil((y1-y0)*s),[a,b]=this.#scratchFor(w,h);
+        const fresh=c=>{c.setTransform(1,0,0,1,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';c.filter='none';c.shadowColor='transparent';c.shadowBlur=0;c.clearRect(0,0,w,h);};
+        fresh(a.context);a.context.setTransform(s*M[0],s*M[1],s*M[2],s*M[3],s*(M[4]-x0),s*(M[5]-y0));
+        this.#set={};try{this.#style(a.context,{...m,blur:0,shadow:null},{opacity:1,blend:'normal'},sx,sy);this.#paint2d(a.context,draw,m);}finally{this.#set={};}
+        const t=m.blur_angle,dx=M[0]*Math.cos(t)+M[2]*Math.sin(t),dy=M[1]*Math.cos(t)+M[3]*Math.sin(t),l=Math.hypot(dx,dy)||1,ux=dx/l,uy=dy/l;
+        const stamp=(from,into,vx,vy,sig)=>{
+            const c=into.context;fresh(c);if(sig<=.05){c.drawImage(from.surface,0,0,w,h,0,0,w,h);return;}
+            const r=Math.ceil(sig*3),weights=[];let total=0;for(let i=-r;i<=r;i++){const v=Math.exp(-i*i/(2*sig*sig));weights.push(v);total+=v;}
+            c.globalCompositeOperation='lighter';for(let i=-r;i<=r;i++){c.globalAlpha=weights[i+r]/total;c.drawImage(from.surface,0,0,w,h,i*vx,i*vy,w,h);}
+        };
+        stamp(a,b,ux,uy,along*s);stamp(b,a,-uy,ux,across*s);
+        ctx.save();
+        try{
+            ctx.setTransform(1/s,0,0,1/s,x0,y0);ctx.globalAlpha=draw.opacity;ctx.globalCompositeOperation=COMPOSITE[draw.blend];ctx.filter='none';
+            if(m.shadow){ctx.shadowColor=m.shadow.color;ctx.shadowBlur=m.shadow.blur*k;ctx.shadowOffsetX=ox;ctx.shadowOffsetY=oy;}else ctx.shadowColor='transparent';
+            ctx.imageSmoothingEnabled=true;ctx.drawImage(a.surface,0,0,w,h,0,0,w,h);
+        }finally{ctx.restore();this.#set={};}
+    }
+    // Where a packet draws under the matrix M: [left, top, right, bottom] in the surface's pixels, or null.
+    #extent(draw,m,M){
+        let local;
+        if(draw.type==='shape'){const pad=m.stroke!==null&&m.stroke_width>0?m.stroke_width*(m.line_join==='miter'?5:1):0;local=pathBounds(flattenGeometry(this.#geometry(draw.geometry_id,draw.geometry).descriptor.geometry,1),pad+1);}
+        else if(draw.type==='sprite'){const [w,h]=draw.size,x0=-w*draw.origin[0],y0=-h*draw.origin[1];local=[x0,y0,x0+w,y0+h];}
+        else{const f=draw.font,size=measureText(draw.text,f,{create_surface:this.#createSurface}),x=draw.align==='center'?-size.width/2:draw.align==='right'?-size.width:0;local=[x-f.size,-f.size*1.5,x+size.width+f.size,f.size*1.5];}
+        if(!local)return null;let l=Infinity,t=Infinity,r=-Infinity,b=-Infinity;
+        for(const [x,y] of [[local[0],local[1]],[local[2],local[1]],[local[0],local[3]],[local[2],local[3]]]){const px=M[0]*x+M[2]*y+M[4],py=M[1]*x+M[3]*y+M[5];if(px<l)l=px;if(px>r)r=px;if(py<t)t=py;if(py>b)b=py;}
+        return [l,t,r,b];
+    }
+    #scratch=null;
+    // Two scratch surfaces at least w by h, grown in steps of 256 and kept.
+    #scratchFor(w,h){
+        const sc=this.#scratch;if(sc&&sc[0].surface.width>=w&&sc[0].surface.height>=h)return sc;
+        const W=Math.ceil(Math.max(w,sc?.[0].surface.width??0)/256)*256,H=Math.ceil(Math.max(h,sc?.[0].surface.height??0)/256)*256;
+        this.#scratch=[0,1].map(()=>{const surface=this.#createSurface(W,H),context=surface.getContext('2d');if(!context)throw new Error('Scratch surface unavailable');return {surface,context};});return this.#scratch;
     }
     render(frame){
         this.#live();
@@ -206,7 +257,7 @@ export class canvasRenderer {
         if(!this.#layer){const surface=this.#createSurface(w,h),context=surface.getContext('2d');if(!context)throw new Error('Layer surface unavailable');this.#layer={surface,context};}
         if(this.#layer.surface.width!==w)this.#layer.surface.width=w;if(this.#layer.surface.height!==h)this.#layer.surface.height=h;return this.#layer;
     }
-    dispose(){if(this.#disposed)return;this.#disposed=true;this.#generation++;for(const entry of this.#resources.values())this.#release(entry);this.#resources.clear();this.#pictures.clear();if(this.#layer)this.#release(this.#layer);this.#layer=null;this.#context=null;this.#surface=null;}
+    dispose(){if(this.#disposed)return;this.#disposed=true;this.#generation++;for(const entry of this.#resources.values())this.#release(entry);this.#resources.clear();this.#pictures.clear();if(this.#layer)this.#release(this.#layer);this.#layer=null;this.#scratch=null;this.#context=null;this.#surface=null;}
 }
 
 let measurer=null;

@@ -90,4 +90,8 @@ test('blur is paint like any other: a step asks for it, the packet carries it, a
  const [p]=art.finish(),normal=packet(p);assert.equal(normal.material.blur,1.5);assert.ok(requirements(normal,()=>null).includes('blur'));
  assert.equal(packet({type:'shape',geometry:{type:'rect',size:[1,1]}}).material.blur,0,'sharp by default');
  assert.throws(()=>packet({type:'shape',geometry:{type:'rect',size:[1,1]},material:{blur:-1}}),/blur/);
+ const streak=packet({type:'shape',geometry:{type:'rect',size:[1,1]},material:{blur:{spread:[6,1],angle:.5}}}).material;
+ assert.deepEqual([streak.blur,streak.blur_spread,streak.blur_angle],[6,[6,1],.5],'a streak spreads along its angle and across it');
+ assert.deepEqual(packet({type:'shape',geometry:{type:'rect',size:[1,1]},material:{blur:{spread:4}}}).material.blur_spread,[4,0],'a lone spread is all along');
+ assert.throws(()=>packet({type:'shape',geometry:{type:'rect',size:[1,1]},material:{blur:'soft'}}),/blur/);
 });

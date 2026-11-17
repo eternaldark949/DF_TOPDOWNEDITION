@@ -100,7 +100,7 @@ test('and at twice the pixel density under a turned, zoomed camera', { skip: !ch
 });
 
 // Blur and shadows: the same soft frame on both backends.
-const soft = async ({ pixel_ratio = 1, zoom = 1 } = {}) => {
+const soft = async ({ pixel_ratio = 1, zoom = 1, streaks = true } = {}) => {
     const R = await import('/src/engine/basement/rendering/index.mjs'), { physicsSystem } = await import('/src/engine/basement/physics/index.mjs');
     const W = 160 * pixel_ratio, H = 120 * pixel_ratio, surfaces = [];
     const camera = new R.cameraSystem({ position: [80, 60], zoom, viewport: { width: 160, height: 120, pixel_ratio } });
@@ -113,6 +113,10 @@ const soft = async ({ pixel_ratio = 1, zoom = 1 } = {}) => {
         frame.submit({ type: 'shape', geometry: { type: 'ellipse', radii: [18, 10] }, position: [110, 30], material: { fill: 'rgba(10,0,30,0.7)', blur: 3 } });
         frame.submit({ type: 'shape', geometry: { type: 'path', commands: [['move', -25, 0], ['quadratic', 0, -18, 25, 0]] }, position: [45, 88], material: { fill: null, stroke: 'rgba(0,0,0,0.6)', stroke_width: 6, blur: 1.5 } });
         frame.submit({ type: 'shape', geometry: { type: 'ellipse', radii: [22, 22] }, position: [115, 85], material: { fill: '#e0a020', blur: 12 }, opacity: .8, clips: [{ geometry: { type: 'rect', size: [36, 60] } }] });
+        if (streaks) {
+            frame.submit({ type: 'shape', geometry: { type: 'rect', size: [16, 10] }, position: [80, 62], rotation: .5, material: { fill: '#c02040', blur: { spread: [7, 0], angle: 0 } } });
+            frame.submit({ type: 'shape', geometry: { type: 'ellipse', radii: [6, 6] }, position: [80, 100], material: { fill: '#103080', blur: { spread: [10, 1.5], angle: 2.4 }, shadow: { color: 'rgba(0,0,0,0.5)', blur: 4, offset: [0, 6] } } });
+        }
         render.endFrame();
     };
     const grab = () => { const c = surfaces.at(-1), out = Object.assign(document.createElement('canvas'), { width: W, height: H }), ctx = out.getContext('2d'); ctx.drawImage(c, 0, 0); return [...ctx.getImageData(0, 0, W, H).data]; };
@@ -121,7 +125,7 @@ const soft = async ({ pixel_ratio = 1, zoom = 1 } = {}) => {
 };
 const compare = ({ W, H, canvas, webgl }) => { let total = 0, far = 0, worst = 0; for (let i = 0; i < canvas.length; i += 4) { let d = 0; for (let c = 0; c < 4; c++) d = Math.max(d, Math.abs(canvas[i + c] - webgl[i + c])); total += d; worst = Math.max(worst, d); if (d > 24) far++; } return { mean: total / (W * H), share: far / (W * H), worst }; };
 
-test('WebGL blurs and casts shadows as Canvas does: a soft shadow, a blurred fill, a blurred stroke and a clipped glow', { skip: !chromium && 'Playwright is not installed' }, async () => {
+test('WebGL blurs and casts shadows as Canvas does: a soft shadow, a blurred fill, a blurred stroke, a clipped glow and streaks along an angle', { skip: !chromium && 'Playwright is not installed' }, async () => {
     for (const options of [{}, { pixel_ratio: 2, zoom: 1.5 }]) {
         const { mean, share, worst } = compare(await inBrowser(soft, options));
         assert.ok(mean < 2.5, `mean channel difference ${mean.toFixed(2)} (${JSON.stringify(options)})`); assert.ok(share < .02, `${(share * 100).toFixed(2)}% of pixels differ by more than 24, worst ${worst}`);
