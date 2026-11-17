@@ -26,6 +26,12 @@ import { particlePhysics } from '../particles/particles.mjs';
 import { navigationSystem } from '../navigation/system.mjs';
 
 /** Standalone fixed-step world. Exactly one spatialGrid is constructed here. */
+/** Gravity is [x, y] across the ground, or [x, y, z] with z pulling up (+) or down (-). Kept as three. */
+function gravityVector(v) {
+    if (!Array.isArray(v) || (v.length !== 2 && v.length !== 3)) throw new TypeError('gravity must be [x, y] or [x, y, z]');
+    return [number(v[0], 'gravity'), number(v[1], 'gravity'), number(v[2] ?? 0, 'gravity')];
+}
+const Z_EPS = 1e-3;
 export class physicsSystem {
     #bodies = new Map(); #moving = new Set(); #constraints = new Map(); #listeners = new Map();
     #queue = []; #events = []; #contacts = new Map(); #stepContacts = new Map();
@@ -35,10 +41,11 @@ export class physicsSystem {
     #stepAuthority; #broadphaseEpoch=0; #candidateCache=null;
     #queries; #particles; #attachments; #projectilePolicies=new Set(); #lightChanges;
     #stats = { steps: 0, narrow_checks: 0, candidate_pairs: 0, active_movers: 0, spatial_sync_requests: 0, spatial_sync_skips: 0, bounds_calculations: 0, swept_bounds_calculations: 0, attachment_placements: 0, broadphase_builds: 0, broadphase_reuses: 0 };
-    constructor({ cell_size = 128, fixed_step = 1 / 60, gravity = [0, 0], solver_iterations = 6, sleep_speed = 0.05, sleep_delay = 0.5, asset_library, step_authority, navigation } = {}) {
+    constructor({ cell_size = 128, fixed_step = 1 / 60, gravity = [0, 0], floor = 0, solver_iterations = 6, sleep_speed = 0.05, sleep_delay = 0.5, asset_library, step_authority, navigation } = {}) {
         if (step_authority !== undefined && typeof step_authority !== 'symbol') throw new TypeError('step_authority must be a private Symbol');
         this.#stepAuthority = step_authority;
-        Object.defineProperty(this, 'config', { value: freeze({ cell_size: number(cell_size, 'cell_size', 1), fixed_step: number(fixed_step, 'fixed_step', EPS, 0.1), gravity: vector(gravity),
+        Object.defineProperty(this, 'config', { value: freeze({ cell_size: number(cell_size, 'cell_size', 1), fixed_step: number(fixed_step, 'fixed_step', EPS, 0.1), gravity: gravityVector(gravity),
+            floor: floor === null ? null : number(floor, 'floor', -Infinity),
             solver_iterations: number(solver_iterations, 'solver_iterations', 1, 32), sleep_speed: number(sleep_speed, 'sleep_speed', 0), sleep_delay: number(sleep_delay, 'sleep_delay', 0) }), enumerable: true });
         if (!Number.isInteger(solver_iterations)) throw new TypeError('solver_iterations must be integral');
         Object.defineProperty(this, 'spatial_grid', { value: new spatialGrid({ cell_size }), enumerable: true });
@@ -139,7 +146,8 @@ export class physicsSystem {
         const config = bodyConfig(packet), id = this.#nextId++;
         const r = { world: this, metrics:this.#stats, id, config, shape: new collisionShape(config.collision_shape), position: [...config.position], rotation: config.rotation,
             previous_position: [...config.position], previous_rotation: config.rotation, velocity: [...config.linear_velocity], angular_velocity: config.angular_velocity,
-            force: [0, 0], torque: 0, sleeping: false, sleep_time: 0, removed: false, indexed: false, motor: null };
+            force: [0, 0], torque: 0, sleeping: false, sleep_time: 0, removed: false, indexed: false, motor: null,
+            elevation: config.elevation, previous_elevation: config.elevation, vertical_velocity: config.vertical_velocity, grounded: false };
         r.handle = new physicsBody(r);
         enforceLocks(r);
         this._mutate(() => { this.#nextId = Math.max(this.#nextId, id + 1); this.#bodies.set(id,r);
@@ -217,7 +225,7 @@ export class physicsSystem {
         const r = this._record(value);
         this._mutate(() => {
             if (r.removed) return;
-            this.#motionEnvelope = null;this.#candidateCache=null; this.spatial_grid.removeInstance(r.id); r.indexed = false; r.removed = true; this.#lightTouch(r, true); this.#bodies.delete(r.id); this.#moving.delete(r);
+            this.#motionEnvelope = null;this.#candidateCache=null; this.spatial_grid.removeInstance(r.id); r.indexed = false; r.removed = true; this.#lightTouch(r, true); this.#bodies.delete(r.id); this.#moving.delete(r); this.#riders.delete(r); this.#wakeRiders(r);
             this.navigation._bodyRemoved(r); this.#attachments._bodyRemoved(r); this.rigs._bodyRemoved(r.id); this.elements._bodyRemoved(r.id); this.traffic.removeVehicle(r.id); this.motion._remove(r.id); this.#particles._bodyRemoved(r.id);
             for (const [id, c] of this.#constraints) { const cr = constraintRecord(c); if (cr.a === r || cr.b === r) this.#constraints.delete(id); }
         });
@@ -235,7 +243,8 @@ export class physicsSystem {
             if (r.removed) return;
             checkMountedChanges();
             const previous={config:r.config,shape:r.shape,position:r.position,rotation:r.rotation,velocity:r.velocity,angular_velocity:r.angular_velocity,
-                previous_position:r.previous_position,previous_rotation:r.previous_rotation,sleeping:r.sleeping};
+                previous_position:r.previous_position,previous_rotation:r.previous_rotation,sleeping:r.sleeping,
+                elevation:r.elevation,previous_elevation:r.previous_elevation,vertical_velocity:r.vertical_velocity,grounded:r.grounded};
             const next=bodyConfig({...snapshot(r),active:r.config.active,...change});
             if(!Object.hasOwn(change,'collision_shape'))next.collision_shape=r.config.collision_shape;
             if(!Object.hasOwn(change,'render_shape'))next.render_shape=r.config.render_shape;
@@ -244,10 +253,12 @@ export class physicsSystem {
             r.config=next;invalidateMass(r);
             if(Object.hasOwn(change,'collision_shape'))r.shape=new collisionShape(next.collision_shape);
             r.position = [...next.position]; r.rotation = next.rotation; r.velocity = [...next.linear_velocity]; r.angular_velocity = next.angular_velocity;
+            if(r.elevation!==next.elevation){r.elevation=r.previous_elevation=next.elevation;r.grounded=false;}
+            r.vertical_velocity=next.vertical_velocity;if(r.vertical_velocity)r.grounded=false;
             if(r.previous_position[0]!==r.position[0]||r.previous_position[1]!==r.position[1]||r.previous_rotation!==r.rotation)this.#broadphaseEpoch++;
             r.previous_position=[...r.position];r.previous_rotation=r.rotation;r.sleeping=false;enforceLocks(r);
             try{this.#sync(r);}catch(error){Object.assign(r,previous);invalidateMass(r);this.#sync(r);throw error;}
-            this.elements._bodyUpdated(r.id, next); this.#attachments._syncDescendants(r, true);
+            this.elements._bodyUpdated(r.id, next); this.#attachments._syncDescendants(r, true); this.#wakeRiders(r);
         }); return r.handle;
     }
     activateBody(b) { return this.updateBody(b, { active: true }); }
@@ -256,7 +267,8 @@ export class physicsSystem {
     _renderBody(b, blend, result) {
         const r = this._record(b); number(blend, 'blend', 0, 1);
         if (r.parent_mount) return this.#attachments._render(r, blend, result);
-        return Object.assign(result, { body_id: r.id, position: add(r.previous_position, scale(sub(r.position, r.previous_position), blend)), rotation: r.previous_rotation + (r.rotation - r.previous_rotation) * blend, elevation: r.config.elevation });
+        return Object.assign(result, { body_id: r.id, position: add(r.previous_position, scale(sub(r.position, r.previous_position), blend)), rotation: r.previous_rotation + (r.rotation - r.previous_rotation) * blend,
+            elevation: r.previous_elevation + (r.elevation - r.previous_elevation) * blend });
     }
     _command(b, action, packet) {
         const requested = this._record(b), p = { ...packet }; let r = requested;
@@ -270,7 +282,7 @@ export class physicsSystem {
         };
         checkMounted();
         for (const k of ['position', 'velocity', 'force', 'impulse', 'world_point']) if (p[k] !== undefined) p[k] = vector(p[k], k);
-        for (const k of ['rotation', 'angular_velocity', 'torque', 'angular_impulse', 'strength']) if (p[k] !== undefined) number(p[k], k, k === 'strength' ? 0 : -Infinity);
+        for (const k of ['rotation', 'angular_velocity', 'vertical_velocity', 'torque', 'angular_impulse', 'strength']) if (p[k] !== undefined) number(p[k], k, k === 'strength' ? 0 : -Infinity);
         if(p.placement_bounds)p.placement_bounds=validBounds(p.placement_bounds);
         if (p.space && !['world', 'local'].includes(p.space)) throw new TypeError('Invalid space');
         if (p.placement_mode && !['exact', 'clear'].includes(p.placement_mode)) throw new TypeError('Invalid placement_mode');
@@ -295,6 +307,7 @@ export class physicsSystem {
                 }
                 case 'velocity': if (r.config.physics_type !== 'static') r.velocity = local(p.velocity); break;
                 case 'angular_velocity': if (r.config.physics_type !== 'static') r.angular_velocity = p.angular_velocity; break;
+                case 'vertical_velocity': if (r.config.physics_type !== 'static') { r.vertical_velocity = p.vertical_velocity; if (p.vertical_velocity) { r.grounded = false; r.standing_on = null; this.#riders.delete(r); } } break;
                 case 'force': if (movable(r)) { const f = local(p.force); r.force = add(r.force, f); if (point) r.torque += (point[0] - massCenter(r)[0]) * f[1] - (point[1] - massCenter(r)[1]) * f[0]; } break;
                 case 'torque': if (movable(r)) r.torque += p.torque; break;
                 case 'impulse': changeVelocity(r, local(p.impulse), point); break;
@@ -309,10 +322,42 @@ export class physicsSystem {
                 default: throw new Error(`Unknown physics command: ${action}`);
             }
             if (action !== 'sleep') { r.sleeping = false; r.sleep_time = 0; }
-            enforceLocks(r); this.#motionEnvelope = null; this.#attachments._syncDescendants(r, action === 'position' || action === 'rotation');
+            enforceLocks(r); this.#motionEnvelope = null; this.#attachments._syncDescendants(r, action === 'position' || action === 'rotation'); if (action === 'position' || action === 'rotation') this.#wakeRiders(r);
         }); return b;
     }
-    #meets(a, b, unmounted_a = false) { return (unmounted_a ? a.config.physics_type !== 'no_collision' : physical(a)) && physical(b) && !a.config.collision_exclusions.includes(b.id) && !b.config.collision_exclusions.includes(a.id) && !!(a.config.collision_mask & b.config.collision_group) && !!(b.config.collision_mask & a.config.collision_group) && spansMeet(worldSpan(a), worldSpan(b)); }
+    #meets(a, b, unmounted_a = false) { return this.#pairs(a, b, unmounted_a) && spansMeet(worldSpan(a), worldSpan(b)); }
+    #pairs(a, b, unmounted_a = false) { return (unmounted_a ? a.config.physics_type !== 'no_collision' : physical(a)) && physical(b) && !a.config.collision_exclusions.includes(b.id) && !b.config.collision_exclusions.includes(a.id) && !!(a.config.collision_mask & b.config.collision_group) && !!(b.config.collision_mask & a.config.collision_group); }
+    /**
+     * Up and down: move a body by its vertical speed and, if it can be stopped, land it on the highest
+     * thing under it that it was above: the floor, or the top of a solid it can collide with that its
+     * footprint covers. Only awake, unattached movers come here, and a body resting on the floor asks
+     * nothing of the grid.
+     */
+    #rise(r, step) {
+        const before = r.elevation, vz = r.vertical_velocity, after = before + vz * step;
+        if (r.prescribed_step || !movable(r)) { r.elevation = after; return; }
+        const floor = this.config.floor, base = r.config.height_span?.[0] ?? 0;
+        let support = floor !== null && floor <= before + base + Z_EPS ? floor : -Infinity, under = null;
+        if (r.config.height_span && !r.config.ghost && !(support >= before + base - Z_EPS && vz <= 0)) {
+            for (const b of this.spatial_grid.queryBounds(bodyBounds(r), this.#supportScratch, { groups: r.config.collision_mask })) {
+                const c = b?.body_id && this.#bodies.get(b.body_id);
+                if (!c || c === r || c.removed || !c.config.height_span || c.config.ghost || !bodyActive(c) || !this.#pairs(r, c) || this.#carries(r, c)) continue;
+                const top = worldSpan(c)[1];
+                if (top <= support || top > before + base + Z_EPS || !collisionDetector.contact(r.shape, pose(r), c.shape, pose(c))) continue;
+                support = top; under = c;
+            }
+        }
+        const rest = support - base;
+        if (vz <= 0 && after <= rest) {
+            const was = r.grounded; r.elevation = rest; r.vertical_velocity = 0; r.grounded = true; r.standing_on = under?.id ?? null; if (under) this.#riders.add(r); else this.#riders.delete(r);
+            if (!was && before > rest + Z_EPS) this._emit('bodyLanded', { body: r.handle, speed: -vz, on_body: under?.handle ?? null, on_entity: under ? this.elements.fetchEntity(under.id) : null });
+        } else { r.elevation = after; r.grounded = false; r.standing_on = null; this.#riders.delete(r); }
+    }
+    #supportScratch = []; #riders = new Set();
+    /** What stands on a body that was moved, changed or removed wakes up and looks under itself again. */
+    #wakeRiders(r) { for (const o of this.#riders) if (o.standing_on === r.id) { o.sleeping = false; o.sleep_time = 0; o.grounded = false; o.standing_on = null; this.#riders.delete(o); } }
+    /** Whether `a` holds `b`, at any depth: what a body carries is never under its feet. */
+    #carries(a, b) { for (let m = b.parent_mount; m; m = m.parent.parent_mount) if (m.parent === a) return true; return false; }
     _canCollide(a, b, { unmounted_a = false } = {}) { return this.#meets(this._record(a), this._record(b), unmounted_a); }
     #report(a, b, contact, response = {}) {
         const lo = a.id < b.id, key = lo ? `${a.id}:${b.id}` : `${b.id}:${a.id}`;
@@ -464,6 +509,7 @@ export class physicsSystem {
                 if(r.previous_position[0]!==r.position[0]||r.previous_position[1]!==r.position[1]||r.previous_rotation!==r.rotation){
                     this.#broadphaseEpoch++;r.previous_position=[...r.position];r.previous_rotation=r.rotation;
                 }
+                r.previous_elevation=r.elevation;
             }
             this.#attachments._capturePrevious(step_seconds); this.rigs._capturePrevious();
             this.traffic._update();
@@ -476,7 +522,9 @@ export class physicsSystem {
                 if (!scripted) r.motor?._update(step_seconds);
                 if (movable(r) && !scripted) {
                     if (r.force[0] || r.force[1]) changeVelocity(r, scale(r.force, step_seconds));
-                    if (this.config.gravity[0] || this.config.gravity[1]) changeVelocity(r, scale(this.config.gravity, massProperties(r).mass * step_seconds), massCenter(r));
+                    const g = this.config.gravity, pull = r.config.gravity_scale;
+                    if (pull && (g[0] || g[1])) changeVelocity(r, [g[0] * pull * massProperties(r).mass * step_seconds, g[1] * pull * massProperties(r).mass * step_seconds], massCenter(r));
+                    if (pull && g[2]) r.vertical_velocity += g[2] * pull * step_seconds;
                     if(r.torque)changeAngularSpeed(r,r.torque*inverseInertia(r)*step_seconds);
                     if((r.config.linear_damping||r.config.angular_damping)&&(r.velocity[0]||r.velocity[1]||r.angular_velocity)){
                         const velocity=scale(centerVelocity(r),Math.exp(-r.config.linear_damping*step_seconds));
@@ -497,6 +545,7 @@ export class physicsSystem {
                     if(r.prescribed_step){r.position=add(r.position,scale(r.velocity,r.motion_step));r.rotation+=r.angular_velocity*r.motion_step;}
                     else integrateAtCenter(r,r.motion_step);
                 }
+                if(r.vertical_velocity||(!r.grounded&&r.config.gravity_scale&&this.config.gravity[2]))this.#rise(r,r.motion_step);
                 this.#sync(r, true);
             }
             this.#attachments._syncAll();
@@ -514,7 +563,7 @@ export class physicsSystem {
             for (const r of moving) {
                 if (!r.config.active || r.removed) continue;
                 enforceLocks(r);
-                if (!r.motor && r.config.sleep_enabled && length(r.velocity) < this.config.sleep_speed && Math.abs(r.angular_velocity) < this.config.sleep_speed) {
+                if (!r.motor && r.config.sleep_enabled && length(r.velocity) < this.config.sleep_speed && Math.abs(r.angular_velocity) < this.config.sleep_speed && !r.vertical_velocity && (r.grounded || !this.config.gravity[2] || !r.config.gravity_scale)) {
                     r.sleep_time += step_seconds;
                     if (r.sleep_time >= this.config.sleep_delay) { r.sleeping = true; r.velocity = [0, 0]; r.angular_velocity = 0; }
                 } else r.sleep_time = 0;

@@ -188,7 +188,7 @@ Every object in the world is a `gameEntity`, the way every object in a Blender g
 | `entity.addComponent({...})` / `entity.removeComponent(name)` | Adds or removes a part |
 | `entity.height` | How tall it stands: the highest top among its components |
 | `entity.scaleTo(2)` / `entity.scaleBy([1, 1, 3])` / `entity.scale` / `entity.world_scale` | Resizes it whole (see [Scale](#scale)) |
-| `entity.setElevation(z)` / `entity.elevation` / `entity.world_elevation` | Raises it off the ground: its base stands at z. Collision, height queries, drawing, the camera lean and picking all use it; an attached child stands on its parent's elevation plus the anchor's height (see [Heights](#heights-z)) |
+| `entity.setElevation(z)` / `entity.elevation` / `entity.world_elevation` / `entity.setVerticalVelocity(vz)` / `entity.grounded` | Raises it off the ground: its base stands at z. Collision, height queries, drawing, the camera lean and picking all use it; an attached child stands on its parent's elevation plus the anchor's height (see [Heights](#heights-z)) |
 | `entity.on(event, handler)` | Events on this entity, such as `propertyChanged` or a contact; returns a call that stops listening |
 | `entity.activate()` / `entity.deactivate()` / `entity.destroy()` | Turns it on or off, or removes it |
 
@@ -212,10 +212,11 @@ The world has one vertical axis, z, in the same world units as x and y (50 to a 
 - **Its parts** count up from there: a component layer's `height` is above the entity's base, or above its rig joint when it rides one.
 - **A rig stands up.** A joint has a `height` and a `pitch` as well as a position and a turn: a hip pitched straight down puts its knee and foot below it, and a walk swings the pitch, so from above the leg shortens and the foot reaches forward on its own. A part on a pitched bone is drawn shorter along the bone and keeps its size, because body parts are round.
 - **Its collision height follows its pose.** An entity whose height span comes from its components takes it from the posed joints: a crouch is shorter, and `entity.height` reads the pose.
-- **Attached things stand where they are held**: a cup in a hand is at the hand's height, a hat at the head's. A detached thing keeps standing at its parent's elevation.
+- **Attached things stand where they are held**: a cup in a hand is at the hand's height, a hat at the head's. A detached thing keeps standing at its parent's elevation, or drops from the hand when things fall.
 - **Everything reads z**: collision (`height_span` raised by the elevation), queries (`at_height`), drawing order, the camera lean, and picking, which leans like the drawing so a tall thing is hit where it is drawn.
 - **So does the rest of the world**: walkers path under what is above their `headroom` and over what is under their `step_height` (`navigation.configureField`); a shot leaves at its source's height (`local_elevation`) as a point that flies over a low wall; a lamp's light (`getVisibilityPolygon({at_height})`) shines over walls that do not reach it; particles are born at an `elevation`.
-- **Not yet**: falling, jumping and thrown arcs (vertical motion), and IK reaching a point at a height (it solves on the ground).
+- **Things rise and fall.** Give the world a gravity with a z part (`gravity: [0, 0, -490]` is 9.8 m/s²) and an entity in the air falls and lands on the floor or on the top of a solid under it, and is `grounded`; `bodyLanded` reports the landing. `entity.setVerticalVelocity(vz)` is a jump; a projectile made with a `vertical_velocity` arcs. A body's `gravity_scale` (0 floats) and the world's `floor` (null for none) are data. By default gravity's z is 0 and a flat world stays flat.
+- **Not yet**: tilting a whole body (pitch and roll) and IK reaching a point at a height (it solves on the ground).
 
 ### Spatial queries
 

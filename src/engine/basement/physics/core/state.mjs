@@ -32,6 +32,7 @@ export function bodyConfig(packet = {}) {
         active: p.active !== false,
         axis_lock: { x: !!lock.x, y: !!lock.y, rotation: !!lock.rotation },
         height_span: heightSpan(p.height_span), elevation: number(p.elevation ?? 0, 'elevation', -Infinity),
+        vertical_velocity: number(p.vertical_velocity ?? 0, 'vertical_velocity'), gravity_scale: number(p.gravity_scale ?? 1, 'gravity_scale'),
     };
 }
 /**
@@ -44,19 +45,23 @@ export function heightSpan(value) {
     if (!Array.isArray(value) || value.length !== 2 || !value.every(Number.isFinite) || value[0] > value[1]) throw new TypeError('height_span is [base, top] in world units, base no higher than top, or null');
     return [value[0], value[1]];
 }
-/** How high a body's base stands above the ground: its own `elevation`, or, while attached, where its mount holds it (the parent's elevation plus the anchor's height). */
-export const worldElevation = r => r.parent_mount ? (r.mount_elevation ?? 0) : r.config.elevation;
+/** How high a body's base stands above the ground: its own live elevation (it rises and falls), or, while attached, where its mount holds it (the parent's elevation plus the anchor's height). */
+export const worldElevation = r => r.parent_mount ? (r.mount_elevation ?? 0) : r.elevation;
 /** The heights a body fills in the world: its height_span raised by its elevation, or null (every height). */
 export const worldSpan = r => { const s = r.config.height_span; if (!s) return null; const z = worldElevation(r); return z ? [s[0] + z, s[1] + z] : s; };
-/** Whether two spans overlap (null reaches every height). Touching ends count. */
-export const spansMeet = (a, b) => !a || !b || (a[0] <= b[1] && b[0] <= a[1]);
+/**
+ * Whether two spans overlap (null reaches every height). Two solids that only touch ends do not meet,
+ * so a box stands on a crate without being pushed off it; a point (a shot, a ray) on an end does.
+ */
+export const spansMeet = (a, b) => { if (!a || !b) return true; const lo = Math.max(a[0], b[0]), hi = Math.min(a[1], b[1]); return hi > lo || (hi === lo && (a[0] === a[1] || b[0] === b[1])); };
 export function bodyActive(r) {
     for (let current = r; current; current = current.parent_mount?.parent) if (!current.config.active || current.removed) return false;
     return true;
 }
 export function snapshot(r) {
     return { ...clone(r.config), body_id: r.id, position: [...r.position], rotation: r.rotation,
-        linear_velocity: [...r.velocity], angular_velocity: r.angular_velocity, sleeping: r.sleeping, active: bodyActive(r), attached_to: r.parent_mount?.parent.id ?? null, world_elevation: worldElevation(r) };
+        linear_velocity: [...r.velocity], angular_velocity: r.angular_velocity, sleeping: r.sleeping, active: bodyActive(r), attached_to: r.parent_mount?.parent.id ?? null,
+        elevation: r.elevation, vertical_velocity: r.vertical_velocity, grounded: r.grounded, world_elevation: worldElevation(r) };
 }
 export const pose = r => ({ position: r.position, rotation: r.rotation });
 export const previousPose = r => ({ position: r.previous_position, rotation: r.previous_rotation });

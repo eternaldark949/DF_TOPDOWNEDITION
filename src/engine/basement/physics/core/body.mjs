@@ -14,6 +14,8 @@ export class physicsBody {
     setPosition(position, options = {}) { return bodyRecord(this).world._command(this, 'position', { position, ...options }); }
     setRotation(rotation, options = {}) { return bodyRecord(this).world._command(this, 'rotation', { rotation, ...options }); }
     setLinearVelocity(velocity, options = {}) { return bodyRecord(this).world._command(this, 'velocity', { velocity, ...options }); }
+    /** Up (+) or down (-) speed in world units a second: a jump, a toss, a drop. */
+    setVerticalVelocity(vertical_velocity) { return bodyRecord(this).world._command(this, 'vertical_velocity', { vertical_velocity }); }
     setAngularVelocity(angular_velocity) { return bodyRecord(this).world._command(this, 'angular_velocity', { angular_velocity }); }
     applyForce(force, options = {}) { return bodyRecord(this).world._command(this, 'force', { force, ...options }); }
     applyTorque(torque) { return bodyRecord(this).world._command(this, 'torque', { torque }); }

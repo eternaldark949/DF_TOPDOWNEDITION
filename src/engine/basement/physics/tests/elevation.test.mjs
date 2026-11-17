@@ -97,3 +97,68 @@ test('a shot leaves at its source\'s height and flies there; lights and particle
     const pool = p.createParticlePool({ capacity: 4 }), [id] = p.emitParticles(pool, { position: [0, 0], elevation: 60, height_span: [0, 1] });
     assert.equal(p.fetchBody(id).getState().world_elevation, 60, 'a spark is born at its height');
 });
+
+// ----- Z motion: things rise and fall under gravity's z and land on what is under them. -----
+const G = -980;   // 9.8 m/s² at 50 units a metre is -490; a heavier pull keeps the tests short
+const fallWorld = () => new physicsSystem({ gravity: [0, 0, G] });
+const run = (p, seconds) => { for (let t = 0; t < seconds - 1e-9; t += 1 / 60) p.updateState(1 / 60); };
+const box = (p, at, z = 0, span = [0, 20]) => p.elements.createEntity({ kind: 'prop', position: at, collision_shape: { shape_type: 'box', dimensions: [20, 20] }, height_span: span, elevation: z, physics_type: 'rigid' });
+
+test('a thing in the air falls under gravity\'s z and lands on the floor, once', () => {
+    const p = fallWorld(), b = box(p, [0, 0], 300), landed = [];
+    p.on('bodyLanded', e => landed.push(e));
+    p.updateState(1 / 60); assert.ok(b.elevation < 300 && b.vertical_velocity < 0 && !b.grounded, 'it starts to fall');
+    const mid = b.getRenderState(.5).elevation; assert.ok(mid < 300 && mid > b.elevation, 'and is drawn between steps');
+    run(p, 1.5);
+    assert.equal(b.elevation, 0); assert.equal(b.vertical_velocity, 0); assert.ok(b.grounded);
+    assert.equal(landed.length, 1, 'one landing'); assert.ok(landed[0].speed > 500 && landed[0].on_entity === null, 'with its speed, on the floor');
+    assert.equal(new physicsSystem().config.gravity[2], 0, 'by default nothing falls: a flat world stays flat');
+});
+
+test('it lands on the top of a solid under it, and falls again when it walks off or that is taken away', () => {
+    const p = fallWorld(), crate = box(p, [0, 0], 0, [0, 40]), b = box(p, [0, 0], 200), landed = [];
+    p.on('bodyLanded', e => landed.push(e));
+    run(p, 1); near(b.elevation, 40, 'on the crate'); assert.equal(landed[0].on_entity, crate, 'and knows what it stands on');
+    assert.ok(!p.raycast({ from: [-50, 0], to: [50, 0], at_height: 30, ignore_body: crate.body }), 'standing on it is not in it: nothing pushes it off');
+    b.moveTo([60, 0]); run(p, .6); assert.equal(b.elevation, 0, 'moved off, it drops to the floor');
+    const c = box(p, [0, 0], 200); run(p, 1); near(c.elevation, 40);
+    run(p, 2); p.elements.destroyEntity?.(crate) ?? p.removeBody(crate.body); run(p, .6);
+    assert.equal(c.elevation, 0, 'take the crate away, even from under a sleeper, and it falls');
+});
+
+test('a jump is a vertical speed: it rises, arcs and comes down where it started, over a low wall', () => {
+    const p = fallWorld(), j = p.elements.createEntity({ kind: 'character', position: [0, 0], collision_shape: { shape_type: 'circle', radius: 5 }, height_span: [0, 60] });
+    run(p, .1); assert.ok(j.grounded);
+    j.setVerticalVelocity(500); let top = 0;
+    for (let i = 0; i < 90; i++) { p.updateState(1 / 60); top = Math.max(top, j.elevation); }
+    assert.ok(Math.abs(top - 500 * 500 / (2 * -G)) < 10, `up to v²/2g: ${top}`); assert.equal(j.elevation, 0); assert.ok(j.grounded);
+    const floaty = box(p, [100, 0], 100); floaty.updateBody({ gravity_scale: 0 }); run(p, .5);
+    assert.equal(floaty.elevation, 100, 'gravity_scale 0 floats');
+    const p2 = fallWorld(); p2.elements.createEntity({ kind: 'static', position: [60, 0], collision_shape: { shape_type: 'box', dimensions: [10, 200] }, height_span: [0, 30] });
+    const runner = p2.elements.createEntity({ kind: 'character', position: [0, 0], collision_shape: { shape_type: 'circle', radius: 5 }, height_span: [0, 60] });
+    runner.motor.setMovement([1, 0], { speed: 200 }); run(p2, .05); runner.setVerticalVelocity(450); run(p2, .8);
+    assert.ok(runner.position[0] > 100, `jumping, it clears the wall: ${runner.position[0]}`);
+});
+
+test('a toss arcs: a shot with a vertical speed comes down, and something let go drops from the hand', () => {
+    const p = fallWorld(), thrower = p.elements.createEntity({ kind: 'character', position: [0, 0], height_span: [0, 87] });
+    const shot = p.createProjectileFrom(thrower, { direction: [1, 0], local_elevation: 70, speed: 300, vertical_velocity: 300 }), heights = [];
+    for (let i = 0; i < 30; i++) { p.updateState(1 / 60); if (p.fetchBody(shot.body_id)) heights.push(shot.world_elevation); }
+    assert.ok(Math.max(...heights) > 70 && heights.at(-1) < Math.max(...heights), 'up, then down');
+    const p2 = fallWorld(), holder = p2.elements.createEntity({ kind: 'character', position: [0, 0], height_span: [0, 87] }), cup = box(p2, [0, 0], 0, [0, 4]);
+    holder.attach(cup, { elevation: 60 }); run(p2, .1); assert.equal(cup.world_elevation, 60, 'held, it does not fall');
+    holder.detach(cup, { exit_points: [[20, 0]] }); p2.updateState(1 / 60); assert.ok(cup.elevation > 50 && cup.elevation < 60, 'let go, it drops from the hand');
+    run(p2, .6); assert.equal(cup.elevation, 0);
+    const saved = (() => { const q = fallWorld(), b = box(q, [0, 0], 300); q.updateState(1 / 60); return [q.savePhysicsState(), b.entity_id, b.vertical_velocity, b.elevation]; })();
+    const q = fallWorld(); q.loadPhysicsState(saved[0]); const b = q.elements.fetchEntity(saved[1]);
+    assert.equal(b.vertical_velocity, saved[2]); assert.equal(b.elevation, saved[3], 'a fall saves mid-air');
+});
+
+test('falling is cheap: a crowd standing on the floor asks nothing of the grid', () => {
+    const p = fallWorld();
+    for (let i = 0; i < 400; i++) p.elements.createEntity({ kind: 'character', position: [(i % 20) * 30, Math.floor(i / 20) * 30], collision_shape: { shape_type: 'circle', radius: 5 }, height_span: [0, 60] }).motor.setMovement([1, 0], { speed: 50 });
+    const flat = new physicsSystem();
+    for (let i = 0; i < 400; i++) flat.elements.createEntity({ kind: 'character', position: [(i % 20) * 30, Math.floor(i / 20) * 30], collision_shape: { shape_type: 'circle', radius: 5 }, height_span: [0, 60] }).motor.setMovement([1, 0], { speed: 50 });
+    const time = w => { run(w, .1); const t = performance.now(); run(w, .5); return performance.now() - t; };
+    const a = time(flat), b = time(p); assert.ok(b < a * 1.5 + 20, `gravity's z costs little: ${b.toFixed(1)} ms vs ${a.toFixed(1)} ms`);
+});

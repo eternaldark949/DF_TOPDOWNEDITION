@@ -114,7 +114,10 @@ export class attachmentManager {
             if (this.#entries.get(e.child.id) !== e) return;
             const position = this.#exit(e, points);
             if (!position) { e.detaching = false; this.#event('bodyDetachBlocked', e); return; }
-            const standing = worldElevation(e.parent); this.#forget(e); e.child.config = { ...e.child.config, elevation: standing }; e.child.position = position; e.child.previous_position = [...position]; e.child.previous_rotation = e.child.rotation;
+            // Let go, it stands where its holder stands; under falling gravity it drops from where it was held instead, at its holder's vertical speed.
+            const falls = this.world.config.gravity[2] < 0 && e.child.config.gravity_scale > 0, standing = falls ? worldElevation(e.child) : worldElevation(e.parent);
+            let root = e.parent; while (root.parent_mount) root = root.parent_mount.parent;
+            this.#forget(e); e.child.elevation = e.child.previous_elevation = standing; e.child.vertical_velocity = falls ? root.vertical_velocity : 0; e.child.grounded = false; e.child.position = position; e.child.previous_position = [...position]; e.child.previous_rotation = e.child.rotation;
             if (!inherit_velocity) { e.child.velocity = [0, 0]; e.child.angular_velocity = 0; }
             e.child.sleeping = false; enforceLocks(e.child); this.world._syncBody(e.child.handle); this._syncDescendants(e.child, true);
             this.#event('bodyDetached', e, { reason: 'requested' });

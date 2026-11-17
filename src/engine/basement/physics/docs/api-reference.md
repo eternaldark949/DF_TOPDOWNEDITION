@@ -18,7 +18,8 @@ Constructor options:
 |---|---|---|
 | `cell_size` | `128` | Positive shared-index cell width. |
 | `fixed_step` | `1/60` | Default seconds per `updateState`. |
-| `gravity` | `[0,0]` | World acceleration for movable bodies. |
+| `gravity` | `[0,0]` | World acceleration for movable bodies: `[x,y]` across the ground, or `[x,y,z]` where z pulls up (+) or down (−), e.g. `[0,0,-490]` for 9.8 m/s² at 50 units a metre. Kept as three numbers in `config.gravity`. Each body's `gravity_scale` multiplies it. |
+| `floor` | `0` | The elevation things fall to when nothing else is under them, or `null` for no floor. |
 | `solver_iterations` | `6` | Maximum contact/joint iterations, integer 1–32. |
 | `sleep_speed`, `sleep_delay` | `0.05`, `0.5` | Automatic sleeping threshold and seconds. |
 | `asset_library` | `EMPTY_DATA_SOURCE` | The world's data source: any object with `resolveTemplate()` and `getResource()`, normally the Directory's registry (`engine/directory/registry.mjs`). Not part of numerical world config. |
@@ -53,7 +54,9 @@ Constructor options:
 | `linear_damping`, `angular_damping` | `0`, `0`; nonnegative exponential decay rates per second. |
 | `collision_group`, `collision_mask`, `query_mask` | Default role group, `BODY_GROUP.ALL`, `BODY_GROUP.ALL`. |
 | `height_span` | `null` (every height) or `[base, top]` above the ground in world units. Two bodies touch only when their spans overlap, as well as their masks allowing it: a shot at 1.5 m passes over a 1 m wall, a car under a bridge deck. An entity made of components gets the span its solid layers fill unless the packet gives one, and keeps following them as they change. |
-| `elevation` | `0`. The z of the body's base above the ground, in world units: its `height_span` counts up from here, so a body on a roof or a second floor meets only what is up there. An attached body ignores its own and stands where its mount holds it (its parent's elevation, plus the rig anchor's height, plus the mount's `local_elevation`); its state reports `world_elevation`. When it detaches it keeps standing at its parent's elevation. |
+| `elevation` | `0`. The z of the body's base above the ground, in world units: its `height_span` counts up from here, so a body on a roof or a second floor meets only what is up there. An attached body ignores its own and stands where its mount holds it (its parent's elevation, plus the rig anchor's height, plus the mount's `local_elevation`); its state reports `world_elevation`. When it detaches it keeps standing at its parent's elevation, or, under falling gravity, drops from where it was held at its holder's vertical speed. The elevation is live: it rises and falls with `vertical_velocity`. |
+| `vertical_velocity` | `0`. Up (+) or down (−) speed in world units a second. Gravity's z changes it; a body that can be stopped (rigid, character, no-collision, not scripted) lands on the highest thing under it that it was above: the `floor`, or the top of a solid with a `height_span` it can collide with whose footprint it covers. Then it is `grounded` (in its state) and stops; a `bodyLanded` event reports a real fall. What stands on something wakes and looks again when that is moved, changed or removed. Two solids that only touch ends do not meet, so a box on a crate is not pushed off it. |
+| `gravity_scale` | `1`. How much of the world's gravity pulls this body: `0` floats, `2` falls twice as fast. |
 | `ghost`, `continuous_collision`, `sleep_enabled`, `active` | `false`, `true`, `true`, `true`. |
 | `blocks_light` | `null`: blocks light when a visibility query's groups include it (static bodies by default). `true` always blocks (a door leaf, a big prop), `false` never (glass). Ghosts never block. |
 | `axis_lock` | `{ x:false, y:false, rotation:false }`. Character contacts do not impart spin, independently of heading control. |
@@ -82,7 +85,7 @@ Properties: immutable `body_id`; frozen-copy `position`, `linear_velocity`; read
 | `getState(result = {})` | Detached full body snapshot; supplied object is populated and returned. |
 | `getRenderState(blend, result = {})` | Interpolated `position`, `rotation`, `body_id`; blend in 0–1. |
 | `setPosition(position, options = {})`, `setRotation(angle, options = {})` | Explicit placement. `placement_mode:'exact'` default, or `'clear'`; `preserve_velocity:false` default. Occupied clear placement emits `movementBlocked`. |
-| `setLinearVelocity(velocity, {space='world'})`, `setAngularVelocity(value)` | Command motion; locks and static type are enforced. |
+| `setLinearVelocity(velocity, {space='world'})`, `setAngularVelocity(value)`, `setVerticalVelocity(value)` | Command motion; locks and static type are enforced. A vertical speed lifts it off what it stands on (a jump, a toss). |
 | `applyForce(force, {space='world',world_point})`, `applyTorque(torque)` | Accumulate for the next step; a force at a point also produces torque. |
 | `applyImpulse(impulse, {space='world',world_point})`, `applyAngularImpulse(value)` | Mass/inertia-aware instantaneous velocity change, respecting locks. |
 | `applyImpact({source_body,strength,world_point})` | Momentum impulse away from source; calculates direction, mass response and torque inside engine. Physical masks and ghosts apply. |
@@ -184,6 +187,8 @@ Engine-internal grid operations: `registerInstance(id,bounds,value,group=null)` 
 
 `contactBegin`, `contactStay`, `contactEnd`: `{body_a,body_b,world_point,normal,penetration_depth,relative_velocity,normal_impulse,tangent_impulse,sensor_only,simulation_tick}`. Bodies are ordered by ascending ID and normals point A→B.
 
+`bodyLanded`: `{body,entity,speed,on_body,on_entity,simulation_tick}` when a falling body comes to rest; `on_body` is what it landed on, or null for the floor.
+
 `projectileHit`: `{projectile,body,target_body,world_point,normal,fraction,impact_scale,sensor_only,simulation_tick}`. Its normal points projectile→target. `destinationReached`: `{body,position,simulation_tick}`. `movementBlocked`: `{body,reason,simulation_tick}`. `constraintBroken`: `{constraint_id,body_a,body_b,impulse,simulation_tick}`.
 
 Event packets and vector fields are immutable. Handle references permit requests, committed next step. An end event can refer to a removed body's immutable identity; do not assume `getState()` still succeeds. All listeners run even if one throws; `updateState` then throws an `AggregateError`. `on` returns an unsubscribe function.
@@ -212,6 +217,7 @@ Entity properties are read-only: `entity_id`, `body_id` (same root identity), `k
 | `distanceTo(target)`, `directionTo(target)` | Distance and unit direction to a point or anything with a `position`; the direction to its own position is `[0,0]`. |
 | `attach(child,{at=[0,0],rotation=0,elevation=0,combine_mass=false,rig_anchor=null})` | Parents a child entity or body at a local offset (and `elevation` above this one's base; a rig anchor adds the anchor's height) through `attachBody`; returns the parent. |
 | `elevation`, `world_elevation`, `setElevation(z)` | Read-only z of its own base, and where its base is in the world (its parent's elevation plus the anchor's height while attached); `setElevation` raises or lowers it and returns the entity. |
+| `vertical_velocity`, `grounded`, `setVerticalVelocity(vz)` | How fast it rises or falls, and whether it rests on the floor or on something under it; `setVerticalVelocity` sends it up or down (a jump) and returns the entity. Gravity's z brings it back down. |
 | `detach(child=null,{exit_points,inherit_velocity})` | With no child, detaches this entity from its parent; with a child, detaches that child and throws if it is not attached here. Exits at its current local offset unless `exit_points` are given. Returns `true` when it left and `false` when it had no parent or no exit was clear. |
 | `parent`, `children` | Read-only: the parent entity or `null`, and the attached child entities. |
 | `components`, `getComponent(name)`, `hasComponent(name)` | Its parts, as live `entityComponent` views in order; a missing name gives `null`. |

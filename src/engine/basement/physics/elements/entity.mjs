@@ -22,7 +22,7 @@ function initializeEntity(entity, elements, packet) {
     records.set(entity, elements._construct(entity, packet));
     // A subclass field initializer cannot replace identity, a component or the live pose.
     for (const key of ['entity_id', 'body_id', 'kind', 'template_id', 'name', 'tags', 'assets', 'data', 'physics_system', 'body', 'motor', 'awareness', 'registered', 'pending', 'destroyed', 'active', 'position', 'rotation',
-        'linear_velocity', 'angular_velocity', 'mass', 'physics_type', 'collision_shape', 'collision_group', 'collision_mask', 'query_mask', 'axis_lock', 'ghost', 'parent', 'children', 'components', 'height', 'scale', 'world_scale', 'elevation', 'world_elevation']) {
+        'linear_velocity', 'angular_velocity', 'mass', 'physics_type', 'collision_shape', 'collision_group', 'collision_mask', 'query_mask', 'axis_lock', 'ghost', 'parent', 'children', 'components', 'height', 'scale', 'world_scale', 'elevation', 'world_elevation', 'vertical_velocity', 'grounded']) {
         const getter = Object.getOwnPropertyDescriptor(gameEntity.prototype, key).get;
         Object.defineProperty(entity, key, { get: getter, configurable: false, enumerable: false });
     }
@@ -115,6 +115,12 @@ export class gameEntity {
     get world_elevation() { return entityRecord(this).body.getState().world_elevation; }
     /** Raises or lowers it: its collision, queries, drawing and attached children all follow. */
     setElevation(z) { return this.updateBody({ elevation: z }); }
+    /** How fast it rises (+) or falls (-), in world units a second. */
+    get vertical_velocity() { return entityRecord(this).body.getState().vertical_velocity; }
+    /** Whether it rests on the floor or on something solid under it. */
+    get grounded() { return entityRecord(this).body.getState().grounded; }
+    /** Sends it up or down: a jump, a toss. World gravity's z brings it back to what is under it. */
+    setVerticalVelocity(vz) { entityRecord(this).body.setVerticalVelocity(vz); return this; }
     // ----- Placement: readable verbs over the body. -----
     moveTo(x, y, options) { return this.setPosition(Array.isArray(x) ? x : [x, y], Array.isArray(x) ? y : options); }
     rotateTo(angle, options) { return this.setRotation(angle, options); }
