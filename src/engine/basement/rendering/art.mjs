@@ -88,7 +88,7 @@ export class artScene{
 
     // ----- Readable drawing calls: one shape each, in the group's local space ----------------------
     // Every call takes one object: where the shape sits (around the group's origin) and how it is
-    // painted (`fill`, `stroke`, `line_width`, `alpha`, `blend`, `shadow`). See DRAWING below.
+    // painted (`fill`, `stroke`, `line_width`, `alpha`, `blend`, `shadow`, `blur`). See DRAWING below.
     /** A box with its top-left corner at (x, y), rounded when `radius` is set. */
     drawRectangle({x=0,y=0,width,height,radius=0,...paint}){return this.#draw(radius?roundRect(x,y,width,height,radius):rect(x,y,width,height),paint);}
     /** A circle round (x, y). */
@@ -140,7 +140,7 @@ export class artScene{
 
 /** The shapes a drawing step may name, and the readable call each one is. */
 export const DRAWING=Object.freeze({rectangle:'drawRectangle',circle:'drawCircle',ellipse:'drawEllipse',capsule:'drawCapsule',limb:'drawLimb',line:'drawLine',polygon:'drawPolygon',curve:'drawCurve',text:'drawText',glow:'drawGlow',ground_shadow:'drawGroundShadow'});
-const PAINT_KEYS=new Set(['fill','stroke','line_width','line_cap','line_join','dash','alpha','blend','shadow']);
+const PAINT_KEYS=new Set(['fill','stroke','line_width','line_cap','line_join','dash','alpha','blend','shadow','blur']);
 const NO_MATERIALS=Object.freeze({});
 /** The fields a material record may hold: its paint, plus `kind` and the physical `surface` that drawing ignores. */
 export const MATERIAL=Object.freeze({paint:Object.freeze([...PAINT_KEYS]),other:Object.freeze(['kind','surface'])});
@@ -154,11 +154,12 @@ function materialPaint(name,materials){
     return paint;
 }
 /** A step's paint fields as a material, its opacity and its blend. Unknown fields are refused, so a typo never draws silently wrong. */
-function drawPaint({fill=null,stroke=null,line_width,line_cap,line_join,dash,alpha=1,blend,shadow,...rest}){
+function drawPaint({fill=null,stroke=null,line_width,line_cap,line_join,dash,alpha=1,blend,shadow,blur,...rest}){
     const unknown=Object.keys(rest);if(unknown.length)throw new TypeError(`Unknown drawing field: ${unknown.join(', ')} (paint is ${[...PAINT_KEYS].join(', ')})`);
     if(fill===null&&stroke===null)fill='#000';
     const material={fill,stroke};if(line_width!==undefined)material.stroke_width=line_width;if(line_cap)material.line_cap=line_cap;if(line_join)material.line_join=line_join;if(dash)material.dash=dash;
     if(shadow)material.shadow={color:shadow.color??'rgba(0,0,0,.5)',blur:shadow.blur??0,offset:shadow.offset??[0,0]};
+    if(blur)material.blur=blur;
     if(!(alpha>=0&&alpha<=1))throw new TypeError('alpha must be in [0,1]');
     return {material,opacity:alpha,blend};
 }

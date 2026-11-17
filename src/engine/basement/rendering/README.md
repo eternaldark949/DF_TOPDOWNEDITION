@@ -78,7 +78,7 @@ Common packet fields:
 
 A `sprite` supplies `resource_id`, `size:[w,h]`, optional atlas `source:[sx,sy,sw,sh]`, and normalized `origin:[.5,.5]` (default center; `[0,0]` is top-left). Resource IDs reference an image or an offscreen target. A `text` packet supplies a string, `font:{family,size,weight,style}`, `align:left|center|right`, and `baseline:top|middle|bottom|alphabetic`. Font families are resolved by the platform's loaded fonts; WebGL draws each line as a texture the platform rasterized.
 
-Materials accept `fill`/`stroke` color strings or gradient data; `null` disables that paint. Other fields are `stroke_width`, `line_cap`, `line_join`, `dash`, `dash_offset`, and `shadow:{color,blur,offset:[x,y]}`. Shadow blur/offset use pass-logical screen units, independent of camera zoom, scaled for the actual target resolution. Colors use CSS color notation; a future backend must parse/implement the supported color contract.
+Materials accept `fill`/`stroke` color strings or gradient data; `null` disables that paint. Other fields are `stroke_width`, `line_cap`, `line_join`, `dash`, `dash_offset`, `blur` (the packet is drawn blurred by this spread, Canvas's `blur()` filter, in pass-logical screen units like a shadow's), and `shadow:{color,blur,offset:[x,y]}`. Shadow blur/offset use pass-logical screen units, independent of camera zoom, scaled for the actual target resolution. Colors use CSS color notation; a future backend must parse/implement the supported color contract.
 
 ```js
 {fill:{type:'linear',from:[-10,0],to:[10,0],stops:[[0,'#f00'],[1,'#00f']]}}
@@ -174,7 +174,7 @@ art.draw([
 | `drawGroundShadow` | `ground_shadow` | `x`, `y`, `radius_x`, `radius_y`, `strength` |
 | `draw(steps, {at, rotation, scale, values, materials})` | `group` | `x`, `y`, `rotation`, `scale`, `steps` |
 
-Paint fields on any shape: `fill` and `stroke` (a colour or a `linear` / `radial` gradient; black fill when neither is given), `line_width`, `line_cap`, `line_join`, `dash`, `alpha` (0 to 1), `blend`, `shadow` (`{color, blur, offset}`). An unknown field is refused, so a typo never draws silently wrong. `DRAWING` lists every step shape and the call it is.
+Paint fields on any shape: `fill` and `stroke` (a colour or a `linear` / `radial` gradient; black fill when neither is given), `line_width`, `line_cap`, `line_join`, `dash`, `alpha` (0 to 1), `blend`, `shadow` (`{color, blur, offset}`), `blur` (a soft edge: the shape is drawn blurred by this spread, in screen units like a shadow's). An unknown field is refused, so a typo never draws silently wrong. `DRAWING` lists every step shape and the call it is.
 
 A string value `"$name"` in a step is read from `values`, usually a look's fields, so one drawing serves every variant of a thing.
 
@@ -295,7 +295,7 @@ Canvas implements the whole packet/material/target contract. WebGL implements th
 
 ### WebGL backend (`webgl.mjs`)
 
-`new webglRenderer({decode_image, create_surface, max_picture_bytes = 64 MB, densities = [1, 1.5, 2, 3, 4]})` draws the packet contract with WebGL 2 on a fresh canvas (`initialize` asks it for a `webgl2` context with a stencil and throws when there is none, so the render system keeps the old backend). The engine registers it as `webgl`. `WEBGL_CAPABILITIES` is what it declares: every packet type, geometry, both gradients, patterns, clips, dashes, targets, layers and pictures, and the blends `normal`, `add`, `multiply`, `screen`, `source-atop`, `destination-out` and `destination-over`. Not yet: `shadow` (needs a blur pass), the blends that read the destination per pixel (`overlay`, `soft-light`, `lighten`, `darken`) and those Canvas applies to the whole surface outside the shape (`source-in`, `source-out`, `destination-in`). `multiply` is exact over an opaque destination, which is where the engine uses it (a light layer over the scene).
+`new webglRenderer({decode_image, create_surface, max_picture_bytes = 64 MB, densities = [1, 1.5, 2, 3, 4]})` draws the packet contract with WebGL 2 on a fresh canvas (`initialize` asks it for a `webgl2` context with a stencil and throws when there is none, so the render system keeps the old backend). The engine registers it as `webgl`. `WEBGL_CAPABILITIES` is what it declares: every packet type, geometry, both gradients, patterns, clips, shadows, blur, dashes, targets, layers and pictures, and the blends `normal`, `add`, `multiply`, `screen`, `source-atop`, `destination-out` and `destination-over`. A blurred or shadowed packet is drawn sharp on a kept scratch surface around it (smaller when the blur is wide), blurred there in two Gaussian passes and laid back under its clips and blend. Not yet: the blends that read the destination per pixel (`overlay`, `soft-light`, `lighten`, `darken`) and those Canvas applies to the whole surface outside the shape (`source-in`, `source-out`, `destination-in`). `multiply` is exact over an opaque destination, which is where the engine uses it (a light layer over the scene).
 
 How it draws, so its results match Canvas:
 

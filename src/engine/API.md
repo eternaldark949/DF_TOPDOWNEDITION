@@ -267,7 +267,7 @@ Reference: [maps README](basement/maps/README.md).
 
 `basement.render` draws frames through a backend. Each frame it hands your `render` hooks a `frame` to draw into. The backend is a light switch: the engine registers `canvas`, `webgl` (WebGL 2) and `recording` (headless, keeps frames as data), and nothing above the backend knows which one is drawing. Give `new gameEngine({ render: { create_surface: id => freshCanvas } })` and a switch is just `setRenderer('webgl')` or `setRenderer('canvas')`.
 
-`webgl` draws the same frames as `canvas` (checked pixel by pixel in `tools/test-webgl-pixels.mjs`), except for what it does not declare yet: `shadow`, and the blends `overlay`, `soft-light`, `lighten`, `darken`, `source-in`, `source-out` and `destination-in`. A frame that asks for one of those is refused before it is drawn, so check `render.getCapabilities()` or keep to the rest. `WEBGL_CAPABILITIES` lists what it draws.
+`webgl` draws the same frames as `canvas` (checked pixel by pixel in `tools/test-webgl-pixels.mjs`), except for what it does not declare yet: the blends `overlay`, `soft-light`, `lighten`, `darken`, `source-in`, `source-out` and `destination-in`. A frame that asks for one of those is refused before it is drawn, so check `render.getCapabilities()` or keep to the rest. `WEBGL_CAPABILITIES` lists what it draws.
 
 | Call | What it does |
 |---|---|
@@ -299,7 +299,7 @@ The calls are `drawRectangle`, `drawCircle`, `drawEllipse`, `drawCapsule`, `draw
 ]
 ```
 
-**Materials and textures.** A step's `material` names a material record, so many drawings share one substance. A material holds paint fields (`fill`, `stroke`, `line_width`, `alpha`, `blend`, `shadow`, …) and an optional `surface` (`friction`, `restitution`, `hit_sound`, `hit_effect`, `footstep`); any other field is refused. A step's own paint wins over its material's. A texture is a fill: `{ "type": "pattern", "image": "bricks", "repeat": "repeat" }` repeats a registered image and moves with its object.
+**Materials and textures.** A step's `material` names a material record, so many drawings share one substance. A material holds paint fields (`fill`, `stroke`, `line_width`, `alpha`, `blend`, `shadow`, `blur`, …) and an optional `surface` (`friction`, `restitution`, `hit_sound`, `hit_effect`, `footstep`); any other field is refused. A step's own paint wins over its material's. A texture is a fill: `{ "type": "pattern", "image": "bricks", "repeat": "repeat" }` repeats a registered image and moves with its object.
 
 **Looks.** An entity whose `drawing` asset names a drawing is drawn by the engine every frame at its own position and rotation; nothing else is needed. Its `look` property (`{values, scale, layer, depth, visible}`) says what the drawing reads and where it sits, so `entity.set('look', {...})` changes how it looks and `entity.setAsset('drawing', id)` swaps its art.
 

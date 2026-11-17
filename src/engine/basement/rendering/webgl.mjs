@@ -28,17 +28,17 @@ const BLEND_FUNCTIONS=Object.freeze({
     'destination-over':['ONE_MINUS_DST_ALPHA','ONE','ONE_MINUS_DST_ALPHA','ONE'],
 });
 /**
- * What this backend draws. Not yet: `shadow` (needs a blur pass), the blends that read the destination
+ * What this backend draws. Not yet: the blends that read the destination
  * per pixel (`overlay`, `soft-light`, `lighten`, `darken`) and the ones Canvas applies to the whole
  * surface outside the shape (`source-in`, `source-out`, `destination-in`).
  */
-export const WEBGL_CAPABILITIES=Object.freeze(['shape','sprite','text','picture','geometry:rect','geometry:ellipse','geometry:path','gradient:linear','gradient:radial','pattern','clip','dash','target','layer',...Object.keys(BLEND_FUNCTIONS).map(name=>`blend:${name}`)]);
+export const WEBGL_CAPABILITIES=Object.freeze(['shape','sprite','text','picture','geometry:rect','geometry:ellipse','geometry:path','gradient:linear','gradient:radial','pattern','clip','shadow','blur','dash','target','layer',...Object.keys(BLEND_FUNCTIONS).map(name=>`blend:${name}`)]);
 if(WEBGL_CAPABILITIES.some(need=>!CAPABILITIES.includes(need)))throw new Error('WebGL declares a capability the engine does not name');
 
 const VERTEX=`#version 300 es
 in vec2 a_position;uniform vec3 u_row0,u_row1;out vec2 v_local;
 void main(){v_local=a_position;vec3 p=vec3(a_position,1.);gl_Position=vec4(dot(u_row0,p),dot(u_row1,p),0.,1.);}`;
-// Modes: 0 colour, 1 linear gradient, 2 radial gradient (Canvas's two circles), 3 pattern, 4 texture.
+// Modes: 0 colour, 1 linear gradient, 2 radial gradient (Canvas's two circles), 3 pattern, 4 texture, 5 a texture's alpha in one colour (a shadow).
 // Outside a gradient's cone or a pattern that does not repeat the paint is transparent, never discarded:
 // the cover pass must still reset the stencil there.
 const FRAGMENT=`#version 300 es
@@ -47,6 +47,7 @@ uniform int u_mode;uniform vec4 u_color,u_points,u_uv;uniform vec2 u_radii,u_rep
 void main(){
  if(u_mode==0){color=u_color;return;}
  if(u_mode==4){color=texture(u_texture,v_local*u_uv.xy+u_uv.zw)*u_opacity;return;}
+ if(u_mode==5){color=u_color*texture(u_texture,v_local*u_uv.xy+u_uv.zw).a;return;}
  if(u_mode==3){vec2 uv=v_local*u_uv.xy;bool out_x=u_repeat.x<.5&&(uv.x<0.||uv.x>1.),out_y=u_repeat.y<.5&&(uv.y<0.||uv.y>1.);color=out_x||out_y?vec4(0):texture(u_texture,uv)*u_opacity;return;}
  float t;
  if(u_mode==1){vec2 d=u_points.zw-u_points.xy;float l=dot(d,d);if(l<1e-12){color=vec4(0);return;}t=dot(v_local-u_points.xy,d)/l;}
@@ -59,6 +60,19 @@ void main(){
  }
  color=texture(u_texture,vec2(clamp(t,0.,1.)*(255./256.)+.5/256.,.5))*u_opacity;
 }`;
+
+// One direction of a Gaussian blur over the top-left `u_region` pixels of a surface `u_size` big, read with
+// the surface's rows bottom-up. Taps past the region repeat its edge, which the caller pads with clear pixels.
+const MAX_TAPS=24;
+const BLUR_FRAGMENT=`#version 300 es
+precision highp float;in vec2 v_local;uniform sampler2D u_texture;uniform vec2 u_size,u_region,u_dir;uniform float u_sigma;out vec4 color;
+void main(){
+ vec2 lo=vec2(.5,u_size.y-u_region.y+.5),hi=vec2(u_region.x-.5,u_size.y-.5),at=vec2(v_local.x,u_size.y-v_local.y);
+ int r=int(ceil(u_sigma*3.));vec4 sum=vec4(0);float total=0.;
+ for(int i=-${MAX_TAPS};i<=${MAX_TAPS};i++){if(i<-r||i>r)continue;float w=exp(-float(i*i)/(2.*u_sigma*u_sigma));sum+=texture(u_texture,clamp(at+u_dir*float(i),lo,hi)/u_size)*w;total+=w;}
+ color=sum/total;
+}`;
+const BLUR_SIGMA=MAX_TAPS/3;   // a wider blur is drawn smaller and stretched back
 
 const IDENTITY=Object.freeze([1,0,0,1,0,0]);
 const multiply=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
@@ -77,7 +91,7 @@ function touch(map,key){const value=map.get(key);if(value!==undefined){map.delet
 export class webglRenderer {
     #surface=null;#gl=null;#viewport=null;#main=null;#program=null;#uniforms={};#buffer=null;#vao=null;#samplers=null;#samples=0;#maxTexture=4096;
     #resources=new Map();#ramps=new Map();#texts=new Map();#pictures=new Map();#pictureBytes=0;#vectorPictures=new Set();#layer=null;#bound=null;
-    #decodeImage;#createSurface;#maxPictureBytes;#densities;#disposed=false;#generation=0;
+    #decodeImage;#createSurface;#maxPictureBytes;#densities;#disposed=false;#generation=0;#blurProgram=null;#blurUniforms={};#scratch=null;
     /**
      * `decode_image(url)` gives an image WebGL can upload (default: the browser's Image); `create_surface(w, h)`
      * makes the 2D surfaces text is rasterized on (default: canvas.mjs's). Pictures are painted at the first of
@@ -103,7 +117,11 @@ export class webglRenderer {
         const gl=this.#gl,shader=(type,source)=>{const s=gl.createShader(type);gl.shaderSource(s,source);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(`WebGL shader: ${gl.getShaderInfoLog(s)}`);return s;};
         const program=gl.createProgram();gl.attachShader(program,shader(gl.VERTEX_SHADER,VERTEX));gl.attachShader(program,shader(gl.FRAGMENT_SHADER,FRAGMENT));gl.bindAttribLocation(program,0,'a_position');gl.linkProgram(program);
         if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw new Error(`WebGL program: ${gl.getProgramInfoLog(program)}`);
-        this.#program=program;gl.useProgram(program);
+        this.#program=program;
+        const blur=gl.createProgram();gl.attachShader(blur,shader(gl.VERTEX_SHADER,VERTEX));gl.attachShader(blur,shader(gl.FRAGMENT_SHADER,BLUR_FRAGMENT));gl.bindAttribLocation(blur,0,'a_position');gl.linkProgram(blur);
+        if(!gl.getProgramParameter(blur,gl.LINK_STATUS))throw new Error(`WebGL program: ${gl.getProgramInfoLog(blur)}`);
+        this.#blurProgram=blur;gl.useProgram(blur);for(const name of ['u_row0','u_row1','u_texture','u_size','u_region','u_dir','u_sigma'])this.#blurUniforms[name]=gl.getUniformLocation(blur,name);gl.uniform1i(this.#blurUniforms.u_texture,0);
+        gl.useProgram(program);
         for(const name of ['u_row0','u_row1','u_mode','u_color','u_points','u_uv','u_radii','u_repeat','u_opacity','u_texture'])this.#uniforms[name]=gl.getUniformLocation(program,name);
         gl.uniform1i(this.#uniforms.u_texture,0);
         this.#vao=gl.createVertexArray();gl.bindVertexArray(this.#vao);this.#buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,this.#buffer);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
@@ -236,6 +254,10 @@ export class webglRenderer {
         this.#rows(m);this.#direct(clipped);this.#texturePaint(image.texture,[su,sv,ou,ov],opacity);this.#draw(quad(x0,y0,x0+w,y0+h));
     }
     #text(d,m,material,clipped,opacity){
+        const line=this.#textLine(d,m,material);if(!line)return;
+        this.#rows(m);this.#direct(clipped);this.#texturePaint(line.texture,[1/line.width,1/line.height,-line.x/line.width,-line.y/line.height],opacity);this.#draw(quad(line.x,line.y,line.x+line.width,line.y+line.height));
+    }
+    #textLine(d,m,material){
         const scale=2**(Math.ceil(Math.log2(scaleOf(m))*4)/4),paint=p=>p===null||typeof p==='string'?p:JSON.stringify(p);
         const key=JSON.stringify([d.text,d.font,d.align,d.baseline,paint(material.fill),paint(material.stroke),material.stroke_width,material.line_cap,material.line_join,material.dash,material.dash_offset,scale]);
         let line=touch(this.#texts,key);
@@ -244,8 +266,7 @@ export class webglRenderer {
             line=null;if(raster){try{line={texture:this.#texture(raster.surface.width,raster.surface.height,{image:raster.surface}),x:raster.x,y:raster.y,width:raster.width,height:raster.height};}finally{raster.surface.width=0;raster.surface.height=0;}}
             this.#texts.set(key,line);if(this.#texts.size>512){const [first,old]=this.#texts.entries().next().value;if(old)this.#gl.deleteTexture(old.texture);this.#texts.delete(first);}
         }
-        if(!line)return;
-        this.#rows(m);this.#direct(clipped);this.#texturePaint(line.texture,[1/line.width,1/line.height,-line.x/line.width,-line.y/line.height],opacity);this.#draw(quad(line.x,line.y,line.x+line.width,line.y+line.height));
+        return line;
     }
     // A picture's packets, checked against what this backend draws, the way the render system checks a frame's.
     #build(d){
@@ -284,13 +305,83 @@ export class webglRenderer {
         const clips=context.clips.length||d.clips.length?[...context.clips,...d.clips.map(clip=>({...this.#geometry(clip.geometry_id,clip.geometry),matrix:multiply(m,clip.transform),rule:clip.rule}))]:context.clips;
         const opacity=d.opacity*context.opacity,blend=context.blend&&d.blend==='normal'?context.blend:d.blend;
         if(d.type==='picture')return this.#picture(d,m,context,clips,opacity,blend);
+        const material=d.material_id?this.#resources.get(d.material_id).descriptor.material:d.material;
+        if(material.blur||material.shadow)return this.#soft(d,m,material,clips,opacity,blend,context);
+        this.#plain(d,m,material,clips,opacity,blend);
+    }
+    #plain(d,m,material,clips,opacity,blend){
         const clipped=clips.length>0;if(clipped)this.#clip(clips);
         try{
-            this.#blend(blend);const material=d.material_id?this.#resources.get(d.material_id).descriptor.material:d.material;
+            this.#blend(blend);
             if(d.type==='shape')this.#shape(d,m,material,clipped,opacity);
             else if(d.type==='sprite')this.#sprite(d,m,clipped,opacity);
             else this.#text(d,m,material,clipped,opacity);
         }finally{if(clipped)this.#clearStencil();}
+    }
+    // Where a packet draws on the bound surface: [left, top, right, bottom] in its pixels, or null.
+    #extent(d,m,material){
+        let local;
+        if(d.type==='shape'){
+            const {entry,g}=this.#geometry(d.geometry_id,d.geometry),pad=material.stroke!==null&&material.stroke_width>0?material.stroke_width*(material.line_join==='miter'?5:1):0;let l=Infinity,t=Infinity,r=-Infinity,b=-Infinity;
+            for(const path of this.#flatten(entry,g,m))for(let i=0;i<path.points.length;i+=2){const x=path.points[i],y=path.points[i+1];if(x<l)l=x;if(x>r)r=x;if(y<t)t=y;if(y>b)b=y;}
+            if(!(l<=r))return null;local=[l-pad,t-pad,r+pad,b+pad];
+        }else if(d.type==='sprite'){const [w,h]=d.size,x0=-w*d.origin[0],y0=-h*d.origin[1];local=[x0,y0,x0+w,y0+h];}
+        else{const line=this.#textLine(d,m,material);if(!line)return null;local=[line.x,line.y,line.x+line.width,line.y+line.height];}
+        let l=Infinity,t=Infinity,r=-Infinity,b=-Infinity;
+        for(const [x,y] of [[local[0],local[1]],[local[2],local[1]],[local[0],local[3]],[local[2],local[3]]]){const px=m[0]*x+m[2]*y+m[4],py=m[1]*x+m[3]*y+m[5];if(px<l)l=px;if(px>r)r=px;if(py<t)t=py;if(py>b)b=py;}
+        return [l,t,r,b];
+    }
+    /**
+     * A blurred or shadowed packet: drawn sharp on a scratch surface around it (smaller when the blur is wide),
+     * blurred there in two passes, then laid on the surface under the packet's clips and blend: the shadow in its
+     * colour at its offset first, then the packet itself, blurred or sharp. Blurs are Canvas's: `blur` is the
+     * spread, a shadow's `blur` twice it, both in pass units.
+     */
+    #soft(d,m,material,clips,opacity,blend,context){
+        const back=this.#bound,k=Math.max(context.sx,context.sy),shadow=material.shadow,box=this.#extent(d,m,material);
+        const blur=material.blur*k,cast=shadow?Math.hypot(shadow.blur*k/2,blur):0,sigma=Math.max(blur,cast),pad=Math.ceil(3*sigma)+2;
+        const ox=shadow?shadow.offset[0]*context.sx:0,oy=shadow?shadow.offset[1]*context.sy:0;
+        if(box){
+            const x0=Math.floor(Math.max(box[0]-pad,-pad-Math.abs(ox))),y0=Math.floor(Math.max(box[1]-pad,-pad-Math.abs(oy))),x1=Math.ceil(Math.min(box[2]+pad,back.width+pad+Math.abs(ox))),y1=Math.ceil(Math.min(box[3]+pad,back.height+pad+Math.abs(oy)));
+            if(x1>x0&&y1>y0){
+                const most=Math.min(this.#maxTexture,2048),s=Math.min(1,sigma>BLUR_SIGMA?BLUR_SIGMA/sigma:1,most/(x1-x0),most/(y1-y0)),w=Math.ceil((x1-x0)*s),h=Math.ceil((y1-y0)*s);
+                const [a]=this.#scratchFor(w,h);
+                try{
+                    this.#bind(a);this.#clearRegion(w,h);this.#plain(d,multiply([s,0,0,s,-x0*s,-y0*s],m),material,[],1,'normal');this.#resolve(a);
+                    const lay=(surface,mode,dx,dy)=>{
+                        this.#bind(back);const clipped=clips.length>0;if(clipped)this.#clip(clips);
+                        try{this.#blend(blend);this.#rows([1/s,0,0,1/s,x0+dx,y0+dy]);this.#direct(clipped);this.#texturePaint(surface.texture,[1/surface.width,-1/surface.height,0,1],opacity);
+                            if(mode===5){this.#gl.uniform1i(this.#uniforms.u_mode,5);this.#gl.uniform4fv(this.#uniforms.u_color,premultiplied(shadow.color,opacity));}
+                            this.#draw(quad(0,0,w,h));}
+                        finally{if(clipped)this.#clearStencil();}
+                    };
+                    if(shadow&&premultiplied(shadow.color,1)[3]>0)lay(cast*s>.05?this.#blurred(w,h,cast*s):a,5,ox,oy);
+                    if(blur*s>.05){lay(this.#blurred(w,h,blur*s),4,0,0);return;}
+                }finally{this.#bind(back);}
+            }
+        }
+        if(!material.blur)this.#plain(d,m,material,clips,opacity,blend);
+    }
+    #clearRegion(w,h){const gl=this.#gl;gl.enable(gl.SCISSOR_TEST);gl.scissor(0,this.#bound.height-h,w,h);gl.colorMask(true,true,true,true);gl.stencilMask(0xff);gl.clearColor(0,0,0,0);gl.clearStencil(0);gl.clear(gl.COLOR_BUFFER_BIT|gl.STENCIL_BUFFER_BIT);gl.disable(gl.SCISSOR_TEST);}
+    // Three scratch surfaces at least w by h, grown in steps of 256 and kept.
+    #scratchFor(w,h){
+        const sc=this.#scratch;if(sc&&sc[0].width>=w&&sc[0].height>=h)return sc;
+        const W=Math.ceil(Math.max(w,sc?.[0].width??0)/256)*256,H=Math.ceil(Math.max(h,sc?.[0].height??0)/256)*256;
+        if(sc)for(const t of sc)this.#freeTarget(t);this.#scratch=null;this.#scratch=[this.#target(W,H),this.#target(W,H),this.#target(W,H)];return this.#scratch;
+    }
+    // The first scratch surface's top-left w by h blurred by sigma (pixels) into the third, through the second.
+    #blurred(w,h,sigma){
+        const gl=this.#gl,u=this.#blurUniforms,[a,b,c]=this.#scratch;gl.useProgram(this.#blurProgram);
+        try{
+            gl.blendEquation(gl.FUNC_ADD);gl.blendFuncSeparate(gl.ONE,gl.ZERO,gl.ONE,gl.ZERO);gl.activeTexture(gl.TEXTURE0);gl.bindSampler(0,this.#samplers.clamp);
+            for(const [from,into,dir] of [[a,b,[1,0]],[b,c,[0,1]]]){
+                this.#bind(into);this.#clearRegion(w,h);this.#direct(false);
+                const W=into.width,H=into.height;gl.uniform3f(u.u_row0,2/W,0,-1);gl.uniform3f(u.u_row1,0,-2/H,1);
+                gl.bindTexture(gl.TEXTURE_2D,from.texture);gl.uniform2f(u.u_size,from.width,from.height);gl.uniform2f(u.u_region,w,h);gl.uniform2f(u.u_dir,...dir);gl.uniform1f(u.u_sigma,sigma);
+                this.#draw(quad(0,0,w,h));this.#resolve(into);
+            }
+        }finally{gl.useProgram(this.#program);}
+        return c;
     }
     #clear(color){const gl=this.#gl,[r,g,b,a]=color===false?[0,0,0,0]:premultiplied(color);gl.colorMask(true,true,true,true);gl.stencilMask(0xff);gl.clearColor(r,g,b,a);gl.clearStencil(0);gl.clear(color===false?gl.STENCIL_BUFFER_BIT:gl.COLOR_BUFFER_BIT|gl.STENCIL_BUFFER_BIT);}
     render(frame){
@@ -325,10 +416,10 @@ export class webglRenderer {
         if(this.#disposed)return;this.#disposed=true;this.#generation++;const gl=this.#gl;
         if(gl){
             for(const entry of this.#resources.values())this.#release(entry);for(const texture of this.#ramps.values())gl.deleteTexture(texture);
-            for(const line of this.#texts.values())if(line)gl.deleteTexture(line.texture);for(const entry of this.#pictures.values())this.#freeTarget(entry.target);if(this.#layer)this.#freeTarget(this.#layer);
+            for(const line of this.#texts.values())if(line)gl.deleteTexture(line.texture);for(const entry of this.#pictures.values())this.#freeTarget(entry.target);if(this.#layer)this.#freeTarget(this.#layer);for(const t of this.#scratch??[])this.#freeTarget(t);gl.deleteProgram(this.#blurProgram);
             gl.deleteBuffer(this.#buffer);gl.deleteVertexArray(this.#vao);gl.deleteProgram(this.#program);for(const sampler of Object.values(this.#samplers??{}))gl.deleteSampler(sampler);
             gl.getExtension('WEBGL_lose_context')?.loseContext();
         }
-        this.#resources.clear();this.#ramps.clear();this.#texts.clear();this.#pictures.clear();this.#vectorPictures.clear();this.#layer=null;this.#gl=null;this.#surface=null;this.#bound=null;
+        this.#resources.clear();this.#ramps.clear();this.#texts.clear();this.#pictures.clear();this.#vectorPictures.clear();this.#layer=null;this.#scratch=null;this.#gl=null;this.#surface=null;this.#bound=null;
     }
 }

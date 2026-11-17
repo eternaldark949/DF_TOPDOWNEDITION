@@ -32,6 +32,7 @@ export function material(packet={},out={}){
     out.line_cap=packet.line_cap??'butt';out.line_join=packet.line_join??'miter';if(!['butt','round','square'].includes(out.line_cap)||!['miter','bevel','round'].includes(out.line_join))throw new TypeError('Invalid line style');
     const dash=packet.dash??[];if(!Array.isArray(dash))throw new TypeError('Dash must be an array');out.dash??=[];out.dash.length=dash.length;dash.forEach((v,i)=>{out.dash[i]=finite(v,'dash length',0);});out.dash_offset=finite(packet.dash_offset??0,'dash offset');
     if(packet.shadow){out.shadow??={};out.shadow.color=color(packet.shadow.color);out.shadow.blur=finite(packet.shadow.blur??0,'shadow blur',0);out.shadow.offset=vector(packet.shadow.offset??[0,0],'shadow offset',out.shadow.offset);}else out.shadow=null;
+    out.blur=finite(packet.blur??0,'blur',0);
     return out;
 }
 export function packet(input,out={}){
@@ -74,7 +75,7 @@ export function requirements(draw,resolve,result=[]){
     result.length=0;result.push(draw.type,`blend:${draw.blend}`);
     if(draw.type==='picture'){if(draw.clips.length)result.push('clip');for(const clip of draw.clips){const g=clip.geometry_id?resolve(clip.geometry_id,'geometry').geometry:clip.geometry;result.push(`geometry:${g.type}`);}return result;}
     const g=draw.geometry_id?resolve(draw.geometry_id,'geometry').geometry:draw.geometry,m=draw.material_id?resolve(draw.material_id,'material').material:draw.material;
-    if(g)result.push(`geometry:${g.type}`);if(draw.clips.length)result.push('clip');if(m.shadow)result.push('shadow');if(m.dash.length)result.push('dash');
+    if(g)result.push(`geometry:${g.type}`);if(draw.clips.length)result.push('clip');if(m.shadow)result.push('shadow');if(m.blur)result.push('blur');if(m.dash.length)result.push('dash');
     for(const p of [m.fill,m.stroke])if(p&&typeof p==='object'){if(p.type==='pattern'){resolve(p.image,'image');result.push('pattern');}else result.push(`gradient:${p.type}`);}
     for(const clip of draw.clips){const g=clip.geometry_id?resolve(clip.geometry_id,'geometry').geometry:clip.geometry;result.push(`geometry:${g.type}`);}
     if(draw.resource_id&&resolve(draw.resource_id,['image','target']).type==='target')result.push('target');return result;

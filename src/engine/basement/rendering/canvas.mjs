@@ -144,6 +144,7 @@ export class canvasRenderer {
         set('lineWidth',m.stroke_width||1);set('lineCap',m.line_cap);set('lineJoin',m.line_join);
         const dash=m.dash.length?m.dash.join(','):'';if(st.dash!==dash){ctx.setLineDash(m.dash);st.dash=dash;}set('lineDashOffset',m.dash_offset);
         set('shadowColor',m.shadow?.color??'transparent');set('shadowBlur',(m.shadow?.blur??0)*Math.max(sx,sy));set('shadowOffsetX',(m.shadow?.offset[0]??0)*sx);set('shadowOffsetY',(m.shadow?.offset[1]??0)*sy);
+        set('filter',m.blur?`blur(${m.blur*Math.max(sx,sy)}px)`:'none');
     }
     #geometry(id,inline){return id?this.#resources.get(id):{descriptor:{geometry:inline},path:null};}
     #shape(ctx,entry,m){
@@ -156,6 +157,7 @@ export class canvasRenderer {
     #picture(ctx,draw,layered){
         const st=this.#set,alpha=draw.opacity,composite=COMPOSITE[draw.blend];
         if(st.globalAlpha!==alpha){ctx.globalAlpha=alpha;st.globalAlpha=alpha;}if(st.globalCompositeOperation!==composite){ctx.globalCompositeOperation=composite;st.globalCompositeOperation=composite;}
+        if(st.filter!=='none'){ctx.filter='none';st.filter='none';}if(st.shadowColor!=='transparent'){ctx.shadowColor='transparent';st.shadowColor='transparent';}   // a stamp is not blurred or shadowed by the packet before it
         const p=draw.picture,ask=this.#ask;ask.key=p.key;ask.bounds=p.bounds;ask.matrix=p.matrix;ask.source=p.source;ask.layered=layered||p.layered;ask.stamp=!draw.prepare;ask.blend=draw.blend;
         if(this.#pictures.draw(ctx,ask,draw.build)==='vector')this.#set={};   // the vector fallback drew packets of its own
     }
@@ -188,12 +190,12 @@ export class canvasRenderer {
             const sx=target.surface.width/pass.viewport.width,sy=target.surface.height/pass.viewport.height;
             ctx.save();this.#set={};
             try{
-                if(pass.clear_color!==false||layer){ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.clearRect(0,0,target.surface.width,target.surface.height);if(pass.clear_color!==false){ctx.fillStyle=pass.clear_color;ctx.fillRect(0,0,target.surface.width,target.surface.height);}}
+                if(pass.clear_color!==false||layer){ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.filter='none';ctx.clearRect(0,0,target.surface.width,target.surface.height);if(pass.clear_color!==false){ctx.fillStyle=pass.clear_color;ctx.fillRect(0,0,target.surface.width,target.surface.height);}}
                 for(const draw of pass.packets)this.#draw(ctx,draw,frame.view,sx,sy,!!layer);
             }finally{ctx.restore();this.#set={};}
             if(layer){
                 const out=into.context;out.save();
-                try{out.setTransform(1,0,0,1,0,0);out.globalAlpha=layer.opacity;out.globalCompositeOperation=COMPOSITE[layer.blend];out.shadowColor='transparent';out.shadowBlur=0;out.imageSmoothingEnabled=true;out.drawImage(target.surface,0,0,into.surface.width,into.surface.height);}
+                try{out.setTransform(1,0,0,1,0,0);out.globalAlpha=layer.opacity;out.globalCompositeOperation=COMPOSITE[layer.blend];out.shadowColor='transparent';out.shadowBlur=0;out.filter='none';out.imageSmoothingEnabled=true;out.drawImage(target.surface,0,0,into.surface.width,into.surface.height);}
                 finally{out.restore();}
             }
         }

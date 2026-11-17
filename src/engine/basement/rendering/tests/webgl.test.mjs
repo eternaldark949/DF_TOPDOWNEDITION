@@ -64,8 +64,8 @@ test('strokes cover their width with Canvas caps and joins; dashes cut the outli
 
 test('the WebGL backend declares a subset of the engine vocabulary and refuses what it cannot draw',async()=>{
  assert.ok(WEBGL_CAPABILITIES.every(need=>CAPABILITIES.includes(need)));
- for(const need of ['shape','sprite','text','picture','clip','target','layer','gradient:radial','pattern','dash','blend:normal','blend:add','blend:destination-out'])assert.ok(WEBGL_CAPABILITIES.includes(need),need);
- for(const missing of ['shadow','blend:overlay','blend:source-in'])assert.ok(!WEBGL_CAPABILITIES.includes(missing),missing);
+ for(const need of ['shape','sprite','text','picture','clip','target','layer','gradient:radial','pattern','dash','shadow','blur','blend:normal','blend:add','blend:destination-out'])assert.ok(WEBGL_CAPABILITIES.includes(need),need);
+ for(const missing of ['blend:overlay','blend:source-in'])assert.ok(!WEBGL_CAPABILITIES.includes(missing),missing);
  const backend=new webglRenderer();assert.equal(backend.capabilities,WEBGL_CAPABILITIES);
  assert.throws(()=>backend.initialize({getContext:()=>null},{viewport:{width:1,height:1,pixel_ratio:1}}),/WebGL 2 context unavailable/);
  assert.throws(()=>new webglRenderer({densities:[2,1]}),/Densities/);
@@ -76,10 +76,18 @@ test('the WebGL backend declares a subset of the engine vocabulary and refuses w
  class Subset extends recordingRenderer{constructor(){super({capabilities:WEBGL_CAPABILITIES});}}
  const render=new renderSystem({physics_system:world,camera,create_surface:id=>({id,getContext:()=>null})}).registerRenderer('subset',Subset).registerRenderer('webgl',webglRenderer);
  await render.setRenderer('subset');
- render.beginFrame().submit({type:'shape',geometry:{type:'rect',size:[4,4]},material:{fill:'#fff',shadow:{color:'#000',blur:4}}});
- assert.throws(()=>render.endFrame(),/capability unavailable: shadow/);
+ render.beginFrame().submit({type:'shape',geometry:{type:'rect',size:[4,4]},material:{fill:'#fff'},blend:'overlay'});
+ assert.throws(()=>render.endFrame(),/capability unavailable: blend:overlay/);
  render.beginFrame().submit({type:'shape',geometry:{type:'rect',size:[4,4]},blend:'overlay'});assert.throws(()=>render.endFrame(),/blend:overlay/);
  render.beginFrame().submit({type:'shape',geometry:{type:'rect',size:[4,4]},blend:'add'});assert.equal(render.endFrame(),1);
  await assert.rejects(render.setRenderer('webgl'),/WebGL 2 context unavailable/);assert.equal(render.getRenderer(),'subset');
  render.dispose();
+});
+
+test('blur is paint like any other: a step asks for it, the packet carries it, and a backend must declare it',async()=>{
+ const {artScene}=await import('../index.mjs'),{packet,requirements}=await import('../packets.mjs');
+ const art=new artScene();art.drawEllipse({x:0,y:0,radius_x:4,radius_y:2,fill:'#000',blur:1.5});
+ const [p]=art.finish(),normal=packet(p);assert.equal(normal.material.blur,1.5);assert.ok(requirements(normal,()=>null).includes('blur'));
+ assert.equal(packet({type:'shape',geometry:{type:'rect',size:[1,1]}}).material.blur,0,'sharp by default');
+ assert.throws(()=>packet({type:'shape',geometry:{type:'rect',size:[1,1]},material:{blur:-1}}),/blur/);
 });
