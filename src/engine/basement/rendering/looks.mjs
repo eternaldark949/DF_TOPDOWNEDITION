@@ -58,12 +58,15 @@ export function drawingReach(steps,{values={}}={}){
  * Draws one entity's look into `scene` at its render pose, or does nothing when it has none. The
  * drawing and its materials are read from `source` (the world's data source).
  */
-export function drawLook(scene,entity,source,blend=1){
+export function drawLook(scene,entity,source,blend=1,{view=null}={}){
     const drawing_id=entity.assets?.drawing;if(!drawing_id)return false;
     const look=entity.get('look',{});if(look.visible===false)return false;
     const drawing=resource(source,drawing_id,'drawing'),pose=entity.getRenderState(blend);
     const [wx,wy]=entity.world_scale??[1,1],k=look.scale??1;
+    // Leaning toward the camera, a look stands in the plane of its base's elevation.
+    if(view)scene.enter({matrix:view.plane(view.k(pose.elevation??0))});
     scene.draw(drawing.steps,{at:pose.position,rotation:pose.rotation,scale:[wx*k,wy*k],values:look.values??{},materials:name=>resource(source,qualifyResource(name,drawing_id),'material')});
+    if(view)scene.leave();
     return true;
 }
 /**
@@ -78,33 +81,39 @@ export function componentSteps(components,source,{solid_only=false}={}){
 }
 /**
  * Draws an entity's components, one scene per visible layer, lowest first: [{height, layer, component,
- * packets}]. A component on a joint is placed by `joints(name)` ({position, rotation, scale} in the world),
- * when it gives one; otherwise it rides the entity's pose. Layers are drawn by base height, then layer
- * number, then component order, so taller parts cover lower ones.
+ * packets}]. Heights are z in the world. A component off a joint stands on the entity's base (its
+ * elevation); one on a joint stands on the joint, placed by `joints(name)` ({position, rotation, scale,
+ * height, pitch} in the world), when it gives one. Either way a layer's `height` counts up from there. A
+ * joint's pitch tips its bone out of the ground plane, so from above the component is shortened along
+ * the bone by the pitch's cosine, and its `at` rises with the bone. Layers draw by their height in the
+ * world, then layer number, then component order, so taller parts cover lower ones.
  */
 export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null}={}){
     if(view!==null&&!(view instanceof heightView))throw new TypeError('A height view is a heightView or null');
     const components=entity.get('components')??[];if(!components.length)return [];
     const look=entity.get('look',{});if(look.visible===false)return [];
-    const pose=entity.getRenderState(blend),scale=look.scale??1,[wx,wy,wz]=entity.world_scale??[1,1,1],values=look.values??{},out=[];
-    for(const {component:c,layer} of layersByHeight(components)){
-        // A joint's world pose carries the rig's scale (a taller rig, a scaled entity); off a joint the entity's scale and the look's apply.
-        const joint=c.joint?joints(c.joint):null,base=joint??{position:pose.position,rotation:pose.rotation};
-        const size=joint?.scale?[joint.scale[0]*scale,joint.scale[1]*scale]:[wx*scale,wy*scale],kx=joint?1:wx*scale,ky=joint?1:wy*scale;
+    const pose=entity.getRenderState(blend),scale=look.scale??1,[wx,wy,wz]=entity.world_scale??[1,1,1],values=look.values??{},elevation=pose.elevation??0,parts=[];
+    for(const {component:c,layer,order} of listLayers(components)){
+        // A joint's world pose carries the rig's scale (a taller rig, a scaled entity) and its height; off a joint the entity's scale and the look's apply.
+        const joint=c.joint?joints(c.joint):null,base=joint??{position:pose.position,rotation:pose.rotation},pitch=joint?.pitch??0,fore=Math.cos(pitch);
+        const size=joint?.scale?[joint.scale[0]*scale,joint.scale[1]*scale]:[wx*scale,wy*scale],kx=joint?fore:wx*scale,ky=joint?1:wy*scale;
         const cos=Math.cos(base.rotation),sin=Math.sin(base.rotation),x=c.at[0]*kx,y=c.at[1]*ky;
-        const scene=new artScene(),steps=layerSteps(layer,source),place={at:[base.position[0]+x*cos-y*sin,base.position[1]+x*sin+y*cos],rotation:base.rotation+c.rotation,scale:size};
+        const ground=joint?(joint.height??elevation)+c.at[0]*Math.sin(pitch)*wz:elevation,z0=ground+layer.height*wz,z1=ground+(layer.height+layer.thickness)*wz;
+        parts.push({c,layer,order,z0,z1,fore,place:{at:[base.position[0]+x*cos-y*sin,base.position[1]+x*sin+y*cos],rotation:base.rotation+c.rotation,scale:size}});
+    }
+    parts.sort((a,b)=>a.z0-b.z0||a.layer.layer-b.layer.layer||a.order-b.order);
+    return parts.map(({c,layer,z0,z1,fore,place})=>{
+        const scene=new artScene(),steps=fore===1?layerSteps(layer,source):foreshorten(layerSteps(layer,source),fore);
         // Leaning toward the camera: the walls from the layer's base to its top, then its shapes in the plane of its top.
-        const z0=layer.height*wz,z1=(layer.height+layer.thickness)*wz;
         if(view&&layer.sides)drawSides(scene,steps,place,values,readValues({fill:layer.sides},values).fill,view,z0,z1);
         if(view)scene.enter({matrix:view.plane(view.k(z1))});
         scene.draw(steps,{...place,values,materials:name=>resource(source,qualifyResource(name,layer.drawing??entity.template_id??name),'material')});
         if(view)scene.leave();
-        out.push({height:layer.height*wz,layer:layer.layer,component:c.name,packets:scene.finish()});
-    }
-    return out;
+        return {height:z0,layer:layer.layer,component:c.name,packets:scene.finish()};
+    });
 }
-// Lowest first: by base height, then layer number, then component order (the physics package's layersByHeight).
-function layersByHeight(components){const out=[];components.forEach((component,order)=>{for(const layer of component.layers)if(layer.visible!==false)out.push({component,layer,order});});return out.sort((a,b)=>a.layer.height-b.layer.height||a.layer.layer-b.layer.layer||a.order-b.order);}
+// Every visible layer with its component and the component's place in the list.
+function listLayers(components){const out=[];components.forEach((component,order)=>{for(const layer of component.layers)if(layer.visible!==false)out.push({component,layer,order});});return out.sort((a,b)=>a.layer.height-b.layer.height||a.layer.layer-b.layer.layer||a.order-b.order);}
 /** A layer's walls, seen from above: each face of the hull of its shapes that the camera sees, from the plane of its base to the plane of its top. */
 function drawSides(scene,steps,{at,rotation,scale},values,fill,view,z0,z1){
     if(z1<=z0)return;
@@ -117,6 +126,16 @@ function drawSides(scene,steps,{at,rotation,scale},values,fill,view,z0,z1){
         const [p,q,r,t]=[view.scaled(a[0],a[1],k0),view.scaled(b[0],b[1],k0),view.scaled(b[0],b[1],k1),view.scaled(a[0],a[1],k1)];
         scene.fill([['move',...p],['line',...q],['line',...r],['line',...t],['close']],fill);
     }
+}
+/**
+ * Steps seen along a tilted bone: every place along x (a step's x, from, to and points) is shortened by `k`,
+ * the cosine of the bone's pitch, and every size is kept, because body parts are round: a leg pointing
+ * straight down is seen from above as the circle at its end, not as a squashed sliver.
+ */
+export function foreshorten(steps,k){
+    const p=v=>Array.isArray(v)&&v.length===2&&typeof v[0]!=='object'?[typeof v[0]==='number'?v[0]*k:v[0],v[1]]:v;
+    return steps.map(step=>{const out={...step};if(typeof out.x==='number')out.x*=k;for(const key of ['from','to'])if(out[key]!==undefined)out[key]=p(out[key]);
+        if(Array.isArray(out.points))out.points=out.points.map(p);if(out.shape==='group'&&Array.isArray(out.steps))out.steps=foreshorten(out.steps,k);return out;});
 }
 function layerSteps(layer,source){return layer.steps??resource(source,layer.drawing,'drawing').steps;}
 function resource(source,id,kind){const value=source.getResource(id);if(value.kind!==kind)throw new TypeError(`${id} is a ${value.kind}, not a ${kind}`);return value;}
@@ -132,6 +151,7 @@ function outline(step){
         case 'circle':return ring(x,y,step.radius,step.radius);
         case 'ellipse':return ring(x,y,step.radius_x,step.radius_y,step.rotation??0);
         case 'capsule':return [...ring(...step.from,step.radius,step.radius),...ring(...step.to,step.radius,step.radius)];
+        case 'limb':{const [r0,rb,r1]=step.radii,t=step.belly_at??.3,m=[step.from[0]+(step.to[0]-step.from[0])*t,step.from[1]+(step.to[1]-step.from[1])*t];return [...ring(...step.from,r0,r0),...ring(...m,rb,rb),...ring(...step.to,r1,r1)];}
         case 'line':case 'polygon':case 'curve':return step.points.map(p=>[...p]);
         case 'glow':return ring(x,y,step.radius,step.radius);
         case 'ground_shadow':return ring(x,y,step.radius_x,step.radius_y);

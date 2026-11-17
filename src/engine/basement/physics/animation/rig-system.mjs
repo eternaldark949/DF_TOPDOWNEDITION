@@ -17,10 +17,15 @@ export class rigSystem {
         const entry={record,controller:null,previous:null,chains:new Map()};
         const guard=()=>{this.#guard();this.#record(record.handle);if(entry.controller&&this.#rigs.get(record.id)!==entry)throw new Error('Rig was removed');};
         entry.controller=new animationController({definition,clips,authority:this.#authority,guard,root_motion_guard:()=>{if(!(record.motor instanceof characterMotor)||record.parent_mount)throw new Error('Root motion requires an unmounted character motor');}});
-        this.#place(entry);entry.previous=entry.controller.getPose();this.#rigs.set(record.id,entry);return entry.controller;
+        this.#place(entry);entry.previous=entry.controller.getPose();this.#rigs.set(record.id,entry);this.#posed(entry);return entry.controller;
     }
+    /** Its joints' heights in rig space, by name (null with no rig): what a component on a joint stands on. */
+    _jointHeights(body){const entry=this.#rigs.get(this.#record(body).id);if(!entry)return null;const pose=entry.controller;return id=>{try{return pose.getJoint(id).height;}catch{return null;}};}
+    #posed(entry){const entity=this.#world.elements.fetchEntity(entry.record.id);if(entity)this.#world.elements._rigPosed(entity);}
     /** The rig's root in the world: its body's pose, at its entity's scale. */
     #root(entry,pose={position:entry.record.position,rotation:entry.record.rotation}){const s=this.#world.elements.fetchEntity(entry.record.id)?.world_scale;return {position:[...pose.position],rotation:pose.rotation,...(s&&(s[0]!==1||s[1]!==1)?{scale:[s[0],s[1]]}:{})};}
+    /** The world options a rig-space pose is read with: the root, the base's elevation and the entity's height scale. */
+    #world_options(entry,state){return {root:this.#root(entry,state),elevation:state.elevation??0,height_scale:this.#world.elements.fetchEntity(entry.record.id)?.world_scale?.[2]??1};}
     #place(entry){entry.controller._setRoot(this.#root(entry),this.#authority);}
     getRig(body){return this.#rigs.get(this.#record(body).id)?.controller??null;}
     removeRig(body){
@@ -60,7 +65,7 @@ export class rigSystem {
     getPose(body,{blend=1,world_space=false,relative_to=null}={}){
         if(typeof world_space!=='boolean')throw new TypeError('world_space must be boolean');
         const entry=this.#entry(body),pose=this.#pose(entry,blend),root=world_space?entry.record.handle.getRenderState(blend):null;
-        const options=root?{root:this.#root(entry,root)}:undefined;
+        const options=root?this.#world_options(entry,root):undefined;
         if(relative_to!==null&&world_space)throw new TypeError('Choose world space or a relative joint');
         const relative=relative_to===null?null:inverse(pose.getJoint(relative_to).matrix),project=value=>relative?describe(multiply(relative,value.matrix)):value;
         return {rig_id:entry.controller.definition.rig_id,joints:Object.fromEntries(entry.controller.definition.getJointNames().map(id=>[id,project(pose.getJoint(id,options))])),anchors:Object.fromEntries(entry.controller.definition.getAnchorNames().map(id=>[id,project(pose.getAnchor(id,options))]))};
@@ -68,7 +73,7 @@ export class rigSystem {
     getAnchor(body,anchor,{blend=1,world_space=true}={}){
         name(anchor);if(typeof world_space!=='boolean')throw new TypeError('world_space must be boolean');
         const entry=this.#entry(body),pose=this.#pose(entry,blend),root=world_space?entry.record.handle.getRenderState(blend):null;
-        return pose.getAnchor(anchor,root?{root:this.#root(entry,root)}:undefined);
+        return pose.getAnchor(anchor,root?this.#world_options(entry,root):undefined);
     }
     _beforeStep(seconds){
         const requests=[];
@@ -89,6 +94,7 @@ export class rigSystem {
             this.#place(entry);const distance=this.#world.getBodyMotion(entry.record.handle).distance;
             for(const marker of entry.controller.advance(seconds,{distance},this.#authority))this.#world._emit('animationMarker',{body:entry.record.handle,...marker});
             if(entry.chains.size)this.#measure(entry);
+            this.#posed(entry);
         }
     }
     _bodyRemoved(id){
@@ -105,6 +111,7 @@ export class rigSystem {
             const pose=new rigPose(controller.definition);pose.load({format_version:1,rig_id:controller.definition.rig_id,locals:saved.previous});const entry=this.#entry(saved.body_id);entry.previous=pose.getLocalPose();
             for(const chain of saved.chains??[]){fields(chain,['packet','segments','hinges','lengths','offsets']);const restored=new physicalChain(this.#world,entry.record,controller,this.#authority,chain.packet,chain);entry.chains.set(restored.chain_id,restored);}
             if(entry.chains.size)this.#measure(entry);
+            this.#posed(entry);
         }
     }
 }

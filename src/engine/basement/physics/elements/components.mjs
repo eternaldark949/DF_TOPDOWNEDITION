@@ -58,10 +58,20 @@ export function readComponents(list) {
 /** The lowest base and the highest top of a component's layers. */
 export function componentSpan(component) { return { base: Math.min(...component.layers.map(l => l.height)), top: Math.max(...component.layers.map(l => l.height + l.thickness)) }; }
 
-/** The span its solid layers fill, [base, top] across every component, or null when none is solid: the body's height_span. */
-export function solidSpan(components) {
-    const layers = components.flatMap(c => c.layers.filter(l => l.solid));
-    return layers.length ? [Math.min(...layers.map(l => l.height)), Math.max(...layers.map(l => l.height + l.thickness))] : null;
+/**
+ * The span its solid layers fill, [base, top] across every component, or null when none is solid: the
+ * body's height_span. A component on a rig joint stands on that joint: `joint_height(name)` gives the
+ * joint's posed height (null or omitted: the joint is at the entity's base), so a crouch lowers the span.
+ */
+export function solidSpan(components, joint_height = () => null) { return layersSpan(components, joint_height, true); }
+/** The span its layers fill, [base, top], as solidSpan does, over every layer (`solid_only` false) or the solid ones. */
+export function layersSpan(components, joint_height = () => null, solid_only = false) {
+    let base = Infinity, top = -Infinity;
+    for (const c of components) {
+        const z = (c.joint ? joint_height(c.joint) : null) ?? 0;
+        for (const l of c.layers) if (!solid_only || l.solid) { base = Math.min(base, z + l.height); top = Math.max(top, z + l.height + l.thickness); }
+    }
+    return base === Infinity ? null : [base, top];
 }
 
 /** A component's layers to draw, lowest first: [{component, layer}] across the list, by height, then layer, then list order. */

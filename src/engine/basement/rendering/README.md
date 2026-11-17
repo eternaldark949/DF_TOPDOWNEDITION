@@ -165,6 +165,7 @@ art.draw([
 | `drawCircle` | `circle` | `x`, `y`, `radius` |
 | `drawEllipse` | `ellipse` | `x`, `y`, `radius_x`, `radius_y`, `rotation` |
 | `drawCapsule` | `capsule` | `from`, `to`, `radius` |
+| `drawLimb` | `limb` | `from`, `to`, `radii` ([start, belly, end]), `belly_at` (0..1, default 0.3): round at each joint, swelling between |
 | `drawLine` | `line` | `points` (open; stroked black, 1 wide, unless told) |
 | `drawPolygon` | `polygon` | `points` (closed) |
 | `drawCurve` | `curve` | `points` (closed, corners rounded) |
@@ -185,9 +186,9 @@ An entity has a look when its `drawing` asset names a drawing resource (`{kind: 
 
 `fitBounds(steps, bounds, {values})` fits the collision shape to a drawing, like Blender's collision bounds: `bounds` is one of `BOUNDS` (`circle`, `box`, `capsule`, `hull`). It reads only the solid steps: the ones marked `solid: true`, or, when no step is marked, every shape except glows, ground shadows, text and lines. `drawingReach(steps, {values})` is the circle round everything painted, glows included, used as the body's render bounds so the camera keeps drawing it. `drawingOutline(steps, {values})` is the outline points of each step with its solid flag.
 
-### Components (`drawComponents`, `componentSteps`)
+### Components (`drawComponents`, `componentSteps`, `foreshorten`)
 
-An entity made of components (see the physics API's Components) is drawn by `drawLooks` too: `drawComponents(entity, source, blend, {joints})` gives one `{height, layer, component, packets}` per visible layer, lowest base first, each placed at its component's `at` and `rotation` from the entity's pose (scaled by `look.scale`), or from the world pose `joints(name)` gives for a component on a rig joint. `drawLooks` submits each at `look.depth` plus its height, so taller parts draw over lower ones, across entities too. With `{view}` (a `heightView`) each layer draws raised in the plane of its top and its `sides` show. `componentSteps(components, source, {solid_only})` turns the components into one drawing in the entity's space (each layer a group), which `fitBounds` and `drawingReach` read; a component on a joint is placed at rest.
+An entity made of components (see the physics API's Components) is drawn by `drawLooks` too: `drawComponents(entity, source, blend, {joints})` gives one `{height, layer, component, packets}` per visible layer, lowest base first, each placed at its component's `at` and `rotation` from the entity's pose (scaled by `look.scale`), or from the world pose `joints(name)` gives for a component on a rig joint. Heights are z in the world: a layer counts up from the entity's base (its `elevation`) or from its joint's `height`. A joint's `pitch` tips its bone out of the ground plane, so `foreshorten(steps, k)` shortens every place along the bone (x, `from`, `to`, `points`) by `k`, the pitch's cosine, and keeps every size: a leg pointing straight down is seen as the round end of it. `drawLooks` submits each at `look.depth` plus its z, so higher parts draw over lower ones, across entities too; a `drawing` look stands at its entity's elevation the same way. With `{view}` (a `heightView`) each layer draws raised in the plane of its top and its `sides` show. `componentSteps(components, source, {solid_only})` turns the components into one drawing in the entity's space (each layer a group), which `fitBounds` and `drawingReach` read; a component on a joint is placed at rest.
 
 ## Height (`height.mjs`)
 

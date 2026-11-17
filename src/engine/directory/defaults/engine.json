@@ -15,11 +15,13 @@
      "position": [
       -1,
       0
-     ]
+     ],
+     "height": "92 cm"
     },
     {
      "name": "torso",
-     "parent": "root"
+     "parent": "root",
+     "height": "1.2 m"
     },
     {
      "name": "head",
@@ -28,6 +30,7 @@
       1,
       0
      ],
+     "height": "40 cm",
      "limits": {
       "min_rotation": -1.3,
       "max_rotation": 1.3
@@ -39,23 +42,29 @@
      "position": [
       0,
       -11
-     ]
+     ],
+     "height": "22 cm",
+     "rotation": -0.7854,
+     "pitch": -1.2629
     },
     {
      "name": "elbow_l",
      "parent": "shoulder_l",
      "position": [
-      3,
-      -3
-     ]
+      14,
+      0
+     ],
+     "rotation": 1.3045,
+     "pitch": 0.3611
     },
     {
      "name": "hand_l",
      "parent": "elbow_l",
      "position": [
-      7,
-      4
-     ]
+      13,
+      0
+     ],
+     "pitch": 0.9018
     },
     {
      "name": "hip_l",
@@ -63,13 +72,14 @@
      "position": [
       0,
       -5
-     ]
+     ],
+     "pitch": -1.5708
     },
     {
      "name": "knee_l",
      "parent": "hip_l",
      "position": [
-      2,
+      "44 cm",
       0
      ]
     },
@@ -77,9 +87,10 @@
      "name": "foot_l",
      "parent": "knee_l",
      "position": [
-      2,
+      "42 cm",
       0
-     ]
+     ],
+     "pitch": 1.5708
     },
     {
      "name": "shoulder_r",
@@ -87,23 +98,29 @@
      "position": [
       0,
       11
-     ]
+     ],
+     "height": "22 cm",
+     "rotation": 0.7854,
+     "pitch": -1.2629
     },
     {
      "name": "elbow_r",
      "parent": "shoulder_r",
      "position": [
-      3,
-      3
-     ]
+      14,
+      0
+     ],
+     "rotation": -1.3045,
+     "pitch": 0.3611
     },
     {
      "name": "hand_r",
      "parent": "elbow_r",
      "position": [
-      7,
-      -4
-     ]
+      13,
+      0
+     ],
+     "pitch": 0.9018
     },
     {
      "name": "hip_r",
@@ -111,13 +128,14 @@
      "position": [
       0,
       5
-     ]
+     ],
+     "pitch": -1.5708
     },
     {
      "name": "knee_r",
      "parent": "hip_r",
      "position": [
-      2,
+      "44 cm",
       0
      ]
     },
@@ -125,9 +143,10 @@
      "name": "foot_r",
      "parent": "knee_r",
      "position": [
-      2,
+      "42 cm",
       0
-     ]
+     ],
+     "pitch": 1.5708
     }
    ],
    "anchors": {
@@ -220,248 +239,210 @@
      "duration": 1,
      "tracks": [
       {
-       "joint": "knee_l",
-       "channel": "position",
+       "joint": "hip_l",
+       "channel": "pitch",
        "keys": [
         {
          "time": 0,
-         "value": [
-          2,
-          0
-         ]
+         "value": -1.5708
         },
         {
          "time": 0.25,
-         "value": [
-          5,
-          0
-         ]
+         "value": -1.1208
         },
         {
          "time": 0.5,
-         "value": [
-          2,
-          0
-         ]
+         "value": -1.5708
         },
         {
          "time": 0.75,
-         "value": [
-          -1,
-          0
-         ]
+         "value": -2.0208
         },
         {
          "time": 1,
-         "value": [
-          2,
-          0
-         ]
+         "value": -1.5708
+        }
+       ]
+      },
+      {
+       "joint": "knee_l",
+       "channel": "pitch",
+       "keys": [
+        {
+         "time": 0,
+         "value": -0.45
+        },
+        {
+         "time": 0.25,
+         "value": -0.05
+        },
+        {
+         "time": 0.5,
+         "value": -0.05
+        },
+        {
+         "time": 0.75,
+         "value": -0.05
+        },
+        {
+         "time": 1,
+         "value": -0.45
         }
        ]
       },
       {
        "joint": "foot_l",
-       "channel": "position",
+       "channel": "pitch",
        "keys": [
         {
          "time": 0,
-         "value": [
-          2,
-          0
-         ]
+         "value": 2.0208
         },
         {
          "time": 0.25,
-         "value": [
-          5,
-          0
-         ]
+         "value": 1.1708
         },
         {
          "time": 0.5,
-         "value": [
-          2,
-          0
-         ]
+         "value": 1.6208
         },
         {
          "time": 0.75,
-         "value": [
-          -1,
-          0
-         ]
+         "value": 2.0708
         },
         {
          "time": 1,
-         "value": [
-          2,
-          0
-         ]
+         "value": 2.0208
         }
        ]
       },
       {
-       "joint": "hand_l",
-       "channel": "position",
+       "joint": "shoulder_l",
+       "channel": "pitch",
        "keys": [
         {
          "time": 0,
-         "value": [
-          7,
-          -4
-         ]
+         "value": -1.2629
         },
         {
          "time": 0.25,
-         "value": [
-          5,
-          -4
-         ]
+         "value": -1.5629
         },
         {
          "time": 0.5,
-         "value": [
-          7,
-          -4
-         ]
+         "value": -1.2629
         },
         {
          "time": 0.75,
-         "value": [
-          9,
-          -4
-         ]
+         "value": -0.9629
         },
         {
          "time": 1,
-         "value": [
-          7,
-          -4
-         ]
+         "value": -1.2629
+        }
+       ]
+      },
+      {
+       "joint": "hip_r",
+       "channel": "pitch",
+       "keys": [
+        {
+         "time": 0,
+         "value": -1.5708
+        },
+        {
+         "time": 0.25,
+         "value": -2.0208
+        },
+        {
+         "time": 0.5,
+         "value": -1.5708
+        },
+        {
+         "time": 0.75,
+         "value": -1.1208
+        },
+        {
+         "time": 1,
+         "value": -1.5708
         }
        ]
       },
       {
        "joint": "knee_r",
-       "channel": "position",
+       "channel": "pitch",
        "keys": [
         {
          "time": 0,
-         "value": [
-          2,
-          0
-         ]
+         "value": -0.05
         },
         {
          "time": 0.25,
-         "value": [
-          -1,
-          0
-         ]
+         "value": -0.05
         },
         {
          "time": 0.5,
-         "value": [
-          2,
-          0
-         ]
+         "value": -0.45
         },
         {
          "time": 0.75,
-         "value": [
-          5,
-          0
-         ]
+         "value": -0.05
         },
         {
          "time": 1,
-         "value": [
-          2,
-          0
-         ]
+         "value": -0.05
         }
        ]
       },
       {
        "joint": "foot_r",
-       "channel": "position",
+       "channel": "pitch",
        "keys": [
         {
          "time": 0,
-         "value": [
-          2,
-          0
-         ]
+         "value": 1.6208
         },
         {
          "time": 0.25,
-         "value": [
-          -1,
-          0
-         ]
+         "value": 2.0708
         },
         {
          "time": 0.5,
-         "value": [
-          2,
-          0
-         ]
+         "value": 2.0208
         },
         {
          "time": 0.75,
-         "value": [
-          5,
-          0
-         ]
+         "value": 1.1708
         },
         {
          "time": 1,
-         "value": [
-          2,
-          0
-         ]
+         "value": 1.6208
         }
        ]
       },
       {
-       "joint": "hand_r",
-       "channel": "position",
+       "joint": "shoulder_r",
+       "channel": "pitch",
        "keys": [
         {
          "time": 0,
-         "value": [
-          7,
-          4
-         ]
+         "value": -1.2629
         },
         {
          "time": 0.25,
-         "value": [
-          9,
-          4
-         ]
+         "value": -0.9629
         },
         {
          "time": 0.5,
-         "value": [
-          7,
-          4
-         ]
+         "value": -1.2629
         },
         {
          "time": 0.75,
-         "value": [
-          5,
-          4
-         ]
+         "value": -1.5629
         },
         {
          "time": 1,
-         "value": [
-          7,
-          4
-         ]
+         "value": -1.2629
         }
        ]
       },
@@ -692,13 +673,14 @@
      "layers": [
       {
        "layer": 0,
-       "height": "0 m",
-       "thickness": "10 cm",
+       "height": "-6 cm",
+       "thickness": "8 cm",
        "steps": [
         {
          "shape": "ellipse",
-         "radius_x": 3.5,
-         "radius_y": 2.2,
+         "x": 2.4,
+         "radius_x": 3.7,
+         "radius_y": 2.35,
          "fill": "$shoes"
         }
        ]
@@ -706,19 +688,62 @@
      ]
     },
     {
-     "name": "foot_r",
-     "joint": "foot_r",
+     "name": "shin_l",
+     "joint": "knee_l",
      "layers": [
       {
        "layer": 0,
-       "height": "0 m",
+       "height": "-8 cm",
        "thickness": "10 cm",
        "steps": [
         {
-         "shape": "ellipse",
-         "radius_x": 3.5,
-         "radius_y": 2.2,
-         "fill": "$shoes"
+         "shape": "limb",
+         "from": [
+          0,
+          0
+         ],
+         "to": [
+          21,
+          0
+         ],
+         "radii": [
+          3.45,
+          3.75,
+          2.2
+         ],
+         "belly_at": 0.3,
+         "fill": "$trousers"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "thigh_l",
+     "joint": "hip_l",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-8 cm",
+       "thickness": "12 cm",
+       "steps": [
+        {
+         "shape": "limb",
+         "from": [
+          0,
+          0
+         ],
+         "to": [
+          22,
+          0
+         ],
+         "radii": [
+          4.75,
+          4.55,
+          3.45
+         ],
+         "belly_at": 0.28,
+         "fill": "$trousers"
         }
        ]
       }
@@ -730,20 +755,25 @@
      "layers": [
       {
        "layer": 0,
-       "height": "1 m",
-       "thickness": "40 cm",
+       "height": "-4 cm",
+       "thickness": "8 cm",
        "steps": [
         {
-         "shape": "capsule",
+         "shape": "limb",
          "from": [
           0,
           0
          ],
          "to": [
-          3,
-          -3
+          14,
+          0
          ],
-         "radius": 3.2,
+         "radii": [
+          3.8,
+          3.6,
+          2.75
+         ],
+         "belly_at": 0.35,
          "fill": "$shirt"
         }
        ]
@@ -756,20 +786,25 @@
      "layers": [
       {
        "layer": 0,
-       "height": "95 cm",
-       "thickness": "30 cm",
+       "height": "-4 cm",
+       "thickness": "8 cm",
        "steps": [
         {
-         "shape": "capsule",
+         "shape": "limb",
          "from": [
           0,
           0
          ],
          "to": [
-          7,
-          4
+          13,
+          0
          ],
-         "radius": 2.6,
+         "radii": [
+          2.75,
+          2.9,
+          1.95
+         ],
+         "belly_at": 0.22,
          "fill": "$skin"
         }
        ]
@@ -782,13 +817,113 @@
      "layers": [
       {
        "layer": 0,
-       "height": "90 cm",
-       "thickness": "10 cm",
+       "height": "-3 cm",
+       "thickness": "6 cm",
        "steps": [
         {
          "shape": "circle",
-         "radius": 2.2,
+         "radius": 2.35,
          "fill": "$skin"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "shoulder_l",
+     "joint": "shoulder_l",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-2 cm",
+       "thickness": "6 cm",
+       "steps": [
+        {
+         "shape": "circle",
+         "radius": 4.3,
+         "fill": "$shirt"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "foot_r",
+     "joint": "foot_r",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-6 cm",
+       "thickness": "8 cm",
+       "steps": [
+        {
+         "shape": "ellipse",
+         "x": 2.4,
+         "radius_x": 3.7,
+         "radius_y": 2.35,
+         "fill": "$shoes"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "shin_r",
+     "joint": "knee_r",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-8 cm",
+       "thickness": "10 cm",
+       "steps": [
+        {
+         "shape": "limb",
+         "from": [
+          0,
+          0
+         ],
+         "to": [
+          21,
+          0
+         ],
+         "radii": [
+          3.45,
+          3.75,
+          2.2
+         ],
+         "belly_at": 0.3,
+         "fill": "$trousers"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "thigh_r",
+     "joint": "hip_r",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-8 cm",
+       "thickness": "12 cm",
+       "steps": [
+        {
+         "shape": "limb",
+         "from": [
+          0,
+          0
+         ],
+         "to": [
+          22,
+          0
+         ],
+         "radii": [
+          4.75,
+          4.55,
+          3.45
+         ],
+         "belly_at": 0.28,
+         "fill": "$trousers"
         }
        ]
       }
@@ -800,20 +935,25 @@
      "layers": [
       {
        "layer": 0,
-       "height": "1 m",
-       "thickness": "40 cm",
+       "height": "-4 cm",
+       "thickness": "8 cm",
        "steps": [
         {
-         "shape": "capsule",
+         "shape": "limb",
          "from": [
           0,
           0
          ],
          "to": [
-          3,
-          3
+          14,
+          0
          ],
-         "radius": 3.2,
+         "radii": [
+          3.8,
+          3.6,
+          2.75
+         ],
+         "belly_at": 0.35,
          "fill": "$shirt"
         }
        ]
@@ -826,20 +966,25 @@
      "layers": [
       {
        "layer": 0,
-       "height": "95 cm",
-       "thickness": "30 cm",
+       "height": "-4 cm",
+       "thickness": "8 cm",
        "steps": [
         {
-         "shape": "capsule",
+         "shape": "limb",
          "from": [
           0,
           0
          ],
          "to": [
-          7,
-          -4
+          13,
+          0
          ],
-         "radius": 2.6,
+         "radii": [
+          2.75,
+          2.9,
+          1.95
+         ],
+         "belly_at": 0.22,
          "fill": "$skin"
         }
        ]
@@ -852,13 +997,98 @@
      "layers": [
       {
        "layer": 0,
-       "height": "90 cm",
-       "thickness": "10 cm",
+       "height": "-3 cm",
+       "thickness": "6 cm",
        "steps": [
         {
          "shape": "circle",
-         "radius": 2.2,
+         "radius": 2.35,
          "fill": "$skin"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "shoulder_r",
+     "joint": "shoulder_r",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-2 cm",
+       "thickness": "6 cm",
+       "steps": [
+        {
+         "shape": "circle",
+         "radius": 4.3,
+         "fill": "$shirt"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "pelvis",
+     "joint": "pelvis",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-6 cm",
+       "thickness": "14 cm",
+       "steps": [
+        {
+         "shape": "curve",
+         "points": [
+          [
+           2.6,
+           0
+          ],
+          [
+           1.8,
+           6.16
+          ],
+          [
+           -0.6,
+           10.416
+          ],
+          [
+           -3.3,
+           11.2
+          ],
+          [
+           -5.6,
+           9.632
+          ],
+          [
+           -7.75,
+           4.704
+          ],
+          [
+           -7.4,
+           0
+          ],
+          [
+           -7.75,
+           -4.704
+          ],
+          [
+           -5.6,
+           -9.632
+          ],
+          [
+           -3.3,
+           -11.2
+          ],
+          [
+           -0.6,
+           -10.416
+          ],
+          [
+           1.8,
+           -6.16
+          ]
+         ],
+         "fill": "$trousers"
         }
        ]
       }
@@ -870,13 +1100,69 @@
      "layers": [
       {
        "layer": 0,
-       "height": "1.1 m",
-       "thickness": "40 cm",
+       "height": "-30 cm",
+       "thickness": "52 cm",
        "steps": [
         {
-         "shape": "ellipse",
-         "radius_x": 7,
-         "radius_y": 12,
+         "shape": "curve",
+         "points": [
+          [
+           6.3,
+           0
+          ],
+          [
+           5.4,
+           4.84
+          ],
+          [
+           3.7,
+           8.8
+          ],
+          [
+           1.505,
+           12.204
+          ],
+          [
+           -2.795,
+           11.516
+          ],
+          [
+           -5.8,
+           9.4
+          ],
+          [
+           -7.8,
+           3.948
+          ],
+          [
+           -7.45,
+           0
+          ],
+          [
+           -7.8,
+           -3.948
+          ],
+          [
+           -5.8,
+           -9.4
+          ],
+          [
+           -2.795,
+           -11.516
+          ],
+          [
+           1.505,
+           -12.204
+          ],
+          [
+           3.7,
+           -8.8
+          ],
+          [
+           5.4,
+           -4.84
+          ]
+         ],
          "fill": "$shirt"
         }
        ]
@@ -889,26 +1175,138 @@
      "layers": [
       {
        "layer": 0,
-       "height": "1.5 m",
+       "height": "-5 cm",
        "thickness": "20 cm",
        "steps": [
         {
-         "shape": "circle",
-         "radius": 6.5,
+         "shape": "ellipse",
+         "x": -0.4,
+         "y": -7.05,
+         "radius_x": 1.7,
+         "radius_y": 1.15,
+         "fill": "$skin"
+        },
+        {
+         "shape": "ellipse",
+         "x": -0.4,
+         "y": 7.05,
+         "radius_x": 1.7,
+         "radius_y": 1.15,
+         "fill": "$skin"
+        },
+        {
+         "shape": "curve",
+         "points": [
+          [
+           7.8,
+           0
+          ],
+          [
+           6.5,
+           4.9
+          ],
+          [
+           2.6,
+           7.0
+          ],
+          [
+           -1.0,
+           7.35
+          ],
+          [
+           -5.0,
+           6.4
+          ],
+          [
+           -7.6,
+           3.6
+          ],
+          [
+           -8.4,
+           0
+          ],
+          [
+           -7.6,
+           -3.6
+          ],
+          [
+           -5.0,
+           -6.4
+          ],
+          [
+           -1.0,
+           -7.35
+          ],
+          [
+           2.6,
+           -7.0
+          ],
+          [
+           6.5,
+           -4.9
+          ]
+         ],
          "fill": "$skin"
         }
        ]
       },
       {
        "layer": 1,
-       "height": "1.7 m",
-       "thickness": "5 cm",
+       "height": "-2 cm",
+       "thickness": "17 cm",
        "steps": [
         {
-         "shape": "ellipse",
-         "x": -1.5,
-         "radius_x": 5.5,
-         "radius_y": 6,
+         "shape": "curve",
+         "points": [
+          [
+           5.966,
+           0.0
+          ],
+          [
+           4.705,
+           4.998
+          ],
+          [
+           0.922,
+           7.14
+          ],
+          [
+           -2.57,
+           7.497
+          ],
+          [
+           -6.45,
+           6.528
+          ],
+          [
+           -8.972,
+           3.672
+          ],
+          [
+           -9.748,
+           0.0
+          ],
+          [
+           -8.972,
+           -3.672
+          ],
+          [
+           -6.45,
+           -6.528
+          ],
+          [
+           -2.57,
+           -7.497
+          ],
+          [
+           0.922,
+           -7.14
+          ],
+          [
+           4.705,
+           -4.998
+          ]
+         ],
          "fill": "$hair"
         }
        ]
@@ -920,6 +1318,7 @@
     "values": {
      "skin": "#d9a57a",
      "shirt": "#3d6b8f",
+     "trousers": "#2f3542",
      "shoes": "#2b2b2b",
      "hair": "#3b2a1e"
     }

@@ -7,6 +7,7 @@ import { gameEntity, entityRecord, restoreEntity } from './entity.mjs';
 import { KINDS, MOTORS } from './elements.mjs';
 
 const UNSAFE = ['__proto__', 'constructor', 'prototype'];
+const SPAN_STEP = .5;   // world units a posed span moves before the body is told: breathing does not churn the broadphase
 function checkKind(kind, preset) {
     if (typeof kind !== 'string' || !kind || UNSAFE.includes(kind)) throw new TypeError('A kind is named by a non-empty string');
     const { body = {}, motor = null, awareness = false, ...rest } = preset ?? {};
@@ -108,6 +109,14 @@ export class gameElements {
 
         return record;
     }
+    /** Its solid layers' span, each component on a rig joint standing at the joint's posed height. */
+    #posedSpan(r) { const heights = this.world.rigs._jointHeights(r.body), span = solidSpan(r.data.components ?? [], heights ?? undefined); return span && span.map(v => Math.round(v * 1e6) / 1e6); }   // a bone's sine leaves dust
+    /** After its rig moves: an entity whose span comes from its components follows its pose (a crouch is shorter). */
+    _rigPosed(entity) {
+        const r = entityRecord(entity); if (!r.auto_span || !(r.data.components ?? []).some(c => c.joint)) return;
+        const next = scaleSpan(this.#posedSpan(r), r.world_scale[2]), now = r.body.getState().height_span;
+        if (!next !== !now || next && (Math.abs(next[0] - now[0]) > SPAN_STEP || Math.abs(next[1] - now[1]) > SPAN_STEP)) this.world.updateBody(r.body, { height_span: next });
+    }
     /**
      * Fits an entity's body to its world scale (its own times `parent_scale`): the rest shapes, mass
      * and height span, scaled. Its attached children follow, their offsets stretched by the change.
@@ -115,7 +124,7 @@ export class gameElements {
     _refit(entity, parent_scale = null) {
         const r = entityRecord(entity), parent = parent_scale ?? (entity.parent ? entityRecord(entity.parent).world_scale : [1, 1, 1]);
         const previous = r.world_scale, next = multiplyScale(r.scale, parent);
-        const span = r.auto_span ? solidSpan(r.data.components ?? []) : r.rest.height_span;
+        const span = r.auto_span ? this.#posedSpan(r) : r.rest.height_span;
         r.world_scale = next;
         this.world.updateBody(r.body, sizedBody({ ...r.rest, height_span: span }, next, r.mass_scales));
         if (previous.some((v, i) => v !== next[i])) this.world.rigs._rescale(r.body);   // physical chains are rebuilt at the new size

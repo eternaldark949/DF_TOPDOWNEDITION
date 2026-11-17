@@ -1,6 +1,6 @@
 // ===== LV0 BASEMENT =====
 import {bodyActive} from '../core/state.mjs';
-import {entityComponent,readComponent,componentSpan} from './components.mjs';
+import {entityComponent,readComponent,componentSpan,layersSpan} from './components.mjs';
 import {readScale} from './scale.mjs';
 /** Entity metadata/lifecycle only. Physical state lives exclusively in the engine body. */
 const records = new WeakMap();
@@ -22,7 +22,7 @@ function initializeEntity(entity, elements, packet) {
     records.set(entity, elements._construct(entity, packet));
     // A subclass field initializer cannot replace identity, a component or the live pose.
     for (const key of ['entity_id', 'body_id', 'kind', 'template_id', 'name', 'tags', 'assets', 'data', 'physics_system', 'body', 'motor', 'awareness', 'registered', 'pending', 'destroyed', 'active', 'position', 'rotation',
-        'linear_velocity', 'angular_velocity', 'mass', 'physics_type', 'collision_shape', 'collision_group', 'collision_mask', 'query_mask', 'axis_lock', 'ghost', 'parent', 'children', 'components', 'height', 'scale', 'world_scale']) {
+        'linear_velocity', 'angular_velocity', 'mass', 'physics_type', 'collision_shape', 'collision_group', 'collision_mask', 'query_mask', 'axis_lock', 'ghost', 'parent', 'children', 'components', 'height', 'scale', 'world_scale', 'elevation', 'world_elevation']) {
         const getter = Object.getOwnPropertyDescriptor(gameEntity.prototype, key).get;
         Object.defineProperty(entity, key, { get: getter, configurable: false, enumerable: false });
     }
@@ -88,8 +88,13 @@ export class gameEntity {
         this.set('components', [...structuredClone(list), component]); return new entityComponent(this, component.name);
     }
     removeComponent(name) { const list = this.get('components') ?? []; if (!list.some(c => c.name === name)) return false; this.set('components', structuredClone(list.filter(c => c.name !== name))); return true; }
-    /** How tall it stands: the highest top among its components (0 with none). */
-    get height() { const list = this.get('components') ?? []; return list.length ? Math.max(0, ...list.map(c => componentSpan(c).top)) * entityRecord(this).world_scale[2] : 0; }
+    /** How tall it stands above its base: the highest top among its components (0 with none). On a rig, as posed: a crouch is shorter. */
+    get height() {
+        const r = entityRecord(this), list = this.get('components') ?? [];
+        if (!list.length) return 0;
+        const span = layersSpan(list, r.elements.world.rigs._jointHeights(r.body) ?? undefined);
+        return Math.max(0, Math.round(span[1] * 1e6) / 1e6) * r.world_scale[2];
+    }
     // ----- Scale: its size against its record, [x, y, height]. -----
     /** Its own scale, [x, y, height] (1 is the size its record makes). */
     get scale() { return [...entityRecord(this).scale]; }
@@ -103,6 +108,13 @@ export class gameEntity {
     scaleTo(scale) { const r = entityRecord(this); r.elements._requireLive(this); r.scale = readScale(scale); r.elements._refit(this); return this; }
     /** Resizes it by a factor of its own scale (a number, or [x, y, height]). */
     scaleBy(factor) { const f = readScale(factor), s = entityRecord(this).scale; return this.scaleTo([s[0] * f[0], s[1] * f[1], s[2] * f[2]]); }
+    // ----- Elevation: z, how high its base stands. Its layers and rig heights count up from here. -----
+    /** Its own elevation above the ground, in world units (0: on the ground). An attached entity is held by its mount instead. */
+    get elevation() { return entityRecord(this).body.getState().elevation; }
+    /** Where its base is in the world: its own elevation, or, while attached, its parent's plus the anchor's height. */
+    get world_elevation() { return entityRecord(this).body.getState().world_elevation; }
+    /** Raises or lowers it: its collision, queries, drawing and attached children all follow. */
+    setElevation(z) { return this.updateBody({ elevation: z }); }
     // ----- Placement: readable verbs over the body. -----
     moveTo(x, y, options) { return this.setPosition(Array.isArray(x) ? x : [x, y], Array.isArray(x) ? y : options); }
     rotateTo(angle, options) { return this.setRotation(angle, options); }
@@ -113,9 +125,10 @@ export class gameEntity {
     // ----- Parenting: a child rides its parent at a local offset until it is detached. -----
     get parent() { const r = entityRecord(this), mount = r.elements.world.getAttachmentState(r.body); return mount ? r.elements.fetchEntity(mount.parent_body_id) : null; }
     get children() { const r = entityRecord(this); return r.elements.world.getAttachedBodies(r.body).map(body => r.elements.getEntityForBody(body)).filter(Boolean); }
-    attach(child, { at = [0, 0], rotation = 0, combine_mass = false, rig_anchor = null } = {}) {
+    /** Holds `child` at `at` (and `rotation`), `elevation` above this one's base, or on a rig anchor (which adds the anchor's height). */
+    attach(child, { at = [0, 0], rotation = 0, elevation = 0, combine_mass = false, rig_anchor = null } = {}) {
         const r = entityRecord(this); r.elements._requireLive(this);
-        r.elements.world.attachBody(bodyOf(child), { parent_body: r.body, local_position: at, local_rotation: rotation, combine_mass, rig_anchor });
+        r.elements.world.attachBody(bodyOf(child), { parent_body: r.body, local_position: at, local_rotation: rotation, local_elevation: elevation, combine_mass, rig_anchor });
         if (child instanceof gameEntity) r.elements._refit(child, r.world_scale);   // a child takes its parent's scale
         return this;
     }

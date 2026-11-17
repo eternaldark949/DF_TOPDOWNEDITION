@@ -2,7 +2,7 @@
 import {clone,freeze,number,vector,angleDelta} from '../core/values.mjs';
 import {name,fields} from './values.mjs';
 const records=new WeakMap();
-const channels=['position','rotation','scale'];
+const channels=['position','rotation','scale','height','pitch'],SCALAR=new Set(['rotation','height','pitch']),TURN=new Set(['rotation','pitch']);
 function portable(value,seen=new Set(),depth=0){
     if(depth>64)throw new TypeError('Marker data is too deep');
     if(value===null||typeof value==='string'||typeof value==='boolean')return;
@@ -18,7 +18,7 @@ function keys(input,channel,duration){
         const time=number(key.time,'key time',0,duration),interpolation=key.interpolation??'linear';
         if(time<=previous||!['linear','hold','smooth'].includes(interpolation))throw new TypeError('Invalid keyframe order/interpolation');
         previous=time;
-        const value=channel==='rotation'?number(key.value,'rotation'):vector(key.value,'key value');
+        const value=SCALAR.has(channel)?number(key.value,channel):vector(key.value,'key value');
         if(channel==='scale'&&value.some(v=>v<=1e-7))throw new TypeError('Animation scale must be positive');
         return {time,value,interpolation};
     });
@@ -31,7 +31,7 @@ function sample(track,time){
     while(high-low>1){const mid=(low+high)>>1;if(list[mid].time<=time)low=mid;else high=mid;}
     const a=list[low],b=list[high];let t=(time-a.time)/(b.time-a.time);
     if(a.interpolation==='hold')t=0;else if(a.interpolation==='smooth')t=t*t*(3-2*t);
-    return track.channel==='rotation'?a.value+angleDelta(a.value,b.value)*t:a.value.map((v,i)=>v+(b.value[i]-v)*t);
+    return TURN.has(track.channel)?a.value+angleDelta(a.value,b.value)*t:track.channel==='height'?a.value+(b.value-a.value)*t:a.value.map((v,i)=>v+(b.value[i]-v)*t);
 }
 /** Immutable, renderer-independent authored local transform tracks. Seconds and radians. */
 export class animationClip {

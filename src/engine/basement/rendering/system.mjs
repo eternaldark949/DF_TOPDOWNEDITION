@@ -5,6 +5,7 @@ import {finite,identifier,freezeData,CAPABILITIES} from './values.mjs';
 import {artScene} from './art.mjs';
 import {drawLook,drawComponents} from './looks.mjs';
 import {heightView} from './height.mjs';
+const PICK_STEPS=Object.freeze([1,.75,.5,.25,0]);   // top first: what the camera sees of a tall thing is its top
 
 function normalizeResource(description){
     if(!description||typeof description!=='object')throw new TypeError('A data resource descriptor is required');
@@ -92,7 +93,7 @@ export class renderSystem {
         for(const {entity} of this.getVisibleEntities({blend},this.#visible)){
             if(!entity)continue;
             const look=entity.get('look',{}),layer=look.layer??0,depth=look.depth??0;let drew=false;
-            if(entity.assets?.drawing){const scene=new artScene();if(drawLook(scene,entity,source,blend)){for(const packet of scene.finish())this.#frame.submit({...packet,layer,depth});drew=true;}}
+            if(entity.assets?.drawing){const scene=new artScene();if(drawLook(scene,entity,source,blend,{view})){const z=entity.world_elevation??0;for(const packet of scene.finish())this.#frame.submit({...packet,layer,depth:depth+z});drew=true;}}
             if(entity.has('components')){
                 let pose;const rigs=this.#world.rigs,joints=name=>{pose??=rigs?.getRig(entity)?rigs.getPose(entity,{blend,world_space:true}):null;return pose?.joints[name]??null;};
                 for(const part of drawComponents(entity,source,blend,{joints,view})){for(const packet of part.packets)this.#frame.submit({...packet,layer,depth:depth+part.height});drew=true;}
@@ -103,8 +104,9 @@ export class renderSystem {
     }
     /**
      * Everything at a world point, top first, the way a ray from the camera meets it: higher `look.layer`
-     * first, then the taller entity (its components' highest top), then the one made later. Each hit is
-     * {entity, body, position, height, layer}. `bounds` is `collision` (default) or `render`; `kind`,
+     * first, then the higher top (its elevation plus its components' highest top), then the one made later.
+     * With a height view on, the ray leans like the drawing: a tall thing is hit where it is drawn. Each hit
+     * is {entity, body, position (the ground point under the hit), height (its top), layer}. `bounds` is `collision` (default) or `render`; `kind`,
      * `tag` and `property` (an entity property it must have, like UPBGE's propName) filter. Without
      * `xray` the first thing met blocks the ray: only it can be hit. `ignore` lists entities to look past.
      */
@@ -112,9 +114,15 @@ export class renderSystem {
         this.#live();const [x,y]=point;finite(x,'pick x');finite(y,'pick y');
         if(!['collision','render'].includes(bounds))throw new TypeError('Pick bounds are collision or render');
         const skip=new Set((Array.isArray(ignore)?ignore:[ignore]).map(e=>e?.entity_id??e)),hits=[];
-        for(const {entity,body} of this.#world.queryEntitiesInBounds({bounds:{left:x-.5,top:y-.5,right:x+.5,bottom:y+.5},bounds_type:bounds},[])){
-            if(!entity||skip.has(entity.entity_id)||!this.#world.containsPoint(body,[x,y],{bounds_type:bounds}))continue;
-            hits.push({entity,body,position:[x,y],height:entity.height??0,layer:entity.get('look',{}).layer??0});
+        // Leaning toward the camera, what is drawn at this point stands somewhere between it and the camera: at
+        // height z it is the ground point camera + (point − camera) / k(z). Each candidate is tested from its base to its top.
+        const view=this.#lean?new heightView({camera:this.#camera.getView(blend).position,...this.#lean}):null,[cx,cy]=view?view.camera:[x,y];
+        const area={left:Math.min(x,cx)-.5,top:Math.min(y,cy)-.5,right:Math.max(x,cx)+.5,bottom:Math.max(y,cy)+.5};
+        for(const {entity,body} of this.#world.queryEntitiesInBounds({bounds:area,bounds_type:bounds},[])){
+            if(!entity||skip.has(entity.entity_id))continue;
+            const base=entity.world_elevation??0,top=base+(entity.height??0);
+            const at=(view?PICK_STEPS.map(t=>base+(top-base)*t):[base]).map(z=>[z,view?view.scaled(x,y,1/view.k(z)):[x,y]]).find(([,p])=>this.#world.containsPoint(body,p,{bounds_type:bounds}));
+            if(at)hits.push({entity,body,position:at[1],height:top,layer:entity.get('look',{}).layer??0});
         }
         hits.sort((a,b)=>b.layer-a.layer||b.height-a.height||b.entity.entity_id-a.entity.entity_id);
         const passes=h=>(kind===undefined||h.entity.kind===kind)&&(tag===undefined||h.entity.tags.includes(tag))&&(property===undefined||h.entity.has(property));

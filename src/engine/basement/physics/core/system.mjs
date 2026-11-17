@@ -3,7 +3,7 @@ import {rigSystem} from '../animation/rig-system.mjs';
 import {mountedLaunchState} from '../attachments/emitter.mjs';
 import { massProperties, massCenter, invalidateMass, integrateAtCenter, changeAngularSpeed, centerVelocity, setCenterVelocity } from './mass.mjs';
 import { BODY_GROUP, EPS, vector, number, clone, freeze, validBounds, boundsMeet, sub, add, dot, scale, length, unit, rotate, unionBounds } from './values.mjs';
-import { bodyConfig, bodyRecord, pose, previousPose, liveBounds, bodyBounds, sweptBounds, snapshot, bodyActive, spansMeet, movable, physical, changeVelocity, enforceLocks, inverseInertia } from './state.mjs';
+import { bodyConfig, bodyRecord, pose, previousPose, liveBounds, bodyBounds, sweptBounds, snapshot, bodyActive, spansMeet, worldSpan, worldElevation, movable, physical, changeVelocity, enforceLocks, inverseInertia } from './state.mjs';
 import { physicsBody } from './body.mjs';
 import { collisionShape, shapeReach, shapeBounds } from '../collision/shape.mjs';
 import { collisionDetector } from '../collision/detector.mjs';
@@ -93,6 +93,8 @@ export class physicsSystem {
         this.#motionEnvelope=null;this.#stats.spatial_sync_requests++;
         if(r.removed)return;
         const configChanged=r.light_config!==r.config;r.light_config=r.config;
+        const elevation=worldElevation(r);
+        if(r.broadphase_elevation!==elevation){if(r.broadphase_elevation!==undefined&&r.config.height_span)this.#broadphaseEpoch++;r.broadphase_elevation=elevation;}
         if(r.broadphase_config!==r.config||r.broadphase_mount!==r.parent_mount){
             const old=r.broadphase_config,next=r.config;
             if(!old||old.physics_type!==next.physics_type||old.active!==next.active||old.collision_group!==next.collision_group||old.collision_mask!==next.collision_mask
@@ -252,7 +254,7 @@ export class physicsSystem {
     _renderBody(b, blend, result) {
         const r = this._record(b); number(blend, 'blend', 0, 1);
         if (r.parent_mount) return this.#attachments._render(r, blend, result);
-        return Object.assign(result, { body_id: r.id, position: add(r.previous_position, scale(sub(r.position, r.previous_position), blend)), rotation: r.previous_rotation + (r.rotation - r.previous_rotation) * blend });
+        return Object.assign(result, { body_id: r.id, position: add(r.previous_position, scale(sub(r.position, r.previous_position), blend)), rotation: r.previous_rotation + (r.rotation - r.previous_rotation) * blend, elevation: r.config.elevation });
     }
     _command(b, action, packet) {
         const requested = this._record(b), p = { ...packet }; let r = requested;
@@ -308,7 +310,7 @@ export class physicsSystem {
             enforceLocks(r); this.#motionEnvelope = null; this.#attachments._syncDescendants(r, action === 'position' || action === 'rotation');
         }); return b;
     }
-    #meets(a, b, unmounted_a = false) { return (unmounted_a ? a.config.physics_type !== 'no_collision' : physical(a)) && physical(b) && !a.config.collision_exclusions.includes(b.id) && !b.config.collision_exclusions.includes(a.id) && !!(a.config.collision_mask & b.config.collision_group) && !!(b.config.collision_mask & a.config.collision_group) && spansMeet(a.config.height_span, b.config.height_span); }
+    #meets(a, b, unmounted_a = false) { return (unmounted_a ? a.config.physics_type !== 'no_collision' : physical(a)) && physical(b) && !a.config.collision_exclusions.includes(b.id) && !b.config.collision_exclusions.includes(a.id) && !!(a.config.collision_mask & b.config.collision_group) && !!(b.config.collision_mask & a.config.collision_group) && spansMeet(worldSpan(a), worldSpan(b)); }
     _canCollide(a, b, { unmounted_a = false } = {}) { return this.#meets(this._record(a), this._record(b), unmounted_a); }
     #report(a, b, contact, response = {}) {
         const lo = a.id < b.id, key = lo ? `${a.id}:${b.id}` : `${b.id}:${a.id}`;

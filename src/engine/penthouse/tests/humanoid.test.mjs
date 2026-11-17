@@ -24,7 +24,10 @@ test('a humanoid boots on the engine defaults with a body, a rig and an idle pos
     assert.deepEqual([...person.entity.body.getState().height_span], [0, 87.5], 'and its body reaches that high');
     const drawn = drawComponents(person.entity, p.elements.asset_library, 1, { joints: name => p.rigs.getPose(person.entity, { world_space: true }).joints[name] });
     assert.deepEqual(drawn.map(part => part.component).slice(0, 2), ['foot_l', 'foot_r'], 'drawn lowest first');
-    assert.deepEqual(drawn.map(part => part.component).slice(-3), ['torso', 'head', 'head'], 'the torso, the head, then the hair over it');
+    const order = drawn.map(part => part.component);
+    assert.deepEqual(order.slice(-2), ['head', 'head'], 'the head, then the hair over it, on top');
+    assert.ok(order.indexOf('pelvis') < order.indexOf('torso') && order.indexOf('torso') < order.indexOf('shoulder_l'), 'the pelvis under the torso, the shoulder caps over it');
+    for (const part of ['thigh_l', 'shin_r', 'pelvis', 'shoulder_r', 'upper_arm_l', 'forearm_r', 'hand_l']) assert.ok(order.includes(part), `it has a ${part}`);
     const head = drawn.find(part => part.component === 'head'), headJoint = p.rigs.getPose(person.entity, { world_space: true }).joints.head;
     assert.deepEqual(head.packets[0].matrix.slice(4), headJoint.position, 'the head rides its joint');
     const tall = new humanoid(p, { position: [300, 100], height: 2 });
@@ -104,4 +107,34 @@ test('a physical arm is rebuilt at the new size when its humanoid scales', () =>
     const hand = p.rigs.getPose(person.entity, { world_space: true }).joints.hand_r.position, shoulder = p.rigs.getPose(person.entity, { world_space: true }).joints.shoulder_r.position;
     assert.ok(Math.hypot(hand[0] - shoulder[0], hand[1] - shoulder[1]) > 2 * 8, 'the arm reaches as far as a big arm does');
     person.setPhysicalArm('r', false); assert.deepEqual(person.physical_arms, []);
+});
+
+test('it stands up from the ground: legs hang from the hips, a stride reaches forward, a crouch is shorter', () => {
+    const p = world(), person = new humanoid(p, { position: [0, 0] }); p.updateState();
+    const pose = () => p.rigs.getPose(person.entity, { world_space: true }).joints;
+    let j = pose();
+    assert.ok(Math.abs(j.hip_l.height - 46) < 1e-6 && Math.abs(j.foot_l.height - 3) < 1e-6, 'the hip at 92 cm, the ankle just off the ground');
+    assert.ok(Math.hypot(j.foot_l.position[0] - j.hip_l.position[0], j.foot_l.position[1] - j.hip_l.position[1]) < 0.01, 'standing, the foot is right under the hip');
+    person.entity.motor.setMovement([1, 0]); let reach = 0;
+    for (let i = 0; i < 60; i++) { person.updateState(); p.updateState(); j = pose(); reach = Math.max(reach, j.foot_l.position[0] - j.hip_l.position[0]); }
+    assert.ok(reach > 8, `walking swings the leg's pitch and the foot reaches ahead (${reach.toFixed(1)})`);
+    const still = world(), crouching = new humanoid(still, { position: [0, 0] }); still.updateState();
+    const tall = crouching.entity.height;
+    crouching.rig.setProceduralPose({ hip_l: { pitch: -0.3 }, hip_r: { pitch: -0.3 }, knee_l: { pitch: -2.4 }, knee_r: { pitch: -2.4 }, torso: { height: 40 }, pelvis: { height: 30 } });
+    still.updateState();
+    assert.ok(crouching.entity.height < tall - 15, 'a crouch is shorter');
+    still.updateState();   // the body hears its new span when the step that posed it commits
+    assert.ok(crouching.entity.body.getState().height_span[1] < tall - 15, 'and so is its body: it fits under what it could not');
+});
+
+test('a humanoid on a raised floor stands on it, and what it holds is at its hand', () => {
+    const p = world(), person = new humanoid(p, { position: [0, 0] }), cup = p.elements.createEntity({ position: [0, 0], components: [{ name: 'cup', layers: [{ layer: 0, height: 0, thickness: 4, steps: [] }] }] });
+    person.entity.setElevation(150); p.updateState();
+    assert.equal(person.entity.world_elevation, 150);
+    assert.deepEqual([...person.entity.body.getState().height_span], [0, 87.5], 'its own span counts from its base');
+    assert.ok(!p.raycast({ from: [-50, 0], to: [50, 0], at_height: 40 }), 'a ray at knee height on the ground passes under it');
+    assert.ok(p.raycast({ from: [-50, 0], to: [50, 0], at_height: 190 }), 'one at its chest up there meets it');
+    person.entity.attach(cup, { rig_anchor: 'hand_r' }); p.updateState();
+    const hand = p.rigs.getPose(person.entity, { world_space: true }).joints.hand_r.height;
+    assert.ok(Math.abs(cup.world_elevation - hand) < 1e-6 && hand > 190, 'the cup is at the hand, a metre up from the raised floor');
 });

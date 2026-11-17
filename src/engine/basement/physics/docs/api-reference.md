@@ -53,6 +53,7 @@ Constructor options:
 | `linear_damping`, `angular_damping` | `0`, `0`; nonnegative exponential decay rates per second. |
 | `collision_group`, `collision_mask`, `query_mask` | Default role group, `BODY_GROUP.ALL`, `BODY_GROUP.ALL`. |
 | `height_span` | `null` (every height) or `[base, top]` above the ground in world units. Two bodies touch only when their spans overlap, as well as their masks allowing it: a shot at 1.5 m passes over a 1 m wall, a car under a bridge deck. An entity made of components gets the span its solid layers fill unless the packet gives one, and keeps following them as they change. |
+| `elevation` | `0`. The z of the body's base above the ground, in world units: its `height_span` counts up from here, so a body on a roof or a second floor meets only what is up there. An attached body ignores its own and stands where its mount holds it (its parent's elevation, plus the rig anchor's height, plus the mount's `local_elevation`); its state reports `world_elevation`. When it detaches it keeps standing at its parent's elevation. |
 | `ghost`, `continuous_collision`, `sleep_enabled`, `active` | `false`, `true`, `true`, `true`. |
 | `blocks_light` | `null`: blocks light when a visibility query's groups include it (static bodies by default). `true` always blocks (a door leaf, a big prop), `false` never (glass). Ghosts never block. |
 | `axis_lock` | `{ x:false, y:false, rotation:false }`. Character contacts do not impart spin, independently of heading control. |
@@ -209,7 +210,8 @@ Entity properties are read-only: `entity_id`, `body_id` (same root identity), `k
 | `moveTo(x,y,options)` or `moveTo([x,y],options)`, `rotateTo(angle,options)` | Readable names for `setPosition` and `setRotation`; return the entity. |
 | `toWorld([x,y])`, `toLocal([x,y])` | Convert a point between the entity's frame (position plus rotation) and the world. |
 | `distanceTo(target)`, `directionTo(target)` | Distance and unit direction to a point or anything with a `position`; the direction to its own position is `[0,0]`. |
-| `attach(child,{at=[0,0],rotation=0,combine_mass=false,rig_anchor=null})` | Parents a child entity or body at a local offset through `attachBody`; returns the parent. |
+| `attach(child,{at=[0,0],rotation=0,elevation=0,combine_mass=false,rig_anchor=null})` | Parents a child entity or body at a local offset (and `elevation` above this one's base; a rig anchor adds the anchor's height) through `attachBody`; returns the parent. |
+| `elevation`, `world_elevation`, `setElevation(z)` | Read-only z of its own base, and where its base is in the world (its parent's elevation plus the anchor's height while attached); `setElevation` raises or lowers it and returns the entity. |
 | `detach(child=null,{exit_points,inherit_velocity})` | With no child, detaches this entity from its parent; with a child, detaches that child and throws if it is not attached here. Exits at its current local offset unless `exit_points` are given. Returns `true` when it left and `false` when it had no parent or no exit was clear. |
 | `parent`, `children` | Read-only: the parent entity or `null`, and the attached child entities. |
 | `components`, `getComponent(name)`, `hasComponent(name)` | Its parts, as live `entityComponent` views in order; a missing name gives `null`. |
@@ -483,7 +485,7 @@ Event-time accepted launches are pending native commands. They revalidate emitte
 
 ### `rigDefinition`
 
-`new rigDefinition({rig_id, joints, anchors})` compiles an immutable hierarchy. `joints` contains `{name, parent:null, position:[0,0], rotation:0, scale:[1,1], limits:null}`. `limits`, when present, is `{min_rotation,max_rotation}` in radians. Parents may appear after children. Duplicate names, missing references, cycles and singular local scales are rejected. `anchors` is a dictionary of `{joint,position,rotation,scale}` offsets. The hierarchy supports multiple roots and non-humanoid forms.
+`new rigDefinition({rig_id, joints, anchors})` compiles an immutable hierarchy. `joints` contains `{name, parent:null, position:[0,0], rotation:0, scale:[1,1], height:0, pitch:0, limits:null}`. Rigs stand up from the ground: a joint sits `position` along its parent's bone (the parent's x axis, tipped by the parent's `pitch`, so from above the x part shortens by the pitch's cosine and the rest of it rises), plus `height` straight up. `pitch` tips the joint's own bone out of the ground plane (up is positive) and adds down the chain: a leg is a hip pitched −π/2 with its knee and foot along it, and a walk swings that pitch, so the foot reaches forward without the clip moving it. Heights count in the parent's bone length, so a larger rig is taller too. `limits`, when present, is `{min_rotation,max_rotation}` in radians. Parents may appear after children. Duplicate names, missing references, cycles and singular local scales are rejected. `anchors` is a dictionary of `{joint,position,rotation,scale}` offsets. The hierarchy supports multiple roots and non-humanoid forms.
 
 - `rig_id`: authored identifier.
 - `getJointNames()` / `getAnchorNames()`: detached name arrays.
@@ -495,16 +497,16 @@ Event-time accepted launches are pending native commands. They revalidate emitte
 
 - `definition` / `revision`: compiled definition and changed-pose revision.
 - `resetPose()`: restore authored rest transforms.
-- `setJoint(name,{position?,rotation?,scale?})`: update one local transform.
+- `setJoint(name,{position?,rotation?,scale?,height?,pitch?})`: update one local transform.
 - `setPose(joints,{weight:1,additive:false,mask:null})`: atomically update/blend named local transforms; limits clamp rotation. Additive positions/rotations are offsets; additive scale is a factor. Rotation blends take the shortest arc. `mask` is an array of joint names.
 - `getLocalPose()`: detached local transform dictionary.
 - `getLocalJoint(name)`: one joint's detached local transform.
-- `getJoint(name,{root?})` / `getAnchor(name,{root?})`: resolved `{position,rotation,scale,matrix}`. Optional `root` is a transform. `matrix` is the complete affine `[a,b,c,d,x,y]` transform, preserving shear from scaled hierarchies. Resolution is cached until the pose changes.
+- `getJoint(name,{root?,elevation?,height_scale?})` / `getAnchor(name,{root?,elevation?,height_scale?})`: resolved `{position,rotation,scale,matrix,height,pitch}`. `height` is the joint's z (in the world with a `root`: `elevation` plus its rig height times `height_scale`) and `pitch` how far its bone tips out of the ground plane. Optional `root` is a transform. `matrix` is the complete affine `[a,b,c,d,x,y]` transform, preserving shear from scaled hierarchies. Resolution is cached until the pose changes.
 - `getSnapshot()` / `load(snapshot)`: versioned pose exchange; invalid loads leave the pose intact.
 
 ### `animationClip`
 
-`new animationClip({clip_id,duration,loop:true,tracks:[],markers:[],root_motion:null})` compiles immutable authored data. Times are seconds. Each track is `{joint,channel,keys}`. `channel` is `position`, `rotation` or `scale`; keys are `{time,value,interpolation:'linear'}`. Vector channels use two numbers; rotation uses radians. `interpolation` can also be `hold` or `smooth` and applies from that key to the next. Key times must strictly increase within the duration. Channels hold their first/last authored values outside their keyed interval; non-looping clips hold at the end. Animation scale keys must be positive.
+`new animationClip({clip_id,duration,loop:true,tracks:[],markers:[],root_motion:null})` compiles immutable authored data. Times are seconds. Each track is `{joint,channel,keys}`. `channel` is `position`, `rotation`, `scale`, `height` or `pitch`; keys are `{time,value,interpolation:'linear'}`. Vector channels use two numbers; rotation uses radians. `interpolation` can also be `hold` or `smooth` and applies from that key to the next. Key times must strictly increase within the duration. Channels hold their first/last authored values outside their keyed interval; non-looping clips hold at the end. Animation scale keys must be positive.
 
 Markers are `{name,time,data:null}` with portable JSON payloads. A separate translation-only `root_motion` track uses `{time,value:[x,y],interpolation?}` keys in body-local space. It never writes a joint or teleports a body.
 

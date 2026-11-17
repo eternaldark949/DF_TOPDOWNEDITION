@@ -33,6 +33,20 @@ export function capsule([ax,ay],[bx,by],r){
     finite(r,'capsule radius');const angle=Math.atan2(by-ay,bx-ax),turn=Math.PI/2;
     return [ellipse(ax,ay,r,r,0,angle+turn,angle-turn+Math.PI*2),ellipse(bx,by,r,r,0,angle-turn,angle+turn),['close']];
 }
+/**
+ * A limb from joint `from` to joint `to`: round at each joint (radius `radii[0]` and `radii[2]`, so the next
+ * limb carries on from the same circle) and swelling to `radii[1]` a `belly_at` (0..1) of the way along: a
+ * thigh, a calf, a forearm. Fill it.
+ */
+export function limb([ax,ay],[bx,by],[r0,rb,r1],belly_at=.3){
+    for(const [v,n] of [[r0,'start radius'],[rb,'belly radius'],[r1,'end radius'],[belly_at,'belly position']])finite(v,`limb ${n}`);
+    const dx=bx-ax,dy=by-ay,L=Math.hypot(dx,dy)||1e-6,a=Math.atan2(dy,dx),ux=dx/L,uy=dy/L,nx=-uy,ny=ux;
+    const c1=Math.max(.05,belly_at*.85)*L,c2=(belly_at+(1-belly_at)*.5)*L,w1=Math.max(rb*1.05,r0),w2=(rb+r1)*.5;
+    return [ellipse(ax,ay,r0,r0,0,a+Math.PI/2,a+Math.PI*1.5),
+        ['cubic',ax+ux*c1-nx*w1,ay+uy*c1-ny*w1,ax+ux*c2-nx*w2,ay+uy*c2-ny*w2,bx-nx*r1,by-ny*r1],
+        ellipse(bx,by,r1,r1,0,a-Math.PI/2,a+Math.PI/2),
+        ['cubic',ax+ux*c2+nx*w2,ay+uy*c2+ny*w2,ax+ux*c1+nx*w1,ay+uy*c1+ny*w1,ax+nx*r0,ay+ny*r0],['close']];
+}
 /** A closed shape through `points` with corners rounded by quadratic curves (a blob, a cushion). */
 export function smoothShape(points){
     if(points?.length<3)throw new TypeError('A smooth shape needs three points or more');
@@ -83,6 +97,8 @@ export class artScene{
     drawEllipse({x=0,y=0,radius_x,radius_y,rotation=0,...paint}){return this.#draw([ellipse(x,y,radius_x,radius_y,rotation)],paint);}
     /** A stadium from `from` to `to` with round ends of `radius`. */
     drawCapsule({from,to,radius,...paint}){return this.#draw(capsule(from,to,radius),paint);}
+    /** A limb from `from` to `to`, `radii` [start, belly, end], swelling `belly_at` of the way along. */
+    drawLimb({from,to,radii,belly_at=.3,...paint}){return this.#draw(limb(from,to,radii,belly_at),paint);}
     /** An open line through `points`; it is stroked (black, 1 wide, unless told). */
     drawLine({points,...paint}){return this.#draw(polyline(points),{stroke:'#000',...paint});}
     /** A closed polygon through `points`. */
@@ -123,7 +139,7 @@ export class artScene{
 }
 
 /** The shapes a drawing step may name, and the readable call each one is. */
-export const DRAWING=Object.freeze({rectangle:'drawRectangle',circle:'drawCircle',ellipse:'drawEllipse',capsule:'drawCapsule',line:'drawLine',polygon:'drawPolygon',curve:'drawCurve',text:'drawText',glow:'drawGlow',ground_shadow:'drawGroundShadow'});
+export const DRAWING=Object.freeze({rectangle:'drawRectangle',circle:'drawCircle',ellipse:'drawEllipse',capsule:'drawCapsule',limb:'drawLimb',line:'drawLine',polygon:'drawPolygon',curve:'drawCurve',text:'drawText',glow:'drawGlow',ground_shadow:'drawGroundShadow'});
 const PAINT_KEYS=new Set(['fill','stroke','line_width','line_cap','line_join','dash','alpha','blend','shadow']);
 const NO_MATERIALS=Object.freeze({});
 /** The fields a material record may hold: its paint, plus `kind` and the physical `surface` that drawing ignores. */

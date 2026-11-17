@@ -188,6 +188,7 @@ Every object in the world is a `gameEntity`, the way every object in a Blender g
 | `entity.addComponent({...})` / `entity.removeComponent(name)` | Adds or removes a part |
 | `entity.height` | How tall it stands: the highest top among its components |
 | `entity.scaleTo(2)` / `entity.scaleBy([1, 1, 3])` / `entity.scale` / `entity.world_scale` | Resizes it whole (see [Scale](#scale)) |
+| `entity.setElevation(z)` / `entity.elevation` / `entity.world_elevation` | Raises it off the ground: its base stands at z. Collision, height queries, drawing, the camera lean and picking all use it; an attached child stands on its parent's elevation plus the anchor's height (see [Heights](#heights-z)) |
 | `entity.on(event, handler)` | Events on this entity, such as `propertyChanged` or a contact; returns a call that stops listening |
 | `entity.activate()` / `entity.deactivate()` / `entity.destroy()` | Turns it on or off, or removes it |
 
@@ -202,6 +203,17 @@ car.distanceTo([200, 70]);     // 30
 ```
 
 Reference: [entities](basement/physics/docs/entities.md).
+
+#### Heights (z)
+
+The world has one vertical axis, z, in the same world units as x and y (50 to a metre; data may write "1.75 m").
+
+- **An entity's base** stands at its `elevation` (0: on the ground). `entity.setElevation(z)` raises it; `entity.world_elevation` is where it is now.
+- **Its parts** count up from there: a component layer's `height` is above the entity's base, or above its rig joint when it rides one.
+- **A rig stands up.** A joint has a `height` and a `pitch` as well as a position and a turn: a hip pitched straight down puts its knee and foot below it, and a walk swings the pitch, so from above the leg shortens and the foot reaches forward on its own. A part on a pitched bone is drawn shorter along the bone and keeps its size, because body parts are round.
+- **Its collision height follows its pose.** An entity whose height span comes from its components takes it from the posed joints: a crouch is shorter, and `entity.height` reads the pose.
+- **Attached things stand where they are held**: a cup in a hand is at the hand's height, a hat at the head's. A detached thing keeps standing at its parent's elevation.
+- **Everything reads z**: collision (`height_span` raised by the elevation), queries (`at_height`), drawing order, the camera lean, and picking, which leans like the drawing so a tall thing is hit where it is drawn.
 
 ### Spatial queries
 
@@ -273,7 +285,7 @@ art.drawLine({ points: [[-8, 6], [8, 6]], stroke: '#2b2118', line_width: 1 });
 for (const packet of art.finish()) frame.submit(packet);
 ```
 
-The calls are `drawRectangle`, `drawCircle`, `drawEllipse`, `drawCapsule`, `drawLine`, `drawPolygon`, `drawCurve`, `drawText`, `drawGlow` and `drawGroundShadow`. Paint fields on any of them: `fill`, `stroke`, `line_width`, `alpha`, `blend`, `shadow`, and gradients through `linear` and `radial`.
+The calls are `drawRectangle`, `drawCircle`, `drawEllipse`, `drawCapsule`, `drawLimb`, `drawLine`, `drawPolygon`, `drawCurve`, `drawText`, `drawGlow` and `drawGroundShadow`. Paint fields on any of them: `fill`, `stroke`, `line_width`, `alpha`, `blend`, `shadow`, and gradients through `linear` and `radial`.
 
 **Drawings as data.** The same shapes can be a list of steps in data, so a thing's appearance needs no code. `art.draw(steps, { at, rotation, scale, values })` paints them; a `group` step nests steps at its own offset, turn and size, and a value `"$name"` is read from `values` (a look's fields), so one drawing serves every variant:
 

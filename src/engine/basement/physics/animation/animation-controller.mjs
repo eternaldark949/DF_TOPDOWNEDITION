@@ -58,7 +58,7 @@ export class animationController {
         if(!state.from_pose||t===1)return target;
         const result={};
         for(const joint of new Set([...Object.keys(state.from_pose),...Object.keys(target)])){
-            const baseline=state.additive?{position:[0,0],rotation:0,scale:[1,1]}:this.#rest[joint],from=state.from_pose[joint]??{},to=target[joint]??{};
+            const baseline=state.additive?{position:[0,0],rotation:0,scale:[1,1],height:0,pitch:0}:this.#rest[joint],from=state.from_pose[joint]??{},to=target[joint]??{};
             const blended=blendTransform({...baseline,...from},{...baseline,...to},t);
             result[joint]=Object.fromEntries([...new Set([...Object.keys(from),...Object.keys(to)])].map(channel=>[channel,blended[channel]]));
         }
