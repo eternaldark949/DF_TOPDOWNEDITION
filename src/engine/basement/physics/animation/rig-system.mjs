@@ -41,6 +41,12 @@ export class rigSystem {
         const chain=new physicalChain(this.#world,entry.record,entry.controller,this.#authority,packet);entry.chains.set(chain.chain_id,chain);this.#measure(entry);return chain.getState();
     }
     removePhysicalChain(body,chain_id){this.#guard();const entry=this.#entry(body),chain=entry.chains.get(chain_id);if(!chain)return;entry.chains.delete(chain_id);chain._remove();this.#measure(entry);}
+    /** Rebuilds a body's physical chains at its entity's new scale: same chains, same ids, bones and radii sized again. */
+    _rescale(body){
+        const entry=this.#rigs.get(this.#record(body).id);if(!entry?.chains.size)return;
+        for(const [chain_id,chain] of [...entry.chains]){const {packet}=chain._saveState();entry.chains.delete(chain_id);chain._remove();const again=new physicalChain(this.#world,entry.record,entry.controller,this.#authority,packet);entry.chains.set(again.chain_id,again);}
+        this.#measure(entry);
+    }
     getPhysicalChains(body){return [...this.#entry(body).chains.values()].map(chain=>chain.getState());}
     #measure(entry){const locals={};for(const chain of entry.chains.values())Object.assign(locals,chain._measure());entry.controller._setPhysicalPose(locals,this.#authority);}
     #entry(body){const entry=this.#rigs.get(this.#record(body).id);if(!entry)throw new TypeError('Body has no rig');return entry;}

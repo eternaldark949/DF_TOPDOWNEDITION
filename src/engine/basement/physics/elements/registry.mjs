@@ -118,6 +118,7 @@ export class gameElements {
         const span = r.auto_span ? solidSpan(r.data.components ?? []) : r.rest.height_span;
         r.world_scale = next;
         this.world.updateBody(r.body, sizedBody({ ...r.rest, height_span: span }, next, r.mass_scales));
+        if (previous.some((v, i) => v !== next[i])) this.world.rigs._rescale(r.body);   // physical chains are rebuilt at the new size
         for (const child of entity.children) {
             const mount = this.world.getAttachmentState(child.body);
             if (mount) this.world.setAttachmentPose(child.body, { local_position: [mount.local_position[0] * next[0] / previous[0], mount.local_position[1] * next[1] / previous[1]] });

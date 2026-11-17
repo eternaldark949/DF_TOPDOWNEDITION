@@ -92,3 +92,16 @@ test('a humanoid scales whole, Alice-style: its rig, its parts, its height and i
     assert.ok(Math.abs(after.shoulders / before.shoulders - 4) < 0.01, 'her shoulders are four times as wide (give or take her breathing)');
     alice.entity.scaleTo(0.25); p.updateState(); assert.equal(alice.entity.height, 87.5 / 4, 'and shrinks as well');
 });
+
+test('a physical arm is rebuilt at the new size when its humanoid scales', () => {
+    const p = world(), person = new humanoid(p, { position: [0, 0] }).setPhysicalArm('r', true); steps(p, person, 5);
+    const bones = () => p.rigs.getPhysicalChains(person.entity)[0].segments.map(id => p.fetchBody(id).getState().collision_shape);
+    const before = bones(), length = shape => shape.points[1][0] - shape.points[0][0];
+    person.entity.scaleTo(3); steps(p, person, 5);
+    const after = bones();
+    assert.deepEqual(person.physical_arms, ['r'], 'still the same arm');
+    after.forEach((shape, i) => { assert.ok(Math.abs(shape.radius - 3 * before[i].radius) < 1e-9, 'three times as thick'); assert.ok(Math.abs(length(shape) / length(before[i]) - 3) < 0.02, 'and three times as long'); });
+    const hand = p.rigs.getPose(person.entity, { world_space: true }).joints.hand_r.position, shoulder = p.rigs.getPose(person.entity, { world_space: true }).joints.shoulder_r.position;
+    assert.ok(Math.hypot(hand[0] - shoulder[0], hand[1] - shoulder[1]) > 2 * 8, 'the arm reaches as far as a big arm does');
+    person.setPhysicalArm('r', false); assert.deepEqual(person.physical_arms, []);
+});

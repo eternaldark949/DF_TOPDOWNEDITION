@@ -12,6 +12,8 @@ import {name,fields} from './values.mjs';
  *
  * A segment body sits at its bone's midpoint, turned along the bone, so its mass swings like a limb.
  * `offset` is the bone's heading in its joint's frame; hinge angles carry it.
+ * The chain is built at its entity's world scale; when the entity is scaled the rig system rebuilds it at
+ * the new size (rigSystem._rescale).
  * `reaction: false` makes the root hinge one-way: the chain follows the rig's body but never pushes
  * it, for cosmetic parts (a tail, a scarf) that must not move their owner.
  */
@@ -40,7 +42,7 @@ export class physicalChain{
             const a=points[k].position,b=points[k+1].position,length=Math.hypot(b[0]-a[0],b[1]-a[1]);if(length<1e-6)throw new TypeError('A chain bone needs length');
             const rotation=heading(a,b);this.lengths.push(length);this.offsets.push(angleDelta(points[k].rotation,rotation));
             this.segments.push(this.#world.createBody({physics_type:'rigid',position:[(a[0]+b[0])/2,(a[1]+b[1])/2],rotation,mass:this.config.mass,linear_damping:this.config.linear_damping,angular_damping:this.config.angular_damping,
-                collision_shape:{shape_type:'capsule',radius:this.config.radius,points:[[-length/2,0],[length/2,0]]},
+                collision_shape:{shape_type:'capsule',radius:this.config.radius*this.#size(),points:[[-length/2,0],[length/2,0]]},
                 ...(this.config.collision_group===null?{}:{collision_group:this.config.collision_group}),...(this.config.collision_mask===null?{}:{collision_mask:this.config.collision_mask}),
                 tags:['rig_segment']}));
         }
@@ -48,13 +50,16 @@ export class physicalChain{
         for(const body of this.segments)this.#world.updateBody(body,{collision_exclusions:ids.filter(id=>id!==body.body_id)});
         this.hinges=this.segments.map((body,k)=>this.#world.createConstraint({constraint_type:'hinge',body_a:body,body_b:k?this.segments[k-1]:owner.handle,local_anchor_a:[-this.lengths[k]/2,0],one_way:!k&&!this.config.reaction,...this.#drive(k)}));
     }
-    #root(){return {position:[...this.#owner.position],rotation:this.#owner.rotation};}
+    /** Its entity's world scale in the plane: the rig's root carries it, so the bones are that much longer. */
+    #scale(){const s=this.#world.elements.fetchEntity(this.#owner.id)?.world_scale;return s?[s[0],s[1]]:[1,1];}
+    #size(){const [sx,sy]=this.#scale();return (sx+sy)/2;}
+    #root(){const [sx,sy]=this.#scale();return {position:[...this.#owner.position],rotation:this.#owner.rotation,...(sx!==1||sy!==1?{scale:[sx,sy]}:{})};}
     #angle(k){const turn=body=>this.#world._record(body).rotation;return k?angleDelta(turn(this.segments[k-1]),turn(this.segments[k])):angleDelta(this.#owner.rotation,turn(this.segments[0]));}
     /** Hinge k's anchor on its parent body, servo and limits, from the animated pose. */
     #drive(k){
         const {follow_rate,follow_torque:max_torque}=this.config,local=this.#controller.getAnimatedPose()[this.joints[k]].rotation;
         const shift=k?this.offsets[k]-this.offsets[k-1]:this.offsets[0]+(this.parent===null?0:this.#controller.getAnimatedJoint(this.parent).rotation);
-        const anchor=k?[this.lengths[k-1]/2,0]:this.#controller.getAnimatedJoint(this.joints[0]).position,limit=this.limits[k];
+        const [sx,sy]=this.#scale(),root=this.#controller.getAnimatedJoint(this.joints[0]).position,anchor=k?[this.lengths[k-1]/2,0]:[root[0]*sx,root[1]*sy],limit=this.limits[k];
         // Hinge angles are wrapped to (-π, π]; a joint limit is carried into that range, and the rig's own limit clamps the rest.
         const wrap=v=>Math.max(-Math.PI,Math.min(Math.PI,v)),near=angleDelta(0,shift),[min_rotation,max_rotation]=limit?[wrap(limit.min_rotation+near),wrap(limit.max_rotation+near)]:[-Math.PI,Math.PI];
         return {local_anchor_b:anchor,target_rotation:local+shift,motor_speed:this.hinges?angleDelta(this.#angle(k),local+shift)*follow_rate:0,max_torque,min_rotation:Math.min(min_rotation,max_rotation),max_rotation};
