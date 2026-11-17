@@ -11,7 +11,7 @@ export const KINDS = Object.freeze({
     decoration: { body: { physics_type: 'static', collision_group: 0, collision_mask: 0, query_mask: 0 }, motor: null, awareness: false },
     character: { body: { physics_type: 'character', collision_group: BODY_GROUP.CHARACTER }, motor: 'character', awareness: true },
     vehicle: { body: { physics_type: 'rigid', collision_group: BODY_GROUP.VEHICLE }, motor: 'vehicle', awareness: false },
-    projectile: { body: { physics_type: 'rigid', collision_group: BODY_GROUP.PROJECTILE, friction: 0, linear_damping: 0, angular_damping: 0 }, motor: 'projectile', awareness: false },
+    projectile: { body: { physics_type: 'rigid', collision_group: BODY_GROUP.PROJECTILE, friction: 0, linear_damping: 0, angular_damping: 0, height_span: [0, 0] }, motor: 'projectile', awareness: false },
     prop: { body: { physics_type: 'rigid', collision_group: BODY_GROUP.PROP }, motor: null, awareness: false },
     static: { body: { physics_type: 'static', collision_group: BODY_GROUP.STATIC }, motor: null, awareness: false },
     trigger: { body: { physics_type: 'static', collision_group: BODY_GROUP.SENSOR, ghost: true }, motor: null, awareness: false },

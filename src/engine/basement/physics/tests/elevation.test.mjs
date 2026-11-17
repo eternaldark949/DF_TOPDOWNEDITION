@@ -65,3 +65,35 @@ test('a held thing stands where it is held: its parent\'s elevation, the anchor\
     const saved = p.savePhysicsState(), q = new physicsSystem(); q.loadPhysicsState(saved);
     near(q.elements.fetchEntity(cup.entity_id).world_elevation, 30 + 2 * hand, 'and it all saves');
 });
+
+test('walkers path under what is above their headroom and over what is under their step', () => {
+    const p = new physicsSystem(), wall = (y, span) => p.elements.createEntity({ kind: 'static', position: [0, y], collision_shape: { shape_type: 'box', dimensions: [20, 400] }, height_span: span });
+    wall(0, [150, 160]);   // an awning, 3 m up
+    const route = () => p.navigation.findPath({ from: [-100, 0], to: [100, 0], radius: 8 });
+    const straight = path => path && path.points.every(q => Math.abs(q[1]) < 1);
+    assert.ok(!straight(route()), 'with no headroom set, everything in the way blocks: the path goes round');
+    p.navigation.configureField({ headroom: 100 });
+    assert.ok(straight(route()), 'with 2 m of headroom, the path walks straight under the awning');
+    const kerb = wall(0, [0, 5]); assert.ok(!straight(route()), 'a kerb blocks with no step');
+    p.navigation.configureField({ step_height: 10 }); assert.ok(straight(route()), 'and is stepped over with a 20 cm step');
+    kerb.setElevation(120); p.updateState(); assert.ok(straight(route()), 'raised above the headroom, it no longer blocks');
+    kerb.setElevation(40); p.updateState(); assert.ok(!straight(route()), 'lowered into the band, it blocks again');
+    assert.deepEqual([p.navigation.configureField({}).headroom, p.navigation.configureField({}).step_height], [100, 10], 'the band is part of the saved field');
+});
+
+test('a shot leaves at its source\'s height and flies there; lights and particles stand at a height too', () => {
+    const p = new physicsSystem(), low = p.elements.createEntity({ kind: 'static', position: [100, 0], collision_shape: { shape_type: 'box', dimensions: [10, 200] }, height_span: [0, 50] });
+    const shooter = p.elements.createEntity({ kind: 'character', position: [0, 0], height_span: [0, 87] });
+    const high = p.createProjectileFrom(shooter, { direction: [1, 0], local_elevation: 70, speed: 600 }), under = p.createProjectileFrom(shooter, { direction: [1, 0], local_elevation: 20, speed: 600 });
+    assert.equal(high.world_elevation, 70); assert.deepEqual([...high.body.getState().height_span], [0, 0], 'a projectile is a point at its height');
+    for (let i = 0; i < 30; i++) p.updateState(1 / 60);
+    assert.ok(high.body.position[0] > 150, 'a shot at chest height flies over the low wall');
+    assert.ok(!p.fetchBody(under.body_id) || under.body.position[0] < 110, 'one at knee height meets it');
+    shooter.setElevation(200); p.updateState();
+    assert.equal(p.createProjectileFrom(shooter, { direction: [1, 0], local_elevation: 70 }).world_elevation, 270, 'from up on a roof, it leaves from up there');
+    const reach = at_height => Math.max(...p.getVisibilityPolygon({ origin: [0, 0], radius: 300, ...(at_height === undefined ? {} : { at_height }) }).points.filter(q => Math.abs(q[1]) < 5).map(q => q[0]));
+    assert.ok(reach() < 100, 'a light on the ground is stopped by the low wall');
+    assert.ok(reach(150) > 290, 'a lamp at 3 m shines over it');
+    const pool = p.createParticlePool({ capacity: 4 }), [id] = p.emitParticles(pool, { position: [0, 0], elevation: 60, height_span: [0, 1] });
+    assert.equal(p.fetchBody(id).getState().world_elevation, 60, 'a spark is born at its height');
+});

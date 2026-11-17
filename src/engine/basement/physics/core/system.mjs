@@ -148,8 +148,10 @@ export class physicsSystem {
         return r.handle;
     }
     createEntity(packet = {}) { return this.elements.createEntity(packet); }
-    createProjectileFrom(source, { local_position = [0,0], target, direction, angle, angle_offset=0, ...packet } = {}) {
+    createProjectileFrom(source, { local_position = [0,0], local_elevation = 0, target, direction, angle, angle_offset=0, ...packet } = {}) {
         const r = this._record(referenceBody(source));
+        // A shot leaves at its source's height: the source's base (a gun held in a hand is at the hand) plus `local_elevation`.
+        if (packet.elevation === undefined) packet.elevation = worldElevation(r) + number(local_elevation, 'local_elevation', -Infinity);
         if(this.getAttachmentState(source)){
             const resolved=this.elements.asset_library.resolveTemplate(packet.template,packet),state=this.getMountedLaunchState(source,{local_position,target,direction,angle,angle_offset,collision_shape:resolved.collision_shape});
             if(!state.allowed)return null;

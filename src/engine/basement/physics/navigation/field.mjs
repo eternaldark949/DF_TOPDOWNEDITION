@@ -1,6 +1,6 @@
 // ===== LV0 BASEMENT =====
 import { BODY_GROUP, EPS, number, mask, validBounds } from '../core/values.mjs';
-import { physical } from '../core/state.mjs';
+import { physical, worldSpan } from '../core/state.mjs';
 import { pieces } from '../collision/shape.mjs';
 import { segmentPieceDistance } from './geometry.mjs';
 
@@ -20,27 +20,31 @@ export const chunkKey = (cx, cy) => (cx + OFFSET) * SPAN + (cy + OFFSET);
 export class navigationField {
     #world; #chunks = new Map(); #revision = 0; #found = []; #select;
     #stats = { chunk_builds: 0, chunk_reuses: 0, cells_built: 0, piece_cells: 0, dirty_marks: 0, obstacle_updates: 0, exact_checks: 0 };
-    constructor(world, { cell_size = 8, chunk_cells = 32, max_clearance = 64, obstacle_groups = BODY_GROUP.STATIC | BODY_GROUP.PROP } = {}) {
+    constructor(world, { cell_size = 8, chunk_cells = 32, max_clearance = 64, obstacle_groups = BODY_GROUP.STATIC | BODY_GROUP.PROP, headroom = null, step_height = 0 } = {}) {
         this.#world = world;
         this.cell_size = number(cell_size, 'cell_size', 0.5, 1024);
         this.chunk_cells = number(chunk_cells, 'chunk_cells', 4, 256);
         if (!Number.isInteger(chunk_cells)) throw new TypeError('chunk_cells must be integral');
         this.max_clearance = number(max_clearance, 'max_clearance', cell_size, cell_size * 64);
         this.obstacle_groups = mask(obstacle_groups, 'obstacle_groups'); this.#select = { groups: this.obstacle_groups };
+        // The walking band on the ground: a body blocks only where it fills some of (step_height, headroom).
+        // A walker passes under an awning above its headroom and over a kerb no higher than its step.
+        this.headroom = headroom === null ? null : number(headroom, 'headroom', 0); this.step_height = number(step_height, 'step_height', 0);
         this.chunk_size = this.cell_size * this.chunk_cells;
         Object.freeze(this);
     }
     get revision() { return this.#revision; }
-    getConfig() { return { cell_size: this.cell_size, chunk_cells: this.chunk_cells, max_clearance: this.max_clearance, obstacle_groups: this.obstacle_groups }; }
-    /** Characters, vehicles and projectiles are agents, never baked into walkable space. */
+    getConfig() { return { cell_size: this.cell_size, chunk_cells: this.chunk_cells, max_clearance: this.max_clearance, obstacle_groups: this.obstacle_groups, headroom: this.headroom, step_height: this.step_height }; }
+    /** Characters, vehicles and projectiles are agents, never baked into walkable space; nor is anything above the headroom or under the step. */
     isObstacle(r) {
         const c = r.config;
-        return !r.removed && physical(r) && !c.ghost && !!(c.collision_group & this.obstacle_groups) && c.physics_type !== 'character';
+        return !r.removed && physical(r) && !c.ghost && !!(c.collision_group & this.obstacle_groups) && c.physics_type !== 'character' && this.#inBand(worldSpan(r));
     }
+    #inBand(span) { return !span || span[1] > this.step_height && (this.headroom === null || span[0] < this.headroom); }
     _bodySynced(r) {
         const tracked = r.navigation_pose;
         if (!this.isObstacle(r)) { if (tracked) { r.navigation_pose = null; this.#dirty(tracked.bounds); } return; }
-        if (tracked && tracked.x === r.position[0] && tracked.y === r.position[1] && tracked.rotation === r.rotation && tracked.shape === r.shape) return;
+        if (tracked && tracked.x === r.position[0] && tracked.y === r.position[1] && tracked.rotation === r.rotation && tracked.shape === r.shape) return;   // (raised into or out of the band, isObstacle already said so)
         const bounds = this.#bounds(r);
         if (tracked) this.#dirty(tracked.bounds);
         this.#dirty(bounds);

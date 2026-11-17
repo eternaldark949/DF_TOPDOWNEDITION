@@ -87,7 +87,7 @@ Constructor options come from `new physicsSystem({ navigation: { field: {...}, m
 | `findRoute({body OR from (point or node id), to (point or node id), profile='car', near_range?, max_candidates=4})` | `{points, lanes, spans, length, travel_seconds, revision}`, or `null`. `spans` is `[{lane_id, from, to}]`: the stretch of each lane the route covers, ready for a traffic route's `lanes`. |
 | `registerProfile(name, {layer:'field'|'road', near_range=200, radius?})` / `getProfile(name)` | Named travel profiles; saved with the world. |
 | `agentRadius(body_or_shape)` | Radius used for field planning: a circle's radius (plus offset), otherwise the shape's reach. |
-| `configureField({cell_size, chunk_cells, max_clearance, obstacle_groups})` | Replaces field settings; cached chunks are discarded. Returns the active config. |
+| `configureField({cell_size, chunk_cells, max_clearance, obstacle_groups, headroom, step_height})` | Replaces field settings; cached chunks are discarded. Returns the active config. `headroom` (null: no limit) and `step_height` (0) are the walking band on the ground: a body blocks only where its height in the world (its `height_span` raised by its elevation) fills some of it, so walkers path under an awning above their headroom and over a kerb no higher than their step. A body with no span blocks at every height. |
 | `invalidateRegion(bounds)` | Marks chunks dirty, for blockers the field cannot see (for example a change of `obstacle_groups` policy). |
 | `getStatistics()` | Request, reuse, memo and repair counts, plus `field`, `planner` and `roads` statistics. |
 | `field` / `roads` | The `navigationField` and `roadNetwork` below. |
