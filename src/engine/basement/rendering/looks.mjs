@@ -99,11 +99,14 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null}
         const size=joint?.scale?[joint.scale[0]*scale,joint.scale[1]*scale]:[wx*scale,wy*scale],kx=joint?fore:wx*scale,ky=joint?1:wy*scale;
         const cos=Math.cos(base.rotation),sin=Math.sin(base.rotation),x=c.at[0]*kx,y=c.at[1]*ky;
         const ground=joint?(joint.height??elevation)+c.at[0]*Math.sin(pitch)*wz:elevation,z0=ground+layer.height*wz,z1=ground+(layer.height+layer.thickness)*wz;
-        parts.push({c,layer,order,z0,z1,fore,place:{at:[base.position[0]+x*cos-y*sin,base.position[1]+x*sin+y*cos],rotation:base.rotation+c.rotation,scale:size}});
+        parts.push({c,layer,order,z0,z1,fore,rise:joint?Math.sin(pitch)*size[0]*wz:0,place:{at:[base.position[0]+x*cos-y*sin,base.position[1]+x*sin+y*cos],rotation:base.rotation+c.rotation,scale:size}});
     }
     parts.sort((a,b)=>a.z0-b.z0||a.layer.layer-b.layer.layer||a.order-b.order);
-    return parts.map(({c,layer,z0,z1,fore,place})=>{
-        const scene=new artScene(),steps=fore===1?layerSteps(layer,source):foreshorten(layerSteps(layer,source),fore);
+    return parts.map(({c,layer,z0,z1,fore,rise,place})=>{
+        // A tipped bone is drawn in the plane of its joint, but its far end is lower or higher: leaning toward
+        // the camera, it slants on to where that end is drawn, so a hanging leg reaches its knee and its foot.
+        const lean=view&&rise?boneLean(view,place,z1,rise):null;
+        const scene=new artScene(),steps=fore===1&&!lean?layerSteps(layer,source):foreshorten(layerSteps(layer,source),fore,lean??[0,0]);
         // Leaning toward the camera: the walls from the layer's base to its top, then its shapes in the plane of its top.
         if(view&&layer.sides)drawSides(scene,steps,place,values,readValues({fill:layer.sides},values).fill,view,z0,z1);
         if(view)scene.enter({matrix:view.plane(view.k(z1))});
@@ -129,13 +132,25 @@ function drawSides(scene,steps,{at,rotation,scale},values,fill,view,z0,z1){
 }
 /**
  * Steps seen along a tilted bone: every place along x (a step's x, from, to and points) is shortened by `k`,
- * the cosine of the bone's pitch, and every size is kept, because body parts are round: a leg pointing
+ * the cosine of the bone's pitch, and slanted by `lean` ([x, y] per unit of x, for a leaning view), and every size is kept, because body parts are round: a leg pointing
  * straight down is seen from above as the circle at its end, not as a squashed sliver.
  */
-export function foreshorten(steps,k){
-    const p=v=>Array.isArray(v)&&v.length===2&&typeof v[0]!=='object'?[typeof v[0]==='number'?v[0]*k:v[0],v[1]]:v;
-    return steps.map(step=>{const out={...step};if(typeof out.x==='number')out.x*=k;for(const key of ['from','to'])if(out[key]!==undefined)out[key]=p(out[key]);
-        if(Array.isArray(out.points))out.points=out.points.map(p);if(out.shape==='group'&&Array.isArray(out.steps))out.steps=foreshorten(out.steps,k);return out;});
+export function foreshorten(steps,k,[lx,ly]=[0,0]){
+    const p=v=>Array.isArray(v)&&v.length===2&&typeof v[0]==='number'&&typeof v[1]==='number'?[v[0]*(k+lx),v[1]+v[0]*ly]:v;
+    return steps.map(step=>{const out={...step};
+        if(typeof out.x==='number'){if(ly&&(out.y===undefined||typeof out.y==='number'))out.y=(out.y??0)+out.x*ly;out.x*=k+lx;}
+        for(const key of ['from','to'])if(out[key]!==undefined)out[key]=p(out[key]);
+        if(Array.isArray(out.points))out.points=out.points.map(p);if(out.shape==='group'&&Array.isArray(out.steps))out.steps=foreshorten(out.steps,k,[lx,ly]);return out;});
+}
+/**
+ * How a tipped bone slants when the view leans: per unit along the bone, the extra offset (in the part's own
+ * frame and scale) that carries a point from the plane of the joint's height to where its own height is
+ * drawn. `rise` is the height gained per unit along the bone.
+ */
+function boneLean(view,{at,rotation,scale},z,rise){
+    const k=view.k(z),d=(view.k(z+rise)-view.k(z-rise))/(2*k),[cx,cy]=view.camera,wx=(at[0]-cx)*d,wy=(at[1]-cy)*d;
+    const cos=Math.cos(rotation),sin=Math.sin(rotation),[sx,sy]=typeof scale==='number'?[scale,scale]:scale;
+    return [(wx*cos+wy*sin)/sx,(-wx*sin+wy*cos)/sy];
 }
 function layerSteps(layer,source){return layer.steps??resource(source,layer.drawing,'drawing').steps;}
 function resource(source,id,kind){const value=source.getResource(id);if(value.kind!==kind)throw new TypeError(`${id} is a ${value.kind}, not a ${kind}`);return value;}

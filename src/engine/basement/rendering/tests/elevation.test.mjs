@@ -16,6 +16,7 @@ test('a tipped bone is drawn shorter along it and no thinner: places shorten, si
  assert.equal(short[1].x,4);assert.equal(short[1].radius,3);assert.equal(short[2].x,5);assert.deepEqual(short[2].steps[0].points,[[0,0],[2,0],[2,2]]);
  assert.deepEqual(steps[0].to,[20,0],'the data is not touched');
  const down=foreshorten(steps,0);assert.deepEqual(down[0].to,[0,0],'pointing straight down it is the round end of it');
+ const leaned=foreshorten(steps,0,[.5,.25]);assert.deepEqual(leaned[0].to,[10,5],'leaning, a hanging bone slants on to where its end is drawn');assert.equal(leaned[1].y,2);assert.deepEqual(leaned[0].radii,[4,4.5,3]);
 });
 
 test('a limb is round at each joint and swells between, and its outline fits bounds',()=>{
