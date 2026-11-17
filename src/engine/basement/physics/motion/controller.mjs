@@ -1,6 +1,7 @@
 // ===== LV0 BASEMENT =====
 import { clone, number, vector, sub, add, scale, rotate } from '../core/values.mjs';
 import { referenceBody } from '../spatial/queries.mjs';
+import { readEasing, ease } from './easing.mjs';
 
 /** Timelines and orbiting mechanics use the ordinary body's velocity and collision step. */
 export class motionController {
@@ -18,10 +19,10 @@ export class motionController {
     moveBodyTo(body, packet) {
         const r = this.#body(body), duration = number(packet.duration, 'duration', 1e-7);
         const target = vector(packet.position), rotation = number(packet.rotation ?? r.rotation, 'rotation');
-        if (!['linear', 'smooth'].includes(packet.easing ?? 'linear')) throw new TypeError('Invalid easing');
+        const easing = readEasing(packet.easing ?? 'linear');
         this.world._mutate(() => {
             if (!this.world.fetchBody(r.id)) return;
-            this.#motions.set(r.id, { type: 'move', from: [...r.position], from_rotation: r.rotation, to: target, to_rotation: rotation, duration, elapsed: 0, easing: packet.easing ?? 'linear' });
+            this.#motions.set(r.id, { type: 'move', from: [...r.position], from_rotation: r.rotation, to: target, to_rotation: rotation, duration, elapsed: 0, easing });
             r.sleeping = false; r.sleep_time = 0;
         }); return r.handle;
     }
@@ -49,7 +50,7 @@ export class motionController {
         m.elapsed += dt;
         let target, rotation;
         if (m.type === 'move') {
-            const fraction = Math.min(1, m.elapsed / m.duration), t = m.easing === 'smooth' ? fraction * fraction * (3 - 2 * fraction) : fraction;
+            const fraction = Math.min(1, m.elapsed / m.duration), t = ease(m.easing, fraction);
             target = add(m.from, scale(sub(m.to, m.from), t)); rotation = m.from_rotation + (m.to_rotation - m.from_rotation) * t;
             if (fraction >= 1) {
                 // Completion means the timeline ended; contact response may stop the body short.

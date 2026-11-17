@@ -18,6 +18,7 @@ import { awarenessMatrix } from '../elements/elements.mjs';
 import { gameElements } from '../elements/registry.mjs';
 import { physicsConstraint, constraintRecord, updateConstraint, constraintSolver } from '../constraints/constraint.mjs';
 import { motionController } from '../motion/controller.mjs';
+import { tweenSystem } from '../motion/tweens.mjs';
 import { trafficController } from '../traffic/controller.mjs';
 import { attachmentManager } from '../attachments/manager.mjs';
 import { pathGeometry } from '../motion/path-geometry.mjs';
@@ -52,6 +53,7 @@ export class physicsSystem {
         this.#lightChanges = new changeCounters({ cell_size: cell_size * 2 });
         Object.defineProperty(this, 'elements', { value: new gameElements(this, { asset_library }), enumerable: true });
         Object.defineProperty(this, 'motion', { value: new motionController(this), enumerable: true });
+        Object.defineProperty(this, 'tweens', { value: new tweenSystem(this), enumerable: true });
         Object.defineProperty(this, 'rigs', { value: new rigSystem(this), enumerable: true });
         Object.defineProperty(this, 'traffic', { value: new trafficController(this), enumerable: true });
         Object.defineProperty(this, 'navigation', { value: new navigationSystem(this, navigation), enumerable: true });
@@ -65,6 +67,12 @@ export class physicsSystem {
         return r;
     }
     _syncBody(body) { this.#sync(this._record(body)); }
+    /** Sets a body's live elevation and keeps the step's start for drawing between, as a smooth change (a tween) does; it wakes and stands again. */
+    _setLiveElevation(body, z) {
+        const r = this._record(body); number(z, 'elevation', -Infinity);
+        this._mutate(() => { if (r.removed || r.parent_mount) return; r.elevation = r.previous_elevation = z; r.grounded = false; r.standing_on = null; this.#riders.delete(r); r.sleeping = false; r.sleep_time = 0; this.#sync(r); this.#attachments._syncDescendants(r, false); this.#wakeRiders(r); });
+        return body;
+    }
     _canReuseMotorRequest(){return !this.#stepping&&!this.#dispatching&&!this.#committing&&!this.#queue.length;}
     _mutate(fn) { if (!this.#committing && (this.#stepping || this.#dispatching || this.#queue.length)) this.#queue.push(fn); else fn(); }
     _emit(type, packet) {
@@ -498,6 +506,7 @@ export class physicsSystem {
         number(step_seconds, 'step_seconds', EPS, 0.1);
         if (this.#stepping || this.#dispatching) throw new Error('Physics updates are not reentrant');
         this.commitCommands();
+        this.tweens._update(step_seconds); this.commitCommands();   // eased values land before the step moves anything
         this.rigs._beforeStep(step_seconds);
         this.#stepping = true; this.#tick++; this.#stepContacts.clear(); this.#stats.steps++;
         try {
@@ -736,7 +745,7 @@ export class physicsSystem {
     removeChain(chain) { return this.#particles.removeChain(chain); }
     clearWorld() {
         this._mutate(() => { for (const r of this.#bodies.values()) r.removed = true; this.#bodies.clear(); this.#moving.clear(); this.#constraints.clear(); this.#contacts.clear(); this.#stepContacts.clear();
-            this.#attachments._clear(); this.rigs._clear(); this.elements._clear(); this.traffic._clear(); this.motion._clear(); this.spatial_grid.clear(); this.navigation._clear(); this.#particles._clear(); this.#events = []; this.#nextId = 1; this.#nextConstraint = 1; this.#tick = 0; this.#motionEnvelope = null;this.#candidateCache=null;this.#broadphaseEpoch++; });
+            this.#attachments._clear(); this.rigs._clear(); this.elements._clear(); this.traffic._clear(); this.motion._clear(); this.tweens._clear(); this.spatial_grid.clear(); this.navigation._clear(); this.#particles._clear(); this.#events = []; this.#nextId = 1; this.#nextConstraint = 1; this.#tick = 0; this.#motionEnvelope = null;this.#candidateCache=null;this.#broadphaseEpoch++; });
     }
     // Versioned exchange; validate a replacement before changing the live registry.
     _exportState() {
@@ -744,7 +753,7 @@ export class physicsSystem {
         return { format_version: 2, config: clone(this.config), simulation_tick: this.simulation_tick, entities: this.elements._saveState(),
             attachments: this.#attachments._saveState(), rigs:this.rigs._saveState(),
             bodies: [...this.#bodies.values()].map(r => ({ ...snapshot(r), active: r.config.active, force: [...r.force], torque: r.torque, sleep_time: r.sleep_time, motor: this._saveMotor(r.motor) })),
-            constraints: [...this.#constraints.values()].map(c => c.getState()), particles: this.#particles._saveState(), traffic: this.traffic._saveState(), motion: this.motion._saveState(),
+            constraints: [...this.#constraints.values()].map(c => c.getState()), particles: this.#particles._saveState(), traffic: this.traffic._saveState(), motion: this.motion._saveState(), tweens: this.tweens._saveState(),
             spatial_instances: this.spatial_grid.exportInstances().filter(e => typeof e.id === 'string' && e.id.startsWith('spatial:')), navigation: this.navigation._saveState(),
             next_body_id: this.#nextId, next_constraint_id: this.#nextConstraint };
     }
@@ -818,7 +827,7 @@ export class physicsSystem {
         this.#particles._loadState(saved.particles);
         for (const e of saved.spatial_instances ?? []) this.registerSpatialInstance(e.value.instance_id, e.bounds, e.value);
         this.elements._restoreState(saved.entities);
-        this.traffic._loadState(saved.traffic); this.motion._loadState(saved.motion); this.navigation._loadState(saved.navigation);
+        this.traffic._loadState(saved.traffic); this.motion._loadState(saved.motion); this.tweens._loadState(saved.tweens); this.navigation._loadState(saved.navigation);
         this.rigs._loadState(saved.rigs);
         this.#attachments._loadState(saved.attachments);
     }

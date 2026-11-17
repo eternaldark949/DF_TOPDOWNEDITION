@@ -237,6 +237,7 @@ Everything in the world sits on one shared spatial grid, so asking what is aroun
 |---|---|
 | `physics.findPath(packet)` | A path around walls |
 | `basement.motion` | Moves bodies along paths and lanes |
+| `physics.tweens` / `entity.tween(property, to, {duration, easing, delay, repeat, yoyo})` | Eases any value over time: a size, a height, a colour in the look, any number in the entity's data. Easings are data: a name (`smooth`, `ease_out`, `back_out`, `bounce_out`…), a bezier `[x1, y1, x2, y2]` or `{steps}` |
 | `basement.traffic` | Runs vehicles on a road network, with lane occupancy |
 
 Reference: [navigation](basement/physics/docs/navigation.md). The API spec merges cars and walkers into one agent system on one network; that section of this guide is written when it is built.

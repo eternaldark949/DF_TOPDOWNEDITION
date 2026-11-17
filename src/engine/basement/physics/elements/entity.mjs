@@ -115,6 +115,10 @@ export class gameEntity {
     get world_elevation() { return entityRecord(this).body.getState().world_elevation; }
     /** Raises or lowers it: its collision, queries, drawing and attached children all follow. */
     setElevation(z) { return this.updateBody({ elevation: z }); }
+    /** Eases a property ('scale', 'elevation', or a data key such as 'look.values.shirt') to `to` over time; see tweens.start. Returns the tween's id. */
+    tween(property, to, options) { const r = entityRecord(this); r.elements._requireLive(this); return r.elements.world.tweens.start(this, property, to, options); }
+    /** Stops its tweens, or the one on `property`; each stays where it got to. */
+    stopTween(property) { return entityRecord(this).elements.world.tweens.stop(this, property); }
     /** How fast it rises (+) or falls (-), in world units a second. */
     get vertical_velocity() { return entityRecord(this).body.getState().vertical_velocity; }
     /** Whether it rests on the floor or on something solid under it. */

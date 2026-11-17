@@ -217,6 +217,7 @@ Entity properties are read-only: `entity_id`, `body_id` (same root identity), `k
 | `distanceTo(target)`, `directionTo(target)` | Distance and unit direction to a point or anything with a `position`; the direction to its own position is `[0,0]`. |
 | `attach(child,{at=[0,0],rotation=0,elevation=0,combine_mass=false,rig_anchor=null})` | Parents a child entity or body at a local offset (and `elevation` above this one's base; a rig anchor adds the anchor's height) through `attachBody`; returns the parent. |
 | `elevation`, `world_elevation`, `setElevation(z)` | Read-only z of its own base, and where its base is in the world (its parent's elevation plus the anchor's height while attached); `setElevation` raises or lowers it and returns the entity. |
+| `tween(property, to, options)`, `stopTween(property?)` | Eases one of its values over time (`physics.tweens.start` on it; see tweenSystem) and returns the tween's id; `stopTween` stops its tweens or the one on `property`. |
 | `vertical_velocity`, `grounded`, `setVerticalVelocity(vz)` | How fast it rises or falls, and whether it rests on the floor or on something under it; `setVerticalVelocity` sends it up or down (a jump) and returns the entity. Gravity's z brings it back down. |
 | `detach(child=null,{exit_points,inherit_velocity})` | With no child, detaches this entity from its parent; with a child, detaches that child and throws if it is not attached here. Exits at its current local offset unless `exit_points` are given. Returns `true` when it left and `false` when it had no parent or no exit was clear. |
 | `parent`, `children` | Read-only: the parent entity or `null`, and the attached child entities. |
@@ -315,12 +316,26 @@ Events: `trafficRouteCompleted`, `passingRouteAccepted`, `passingRouteBlocked`, 
 
 Every world owns `physics.motion`, a `motionController`:
 
-- `moveBodyTo(body,{position,rotation?,duration,easing='linear'})`: engine-owned absolute timeline, `linear` or `smooth` easing.
+- `moveBodyTo(body,{position,rotation?,duration,easing='linear'})`: engine-owned absolute timeline under any easing (see Easing below).
 - `orbitBody(body,{center,angular_speed,rotate_body=false})`: engine-owned orbital position and optional rotation, suitable for ride parts and staged effects.
 - `stopBodyMotion(body)`: stop this timeline and body velocity.
 - `getMotionState(body)`: detached timeline/orbit state or null.
 
 Bodies must be nonstatic. Scripts suspend the normal motor/force integration while active and request velocities through the ordinary integration/CCD/contact pipeline. Rigid/character bodies can be blocked; kinematic bodies act as prescribed moving geometry and cannot be stopped by a static body's impulse. Completion stops residual scripted velocity on the following step; normal motors then resume. `motionCompleted` reports `{body,entity,requested_position,simulation_tick}` when a timeline ends; the actual body can stop short if obstructed. Orbit/timeline state survives save/load. Game cutscenes should react to events and read body poses instead of calculating interpolation.
+
+## Easing
+
+`EASINGS` holds every named easing (`linear`, `smooth`, `ease_in`/`_out`/`_in_out`, `cubic_*`, `sine_*`, `back_in`, `back_out`, `elastic_out`, `bounce_in`, `bounce_out`), each from 0 at the start to 1 at the end (back and elastic overshoot). An easing in data is a name, a CSS-style cubic bezier `[x1, y1, x2, y2]`, or `{steps: n}` for n even jumps. `readEasing(value)` checks one and `ease(easing, t)` reads its progress at `t` in [0, 1]. Scripted motion and tweens share them.
+
+## tweenSystem
+
+Every world owns `physics.tweens`, which eases any value on an entity over time. Tweens run at the start of each fixed step (before anything moves), save and load with the world, and end quietly when their entity is destroyed.
+
+- `start(entity, property, to, {duration=.5, from?, easing='smooth', delay=0, repeat=0, yoyo=false, angle=false})` eases `property` from its value now (or `from`) to `to` and returns the tween's id. `property` is `scale`, `elevation` (the live height, as a lift does), or a data key read down its objects, such as `look.values.shirt` or `glow`. `to` is a number, a list of numbers the same length as the value, or a colour (`#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb()`, `rgba()`; colours travel through their alpha too). `repeat` is the extra runs (-1 for ever), `yoyo` sends every other run back, and `angle` turns a number the short way round. A new tween on the same property replaces the old one. `position` and `rotation` are refused: move a body with `motion.moveBodyTo`, which travels through collisions.
+- `stop(tween_id)` or `stop(entity, property?)` stops a tween, or an entity's tweens; each value stays where it got to.
+- `getTween(tween_id)` is a copy of its state or null; `listTweens(entity)` the ids running on it.
+
+`tweenFinished`: `{body, entity, tween_id, property, simulation_tick}` when a tween ends (one that repeats for ever never does).
 
 ## Cloth meshes
 

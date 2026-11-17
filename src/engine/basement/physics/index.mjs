@@ -18,6 +18,8 @@ export { KINDS, MOTORS, awarenessMatrix } from './elements/elements.mjs';
 export { BODY_GROUP, QUERY_GROUP, PHYSICS_TYPES } from './core/values.mjs';
 export { trafficController } from './traffic/controller.mjs';
 export { motionController } from './motion/controller.mjs';
+export { tweenSystem } from './motion/tweens.mjs';
+export { EASINGS, readEasing, ease } from './motion/easing.mjs';
 export { pathGeometry } from './motion/path-geometry.mjs';
 export { navigationSystem } from './navigation/system.mjs';
 export { navigationField } from './navigation/field.mjs';
