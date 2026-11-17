@@ -6,6 +6,8 @@ import {BLENDS,CAPABILITIES} from './values.mjs';
 const COMPOSITE=Object.freeze({normal:'source-over',add:'lighter',multiply:'multiply',screen:'screen','source-in':'source-in','source-out':'source-out','destination-in':'destination-in','destination-out':'destination-out','source-atop':'source-atop','destination-over':'destination-over',overlay:'overlay','soft-light':'soft-light',lighten:'lighten',darken:'darken'});
 import {geometry} from './packets.mjs';
 import {flattenGeometry,pathBounds} from './paths.mjs';
+import {GRAIN_SIZE,grainPixels,grainOffset} from './effects.mjs';
+import {readColor} from './colors.mjs';
 
 function createSurface(width,height){
     if(typeof OffscreenCanvas!=='undefined')return new OffscreenCanvas(width,height);
@@ -245,11 +247,45 @@ export class canvasRenderer {
                 for(const draw of pass.packets)this.#draw(ctx,draw,frame.view,sx,sy,!!layer);
             }finally{ctx.restore();this.#set={};}
             if(layer){
+                if(layer.effects.length)this.#applyEffects(target,layer.effects,sx);
                 const out=into.context;out.save();
                 try{out.setTransform(1,0,0,1,0,0);out.globalAlpha=layer.opacity;out.globalCompositeOperation=COMPOSITE[layer.blend];out.shadowColor='transparent';out.shadowBlur=0;out.filter='none';out.imageSmoothingEnabled=true;out.drawImage(target.surface,0,0,into.surface.width,into.surface.height);}
                 finally{out.restore();}
             }
         }
+        if(frame.effects?.length)this.#applyEffects(main,frame.effects,main.surface.width/frame.view.width,opaqueFrame(frame));
+        this.#frames++;
+    }
+    #frames=0;#copy=null;#grain=null;
+    // A copy of a surface's pixels, on a kept surface the same size.
+    #copyOf(surface){
+        if(!this.#copy){const s=this.#createSurface(surface.width,surface.height);this.#copy={surface:s,context:s.getContext('2d')};}
+        const c=this.#copy;if(c.surface.width!==surface.width)c.surface.width=surface.width;if(c.surface.height!==surface.height)c.surface.height=surface.height;
+        c.context.setTransform(1,0,0,1,0,0);c.context.globalAlpha=1;c.context.globalCompositeOperation='copy';c.context.filter='none';c.context.drawImage(surface,0,0);return c.surface;
+    }
+    /** A surface's image changed in place by each effect in turn (see effects.mjs); `sx` is its pixels per pass unit. */
+    #applyEffects({surface,context:ctx},stack,sx,opaque=false){
+        const W=surface.width,H=surface.height;
+        ctx.save();
+        try{
+            for(const e of stack){
+                ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.filter='none';ctx.shadowColor='transparent';ctx.shadowBlur=0;ctx.imageSmoothingEnabled=true;
+                if(e.type==='grade'){
+                    const filter=[e.exposure?`brightness(${2**e.exposure})`:'',e.contrast!==1?`contrast(${e.contrast})`:'',e.saturation!==1?`saturate(${e.saturation})`:''].filter(Boolean).join(' ');
+                    if(filter){ctx.globalCompositeOperation='copy';ctx.filter=filter;ctx.drawImage(this.#copyOf(surface),0,0);ctx.filter='none';}
+                    if(e.tint_amount>0){const shape=opaque?null:this.#copyOf(surface);ctx.globalCompositeOperation='multiply';ctx.globalAlpha=e.tint_amount;ctx.fillStyle=e.tint;ctx.fillRect(0,0,W,H);ctx.globalAlpha=1;if(shape){ctx.globalCompositeOperation='destination-in';ctx.drawImage(shape,0,0);}}
+                }else if(e.type==='vignette'){
+                    const reach=Math.hypot(W,H)/2,[r,g,b,a]=readColor(e.color),paint=k=>`rgba(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)},${a*k})`,ring=ctx.createRadialGradient(W/2,H/2,e.radius*reach,W/2,H/2,(e.radius+e.softness)*reach);
+                    ring.addColorStop(0,paint(0));ring.addColorStop(1,paint(e.strength));ctx.fillStyle=ring;ctx.fillRect(0,0,W,H);
+                }else if(e.type==='grain'){
+                    if(!this.#grain){const s=this.#createSurface(GRAIN_SIZE,GRAIN_SIZE),c=s.getContext('2d'),data=c.createImageData(GRAIN_SIZE,GRAIN_SIZE);data.data.set(grainPixels());c.putImageData(data,0,0);this.#grain=s;}
+                    const shape=opaque?null:this.#copyOf(surface),size=e.size*sx,[ox,oy]=grainOffset(this.#frames,e.animated),pattern=ctx.createPattern(this.#grain,'repeat');
+                    ctx.imageSmoothingEnabled=false;ctx.globalCompositeOperation='overlay';ctx.globalAlpha=e.amount;ctx.fillStyle=pattern;
+                    ctx.setTransform(size,0,0,size,-ox*size,-oy*size);ctx.fillRect(ox,oy,W/size,H/size);
+                    if(shape){ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='destination-in';ctx.drawImage(shape,0,0);}
+                }
+            }
+        }finally{ctx.restore();this.#set={};}
     }
     // One off-screen surface serves every layer pass in turn: each is laid over its pass before the next begins.
     #layerOver(base,scale){
@@ -258,6 +294,15 @@ export class canvasRenderer {
         if(this.#layer.surface.width!==w)this.#layer.surface.width=w;if(this.#layer.surface.height!==h)this.#layer.surface.height=h;return this.#layer;
     }
     dispose(){if(this.#disposed)return;this.#disposed=true;this.#generation++;for(const entry of this.#resources.values())this.#release(entry);this.#resources.clear();this.#pictures.clear();if(this.#layer)this.#release(this.#layer);this.#layer=null;this.#scratch=null;this.#context=null;this.#surface=null;}
+}
+
+// Whether a frame's screen ends fully opaque: cleared to an opaque colour first, and nothing drawn on it cuts
+// holes. Then effects need not keep its shape, which saves two copies of the screen each.
+const CUTS=new Set(['source-in','source-out','destination-in','destination-out']);
+function opaqueFrame(frame){
+    const first=frame.passes.find(p=>p.target_id===null&&!p.layer);if(!first||first.clear_color===false||readColor(first.clear_color)[3]<1)return false;
+    for(const pass of frame.passes){if(pass.layer){if(pass.layer.into===null&&CUTS.has(pass.layer.blend))return false;continue;}if(pass.target_id===null)for(const d of pass.packets)if(CUTS.has(d.blend))return false;}
+    return true;
 }
 
 let measurer=null;

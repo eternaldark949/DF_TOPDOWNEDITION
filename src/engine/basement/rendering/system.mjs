@@ -1,6 +1,7 @@
 // ===== LV0 BASEMENT =====
 import {renderFrame} from './frame.mjs';
 import {geometry,material,requirements} from './packets.mjs';
+import {effectStack,effectNeeds} from './effects.mjs';
 import {finite,identifier,freezeData,CAPABILITIES} from './values.mjs';
 import {artScene} from './art.mjs';
 import {drawLook,drawComponents} from './looks.mjs';
@@ -30,7 +31,7 @@ const methods=['initialize','resize','render','registerResource','releaseResourc
  */
 export class renderSystem {
     #createSurface=null;#lean=null;#world;#camera;#frame=new renderFrame();#renderers=new Map();#resources=new Map();#backend=null;#backendId=null;#surface=null;
-    #collecting=false;#busy=false;#disposed=false;#generation=0;#last=null;#surfaceListeners=new Set();#frameListeners=new Set();#requirements=[];#visible=[];
+    #effects=Object.freeze([]);#layerEffects=new Map();#collecting=false;#busy=false;#disposed=false;#generation=0;#last=null;#surfaceListeners=new Set();#frameListeners=new Set();#requirements=[];#visible=[];
     constructor({physics_system,camera,create_surface=null}={}){if(create_surface!==null&&typeof create_surface!=='function')throw new TypeError('create_surface makes a surface for a renderer id');this.#createSurface=create_surface;if(!physics_system?.queryEntitiesInBounds||!camera?.getView)throw new TypeError('renderSystem requires native world and camera');this.#world=physics_system;this.#camera=camera;}
     get renderer_id(){return this.#backendId;}
     get disposed(){return this.#disposed;}
@@ -131,11 +132,26 @@ export class renderSystem {
     }
     /** The top thing at a world point that passes the filters (see pickAllAt), or null. Without `xray: true`, something on top that fails them blocks the pick. */
     pickAt(point,options={}){return this.pickAllAt(point,{xray:false,...options})[0]??null;}
-    beginFrame(blend=1){this.#live();if(this.#collecting)throw new Error('A render frame is already open');this.#collecting=true;try{return this.#frame.begin(this.#camera.getView(blend));}catch(error){this.#collecting=false;throw error;}}
+    /**
+     * Effects on everything drawn from now on (a list of effects, or {preset, ...changes} naming an `effects`
+     * resource in the world's data), or null for none. See effects.mjs.
+     */
+    setEffects(effects){this.#live();this.#effects=this.#stack(effects);return this;}
+    /** Effects on one packet layer number alone, drawn as a pass of its own (null removes them). */
+    setLayerEffects(layer,effects){this.#live();if(!Number.isFinite(layer))throw new TypeError('A layer is a number');const stack=this.#stack(effects);if(stack.length)this.#layerEffects.set(layer,stack);else this.#layerEffects.delete(layer);return this;}
+    /** A stack read from a list or a preset in the world's data. */
+    #stack(value){return effectStack(value,id=>this.#world.elements.asset_library.getResource(id));}
+    getEffects(){return {frame:this.#effects,layers:Object.fromEntries(this.#layerEffects)};}
+    beginFrame(blend=1){
+        this.#live();if(this.#collecting)throw new Error('A render frame is already open');this.#collecting=true;
+        try{const frame=this.#frame.begin(this.#camera.getView(blend));if(this.#effects.length)frame.setEffects(this.#effects);for(const [layer,stack] of this.#layerEffects)frame.setLayerEffects(layer,stack);return frame;}
+        catch(error){this.#collecting=false;this.#frame.abort();throw error;}
+    }
     endFrame(){
         this.#live();if(!this.#collecting)throw new Error('No open render frame');
         try{
             const frame=this.#frame.finish(),caps=this.#backend?new Set(this.#backend.capabilities):null;
+            if(caps)for(const need of [...effectNeeds(frame.effects),...frame.passes.flatMap(pass=>pass.layer?effectNeeds(pass.layer.effects):[])])if(!caps.has(need))throw new Error(`Renderer capability unavailable: ${need}`);
             for(const pass of frame.passes){
                 if(pass.target_id!==null){this.#resource(pass.target_id,'target');if(caps&&!caps.has('target'))throw new Error('Renderer does not support targets');}
                 if(pass.layer&&caps&&!caps.has('layer'))throw new Error('Renderer capability unavailable: layer');

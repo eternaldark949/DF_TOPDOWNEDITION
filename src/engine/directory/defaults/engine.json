@@ -1,6 +1,6 @@
 {
  "library_id": "engine",
- "description": "The engine's default library: base entity kinds and a default humanoid. Any game may start from it, extend it or replace it.",
+ "description": "The engine's default library: base entity kinds, a default humanoid and effect presets (film, neon_night, foggy_dawn). Any game may start from it, extend it or replace it.",
  "resources": {
   "humanoid_skeleton": {
    "kind": "skeleton",
@@ -568,6 +568,68 @@
       "closing_stiffness": 90
      },
      "suffix": "right"
+    }
+   ]
+  },
+  "film": {
+   "kind": "effects",
+   "effects": [
+    {
+     "type": "grade",
+     "contrast": 1.08,
+     "saturation": 0.85,
+     "tint": "#ffe6c4",
+     "tint_amount": 0.22
+    },
+    {
+     "type": "vignette",
+     "strength": 0.45,
+     "radius": 0.5,
+     "softness": 0.6
+    },
+    {
+     "type": "grain",
+     "amount": 0.07
+    }
+   ]
+  },
+  "neon_night": {
+   "kind": "effects",
+   "effects": [
+    {
+     "type": "grade",
+     "exposure": -0.2,
+     "contrast": 1.25,
+     "saturation": 1.4,
+     "tint": "#8a78ff",
+     "tint_amount": 0.3
+    },
+    {
+     "type": "vignette",
+     "strength": 0.6,
+     "radius": 0.45,
+     "softness": 0.55,
+     "color": "#0a0020"
+    }
+   ]
+  },
+  "foggy_dawn": {
+   "kind": "effects",
+   "effects": [
+    {
+     "type": "grade",
+     "exposure": 0.25,
+     "contrast": 0.8,
+     "saturation": 0.7,
+     "tint": "#ffd8b4",
+     "tint_amount": 0.35
+    },
+    {
+     "type": "vignette",
+     "strength": 0.3,
+     "radius": 0.55,
+     "softness": 0.5,
+     "color": "#fff2e4"
     }
    ]
   }

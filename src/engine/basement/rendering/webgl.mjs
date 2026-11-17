@@ -9,7 +9,8 @@
 // rasterized by the platform's text drawing (canvas.mjs), because WebGL has no text of its own.
 import {CAPABILITIES} from './values.mjs';
 import {packet as normalizePacket,requirements} from './packets.mjs';
-import {premultiplied,gradientRamp} from './colors.mjs';
+import {premultiplied,gradientRamp,readColor} from './colors.mjs';
+import {GRAIN_SIZE,grainPixels,grainOffset} from './effects.mjs';
 import {flattenGeometry,fillTriangles,strokeTriangles,dashPaths} from './paths.mjs';
 import {rasterizeCanvasText,measureCanvasText} from './canvas.mjs';
 
@@ -32,7 +33,7 @@ const BLEND_FUNCTIONS=Object.freeze({
  * per pixel (`overlay`, `soft-light`, `lighten`, `darken`) and the ones Canvas applies to the whole
  * surface outside the shape (`source-in`, `source-out`, `destination-in`).
  */
-export const WEBGL_CAPABILITIES=Object.freeze(['shape','sprite','text','picture','geometry:rect','geometry:ellipse','geometry:path','gradient:linear','gradient:radial','pattern','clip','shadow','blur','dash','target','layer',...Object.keys(BLEND_FUNCTIONS).map(name=>`blend:${name}`)]);
+export const WEBGL_CAPABILITIES=Object.freeze(['shape','sprite','text','picture','geometry:rect','geometry:ellipse','geometry:path','gradient:linear','gradient:radial','pattern','clip','shadow','blur','dash','target','layer','effect:grade','effect:vignette','effect:grain',...Object.keys(BLEND_FUNCTIONS).map(name=>`blend:${name}`)]);
 if(WEBGL_CAPABILITIES.some(need=>!CAPABILITIES.includes(need)))throw new Error('WebGL declares a capability the engine does not name');
 
 const VERTEX=`#version 300 es
@@ -74,6 +75,28 @@ void main(){
 }`;
 const BLUR_SIGMA=MAX_TAPS/3;   // a wider blur is drawn smaller and stretched back
 
+// One effect over a whole surface, pixel for pixel, matching Canvas's compositing (effects.mjs says what each does).
+// u_type 0 grade: u_a (2^exposure, contrast, saturation, tint amount × tint alpha), u_b the tint.
+// 1 vignette: u_a (inner, outer radius in pixels, strength), u_b the colour. 2 grain: u_a (amount, size, offset).
+const POST_FRAGMENT=`#version 300 es
+precision highp float;uniform sampler2D u_texture,u_grain;uniform int u_type;uniform vec2 u_size;uniform vec4 u_a,u_b;out vec4 color;
+vec3 overlay(vec3 b,vec3 s){return mix(2.*b*s,1.-2.*(1.-b)*(1.-s),step(.5,b));}
+// Canvas: a source of straight colour s and alpha k composited by blend result m over the pixel, then kept to the pixel's shape
+vec4 over(vec3 c,float a,vec3 s,float k,vec3 m){vec3 rgb=s*k*(1.-a)+c*a*(1.-k)+k*a*m;return vec4(rgb,k+a-k*a)*a;}
+void main(){
+ vec4 src=texelFetch(u_texture,ivec2(gl_FragCoord.xy),0);vec2 at=vec2(gl_FragCoord.x,u_size.y-gl_FragCoord.y);
+ if(u_type==1){float d=distance(at,u_size*.5),t=clamp((d-u_a.x)/max(u_a.y-u_a.x,1e-6),0.,1.),k=u_a.z*t*u_b.a;color=vec4(u_b.rgb*k,k)+src*(1.-k);return;}
+ if(src.a<=0.){color=src;return;}
+ vec3 c=src.rgb/src.a;
+ if(u_type==0){
+  c=clamp(c*u_a.x,0.,1.);c=clamp((c-.5)*u_a.y+.5,0.,1.);float s=u_a.z;
+  c=clamp(mat3(.213+.787*s,.213-.213*s,.213-.213*s,.715-.715*s,.715+.285*s,.715-.715*s,.072-.072*s,.072-.072*s,.072+.928*s)*c,0.,1.);
+  color=u_a.w>0.?over(c,src.a,u_b.rgb,u_a.w,c*u_b.rgb):vec4(c*src.a,src.a);return;
+ }
+ ivec2 g=ivec2(floor(at/u_a.y+u_a.zw))&${GRAIN_SIZE-1};vec3 n=texelFetch(u_grain,g,0).rgb;
+ color=over(c,src.a,n,u_a.x,overlay(c,n));
+}`;
+
 const IDENTITY=Object.freeze([1,0,0,1,0,0]);
 const multiply=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
 const scaled=(m,sx,sy)=>[m[0]*sx,m[1]*sy,m[2]*sx,m[3]*sy,m[4]*sx,m[5]*sy];
@@ -91,7 +114,7 @@ function touch(map,key){const value=map.get(key);if(value!==undefined){map.delet
 export class webglRenderer {
     #surface=null;#gl=null;#viewport=null;#main=null;#program=null;#uniforms={};#buffer=null;#vao=null;#samplers=null;#samples=0;#maxTexture=4096;
     #resources=new Map();#ramps=new Map();#texts=new Map();#pictures=new Map();#pictureBytes=0;#vectorPictures=new Set();#layer=null;#bound=null;
-    #decodeImage;#createSurface;#maxPictureBytes;#densities;#disposed=false;#generation=0;#blurProgram=null;#blurUniforms={};#scratch=null;
+    #decodeImage;#createSurface;#maxPictureBytes;#densities;#disposed=false;#generation=0;#blurProgram=null;#blurUniforms={};#scratch=null;#postProgram=null;#postUniforms={};#post=null;#spare=null;#grain=null;#frames=0;
     /**
      * `decode_image(url)` gives an image WebGL can upload (default: the browser's Image); `create_surface(w, h)`
      * makes the 2D surfaces text is rasterized on (default: canvas.mjs's). Pictures are painted at the first of
@@ -121,6 +144,9 @@ export class webglRenderer {
         const blur=gl.createProgram();gl.attachShader(blur,shader(gl.VERTEX_SHADER,VERTEX));gl.attachShader(blur,shader(gl.FRAGMENT_SHADER,BLUR_FRAGMENT));gl.bindAttribLocation(blur,0,'a_position');gl.linkProgram(blur);
         if(!gl.getProgramParameter(blur,gl.LINK_STATUS))throw new Error(`WebGL program: ${gl.getProgramInfoLog(blur)}`);
         this.#blurProgram=blur;gl.useProgram(blur);for(const name of ['u_row0','u_row1','u_texture','u_size','u_region','u_dir','u_sigma'])this.#blurUniforms[name]=gl.getUniformLocation(blur,name);gl.uniform1i(this.#blurUniforms.u_texture,0);
+        const post=gl.createProgram();gl.attachShader(post,shader(gl.VERTEX_SHADER,VERTEX));gl.attachShader(post,shader(gl.FRAGMENT_SHADER,POST_FRAGMENT));gl.bindAttribLocation(post,0,'a_position');gl.linkProgram(post);
+        if(!gl.getProgramParameter(post,gl.LINK_STATUS))throw new Error(`WebGL program: ${gl.getProgramInfoLog(post)}`);
+        this.#postProgram=post;gl.useProgram(post);for(const name of ['u_row0','u_row1','u_texture','u_grain','u_type','u_size','u_a','u_b'])this.#postUniforms[name]=gl.getUniformLocation(post,name);gl.uniform1i(this.#postUniforms.u_texture,0);gl.uniform1i(this.#postUniforms.u_grain,1);
         gl.useProgram(program);
         for(const name of ['u_row0','u_row1','u_mode','u_color','u_points','u_uv','u_radii','u_repeat','u_opacity','u_texture'])this.#uniforms[name]=gl.getUniformLocation(program,name);
         gl.uniform1i(this.#uniforms.u_texture,0);
@@ -397,6 +423,37 @@ export class webglRenderer {
         }finally{gl.useProgram(this.#program);}
         return into;
     }
+    // A target kept between frames, made again when the size changes; `full` ones are drawn into, the rest only written by effects.
+    #sized(target,w,h,full){
+        if(target&&target.width===w&&target.height===h)return target;if(target)this.#freeTarget(target);
+        if(full)return this.#target(w,h);
+        const gl=this.#gl,texture=this.#texture(w,h),fbo=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,texture,0);this.#bound=null;
+        return {width:w,height:h,texture,resolve:fbo,fbo,color:null,stencil:null,flip:true};
+    }
+    /**
+     * Each effect of `stack` over the whole of `source` (resolved), between it and a spare surface, the last
+     * into `final` when given. `sx` is device pixels per pass unit. Returns the surface holding the result.
+     */
+    #effects(source,stack,sx,final){
+        const gl=this.#gl,u=this.#postUniforms,W=source.width,H=source.height;let current=source;
+        if(!this.#grain)this.#grain=this.#texture(GRAIN_SIZE,GRAIN_SIZE,{pixels:grainPixels()});
+        gl.useProgram(this.#postProgram);
+        try{
+            gl.blendEquation(gl.FUNC_ADD);gl.blendFuncSeparate(gl.ONE,gl.ZERO,gl.ONE,gl.ZERO);gl.disable(gl.STENCIL_TEST);
+            gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.#grain);gl.activeTexture(gl.TEXTURE0);
+            gl.uniform3f(u.u_row0,2/W,0,-1);gl.uniform3f(u.u_row1,0,-2/H,1);gl.uniform2f(u.u_size,W,H);
+            stack.forEach((e,i)=>{
+                const into=i===stack.length-1&&final?final:current===source?(this.#spare=this.#sized(this.#spare,W,H,false)):source;
+                gl.bindFramebuffer(gl.FRAMEBUFFER,into===this.#main?null:into.resolve);gl.viewport(0,0,W,H);this.#bound=null;
+                gl.bindTexture(gl.TEXTURE_2D,current.texture);
+                if(e.type==='grade'){const t=readColor(e.tint);gl.uniform1i(u.u_type,0);gl.uniform4f(u.u_a,2**e.exposure,e.contrast,e.saturation,e.tint_amount*t[3]);gl.uniform4f(u.u_b,t[0],t[1],t[2],1);}
+                else if(e.type==='vignette'){const reach=Math.hypot(W,H)/2,c=readColor(e.color);gl.uniform1i(u.u_type,1);gl.uniform4f(u.u_a,e.radius*reach,(e.radius+e.softness)*reach,e.strength,0);gl.uniform4f(u.u_b,...c);}
+                else{const [ox,oy]=grainOffset(this.#frames,e.animated);gl.uniform1i(u.u_type,2);gl.uniform4f(u.u_a,e.amount,e.size*sx,ox,oy);}
+                this.#draw(quad(0,0,W,H));current=into;
+            });
+        }finally{gl.enable(gl.STENCIL_TEST);gl.useProgram(this.#program);this.#bound=null;}
+        return current;
+    }
     #clear(color){const gl=this.#gl,[r,g,b,a]=color===false?[0,0,0,0]:premultiplied(color);gl.colorMask(true,true,true,true);gl.stencilMask(0xff);gl.clearColor(r,g,b,a);gl.clearStencil(0);gl.clear(color===false?gl.STENCIL_BUFFER_BIT:gl.COLOR_BUFFER_BIT|gl.STENCIL_BUFFER_BIT);}
     render(frame){
         this.#live();if(frame.format_version!==1)throw new TypeError('Unsupported render frame version');
@@ -405,7 +462,8 @@ export class webglRenderer {
             for(const d of pass.packets)if(d.type==='text'){const m=d.material_id?this.#resources.get(d.material_id).descriptor.material:d.material;if([m.fill,m.stroke].some(p=>p?.type==='pattern'))throw new Error('WebGL cannot fill text with a pattern');}
         }
         const gl=this.#gl;gl.useProgram(this.#program);gl.bindVertexArray(this.#vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.#buffer);this.#bound=null;
-        const find=id=>id===null?this.#main:this.#resources.get(id).target;
+        const post=frame.effects?.length?(this.#post=this.#sized(this.#post,this.#main.width,this.#main.height,true)):null;
+        const find=id=>id===null?(post??this.#main):this.#resources.get(id).target;
         for(const pass of frame.passes){
             const layer=pass.layer,into=layer?find(layer.into):null;let target;
             if(layer){
@@ -418,10 +476,14 @@ export class webglRenderer {
             for(const d of pass.packets)this.#packet(d,context);
             if(target!==this.#main)this.#resolve(target);
             if(layer){
+                const done=layer.effects?.length?this.#effects(target,layer.effects,context.sx,null):target;
                 this.#bind(into);this.#blend(layer.blend);this.#direct(false);this.#rows(IDENTITY);
-                this.#texturePaint(target.texture,[1/into.width,-1/into.height,0,1],layer.opacity);this.#draw(quad(0,0,into.width,into.height));
+                this.#texturePaint(done.texture,[1/into.width,-1/into.height,0,1],layer.opacity);this.#draw(quad(0,0,into.width,into.height));
+                if(into!==this.#main)this.#resolve(into);
             }
         }
+        if(post)this.#effects(post,frame.effects,this.#main.width/frame.view.width,this.#main);
+        this.#frames++;
         gl.bindSampler(0,null);
     }
     /** Pictures held and the bytes they use; for tests and tuning. */
@@ -430,10 +492,10 @@ export class webglRenderer {
         if(this.#disposed)return;this.#disposed=true;this.#generation++;const gl=this.#gl;
         if(gl){
             for(const entry of this.#resources.values())this.#release(entry);for(const texture of this.#ramps.values())gl.deleteTexture(texture);
-            for(const line of this.#texts.values())if(line)gl.deleteTexture(line.texture);for(const entry of this.#pictures.values())this.#freeTarget(entry.target);if(this.#layer)this.#freeTarget(this.#layer);for(const t of this.#scratch??[])this.#freeTarget(t);gl.deleteProgram(this.#blurProgram);
+            for(const line of this.#texts.values())if(line)gl.deleteTexture(line.texture);for(const entry of this.#pictures.values())this.#freeTarget(entry.target);if(this.#layer)this.#freeTarget(this.#layer);for(const t of [...this.#scratch??[],this.#post,this.#spare])if(t)this.#freeTarget(t);if(this.#grain)gl.deleteTexture(this.#grain);gl.deleteProgram(this.#blurProgram);gl.deleteProgram(this.#postProgram);
             gl.deleteBuffer(this.#buffer);gl.deleteVertexArray(this.#vao);gl.deleteProgram(this.#program);for(const sampler of Object.values(this.#samplers??{}))gl.deleteSampler(sampler);
             gl.getExtension('WEBGL_lose_context')?.loseContext();
         }
-        this.#resources.clear();this.#ramps.clear();this.#texts.clear();this.#pictures.clear();this.#vectorPictures.clear();this.#layer=null;this.#scratch=null;this.#gl=null;this.#surface=null;this.#bound=null;
+        this.#resources.clear();this.#ramps.clear();this.#texts.clear();this.#pictures.clear();this.#vectorPictures.clear();this.#layer=null;this.#scratch=null;this.#post=null;this.#spare=null;this.#grain=null;this.#gl=null;this.#surface=null;this.#bound=null;
     }
 }

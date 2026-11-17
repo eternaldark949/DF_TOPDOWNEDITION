@@ -131,3 +131,36 @@ test('WebGL blurs and casts shadows as Canvas does: a soft shadow, a blurred fil
         assert.ok(mean < 2.5, `mean channel difference ${mean.toFixed(2)} (${JSON.stringify(options)})`); assert.ok(share < .02, `${(share * 100).toFixed(2)}% of pixels differ by more than 24, worst ${worst}`);
     }
 });
+
+// Effects: a colour grade and grain on one packet layer alone, a layer pass with a vignette, and a grade, vignette and still grain on the whole frame.
+const effects = async ({ pixel_ratio = 1, frame_effects = true } = {}) => {
+    const R = await import('/src/engine/basement/rendering/index.mjs'), { physicsSystem } = await import('/src/engine/basement/physics/index.mjs');
+    const W = 160 * pixel_ratio, H = 120 * pixel_ratio, surfaces = [];
+    const camera = new R.cameraSystem({ position: [80, 60], viewport: { width: 160, height: 120, pixel_ratio } });
+    const render = new R.renderSystem({ physics_system: new physicsSystem(), camera, create_surface: () => { const c = Object.assign(document.createElement('canvas'), { width: W, height: H }); surfaces.push(c); return c; } });
+    render.registerRenderer('canvas', R.canvasRenderer).registerRenderer('webgl', R.webglRenderer);
+    await render.setRenderer('canvas');
+    render.setLayerEffects(2, [{ type: 'grade', saturation: 0, contrast: 1.4, tint: '#ffd090', tint_amount: .6 }, { type: 'grain', amount: .5, size: 2, animated: false }]);
+    if (frame_effects) render.setEffects([{ type: 'grade', exposure: .3, contrast: 1.2, saturation: 1.3 }, { type: 'vignette', strength: .8, radius: .4, softness: .5, color: '#100020' }, { type: 'grain', amount: .15, animated: false }]);
+    const draw = () => {
+        const frame = render.beginFrame(); frame.clear('#305070');
+        frame.submit({ type: 'shape', geometry: { type: 'rect', size: [160, 40] }, position: [80, 100], material: { fill: { type: 'linear', from: [-80, 0], to: [80, 0], stops: [[0, '#20a040'], [1, '#c0e040']] } } });
+        frame.submit({ type: 'shape', layer: 2, geometry: { type: 'ellipse', radii: [26, 26] }, position: [50, 50], material: { fill: { type: 'radial', from: [0, 0], inner_radius: 0, to: [0, 0], outer_radius: 26, stops: [[0, '#ff4060'], [1, 'rgba(40,80,255,0.4)']] } } });
+        frame.submit({ type: 'shape', layer: 3, geometry: { type: 'rect', size: [30, 30], radius: 5 }, position: [70, 62], material: { fill: '#ffcc22' } });
+        frame.beginPass({ layer: { scale: 1, blend: 'normal', opacity: .9, effects: [{ type: 'vignette', strength: 1, radius: .2, softness: .4, color: '#ff0000' }] }, clear_color: 'transparent' });
+        frame.submit({ type: 'shape', geometry: { type: 'ellipse', radii: [30, 20] }, position: [120, 45], material: { fill: '#e0e0ff' } });
+        frame.endPass();
+        render.endFrame();
+    };
+    const grab = () => { const c = surfaces.at(-1), out = Object.assign(document.createElement('canvas'), { width: W, height: H }), ctx = out.getContext('2d'); ctx.drawImage(c, 0, 0); return [...ctx.getImageData(0, 0, W, H).data]; };
+    draw(); const canvas = grab(); await render.setRenderer('webgl'); const capabilities = render.getCapabilities(); draw(); const webgl = grab(); render.dispose();
+    return { W, H, canvas, webgl, capabilities };
+};
+
+test('WebGL draws effects as Canvas does: a grade and grain on one layer, a vignette on a layer pass, and grade, vignette and grain on the frame', { skip: !chromium && 'Playwright is not installed' }, async () => {
+    for (const options of [{ frame_effects: false }, {}, { pixel_ratio: 2 }]) {
+        const result = await inBrowser(effects, options), { mean, share, worst } = compare(result);
+        assert.ok(['effect:grade', 'effect:vignette', 'effect:grain'].every(need => result.capabilities.includes(need)));
+        assert.ok(mean < 2.5, `mean channel difference ${mean.toFixed(2)} (${JSON.stringify(options)})`); assert.ok(share < .02, `${(share * 100).toFixed(2)}% of pixels differ by more than 24, worst ${worst} (${JSON.stringify(options)})`);
+    }
+});

@@ -107,6 +107,28 @@ frame.endPass();
 
 A layer pass (`beginPass({layer:{scale = 1, blend = 'normal', opacity = 1}, clear_color})`) draws into a fresh off-screen surface the size of its enclosing pass (times `scale`, for a cheaper softer layer), cleared to `clear_color`, and `endPass` lays it over that pass at `opacity` with `blend`. Its packets' blends act only on the layer, and its pictures paint their own base (`layered`), so a light layer's dark with its cuts can be cached. A layer pass takes no target or viewport and cannot open another pass. A backend declares the `layer` capability.
 
+### Effects (`effects.mjs`)
+
+Effects are done to a finished image: a stack is a list of `{type, ...fields}` applied in order. `EFFECTS` lists each type with its defaults, `effect(spec)` checks one (unknown types, fields or values out of range throw), `effectStack(value, resolve)` reads a list or a preset, and `validateEffectsPreset` checks an `effects` resource for the Directory.
+
+| Type | Fields (defaults) | What it does |
+|---|---|---|
+| `grade` | `exposure` 0, `contrast` 1, `saturation` 1, `tint` `#ffffff`, `tint_amount` 0 | Exposure in stops, then contrast and saturation (CSS's brightness, contrast, saturate on straight colour), then the tint multiplied in. |
+| `vignette` | `strength` .5, `radius` .55, `softness` .45, `color` `#000000` | The edges drawn toward `color`: none inside `radius`, `strength` at `radius + softness` (fractions of the centre-to-corner distance). |
+| `grain` | `amount` .08, `size` 1, `animated` true | Film noise laid over by overlay, each grain `size` pass units; animated grain jumps every frame. |
+
+Stacks go three places:
+
+```js
+render.setEffects({preset:'engine:film', grain:{amount:.12}});   // the whole frame, every frame, until changed (null removes)
+render.setLayerEffects(3, [{type:'grade', saturation:0}]);       // the packets of layer 3 alone
+frame.beginPass({layer:{effects:[{type:'vignette', strength:.8}]}, clear_color:'transparent'});   // one layer pass
+```
+
+A preset is `{preset: id, ...changes}`: the `effects` resource `id` read from the world's data (`asset_library`), each of its effects taking the changes under its type; changing a type the preset lacks throws. The engine library ships `engine:film`, `engine:neon_night` and `engine:foggy_dawn`. The frame's stack is done last, over everything. A layer number's stack splits each frame pass where that layer's packets are (packets are sorted by layer first): they are drawn on a transparent layer pass of their own, the effects are done to it alone, and it is laid over what is under it; the packets above it carry on over the result. A layer pass's stack is done before it is laid over its pass. `frame.setEffects` and `frame.setLayerEffects` set them for one frame on a bare `renderFrame`; the finished frame carries `effects`.
+
+A backend declares `effect:<type>` for each type it draws; the render system refuses a frame needing another. Canvas and WebGL draw all three alike (the grain is one texture, `grainPixels`, at the same offsets, `grainOffset`, on both). Canvas grades through its `filter`, tints with `multiply`, rings the vignette with a radial gradient and lays the grain with `overlay`, keeping the image's shape; WebGL does each in one full-surface shader pass between two kept surfaces, the last written straight to the screen. Cost: WebGL pays one full-screen pass per effect. Canvas skips the shape-keeping copies when the screen is cleared opaque and nothing cuts holes in it, and skips a grade's filter when only its tint changes; a grade's filter runs on the GPU in an accelerated browser but is about 30 ms at 2400×1600 where Canvas is drawn in software, so a game falling back to software Canvas should keep to tints, vignettes and grain.
+
 `endPass` creates a continuation of the previous pass without clearing it. Default pass viewport dimensions inherit from the enclosing pass; supply dimensions explicitly when using a cache-sized coordinate system. Targets have fixed physical pixel dimensions, while pass viewport dimensions define logical coordinates. Scaling is handled by the backend. A pass cannot sample the target it is currently writing.
 
 `beginFrame`/`endFrame`/`abortFrame` belong to the runtime's render lifecycle. Producers only clear/submit/open/close passes on the supplied frame. A producer failure aborts the partial frame and stops scheduling. Rendering is synchronous once resources are prepared.
@@ -273,6 +295,7 @@ Screen coordinates are logical viewport units; client conversions account for th
 | `getSurfaceBounds()` | Data-only CSS bounds for pointer conversion. |
 | `onFrameRendered(handler)` | Successful backend frame completion with immutable written `targets`; cache bookkeeping only, no resource mutation during callbacks. |
 | `onSurfaceChanged(handler)` | Platform composition notification; returns unsubscribe. The notification contains the host-supplied surface, never its context. |
+| `setEffects(stack)`, `setLayerEffects(layer, stack)`, `getEffects()` | Effects on the whole frame or on one packet layer number, kept until changed; a stack is a list of effects or `{preset, ...changes}` (see Effects). `getEffects()` is `{frame, layers}`. |
 | `getVisibleEntities({blend,margin,...filters})` | Native shared-index query using render extents. |
 | `setHeightView({eye, lean=1} \| null)`, `getHeightView()` | Leans heights toward the camera as a camera `eye` world units up sees them: `drawLooks` draws each component layer in the plane of its top (scaled about the camera by `heightScale`), and a layer with `sides` first fills the faces of its outline's hull that the camera sees, from its base plane to its top plane. `null` (the default) draws flat. |
 | `pickAllAt([x,y],{bounds,kind,tag,property,xray=true,ignore})`, `pickAt([x,y],options)` | What is at a world point, top first as a ray from the camera meets it: higher `look.layer`, then the taller entity (`entity.height`), then the later one. Each hit is `{entity,body,position,height,layer}`; `bounds` is `collision` (default) or `render`, tested exactly with `containsPoint`. `pickAt` is the top hit or null and defaults to `xray: false`, so a top thing that fails the filters blocks it. |
@@ -281,7 +304,7 @@ Screen coordinates are logical viewport units; client conversions account for th
 | `getStatistics()` | Packet/pass counts and storage capacity, resource count and renderer ID. |
 | `dispose()`, `disposed` | Release backend resources/subscriptions and prevent resurrection. |
 
-Frames declare `format_version:1`; the Canvas backend rejects unknown versions. Backends borrow completed frame buffers for their synchronous render call. They must not retain/mutate pooled packets across frames; inspection tools use `getFrameSnapshot`. For standalone producers, `new renderFrame()` supplies `begin(view,options)`, `clear`, `submit`, `beginPass`, `endPass`, `finish`, `abort`, `snapshot` and `getStatistics`. `finish` borrows pooled data; `snapshot` explicitly copies it. A frame rejects submission after completion. Offscreen passes preserve submission dependencies; sorting happens only within each pass.
+Frames declare `format_version:1`; the Canvas backend rejects unknown versions. Backends borrow completed frame buffers for their synchronous render call. They must not retain/mutate pooled packets across frames; inspection tools use `getFrameSnapshot`. For standalone producers, `new renderFrame()` supplies `begin(view,options)`, `clear`, `submit`, `beginPass`, `endPass`, `setEffects`, `setLayerEffects`, `finish`, `abort`, `snapshot` and `getStatistics`. `finish` borrows pooled data; `snapshot` explicitly copies it. A frame rejects submission after completion. Offscreen passes preserve submission dependencies; sorting happens only within each pass.
 
 ## Backend contract and WebGL work
 
@@ -295,7 +318,7 @@ Canvas implements the whole packet/material/target contract. WebGL implements th
 
 ### WebGL backend (`webgl.mjs`)
 
-`new webglRenderer({decode_image, create_surface, max_picture_bytes = 64 MB, densities = [1, 1.5, 2, 3, 4]})` draws the packet contract with WebGL 2 on a fresh canvas (`initialize` asks it for a `webgl2` context with a stencil and throws when there is none, so the render system keeps the old backend). The engine registers it as `webgl`. `WEBGL_CAPABILITIES` is what it declares: every packet type, geometry, both gradients, patterns, clips, shadows, blur, dashes, targets, layers and pictures, and the blends `normal`, `add`, `multiply`, `screen`, `source-atop`, `destination-out` and `destination-over`. A blurred or shadowed packet is drawn sharp on a kept scratch surface around it (smaller when the blur is wide), blurred there one direction at a time (across and down, or along and across a directional blur's angle) and laid back under its clips and blend; a shadow is cast from the blurred packet. Not yet: the blends that read the destination per pixel (`overlay`, `soft-light`, `lighten`, `darken`) and those Canvas applies to the whole surface outside the shape (`source-in`, `source-out`, `destination-in`). `multiply` is exact over an opaque destination, which is where the engine uses it (a light layer over the scene).
+`new webglRenderer({decode_image, create_surface, max_picture_bytes = 64 MB, densities = [1, 1.5, 2, 3, 4]})` draws the packet contract with WebGL 2 on a fresh canvas (`initialize` asks it for a `webgl2` context with a stencil and throws when there is none, so the render system keeps the old backend). The engine registers it as `webgl`. `WEBGL_CAPABILITIES` is what it declares: every packet type, geometry, both gradients, patterns, clips, shadows, blur, dashes, targets, layers, pictures and the effects `grade`, `vignette` and `grain`, and the blends `normal`, `add`, `multiply`, `screen`, `source-atop`, `destination-out` and `destination-over`. A blurred or shadowed packet is drawn sharp on a kept scratch surface around it (smaller when the blur is wide), blurred there one direction at a time (across and down, or along and across a directional blur's angle) and laid back under its clips and blend; a shadow is cast from the blurred packet. Not yet: the blends that read the destination per pixel (`overlay`, `soft-light`, `lighten`, `darken`) and those Canvas applies to the whole surface outside the shape (`source-in`, `source-out`, `destination-in`). `multiply` is exact over an opaque destination, which is where the engine uses it (a light layer over the scene).
 
 How it draws, so its results match Canvas:
 
@@ -305,7 +328,7 @@ How it draws, so its results match Canvas:
 - **Text** is a texture of the line, rasterized by the platform through canvas.mjs's `rasterizeCanvasText` (the one place 2D Canvas is used for WebGL) at the view's scale, and cached; `measureText` is `measureCanvasText`, the same numbers as Canvas. Text cannot be filled with a pattern.
 - `statistics` gives `{pictures, picture_bytes, texts, ramps, resources}`.
 
-`tools/test-webgl-pixels.mjs` draws one scene through `renderSystem` on Canvas, switches to WebGL on a fresh canvas, draws it again and compares them pixel by pixel (also at DPR 2 under a turned, zoomed camera), then switches back. `tests/webgl.test.mjs` checks the colour reading, outlines, strokes, dashes and the declared subset without a GPU.
+`tools/test-webgl-pixels.mjs` draws one scene through `renderSystem` on Canvas, switches to WebGL on a fresh canvas, draws it again and compares them pixel by pixel (also at DPR 2 under a turned, zoomed camera), then switches back; it compares blur, shadows and effects the same way. `tests/webgl.test.mjs` checks the colour reading, outlines, strokes, dashes and the declared subset without a GPU.
 
 Surface notifications are for platform wiring/queries; await the mount Promise before another resource/backend mutation.
 

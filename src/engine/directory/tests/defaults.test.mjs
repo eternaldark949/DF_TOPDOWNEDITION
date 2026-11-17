@@ -37,3 +37,14 @@ test('door kinds are library data the map builder reads', async () => {
     assert.equal(leaves.length, 2); assert.ok(leaves.every(e => e.joints?.[0].constraint_type === 'hinge'));
     assert.throws(() => validateDoorKind({ name: 'x', leaves: [{ from: [0, 0], to: [1, 0], motion: 'hinge' }] }), /pivot/);
 });
+
+test('the engine library ships effect presets a world reads by id, with changes by type', async () => {
+    const { physicsSystem } = await import('../../basement/physics/index.mjs'), { renderSystem, cameraSystem } = await import('../../basement/rendering/index.mjs');
+    const registry = createEngineRegistry();
+    for (const id of ['engine:film', 'engine:neon_night', 'engine:foggy_dawn']) assert.equal(registry.getResource(id).kind, 'effects');
+    const render = new renderSystem({ physics_system: new physicsSystem({ asset_library: registry }), camera: new cameraSystem({ viewport: { width: 10, height: 10 } }) });
+    render.setEffects({ preset: 'engine:film', grain: { amount: .2 } });
+    assert.deepEqual(render.getEffects().frame.map(e => e.type), ['grade', 'vignette', 'grain']); assert.equal(render.getEffects().frame[2].amount, .2);
+    assert.throws(() => validateLibrary({ library_id: 'bad', resources: { x: { kind: 'effects', effects: [{ type: 'grain', amount: 3 }] } } }), /bad:x\.effects\[0\]/);
+    render.dispose();
+});

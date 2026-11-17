@@ -25,7 +25,7 @@
 //                from its start. A map door names the kind in its `type`. The Basement map builder
 //                has the full rules and the built-in kinds (plain, sliding, hinged, arch).
 import { plain } from './values.mjs';
-import { DRAWING, MATERIAL } from '../basement/rendering/index.mjs';
+import { DRAWING, MATERIAL, validateEffectsPreset } from '../basement/rendering/index.mjs';
 
 export const STRUCTURES = Object.freeze({
     prop_catalog: 'A catalog of prop types and the families they are presets of: { types: { <type>: { defaults, movable?, blocks_light?, light? } }, families?: { <family>: { look: { <field>: { kind, default } } } } }.',
@@ -173,7 +173,7 @@ export function validateMaterial(material, where = 'material') {
     }
     return material;
 }
-const VALIDATORS = { drawing: validateDrawing, material: validateMaterial, prop_catalog: validatePropCatalog, skeleton: validateSkeleton, clip_set: validateClipSet, locomotion: validateLocomotion, door_kind: validateDoorKind };
+const VALIDATORS = { drawing: validateDrawing, material: validateMaterial, prop_catalog: validatePropCatalog, skeleton: validateSkeleton, clip_set: validateClipSet, locomotion: validateLocomotion, door_kind: validateDoorKind, effects: validateEffectsPreset };
 /** Validates every resource of a library whose kind has a structure here; other kinds pass through. Returns the library. */
 export function validateLibrary(library) {
     for (const [id, resource] of Object.entries(library?.resources ?? {})) VALIDATORS[resource?.kind]?.(resource, `${library.library_id}:${id}`);
