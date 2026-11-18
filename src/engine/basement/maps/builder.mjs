@@ -95,10 +95,10 @@ export function buildMapPackets(definition, { templates = {}, decorate = null, p
     // shape (a rectangle, circle, ellipse, polygon, curve, line or capsule); it is placed at their centre and drawn back by that much, so a texture stays anchored to the map.
     const floor_layer = definition.floor_layer ?? -100;
     (definition.floors ?? []).forEach((step, i) => {
-        const { elevation = 0, ...art } = step, points = floorPoints(art, i);
+        const { elevation = 0, thickness = 0, sides, ...art } = step, points = floorPoints(art, i);
         const xs = points.map(q => q[0]), ys = points.map(q => q[1]), [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)], at = [(x0 + x1) / 2, (y0 + y1) / 2];
         push('floors', i, step, { ...kind_of('floor'), position: at, elevation, render_shape: { shape_type: 'box', dimensions: [Math.max(x1 - x0, 1e-3), Math.max(y1 - y0, 1e-3)] },
-            components: [{ name: 'floor', layers: [{ layer: 0, height: 0, thickness: 0, solid: false, steps: [{ shape: 'group', x: -at[0], y: -at[1], steps: [art] }] }] }],
+            components: [{ name: 'floor', layers: [{ layer: 0, height: 0, thickness: finite(thickness, `floor ${i} thickness`), solid: false, ...(sides === undefined ? {} : { sides }), steps: [{ shape: 'group', x: -at[0], y: -at[1], steps: [art] }] }] }],
             data: { role: 'floor', authored_id: `floor_${i}`, look: { layer: floor_layer, depth: i * 1e-6 } } });
     });
 

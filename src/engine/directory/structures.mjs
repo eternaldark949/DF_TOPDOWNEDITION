@@ -203,7 +203,7 @@ export function validateMap(map, where = 'map') {
     for (const key of MAP_LISTS) if (map[key] !== undefined && !(Array.isArray(map[key]) && map[key].every(plain))) fail(where, `${key} is a list of objects`);
     if (map.rooms !== undefined && !(plain(map.rooms) && Object.values(map.rooms).every(plain))) fail(where, 'rooms are { id: room }');
     if (map.wall_look !== undefined && !(plain(map.wall_look) && typeof map.wall_look.material === 'string')) fail(where, 'wall_look is { material, sides?, height?, layer? }');
-    if (map.floors?.length) validateDrawing({ steps: map.floors.map(({ elevation, ...step }) => step) }, `${where}.floors`);
+    if (map.floors?.length) validateDrawing({ steps: map.floors.map(({ elevation, thickness, sides, ...step }) => step) }, `${where}.floors`);
     return map;
 }
 /** The map builder's definition of the map resource `id`: a detached copy, its `setting` as the builder's `kind` and its id as `map_id`. */

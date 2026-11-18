@@ -346,4 +346,7 @@ test('floors are drawing steps in map space, walls take a drawn look, and a plac
     assert.throws(() => buildMapPackets({ floors: [{ shape: 'path', commands: [] }] }), /floor/i);
     const [inlay] = buildMapPackets({ floors: [{ shape: 'group', x: 100, y: 0, steps: [{ shape: 'rectangle', x: 0, y: 0, width: 10, height: 10 }, { shape: 'circle', x: 50, y: 50, radius: 5 }] }] }).entries.map(e => e.packet);
     assert.deepEqual(inlay.position, [127.5, 27.5], 'a group is one floor entity, bounded by its children where it places them'); assert.deepEqual(inlay.render_shape.dimensions, [55, 55]);
+    const [kerb] = buildMapPackets({ floors: [{ shape: 'rectangle', x: 0, y: 0, width: 100, height: 4, fill: '#3b3542', thickness: 6, sides: { material: 'city:kerb' } }] }).entries.map(e => e.packet);
+    assert.equal(kerb.components[0].layers[0].thickness, 6, 'a floor step can stand up a little (a kerb), its faces drawn in its sides');
+    assert.deepEqual(kerb.components[0].layers[0].sides, { material: 'city:kerb' }); assert.equal(kerb.components[0].layers[0].solid, false, 'and still stops nothing');
 });
