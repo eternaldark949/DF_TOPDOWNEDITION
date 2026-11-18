@@ -132,7 +132,7 @@ export class canvasRenderer {
     releaseResource(id){const entry=this.#resources.get(id);if(!entry)return;this.#resources.delete(id);this.#release(entry);}
     #paint(ctx,paint){
         if(typeof paint==='string'||paint===null)return paint;
-        if(paint.type==='pattern')return ctx.createPattern(this.#resources.get(paint.image).image,paint.repeat);
+        if(paint.type==='pattern'){const pattern=ctx.createPattern(this.#resources.get(paint.image).image,paint.repeat);if(paint.matrix){const [a,b,c,d,e,f]=paint.matrix;pattern.setTransform({a,b,c,d,e,f});}return pattern;}
         const gradient=paint.type==='linear'?ctx.createLinearGradient(...paint.from,...paint.to):ctx.createRadialGradient(...paint.from,paint.inner_radius,...paint.to,paint.outer_radius);
         for(const [offset,color]of paint.stops)gradient.addColorStop(offset,color);return gradient;
     }

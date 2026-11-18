@@ -44,12 +44,12 @@ void main(){v_local=a_position;vec3 p=vec3(a_position,1.);gl_Position=vec4(dot(u
 // the cover pass must still reset the stencil there.
 const FRAGMENT=`#version 300 es
 precision highp float;in vec2 v_local;
-uniform int u_mode;uniform vec4 u_color,u_points,u_uv;uniform vec2 u_radii,u_repeat;uniform float u_opacity;uniform sampler2D u_texture;out vec4 color;
+uniform int u_mode;uniform vec4 u_color,u_points,u_uv;uniform vec3 u_pat0,u_pat1;uniform vec2 u_radii,u_repeat;uniform float u_opacity;uniform sampler2D u_texture;out vec4 color;
 void main(){
  if(u_mode==0){color=u_color;return;}
  if(u_mode==4){color=texture(u_texture,v_local*u_uv.xy+u_uv.zw)*u_opacity;return;}
  if(u_mode==5){color=u_color*texture(u_texture,v_local*u_uv.xy+u_uv.zw).a;return;}
- if(u_mode==3){vec2 uv=v_local*u_uv.xy;bool out_x=u_repeat.x<.5&&(uv.x<0.||uv.x>1.),out_y=u_repeat.y<.5&&(uv.y<0.||uv.y>1.);color=out_x||out_y?vec4(0):texture(u_texture,uv)*u_opacity;return;}
+ if(u_mode==3){vec3 q=vec3(v_local,1.);vec2 uv=vec2(dot(u_pat0,q),dot(u_pat1,q))*u_uv.xy+u_uv.zw;bool out_x=u_repeat.x<.5&&(uv.x<0.||uv.x>1.),out_y=u_repeat.y<.5&&(uv.y<0.||uv.y>1.);color=out_x||out_y?vec4(0):texture(u_texture,uv)*u_opacity;return;}
  float t;
  if(u_mode==1){vec2 d=u_points.zw-u_points.xy;float l=dot(d,d);if(l<1e-12){color=vec4(0);return;}t=dot(v_local-u_points.xy,d)/l;}
  else{
@@ -169,7 +169,7 @@ export class webglRenderer {
         if(!gl.getProgramParameter(post,gl.LINK_STATUS))throw new Error(`WebGL program: ${gl.getProgramInfoLog(post)}`);
         this.#postProgram=post;gl.useProgram(post);for(const name of ['u_row0','u_row1','u_texture','u_grain','u_type','u_size','u_a','u_b','u_glow0','u_glow1','u_glow2','u_glow3'])this.#postUniforms[name]=gl.getUniformLocation(post,name);gl.uniform1i(this.#postUniforms.u_texture,0);gl.uniform1i(this.#postUniforms.u_grain,1);for(let i=0;i<4;i++)gl.uniform1i(this.#postUniforms[`u_glow${i}`],2+i);
         gl.useProgram(program);
-        for(const name of ['u_row0','u_row1','u_mode','u_color','u_points','u_uv','u_radii','u_repeat','u_opacity','u_texture'])this.#uniforms[name]=gl.getUniformLocation(program,name);
+        for(const name of ['u_row0','u_row1','u_mode','u_color','u_points','u_uv','u_pat0','u_pat1','u_radii','u_repeat','u_opacity','u_texture'])this.#uniforms[name]=gl.getUniformLocation(program,name);
         gl.uniform1i(this.#uniforms.u_texture,0);
         this.#vao=gl.createVertexArray();gl.bindVertexArray(this.#vao);this.#buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,this.#buffer);gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
         const sampler=wrap=>{const s=gl.createSampler();gl.samplerParameteri(s,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.samplerParameteri(s,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.samplerParameteri(s,gl.TEXTURE_WRAP_S,wrap);gl.samplerParameteri(s,gl.TEXTURE_WRAP_T,wrap);return s;};
@@ -257,7 +257,9 @@ export class webglRenderer {
         gl.uniform1f(u.u_opacity,opacity);gl.activeTexture(gl.TEXTURE0);
         if(paint.type==='pattern'){
             const image=this.#resources.get(paint.image);gl.uniform1i(u.u_mode,3);gl.bindTexture(gl.TEXTURE_2D,image.texture);gl.bindSampler(0,this.#samplers.repeat);
-            gl.uniform4f(u.u_uv,1/image.width,1/image.height,0,0);gl.uniform2f(u.u_repeat,paint.repeat==='repeat'||paint.repeat==='repeat-x'?1:0,paint.repeat==='repeat'||paint.repeat==='repeat-y'?1:0);return;
+            // Pattern pixels from the shape's local space: the inverse of the pattern's matrix. A target is stored upside down.
+            const [a,b,c,d,e,f]=paint.matrix??[1,0,0,1,0,0],det=a*d-b*c;gl.uniform3f(u.u_pat0,d/det,-c/det,(c*f-d*e)/det);gl.uniform3f(u.u_pat1,-b/det,a/det,(b*e-a*f)/det);
+            if(image.flip)gl.uniform4f(u.u_uv,1/image.width,-1/image.height,0,1);else gl.uniform4f(u.u_uv,1/image.width,1/image.height,0,0);gl.uniform2f(u.u_repeat,paint.repeat==='repeat'||paint.repeat==='repeat-x'?1:0,paint.repeat==='repeat'||paint.repeat==='repeat-y'?1:0);return;
         }
         gl.uniform1i(u.u_mode,paint.type==='linear'?1:2);gl.uniform4f(u.u_points,...paint.from,...paint.to);gl.uniform2f(u.u_radii,paint.inner_radius??0,paint.outer_radius??0);
         gl.bindTexture(gl.TEXTURE_2D,this.#ramp(paint.stops));gl.bindSampler(0,this.#samplers.clamp);

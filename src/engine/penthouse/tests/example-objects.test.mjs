@@ -61,3 +61,24 @@ test('the cart is painted in materials its look picks: a chrome cart extends it 
     for (const template of Object.values(library.templates)) assert.ok(!JSON.stringify(template).match(/#[0-9a-f]{3,6}|rgba?\(/i), 'no colour is written in a template');
     render.dispose();
 });
+
+const floors = JSON.parse(readFileSync(new URL('../examples/floors.json', import.meta.url), 'utf8'));
+test('a texture is painted once per set of values into a tile and repeated; a material recolours it', async () => {
+    validateLibrary(floors);
+    const p = new physicsSystem({ asset_library: createEngineRegistry({ libraries: [floors] }) }), camera = new cameraSystem({ position: [0, 0], viewport: { width: 400, height: 300 } }), render = new renderSystem({ physics_system: p, camera });
+    render.registerRenderer('recording', recordingRenderer); await render.setRenderer('recording', { surface: null });
+    const floor = (x, material) => createObject(p.elements, { kind: 'decoration', components: [{ name: 'floor', layers: [{ layer: 0, steps: [{ shape: 'rectangle', x: -50, y: -50, width: 100, height: 100, material }] }] }] }, [x, 0]);
+    floor(-100, 'floors:walnut_parquet'); floor(0, 'floors:oak_parquet'); floor(100, 'floors:walnut_parquet'); p.updateState(1 / 60);
+    const draw = () => { render.beginFrame(); render.drawLooks(); render.endFrame(); return render.getFrameSnapshot(); };
+    const first = draw();
+    assert.deepEqual(first.passes.flatMap(pass => pass.packets).map(packet => packet.material.fill), ['#5a4030', '#5a4030', '#5a4030'], 'the base colour stands in the first frame');
+    await render.texturesReady();
+    const second = draw(), tiles = second.passes.filter(pass => pass.target_id !== null), fills = second.passes.flatMap(pass => pass.target_id === null ? pass.packets : []).map(packet => packet.material.fill);
+    assert.equal(tiles.length, 2, 'walnut and oak: two tiles, painted before the floors');
+    assert.deepEqual(tiles.map(pass => [pass.viewport.width, pass.viewport.height]), [[576, 128], [576, 128]], '144 × 32 units at 4 pixels a unit');
+    assert.ok(fills.every(fill => fill.type === 'pattern'), 'every floor repeats its tile');
+    assert.equal(fills[0].image, fills[2].image, 'two walnut floors share one tile'); assert.notEqual(fills[0].image, fills[1].image);
+    assert.deepEqual(fills[0].matrix.map(v => v + 0), [0.25, 0, 0, 0.25, 0, 0], 'a quarter unit a pixel');
+    assert.equal(draw().passes.filter(pass => pass.target_id !== null).length, 0, 'painted once, then only repeated');
+    render.dispose();
+});

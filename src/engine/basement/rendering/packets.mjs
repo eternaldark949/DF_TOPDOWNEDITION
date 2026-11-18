@@ -19,7 +19,7 @@ export function geometry(packet,out={}){
 }
 function paint(packet,out){
     if(packet===null)return null;if(typeof packet==='string')return color(packet);
-    if(packet?.type==='pattern'){if(!['repeat','repeat-x','repeat-y','no-repeat'].includes(packet.repeat??'repeat'))throw new TypeError('Pattern repeat is repeat, repeat-x, repeat-y or no-repeat');if(!out||typeof out!=='object')out={};out.type='pattern';out.image=identifier(packet.image);out.repeat=packet.repeat??'repeat';return out;}
+    if(packet?.type==='pattern'){if(!['repeat','repeat-x','repeat-y','no-repeat'].includes(packet.repeat??'repeat'))throw new TypeError('Pattern repeat is repeat, repeat-x, repeat-y or no-repeat');if(!out||typeof out!=='object')out={};out.type='pattern';out.image=identifier(packet.image);out.repeat=packet.repeat??'repeat';if(packet.matrix!==undefined&&packet.matrix!==null){if(!Array.isArray(packet.matrix)||packet.matrix.length!==6)throw new TypeError('A pattern matrix is [a, b, c, d, e, f]');out.matrix=packet.matrix.map(v=>finite(v,'pattern matrix'));if(!(out.matrix[0]*out.matrix[3]-out.matrix[1]*out.matrix[2]))throw new TypeError('A pattern matrix must be invertible');}else delete out.matrix;return out;}
     if(!packet||!['linear','radial'].includes(packet.type))throw new TypeError('Invalid paint');
     if(!Array.isArray(packet.stops)||packet.stops.length<2)throw new TypeError('Gradient requires stops');
     if(!out||typeof out!=='object')out={};out.type=packet.type;out.from=vector(packet.from,'gradient from',out.from);out.to=vector(packet.to,'gradient to',out.to);
@@ -84,7 +84,7 @@ export function requirements(draw,resolve,result=[]){
     if(draw.type==='picture'){if(draw.clips.length)result.push('clip');for(const clip of draw.clips){const g=clip.geometry_id?resolve(clip.geometry_id,'geometry').geometry:clip.geometry;result.push(`geometry:${g.type}`);}return result;}
     const g=draw.geometry_id?resolve(draw.geometry_id,'geometry').geometry:draw.geometry,m=draw.material_id?resolve(draw.material_id,'material').material:draw.material;
     if(g)result.push(`geometry:${g.type}`);if(draw.clips.length)result.push('clip');if(m.shadow)result.push('shadow');if(m.blur)result.push('blur');if(m.dash.length)result.push('dash');
-    for(const p of [m.fill,m.stroke])if(p&&typeof p==='object'){if(p.type==='pattern'){resolve(p.image,'image');result.push('pattern');}else result.push(`gradient:${p.type}`);}
+    for(const p of [m.fill,m.stroke])if(p&&typeof p==='object'){if(p.type==='pattern'){if(resolve(p.image,['image','target']).type==='target')result.push('target');result.push('pattern');}else result.push(`gradient:${p.type}`);}
     for(const clip of draw.clips){const g=clip.geometry_id?resolve(clip.geometry_id,'geometry').geometry:clip.geometry;result.push(`geometry:${g.type}`);}
     if(draw.resource_id&&resolve(draw.resource_id,['image','target']).type==='target')result.push('target');return result;
 }

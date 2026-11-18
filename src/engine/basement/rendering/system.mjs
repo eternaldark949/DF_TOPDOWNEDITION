@@ -30,7 +30,7 @@ const methods=['initialize','resize','render','registerResource','releaseResourc
  * host which surface is live.
  */
 export class renderSystem {
-    #createSurface=null;#lean=null;#world;#camera;#frame=new renderFrame();#renderers=new Map();#resources=new Map();#backend=null;#backendId=null;#surface=null;
+    #createSurface=null;#lean=null;#textures=new Map();#texturesWanted=[];#textureChain=Promise.resolve();#world;#camera;#frame=new renderFrame();#renderers=new Map();#resources=new Map();#backend=null;#backendId=null;#surface=null;
     #effects=Object.freeze([]);#layerEffects=new Map();#collecting=false;#busy=false;#disposed=false;#generation=0;#last=null;#surfaceListeners=new Set();#frameListeners=new Set();#requirements=[];#visible=[];
     constructor({physics_system,camera,create_surface=null}={}){if(create_surface!==null&&typeof create_surface!=='function')throw new TypeError('create_surface makes a surface for a renderer id');this.#createSurface=create_surface;if(!physics_system?.queryEntitiesInBounds||!camera?.getView)throw new TypeError('renderSystem requires native world and camera');this.#world=physics_system;this.#camera=camera;}
     get renderer_id(){return this.#backendId;}
@@ -58,6 +58,7 @@ export class renderSystem {
             for(const [id,resource]of this.#resources)await next.registerResource(id,resource);
             if(this.#disposed||generation!==this.#generation)throw new Error('Renderer preparation was cancelled');
             const old=this.#backend;this.#backend=next;this.#backendId=renderer_id;this.#surface=surface;installed=true;
+            for(const entry of this.#textures.values())if(entry.state==='painted')entry.state='ready';
             const errors=[];
             try{old?.dispose();}catch(error){errors.push(error);}
             for(const handler of this.#surfaceListeners)try{handler(Object.freeze({surface,renderer_id}));}catch(error){errors.push(error);}
@@ -87,6 +88,41 @@ export class renderSystem {
      */
     setHeightView(options){this.#live();if(options===null){this.#lean=null;return this;}const {eye,lean=1}=options??{};new heightView({camera:[0,0],eye,lean}).k(0);if(!(eye>0))throw new RangeError('A height view needs an eye above the ground');this.#lean={eye,lean};return this;}
     getHeightView(){return this.#lean?{...this.#lean}:null;}
+    /**
+     * A paint that names a texture, `{type: 'pattern', texture, values, scale, rotation, offset, repeat}`, as the pattern
+     * the backend draws: the texture resource's tile, painted once for these values into a target of its own and
+     * repeated, `pixels_per_unit` pixels to a world unit, turned by `rotation`, scaled by `scale` and moved by `offset`
+     * in the shape's space. The first frame a tile is asked for it is not painted yet, so the texture's `base` colour
+     * stands in; its target is made after that frame and painted at the start of the next. Any other paint is returned.
+     */
+    resolvePaint(paint){
+        if(!paint||typeof paint!=='object'||paint.type!=='pattern'||paint.texture===undefined)return paint;
+        const id=paint.texture,texture=this.#world.elements.asset_library.getResource(id);if(texture?.kind!=='texture')throw new TypeError(`${id} is not a texture`);
+        const values={...(texture.values??{}),...(paint.values??{})},key=`${id} ${JSON.stringify(values)}`;let entry=this.#textures.get(key);
+        if(!entry){const ppu=texture.pixels_per_unit??4,[w,h]=texture.size;entry={key,resource_id:`texture:${this.#textures.size}:${id}`,size:[w,h],pixels:[Math.max(1,Math.round(w*ppu)),Math.max(1,Math.round(h*ppu))],ppu,steps:texture.steps,values,state:'wanted'};this.#textures.set(key,entry);this.#texturesWanted.push(entry);}
+        if(entry.state!=='painted')return texture.base;
+        const scale=paint.scale??1,turn=paint.rotation??0,[ox,oy]=paint.offset??[0,0],[sx,sy]=[entry.size[0]/entry.pixels[0]*scale,entry.size[1]/entry.pixels[1]*scale],c=Math.cos(turn),s=Math.sin(turn);
+        return {type:'pattern',image:entry.resource_id,repeat:paint.repeat??'repeat',matrix:[c*sx,s*sx,-s*sy,c*sy,ox,oy]};
+    }
+    #textured(packet){const m=packet.material;if(!m)return packet;const fill=this.resolvePaint(m.fill),stroke=this.resolvePaint(m.stroke);return fill===m.fill&&stroke===m.stroke?packet:{...packet,material:{...m,fill,stroke}};}
+    // After a frame: make a target for each tile asked for (a target is made at once; the promise settles before the next frame).
+    /** Settles once every tile asked for so far has its target (for tests and loading screens). */
+    texturesReady(){return this.#textureChain;}
+    #registerTextures(){
+        for(const entry of this.#texturesWanted.splice(0)){entry.state='registering';
+            this.#textureChain=this.#textureChain.then(()=>this.registerResource(entry.resource_id,{type:'target',width:entry.pixels[0],height:entry.pixels[1]})).then(()=>{entry.state='ready';},error=>{entry.state='failed';entry.error=error;});}
+    }
+    // At the start of a frame: paint every tile whose target is ready, before anything that repeats it. A tile's
+    // shapes are drawn nine times, shifted a tile each way, so a shape across an edge comes back on the other side.
+    #paintTextures(frame){
+        for(const entry of this.#textures.values()){if(entry.state!=='ready'||!this.#backend)continue;
+            const [pw,ph]=entry.pixels,[w,h]=entry.size,scene=new artScene();
+            for(const dx of [-w,0,w])for(const dy of [-h,0,h])scene.draw(entry.steps,{at:[dx*pw/w,dy*ph/h],scale:[pw/w,ph/h],values:entry.values});
+            frame.beginPass({target_id:entry.resource_id,clear_color:'transparent',viewport:{width:pw,height:ph}});
+            for(const packet of scene.finish())frame.submit({...packet,space:'screen'});
+            frame.endPass();entry.state='painted';
+        }
+    }
     /** Draws every visible entity's look (a `drawing` asset) and its components into the open frame, at its `look.layer` and `look.depth`; a component layer's depth adds its height, so higher parts draw over lower ones. Returns how many entities it drew. */
     drawLooks(blend=1){
         this.#live();if(!this.#collecting)throw new Error('Draw looks inside an open render frame');
@@ -94,10 +130,10 @@ export class renderSystem {
         for(const {entity} of this.getVisibleEntities({blend},this.#visible)){
             if(!entity)continue;
             const look=entity.get('look',{}),layer=look.layer??0,depth=look.depth??0;let drew=false;
-            if(entity.assets?.drawing){const scene=new artScene();if(drawLook(scene,entity,source,blend,{view})){const z=entity.world_elevation??0;for(const packet of scene.finish())this.#frame.submit({...packet,layer,depth:depth+z});drew=true;}}
+            if(entity.assets?.drawing){const scene=new artScene();if(drawLook(scene,entity,source,blend,{view})){const z=entity.world_elevation??0;for(const packet of scene.finish())this.#frame.submit(this.#textured({...packet,layer,depth:depth+z}));drew=true;}}
             if(entity.has('components')){
                 let pose;const rigs=this.#world.rigs,joints=name=>{pose??=rigs?.getRig(entity)?rigs.getPose(entity,{blend,world_space:true}):null;return pose?.joints[name]??null;};
-                for(const part of drawComponents(entity,source,blend,{joints,view})){for(const packet of part.packets)this.#frame.submit({...packet,layer,depth:depth+part.depth});drew=true;}
+                for(const part of drawComponents(entity,source,blend,{joints,view})){for(const packet of part.packets)this.#frame.submit(this.#textured({...packet,layer,depth:depth+part.depth}));drew=true;}
             }
             if(drew)drawn++;
         }
@@ -144,7 +180,7 @@ export class renderSystem {
     getEffects(){return {frame:this.#effects,layers:Object.fromEntries(this.#layerEffects)};}
     beginFrame(blend=1){
         this.#live();if(this.#collecting)throw new Error('A render frame is already open');this.#collecting=true;
-        try{const frame=this.#frame.begin(this.#camera.getView(blend));if(this.#effects.length)frame.setEffects(this.#effects);for(const [layer,stack] of this.#layerEffects)frame.setLayerEffects(layer,stack);return frame;}
+        try{const frame=this.#frame.begin(this.#camera.getView(blend));if(this.#effects.length)frame.setEffects(this.#effects);for(const [layer,stack] of this.#layerEffects)frame.setLayerEffects(layer,stack);this.#paintTextures(frame);return frame;}
         catch(error){this.#collecting=false;this.#frame.abort();throw error;}
     }
     endFrame(){
@@ -165,7 +201,7 @@ export class renderSystem {
             this.#last=frame;
             if(this.#backend&&this.#frameListeners.size){const event=Object.freeze({targets:Object.freeze([...new Set(frame.passes.map(pass=>pass.target_id).filter(id=>id!==null))])});for(const handler of this.#frameListeners)handler(event);}
             return frame.packet_count;
-        }finally{this.#collecting=false;}
+        }finally{this.#collecting=false;this.#registerTextures();}
     }
     abortFrame(){this.#frame.abort();this.#collecting=false;}
     getFrameSnapshot(){this.#live();return this.#frame.snapshot();}

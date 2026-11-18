@@ -7,11 +7,11 @@ import { controlSystem } from './basement/controls/index.mjs';
 import { cameraSystem, renderSystem, canvasRenderer, recordingRenderer, webglRenderer } from './basement/rendering/index.mjs';
 import { gameLoop } from './lobby/game-loop.mjs';
 import { UNITS_PER_METRE, metres, centimetres, toMetres, isLength, readLength, readLengths } from './basement/units/index.mjs';
-import { assetLibrary, mergeDefinition, identifier, nonnegative, jsonCopy, STRUCTURES, validatePropCatalog, validateMapLayout, checkLook, validateSkeleton, validateClipSet, validateLocomotion, validateDoorKind, validateDrawing, validateMaterial, validateLibrary, doorKindsOf, ENGINE_LIBRARIES, createEngineRegistry, resolvePlacement, resolveLayout, resolvePropLook, isMovable } from './directory/index.mjs';
+import { assetLibrary, mergeDefinition, identifier, nonnegative, jsonCopy, STRUCTURES, validatePropCatalog, validateMapLayout, checkLook, validateSkeleton, validateClipSet, validateLocomotion, validateDoorKind, validateDrawing, validateMaterial, validateTexture, validateLibrary, doorKindsOf, ENGINE_LIBRARIES, createEngineRegistry, resolvePlacement, resolveLayout, resolvePropLook, isMovable } from './directory/index.mjs';
 import { humanoid, objectPacket, createObject } from './penthouse/index.mjs';
 
 /** What each jack carries besides the running systems: the Directory's functions and the Penthouse's prefabs. */
-const DIRECTORY = Object.freeze({ assetLibrary, mergeDefinition, identifier, nonnegative, jsonCopy, STRUCTURES, validatePropCatalog, validateMapLayout, checkLook, validateSkeleton, validateClipSet, validateLocomotion, validateDoorKind, validateDrawing, validateMaterial, validateLibrary, doorKindsOf, ENGINE_LIBRARIES, createEngineRegistry, resolvePlacement, resolveLayout, resolvePropLook, isMovable });
+const DIRECTORY = Object.freeze({ assetLibrary, mergeDefinition, identifier, nonnegative, jsonCopy, STRUCTURES, validatePropCatalog, validateMapLayout, checkLook, validateSkeleton, validateClipSet, validateLocomotion, validateDoorKind, validateDrawing, validateMaterial, validateTexture, validateLibrary, doorKindsOf, ENGINE_LIBRARIES, createEngineRegistry, resolvePlacement, resolveLayout, resolvePropLook, isMovable });
 const UNITS = Object.freeze({ UNITS_PER_METRE, metres, centimetres, toMetres, isLength, readLength, readLengths });
 const PENTHOUSE = Object.freeze({ humanoid, objectPacket, createObject });
 

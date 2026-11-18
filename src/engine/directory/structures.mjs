@@ -35,7 +35,8 @@ export const STRUCTURES = Object.freeze({
     locomotion: 'Which clips stand and walk: { idle, walk, stride (px per cycle), moving_speed (px/s) }.',
     door_kind: 'The leaves that fill a door\'s opening: { name, leaves: [{ from, to, motion, travel?, pivot?, hinge?, suffix? }] }.',
     drawing: 'An object\'s art in its own space, back to front: { steps: [{ shape, material?, solid?, ...fields }] }; shape is a drawing shape or group ({ shape: "group", x?, y?, rotation?, scale?, steps }). "$name" values are read from the object\'s look.',
-    material: 'How a substance looks and behaves: { fill?, stroke?, line_width?, line_cap?, line_join?, dash?, alpha?, blend?, shadow?, surface?: { friction?, restitution?, hit_sound?, hit_effect?, footstep? } }; fill may be a colour, a gradient or a pattern { type: "pattern", image, repeat? }.'
+    material: 'How a substance looks and behaves: { fill?, stroke?, line_width?, line_cap?, line_join?, dash?, alpha?, blend?, shadow?, surface?: { friction?, restitution?, hit_sound?, hit_effect?, footstep? } }; fill may be a colour, a gradient or a pattern { type: "pattern", image, repeat? }.',
+    texture: 'A surface that repeats, drawn once per set of values and tiled: { size: [w, h] (world units), steps (drawing steps, "$name" read from values), values (the default colours), base (the colour shown until the tile is ready), pixels_per_unit? (default 4) }. A material repeats it with fill: { type: "pattern", texture, values?, scale?, rotation?, offset? }.',
 });
 
 const fail = (where, message) => { throw new TypeError(`${where}: ${message}`); };
@@ -161,6 +162,19 @@ export function validateDrawing(drawing, where = 'drawing') {
 }
 const SURFACE_FIELDS = ['friction', 'restitution', 'hit_sound', 'hit_effect', 'footstep'];
 /** A material resource: paint fields and an optional physical surface, nothing else. */
+/** Throws unless `texture` is a texture: a tile size, its drawing steps, default values and a base colour. Returns it. */
+export function validateTexture(texture, where = 'texture') {
+    if (!plain(texture)) fail(where, 'a texture is { size, steps, values, base }');
+    for (const key of Object.keys(texture)) if (!['kind', 'size', 'steps', 'values', 'base', 'pixels_per_unit'].includes(key)) fail(where, `unknown field ${key} (a texture holds size, steps, values, base, pixels_per_unit)`);
+    if (!Array.isArray(texture.size) || texture.size.length !== 2 || !texture.size.every(v => Number.isFinite(v) && v > 0)) fail(where, 'size is [width, height] in world units');
+    if (texture.pixels_per_unit !== undefined && !(Number.isFinite(texture.pixels_per_unit) && texture.pixels_per_unit > 0 && texture.pixels_per_unit <= 16)) fail(where, 'pixels_per_unit is in (0, 16]');
+    if (typeof texture.base !== 'string' || !COLOR.test(texture.base.trim())) fail(where, 'base is the colour shown until the tile is painted');
+    if (texture.values !== undefined && !plain(texture.values)) fail(where, 'values are { name: colour }');
+    const [w, h] = texture.size, px = (texture.pixels_per_unit ?? 4) ** 2 * w * h;
+    if (px > 4096 * 4096) fail(where, 'the tile is too big: keep size × pixels_per_unit within 4096 pixels a side');
+    validateDrawing({ steps: texture.steps }, where);
+    return texture;
+}
 export function validateMaterial(material, where = 'material') {
     if (!plain(material)) fail(where, 'a material is an object');
     for (const key of Object.keys(material)) if (!MATERIAL.paint.includes(key) && !MATERIAL.other.includes(key)) fail(where, `unknown field ${key} (a material holds ${[...MATERIAL.paint, ...MATERIAL.other].join(', ')})`);
@@ -173,7 +187,7 @@ export function validateMaterial(material, where = 'material') {
     }
     return material;
 }
-const VALIDATORS = { drawing: validateDrawing, material: validateMaterial, prop_catalog: validatePropCatalog, skeleton: validateSkeleton, clip_set: validateClipSet, locomotion: validateLocomotion, door_kind: validateDoorKind, effects: validateEffectsPreset };
+const VALIDATORS = { drawing: validateDrawing, material: validateMaterial, texture: validateTexture, prop_catalog: validatePropCatalog, skeleton: validateSkeleton, clip_set: validateClipSet, locomotion: validateLocomotion, door_kind: validateDoorKind, effects: validateEffectsPreset };
 /** Validates every resource of a library whose kind has a structure here; other kinds pass through. Returns the library. */
 export function validateLibrary(library) {
     for (const [id, resource] of Object.entries(library?.resources ?? {})) VALIDATORS[resource?.kind]?.(resource, `${library.library_id}:${id}`);

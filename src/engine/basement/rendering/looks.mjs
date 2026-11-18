@@ -65,7 +65,7 @@ export function drawLook(scene,entity,source,blend=1,{view=null}={}){
     const [wx,wy]=entity.world_scale??[1,1],k=look.scale??1;
     // Leaning toward the camera, a look stands in the plane of its base's elevation.
     if(view)scene.enter({matrix:view.plane(view.k(pose.elevation??0))});
-    scene.draw(drawing.steps,{at:pose.position,rotation:pose.rotation,scale:[wx*k,wy*k],values:look.values??{},materials:name=>resource(source,qualifyResource(name,drawing_id),'material')});
+    scene.draw(drawing.steps,{at:pose.position,rotation:pose.rotation,scale:[wx*k,wy*k],values:look.values??{},materials:name=>materialOf(source,qualifyResource(name,drawing_id))});
     if(view)scene.leave();
     return true;
 }
@@ -117,7 +117,7 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null}
         const lean=view&&rise?boneLean(view,place,z1,rise):null;
         const scene=new artScene(),steps=fore===1&&!lean?layerSteps(layer,source):foreshorten(layerSteps(layer,source),fore,lean??[0,0]);
         // Leaning toward the camera: the walls from the layer's base to its top, then its shapes in the plane of its top.
-        const materials=name=>resource(source,qualifyResource(name,layer.drawing??entity.template_id??name),'material');
+        const materials=name=>materialOf(source,qualifyResource(name,layer.drawing??entity.template_id??name));
         if(view&&layer.sides)drawSides(scene,steps,place,values,sidesPaint(layer.sides,values,materials),view,z0,z1);
         if(view)scene.enter({matrix:view.plane(view.k(z1))});
         scene.draw(steps,{...place,values,materials});
@@ -165,6 +165,13 @@ function boneLean(view,{at,rotation,scale},z,rise){
     return [(wx*cos+wy*sin)/sx,(-wx*sin+wy*cos)/sy];
 }
 function layerSteps(layer,source){return layer.steps??resource(source,layer.drawing,'drawing').steps;}
+// A material record, with a texture its paint repeats named in the material's own library when written bare.
+const QUALIFIED=new WeakMap();
+function materialOf(source,id){
+    const m=resource(source,id,'material');let out=QUALIFIED.get(m);if(out)return out;
+    const paint=p=>p&&typeof p==='object'&&p.type==='pattern'&&typeof p.texture==='string'?{...p,texture:qualifyResource(p.texture,id)}:p;
+    out={...m,fill:paint(m.fill),stroke:paint(m.stroke)};if(m.fill===undefined)delete out.fill;if(m.stroke===undefined)delete out.stroke;QUALIFIED.set(m,out);return out;
+}
 function resource(source,id,kind){const value=source.getResource(id);if(value.kind!==kind)throw new TypeError(`${id} is a ${value.kind}, not a ${kind}`);return value;}
 
 // ----- Geometry -------------------------------------------------------------------------------------
