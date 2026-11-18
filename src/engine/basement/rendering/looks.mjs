@@ -117,15 +117,18 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null}
         const lean=view&&rise?boneLean(view,place,z1,rise):null;
         const scene=new artScene(),steps=fore===1&&!lean?layerSteps(layer,source):foreshorten(layerSteps(layer,source),fore,lean??[0,0]);
         // Leaning toward the camera: the walls from the layer's base to its top, then its shapes in the plane of its top.
-        if(view&&layer.sides)drawSides(scene,steps,place,values,readValues({fill:layer.sides},values).fill,view,z0,z1);
+        const materials=name=>resource(source,qualifyResource(name,layer.drawing??entity.template_id??name),'material');
+        if(view&&layer.sides)drawSides(scene,steps,place,values,sidesPaint(layer.sides,values,materials),view,z0,z1);
         if(view)scene.enter({matrix:view.plane(view.k(z1))});
-        scene.draw(steps,{...place,values,materials:name=>resource(source,qualifyResource(name,layer.drawing??entity.template_id??name),'material')});
+        scene.draw(steps,{...place,values,materials});
         if(view)scene.leave();
         return {height:z0,depth:key,layer:layer.layer,component:c.name,packets:scene.finish()};
     });
 }
 // Every visible layer with its component and the component's place in the list.
 function listLayers(components){const out=[];components.forEach((component,order)=>{for(const layer of component.layers)if(layer.visible!==false)out.push({component,layer,order});});return out.sort((a,b)=>a.layer.height-b.layer.height||a.layer.layer-b.layer.layer||a.order-b.order);}
+// A layer's sides paint: a colour, a "$look" value, or {material} (its fill, else its stroke).
+function sidesPaint(sides,values,materials){if(typeof sides==='string')return readValues({fill:sides},values).fill;const m=materials(readValues({m:sides.material},values).m);return m.fill??m.stroke;}
 /** A layer's walls, seen from above: each face of the hull of its shapes that the camera sees, from the plane of its base to the plane of its top. */
 function drawSides(scene,steps,{at,rotation,scale},values,fill,view,z0,z1){
     if(z1<=z0)return;
