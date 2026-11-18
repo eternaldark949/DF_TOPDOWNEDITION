@@ -260,7 +260,7 @@ A file that seems to fit two answers is really two files. Split it. Example: `di
 
 ## 8. Folder structure
 
-ETERNAL's layout (2026-11-12, classic code moved out 2026-11-15, the old `src/game/` cut 2026-11-16): `src/` holds `engine/` and nothing else until a game is written on it. Classic code is in `reference/classic/` (section 7). Entries marked *(to build)* do not exist yet.
+ETERNAL's layout (2026-11-12, classic code moved out 2026-11-15, the old `src/game/` cut 2026-11-16): `src/` holds `engine/` and the game's content, `game/data/` (added 2026-11-18 with ETERNAL's permission), and nothing else until the game's mechanics are written on the engine. Classic code is in `reference/classic/` (section 7). Entries marked *(to build)* do not exist yet.
 
 ```
 src/
@@ -276,6 +276,11 @@ src/
       runtime/                         gameEngine and gameLevel: the coordinator that runs the phases
     directory/                    LV2  the data layer: registry.mjs, structures.mjs, loading.mjs (to build: defaults)
     penthouse/                    LV3  prefabs (to build: humanoid/, foliage/)
+  game/
+    data/                         the game's content: Directory libraries only (.json), its README and tests/
+      maps/                       one library per map (<id>.json), its `map` resource and what only it uses
+      libraries/                  libraries any map may use (surfaces.json: plaster, stone, marble, parquet, tiles)
+      tests/                      every map validates, builds and draws
 reference/
   classic/                        read-only classic code at its original paths (section 7), and the classic GAME_DB (game-db/)
 ```
@@ -307,7 +312,7 @@ In CI (`.github/workflows/build.yml`):
   - a file in `src/engine/` imports outside `src/engine/`, or imports a level that section 3 forbids;
   - a `.mjs` file in `src/engine/` lacks its level banner on the first line, or names the game (`df_`, `apartment`, `GAME_DB`, `DFNative` and so on) outside its tests.
 
-`src/` holds only `engine/`, so the engine's tests already run with no game present.
+`src/` holds `engine/` and `game/data/`, which holds only data, so the engine's tests still run with no game present. The layout check allows `game/data/` only `.json` and `.md` files and `tests/*.test.mjs`, and CI runs `src/game/data/tests/` as well.
 
 ---
 
