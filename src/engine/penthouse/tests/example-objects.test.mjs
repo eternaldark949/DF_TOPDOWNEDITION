@@ -1,12 +1,13 @@
 // ===== LV3 PENTHOUSE =====
-// The example bar cart: one object from one data file, made of components, drawn by the engine with no drawing code.
+// The examples: objects, textures and a whole map from data files, drawn by the engine with no drawing code.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { physicsSystem } from '../../basement/physics/index.mjs';
 import { renderSystem, cameraSystem, recordingRenderer } from '../../basement/rendering/index.mjs';
 import { createEngineRegistry, validateLibrary } from '../../directory/index.mjs';
-import { createObject } from '../index.mjs';
+import { mapInstance } from '../../basement/maps/index.mjs';
+import { createObject, objectPacket } from '../index.mjs';
 
 const library = JSON.parse(readFileSync(new URL('../examples/bar-cart.json', import.meta.url), 'utf8'));
 const world = () => new physicsSystem({ asset_library: createEngineRegistry({ libraries: [library] }) });
@@ -80,5 +81,28 @@ test('a texture is painted once per set of values into a tile and repeated; a ma
     assert.equal(fills[0].image, fills[2].image, 'two walnut floors share one tile'); assert.notEqual(fills[0].image, fills[1].image);
     assert.deepEqual(fills[0].matrix.map(v => v + 0), [0.25, 0, 0, 0.25, 0, 0], 'a quarter unit a pixel');
     assert.equal(draw().passes.filter(pass => pass.target_id !== null).length, 0, 'painted once, then only repeated');
+    render.dispose();
+});
+
+test('a whole map is data: the suite\'s floors, walls, rugs and cart come from its files, its floors textured and anchored to the map', async () => {
+    const suite = JSON.parse(readFileSync(new URL('../examples/suite.json', import.meta.url), 'utf8')), definition = JSON.parse(readFileSync(new URL('../examples/suite-map.json', import.meta.url), 'utf8'));
+    validateLibrary(suite);
+    const p = new physicsSystem({ asset_library: createEngineRegistry({ libraries: [library, suite] }) });
+    const map = new mapInstance(p, definition, { make_object: (record, at, overrides) => objectPacket(p.elements.asset_library, record, at, overrides) });
+    assert.equal(map.entities('floor').length, definition.floors.length);
+    assert.equal(map.entities('wall').length, 15, 'the ten classic walls, three of them cut by five doorways');
+    assert.ok(map.entities('wall').every(w => w.components[0].layers[0].thickness === 120), 'walls 2.4 m tall');
+    const cart = map.entities('prop').find(e => e.get('object') === 'examples:bar_cart');
+    assert.deepEqual(cart.position, [619, 781]); assert.equal(cart.get('behaviour'), 'refill_drink', 'a placed object is the catalog record');
+    assert.equal(map.rooms.rooms.length, 4);
+    const camera = new cameraSystem({ position: [700, 450], viewport: { width: 1400, height: 900 } }), render = new renderSystem({ physics_system: p, camera });
+    render.registerRenderer('recording', recordingRenderer); await render.setRenderer('recording', { surface: null });
+    p.updateState(1 / 60);
+    const draw = () => { render.beginFrame(); render.drawLooks(); render.endFrame(); return render.getFrameSnapshot(); };
+    draw(); await render.texturesReady();
+    const frame = draw(), tiles = frame.passes.filter(pass => pass.target_id !== null), fills = frame.passes.flatMap(pass => pass.target_id === null ? pass.packets : []).map(packet => packet.material.fill);
+    assert.equal(tiles.length, 7, 'six floor textures and the bed rug\'s lattice, each painted once');
+    const teak = fills.find(fill => fill?.type === 'pattern' && fill.matrix[4] === 8 && fill.matrix[5] === 8);
+    assert.ok(teak, 'the teak starts at the veranda\'s corner: its offset is in map space');
     render.dispose();
 });

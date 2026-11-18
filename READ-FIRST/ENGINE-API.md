@@ -79,7 +79,7 @@ An object is like Blender's `KX_GameObject`: a name, an id, a position, a rotati
 | `switches: {traffic, walkers, ground, buildings, plants, lighting, …}` | True/false per system in the map's layout file | have for six systems |
 | `travel(exit)` | Moves the player through an exit to another map | have |
 | `spawn(record, at)` on load | Places the map's characters and props | partly: layout NPCs are not spawned natively |
-| One map drawer | Ground, buildings, plants and interiors drawn by one drawer | partly: the drawers still carry city names and there is no interior drawer |
+| One map drawer | Ground, buildings, plants and interiors drawn by one drawer | partly: a map's `floors` (textured drawing steps), `wall_look` and `object` placements are data the engine draws (the example suite map); the classic maps are not yet converted, and the city drawers still carry city names |
 
 ### Agents and navigation
 

@@ -314,3 +314,34 @@ test('lights are declared one way on a lamp, a placement or a catalog type, and 
     assert.deepEqual(declaredLight({ radius: 150, glow: .3, intensity: 0, animation: { kind: 'stutter', period: 9 } }).animation, { kind: 'stutter', period: 9, burst: .9, depth: .7, offset: 0 }, 'a faulty lamp stutters now and then');
     assert.equal(declaredLight({ size: [60, 3], rotation: .4 }).rotation, .4, 'a strip can be turned');
 });
+
+test('floors are drawing steps in map space, walls take a drawn look, and a placement can name a catalog object', () => {
+    const made = [];
+    const { entries } = buildMapPackets({
+        floor_layer: -90,
+        floors: [{ shape: 'rectangle', x: 10, y: 20, width: 100, height: 40, material: 'demo:parquet' }, { shape: 'circle', x: 200, y: 50, radius: 30, fill: '#fff', line_width: 4, elevation: 2 }],
+        wall_look: { material: 'demo:plaster', height: 120, layer: 10 },
+        walls: [{ x: 0, y: 0, w: 100, h: 8 }, { x: 0, y: 8, w: 8, h: 50, material: 'demo:stone', sides: 'demo:stone_face', height: 60 }],
+        placements: [{ object: 'demo:rug', at: [50, 40], rotation: .5 }, { object: 'demo:cart', x: 100, y: 100, width: 20, height: 10, data: { tag: 1 } }]
+    }, { make_object: (record, at, overrides) => { made.push(record); return { kind: 'decoration', position: at, ...overrides }; } });
+    const [a, b] = entries.filter(e => e.section === 'floors').map(e => e.packet);
+    assert.equal(entries[0].section, 'floors', 'floors are built first');
+    assert.deepEqual(a.position, [60, 40]); assert.deepEqual(a.render_shape.dimensions, [100, 40]);
+    assert.deepEqual(a.components[0].layers[0].steps, [{ shape: 'group', x: -60, y: -40, steps: [{ shape: 'rectangle', x: 10, y: 20, width: 100, height: 40, material: 'demo:parquet' }] }], 'drawn back by its centre, so its texture stays anchored to the map');
+    assert.deepEqual(a.data, { role: 'floor', authored_id: 'floor_0', look: { layer: -90, depth: 0 } });
+    assert.deepEqual(b.render_shape.dimensions, [64, 64], 'a stroke widens the bounds by half its width');
+    assert.equal(b.elevation, 2); assert.equal(b.components[0].layers[0].steps[0].steps[0].elevation, undefined);
+    assert.ok(b.data.look.depth > a.data.look.depth, 'later steps draw over earlier ones');
+    const [plain, stone] = entries.filter(e => e.section === 'walls').map(e => e.packet);
+    assert.deepEqual(plain.components[0].layers[0], { layer: 0, height: 0, thickness: 120, solid: false, sides: { material: 'demo:plaster' }, steps: [{ shape: 'rectangle', x: -50, y: -4, width: 100, height: 8, material: 'demo:plaster' }] });
+    assert.deepEqual(plain.collision_shape, { shape_type: 'box', dimensions: [100, 8] }, 'the look never changes what a wall stops');
+    assert.equal(stone.components[0].layers[0].thickness, 60); assert.deepEqual(stone.components[0].layers[0].sides, { material: 'demo:stone_face' });
+    assert.deepEqual(plain.data.look, { layer: 10 });
+    assert.equal(buildMapPackets({ walls: [{ x: 0, y: 0, w: 1, h: 1 }] }).entries[0].packet.components, undefined, 'a wall without a look stays undrawn');
+    const [rug, cart] = entries.filter(e => e.section === 'placements').map(e => e.packet);
+    assert.deepEqual(made, ['demo:rug', 'demo:cart']);
+    assert.deepEqual(rug.position, [50, 40]); assert.equal(rug.rotation, .5); assert.equal(rug.data.object, 'demo:rug'); assert.equal(rug.data.authored_id, 'prop_0');
+    assert.deepEqual(cart.position, [110, 105], 'without `at`, the middle of its rectangle'); assert.equal(cart.data.tag, 1);
+    assert.throws(() => buildMapPackets({ placements: [{ object: 'demo:rug', at: [0, 0] }] }), /make_object/);
+    assert.throws(() => buildMapPackets({ floors: [{ shape: 'text', text: 'x' }] }), /floor/i);
+});

@@ -43,17 +43,32 @@ export function declaredLight(light, { shadows = 'dynamic' } = {}) {
 }
 const lightShape = l => l.shape === 'strip' ? { shape_type: 'box', dimensions: l.size, local_position: l.position } : { shape_type: 'circle', radius: l.radius, local_position: l.position };
 
+// The corners of the box round one floor step, in map space.
+function floorPoints(step, i) {
+    const n = (v, what) => finite(v, `floor ${i} ${what}`), x = step.x ?? 0, y = step.y ?? 0, pad = (step.line_width ?? 0) / 2;
+    const around = (cx, cy, rx, ry) => [[cx - rx - pad, cy - ry - pad], [cx + rx + pad, cy + ry + pad]];
+    switch (step.shape) {
+        case 'rectangle': return around(n(x, 'x') + n(step.width, 'width') / 2, n(y, 'y') + n(step.height, 'height') / 2, step.width / 2, step.height / 2);
+        case 'circle': return around(n(x, 'x'), n(y, 'y'), n(step.radius, 'radius'), step.radius);
+        case 'ellipse': { const r = Math.max(n(step.radius_x, 'radius_x'), n(step.radius_y, 'radius_y')); return around(n(x, 'x'), n(y, 'y'), r, r); }
+        case 'polygon': case 'curve': case 'line': if (!Array.isArray(step.points) || !step.points.length) break; return step.points.flatMap(([px, py]) => around(n(px, 'point'), n(py, 'point'), 0, 0));
+        case 'capsule': return [step.from, step.to].flatMap(([px, py]) => around(n(px, 'point'), n(py, 'point'), n(step.radius, 'radius'), step.radius));
+    }
+    throw new TypeError(`Map floor ${i} is a rectangle, circle, ellipse, polygon, curve, line or capsule`);
+}
 export const MAP_KINDS = Object.freeze(['interior', 'exterior']);
 /** Without a template, each section uses one of the engine's own entity types. */
 export const DEFAULT_KINDS = Object.freeze({ wall: { kind: 'static' }, prop: { kind: 'prop', physics_type: 'static' }, light: { kind: 'decoration' },
-    trigger: { kind: 'trigger', ghost: true }, room: { kind: 'trigger', ghost: true, collision_mask: 0 }, door: { kind: 'prop', physics_type: 'kinematic' }, cloth: { kind: 'decoration' } });
+    trigger: { kind: 'trigger', ghost: true }, floor: { kind: 'decoration' }, room: { kind: 'trigger', ghost: true, collision_mask: 0 }, door: { kind: 'prop', physics_type: 'kinematic' }, cloth: { kind: 'decoration' } });
 
 /**
  * Returns `{ entries, spawn }`. Each entry is `{ section, index, source, packet }`, in build order:
- * walls (cut by door openings), boundary, placements, lights, triggers, rooms (one entry per
+ * floors, walls (cut by door openings), boundary, placements, lights, triggers, rooms (one entry per
  * rectangle), doors (a sliding door is two leaves, an arch none), cloths. `decorate(packet, entry)` may add game data; it must not change ids or roles.
+ * `make_object(record, at, overrides)` makes the packet of a placement that names a catalog `object` (the
+ * Penthouse's `objectPacket` on the world's data); a map with such placements needs it.
  */
-export function buildMapPackets(definition, { templates = {}, decorate = null, prop_types = {}, door_kinds = {} } = {}) {
+export function buildMapPackets(definition, { templates = {}, decorate = null, prop_types = {}, door_kinds = {}, make_object = null } = {}) {
     const kinds = resolveDoorKinds(door_kinds);
     const kind = definition.kind ?? 'interior';
     if (!MAP_KINDS.includes(kind)) throw new TypeError(`Unknown map kind: ${kind}`);
@@ -66,15 +81,47 @@ export function buildMapPackets(definition, { templates = {}, decorate = null, p
     const [width, height] = definition.size ?? [0, 0];
     const doors = definition.doors ?? [];
 
-    // Walls, with every door (and any extra opening) cut out, then the boundary ring.
+    // Floors: drawing steps in the map's own space, drawn in order under everything (look layer `floor_layer`,
+    // default -100), each its own flat decoration so it streams with its region. A step's bounds come from its
+    // shape (a rectangle, circle, ellipse, polygon, curve, line or capsule); it is placed at their centre and drawn back by that much, so a texture stays anchored to the map.
+    const floor_layer = definition.floor_layer ?? -100;
+    (definition.floors ?? []).forEach((step, i) => {
+        const { elevation = 0, ...art } = step, points = floorPoints(art, i);
+        const xs = points.map(q => q[0]), ys = points.map(q => q[1]), [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)], at = [(x0 + x1) / 2, (y0 + y1) / 2];
+        push('floors', i, step, { ...kind_of('floor'), position: at, elevation, render_shape: { shape_type: 'box', dimensions: [Math.max(x1 - x0, 1e-3), Math.max(y1 - y0, 1e-3)] },
+            components: [{ name: 'floor', layers: [{ layer: 0, height: 0, thickness: 0, solid: false, steps: [{ shape: 'group', x: -at[0], y: -at[1], steps: [art] }] }] }],
+            data: { role: 'floor', authored_id: `floor_${i}`, look: { layer: floor_layer, depth: i * 1e-6 } } });
+    });
+
+    // Walls, with every door (and any extra opening) cut out, then the boundary ring. With `wall_look`
+    // ({material, sides, height, layer}), or a wall's own `material` / `sides` / `height`, a wall is drawn: its
+    // top in `material`, its faces in `sides` when heights lean. The look never changes what a wall stops.
     const walls = layoutGeometry.cutWallOpenings(definition.walls ?? [], [...doors, ...(definition.wall_openings ?? [])]);
     const thickness = definition.boundary === false ? 0 : definition.boundary?.thickness ?? 0;
     const ring = thickness > 0 ? [{ x: -thickness, y: -thickness, w: width + 2 * thickness, h: thickness }, { x: -thickness, y: height, w: width + 2 * thickness, h: thickness },
         { x: -thickness, y: 0, w: thickness, h: height }, { x: width, y: 0, w: thickness, h: height }] : [];
-    [...walls, ...ring].forEach((r, i) => push('walls', i, r, { ...kind_of('wall'), ...box(r.x, r.y, r.w, r.h), data: { role: 'wall', authored_id: `wall_${i}` } }));
+    const wall_look = definition.wall_look ?? null;
+    [...walls, ...ring].forEach((r, i) => {
+        const packet = { ...kind_of('wall'), ...box(r.x, r.y, r.w, r.h), data: { role: 'wall', authored_id: `wall_${i}` } };
+        const material = r.material ?? wall_look?.material;
+        if (material) {
+            const sides = r.sides ?? wall_look?.sides ?? material, height = r.height ?? wall_look?.height ?? 0;
+            packet.components = [{ name: 'wall', layers: [{ layer: 0, height: 0, thickness: finite(height, 'wall height'), solid: false, sides: { material: sides }, steps: [{ shape: 'rectangle', x: -r.w / 2, y: -r.h / 2, width: r.w, height: r.h, material }] }] }];
+            packet.data.look = { layer: wall_look?.layer ?? 0 };
+        }
+        push('walls', i, r, packet);
+    });
 
     // Placements: catalog props at their authored rectangles.
+    // A placement that names a catalog `object` is made from that record at its centre (or `at`), its size and
+    // shape the record's own; `width` and `height` may be left out.
     (definition.placements ?? []).forEach((p, i) => {
+        if (p.object !== undefined) {
+            if (typeof make_object !== 'function') throw new TypeError(`Map placement ${i} names the object ${p.object}: give the builder make_object`);
+            const at = p.at ?? [finite(p.x, 'x') + (p.width ?? 0) / 2, finite(p.y, 'y') + (p.height ?? 0) / 2];
+            const packet = make_object(p.object, at, { rotation: p.rotation ?? 0, data: { role: p.role ?? 'prop', authored_id: p.authored_id ?? `prop_${i}`, layout_index: i, object: p.object, home_position: [...at], home_rotation: p.rotation ?? 0, ...p.data } });
+            push('placements', i, p, packet); return;
+        }
         const packet = { ...kind_of('prop', p.template), ...box(p.x, p.y, p.width, p.height),
             data: { role: p.role ?? 'prop', authored_id: p.authored_id ?? `prop_${i}`, layout_index: i, prop_type: p.type ?? null,
                 movable: !!(p.movable ?? prop_types[p.type]?.movable), home_position: null, home_rotation: p.rotation ?? 0, ...p.data } };
