@@ -7,7 +7,7 @@ library, registered at boot, and found by its qualified id (`library:local`). Se
 | Folder | What it holds |
 |---|---|
 | `maps/` | One library per map, named for it (`apt_949.json` is library `apt_949`). Its `map` resource is the whole map: size, setting, spawn, floors (drawing steps in map space), `wall_look`, walls, rooms, doors, exits (`triggers` with `role: 'transition'` and `data.target`), placements, plus the game's own fields (`label`, `landmarks`, `windows`, `camera_bounds`, `ambient_darkness`, ...). Anything only that map uses (its textures, materials, rugs) sits in the same file. |
-| `libraries/` | Libraries any map may use. `surfaces.json`: the plaster every map's walls are drawn in. |
+| `libraries/` | Libraries any map may use. `surfaces.json`: the plaster every map's walls are drawn in, and surfaces shared by maps: polished stone slabs (`stone_slabs`, recoloured by `stone`, `alt` and `seam`, sized by the pattern's `scale`) with obsidian and champagne flecks laid over them, honed marble (`marble_slabs`, by `tone`), herringbone parquet (`herringbone`, by `base` and `dark`) and two-colour tiles (`checker`). |
 | `tests/` | `maps.test.mjs`: every classic map has its file, every file validates, every map builds, and the apartment draws. |
 
 ## Loading a map
@@ -25,10 +25,14 @@ const map = new mapInstance(physics, mapDefinition(registry, 'apt_949:map'), {
 All 21 classic maps are here, generated once from `reference/classic/game-db/places.json`. From now on the files
 are the source; edit them, not the classic data.
 
-- `apt_949`: done. Its floor art (teak, travertine, Versailles parquet, harlequin and bath marble, trellis
-  carpet) is textures and materials, its rugs are objects, and the bar cart is placed (`examples:bar_cart`, the
-  engine's example library, until the game's furniture catalog exists).
-- Every other map: its geometry is data (floors as flat colours, walls, rooms, doors, exits, landmarks). Its
-  floor art and furniture are next, the same way as the apartment. `sdc` and `ollo_test` keep their city
-  fields (`buildings`, `pavements`, `crosswalks`, `floor_areas`) as data until the city's builder is rewritten,
-  and maps whose walls were made in classic code (`keepers_hill`, `keepers_parlor`, `van_interior`) have none yet.
+- Floor art done, as textures, materials, floor steps (grouped, so a room's inlays are one entity) and rug objects:
+  `apt_949`, `hotel_suite`, `hotel_lobby`, `church_boss`, `medbay_sw`, `moon_city_nightclub`, `cozy_cafe_interior`,
+  `house_of_death`, `enni_cole_interior`, `enni_cole_upper`, `demoness_palace`, `neural_sys_interior`, `auto_shop`,
+  `biggs_arena`, `keepers_hill`, `keepers_parlor`, `van_interior`. The apartment's bar cart is placed
+  (`examples:bar_cart`, the engine's example library, until the game's furniture catalog exists). What moves (the
+  hill's clouds and flowers, the road under the van, glows) is not floor art and is still to be built.
+- No classic floor painter, so flat colours for now: `ethereal_plane`, `sdc`, `ollo_test`, `ollo_interior`. `sdc` and
+  `ollo_test` keep their city fields (`buildings`, `pavements`, `crosswalks`, `floor_areas`) as data until the city's
+  builder is rewritten.
+- Furniture for every map but the apartment is next. The scene-only maps (`keepers_hill`, `keepers_parlor`,
+  `van_interior`) have no walls, as in the classic game.
