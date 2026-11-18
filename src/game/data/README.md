@@ -28,10 +28,11 @@ are the source; edit them, not the classic data.
 - Floor art done, as textures, materials, floor steps (grouped, so a room's inlays are one entity) and rug objects:
   `apt_949`, `hotel_suite`, `hotel_lobby`, `church_boss`, `medbay_sw`, `moon_city_nightclub`, `cozy_cafe_interior`,
   `house_of_death`, `enni_cole_interior`, `enni_cole_upper`, `demoness_palace`, `neural_sys_interior`, `auto_shop`,
-  `biggs_arena`, `keepers_hill`, `keepers_parlor`, `van_interior`. The apartment's bar cart is placed
+  `biggs_arena`, `keepers_hill`, `keepers_parlor`, `van_interior`. `ethereal_plane` had no classic floor art and has a new
+  one: pearl and blush, mist, a bloom of translucent petals, drifting petals and sparkle, pearl walls. The apartment's bar cart is placed
   (`examples:bar_cart`, the engine's example library, until the game's furniture catalog exists). What moves (the
   hill's clouds and flowers, the road under the van, glows) is not floor art and is still to be built.
-- No classic floor painter, so flat colours for now: `ethereal_plane`, `sdc`, `ollo_test`, `ollo_interior`. `sdc` and
+- No classic floor painter, so flat colours for now: `sdc`, `ollo_test`, `ollo_interior`. `sdc` and
   `ollo_test` keep their city fields (`buildings`, `pavements`, `crosswalks`, `floor_areas`) as data until the city's
   builder is rewritten.
 - Furniture for every map but the apartment is next. The scene-only maps (`keepers_hill`, `keepers_parlor`,
