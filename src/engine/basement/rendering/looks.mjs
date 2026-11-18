@@ -120,9 +120,10 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null}
         const materials=name=>materialOf(source,qualifyResource(name,layer.drawing??entity.template_id??name));
         // A layer with walls draws them at its base's depth and its top at its top's height, so wherever two
         // walls meet, every face goes under every top at that height and none stands taller than the other.
+        // Among faces, the farthest from the camera goes first, so a near wall's face hides the end of one behind it.
         // A part drawn whole (a bottle on a tray) keeps its walls and top together at its base.
         let sides=[],top=key;
-        if(view&&layer.sides&&z1>z0){const walls=new artScene();drawSides(walls,steps,place,values,sidesPaint(layer.sides,values,materials),view,z0,z1);sides=walls.finish();if(!whole({c}))top=key+z1-z0;}
+        if(view&&layer.sides&&z1>z0){sides=drawSides(steps,place,values,sidesPaint(layer.sides,values,materials),view,z0,z1);if(whole({c}))for(const packet of sides)packet.depth=0;else top=key+z1-z0;}
         if(view)scene.enter({matrix:view.plane(view.k(z1))});
         scene.draw(steps,{...place,values,materials});
         if(view)scene.leave();
@@ -133,19 +134,29 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null}
 function listLayers(components){const out=[];components.forEach((component,order)=>{for(const layer of component.layers)if(layer.visible!==false)out.push({component,layer,order});});return out.sort((a,b)=>a.layer.height-b.layer.height||a.layer.layer-b.layer.layer||a.order-b.order);}
 // A layer's sides paint: a colour, a "$look" value, or {material} (its fill, else its stroke).
 function sidesPaint(sides,values,materials){if(typeof sides==='string')return readValues({fill:sides},values).fill;const m=materials(readValues({m:sides.material},values).m);return m.fill??m.stroke;}
-/** A layer's walls, seen from above: each face of the hull of its shapes that the camera sees, from the plane of its base to the plane of its top. */
-function drawSides(scene,steps,{at,rotation,scale},values,fill,view,z0,z1){
-    if(z1<=z0)return;
+/**
+ * A layer's walls, seen from above: each face of the hull of its shapes that the camera sees, from the plane of
+ * its base to the plane of its top. Returns their packets, each with a `depth` a hair under 0 that is lower the
+ * farther its face's nearest point is from the camera, so faces at one height draw farthest first (the painter's
+ * order for walls standing on one floor: a nearer face is never behind a farther one where they overlap).
+ */
+function drawSides(steps,{at,rotation,scale},values,fill,view,z0,z1){
+    if(z1<=z0)return [];
     const [sx,sy]=typeof scale==='number'?[scale,scale]:scale,points=drawingOutline([{shape:'group',x:at[0],y:at[1],rotation,scale:[sx,sy],steps}],{values}).flatMap(part=>part.points),hull=convexHull(points);
-    if(hull.length<3)return;
-    const cx=hull.reduce((t,p)=>t+p[0],0)/hull.length,cy=hull.reduce((t,p)=>t+p[1],0)/hull.length,k0=view.k(z0),k1=view.k(z1);
+    if(hull.length<3)return [];
+    const cx=hull.reduce((t,p)=>t+p[0],0)/hull.length,cy=hull.reduce((t,p)=>t+p[1],0)/hull.length,k0=view.k(z0),k1=view.k(z1),out=[];
     for(let i=0;i<hull.length;i++){
         const a=hull[i],b=hull[(i+1)%hull.length],mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;let nx=b[1]-a[1],ny=a[0]-b[0];if(nx*(mx-cx)+ny*(my-cy)<0){nx=-nx;ny=-ny;}
         if(!view.sees({x1:a[0],y1:a[1],x2:b[0],y2:b[1],nx,ny}))continue;
         const [p,q,r,t]=[view.scaled(a[0],a[1],k0),view.scaled(b[0],b[1],k0),view.scaled(b[0],b[1],k1),view.scaled(a[0],a[1],k1)];
-        scene.fill([['move',...p],['line',...q],['line',...r],['line',...t],['close']],fill);
+        const scene=new artScene();scene.fill([['move',...p],['line',...q],['line',...r],['line',...t],['close']],fill);
+        const d=nearest(view.camera,a,b),depth=-1e-3*d/(d+1000);
+        for(const packet of scene.finish())out.push({...packet,depth});
     }
+    return out;
 }
+// How far a point is from the segment a–b.
+function nearest([px,py],a,b){const ex=b[0]-a[0],ey=b[1]-a[1],L=ex*ex+ey*ey,t=L?Math.max(0,Math.min(1,((px-a[0])*ex+(py-a[1])*ey)/L)):0;return Math.hypot(a[0]+ex*t-px,a[1]+ey*t-py);}
 /**
  * Steps seen along a tilted bone: every place along x (a step's x, from, to and points) is shortened by `k`,
  * the cosine of the bone's pitch, and slanted by `lean` ([x, y] per unit of x, for a leaning view), and every size is kept, because body parts are round: a leg pointing
