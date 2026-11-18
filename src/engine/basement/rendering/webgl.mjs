@@ -10,7 +10,7 @@
 import {CAPABILITIES} from './values.mjs';
 import {packet as normalizePacket,requirements} from './packets.mjs';
 import {premultiplied,gradientRamp,readColor} from './colors.mjs';
-import {GRAIN_SIZE,grainPixels,grainOffset,GLOWS,glowPlan,glowSizes} from './effects.mjs';
+import {GRAIN_SIZE,grainPixels,grainOffset,GLOWS,glowPlan,glowSizes,bokehPlan} from './effects.mjs';
 import {flattenGeometry,fillTriangles,strokeTriangles,dashPaths} from './paths.mjs';
 import {rasterizeCanvasText,measureCanvasText} from './canvas.mjs';
 
@@ -33,7 +33,7 @@ const BLEND_FUNCTIONS=Object.freeze({
  * per pixel (`overlay`, `soft-light`, `lighten`, `darken`) and the ones Canvas applies to the whole
  * surface outside the shape (`source-in`, `source-out`, `destination-in`).
  */
-export const WEBGL_CAPABILITIES=Object.freeze(['shape','sprite','text','picture','geometry:rect','geometry:ellipse','geometry:path','gradient:linear','gradient:radial','pattern','clip','shadow','blur','dash','target','layer','effect:grade','effect:vignette','effect:grain','effect:bloom','effect:fog_glow','effect:star_glow',...Object.keys(BLEND_FUNCTIONS).map(name=>`blend:${name}`)]);
+export const WEBGL_CAPABILITIES=Object.freeze(['shape','sprite','text','picture','geometry:rect','geometry:ellipse','geometry:path','gradient:linear','gradient:radial','pattern','clip','shadow','blur','dash','target','layer','effect:grade','effect:vignette','effect:grain','effect:bloom','effect:fog_glow','effect:star_glow','effect:bokeh',...Object.keys(BLEND_FUNCTIONS).map(name=>`blend:${name}`)]);
 if(WEBGL_CAPABILITIES.some(need=>!CAPABILITIES.includes(need)))throw new Error('WebGL declares a capability the engine does not name');
 
 const VERTEX=`#version 300 es
@@ -84,14 +84,24 @@ const BLUR_SIGMA=MAX_TAPS/3;   // a wider blur is drawn smaller and stretched ba
 // The light effects' steps, each read linearly from a surface of another size: 3 the bright part, u_a (threshold,
 // tinted), u_b the tint (as Canvas's multiply then destination-in does it); 4 a copy times u_a.x (a level halved, or a spread summed);
 // 5 the surface plus the four u_glow surfaces at weights u_a, clamped as Canvas's lighter is.
+// Bokeh's, on surfaces the same size: 6 the brighter of the surface and a copy moved by u_b (laid by Canvas's lighten);
+// 7 a copy moved by u_b times u_a.x;
+// 8 the surface less u_glow0 at opacity u_a.x, by Canvas's difference blend.
 const POST_FRAGMENT=`#version 300 es
 precision highp float;uniform sampler2D u_texture,u_grain,u_glow0,u_glow1,u_glow2,u_glow3;uniform int u_type;uniform vec2 u_size;uniform vec4 u_a,u_b;out vec4 color;
+// a pixel of the surface at q (pixels, bottom-up), read linearly, clear past the edges as a shifted Canvas draw is
+vec4 edge(vec2 q){vec2 c=clamp(q+.5,0.,1.)*clamp(u_size+.5-q,0.,1.);return texture(u_texture,clamp(q,vec2(.5),u_size-.5)/u_size)*c.x*c.y;}
 vec3 overlay(vec3 b,vec3 s){return mix(2.*b*s,1.-2.*(1.-b)*(1.-s),step(.5,b));}
 // Canvas: a source of straight colour s and alpha k composited by blend result m over the pixel, then kept to the pixel's shape
 vec4 over(vec3 c,float a,vec3 s,float k,vec3 m){vec3 rgb=s*k*(1.-a)+c*a*(1.-k)+k*a*m;return vec4(rgb,k+a-k*a)*a;}
 void main(){
  vec2 uv=gl_FragCoord.xy/u_size;
  if(u_type==4){color=texture(u_texture,uv)*u_a.x;return;}
+ if(u_type==7){color=u_a.x*edge(gl_FragCoord.xy-u_b.xy);return;}
+ if(u_type==6){vec4 d=edge(gl_FragCoord.xy),c=edge(gl_FragCoord.xy-u_b.xy);vec3 cd=d.a>0.?d.rgb/d.a:vec3(0),cc=c.a>0.?c.rgb/c.a:vec3(0);
+  color=vec4(c.rgb*(1.-d.a)+d.rgb*(1.-c.a)+c.a*d.a*max(cd,cc),c.a+d.a-c.a*d.a);return;}
+ if(u_type==8){vec4 b=texelFetch(u_texture,ivec2(gl_FragCoord.xy),0),s=texelFetch(u_glow0,ivec2(gl_FragCoord.xy),0);float k=u_a.x*s.a,a=b.a;vec3 cb=a>0.?b.rgb/a:vec3(0),cs=s.a>0.?s.rgb/s.a:vec3(0);
+  color=vec4(cs*k*(1.-a)+cb*a*(1.-k)+k*a*abs(cb-cs),k+a-k*a);return;}
  if(u_type==3){vec4 s=texture(u_texture,uv);if(s.a<=0.){color=vec4(0);return;}float a=s.a;vec3 g=clamp((s.rgb/a-u_a.x)/(1.-u_a.x),0.,1.)*a;
   color=vec4(u_a.y>.5?u_b.rgb*(a*(1.-a)+a*g):g,a);return;}
  vec4 src=texelFetch(u_texture,ivec2(gl_FragCoord.xy),0);vec2 at=vec2(gl_FragCoord.x,u_size.y-gl_FragCoord.y);
@@ -450,11 +460,12 @@ export class webglRenderer {
         if(!this.#grain)this.#grain=this.#texture(GRAIN_SIZE,GRAIN_SIZE,{pixels:grainPixels()});
         try{
             stack.forEach((e,i)=>{
-                const glows=GLOWS.includes(e.type)?this.#glowSpreads(current,e,sx):null;
+                const glows=GLOWS.includes(e.type)?this.#glowSpreads(current,e,sx):null,bokeh=e.type==='bokeh'?this.#bokehSum(current,e,sx):null;
                 const into=i===stack.length-1&&final?final:current===source?(this.#spare=this.#sized(this.#spare,W,H,false)):source;
                 this.#postOver(into===this.#main?null:into.resolve,W,H);
-                gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.#grain);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,current.texture);
-                if(e.type==='grade'){const t=readColor(e.tint);gl.uniform1i(u.u_type,0);gl.uniform4f(u.u_a,2**e.exposure,e.contrast,e.saturation,e.tint_amount*t[3]);gl.uniform4f(u.u_b,t[0],t[1],t[2],1);}
+                gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.#grain);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,(bokeh??current).texture);
+                if(bokeh){gl.bindSampler(0,this.#samplers.clamp);gl.uniform1i(u.u_type,4);gl.uniform4f(u.u_a,1,0,0,0);}
+                else if(e.type==='grade'){const t=readColor(e.tint);gl.uniform1i(u.u_type,0);gl.uniform4f(u.u_a,2**e.exposure,e.contrast,e.saturation,e.tint_amount*t[3]);gl.uniform4f(u.u_b,t[0],t[1],t[2],1);}
                 else if(e.type==='vignette'){const reach=Math.hypot(W,H)/2,c=readColor(e.color);gl.uniform1i(u.u_type,1);gl.uniform4f(u.u_a,e.radius*reach,(e.radius+e.softness)*reach,e.strength,0);gl.uniform4f(u.u_b,...c);}
                 else if(e.type==='grain'){const [ox,oy]=grainOffset(this.#frames,e.animated);gl.uniform1i(u.u_type,2);gl.uniform4f(u.u_a,e.amount,e.size*sx,ox,oy);}
                 else{
@@ -474,6 +485,27 @@ export class webglRenderer {
         const gl=this.#gl,u=this.#postUniforms;gl.useProgram(this.#postProgram);gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);gl.viewport(0,0,w,h);this.#bound=null;
         gl.blendEquation(gl.FUNC_ADD);gl.blendFuncSeparate(gl.ONE,gl.ZERO,gl.ONE,gl.ZERO);gl.disable(gl.STENCIL_TEST);
         gl.uniform3f(u.u_row0,2/w,0,-1);gl.uniform3f(u.u_row1,0,-2/h,1);gl.uniform2f(u.u_size,w,h);
+    }
+    /** Bokeh's result at its level's size (bokehPlan), made as canvas.mjs makes it; laid over the whole surface after. */
+    #bokehSum(source,e,sx){
+        const gl=this.#gl,u=this.#postUniforms,plan=bokehPlan(e,sx),sizes=glowSizes(source.width,source.height,plan.level),[w,h]=sizes[plan.level];
+        const step=(into,texture,type,a,b=[0,0],[tw,th]=[w,h])=>{this.#postOver(into.resolve,tw,th);gl.bindTexture(gl.TEXTURE_2D,texture);gl.uniform1i(u.u_type,type);gl.uniform4f(u.u_a,...a);gl.uniform4f(u.u_b,b[0],b[1],0,0);this.#draw(quad(0,0,tw,th));};
+        gl.activeTexture(gl.TEXTURE0);gl.bindSampler(0,this.#samplers.clamp);let from=source,lit=null;
+        for(let l=1;l<=plan.level;l++){
+            const size=sizes[l],t=this.#glowTarget(`level${l}`,...size),b=this.#glowTarget(`bokeh_bright${l}`,...size);step(t,from.texture,4,[1,0,0,0],[0,0],size);
+            if(l===1)step(b,source.texture,3,[plan.threshold,0,0,0],[0,0],size);else step(b,lit.texture,4,[1,0,0,0],[0,0],size);
+            from=t;lit=b;
+        }
+        const rest=this.#glowTarget('bokeh_rest',w,h);gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,lit.texture);gl.activeTexture(gl.TEXTURE0);step(rest,from.texture,8,[1-plan.threshold,0,0,0]);
+        gl.activeTexture(gl.TEXTURE2);gl.bindTexture(gl.TEXTURE_2D,null);gl.activeTexture(gl.TEXTURE0);
+        let kept=rest;const more=glowSizes(w,h,plan.soft);for(let i=1;i<=plan.soft;i++){const t=this.#glowTarget(`bokeh_rest${i}`,...more[i]);step(t,kept.texture,4,[1,0,0,0],[0,0],more[i]);kept=t;}
+        const [bw,bh]=more[plan.soft],base=this.#glowTarget('bokeh_base',bw,bh);this.#blurred(kept,base,bw,bh,[[[1,0],plan.sigma],[[0,1],plan.sigma]],this.#glowTarget('bokeh_between',bw,bh),0);   // edges repeated, as canvas.mjs pads them
+        // the lights grown along each side; gl_FragCoord runs bottom-up, so a move down the screen is -y
+        const a=this.#glowTarget('bokeh_a',w,h),b=this.#glowTarget('bokeh_b',w,h);let disc=lit;
+        for(const [dx,dy] of plan.steps){const out=disc===a?b:a;step(out,disc.texture,6,[0,0,0,0],[dx,-dy]);disc=out;}
+        const sum=this.#glowTarget('bokeh_sum',w,h);step(sum,base.texture,4,[1,0,0,0]);
+        gl.blendFuncSeparate(gl.ONE,gl.ONE,gl.ONE,gl.ONE);gl.bindTexture(gl.TEXTURE_2D,disc.texture);gl.uniform1i(u.u_type,7);gl.uniform4f(u.u_a,plan.highlights,0,0,0);gl.uniform4f(u.u_b,plan.centre[0],-plan.centre[1],0,0);this.#draw(quad(0,0,w,h));
+        return sum;
     }
     #glowTarget(key,w,h){const t=this.#sized(this.#glows.get(key),w,h,false);this.#glows.set(key,t);return t;}
     /** A light effect's spreads of `source` (glowPlan), each [surface, weight × strength], as canvas.mjs makes them. */

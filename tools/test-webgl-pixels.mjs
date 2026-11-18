@@ -190,13 +190,18 @@ const LIGHT_CASES = [
     { frame: [{ type: 'star_glow', rays: 6 }] },
     { layer: [{ type: 'bloom', color: '#ffb060', strength: 1.2, threshold: .3 }], frame: [{ type: 'bloom', radius: 2 }] },
     { pixel_ratio: 2, frame: [{ type: 'bloom', radius: 6 }, { type: 'star_glow', length: 30 }] },
+    { frame: [{ type: 'bokeh' }] },
+    { frame: [], layer: [{ type: 'bokeh', blades: 8, radius: 12, rotation: .3, highlights: 4 }] },
+    { pixel_ratio: 2, frame: [{ type: 'bokeh', blades: 4, radius: 5 }] },
 ];
 
-test('WebGL adds light as Canvas does: bloom, fog glow, star glow, a tinted bloom on one layer, and at twice the density', { skip: !chromium && 'Playwright is not installed' }, async () => {
+test('WebGL adds light as Canvas does: bloom, fog glow, star glow, a tinted bloom on one layer, bokeh on the frame and on one layer, and at twice the density', { skip: !chromium && 'Playwright is not installed' }, async () => {
     for (const options of LIGHT_CASES) {
         // Canvas adds light in 8-bit steps, each rounded to the nearest 255th, which leans up: a streak, some
         // fifty stamps of a few 255ths each, ends about 5% brighter on Canvas (measured), so star glow is held to less
-        const { mean, share, worst } = compare(await inBrowser(lights, options)), streaks = options.frame.some(e => e.type === 'star_glow');
-        assert.ok(mean < (streaks ? 5 : 3.5), `mean channel difference ${mean.toFixed(2)} (${JSON.stringify(options)})`); assert.ok(share < .02, `${(share * 100).toFixed(2)}% of pixels differ by more than 24, worst ${worst} (${JSON.stringify(options)})`);
+        // Bokeh grows each light to the brightest pixel near it, so a light whose brightest pixel rounds one 255th
+        // apart on the two (amplified by the threshold) differs over its whole disc: more pixels differ, as little on average
+        const { mean, share, worst } = compare(await inBrowser(lights, options)), streaks = options.frame.some(e => e.type === 'star_glow'), discs = [...options.frame, ...options.layer ?? []].some(e => e.type === 'bokeh');
+        assert.ok(mean < (streaks ? 5 : 3.5), `mean channel difference ${mean.toFixed(2)} (${JSON.stringify(options)})`); assert.ok(share < (discs ? .05 : .02), `${(share * 100).toFixed(2)}% of pixels differ by more than 24, worst ${worst} (${JSON.stringify(options)})`);
     }
 });

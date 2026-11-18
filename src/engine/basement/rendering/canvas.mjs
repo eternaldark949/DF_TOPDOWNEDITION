@@ -6,7 +6,7 @@ import {BLENDS,CAPABILITIES} from './values.mjs';
 const COMPOSITE=Object.freeze({normal:'source-over',add:'lighter',multiply:'multiply',screen:'screen','source-in':'source-in','source-out':'source-out','destination-in':'destination-in','destination-out':'destination-out','source-atop':'source-atop','destination-over':'destination-over',overlay:'overlay','soft-light':'soft-light',lighten:'lighten',darken:'darken'});
 import {geometry} from './packets.mjs';
 import {flattenGeometry,pathBounds} from './paths.mjs';
-import {GRAIN_SIZE,grainPixels,grainOffset,GLOWS,glowPlan,glowSizes,thresholdFilter} from './effects.mjs';
+import {GRAIN_SIZE,grainPixels,grainOffset,GLOWS,glowPlan,glowSizes,thresholdFilter,bokehPlan} from './effects.mjs';
 import {readColor} from './colors.mjs';
 
 function createSurface(width,height){
@@ -263,6 +263,29 @@ export class canvasRenderer {
         if(s.surface.width!==w)s.surface.width=w;if(s.surface.height!==h)s.surface.height=h;
         const c=s.context;c.setTransform(1,0,0,1,0,0);c.globalAlpha=1;c.globalCompositeOperation='source-over';c.filter='none';c.shadowColor='transparent';c.shadowBlur=0;c.imageSmoothingEnabled=true;c.clearRect(0,0,w,h);return s;
     }
+    // `surface` out of focus as bokehPlan says (see effects.mjs): drawn small, then laid back over the whole of it.
+    #bokeh(surface,ctx,e,sx){
+        const W=surface.width,H=surface.height,plan=bokehPlan(e,sx),sizes=glowSizes(W,H,plan.level),[w,h]=sizes[plan.level];let from=surface,lit=null;
+        for(let l=1;l<=plan.level;l++){
+            const [lw,lh]=sizes[l],s=this.#glowSurface(`level${l}`,lw,lh),b=this.#glowSurface(`bokeh_bright${l}`,lw,lh);s.context.drawImage(from,0,0,lw,lh);
+            if(l===1){b.context.filter=thresholdFilter(plan.threshold);b.context.drawImage(surface,0,0,lw,lh);b.context.filter='none';}else b.context.drawImage(lit,0,0,lw,lh);
+            from=s.surface;lit=b.surface;
+        }
+        const rest=this.#glowSurface('bokeh_rest',w,h),rc=rest.context;rc.drawImage(from,0,0);rc.globalCompositeOperation='difference';rc.globalAlpha=1-plan.threshold;rc.drawImage(lit,0,0);
+        // the rest, halved `soft` times, repeats its edge pixels outward before blurring, so the picture does not darken at its borders
+        let kept=rest.surface;const more=glowSizes(w,h,plan.soft);for(let i=1;i<=plan.soft;i++){const [lw,lh]=more[i],s=this.#glowSurface(`bokeh_rest${i}`,lw,lh);s.context.drawImage(kept,0,0,lw,lh);kept=s.surface;}
+        const [bw,bh]=more[plan.soft],p=Math.ceil(plan.sigma*3)+1,padded=this.#glowSurface('bokeh_pad',bw+2*p,bh+2*p),pc=padded.context;pc.imageSmoothingEnabled=false;pc.drawImage(kept,p,p);
+        for(const [sx0,sy0,sw,sh,dx,dy,dw,dh] of [[0,0,1,bh,0,p,p,bh],[bw-1,0,1,bh,bw+p,p,p,bh],[0,0,bw,1,p,0,bw,p],[0,bh-1,bw,1,p,bh+p,bw,p],[0,0,1,1,0,0,p,p],[bw-1,0,1,1,bw+p,0,p,p],[0,bh-1,1,1,0,bh+p,p,p],[bw-1,bh-1,1,1,bw+p,bh+p,p,p]])pc.drawImage(kept,sx0,sy0,sw,sh,dx,dy,dw,dh);
+        const soft=this.#glowSurface('bokeh_soft',bw+2*p,bh+2*p);soft.context.filter=`blur(${plan.sigma}px)`;soft.context.drawImage(padded.surface,0,0);soft.context.filter='none';
+        const base=this.#glowSurface('bokeh_base',bw,bh);base.context.drawImage(soft.surface,p,p,bw,bh,0,0,bw,bh);
+        // the lights grown along each side: each step keeps the brighter of the image and a copy moved whole pixels
+        const a=this.#glowSurface('bokeh_a',w,h),b=this.#glowSurface('bokeh_b',w,h);let disc=lit;
+        for(const [dx,dy] of plan.steps){const out=disc===a.surface?b:a,c=out.context;c.globalCompositeOperation='source-over';c.globalAlpha=1;c.clearRect(0,0,w,h);
+            c.drawImage(disc,0,0);c.globalCompositeOperation='lighten';c.drawImage(disc,dx,dy);disc=out.surface;}
+        const sum=this.#glowSurface('bokeh_sum',w,h),c=sum.context;c.drawImage(base.surface,0,0,w,h);c.globalCompositeOperation='lighter';
+        for(let k=plan.highlights;k>1e-4;k-=1){c.globalAlpha=Math.min(1,k);c.drawImage(disc,...plan.centre);}
+        ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='copy';ctx.imageSmoothingEnabled=true;ctx.drawImage(sum.surface,0,0,W,H);ctx.globalCompositeOperation='source-over';
+    }
     // The bright part of `surface` spread as glowPlan says, added to it (see effects.mjs).
     #glow(surface,ctx,e,sx,opaque){
         const W=surface.width,H=surface.height,plan=glowPlan(e,sx),sizes=glowSizes(W,H,plan.levels),levels=[null],[r,g,b]=readColor(plan.color),tinted=r<1||g<1||b<1;
@@ -312,6 +335,7 @@ export class canvasRenderer {
                     ctx.setTransform(size,0,0,size,-ox*size,-oy*size);ctx.fillRect(ox,oy,W/size,H/size);
                     if(shape){ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='destination-in';ctx.drawImage(shape,0,0);}
                 }else if(GLOWS.includes(e.type))this.#glow(surface,ctx,e,sx,opaque);
+                else if(e.type==='bokeh')this.#bokeh(surface,ctx,e,sx);
             }
         }finally{ctx.restore();this.#set={};}
     }

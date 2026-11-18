@@ -68,3 +68,17 @@ test('light effects are planned the same for both backends: halved levels, small
  const t=.6,[gain,k]=thresholdFilter(t).match(/[\d.]+/g).map(Number),f=c=>Math.min(1,Math.max(0,(c*gain-.5)*k+.5));
  for(const c of [0,.3,.6,.8,1])assert.ok(Math.abs(f(c)-Math.min(1,Math.max(0,(c-t)/(1-t))))<1e-9);
 });
+
+test('bokeh grows lights along each side of its aperture by whole pixels, and centres the discs again',async()=>{
+ const {bokehPlan,BOKEH_RADIUS}=await import('../effects.mjs');
+ for(const blades of [4,6,8,10,12])for(const [radius,sx] of [[12,1],[12,2],[40,2],[3,1]]){
+  const plan=bokehPlan(effect({type:'bokeh',radius,blades,rotation:.4}),sx),r=radius*sx/2**plan.level,side=Math.max(1,Math.round(2*r*Math.sin(Math.PI/blades)));
+  assert.ok(plan.level>=1&&r<=BOKEH_RADIUS,`level ${plan.level} for ${radius}x${sx}`);assert.equal(plan.sigma,r/2/2**plan.soft);assert.ok(plan.sigma<=3,'the rest blurs at a level small enough');
+  assert.ok(plan.steps.every(([x,y])=>Number.isInteger(x)&&Number.isInteger(y)&&(x||y)),'whole pixels');
+  const total=plan.steps.reduce((a,[x,y])=>[a[0]+x,a[1]+y],[0,0]);assert.deepEqual(plan.centre,[-Math.round(total[0]/2),-Math.round(total[1]/2)]);
+ }
+ // an unturned square: one side along x, one down y, so the moves add to [side, side]
+ const square=bokehPlan(effect({type:'bokeh',radius:12,blades:4}),2),side=Math.round(2*(24/2**square.level)*Math.sin(Math.PI/4));
+ assert.deepEqual(square.steps.reduce((a,[x,y])=>[a[0]+x,a[1]+y],[0,0]),[side,side]);assert.deepEqual(square.steps.slice(0,2),[[1,0],[2,0]],'1, 2, 4… pixels along each side');
+ assert.throws(()=>effect({type:'bokeh',blades:5}),/4, 6, 8, 10 or 12/);assert.throws(()=>effect({type:'bokeh',blades:14}),/at most 12/);
+});

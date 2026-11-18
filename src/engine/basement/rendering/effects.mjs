@@ -17,6 +17,9 @@ import {readColor} from './colors.mjs';
  *   and added back at `strength`, times `color`. Bloom spreads it at `radius` and twice and four times it
  *   (a tight core with a wide skirt); fog glow once, wide; star glow in `rays` streaks `length` long, the
  *   first at `angle` (radians, clockwise on screen).
+ * - bokeh: out of focus, as a lens sees it. What is brighter than `threshold` is taken out and grown into
+ *   the aperture's shape (`blades` sides, 4 to 12, turned by `rotation`) `radius` wide, at `highlights`
+ *   times its brightness, so lights become discs; the rest is blurred as wide.
  */
 export const EFFECTS=Object.freeze({
     grade:Object.freeze({exposure:0,contrast:1,saturation:1,tint:'#ffffff',tint_amount:0}),
@@ -25,8 +28,9 @@ export const EFFECTS=Object.freeze({
     bloom:Object.freeze({threshold:.65,strength:1.2,radius:8,color:'#ffffff'}),
     fog_glow:Object.freeze({threshold:.45,strength:2,radius:40,color:'#ffffff'}),
     star_glow:Object.freeze({threshold:.75,strength:1.5,length:60,rays:4,angle:Math.PI/4,color:'#ffffff'}),
+    bokeh:Object.freeze({radius:12,blades:6,rotation:0,threshold:.6,highlights:1}),
 });
-const RANGES={exposure:[-8,8],contrast:[0,8],saturation:[0,8],tint_amount:[0,1],strength:[0,8],'vignette.radius':[0,4],softness:[.001,4],amount:[0,1],size:[1,64],'vignette.strength':[0,1],threshold:[0,.99],radius:[.5,256],length:[1,512],rays:[2,8],angle:[-7,7]};
+const RANGES={exposure:[-8,8],contrast:[0,8],saturation:[0,8],tint_amount:[0,1],strength:[0,8],'vignette.radius':[0,4],softness:[.001,4],amount:[0,1],size:[1,64],'vignette.strength':[0,1],threshold:[0,.99],radius:[.5,256],length:[1,512],rays:[2,8],angle:[-7,7],blades:[4,12],rotation:[-7,7],highlights:[0,32]};
 /** One effect, checked and filled in from its defaults. Unknown types or fields are refused. */
 export function effect(spec){
     if(!spec||typeof spec!=='object')throw new TypeError('An effect is {type, ...fields}');
@@ -36,7 +40,8 @@ export function effect(spec){
     for(const [key,fallback] of Object.entries(defaults)){
         const value=spec[key]??fallback;
         if(typeof fallback==='number'){const [lo,hi]=RANGES[`${spec.type}.${key}`]??RANGES[key];out[key]=finite(value,`${spec.type} ${key}`,lo);if(out[key]>hi)throw new RangeError(`${spec.type} ${key} is at most ${hi}`);
-            if(key==='rays'&&out[key]%2)throw new RangeError(`${spec.type} rays is 2, 4, 6 or 8`);}
+            if(key==='rays'&&out[key]%2)throw new RangeError(`${spec.type} rays is 2, 4, 6 or 8`);
+            if(key==='blades'&&out[key]%2)throw new RangeError(`${spec.type} blades is 4, 6, 8, 10 or 12`);}
         else if(typeof fallback==='boolean'){if(typeof value!=='boolean')throw new TypeError(`${spec.type} ${key} is true or false`);out[key]=value;}
         else{readColor(value);out[key]=color(value);}   // a colour the backends can read
     }
@@ -102,3 +107,32 @@ export function glowPlan(e,sx){
 }
 /** CSS filter that keeps what is above `t`, stretched back to 0 to 1: brightness(1/(1+t)) then contrast((1+t)/(1-t)). */
 export const thresholdFilter=t=>`brightness(${1/(1+t)}) contrast(${(1+t)/(1-t)})`;
+
+// ----- Bokeh: the aperture's shape from straight lines, the same on both backends -----
+/** The widest aperture drawn at one level, in that level's pixels; a wider one is drawn on a smaller level. */
+export const BOKEH_RADIUS=16;
+/**
+ * How bokeh is drawn on a surface `sx` device pixels per pass unit, at `level` (halved from the surface):
+ * - the bright part is taken at level 1 as glow's is (`thresholdFilter(threshold)`) and halved on down;
+ * - the rest is the level less (1 - threshold) times the bright part (Canvas's difference blend at that
+ *   opacity), halved `soft` more times and blurred there by `sigma` with its edges repeated (a Gaussian: soft
+ *   content looks alike through any aperture, and needs no detail);
+ * - each light grows into the aperture, a regular polygon of `blades` sides: polygons with sides in pairs
+ *   are sums of straight segments, so the bright part is grown along each side in turn. Each step keeps the
+ *   brighter (Canvas's lighten) of the image and a copy moved by `steps[i]`, whole pixels (1, 2, 4… along
+ *   the side, the last cut to fit), so no light is thinned by reading between pixels; a light keeps its
+ *   brightness however wide its disc, where an average would thin a small light to nothing;
+ * - the discs are moved back by `centre` (whole pixels) and added to the rest `highlights` times over, at the level's size.
+ * Moves are in level pixels, y down.
+ */
+export function bokehPlan(e,sx){
+    const R=e.radius*sx,level=Math.min(8,Math.max(1,Math.ceil(Math.log2(R/BOKEH_RADIUS)))),r=R/2**level,m=e.blades/2,side=Math.max(1,Math.round(2*r*Math.sin(Math.PI/e.blades)));
+    const steps=[],total=[0,0];
+    for(let j=0;j<m;j++){
+        const t=e.rotation+j*Math.PI/m,dir=[Math.cos(t),Math.sin(t)];let done=0,along=[0,0];
+        for(let h=1;done<side;h*=2){const step=Math.min(h,side-done);done+=step;const to=[Math.round(dir[0]*done),Math.round(dir[1]*done)];steps.push([to[0]-along[0],to[1]-along[1]]);along=to;}
+        total[0]+=along[0];total[1]+=along[1];
+    }
+    const soft=Math.max(0,Math.ceil(Math.log2(r/2/GLOW_SIGMA)));
+    return {level,soft,sigma:r/2/2**soft,threshold:e.threshold,highlights:e.highlights,steps:steps.filter(([x,y])=>x||y),centre:[-Math.round(total[0]/2),-Math.round(total[1]/2)]};
+}
