@@ -343,5 +343,7 @@ test('floors are drawing steps in map space, walls take a drawn look, and a plac
     assert.deepEqual(rug.position, [50, 40]); assert.equal(rug.rotation, .5); assert.equal(rug.data.object, 'demo:rug'); assert.equal(rug.data.authored_id, 'prop_0');
     assert.deepEqual(cart.position, [110, 105], 'without `at`, the middle of its rectangle'); assert.equal(cart.data.tag, 1);
     assert.throws(() => buildMapPackets({ placements: [{ object: 'demo:rug', at: [0, 0] }] }), /make_object/);
-    assert.throws(() => buildMapPackets({ floors: [{ shape: 'text', text: 'x' }] }), /floor/i);
+    assert.throws(() => buildMapPackets({ floors: [{ shape: 'path', commands: [] }] }), /floor/i);
+    const [inlay] = buildMapPackets({ floors: [{ shape: 'group', x: 100, y: 0, steps: [{ shape: 'rectangle', x: 0, y: 0, width: 10, height: 10 }, { shape: 'circle', x: 50, y: 50, radius: 5 }] }] }).entries.map(e => e.packet);
+    assert.deepEqual(inlay.position, [127.5, 27.5], 'a group is one floor entity, bounded by its children where it places them'); assert.deepEqual(inlay.render_shape.dimensions, [55, 55]);
 });

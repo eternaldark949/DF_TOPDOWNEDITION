@@ -53,8 +53,17 @@ function floorPoints(step, i) {
         case 'ellipse': { const r = Math.max(n(step.radius_x, 'radius_x'), n(step.radius_y, 'radius_y')); return around(n(x, 'x'), n(y, 'y'), r, r); }
         case 'polygon': case 'curve': case 'line': if (!Array.isArray(step.points) || !step.points.length) break; return step.points.flatMap(([px, py]) => around(n(px, 'point'), n(py, 'point'), 0, 0));
         case 'capsule': return [step.from, step.to].flatMap(([px, py]) => around(n(px, 'point'), n(py, 'point'), n(step.radius, 'radius'), step.radius));
+        // Text: a box as wide as its characters at most and as tall as its size, round its anchor.
+        case 'text': { const size = n(step.size ?? 12, 'size'), w = String(step.text ?? '').length * size * .7; return around(n(x, 'x'), n(y, 'y'), w, size); }
+        // A group (one entity for many small steps): its children's corners, through its place, turn and scale.
+        case 'group': {
+            if (!Array.isArray(step.steps) || !step.steps.length) break;
+            const a = step.rotation ?? 0, [sx, sy] = Array.isArray(step.scale) ? step.scale : [step.scale ?? 1, step.scale ?? 1], c = Math.cos(a), s = Math.sin(a);
+            return step.steps.flatMap(child => { const box = floorPoints(child, i), [[x0, y0], [x1, y1]] = [[Math.min(...box.map(q => q[0])), Math.min(...box.map(q => q[1]))], [Math.max(...box.map(q => q[0])), Math.max(...box.map(q => q[1]))]];
+                return [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(([px, py]) => [n(x, 'x') + (px * sx) * c - (py * sy) * s, n(y, 'y') + (px * sx) * s + (py * sy) * c]); });
+        }
     }
-    throw new TypeError(`Map floor ${i} is a rectangle, circle, ellipse, polygon, curve, line or capsule`);
+    throw new TypeError(`Map floor ${i} is a rectangle, circle, ellipse, polygon, curve, line, capsule, text or group`);
 }
 export const MAP_KINDS = Object.freeze(['interior', 'exterior']);
 /** Without a template, each section uses one of the engine's own entity types. */
