@@ -118,11 +118,15 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null}
         const scene=new artScene(),steps=fore===1&&!lean?layerSteps(layer,source):foreshorten(layerSteps(layer,source),fore,lean??[0,0]);
         // Leaning toward the camera: the walls from the layer's base to its top, then its shapes in the plane of its top.
         const materials=name=>materialOf(source,qualifyResource(name,layer.drawing??entity.template_id??name));
-        if(view&&layer.sides)drawSides(scene,steps,place,values,sidesPaint(layer.sides,values,materials),view,z0,z1);
+        // A layer with walls draws them at its base's depth and its top at its top's height, so wherever two
+        // walls meet, every face goes under every top at that height and none stands taller than the other.
+        // A part drawn whole (a bottle on a tray) keeps its walls and top together at its base.
+        let sides=[],top=key;
+        if(view&&layer.sides&&z1>z0){const walls=new artScene();drawSides(walls,steps,place,values,sidesPaint(layer.sides,values,materials),view,z0,z1);sides=walls.finish();if(!whole({c}))top=key+z1-z0;}
         if(view)scene.enter({matrix:view.plane(view.k(z1))});
         scene.draw(steps,{...place,values,materials});
         if(view)scene.leave();
-        return {height:z0,depth:key,layer:layer.layer,component:c.name,packets:scene.finish()};
+        return {height:z0,depth:key,top,layer:layer.layer,component:c.name,sides,packets:scene.finish()};
     });
 }
 // Every visible layer with its component and the component's place in the list.

@@ -53,3 +53,13 @@ test('a pick leans like the drawing: a tall thing is hit where it is drawn, from
  const up=render.pickAt([50+(20-50)*400/(400-104),50]);
  assert.equal(up?.entity,ledge,'a thing up on a ledge is hit where it is drawn');near(up.height,104,'its height is its top in the world');
 });
+
+test('leaning, every wall face draws under every wall top at that height, so walls that meet stand equally tall',async()=>{
+ const {world,render}=fixture();render.registerRenderer('recording',recordingRenderer);await render.setRenderer('recording',{surface:null});render.setHeightView({eye:900});
+ const wall=(x,y,w,h)=>world.elements.createEntity({kind:'static',position:[x,y],components:[{name:'wall',layers:[{layer:0,height:0,thickness:120,solid:false,sides:'#444',steps:[{shape:'rectangle',x:-w/2,y:-h/2,width:w,height:h,fill:'#222'}]}]}]});
+ wall(200,0,8,300);wall(100,150,200,8);world.updateState(1/60);   // a T: the second wall's face crosses the first one's top
+ render.beginFrame();render.drawLooks();render.endFrame();
+ const fills=render.getFrameSnapshot().passes.flatMap(pass=>pass.packets).map(packet=>packet.material.fill);
+ assert.ok(fills.lastIndexOf('#444')<fills.indexOf('#222'),`faces, then tops: ${fills}`);
+ render.dispose();
+});

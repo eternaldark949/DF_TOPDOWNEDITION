@@ -133,7 +133,7 @@ export class renderSystem {
             if(entity.assets?.drawing){const scene=new artScene();if(drawLook(scene,entity,source,blend,{view})){const z=entity.world_elevation??0;for(const packet of scene.finish())this.#frame.submit(this.#textured({...packet,layer,depth:depth+z}));drew=true;}}
             if(entity.has('components')){
                 let pose;const rigs=this.#world.rigs,joints=name=>{pose??=rigs?.getRig(entity)?rigs.getPose(entity,{blend,world_space:true}):null;return pose?.joints[name]??null;};
-                for(const part of drawComponents(entity,source,blend,{joints,view})){for(const packet of part.packets)this.#frame.submit(this.#textured({...packet,layer,depth:depth+part.depth}));drew=true;}
+                for(const part of drawComponents(entity,source,blend,{joints,view})){for(const packet of part.sides)this.#frame.submit(this.#textured({...packet,layer,depth:depth+part.depth}));for(const packet of part.packets)this.#frame.submit(this.#textured({...packet,layer,depth:depth+part.top}));drew=true;}
             }
             if(drew)drawn++;
         }
