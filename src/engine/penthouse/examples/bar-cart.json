@@ -1,0 +1,66 @@
+{
+ "library_id": "examples",
+ "description": "An example object built only from data: a bar cart made of components, each part at its own height, drawn by the engine's drawing steps. A game's own catalog holds records like this one.",
+ "templates": {
+  "bar_cart": {
+   "kind": "prop",
+   "physics_type": "static",
+   "look": {"layer": 1, "values": {"frame": "#c9a46a", "tray": "rgba(40,30,36,0.92)", "wheel": "#1a1416", "bottle_glass": "#14100f", "cork": "#c8a27a", "wine": "#6a0c20", "whiskey": "#b5641a", "green_bottle": "#2c4a2a", "crystal": "rgba(225,240,255,0.25)", "bucket": "#b8bcc8"}},
+   "bounds": "box",
+   "data": {"behaviour": "refill_drink", "label": "Pour"},
+   "components": [
+    {"name": "frame", "layers": [
+      {"layer": 0, "height": 0, "thickness": "8 cm", "sides": "$wheel", "steps": [
+        {"shape": "circle", "x": -16, "y": -9, "radius": 3.2, "fill": "$wheel", "stroke": "$frame", "line_width": 0.8},
+        {"shape": "circle", "x": -16, "y": 9, "radius": 3.2, "fill": "$wheel", "stroke": "$frame", "line_width": 0.8}]},
+      {"layer": 1, "height": "25 cm", "thickness": "2 cm", "sides": "$frame", "steps": [
+        {"shape": "rectangle", "x": -19, "y": -11, "width": 38, "height": 22, "radius": 3, "fill": "$tray", "stroke": "$frame", "line_width": 1.4}]},
+      {"layer": 2, "height": "8 cm", "thickness": "72 cm", "sides": "$frame", "steps": [
+        {"shape": "circle", "x": -17, "y": -9, "radius": 1, "fill": "$frame"},
+        {"shape": "circle", "x": -17, "y": 9, "radius": 1, "fill": "$frame"},
+        {"shape": "circle", "x": 17, "y": -9, "radius": 1, "fill": "$frame"},
+        {"shape": "circle", "x": 17, "y": 9, "radius": 1, "fill": "$frame"}]},
+      {"layer": 3, "height": "80 cm", "thickness": "3 cm", "sides": "$frame", "steps": [
+        {"shape": "rectangle", "x": -19, "y": -11, "width": 38, "height": 22, "radius": 3, "fill": "$tray", "stroke": "$frame", "line_width": 1.4},
+        {"shape": "rectangle", "x": -17, "y": -9, "width": 34, "height": 2.5, "fill": "rgba(255,240,220,0.08)"}]},
+      {"layer": 4, "height": "76 cm", "thickness": "4 cm", "solid": false, "steps": [
+        {"shape": "line", "points": [[16.0, -9.0], [17.75, -6.75], [19.0, -4.5], [19.75, -2.25], [20.0, 0.0], [19.75, 2.25], [19.0, 4.5], [17.75, 6.75], [16.0, 9.0]], "stroke": "$frame", "line_width": 1.6, "line_cap": "round"}]}]},
+    {"name": "red_wine", "at": [-12, -5], "layers": [
+      {"layer": 0, "height": "83 cm", "thickness": "30 cm", "sides": "$wine", "steps": [
+        {"shape": "circle", "x": 0, "y": 0, "radius": 3.4, "fill": "$bottle_glass", "stroke": "rgba(255,255,255,0.18)", "line_width": 0.6},
+        {"shape": "circle", "x": 0, "y": 0, "radius": 2.3, "fill": "$wine"},
+        {"shape": "circle", "x": 0, "y": 0, "radius": 1.2, "fill": "$cork"},
+        {"shape": "circle", "x": -1.1, "y": -1.1, "radius": 0.6, "fill": "rgba(255,255,255,0.6)"}]}]},
+    {"name": "green_bottle", "at": [-12, 5], "layers": [
+      {"layer": 0, "height": "83 cm", "thickness": "30 cm", "sides": "$green_bottle", "steps": [
+        {"shape": "circle", "x": 0, "y": 0, "radius": 3.4, "fill": "$bottle_glass", "stroke": "rgba(255,255,255,0.18)", "line_width": 0.6},
+        {"shape": "circle", "x": 0, "y": 0, "radius": 2.3, "fill": "$green_bottle"},
+        {"shape": "circle", "x": 0, "y": 0, "radius": 1.2, "fill": "$cork"},
+        {"shape": "circle", "x": -1.1, "y": -1.1, "radius": 0.6, "fill": "rgba(255,255,255,0.6)"}]}]},
+    {"name": "whiskey", "at": [-5, 0], "layers": [
+      {"layer": 0, "height": "83 cm", "thickness": "26 cm", "sides": "$whiskey", "steps": [
+        {"shape": "circle", "x": 0, "y": 0, "radius": 3.4, "fill": "$bottle_glass", "stroke": "rgba(255,255,255,0.18)", "line_width": 0.6},
+        {"shape": "circle", "x": 0, "y": 0, "radius": 2.3, "fill": "$whiskey"},
+        {"shape": "circle", "x": 0, "y": 0, "radius": 1.2, "fill": "$cork"},
+        {"shape": "circle", "x": -1.1, "y": -1.1, "radius": 0.6, "fill": "rgba(255,255,255,0.6)"}]}]},
+    {"name": "decanter", "at": [3, -4], "layers": [
+      {"layer": 0, "height": "83 cm", "thickness": "22 cm", "sides": "$crystal", "steps": [
+        {"shape": "circle", "x": 0, "y": 0, "radius": 3.6, "fill": "$crystal", "stroke": "rgba(240,250,255,0.75)", "line_width": 0.6},
+        {"shape": "circle", "x": 0, "y": 0, "radius": 2.4, "fill": "$whiskey"},
+        {"shape": "circle", "x": 0, "y": 0, "radius": 1.1, "fill": "rgba(240,250,255,0.85)"}]}]},
+    {"name": "ice_bucket", "at": [4, 4], "layers": [
+      {"layer": 0, "height": "83 cm", "thickness": "18 cm", "sides": "$bucket", "steps": [
+        {"shape": "circle", "x": 0, "y": 0, "radius": 4, "fill": "$bucket", "stroke": "#e6e8f0", "line_width": 0.8},
+        {"shape": "circle", "x": 0, "y": 0, "radius": 3, "fill": "#dfe9f2"},
+        {"shape": "rectangle", "x": -1.5, "y": -1.5, "width": 1.6, "height": 1.6, "fill": "rgba(255,255,255,0.85)"},
+        {"shape": "rectangle", "x": 0.5, "y": 0, "width": 1.4, "height": 1.4, "fill": "rgba(255,255,255,0.85)"}]}]},
+    {"name": "coupe_left", "at": [11, -5], "layers": [
+      {"layer": 0, "height": "83 cm", "thickness": "14 cm", "sides": "rgba(220,240,255,0.2)", "steps": [
+        {"shape": "circle", "x": 0, "y": 0, "radius": 2.6, "fill": "rgba(220,240,255,0.2)", "stroke": "rgba(245,252,255,0.8)", "line_width": 0.5}]}]},
+    {"name": "coupe_right", "at": [11, 5], "layers": [
+      {"layer": 0, "height": "83 cm", "thickness": "14 cm", "sides": "rgba(220,240,255,0.2)", "steps": [
+        {"shape": "circle", "x": 0, "y": 0, "radius": 2.6, "fill": "rgba(220,240,255,0.2)", "stroke": "rgba(245,252,255,0.8)", "line_width": 0.5}]}]}
+   ]
+  }
+ }
+}
