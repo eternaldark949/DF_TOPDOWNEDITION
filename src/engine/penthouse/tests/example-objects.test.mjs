@@ -34,3 +34,17 @@ test('the bar cart draws its parts lowest first, coloured by its look, and a loo
     assert.equal(draw().filter(packet => packet.material.stroke === '#c9a46a').length, 0, 'a chrome cart is the same record with one value changed');
     render.dispose();
 });
+
+test('leaning, each thing on the tray draws whole, farthest from the camera first, so a near bottle covers the foot of a far glass', async () => {
+    const p = world(), camera = new cameraSystem({ position: [0, 0], viewport: { width: 400, height: 300 } }), render = new renderSystem({ physics_system: p, camera });
+    render.registerRenderer('recording', recordingRenderer); await render.setRenderer('recording', { surface: null });
+    createObject(p.elements, 'examples:bar_cart', [0, 0]); p.updateState(1 / 60);
+    const order = x => { camera.setView({ position: [x, 0] }); render.setHeightView({ eye: 400 }); render.beginFrame(); render.drawLooks(); render.endFrame();
+        const fills = render.getFrameSnapshot().passes.flatMap(pass => pass.packets).map(packet => packet.material.fill);
+        return { wine: fills.lastIndexOf('#6a0c20'), cork: fills.indexOf('#c8a27a'), coupe: fills.indexOf('rgba(220,240,255,0.2)'), tray: fills.lastIndexOf('rgba(40,30,36,0.92)') }; };
+    const left = order(-150), right = order(150);
+    assert.ok(left.tray < left.coupe && right.tray < right.wine, 'the frame and its tray first');
+    assert.ok(left.coupe < left.wine, 'camera on the left: the coupe (right end) is far, so drawn before the wine');
+    assert.ok(right.wine < right.coupe, 'camera on the right: the wine is far');
+    render.dispose();
+});

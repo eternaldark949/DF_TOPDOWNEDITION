@@ -80,13 +80,15 @@ export function componentSteps(components,source,{solid_only=false}={}){
     return out;
 }
 /**
- * Draws an entity's components, one scene per visible layer, lowest first: [{height, layer, component,
- * packets}]. Heights are z in the world. A component off a joint stands on the entity's base (its
- * elevation); one on a joint stands on the joint, placed by `joints(name)` ({position, rotation, scale,
+ * Draws an entity's components, one scene per visible layer, lowest first: [{height, depth, layer, component,
+ * packets}]; `depth` is the height its packets sort by (its component's base when it draws whole).
+ * Heights are z in the world. A component off a joint stands on the entity's base (its elevation); one on a joint stands on the joint, placed by `joints(name)` ({position, rotation, scale,
  * height, pitch} in the world), when it gives one. Either way a layer's `height` counts up from there. A
  * joint's pitch tips its bone out of the ground plane, so from above the component is shortened along
  * the bone by the pitch's cosine, and its `at` rises with the bone. Layers draw by their height in the
- * world, then layer number, then component order, so taller parts cover lower ones.
+ * world, then layer number, then component order, so taller parts cover lower ones. Leaning toward the
+ * camera, parts at one height draw farthest from the camera first, and a component set on the entity above
+ * its base (a bottle on a tray) draws whole from that base, so a near bottle covers the foot of a far one.
  */
 export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null}={}){
     if(view!==null&&!(view instanceof heightView))throw new TypeError('A height view is a heightView or null');
@@ -101,8 +103,15 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null}
         const ground=joint?(joint.height??elevation)+c.at[0]*Math.sin(pitch)*wz:elevation,z0=ground+layer.height*wz,z1=ground+(layer.height+layer.thickness)*wz;
         parts.push({c,layer,order,z0,z1,fore,rise:joint?Math.sin(pitch)*size[0]*wz:0,place:{at:[base.position[0]+x*cos-y*sin,base.position[1]+x*sin+y*cos],rotation:base.rotation+c.rotation,scale:size}});
     }
-    parts.sort((a,b)=>a.z0-b.z0||a.layer.layer-b.layer.layer||a.order-b.order);
-    return parts.map(({c,layer,z0,z1,fore,rise,place})=>{
+    // Leaning, a component off a joint that stands above the entity's base is a thing set on it (a bottle on a
+    // tray): it draws whole, its layers in height order, and things on one base draw farthest from the camera
+    // first, so a near one covers the foot of a far one, as from the eye above. Parts rising from the base (a
+    // building's floors) and parts on joints keep drawing layer by layer, by height, so they sort with the world.
+    const base=new Map();for(const p of parts)if(!p.c.joint)base.set(p.c,Math.min(base.get(p.c)??Infinity,p.z0));
+    const whole=p=>view&&!p.c.joint&&base.get(p.c)>elevation;
+    for(const p of parts){const w=whole(p);p.key=w?base.get(p.c):p.z0;p.far=view?-Math.hypot(p.place.at[0]-view.camera[0],p.place.at[1]-view.camera[1]):0;p.then=w?[p.order,p.z0,p.layer.layer]:[p.layer.layer,p.order,0];}
+    parts.sort((a,b)=>a.key-b.key||a.far-b.far||a.then[0]-b.then[0]||a.then[1]-b.then[1]||a.then[2]-b.then[2]);
+    return parts.map(({c,layer,z0,z1,fore,rise,place,key})=>{
         // A tipped bone is drawn in the plane of its joint, but its far end is lower or higher: leaning toward
         // the camera, it slants on to where that end is drawn, so a hanging leg reaches its knee and its foot.
         const lean=view&&rise?boneLean(view,place,z1,rise):null;
@@ -112,7 +121,7 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null}
         if(view)scene.enter({matrix:view.plane(view.k(z1))});
         scene.draw(steps,{...place,values,materials:name=>resource(source,qualifyResource(name,layer.drawing??entity.template_id??name),'material')});
         if(view)scene.leave();
-        return {height:z0,layer:layer.layer,component:c.name,packets:scene.finish()};
+        return {height:z0,depth:key,layer:layer.layer,component:c.name,packets:scene.finish()};
     });
 }
 // Every visible layer with its component and the component's place in the list.
