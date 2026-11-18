@@ -1,0 +1,24 @@
+{
+  "library_id": "neural_sys_interior",
+  "description": "Neural Systems — Identity Atelier: the classic geometry (floors as flat colours, walls, rooms, doors, exits, landmarks). Its floor art and furniture are still to be built as data.",
+  "resources": {
+    "map": {
+      "kind": "map",
+      "label": "Neural Systems — Identity Atelier",
+      "setting": "interior",
+      "size": [1000, 800],
+      "spawn": [500, 700],
+      "floors": [{"shape": "rectangle", "x": 0, "y": 0, "width": 1000, "height": 800, "fill": "#070f22"}, {"shape": "rectangle", "x": 50, "y": 50, "width": 900, "height": 500, "fill": "#0e0e20"}, {"shape": "rectangle", "x": 50, "y": 550, "width": 350, "height": 200, "fill": "#101028"}, {"shape": "rectangle", "x": 600, "y": 550, "width": 350, "height": 200, "fill": "#08081a"}],
+      "wall_look": {"material": "surfaces:plaster", "sides": "surfaces:plaster_face", "height": 120, "layer": 10},
+      "walls": [{"x": 0, "y": 0, "w": 1000, "h": 50}, {"x": 0, "y": 750, "w": 400, "h": 50}, {"x": 600, "y": 750, "w": 400, "h": 50}, {"x": 0, "y": 0, "w": 50, "h": 800}, {"x": 950, "y": 0, "w": 50, "h": 800}, {"x": 400, "y": 550, "w": 15, "h": 80}, {"x": 400, "y": 700, "w": 15, "h": 50}, {"x": 585, "y": 550, "w": 15, "h": 80}, {"x": 585, "y": 700, "w": 15, "h": 50}, {"x": 50, "y": 550, "w": 365, "h": 15}, {"x": 585, "y": 550, "w": 365, "h": 15}, {"x": 200, "y": 50, "w": 600, "h": 8}],
+      "rooms": {"showroom": {"x": 0, "y": 0, "w": 1000, "h": 550, "type": "indoor", "label": "Showroom"}, "foyer": {"x": 415, "y": 565, "w": 170, "h": 235, "type": "indoor", "label": "Foyer"}, "consult": {"x": 0, "y": 565, "w": 400, "h": 235, "type": "indoor", "label": "Consultation"}, "server": {"x": 600, "y": 565, "w": 400, "h": 235, "type": "indoor", "label": "Server Room"}},
+      "doors": [{"x": 415, "y": 550, "w": 170, "h": 15, "type": "arch", "orientation": "H", "rooms": ["showroom", "foyer"]}, {"x": 400, "y": 630, "w": 15, "h": 70, "type": "hinged", "orientation": "V", "rooms": ["foyer", "consult"], "hingeSide": "left"}, {"x": 585, "y": 630, "w": 15, "h": 70, "type": "hinged", "orientation": "V", "rooms": ["foyer", "server"], "hingeSide": "right"}],
+      "triggers": [{"x": 400, "y": 720, "w": 200, "h": 80, "role": "transition", "authored_id": "exit_0", "data": {"target": "sdc", "label": "Exit Neural Systems"}}],
+      "landmarks": {"neural_exit": [500, 760], "neural_counter": [500, 250], "neural_console_left": [200, 200], "neural_console_right": [800, 200], "neural_server": [775, 650]},
+      "ambient_darkness": 0.5,
+      "nav_props": "all",
+      "lighting_tint": "6, 10, 34",
+      "wall_style": {"fill": "#0c1b32", "stroke": "rgba(152,178,204,.55)"}
+    }
+  }
+}

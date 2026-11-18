@@ -1,0 +1,17 @@
+{
+  "library_id": "keepers_parlor",
+  "description": "The Keeper's parlor: the classic geometry (floors as flat colours, walls, rooms, doors, exits, landmarks). Its floor art and furniture are still to be built as data.",
+  "resources": {
+    "map": {
+      "kind": "map",
+      "label": "The Keeper's parlor",
+      "setting": "interior",
+      "size": [900, 700],
+      "spawn": [450, 600],
+      "floors": [{"shape": "rectangle", "x": 0, "y": 0, "width": 900, "height": 700, "fill": "#140c10"}],
+      "wall_look": {"material": "surfaces:plaster", "sides": "surfaces:plaster_face", "height": 120, "layer": 10},
+      "landmarks": {"hearth": [450, 70], "parlor_mid": [520, 260], "keeper_seat": [450, 262], "traveler_seat": [648, 306], "parlor_window": [450, 20]},
+      "ambient_darkness": 0.78
+    }
+  }
+}

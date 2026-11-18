@@ -1,0 +1,17 @@
+{
+  "library_id": "keepers_hill",
+  "description": "Somewhere between the realms: the classic geometry (floors as flat colours, walls, rooms, doors, exits, landmarks). Its floor art and furniture are still to be built as data.",
+  "resources": {
+    "map": {
+      "kind": "map",
+      "label": "Somewhere between the realms",
+      "setting": "interior",
+      "size": [1800, 2800],
+      "spawn": [900, 2450],
+      "floors": [{"shape": "rectangle", "x": 0, "y": 0, "width": 1800, "height": 2800, "fill": "#140a26"}],
+      "wall_look": {"material": "surfaces:plaster", "sides": "surfaces:plaster_face", "height": 120, "layer": 10},
+      "landmarks": {"hill_foot": [900, 2330], "hill_low": [900, 2120], "hill_mid": [900, 1500], "keeper_house": [900, 600], "keeper_porch": [900, 760]},
+      "ambient_darkness": 0.4
+    }
+  }
+}

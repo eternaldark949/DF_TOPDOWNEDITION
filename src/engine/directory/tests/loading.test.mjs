@@ -1,7 +1,7 @@
 // ===== LV2 DIRECTORY =====
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolvePlacement, resolveLayout, resolvePropLook, isMovable, validatePropCatalog, validateMapLayout } from '../index.mjs';
+import { resolvePlacement, resolveLayout, resolvePropLook, isMovable, validatePropCatalog, validateMapLayout, validateMap, mapDefinition, validateLibrary, assetLibrary } from '../index.mjs';
 
 const catalog = { types: { crate: { defaults: { width: 20, height: 20, color: '#863' }, movable: true }, wall_lamp: { defaults: { width: 6, height: 6, light: { radius: 80 } } } } };
 
@@ -50,4 +50,19 @@ test('a family declares a look schema; types are presets of it and placements se
     assert.throws(() => validatePropCatalog({ families: { f: { look: { a: { kind: 'number', default: 'x' } } } }, types: {} }), /default is not a number/);
     assert.throws(() => validateMapLayout({ props: [{ type: 'cafe_table', x: 1, y: 1, look: { glaze: '#fff' } }] }, props.types, 'cafe', families), /cafe: placement 0 \(cafe_table\): unknown look field glaze/);
     assert.doesNotThrow(() => validateMapLayout({ props: [{ type: 'cafe_table', x: 1, y: 1, look: { cups: null, top: '#000' } }] }, props.types, 'cafe', families));
+});
+
+test('a map is a resource: validated like any other, found by its id, and built from a detached copy', () => {
+    const map = { kind: 'map', setting: 'exterior', size: [400, 300], spawn: [20, 20], label: 'Yard', floors: [{ shape: 'rectangle', x: 0, y: 0, width: 400, height: 300, fill: '#363', elevation: 0 }], walls: [{ x: 0, y: 0, w: 400, h: 8 }], wall_look: { material: 'demo:stone' } };
+    const registry = new assetLibrary(); registry.registerLibrary(validateLibrary({ library_id: 'yard', resources: { map } }));
+    const definition = mapDefinition(registry, 'yard:map');
+    assert.equal(definition.map_id, 'yard:map'); assert.equal(definition.kind, 'exterior', 'its setting is the builder\'s kind');
+    assert.equal(definition.label, 'Yard', 'what the builder does not read is kept as the game\'s data');
+    definition.walls[0].w = 1; assert.equal(map.walls[0].w, 400, 'detached');
+    assert.equal(mapDefinition(registry, 'yard:map').kind, 'exterior');
+    assert.throws(() => validateMap({ size: [0, 10] }), /size/);
+    assert.throws(() => validateMap({ size: [10, 10], setting: 'cave' }), /setting/);
+    assert.throws(() => validateMap({ size: [10, 10], walls: {} }), /walls/);
+    assert.throws(() => validateMap({ size: [10, 10], floors: [{ shape: 'blob' }] }), /floors/);
+    assert.throws(() => validateMap({ size: [10, 10], wall_look: { height: 3 } }), /wall_look/);
 });

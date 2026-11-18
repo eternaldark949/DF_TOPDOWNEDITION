@@ -1,0 +1,8 @@
+{
+  "library_id": "surfaces",
+  "description": "Surfaces any map may use.",
+  "resources": {
+    "plaster": {"kind": "material", "fill": "#2a2026"},
+    "plaster_face": {"kind": "material", "fill": "#4c3a40"}
+  }
+}

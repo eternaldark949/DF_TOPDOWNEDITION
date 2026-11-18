@@ -1,0 +1,17 @@
+{
+  "library_id": "van_interior",
+  "description": "En route to Double Nights: the classic geometry (floors as flat colours, walls, rooms, doors, exits, landmarks). Its floor art and furniture are still to be built as data.",
+  "resources": {
+    "map": {
+      "kind": "map",
+      "label": "En route to Double Nights",
+      "setting": "interior",
+      "size": [400, 820],
+      "spawn": [200, 460],
+      "floors": [{"shape": "rectangle", "x": 0, "y": 0, "width": 400, "height": 820, "fill": "#0b0a10"}],
+      "wall_look": {"material": "surfaces:plaster", "sides": "surfaces:plaster_face", "height": 120, "layer": 10},
+      "landmarks": {"van_center": [200, 450], "van_949": [136, 404], "van_747": [264, 404], "van_rear": [200, 700], "van_partition": [200, 186]},
+      "ambient_darkness": 0.62
+    }
+  }
+}

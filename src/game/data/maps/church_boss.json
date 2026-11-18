@@ -1,0 +1,21 @@
+{
+  "library_id": "church_boss",
+  "description": "Abandoned Church: the classic geometry (floors as flat colours, walls, rooms, doors, exits, landmarks). Its floor art and furniture are still to be built as data.",
+  "resources": {
+    "map": {
+      "kind": "map",
+      "label": "Abandoned Church",
+      "setting": "exterior",
+      "size": [1200, 1400],
+      "spawn": [600, 1250],
+      "floors": [{"shape": "rectangle", "x": 0, "y": 0, "width": 1200, "height": 1400, "fill": "#0e0c12"}],
+      "wall_look": {"material": "surfaces:plaster", "sides": "surfaces:plaster_face", "height": 120, "layer": 10},
+      "walls": [{"x": 0, "y": 0, "w": 1200, "h": 50}, {"x": 0, "y": 1350, "w": 550, "h": 50}, {"x": 650, "y": 1350, "w": 550, "h": 50}, {"x": 0, "y": 0, "w": 50, "h": 1400}, {"x": 1150, "y": 0, "w": 50, "h": 1400}],
+      "triggers": [{"x": 550, "y": 1320, "w": 100, "h": 80, "role": "transition", "authored_id": "exit_0", "data": {"target": "hotel_suite", "label": "Exit Church"}}],
+      "landmarks": {"church_exit": [600, 1370], "church_altar": [600, 175], "boss_spawn": [600, 400]},
+      "climate": "tempest",
+      "nav_props": "all",
+      "wall_style": {"fill": "#16121a", "stroke": "rgba(170,120,255,0.35)"}
+    }
+  }
+}

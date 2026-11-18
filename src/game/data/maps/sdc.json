@@ -1,0 +1,17 @@
+{
+  "library_id": "sdc",
+  "description": "Southern Dimensions City: the classic geometry (floors as flat colours, walls, rooms, doors, exits, landmarks). Its floor art and furniture are still to be built as data.",
+  "resources": {
+    "map": {
+      "kind": "map",
+      "label": "Southern Dimensions City",
+      "setting": "exterior",
+      "size": [13200, 13200],
+      "spawn": [1200, 550],
+      "floors": [{"shape": "rectangle", "x": 0, "y": 0, "width": 13200, "height": 13200, "fill": "#2a262e"}, {"shape": "rectangle", "x": 2600, "y": 5800, "width": 1000, "height": 800, "fill": "#1a2b1a"}, {"shape": "rectangle", "x": 2000, "y": 900, "width": 1800, "height": 1200, "fill": "#4a2a2a"}, {"shape": "rectangle", "x": 50, "y": 80, "width": 800, "height": 600, "fill": "#1a2518"}, {"shape": "rectangle", "x": 200, "y": 4500, "width": 1500, "height": 1200, "fill": "#3d3d3d"}],
+      "wall_look": {"material": "surfaces:plaster", "sides": "surfaces:plaster_face", "height": 120, "layer": 10},
+      "climate": "city",
+      "floor_areas": [{"area": "hub_graveyard", "color": "#1a2e1a"}]
+    }
+  }
+}

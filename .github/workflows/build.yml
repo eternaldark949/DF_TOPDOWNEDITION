@@ -27,11 +27,11 @@ jobs:
           "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
           echo "NODE_PATH=$RUNNER_TEMP/pw/node_modules" >> "$GITHUB_ENV"
 
-      - name: Check the folder rules (src holds only the engine, classic code in reference/classic)
+      - name: Check the folder rules (src holds the engine and the game's data, classic code in reference/classic)
         run: node tools/check-layout.mjs
 
-      - name: Check the engine (every level, standalone)
-        run: node --test src/engine/tests/*.test.mjs src/engine/*/tests/*.test.mjs src/engine/basement/*/tests/*.test.mjs
+      - name: Check the engine (every level, standalone) and the game's data
+        run: node --test src/engine/tests/*.test.mjs src/engine/*/tests/*.test.mjs src/engine/basement/*/tests/*.test.mjs src/game/data/tests/*.test.mjs
 
       - name: Check the drawing on a real canvas
         run: node --test tools/test-art-pixels.mjs

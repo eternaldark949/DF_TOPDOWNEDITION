@@ -1,5 +1,6 @@
 // Enforces the folder rules in READ-FIRST/ENGINE-ARCHITECTURE.md:
-//   0. src/ holds only engine/: code that follows the Engine API spec (a game is written on it, to the same rules)
+//   0. src/ holds engine/ (code that follows the Engine API spec) and game/data/ (the game's content: JSON
+//      libraries, their README and the tests that load them); game code is written on the engine to the same rules
 //   1. classic code lives only in reference/classic/, read-only (no .js, .cjs or .css in src; .html only in examples/)
 //   2. nothing in src/ imports from reference/, and classic scripts import nothing (they reach the
 //      new engine only through the bundled DFNative object)
@@ -29,7 +30,8 @@ const GAME_NAMES = /\bdf_|\bapartment|\bGAME_DB\b|\bDFNative\b|\bganger|\bvelvet
 const importsOf = source => [...source.matchAll(/(?:^|[\s;])(?:import|export)\s[^'"`]*?from\s*['"]([^'"]+)['"]|import\s*\(\s*['"]([^'"]+)['"]\s*\)|^\s*import\s*['"]([^'"]+)['"]/gm)].map(m => m[1] ?? m[2] ?? m[3]);
 
 for (const f of files) {
-    if (!/^engine\//.test(f.rel) && f.rel !== 'README.md') problems.push(`${f.rel}: src/ holds only engine/`);
+    if (!/^engine\//.test(f.rel) && !/^game\/data\//.test(f.rel) && f.rel !== 'README.md') problems.push(`${f.rel}: src/ holds only engine/ and game/data/`);
+    if (/^game\/data\//.test(f.rel) && !/\.(json|md)$/.test(f.rel) && !/^game\/data\/tests\/[^/]+\.test\.mjs$/.test(f.rel)) problems.push(`${f.rel}: game/data holds data (.json), its README and tests/*.test.mjs`);
     if (/\.(js|cjs|css)$/.test(f.rel)) problems.push(`${f.rel}: classic file in src/ (new code is .mjs; classic code is in reference/classic/)`);
     if (f.rel.endsWith('.html') && !f.rel.includes('/examples/')) problems.push(`${f.rel}: page in src/ that is not an example`);
     if (!f.rel.endsWith('.mjs')) continue;

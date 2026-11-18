@@ -12,6 +12,10 @@
 // map_layout     { map_id?, props: [placement], ...any other per-map lists (copied as data) }
 //                placement = { type, x, y, ...fields }: fields override the type's defaults, and a
 //                field set to null removes that default.
+// map            { size: [w, h], setting?: 'interior'|'exterior', spawn?, floors?, wall_look?, walls?, placements?, rooms?, doors?, ... }
+//                A whole map as data: the Basement map builder's definition, found by its id like any
+//                resource. `setting` is the builder's `kind` (the resource's own `kind` is 'map'). Fields
+//                the builder does not read (a label, landmarks, windows) are the game's, kept as data.
 // skeleton       { rig_id, joints: [{ name, parent?, position?, rotation?, scale?, limits? }], anchors? }
 //                A rig hierarchy in px and radians, +x forward, -y left. The Basement's rigDefinition
 //                packet, so a prefab compiles it as it is.
@@ -30,6 +34,7 @@ import { DRAWING, MATERIAL, validateEffectsPreset } from '../basement/rendering/
 export const STRUCTURES = Object.freeze({
     prop_catalog: 'A catalog of prop types and the families they are presets of: { types: { <type>: { defaults, movable?, blocks_light?, light? } }, families?: { <family>: { look: { <field>: { kind, default } } } } }.',
     map_layout: 'A map\'s placements over a prop catalog: { props: [{ type, x, y, ...fields }], ... }.',
+    map: 'A whole map as data, the map builder\'s definition: { size: [w, h], setting?: "interior" | "exterior", spawn?, floors? (drawing steps in map space), wall_look?, walls?, wall_openings?, placements?, lights?, triggers?, rooms?, doors?, room_links?, cloths?, regions?, ...game data }. Built with mapDefinition(registry, id).',
     skeleton: 'A rig hierarchy: { rig_id, joints: [{ name, parent?, position?, rotation?, scale?, limits? }], anchors? }.',
     clip_set: 'Animation clips for one skeleton: { clips: [{ clip_id, duration, tracks, markers? }] }.',
     locomotion: 'Which clips stand and walk: { idle, walk, stride (px per cycle), moving_speed (px/s) }.',
@@ -187,7 +192,28 @@ export function validateMaterial(material, where = 'material') {
     }
     return material;
 }
-const VALIDATORS = { drawing: validateDrawing, material: validateMaterial, texture: validateTexture, prop_catalog: validatePropCatalog, skeleton: validateSkeleton, clip_set: validateClipSet, locomotion: validateLocomotion, door_kind: validateDoorKind, effects: validateEffectsPreset };
+const MAP_LISTS = ['floors', 'walls', 'wall_openings', 'placements', 'lights', 'triggers', 'doors', 'room_links', 'cloths'];
+const point = v => Array.isArray(v) && v.length === 2 && v.every(Number.isFinite);
+/** Throws unless `map` is a map: a positive size, its sections the right shapes, a floor step a drawing step. Returns it. */
+export function validateMap(map, where = 'map') {
+    if (!plain(map)) fail(where, 'a map is { size, ...sections }');
+    if (!Array.isArray(map.size) || map.size.length !== 2 || !map.size.every(v => Number.isFinite(v) && v > 0)) fail(where, 'size is [width, height] in world units');
+    if (map.setting !== undefined && !['interior', 'exterior'].includes(map.setting)) fail(where, 'setting is interior or exterior');
+    if (map.spawn !== undefined && map.spawn !== null && !point(map.spawn)) fail(where, 'spawn is [x, y]');
+    for (const key of MAP_LISTS) if (map[key] !== undefined && !(Array.isArray(map[key]) && map[key].every(plain))) fail(where, `${key} is a list of objects`);
+    if (map.rooms !== undefined && !(plain(map.rooms) && Object.values(map.rooms).every(plain))) fail(where, 'rooms are { id: room }');
+    if (map.wall_look !== undefined && !(plain(map.wall_look) && typeof map.wall_look.material === 'string')) fail(where, 'wall_look is { material, sides?, height?, layer? }');
+    if (map.floors?.length) validateDrawing({ steps: map.floors.map(({ elevation, ...step }) => step) }, `${where}.floors`);
+    return map;
+}
+/** The map builder's definition of the map resource `id`: a detached copy, its `setting` as the builder's `kind` and its id as `map_id`. */
+export function mapDefinition(registry, id) {
+    const map = registry.getResource(id);
+    if (map?.kind !== 'map') throw new TypeError(`${id} is not a map`);
+    const { kind, setting = 'interior', ...definition } = structuredClone(map);
+    return { map_id: id, kind: setting, ...definition };
+}
+const VALIDATORS = { drawing: validateDrawing, material: validateMaterial, texture: validateTexture, prop_catalog: validatePropCatalog, skeleton: validateSkeleton, clip_set: validateClipSet, locomotion: validateLocomotion, door_kind: validateDoorKind, effects: validateEffectsPreset, map: validateMap };
 /** Validates every resource of a library whose kind has a structure here; other kinds pass through. Returns the library. */
 export function validateLibrary(library) {
     for (const [id, resource] of Object.entries(library?.resources ?? {})) VALIDATORS[resource?.kind]?.(resource, `${library.library_id}:${id}`);

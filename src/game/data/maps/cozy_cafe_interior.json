@@ -1,0 +1,23 @@
+{
+  "library_id": "cozy_cafe_interior",
+  "description": "Cozy Cafe: the classic geometry (floors as flat colours, walls, rooms, doors, exits, landmarks). Its floor art and furniture are still to be built as data.",
+  "resources": {
+    "map": {
+      "kind": "map",
+      "label": "Cozy Cafe",
+      "setting": "interior",
+      "size": [1200, 1000],
+      "spawn": [600, 900],
+      "floors": [{"shape": "rectangle", "x": 0, "y": 0, "width": 1200, "height": 1000, "fill": "#2a1a0e"}],
+      "wall_look": {"material": "surfaces:plaster", "sides": "surfaces:plaster_face", "height": 120, "layer": 10},
+      "walls": [{"x": 0, "y": 0, "w": 1200, "h": 50}, {"x": 0, "y": 950, "w": 500, "h": 50}, {"x": 700, "y": 950, "w": 500, "h": 50}, {"x": 0, "y": 0, "w": 50, "h": 1000}, {"x": 1150, "y": 0, "w": 50, "h": 1000}, {"x": 700, "y": 300, "w": 450, "h": 15}, {"x": 690, "y": 60, "w": 15, "h": 240}, {"x": 950, "y": 700, "w": 200, "h": 15}, {"x": 940, "y": 700, "w": 15, "h": 250}],
+      "rooms": {"cafe": {"rects": [{"x": 0, "y": 0, "w": 690, "h": 315}, {"x": 0, "y": 315, "w": 1200, "h": 385}, {"x": 0, "y": 700, "w": 940, "h": 300}], "type": "indoor", "label": "Café"}, "kitchen": {"x": 705, "y": 0, "w": 495, "h": 300, "type": "indoor", "label": "Kitchen"}, "storeroom": {"x": 955, "y": 715, "w": 245, "h": 285, "type": "indoor", "label": "Storeroom"}},
+      "doors": [{"x": 760, "y": 300, "w": 80, "h": 15, "type": "hinged", "orientation": "H", "rooms": ["cafe", "kitchen"], "hingeSide": "left"}, {"x": 940, "y": 790, "w": 15, "h": 80, "type": "hinged", "orientation": "V", "rooms": ["cafe", "storeroom"], "hingeSide": "left"}],
+      "triggers": [{"x": 500, "y": 920, "w": 200, "h": 80, "role": "transition", "authored_id": "exit_0", "data": {"target": "sdc", "label": "Exit to City"}}],
+      "landmarks": {"cafe_exit": [600, 960], "cafe_counter": [250, 200], "cafe_dining": [560, 550], "cafe_booths": [1040, 500], "cafe_hearth": [190, 535], "cafe_kitchen": [900, 150]},
+      "ambient_darkness": 0.5,
+      "nav_props": "all",
+      "wall_style": {"fill": "#2b1a12", "stroke": "rgba(240,190,120,0.35)"}
+    }
+  }
+}

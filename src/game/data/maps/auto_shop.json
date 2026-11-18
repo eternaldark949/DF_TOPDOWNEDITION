@@ -1,0 +1,22 @@
+{
+  "library_id": "auto_shop",
+  "description": "Torque Auto — Service Bay: the classic geometry (floors as flat colours, walls, rooms, doors, exits, landmarks). Its floor art and furniture are still to be built as data.",
+  "resources": {
+    "map": {
+      "kind": "map",
+      "label": "Torque Auto — Service Bay",
+      "setting": "interior",
+      "size": [1400, 1000],
+      "spawn": [700, 900],
+      "floors": [{"shape": "rectangle", "x": 0, "y": 0, "width": 1400, "height": 1000, "fill": "#1d1d22"}],
+      "wall_look": {"material": "surfaces:plaster", "sides": "surfaces:plaster_face", "height": 120, "layer": 10},
+      "walls": [{"x": 0, "y": 0, "w": 1400, "h": 50}, {"x": 0, "y": 950, "w": 600, "h": 50}, {"x": 800, "y": 950, "w": 600, "h": 50}, {"x": 0, "y": 0, "w": 50, "h": 1000}, {"x": 1350, "y": 0, "w": 50, "h": 1000}, {"x": 880, "y": 50, "w": 20, "h": 280}, {"x": 880, "y": 430, "w": 20, "h": 220}, {"x": 880, "y": 690, "w": 470, "h": 20}, {"x": 880, "y": 650, "w": 20, "h": 40}, {"x": 880, "y": 710, "w": 20, "h": 240}],
+      "rooms": {"bay": {"x": 0, "y": 0, "w": 880, "h": 1000, "type": "indoor", "label": "Service Bay"}, "showroom": {"x": 900, "y": 0, "w": 500, "h": 690, "type": "indoor", "label": "Showroom"}, "parts": {"x": 900, "y": 710, "w": 500, "h": 290, "type": "indoor", "label": "Parts Room"}},
+      "doors": [{"x": 880, "y": 330, "w": 20, "h": 100, "type": "arch", "orientation": "V", "rooms": ["bay", "showroom"]}, {"x": 880, "y": 790, "w": 20, "h": 80, "type": "hinged", "orientation": "V", "rooms": ["bay", "parts"], "hingeSide": "left"}],
+      "triggers": [{"x": 600, "y": 920, "w": 200, "h": 80, "role": "transition", "authored_id": "exit_0", "data": {"target": "sdc", "label": "Exit to City"}}],
+      "landmarks": {"shop_exit": [700, 960], "shop_counter": [1100, 300], "shop_bay_1": [250, 200], "shop_bay_2": [250, 450], "shop_lift": [600, 350], "shop_parts": [1100, 800]},
+      "ambient_darkness": 0.45,
+      "wall_style": {"fill": "#1c1c22", "stroke": "rgba(255,154,42,0.4)"}
+    }
+  }
+}

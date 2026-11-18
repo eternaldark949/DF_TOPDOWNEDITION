@@ -1,0 +1,17 @@
+{
+  "library_id": "ethereal_plane",
+  "description": "The Ethereal Plane: the classic geometry (floors as flat colours, walls, rooms, doors, exits, landmarks). Its floor art and furniture are still to be built as data.",
+  "resources": {
+    "map": {
+      "kind": "map",
+      "label": "The Ethereal Plane",
+      "setting": "interior",
+      "size": [1200, 1200],
+      "spawn": [600, 1000],
+      "floors": [{"shape": "rectangle", "x": 0, "y": 0, "width": 1200, "height": 1200, "fill": "#0a001a"}, {"shape": "rectangle", "x": 100, "y": 100, "width": 1000, "height": 1000, "fill": "#150025"}],
+      "wall_look": {"material": "surfaces:plaster", "sides": "surfaces:plaster_face", "height": 120, "layer": 10},
+      "walls": [{"x": 0, "y": 0, "w": 1200, "h": 50}, {"x": 0, "y": 1150, "w": 1200, "h": 50}, {"x": 0, "y": 0, "w": 50, "h": 1200}, {"x": 1150, "y": 0, "w": 50, "h": 1200}],
+      "triggers": [{"x": 550, "y": 1100, "w": 100, "h": 50, "role": "transition", "authored_id": "exit_0", "data": {"target": "sdc", "label": "Return to Body"}}]
+    }
+  }
+}

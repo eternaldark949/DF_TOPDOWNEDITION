@@ -1,0 +1,21 @@
+{
+  "library_id": "medbay_sw",
+  "description": "Dr. Yin's Clinic: the classic geometry (floors as flat colours, walls, rooms, doors, exits, landmarks). Its floor art and furniture are still to be built as data.",
+  "resources": {
+    "map": {
+      "kind": "map",
+      "label": "Dr. Yin's Clinic",
+      "setting": "interior",
+      "size": [800, 800],
+      "spawn": [400, 600],
+      "floors": [{"shape": "rectangle", "x": 0, "y": 0, "width": 800, "height": 800, "fill": "#76828a"}],
+      "wall_look": {"material": "surfaces:plaster", "sides": "surfaces:plaster_face", "height": 120, "layer": 10},
+      "walls": [{"x": 0, "y": 0, "w": 800, "h": 50}, {"x": 0, "y": 750, "w": 350, "h": 50}, {"x": 450, "y": 750, "w": 350, "h": 50}, {"x": 0, "y": 0, "w": 50, "h": 800}, {"x": 750, "y": 0, "w": 50, "h": 800}],
+      "rooms": {"clinic": {"x": 0, "y": 0, "w": 800, "h": 800, "type": "indoor", "label": "Clinic"}},
+      "triggers": [{"x": 350, "y": 720, "w": 100, "h": 80, "role": "transition", "authored_id": "exit_0", "data": {"target": "sdc", "label": "Exit Clinic"}}],
+      "landmarks": {"clinic_exit": [400, 760], "clinic_dr_yin": [400, 200], "clinic_bed_left": [200, 400], "clinic_bed_right": [600, 400], "clinic_respawn": [212, 328], "clinic_scanner": [400, 480]},
+      "ambient_darkness": 0.5,
+      "respawn": {"x": 212, "y": 328}
+    }
+  }
+}
