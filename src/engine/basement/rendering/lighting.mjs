@@ -88,20 +88,21 @@ export function createLightLayer({bounds,tint,areas=[],lights=[]},{scene=new art
  * tile, the areas over it and every still light that reaches it; a light's `polygon` is known by its array, so give a new array when the shadow changes.
  * `key` prefixes the pictures' keys.
  */
-export function createLightLayerParts({extent,tint,areas=[],lights=[],key='light',tile_size=null,view=null,ahead=0,waiting=[]}){
+export function createLightLayerParts({extent,tint,areas=[],lights=[],grids=[],key='light',tile_size=null,view=null,ahead=0,waiting=[]}){
     const {left,top,right,bottom}=extent??{};for(const v of [left,top,right,bottom])finite(v,'extent');
     if(typeof tint!=='string'||!tint)throw new TypeError('The light layer needs a tint colour');
     const all=lights.map(l=>{const shape=validLight(l);return [l,shape,reach(l,shape),l.still?digests(l):null];});
     const cutStill=all.filter(([l])=>l.still===true),glowStill=all.filter(([l])=>l.still===true||l.still==='glow');
     const darks=[],glows=[],ready=[],near=view&&viewAhead(view,ahead);
     const meets=([x,y,w,h])=>([,,r])=>r[0]<x+w&&r[2]>x&&r[1]<y+h&&r[3]>y;
+    const lighted=grids.filter(g=>g&&g.peak>=.004).map(g=>{const r=g.cell*DISC;return [g,null,[g.left-r,g.top-r,g.right+r,g.bottom+r]];});
     const shades=areas.filter(a=>finite(a.cut,'area cut',0)>=.001).map(a=>[a,null,areaReach(a)]).filter(([,,r])=>r);
     for(const tile of tiles(extent,tile_size,near)){
         const shown=!view||(tile[0]<view.right&&tile[0]+tile[2]>view.left&&tile[1]<view.bottom&&tile[1]+tile[3]>view.top);
-        const cuts=cutStill.filter(meets(tile)),lit=glowStill.filter(meets(tile)).filter(([l])=>l.color&&(l.glow??0)>=.001),thinned=shades.filter(meets(tile)).map(([a])=>a);
-        const picture=(part,list,paint,extra)=>({key:`${key}:${signature(tint,tile,list,part,extra)}:${part}`,bounds:tile,build(){const scene=new artScene();paint(scene);return scene.finish();}});
-        const dark={picture:picture('dark',cuts,scene=>{scene.fill(rect(...tile),tint);thin(scene,thinned);for(const [l,shape] of cuts)cut(scene,l,shape);},thinned)};
-        const colour=lit.length?{picture:picture('glow',lit,scene=>{for(const [l,shape] of lit)glow(scene,l,shape);}),blend:'add'}:null;
+        const cuts=cutStill.filter(meets(tile)),lit=glowStill.filter(meets(tile)).filter(([l])=>l.color&&(l.glow??0)>=.001),thinned=shades.filter(meets(tile)).map(([a])=>a),bright=lighted.filter(meets(tile)).map(([g])=>g);
+        const picture=(part,list,paint,extra)=>({key:`${key}:${signature(tint,tile,list,part,extra,bright)}:${part}`,bounds:tile,build(){const scene=new artScene();paint(scene);return scene.finish();}});
+        const dark={picture:picture('dark',cuts,scene=>{scene.fill(rect(...tile),tint);thin(scene,thinned);for(const [l,shape] of cuts)cut(scene,l,shape);for(const g of bright)drawLightGrid(scene,g,'cut',{clip:tile});},thinned)};
+        const colour=lit.length||bright.length?{picture:picture('glow',lit,scene=>{for(const [l,shape] of lit)glow(scene,l,shape);for(const g of bright)drawLightGrid(scene,g,'glow',{clip:tile});}),blend:'add'}:null;
         if(shown){darks.push(dark);if(colour)glows.push(colour);}
         else if(waiting.some(r=>meets(tile)([,,r])))continue;
         else{ready.push({...dark,prepare:true});if(colour)ready.push({...colour,prepare:true});}
@@ -194,9 +195,161 @@ function digests(l){
     return {dark,glow:hash>>>0};
 }
 /** A short hash of everything a still picture shows: its tint, tile and part, the areas over it by value and its lights' digests. */
-function signature(tint,bounds,still,part,areas=[]){
-    hash=0x811c9dc5;add(tint);add(bounds);add(part);
+function signature(tint,bounds,still,part,areas=[],grids=[]){
+    hash=0x811c9dc5;add(tint);add(bounds);add(part);for(const g of grids)add(g.key);
     for(const a of areas){mix(0x61);add(a.cut);if(a.polygon)add(a.polygon);else for(const q of a.rects)add([q.x,q.y,q.w,q.h]);}
     for(const entry of still)mix(entry[3][part]);
     return (hash>>>0).toString(36)+still.length;
 }
+
+// ----- The light grid ---------------------------------------------------------------------------
+// Glowing shapes (steps marked `emits`, see art.mjs) light what is round them without being lights: a
+// small grid of the light arriving at each cell, baked once per region and re-baked only when something
+// glowing in it changes, like EEVEE's irradiance volume in 2D. The light layer draws it as one more still
+// part of its tiles: a cut that thins the dark where the grid is bright, and the grid's colour, added.
+
+/** The light grid's defaults: cell size (16 or 32 world units), blur passes, overall strength, how much of
+ *  the dark a fully lit cell cuts, how strongly its colour is added, and what a wall passes on. */
+export const LIGHT_GRID=Object.freeze({cell:32,spread:3,strength:1,cut:.6,glow:.55,pass:.06});
+export const LIGHT_GRID_CELLS=Object.freeze([16,32]);
+const GRID_FIELDS=Object.freeze(['cell','spread','strength','cut','glow','pass','regions']);
+/** A map's `light_grid` in its one form (unknown fields refused): the defaults with its own, and `regions` {key: {cell, ...}}. */
+export function readLightGrid(settings={}){
+    if(!settings||typeof settings!=='object'||Array.isArray(settings))throw new TypeError('light_grid is {cell, spread, strength, cut, glow, pass, regions}');
+    for(const key of Object.keys(settings))if(!GRID_FIELDS.includes(key))throw new TypeError(`Unknown light_grid field: ${key} (one of ${GRID_FIELDS.join(', ')})`);
+    const one=(s,where)=>{const out={...LIGHT_GRID};for(const key of Object.keys(LIGHT_GRID))if(s[key]!==undefined)out[key]=s[key];
+        if(!LIGHT_GRID_CELLS.includes(out.cell))throw new TypeError(`${where}.cell is 16 or 32`);
+        if(!(Number.isInteger(out.spread)&&out.spread>=0&&out.spread<=8))throw new TypeError(`${where}.spread is a whole number of passes, 0 to 8`);
+        for(const key of ['strength','cut','glow'])if(!(Number.isFinite(out[key])&&out[key]>=0))throw new TypeError(`${where}.${key} is a number of 0 or more`);
+        if(!(out.pass>=0&&out.pass<=1))throw new TypeError(`${where}.pass is 0..1`);return out;};
+    const base=one(settings,'light_grid'),regions={};
+    for(const [key,s] of Object.entries(settings.regions??{})){if(!s||typeof s!=='object')throw new TypeError(`light_grid.regions.${key} is {cell, ...}`);
+        for(const k of Object.keys(s))if(!Object.hasOwn(LIGHT_GRID,k))throw new TypeError(`Unknown light_grid.regions.${key} field: ${k}`);regions[key]=one({...base,...s},`light_grid.regions.${key}`);}
+    return {...base,regions};
+}
+
+// Geometry for the bake: boxes are [left, top, right, bottom], outlines lists of [x, y].
+const insideOutline=(px,py,pts)=>{let inside=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const [xi,yi]=pts[i],[xj,yj]=pts[j];if((yi>py)!==(yj>py)&&px<(xj-xi)*(py-yi)/(yj-yi)+xi)inside=!inside;}return inside;};
+function nearestOnSegment(px,py,ax,ay,bx,by){const ex=bx-ax,ey=by-ay,L=ex*ex+ey*ey,t=L?Math.max(0,Math.min(1,((px-ax)*ex+(py-ay)*ey)/L)):0;return [ax+ex*t,ay+ey*t];}
+/** The point of an emitter nearest (px, py), and the distance to it (0 inside a closed shape; less half its width along a line). */
+function nearestOnEmitter(e,px,py){
+    const pts=e.outline;if(!e.open&&pts.length>2&&insideOutline(px,py,pts))return [px,py,0];
+    let best=Infinity,bx=pts[0][0],by=pts[0][1];
+    const n=e.open?pts.length-1:pts.length;
+    for(let i=0;i<n;i++){const a=pts[i],b=pts[(i+1)%pts.length],[qx,qy]=nearestOnSegment(px,py,a[0],a[1],b[0],b[1]),d=(qx-px)**2+(qy-py)**2;if(d<best){best=d;bx=qx;by=qy;}}
+    if(pts.length===1)best=(px-bx)**2+(py-by)**2;
+    return [bx,by,Math.max(0,Math.sqrt(best)-(e.width??0)/2)];
+}
+/** Whether the segment (ax, ay)–(bx, by) passes through a blocker (a box or an outline). */
+function crosses(b,ax,ay,bx,by){
+    if(b.box){const [l,t,r,btm]=b.box;let t0=0,t1=1;const dx=bx-ax,dy=by-ay;
+        for(const [p,q] of [[-dx,ax-l],[dx,r-ax],[-dy,ay-t],[dy,btm-ay]]){if(p===0){if(q<0)return false;continue;}const k=q/p;if(p<0){if(k>t1)return false;if(k>t0)t0=k;}else{if(k<t0)return false;if(k<t1)t1=k;}}
+        return t0<t1;}
+    const pts=b.outline;if(insideOutline(ax,ay,pts)||insideOutline(bx,by,pts))return true;
+    for(let i=0,j=pts.length-1;i<pts.length;j=i++){const [x1,y1]=pts[j],[x2,y2]=pts[i],d=(bx-ax)*(y2-y1)-(by-ay)*(x2-x1);if(!d)continue;
+        const u=((x1-ax)*(y2-y1)-(y1-ay)*(x2-x1))/d,v=((x1-ax)*(by-ay)-(y1-ay)*(bx-ax))/d;if(u>0&&u<1&&v>=0&&v<=1)return true;}
+    return false;
+}
+const containsPoint=(b,x,y)=>b.box?x>b.box[0]&&x<b.box[2]&&y>b.box[1]&&y<b.box[3]:insideOutline(x,y,b.outline);
+const blockerOf=b=>{const out=Array.isArray(b)?{box:b}:b.box?{box:b.box}:{outline:b.outline};
+    out.bounds=out.box??[Math.min(...out.outline.map(p=>p[0])),Math.min(...out.outline.map(p=>p[1])),Math.max(...out.outline.map(p=>p[0])),Math.max(...out.outline.map(p=>p[1]))];return out;};
+const hexRgb=hex=>{const h=hex.length===4?[...hex.slice(1)].map(c=>c+c).join(''):hex.slice(1);return [0,2,4].map(i=>parseInt(h.slice(i,i+2),16)/255);};
+
+/**
+ * Bakes one region's light grid: every emitter (drawingEmitters' form: {outline, open, width, bounds,
+ * color, strength, reach, height}) adds its colour to each cell in reach, falling off with distance as
+ * (1 - d / R)² where d counts its height (√(d² + height²)) and R = reach + height, so a high window
+ * reaches farther and softer; a cell a blocker hides from the emitter's nearest point takes only `pass`
+ * of it. Then `spread` blur passes bleed the light round corners: a cell inside a blocker takes no light,
+ * and light crossing a blocker between two cells keeps only `pass`. Blockers are boxes [left, top, right,
+ * bottom] or {outline}; an emitter standing inside a blocker (a sign on a wall) is not hidden by it.
+ *  bounds   {left, top, right, bottom}: the region, cut into cells of `cell` world units
+ * Returns a lightGrid: {left, top, cell, cols, rows, light (Float32Array, rgb per cell, 0..1 and over),
+ * key (a hash of its light, so a picture of it is keyed by what it shows), settings, sample(x, y)}.
+ * Emitters and blockers past the region (within an emitter's reach) should be passed too.
+ */
+export function bakeLightGrid({bounds,cell=LIGHT_GRID.cell,emitters=[],blockers=[],spread=LIGHT_GRID.spread,strength=LIGHT_GRID.strength,pass=LIGHT_GRID.pass,cut=LIGHT_GRID.cut,glow=LIGHT_GRID.glow}){
+    const {left,top,right,bottom}=bounds??{};for(const v of [left,top,right,bottom])finite(v,'grid bounds');
+    if(!LIGHT_GRID_CELLS.includes(cell))throw new TypeError('A light grid cell is 16 or 32 world units');
+    const cols=Math.max(1,Math.ceil((right-left)/cell)),rows=Math.max(1,Math.ceil((bottom-top)/cell)),n=cols*rows,light=new Float32Array(n*3);
+    const walls=blockers.map(blockerOf).filter(b=>b.bounds[0]<right+cell&&b.bounds[2]>left-cell&&b.bounds[1]<bottom+cell&&b.bounds[3]>top-cell);
+    const cx=i=>left+(i+.5)*cell,cy=j=>top+(j+.5)*cell;
+    const solid=new Uint8Array(n),span=([l,t,r,b],pad=0)=>[Math.max(0,Math.floor((l-pad-left)/cell)),Math.min(cols-1,Math.floor((r+pad-left)/cell)),Math.max(0,Math.floor((t-pad-top)/cell)),Math.min(rows-1,Math.floor((b+pad-top)/cell))];
+    for(const w of walls){const [i0,i1,j0,j1]=span(w.bounds);for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++)if(containsPoint(w,cx(i),cy(j)))solid[j*cols+i]=1;}
+    for(const e of emitters){
+        const k=e.strength*strength;if(!(k>0))continue;
+        const h=e.height??0,R=e.reach+h,[el,et,er,eb]=e.bounds;
+        if(er+R<left||el-R>right||eb+R<top||et-R>bottom)continue;
+        const near=walls.filter(b=>b.bounds[0]<er+R&&b.bounds[2]>el-R&&b.bounds[1]<eb+R&&b.bounds[3]>et-R);
+        const [r,g,b]=hexRgb(e.color);
+        const i0=Math.max(0,Math.floor((el-R-left)/cell)),i1=Math.min(cols-1,Math.floor((er+R-left)/cell)),j0=Math.max(0,Math.floor((et-R-top)/cell)),j1=Math.min(rows-1,Math.floor((eb+R-top)/cell));
+        for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){
+            const c=j*cols+i;if(solid[c])continue;
+            const px=cx(i),py=cy(j),[qx,qy,d]=nearestOnEmitter(e,px,py),de=Math.sqrt(d*d+h*h);if(de>=R)continue;
+            let f=k*(1-de/R)**2;
+            if(d>0)for(const w of near)if(!containsPoint(w,qx,qy)&&crosses(w,px,py,qx,qy)){f*=pass;break;}
+            light[c*3]+=r*f;light[c*3+1]+=g*f;light[c*3+2]+=b*f;
+        }
+    }
+    // Spread, only over the lit cells and `spread` round them (light moves a cell a pass).
+    let li=cols,lj=rows,hi=-1,hj=-1;for(let c=0;c<n;c++)if(light[c*3]+light[c*3+1]+light[c*3+2]>0){const i=c%cols,j=(c-i)/cols;if(i<li)li=i;if(i>hi)hi=i;if(j<lj)lj=j;if(j>hj)hj=j;}
+    if(spread>0&&hi>=0){
+        const I0=Math.max(0,li-spread),I1=Math.min(cols-1,hi+spread),J0=Math.max(0,lj-spread),J1=Math.min(rows-1,hj+spread);
+        // Each cell's eight neighbour weights, once: half on diagonals, `pass` across a blocker or into one, none past the edge.
+        const W=new Float32Array(n*8),O=new Int32Array(n*8),DI=[-1,0,1,-1,1,-1,0,1],DJ=[-1,-1,-1,0,0,1,1,1],local=[];
+        for(let j=J0;j<=J1;j++)for(let i=I0;i<=I1;i++){
+            const c=j*cols+i,x=cx(i),y=cy(j);local.length=0;
+            for(const w of walls)if(w.bounds[0]<x+cell&&w.bounds[2]>x-cell&&w.bounds[1]<y+cell&&w.bounds[3]>y-cell)local.push(w);
+            for(let q=0;q<8;q++){const a=i+DI[q],b=j+DJ[q];if(a<I0||a>I1||b<J0||b>J1)continue;const o=b*cols+a;
+                let w=(DI[q]&&DJ[q]?.5:1)*(solid[o]?pass:1);
+                if(local.length){const ax=cx(a),ay=cy(b);for(const k of local)if(crosses(k,x,y,ax,ay)){w*=pass;break;}}
+                W[c*8+q]=w;O[c*8+q]=o;}
+        }
+        let src=light,dst=new Float32Array(n*3);
+        for(let p=0;p<spread;p++){
+            for(let j=J0;j<=J1;j++)for(let c=j*cols+I0,e=j*cols+I1;c<=e;c++){
+                if(solid[c]){dst[c*3]=dst[c*3+1]=dst[c*3+2]=0;continue;}
+                let wr=2,sr=src[c*3]*2,sg=src[c*3+1]*2,sb=src[c*3+2]*2;
+                for(let q=c*8,end=q+8;q<end;q++){const w=W[q];if(!w)continue;const o=O[q]*3;wr+=w;sr+=src[o]*w;sg+=src[o+1]*w;sb+=src[o+2]*w;}
+                dst[c*3]=sr/wr;dst[c*3+1]=sg/wr;dst[c*3+2]=sb/wr;
+            }
+            [src,dst]=[dst,src];
+        }
+        if(src!==light)light.set(src);
+    }
+    hash=0x811c9dc5;add(left);add(top);add(cell);add(cols);add(rows);add(cut);add(glow);for(let i=0;i<light.length;i++)mix(Math.round(light[i]*1024));
+    return new lightGrid({left,top,cell,cols,rows,light,key:(hash>>>0).toString(36),cut,glow});
+}
+/** A baked light grid (see bakeLightGrid). `sample(x, y)` gives the light arriving there, [r, g, b], read between cell centres; `peak` is its brightest channel. */
+export class lightGrid{
+    constructor({left,top,cell,cols,rows,light,key,cut=LIGHT_GRID.cut,glow=LIGHT_GRID.glow}){Object.assign(this,{left,top,cell,cols,rows,light,key,cut,glow});this.right=left+cols*cell;this.bottom=top+rows*cell;let m=0;for(const v of light)if(v>m)m=v;this.peak=m;}
+    sample(x,y){
+        const {cols,rows,cell,light}=this,u=Math.max(0,Math.min(cols-1,(x-this.left)/cell-.5)),v=Math.max(0,Math.min(rows-1,(y-this.top)/cell-.5));
+        const i=Math.floor(u),j=Math.floor(v),fx=u-i,fy=v-j,i1=Math.min(cols-1,i+1),j1=Math.min(rows-1,j+1),out=[0,0,0];
+        for(let ch=0;ch<3;ch++){const a=light[(j*cols+i)*3+ch],b=light[(j*cols+i1)*3+ch],c=light[(j1*cols+i)*3+ch],d=light[(j1*cols+i1)*3+ch];out[ch]=(a*(1-fx)+b*fx)*(1-fy)+(c*(1-fx)+d*fx)*fy;}
+        return out;
+    }
+}
+// A cell drawn as a soft disc: a Gaussian (σ = .6 cell) out to 1.6 cells, so the discs of a lattice sum to a smooth field (2.26 × a disc's peak).
+const DISC=1.6,DISC_SUM=2*Math.PI*.36,DISC_STOPS=Object.freeze([[0,1],[.25,.8],[.5,.41],[.75,.135],[1,0]]);
+/**
+ * The grid as packets in `scene` (an artScene), scaled up smoothly as soft discs: `part` 'cut' draws its
+ * brightness in white for a cut (in `blend`, default destination-out), 'glow' its colour (default add).
+ * Only the cells whose disc meets `clip` [x, y, w, h] are drawn, when given.
+ */
+export function drawLightGrid(scene,grid,part,{clip=null,blend=part==='cut'?'destination-out':'add'}={}){
+    const {cols,rows,cell,light}=grid,r=cell*DISC,k=part==='cut'?grid.cut:grid.glow;if(!(k>0))return scene;
+    let i0=0,i1=cols-1,j0=0,j1=rows-1;
+    if(clip){const [x,y,w,h]=clip;i0=Math.max(0,Math.floor((x-r-grid.left)/cell));i1=Math.min(cols-1,Math.floor((x+w+r-grid.left)/cell));j0=Math.max(0,Math.floor((y-r-grid.top)/cell));j1=Math.min(rows-1,Math.floor((y+h+r-grid.top)/cell));}
+    scene.enter({},{blend});
+    for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){
+        const c=(j*cols+i)*3,R=light[c],G=light[c+1],B=light[c+2],m=Math.max(R,G,B);if(m<.004)continue;
+        const x=grid.left+(i+.5)*cell,y=grid.top+(j+.5)*cell;
+        if(part==='cut'){const a=Math.min(1,(.2126*R+.7152*G+.0722*B)*k)/DISC_SUM;if(a<.002)continue;scene.fill([circle(x,y,r)],radial([x,y],0,[x,y],r,DISC_STOPS.map(([o,v])=>[o,white(a*v)])));}
+        else{const a=Math.min(1,m*k)/DISC_SUM,[cr,cg,cb]=[R/m,G/m,B/m].map(v=>Math.round(v*255));
+            scene.fill([circle(x,y,r)],radial([x,y],0,[x,y],r,DISC_STOPS.map(([o,v])=>[o,`rgba(${cr},${cg},${cb},${+(a*v).toFixed(4)})`])));}
+    }
+    scene.leave();return scene;
+}
+/** The grid's packets alone, its colour by default: what a reflection target or a debug view draws. */
+export function lightGridPackets(grid,part='glow',options={}){return drawLightGrid(new artScene(),grid,part,options).finish();}

@@ -7,9 +7,18 @@ export {recordingRenderer} from './recording.mjs';
 export {webglRenderer,WEBGL_CAPABILITIES} from './webgl.mjs';
 export {BLENDS,CAPABILITIES} from './values.mjs';
 export {EFFECTS,effect,effectStack,validateEffectsPreset} from './effects.mjs';
+<<<<<<< HEAD
 export {artScene,DRAWING,MATERIAL,EMITS,readEmits,REFLECT,readReflect,readValues,circle,ellipse,polyline,polygon,rect,roundRect,capsule,limb,smoothShape,linear,radial,glow,groundShadow,hexToRgb,rgbToHex,rgba,mix,shade,seededRandom,hash2} from './art.mjs';
 export {createLightLayer,createLightLayerParts,LIGHT_CUT} from './lighting.mjs';
 export {heightScale,heightView,boxFaces} from './height.mjs';
 export {depthBatches} from './depth.mjs';
 export {BOUNDS,fitBounds,drawingReach,drawingOutline,drawingEmitters,drawLook,drawComponents,componentSteps,foreshorten,qualifyResource} from './looks.mjs';
 export {reflectionPass,REFLECTION_QUALITY,createReflectionMask,createReflectionProbes,maskSteps,heightPackets,drawLightReflection,drawEmitterReflection,reflectionMatrix,wetStep} from './reflections.mjs';
+=======
+export {artScene,DRAWING,MATERIAL,EMITS,readEmits,readValues,circle,ellipse,polyline,polygon,rect,roundRect,capsule,limb,smoothShape,linear,radial,glow,groundShadow,hexToRgb,rgbToHex,rgba,mix,shade,seededRandom,hash2} from './art.mjs';
+export {createLightLayer,createLightLayerParts,LIGHT_CUT,LIGHT_GRID,LIGHT_GRID_CELLS,readLightGrid,bakeLightGrid,lightGrid,drawLightGrid,lightGridPackets} from './lighting.mjs';
+export {heightScale,heightView,boxFaces} from './height.mjs';
+export {depthBatches} from './depth.mjs';
+export {BOUNDS,fitBounds,drawingReach,drawingOutline,drawingEmitters,drawLook,drawComponents,componentSteps,foreshorten,qualifyResource} from './looks.mjs';
+export {lightGridSystem,entityEmitters} from './light-grid.mjs';
+>>>>>>> 902bf29a556828c1c3da54f7eb1a2a16876af785

@@ -1,6 +1,7 @@
 // ===== LV1 LOBBY =====
 import { gameLevel } from './game-level.mjs';
 import { mapInstance } from '../../basement/maps/index.mjs';
+import { lightGridSystem } from '../../basement/rendering/index.mjs';
 
 /**
  * A level that is one Basement map. A subclass says which map with `mapDefinition`; the level builds
@@ -23,9 +24,21 @@ export class mapLevel extends gameLevel {
         this.definition = prepared.definition;
         const travellers = prepared.travellers.map(id => context.basement.elements.fetchEntity(id)).filter(e => e && !e.destroyed);
         if (travellers.length) this.placeTravellers(context, travellers, this.arrivalPose(context, prepared.arrival?.from ?? null, travellers[0]));
+        // The light grid, when the map's switches turn it on: its regions bake behind the level change too.
+        this.light_grid = prepared.definition.switches?.light_grid ? new lightGridSystem({ settings: prepared.definition.light_grid ?? {}, source: context.assets ?? context.basement.physics.elements?.asset_library ?? null }).attach(this.map, this.lightGridOptions(context)) : null;
         this.map.setFocus(this.mapFocuses(context), { budget_ms: Infinity });   // (the arriving regions, whole, behind the level change)
+        this.light_grid?.updateState({ budget_ms: Infinity });
     }
-    afterPhysics(context, seconds) { this.map.setFocus(this.mapFocuses(context), { budget_ms: this.mapStreamBudget(context) }); this.map.updateState(this.mapUpdateOptions(context)); }
+    afterPhysics(context, seconds) {
+        this.map.setFocus(this.mapFocuses(context), { budget_ms: this.mapStreamBudget(context) }); this.map.updateState(this.mapUpdateOptions(context));
+        if (this.light_grid) { this.light_grid.setMovers(this.light_grid.moversOf(this.lightGridMovers(context))); this.light_grid.updateState({ budget_ms: this.lightGridBudget(context) }); }
+    }
+    /** The light grid's tier options (`radius`: how far round a focus regions keep a baked grid). */
+    lightGridOptions(context) { return {}; }
+    /** The entities that may carry glowing art as they move (by default every character and vehicle). */
+    lightGridMovers(context) { const elements = context.basement.physics.elements; return [...elements.getEntities({ kind: 'character' }), ...elements.getEntities({ kind: 'vehicle' })]; }
+    /** Milliseconds a step may spend baking light grid regions (the old grid shows until its new one is ready). */
+    lightGridBudget(context) { return 2; }
     /**
      * What the map streams round: `[x, y]` points or `{position, velocity}`. By default every active
      * character body (so no one walks where walls are not built), or the map's spawn when there is none.
@@ -40,7 +53,7 @@ export class mapLevel extends gameLevel {
     mapStreamBudget(context) { return 3; }
     /** What `map.updateState` is given each step (door ranges, who opens doors). */
     mapUpdateOptions(context) { return {}; }
-    leave(context) { this.map?.destroy(); this.map = null; }
+    leave(context) { this.map?.destroy(); this.map = null; this.light_grid = null; }
     /** Every exit: `{entity, target, label, auto, bounds}`. */
     getExits() {
         if (!this.map) return [];

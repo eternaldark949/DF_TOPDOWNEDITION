@@ -20,7 +20,7 @@ const moved = (entity, packet) => Math.hypot(entity.position[0] - packet.positio
  * baked light, navigation) joins through `addTier`, each tier with its own radius.
  */
 export class mapInstance {
-    #physics; #entries; #openings; #byId = new Map(); #byRole = new Map(); #bySection = new Map(); #regions = new Map(); #memory = new Map(); #region_size; #tiers = new Map(); #queue = [];
+    #physics; #entries; #openings; #byId = new Map(); #byRole = new Map(); #bySection = new Map(); #regions = new Map(); #memory = new Map(); #region_size; #tiers = new Map(); #queue = []; #area = [0, 0]; #areaKeys = null;
     #stats = { region_loads: 0, region_unloads: 0, created: 0, destroyed: 0 };
     constructor(physics, definition, options = {}) {
         this.#physics = physics; this.map_id = definition.map_id ?? null;
@@ -46,6 +46,7 @@ export class mapInstance {
         this.#tiers.set('entities', { radius: regions.radius ?? 4096, keep: regions.keep ?? size, loaded: new Set(),
             load: key => this.#build(this.#regions.get(key)), release: key => { for (const entry of this.#regions.get(key)) this.#release(entry); } });
         const [w, h] = definition.size ?? [0, 0];
+        this.#area = [w, h];
         this.setFocus(options.focus ?? this.spawn ?? [w / 2, h / 2], { budget_ms: Infinity });
         /** Rooms, their links and who is in which (an empty graph when the map has no rooms). */
         this.rooms = new roomGraph(physics, this, definition, built.door_kinds);
@@ -114,7 +115,7 @@ export class mapInstance {
         for (const [name, tier] of this.#tiers) {
             const r = name === 'entities' && radius !== undefined ? radius : tier.radius, k = name === 'entities' && keep !== undefined ? keep : tier.keep;
             for (const key of [...tier.loaded]) if (distance(key) > r + k) { tier.release(key, this.#regionBounds(key)); tier.loaded.delete(key); unloaded++; if (name === 'entities') this.#stats.region_unloads++; }
-            for (const key of this.#regions.keys()) if (!tier.loaded.has(key) && distance(key) <= r) work.push({ name, tier, key, d: distance(key) });
+            for (const key of tier.every ? this.#everyKey() : this.#regions.keys()) if (!tier.loaded.has(key) && distance(key) <= r) work.push({ name, tier, key, d: distance(key) });
         }
         work.sort((x, y) => x.d - y.d || (x.name === 'entities' ? -1 : 0) - (y.name === 'entities' ? -1 : 0));
         let done = 0;
@@ -131,14 +132,17 @@ export class mapInstance {
     /**
      * Adds per-region work beside the bodies: `load(key, bounds)` when a region comes within `radius` of a
      * focus, `release(key, bounds)` past `radius + keep`. Regions already in reach load on the next setFocus.
+     * With `every`, the tier streams every region over the map's size, empty ones too (light spilling onto bare ground).
      */
-    addTier(name, { radius, keep = this.#region_size, load, release }) {
+    addTier(name, { radius, keep = this.#region_size, load, release, every = false }) {
         if (typeof name !== 'string' || !name || this.#tiers.has(name)) throw new TypeError(`A map tier needs a new name (${name})`);
         if (!(radius >= 0) || !(keep >= 0) || typeof load !== 'function' || typeof release !== 'function') throw new TypeError('A map tier needs a radius, a keep, load and release');
-        this.#tiers.set(name, { radius, keep, load, release, loaded: new Set() });
+        this.#tiers.set(name, { radius, keep, load, release, every: !!every, loaded: new Set() });
         return this;
     }
     get region_size() { return this.#region_size; }
+    /** Every region key over the map's size, empty ones included (a tier with `every` streams them all). */
+    #everyKey() { if (!this.#areaKeys) { const s = this.#region_size, out = []; for (let x = 0; x < Math.max(1, Math.ceil(this.#area[0] / s)); x++) for (let y = 0; y < Math.max(1, Math.ceil(this.#area[1] / s)); y++) out.push(`${x},${y}`); for (const key of this.#regions.keys()) if (!out.includes(key)) out.push(key); this.#areaKeys = out; } return this.#areaKeys; }
     get loaded_regions() { return [...this.#tiers.get('entities').loaded]; }
 
     /**

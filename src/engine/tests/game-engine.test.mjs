@@ -174,6 +174,26 @@ test('engine alone: map levels with exits, an auto exit, and travellers carried 
     e.dispose();
 });
 
+test('a map level whose switches turn the light grid on bakes it on entry and re-bakes round a glowing mover after physics', async () => {
+    const { mapLevel } = await import('../lobby/runtime/map-level.mjs');
+    const glow = { library_id: 'glow', resources: { underglow: { kind: 'drawing', steps: [{ shape: 'ellipse', radius_x: 20, radius_y: 10, fill: '#33ccff', emits: { reach: 80 } }] } } };
+    const street = { map_id: 'street', size: [1024, 512], regions: { size: 512 }, switches: { light_grid: true }, light_grid: { cell: 32 },
+        floors: [{ shape: 'rectangle', x: 100, y: 100, width: 60, height: 8, fill: '#ff3399', emits: { reach: 100 } }], walls: [{ x: 90, y: 112, w: 80, h: 10 }] };
+    class Street extends mapLevel { mapDefinition() { return { definition: street }; } }
+    const e = new gameEngine({ asset_library: createEngineRegistry({ libraries: [glow] }), schedule_frame: null }); e.registerLevel('street', Street);
+    await e.loadLevel('street');
+    const grid = e.active_level.light_grid;
+    assert.ok(grid, 'the switch made the light grid'); assert.equal(grid.pending, 0, 'baked whole behind the level change');
+    assert.ok(grid.sample(130, 80)[0] > .3 && grid.sample(130, 140)[0] < grid.sample(130, 80)[0] * .25, 'lit on the sign\'s side of the wall');
+    const car = e.basement.physics.createEntity({ kind: 'vehicle', position: [700, 300], collision_shape: { shape_type: 'circle', radius: 10 }, assets: { drawing: 'glow:underglow' } });
+    e.start(); e.updateState(1 / 60);
+    assert.ok(grid.sample(700, 300)[2] > .3, 'the moving car lights the ground under it');
+    assert.equal(grid.liveLights().length, 1);
+    e.basement.physics.updateBody(car, { position: [300, 300] }); e.updateState(1 / 60);
+    assert.ok(grid.sample(300, 300)[2] > .3 && grid.sample(700, 300)[2] < .01, 'and its light moves with it');
+    e.dispose();
+});
+
 const toys = { library_id: 'toys', resources: {
     lamp: { kind: 'drawing', steps: [{ shape: 'glow', radius: 60, color: '#ffd27f' }, { shape: 'circle', radius: 10, material: 'brass', solid: true }, { shape: 'rectangle', x: -2, y: 10, width: 4, height: 30, material: 'brass', solid: true }] },
     brass: { kind: 'material', fill: '#b5a642' } },
