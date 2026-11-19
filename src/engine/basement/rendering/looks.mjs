@@ -4,7 +4,7 @@
 // property ({values, scale, layer, depth, visible}). A step's `material` names a material resource
 // ({kind: 'material', fill, stroke, ..., surface}). `fitBounds` turns a drawing into the collision
 // shape that matches it, the way Blender's collision bounds are worked out from a mesh.
-import {artScene,DRAWING,readValues} from './art.mjs';
+import {artScene,DRAWING,readValues,readEmits} from './art.mjs';
 import {heightView} from './height.mjs';
 
 /** The collision bounds a drawing can be fitted to. */
@@ -35,6 +35,37 @@ export function drawingOutline(steps,{values={}}={}){
     };
     walk(steps,[1,0,0,1,0,0]);
     return out.map(({points,solid,shape})=>({points,solid:marked?solid===true:solid!==false&&!UNSOLID.has(shape)}));
+}
+
+/**
+ * The steps of a drawing that glow (`emits` on the step, or on the material it names), each as
+ * `{outline, open, width, bounds, color, strength, reach, height}` through `at`, `rotation` and `scale`:
+ * `outline` the shape's points (a convex ring, or a polygon's own points), `open` true for a line (lit
+ * along it, `width` across), `bounds` [left, top, right, bottom], `color` '#rrggbb' (the emits colour,
+ * else the step's fill, else its stroke, else white), and the emits strength, reach and height (plus
+ * `elevation` when given). `materials(name)` gives a material record. One list feeds the light grid
+ * and the reflections, so a glowing step is marked once.
+ */
+export function drawingEmitters(steps,{at=[0,0],rotation=0,scale=1,values={},materials=null,elevation=0}={}){
+    const out=[],[sx0,sy0]=typeof scale==='number'?[scale,scale]:scale,c0=Math.cos(rotation),s0=Math.sin(rotation);
+    const walk=(list,m)=>{
+        if(!Array.isArray(list))throw new TypeError('A drawing is a list of steps');
+        for(const raw of list){
+            const step=readValues(raw,values),{shape}=step;
+            if(shape==='group'){const {steps,x=0,y=0,rotation=0,scale=1}=step,[sx,sy]=typeof scale==='number'?[scale,scale]:scale,c=Math.cos(rotation),s=Math.sin(rotation);
+                walk(steps,compose(m,[c*sx,s*sx,-s*sy,c*sy,x,y]));continue;}
+            const record=step.material!==undefined&&materials?materials(step.material):null;
+            const emits=readEmits(step.emits!==undefined?step.emits:record?.emits??null,`${shape} emits`);if(!emits||emits.strength<=0)continue;
+            const fill=step.fill??record?.fill,stroke=step.stroke??record?.stroke,hex=v=>typeof v!=='string'?null:/^#[0-9a-f]{6}$/i.test(v)?v.toLowerCase():/^#[0-9a-f]{3}$/i.test(v)?'#'+[...v.slice(1).toLowerCase()].map(d=>d+d).join(''):null;
+            const open=shape==='line',k=Math.sqrt(Math.abs(m[0]*m[3]-m[1]*m[2]));
+            const local=outline(step),points=(open||shape==='polygon'||shape==='curve'?local:convexHull(local)).map(p=>apply(m,p));
+            const xs=points.map(p=>p[0]),ys=points.map(p=>p[1]),width=open?(step.line_width??record?.line_width??1)*k:0;
+            out.push({outline:points,open,width,bounds:[Math.min(...xs)-width/2,Math.min(...ys)-width/2,Math.max(...xs)+width/2,Math.max(...ys)+width/2],
+                color:hex(emits.color)??hex(fill)??hex(stroke)??'#ffffff',strength:emits.strength,reach:emits.reach*k,height:emits.height+elevation});
+        }
+    };
+    walk(steps,[c0*sx0,s0*sx0,-s0*sy0,c0*sy0,at[0],at[1]]);
+    return out;
 }
 
 /**

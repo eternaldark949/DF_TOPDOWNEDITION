@@ -367,6 +367,12 @@ Verified batch: **217 combined engine/controls/rendering/Directory/runtime tests
 
 These `canvasRenderer` statics are Canvas-only host tools, not the contract: under `renderSystem` the same packets go into layer passes and `picture` packets, which every backend draws.
 
+## Glowing shapes
+
+`emits` on a drawing step or a material marks a shape that glows and lights what is round it, without being a light object: `true`, or `{strength = 1, reach = 96, color, height = 0}` (`EMITS`). `reach` and `height` are world units; a high emitter (a window three floors up) reaches farther and softer. `color` is '#rrggbb' or '#rgb' and defaults to the step's fill, then its stroke, then white. A step's `emits` wins over its material's, and `emits: false` on a step turns its material's off. Drawing ignores it: an emitting step draws as it would without. `readEmits(emits)` gives the one form `{strength, reach, color, height}` (null when off) and refuses unknown fields.
+
+`drawingEmitters(steps, {at, rotation, scale, values, materials, elevation})` lists a drawing's glowing shapes through its place, turn and scale, each `{outline, open, width, bounds, color, strength, reach, height}`: `outline` the shape's points (a convex ring, or a polygon's own points), `open` for a line lit along it `width` across, `bounds` `[left, top, right, bottom]`, the colour as '#rrggbb', reach scaled with the drawing and `elevation` added to the height. `materials(name)` gives a material record. It is the one list both the light grid and the reflections read.
+
 ## Light layer
 
 `createLightLayer({bounds, tint, areas, lights})` (`lighting.mjs`) builds the darkness over a scene as packets: `tint` over `bounds`; each area (`{rects | polygon, cut}`) thins the dark by `cut`; each light cuts its reach out of the dark (`destination-out`), then every light's colour is added (`add`). A point light is `{position, radius, inner_radius, polygon, intensity, cut, color, glow, glow_stops}`: a radial cut from `inner_radius` to `radius` shaped by `cut` (`[[offset, alpha]]`, default `LIGHT_CUT`) at `intensity` (capped at 1), kept inside `polygon` when given (from the physics world's `getVisibilityPolygon`, so walls cast shadows), and its colour added at `glow` through `glow_stops`. An area light (`shape: 'area'`, `size`, `round`) does the same over a rounded strip. Draw the layer over the finished scene at the dark's strength.
