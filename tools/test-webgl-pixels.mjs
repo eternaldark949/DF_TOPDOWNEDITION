@@ -46,6 +46,7 @@ const scene = async ({ pixel_ratio = 1, zoom = 1, rotation = 0 } = {}) => {
     art.drawLine({ points: [[4, 36], [70, 36], [70, 56]], stroke: '#00ff00', line_width: 4, dash: [6, 3], line_cap: 'round', line_join: 'round' });
     art.drawText({ text: 'GL ok', x: 80, y: 20, size: 14, weight: 700, family: 'sans-serif', fill: '#ffeeaa' });
     const looks = art.finish();
+    const inline = { width: 4, height: 2, data: new Uint8ClampedArray([255, 0, 128, 255, 255, 200, 0, 255, 0, 255, 255, 128, 255, 255, 255, 255, 0, 0, 255, 255, 255, 0, 0, 64, 40, 255, 40, 255, 255, 120, 0, 200]) };
     const draw = () => {
         const frame = render.beginFrame(); frame.clear('#202030');
         frame.beginPass({ target_id: 'cache', viewport: { width: 40, height: 40 } });
@@ -56,6 +57,7 @@ const scene = async ({ pixel_ratio = 1, zoom = 1, rotation = 0 } = {}) => {
         frame.submit({ type: 'shape', geometry: { type: 'rect', size: [30, 30] }, position: [25, 90], material: { fill: { type: 'pattern', image: 'checker', repeat: 'repeat' } } });
         frame.submit({ type: 'sprite', resource_id: 'cache', position: [75, 90], size: [40, 40], blend: 'add' });
         frame.submit({ type: 'sprite', resource_id: 'checker', position: [145, 15], size: [16, 16], rotation: .4 });
+        frame.submit({ type: 'sprite', pixels: inline, position: [12, 112], size: [24, 12], blend: 'add' });
         frame.submit({ type: 'shape', geometry: { type: 'rect', size: [40, 40] }, position: [130, 100], material: { fill: '#00ffff' },
             clips: [{ geometry: { type: 'ellipse', radii: [14, 14] }, transform: [1, 0, 0, 1, -6, -6] }, { geometry: { type: 'rect', size: [24, 24] } }] });
         frame.submit({ type: 'picture', position: [120, 60], picture: { key: 'badge', bounds: [-10, -10, 20, 20], build: () => [
@@ -76,7 +78,7 @@ const scene = async ({ pixel_ratio = 1, zoom = 1, rotation = 0 } = {}) => {
     return { W, H, canvas, webgl, again, capabilities, switches: surfaces.length };
 };
 
-test('WebGL draws the same frame as Canvas: shapes, gradients, dashes, text, sprites, patterns, clips, targets, pictures and layers', { skip: !chromium && 'Playwright is not installed' }, async () => {
+test('WebGL draws the same frame as Canvas: shapes, gradients, dashes, text, sprites (of a resource or their own pixels), patterns, clips, targets, pictures and layers', { skip: !chromium && 'Playwright is not installed' }, async () => {
     const { W, H, canvas, webgl, again, capabilities, switches } = await inBrowser(scene);
     assert.ok(capabilities.includes('layer') && capabilities.includes('blur') && !capabilities.includes('blend:overlay'), 'the WebGL backend is live with its own capabilities');
     assert.equal(switches, 3, 'each switch drew on a fresh surface');
@@ -86,7 +88,7 @@ test('WebGL draws the same frame as Canvas: shapes, gradients, dashes, text, spr
     const mean = total / (W * H), share = far / (W * H);
     // Anti-aliased edges and text hinting differ slightly between the two; the paint inside every shape must match.
     assert.ok(mean < 4, `mean channel difference ${mean.toFixed(2)}`); assert.ok(share < .03, `${(share * 100).toFixed(2)}% of pixels differ by more than 48`);
-    for (const [x, y, what] of [[24, 16, 'gradient box'], [6, 16, 'its outline'], [10, 36, 'a dash'], [120, 48, 'the even-odd ring'], [120, 60, 'its hole'], [25, 90, 'the pattern'], [75, 90, 'the target sprite'], [124, 94, 'inside both clips'], [146, 116, 'outside the clips'], [60, 60, 'the light layer'], [2, 2, 'the dark']]) {
+    for (const [x, y, what] of [[24, 16, 'gradient box'], [6, 16, 'its outline'], [10, 36, 'a dash'], [120, 48, 'the even-odd ring'], [120, 60, 'its hole'], [25, 90, 'the pattern'], [75, 90, 'the target sprite'], [124, 94, 'inside both clips'], [146, 116, 'outside the clips'], [60, 60, 'the light layer'], [2, 2, 'the dark'], [12, 112, 'a sprite of its own pixels, read smoothly']]) {
         const a = at(canvas, x, y), b = at(webgl, x, y);
         assert.ok(a.every((v, i) => Math.abs(v - b[i]) <= 12), `${what} at ${x},${y}: canvas ${a} webgl ${b}`);
     }

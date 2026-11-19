@@ -75,6 +75,13 @@ export class artScene{
         this.packets.push({type:'shape',matrix:[...this.matrix],geometry:geometry(commands),material:{fill:null,stroke:null,stroke_width,line_cap,line_join,dash:[...dash],...copy(material)},opacity:this.style.opacity,blend:this.style.blend,clips:this.clips.map(clip=>({geometry:clip.geometry,transform:multiply(inv,clip.matrix),rule:clip.rule}))});return this;
     }
     fill(commands,color){return this.paint(commands,{fill:color});}
+    /**
+     * A small image of its own in the group (`pixels` {width, height, data}: RGBA bytes, rows top down), its
+     * `source` [x, y, w, h] pixels drawn with their top-left at the group's origin, `scale` local units a
+     * pixel, read smoothly between pixel centres. Backends upload a data array once.
+     */
+    sprite(pixels,source=[0,0,pixels.width,pixels.height],scale=1){const inv=this.clips.length?inverse(this.matrix):null;
+        this.packets.push({type:'sprite',matrix:[...this.matrix],pixels,source:[...source],size:[source[2]*scale,source[3]*scale],origin:[0,0],material:{fill:null,stroke:null},opacity:this.style.opacity,blend:this.style.blend,clips:this.clips.map(clip=>({geometry:clip.geometry,transform:multiply(inv,clip.matrix),rule:clip.rule}))});return this;}
     stroke(commands,color,stroke_width=this.style.stroke_width){return this.paint(commands,{stroke:color,stroke_width});}
     /** The fill-then-outline pair the classic art draws for nearly every part. */
     outlined(commands,fill,stroke,stroke_width=this.style.stroke_width){return this.paint(commands,{fill,stroke,stroke_width});}

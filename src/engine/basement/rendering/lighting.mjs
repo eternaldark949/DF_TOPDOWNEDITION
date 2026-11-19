@@ -95,7 +95,7 @@ export function createLightLayerParts({extent,tint,areas=[],lights=[],grids=[],k
     const cutStill=all.filter(([l])=>l.still===true),glowStill=all.filter(([l])=>l.still===true||l.still==='glow');
     const darks=[],glows=[],ready=[],near=view&&viewAhead(view,ahead);
     const meets=([x,y,w,h])=>([,,r])=>r[0]<x+w&&r[2]>x&&r[1]<y+h&&r[3]>y;
-    const lighted=grids.filter(g=>g&&g.peak>=.004).map(g=>{const r=g.cell*DISC;return [g,null,[g.left-r,g.top-r,g.right+r,g.bottom+r]];});
+    const lighted=grids.filter(g=>g&&g.peak>=.004).map(g=>[g,null,[g.left,g.top,g.right,g.bottom]]);
     const shades=areas.filter(a=>finite(a.cut,'area cut',0)>=.001).map(a=>[a,null,areaReach(a)]).filter(([,,r])=>r);
     for(const tile of tiles(extent,tile_size,near)){
         const shown=!view||(tile[0]<view.right&&tile[0]+tile[2]>view.left&&tile[1]<view.bottom&&tile[1]+tile[3]>view.top);
@@ -209,8 +209,8 @@ function signature(tint,bounds,still,part,areas=[],grids=[]){
 // part of its tiles: a cut that thins the dark where the grid is bright, and the grid's colour, added.
 
 /** The light grid's defaults: cell size (16 or 32 world units), blur passes, overall strength, how much of
- *  the dark a fully lit cell cuts, how strongly its colour is added, and what a wall passes on. */
-export const LIGHT_GRID=Object.freeze({cell:32,spread:3,strength:1,cut:.6,glow:.55,pass:.06});
+ *  the dark a fully lit cell cuts (by its brightest channel, so a deep neon lifts it like white), how strongly its colour is added, and what a wall passes on. */
+export const LIGHT_GRID=Object.freeze({cell:32,spread:3,strength:1,cut:.9,glow:.35,pass:.06});
 export const LIGHT_GRID_CELLS=Object.freeze([16,32]);
 const GRID_FIELDS=Object.freeze(['cell','spread','strength','cut','glow','pass','regions']);
 /** A map's `light_grid` in its one form (unknown fields refused): the defaults with its own, and `regions` {key: {cell, ...}}. */
@@ -330,26 +330,32 @@ export class lightGrid{
         return out;
     }
 }
-// A cell drawn as a soft disc: a Gaussian (σ = .6 cell) out to 1.6 cells, so the discs of a lattice sum to a smooth field (2.26 × a disc's peak).
-const DISC=1.6,DISC_SUM=2*Math.PI*.36,DISC_STOPS=Object.freeze([[0,1],[.25,.8],[.5,.41],[.75,.135],[1,0]]);
 /**
- * The grid as packets in `scene` (an artScene), scaled up smoothly as soft discs: `part` 'cut' draws its
- * brightness in white for a cut (in `blend`, default destination-out), 'glow' its colour (default add).
- * Only the cells whose disc meets `clip` [x, y, w, h] are drawn, when given.
+ * The grid in `scene` (an artScene) as one small image, a pixel a cell, scaled up smoothly (read
+ * between cell centres): `part` 'cut' is its brightness in white for a cut (in `blend`, default
+ * destination-out), 'glow' its colour (default add). With `clip` [x, y, w, h], only the cells round it.
+ * Each part's image is made once per grid.
  */
 export function drawLightGrid(scene,grid,part,{clip=null,blend=part==='cut'?'destination-out':'add'}={}){
-    const {cols,rows,cell,light}=grid,r=cell*DISC,k=part==='cut'?grid.cut:grid.glow;if(!(k>0))return scene;
+    const {cols,rows,cell}=grid;if(!((part==='cut'?grid.cut:grid.glow)>0))return scene;
     let i0=0,i1=cols-1,j0=0,j1=rows-1;
-    if(clip){const [x,y,w,h]=clip;i0=Math.max(0,Math.floor((x-r-grid.left)/cell));i1=Math.min(cols-1,Math.floor((x+w+r-grid.left)/cell));j0=Math.max(0,Math.floor((y-r-grid.top)/cell));j1=Math.min(rows-1,Math.floor((y+h+r-grid.top)/cell));}
-    scene.enter({},{blend});
-    for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){
-        const c=(j*cols+i)*3,R=light[c],G=light[c+1],B=light[c+2],m=Math.max(R,G,B);if(m<.004)continue;
-        const x=grid.left+(i+.5)*cell,y=grid.top+(j+.5)*cell;
-        if(part==='cut'){const a=Math.min(1,(.2126*R+.7152*G+.0722*B)*k)/DISC_SUM;if(a<.002)continue;scene.fill([circle(x,y,r)],radial([x,y],0,[x,y],r,DISC_STOPS.map(([o,v])=>[o,white(a*v)])));}
-        else{const a=Math.min(1,m*k)/DISC_SUM,[cr,cg,cb]=[R/m,G/m,B/m].map(v=>Math.round(v*255));
-            scene.fill([circle(x,y,r)],radial([x,y],0,[x,y],r,DISC_STOPS.map(([o,v])=>[o,`rgba(${cr},${cg},${cb},${+(a*v).toFixed(4)})`])));}
-    }
-    scene.leave();return scene;
+    if(clip){const [x,y,w,h]=clip;i0=Math.max(0,Math.floor((x-grid.left)/cell)-1);i1=Math.min(cols-1,Math.floor((x+w-grid.left)/cell)+1);j0=Math.max(0,Math.floor((y-grid.top)/cell)-1);j1=Math.min(rows-1,Math.floor((y+h-grid.top)/cell)+1);}
+    if(i1<i0||j1<j0)return scene;
+    const image=gridImage(grid,part),source=[i0,j0,i1-i0+1,j1-j0+1];
+    // (one sprite over the cells, its pixels' centres on the cell centres; a clipped one keeps a cell more each side, so its edges read like the whole)
+    scene.enter({position:[grid.left+i0*cell,grid.top+j0*cell]},{blend});scene.sprite(image,source,cell);scene.leave();
+    return scene;
+}
+const IMAGES=new WeakMap();
+/** A grid part as RGBA pixels, a pixel a cell: the cut white at its brightness, the glow its colour at its strength. */
+function gridImage(grid,part){
+    let both=IMAGES.get(grid);if(!both)IMAGES.set(grid,both={});
+    if(both[part])return both[part];
+    const {cols,rows,light}=grid,k=part==='cut'?grid.cut:grid.glow,data=new Uint8ClampedArray(cols*rows*4);
+    for(let c=0;c<cols*rows;c++){const R=light[c*3],G=light[c*3+1],B=light[c*3+2],o=c*4;
+        if(part==='cut'){data[o]=data[o+1]=data[o+2]=255;data[o+3]=Math.round(Math.min(1,Math.max(R,G,B)*k)*255);}   // (a deep neon lifts the dark as much as a white light of its strength)
+        else{const m=Math.max(R,G,B);if(m<=0)continue;data[o]=R/m*255;data[o+1]=G/m*255;data[o+2]=B/m*255;data[o+3]=Math.round(Math.min(1,m*k)*255);}}
+    return both[part]={width:cols,height:rows,data};
 }
 /** The grid's packets alone, its colour by default: what a reflection target or a debug view draws. */
 export function lightGridPackets(grid,part='glow',options={}){return drawLightGrid(new artScene(),grid,part,options).finish();}
