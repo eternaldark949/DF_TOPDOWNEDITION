@@ -72,7 +72,7 @@ One path for every map:
 - **Regions:** entries are bucketed by the region their centre falls in. An entry larger than one region (the boundary, a long wall, a big building) stays loaded.
 - **Focuses:** `setFocus(focuses, {radius, keep, budget_ms = 3, lead = 1})` takes points `[x, y]` or moving focuses `{position, velocity}`; a moving focus also reaches `lead` seconds ahead. Regions within `radius` of the nearest focus are built, nearest first; regions past `radius + keep` are released, so walking along a border does not thrash. It returns `{loaded, unloaded, pending}`.
 - **Budget:** building stops once `budget_ms` is spent, and `pending` regions wait for the next call. The constructor builds round `options.focus` (default: the spawn, else the map's centre) all at once, as a level change does behind its fade. A map that fits inside the radius is therefore whole from the start, built in authored order.
-- **Tiers:** `addTier(name, {radius, keep, load(key, bounds), release(key, bounds)})` adds per-region work beside the bodies (ground tiles, baked light, navigation), each tier at its own radius. The bodies are the `entities` tier.
+- **Tiers:** `addTier(name, {radius, keep, load(key, bounds), release(key, bounds), every})` adds per-region work beside the bodies (ground tiles, baked light, navigation), each tier at its own radius. The bodies are the `entities` tier. A tier streams the regions that hold entries, or with `every: true` every region over the map's size, empty ones too (the light grid, whose light spills onto bare ground).
 - **Region memory:** a released entity that was moved (a pushed bin, a knocked-over sign) keeps its pose. It is rebuilt there when its region loads again. `saveState()` / `loadState()` carry that memory as plain data, and `loadState` puts an already-built entity back where it was left.
 - **Snapshots:** after a physics snapshot is restored, `reconnect()` re-links ids to the restored entities; regions the snapshot held count as loaded, and the rest build as a focus reaches them.
 
@@ -90,7 +90,7 @@ The map system uses the world's one spatial grid and navigation field. It never 
 | `mapInstance.updateState({near_range, duration, easing, include_groups})` | Opens and closes sliding and plain doors by proximity, with timed kinematic moves, then updates room occupancy. Hinged doors are skipped: they are physical. |
 | `HINGE` | Defaults for a hinged leaf: `{mass: 12, damping: 7.7, closing_stiffness: 64.8, swing_limit: π − 0.25}`. A kind's leaf `hinge`, then the door's `hinge` field, override them. |
 | `DOOR_KINDS` / `validateDoorKind(kind, name?)` | The built-in kinds / the check every kind passes before it is built. |
-| `mapInstance.setFocus(focuses, {radius, keep, budget_ms, lead})` / `.addTier(name, {radius, keep, load, release})` / `.loaded_regions` / `.region_size` | Streaming (see above). `setFocus` returns `{loaded, unloaded, pending}`. |
+| `mapInstance.setFocus(focuses, {radius, keep, budget_ms, lead})` / `.addTier(name, {radius, keep, load, release, every})` / `.loaded_regions` / `.region_size` | Streaming (see above). `setFocus` returns `{loaded, unloaded, pending}`. |
 | `mapInstance.reconnect()` / `.saveState()` / `.loadState(state)` / `.getStatistics()` / `.destroy()` | Lifecycle. |
 
 ## Game data

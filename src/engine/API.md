@@ -311,7 +311,7 @@ The calls are `drawRectangle`, `drawCircle`, `drawEllipse`, `drawCapsule`, `draw
 | `fitBounds(steps, bounds)` | The collision shape that fits a drawing's solid steps: `circle`, `box`, `capsule` or `hull` |
 | `drawingReach(steps)` | The circle round everything a drawing paints, glows included |
 
-The light layer (`createLightLayer`) draws lights and shadows. Colour helpers: `rgba`, `mix`, `shade`, `hexToRgb`.
+The light layer (`createLightLayer`) draws lights and shadows. Glowing art lights its surroundings through the light grid: `bakeLightGrid` bakes one region's grid from `emits` shapes (cell 16 or 32, walls stop it), `createLightLayerParts({grids})` draws it into the light tiles as a cut and a colour, and `lightGridSystem` keeps a map's grids current per region (a map's `light_grid: {cell, spread, strength, regions}` settings, moving emitters re-baking what they reach). See the rendering README's Light grid section. Colour helpers: `rgba`, `mix`, `shade`, `hexToRgb`.
 
 Reference: [rendering README](basement/rendering/README.md).
 
@@ -431,7 +431,7 @@ A level is a `gameLevel` subclass. It holds content and policy; it never owns th
 
 ### Map levels
 
-`mapLevel` is a level that loads a map: give it a map definition and it builds the map, streams it, places travellers and exposes its exits.
+`mapLevel` is a level that loads a map: give it a map definition and it builds the map, streams it, places travellers and exposes its exits. With `switches: {light_grid: true}` in the map it also keeps the map's light grid (`level.light_grid`): glowing art lights its surroundings, baked per region and re-baked round moving emitters within a budget after physics. Draw it with `createLightLayerParts({..., grids: level.light_grid.grids(view)})`, add `level.light_grid.liveLights()` to the live lights, and read `level.light_grid.sample(x, y)` for reflections.
 
 | Member | What it does |
 |---|---|
