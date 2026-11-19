@@ -287,7 +287,9 @@ export function bakeLightGrid({bounds,cell=LIGHT_GRID.cell,emitters=[],blockers=
         const m=Math.ceil(margin)*cell,wide=bakeLightGrid({bounds:{left:left-m,top:top-m,right:right+m,bottom:bottom+m},cell,emitters,blockers,spread,strength,pass,cut,glow});
         const cols=Math.max(1,Math.ceil((right-left)/cell)),rows=Math.max(1,Math.ceil((bottom-top)/cell)),k=Math.ceil(margin),light=new Float32Array(cols*rows*3);
         for(let j=0;j<rows;j++)light.set(wide.light.subarray(((j+k)*wide.cols+k)*3,((j+k)*wide.cols+k+cols)*3),j*cols*3);
-        return new lightGrid({left,top,cell,cols,rows,light,key:gridKey(left,top,cell,cols,rows,cut,glow,light),cut,glow});
+        const rim=new Float32Array((cols+2)*(rows+2)*3);   // (the cells and a ring of the margin, so a drawn grid blends into the one beside it)
+        for(let j=0;j<rows+2;j++)rim.set(wide.light.subarray(((j+k-1)*wide.cols+k-1)*3,((j+k-1)*wide.cols+k+cols+1)*3),j*(cols+2)*3);
+        return new lightGrid({left,top,cell,cols,rows,light,rim,key:gridKey(left,top,cell,cols,rows,cut,glow,rim),cut,glow});
     }
     if(!LIGHT_GRID_CELLS.includes(cell))throw new TypeError('A light grid cell is 16 or 32 world units');
     const cols=Math.max(1,Math.ceil((right-left)/cell)),rows=Math.max(1,Math.ceil((bottom-top)/cell)),n=cols*rows,light=new Float32Array(n*3);
@@ -358,13 +360,14 @@ export function patchLightGrid(grid,patch,part){
     const {left,top,cell,cols,rows}=grid;
     if(patch.cell!==cell||(patch.left-left)%cell||(patch.top-top)%cell)throw new TypeError('A patch is baked on the grid\'s own cells');
     const i0=Math.max(0,Math.floor((part.left-left)/cell)),i1=Math.min(cols-1,Math.ceil((part.right-left)/cell)-1),j0=Math.max(0,Math.floor((part.top-top)/cell)),j1=Math.min(rows-1,Math.ceil((part.bottom-top)/cell)-1);
-    const light=grid.light.slice(),di=(patch.left-left)/cell,dj=(patch.top-top)/cell;
+    const light=grid.light.slice(),rim=grid.rim?.slice()??null,di=(patch.left-left)/cell,dj=(patch.top-top)/cell;
     for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const a=i-di,b=j-dj;if(a<0||a>=patch.cols||b<0||b>=patch.rows)continue;const o=(j*cols+i)*3,q=(b*patch.cols+a)*3;light[o]=patch.light[q];light[o+1]=patch.light[q+1];light[o+2]=patch.light[q+2];}
-    return new lightGrid({left,top,cell,cols,rows,light,key:gridKey(left,top,cell,cols,rows,grid.cut,grid.glow,light),cut:grid.cut,glow:grid.glow});
+    if(rim)for(let j=j0-(j0===0);j<=j1+(j1===rows-1);j++)for(let i=i0-(i0===0);i<=i1+(i1===cols-1);i++){const a=i-di,b=j-dj;if(a<0||a>=patch.cols||b<0||b>=patch.rows)continue;const o=((j+1)*(cols+2)+i+1)*3,q=(b*patch.cols+a)*3;rim[o]=patch.light[q];rim[o+1]=patch.light[q+1];rim[o+2]=patch.light[q+2];}
+    return new lightGrid({left,top,cell,cols,rows,light,rim,key:gridKey(left,top,cell,cols,rows,grid.cut,grid.glow,rim??light),cut:grid.cut,glow:grid.glow});
 }
 /** A baked light grid (see bakeLightGrid). `sample(x, y)` gives the light arriving there, [r, g, b], read between cell centres; `peak` is its brightest channel. */
 export class lightGrid{
-    constructor({left,top,cell,cols,rows,light,key,cut=LIGHT_GRID.cut,glow=LIGHT_GRID.glow}){Object.assign(this,{left,top,cell,cols,rows,light,key,cut,glow});this.right=left+cols*cell;this.bottom=top+rows*cell;let m=0;for(const v of light)if(v>m)m=v;this.peak=m;}
+    constructor({left,top,cell,cols,rows,light,rim=null,key,cut=LIGHT_GRID.cut,glow=LIGHT_GRID.glow}){Object.assign(this,{left,top,cell,cols,rows,light,rim,key,cut,glow});this.right=left+cols*cell;this.bottom=top+rows*cell;let m=0;for(const v of light)if(v>m)m=v;this.peak=m;}
     sample(x,y){
         const {cols,rows,cell,light}=this,u=Math.max(0,Math.min(cols-1,(x-this.left)/cell-.5)),v=Math.max(0,Math.min(rows-1,(y-this.top)/cell-.5));
         const i=Math.floor(u),j=Math.floor(v),fx=u-i,fy=v-j,i1=Math.min(cols-1,i+1),j1=Math.min(rows-1,j+1),out=[0,0,0];
@@ -379,13 +382,15 @@ export class lightGrid{
  * Each part's image is made once per grid.
  */
 export function drawLightGrid(scene,grid,part,{clip=null,blend=part==='cut'?'destination-out':'add'}={}){
-    const {cols,rows,cell}=grid;if(!((part==='cut'?grid.cut:grid.glow)>0))return scene;
-    let i0=0,i1=cols-1,j0=0,j1=rows-1;
-    if(clip){const [x,y,w,h]=clip;i0=Math.max(0,Math.floor((x-grid.left)/cell)-1);i1=Math.min(cols-1,Math.floor((x+w-grid.left)/cell)+1);j0=Math.max(0,Math.floor((y-grid.top)/cell)-1);j1=Math.min(rows-1,Math.floor((y+h-grid.top)/cell)+1);}
+    const {cols,rows,cell}=grid,r=grid.rim?1:0;if(!((part==='cut'?grid.cut:grid.glow)>0))return scene;
+    let i0=-r,i1=cols-1+r,j0=-r,j1=rows-1+r;
+    if(clip){const [x,y,w,h]=clip;i0=Math.max(-r,Math.floor((x-grid.left)/cell)-1);i1=Math.min(cols-1+r,Math.floor((x+w-grid.left)/cell)+1);j0=Math.max(-r,Math.floor((y-grid.top)/cell)-1);j1=Math.min(rows-1+r,Math.floor((y+h-grid.top)/cell)+1);}
     if(i1<i0||j1<j0)return scene;
-    const image=gridImage(grid,part),source=[i0,j0,i1-i0+1,j1-j0+1];
-    // (one sprite over the cells, its pixels' centres on the cell centres; a clipped one keeps a cell more each side, so its edges read like the whole)
-    scene.enter({position:[grid.left+i0*cell,grid.top+j0*cell]},{blend});scene.sprite(image,source,cell);scene.leave();
+    const image=gridImage(grid,part),source=[i0+r,j0+r,i1-i0+1,j1-j0+1];
+    // (one sprite over the cells, its pixels' centres on the cell centres; a clipped one keeps a cell more each side, so its edges read like the whole;
+    //  a grid with a rim is cut back to its own bounds, the rim only there for the blend across to the grid beside it)
+    scene.enter();if(r)scene.clip(rect(grid.left,grid.top,grid.right-grid.left,grid.bottom-grid.top));
+    scene.enter({position:[grid.left+i0*cell,grid.top+j0*cell]},{blend});scene.sprite(image,source,cell);scene.leave();scene.leave();
     return scene;
 }
 const IMAGES=new WeakMap();
@@ -393,7 +398,7 @@ const IMAGES=new WeakMap();
 function gridImage(grid,part){
     let both=IMAGES.get(grid);if(!both)IMAGES.set(grid,both={});
     if(both[part])return both[part];
-    const {cols,rows,light}=grid,k=part==='cut'?grid.cut:grid.glow,data=new Uint8ClampedArray(cols*rows*4);
+    const r=grid.rim?1:0,cols=grid.cols+2*r,rows=grid.rows+2*r,light=grid.rim??grid.light,k=part==='cut'?grid.cut:grid.glow,data=new Uint8ClampedArray(cols*rows*4);
     for(let c=0;c<cols*rows;c++){const R=light[c*3],G=light[c*3+1],B=light[c*3+2],o=c*4;
         if(part==='cut'){data[o]=data[o+1]=data[o+2]=255;data[o+3]=Math.round(Math.min(1,Math.max(R,G,B)*k)*255);}   // (a deep neon lifts the dark as much as a white light of its strength)
         else{const m=Math.max(R,G,B);if(m<=0)continue;data[o]=R/m*255;data[o+1]=G/m*255;data[o+2]=B/m*255;data[o+3]=Math.round(Math.min(1,m*k)*255);}}

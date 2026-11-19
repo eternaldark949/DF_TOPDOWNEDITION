@@ -91,7 +91,11 @@ test('a map\'s light grid: still emitters bake per region, a mover re-bakes what
     grids.setMovers(car(760));const step=grids.getStatistics().patches;grids.updateState({budget_ms:Infinity});
     assert.ok(grids.getStatistics().patches>step,'a mover re-bakes only the cells round it');
     for(const g of grids.grids()){const key=`${g.left/512},${g.top/512}`,whole=grids.bakeRegion(key);let worst=0;for(let i=0;i<g.light.length;i++)worst=Math.max(worst,Math.abs(g.light[i]-whole.light[i]));
-        assert.ok(worst<1e-5,`and gets what a whole bake of ${key} gets (${worst})`);assert.equal(g.key,whole.key);}
+        for(let i=0;i<g.rim.length;i++)worst=Math.max(worst,Math.abs(g.rim[i]-whole.rim[i]));
+        assert.ok(worst<1e-5,`and gets what a whole bake of ${key} gets, its rim too (${worst})`);assert.equal(g.key,whole.key);}
+    {const [a,b]=['0,1','1,1'].map(k=>grids.grids().find(g=>`${g.left/512},${g.top/512}`===k)),w=a.cols+2;let worst=0;
+        for(let j=0;j<a.rows;j++)for(let c=0;c<3;c++)worst=Math.max(worst,Math.abs(a.rim[((j+1)*w+w-1)*3+c]-b.light[j*b.cols*3+c]));
+        assert.ok(worst<1e-5,`a grid's rim is the first cells of the grid beside it, so the two draw without a seam (${worst})`);}
     grids.setMovers([]);grids.updateState({budget_ms:Infinity});
     let t=0;grids.setMovers(car(1500));const one=grids.updateState({budget_ms:0,now:()=>t++});assert.equal(one.baked,1,'a spent budget still bakes one a call');
 });
