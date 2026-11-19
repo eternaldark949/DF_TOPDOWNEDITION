@@ -55,9 +55,9 @@
     "teak_boards": {"kind": "material", "fill": {"type": "pattern", "texture": "teak"}},
     "travertine_edge": {"kind": "material", "fill": {"type": "pattern", "texture": "travertine"}},
     "walnut_versailles": {"kind": "material", "fill": {"type": "pattern", "texture": "versailles_parquet"}},
-    "wine_harlequin": {"kind": "material", "fill": {"type": "pattern", "texture": "harlequin_marble"}},
+    "wine_harlequin": {"kind": "material", "reflect": {"strength": 0.3}, "fill": {"type": "pattern", "texture": "harlequin_marble"}},
     "mauve_trellis": {"kind": "material", "fill": {"type": "pattern", "texture": "trellis_carpet"}},
-    "white_bath_marble": {"kind": "material", "fill": {"type": "pattern", "texture": "bath_marble"}},
+    "white_bath_marble": {"kind": "material", "reflect": {"strength": 0.35}, "fill": {"type": "pattern", "texture": "bath_marble"}},
     "blush_lattice": {"kind": "material", "fill": {"type": "pattern", "texture": "diamond_lattice"}},
     "map": {
       "kind": "map",

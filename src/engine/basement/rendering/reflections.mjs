@@ -17,7 +17,7 @@
 // classic's long smears down a wet street); its shape is not flipped, as a floor seen from above shows it.
 import {artScene,rect,circle,radial,readReflect} from './art.mjs';
 import {readColor} from './colors.mjs';
-import {drawingEmitters} from './looks.mjs';
+import {fallen} from './looks.mjs';
 import {viewAhead} from './camera.mjs';
 import {effect} from './effects.mjs';
 
@@ -33,7 +33,7 @@ export const REFLECTION_QUALITY=Object.freeze({
     off:Object.freeze({scale:0,mask_scale:0,lights:false,emits:false,bodies:'none',planes:false,bands:0,steps:0}),
     low:Object.freeze({scale:.25,mask_scale:.25,lights:true,emits:false,bodies:'silhouettes',planes:false,bands:1,steps:0}),
     medium:Object.freeze({scale:.5,mask_scale:.25,lights:true,emits:true,bodies:'silhouettes',planes:true,bands:12,steps:0}),
-    high:Object.freeze({scale:.5,mask_scale:.25,lights:true,emits:true,bodies:'screen',planes:true,bands:12,steps:32}),
+    high:Object.freeze({scale:.5,mask_scale:.25,lights:true,emits:true,bodies:'screen',planes:true,bands:12,steps:48}),
 });
 const LEVELS=Object.freeze(['off','low','medium','high']);
 const WET_STEPS=8;
@@ -42,8 +42,11 @@ const PAINT=['fill','stroke','line_cap','line_join','dash','alpha','blend','shad
 
 /** Wetness 0..1 in the eight steps the mask is baked at (dry to soaked). */
 export const wetStep=w=>Math.round(Math.max(0,Math.min(1,w))*WET_STEPS)/WET_STEPS;
-/** The matrix that draws a thing at height z where its reflection falls: `fall` × z down the world's y. */
-export const reflectionMatrix=(z,fall)=>[1,0,0,1,0,fall*z];
+/**
+ * The matrix that draws a thing at height z where its reflection shows: `fall` × z down the world's y, and, under a
+ * height view, in the plane of its depth below the floor (toward the camera), so what leans away leans back.
+ */
+export const reflectionMatrix=(z,fall,view=null)=>fallen(view,fall,z);
 
 /**
  * The floor steps as the mask draws them: each step first clears what is under it (at its own alpha), then,
@@ -109,30 +112,30 @@ const rgba=([r,g,b],a)=>`rgba(${r},${g},${b},${+Math.max(0,Math.min(1,a)).toFixe
  * intensity, glow, radius | size | length}) plus `height` (world units above the ground, default 0) and
  * `reflect` (how strongly it shows, default 1).
  */
-export function drawLightReflection(scene,l,{fall=.75,strength=1}={}){
+export function drawLightReflection(scene,l,{fall=.75,strength=1,view=null}={}){
     if(!l.color)return scene;
     const [x,y]=l.position,h=l.height??0,k=Math.min(1,l.intensity??1)*(l.reflect??1)*strength;if(k<.002)return scene;
-    const c=rgbOf(l.color),r=l.radius??(l.size?Math.max(...l.size):l.length??60),yr=y+fall*h,head=Math.max(3,Math.min(24,r*.06+h*.04)),smear=Math.max(head*3,fall*h*1.1+r*.3);
+    const m=fallen(view,fall,h),c=rgbOf(l.color),r=(l.radius??(l.size?Math.max(...l.size):l.length??60))*m[0],X=m[0]*x+m[4],yr=m[3]*y+m[5],head=Math.max(3,Math.min(24,r*.06+h*.04)),smear=Math.max(head*3,fall*h*1.1+r*.3);
     scene.enter({},{blend:'add'});
-    scene.fill([circle(x,yr,r*.45)],radial([x,yr],0,[x,yr],r*.45,[[0,rgba(c,.16*k)],[1,rgba(c,0)]]));
-    scene.enter({position:[x,yr+smear*.2],scale:[head*1.5,smear]});scene.fill([circle(0,0,1)],radial([0,0],0,[0,0],1,[[0,rgba(c,.5*k)],[.45,rgba(c,.18*k)],[1,rgba(c,0)]]));scene.leave();
-    scene.fill([circle(x,yr,head*2)],radial([x,yr],0,[x,yr],head*2,[[0,rgba(c,.9*k)],[.35,rgba(c,.45*k)],[1,rgba(c,0)]]));
-    scene.fill([circle(x,yr,head*.7)],radial([x,yr],0,[x,yr],head*.7,[[0,`rgba(255,255,255,${+(.8*k).toFixed(4)})`],[1,rgba(c,0)]]));
+    scene.fill([circle(X,yr,r*.45)],radial([X,yr],0,[X,yr],r*.45,[[0,rgba(c,.16*k)],[1,rgba(c,0)]]));
+    scene.enter({position:[X,yr+smear*.2],scale:[head*1.5,smear]});scene.fill([circle(0,0,1)],radial([0,0],0,[0,0],1,[[0,rgba(c,.7*k)],[.45,rgba(c,.28*k)],[1,rgba(c,0)]]));scene.leave();
+    scene.fill([circle(X,yr,head*2)],radial([X,yr],0,[X,yr],head*2,[[0,rgba(c,.9*k)],[.35,rgba(c,.45*k)],[1,rgba(c,0)]]));
+    scene.fill([circle(X,yr,head*.7)],radial([X,yr],0,[X,yr],head*.7,[[0,`rgba(255,255,255,${+(.55*k).toFixed(4)})`],[1,rgba(c,0)]]));
     scene.leave();return scene;
 }
 /**
  * A glowing shape's mirror (one of drawingEmitters' list): its outline where it falls, in its colour, and a soft
  * smear below it, added.
  */
-export function drawEmitterReflection(scene,em,{fall=.75,strength=1}={}){
+export function drawEmitterReflection(scene,em,{fall=.75,strength=1,view=null}={}){
     const k=Math.min(1,em.strength)*strength;if(k<.002)return scene;
-    const c=rgbOf(em.color),d=fall*em.height,[l,t,r,b]=em.bounds,w=Math.max(4,r-l),cx=(l+r)/2;
-    scene.enter({matrix:reflectionMatrix(em.height,fall)},{blend:'add'});
+    const m=fallen(view,fall,em.height),c=rgbOf(em.color),d=fall*em.height,[l,t,r,b]=em.bounds,w=Math.max(4,r-l)*m[0],cx=m[0]*(l+r)/2+m[4],bottom=m[3]*b+m[5];
+    scene.enter({matrix:m},{blend:'add'});
     const path=[['move',...em.outline[0]],...em.outline.slice(1).map(p=>['line',...p])];
     if(em.open)scene.stroke(path,rgba(c,.85*k),Math.max(1,em.width));else scene.fill([...path,['close']],rgba(c,.85*k));
     scene.leave();
     const len=Math.max(12,(b-t)*1.5+d*.6);
-    scene.enter({position:[cx,b+d+len*.35],scale:[w*.7,len]},{blend:'add'});scene.fill([circle(0,0,1)],radial([0,0],0,[0,0],1,[[0,rgba(c,.35*k)],[1,rgba(c,0)]]));scene.leave();
+    scene.enter({position:[cx,bottom+len*.35],scale:[w*.7,len]},{blend:'add'});scene.fill([circle(0,0,1)],radial([0,0],0,[0,0],1,[[0,rgba(c,.35*k)],[1,rgba(c,0)]]));scene.leave();
     return scene;
 }
 /**
@@ -189,7 +192,7 @@ export function heightPackets(part,{hmax=1024,drawing=false}={}){
  *  key        the prefix of its resource ids and picture keys
  */
 export class reflectionPass{
-    #render;#quality;#level;#fall;#layer;#ground;#budget;#key;#size=null;#slow=0;#steady=0;#stats={};#planes=new WeakMap();#areas=new WeakMap();
+    #render;#quality;#level;#fall;#layer;#ground;#budget;#key;#size=null;#slow=0;#steady=0;#stats={};#planes=new WeakMap();#areas=new WeakMap();#split=new WeakMap();
     constructor(render,{quality='medium',fall=.75,layer=-99,ground=-100,budget_ms=2,key='reflect'}={}){
         if(!render?.lookParts)throw new TypeError('A reflection pass draws through a renderSystem');
         this.#render=render;this.#fall=fall;this.#layer=layer;this.#ground=ground;this.#budget=budget_ms;this.#key=key;this.setQuality(quality);
@@ -230,7 +233,7 @@ export class reflectionPass{
     draw(frame,{extent,floors=[],materials=()=>null,wetness=0,lights=[],emitters=[],grid=null,time=0,ripple=2,tile_size=1024,ahead=256,blend=1}={}){
         const start=now(),q=this.#quality;let n=0;
         if(q.scale<=0||!this.#size){this.#stats={ms:0,packets:0,level:this.#level,ssr:false};return 0;}
-        const render=this.#render,v=render.getVisibleBounds(blend),fall=this.#fall;
+        const render=this.#render,v=render.getVisibleBounds(blend),fall=this.#fall,view=render.heightViewAt(blend);
         const caps=new Set(render.getCapabilities()),ssr=q.bodies==='screen'&&caps.has('effect:reflection');
         const submit=(packet)=>{frame.submit(packet);n++;};
         const vp=render.getViewport(),screen={width:vp.width,height:vp.height},whole={type:'sprite',space:'screen',position:[vp.width/2,vp.height/2],size:[vp.width,vp.height]};
@@ -240,14 +243,15 @@ export class reflectionPass{
         for(const p of createReflectionMask({extent,floors,materials,wetness,tile_size,view:v,ahead,key:this.#key}))submit(p);
         frame.endPass();
         if(planes){frame.beginPass({target_id:this.target('plane_mask'),viewport:screen});for(const p of createReflectionMask({extent,floors,materials,wetness,tile_size,view:v,ahead,part:'plane',key:this.#key}))submit(p);frame.endPass();}
-        const still=emitters.filter(e=>e.still),live=emitters.filter(e=>!e.still);
+        let split=this.#split.get(emitters);if(!split){split=[emitters.filter(e=>e.still),emitters.filter(e=>!e.still)];this.#split.set(emitters,split);}   // the same array each frame keeps the probes' keys
+        const [still,live]=split;
         const probes=q.emits?createReflectionProbes({extent,emitters:still,fall,tile_size,view:v,ahead,key:this.#key}):[];
         // The light target: mirrored lights, glowing shapes, probes (when no screen-space walk falls back to them), silhouettes.
         frame.beginPass({target_id:this.target('light'),viewport:screen});
         if(!ssr)for(const p of probes)submit(p);
         const art=new artScene();
-        if(q.lights)for(const l of lights)drawLightReflection(art,l,{fall});
-        if(q.emits)for(const em of live)drawEmitterReflection(art,em,{fall});
+        if(q.lights)for(const l of lights)drawLightReflection(art,l,{fall,view});
+        if(q.emits)for(const em of live)drawEmitterReflection(art,em,{fall,view});
         for(const p of art.finish())submit(p);
         if(!ssr&&q.bodies!=='none'){
             for(const {entity,parts} of render.lookParts(blend,{above:this.#ground,mirror:fall,margin:64})){
@@ -279,7 +283,7 @@ export class reflectionPass{
             submit({type:'sprite',space:'screen',resource_id:this.target('light'),source:[0,th*i/bands,tw,th/bands],position:[vp.width/2+dx,y0+h/2],size:[vp.width,h+.5],blend:'add',layer:this.#layer,depth:0});
         }
         if(planes)submit({...whole,resource_id:this.target('plane'),layer:this.#layer,depth:1e-3});
-        if(ssr)frame.setEffects([effect({type:'reflection',height:this.target('height'),mask:this.target('mask'),probe:this.target('probe'),plane:planes?this.target('plane_mask'):null,fall,steps:q.steps,ripple:ripple*.5,time}),...frame.getEffects()]);
+        if(ssr)frame.setEffects([effect({type:'reflection',height:this.target('height'),mask:this.target('mask'),probe:this.target('probe'),plane:planes?this.target('plane_mask'):null,fall,steps:q.steps,ripple:ripple*.5,time,eye:view?view.eye:0,lean:view?view.lean:1}),...frame.getEffects()]);
         const ms=now()-start;this.#stats={ms,packets:n,level:this.#level,ssr};this.#pace(ms);
         return n;
     }

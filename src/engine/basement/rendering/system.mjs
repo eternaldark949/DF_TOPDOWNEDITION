@@ -4,7 +4,7 @@ import {geometry,material,requirements} from './packets.mjs';
 import {effectStack,effectNeeds,effectTargets} from './effects.mjs';
 import {finite,identifier,freezeData,CAPABILITIES} from './values.mjs';
 import {artScene} from './art.mjs';
-import {drawLook,drawComponents} from './looks.mjs';
+import {drawLook,drawComponents,fallen} from './looks.mjs';
 import {heightView} from './height.mjs';
 const PICK_STEPS=Object.freeze([1,.75,.5,.25,0]);   // top first: what the camera sees of a tall thing is its top
 
@@ -80,6 +80,8 @@ export class renderSystem {
         this.#camera.setViewport(dimensions);
         try{this.#backend?.resize(this.#camera.viewport);}catch(error){this.#camera.setViewport(old);throw error;}return this;
     }
+    /** The height view now drawn (a heightView at the camera), or null when everything draws flat. */
+    heightViewAt(blend=1){return this.#lean?new heightView({camera:this.#camera.getView(blend).position,...this.#lean}):null;}
     /** The camera's viewport ({width, height, pixel_ratio}) and the world bounds it sees. */
     getViewport(){return this.#camera.viewport;}
     getVisibleBounds(blend=1,margin=0){return this.#camera.getVisibleBounds({blend,margin});}
@@ -153,12 +155,12 @@ export class renderSystem {
      * `margin` widens the view (world units), so what stands just off screen is found too.
      */
     lookParts(blend=1,{above=-Infinity,mirror=null,margin=0,filter=null}={}){
-        this.#live();const lib=this.#world.elements.asset_library,view=mirror===null&&this.#lean?new heightView({camera:this.#camera.getView(blend).position,...this.#lean}):null,out=[];
+        this.#live();const lib=this.#world.elements.asset_library,view=this.#lean?new heightView({camera:this.#camera.getView(blend).position,...this.#lean}):null,out=[];
         for(const {entity} of this.getVisibleEntities({blend,margin},[])){
             if(!entity)continue;const look=entity.get('look',{});if((look.layer??0)<=above||look.visible===false||look.reflect===false)continue;
             if(filter&&!filter(entity))continue;
             const parts=[],z=entity.world_elevation??0,h=entity.height??0;
-            if(entity.assets?.drawing){const scene=new artScene();if(mirror!==null)scene.enter({matrix:[1,0,0,1,0,mirror*(z+h/2)]});if(drawLook(scene,entity,lib,blend,{view})){if(mirror!==null)scene.leave();parts.push({packets:scene.finish(),sides:[],z0:z,z1:z+h,drawing:true});}}
+            if(entity.assets?.drawing){const scene=new artScene();if(mirror!==null)scene.enter({matrix:fallen(view,mirror,z+h/2)});if(drawLook(scene,entity,lib,blend,{view:mirror===null?view:null})){if(mirror!==null)scene.leave();parts.push({packets:scene.finish(),sides:[],z0:z,z1:z+h,drawing:true});}}
             if(entity.has('components')){
                 let pose;const rigs=this.#world.rigs,joints=name=>{pose??=rigs?.getRig(entity)?rigs.getPose(entity,{blend,world_space:true}):null;return pose?.joints[name]??null;};
                 for(const part of drawComponents(entity,lib,blend,{joints,view,mirror}))parts.push({packets:part.packets,sides:part.sides,z0:part.height,z1:part.peak,drawing:false});

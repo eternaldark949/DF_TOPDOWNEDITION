@@ -122,23 +122,31 @@ void main(){
 
 // Screen-space reflection (effects.mjs, reflection): u_texture the picture so far, u_height each pixel's height (red,
 // over green: something stands there), u_mask where the floor shines (alpha), u_probe the baked mirror, u_plane
-// where a reflection plane draws instead. u_dir is the way up the world's y in framebuffer pixels, u_a (strength,
-// fall, framebuffer pixels per world unit, reach), u_b (ripple px, ripple radians a pixel, time, hmax), u_steps the samples.
+// where a reflection plane draws instead. It marches up in height t: what stands at height t and shows in this
+// pixel stands on the floor point F where the pixel is c + (F - c) k(-t) + fall t down the world's y, so it is
+// drawn at c + (F - c) k(t); the first such point whose height reaches t is what this pixel mirrors. u_dir is the
+// way up the world's y in framebuffer pixels, u_c the camera there, u_a (strength, fall, framebuffer pixels per
+// world unit, reach), u_b (ripple px, ripple radians a pixel, time, hmax), u_k (eye, lean; eye 0 draws flat).
 const REFLECT_FRAGMENT=`#version 300 es
-precision highp float;uniform sampler2D u_texture,u_height,u_mask,u_probe,u_plane;uniform vec2 u_size,u_dir;uniform vec4 u_a,u_b;uniform int u_steps,u_planes;out vec4 color;
+precision highp float;uniform sampler2D u_texture,u_height,u_mask,u_probe,u_plane;uniform vec2 u_size,u_dir,u_c,u_k;uniform vec4 u_a,u_b;uniform int u_steps,u_planes;out vec4 color;
+float K(float z){if(u_k.x<=0.)return 1.;return 1.+(u_k.x/(u_k.x-min(z,u_k.x*.86))-1.)*u_k.y;}
+// where what stands at height t and mirrors into the pixel at q0 is drawn
+vec2 at(vec2 q0,float t){return u_c+(q0+u_dir*(u_a.y*t*u_a.z)-u_c)*(K(t)/K(-t));}
 void main(){
  vec2 p=gl_FragCoord.xy,uv=p/u_size;vec4 src=texelFetch(u_texture,ivec2(p),0),under=texture(u_height,uv);
  float w=texture(u_mask,uv).a*u_a.x*(1.-smoothstep(.25,.75,under.g));if(u_planes>0)w*=1.-texture(u_plane,uv).a;
  if(w<=.002){color=src;return;}
- vec2 q0=p+vec2(u_b.x*sin(p.y*u_b.y+u_b.z*3.),0.);float dt=u_a.w/float(u_steps);vec3 found=vec3(0);float got=0.;bool done=false;
+ vec2 q0=p+vec2(u_b.x*sin(p.y*u_b.y+u_b.z*3.),0.);float dt=u_a.w/float(u_steps);vec3 found=vec3(0);float got=0.;
  for(int i=1;i<=64;i++){
-  if(i>u_steps)break;float t=dt*float(i);vec2 q=q0+u_dir*(t*u_a.z);
+  if(i>u_steps)break;float t=dt*float(i);
+  vec2 q=at(q0,t);
   if(q.x<0.||q.y<0.||q.x>u_size.x||q.y>u_size.y)break;
   vec4 h=texture(u_height,q/u_size);if(h.g<.5)continue;
-  float need=u_a.y*u_b.w*h.r/h.g;
-  if(t+dt*.5>=need){if(t-need<=dt*1.5+4.){found=texture(u_texture,q/u_size).rgb;got=1.-t/u_a.w;}done=true;break;}
+  float z=u_b.w*h.r/h.g;if(z<t-dt||z>t+dt*2.+12.)continue;   // higher than that is an overhang the ray passes under
+  float lo=t-dt,hi=t;for(int k=0;k<5;k++){float m=.5*(lo+hi);vec4 g=texture(u_height,at(q0,m)/u_size);if(g.g>=.5&&u_b.w*g.r/g.g>=m-1.)hi=m;else lo=m;}   // the crossing, found closer
+  found=texture(u_texture,at(q0,hi)/u_size).rgb;got=1.-.7*hi/u_a.w;break;
  }
- vec3 probe=texture(u_probe,(q0)/u_size).rgb;
+ vec3 probe=texture(u_probe,q0/u_size).rgb;
  vec3 r=found*got+probe*(1.-got);
  color=vec4(min(src.rgb+w*r,vec3(src.a)),src.a);
 }`;
@@ -195,7 +203,7 @@ export class webglRenderer {
         this.#postProgram=post;gl.useProgram(post);for(const name of ['u_row0','u_row1','u_texture','u_grain','u_type','u_size','u_a','u_b','u_glow0','u_glow1','u_glow2','u_glow3'])this.#postUniforms[name]=gl.getUniformLocation(post,name);gl.uniform1i(this.#postUniforms.u_texture,0);gl.uniform1i(this.#postUniforms.u_grain,1);for(let i=0;i<4;i++)gl.uniform1i(this.#postUniforms[`u_glow${i}`],2+i);
         const reflect=gl.createProgram();gl.attachShader(reflect,shader(gl.VERTEX_SHADER,VERTEX));gl.attachShader(reflect,shader(gl.FRAGMENT_SHADER,REFLECT_FRAGMENT));gl.bindAttribLocation(reflect,0,'a_position');gl.linkProgram(reflect);
         if(!gl.getProgramParameter(reflect,gl.LINK_STATUS))throw new Error(`WebGL program: ${gl.getProgramInfoLog(reflect)}`);
-        this.#reflectProgram=reflect;gl.useProgram(reflect);for(const name of ['u_row0','u_row1','u_texture','u_height','u_mask','u_probe','u_plane','u_size','u_dir','u_a','u_b','u_steps','u_planes'])this.#reflectUniforms[name]=gl.getUniformLocation(reflect,name);
+        this.#reflectProgram=reflect;gl.useProgram(reflect);for(const name of ['u_row0','u_row1','u_texture','u_height','u_mask','u_probe','u_plane','u_size','u_dir','u_c','u_k','u_a','u_b','u_steps','u_planes'])this.#reflectUniforms[name]=gl.getUniformLocation(reflect,name);
         ['u_texture','u_height','u_mask','u_probe','u_plane'].forEach((name,i)=>gl.uniform1i(this.#reflectUniforms[name],i));
         gl.useProgram(program);
         for(const name of ['u_row0','u_row1','u_mode','u_color','u_points','u_uv','u_pat0','u_pat1','u_radii','u_repeat','u_opacity','u_texture'])this.#uniforms[name]=gl.getUniformLocation(program,name);
@@ -519,6 +527,7 @@ export class webglRenderer {
         gl.useProgram(this.#reflectProgram);gl.bindFramebuffer(gl.FRAMEBUFFER,into===this.#main?null:into.resolve);gl.viewport(0,0,W,H);this.#bound=null;
         gl.blendEquation(gl.FUNC_ADD);gl.blendFuncSeparate(gl.ONE,gl.ZERO,gl.ONE,gl.ZERO);gl.disable(gl.STENCIL_TEST);
         gl.uniform3f(u.u_row0,2/W,0,-1);gl.uniform3f(u.u_row1,0,-2/H,1);gl.uniform2f(u.u_size,W,H);gl.uniform2f(u.u_dir,up[0]/per,up[1]/per);
+        const [x,y]=this.#view.position,cx=(m[0]*x+m[2]*y+m[4])*sx,cy=(m[1]*x+m[3]*y+m[5])*sx;gl.uniform2f(u.u_c,cx,H-cy);gl.uniform2f(u.u_k,e.eye,e.lean);
         gl.uniform4f(u.u_a,e.strength,e.fall,per,e.reach);gl.uniform4f(u.u_b,e.ripple*sx,e.ripple_scale/sx,e.time,e.hmax);gl.uniform1i(u.u_steps,e.steps);gl.uniform1i(u.u_planes,e.plane===null?0:1);
         [source.texture,texture(e.height),texture(e.mask),e.probe===null?null:texture(e.probe),e.plane===null?null:texture(e.plane)].forEach((t,k)=>{gl.activeTexture(gl.TEXTURE0+k);gl.bindTexture(gl.TEXTURE_2D,t);gl.bindSampler(k,this.#samplers.clamp);});
         this.#draw(quad(0,0,W,H));
