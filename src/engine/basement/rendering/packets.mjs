@@ -49,12 +49,12 @@ export function packet(input,out={}){
     out.opacity=finite(input.opacity??1,'opacity',0);if(out.opacity>1)throw new TypeError('Opacity must be in [0,1]');out.blend=input.blend??'normal';if(!BLENDS.includes(out.blend))throw new TypeError('Unsupported blend');
     out.transform=transform(input,out.transform);out.material_id=input.material_id===undefined?null:identifier(input.material_id);out.material=out.material_id||input.type==='picture'?null:material(input.material,out.material??{});
     if(input.type==='picture'){if(input.material_id!==undefined||input.material!==undefined)throw new TypeError('A picture carries its own paint');picture(input,out);}else{out.picture=null;out.prepare=false;if(out.build)out.build=null;}
-    out.geometry_id=null;out.geometry=null;out.resource_id=null;out.text=null;
+    out.geometry_id=null;out.geometry=null;out.resource_id=null;out.pixels=null;out.text=null;
     if(input.type!=='sprite'){out.size=null;out.source=null;out.origin=null;}
     if(input.type!=='text'){out.font=null;out.align=null;out.baseline=null;}
     if(input.type==='shape'){out.geometry_id=input.geometry_id===undefined?null:identifier(input.geometry_id);if(!out.geometry_id){out.geometry=geometry(input.geometry,geometryBuffers.get(out)??{});geometryBuffers.set(out,out.geometry);}}
     if(input.type==='sprite'){
-        out.resource_id=identifier(input.resource_id);out.size=vector(input.size,'sprite size',out.size??[]);out.size.forEach(v=>finite(v,'sprite size',0));
+        if(input.pixels!==undefined){if(input.resource_id!==undefined)throw new TypeError('A sprite draws a resource or its own pixels, not both');out.pixels=pixelsOf(input.pixels);}else out.resource_id=identifier(input.resource_id);out.size=vector(input.size,'sprite size',out.size??[]);out.size.forEach(v=>finite(v,'sprite size',0));
         out.source=input.source?matrixSource(input.source,out.source??[]):null;
         out.origin=vector(input.origin??[.5,.5],'sprite origin',out.origin??[]);
     }
@@ -76,6 +76,12 @@ function picture(input,out){
     dst.matrix=matrix(p.matrix??[1,0,0,1,0,0],dst.matrix??[]);dst.source=p.source?rect4(p.source,'picture source',dst.source??[]):null;dst.layered=p.layered===true;out.picture=dst;
     out.prepare=input.prepare===true;
     if(!Object.hasOwn(out,'build'))Object.defineProperty(out,'build',{writable:true,enumerable:false,value:null});out.build=p.build;
+}
+/** A sprite's own small image: {width, height, data} with data width × height × 4 RGBA bytes, rows top down, not premultiplied. Backends read an array once, so give a new one when the pixels change. */
+function pixelsOf(p){
+    if(!p||typeof p!=='object'||!Number.isInteger(p.width)||!Number.isInteger(p.height)||p.width<1||p.height<1||p.width>1024||p.height>1024)throw new TypeError('Sprite pixels are {width, height, data}, at most 1024 a side');
+    if(!(p.data instanceof Uint8ClampedArray||p.data instanceof Uint8Array)||p.data.length!==p.width*p.height*4)throw new TypeError('Sprite pixel data is width × height × 4 bytes');
+    return p;
 }
 function rect4(value,name,out){if(!Array.isArray(value)||value.length!==4)throw new TypeError(`Invalid ${name}`);for(let i=0;i<4;i++)out[i]=finite(value[i],name);return out;}
 function matrixSource(source,out){if(!Array.isArray(source)||source.length!==4)throw new TypeError('Sprite source must be [x,y,width,height]');for(let i=0;i<4;i++)out[i]=finite(source[i],'sprite source',0);if(!out[2]||!out[3])throw new TypeError('Empty sprite source');return out;}

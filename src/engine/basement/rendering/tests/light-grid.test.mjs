@@ -38,7 +38,12 @@ test('a high emitter reaches farther and softer; strength scales it', () => {
 test('the same light bakes the same key; a change gives a new one', () => {
     const a=bakeLightGrid({bounds:region,emitters:[neon(200,200)]}),b=bakeLightGrid({bounds:region,emitters:[neon(200,200)]}),c=bakeLightGrid({bounds:region,emitters:[neon(210,200)]});
     assert.equal(a.key,b.key);assert.notEqual(a.key,c.key);
-    assert.ok(lightGridPackets(a).length>10,'the grid draws as soft discs');assert.ok(lightGridPackets(a).every(p=>p.blend==='add'));
+    const [glow]=lightGridPackets(a),[cut]=lightGridPackets(a,'cut');
+    assert.equal(glow.type,'sprite');assert.equal(glow.blend,'add');assert.equal(cut.blend,'destination-out');
+    assert.deepEqual([glow.pixels.width,glow.pixels.height],[a.cols,a.rows],'the grid draws as one small image, a pixel a cell');
+    assert.deepEqual(glow.size,[a.cols*a.cell,a.rows*a.cell],'scaled up over the region');
+    assert.equal(lightGridPackets(a)[0].pixels,glow.pixels,'made once per grid');
+    const lit=(a.cols*Math.floor(190/32)+Math.floor(230/32))*4;assert.ok(glow.pixels.data[lit]>200&&glow.pixels.data[lit+3]>0,'its colour where the light is');
 });
 
 test('the light layer\'s tiles carry the grid: a cut in the dark and its colour, keyed by what it shows', () => {

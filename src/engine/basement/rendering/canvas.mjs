@@ -176,11 +176,14 @@ export class canvasRenderer {
             this.#style(ctx,material,draw,sx,sy);this.#paint2d(ctx,draw,material);
         }finally{if(clipped){ctx.restore();this.#set={};}}
     }
+    // A sprite's own pixels on a surface, painted once per data array.
+    #inlined=new WeakMap();
+    #inline(p){let surface=this.#inlined.get(p.data);if(!surface){surface=this.#createSurface(p.width,p.height);const c=surface.getContext('2d'),data=c.createImageData(p.width,p.height);data.data.set(p.data);c.putImageData(data,0,0);this.#inlined.set(p.data,surface);}return surface;}
     // What a packet draws, with the context already placed and styled.
     #paint2d(ctx,draw,material){
             if(draw.type==='shape')this.#shape(ctx,this.#geometry(draw.geometry_id,draw.geometry),material);
             else if(draw.type==='sprite'){
-                const image=this.#resources.get(draw.resource_id).image,[w,h]=draw.size;
+                const image=draw.pixels?this.#inline(draw.pixels):this.#resources.get(draw.resource_id).image,[w,h]=draw.size;ctx.imageSmoothingEnabled=true;
                 if(draw.source)ctx.drawImage(image,...draw.source,-w*draw.origin[0],-h*draw.origin[1],w,h);else ctx.drawImage(image,-w*draw.origin[0],-h*draw.origin[1],w,h);
             }else{
                 const f=draw.font;ctx.font=`${f.style} ${f.weight} ${f.size}px ${f.family}`;ctx.textAlign=draw.align;ctx.textBaseline=draw.baseline;if(f.letter_spacing&&'letterSpacing' in ctx)ctx.letterSpacing=`${f.letter_spacing}px`;

@@ -35,6 +35,7 @@ const BLEND_FUNCTIONS=Object.freeze({
  * per pixel (`overlay`, `soft-light`, `lighten`, `darken`) and the ones Canvas applies to the whole
  * surface outside the shape (`source-in`, `source-out`); `destination-in` only inside it.
  */
+const INLINE_KEEP=256;
 export const WEBGL_CAPABILITIES=Object.freeze(['shape','sprite','text','picture','geometry:rect','geometry:ellipse','geometry:path','gradient:linear','gradient:radial','pattern','clip','shadow','blur','dash','target','layer','effect:grade','effect:vignette','effect:grain','effect:bloom','effect:fog_glow','effect:star_glow','effect:bokeh','effect:reflection',...Object.keys(BLEND_FUNCTIONS).map(name=>`blend:${name}`)]);
 if(WEBGL_CAPABILITIES.some(need=>!CAPABILITIES.includes(need)))throw new Error('WebGL declares a capability the engine does not name');
 
@@ -334,8 +335,19 @@ export class webglRenderer {
             if(box){this.#mark(clipped,true);this.#draw(triangles);this.#cover();this.#paint(material.stroke,opacity);this.#draw(box);}
         }
     }
+    // A sprite's own pixels as a texture, uploaded once per data array; the least recently drawn of more than INLINE_KEEP go.
+    #inlined=new Map();
+    #inline(p){
+        let entry=this.#inlined.get(p.data);
+        if(entry){this.#inlined.delete(p.data);this.#inlined.set(p.data,entry);return entry;}
+        const gl=this.#gl;gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true);
+        try{entry={width:p.width,height:p.height,texture:this.#texture(p.width,p.height,{pixels:p.data instanceof Uint8Array?p.data:new Uint8Array(p.data.buffer,p.data.byteOffset,p.data.length)})};}finally{gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,false);}
+        this.#inlined.set(p.data,entry);
+        while(this.#inlined.size>INLINE_KEEP){const [key,old]=this.#inlined.entries().next().value;gl.deleteTexture(old.texture);this.#inlined.delete(key);}
+        return entry;
+    }
     #sprite(d,m,clipped,opacity){
-        const image=this.#resources.get(d.resource_id),[w,h]=d.size,x0=-w*d.origin[0],y0=-h*d.origin[1],[sx,sy,sw,sh]=d.source??[0,0,image.width,image.height];
+        const image=d.pixels?this.#inline(d.pixels):this.#resources.get(d.resource_id),[w,h]=d.size,x0=-w*d.origin[0],y0=-h*d.origin[1],[sx,sy,sw,sh]=d.source??[0,0,image.width,image.height];
         let su=sw/(w*image.width),ou=(sx-x0*sw/w)/image.width,sv=sh/(h*image.height),ov=(sy-y0*sh/h)/image.height;if(image.flip){sv=-sv;ov=1-ov;}
         this.#rows(m);this.#direct(clipped);this.#texturePaint(image.texture,[su,sv,ou,ov],opacity);this.#draw(quad(x0,y0,x0+w,y0+h));
     }
@@ -620,7 +632,7 @@ export class webglRenderer {
         if(this.#disposed)return;this.#disposed=true;this.#generation++;const gl=this.#gl;
         if(gl){
             for(const entry of this.#resources.values())this.#release(entry);for(const texture of this.#ramps.values())gl.deleteTexture(texture);
-            for(const line of this.#texts.values())if(line)gl.deleteTexture(line.texture);for(const entry of this.#pictures.values())this.#freeTarget(entry.target);if(this.#layer)this.#freeTarget(this.#layer);for(const t of [...this.#scratch??[],this.#post,this.#spare,...this.#glows.values()])if(t)this.#freeTarget(t);if(this.#grain)gl.deleteTexture(this.#grain);gl.deleteProgram(this.#blurProgram);gl.deleteProgram(this.#postProgram);gl.deleteProgram(this.#reflectProgram);
+            for(const line of this.#texts.values())if(line)gl.deleteTexture(line.texture);for(const entry of this.#inlined.values())gl.deleteTexture(entry.texture);this.#inlined.clear();for(const entry of this.#pictures.values())this.#freeTarget(entry.target);if(this.#layer)this.#freeTarget(this.#layer);for(const t of [...this.#scratch??[],this.#post,this.#spare,...this.#glows.values()])if(t)this.#freeTarget(t);if(this.#grain)gl.deleteTexture(this.#grain);gl.deleteProgram(this.#blurProgram);gl.deleteProgram(this.#postProgram);gl.deleteProgram(this.#reflectProgram);
             gl.deleteBuffer(this.#buffer);gl.deleteVertexArray(this.#vao);gl.deleteProgram(this.#program);for(const sampler of Object.values(this.#samplers??{}))gl.deleteSampler(sampler);
             gl.getExtension('WEBGL_lose_context')?.loseContext();
         }
