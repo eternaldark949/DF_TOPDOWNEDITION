@@ -121,8 +121,10 @@ export function componentSteps(components,source,{solid_only=false}={}){
  * camera, parts at one height draw farthest from the camera first, and a component set on the entity above
  * its base (a bottle on a tray) draws whole from that base, so a near bottle covers the foot of a far one.
  */
-export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null}={}){
+export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,mirror=null}={}){
     if(view!==null&&!(view instanceof heightView))throw new TypeError('A height view is a heightView or null');
+    if(mirror!==null&&!(Number.isFinite(mirror)&&mirror>=0))throw new TypeError('A mirror is how far a reflection falls per unit of height, 0 or more');
+    if(mirror!==null)view=null;   // a reflection is drawn from above: each part falls by its height, no lean
     const components=entity.get('components')??[];if(!components.length)return [];
     const look=entity.get('look',{});if(look.visible===false)return [];
     const pose=entity.getRenderState(blend),scale=look.scale??1,[wx,wy,wz]=entity.world_scale??[1,1,1],values=look.values??{},elevation=pose.elevation??0,parts=[];
@@ -155,10 +157,12 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null}
         // A part drawn whole (a bottle on a tray) keeps its walls and top together at its base.
         let sides=[],top=key;
         if(view&&layer.sides&&z1>z0){sides=drawSides(steps,place,values,sidesPaint(layer.sides,values,materials),view,z0,z1);if(whole({c}))for(const packet of sides)packet.depth=0;else top=key+z1-z0;}
+        if(mirror!==null&&layer.sides&&z1>z0)sides=mirrorSides(steps,place,values,sidesPaint(layer.sides,values,materials),mirror,z0,z1);
         if(view)scene.enter({matrix:view.plane(view.k(z1))});
+        else if(mirror!==null)scene.enter({matrix:[1,0,0,1,0,mirror*z1]});
         scene.draw(steps,{...place,values,materials});
-        if(view)scene.leave();
-        return {height:z0,depth:key,top,layer:layer.layer,component:c.name,sides,packets:scene.finish()};
+        if(view||mirror!==null)scene.leave();
+        return {height:z0,peak:z1,depth:key,top,layer:layer.layer,component:c.name,sides,packets:scene.finish()};
     });
 }
 // Every visible layer with its component and the component's place in the list.
@@ -185,6 +189,21 @@ function drawSides(steps,{at,rotation,scale},values,fill,view,z0,z1){
         for(const packet of scene.finish())out.push({...packet,depth});
     }
     return out;
+}
+/**
+ * A layer's walls in a reflection below it: each face of its hull that looks down the screen (+y), from where its
+ * base falls (`fall` × z0 below its foot) to where its top falls (`fall` × z1), as a still wet floor shows it.
+ */
+function mirrorSides(steps,{at,rotation,scale},values,fill,fall,z0,z1){
+    const [sx,sy]=typeof scale==='number'?[scale,scale]:scale,points=drawingOutline([{shape:'group',x:at[0],y:at[1],rotation,scale:[sx,sy],steps}],{values}).flatMap(part=>part.points),hull=convexHull(points);
+    if(hull.length<3)return [];
+    const cx=hull.reduce((t,p)=>t+p[0],0)/hull.length,cy=hull.reduce((t,p)=>t+p[1],0)/hull.length,f0=fall*z0,f1=fall*z1,scene=new artScene();
+    for(let i=0;i<hull.length;i++){
+        const a=hull[i],b=hull[(i+1)%hull.length];let nx=b[1]-a[1],ny=a[0]-b[0];if(nx*((a[0]+b[0])/2-cx)+ny*((a[1]+b[1])/2-cy)<0){nx=-nx;ny=-ny;}
+        if(ny<=0)continue;
+        scene.fill([['move',a[0],a[1]+f0],['line',b[0],b[1]+f0],['line',b[0],b[1]+f1],['line',a[0],a[1]+f1],['close']],fill);
+    }
+    return scene.finish().map(packet=>({...packet,depth:0}));
 }
 // How far a point is from the segment a–b.
 function nearest([px,py],a,b){const ex=b[0]-a[0],ey=b[1]-a[1],L=ex*ex+ey*ey,t=L?Math.max(0,Math.min(1,((px-a[0])*ex+(py-a[1])*ey)/L)):0;return Math.hypot(a[0]+ex*t-px,a[1]+ey*t-py);}

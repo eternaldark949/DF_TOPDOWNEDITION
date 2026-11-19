@@ -1,7 +1,7 @@
 // ===== LV0 BASEMENT =====
 import {renderFrame} from './frame.mjs';
 import {geometry,material,requirements} from './packets.mjs';
-import {effectStack,effectNeeds} from './effects.mjs';
+import {effectStack,effectNeeds,effectTargets} from './effects.mjs';
 import {finite,identifier,freezeData,CAPABILITIES} from './values.mjs';
 import {artScene} from './art.mjs';
 import {drawLook,drawComponents} from './looks.mjs';
@@ -80,6 +80,9 @@ export class renderSystem {
         this.#camera.setViewport(dimensions);
         try{this.#backend?.resize(this.#camera.viewport);}catch(error){this.#camera.setViewport(old);throw error;}return this;
     }
+    /** The camera's viewport ({width, height, pixel_ratio}) and the world bounds it sees. */
+    getViewport(){return this.#camera.viewport;}
+    getVisibleBounds(blend=1,margin=0){return this.#camera.getVisibleBounds({blend,margin});}
     getVisibleEntities({blend=1,margin=0,...options}={},results=[]){this.#live();return this.#world.queryEntitiesInBounds({...options,bounds:this.#camera.getVisibleBounds({blend,margin}),bounds_type:'render'},results);}
     /**
      * Leans heights toward the camera, the way a camera `eye` world units above the ground sees them:
@@ -140,6 +143,33 @@ export class renderSystem {
         return drawn;
     }
     /**
+     * Every visible entity's look as parts, for passes that draw the world again (a reflection, a height layer):
+     * `[{entity, parts: [{packets, sides, z0, z1}]}]`, each part's packets at the entity's pose and the heights it
+     * spans (a drawing look spans its elevation up to its `height`; a component layer its base to its top).
+     * `above` leaves out looks at that layer or under (the ground). With `mirror` (how far a reflection falls per
+     * unit of height) every part is drawn as a wet floor shows it, `mirror` × its height lower down the world's
+     * y: a drawing at its middle height, each component layer at its top, its walls from base to top
+     * (drawComponents' mirror); otherwise as drawLooks draws them, leaning when a height view is set.
+     * `margin` widens the view (world units), so what stands just off screen is found too.
+     */
+    lookParts(blend=1,{above=-Infinity,mirror=null,margin=0,filter=null}={}){
+        this.#live();const lib=this.#world.elements.asset_library,view=mirror===null&&this.#lean?new heightView({camera:this.#camera.getView(blend).position,...this.#lean}):null,out=[];
+        for(const {entity} of this.getVisibleEntities({blend,margin},[])){
+            if(!entity)continue;const look=entity.get('look',{});if((look.layer??0)<=above||look.visible===false||look.reflect===false)continue;
+            if(filter&&!filter(entity))continue;
+            const parts=[],z=entity.world_elevation??0,h=entity.height??0;
+            if(entity.assets?.drawing){const scene=new artScene();if(mirror!==null)scene.enter({matrix:[1,0,0,1,0,mirror*(z+h/2)]});if(drawLook(scene,entity,lib,blend,{view})){if(mirror!==null)scene.leave();parts.push({packets:scene.finish(),sides:[],z0:z,z1:z+h,drawing:true});}}
+            if(entity.has('components')){
+                let pose;const rigs=this.#world.rigs,joints=name=>{pose??=rigs?.getRig(entity)?rigs.getPose(entity,{blend,world_space:true}):null;return pose?.joints[name]??null;};
+                for(const part of drawComponents(entity,lib,blend,{joints,view,mirror}))parts.push({packets:part.packets,sides:part.sides,z0:part.height,z1:part.peak,drawing:false});
+            }
+            if(parts.length)out.push({entity,parts,layer:look.layer??0,depth:look.depth??0});
+        }
+        return out;
+    }
+    /** A paint with its textures read (see resolvePaint), for a packet a pass draws again. */
+    textured(packet){return this.#textured(packet);}
+    /**
      * Everything at a world point, top first, the way a ray from the camera meets it: higher `look.layer`
      * first, then the higher top (its elevation plus its components' highest top), then the one made later.
      * With a height view on, the ray leans like the drawing: a tall thing is hit where it is drawn. Each hit
@@ -188,6 +218,7 @@ export class renderSystem {
         try{
             const frame=this.#frame.finish(),caps=this.#backend?new Set(this.#backend.capabilities):null;
             if(caps)for(const need of [...effectNeeds(frame.effects),...frame.passes.flatMap(pass=>pass.layer?effectNeeds(pass.layer.effects):[])])if(!caps.has(need))throw new Error(`Renderer capability unavailable: ${need}`);
+            for(const id of [...effectTargets(frame.effects),...frame.passes.flatMap(pass=>pass.layer?effectTargets(pass.layer.effects):[])])this.#resource(id,'target');
             for(const pass of frame.passes){
                 if(pass.target_id!==null){this.#resource(pass.target_id,'target');if(caps&&!caps.has('target'))throw new Error('Renderer does not support targets');}
                 if(pass.layer&&caps&&!caps.has('layer'))throw new Error('Renderer capability unavailable: layer');

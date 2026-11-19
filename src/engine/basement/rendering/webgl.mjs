@@ -27,13 +27,15 @@ const BLEND_FUNCTIONS=Object.freeze({
     'source-atop':['DST_ALPHA','ONE_MINUS_SRC_ALPHA','ZERO','ONE'],
     'destination-out':['ZERO','ONE_MINUS_SRC_ALPHA','ZERO','ONE_MINUS_SRC_ALPHA'],
     'destination-over':['ONE_MINUS_DST_ALPHA','ONE','ONE_MINUS_DST_ALPHA','ONE'],
+    // Canvas also clears what lies outside the shape: exact where the shape covers the whole surface (a mask laid over a target).
+    'destination-in':['ZERO','SRC_ALPHA','ZERO','SRC_ALPHA'],
 });
 /**
  * What this backend draws. Not yet: the blends that read the destination
  * per pixel (`overlay`, `soft-light`, `lighten`, `darken`) and the ones Canvas applies to the whole
- * surface outside the shape (`source-in`, `source-out`, `destination-in`).
+ * surface outside the shape (`source-in`, `source-out`); `destination-in` only inside it.
  */
-export const WEBGL_CAPABILITIES=Object.freeze(['shape','sprite','text','picture','geometry:rect','geometry:ellipse','geometry:path','gradient:linear','gradient:radial','pattern','clip','shadow','blur','dash','target','layer','effect:grade','effect:vignette','effect:grain','effect:bloom','effect:fog_glow','effect:star_glow','effect:bokeh',...Object.keys(BLEND_FUNCTIONS).map(name=>`blend:${name}`)]);
+export const WEBGL_CAPABILITIES=Object.freeze(['shape','sprite','text','picture','geometry:rect','geometry:ellipse','geometry:path','gradient:linear','gradient:radial','pattern','clip','shadow','blur','dash','target','layer','effect:grade','effect:vignette','effect:grain','effect:bloom','effect:fog_glow','effect:star_glow','effect:bokeh','effect:reflection',...Object.keys(BLEND_FUNCTIONS).map(name=>`blend:${name}`)]);
 if(WEBGL_CAPABILITIES.some(need=>!CAPABILITIES.includes(need)))throw new Error('WebGL declares a capability the engine does not name');
 
 const VERTEX=`#version 300 es
@@ -118,6 +120,29 @@ void main(){
  color=over(c,src.a,n,u_a.x,overlay(c,n));
 }`;
 
+// Screen-space reflection (effects.mjs, reflection): u_texture the picture so far, u_height each pixel's height (red,
+// over green: something stands there), u_mask where the floor shines (alpha), u_probe the baked mirror, u_plane
+// where a reflection plane draws instead. u_dir is the way up the world's y in framebuffer pixels, u_a (strength,
+// fall, framebuffer pixels per world unit, reach), u_b (ripple px, ripple radians a pixel, time, hmax), u_steps the samples.
+const REFLECT_FRAGMENT=`#version 300 es
+precision highp float;uniform sampler2D u_texture,u_height,u_mask,u_probe,u_plane;uniform vec2 u_size,u_dir;uniform vec4 u_a,u_b;uniform int u_steps,u_planes;out vec4 color;
+void main(){
+ vec2 p=gl_FragCoord.xy,uv=p/u_size;vec4 src=texelFetch(u_texture,ivec2(p),0),under=texture(u_height,uv);
+ float w=texture(u_mask,uv).a*u_a.x*(1.-smoothstep(.25,.75,under.g));if(u_planes>0)w*=1.-texture(u_plane,uv).a;
+ if(w<=.002){color=src;return;}
+ vec2 q0=p+vec2(u_b.x*sin(p.y*u_b.y+u_b.z*3.),0.);float dt=u_a.w/float(u_steps);vec3 found=vec3(0);float got=0.;bool done=false;
+ for(int i=1;i<=64;i++){
+  if(i>u_steps)break;float t=dt*float(i);vec2 q=q0+u_dir*(t*u_a.z);
+  if(q.x<0.||q.y<0.||q.x>u_size.x||q.y>u_size.y)break;
+  vec4 h=texture(u_height,q/u_size);if(h.g<.5)continue;
+  float need=u_a.y*u_b.w*h.r/h.g;
+  if(t+dt*.5>=need){if(t-need<=dt*1.5+4.){found=texture(u_texture,q/u_size).rgb;got=1.-t/u_a.w;}done=true;break;}
+ }
+ vec3 probe=texture(u_probe,(q0)/u_size).rgb;
+ vec3 r=found*got+probe*(1.-got);
+ color=vec4(min(src.rgb+w*r,vec3(src.a)),src.a);
+}`;
+
 const IDENTITY=Object.freeze([1,0,0,1,0,0]);
 const multiply=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
 const scaled=(m,sx,sy)=>[m[0]*sx,m[1]*sy,m[2]*sx,m[3]*sy,m[4]*sx,m[5]*sy];
@@ -135,7 +160,7 @@ function touch(map,key){const value=map.get(key);if(value!==undefined){map.delet
 export class webglRenderer {
     #surface=null;#gl=null;#viewport=null;#main=null;#program=null;#uniforms={};#buffer=null;#vao=null;#samplers=null;#samples=0;#maxTexture=4096;
     #resources=new Map();#ramps=new Map();#texts=new Map();#pictures=new Map();#pictureBytes=0;#vectorPictures=new Set();#layer=null;#bound=null;
-    #decodeImage;#createSurface;#maxPictureBytes;#densities;#disposed=false;#generation=0;#blurProgram=null;#blurUniforms={};#scratch=null;#postProgram=null;#postUniforms={};#post=null;#spare=null;#grain=null;#frames=0;#glows=new Map();
+    #decodeImage;#createSurface;#maxPictureBytes;#densities;#disposed=false;#generation=0;#blurProgram=null;#blurUniforms={};#scratch=null;#postProgram=null;#postUniforms={};#reflectProgram=null;#reflectUniforms={};#view=null;#post=null;#spare=null;#grain=null;#frames=0;#glows=new Map();
     /**
      * `decode_image(url)` gives an image WebGL can upload (default: the browser's Image); `create_surface(w, h)`
      * makes the 2D surfaces text is rasterized on (default: canvas.mjs's). Pictures are painted at the first of
@@ -168,6 +193,10 @@ export class webglRenderer {
         const post=gl.createProgram();gl.attachShader(post,shader(gl.VERTEX_SHADER,VERTEX));gl.attachShader(post,shader(gl.FRAGMENT_SHADER,POST_FRAGMENT));gl.bindAttribLocation(post,0,'a_position');gl.linkProgram(post);
         if(!gl.getProgramParameter(post,gl.LINK_STATUS))throw new Error(`WebGL program: ${gl.getProgramInfoLog(post)}`);
         this.#postProgram=post;gl.useProgram(post);for(const name of ['u_row0','u_row1','u_texture','u_grain','u_type','u_size','u_a','u_b','u_glow0','u_glow1','u_glow2','u_glow3'])this.#postUniforms[name]=gl.getUniformLocation(post,name);gl.uniform1i(this.#postUniforms.u_texture,0);gl.uniform1i(this.#postUniforms.u_grain,1);for(let i=0;i<4;i++)gl.uniform1i(this.#postUniforms[`u_glow${i}`],2+i);
+        const reflect=gl.createProgram();gl.attachShader(reflect,shader(gl.VERTEX_SHADER,VERTEX));gl.attachShader(reflect,shader(gl.FRAGMENT_SHADER,REFLECT_FRAGMENT));gl.bindAttribLocation(reflect,0,'a_position');gl.linkProgram(reflect);
+        if(!gl.getProgramParameter(reflect,gl.LINK_STATUS))throw new Error(`WebGL program: ${gl.getProgramInfoLog(reflect)}`);
+        this.#reflectProgram=reflect;gl.useProgram(reflect);for(const name of ['u_row0','u_row1','u_texture','u_height','u_mask','u_probe','u_plane','u_size','u_dir','u_a','u_b','u_steps','u_planes'])this.#reflectUniforms[name]=gl.getUniformLocation(reflect,name);
+        ['u_texture','u_height','u_mask','u_probe','u_plane'].forEach((name,i)=>gl.uniform1i(this.#reflectUniforms[name],i));
         gl.useProgram(program);
         for(const name of ['u_row0','u_row1','u_mode','u_color','u_points','u_uv','u_pat0','u_pat1','u_radii','u_repeat','u_opacity','u_texture'])this.#uniforms[name]=gl.getUniformLocation(program,name);
         gl.uniform1i(this.#uniforms.u_texture,0);
@@ -464,6 +493,7 @@ export class webglRenderer {
             stack.forEach((e,i)=>{
                 const glows=GLOWS.includes(e.type)?this.#glowSpreads(current,e,sx):null,bokeh=e.type==='bokeh'?this.#bokehSum(current,e,sx):null;
                 const into=i===stack.length-1&&final?final:current===source?(this.#spare=this.#sized(this.#spare,W,H,false)):source;
+                if(e.type==='reflection'){this.#reflect(current,into,e,sx);current=into;return;}
                 this.#postOver(into===this.#main?null:into.resolve,W,H);
                 gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.#grain);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,(bokeh??current).texture);
                 if(bokeh){gl.bindSampler(0,this.#samplers.clamp);gl.uniform1i(u.u_type,4);gl.uniform4f(u.u_a,1,0,0,0);}
@@ -481,6 +511,18 @@ export class webglRenderer {
             });
         }finally{for(let k=2;k<6;k++)gl.bindSampler(k,null);gl.activeTexture(gl.TEXTURE0);gl.enable(gl.STENCIL_TEST);gl.useProgram(this.#program);this.#bound=null;}
         return current;
+    }
+    // A reflection (REFLECT_FRAGMENT) of `source` into `into`, its targets read by id.
+    #reflect(source,into,e,sx){
+        const gl=this.#gl,u=this.#reflectUniforms,W=source.width,H=source.height,m=this.#view.world_to_screen,texture=id=>id===null?this.#grain:this.#resources.get(id).texture;
+        const up=[-m[2]*sx,m[3]*sx],per=Math.hypot(up[0],up[1])||1;
+        gl.useProgram(this.#reflectProgram);gl.bindFramebuffer(gl.FRAMEBUFFER,into===this.#main?null:into.resolve);gl.viewport(0,0,W,H);this.#bound=null;
+        gl.blendEquation(gl.FUNC_ADD);gl.blendFuncSeparate(gl.ONE,gl.ZERO,gl.ONE,gl.ZERO);gl.disable(gl.STENCIL_TEST);
+        gl.uniform3f(u.u_row0,2/W,0,-1);gl.uniform3f(u.u_row1,0,-2/H,1);gl.uniform2f(u.u_size,W,H);gl.uniform2f(u.u_dir,up[0]/per,up[1]/per);
+        gl.uniform4f(u.u_a,e.strength,e.fall,per,e.reach);gl.uniform4f(u.u_b,e.ripple*sx,e.ripple_scale/sx,e.time,e.hmax);gl.uniform1i(u.u_steps,e.steps);gl.uniform1i(u.u_planes,e.plane===null?0:1);
+        [source.texture,texture(e.height),texture(e.mask),e.probe===null?null:texture(e.probe),e.plane===null?null:texture(e.plane)].forEach((t,k)=>{gl.activeTexture(gl.TEXTURE0+k);gl.bindTexture(gl.TEXTURE_2D,t);gl.bindSampler(k,this.#samplers.clamp);});
+        this.#draw(quad(0,0,W,H));
+        for(let k=1;k<5;k++){gl.activeTexture(gl.TEXTURE0+k);gl.bindTexture(gl.TEXTURE_2D,null);gl.bindSampler(k,null);}gl.activeTexture(gl.TEXTURE0);
     }
     // The effect program drawing over the whole of a w by h framebuffer (null: the screen), replacing it.
     #postOver(fbo,w,h){
@@ -538,6 +580,7 @@ export class webglRenderer {
             for(const d of pass.packets)if(d.type==='text'){const m=d.material_id?this.#resources.get(d.material_id).descriptor.material:d.material;if([m.fill,m.stroke].some(p=>p?.type==='pattern'))throw new Error('WebGL cannot fill text with a pattern');}
         }
         const gl=this.#gl;gl.useProgram(this.#program);gl.bindVertexArray(this.#vao);gl.bindBuffer(gl.ARRAY_BUFFER,this.#buffer);this.#bound=null;
+        this.#view=frame.view;
         const post=frame.effects?.length?(this.#post=this.#sized(this.#post,this.#main.width,this.#main.height,true)):null;
         const find=id=>id===null?(post??this.#main):this.#resources.get(id).target;
         for(const pass of frame.passes){
@@ -568,7 +611,7 @@ export class webglRenderer {
         if(this.#disposed)return;this.#disposed=true;this.#generation++;const gl=this.#gl;
         if(gl){
             for(const entry of this.#resources.values())this.#release(entry);for(const texture of this.#ramps.values())gl.deleteTexture(texture);
-            for(const line of this.#texts.values())if(line)gl.deleteTexture(line.texture);for(const entry of this.#pictures.values())this.#freeTarget(entry.target);if(this.#layer)this.#freeTarget(this.#layer);for(const t of [...this.#scratch??[],this.#post,this.#spare,...this.#glows.values()])if(t)this.#freeTarget(t);if(this.#grain)gl.deleteTexture(this.#grain);gl.deleteProgram(this.#blurProgram);gl.deleteProgram(this.#postProgram);
+            for(const line of this.#texts.values())if(line)gl.deleteTexture(line.texture);for(const entry of this.#pictures.values())this.#freeTarget(entry.target);if(this.#layer)this.#freeTarget(this.#layer);for(const t of [...this.#scratch??[],this.#post,this.#spare,...this.#glows.values()])if(t)this.#freeTarget(t);if(this.#grain)gl.deleteTexture(this.#grain);gl.deleteProgram(this.#blurProgram);gl.deleteProgram(this.#postProgram);gl.deleteProgram(this.#reflectProgram);
             gl.deleteBuffer(this.#buffer);gl.deleteVertexArray(this.#vao);gl.deleteProgram(this.#program);for(const sampler of Object.values(this.#samplers??{}))gl.deleteSampler(sampler);
             gl.getExtension('WEBGL_lose_context')?.loseContext();
         }
