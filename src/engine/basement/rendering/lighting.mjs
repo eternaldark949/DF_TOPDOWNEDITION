@@ -232,17 +232,24 @@ export function readLightGrid(settings={}){
     return {...base,regions};
 }
 
+// Scratch arrays a bake reuses, by name, grown as needed: no garbage a bake, so baking does not wake the collector.
+const SCRATCH=new Map();
+function scratch(name,size,Type){let a=SCRATCH.get(name);if(!a||a.length<size){a=new Type(size);SCRATCH.set(name,a);}return size===a.length?a:a.subarray(0,size);}
+const DI=Object.freeze([-1,0,1,-1,1,-1,0,1]),DJ=Object.freeze([-1,-1,-1,0,0,1,1,1]),KW=Object.freeze(DI.map((di,q)=>di&&DJ[q]?.5:1));
 // Geometry for the bake: boxes are [left, top, right, bottom], outlines lists of [x, y].
 const insideOutline=(px,py,pts)=>{let inside=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const [xi,yi]=pts[i],[xj,yj]=pts[j];if((yi>py)!==(yj>py)&&px<(xj-xi)*(py-yi)/(yj-yi)+xi)inside=!inside;}return inside;};
-function nearestOnSegment(px,py,ax,ay,bx,by){const ex=bx-ax,ey=by-ay,L=ex*ex+ey*ey,t=L?Math.max(0,Math.min(1,((px-ax)*ex+(py-ay)*ey)/L)):0;return [ax+ex*t,ay+ey*t];}
-/** The point of an emitter nearest (px, py), and the distance to it (0 inside a closed shape; less half its width along a line). */
-function nearestOnEmitter(e,px,py){
-    const pts=e.outline;if(!e.open&&pts.length>2&&insideOutline(px,py,pts))return [px,py,0];
-    let best=Infinity,bx=pts[0][0],by=pts[0][1];
+// The point of an emitter nearest (px, py) goes in NX, NY and its distance in ND (0 inside a closed shape; less half
+// its width along a line): no arrays made, as a bake asks this for every cell in every emitter's reach.
+let NX=0,NY=0,ND=0;
+const isBox=pts=>pts.length===4&&pts[0][1]===pts[1][1]&&pts[1][0]===pts[2][0]&&pts[2][1]===pts[3][1]&&pts[3][0]===pts[0][0];
+function nearestOnEmitter(e,box,px,py){
+    if(box){const B=e.bounds,l=B[0],t=B[1],r=B[2],b=B[3];NX=px<l?l:px>r?r:px;NY=py<t?t:py>b?b:py;const dx=NX-px,dy=NY-py;ND=Math.sqrt(dx*dx+dy*dy);return;}
+    const pts=e.outline;if(!e.open&&pts.length>2&&insideOutline(px,py,pts)){NX=px;NY=py;ND=0;return;}
+    let best=Infinity;NX=pts[0][0];NY=pts[0][1];
     const n=e.open?pts.length-1:pts.length;
-    for(let i=0;i<n;i++){const a=pts[i],b=pts[(i+1)%pts.length],[qx,qy]=nearestOnSegment(px,py,a[0],a[1],b[0],b[1]),d=(qx-px)**2+(qy-py)**2;if(d<best){best=d;bx=qx;by=qy;}}
-    if(pts.length===1)best=(px-bx)**2+(py-by)**2;
-    return [bx,by,Math.max(0,Math.sqrt(best)-(e.width??0)/2)];
+    for(let i=0;i<n;i++){const a=pts[i],b=pts[(i+1)%pts.length],ax=a[0],ay=a[1],ex=b[0]-ax,ey=b[1]-ay,L=ex*ex+ey*ey,t=L?Math.max(0,Math.min(1,((px-ax)*ex+(py-ay)*ey)/L)):0,qx=ax+ex*t,qy=ay+ey*t,d=(qx-px)**2+(qy-py)**2;if(d<best){best=d;NX=qx;NY=qy;}}
+    if(pts.length===1)best=(px-NX)**2+(py-NY)**2;
+    ND=Math.max(0,Math.sqrt(best)-(e.width??0)/2);
 }
 /** Whether the segment (ax, ay)–(bx, by) passes through a blocker (a box or an outline). */
 function crosses(b,ax,ay,bx,by){
@@ -270,10 +277,18 @@ const hexRgb=hex=>{const h=hex.length===4?[...hex.slice(1)].map(c=>c+c).join('')
  *  bounds   {left, top, right, bottom}: the region, cut into cells of `cell` world units
  * Returns a lightGrid: {left, top, cell, cols, rows, light (Float32Array, rgb per cell, 0..1 and over),
  * key (a hash of its light, so a picture of it is keyed by what it shows), settings, sample(x, y)}.
- * Emitters and blockers past the region (within an emitter's reach) should be passed too.
+ * Emitters and blockers past the region (within an emitter's reach) should be passed too. With `margin` (cells)
+ * it is baked that much wider and cut back, so its edge cells see the light past them as the region beside it
+ * does and two regions' grids meet without a seam (give `spread` or more).
  */
-export function bakeLightGrid({bounds,cell=LIGHT_GRID.cell,emitters=[],blockers=[],spread=LIGHT_GRID.spread,strength=LIGHT_GRID.strength,pass=LIGHT_GRID.pass,cut=LIGHT_GRID.cut,glow=LIGHT_GRID.glow}){
+export function bakeLightGrid({bounds,cell=LIGHT_GRID.cell,emitters=[],blockers=[],spread=LIGHT_GRID.spread,strength=LIGHT_GRID.strength,pass=LIGHT_GRID.pass,cut=LIGHT_GRID.cut,glow=LIGHT_GRID.glow,margin=0}){
     const {left,top,right,bottom}=bounds??{};for(const v of [left,top,right,bottom])finite(v,'grid bounds');
+    if(margin>0){   // (baked wider and cut back, so the spread at the edge sees the light past it, as the region beside it does)
+        const m=Math.ceil(margin)*cell,wide=bakeLightGrid({bounds:{left:left-m,top:top-m,right:right+m,bottom:bottom+m},cell,emitters,blockers,spread,strength,pass,cut,glow});
+        const cols=Math.max(1,Math.ceil((right-left)/cell)),rows=Math.max(1,Math.ceil((bottom-top)/cell)),k=Math.ceil(margin),light=new Float32Array(cols*rows*3);
+        for(let j=0;j<rows;j++)light.set(wide.light.subarray(((j+k)*wide.cols+k)*3,((j+k)*wide.cols+k+cols)*3),j*cols*3);
+        return new lightGrid({left,top,cell,cols,rows,light,key:gridKey(left,top,cell,cols,rows,cut,glow,light),cut,glow});
+    }
     if(!LIGHT_GRID_CELLS.includes(cell))throw new TypeError('A light grid cell is 16 or 32 world units');
     const cols=Math.max(1,Math.ceil((right-left)/cell)),rows=Math.max(1,Math.ceil((bottom-top)/cell)),n=cols*rows,light=new Float32Array(n*3);
     const walls=blockers.map(blockerOf).filter(b=>b.bounds[0]<right+cell&&b.bounds[2]>left-cell&&b.bounds[1]<bottom+cell&&b.bounds[3]>top-cell);
@@ -285,13 +300,14 @@ export function bakeLightGrid({bounds,cell=LIGHT_GRID.cell,emitters=[],blockers=
         const h=e.height??0,R=e.reach+h,[el,et,er,eb]=e.bounds;
         if(er+R<left||el-R>right||eb+R<top||et-R>bottom)continue;
         const near=walls.filter(b=>b.bounds[0]<er+R&&b.bounds[2]>el-R&&b.bounds[1]<eb+R&&b.bounds[3]>et-R);
-        const [r,g,b]=hexRgb(e.color);
+        const [r,g,b]=hexRgb(e.color),box=!e.open&&isBox(e.outline);
         const i0=Math.max(0,Math.floor((el-R-left)/cell)),i1=Math.min(cols-1,Math.floor((er+R-left)/cell)),j0=Math.max(0,Math.floor((et-R-top)/cell)),j1=Math.min(rows-1,Math.floor((eb+R-top)/cell));
         for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){
             const c=j*cols+i;if(solid[c])continue;
-            const px=cx(i),py=cy(j),[qx,qy,d]=nearestOnEmitter(e,px,py),de=Math.sqrt(d*d+h*h);if(de>=R)continue;
+            const px=cx(i),py=cy(j);nearestOnEmitter(e,box,px,py);const qx=NX,qy=NY,d=ND,de=Math.sqrt(d*d+h*h);if(de>=R)continue;
             let f=k*(1-de/R)**2;
-            if(d>0)for(const w of near)if(!containsPoint(w,qx,qy)&&crosses(w,px,py,qx,qy)){f*=pass;break;}
+            if(d>0){const x0=Math.min(px,qx),x1=Math.max(px,qx),y0=Math.min(py,qy),y1=Math.max(py,qy);
+                for(const w of near){const b=w.bounds;if(b[0]>x1||b[2]<x0||b[1]>y1||b[3]<y0)continue;if(!containsPoint(w,qx,qy)&&crosses(w,px,py,qx,qy)){f*=pass;break;}}}
             light[c*3]+=r*f;light[c*3+1]+=g*f;light[c*3+2]+=b*f;
         }
     }
@@ -299,30 +315,52 @@ export function bakeLightGrid({bounds,cell=LIGHT_GRID.cell,emitters=[],blockers=
     let li=cols,lj=rows,hi=-1,hj=-1;for(let c=0;c<n;c++)if(light[c*3]+light[c*3+1]+light[c*3+2]>0){const i=c%cols,j=(c-i)/cols;if(i<li)li=i;if(i>hi)hi=i;if(j<lj)lj=j;if(j>hj)hj=j;}
     if(spread>0&&hi>=0){
         const I0=Math.max(0,li-spread),I1=Math.min(cols-1,hi+spread),J0=Math.max(0,lj-spread),J1=Math.min(rows-1,hj+spread);
-        // Each cell's eight neighbour weights, once: half on diagonals, `pass` across a blocker or into one, none past the edge.
-        const W=new Float32Array(n*8),O=new Int32Array(n*8),DI=[-1,0,1,-1,1,-1,0,1],DJ=[-1,-1,-1,0,0,1,1,1],local=[];
+        // A cell near a blocker (or at the box's edge) keeps its eight neighbour weights: half on diagonals, `pass`
+        // across a blocker or into one, none outside the box. Every other cell takes the plain kernel.
+        const slot=scratch('slot',n,Int32Array).fill(-1),W=scratch('weights',n*8,Float32Array),local=[];let used=0;
         for(let j=J0;j<=J1;j++)for(let i=I0;i<=I1;i++){
             const c=j*cols+i,x=cx(i),y=cy(j);local.length=0;
             for(const w of walls)if(w.bounds[0]<x+cell&&w.bounds[2]>x-cell&&w.bounds[1]<y+cell&&w.bounds[3]>y-cell)local.push(w);
-            for(let q=0;q<8;q++){const a=i+DI[q],b=j+DJ[q];if(a<I0||a>I1||b<J0||b>J1)continue;const o=b*cols+a;
+            let plain=!local.length&&i>I0&&i<I1&&j>J0&&j<J1;
+            if(plain)for(let q=0;q<8;q++)if(solid[(j+DJ[q])*cols+i+DI[q]]){plain=false;break;}
+            if(plain)continue;
+            slot[c]=used++;
+            for(let q=0;q<8;q++){const a=i+DI[q],b=j+DJ[q];if(a<I0||a>I1||b<J0||b>J1){W[slot[c]*8+q]=0;continue;}const o=b*cols+a;
                 let w=(DI[q]&&DJ[q]?.5:1)*(solid[o]?pass:1);
                 if(local.length){const ax=cx(a),ay=cy(b);for(const k of local)if(crosses(k,x,y,ax,ay)){w*=pass;break;}}
-                W[c*8+q]=w;O[c*8+q]=o;}
+                W[slot[c]*8+q]=w;}
         }
-        let src=light,dst=new Float32Array(n*3);
+        const OFF=DI.map((di,q)=>(DJ[q]*cols+di)*3);
+        let src=light,dst=scratch('spread',n*3,Float32Array);
         for(let p=0;p<spread;p++){
             for(let j=J0;j<=J1;j++)for(let c=j*cols+I0,e=j*cols+I1;c<=e;c++){
-                if(solid[c]){dst[c*3]=dst[c*3+1]=dst[c*3+2]=0;continue;}
-                let wr=2,sr=src[c*3]*2,sg=src[c*3+1]*2,sb=src[c*3+2]*2;
-                for(let q=c*8,end=q+8;q<end;q++){const w=W[q];if(!w)continue;const o=O[q]*3;wr+=w;sr+=src[o]*w;sg+=src[o+1]*w;sb+=src[o+2]*w;}
-                dst[c*3]=sr/wr;dst[c*3+1]=sg/wr;dst[c*3+2]=sb/wr;
+                const c3=c*3;
+                if(solid[c]){dst[c3]=dst[c3+1]=dst[c3+2]=0;continue;}
+                let wr=2,sr=src[c3]*2,sg=src[c3+1]*2,sb=src[c3+2]*2;const k=slot[c];
+                if(k<0){for(let q=0;q<8;q++){const o=c3+OFF[q],w=KW[q];wr+=w;sr+=src[o]*w;sg+=src[o+1]*w;sb+=src[o+2]*w;}}
+                else for(let q=0;q<8;q++){const w=W[k*8+q];if(!w)continue;const o=c3+OFF[q];wr+=w;sr+=src[o]*w;sg+=src[o+1]*w;sb+=src[o+2]*w;}
+                dst[c3]=sr/wr;dst[c3+1]=sg/wr;dst[c3+2]=sb/wr;
             }
             [src,dst]=[dst,src];
         }
-        if(src!==light)light.set(src);
+        if(src!==light)for(let j=J0;j<=J1;j++)light.set(src.subarray((j*cols+I0)*3,(j*cols+I1+1)*3),(j*cols+I0)*3);   // (the scratch holds other bakes' cells outside the box)
     }
-    hash=0x811c9dc5;add(left);add(top);add(cell);add(cols);add(rows);add(cut);add(glow);for(let i=0;i<light.length;i++)mix(Math.round(light[i]*1024));
-    return new lightGrid({left,top,cell,cols,rows,light,key:(hash>>>0).toString(36),cut,glow});
+    return new lightGrid({left,top,cell,cols,rows,light,key:gridKey(left,top,cell,cols,rows,cut,glow,light),cut,glow});
+}
+function gridKey(left,top,cell,cols,rows,cut,glow,light){hash=0x811c9dc5;add(left);add(top);add(cell);add(cols);add(rows);add(cut);add(glow);for(let i=0;i<light.length;i++)mix(Math.round(light[i]*1024));return (hash>>>0).toString(36);}
+/**
+ * A grid with the cells of `part` ({left, top, right, bottom}, cut to whole cells) taken from `patch`, a grid
+ * baked on the same cells over an area round it: how a moving emitter re-bakes only the cells it passes
+ * through. Bake `patch` over `part` grown by `spread` cells each side (within the grid), so its own edges,
+ * which see no light from past them, stay out of what is copied. Returns a new grid; `grid` is unchanged.
+ */
+export function patchLightGrid(grid,patch,part){
+    const {left,top,cell,cols,rows}=grid;
+    if(patch.cell!==cell||(patch.left-left)%cell||(patch.top-top)%cell)throw new TypeError('A patch is baked on the grid\'s own cells');
+    const i0=Math.max(0,Math.floor((part.left-left)/cell)),i1=Math.min(cols-1,Math.ceil((part.right-left)/cell)-1),j0=Math.max(0,Math.floor((part.top-top)/cell)),j1=Math.min(rows-1,Math.ceil((part.bottom-top)/cell)-1);
+    const light=grid.light.slice(),di=(patch.left-left)/cell,dj=(patch.top-top)/cell;
+    for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const a=i-di,b=j-dj;if(a<0||a>=patch.cols||b<0||b>=patch.rows)continue;const o=(j*cols+i)*3,q=(b*patch.cols+a)*3;light[o]=patch.light[q];light[o+1]=patch.light[q+1];light[o+2]=patch.light[q+2];}
+    return new lightGrid({left,top,cell,cols,rows,light,key:gridKey(left,top,cell,cols,rows,grid.cut,grid.glow,light),cut:grid.cut,glow:grid.glow});
 }
 /** A baked light grid (see bakeLightGrid). `sample(x, y)` gives the light arriving there, [r, g, b], read between cell centres; `peak` is its brightest channel. */
 export class lightGrid{

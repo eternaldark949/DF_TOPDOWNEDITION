@@ -35,6 +35,14 @@ test('a high emitter reaches farther and softer; strength scales it', () => {
     assert.ok(Math.abs(strong.sample(230,190)[0]-2*low.sample(230,190)[0])<1e-4);
 });
 
+test('two regions baked with a margin meet without a seam: each matches one bake over both', () => {
+    const lamp=neon(990,300,40,'#33ccff'),whole=bakeLightGrid({bounds:{left:0,top:0,right:2048,bottom:1024},cell:16,emitters:[lamp]});
+    const left=bakeLightGrid({bounds:{left:0,top:0,right:1024,bottom:1024},cell:16,emitters:[lamp],margin:3}),right=bakeLightGrid({bounds:{left:1024,top:0,right:2048,bottom:1024},cell:16,emitters:[lamp],margin:3});
+    for(const x of [960,1000,1016,1032,1060])assert.ok(Math.abs((x<1024?left:right).sample(x,300)[2]-whole.sample(x,300)[2])<1e-4,`at ${x}`);
+    const bare=bakeLightGrid({bounds:{left:0,top:0,right:1024,bottom:1024},cell:16,emitters:[lamp]});
+    assert.ok(Math.abs(bare.sample(1016,300)[2]-whole.sample(1016,300)[2])>.01,'without the margin the edge would differ');
+});
+
 test('the same light bakes the same key; a change gives a new one', () => {
     const a=bakeLightGrid({bounds:region,emitters:[neon(200,200)]}),b=bakeLightGrid({bounds:region,emitters:[neon(200,200)]}),c=bakeLightGrid({bounds:region,emitters:[neon(210,200)]});
     assert.equal(a.key,b.key);assert.notEqual(a.key,c.key);
@@ -80,5 +88,10 @@ test('a map\'s light grid: still emitters bake per region, a mover re-bakes what
     assert.ok(grids.sample(300,700)[2]<.01&&grids.sample(700,700)[2]>.3,'its light went with it');
     assert.equal(grids.liveLights().length,1,'and it keeps a small live light of its own');
     grids.setMovers([]);grids.updateState({budget_ms:Infinity});assert.ok(grids.sample(700,700)[2]<.01,'gone when it goes');
+    grids.setMovers(car(760));const step=grids.getStatistics().patches;grids.updateState({budget_ms:Infinity});
+    assert.ok(grids.getStatistics().patches>step,'a mover re-bakes only the cells round it');
+    for(const g of grids.grids()){const key=`${g.left/512},${g.top/512}`,whole=grids.bakeRegion(key);let worst=0;for(let i=0;i<g.light.length;i++)worst=Math.max(worst,Math.abs(g.light[i]-whole.light[i]));
+        assert.ok(worst<1e-5,`and gets what a whole bake of ${key} gets (${worst})`);assert.equal(g.key,whole.key);}
+    grids.setMovers([]);grids.updateState({budget_ms:Infinity});
     let t=0;grids.setMovers(car(1500));const one=grids.updateState({budget_ms:0,now:()=>t++});assert.equal(one.baked,1,'a spent budget still bakes one a call');
 });

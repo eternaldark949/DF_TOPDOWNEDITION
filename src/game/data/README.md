@@ -32,6 +32,10 @@ are the source; edit them, not the classic data.
   one: pearl and blush, mist, a bloom of translucent petals, drifting petals and sparkle, pearl walls. The apartment's bar cart is placed
   (`examples:bar_cart`, the engine's example library, until the game's furniture catalog exists). What moves (the
   hill's clouds and flowers, the road under the van, glows) is not floor art and is still to be built.
+- Glowing art (`emits`, lit by the light grid): `moon_city_nightclub` has its dance floor's lit tiles in violet and pink,
+  its five spotlight rings and a string of warm and pink bulbs along the bar's front, with `switches.light_grid` on at
+  16-unit cells. The other maps' signs, lit windows, the ethereal plane's petals and the city's neon are still to be marked;
+  the city's signs and windows come with its buildings.
 - `sdc` (Southern Dimensions City) carries its layout as data, exported once from the classic city's seeded generator: `streets`
   (each road's outline, lanes, lane width and `stops`, its centre line with the normal at each point; the junctions), `blocks`
   (blocks, parks, the graveyard), `pavements`, `crosswalks` and the park `pools`. Its floor is drawn from `city.json` the classic

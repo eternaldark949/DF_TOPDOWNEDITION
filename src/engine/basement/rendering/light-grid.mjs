@@ -5,9 +5,11 @@
 // emitter (a car's underglow, a glowing character) re-bakes the regions it reaches as it moves on, and
 // keeps a small live light of its own on top. Nothing here knows which map it is: the map's
 // `light_grid` settings say the cell size (16 or 32, with per-region overrides) and how strong it is.
-import {bakeLightGrid,readLightGrid} from './lighting.mjs';
+import {bakeLightGrid,patchLightGrid,readLightGrid} from './lighting.mjs';
 import {drawingEmitters} from './looks.mjs';
 
+// How far past a region its bake reaches: the spread's margin at most (8 passes of 32) and a cell more.
+const EDGE=8*32+32;
 const finiteBox=([l,t,r,b])=>[l,t,r,b].every(Number.isFinite);
 /** A packet's collision box as an outline in the world ([x, y] corners), or null. */
 function boxOutline(packet){
@@ -57,8 +59,8 @@ export function entityEmitters(body,source,{pose=null}={}){
  *  liveLights()            a small live point light per moving emitter, for the light layer's live lights
  */
 export class lightGridSystem{
-    #settings;#source;#map=null;#size=0;#still=new Map();#walls=new Map();#grids=new Map();#loaded=new Set();#queue=[];#queued=new Set();#movers=new Map();
-    #stats={bakes:0,bake_ms:0,last_bake_ms:0,max_bake_ms:0};
+    #settings;#source;#map=null;#size=0;#still=new Map();#walls=new Map();#grids=new Map();#loaded=new Set();#queue=[];#queued=new Map();#movers=new Map();
+    #stats={bakes:0,patches:0,bake_ms:0,last_bake_ms:0,max_bake_ms:0};
     constructor({settings={},source=null}={}){this.#settings=readLightGrid(settings);this.#source=source;}
     get settings(){return this.#settings;}
     /** The settings a region bakes with: the map's, or its region's override. */
@@ -67,9 +69,9 @@ export class lightGridSystem{
         if(this.#map)throw new Error('A light grid system serves one map');
         this.#map=map;this.#size=map.region_size;
         for(const packet of map.packets()){
-            if(blocksLight(packet)){const outline=boxOutline(packet);if(outline)this.#bucket(this.#walls,{outline},outline,0);}
+            if(blocksLight(packet)){const outline=boxOutline(packet);if(outline)this.#bucket(this.#walls,{outline},outline,EDGE);}
             if(packet.physics_type==='dynamic'||packet.kind==='character')continue;    // (moving things are movers)
-            for(const e of entityEmitters(packet,this.#source))this.#bucket(this.#still,e,null,e.reach+(e.height??0));
+            for(const e of entityEmitters(packet,this.#source))this.#bucket(this.#still,e,null,e.reach+(e.height??0)+EDGE);
         }
         map.addTier('light_grid',{radius,keep:keep??this.#size,every:true,load:key=>{this.#loaded.add(key);this.#want(key);},release:key=>{this.#loaded.delete(key);this.#grids.delete(key);this.#queued.delete(key);}});
         return this;
@@ -78,39 +80,60 @@ export class lightGridSystem{
     #bucket(index,item,outline,pad){
         const box=item.bounds??(item.bounds=[Math.min(...outline.map(p=>p[0])),Math.min(...outline.map(p=>p[1])),Math.max(...outline.map(p=>p[0])),Math.max(...outline.map(p=>p[1]))]);
         if(!finiteBox(box))return;
-        for(const key of this.#keysOf(box,pad+32)){let list=index.get(key);if(!list)index.set(key,list=[]);list.push(item);}
+        for(const key of this.#keysOf(box,pad)){let list=index.get(key);if(!list)index.set(key,list=[]);list.push(item);}
     }
-    #want(key){if(this.#loaded.has(key)&&!this.#queued.has(key)){this.#queued.add(key);this.#queue.push(key);}}
+    // A region to re-bake: whole (`box` null), or only the cells round `box` [left, top, right, bottom] (a mover's reach).
+    #want(key,box=null){
+        if(!this.#loaded.has(key))return;
+        const was=this.#queued.get(key);
+        if(was===undefined)this.#queue.push(key);
+        this.#queued.set(key,was===null||box===null||!this.#grids.has(key)?null:was?[Math.min(was[0],box[0]),Math.min(was[1],box[1]),Math.max(was[2],box[2]),Math.max(was[3],box[3])]:box);
+    }
     #bounds(key){const [x,y]=key.split(',').map(Number),s=this.#size;return {left:x*s,top:y*s,right:(x+1)*s,bottom:(y+1)*s};}
     setMovers(movers=[]){
         const seen=new Set();
         for(const {id,emitters} of movers){
             seen.add(id);
             const reach=emitters.map(e=>{const R=e.reach+(e.height??0),[l,t,r,b]=e.bounds;return [l-R,t-R,r+R,b+R];});
-            const keys=new Set(reach.flatMap(box=>this.#keysOf(box,0)));
+            const area=reach.length?[Math.min(...reach.map(b=>b[0])),Math.min(...reach.map(b=>b[1])),Math.max(...reach.map(b=>b[2])),Math.max(...reach.map(b=>b[3]))]:null;
+            const keys=new Set(reach.flatMap(box=>this.#keysOf(box,EDGE)));
             const half=Math.min(...[...keys].map(k=>this.regionSettings(k).cell))/2;
             const sign=emitters.map(e=>[Math.round(e.bounds[0]/half),Math.round(e.bounds[1]/half),e.color,Math.round(e.strength*64),Math.round(e.reach)].join(':')).join('|');
             const before=this.#movers.get(id);
-            if(!before||before.sign!==sign){for(const k of before?.keys??[])this.#want(k);for(const k of keys)this.#want(k);}
-            this.#movers.set(id,{emitters,keys,sign});
+            if(!before||before.sign!==sign){for(const k of before?.keys??[])this.#want(k,before.area);for(const k of keys)this.#want(k,area);}
+            this.#movers.set(id,{emitters,keys,sign,area});
         }
-        for(const [id,m] of this.#movers)if(!seen.has(id)){for(const k of m.keys)this.#want(k);this.#movers.delete(id);}
+        for(const [id,m] of this.#movers)if(!seen.has(id)){for(const k of m.keys)this.#want(k,m.area);this.#movers.delete(id);}
         return this;
     }
     /** Bakes queued regions until `budget_ms` is spent; returns {baked, pending}. */
     updateState({budget_ms=2,now=()=>performance.now()}={}){
         const t0=now();let baked=0;
         while(this.#queue.length&&(!baked||now()-t0<budget_ms)){
-            const key=this.#queue.shift();if(!this.#queued.delete(key)||!this.#loaded.has(key))continue;
-            const t=now();this.#grids.set(key,this.bakeRegion(key));const ms=now()-t;
-            baked++;this.#stats.bakes++;this.#stats.bake_ms+=ms;this.#stats.last_bake_ms=ms;this.#stats.max_bake_ms=Math.max(this.#stats.max_bake_ms,ms);
+            const key=this.#queue.shift(),box=this.#queued.get(key);if(box===undefined||!this.#loaded.has(key)){this.#queued.delete(key);continue;}this.#queued.delete(key);
+            const t=now();this.#grids.set(key,box?this.bakeCells(key,box):this.bakeRegion(key));const ms=now()-t;
+            baked++;this.#stats.bakes++;if(box)this.#stats.patches++;this.#stats.bake_ms+=ms;this.#stats.last_bake_ms=ms;this.#stats.max_bake_ms=Math.max(this.#stats.max_bake_ms,ms);
         }
         return {baked,pending:this.#queue.length};
     }
     /** One region's grid from its still emitters, the movers reaching it and its walls. */
     bakeRegion(key){
         const s=this.regionSettings(key),movers=[...this.#movers.values()].filter(m=>m.keys.has(key)).flatMap(m=>m.emitters);
-        return bakeLightGrid({bounds:this.#bounds(key),cell:s.cell,spread:s.spread,strength:s.strength,cut:s.cut,glow:s.glow,pass:s.pass,emitters:[...(this.#still.get(key)??[]),...movers],blockers:this.#walls.get(key)??[]});
+        return bakeLightGrid({bounds:this.#bounds(key),margin:s.spread,cell:s.cell,spread:s.spread,strength:s.strength,cut:s.cut,glow:s.glow,pass:s.pass,emitters:[...(this.#still.get(key)??[]),...movers],blockers:this.#walls.get(key)??[]});
+    }
+    /**
+     * The region's grid with only the cells round `box` (a mover's reach, grown by the spread) baked again,
+     * over an area `spread` cells wider still so the copied cells see all the light they would in a whole bake.
+     */
+    bakeCells(key,box){
+        const s=this.regionSettings(key),r=this.#bounds(key),grid=this.#grids.get(key),c=s.cell,g=s.spread*c;
+        const snap=(v,o,f)=>o+f((v-o)/c)*c,clamp=b=>({left:Math.max(r.left,b.left),top:Math.max(r.top,b.top),right:Math.min(r.right,b.right),bottom:Math.min(r.bottom,b.bottom)});
+        const part=clamp({left:snap(box[0]-g,r.left,Math.floor),top:snap(box[1]-g,r.top,Math.floor),right:snap(box[2]+g,r.left,Math.ceil),bottom:snap(box[3]+g,r.top,Math.ceil)});
+        if(part.right<=part.left||part.bottom<=part.top)return grid;
+        const area={left:part.left-g,top:part.top-g,right:part.right+g,bottom:part.bottom+g};   // (past the region too, as its whole bake reaches)
+        const movers=[...this.#movers.values()].filter(m=>m.keys.has(key)).flatMap(m=>m.emitters);
+        const patch=bakeLightGrid({bounds:area,cell:c,spread:s.spread,strength:s.strength,cut:s.cut,glow:s.glow,pass:s.pass,emitters:[...(this.#still.get(key)??[]),...movers],blockers:this.#walls.get(key)??[]});
+        return patchLightGrid(grid,patch,part);
     }
     grids(view=null){const out=[];for(const g of this.#grids.values())if(!view||(g.left<view.right&&g.right>view.left&&g.top<view.bottom&&g.bottom>view.top))out.push(g);return out;}
     sample(x,y){const g=this.#grids.get(`${Math.floor(x/this.#size)},${Math.floor(y/this.#size)}`);return g?g.sample(x,y):[0,0,0];}
