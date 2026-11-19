@@ -249,8 +249,9 @@ export class reflectionPass{
         // The light target: mirrored lights, glowing shapes, probes (when no screen-space walk falls back to them), silhouettes.
         frame.beginPass({target_id:this.target('light'),viewport:screen});
         if(!ssr)for(const p of probes)submit(p);
-        const art=new artScene();
-        if(q.lights)for(const l of lights)drawLightReflection(art,l,{fall,view});
+        // A light's scatter and smear go under the silhouettes; its head and core over them, so the lamp's own fixture never hides its light.
+        const art=new artScene(),heads=[];
+        if(q.lights)for(const l of lights){const [scatter,smear,...head]=drawLightReflection(new artScene(),l,{fall,view}).finish();for(const p of [scatter,smear])if(p)submit(p);heads.push(...head);}
         if(q.emits)for(const em of live)drawEmitterReflection(art,em,{fall,view});
         for(const p of art.finish())submit(p);
         if(!ssr&&q.bodies!=='none'){
@@ -259,6 +260,7 @@ export class reflectionPass{
                 for(const part of parts)for(const packet of [...part.sides,...part.packets]){const cut=painted(packet,'#000','destination-out');if(cut)submit(cut);if(tint){const glow=painted(packet,tint,'add');if(glow)submit(glow);}}
             }
         }
+        for(const p of heads)submit(p);
         submit({...whole,resource_id:this.target('mask'),blend:'destination-in'});
         frame.endPass();
         if(ssr){

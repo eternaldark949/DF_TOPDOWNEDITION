@@ -15,6 +15,8 @@ const MATERIALS = {
 };
 const materials = name => MATERIALS[name.replace(/^demo:/, '')] ?? null;
 const box = (w, h, z, fill, extra = {}) => ({ layer: 0, height: z[0], thickness: z[1] - z[0], sides: extra.sides ?? null, steps: [{ shape: 'rectangle', x: -w / 2, y: -h / 2, width: w, height: h, fill, ...extra.step }] });
+// The floor as one entity at the scene's centre, seen wherever the scene is (its render shape covers it all).
+const floorEntity = (E, floors, W, H) => E.createEntity({ kind: 'decoration', position: [W / 2, H / 2], render_shape: { shape_type: 'box', dimensions: [W, H] }, components: [{ name: 'floor', layers: [{ layer: 0, height: 0, thickness: 0, solid: false, steps: [{ shape: 'group', x: -W / 2, y: -H / 2, steps: floors }] }] }], data: { look: { layer: -100 } } });
 const layers = list => list.map((l, i) => { const o = { ...l, layer: i }; if (o.sides === null) delete o.sides; return o; });
 
 /** The street: { floors, extent, view, build(world) → {lights, emitters, blockers} }. `walkers` and `cars` say how many. */
@@ -29,7 +31,7 @@ export function street({ walkers = 12, cars = 3, seed = 7 } = {}) {
     ];
     function build(world) {
         const E = world.elements, lights = [], emitters = [], blockers = [];
-        E.createEntity({ kind: 'decoration', position: [0, 0], components: [{ name: 'floor', layers: [{ layer: 0, height: 0, thickness: 0, solid: false, steps: floors }] }], data: { look: { layer: -100 } } });
+        floorEntity(E, floors, W, H);
         // Buildings along the top, their windows glowing; a neon sign on one.
         for (let i = 0; i < 5; i++) {
             const x = 160 + i * 320, w = 260, y = 150;
@@ -75,7 +77,7 @@ export function lobby() {
     ];
     function build(world) {
         const E = world.elements, lights = [];
-        E.createEntity({ kind: 'decoration', position: [0, 0], components: [{ name: 'floor', layers: [{ layer: 0, height: 0, thickness: 0, solid: false, steps: floors }] }], data: { look: { layer: -100 } } });
+        floorEntity(E, floors, W, H);
         for (const [x, y] of [[200, 200], [800, 200], [200, 520], [800, 520]]) E.createEntity({ kind: 'static', position: [x, y], components: [{ name: 'pillar', layers: [{ layer: 0, height: 0, thickness: 220, sides: '#7d6a4a', steps: [{ shape: 'circle', radius: 24, fill: '#b8a27a' }] }] }] });
         E.createEntity({ kind: 'static', position: [500, 160], components: [{ name: 'bar', layers: [box(300, 50, [0, 55], '#3a2416', { sides: '#2a180e' }), box(300, 50, [55, 58], '#d8c8a0')].map((l, i) => { const o = { ...l, layer: i }; if (o.sides === null) delete o.sides; return o; }) }] });
         for (const [x, y, c] of [[420, 330, '#2a3a6a'], [600, 300, '#6a2a3a'], [330, 600, '#2a5a3a']]) E.createEntity({ kind: 'decoration', position: [x, y], components: [{ name: 'body', layers: [

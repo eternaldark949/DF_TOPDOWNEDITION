@@ -40,7 +40,7 @@ export const STRUCTURES = Object.freeze({
     locomotion: 'Which clips stand and walk: { idle, walk, stride (px per cycle), moving_speed (px/s) }.',
     door_kind: 'The leaves that fill a door\'s opening: { name, leaves: [{ from, to, motion, travel?, pivot?, hinge?, suffix? }] }.',
     drawing: 'An object\'s art in its own space, back to front: { steps: [{ shape, material?, solid?, ...fields }] }; shape is a drawing shape or group ({ shape: "group", x?, y?, rotation?, scale?, steps }). "$name" values are read from the object\'s look.',
-    material: 'How a substance looks and behaves: { fill?, stroke?, line_width?, line_cap?, line_join?, dash?, alpha?, blend?, shadow?, surface?: { friction?, restitution?, hit_sound?, hit_effect?, footstep? } }; fill may be a colour, a gradient or a pattern { type: "pattern", image, repeat? }.',
+    material: 'How a substance looks and behaves: { fill?, stroke?, line_width?, line_cap?, line_join?, dash?, alpha?, blend?, shadow?, surface?: { friction?, restitution?, hit_sound?, hit_effect?, footstep? }, emits?, reflect?: true | { strength? (0..1), wet?, plane? } }; fill may be a colour, a gradient or a pattern { type: "pattern", image, repeat? }.',
     texture: 'A surface that repeats, drawn once per set of values and tiled: { size: [w, h] (world units), steps (drawing steps, "$name" read from values), values (the default colours), base (the colour shown until the tile is ready), pixels_per_unit? (default 4) }. A material repeats it with fill: { type: "pattern", texture, values?, scale?, rotation?, offset? }.',
 });
 
