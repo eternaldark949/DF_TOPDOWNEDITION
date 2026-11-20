@@ -371,7 +371,11 @@ const CORNER=Math.PI/6,SLIVER=.6;
 // A panel's own drawing (a fan, a crest, a sign): each shape's outline in the panel's frame (x across from its middle,
 // y down from its top), scaled to the wall, with its paint.
 function panelShapes(steps,values,h,v){
-    return steps.map(raw=>{const st=readValues(raw,values),[part]=drawingOutline([st],{values,fine:true});
+    return steps.map(raw=>{const st=readValues(raw,values);
+        // a text step stays text: drawn on the face under the wall's own matrix (a sign, a name, a number)
+        if(st.shape==='text')return {text:String(st.text),x:(st.x??0)*h,y:(st.y??0)*v,h,v,font:{family:st.family??'sans-serif',size:st.size??16,weight:st.weight??400,style:st.style??'normal'},
+            align:st.align??'left',baseline:st.baseline??'alphabetic',fill:st.fill===undefined&&st.stroke===undefined?'#000':st.fill,stroke:st.stroke,line_width:st.line_width??1};
+        const [part]=drawingOutline([st],{values,fine:true});
         return {points:part.points.map(([x,y])=>[x*h,y*v]),fill:st.fill,stroke:st.stroke,line_width:(st.line_width??1)*h,open:st.shape==='line'};});
 }
 const near0=v=>Number.isFinite(v)?v:0;
@@ -481,6 +485,13 @@ function paintFacade(scene,view,pts,plan,art,i,len,z0,face,screen){
                         // a lit one (as many as `lit` says, the same every frame) is drawn as its `lit_steps`, with the lit panels
                         const lit=panel.lit_shapes&&panel.lit>0&&hash(W.key,b,r,k,art.seed)<panel.lit,shapes=lit?panel.lit_shapes:panel.shapes,tag=lit?'u':'x';
                         shapes.forEach((sh,j)=>{
+                            // text: an affine map from the panel's frame onto the face, exact on the panel's own facet
+                            // (it leans with the wall; text running past a corner is not bent round it)
+                            if(sh.text!==undefined){
+                                const p=pts[f],q=pts[(f+1)%n],L=(F.s1-F.s0)||1,u=at,on=(s,z)=>{const t=(s-F.s0)/L;return view.scaled(p[0]+(q[0]-p[0])*t,p[1]+(q[1]-p[1])*t,kOf(z));};
+                                const O=on(u-sh.x,za+H-sh.y),X=on(u-sh.x-sh.h,za+H-sh.y),Y=on(u-sh.x,za+H-sh.y-sh.v);
+                                get(`${lit?'T':'t'}${k}.${j}`).push([X[0]-O[0],X[1]-O[1],Y[0]-O[0],Y[1]-O[1],O[0],O[1]]);return;
+                            }
                             const path=sh.points.map(([x,y],q)=>{const [X,Y]=onWall(W,mid-x,za+H-y);return [q?'line':'move',X,Y];});if(!sh.open)path.push(['close']);
                             if(sh.fill)get(`${tag}${k}.${j}`).push(...path);if(sh.stroke)get(`${lit?'v':'y'}${k}.${j}`).push(...path);
                         });
@@ -497,13 +508,17 @@ function paintFacade(scene,view,pts,plan,art,i,len,z0,face,screen){
         }
     }
     const fill=(key,paint,into=scene)=>{const p=paths.get(key);if(p&&p.length&&paint)into.fill(p,paint);};
+    // a panel's text, once for each place it stands (each matrix maps the panel's frame onto the face)
+    const words=(key,sh,into=scene)=>{for(const matrix of paths.get(key)??[]){into.enter({matrix});
+        if(sh.fill)into.text(sh.text,0,0,{font:sh.font,align:sh.align,baseline:sh.baseline},{fill:sh.fill});
+        if(sh.stroke)into.text(sh.text,0,0,{font:sh.font,align:sh.align,baseline:sh.baseline},{stroke:sh.stroke,stroke_width:sh.line_width});into.leave();}};
     art.bands.forEach((band,k)=>{if(!band.lit)fill(`b${k}`,band.fill);});   // (a lit band goes with the lit panels: over the shading, and shining at night)
     art.piers.forEach((pier,k)=>{fill(`p${k}`,pier.fill);fill(`e${k}`,pier.edge);});
     art.panels.forEach((panel,k)=>{fill(`w${k}`,panel.fill);fill(`r${k}`,panel.bar_fill);const s=paths.get(`s${k}`);if(s&&s.length)scene.stroke(s,panel.stroke,panel.line_width);
-        panel.shapes?.forEach((sh,j)=>{fill(`x${k}.${j}`,sh.fill);const t=paths.get(`y${k}.${j}`);if(t&&t.length)scene.stroke(t,sh.stroke,sh.line_width);});});
-    const glows=art.panels.some((p,k)=>paths.get(`l${k}`)?.length||p.lit_shapes?.some((sh,j)=>paths.get(`u${k}.${j}`)?.length||paths.get(`v${k}.${j}`)?.length))||art.bands.some((b,k)=>b.lit&&paths.get(`b${k}`)?.length);
+        panel.shapes?.forEach((sh,j)=>{if(sh.text!==undefined)return words(`t${k}.${j}`,sh);fill(`x${k}.${j}`,sh.fill);const t=paths.get(`y${k}.${j}`);if(t&&t.length)scene.stroke(t,sh.stroke,sh.line_width);});});
+    const glows=art.panels.some((p,k)=>paths.get(`l${k}`)?.length||p.lit_shapes?.some((sh,j)=>paths.get(`u${k}.${j}`)?.length||paths.get(`v${k}.${j}`)?.length||paths.get(`T${k}.${j}`)?.length))||art.bands.some((b,k)=>b.lit&&paths.get(`b${k}`)?.length);
     return glows?into=>{art.bands.forEach((band,k)=>{if(band.lit)fill(`b${k}`,band.fill,into);});art.panels.forEach((panel,k)=>{fill(`l${k}`,panel.lit_fill,into);fill(`r${k}`,panel.bar_fill,into);
-        panel.lit_shapes?.forEach((sh,j)=>{fill(`u${k}.${j}`,sh.fill,into);const t=paths.get(`v${k}.${j}`);if(t&&t.length)into.stroke(t,sh.stroke,sh.line_width);});});}:null;
+        panel.lit_shapes?.forEach((sh,j)=>{if(sh.text!==undefined)return words(`T${k}.${j}`,sh,into);fill(`u${k}.${j}`,sh.fill,into);const t=paths.get(`v${k}.${j}`);if(t&&t.length)into.stroke(t,sh.stroke,sh.line_width);});});}:null;
 }
 const LIGHT=(()=>{const x=-.55,y=-.83,l=Math.hypot(x,y);return [x/l,y/l];})();   // toward the light, upper left
 /**
