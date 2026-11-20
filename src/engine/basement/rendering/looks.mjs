@@ -20,7 +20,7 @@ export function qualifyResource(name,drawing_id){return name.includes(':')||!dra
  * A step is solid when it says `solid: true`; when no step in the drawing says so, every shape but
  * glows, ground shadows, text and lines is.
  */
-export function drawingOutline(steps,{values={}}={}){
+export function drawingOutline(steps,{values={},fine=false}={}){
     const out=[];let marked=false;
     const walk=(list,m)=>{
         if(!Array.isArray(list))throw new TypeError('A drawing is a list of steps');
@@ -30,7 +30,7 @@ export function drawingOutline(steps,{values={}}={}){
                 walk(steps,compose(m,[c*sx,s*sx,-s*sy,c*sy,x,y]));continue;}
             if(!DRAWING[shape])throw new TypeError(`Unknown drawing shape: ${shape}`);
             if(step.solid===true)marked=true;
-            out.push({points:outline(step).map(p=>apply(m,p)),solid:step.solid,shape});
+            out.push({points:outline(step,fine).map(p=>apply(m,p)),solid:step.solid,shape});
         }
     };
     walk(steps,[1,0,0,1,0,0]);
@@ -157,7 +157,7 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,
         // Among faces, the farthest from the camera goes first, so a near wall's face hides the end of one behind it.
         // A part drawn whole (a bottle on a tray) keeps its walls and top together at its base.
         let sides=[],top=key;
-        if(view&&layer.sides&&z1>z0){sides=drawSides(steps,place,values,sidesPaint(layer.sides,values,materials),view,z0,z1);if(whole({c}))for(const packet of sides)packet.depth=0;else top=key+z1-z0;}
+        if(view&&layer.sides&&z1>z0){sides=drawSides(steps,place,values,sidesPaint(layer.sides,values,materials),view,z0,z1,layer.sides);if(whole({c}))for(const packet of sides)packet.depth=0;else top=key+z1-z0;}
         if(mirror!==null&&layer.sides&&z1>z0)sides=mirrorSides(steps,place,values,sidesPaint(layer.sides,values,materials),mirror,z0,z1,below);
         if(view)scene.enter({matrix:view.plane(view.k(z1))});
         else if(mirror!==null)scene.enter({matrix:fallen(below,mirror,z1)});
@@ -171,23 +171,48 @@ function listLayers(components){const out=[];components.forEach((component,order
 // A layer's sides paint: a colour, a "$look" value, or {material} (its fill, else its stroke).
 function sidesPaint(sides,values,materials){if(typeof sides==='string')return readValues({fill:sides},values).fill;const m=materials(readValues({m:sides.material},values).m);return m.fill??m.stroke;}
 /**
- * A layer's walls, seen from above: each face of the hull of its shapes that the camera sees, from the plane of
- * its base to the plane of its top. Returns their packets, each with a `depth` a hair under 0 that is lower the
+ * A layer's walls, seen from above: from the plane of its base to the plane of its top, each face the camera sees.
+ * By default every solid shape stands on its own true outline: a rounded rectangle rounds its corners, a circle or
+ * an arc is faceted finely enough to read as a curve, and a hollow shape (a crescent, an L) keeps its hollow. A
+ * shape lying wholly inside another (a button on a cushion) adds no walls. `follow: 'hull'` wraps the whole layer
+ * in one convex skin instead. Each face is darkened by `shade` the more it turns from the light (from the upper
+ * left), so a curve reads round. Returns their packets, each with a `depth` a hair under 0 that is lower the
  * farther its face's nearest point is from the camera, so faces at one height draw farthest first (the painter's
  * order for walls standing on one floor: a nearer face is never behind a farther one where they overlap).
  */
-function drawSides(steps,{at,rotation,scale},values,fill,view,z0,z1){
+function drawSides(steps,{at,rotation,scale},values,fill,view,z0,z1,{shade=.35,follow='shapes'}={}){
     if(z1<=z0)return [];
-    const [sx,sy]=typeof scale==='number'?[scale,scale]:scale,points=drawingOutline([{shape:'group',x:at[0],y:at[1],rotation,scale:[sx,sy],steps}],{values}).flatMap(part=>part.points),hull=convexHull(points);
-    if(hull.length<3)return [];
-    const cx=hull.reduce((t,p)=>t+p[0],0)/hull.length,cy=hull.reduce((t,p)=>t+p[1],0)/hull.length,k0=view.k(z0),k1=view.k(z1),out=[];
-    for(let i=0;i<hull.length;i++){
-        const a=hull[i],b=hull[(i+1)%hull.length],mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2;let nx=b[1]-a[1],ny=a[0]-b[0];if(nx*(mx-cx)+ny*(my-cy)<0){nx=-nx;ny=-ny;}
-        if(!view.sees({x1:a[0],y1:a[1],x2:b[0],y2:b[1],nx,ny}))continue;
-        const [p,q,r,t]=[view.scaled(a[0],a[1],k0),view.scaled(b[0],b[1],k0),view.scaled(b[0],b[1],k1),view.scaled(a[0],a[1],k1)];
-        const scene=new artScene();scene.fill([['move',...p],['line',...q],['line',...r],['line',...t],['close']],fill);
-        const d=nearest(view.camera,a,b),depth=-1e-3*d/(d+1000);
-        for(const packet of scene.finish())out.push({...packet,depth});
+    const [sx,sy]=typeof scale==='number'?[scale,scale]:scale,c=Math.cos(rotation),s=Math.sin(rotation);
+    const place=([x,y])=>{const px=x*sx,py=y*sy;return [at[0]+px*c-py*s,at[1]+px*s+py*c];};
+    const flip=sx*sy<0,loops=sideLoops(steps,values,follow);if(!loops.length)return [];
+    const k0=view.k(z0),k1=view.k(z1),out=[];
+    // A curve is many short faces: each unbroken run the camera sees is filled as one shape (no hairline seams
+    // between facets), and its shading laid over in bands of faces that turn alike.
+    const strip=(pts,i,j,path=[])=>{
+        for(let m=i;m<=j;m++){const q=pts[m%pts.length],[x,y]=view.scaled(q[0],q[1],k0);path.push([m===i?'move':'line',x,y]);}
+        for(let m=j;m>=i;m--){const q=pts[m%pts.length],[x,y]=view.scaled(q[0],q[1],k1);path.push(['line',x,y]);}
+        path.push(['close']);return path;
+    };
+    for(const loop of loops){
+        const pts=loop.map(place),n=pts.length,face=[];
+        for(let i=0;i<n;i++){
+            const a=pts[i],b=pts[(i+1)%n],ex=b[0]-a[0],ey=b[1]-a[1],L=Math.hypot(ex,ey);
+            // loops run with a positive signed area, so the outward side is (ey, -ex); a mirror flips it
+            let nx=L>1e-9?ey/L:0,ny=L>1e-9?-ex/L:0;if(flip){nx=-nx;ny=-ny;}
+            const seen=L>1e-9&&view.sees({x1:a[0],y1:a[1],x2:b[0],y2:b[1],nx,ny});
+            face.push({seen,dark:seen?Math.round(shade*(1-(nx*LIGHT[0]+ny*LIGHT[1]))/2*50)/50:0,d:seen?nearest(view.camera,a,b):Infinity});
+        }
+        // runs of seen faces, starting just after an unseen one so a run never wraps in two pieces
+        let start=face.findIndex(f=>!f.seen);if(start<0)start=0;
+        for(let m=0;m<n;){
+            const i=(start+m)%n;if(!face[i].seen){m++;continue;}
+            let len=0;while(len<n-m&&face[(i+len)%n].seen)len++;
+            const scene=new artScene();scene.fill(strip(pts,i,i+len),fill);
+            for(let u=0;u<len;){let v=u;while(v+1<len&&face[(i+v+1)%n].dark===face[(i+u)%n].dark)v++;const dk=face[(i+u)%n].dark;if(dk>.004)scene.fill(strip(pts,i+u,i+v+1),`rgba(0,0,0,${dk})`);u=v+1;}
+            let d=Infinity;for(let q=0;q<len;q++)d=Math.min(d,face[(i+q)%n].d);const depth=-1e-3*d/(d+1000);
+            for(const packet of scene.finish())out.push({...packet,depth});
+            m+=len;
+        }
     }
     return out;
 }
@@ -214,6 +239,36 @@ export function fallen(view,fall,z){
     if(!view)return [1,0,0,1,0,fall*z];
     const [cx,cy]=view.camera,k=view.k(-z);return [k,0,0,k,cx*(1-k),cy*(1-k)+fall*z];
 }
+const LIGHT=(()=>{const x=-.55,y=-.83,l=Math.hypot(x,y);return [x/l,y/l];})();   // toward the light, upper left
+/**
+ * The closed loops a layer's walls stand on, in the drawing's own space, counter-clockwise (y down), worked out
+ * once per drawing and look. 'shapes': each solid shape's fine outline that no larger one covers; 'hull': one hull.
+ */
+const LOOPS=new WeakMap();
+function sideLoops(steps,values,follow){
+    let byValues=LOOPS.get(steps);if(!byValues)LOOPS.set(steps,byValues=new WeakMap());
+    const key=values&&typeof values==='object'?values:EMPTY;let byFollow=byValues.get(key);if(!byFollow)byValues.set(key,byFollow={});
+    if(byFollow[follow])return byFollow[follow];
+    const parts=drawingOutline([{shape:'group',steps}],{values,fine:true}).filter(p=>p.solid&&p.points.length>=3);
+    let loops;
+    if(follow==='hull'){const h=convexHull(parts.flatMap(p=>p.points));loops=h.length>=3?[counterClockwise(h)]:[];}
+    else{
+        const sized=parts.map(p=>({points:counterClockwise(p.points),area:Math.abs(signedArea(p.points))})).filter(p=>p.area>1e-6).sort((a,b)=>b.area-a.area);
+        // a shape covered by a larger one (a shine laid over its cushion, a button on it) adds no walls: tested
+        // with its points drawn a hair toward its middle, so a copy of the same outline counts as covered
+        loops=[];for(const p of sized){
+            const [mx,my]=p.points.reduce((t,q)=>[t[0]+q[0]/p.points.length,t[1]+q[1]/p.points.length],[0,0]),pulled=p.points.map(([x,y])=>[x+(mx-x)*.02,y+(my-y)*.02]);
+            if(!loops.some(o=>o.area>=p.area*.999&&pulled.every(q=>inside(q,o.points))))loops.push(p);
+        }
+        loops=loops.map(p=>p.points);
+    }
+    return byFollow[follow]=loops;
+}
+const EMPTY={};
+function signedArea(pts){let a=0;for(let i=0;i<pts.length;i++){const p=pts[i],q=pts[(i+1)%pts.length];a+=p[0]*q[1]-q[0]*p[1];}return a/2;}
+// Counter-clockwise on screen (y down) is a positive signed area here.
+function counterClockwise(pts){return signedArea(pts)<0?[...pts].reverse():pts;}
+function inside([x,y],pts){let c=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const [xi,yi]=pts[i],[xj,yj]=pts[j];if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)c=!c;}return c;}
 // How far a point is from the segment a–b.
 function nearest([px,py],a,b){const ex=b[0]-a[0],ey=b[1]-a[1],L=ex*ex+ey*ey,t=L?Math.max(0,Math.min(1,((px-a[0])*ex+(py-a[1])*ey)/L)):0;return Math.hypot(a[0]+ex*t-px,a[1]+ey*t-py);}
 /**
@@ -251,13 +306,22 @@ function resource(source,id,kind){const value=source.getResource(id);if(value.ki
 // ----- Geometry -------------------------------------------------------------------------------------
 const compose=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
 const apply=(m,[x,y])=>[m[0]*x+m[2]*y+m[4],m[1]*x+m[3]*y+m[5]];
-const ring=(x,y,rx,ry,turn=0)=>Array.from({length:SAMPLES},(_,i)=>{const a=i/SAMPLES*Math.PI*2,c=Math.cos(turn),s=Math.sin(turn),px=Math.cos(a)*rx,py=Math.sin(a)*ry;return [x+px*c-py*s,y+px*s+py*c];});
-function outline(step){
+const ring=(x,y,rx,ry,turn=0,n=SAMPLES)=>Array.from({length:n},(_,i)=>{const a=i/n*Math.PI*2,c=Math.cos(turn),s=Math.sin(turn),px=Math.cos(a)*rx,py=Math.sin(a)*ry;return [x+px*c-py*s,y+px*s+py*c];});
+// How many points round a curve of radius r when walls stand on it: about one every 3 units, 16 to 96.
+const facets=r=>Math.max(16,Math.min(96,Math.ceil(2*Math.PI*Math.abs(r)/3)));
+/** A rounded rectangle's outline: each corner a quarter circle of `n` steps (clockwise from the top left, y down). */
+function roundedRect(x,y,w,h,r,n){
+    const rr=Math.max(0,Math.min(Math.abs(r),Math.abs(w)/2,Math.abs(h)/2));if(!(rr>0))return [[x,y],[x+w,y],[x+w,y+h],[x,y+h]];
+    const out=[],corner=(cx,cy,a0)=>{for(let i=0;i<=n;i++){const a=a0+i/n*Math.PI/2;out.push([cx+Math.cos(a)*rr,cy+Math.sin(a)*rr]);}};
+    corner(x+w-rr,y+rr,-Math.PI/2);corner(x+w-rr,y+h-rr,0);corner(x+rr,y+h-rr,Math.PI/2);corner(x+rr,y+rr,Math.PI);return out;
+}
+/** A step's outline. `fine`: as walls stand on it, its curves faceted to their size and a rectangle's corners rounded. */
+function outline(step,fine=false){
     const {shape,x=0,y=0}=step;
     switch(shape){
-        case 'rectangle':return [[x,y],[x+step.width,y],[x+step.width,y+step.height],[x,y+step.height]];
-        case 'circle':return ring(x,y,step.radius,step.radius);
-        case 'ellipse':return ring(x,y,step.radius_x,step.radius_y,step.rotation??0);
+        case 'rectangle':return fine&&step.radius?roundedRect(x,y,step.width,step.height,step.radius,Math.max(3,Math.ceil(facets(step.radius)/4))):[[x,y],[x+step.width,y],[x+step.width,y+step.height],[x,y+step.height]];
+        case 'circle':return ring(x,y,step.radius,step.radius,0,fine?facets(step.radius):SAMPLES);
+        case 'ellipse':return ring(x,y,step.radius_x,step.radius_y,step.rotation??0,fine?facets(Math.max(step.radius_x,step.radius_y)):SAMPLES);
         case 'capsule':return [...ring(...step.from,step.radius,step.radius),...ring(...step.to,step.radius,step.radius)];
         case 'limb':{const [r0,rb,r1]=step.radii,t=step.belly_at??.3,m=[step.from[0]+(step.to[0]-step.from[0])*t,step.from[1]+(step.to[1]-step.from[1])*t];return [...ring(...step.from,r0,r0),...ring(...m,rb,rb),...ring(...step.to,r1,r1)];}
         case 'line':case 'polygon':case 'curve':return step.points.map(p=>[...p]);

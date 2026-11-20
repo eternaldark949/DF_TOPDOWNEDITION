@@ -64,3 +64,24 @@ test('leaning, every wall face draws under every wall top at that height, neares
  assert.ok(fills.lastIndexOf('#555')<fills.indexOf('#444'),`the near wall's face last, over the end of the far one: ${fills}`);
  render.dispose();
 });
+
+test('leaning, walls stand on each shape\'s true outline: rounded corners round, a hollow kept, a shape on another adds none, a curve shaded round',async()=>{
+ const run=async steps=>{
+  const {world,render}=fixture();render.registerRenderer('recording',recordingRenderer);await render.setRenderer('recording',{surface:null});render.setHeightView({eye:900});
+  world.elements.createEntity({kind:'static',position:[50,250],components:[{name:'b',layers:[{layer:0,height:0,thickness:120,solid:false,sides:'#777',steps}]}]});world.updateState(1/60);
+  render.beginFrame();render.drawLooks();render.endFrame();const walls=render.getFrameSnapshot().passes.flatMap(p=>p.packets).filter(p=>p.depth<0);render.dispose();
+  return {walls,points:walls.filter(p=>p.material.fill==='#777').flatMap(p=>p.geometry.commands.filter(c=>c[0]!=='close').map(c=>[c[1],c[2]]))};
+ };
+ // a rounded block below the camera: its walls never reach the square corner its box would have
+ const rounded=await run([{shape:'rectangle',x:-40,y:-20,width:80,height:40,radius:16,fill:'#a33'}]);
+ assert.ok(rounded.points.length>8,'a rounded corner is many facets');
+ assert.ok(rounded.points.every(([x,y])=>Math.hypot(x-10,y-230)>3),'no wall foot at the box\'s top-left corner (10, 230)');
+ assert.equal(rounded.walls.filter(p=>p.material.fill==='#777').length,1,'one unbroken run of faces is one fill, so no seams between facets');
+ assert.ok(rounded.walls.some(p=>/^rgba\(0,0,0,/.test(p.material.fill)),'faces turned from the light are shaded');
+ // an L, hollow toward the camera: the walls of its inner corner stand (a hull would have bridged it)
+ const ell=await run([{shape:'polygon',points:[[-40,-40],[40,-40],[40,-10],[-10,-10],[-10,40],[-40,40]],fill:'#a33'}]);
+ assert.ok(ell.points.some(([x,y])=>Math.abs(x-40)<1e-6&&Math.abs(y-240)<1e-6),'a wall stands at the inner corner (40, 240)');
+ // a button on a cushion adds no walls of its own
+ const plain=await run([{shape:'rectangle',x:-30,y:-15,width:60,height:30,fill:'#a33'}]),buttoned=await run([{shape:'rectangle',x:-30,y:-15,width:60,height:30,fill:'#a33'},{shape:'circle',x:0,y:0,radius:3,fill:'#ff0'},{shape:'rectangle',x:-30,y:-15,width:60,height:30,fill:'#fff',alpha:.2}]);
+ assert.equal(buttoned.walls.length,plain.walls.length,'shapes covered by a larger one stand no walls');
+});

@@ -3,12 +3,15 @@
 // (turned by `rotation`) from the entity's origin, or from a rig joint when it names one. Its shapes
 // sit on integer layers; each layer has its own base `height` above the component's layer 0 and its
 // own `thickness`, in world units, so a floor slab, a gap and a roof are three layers. A layer with
-// `sides` (a paint, or {material}) shows its walls when the render system leans heights toward the camera. The entity's
+// `sides` (a paint, or {material, shade, follow}) shows its walls when the render system leans heights toward the camera:
+// they follow each solid shape's true outline (rounded corners, curves, hollows), `shade` (0..1, default .35) darkens
+// a face the more it turns from the light, and `follow: 'hull'` wraps the layer in one convex skin instead. The entity's
 // height is the highest top among its components. Components are plain data, kept in the entity's
 // `components` property, so they save, load and change like any property. Lengths are world units:
 // data written in metres is turned into units by the Directory when it loads.
 
 const COMPONENT = Object.freeze(['name', 'at', 'rotation', 'joint', 'layers']);
+const SIDES = Object.freeze(['material', 'shade', 'follow']);
 const LAYER = Object.freeze(['layer', 'height', 'thickness', 'steps', 'drawing', 'solid', 'visible', 'sides']);
 const SAFE = value => typeof value === 'string' && value && !['__proto__', 'prototype', 'constructor'].includes(value);
 const plain = value => value && typeof value === 'object' && !Array.isArray(value);
@@ -24,7 +27,8 @@ export function readLayer(packet, where = 'A layer') {
     if (packet.steps !== undefined && !Array.isArray(packet.steps)) throw new TypeError(`${where}'s steps are a list of drawing steps`);
     if (packet.drawing !== undefined && !SAFE(packet.drawing)) throw new TypeError(`${where}'s drawing is a resource id`);
     const sides = packet.sides, material = plain(sides) ? sides.material : undefined;
-    if (sides !== undefined && !(typeof sides === 'string' && sides) && !(plain(sides) && Object.keys(sides).length === 1 && typeof material === 'string' && material)) throw new TypeError(`${where}'s sides are a paint colour, a "$look" value, or {material: id or "$look" value}`);
+    const sideKeys = plain(sides) && Object.keys(sides).every(k => SIDES.includes(k)) && (sides.shade === undefined || (Number.isFinite(sides.shade) && sides.shade >= 0 && sides.shade <= 1)) && (sides.follow === undefined || ['shapes', 'hull'].includes(sides.follow));
+    if (sides !== undefined && !(typeof sides === 'string' && sides) && !(sideKeys && typeof material === 'string' && material)) throw new TypeError(`${where}'s sides are a paint colour, a "$look" value, or {material: id or "$look" value, shade: 0..1, follow: 'shapes' or 'hull'}`);
     for (const flag of ['solid', 'visible']) if (packet[flag] !== undefined && typeof packet[flag] !== 'boolean') throw new TypeError(`${where}'s ${flag} is true or false`);
     return { layer: packet.layer, height: length(packet.height ?? 0, `${where}'s height`, -Infinity), thickness: length(packet.thickness ?? 0, `${where}'s thickness`),
         ...(packet.steps !== undefined ? { steps: structuredClone(packet.steps) } : { drawing: packet.drawing }),
