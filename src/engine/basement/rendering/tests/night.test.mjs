@@ -118,6 +118,8 @@ test('a text step in a panel is text laid on the face: its matrix puts the panel
  near(m[4],X,'x',1e-6);near(m[5],Y,'y',1e-6);
  assert.ok(m[0]>0&&m[3]>0,'it reads left to right and upright, as seen from outside');
  assert.ok(!draw(.5).some(p=>p.type==='text'),'smaller on screen than its detail: no text');
+});
+
 test('drawNight takes cuts that thin the dark (a reflection pass\'s darknessCut), drawn in the night\'s layer',async()=>{
  class Rec extends recordingRenderer{constructor(...a){super(...a);Rec.last=this;}}
  const {render}=fixture();render.registerRenderer('recording',Rec);await render.setRenderer('recording',{surface:null});
