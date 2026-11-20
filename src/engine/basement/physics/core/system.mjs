@@ -734,6 +734,12 @@ export class physicsSystem {
     emitParticles(pool, packet) { return this.#particles.emitParticles(pool, packet); }
     getParticleState(pool, result) { return this.#particles.getParticleState(pool, result); }
     clearParticles(pool) { return this.#particles.clearParticles(pool); }
+    createParticleSystem(record, options) { return this.#particles.systems.create(record, options); }
+    setParticleArea(system, area) { return this.#particles.systems.setArea(system, area); }
+    setParticleRate(system, rates) { return this.#particles.systems.setRate(system, rates); }
+    burstParticles(system, count, options) { return this.#particles.systems.burst(system, number(count, 'count', 0, 100000), options); }
+    removeParticleSystem(system) { return this.#particles.systems.remove(system); }
+    readParticleSystems() { return this.#particles.systems.read(); }
     createCloth(packet) { return this.#particles.createCloth(packet); }
     setClothAnchors(cloth, positions) { return this.#particles.setClothAnchors(cloth, positions); }
     setClothWind(cloth, wind) { return this.#particles.setClothWind(cloth, wind); }

@@ -11,7 +11,7 @@ export {artScene,DRAWING,MATERIAL,EMITS,readEmits,REFLECT,readReflect,readValues
 export {createLightLayer,createLightLayerParts,entityLights,LIGHT_CUT,LIGHT_GRID,LIGHT_GRID_CELLS,readLightGrid,bakeLightGrid,patchLightGrid,lightGrid,drawLightGrid,lightGridPackets} from './lighting.mjs';
 export {heightScale,heightView,boxFaces} from './height.mjs';
 export {GLARE,readGlare,glarePackets} from './glare.mjs';
-export {RAIN,readRain,rainPackets} from './rain.mjs';
+export {PARTICLE_LOOK,readParticleLook,particlePackets} from './particles.mjs';
 export {NIGHT,readNight} from './night.mjs';
 export {depthBatches} from './depth.mjs';
 export {BOUNDS,fitBounds,drawingReach,drawingOutline,drawingEmitters,facadeEmitters,drawLook,drawComponents,componentCovers,componentSteps,foreshorten,qualifyResource} from './looks.mjs';

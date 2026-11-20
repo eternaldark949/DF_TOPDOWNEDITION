@@ -1,0 +1,13 @@
+{
+  "library_id": "weather",
+  "description": "Weather any map may use, as particle systems: rain that falls past the camera and splashes where it lands. A map names one in its `particles` (with area 'view' it falls wherever the camera looks).",
+  "resources": {
+    "rain": {"kind": "particle_system",
+      "capacity": 5000, "density": 10, "height": [34, 40], "velocity": [[0, 0], [0, 0], [-72, -62]], "life": [2, 2], "land": "die",
+      "on_land": {"system": "weather:rain_splash", "count": 1},
+      "look": {"shape": "streak", "color": "#b9c3dc", "alpha": 0.32, "width": 0.9, "trail": 0.06, "bands": true, "lit": true}},
+    "rain_splash": {"kind": "particle_system",
+      "capacity": 3000, "life": [0.3, 0.5], "land": "none",
+      "look": {"shape": "ring", "color": "#b9c3dc", "alpha": 0.14, "width": 0.7, "size": 3.5, "grow": true, "fade": true}}
+  }
+}

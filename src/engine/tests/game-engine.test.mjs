@@ -206,19 +206,23 @@ test('a map level with a height view sets the camera\'s eye on entry and clears 
     e.dispose();
 });
 
-test('a map level keeps its night and rain, and puts the night\'s effects on the frame only while it is night', async () => {
+test('a map level keeps its night and its particle systems, and puts the night\'s effects on the frame only while it is night', async () => {
     const { mapLevel } = await import('../lobby/runtime/map-level.mjs');
     const night = { tint: 'rgba(24, 0, 78, 0.72)', effects: [{ type: 'grade', tint: '#d0a0ff', tint_amount: 0.5 }], glare: { reach: 58 } };
-    const maps = { city: { map_id: 'city', size: [256, 256], night, rain: { density: 10 } }, room: { map_id: 'room', size: [256, 256] } };
+    const rain = { density: 20, height: [30, 30], velocity: [[0, 0], [0, 0], [-60, -60]], look: { shape: 'streak' } };
+    const maps = { city: { map_id: 'city', size: [256, 256], night, particles: [{ system: rain, area: 'view' }] }, room: { map_id: 'room', size: [256, 256] } };
     class Place extends mapLevel { mapDefinition() { return { definition: maps[this.level_id] }; } }
     const e = new gameEngine({ asset_library: createEngineRegistry({ libraries: [] }), schedule_frame: null }); e.registerLevel('city', Place); e.registerLevel('room', Place);
     const effects = () => { const frame = e.basement.render.beginFrame(); const out = frame.getEffects(); e.basement.render.abortFrame(); return out; };
     const city = await e.loadLevel('city'), context = e.levels?.context ?? { basement: e.basement };
-    assert.equal(city.night.glare.reach, 58); assert.equal(city.night.scale, 0.5, 'the defaults filled in'); assert.equal(city.rain.density, 10);
+    assert.equal(city.night.glare.reach, 58); assert.equal(city.night.scale, 0.5, 'the defaults filled in');
+    const physics = e.basement.physics; assert.equal(physics.readParticleSystems().length, 1, 'its rain is made');
+    e.start(); for (let i = 0; i < 30; i++) e.updateState(); const drops = physics.readParticleSystems()[0], view = e.basement.camera.getVisibleBounds({ margin: 96 });
+    assert.ok(drops.count > 0 && [...drops.x.slice(0, drops.count)].every(x => x >= view.left && x <= view.right), 'it falls where the camera looks');
     assert.deepEqual(effects(), [], 'by day the frame is plain');
     assert.equal(city.setNight(context, true), true); assert.equal(effects()[0].type, 'grade', 'at night it takes the night\'s effects');
     assert.equal(city.setNight(context, false), false); assert.deepEqual(effects(), []);
-    city.setNight(context, true); const room = await e.loadLevel('room'); assert.deepEqual(effects(), [], 'leaving takes them off');
+    city.setNight(context, true); const room = await e.loadLevel('room'); assert.deepEqual(effects(), [], 'leaving takes them off'); assert.equal(physics.readParticleSystems().length, 0, 'and removes its particles');
     assert.equal(room.setNight(context, true), false, 'a map with no night stays off'); assert.equal(room.night, null);
     e.dispose();
 });

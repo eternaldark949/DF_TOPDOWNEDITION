@@ -171,6 +171,39 @@ Named `impact_profile` and general `response_profile` presets are **proposed**, 
 
 `createParticlePool({capacity=256,...body_keywords (an `elevation` and `height_span` stand a particle at a height),lifetime=1,radius=0.5,collide=false})` returns a pool ID. `emitParticles(pool_id,{count=1,...overrides})` returns spawned body IDs up to capacity. Noncolliding particles still move, but generate no contacts. `getParticleState(pool_id,results=[])` returns body states plus `remaining`; `clearParticles(pool_id)` removes all its particles.
 
+### Particle systems
+
+A particle system is data: a record says where particles are born, how they move, how long they live and what happens when they reach the ground, and physics steps them every step with the rest of the world (so they pause and slow with the game clock). `PARTICLE_SYSTEM` holds the fields and their defaults; `readParticleSystem(record, where)` checks one and fills it in (unknown fields are refused, `kind` is allowed so a library resource can be passed as it is).
+
+| Field | Default | Meaning |
+| --- | --- | --- |
+| `capacity` | 2000 | Most particles alive at once; births past it wait. |
+| `rate`, `density` | 0, 0 | Births a second, plus `density` per 100 x 100 world units of `area` a second. |
+| `area` | null | `[x, y, w, h]` where births land; without one they start at `at` within `radius`. |
+| `at`, `radius` | [0, 0], 0 | The point births start from (a burst, a fountain) and how far around it. |
+| `height` | [0, 0] | Birth elevation range. |
+| `velocity` | [[0,0],[0,0],[0,0]] | Birth ranges for x, y and z speed (z is up). |
+| `gravity`, `wind`, `drag` | [0,0,0], [0,0], 0 | Acceleration in x, y, z; a steady drift in x, y; the share of speed lost a second. |
+| `life` | [1, 1] | Seconds a particle lives, a range. |
+| `land` | `'die'` | At the ground (elevation 0, or a roof in collide mode): `die`, `stop`, `bounce` (keeps `bounce` of its fall speed) or `none` (falls on through). |
+| `on_land` | null | `{system, count}`: each landing bursts `count` particles of another system (a record, or a `particle_system` resource id) where it landed, made once per maker. |
+| `collide` | false | Off: packed arrays, no bodies, cheap enough for thousands. On: each particle is a real body in `BODY_GROUP.PARTICLE` that hits world bodies but not other particles, and lands on what is under it (a roof, a table) by its height span. |
+| `seed` | 0 | The same seed and steps give the same particles. |
+| `look` | null | Not read by physics: how rendering draws it (`readParticleLook` in rendering). A system without one is not drawn. |
+
+The world's methods:
+
+| Method | Does |
+| --- | --- |
+| `createParticleSystem(record \| resource_id, {area, at})` | Makes a system and returns its id. An id string is read from the world's `asset_library` (kind `particle_system`). `area` and `at` override the record's. |
+| `setParticleArea(system, area)` | Moves where births land, `[x, y, w, h]`, or null for `at` (a map's rain follows the camera's view this way). |
+| `setParticleRate(system, {rate, density})` | Changes how many are born. |
+| `burstParticles(system, count, {at, height})` | Births `count` at once, at `at` (a hit's sparks, a splash). |
+| `removeParticleSystem(system)` | Removes it, its particles, and the systems its `on_land` made. |
+| `readParticleSystems()` | Each system as `{id, source, look, wind, top, count, x, y, z, px, py, pz, vx, vy, vz, age, life}`: arrays of positions now and a step ago, speeds, ages and lives, the first `count` live. This is what rendering's `drawParticles` reads. |
+
+Cost: in plain mode a step costs about 0.2 ms for 1,000 particles; collide mode pays a body each.
+
 `createChain({points,anchors=[0],mass=1,damping=3,radius=0.2,stiffness=20})` returns a chain ID. Each point is a body; neighbouring points have distance constraints; anchor indices are immovable. `setChainAnchors(chain_id,positions)` takes one position per configured anchor. `getChainState(chain_id,results=[])` returns body states; `removeChain(chain_id)` removes all chain joints/bodies. Chains do not collide with world geometry in this baseline. They are a reusable chain primitive for future hair/cloth adapters, not a migrated wardrobe renderer.
 
 ## Shared spatial service and backend classes

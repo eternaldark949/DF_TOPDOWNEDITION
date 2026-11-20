@@ -8,8 +8,8 @@ import {drawLook,drawComponents,componentCovers,fallen} from './looks.mjs';
 import {heightView} from './height.mjs';
 import {createLightLayerParts,entityLights} from './lighting.mjs';
 import {GLARE,glarePackets} from './glare.mjs';
-import {rainPackets} from './rain.mjs';
-const OVER_ALL=1e9;   // the layer of what is drawn over everything in its pass (glare, rain)
+import {particlePackets} from './particles.mjs';
+const OVER_ALL=1e9;   // the layer of what is drawn over everything in its pass (glare, particles)
 const PICK_STEPS=Object.freeze([1,.75,.5,.25,0]);   // top first: what the camera sees of a tall thing is its top
 
 function normalizeResource(description){
@@ -85,7 +85,7 @@ export class renderSystem {
         try{this.#backend?.resize(this.#camera.viewport);}catch(error){this.#camera.setViewport(old);throw error;}return this;
     }
     /** The height view now drawn (a heightView at the camera), or null when everything draws flat. */
-    heightViewAt(blend=1){return this.#lean?new heightView({camera:this.#camera.getView(blend).position,...this.#lean}):null;}
+    heightViewAt(blend=1){return this.#height?new heightView({camera:this.#camera.getView(blend).position,...this.#height}):null;}
     /** The camera's viewport ({width, height, pixel_ratio}) and the world bounds it sees. */
     getViewport(){return this.#camera.viewport;}
     getVisibleBounds(blend=1,margin=0){return this.#camera.getVisibleBounds({blend,margin});}
@@ -95,8 +95,10 @@ export class renderSystem {
      * each component layer draws in the plane of its top, scaled about the camera, and a layer with
      * `sides` shows its walls. `lean` exaggerates (or softens) it. null draws everything flat.
      */
-    setHeightView(options){this.#live();if(options===null){this.#lean=null;return this;}const {eye,lean=1}=options??{};new heightView({camera:[0,0],eye,lean}).k(0);if(!(eye>0))throw new RangeError('A height view needs an eye above the ground');this.#lean={eye,lean};return this;}
-    getHeightView(){return this.#lean?{...this.#lean}:null;}
+    setHeightView(options){this.#live();if(options===null){this.#lean=null;this.#camera.setHeightView?.(null);return this;}const {eye,lean=1}=options??{};new heightView({camera:[0,0],eye,lean}).k(0);if(!(eye>0))throw new RangeError('A height view needs an eye above the ground');this.#lean={eye,lean};this.#camera.setHeightView?.(this.#lean);return this;}
+    getHeightView(){const h=this.#height;return h?{...h}:null;}
+    // The camera's height view when it keeps one (so camera.setHeightView and this agree), else this system's.
+    get #height(){return this.#camera.getHeightView?this.#camera.getHeightView():this.#lean;}
     /** Still pictures (on by default where the renderer draws pictures): each component layer that is not on a tipped bone is
      *  painted once into a picture, per its steps and look, and stamped under its place every frame, so detailed furniture
      *  costs one image a layer. Off, every shape is drawn every frame. */
@@ -140,7 +142,7 @@ export class renderSystem {
     /** Draws every visible entity's look (a `drawing` asset) and its components into the open frame, at its `look.layer` and `look.depth`; a component layer's depth adds its height, so higher parts draw over lower ones. Returns how many entities it drew. */
     drawLooks(blend=1,{covers=null}={}){
         this.#live();if(!this.#collecting)throw new Error('Draw looks inside an open render frame');
-        const source=this.#world.elements.asset_library,view=this.#lean?new heightView({camera:this.#camera.getView(blend).position,...this.#lean}):null;let drawn=0,shown=null;this.#over=[];if(covers!==null&&!(Number.isFinite(covers)))throw new TypeError('covers is the height (world units) a part stands over to cover the light under it');
+        const source=this.#world.elements.asset_library,view=this.#height?new heightView({camera:this.#camera.getView(blend).position,...this.#height}):null;let drawn=0,shown=null;this.#over=[];if(covers!==null&&!(Number.isFinite(covers)))throw new TypeError('covers is the height (world units) a part stands over to cover the light under it');
         for(const {entity} of this.getVisibleEntities({blend},this.#visible)){
             if(!entity)continue;
             const look=entity.get('look',{}),layer=look.layer??0,depth=look.depth??0;let drew=false;
@@ -169,7 +171,7 @@ export class renderSystem {
     nightOver(){return this.#over.sort((a,b)=>a.layer-b.layer||a.depth-b.depth).map(({packet,over})=>({packet,over}));}
     /**
      * The lights the visible things carry (their `lights` and `emission`), in the world, leaning with the height view.
-     * Inside an open frame they are found once for a blend and margin (the night, its glare and the rain share them).
+     * Inside an open frame they are found once for a blend and margin (the night, its glare and the particles share them).
      */
     visibleLights(blend=1,{margin=512}={}){
         this.#live();const memo=this.#lightsMemo;
@@ -213,15 +215,16 @@ export class renderSystem {
         return glaring.length;
     }
     /**
-     * Rain (rain.mjs) over the open frame at `time` (seconds on the game clock; rain holds no state, so the
-     * same time draws the same rain): `rain` its settings (RAIN, readRain), leaning with the height view when
-     * one is set. Near the visible things' lights (and `lights`; `carried: false` leaves the visible ones out)
-     * drops take the light's colour. Drawn over everything. Returns how many packets it drew.
+     * The world's particle systems (physics' readParticleSystems) over the open frame, each drawn from its record's
+     * `look` (particles.mjs): streaks, dots or rings, between the last two steps at `blend`, leaning with the height
+     * view when one is set. Particles of a `lit` look near the visible things' lights (and `lights`; `carried: false`
+     * leaves the visible ones out) take the light's colour. Drawn over everything. Returns how many packets it drew.
      */
-    drawRain({rain,time,lights=[],carried=true,margin=32,blend=1}={}){
-        this.#live();if(!this.#collecting)throw new Error('Draw the rain inside an open render frame');
-        const v=this.#camera.getView(blend),bounds=this.#camera.getVisibleBounds({blend,margin}),all=[...(carried?this.visibleLights(blend):[]),...lights];
-        const packets=rainPackets({bounds,time:finite(time,'rain time'),settings:rain,view:this.heightViewAt(blend),camera:v.position,zoom:v.zoom,lights:all});
+    drawParticles({lights=[],carried=true,margin=32,blend=1}={}){
+        this.#live();if(!this.#collecting)throw new Error('Draw the particles inside an open render frame');
+        const systems=this.#world.readParticleSystems?.()??[];if(!systems.some(s=>s.look&&s.count))return 0;
+        const v=this.#camera.getView(blend),bounds=this.#camera.getVisibleBounds({blend,margin}),all=systems.some(s=>s.look?.lit)?[...(carried?this.visibleLights(blend):[]),...lights]:[];
+        const packets=particlePackets(systems,{bounds,blend,view:this.heightViewAt(blend),camera:v.position,zoom:v.zoom,lights:all});
         for(const packet of packets)this.#frame.submit({...packet,layer:OVER_ALL});
         return packets.length;
     }
@@ -236,7 +239,7 @@ export class renderSystem {
      * `margin` widens the view (world units), so what stands just off screen is found too.
      */
     lookParts(blend=1,{above=-Infinity,mirror=null,margin=0,filter=null}={}){
-        this.#live();const lib=this.#world.elements.asset_library,view=this.#lean?new heightView({camera:this.#camera.getView(blend).position,...this.#lean}):null,out=[];
+        this.#live();const lib=this.#world.elements.asset_library,view=this.#height?new heightView({camera:this.#camera.getView(blend).position,...this.#height}):null,out=[];
         for(const {entity} of this.getVisibleEntities({blend,margin},[])){
             if(!entity)continue;const look=entity.get('look',{});if((look.layer??0)<=above||look.visible===false||look.reflect===false)continue;
             if(filter&&!filter(entity))continue;
@@ -266,7 +269,7 @@ export class renderSystem {
         const skip=new Set((Array.isArray(ignore)?ignore:[ignore]).map(e=>e?.entity_id??e)),hits=[];
         // Leaning toward the camera, what is drawn at this point stands somewhere between it and the camera: at
         // height z it is the ground point camera + (point − camera) / k(z). Each candidate is tested from its base to its top.
-        const view=this.#lean?new heightView({camera:this.#camera.getView(blend).position,...this.#lean}):null,[cx,cy]=view?view.camera:[x,y];
+        const view=this.#height?new heightView({camera:this.#camera.getView(blend).position,...this.#height}):null,[cx,cy]=view?view.camera:[x,y];
         const area={left:Math.min(x,cx)-.5,top:Math.min(y,cy)-.5,right:Math.max(x,cx)+.5,bottom:Math.max(y,cy)+.5};
         for(const {entity,body} of this.#world.queryEntitiesInBounds({bounds:area,bounds_type:bounds},[])){
             if(!entity||skip.has(entity.entity_id))continue;

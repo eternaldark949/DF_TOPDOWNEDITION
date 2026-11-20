@@ -1,7 +1,7 @@
 // ===== LV1 LOBBY =====
 import { gameLevel } from './game-level.mjs';
 import { mapInstance } from '../../basement/maps/index.mjs';
-import { lightGridSystem, readNight, readRain } from '../../basement/rendering/index.mjs';
+import { lightGridSystem, readNight } from '../../basement/rendering/index.mjs';
 
 /**
  * A level that is one Basement map. A subclass says which map with `mapDefinition`; the level builds
@@ -28,16 +28,20 @@ export class mapLevel extends gameLevel {
         // The camera's height view, when the map gives one: how high the eye stands and how far walls lean from it.
         this.height_view = prepared.definition.height_view ?? null;
         if (this.height_view) context.basement.render?.setHeightView(this.height_view);
-        // How the map looks at night and in the rain, as its data says: whoever draws the frame reads them
-        // (drawNight with `night`, drawRain with `rain`); setNight turns the night's frame effects on and off.
+        // How the map looks at night, as its data says: whoever draws the frame reads it (drawNight with `night`);
+        // setNight turns the night's frame effects on and off.
         this.night = prepared.definition.night ? readNight(prepared.definition.night) : null;
-        this.rain = prepared.definition.rain ? readRain(prepared.definition.rain) : null;
         this.night_on = false;
+        // The map's particle systems (rain, snow, embers): made now, stepped by physics, removed on leaving. One
+        // whose area is 'view' is kept on what the camera sees after each step, so it falls wherever you look.
+        this.particles = (prepared.definition.particles ?? []).map(p => ({ id: context.basement.physics.createParticleSystem(p.system, { ...(Array.isArray(p.area) ? { area: p.area } : {}), ...(p.at ? { at: p.at } : {}) }), view: p.area === 'view', margin: p.margin ?? 96 }));
+        this.followView(context);
         this.light_grid = prepared.definition.switches?.light_grid ? new lightGridSystem({ settings: prepared.definition.light_grid ?? {}, source: context.assets ?? context.basement.physics.elements?.asset_library ?? null }).attach(this.map, this.lightGridOptions(context)) : null;
         this.map.setFocus(this.mapFocuses(context), { budget_ms: Infinity });   // (the arriving regions, whole, behind the level change)
         this.light_grid?.updateState({ budget_ms: Infinity });
     }
     afterPhysics(context, seconds) {
+        this.followView(context);
         this.map.setFocus(this.mapFocuses(context), { budget_ms: this.mapStreamBudget(context) }); this.map.updateState(this.mapUpdateOptions(context));
         if (this.light_grid) { this.light_grid.setMovers(this.light_grid.moversOf(this.lightGridMovers(context))); this.light_grid.updateState({ budget_ms: this.lightGridBudget(context) }); }
     }
@@ -71,7 +75,12 @@ export class mapLevel extends gameLevel {
         if (render && next !== this.night_on && this.night?.effects) render.setEffects(next ? this.night.effects : null);
         this.night_on = next; return next;
     }
-    leave(context) { if (this.night_on) this.setNight(context, false); this.night = null; this.rain = null; this.map?.destroy(); this.map = null; this.light_grid = null; if (this.height_view) context.basement.render?.setHeightView(null); this.height_view = null; }
+    /** Keeps the particle systems marked area 'view' on what the camera sees (with their margin). */
+    followView(context) {
+        const camera = context.basement.camera; if (!camera) return;
+        for (const p of this.particles ?? []) if (p.view) { const b = camera.getVisibleBounds({ margin: p.margin }); context.basement.physics.setParticleArea(p.id, [b.left, b.top, b.right - b.left, b.bottom - b.top]); }
+    }
+    leave(context) { for (const p of this.particles ?? []) context.basement.physics.removeParticleSystem(p.id); this.particles = []; if (this.night_on) this.setNight(context, false); this.night = null; this.map?.destroy(); this.map = null; this.light_grid = null; if (this.height_view) context.basement.render?.setHeightView(null); this.height_view = null; }
     /** Every exit: `{entity, target, label, auto, bounds}`. */
     getExits() {
         if (!this.map) return [];

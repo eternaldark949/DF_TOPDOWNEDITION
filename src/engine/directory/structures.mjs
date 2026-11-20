@@ -12,7 +12,7 @@
 // map_layout     { map_id?, props: [placement], ...any other per-map lists (copied as data) }
 //                placement = { type, x, y, ...fields }: fields override the type's defaults, and a
 //                field set to null removes that default.
-// map            { size: [w, h], setting?: 'interior'|'exterior', spawn?, floors?, wall_look?, walls?, placements?, rooms?, doors?, switches?, light_grid?, height_view?: {eye, lean = 1}, night?: {tint, scale, effects, glare}, rain?: {amount, density, ...}, ... }
+// map            { size: [w, h], setting?: 'interior'|'exterior', spawn?, floors?, wall_look?, walls?, placements?, rooms?, doors?, switches?, light_grid?, height_view?: {eye, lean = 1}, night?: {tint, scale, effects, glare}, particles?: [{system, area?: 'view' | [x, y, w, h], at?, margin?}], ... }
 //                A whole map as data: the Basement map builder's definition, found by its id like any
 //                resource. `setting` is the builder's `kind` (the resource's own `kind` is 'map'). Fields
 //                the builder does not read (a label, landmarks, windows) are the game's, kept as data.
@@ -29,7 +29,8 @@
 //                from its start. A map door names the kind in its `type`. The Basement map builder
 //                has the full rules and the built-in kinds (plain, sliding, hinged, arch).
 import { plain } from './values.mjs';
-import { DRAWING, MATERIAL, readEmits, readReflect, readLightGrid, readNight, readRain, validateEffectsPreset } from '../basement/rendering/index.mjs';
+import { DRAWING, MATERIAL, readEmits, readReflect, readLightGrid, readNight, readParticleLook, validateEffectsPreset } from '../basement/rendering/index.mjs';
+import { readParticleSystem } from '../basement/physics/index.mjs';
 
 export const STRUCTURES = Object.freeze({
     prop_catalog: 'A catalog of prop types and the families they are presets of: { types: { <type>: { defaults, movable?, blocks_light?, light? } }, families?: { <family>: { look: { <field>: { kind, default } } } } }.',
@@ -215,7 +216,16 @@ export function validateMap(map, where = 'map') {
     if (map.height_view !== undefined && !(plain(map.height_view) && Object.keys(map.height_view).every(k => k === 'eye' || k === 'lean') && Number.isFinite(map.height_view.eye) && map.height_view.eye > 0 && (map.height_view.lean === undefined || (Number.isFinite(map.height_view.lean) && map.height_view.lean >= 0)))) fail(where, 'height_view is { eye: world units above the ground (> 0), lean: how far walls lean (>= 0, default 1) }');
     if (map.light_grid !== undefined) { try { readLightGrid(map.light_grid); } catch (error) { fail(where, error.message); } }
     if (map.night !== undefined) { try { readNight(map.night); } catch (error) { fail(where, error.message); } }
-    if (map.rain !== undefined) { try { readRain(map.rain); } catch (error) { fail(where, error.message); } }
+    if (map.particles !== undefined) {
+        if (!Array.isArray(map.particles)) fail(where, 'particles is a list of { system, area?, at?, margin? }');
+        map.particles.forEach((p, i) => {
+            if (!plain(p) || Object.keys(p).some(k => !['system', 'area', 'at', 'margin'].includes(k))) fail(`${where}.particles[${i}]`, 'is { system, area?, at?, margin? }');
+            if (typeof p.system !== 'string') { try { validateParticleSystem(p.system, `${where}.particles[${i}].system`); } catch (error) { fail(where, error.message); } }
+            if (p.area !== undefined && p.area !== 'view' && !(Array.isArray(p.area) && p.area.length === 4 && p.area.every(Number.isFinite))) fail(`${where}.particles[${i}]`, "area is 'view' or [x, y, width, height]");
+            if (p.at !== undefined && !point(p.at)) fail(`${where}.particles[${i}]`, 'at is [x, y]');
+            if (p.margin !== undefined && !(Number.isFinite(p.margin) && p.margin >= 0)) fail(`${where}.particles[${i}]`, 'margin is world units (>= 0)');
+        });
+    }
     if (map.floors?.length) validateDrawing({ steps: map.floors.map(({ elevation, thickness, sides, ...step }) => step) }, `${where}.floors`);
     return map;
 }
@@ -226,7 +236,17 @@ export function mapDefinition(registry, id) {
     const { kind, setting = 'interior', ...definition } = structuredClone(map);
     return { map_id: id, kind: setting, ...definition };
 }
-const VALIDATORS = { drawing: validateDrawing, material: validateMaterial, texture: validateTexture, prop_catalog: validatePropCatalog, skeleton: validateSkeleton, clip_set: validateClipSet, locomotion: validateLocomotion, door_kind: validateDoorKind, effects: validateEffectsPreset, map: validateMap };
+// particle_system  { capacity, rate, density, area, at, radius, height, velocity, gravity, wind, drag, life, land, bounce,
+//                    on_land: {system, count}, collide, seed, look: {shape, color, alpha, width, trail, size, ...} }
+//                Particles as data (the Basement physics' PARTICLE_SYSTEM and the renderer's PARTICLE_LOOK).
+/** Throws unless `resource` is a particle system with a valid look (and a valid inline `on_land` system). Returns it. */
+export function validateParticleSystem(resource, where = 'particle_system') {
+    const { kind, ...record } = resource ?? {};
+    const r = readParticleSystem(record, where); readParticleLook(r.look, `${where}.look`);
+    if (r.on_land && typeof r.on_land.system !== 'string') validateParticleSystem(r.on_land.system, `${where}.on_land.system`);
+    return resource;
+}
+const VALIDATORS = { drawing: validateDrawing, material: validateMaterial, texture: validateTexture, prop_catalog: validatePropCatalog, skeleton: validateSkeleton, clip_set: validateClipSet, locomotion: validateLocomotion, door_kind: validateDoorKind, effects: validateEffectsPreset, particle_system: validateParticleSystem, map: validateMap };
 /** Validates every resource of a library whose kind has a structure here; other kinds pass through. Returns the library. */
 export function validateLibrary(library) {
     for (const [id, resource] of Object.entries(library?.resources ?? {})) VALIDATORS[resource?.kind]?.(resource, `${library.library_id}:${id}`);

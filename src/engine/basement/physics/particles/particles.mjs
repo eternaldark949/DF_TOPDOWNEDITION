@@ -1,9 +1,10 @@
 // ===== LV0 BASEMENT =====
 import { number, vector, clone, length, sub, add, rotate, BODY_GROUP } from '../core/values.mjs';
+import { particleSystems } from './particle-systems.mjs';
 
 /** Particle bodies use the world's ONLY grid and common contact solver. */
 export class particlePhysics {
-    constructor(world) { this.world = world; this.pools = new Map(); this.chains = new Map(); this.cloths = new Map(); this.cloth_vertices = new Map(); this.owner_cloths = new Map(); this.next_id = 1; }
+    constructor(world) { this.world = world; this.pools = new Map(); this.chains = new Map(); this.cloths = new Map(); this.cloth_vertices = new Map(); this.owner_cloths = new Map(); this.next_id = 1; this.systems = new particleSystems(world); }
     createParticlePool(packet = {}) {
         const id = this.next_id++, capacity = number(packet.capacity ?? 256, 'capacity', 1, 100000);
         if (!Number.isInteger(capacity)) throw new TypeError('capacity must be integral');
@@ -106,6 +107,7 @@ export class particlePhysics {
         if (c.owner_id !== null) { let set = this.owner_cloths.get(c.owner_id); if (!set) this.owner_cloths.set(c.owner_id, set = new Set()); set.add(id); }
     }
     _bodyRemoved(body_id) {
+        this.systems._bodyRemoved(body_id);
         for (const pool of this.pools.values()) pool.particles.delete(body_id);
         const own = this.cloth_vertices.get(body_id); if (own !== undefined) this.removeCloth(own);
         for (const id of [...(this.owner_cloths.get(body_id) ?? [])]) this.removeCloth(id);
@@ -137,12 +139,13 @@ export class particlePhysics {
         }
     }
     _update(dt) {
+        this.systems._update(dt);
         for (const p of this.pools.values()) for (const [id, v] of p.particles) {
             v.remaining -= dt;
             if (v.remaining <= 0) { this.world.removeBody(v.body); p.particles.delete(id); }
         }
     }
-    _clear() { this.pools.clear(); this.chains.clear(); this.cloths.clear(); this.cloth_vertices.clear(); this.owner_cloths.clear(); this.next_id = 1; }
+    _clear() { this.systems._clear(); this.pools.clear(); this.chains.clear(); this.cloths.clear(); this.cloth_vertices.clear(); this.owner_cloths.clear(); this.next_id = 1; }
     _saveState() {
         return { next_id: this.next_id,
             cloths: [...this.cloths].map(([id, c]) => ({ id, ...clone({ ...c, bodies: c.bodies.map(b => b.body_id), constraints: c.constraints.map(v => v.constraint_id) }) })),

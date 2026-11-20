@@ -10,6 +10,7 @@ export { characterMotor } from './motors/character.mjs';
 export { vehicleMotor, pathMotor } from './motors/vehicle.mjs';
 export { projectileMotor } from './motors/projectile.mjs';
 export { particlePhysics } from './particles/particles.mjs';
+export { PARTICLE_SYSTEM, readParticleSystem } from './particles/particle-systems.mjs';
 export { gameEntity } from './elements/entity.mjs';
 export { entityComponent, readComponent, readComponents, readLayer, componentSpan, layersByHeight } from './elements/components.mjs';
 export { gameElements } from './elements/registry.mjs';
