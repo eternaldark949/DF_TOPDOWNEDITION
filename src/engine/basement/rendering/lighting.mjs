@@ -42,6 +42,30 @@ function validLight(light,i){
     return shape;
 }
 /**
+ * The lights an object carries, in the world at its pose, for the light layer: its data's `lights` (a template's
+ * or a placement's `lights`: lamps, signs, searchlights, each a light record whose `position` and `rotation` are
+ * in the object's own frame, as its drawing is) and its `emission` (a map light or a prop's `light`; a `strip`
+ * is an area light). They turn and move with the object; each is `still` (cached in the light tiles) unless it
+ * says otherwise or the object moves. A "$name" colour is read from the object's look values. With `view` (a
+ * heightView, leaning) a light with a `height` is drawn where that height leans to: a lamp on its post, a
+ * searchlight on its crown.
+ */
+export function entityLights(body,{pose=null,view=null}={}){
+    const data=typeof body.get==='function'?{lights:body.get('lights'),emission:body.get('emission'),look:body.get('look')}:body.data??{};
+    const at=pose?.position??body.position,a=pose?.rotation??body.rotation??0,c=Math.cos(a),s=Math.sin(a),values=data.look?.values??{};
+    const moving=body.physics_type==='dynamic'||body.kind==='character'||body.kind==='vehicle';
+    const list=[...(data.lights??[]),...(data.emission?[{...data.emission,shape:data.emission.shape==='strip'?'area':data.emission.shape}]:[])];
+    const read=v=>typeof v==='string'&&v.startsWith('$')?values[v.slice(1)]??null:v;
+    return list.map((l,i)=>{
+        const {position=[0,0],rotation=0,polygon,animation,shadows,look,soft,...rest}=l,[x,y]=position;
+        let where=[at[0]+x*c-y*s,at[1]+x*s+y*c];if(view&&rest.height>0)where=view.scaled(where[0],where[1],view.k(rest.height+(body.elevation??0)));
+        const out={...rest,shape:rest.shape??'point',position:where,rotation:a+rotation,still:l.still??!moving};
+        for(const k of ['color'])if(out[k]!==undefined)out[k]=read(out[k]);
+        if(out.color===null)delete out.color;if(out.intensity===null)delete out.intensity;if(out.glow===null)delete out.glow;
+        validLight(out,i);return out;
+    });
+}
+/**
  * The light layer's packets.
  *  bounds   {left, top, right, bottom}: where the dark is drawn (the view, with a margin)
  *  tint     the dark's colour, any CSS colour
@@ -54,10 +78,17 @@ function validLight(light,i){
  *           An area light does the same over a rounded strip of `size` turned by `rotation`; a beam (a
  *           headlight) from `near_width` either side at its position to `width` either side `length` ahead
  *           along `rotation`, fading along it, softer toward its edges and limited to `polygon` when given.
+ *           A light marked `over: true` stands above what stands tall (a searchlight on a crown, a rooftop
+ *           sign): it is drawn after `over` below, so no roof covers it, and is never cached.
  *  cuts     more packets that thin the dark, drawn as cuts after the lights' (a reflection pass's
  *           darknessCut(): the night lifted where a reflection shines). createLightLayerParts takes them too.
+ *  over     what stands over the light on the ground, in the order it is drawn: [{packet, over}], a `cover`
+ *           laying the plain dark back over every light and glow (a roof leaning over the street's light)
+ *           and a `shine` cut out of the dark so it shows at full strength (a lit window). Drawn last, so a
+ *           nearer cover hides a farther shine as the scene does (renderSystem.nightOver() gives them after
+ *           drawLooks). createLightLayerParts takes it too.
  */
-export function createLightLayer({bounds,tint,areas=[],lights=[],cuts=[]},{scene=new artScene()}={}){
+export function createLightLayer({bounds,tint,areas=[],lights=[],cuts=[],over=[]},{scene=new artScene()}={}){
     const {left,top,right,bottom}=bounds??{};for(const v of [left,top,right,bottom])finite(v,'bounds');
     if(typeof tint!=='string'||!tint)throw new TypeError('The light layer needs a tint colour');
     scene.fill(rect(left,top,right-left,bottom-top),tint);
@@ -65,7 +96,7 @@ export function createLightLayer({bounds,tint,areas=[],lights=[],cuts=[]},{scene
     const shapes=lights.map(validLight);
     lights.forEach((l,i)=>cut(scene,l,shapes[i]));
     lights.forEach((l,i)=>glow(scene,l,shapes[i]));
-    return [...scene.finish(),...extraCuts(cuts)];
+    return [...scene.finish(),...extraCuts(cuts),...nightOver(over,tint)];
 }
 /**
  * The same layer, split so what holds still between frames is painted once. Lights marked `still: true`
@@ -90,11 +121,11 @@ export function createLightLayer({bounds,tint,areas=[],lights=[],cuts=[]},{scene
  * tile, the areas over it and every still light that reaches it; a light's `polygon` is known by its array, so give a new array when the shadow changes.
  * `key` prefixes the pictures' keys.
  */
-export function createLightLayerParts({extent,tint,areas=[],lights=[],grids=[],cuts:more=[],key='light',tile_size=null,view=null,ahead=0,waiting=[]}){
+export function createLightLayerParts({extent,tint,areas=[],lights=[],grids=[],cuts:more=[],over=[],key='light',tile_size=null,view=null,ahead=0,waiting=[]}){
     const {left,top,right,bottom}=extent??{};for(const v of [left,top,right,bottom])finite(v,'extent');
     if(typeof tint!=='string'||!tint)throw new TypeError('The light layer needs a tint colour');
     const all=lights.map(l=>{const shape=validLight(l);return [l,shape,reach(l,shape),l.still?digests(l):null];});
-    const cutStill=all.filter(([l])=>l.still===true),glowStill=all.filter(([l])=>l.still===true||l.still==='glow');
+    const cutStill=all.filter(([l])=>l.still===true&&l.over!==true),glowStill=all.filter(([l])=>(l.still===true||l.still==='glow')&&l.over!==true);
     const darks=[],glows=[],ready=[],near=view&&viewAhead(view,ahead);
     const meets=([x,y,w,h])=>([,,r])=>r[0]<x+w&&r[2]>x&&r[1]<y+h&&r[3]>y;
     const lighted=grids.filter(g=>g&&g.peak>=.004).map(g=>[g,null,[g.left,g.top,g.right,g.bottom]]);
@@ -109,12 +140,13 @@ export function createLightLayerParts({extent,tint,areas=[],lights=[],grids=[],c
         else if(waiting.some(r=>meets(tile)([,,r])))continue;
         else{ready.push({...dark,prepare:true});if(colour)ready.push({...colour,prepare:true});}
     }
-    const cuts=new artScene(),colour=new artScene(),cutStamps=[],colourStamps=[];
+    const cuts=new artScene(),colour=new artScene(),cutStamps=[],colourStamps=[],aloft=new artScene();
     for(const [l,shape] of all){
+        if(l.over===true){cut(aloft,l,shape);glow(aloft,l,shape);continue;}   // (aloft: drawn over what stands tall, below)
         if(l.still==='stamp'){const [c,g]=stamps(key,l,shape);if(c)cutStamps.push(c);if(g)colourStamps.push(g);continue;}
         if(l.still!==true)cut(cuts,l,shape);if(!l.still)glow(colour,l,shape);
     }
-    return [...darks,...cutStamps,...cuts.finish(),...extraCuts(more),...glows,...colourStamps,...colour.finish(),...ready];
+    return [...darks,...cutStamps,...cuts.finish(),...extraCuts(more),...glows,...colourStamps,...colour.finish(),...nightOver(over,tint),...aloft.finish(),...ready];
 }
 /**
  * A light whose shape holds still while its strength changes (a pulsing sign, a stuttering lamp, a shot in
@@ -179,6 +211,14 @@ function glow(scene,l,shape,blend='add'){
 }
 /** Packets that lift the dark more (a reflection's light target, a sprite): drawn as cuts, after the lights' (cuts commute). */
 const extraCuts=list=>list.map(p=>({...p,blend:'destination-out'}));
+// What stands over the light, in the order it is drawn: a cover lays the plain dark back (the layer cleared
+// there, then the dark alone), a shine is cut out of it (see renderSystem.nightOver).
+const nightOver=(list,tint)=>list.flatMap(({packet:p,over})=>{
+    // (one depth for all: the frame sorts a pass by depth, and these keep the order they come in)
+    if(over==='shine')return [{...p,blend:'destination-out',layer:0,depth:0}];
+    if(over==='cover')return [{...p,blend:'destination-out',layer:0,depth:0},{...p,material:{...p.material,fill:tint,stroke:null},blend:'normal',layer:0,depth:0}];
+    throw new TypeError('A light layer `over` entry is {packet, over: "cover" | "shine"}');
+});
 const polygonIds=new WeakMap();let polygonCount=0;
 const bits=new Float64Array(1),words=new Uint32Array(bits.buffer);
 /** FNV-1a over plain values (numbers, strings, arrays of them, null, booleans) as they are, without text: `hash = 0x811c9dc5`, then `add` each. */

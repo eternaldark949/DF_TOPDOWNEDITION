@@ -292,7 +292,7 @@ Screen coordinates are logical viewport units; client conversions account for th
 
 ## Public renderSystem API
 
-`drawLooks(blend=1)` draws every visible entity's look into the open frame and returns how many it drew (see Materials, textures and looks).
+`drawLooks(blend=1, {covers})` draws every visible entity's look into the open frame and returns how many it drew (see Materials, textures and looks). With `covers` (a height, leaning) it also keeps what stands over the light for the night (`nightOver`, see The night).
 
 | Method/member | Purpose |
 |---|---|
@@ -314,6 +314,7 @@ Screen coordinates are logical viewport units; client conversions account for th
 | `resolvePaint(paint)`, `texturesReady()` | A paint naming a texture as the pattern the backend draws (see Textures), or the paint unchanged; a promise that settles once every tile asked for has its target. |
 | `setStillPictures(on)`, `getStillPictures()` | On by default wherever the renderer draws pictures: each component layer not on a tipped bone is painted once into a picture (one per its steps and look, shared by every object that has them, sharp at any zoom) and stamped each frame under its place, and leaning, in the plane of its top; its walls are still drawn live. A layer covering more than 400 by 400 world units (a roof, a lawn) and art with text stay shapes: big flat art draws cheaply, and as pictures it would crowd the small, busy ones out of the cache. Detailed furniture then costs one image a layer instead of every shape every frame. Off, every shape is drawn every frame (tests that read each shape's packets turn it off). A texture painted after a picture was made starts a new picture. |
 | `setHeightView({eye, lean=1} \| null)`, `getHeightView()` | Leans heights toward the camera as a camera `eye` world units up sees them: `drawLooks` draws each component layer in the plane of its top (scaled about the camera by `heightScale`), and a layer with `sides` first fills the walls the camera sees, from its base plane to its top plane. Walls stand on each solid shape's true outline: a rectangle's `radius` rounds them, circles and ellipses are faceted to their size (about one facet every 3 units), a hollow polygon keeps its hollow, and a shape lying inside a larger one adds none. Each run of facets the camera sees is one fill, with no seams, and `sides.shade` (0..1, default .35) darkens a facet the more it turns from the light (upper left), so a curve reads round. `sides.follow: 'hull'` wraps the layer in one convex skin instead. `null` (the default) draws flat. |
+| `drawNight({tint, lights, grids, areas, carried=true, scale=.5, tile_size=256, margin=64, key})`, `nightOver()`, `visibleLights(blend, {margin})` | The night over the open frame after `drawLooks(blend, {covers})`, in one layer pass; what stood over the light in the last drawLooks; the lights the visible things carry. See The night. |
 | `pickAllAt([x,y],{bounds,kind,tag,property,xray=true,ignore})`, `pickAt([x,y],options)` | What is at a world point, top first as a ray from the camera meets it: higher `look.layer`, then the taller entity (`entity.height`), then the later one. Each hit is `{entity,body,position,height,layer}`; `bounds` is `collision` (default) or `render`, tested exactly with `containsPoint`. `pickAt` is the top hit or null and defaults to `xray: false`, so a top thing that fails the filters blocks it. |
 | `beginFrame(blend)`, `endFrame()`, `abortFrame()` | Runtime orchestration; one flush per render call. |
 | `getFrameSnapshot()` | Explicit detached/frozen copy of the current packet buffer for inspection/export. No copy is made for every production frame. |
@@ -395,6 +396,26 @@ Light shapes besides `point`: `{shape: 'area', rects | polygon, rotation}` is a 
 The context parameter exists only at this transitional host/backend boundary. Artists never receive it. They emit normal geometry/material/transform/clip packets, and a native `renderSystem` backend can consume the exact same packets directly. New native render hooks should call `frame.submit`, not this adapter. Renderer replacement still requires the ordinary fresh-surface lifecycle.
 
 Drone and VelvetCat now use the packet contract in both the playable host and native runtime presentation. Other classic artists remain on their original direct Canvas paths. This does not claim a whole-game renderer cutover.
+
+## The night
+
+A night is the light layer over the finished scene, with what stands tall kept out of the light on the ground. One frame:
+
+```js
+render.beginFrame();
+render.drawLooks(1, {covers: 24});        // keep what stands over 24 units, and the lit windows and glowing steps
+render.drawNight({tint: 'rgba(10,8,30,.86)', grids: level.light_grid?.grids(render.getVisibleBounds(1, 64)) ?? []});
+render.endFrame();
+```
+
+- **What things carry.** A template or placement's `lights` (light layer records in its own frame: `position` and `rotation` turn and move with it, a `"$name"` colour is read from its look values, `height` in world units) and a map light's or prop's `light` (its `emission`) are the lights it carries. `entityLights(entity, {pose, view})` gives them in the world, each `still` (cached in the light tiles) unless it says otherwise or the thing moves; with `view` (leaning) a light with a `height` is drawn where that height leans to. `renderSystem.visibleLights(blend, {margin = 512})` gives every visible thing's.
+- **Lit windows glow.** A facade panel's `emits` (`true` or `{strength, reach, color, height}`) makes its lit windows glowing shapes for the light grid: `facadeEmitters(steps, facade, place, values, z0, z1, {follow})` gives one per bay of each wall with any lit, a short line a hair outside the wall at the mean height of its lit windows, `strength` times how many are lit, coloured by `emits.color` or the panel's `lit_fill`. The same windows are lit as the facade draws. `entityEmitters` includes them.
+- **Buildings stop the glow.** A thing marked `blocks_light: true` (a template's field, carried onto its placements) stops the light grid with the footprint of each of its components' walled layers (`entityBlockers(packet, source)`), so its windows light the street round it and not its own roofs.
+- **Roofs keep the night.** The light layer is flat, but a roof leans over the street in front of it. With `drawLooks(blend, {covers: h})`, every walled part (a layer with `sides`, off a joint) whose top stands over `h` gives its silhouette, leaning as drawn (`componentCovers(entity, source, view, {above, paint})` gives them for one entity); the light layer lays the plain dark back over them, so a lamp's pool or a window's glow on the ground does not show on the roof leaning over it.
+- **What shines.** With `covers`, the facade's lit windows and every packet painted by a glowing step (`emits` on it or its material; `artScene.mark_shines` marks them) are kept too, as shines: cut out of the dark last, so they show at full strength. A layer with glowing steps is then drawn each frame rather than as a still picture, so its shines are found.
+- **In order.** `nightOver()` gives covers and shines as `[{packet, over: 'cover' | 'shine'}]` in the order the frame draws them (a part's cover goes at its base, before its own windows and glowing steps), so a nearer roof hides a farther window as the scene does. The light layer calls take it as `over` and draw it last.
+- **Lights aloft.** A light marked `over: true` (a searchlight on a crown, a rooftop sign) is drawn after `over`, so no roof covers it, and is never cached.
+- **Cost.** `drawNight` draws the layer at `scale` .5 of the frame by default (the light is soft; a quarter of the pixels). Shines are cut at that size too, so a lit window's edge is soft. The dark comes in tiles of `tile_size` world units, painted once as pictures while nothing in them changes.
 
 ## Light grid
 

@@ -65,7 +65,7 @@ export const radial=(from,inner_radius,to,outer_radius,stops)=>({type:'radial',f
  * it; `paint(shape, material)` emits one shape packet with the group's transform, style and clips.
  */
 export class artScene{
-    packets=[];matrix=identity();style={stroke_width:1,line_cap:'butt',line_join:'miter',dash:[],opacity:1,blend:'normal'};clips=[];#stack=[];
+    packets=[];mark_shines=false;matrix=identity();style={stroke_width:1,line_cap:'butt',line_join:'miter',dash:[],opacity:1,blend:'normal'};clips=[];#stack=[];
     enter(pose={},style={}){this.#stack.push({matrix:this.matrix,style:this.style,clips:this.clips});this.matrix=multiply(this.matrix,transform(pose));this.style={...this.style,...style};this.clips=[...this.clips];return this;}
     leave(){const state=this.#stack.pop();if(!state)throw new Error('Unbalanced art group');Object.assign(this,state);return this;}
     place(pose){this.matrix=multiply(this.matrix,transform(pose));return this;}
@@ -141,7 +141,14 @@ export class artScene{
         if(solid!==undefined&&typeof solid!=='boolean')throw new TypeError('solid is true or false');
         if(emits!==undefined)readEmits(emits);
         if(reflect!==undefined)readReflect(reflect);
-        return this[call](material===undefined?fields:{...materialPaint(material,materials),...fields});
+        // with `mark_shines` on, what a glowing step paints is marked `shine` (it shows through the night: renderSystem.nightOver)
+        const n=this.packets.length,out=this[call](material===undefined?fields:{...materialPaint(material,materials),...fields});
+        if(this.mark_shines&&this.packets.length>n){
+            const record=material===undefined?null:typeof materials==='function'?materials(material):materials?.[material];
+            const glow=emits!==undefined?readEmits(emits):record?.emits!==undefined?readEmits(record.emits):null;
+            if(glow&&glow.strength>0)for(let i=n;i<this.packets.length;i++)this.packets[i].shine=true;
+        }
+        return out;
     }
     #draw(commands,paint){const {material,opacity,blend}=drawPaint(paint);return this.#styled(opacity,blend,()=>this.paint(commands,material));}
     #styled(opacity,blend,fn){if(opacity===1&&blend===undefined)return fn();this.enter({},{opacity:this.style.opacity*opacity,...(blend?{blend}:{})});try{fn();}finally{this.leave();}return this;}

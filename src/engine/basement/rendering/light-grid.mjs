@@ -6,7 +6,7 @@
 // keeps a small live light of its own on top. Nothing here knows which map it is: the map's
 // `light_grid` settings say the cell size (16 or 32, with per-region overrides) and how strong it is.
 import {bakeLightGrid,patchLightGrid,readLightGrid} from './lighting.mjs';
-import {drawingEmitters} from './looks.mjs';
+import {drawingEmitters,facadeEmitters,drawingOutline} from './looks.mjs';
 
 // How far past a region its bake reaches: the spread's margin at most (8 passes of 32) and a cell more.
 const EDGE=8*32+32;
@@ -25,8 +25,27 @@ function blocksLight(packet){
     return packet.data?.role==='wall';
 }
 /**
+ * What of a thing marked `blocks_light: true` stops the light grid's glow: the footprint of each of its
+ * components' walled layers (a layer with `sides`, the lowest of each component), in the world. A building
+ * so marked keeps its lit windows' glow on the street outside, off its own roofs. Others give its box.
+ */
+export function entityBlockers(packet,source=null){
+    const components=packet.components??[];
+    if(!components.length){const outline=boxOutline(packet);return outline?[{outline}]:[];}
+    const at=packet.position,a=packet.rotation??0,c=Math.cos(a),s=Math.sin(a),values=packet.data?.look?.values??{},out=[];
+    for(const comp of components){
+        const layer=(comp.layers??[]).filter(l=>l.sides&&l.blocks_light!==false&&l.thickness>0).sort((x,y)=>x.height-y.height)[0];if(!layer)continue;
+        const steps=layer.steps??(layer.drawing&&source?source.getResource(layer.drawing)?.steps:null);if(!steps)continue;
+        const [cx,cy]=comp.at??[0,0],r=comp.rotation??0,cr=Math.cos(r),sr=Math.sin(r);
+        for(const part of drawingOutline([{shape:'group',steps}],{values}).filter(p=>p.solid&&p.points.length>=3))
+            out.push({outline:part.points.map(([x,y])=>{const u=cx+x*cr-y*sr,v=cy+x*sr+y*cr;return [at[0]+u*c-v*s,at[1]+u*s+v*c];})});
+    }
+    return out;
+}
+/**
  * The glowing shapes of an entity or entity packet, in the world at its pose: its drawing asset's steps
- * (read from `source`) and its components' layers, each at its elevation and layer height.
+ * (read from `source`) and its components' layers, each at its elevation and layer height, and the lit
+ * windows of any layer's facade whose panels say `emits` (facadeEmitters).
  */
 export function entityEmitters(body,source,{pose=null}={}){
     const at=pose?.position??body.position,rotation=pose?.rotation??body.rotation??0,elevation=pose?.elevation??body.elevation??0;
@@ -39,6 +58,8 @@ export function entityEmitters(body,source,{pose=null}={}){
         const steps=layer.steps??(layer.drawing&&source?source.getResource(layer.drawing)?.steps:null);if(!steps)continue;
         const [cx,cy]=c.at??[0,0];
         out.push(...drawingEmitters([{shape:'group',x:cx,y:cy,rotation:c.rotation??0,steps}],{at,rotation,values,materials,elevation:elevation+(layer.height??0)}));
+        if(layer.facade&&layer.sides){const cs=Math.cos(rotation),sn=Math.sin(rotation),z0=elevation+(layer.height??0);
+            out.push(...facadeEmitters(steps,layer.facade,{at:[at[0]+cx*cs-cy*sn,at[1]+cx*sn+cy*cs],rotation:rotation+(c.rotation??0),scale:1},values,z0,z0+(layer.thickness??0),{follow:layer.sides.follow}));}
     }
     return out;
 }
@@ -69,7 +90,8 @@ export class lightGridSystem{
         if(this.#map)throw new Error('A light grid system serves one map');
         this.#map=map;this.#size=map.region_size;
         for(const packet of map.packets()){
-            if(blocksLight(packet)){const outline=boxOutline(packet);if(outline)this.#bucket(this.#walls,{outline},outline,EDGE);}
+            if(packet.blocks_light===true&&packet.components?.length){for(const b of entityBlockers(packet,this.#source))this.#bucket(this.#walls,b,b.outline,EDGE);}
+            else if(blocksLight(packet)){const outline=boxOutline(packet);if(outline)this.#bucket(this.#walls,{outline},outline,EDGE);}
             if(packet.physics_type==='dynamic'||packet.kind==='character')continue;    // (moving things are movers)
             for(const e of entityEmitters(packet,this.#source))this.#bucket(this.#still,e,null,e.reach+(e.height??0)+EDGE);
         }

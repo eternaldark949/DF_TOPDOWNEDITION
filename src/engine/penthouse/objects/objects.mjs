@@ -44,6 +44,8 @@ export function objectPacket(source, record, at = [0, 0], overrides = {}) {
         if (resolved.bounds !== undefined && resolved.collision_shape === undefined) extra.collision_shape = fitBounds([...own, ...(components ? componentSteps(components, source, { solid_only: true }) : [])], resolved.bounds, { values });
         if (resolved.render_shape === undefined) extra.render_shape = drawingReach([...own, ...(components ? componentSteps(components, source) : [])], { values });
     }
+    // What it does to light: whether it stops the light grid's glow (a building), and the lights it carries.
+    for (const key of ['blocks_light', 'lights']) if (resolved[key] !== undefined && packet[key] === undefined) extra[key] = resolved[key];
     const material_id = resolved.assets?.material;
     if (material_id) {
         const material = source.getResource(material_id);

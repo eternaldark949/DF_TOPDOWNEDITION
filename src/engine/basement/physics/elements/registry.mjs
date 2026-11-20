@@ -73,11 +73,13 @@ export class gameElements {
     peruseNearbyEntities(reference, options = {}, results = []) { return this.world.peruseNearbyEntities(reference, { ...options, spatial_entities: true }, results); }
     getStatistics() { return { entities: this.#entities.size, kinds: this.#kinds.size }; }
     _construct(entity, packet) {
-        const { components: parts, look, scale: own_scale, mass_scales, ...definition } = this.#resolve(packet), kind = definition.kind ?? 'entity', preset = this.getKind(kind);
+        const { components: parts, look, lights, scale: own_scale, mass_scales, ...definition } = this.#resolve(packet), kind = definition.kind ?? 'entity', preset = this.getKind(kind);
         const restored = this.#restore;
         let auto_span = false;
         // A record's look is its starting `look` property, as its components are its `components`.
         if (look !== undefined && definition.data?.look === undefined) definition.data = { ...(definition.data ?? {}), look };
+        // Its `lights` (lamps, signs, searchlights in its own frame, placed and turned with it) are its data's lights.
+        if (lights !== undefined) { if (!Array.isArray(lights) || !lights.every(l => l && typeof l === 'object' && !Array.isArray(l))) throw new TypeError('An object\'s lights are a list of light records'); definition.data = { ...(definition.data ?? {}), lights: clone(lights) }; }
         if (parts !== undefined) {
             const components = readComponents(parts); definition.data = { ...(definition.data ?? {}), components };
             // The body reaches as high as its solid layers, unless the packet says otherwise.

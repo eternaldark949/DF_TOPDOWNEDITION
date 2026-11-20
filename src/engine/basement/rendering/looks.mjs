@@ -69,6 +69,51 @@ export function drawingEmitters(steps,{at=[0,0],rotation=0,scale=1,values={},mat
 }
 
 /**
+ * The lit windows of a layer's facade as glowing shapes, for the light grid and the reflections: one per bay
+ * of each wall whose panels say `emits` and have windows lit there, a short line along the bay a hair outside
+ * the wall, at the mean height of its lit windows (from `z0`, the layer's base) and as strong as `emits.strength`
+ * times how many are lit. The same windows are lit as the facade draws. `place` is {at, rotation, scale} as
+ * the layer is drawn, `z1` its top. `color` is the emits colour, else the panel's lit fill.
+ */
+export function facadeEmitters(steps,facade,{at=[0,0],rotation=0,scale=1}={},values={},z0=0,z1=0,{follow='shapes',scale:vs=1}={}){
+    if(!facade||!(z1>z0))return [];
+    const [sx,sy]=typeof scale==='number'?[scale,scale]:scale,c=Math.cos(rotation),s=Math.sin(rotation);
+    const panels=(facade.panels??[]).map((p,k)=>({k,emits:readEmits(p.emits??null,`facade panel ${k} emits`)})).filter(p=>p.emits&&p.emits.strength>0);
+    if(!panels.length)return [];
+    const art=facadeArt(facade,values,Math.sqrt(Math.abs(sx*sy)),vs,z1-z0),where=`${at[0]},${at[1]},${rotation},${sx},${sy}`,out=[];
+    const place=([x,y])=>{const px=x*sx,py=y*sy;return [at[0]+px*c-py*s,at[1]+px*s+py*c];},flip=sx*sy<0;
+    const hex=v=>typeof v!=='string'?null:/^#[0-9a-f]{6}$/i.test(v)?v.toLowerCase():/^#[0-9a-f]{3}$/i.test(v)?'#'+[...v.slice(1).toLowerCase()].map(d=>d+d).join(''):null;
+    for(const loop of sideLoops(steps,values,follow)){
+        const pts=loop.map(place),n=pts.length,plan=facadePlan(loop,where,pts,art),{storeys}=art;
+        // a point s along wall W, and the wall's outward normal there
+        const onWall=(W,s)=>{if(W.closed)s=((s%W.length)+W.length)%W.length;let f=W.facets[0];for(const g of W.facets)if(plan.facet[g].s0<=s)f=g;
+            const F=plan.facet[f],t=Math.max(0,Math.min(1,(s-F.s0)/((F.s1-F.s0)||1))),p=pts[f],q=pts[(f+1)%n],L=Math.hypot(q[0]-p[0],q[1]-p[1])||1;
+            let nx=(q[1]-p[1])/L,ny=-(q[0]-p[0])/L;if(flip){nx=-nx;ny=-ny;}return [p[0]+(q[0]-p[0])*t,p[1]+(q[1]-p[1])*t,nx,ny];};
+        for(const W of plan.walls){
+            if(!W.count)continue;
+            for(let b=0;b<W.count;b++){
+                const mid=W.margin+(b+.5)*W.bay;
+                for(const {k,emits} of panels){
+                    const panel=art.panels[k];if(panel.shapes||!(panel.lit>0))continue;
+                    let lit=0,zs=0;
+                    for(let r=0;r<storeys.count;r++){
+                        if(panel.storeys&&!panel.storeys.includes(r)&&!panel.storeys.includes(r-storeys.count))continue;
+                        if(!(panel.lit_fill&&hash(W.key,b,r,k,art.seed)<panel.lit))continue;
+                        const za=storeys.base+r*storeys.height+panel.at,zb=za+(panel.height??storeys.height-panel.at);lit++;zs+=(za+zb)/2;
+                    }
+                    if(!lit)continue;
+                    const half=Math.min(panel.width,W.bay)/2,[ax,ay,nx,ny]=onWall(W,mid-half),[bx,by,mx,my]=onWall(W,mid+half),o=1.5;
+                    const outline=[[ax+nx*o,ay+ny*o],[bx+mx*o,by+my*o]],width=1;
+                    out.push({outline,open:true,width,bounds:[Math.min(outline[0][0],outline[1][0])-width/2,Math.min(outline[0][1],outline[1][1])-width/2,Math.max(outline[0][0],outline[1][0])+width/2,Math.max(outline[0][1],outline[1][1])+width/2],
+                        color:hex(emits.color)??hex(panel.lit_fill)??'#ffffff',strength:emits.strength*lit,reach:emits.reach,height:emits.height+z0+zs/lit});
+                }
+            }
+        }
+    }
+    return out;
+}
+
+/**
  * The collision shape that fits a drawing: `bounds` is circle, box, capsule or hull. It reads only the
  * drawing's solid steps, at rest, once. Returns a collision_shape packet for the physics body.
  */
@@ -121,7 +166,7 @@ export function componentSteps(components,source,{solid_only=false}={}){
  * camera, parts at one height draw farthest from the camera first, and a component set on the entity above
  * its base (a bottle on a tray) draws whole from that base, so a near bottle covers the foot of a far one.
  */
-export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,mirror=null,pictures=false,screen=null}={}){
+export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,mirror=null,pictures=false,screen=null,shines=false,covers=null}={}){
     if(view!==null&&!(view instanceof heightView))throw new TypeError('A height view is a heightView or null');
     if(mirror!==null&&!(Number.isFinite(mirror)&&mirror>=0))throw new TypeError('A mirror is how far a reflection falls per unit of height, 0 or more');
     // A reflection: each part where it falls, in the plane of its depth below the floor (k(-z)) and `mirror` × its height down the world's y.
@@ -157,21 +202,65 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,
         // Among faces, the farthest from the camera goes first, so a near wall's face hides the end of one behind it.
         // A part drawn whole (a bottle on a tray) keeps its walls and top together at its base.
         let sides=[],top=key;
-        if(view&&layer.sides&&z1>z0){sides=drawSides(steps,place,values,sidesPaint(layer.sides,values,materials),view,z0,z1,{...layer.sides,facade:layer.facade,scale:layer.thickness>0?(z1-z0)/layer.thickness:1,screen});if(whole({c}))for(const packet of sides)packet.depth=0;else top=key+z1-z0;}
+        if(view&&layer.sides&&z1>z0){sides=drawSides(steps,place,values,sidesPaint(layer.sides,values,materials),view,z0,z1,{...layer.sides,facade:layer.facade,scale:layer.thickness>0?(z1-z0)/layer.thickness:1,screen,shines});if(whole({c}))for(const packet of sides)packet.depth=0;else top=key+z1-z0;}
+        // with `covers` (a height), a walled part whose top stands over it gives its silhouette too: where the night comes back over the light on the ground
+        const cover=covers!==null&&view&&layer.sides&&z1>covers&&!c.joint&&!lean?coverOf(steps,place,values,layer.sides.follow??'shapes',view,z0,z1):null;
         if(mirror!==null&&layer.sides&&z1>z0)sides=mirrorSides(steps,place,values,sidesPaint(layer.sides,values,materials),mirror,z0,z1,below);
         // A still layer (not on a tipped bone) is the same art wherever it stands: with `pictures` it is drawn once
         // into a picture, keyed by its steps and look, and stamped each frame under its place and its plane.
-        if(pictures&&mirror===null&&fore===1&&!lean){
+        // (with `shines`, a layer with glowing steps is drawn each frame, so they are found among its packets)
+        if(pictures&&mirror===null&&fore===1&&!lean&&!(shines&&glowing(steps,materials))){
             const art=stillArt(steps,values,materials);
             if(art){const m=placeMatrix(place),matrix=view?compose(view.plane(view.k(z1)),m):m;
-                return {height:z0,peak:z1,depth:key,top,layer:layer.layer,component:c.name,sides,packets:[],picture:{key:art.key,bounds:art.bounds,matrix,build:art.build}};}
+                return {height:z0,peak:z1,depth:key,top,layer:layer.layer,component:c.name,sides,cover,packets:[],picture:{key:art.key,bounds:art.bounds,matrix,build:art.build}};}
         }
         if(view)scene.enter({matrix:view.plane(view.k(z1))});
         else if(mirror!==null)scene.enter({matrix:fallen(below,mirror,z1)});
-        scene.draw(steps,{...place,values,materials});
+        scene.mark_shines=shines;scene.draw(steps,{...place,values,materials});
         if(view||mirror!==null)scene.leave();
-        return {height:z0,peak:z1,depth:key,top,layer:layer.layer,component:c.name,sides,packets:scene.finish()};
+        return {height:z0,peak:z1,depth:key,top,layer:layer.layer,component:c.name,sides,cover,packets:scene.finish()};
     });
+}
+/**
+ * What of an entity stands taller than `above`, leaning as `view` draws it: one fill packet per walled layer
+ * (a layer with `sides`) whose top is over `above`, covering its top and every wall from its base up, as one
+ * shape. The light layer lays the night back over these (its `covers`), so light on the ground (a street lamp,
+ * a lit window's glow) does not show on a roof that leans over it. `paint` fills them.
+ */
+export function componentCovers(entity,source,view,{blend=1,above=24,paint='#ffffff'}={}){
+    if(!(view instanceof heightView))throw new TypeError('Covers lean: give a heightView');
+    const components=entity.get('components')??[];if(!components.length)return [];
+    const look=entity.get('look',{});if(look.visible===false)return [];
+    const pose=entity.getRenderState(blend),scale=look.scale??1,[wx,wy,wz]=entity.world_scale??[1,1,1],values=look.values??{},elevation=pose.elevation??0,out=[];
+    const cos=Math.cos(pose.rotation),sin=Math.sin(pose.rotation);
+    for(const {component:c,layer} of listLayers(components)){
+        if(c.joint||!layer.sides)continue;
+        const z0=elevation+layer.height*wz,z1=elevation+(layer.height+layer.thickness)*wz;if(!(z1>above))continue;
+        const x=c.at[0]*wx*scale,y=c.at[1]*wy*scale,at=[pose.position[0]+x*cos-y*sin,pose.position[1]+x*sin+y*cos],r=pose.rotation+c.rotation,sx=wx*scale,sy=wy*scale;
+        const cover=coverOf(layerSteps(layer,source),{at,rotation:r,scale:[sx,sy]},values,layer.sides.follow??'shapes',view,z0,z1,paint);if(cover)out.push(cover);
+    }
+    return out;
+}
+// One walled layer's silhouette, leaning: its top and every wall from base to top, as one fill packet (or null).
+function coverOf(steps,{at,rotation,scale},values,follow,view,z0,z1,paint='#ffffff'){
+    const [sx,sy]=typeof scale==='number'?[scale,scale]:scale,cr=Math.cos(rotation),sr=Math.sin(rotation);
+    const place=([u,v])=>{const px=u*sx,py=v*sy;return [at[0]+px*cr-py*sr,at[1]+px*sr+py*cr];};
+    const k0=view.k(z0),k1=view.k(z1),path=[];
+    for(const loop of sideLoops(steps,values,follow)){
+        const pts=loop.map(place),n=pts.length,lo=pts.map(([px,py])=>view.scaled(px,py,k0)),hi=pts.map(([px,py])=>view.scaled(px,py,k1));
+        // the top and each wall as a quad, all wound one way, so the nonzero fill joins them
+        const ring=r=>{if(signedArea(r)<0)r=[...r].reverse();r.forEach(([px,py],j)=>path.push([j?'line':'move',px,py]));path.push(['close']);};
+        ring(hi);for(let m=0;m<n;m++){const q=(m+1)%n;ring([lo[m],lo[q],hi[q],hi[m]]);}
+    }
+    if(!path.length)return null;
+    const scene=new artScene();scene.fill(path,paint);return scene.finish()[0];
+}
+// Whether a drawing has a glowing step (`emits` on it or its material), once per steps list.
+const GLOWING=new WeakMap();
+function glowing(steps,materials){
+    let v=GLOWING.get(steps);if(v!==undefined)return v;
+    const walk=list=>list.some(st=>st?.shape==='group'?Array.isArray(st.steps)&&walk(st.steps):st?.emits!==undefined&&st.emits!==false||(typeof st?.material==='string'&&!!materials(st.material)?.emits));
+    v=Array.isArray(steps)&&walk(steps);GLOWING.set(steps,v);return v;
 }
 // Every visible layer with its component and the component's place in the list.
 function listLayers(components){const out=[];components.forEach((component,order)=>{for(const layer of component.layers)if(layer.visible!==false)out.push({component,layer,order});});return out.sort((a,b)=>a.layer.height-b.layer.height||a.layer.layer-b.layer.layer||a.order-b.order);}
@@ -189,7 +278,7 @@ function sidesPaint(sides,values,materials){if(typeof sides==='string')return re
  * never behind a farther one where they overlap), and over anything flat at the height they stand on (the top of
  * the floor below, a roof they rise from), but under every top above it.
  */
-function drawSides(steps,{at,rotation,scale},values,fill,view,z0,z1,{shade=.35,follow='shapes',facade=null,scale:vs=1,screen=null}={}){
+function drawSides(steps,{at,rotation,scale},values,fill,view,z0,z1,{shade=.35,follow='shapes',facade=null,scale:vs=1,screen=null,shines=false}={}){
     if(z1<=z0)return [];
     const [sx,sy]=typeof scale==='number'?[scale,scale]:scale,c=Math.cos(rotation),s=Math.sin(rotation);
     const place=([x,y])=>{const px=x*sx,py=y*sy;return [at[0]+px*c-py*s,at[1]+px*s+py*c];};
@@ -220,9 +309,11 @@ function drawSides(steps,{at,rotation,scale},values,fill,view,z0,z1,{shade=.35,f
             const scene=new artScene();scene.fill(strip(pts,i,i+len),fill);
             const lit=plan?paintFacade(scene,view,pts,plan,art,i,len,z0,face,screen):null;
             for(let u=0;u<len;){let v=u;while(v+1<len&&face[(i+v+1)%n].dark===face[(i+u)%n].dark)v++;const dk=face[(i+u)%n].dark;if(dk>.004)scene.fill(strip(pts,i+u,i+v+1),`rgba(0,0,0,${dk})`);u=v+1;}
-            if(lit)lit();
+            if(lit)lit(scene);
             let d=Infinity;for(let q=0;q<len;q++)d=Math.min(d,face[(i+q)%n].d);const depth=1/(d+1000);
             for(const packet of scene.finish())out.push({...packet,depth});
+            // with `shines`, the lit windows again, marked: what shows through the night (the light layer's shines)
+            if(lit&&shines){const glow=new artScene();lit(glow);for(const packet of glow.finish())out.push({...packet,depth,shine:true});}
             m+=len;
         }
     }
@@ -382,12 +473,12 @@ function paintFacade(scene,view,pts,plan,art,i,len,z0,face,screen){
             });
         }
     }
-    const fill=(key,paint)=>{const p=paths.get(key);if(p&&p.length&&paint)scene.fill(p,paint);};
+    const fill=(key,paint,into=scene)=>{const p=paths.get(key);if(p&&p.length&&paint)into.fill(p,paint);};
     art.bands.forEach((band,k)=>fill(`b${k}`,band.fill));
     art.piers.forEach((pier,k)=>{fill(`p${k}`,pier.fill);fill(`e${k}`,pier.edge);});
     art.panels.forEach((panel,k)=>{fill(`w${k}`,panel.fill);fill(`r${k}`,panel.bar_fill);const s=paths.get(`s${k}`);if(s&&s.length)scene.stroke(s,panel.stroke,panel.line_width);
         panel.shapes?.forEach((sh,j)=>{fill(`x${k}.${j}`,sh.fill);const t=paths.get(`y${k}.${j}`);if(t&&t.length)scene.stroke(t,sh.stroke,sh.line_width);});});
-    return art.panels.some((p,k)=>paths.get(`l${k}`)?.length)?()=>art.panels.forEach((panel,k)=>{fill(`l${k}`,panel.lit_fill);fill(`r${k}`,panel.bar_fill);}):null;
+    return art.panels.some((p,k)=>paths.get(`l${k}`)?.length)?into=>art.panels.forEach((panel,k)=>{fill(`l${k}`,panel.lit_fill,into);fill(`r${k}`,panel.bar_fill,into);}):null;
 }
 const LIGHT=(()=>{const x=-.55,y=-.83,l=Math.hypot(x,y);return [x/l,y/l];})();   // toward the light, upper left
 /**

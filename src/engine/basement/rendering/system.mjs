@@ -4,8 +4,9 @@ import {geometry,material,requirements} from './packets.mjs';
 import {effectStack,effectNeeds,effectTargets} from './effects.mjs';
 import {finite,identifier,freezeData,CAPABILITIES} from './values.mjs';
 import {artScene} from './art.mjs';
-import {drawLook,drawComponents,fallen} from './looks.mjs';
+import {drawLook,drawComponents,componentCovers,fallen} from './looks.mjs';
 import {heightView} from './height.mjs';
+import {createLightLayerParts,entityLights} from './lighting.mjs';
 const PICK_STEPS=Object.freeze([1,.75,.5,.25,0]);   // top first: what the camera sees of a tall thing is its top
 
 function normalizeResource(description){
@@ -31,7 +32,7 @@ const methods=['initialize','resize','render','registerResource','releaseResourc
  */
 export class renderSystem {
     #createSurface=null;#lean=null;#still=true;#texturesPainted=0;#textures=new Map();#texturesWanted=[];#textureChain=Promise.resolve();#world;#camera;#frame=new renderFrame();#renderers=new Map();#resources=new Map();#backend=null;#backendId=null;#surface=null;
-    #effects=Object.freeze([]);#layerEffects=new Map();#collecting=false;#busy=false;#disposed=false;#generation=0;#last=null;#surfaceListeners=new Set();#frameListeners=new Set();#requirements=[];#visible=[];
+    #effects=Object.freeze([]);#layerEffects=new Map();#collecting=false;#busy=false;#disposed=false;#generation=0;#last=null;#surfaceListeners=new Set();#frameListeners=new Set();#requirements=[];#visible=[];#over=[];
     constructor({physics_system,camera,create_surface=null}={}){if(create_surface!==null&&typeof create_surface!=='function')throw new TypeError('create_surface makes a surface for a renderer id');this.#createSurface=create_surface;if(!physics_system?.queryEntitiesInBounds||!camera?.getView)throw new TypeError('renderSystem requires native world and camera');this.#world=physics_system;this.#camera=camera;}
     get renderer_id(){return this.#backendId;}
     get disposed(){return this.#disposed;}
@@ -134,9 +135,9 @@ export class renderSystem {
         }
     }
     /** Draws every visible entity's look (a `drawing` asset) and its components into the open frame, at its `look.layer` and `look.depth`; a component layer's depth adds its height, so higher parts draw over lower ones. Returns how many entities it drew. */
-    drawLooks(blend=1){
+    drawLooks(blend=1,{covers=null}={}){
         this.#live();if(!this.#collecting)throw new Error('Draw looks inside an open render frame');
-        const source=this.#world.elements.asset_library,view=this.#lean?new heightView({camera:this.#camera.getView(blend).position,...this.#lean}):null;let drawn=0,shown=null;
+        const source=this.#world.elements.asset_library,view=this.#lean?new heightView({camera:this.#camera.getView(blend).position,...this.#lean}):null;let drawn=0,shown=null;this.#over=[];if(covers!==null&&!(Number.isFinite(covers)))throw new TypeError('covers is the height (world units) a part stands over to cover the light under it');
         for(const {entity} of this.getVisibleEntities({blend},this.#visible)){
             if(!entity)continue;
             const look=entity.get('look',{}),layer=look.layer??0,depth=look.depth??0;let drew=false;
@@ -144,7 +145,10 @@ export class renderSystem {
             if(entity.has('components')){
                 let pose;const rigs=this.#world.rigs,joints=name=>{pose??=rigs?.getRig(entity)?rigs.getPose(entity,{blend,world_space:true}):null;return pose?.joints[name]??null;};
                 const pictures=this.#still&&!!this.#backend?.capabilities.includes('picture'),screen=view?(shown??={bounds:this.#camera.getView(blend).bounds,zoom:this.#camera.getView(blend).zoom}):null;
-                for(const part of drawComponents(entity,source,blend,{joints,view,pictures,screen})){for(const packet of part.sides)this.#frame.submit(this.#textured({...packet,layer,depth:depth+part.depth+packet.depth}));for(const packet of part.packets)this.#frame.submit(this.#textured({...packet,layer,depth:depth+part.top}));
+                const night=covers!==null&&view;
+                for(const part of drawComponents(entity,source,blend,{joints,view,pictures,screen,shines:night,covers:night?covers:null})){
+                    if(part.cover)this.#over.push({packet:part.cover,over:'cover',layer,depth:depth+part.depth});   // (at its base, before its own: under its walls' windows and its glowing steps, over what stands lower)
+                    for(const packet of part.sides){if(packet.shine){this.#over.push({packet,over:'shine',layer,depth:depth+part.depth+packet.depth});continue;}this.#frame.submit(this.#textured({...packet,layer,depth:depth+part.depth+packet.depth}));}for(const packet of part.packets){this.#frame.submit(this.#textured({...packet,layer,depth:depth+part.top}));if(packet.shine)this.#over.push({packet,over:'shine',layer,depth:depth+part.top});}
                     if(part.picture){const {key,bounds,matrix,build}=part.picture,gen=this.#texturesPainted;   // (a texture painted later is a new picture: the old one held its base colour)
                         this.#frame.submit({type:'picture',picture:{key:`${key}@${gen}`,bounds,matrix,layered:true,build:()=>build().map(packet=>this.#textured(packet))},layer,depth:depth+part.top});}
                     drew=true;}
@@ -152,6 +156,35 @@ export class renderSystem {
             if(drew)drawn++;
         }
         return drawn;
+    }
+    /**
+     * What stood over the light in the last drawLooks({covers}), for the light layer's `over`, in the order the
+     * frame draws it: each walled part (a layer with `sides`) whose top is over `covers` as a `cover` (its
+     * silhouette, leaning as drawn, where the night comes back over the light on the ground) and each lit window
+     * as a `shine` (cut out of the night). Empty without a height view, or when drawLooks was not asked.
+     */
+    nightOver(){return this.#over.sort((a,b)=>a.layer-b.layer||a.depth-b.depth).map(({packet,over})=>({packet,over}));}
+    /** The lights the visible things carry (their `lights` and `emission`), in the world, leaning with the height view. */
+    visibleLights(blend=1,{margin=512}={}){
+        this.#live();const view=this.heightViewAt(blend),out=[];
+        for(const {entity} of this.getVisibleEntities({blend,margin},[]))if(entity)out.push(...entityLights(entity,{pose:entity.getRenderState?.(blend)??null,view}));
+        return out;
+    }
+    /**
+     * The night over the open frame, after drawLooks: one light layer pass (createLightLayerParts) over the view,
+     * `tint` its dark, with the visible things' lights (visibleLights, unless `carried` is false) and `lights`,
+     * the light grids (`grids`, a lightGridSystem's grids(view)), `areas`, and what stood over the light in the last
+     * drawLooks({covers}) (nightOver: roofs keep the night, lit windows and glowing steps shine through it). The
+     * layer is drawn at `scale` of the frame (the light is soft; half the pixels is a quarter of the cost), in
+     * tiles of `tile_size` world units cached as pictures. Returns how many lights it drew.
+     */
+    drawNight({tint,lights=[],grids=[],areas=[],carried=true,scale=.5,tile_size=256,margin=64,key='night',blend=1}={}){
+        this.#live();if(!this.#collecting)throw new Error('Draw the night inside an open render frame');
+        const extent=this.#camera.getVisibleBounds({blend,margin}),all=[...(carried?this.visibleLights(blend):[]),...lights];
+        const parts=createLightLayerParts({extent,tint,areas,lights:all,grids,over:this.nightOver(),key,tile_size,view:extent});
+        this.#frame.beginPass({layer:{scale},clear_color:'transparent'});
+        try{for(const part of parts)this.#frame.submit(part.picture&&!part.type?{type:'picture',...part}:part);}finally{this.#frame.endPass();}
+        return all.length;
     }
     /**
      * Every visible entity's look as parts, for passes that draw the world again (a reflection, a height layer):
