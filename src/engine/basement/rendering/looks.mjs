@@ -90,7 +90,7 @@ export function componentSteps(components,source,{solid_only=false}={}){
  * camera, parts at one height draw farthest from the camera first, and a component set on the entity above
  * its base (a bottle on a tray) draws whole from that base, so a near bottle covers the foot of a far one.
  */
-export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,pictures=false}={}){
+export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,pictures=false,screen=null}={}){
     if(view!==null&&!(view instanceof heightView))throw new TypeError('A height view is a heightView or null');
     const components=entity.get('components')??[];if(!components.length)return [];
     const look=entity.get('look',{});if(look.visible===false)return [];
@@ -123,7 +123,7 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,
         // Among faces, the farthest from the camera goes first, so a near wall's face hides the end of one behind it.
         // A part drawn whole (a bottle on a tray) keeps its walls and top together at its base.
         let sides=[],top=key;
-        if(view&&layer.sides&&z1>z0){sides=drawSides(steps,place,values,sidesPaint(layer.sides,values,materials),view,z0,z1,layer.sides);if(whole({c}))for(const packet of sides)packet.depth=0;else top=key+z1-z0;}
+        if(view&&layer.sides&&z1>z0){sides=drawSides(steps,place,values,sidesPaint(layer.sides,values,materials),view,z0,z1,{...layer.sides,facade:layer.facade,scale:layer.thickness>0?(z1-z0)/layer.thickness:1,screen});if(whole({c}))for(const packet of sides)packet.depth=0;else top=key+z1-z0;}
         // A still layer (not on a tipped bone) is the same art wherever it stands: with `pictures` it is drawn once
         // into a picture, keyed by its steps and look, and stamped each frame under its place and its plane.
         if(pictures&&fore===1&&!lean){
@@ -147,11 +147,13 @@ function sidesPaint(sides,values,materials){if(typeof sides==='string')return re
  * an arc is faceted finely enough to read as a curve, and a hollow shape (a crescent, an L) keeps its hollow. A
  * shape lying wholly inside another (a button on a cushion) adds no walls. `follow: 'hull'` wraps the whole layer
  * in one convex skin instead. Each face is darkened by `shade` the more it turns from the light (from the upper
- * left), so a curve reads round. Returns their packets, each with a `depth` a hair under 0 that is lower the
- * farther its face's nearest point is from the camera, so faces at one height draw farthest first (the painter's
- * order for walls standing on one floor: a nearer face is never behind a farther one where they overlap).
+ * left), so a curve reads round. A `facade` lays windows, piers and bands on the walls (facadeArt). Returns their
+ * packets, each with a `depth` a hair over 0 that is lower the farther its face's nearest point is from the camera,
+ * so faces at one height draw farthest first (the painter's order for walls standing on one floor: a nearer face is
+ * never behind a farther one where they overlap), and over anything flat at the height they stand on (the top of
+ * the floor below, a roof they rise from), but under every top above it.
  */
-function drawSides(steps,{at,rotation,scale},values,fill,view,z0,z1,{shade=.35,follow='shapes'}={}){
+function drawSides(steps,{at,rotation,scale},values,fill,view,z0,z1,{shade=.35,follow='shapes',facade=null,scale:vs=1,screen=null}={}){
     if(z1<=z0)return [];
     const [sx,sy]=typeof scale==='number'?[scale,scale]:scale,c=Math.cos(rotation),s=Math.sin(rotation);
     const place=([x,y])=>{const px=x*sx,py=y*sy;return [at[0]+px*c-py*s,at[1]+px*s+py*c];};
@@ -164,8 +166,9 @@ function drawSides(steps,{at,rotation,scale},values,fill,view,z0,z1,{shade=.35,f
         for(let m=j;m>=i;m--){const q=pts[m%pts.length],[x,y]=view.scaled(q[0],q[1],k1);path.push(['line',x,y]);}
         path.push(['close']);return path;
     };
+    const art=facade?facadeArt(facade,values,Math.sqrt(Math.abs(sx*sy)),vs,z1-z0):null,where=art?`${at[0]},${at[1]},${rotation},${sx},${sy}`:'';
     for(const loop of loops){
-        const pts=loop.map(place),n=pts.length,face=[];
+        const pts=loop.map(place),n=pts.length,face=[],plan=art?facadePlan(loop,where,pts,art):null;
         for(let i=0;i<n;i++){
             const a=pts[i],b=pts[(i+1)%n],ex=b[0]-a[0],ey=b[1]-a[1],L=Math.hypot(ex,ey);
             // loops run with a positive signed area, so the outward side is (ey, -ex); a mirror flips it
@@ -179,13 +182,128 @@ function drawSides(steps,{at,rotation,scale},values,fill,view,z0,z1,{shade=.35,f
             const i=(start+m)%n;if(!face[i].seen){m++;continue;}
             let len=0;while(len<n-m&&face[(i+len)%n].seen)len++;
             const scene=new artScene();scene.fill(strip(pts,i,i+len),fill);
+            const lit=plan?paintFacade(scene,view,pts,plan,art,i,len,z0,face,screen):null;
             for(let u=0;u<len;){let v=u;while(v+1<len&&face[(i+v+1)%n].dark===face[(i+u)%n].dark)v++;const dk=face[(i+u)%n].dark;if(dk>.004)scene.fill(strip(pts,i+u,i+v+1),`rgba(0,0,0,${dk})`);u=v+1;}
-            let d=Infinity;for(let q=0;q<len;q++)d=Math.min(d,face[(i+q)%n].d);const depth=-1e-3*d/(d+1000);
+            if(lit)lit();
+            let d=Infinity;for(let q=0;q<len;q++)d=Math.min(d,face[(i+q)%n].d);const depth=1/(d+1000);
             for(const packet of scene.finish())out.push({...packet,depth});
             m+=len;
         }
     }
     return out;
+}
+// ----- Facades ---------------------------------------------------------------------------------------
+// A layer's `facade` is the art on its walls, laid out as an architect would: the walls run from corner to corner
+// (a curve or a rounded corner carries on round, a turn of more than 30 degrees starts a new wall); each wall is cut
+// into equal bays about `bays.width` wide, `bays.margin` kept clear at each end, and the layer into `storeys`. A
+// panel (a window, a spandrel, a door) stands in every bay of every storey, piers stand between the bays, and bands
+// run along the whole wall. Every point is placed at its own height, so the art leans exactly with the wall.
+const CORNER=Math.PI/6,SLIVER=.6;
+const near0=v=>Number.isFinite(v)?v:0;
+/** A facade's fields with its look values read and its lengths in the world (h: along walls, v: up them). */
+const ARTS=new WeakMap();
+function facadeArt(facade,values,h,v,H){
+    let byKey=ARTS.get(facade);if(!byKey)ARTS.set(facade,byKey=new Map());
+    const key=`${h},${v},${H},${values&&typeof values==='object'?(VALUES_KEY.get(values)??(VALUES_KEY.set(values,JSON.stringify(values)),VALUES_KEY.get(values))):''}`;
+    let art=byKey.get(key);if(!art){if(byKey.size>64)byKey.clear();byKey.set(key,art=readFacade(facade,values,h,v,H));}return art;
+}
+function readFacade(facade,values,h,v,H){
+    const read=o=>o?readValues(o,values):null,up=x=>x===undefined?undefined:x*v,from=(x,d)=>{const z=x===undefined?d:x*v;return z<0?H+z:z;};
+    const st=read(facade.storeys)??{},bays=read(facade.bays)??{};
+    const height=Math.max(1e-6,(st.height??H/v)*v),base=from(st.from,0),count=st.count??Math.max(1,Math.floor((H-base)/height+1e-6));
+    return {
+        storeys:{base,height,count},seed:facade.seed??0,top:H,
+        bays:{width:Math.max(1e-6,(bays.width??H/v)*h),margin:near0(bays.margin)*h},
+        panels:(facade.panels??[]).map(read).map(p=>({...p,width:p.width*h,height:up(p.height),at:up(p.at??0),line_width:p.line_width??1,bars:p.bars??0,bar_width:(p.bar_width??1)*h,lit:p.lit??0,storeys:p.storeys??null})),
+        piers:(facade.piers??[]).map(read).map(p=>({...p,width:p.width*h,from:from(p.from,0),to:from(p.to,H),edge_width:(p.edge_width??1)*h})),
+        bands:(facade.bands??[]).map(read).map(b=>({...b,from:from(b.from,0),to:from(b.to,H)}))
+    };
+}
+/**
+ * Where a loop's walls and bays fall: each facet's wall and its stretch [s0, s1] along it, and each wall's length,
+ * bays and whether it closes on itself (a circle or a rounded block with no corner).
+ */
+const PLANS=new WeakMap();
+function facadePlan(loop,where,pts,art){
+    let byPlace=PLANS.get(loop);if(!byPlace)PLANS.set(loop,byPlace=new Map());
+    const key=`${where}|${art.bays.width},${art.bays.margin}`;let plan=byPlace.get(key);
+    if(!plan){if(byPlace.size>256)byPlace.clear();byPlace.set(key,plan=planWalls(pts,art));}return plan;
+}
+function planWalls(pts,art){
+    const n=pts.length,ang=[],len=[];
+    for(let i=0;i<n;i++){const a=pts[i],b=pts[(i+1)%n];len.push(Math.hypot(b[0]-a[0],b[1]-a[1]));ang.push(Math.atan2(b[1]-a[1],b[0]-a[0]));}
+    const turn=i=>{let d=ang[i]-ang[(i-1+n)%n];while(d>Math.PI)d-=2*Math.PI;while(d<-Math.PI)d+=2*Math.PI;return Math.abs(d);};
+    let starts=[];for(let i=0;i<n;i++)if(len[i]>1e-9&&turn(i)>CORNER)starts.push(i);
+    const closed=!starts.length;if(closed)starts=[0];
+    const facet=new Array(n),walls=[];
+    starts.forEach((a,w)=>{
+        const b=starts[(w+1)%starts.length];let s=0,i=a;
+        do{facet[i]={wall:w,s0:s,s1:s+len[i]};s+=len[i];i=(i+1)%n;}while(i!==b);
+        const {width,margin}=art.bays,m=closed?0:Math.min(margin,s/2),span=s-2*m,count=span>=width*.6?Math.max(1,Math.round(span/width)):0;
+        const [x,y]=pts[a];walls.push({length:s,closed,margin:m,bay:count?span/count:0,count,key:Math.round(x)*73856093^Math.round(y)*19349663});
+    });
+    return {facet,walls};
+}
+// A whole number from a few: which windows are lit is the same every frame and on every machine.
+function hash(...k){let h=2166136261;for(const v of k){h=Math.imul(h^(v|0),16777619);h^=h>>>13;}h=Math.imul(h,0x5bd1e995);h^=h>>>15;return (h>>>0)/4294967296;}
+/** Paints the facade on the run of facets i .. i+len-1 into `scene`; returns a painter for the lit panels (drawn over the shading), or null. */
+function paintFacade(scene,view,pts,plan,art,i,len,z0,face,screen){
+    const n=pts.length,{storeys}=art,paths=new Map(),get=(key)=>{let p=paths.get(key);if(!p)paths.set(key,p=[]);return p;},K=new Map(),kOf=z=>{let k=K.get(z);if(k===undefined)K.set(z,k=view.k(z0+z));return k;};
+    // the stretch [a, b] of facet f at heights za .. zb (above the layer's base), as a quad on the wall
+    // what the screen shows: a facet wholly off it is not dressed, and a piece thinner on screen than SLIVER px is left out
+    const B=screen?.bounds,zoom=screen?.zoom??0,[cx,cy]=view.camera;
+    const piece=(out,f,a,b,za,zb)=>{
+        const F=plan.facet[f],L=F.s1-F.s0;if(!(L>0))return;const lo=Math.max(a,F.s0),hi=Math.min(b,F.s1);if(hi-lo<1e-6||zb-za<1e-6)return;
+        const ka=kOf(za),kb=kOf(zb);if(zoom&&(Math.min((hi-lo)*ka,(kb-ka)*face[f].d)*zoom<SLIVER))return;
+        const p=pts[f],q=pts[(f+1)%n],t0=(lo-F.s0)/L,t1=(hi-F.s0)/L;
+        const x0=p[0]+(q[0]-p[0])*t0,y0=p[1]+(q[1]-p[1])*t0,x1=p[0]+(q[0]-p[0])*t1,y1=p[1]+(q[1]-p[1])*t1;
+        const A=view.scaled(x0,y0,ka),B=view.scaled(x1,y1,ka),C=view.scaled(x1,y1,kb),D=view.scaled(x0,y0,kb);
+        out.push(['move',A[0],A[1]],['line',B[0],B[1]],['line',C[0],C[1]],['line',D[0],D[1]],['close']);
+    };
+    // every stretch [a, b] of a wall, wrapped round a closed one, met by facet f
+    const spans=(f,a,b,fn)=>{const F=plan.facet[f],W=plan.walls[F.wall];if(W.closed&&b>W.length){fn(a,b);fn(a-W.length,b-W.length);}else if(W.closed&&a<0){fn(a,b);fn(a+W.length,b+W.length);}else fn(a,b);};
+    for(let m=0;m<len;m++){
+        const f=(i+m)%n,F=plan.facet[f],W=plan.walls[F.wall];
+        // the stretch of the facet the screen shows, at its foot or its top (a long straight wall is mostly off it)
+        let v0=F.s0,v1=F.s1;
+        if(B){const p=pts[f],q=pts[(f+1)%n],L=F.s1-F.s0;let t0=Infinity,t1=-Infinity;
+            for(const k of [kOf(0),kOf(art.top)]){
+                let a=0,b=1;
+                for(const [ax,lo,hi] of [[0,B.left,B.right],[1,B.top,B.bottom]]){
+                    const c=view.camera[ax],u=c+(p[ax]-c)*k,d=(q[ax]-p[ax])*k;
+                    if(Math.abs(d)<1e-12){if(u<lo||u>hi){a=1;b=0;}continue;}
+                    let ta=(lo-u)/d,tb=(hi-u)/d;if(ta>tb)[ta,tb]=[tb,ta];a=Math.max(a,ta);b=Math.min(b,tb);
+                }
+                if(a<=b){t0=Math.min(t0,a);t1=Math.max(t1,b);}
+            }
+            if(!(t0<=t1))continue;
+            const pad=W.bay||0;v0=Math.max(F.s0,F.s0+L*t0-pad);v1=Math.min(F.s1,F.s0+L*t1+pad);
+        }
+        art.bands.forEach((band,k)=>piece(get(`b${k}`),f,v0,v1,band.from,band.to));
+        if(!W.count)continue;
+        // the bays this facet meets
+        const b0=Math.max(W.closed?-1:0,Math.floor((v0-W.margin)/W.bay)-1),b1=Math.min(W.closed?W.count+1:W.count,Math.ceil((v1-W.margin)/W.bay)+1);
+        art.piers.forEach((pier,k)=>{for(let b=Math.max(b0,0);b<=Math.min(b1,W.count);b++){if(W.closed&&b===W.count)continue;const s=W.margin+b*W.bay;spans(f,s-pier.width/2,s+pier.width/2,(a,c)=>{piece(get(`p${k}`),f,a,c,pier.from,pier.to);if(pier.edge)piece(get(`e${k}`),f,a,a+pier.edge_width,pier.from,pier.to);});}});
+        for(let b=Math.max(b0,0);b<Math.min(b1,W.count);b++){
+            const mid=W.margin+(b+.5)*W.bay;
+            art.panels.forEach((panel,k)=>{
+                for(let r=0;r<storeys.count;r++){
+                    if(panel.storeys&&!panel.storeys.includes(r)&&!panel.storeys.includes(r-storeys.count))continue;
+                    const za=storeys.base+r*storeys.height+panel.at,zb=za+(panel.height??storeys.height-panel.at),on=panel.lit>0&&panel.lit_fill&&hash(W.key,b,r,k,art.seed)<panel.lit;
+                    spans(f,mid-panel.width/2,mid+panel.width/2,(a,c)=>{
+                        piece(get(on?`l${k}`:`w${k}`),f,a,c,za,zb);
+                        if(panel.stroke)piece(get(`s${k}`),f,a,c,za,zb);
+                        for(let q=1;q<=panel.bars;q++){const x=mid-panel.width/2+panel.width*q/(panel.bars+1);if(x>=a&&x<=c)piece(get(`r${k}`),f,x-panel.bar_width/2,x+panel.bar_width/2,za,zb);}
+                    });
+                }
+            });
+        }
+    }
+    const fill=(key,paint)=>{const p=paths.get(key);if(p&&p.length&&paint)scene.fill(p,paint);};
+    art.bands.forEach((band,k)=>fill(`b${k}`,band.fill));
+    art.piers.forEach((pier,k)=>{fill(`p${k}`,pier.fill);fill(`e${k}`,pier.edge);});
+    art.panels.forEach((panel,k)=>{fill(`w${k}`,panel.fill);fill(`r${k}`,panel.bar_fill);const s=paths.get(`s${k}`);if(s&&s.length)scene.stroke(s,panel.stroke,panel.line_width);});
+    return art.panels.some((p,k)=>paths.get(`l${k}`)?.length)?()=>art.panels.forEach((panel,k)=>{fill(`l${k}`,panel.lit_fill);fill(`r${k}`,panel.bar_fill);}):null;
 }
 const LIGHT=(()=>{const x=-.55,y=-.83,l=Math.hypot(x,y);return [x/l,y/l];})();   // toward the light, upper left
 /**
@@ -255,6 +373,7 @@ function resource(source,id,kind){const value=source.getResource(id);if(value.ki
 // ----- Still art ------------------------------------------------------------------------------------
 // A layer's art, painted once: its key names its steps (by identity) and its look values, its bounds hold every
 // shape with room for strokes, blurs and shadows, and `build` draws it at the origin. One record per steps and look.
+const STILL_AREA=800*800;   // the most a still picture covers, in square world units
 const STILL=new WeakMap(),STEPS_ID=new WeakMap(),VALUES_KEY=new WeakMap();
 // Two 32-bit hashes of the drawing's text and its length: a name for its content, made once per steps list.
 function contentKey(steps){const t=JSON.stringify(steps);let a=2166136261,b=5381;for(let i=0;i<t.length;i++){const c=t.charCodeAt(i);a=Math.imul(a^c,16777619);b=Math.imul(b,33)^c;}return `${(a>>>0).toString(36)}${(b>>>0).toString(36)}.${t.length}`;}
@@ -268,7 +387,8 @@ function stillArt(steps,values,materials){
     if(points.length){
         let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;for(const [x,y] of points){x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y);}
         const pad=reach(steps)+1;
-        art={key:`still:${id}:${vk}`,bounds:[x0-pad,y0-pad,x1-x0+2*pad,y1-y0+2*pad],build:()=>new artScene().draw(steps,{values,materials}).finish()};
+        // a big flat layer (a roof, a lawn) draws cheaply as shapes, and as a picture would crowd small, busy art out of the cache
+        if((x1-x0+2*pad)*(y1-y0+2*pad)<=STILL_AREA)art={key:`still:${id}:${vk}`,bounds:[x0-pad,y0-pad,x1-x0+2*pad,y1-y0+2*pad],build:()=>new artScene().draw(steps,{values,materials}).finish()};
     }
     byValues.set(vk,art);return art;
 }

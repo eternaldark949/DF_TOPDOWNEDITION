@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {cameraSystem,renderSystem,recordingRenderer,drawComponents,foreshorten,drawingOutline,limb} from '../index.mjs';
-import {physicsSystem} from '../../physics/index.mjs';
+import {physicsSystem,readLayer} from '../../physics/index.mjs';
 
 const near=(a,b,why='')=>assert.ok(Math.abs(a-b)<1e-6,`${why} ${a} != ${b}`);
 const fixture=()=>{const world=new physicsSystem(),camera=new cameraSystem({position:[50,50],viewport:{width:400,height:400}});return {world,render:new renderSystem({physics_system:world,camera})};};
@@ -69,7 +69,7 @@ test('leaning, walls stand on each shape\'s true outline: rounded corners round,
  const run=async steps=>{
   const {world,render}=fixture();render.registerRenderer('recording',recordingRenderer);await render.setRenderer('recording',{surface:null});render.setStillPictures(false);render.setHeightView({eye:900});
   world.elements.createEntity({kind:'static',position:[50,250],components:[{name:'b',layers:[{layer:0,height:0,thickness:120,solid:false,sides:'#777',steps}]}]});world.updateState(1/60);
-  render.beginFrame();render.drawLooks();render.endFrame();const walls=render.getFrameSnapshot().passes.flatMap(p=>p.packets).filter(p=>p.depth<0);render.dispose();
+  render.beginFrame();render.drawLooks();render.endFrame();const walls=render.getFrameSnapshot().passes.flatMap(p=>p.packets).filter(p=>p.depth>0&&p.depth<.01);render.dispose();
   return {walls,points:walls.filter(p=>p.material.fill==='#777').flatMap(p=>p.geometry.commands.filter(c=>c[0]!=='close').map(c=>[c[1],c[2]]))};
  };
  // a rounded block below the camera: its walls never reach the square corner its box would have
@@ -100,4 +100,69 @@ test('a still layer is one picture, keyed by its steps and look, shared by every
  const k=900/(900-40);assert.ok(Math.abs(pics[0].picture.matrix[0]-k)<1e-9,'stamped in the plane of its top');assert.ok(Math.abs(pics[0].picture.matrix[4]-(50+(60-50)*k))<1e-9,'at its place, leaned from the camera');
  render.setStillPictures(false);const off=frame();assert.ok(!off.some(p=>p.type==='picture')&&off.some(p=>p.material?.fill==='#a33'),'off, every shape is drawn');
  render.dispose();
+});
+
+test('a facade lays panels in every bay of every storey, piers between and bands along, leaning with the wall; lit panels go over the shading',async()=>{
+ const {world,render}=fixture();render.registerRenderer('recording',recordingRenderer);await render.setRenderer('recording',{surface:null});render.setStillPictures(false);render.setHeightView({eye:900});
+ const facade={storeys:{height:20},bays:{width:40},seed:3,
+  panels:[{width:16,height:10,at:5,fill:'#123',lit:'$lit',lit_fill:'#fc8',bars:1,bar_fill:'#000'}],piers:[{width:4,fill:'#999'}],bands:[{from:-10,fill:'#ccc'}]};
+ // a block 200 wide south of the camera, two storeys: only its north face is seen, 5 bays across it
+ const e=world.elements.createEntity({kind:'static',position:[50,250],look:{values:{lit:.4}},components:[{name:'b',layers:[{layer:0,height:0,thickness:40,solid:false,sides:'#777',facade,steps:[{shape:'rectangle',x:-100,y:-30,width:200,height:60,fill:'#a33'}]}]}]});world.updateState(1/60);
+ const frame=()=>{render.beginFrame();render.drawLooks();render.endFrame();return render.getFrameSnapshot().passes.flatMap(p=>p.packets);};
+ const quads=p=>p.geometry.commands.filter(c=>c[0]==='move').length;
+ const packets=frame(),fill=c=>packets.filter(p=>p.material?.fill===c);
+ const dark=fill('#123'),lit=fill('#fc8');
+ assert.equal((dark[0]?quads(dark[0]):0)+(lit[0]?quads(lit[0]):0),10,'a window in each of 5 bays on each of 2 storeys');
+ assert.ok(lit.length&&quads(lit[0])>0&&quads(lit[0])<10,'some are lit, not all');
+ assert.equal(quads(fill('#999')[0]),6,'a pier at each bay edge, both ends too');
+ assert.equal(quads(fill('#ccc')[0]),1,'a band along the wall');
+ const order=packets.map(p=>p.material?.fill),shade=order.findIndex(f=>/^rgba\(0,0,0,/.test(f??''));
+ assert.ok(order.indexOf('#123')<order.indexOf('#fc8'),'unlit windows are part of the wall, lit ones go over it');
+ if(shade>=0)assert.ok(order.indexOf('#123')<shade&&shade<order.indexOf('#fc8'),'under and over the shading');
+ // every point leans with its height: the band at the top stands in the plane of the top
+ const k=900/(900-40),ys=fill('#ccc')[0].geometry.commands.filter(c=>c[0]!=='close').map(c=>c[2]);
+ near(Math.max(...ys),50+(220-50)*k,'the band\'s top edge is the wall\'s top');
+ // the same windows are lit every frame, and more of them when the look says so
+ const again=frame().filter(p=>p.material?.fill==='#fc8');assert.deepEqual(again[0].geometry.commands,lit[0].geometry.commands,'no flicker');
+ e.set('look',{values:{lit:1}});const all=frame().filter(p=>p.material?.fill==='#fc8');assert.equal(quads(all[0]),10,'lit: 1 lights them all');
+ render.dispose();
+});
+
+test('a facade wraps round a curve: a round tower is one wall, its bays laid all the way round',async()=>{
+ const {world,render}=fixture();render.registerRenderer('recording',recordingRenderer);await render.setRenderer('recording',{surface:null});render.setStillPictures(false);render.setHeightView({eye:900});
+ world.elements.createEntity({kind:'static',position:[50,250],components:[{name:'b',layers:[{layer:0,height:0,thickness:30,solid:false,sides:'#777',
+  facade:{bays:{width:30},panels:[{width:10,height:20,at:5,fill:'#123'}]},steps:[{shape:'circle',x:0,y:0,radius:60,fill:'#a33'}]}]}]});world.updateState(1/60);
+ render.beginFrame();render.drawLooks();render.endFrame();const win=render.getFrameSnapshot().passes.flatMap(p=>p.packets).filter(p=>p.material?.fill==='#123');
+ const pts=win.flatMap(p=>p.geometry.commands.filter(c=>c[0]!=='close').map(c=>[c[1],c[2]]));
+ assert.ok(pts.length>0,'windows on the side the camera sees');
+ // round the curve every window foot lies on the circle (the wall's foot), none on a straight chord across it
+ const feet=pts.filter(([x,y])=>Math.abs(Math.hypot(x-50,y-250)-60)<1.5);assert.ok(feet.length>=pts.length/4,'window feet stand on the curve');
+ render.dispose();
+});
+
+test('a facade is checked: it needs sides, and its fields are known',()=>{
+ const make=layer=>()=>readLayer({layer:0,thickness:10,steps:[],...layer});
+ assert.throws(make({facade:{bays:{width:10}}}),/give it sides/);
+ assert.throws(make({sides:'#777',facade:{windows:[]}}),/no field windows/);
+ assert.throws(make({sides:'#777',facade:{panels:[{height:3}]}}),/needs a width/);
+ assert.throws(make({sides:'#777',facade:{panels:[{width:3,lit:2}]}}),/lit/);
+ assert.throws(make({sides:'#777',facade:{panels:[{width:3,storeys:[.5]}]}}),/storeys/);
+ assert.equal(make({sides:'#777',facade:{storeys:{height:13},bays:{width:40},panels:[{width:19,fill:'$glass',lit:'$lit'}]}})().facade.bays.width,40);
+});
+
+test('a facade leaves out what the screen cannot show: walls off screen, and pieces thinner than a pixel',async()=>{
+ const run=async(position,zoom)=>{
+  const world=new physicsSystem(),camera=new cameraSystem({position,zoom,viewport:{width:400,height:400}}),render=new renderSystem({physics_system:world,camera});
+  render.registerRenderer('recording',recordingRenderer);await render.setRenderer('recording',{surface:null});render.setStillPictures(false);render.setHeightView({eye:200});
+  world.elements.createEntity({kind:'static',position:[0,0],components:[{name:'b',layers:[{layer:0,height:0,thickness:60,solid:false,sides:'#777',
+   facade:{storeys:{height:20},bays:{width:20},panels:[{width:8,height:12,at:4,fill:'#123'},{width:8,height:.5,at:2,fill:'#456'}]},steps:[{shape:'rectangle',x:-1000,y:100,width:2000,height:40,fill:'#a33'}]}]}]});world.updateState(1/60);
+  render.beginFrame();render.drawLooks();render.endFrame();const packets=render.getFrameSnapshot().passes.flatMap(p=>p.packets);render.dispose();
+  const count=c=>packets.filter(p=>p.material?.fill===c).reduce((n,p)=>n+p.geometry.commands.filter(q=>q[0]==='move').length,0);
+  return {windows:count('#123'),slivers:count('#456'),wall:count('#777')};
+ };
+ const near=await run([0,0],1);
+ assert.ok(near.wall>0&&near.windows>0,'the wall and its windows are drawn');
+ assert.ok(near.windows<100*3,`only the windows of the stretch on screen: ${near.windows} of 300`);
+ assert.equal(near.slivers,0,'a half-unit sliver is under a pixel tall here: left out');
+ const close=await run([0,40],3);assert.ok(close.slivers>0,'zoomed in it is tall enough to draw');
 });

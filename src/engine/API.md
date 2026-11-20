@@ -218,6 +218,28 @@ The world has one vertical axis, z, in the same world units as x and y (50 to a 
 - **Things rise and fall.** Give the world a gravity with a z part (`gravity: [0, 0, -490]` is 9.8 m/s²) and an entity in the air falls and lands on the floor or on the top of a solid under it, and is `grounded`; `bodyLanded` reports the landing. `entity.setVerticalVelocity(vz)` is a jump; a projectile made with a `vertical_velocity` arcs. A body's `gravity_scale` (0 floats) and the world's `floor` (null for none) are data. By default gravity's z is 0 and a flat world stays flat.
 - **Not yet**: tilting a whole body (pitch and roll) and IK reaching a point at a height (it solves on the ground).
 
+#### Components
+
+An entity is made of components, each a list of layers with a base `height` and a `thickness`: a couch is a frame, a seat and a back; a building is one entity with a component per wing and a layer per floor (template `engine:building`). Leaning, a layer with `sides` shows its walls, standing on each shape's true outline. Its `facade` puts windows, doors, piers and bands on those walls, all as data:
+
+```json
+{ "layer": 1, "height": 22, "thickness": 104, "steps": [{ "shape": "rectangle", "x": 0, "y": 0, "width": 700, "height": 500, "fill": "$stone" }],
+  "sides": { "material": "stone" },
+  "facade": { "storeys": { "height": 13 }, "bays": { "width": 40 },
+              "panels": [{ "width": 19, "height": 7.6, "at": 3, "fill": "$glass", "bars": 1, "bar_fill": "$frame", "lit": "$lit", "lit_fill": "$warm" }],
+              "piers": [{ "width": 3.4, "fill": "$stone_lt" }],
+              "bands": [{ "from": 0, "to": 0.9, "fill": "$stone_hi" }] } }
+```
+
+| Field | What it does |
+|---|---|
+| `storeys` | `{from, height, count}`: the storeys up the layer |
+| `bays` | `{width, margin}`: each wall cut into equal bays, corner to corner, round a curve too |
+| `panels` | Windows, spandrels, doors: one in every bay of every storey, or the `storeys` named; `lit` is the share lit at night, painted `lit_fill` |
+| `piers`, `bands` | Piers between the bays; stripes along the walls |
+
+The fields are in [the physics API reference](basement/physics/docs/api-reference.md); any of them may be a `"$look"` value, so `entity.set('look', {values: {lit: .8}})` lights more windows.
+
 ### Spatial queries
 
 Everything in the world sits on one shared spatial grid, so asking what is around is cheap.
