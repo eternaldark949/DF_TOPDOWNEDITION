@@ -94,11 +94,11 @@ export function facadeEmitters(steps,facade,{at=[0,0],rotation=0,scale=1}={},val
             for(let b=0;b<W.count;b++){
                 const mid=W.margin+(b+.5)*W.bay;
                 for(const {k,emits} of panels){
-                    const panel=art.panels[k];if(panel.shapes||!(panel.lit>0))continue;
+                    const panel=art.panels[k];if((panel.shapes&&!panel.lit_shapes&&!panel.lit_fill)||!(panel.lit>0))continue;
                     let lit=0,zs=0;
                     for(let r=0;r<storeys.count;r++){
                         if(panel.storeys&&!panel.storeys.includes(r)&&!panel.storeys.includes(r-storeys.count))continue;
-                        if(!(panel.lit_fill&&hash(W.key,b,r,k,art.seed)<panel.lit))continue;
+                        if(!((panel.lit_fill||panel.lit_shapes)&&hash(W.key,b,r,k,art.seed)<panel.lit))continue;
                         const za=storeys.base+r*storeys.height+panel.at,zb=za+(panel.height??storeys.height-panel.at);lit++;zs+=(za+zb)/2;
                     }
                     if(!lit)continue;
@@ -389,7 +389,7 @@ function readFacade(facade,values,h,v,H){
     return {
         storeys:{base,height,count},seed:facade.seed??0,top:H,
         bays:{width:Math.max(1e-6,(bays.width??H/v)*h),margin:near0(bays.margin)*h},
-        panels:(facade.panels??[]).map(read).map(p=>({...p,shapes:p.steps?panelShapes(p.steps,values,h,v):null,width:p.width*h,height:up(p.height),at:up(p.at??0),line_width:p.line_width??1,bars:p.bars??0,bar_width:(p.bar_width??1)*h,lit:p.lit??0,storeys:p.storeys??null})),
+        panels:(facade.panels??[]).map(read).map(p=>({...p,shapes:p.steps?panelShapes(p.steps,values,h,v):null,lit_shapes:p.lit_steps?panelShapes(p.lit_steps,values,h,v):null,width:p.width*h,height:up(p.height),at:up(p.at??0),line_width:p.line_width??1,bars:p.bars??0,bar_width:(p.bar_width??1)*h,lit:p.lit??0,storeys:p.storeys??null,detail:p.detail??0,plain:!!(p.fill||p.lit_fill)})),
         piers:(facade.piers??[]).map(read).map(p=>({...p,width:p.width*h,from:from(p.from,0),to:from(p.to,H),edge_width:(p.edge_width??1)*h})),
         bands:(facade.bands??[]).map(read).map(b=>({...b,from:from(b.from,0),to:from(b.to,H)}))
     };
@@ -471,14 +471,18 @@ function paintFacade(scene,view,pts,plan,art,i,len,z0,face,screen){
             art.panels.forEach((panel,k)=>{
                 for(let r=0;r<storeys.count;r++){
                     if(panel.storeys&&!panel.storeys.includes(r)&&!panel.storeys.includes(r-storeys.count))continue;
-                    if(panel.shapes){
+                    // drawn as its steps when it stands at least `detail` px tall on screen; smaller, as the plain panel if it has one
+                    const small=panel.shapes&&zoom&&(()=>{const za=storeys.base+r*storeys.height+panel.at,H=panel.height??storeys.height-panel.at;return (kOf(za+H)-kOf(za))*face[f].d*zoom<Math.max(SLIVER*3,panel.detail);})();
+                    if(panel.shapes&&small&&!panel.plain)continue;
+                    if(panel.shapes&&!small){
                         // drawn whole, once, from the facet its middle stands on; x runs left to right as seen from outside
                         const at=W.closed?((mid%W.length)+W.length)%W.length:mid;if(at<F.s0||at>=F.s1||at<v0-W.bay||at>v1+W.bay)continue;
                         const za=storeys.base+r*storeys.height+panel.at,H=panel.height??storeys.height-panel.at;
-                        if(zoom&&(kOf(za+H)-kOf(za))*face[f].d*zoom<SLIVER*3)continue;
-                        panel.shapes.forEach((sh,j)=>{
+                        // a lit one (as many as `lit` says, the same every frame) is drawn as its `lit_steps`, with the lit panels
+                        const lit=panel.lit_shapes&&panel.lit>0&&hash(W.key,b,r,k,art.seed)<panel.lit,shapes=lit?panel.lit_shapes:panel.shapes,tag=lit?'u':'x';
+                        shapes.forEach((sh,j)=>{
                             const path=sh.points.map(([x,y],q)=>{const [X,Y]=onWall(W,mid-x,za+H-y);return [q?'line':'move',X,Y];});if(!sh.open)path.push(['close']);
-                            if(sh.fill)get(`x${k}.${j}`).push(...path);if(sh.stroke)get(`y${k}.${j}`).push(...path);
+                            if(sh.fill)get(`${tag}${k}.${j}`).push(...path);if(sh.stroke)get(`${lit?'v':'y'}${k}.${j}`).push(...path);
                         });
                         continue;
                     }
@@ -493,11 +497,13 @@ function paintFacade(scene,view,pts,plan,art,i,len,z0,face,screen){
         }
     }
     const fill=(key,paint,into=scene)=>{const p=paths.get(key);if(p&&p.length&&paint)into.fill(p,paint);};
-    art.bands.forEach((band,k)=>fill(`b${k}`,band.fill));
+    art.bands.forEach((band,k)=>{if(!band.lit)fill(`b${k}`,band.fill);});   // (a lit band goes with the lit panels: over the shading, and shining at night)
     art.piers.forEach((pier,k)=>{fill(`p${k}`,pier.fill);fill(`e${k}`,pier.edge);});
     art.panels.forEach((panel,k)=>{fill(`w${k}`,panel.fill);fill(`r${k}`,panel.bar_fill);const s=paths.get(`s${k}`);if(s&&s.length)scene.stroke(s,panel.stroke,panel.line_width);
         panel.shapes?.forEach((sh,j)=>{fill(`x${k}.${j}`,sh.fill);const t=paths.get(`y${k}.${j}`);if(t&&t.length)scene.stroke(t,sh.stroke,sh.line_width);});});
-    return art.panels.some((p,k)=>paths.get(`l${k}`)?.length)?into=>art.panels.forEach((panel,k)=>{fill(`l${k}`,panel.lit_fill,into);fill(`r${k}`,panel.bar_fill,into);}):null;
+    const glows=art.panels.some((p,k)=>paths.get(`l${k}`)?.length||p.lit_shapes?.some((sh,j)=>paths.get(`u${k}.${j}`)?.length||paths.get(`v${k}.${j}`)?.length))||art.bands.some((b,k)=>b.lit&&paths.get(`b${k}`)?.length);
+    return glows?into=>{art.bands.forEach((band,k)=>{if(band.lit)fill(`b${k}`,band.fill,into);});art.panels.forEach((panel,k)=>{fill(`l${k}`,panel.lit_fill,into);fill(`r${k}`,panel.bar_fill,into);
+        panel.lit_shapes?.forEach((sh,j)=>{fill(`u${k}.${j}`,sh.fill,into);const t=paths.get(`v${k}.${j}`);if(t&&t.length)into.stroke(t,sh.stroke,sh.line_width);});});}:null;
 }
 const LIGHT=(()=>{const x=-.55,y=-.83,l=Math.hypot(x,y);return [x/l,y/l];})();   // toward the light, upper left
 /**

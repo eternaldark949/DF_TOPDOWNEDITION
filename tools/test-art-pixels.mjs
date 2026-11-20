@@ -117,7 +117,7 @@ test('a light layer split into still pictures and live lights draws the same lay
         assert.equal(result.pictures, 2, 'the still lights become two pictures: the dark with their cuts, and their colour');
         assert.ok(result.worst.every(d => d <= 3), `the split layer matches the whole one within rounding (${result.worst})`);
         assert.ok(result.tile_worst.every(d => d <= 3), `tiled, and with a lamp cutting live over its baked colour, it matches too, with no seams (${result.tile_worst})`);
-        assert.equal(result.tiles, 8, 'a 200 × 100 extent is eight 64 px tiles'); assert.equal(result.view, 1, 'and a view in one tile asks for that one');
+        assert.equal(result.tiles, 7, 'a 200 × 100 extent is eight 64 px tiles, and those something cuts (all but one) hold a picture: the dark itself is one plain fill'); assert.equal(result.view, 1, 'and a view in one tile asks for that one');
         assert.ok(result.kept >= 3, `a strip light moving repaints only the tiles it reaches (${result.kept} kept)`);
         assert.equal(result.area_repaints, 2, 'an area thinning the dark is baked into the tiles it covers, and changing it repaints just those');
         assert.ok(result.live_only, 'a live light changing keeps the pictures');

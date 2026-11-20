@@ -70,6 +70,10 @@
      "warm": "#ffcf8a",
      "violet": "#c8b4ff",
      "ledge": "#b49cff",
+     "glass_lo": "#1b262c",
+     "lit_hi": "#c98361",
+     "lit_mid": "#e9a775",
+     "lit_lo": "#f6c483",
      "lit": 0.35,
      "lobby_lit": 0.75
     }
@@ -245,17 +249,417 @@
           "width": 22,
           "height": 14.5,
           "at": 4,
+          "steps": [
+           {
+            "shape": "rectangle",
+            "x": -12.1,
+            "y": -1.1,
+            "width": 24.2,
+            "height": 16.7,
+            "fill": "$stone_lo"
+           },
+           {
+            "shape": "rectangle",
+            "x": -12.5,
+            "y": -1.5,
+            "width": 25,
+            "height": 0.5,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -12.5,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 17.5,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -12.5,
+            "y": 15.5,
+            "width": 25,
+            "height": 0.5,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": 12.0,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 17.5,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 0,
+            "width": 22,
+            "height": 14.5,
+            "fill": "$glass"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 7.9750000000000005,
+            "width": 22,
+            "height": 6.525,
+            "fill": "$glass_lo"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              -11.0,
+              0
+             ],
+             [
+              1.1000000000000014,
+              0
+             ],
+             [
+              -11.0,
+              10.875
+             ]
+            ],
+            "fill": "rgba(190, 220, 230, 0.13)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.7,
+            "y": 9.860000000000001,
+            "width": 15.399999999999999,
+            "height": 4.64,
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              4.4,
+              7.25
+             ],
+             [
+              7.92,
+              7.25
+             ],
+             [
+              7.26,
+              5.51
+             ],
+             [
+              5.0600000000000005,
+              5.51
+             ]
+            ],
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "rectangle",
+            "x": 5.91,
+            "y": 7.25,
+            "width": 0.5,
+            "height": 2.61,
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "rectangle",
+            "x": 2.1999999999999993,
+            "y": 2.9000000000000004,
+            "width": 7.04,
+            "height": 0.6,
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 0,
+            "width": 22,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 13.7,
+            "width": 22,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 0,
+            "width": 0.8,
+            "height": 14.5,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 10.2,
+            "y": 0,
+            "width": 0.8,
+            "height": 14.5,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.4,
+            "y": 3.48,
+            "width": 0.8,
+            "height": 11.02,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 3.03,
+            "width": 22,
+            "height": 0.9,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 8.69,
+            "width": 22,
+            "height": 0.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -3.916666666666667,
+            "y": 0,
+            "width": 0.5,
+            "height": 3.48,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 3.416666666666666,
+            "y": 0,
+            "width": 0.5,
+            "height": 3.48,
+            "fill": "$frame"
+           }
+          ],
+          "lit_steps": [
+           {
+            "shape": "rectangle",
+            "x": -12.1,
+            "y": -1.1,
+            "width": 24.2,
+            "height": 16.7,
+            "fill": "$stone_lo"
+           },
+           {
+            "shape": "rectangle",
+            "x": -12.5,
+            "y": -1.5,
+            "width": 25,
+            "height": 0.5,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -12.5,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 17.5,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -12.5,
+            "y": 15.5,
+            "width": 25,
+            "height": 0.5,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": 12.0,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 17.5,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 0,
+            "width": 22,
+            "height": 14.5,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 4.35,
+            "width": 22,
+            "height": 10.149999999999999,
+            "fill": "$lit_mid"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 9.425,
+            "width": 22,
+            "height": 5.074999999999999,
+            "fill": "$lit_lo"
+           },
+           {
+            "shape": "circle",
+            "x": 6.16,
+            "y": 6.525,
+            "radius": 6.6,
+            "fill": "rgba(255, 244, 210, 0.45)"
+           },
+           {
+            "shape": "circle",
+            "x": 6.16,
+            "y": 6.525,
+            "radius": 3.3,
+            "fill": "rgba(255, 248, 225, 0.6)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.7,
+            "y": 9.860000000000001,
+            "width": 15.399999999999999,
+            "height": 4.64,
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              4.4,
+              7.25
+             ],
+             [
+              7.92,
+              7.25
+             ],
+             [
+              7.26,
+              5.51
+             ],
+             [
+              5.0600000000000005,
+              5.51
+             ]
+            ],
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "rectangle",
+            "x": 5.91,
+            "y": 7.25,
+            "width": 0.5,
+            "height": 2.61,
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "rectangle",
+            "x": 2.1999999999999993,
+            "y": 2.9000000000000004,
+            "width": 7.04,
+            "height": 0.6,
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -12.0,
+            "y": 14.5,
+            "width": 24,
+            "height": 1.6,
+            "fill": "rgba(255, 200, 130, 0.35)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 0,
+            "width": 22,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 13.7,
+            "width": 22,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 0,
+            "width": 0.8,
+            "height": 14.5,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 10.2,
+            "y": 0,
+            "width": 0.8,
+            "height": 14.5,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.4,
+            "y": 3.48,
+            "width": 0.8,
+            "height": 11.02,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 3.03,
+            "width": 22,
+            "height": 0.9,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 8.69,
+            "width": 22,
+            "height": 0.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -3.916666666666667,
+            "y": 0,
+            "width": 0.5,
+            "height": 3.48,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 3.416666666666666,
+            "y": 0,
+            "width": 0.5,
+            "height": 3.48,
+            "fill": "$frame"
+           }
+          ],
+          "detail": 6,
           "fill": "$glass",
-          "stroke": "$frame",
-          "line_width": 0.8,
           "bars": 2,
           "bar_width": 0.6,
           "bar_fill": "$frame",
+          "lit_fill": "$lit_mid",
           "lit": "$lobby_lit",
-          "lit_fill": "$warm",
           "emits": {
            "strength": 0.2,
-           "reach": 80
+           "reach": 80,
+           "color": "#ffc98a"
           }
          }
         ],
@@ -358,17 +762,417 @@
           "width": 19,
           "height": 7.6,
           "at": 3,
+          "steps": [
+           {
+            "shape": "rectangle",
+            "x": -10.6,
+            "y": -1.1,
+            "width": 21.2,
+            "height": 9.8,
+            "fill": "$stone_lo"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": -1.5,
+            "width": 22,
+            "height": 0.5,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 10.6,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 8.6,
+            "width": 22,
+            "height": 0.5,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": 10.5,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 10.6,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 0,
+            "width": 19,
+            "height": 7.6,
+            "fill": "$glass"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 4.18,
+            "width": 19,
+            "height": 3.42,
+            "fill": "$glass_lo"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              -9.5,
+              0
+             ],
+             [
+              0.9500000000000011,
+              0
+             ],
+             [
+              -9.5,
+              5.699999999999999
+             ]
+            ],
+            "fill": "rgba(190, 220, 230, 0.13)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -6.65,
+            "y": 5.168,
+            "width": 13.299999999999999,
+            "height": 2.432,
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              -6.84,
+              3.8
+             ],
+             [
+              -3.8000000000000003,
+              3.8
+             ],
+             [
+              -4.37,
+              2.888
+             ],
+             [
+              -6.2700000000000005,
+              2.888
+             ]
+            ],
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -5.57,
+            "y": 3.8,
+            "width": 0.5,
+            "height": 1.3679999999999999,
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "rectangle",
+            "x": 1.9000000000000004,
+            "y": 1.52,
+            "width": 6.08,
+            "height": 0.6,
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 0,
+            "width": 19,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 6.8,
+            "width": 19,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 8.7,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.4,
+            "y": 1.8239999999999998,
+            "width": 0.8,
+            "height": 5.776,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 1.3739999999999999,
+            "width": 19,
+            "height": 0.9,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 4.412,
+            "width": 19,
+            "height": 0.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -3.416666666666667,
+            "y": 0,
+            "width": 0.5,
+            "height": 1.8239999999999998,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 2.916666666666666,
+            "y": 0,
+            "width": 0.5,
+            "height": 1.8239999999999998,
+            "fill": "$frame"
+           }
+          ],
+          "lit_steps": [
+           {
+            "shape": "rectangle",
+            "x": -10.6,
+            "y": -1.1,
+            "width": 21.2,
+            "height": 9.8,
+            "fill": "$stone_lo"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": -1.5,
+            "width": 22,
+            "height": 0.5,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 10.6,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 8.6,
+            "width": 22,
+            "height": 0.5,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": 10.5,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 10.6,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 0,
+            "width": 19,
+            "height": 7.6,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 2.28,
+            "width": 19,
+            "height": 5.319999999999999,
+            "fill": "$lit_mid"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 4.9399999999999995,
+            "width": 19,
+            "height": 2.6599999999999997,
+            "fill": "$lit_lo"
+           },
+           {
+            "shape": "circle",
+            "x": -5.32,
+            "y": 3.42,
+            "radius": 5.7,
+            "fill": "rgba(255, 244, 210, 0.45)"
+           },
+           {
+            "shape": "circle",
+            "x": -5.32,
+            "y": 3.42,
+            "radius": 2.85,
+            "fill": "rgba(255, 248, 225, 0.6)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -6.65,
+            "y": 5.168,
+            "width": 13.299999999999999,
+            "height": 2.432,
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              -6.84,
+              3.8
+             ],
+             [
+              -3.8000000000000003,
+              3.8
+             ],
+             [
+              -4.37,
+              2.888
+             ],
+             [
+              -6.2700000000000005,
+              2.888
+             ]
+            ],
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -5.57,
+            "y": 3.8,
+            "width": 0.5,
+            "height": 1.3679999999999999,
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "rectangle",
+            "x": 1.9000000000000004,
+            "y": 1.52,
+            "width": 6.08,
+            "height": 0.6,
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -10.5,
+            "y": 7.6,
+            "width": 21,
+            "height": 1.6,
+            "fill": "rgba(255, 200, 130, 0.35)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 0,
+            "width": 19,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 6.8,
+            "width": 19,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 8.7,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.4,
+            "y": 1.8239999999999998,
+            "width": 0.8,
+            "height": 5.776,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 1.3739999999999999,
+            "width": 19,
+            "height": 0.9,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 4.412,
+            "width": 19,
+            "height": 0.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -3.416666666666667,
+            "y": 0,
+            "width": 0.5,
+            "height": 1.8239999999999998,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 2.916666666666666,
+            "y": 0,
+            "width": 0.5,
+            "height": 1.8239999999999998,
+            "fill": "$frame"
+           }
+          ],
+          "detail": 6,
           "fill": "$glass",
-          "stroke": "$frame",
-          "line_width": 0.7,
           "bars": 1,
           "bar_width": 0.7,
           "bar_fill": "$frame",
+          "lit_fill": "$lit_mid",
           "lit": "$lit",
-          "lit_fill": "$warm",
           "emits": {
            "strength": 0.045,
-           "reach": 70
+           "reach": 70,
+           "color": "#ffc98a"
           },
           "storeys": [
            0,
@@ -2071,17 +2875,417 @@
           "width": 22,
           "height": 14.5,
           "at": 4,
+          "steps": [
+           {
+            "shape": "rectangle",
+            "x": -12.1,
+            "y": -1.1,
+            "width": 24.2,
+            "height": 16.7,
+            "fill": "$stone_lo"
+           },
+           {
+            "shape": "rectangle",
+            "x": -12.5,
+            "y": -1.5,
+            "width": 25,
+            "height": 0.5,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -12.5,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 17.5,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -12.5,
+            "y": 15.5,
+            "width": 25,
+            "height": 0.5,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": 12.0,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 17.5,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 0,
+            "width": 22,
+            "height": 14.5,
+            "fill": "$glass"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 7.9750000000000005,
+            "width": 22,
+            "height": 6.525,
+            "fill": "$glass_lo"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              -11.0,
+              0
+             ],
+             [
+              1.1000000000000014,
+              0
+             ],
+             [
+              -11.0,
+              10.875
+             ]
+            ],
+            "fill": "rgba(190, 220, 230, 0.13)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.7,
+            "y": 9.860000000000001,
+            "width": 15.399999999999999,
+            "height": 4.64,
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              4.4,
+              7.25
+             ],
+             [
+              7.92,
+              7.25
+             ],
+             [
+              7.26,
+              5.51
+             ],
+             [
+              5.0600000000000005,
+              5.51
+             ]
+            ],
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "rectangle",
+            "x": 5.91,
+            "y": 7.25,
+            "width": 0.5,
+            "height": 2.61,
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "rectangle",
+            "x": 2.1999999999999993,
+            "y": 2.9000000000000004,
+            "width": 7.04,
+            "height": 0.6,
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 0,
+            "width": 22,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 13.7,
+            "width": 22,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 0,
+            "width": 0.8,
+            "height": 14.5,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 10.2,
+            "y": 0,
+            "width": 0.8,
+            "height": 14.5,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.4,
+            "y": 3.48,
+            "width": 0.8,
+            "height": 11.02,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 3.03,
+            "width": 22,
+            "height": 0.9,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 8.69,
+            "width": 22,
+            "height": 0.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -3.916666666666667,
+            "y": 0,
+            "width": 0.5,
+            "height": 3.48,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 3.416666666666666,
+            "y": 0,
+            "width": 0.5,
+            "height": 3.48,
+            "fill": "$frame"
+           }
+          ],
+          "lit_steps": [
+           {
+            "shape": "rectangle",
+            "x": -12.1,
+            "y": -1.1,
+            "width": 24.2,
+            "height": 16.7,
+            "fill": "$stone_lo"
+           },
+           {
+            "shape": "rectangle",
+            "x": -12.5,
+            "y": -1.5,
+            "width": 25,
+            "height": 0.5,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -12.5,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 17.5,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -12.5,
+            "y": 15.5,
+            "width": 25,
+            "height": 0.5,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": 12.0,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 17.5,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 0,
+            "width": 22,
+            "height": 14.5,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 4.35,
+            "width": 22,
+            "height": 10.149999999999999,
+            "fill": "$lit_mid"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 9.425,
+            "width": 22,
+            "height": 5.074999999999999,
+            "fill": "$lit_lo"
+           },
+           {
+            "shape": "circle",
+            "x": 6.16,
+            "y": 6.525,
+            "radius": 6.6,
+            "fill": "rgba(255, 244, 210, 0.45)"
+           },
+           {
+            "shape": "circle",
+            "x": 6.16,
+            "y": 6.525,
+            "radius": 3.3,
+            "fill": "rgba(255, 248, 225, 0.6)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.7,
+            "y": 9.860000000000001,
+            "width": 15.399999999999999,
+            "height": 4.64,
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              4.4,
+              7.25
+             ],
+             [
+              7.92,
+              7.25
+             ],
+             [
+              7.26,
+              5.51
+             ],
+             [
+              5.0600000000000005,
+              5.51
+             ]
+            ],
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "rectangle",
+            "x": 5.91,
+            "y": 7.25,
+            "width": 0.5,
+            "height": 2.61,
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "rectangle",
+            "x": 2.1999999999999993,
+            "y": 2.9000000000000004,
+            "width": 7.04,
+            "height": 0.6,
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -12.0,
+            "y": 14.5,
+            "width": 24,
+            "height": 1.6,
+            "fill": "rgba(255, 200, 130, 0.35)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 0,
+            "width": 22,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 13.7,
+            "width": 22,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 0,
+            "width": 0.8,
+            "height": 14.5,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 10.2,
+            "y": 0,
+            "width": 0.8,
+            "height": 14.5,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.4,
+            "y": 3.48,
+            "width": 0.8,
+            "height": 11.02,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 3.03,
+            "width": 22,
+            "height": 0.9,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 8.69,
+            "width": 22,
+            "height": 0.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -3.916666666666667,
+            "y": 0,
+            "width": 0.5,
+            "height": 3.48,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 3.416666666666666,
+            "y": 0,
+            "width": 0.5,
+            "height": 3.48,
+            "fill": "$frame"
+           }
+          ],
+          "detail": 6,
           "fill": "$glass",
-          "stroke": "$frame",
-          "line_width": 0.8,
           "bars": 2,
           "bar_width": 0.6,
           "bar_fill": "$frame",
+          "lit_fill": "$lit_mid",
           "lit": "$lobby_lit",
-          "lit_fill": "$warm",
           "emits": {
            "strength": 0.2,
-           "reach": 80
+           "reach": 80,
+           "color": "#ffc98a"
           }
          }
         ],
@@ -2178,17 +3382,417 @@
           "width": 19,
           "height": 7.6,
           "at": 3,
+          "steps": [
+           {
+            "shape": "rectangle",
+            "x": -10.6,
+            "y": -1.1,
+            "width": 21.2,
+            "height": 9.8,
+            "fill": "$stone_lo"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": -1.5,
+            "width": 22,
+            "height": 0.5,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 10.6,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 8.6,
+            "width": 22,
+            "height": 0.5,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": 10.5,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 10.6,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 0,
+            "width": 19,
+            "height": 7.6,
+            "fill": "$glass"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 4.18,
+            "width": 19,
+            "height": 3.42,
+            "fill": "$glass_lo"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              -9.5,
+              0
+             ],
+             [
+              0.9500000000000011,
+              0
+             ],
+             [
+              -9.5,
+              5.699999999999999
+             ]
+            ],
+            "fill": "rgba(190, 220, 230, 0.13)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -6.65,
+            "y": 5.168,
+            "width": 13.299999999999999,
+            "height": 2.432,
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              -6.84,
+              3.8
+             ],
+             [
+              -3.8000000000000003,
+              3.8
+             ],
+             [
+              -4.37,
+              2.888
+             ],
+             [
+              -6.2700000000000005,
+              2.888
+             ]
+            ],
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -5.57,
+            "y": 3.8,
+            "width": 0.5,
+            "height": 1.3679999999999999,
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "rectangle",
+            "x": 1.9000000000000004,
+            "y": 1.52,
+            "width": 6.08,
+            "height": 0.6,
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 0,
+            "width": 19,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 6.8,
+            "width": 19,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 8.7,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.4,
+            "y": 1.8239999999999998,
+            "width": 0.8,
+            "height": 5.776,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 1.3739999999999999,
+            "width": 19,
+            "height": 0.9,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 4.412,
+            "width": 19,
+            "height": 0.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -3.416666666666667,
+            "y": 0,
+            "width": 0.5,
+            "height": 1.8239999999999998,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 2.916666666666666,
+            "y": 0,
+            "width": 0.5,
+            "height": 1.8239999999999998,
+            "fill": "$frame"
+           }
+          ],
+          "lit_steps": [
+           {
+            "shape": "rectangle",
+            "x": -10.6,
+            "y": -1.1,
+            "width": 21.2,
+            "height": 9.8,
+            "fill": "$stone_lo"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": -1.5,
+            "width": 22,
+            "height": 0.5,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 10.6,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 8.6,
+            "width": 22,
+            "height": 0.5,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": 10.5,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 10.6,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 0,
+            "width": 19,
+            "height": 7.6,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 2.28,
+            "width": 19,
+            "height": 5.319999999999999,
+            "fill": "$lit_mid"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 4.9399999999999995,
+            "width": 19,
+            "height": 2.6599999999999997,
+            "fill": "$lit_lo"
+           },
+           {
+            "shape": "circle",
+            "x": -5.32,
+            "y": 3.42,
+            "radius": 5.7,
+            "fill": "rgba(255, 244, 210, 0.45)"
+           },
+           {
+            "shape": "circle",
+            "x": -5.32,
+            "y": 3.42,
+            "radius": 2.85,
+            "fill": "rgba(255, 248, 225, 0.6)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -6.65,
+            "y": 5.168,
+            "width": 13.299999999999999,
+            "height": 2.432,
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              -6.84,
+              3.8
+             ],
+             [
+              -3.8000000000000003,
+              3.8
+             ],
+             [
+              -4.37,
+              2.888
+             ],
+             [
+              -6.2700000000000005,
+              2.888
+             ]
+            ],
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -5.57,
+            "y": 3.8,
+            "width": 0.5,
+            "height": 1.3679999999999999,
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "rectangle",
+            "x": 1.9000000000000004,
+            "y": 1.52,
+            "width": 6.08,
+            "height": 0.6,
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -10.5,
+            "y": 7.6,
+            "width": 21,
+            "height": 1.6,
+            "fill": "rgba(255, 200, 130, 0.35)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 0,
+            "width": 19,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 6.8,
+            "width": 19,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 8.7,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.4,
+            "y": 1.8239999999999998,
+            "width": 0.8,
+            "height": 5.776,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 1.3739999999999999,
+            "width": 19,
+            "height": 0.9,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 4.412,
+            "width": 19,
+            "height": 0.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -3.416666666666667,
+            "y": 0,
+            "width": 0.5,
+            "height": 1.8239999999999998,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 2.916666666666666,
+            "y": 0,
+            "width": 0.5,
+            "height": 1.8239999999999998,
+            "fill": "$frame"
+           }
+          ],
+          "detail": 6,
           "fill": "$glass",
-          "stroke": "$frame",
-          "line_width": 0.7,
           "bars": 1,
           "bar_width": 0.7,
           "bar_fill": "$frame",
+          "lit_fill": "$lit_mid",
           "lit": "$lit",
-          "lit_fill": "$warm",
           "emits": {
            "strength": 0.045,
-           "reach": 70
+           "reach": 70,
+           "color": "#ffc98a"
           },
           "storeys": [
            0,
@@ -3508,17 +5112,417 @@
           "width": 22,
           "height": 14.5,
           "at": 4,
+          "steps": [
+           {
+            "shape": "rectangle",
+            "x": -12.1,
+            "y": -1.1,
+            "width": 24.2,
+            "height": 16.7,
+            "fill": "$stone_lo"
+           },
+           {
+            "shape": "rectangle",
+            "x": -12.5,
+            "y": -1.5,
+            "width": 25,
+            "height": 0.5,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -12.5,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 17.5,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -12.5,
+            "y": 15.5,
+            "width": 25,
+            "height": 0.5,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": 12.0,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 17.5,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 0,
+            "width": 22,
+            "height": 14.5,
+            "fill": "$glass"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 7.9750000000000005,
+            "width": 22,
+            "height": 6.525,
+            "fill": "$glass_lo"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              -11.0,
+              0
+             ],
+             [
+              1.1000000000000014,
+              0
+             ],
+             [
+              -11.0,
+              10.875
+             ]
+            ],
+            "fill": "rgba(190, 220, 230, 0.13)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.7,
+            "y": 9.860000000000001,
+            "width": 15.399999999999999,
+            "height": 4.64,
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              4.4,
+              7.25
+             ],
+             [
+              7.92,
+              7.25
+             ],
+             [
+              7.26,
+              5.51
+             ],
+             [
+              5.0600000000000005,
+              5.51
+             ]
+            ],
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "rectangle",
+            "x": 5.91,
+            "y": 7.25,
+            "width": 0.5,
+            "height": 2.61,
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "rectangle",
+            "x": 2.1999999999999993,
+            "y": 2.9000000000000004,
+            "width": 7.04,
+            "height": 0.6,
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 0,
+            "width": 22,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 13.7,
+            "width": 22,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 0,
+            "width": 0.8,
+            "height": 14.5,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 10.2,
+            "y": 0,
+            "width": 0.8,
+            "height": 14.5,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.4,
+            "y": 3.48,
+            "width": 0.8,
+            "height": 11.02,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 3.03,
+            "width": 22,
+            "height": 0.9,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 8.69,
+            "width": 22,
+            "height": 0.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -3.916666666666667,
+            "y": 0,
+            "width": 0.5,
+            "height": 3.48,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 3.416666666666666,
+            "y": 0,
+            "width": 0.5,
+            "height": 3.48,
+            "fill": "$frame"
+           }
+          ],
+          "lit_steps": [
+           {
+            "shape": "rectangle",
+            "x": -12.1,
+            "y": -1.1,
+            "width": 24.2,
+            "height": 16.7,
+            "fill": "$stone_lo"
+           },
+           {
+            "shape": "rectangle",
+            "x": -12.5,
+            "y": -1.5,
+            "width": 25,
+            "height": 0.5,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -12.5,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 17.5,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -12.5,
+            "y": 15.5,
+            "width": 25,
+            "height": 0.5,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": 12.0,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 17.5,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 0,
+            "width": 22,
+            "height": 14.5,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 4.35,
+            "width": 22,
+            "height": 10.149999999999999,
+            "fill": "$lit_mid"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 9.425,
+            "width": 22,
+            "height": 5.074999999999999,
+            "fill": "$lit_lo"
+           },
+           {
+            "shape": "circle",
+            "x": 6.16,
+            "y": 6.525,
+            "radius": 6.6,
+            "fill": "rgba(255, 244, 210, 0.45)"
+           },
+           {
+            "shape": "circle",
+            "x": 6.16,
+            "y": 6.525,
+            "radius": 3.3,
+            "fill": "rgba(255, 248, 225, 0.6)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.7,
+            "y": 9.860000000000001,
+            "width": 15.399999999999999,
+            "height": 4.64,
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              4.4,
+              7.25
+             ],
+             [
+              7.92,
+              7.25
+             ],
+             [
+              7.26,
+              5.51
+             ],
+             [
+              5.0600000000000005,
+              5.51
+             ]
+            ],
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "rectangle",
+            "x": 5.91,
+            "y": 7.25,
+            "width": 0.5,
+            "height": 2.61,
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "rectangle",
+            "x": 2.1999999999999993,
+            "y": 2.9000000000000004,
+            "width": 7.04,
+            "height": 0.6,
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -12.0,
+            "y": 14.5,
+            "width": 24,
+            "height": 1.6,
+            "fill": "rgba(255, 200, 130, 0.35)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 0,
+            "width": 22,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 13.7,
+            "width": 22,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 0,
+            "width": 0.8,
+            "height": 14.5,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 10.2,
+            "y": 0,
+            "width": 0.8,
+            "height": 14.5,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.4,
+            "y": 3.48,
+            "width": 0.8,
+            "height": 11.02,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 3.03,
+            "width": 22,
+            "height": 0.9,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 8.69,
+            "width": 22,
+            "height": 0.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -3.916666666666667,
+            "y": 0,
+            "width": 0.5,
+            "height": 3.48,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 3.416666666666666,
+            "y": 0,
+            "width": 0.5,
+            "height": 3.48,
+            "fill": "$frame"
+           }
+          ],
+          "detail": 6,
           "fill": "$glass",
-          "stroke": "$frame",
-          "line_width": 0.8,
           "bars": 2,
           "bar_width": 0.6,
           "bar_fill": "$frame",
+          "lit_fill": "$lit_mid",
           "lit": "$lobby_lit",
-          "lit_fill": "$warm",
           "emits": {
            "strength": 0.2,
-           "reach": 80
+           "reach": 80,
+           "color": "#ffc98a"
           }
          }
         ],
@@ -3615,17 +5619,417 @@
           "width": 19,
           "height": 7.6,
           "at": 3,
+          "steps": [
+           {
+            "shape": "rectangle",
+            "x": -10.6,
+            "y": -1.1,
+            "width": 21.2,
+            "height": 9.8,
+            "fill": "$stone_lo"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": -1.5,
+            "width": 22,
+            "height": 0.5,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 10.6,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 8.6,
+            "width": 22,
+            "height": 0.5,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": 10.5,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 10.6,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 0,
+            "width": 19,
+            "height": 7.6,
+            "fill": "$glass"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 4.18,
+            "width": 19,
+            "height": 3.42,
+            "fill": "$glass_lo"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              -9.5,
+              0
+             ],
+             [
+              0.9500000000000011,
+              0
+             ],
+             [
+              -9.5,
+              5.699999999999999
+             ]
+            ],
+            "fill": "rgba(190, 220, 230, 0.13)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -6.65,
+            "y": 5.168,
+            "width": 13.299999999999999,
+            "height": 2.432,
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              -6.84,
+              3.8
+             ],
+             [
+              -3.8000000000000003,
+              3.8
+             ],
+             [
+              -4.37,
+              2.888
+             ],
+             [
+              -6.2700000000000005,
+              2.888
+             ]
+            ],
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -5.57,
+            "y": 3.8,
+            "width": 0.5,
+            "height": 1.3679999999999999,
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "rectangle",
+            "x": 1.9000000000000004,
+            "y": 1.52,
+            "width": 6.08,
+            "height": 0.6,
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 0,
+            "width": 19,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 6.8,
+            "width": 19,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 8.7,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.4,
+            "y": 1.8239999999999998,
+            "width": 0.8,
+            "height": 5.776,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 1.3739999999999999,
+            "width": 19,
+            "height": 0.9,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 4.412,
+            "width": 19,
+            "height": 0.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -3.416666666666667,
+            "y": 0,
+            "width": 0.5,
+            "height": 1.8239999999999998,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 2.916666666666666,
+            "y": 0,
+            "width": 0.5,
+            "height": 1.8239999999999998,
+            "fill": "$frame"
+           }
+          ],
+          "lit_steps": [
+           {
+            "shape": "rectangle",
+            "x": -10.6,
+            "y": -1.1,
+            "width": 21.2,
+            "height": 9.8,
+            "fill": "$stone_lo"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": -1.5,
+            "width": 22,
+            "height": 0.5,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 10.6,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 8.6,
+            "width": 22,
+            "height": 0.5,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": 10.5,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 10.6,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 0,
+            "width": 19,
+            "height": 7.6,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 2.28,
+            "width": 19,
+            "height": 5.319999999999999,
+            "fill": "$lit_mid"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 4.9399999999999995,
+            "width": 19,
+            "height": 2.6599999999999997,
+            "fill": "$lit_lo"
+           },
+           {
+            "shape": "circle",
+            "x": -5.32,
+            "y": 3.42,
+            "radius": 5.7,
+            "fill": "rgba(255, 244, 210, 0.45)"
+           },
+           {
+            "shape": "circle",
+            "x": -5.32,
+            "y": 3.42,
+            "radius": 2.85,
+            "fill": "rgba(255, 248, 225, 0.6)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -6.65,
+            "y": 5.168,
+            "width": 13.299999999999999,
+            "height": 2.432,
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              -6.84,
+              3.8
+             ],
+             [
+              -3.8000000000000003,
+              3.8
+             ],
+             [
+              -4.37,
+              2.888
+             ],
+             [
+              -6.2700000000000005,
+              2.888
+             ]
+            ],
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -5.57,
+            "y": 3.8,
+            "width": 0.5,
+            "height": 1.3679999999999999,
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "rectangle",
+            "x": 1.9000000000000004,
+            "y": 1.52,
+            "width": 6.08,
+            "height": 0.6,
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -10.5,
+            "y": 7.6,
+            "width": 21,
+            "height": 1.6,
+            "fill": "rgba(255, 200, 130, 0.35)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 0,
+            "width": 19,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 6.8,
+            "width": 19,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 8.7,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.4,
+            "y": 1.8239999999999998,
+            "width": 0.8,
+            "height": 5.776,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 1.3739999999999999,
+            "width": 19,
+            "height": 0.9,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 4.412,
+            "width": 19,
+            "height": 0.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -3.416666666666667,
+            "y": 0,
+            "width": 0.5,
+            "height": 1.8239999999999998,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 2.916666666666666,
+            "y": 0,
+            "width": 0.5,
+            "height": 1.8239999999999998,
+            "fill": "$frame"
+           }
+          ],
+          "detail": 6,
           "fill": "$glass",
-          "stroke": "$frame",
-          "line_width": 0.7,
           "bars": 1,
           "bar_width": 0.7,
           "bar_fill": "$frame",
+          "lit_fill": "$lit_mid",
           "lit": "$lit",
-          "lit_fill": "$warm",
           "emits": {
            "strength": 0.045,
-           "reach": 70
+           "reach": 70,
+           "color": "#ffc98a"
           },
           "storeys": [
            0,
@@ -4953,7 +7357,7 @@
           "bar_width": 0.6,
           "bar_fill": "$iron",
           "lit": "$lobby_lit",
-          "lit_fill": "$warm",
+          "lit_fill": "$lit_mid",
           "emits": {
            "strength": 0.5,
            "reach": 100
@@ -4970,7 +7374,7 @@
           "bar_width": 0.6,
           "bar_fill": "$iron",
           "lit": 1,
-          "lit_fill": "$warm",
+          "lit_fill": "$lit_mid",
           "emits": {
            "strength": 0.35,
            "reach": 70
@@ -5737,17 +8141,417 @@
           "width": 19,
           "height": 7.6,
           "at": 3,
+          "steps": [
+           {
+            "shape": "rectangle",
+            "x": -10.6,
+            "y": -1.1,
+            "width": 21.2,
+            "height": 9.8,
+            "fill": "$stone_lo"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": -1.5,
+            "width": 22,
+            "height": 0.5,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 10.6,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 8.6,
+            "width": 22,
+            "height": 0.5,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": 10.5,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 10.6,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 0,
+            "width": 19,
+            "height": 7.6,
+            "fill": "$glass"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 4.18,
+            "width": 19,
+            "height": 3.42,
+            "fill": "$glass_lo"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              -9.5,
+              0
+             ],
+             [
+              0.9500000000000011,
+              0
+             ],
+             [
+              -9.5,
+              5.699999999999999
+             ]
+            ],
+            "fill": "rgba(190, 220, 230, 0.13)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -6.65,
+            "y": 5.168,
+            "width": 13.299999999999999,
+            "height": 2.432,
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              -6.84,
+              3.8
+             ],
+             [
+              -3.8000000000000003,
+              3.8
+             ],
+             [
+              -4.37,
+              2.888
+             ],
+             [
+              -6.2700000000000005,
+              2.888
+             ]
+            ],
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -5.57,
+            "y": 3.8,
+            "width": 0.5,
+            "height": 1.3679999999999999,
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "rectangle",
+            "x": 1.9000000000000004,
+            "y": 1.52,
+            "width": 6.08,
+            "height": 0.6,
+            "fill": "rgba(12, 16, 18, 0.45)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 0,
+            "width": 19,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 6.8,
+            "width": 19,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 8.7,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.4,
+            "y": 1.8239999999999998,
+            "width": 0.8,
+            "height": 5.776,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 1.3739999999999999,
+            "width": 19,
+            "height": 0.9,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 4.412,
+            "width": 19,
+            "height": 0.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -3.416666666666667,
+            "y": 0,
+            "width": 0.5,
+            "height": 1.8239999999999998,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 2.916666666666666,
+            "y": 0,
+            "width": 0.5,
+            "height": 1.8239999999999998,
+            "fill": "$frame"
+           }
+          ],
+          "lit_steps": [
+           {
+            "shape": "rectangle",
+            "x": -10.6,
+            "y": -1.1,
+            "width": 21.2,
+            "height": 9.8,
+            "fill": "$stone_lo"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": -1.5,
+            "width": 22,
+            "height": 0.5,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 10.6,
+            "fill": "$stone_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -11.0,
+            "y": 8.6,
+            "width": 22,
+            "height": 0.5,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": 10.5,
+            "y": -1.5,
+            "width": 0.5,
+            "height": 10.6,
+            "fill": "$groove"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 0,
+            "width": 19,
+            "height": 7.6,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 2.28,
+            "width": 19,
+            "height": 5.319999999999999,
+            "fill": "$lit_mid"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 4.9399999999999995,
+            "width": 19,
+            "height": 2.6599999999999997,
+            "fill": "$lit_lo"
+           },
+           {
+            "shape": "circle",
+            "x": -5.32,
+            "y": 3.42,
+            "radius": 5.7,
+            "fill": "rgba(255, 244, 210, 0.45)"
+           },
+           {
+            "shape": "circle",
+            "x": -5.32,
+            "y": 3.42,
+            "radius": 2.85,
+            "fill": "rgba(255, 248, 225, 0.6)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -6.65,
+            "y": 5.168,
+            "width": 13.299999999999999,
+            "height": 2.432,
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              -6.84,
+              3.8
+             ],
+             [
+              -3.8000000000000003,
+              3.8
+             ],
+             [
+              -4.37,
+              2.888
+             ],
+             [
+              -6.2700000000000005,
+              2.888
+             ]
+            ],
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -5.57,
+            "y": 3.8,
+            "width": 0.5,
+            "height": 1.3679999999999999,
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "rectangle",
+            "x": 1.9000000000000004,
+            "y": 1.52,
+            "width": 6.08,
+            "height": 0.6,
+            "fill": "rgba(70, 34, 22, 0.55)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -10.5,
+            "y": 7.6,
+            "width": 21,
+            "height": 1.6,
+            "fill": "rgba(255, 200, 130, 0.35)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 0,
+            "width": 19,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 6.8,
+            "width": 19,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 8.7,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.4,
+            "y": 1.8239999999999998,
+            "width": 0.8,
+            "height": 5.776,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 1.3739999999999999,
+            "width": 19,
+            "height": 0.9,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.5,
+            "y": 4.412,
+            "width": 19,
+            "height": 0.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -3.416666666666667,
+            "y": 0,
+            "width": 0.5,
+            "height": 1.8239999999999998,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 2.916666666666666,
+            "y": 0,
+            "width": 0.5,
+            "height": 1.8239999999999998,
+            "fill": "$frame"
+           }
+          ],
+          "detail": 6,
           "fill": "$glass",
-          "stroke": "$frame",
-          "line_width": 0.7,
           "bars": 1,
           "bar_width": 0.7,
           "bar_fill": "$frame",
+          "lit_fill": "$lit_mid",
           "lit": "$lit",
-          "lit_fill": "$warm",
           "emits": {
            "strength": 0.045,
-           "reach": 70
+           "reach": 70,
+           "color": "#ffc98a"
           },
           "storeys": [
            0,
@@ -7786,6 +10590,16 @@
          "width": 22,
          "height": 1.5,
          "fill": "$char"
+        },
+        {
+         "shape": "rectangle",
+         "x": -322.7,
+         "y": -430.7,
+         "width": 645.4,
+         "height": 445.4,
+         "stroke": "$ledge",
+         "line_width": 2.4,
+         "emits": true
         }
        ],
        "sides": {
@@ -7797,7 +10611,8 @@
          {
           "from": -1.3,
           "to": -0.4,
-          "fill": "$ledge"
+          "fill": "$ledge",
+          "lit": true
          }
         ]
        }
@@ -8249,6 +11064,16 @@
           ]
          ],
          "fill": "rgba(220, 230, 255, 0.12)"
+        },
+        {
+         "shape": "rectangle",
+         "x": -82.69999999999999,
+         "y": -220.7,
+         "width": 165.4,
+         "height": 235.4,
+         "stroke": "$ledge",
+         "line_width": 2.4,
+         "emits": true
         }
        ],
        "sides": {
@@ -8260,7 +11085,8 @@
          {
           "from": -1.3,
           "to": -0.4,
-          "fill": "$ledge"
+          "fill": "$ledge",
+          "lit": true
          }
         ]
        }
@@ -15344,6 +18170,10 @@
      "warm": "#ffcf8a",
      "violet": "#c8b4ff",
      "ledge": "#b49cff",
+     "glass_lo": "#1b262c",
+     "lit_hi": "#c98361",
+     "lit_mid": "#e9a775",
+     "lit_lo": "#f6c483",
      "lit": 0.35,
      "lobby_lit": 0.75
     }

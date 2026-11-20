@@ -17,8 +17,8 @@ const LAYER = Object.freeze(['layer', 'height', 'thickness', 'steps', 'drawing',
 const FACADE = Object.freeze({
     facade: ['storeys', 'bays', 'panels', 'piers', 'bands', 'seed'],
     storeys: 'from height count'.split(' '), bays: ['width', 'margin'],
-    panels: ['width', 'height', 'at', 'fill', 'stroke', 'line_width', 'bars', 'bar_width', 'bar_fill', 'lit', 'lit_fill', 'emits', 'storeys', 'steps'],
-    piers: 'width from to fill edge edge_width'.split(' '), bands: 'from to fill'.split(' ')
+    panels: ['width', 'height', 'at', 'fill', 'stroke', 'line_width', 'bars', 'bar_width', 'bar_fill', 'lit', 'lit_fill', 'emits', 'storeys', 'steps', 'lit_steps', 'detail'],
+    piers: 'width from to fill edge edge_width'.split(' '), bands: 'from to fill lit'.split(' ')
 });
 const SAFE = value => typeof value === 'string' && value && !['__proto__', 'prototype', 'constructor'].includes(value);
 const plain = value => value && typeof value === 'object' && !Array.isArray(value);
@@ -64,10 +64,12 @@ function readFacade(facade, where) {
             for (const field of ['fill', 'stroke', 'bar_fill', 'lit_fill', 'edge']) if (!paint(item[field])) throw new TypeError(`${it}'s ${field} is a paint: a colour, a gradient or a "$look" value`);
             if (key !== 'bands') num(item.width, `${key}[${i}] width`, 1e-6);
             if (key !== 'bands' && item.width === undefined) throw new TypeError(`${it} needs a width`);
-            for (const field of ['height', 'line_width', 'bar_width', 'edge_width']) num(item[field], `${key}[${i}] ${field}`, 0);
+            for (const field of ['height', 'line_width', 'bar_width', 'edge_width', 'detail']) num(item[field], `${key}[${i}] ${field}`, 0);
             for (const field of 'at from to bars'.split(' ')) num(item[field], `${key}[${i}] ${field}`);
-            if (item.lit !== undefined && !lookOr(item.lit, x => Number.isFinite(x) && x >= 0 && x <= 1)) throw new TypeError(`${it}'s lit is the share of them lit, 0..1`);
+            if (key !== 'bands' && item.lit !== undefined && !lookOr(item.lit, x => Number.isFinite(x) && x >= 0 && x <= 1)) throw new TypeError(`${it}'s lit is the share of them lit, 0..1`);
+            if (key === 'bands' && item.lit !== undefined && typeof item.lit !== 'boolean') throw new TypeError(`${it}'s lit is true or false: a lit band (a lamp line under a ledge) is painted over the shading and shines at night`);
             if (item.emits !== undefined && !(typeof item.emits === 'boolean' || plain(item.emits))) throw new TypeError(`${it}'s emits is true, false or {strength, reach, color, height}: its lit windows light what is round them`);
+            if (item.lit_steps !== undefined && !(Array.isArray(item.lit_steps) && item.lit_steps.every(plain) && item.steps !== undefined)) throw new TypeError(`${it}'s lit_steps are the drawing of a lit one (with steps for an unlit one), in the panel's frame`);
             if (item.steps !== undefined && !(Array.isArray(item.steps) && item.steps.every(plain))) throw new TypeError(`${it}'s steps are a drawing (a list of steps) in the panel's frame: x across from its middle, y down from its top`);
             if (item.storeys !== undefined && !(Array.isArray(item.storeys) && item.storeys.every(Number.isInteger))) throw new TypeError(`${it}'s storeys are a list of storey numbers (from 0 at the bottom; -1 is the top one)`);
         });

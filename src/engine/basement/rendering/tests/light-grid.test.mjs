@@ -60,11 +60,13 @@ test('the light layer\'s tiles carry the grid: a cut in the dark and its colour,
     const without=parts([]),withGrid=parts([grid]),again=parts([grid]);
     assert.equal(without.filter(p=>p.blend==='add').length,0);
     const glows=withGrid.filter(p=>p.blend==='add');assert.ok(glows.length>=1&&glows.length<=4,'a colour picture in the tiles the light reaches');
-    assert.deepEqual(withGrid.map(p=>p.picture.key),again.map(p=>p.picture.key),'a still frame keeps every key: nothing repaints');
-    const dark=withGrid.find(p=>p.picture.bounds[0]===0&&p.picture.bounds[1]===0).picture.build();
-    assert.ok(dark.some(p=>p.blend==='destination-out'),'the grid cuts the dark');
+    const keys=list=>list.filter(p=>p.picture).map(p=>p.picture.key);
+    assert.deepEqual(keys(withGrid),keys(again),'a still frame keeps every key: nothing repaints');
+    const tile=withGrid.find(p=>p.picture&&p.blend==='destination-out'&&p.picture.bounds[0]===0&&p.picture.bounds[1]===0);
+    assert.ok(tile&&tile.picture.build().length,'the grid cuts the dark: a tile it lights holds a picture of what it cuts');
+    assert.equal(keys(without).length,0,'with nothing cut, the dark is one plain fill and no tile is painted');
     const moved=parts([bakeLightGrid({bounds:region,emitters:[neon(300,200)]})]);
-    assert.notDeepEqual(moved.map(p=>p.picture.key),withGrid.map(p=>p.picture.key));
+    assert.notDeepEqual(keys(moved),keys(withGrid));
 });
 
 test('a map\'s light grid: still emitters bake per region, a mover re-bakes what it reaches, within the budget', () => {

@@ -134,11 +134,13 @@ export function createLightLayerParts({extent,tint,areas=[],lights=[],grids=[],c
         const shown=!view||(tile[0]<view.right&&tile[0]+tile[2]>view.left&&tile[1]<view.bottom&&tile[1]+tile[3]>view.top);
         const cuts=cutStill.filter(meets(tile)),lit=glowStill.filter(meets(tile)).filter(([l])=>l.color&&(l.glow??0)>=.001),thinned=shades.filter(meets(tile)).map(([a])=>a),bright=lighted.filter(meets(tile)).map(([g])=>g);
         const picture=(part,list,paint,extra)=>({key:`${key}:${signature(tint,tile,list,part,extra,bright)}:${part}`,bounds:tile,build(){const scene=new artScene();paint(scene);return scene.finish();}});
-        const dark={picture:picture('dark',cuts,scene=>{scene.fill(rect(...tile),tint);thin(scene,thinned);for(const [l,shape] of cuts)cut(scene,l,shape);for(const g of bright)drawLightGrid(scene,g,'cut',{clip:tile});},thinned)};
+        // the dark is one plain fill under every tile (tiles laid edge to edge would leave a hairline where their
+        // soft edges meet); a tile holds only what is cut out of it, painted white and cut with destination-out
+        const dark=cuts.length||thinned.length||bright.length?{picture:picture('dark',cuts,scene=>{thin(scene,thinned,'normal');for(const [l,shape] of cuts)cut(scene,l,shape,'normal');for(const g of bright)drawLightGrid(scene,g,'cut',{clip:tile,blend:'normal'});},thinned),blend:'destination-out'}:null;
         const colour=lit.length||bright.length?{picture:picture('glow',lit,scene=>{for(const [l,shape] of lit)glow(scene,l,shape);for(const g of bright)drawLightGrid(scene,g,'glow',{clip:tile});}),blend:'add'}:null;
-        if(shown){darks.push(dark);if(colour)glows.push(colour);}
+        if(shown){if(dark)darks.push(dark);if(colour)glows.push(colour);}
         else if(waiting.some(r=>meets(tile)([,,r])))continue;
-        else{ready.push({...dark,prepare:true});if(colour)ready.push({...colour,prepare:true});}
+        else{if(dark)ready.push({...dark,prepare:true});if(colour)ready.push({...colour,prepare:true});}
     }
     const cuts=new artScene(),colour=new artScene(),cutStamps=[],colourStamps=[],aloft=new artScene();
     for(const [l,shape] of all){
@@ -146,7 +148,8 @@ export function createLightLayerParts({extent,tint,areas=[],lights=[],grids=[],c
         if(l.still==='stamp'){const [c,g]=stamps(key,l,shape);if(c)cutStamps.push(c);if(g)colourStamps.push(g);continue;}
         if(l.still!==true)cut(cuts,l,shape);if(!l.still)glow(colour,l,shape);
     }
-    return [...darks,...cutStamps,...cuts.finish(),...extraCuts(more),...glows,...colourStamps,...colour.finish(),...nightOver(over,tint),...aloft.finish(),...ready];
+    const plain=new artScene();plain.fill(rect(left,top,right-left,bottom-top),tint);
+    return [...plain.finish(),...darks,...cutStamps,...cuts.finish(),...extraCuts(more),...glows,...colourStamps,...colour.finish(),...nightOver(over,tint),...aloft.finish(),...ready];
 }
 /**
  * A light whose shape holds still while its strength changes (a pulsing sign, a stuttering lamp, a shot in
@@ -189,10 +192,10 @@ function tiles({left,top,right,bottom},size,view){
     return out;
 }
 /** The dark thinned where an area is lit. */
-function thin(scene,areas){
+function thin(scene,areas,blend='destination-out'){
     for(const a of areas){const k=finite(a.cut,'area cut',0);if(k<.001)continue;
         const shape=a.polygon?polygonPath(a.polygon):(a.rects??[]).flatMap(q=>rect(q.x,q.y,q.w,q.h));if(!shape.length)continue;
-        scene.enter({},{blend:'destination-out',opacity:Math.min(1,k)});scene.fill(shape,'#ffffff');scene.leave();}
+        scene.enter({},{blend,opacity:Math.min(1,k)});scene.fill(shape,'#ffffff');scene.leave();}
 }
 /** A light's cut out of the dark. */
 function cut(scene,l,shape,blend='destination-out'){

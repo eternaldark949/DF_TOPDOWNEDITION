@@ -73,7 +73,7 @@ test('the light layer draws covers and shines last, and a light aloft after them
  assert.throws(()=>createLightLayer({bounds:{left:0,top:0,right:100,bottom:100},tint,over:[{packet:square,over:'roof'}]}),/cover.*shine/);
  const lights=[{position:[50,50],radius:20,color:'#fff',glow:.5,still:true},{position:[20,20],radius:20,color:'#fff',glow:.5,still:true,over:true}];
  const parts=createLightLayerParts({extent:{left:0,top:0,right:100,bottom:100},tint,lights,over,tile_size:64});
- const at=parts.findIndex(p=>p.material?.fill===tint);assert.ok(at>0);
+ const at=parts.findLastIndex(p=>p.material?.fill===tint);assert.ok(at>0,'the cover lays the dark back after the plain dark');
  assert.ok(parts.slice(at+2).some(p=>!p.picture),'the light aloft is drawn after the covers, as shapes');
  const keys=list=>list.filter(p=>p.picture).map(p=>p.picture.key).sort();
  assert.deepEqual(keys(parts),keys(createLightLayerParts({extent:{left:0,top:0,right:100,bottom:100},tint,lights:lights.slice(0,1),over,tile_size:64})),'and kept out of the cached tiles');
@@ -85,4 +85,19 @@ test('a part the screen cannot show at all is not drawn, leaning from its base t
  assert.equal(drawComponents(e,null,1,{view,screen:screen({left:-200,top:-200,right:200,bottom:200})}).length,0,'off screen: nothing');
  assert.equal(drawComponents(e,null,1,{view,screen:screen({left:-200,top:-200,right:1000,bottom:200})}).length,1,'its foot on screen: drawn');
  const k=view.k(40);assert.ok(1100*k>1100+20+16);assert.equal(drawComponents(e,null,1,{view,screen:screen({left:1100+20,top:-200,right:1100*k,bottom:200})}).length,1,'only its leaning top on screen: drawn');
+});
+
+test('a lit band, a window drawn as lit steps, and a plain one when it is too small on screen to show them',()=>{
+ const world=new physicsSystem(),view=new heightView({camera:[0,0],eye:900});
+ const win=fill=>[{shape:'rectangle',x:-8,y:0,width:16,height:10,fill},{shape:'rectangle',x:-.5,y:0,width:1,height:10,fill:'#222'}];
+ const art={storeys:{height:20},bays:{width:40},seed:3,bands:[{from:-2,to:-1,fill:'#b49cff',lit:true}],
+  panels:[{width:16,height:10,at:5,steps:win('#345'),lit_steps:win('#e9a775'),lit:1,fill:'#123',lit_fill:'#ffcc88',detail:30}]};
+ const e=world.elements.createEntity({kind:'static',position:[0,300],components:[{name:'b',layers:[{layer:0,height:0,thickness:40,solid:false,sides:'#777',facade:art,steps:[box]}]}]});
+ const fills=(zoom,shines=true)=>{const [part]=drawComponents(e,null,1,{view,shines,screen:{bounds:{left:-2000,top:-2000,right:2000,bottom:2000},zoom}});return {all:part.sides.map(p=>p.material.fill),shine:part.sides.filter(p=>p.shine).map(p=>p.material.fill)};};
+ const big=fills(20);
+ assert.ok(big.shine.includes('#b49cff'),'a lit band shines');
+ assert.ok(big.shine.includes('#e9a775')&&!big.all.includes('#123'),'close up, a lit window is its lit steps, and it shines');
+ const small=fills(1);
+ assert.ok(small.shine.includes('#ffcc88')&&!small.all.includes('#e9a775'),'small on screen: the plain panel, lit the same');
+ assert.throws(()=>world.elements.createEntity({kind:'static',position:[0,0],components:[{name:'b',layers:[{layer:0,height:0,thickness:40,sides:'#777',facade:{...art,panels:[{width:4,height:4,lit_steps:win('#fff')}]},steps:[box]}]}]}),/lit_steps/);
 });
