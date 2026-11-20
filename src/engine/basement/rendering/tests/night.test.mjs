@@ -3,7 +3,7 @@
 // and what stands over the light on the ground (covers) or shines through the dark (shines).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {cameraSystem,renderSystem,recordingRenderer,entityLights,facadeEmitters,entityEmitters,entityBlockers,componentCovers,heightView,createLightLayer,createLightLayerParts} from '../index.mjs';
+import {cameraSystem,renderSystem,recordingRenderer,drawComponents,entityLights,facadeEmitters,entityEmitters,entityBlockers,componentCovers,heightView,createLightLayer,createLightLayerParts} from '../index.mjs';
 import {physicsSystem} from '../../physics/index.mjs';
 
 const near=(a,b,why='',e=1e-6)=>assert.ok(Math.abs(a-b)<e,`${why} ${a} != ${b}`);
@@ -77,4 +77,12 @@ test('the light layer draws covers and shines last, and a light aloft after them
  assert.ok(parts.slice(at+2).some(p=>!p.picture),'the light aloft is drawn after the covers, as shapes');
  const keys=list=>list.filter(p=>p.picture).map(p=>p.picture.key).sort();
  assert.deepEqual(keys(parts),keys(createLightLayerParts({extent:{left:0,top:0,right:100,bottom:100},tint,lights:lights.slice(0,1),over,tile_size:64})),'and kept out of the cached tiles');
+});
+
+test('a part the screen cannot show at all is not drawn, leaning from its base to its top',()=>{
+ const world=new physicsSystem(),e=world.elements.createEntity({kind:'static',position:[1000,0],components:[{name:'b',layers:[{layer:0,height:0,thickness:40,solid:false,sides:'#777',steps:[box]}]}]});
+ const view=new heightView({camera:[0,0],eye:900}),screen=b=>({bounds:b,zoom:1});
+ assert.equal(drawComponents(e,null,1,{view,screen:screen({left:-200,top:-200,right:200,bottom:200})}).length,0,'off screen: nothing');
+ assert.equal(drawComponents(e,null,1,{view,screen:screen({left:-200,top:-200,right:1000,bottom:200})}).length,1,'its foot on screen: drawn');
+ const k=view.k(40);assert.ok(1100*k>1100+20+16);assert.equal(drawComponents(e,null,1,{view,screen:screen({left:1100+20,top:-200,right:1100*k,bottom:200})}).length,1,'only its leaning top on screen: drawn');
 });

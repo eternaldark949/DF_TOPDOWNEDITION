@@ -194,6 +194,8 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,
         // A tipped bone is drawn in the plane of its joint, but its far end is lower or higher: leaning toward
         // the camera, it slants on to where that end is drawn, so a hanging leg reaches its knee and its foot.
         const lean=view&&rise?boneLean(view,place,z1,rise):null;
+        // what the screen cannot show at all is not drawn: a still part whose box, leaning from its base to its top, misses it
+        if(screen?.bounds&&view&&!c.joint&&offScreen(layerSteps(layer,source),values,place,view,z0,z1,screen.bounds))return null;
         const scene=new artScene(),steps=fore===1&&!lean?layerSteps(layer,source):foreshorten(layerSteps(layer,source),fore,lean??[0,0]);
         // Leaning toward the camera: the walls from the layer's base to its top, then its shapes in the plane of its top.
         const materials=name=>materialOf(source,qualifyResource(name,layer.drawing??entity.template_id??name));
@@ -219,7 +221,24 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,
         scene.mark_shines=shines;scene.draw(steps,{...place,values,materials});
         if(view||mirror!==null)scene.leave();
         return {height:z0,peak:z1,depth:key,top,layer:layer.layer,component:c.name,sides,cover,packets:scene.finish()};
-    });
+    }).filter(Boolean);
+}
+// A drawing's box in its own frame [left, top, right, bottom], once per steps and look values (null when it paints nothing).
+const BOXES=new WeakMap();
+function localBox(steps,values){
+    let byValues=BOXES.get(steps);if(!byValues)BOXES.set(steps,byValues=new WeakMap());
+    const key=values&&typeof values==='object'&&Object.keys(values).length?values:EMPTY;if(byValues.has(key))return byValues.get(key);   // (no values: one key, though each frame may give a fresh {})
+    let box=null;try{const pts=drawingOutline(steps,{values}).flatMap(p=>p.points);if(pts.length){const xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]);box=[Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)];}}catch{box=null;}
+    byValues.set(key,box);return box;
+}
+// Whether a part placed at `place`, standing from z0 to z1, is drawn wholly off the screen's bounds (a margin kept for strokes and shading).
+function offScreen(steps,values,{at,rotation,scale},view,z0,z1,B,pad=16){
+    const box=localBox(steps,values);if(!box)return false;
+    const [sx,sy]=typeof scale==='number'?[scale,scale]:scale,c=Math.cos(rotation),s=Math.sin(rotation);
+    let l=Infinity,t=Infinity,r=-Infinity,b=-Infinity;
+    for(const k of [view.k(z0),view.k(z1)])for(const [x,y] of [[box[0],box[1]],[box[2],box[1]],[box[2],box[3]],[box[0],box[3]]]){
+        const px=x*sx,py=y*sy,[X,Y]=view.scaled(at[0]+px*c-py*s,at[1]+px*s+py*c,k);if(X<l)l=X;if(X>r)r=X;if(Y<t)t=Y;if(Y>b)b=Y;}
+    return r<B.left-pad||l>B.right+pad||b<B.top-pad||t>B.bottom+pad;
 }
 /**
  * What of an entity stands taller than `above`, leaning as `view` draws it: one fill packet per walled layer
@@ -488,7 +507,7 @@ const LIGHT=(()=>{const x=-.55,y=-.83,l=Math.hypot(x,y);return [x/l,y/l];})();  
 const LOOPS=new WeakMap();
 function sideLoops(steps,values,follow){
     let byValues=LOOPS.get(steps);if(!byValues)LOOPS.set(steps,byValues=new WeakMap());
-    const key=values&&typeof values==='object'?values:EMPTY;let byFollow=byValues.get(key);if(!byFollow)byValues.set(key,byFollow={});
+    const key=values&&typeof values==='object'&&Object.keys(values).length?values:EMPTY;let byFollow=byValues.get(key);if(!byFollow)byValues.set(key,byFollow={});
     if(byFollow[follow])return byFollow[follow];
     const parts=drawingOutline([{shape:'group',steps}],{values,fine:true}).filter(p=>p.solid&&p.points.length>=3);
     let loops;
