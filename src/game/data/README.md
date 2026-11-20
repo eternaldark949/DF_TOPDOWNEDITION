@@ -43,13 +43,18 @@ are the source; edit them, not the classic data.
   courts and a paved apron round each building, rain pools, a kerbside hedge), the parks (hedge border, gravel walk round a moon
   pool, beds, benches, the name at the north gate), roads with their markings and names, junctions, crossings, pavements and a
   raised kerb wherever a pavement meets a road. Its street lamps are `city.json`'s `street_lamp` (amber), `street_lamp_rose`
-  and `street_lamp_violet`: the classic's twin lanterns on a crossarm over an iron post, each lantern's glass glowing (`emits`, so the
-  light grid, the reflections and the night's shines read it), one still point light between them for the pool on the
-  pavement, with `glare` for its star (the star alone, `fog: 0`). A lamp is three layers, kept few because each is a packet a
-  frame: the walled shaft (`cover: false`, too thin to hold the night back over its pool), the crossarm, and the glass; the colour is the look's `lamp` value, so a new colour is a template that `extends`
+  and `street_lamp_violet`: the classic's twin hex lanterns on a crossarm over an iron post, each lantern's glass glowing
+  (`emits`, so the light grid, the reflections and the night's shines read it) under its ribs and cap, one still point light
+  between them for the pool on the pavement, and on each lantern a light too small to light anything that carries its
+  `glare` star (the star alone, `fog: 0`). Few layers, as each is a packet a frame: the walled shaft (`cover: false`, too
+  thin to hold the night back over its pool), the crossarm (its bar `emits` at the least strength, so the night is cut out
+  over it and it reads as iron against its pool), the glass (live at night), and the ribs and caps in a still layer in the
+  glass's plane; the colour is the look's `lamp` value, so a new colour is a template that `extends`
   `street_lamp` with its own values. They stand on both pavements of every straight road, 20 out from the kerb every 350 or so,
-  clear of the junctions, and off each corner of every square junction, as the classic laid them: amber on the north or west
-  pavement, rose on the other, and the Silver Queen's violet round its block (978 placements, written by the street lamp
+  clear of the junctions, and off each corner of every square junction, as the classic laid them: violet on both pavements
+  of the avenues (West, East, Velvet, Meridian and Skyline Ave) and round their junctions, as the classic's West Ave burns;
+  on the other streets amber on the north or west pavement and rose on the other; and the Silver Queen's violet round its
+  block (978 placements, written by the street lamp
   generator kept with the project's tools). `switches.light_grid` is on. Its other buildings, trees and props are next.
 - No classic floor painter, so flat colours for now: `ollo_test`, `ollo_interior`.
 - Furniture for every map but the apartment is next. The scene-only maps (`keepers_hill`, `keepers_parlor`,
