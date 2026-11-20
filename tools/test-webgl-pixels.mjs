@@ -143,7 +143,7 @@ const effects = async ({ pixel_ratio = 1, frame_effects = true } = {}) => {
     render.registerRenderer('canvas', R.canvasRenderer).registerRenderer('webgl', R.webglRenderer);
     await render.setRenderer('canvas');
     render.setLayerEffects(2, [{ type: 'grade', saturation: 0, contrast: 1.4, tint: '#ffd090', tint_amount: .6 }, { type: 'grain', amount: .5, size: 2, animated: false }]);
-    if (frame_effects) render.setEffects([{ type: 'grade', exposure: .3, contrast: 1.2, saturation: 1.3 }, { type: 'vignette', strength: .8, radius: .4, softness: .5, color: '#100020' }, { type: 'grain', amount: .15, animated: false }]);
+    if (frame_effects) render.setEffects([{ type: 'grade', exposure: .3, contrast: 1.2, saturation: 1.3, hue: '#a040ff', hue_amount: .4, tint: '#e0b0ff', tint_amount: .3 }, { type: 'vignette', strength: .8, radius: .4, softness: .5, color: '#100020' }, { type: 'grain', amount: .15, animated: false }]);
     const draw = () => {
         const frame = render.beginFrame(); frame.clear('#305070');
         frame.submit({ type: 'shape', geometry: { type: 'rect', size: [160, 40] }, position: [80, 100], material: { fill: { type: 'linear', from: [-80, 0], to: [80, 0], stops: [[0, '#20a040'], [1, '#c0e040']] } } });

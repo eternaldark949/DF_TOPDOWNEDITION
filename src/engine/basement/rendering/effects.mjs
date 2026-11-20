@@ -7,8 +7,10 @@ import {readColor} from './colors.mjs';
 
 /**
  * Every effect and its fields with their defaults. Lengths are in the pass's own units (logical pixels).
- * - grade: exposure (stops; 1 doubles), contrast (1 unchanged), saturation (0 grey, 1 unchanged), then a
- *   tint multiplied in by tint_amount. Done on straight colour, as CSS's brightness, contrast and saturate are.
+ * - grade: exposure (stops; 1 doubles), contrast (1 unchanged), saturation (0 grey, 1 unchanged), then `hue`'s
+ *   hue and saturation laid over by hue_amount keeping each pixel's lightness (CSS's `color` blend: one cheap
+ *   pass that turns the picture toward a colour), then a tint multiplied in by tint_amount. Done on straight
+ *   colour, as CSS's brightness, contrast and saturate are.
  * - vignette: the edges darkened toward `color`: none inside `radius`, `strength` at `radius + softness`,
  *   both as fractions of the distance from the centre to a corner.
  * - grain: film noise laid over by overlay, `amount` 0 to 1, each grain `size` pixels; `animated` grain
@@ -33,7 +35,7 @@ import {readColor} from './colors.mjs';
  *   camera leans toward it in the floor. The targets are resource ids; `probe` and `plane` may be null.
  */
 export const EFFECTS=Object.freeze({
-    grade:Object.freeze({exposure:0,contrast:1,saturation:1,tint:'#ffffff',tint_amount:0}),
+    grade:Object.freeze({exposure:0,contrast:1,saturation:1,hue:'#ffffff',hue_amount:0,tint:'#ffffff',tint_amount:0}),
     vignette:Object.freeze({strength:.5,radius:.55,softness:.45,color:'#000000'}),
     grain:Object.freeze({amount:.08,size:1,animated:true}),
     bloom:Object.freeze({threshold:.65,strength:1.2,radius:8,color:'#ffffff'}),
@@ -44,7 +46,7 @@ export const EFFECTS=Object.freeze({
 });
 /** Fields that name a render target: `true` when the effect needs one. */
 const TARGETS=Object.freeze({'reflection.height':true,'reflection.mask':true,'reflection.probe':false,'reflection.plane':false});
-const RANGES={exposure:[-8,8],contrast:[0,8],saturation:[0,8],tint_amount:[0,1],strength:[0,8],'vignette.radius':[0,4],softness:[.001,4],amount:[0,1],size:[1,64],'vignette.strength':[0,1],threshold:[0,.99],radius:[.5,256],length:[1,512],rays:[2,8],angle:[-7,7],blades:[4,12],rotation:[-7,7],highlights:[0,32],fall:[0,4],reach:[1,4096],steps:[4,64],ripple:[0,32],ripple_scale:[0,4],time:[-1e9,1e9],hmax:[1,1e5],eye:[0,1e6],'reflection.lean':[0,8]};
+const RANGES={exposure:[-8,8],contrast:[0,8],saturation:[0,8],tint_amount:[0,1],hue_amount:[0,1],strength:[0,8],'vignette.radius':[0,4],softness:[.001,4],amount:[0,1],size:[1,64],'vignette.strength':[0,1],threshold:[0,.99],radius:[.5,256],length:[1,512],rays:[2,8],angle:[-7,7],blades:[4,12],rotation:[-7,7],highlights:[0,32],fall:[0,4],reach:[1,4096],steps:[4,64],ripple:[0,32],ripple_scale:[0,4],time:[-1e9,1e9],hmax:[1,1e5],eye:[0,1e6],'reflection.lean':[0,8]};
 /** One effect, checked and filled in from its defaults. Unknown types or fields are refused. */
 export function effect(spec){
     if(!spec||typeof spec!=='object')throw new TypeError('An effect is {type, ...fields}');

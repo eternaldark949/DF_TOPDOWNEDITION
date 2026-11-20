@@ -206,6 +206,23 @@ test('a map level with a height view sets the camera\'s eye on entry and clears 
     e.dispose();
 });
 
+test('a map level keeps its night and rain, and puts the night\'s effects on the frame only while it is night', async () => {
+    const { mapLevel } = await import('../lobby/runtime/map-level.mjs');
+    const night = { tint: 'rgba(24, 0, 78, 0.72)', effects: [{ type: 'grade', tint: '#d0a0ff', tint_amount: 0.5 }], glare: { reach: 58 } };
+    const maps = { city: { map_id: 'city', size: [256, 256], night, rain: { density: 10 } }, room: { map_id: 'room', size: [256, 256] } };
+    class Place extends mapLevel { mapDefinition() { return { definition: maps[this.level_id] }; } }
+    const e = new gameEngine({ asset_library: createEngineRegistry({ libraries: [] }), schedule_frame: null }); e.registerLevel('city', Place); e.registerLevel('room', Place);
+    const effects = () => { const frame = e.basement.render.beginFrame(); const out = frame.getEffects(); e.basement.render.abortFrame(); return out; };
+    const city = await e.loadLevel('city'), context = e.levels?.context ?? { basement: e.basement };
+    assert.equal(city.night.glare.reach, 58); assert.equal(city.night.scale, 0.5, 'the defaults filled in'); assert.equal(city.rain.density, 10);
+    assert.deepEqual(effects(), [], 'by day the frame is plain');
+    assert.equal(city.setNight(context, true), true); assert.equal(effects()[0].type, 'grade', 'at night it takes the night\'s effects');
+    assert.equal(city.setNight(context, false), false); assert.deepEqual(effects(), []);
+    city.setNight(context, true); const room = await e.loadLevel('room'); assert.deepEqual(effects(), [], 'leaving takes them off');
+    assert.equal(room.setNight(context, true), false, 'a map with no night stays off'); assert.equal(room.night, null);
+    e.dispose();
+});
+
 const toys = { library_id: 'toys', resources: {
     lamp: { kind: 'drawing', steps: [{ shape: 'glow', radius: 60, color: '#ffd27f' }, { shape: 'circle', radius: 10, material: 'brass', solid: true }, { shape: 'rectangle', x: -2, y: 10, width: 4, height: 30, material: 'brass', solid: true }] },
     brass: { kind: 'material', fill: '#b5a642' } },
