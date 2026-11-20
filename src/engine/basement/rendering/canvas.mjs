@@ -34,19 +34,19 @@ const capabilities=CAPABILITIES;   // Canvas draws the whole vocabulary
 
 /** Canvas implementation of the packet contract. Contexts and Canvas/GPU-like handles stay private. */
 export class canvasRenderer {
-    #surface;#context;#viewport;#resources=new Map();#createSurface;#decodeImage;#createPath;#disposed=false;#generation=0;#pictures;#layer=null;#ask={};
+    #surface;#context;#viewport;#resources=new Map();#createSurface;#decodeImage;#createPath;#disposed=false;#generation=0;#pictures;#layer=null;#ask={};#lend=null;
     /** `pictures` is the pictureCache that picture packets are stamped from, or the options for a new one. */
     constructor({create_surface=createSurface,decode_image=decodeImage,create_path=()=>typeof Path2D==='undefined'?null:new Path2D(),pictures={}}={}){
         this.#createSurface=create_surface;this.#decodeImage=decode_image;this.#createPath=create_path;
-        this.#pictures=pictures instanceof pictureCache?pictures:new pictureCache({create_surface,...pictures});
+        this.#pictures=pictures instanceof pictureCache?pictures:new pictureCache({create_surface,lend:id=>this.#resources.get(id),...pictures});
     }
     /** Migration boundary for hosts which already own a Canvas pass. Artists still supply only data. */
-    static drawPackets(context,packets){
+    static drawPackets(context,packets,{lend=null}={}){
         if(!context?.canvas||typeof context.getTransform!=='function')throw new TypeError('A host Canvas context is required');
         let entry=overlays.get(context);
         if(!entry){const renderer=new canvasRenderer();renderer.initialize(context.canvas,{viewport:{width:context.canvas.width,height:context.canvas.height,pixel_ratio:1}});entry={renderer,frame:new renderFrame()};overlays.set(context,entry);}
         const m=context.getTransform(),view={width:Math.max(1,context.canvas.width),height:Math.max(1,context.canvas.height),world_to_screen:[m.a,m.b,m.c,m.d,m.e,m.f]},opacity=context.globalAlpha;
-        entry.frame.begin(view,{clear_color:false});
+        entry.frame.begin(view,{clear_color:false});entry.renderer.#lend=lend;
         try{for(const packet of packets){if(packet.resource_id||packet.geometry_id||packet.material_id||(packet.clips??[]).some(clip=>clip.geometry_id))throw new Error('Canvas overlay accepts inline packets; use renderSystem for resources');entry.frame.submit({...packet,opacity:(packet.opacity??1)*opacity});}entry.renderer.render(entry.frame.finish());}catch(error){entry.frame.abort();throw error;}
         return entry.frame.getStatistics().packets;
     }
@@ -132,7 +132,7 @@ export class canvasRenderer {
     releaseResource(id){const entry=this.#resources.get(id);if(!entry)return;this.#resources.delete(id);this.#release(entry);}
     #paint(ctx,paint){
         if(typeof paint==='string'||paint===null)return paint;
-        if(paint.type==='pattern'){const pattern=ctx.createPattern(this.#resources.get(paint.image).image,paint.repeat);if(paint.matrix){const [a,b,c,d,e,f]=paint.matrix;pattern.setTransform({a,b,c,d,e,f});}return pattern;}
+        if(paint.type==='pattern'){const source=this.#resources.get(paint.image)??this.#lend?.(paint.image);if(!source)return null;const pattern=ctx.createPattern(source.image,paint.repeat);if(paint.matrix){const [a,b,c,d,e,f]=paint.matrix;pattern.setTransform({a,b,c,d,e,f});}return pattern;}
         const gradient=paint.type==='linear'?ctx.createLinearGradient(...paint.from,...paint.to):ctx.createRadialGradient(...paint.from,paint.inner_radius,...paint.to,paint.outer_radius);
         for(const [offset,color]of paint.stops)gradient.addColorStop(offset,color);return gradient;
     }
@@ -391,8 +391,9 @@ const multiply=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[
  * base first, so its blends work on that and it is cached too (a light layer's dark with its cuts).
  */
 export class pictureCache{
-    #entries=new Map();#bytes=0;#spent=0;#max_bytes;#budget_ms;#densities;#create_surface;#now;
-    constructor({max_bytes=48*1048576,budget_ms=3,densities=[1,1.5,2,3,4],create_surface=createSurface,now=()=>performance.now()}={}){
+    #entries=new Map();#bytes=0;#spent=0;#max_bytes;#budget_ms;#densities;#create_surface;#now;#lend;
+    constructor({max_bytes=48*1048576,budget_ms=3,densities=[1,1.5,2,3,4],create_surface=createSurface,now=()=>performance.now(),lend=null}={}){
+        this.#lend=lend;   // a renderer's images, for patterns inside a picture
         if(!(max_bytes>0)||!(budget_ms>=0))throw new TypeError('A picture cache needs a memory budget and a time budget');
         if(!Array.isArray(densities)||!densities.length||densities.some((d,i)=>!(d>0)||(i&&d<=densities[i-1])))throw new TypeError('Densities must rise');
         this.#max_bytes=max_bytes;this.#budget_ms=budget_ms;this.#densities=[...densities];this.#create_surface=create_surface;this.#now=now;
@@ -414,7 +415,7 @@ export class pictureCache{
         const t=context.getTransform(),m=multiply([t.a,t.b,t.c,t.d,t.e,t.f],matrix),scale=Math.max(Math.hypot(m[0],m[1]),Math.hypot(m[2],m[3]));
         const density=this.#densities.find(d=>d>=scale-1e-9);
         const [rx,ry,rw,rh]=source??bounds;if(source&&![rx,ry,rw,rh].every(Number.isFinite))throw new TypeError('A picture source is a finite rect');
-        const vector=packets=>{packets??=build();if(blend)packets=packets.map(p=>(p.blend??'normal')==='normal'?{...p,blend}:p);context.save();try{context.transform(...matrix);context.beginPath();context.rect(rx,ry,rw,rh);context.clip();canvasRenderer.drawPackets(context,packets);}finally{context.restore();}return 'vector';};   // a picture is only its bounds, painted or not
+        const vector=packets=>{packets??=build();if(blend)packets=packets.map(p=>(p.blend??'normal')==='normal'?{...p,blend}:p);context.save();try{context.transform(...matrix);context.beginPath();context.rect(rx,ry,rw,rh);context.clip();canvasRenderer.drawPackets(context,packets,{lend:this.#lend});}finally{context.restore();}return 'vector';};   // a picture is only its bounds, painted or not
         if(density===undefined||this.#entries.get(key)?.vector)return stamp?vector():'later';
         const id=`${key}@${density}`;let entry=this.#entries.get(id),how='stamp';
         if(!stamp&&entry){this.#entries.delete(id);this.#entries.set(id,entry);return 'kept';}
@@ -426,7 +427,7 @@ export class pictureCache{
             if(bytes>this.#max_bytes)return stamp?vector(packets):'later';
             this.#evict(bytes);
             const surface=this.#create_surface(W,H),ctx=surface.getContext('2d');if(!ctx)throw new Error('Picture surface unavailable');
-            ctx.setTransform(W/bw,0,0,H/bh,-bx*W/bw,-by*H/bh);canvasRenderer.drawPackets(ctx,packets);
+            ctx.setTransform(W/bw,0,0,H/bh,-bx*W/bw,-by*H/bh);canvasRenderer.drawPackets(ctx,packets,{lend:this.#lend});
             entry={surface,bytes};this.#bytes+=bytes;this.#spent+=this.#now()-t0;how='paint';
         }else this.#entries.delete(id);
         this.#entries.set(id,entry);

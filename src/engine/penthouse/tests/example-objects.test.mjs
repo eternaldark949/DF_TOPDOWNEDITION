@@ -24,7 +24,7 @@ test('the bar cart is data: components at their own heights, fitted bounds, and 
 
 test('the bar cart draws its parts lowest first, coloured by its look, and a look change recolours it', async () => {
     const p = world(), camera = new cameraSystem({ position: [0, 0], viewport: { width: 400, height: 300 } }), render = new renderSystem({ physics_system: p, camera });
-    render.registerRenderer('recording', recordingRenderer); await render.setRenderer('recording', { surface: null });
+    render.registerRenderer('recording', recordingRenderer); await render.setRenderer('recording', { surface: null }); render.setStillPictures(false);   // (these read each shape's packets)
     const cart = createObject(p.elements, 'examples:bar_cart', [0, 0]); p.updateState(1 / 60);
     const draw = () => { render.beginFrame(); render.drawLooks(); render.endFrame(); return render.getFrameSnapshot().passes.flatMap(pass => pass.packets); };
     const packets = draw(), fills = packets.map(packet => packet.material.fill);
@@ -37,7 +37,7 @@ test('the bar cart draws its parts lowest first, coloured by its look, and a loo
 
 test('leaning, each thing on the tray draws whole, farthest from the camera first, so a near bottle covers the foot of a far glass', async () => {
     const p = world(), camera = new cameraSystem({ position: [0, 0], viewport: { width: 400, height: 300 } }), render = new renderSystem({ physics_system: p, camera });
-    render.registerRenderer('recording', recordingRenderer); await render.setRenderer('recording', { surface: null });
+    render.registerRenderer('recording', recordingRenderer); await render.setRenderer('recording', { surface: null }); render.setStillPictures(false);   // (these read each shape's packets)
     createObject(p.elements, 'examples:bar_cart', [0, 0]); p.updateState(1 / 60);
     const order = x => { camera.setView({ position: [x, 0] }); render.setHeightView({ eye: 400 }); render.beginFrame(); render.drawLooks(); render.endFrame();
         const fills = render.getFrameSnapshot().passes.flatMap(pass => pass.packets).map(packet => packet.material.fill);
@@ -51,7 +51,7 @@ test('leaning, each thing on the tray draws whole, farthest from the camera firs
 
 test('the cart is painted in materials its look picks: a chrome cart extends it and names other materials', async () => {
     const p = world(), camera = new cameraSystem({ position: [0, 0], viewport: { width: 400, height: 300 } }), render = new renderSystem({ physics_system: p, camera });
-    render.registerRenderer('recording', recordingRenderer); await render.setRenderer('recording', { surface: null });
+    render.registerRenderer('recording', recordingRenderer); await render.setRenderer('recording', { surface: null }); render.setStillPictures(false);   // (these read each shape's packets)
     const chrome = createObject(p.elements, 'examples:bar_cart_chrome', [0, 0]); p.updateState(1 / 60);
     assert.equal(chrome.get('behaviour'), 'refill_drink', 'everything else comes from the cart it extends');
     render.setHeightView({ eye: 400 }); render.beginFrame(); render.drawLooks(); render.endFrame();
@@ -66,7 +66,7 @@ const floors = JSON.parse(readFileSync(new URL('../examples/floors.json', import
 test('a texture is painted once per set of values into a tile and repeated; a material recolours it', async () => {
     validateLibrary(floors);
     const p = new physicsSystem({ asset_library: createEngineRegistry({ libraries: [floors] }) }), camera = new cameraSystem({ position: [0, 0], viewport: { width: 400, height: 300 } }), render = new renderSystem({ physics_system: p, camera });
-    render.registerRenderer('recording', recordingRenderer); await render.setRenderer('recording', { surface: null });
+    render.registerRenderer('recording', recordingRenderer); await render.setRenderer('recording', { surface: null }); render.setStillPictures(false);   // (these read each shape's packets)
     const floor = (x, material) => createObject(p.elements, { kind: 'decoration', components: [{ name: 'floor', layers: [{ layer: 0, steps: [{ shape: 'rectangle', x: -50, y: -50, width: 100, height: 100, material }] }] }] }, [x, 0]);
     floor(-100, 'floors:walnut_parquet'); floor(0, 'floors:oak_parquet'); floor(100, 'floors:walnut_parquet'); p.updateState(1 / 60);
     const draw = () => { render.beginFrame(); render.drawLooks(); render.endFrame(); return render.getFrameSnapshot(); };

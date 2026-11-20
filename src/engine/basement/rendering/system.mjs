@@ -30,7 +30,7 @@ const methods=['initialize','resize','render','registerResource','releaseResourc
  * host which surface is live.
  */
 export class renderSystem {
-    #createSurface=null;#lean=null;#textures=new Map();#texturesWanted=[];#textureChain=Promise.resolve();#world;#camera;#frame=new renderFrame();#renderers=new Map();#resources=new Map();#backend=null;#backendId=null;#surface=null;
+    #createSurface=null;#lean=null;#still=true;#texturesPainted=0;#textures=new Map();#texturesWanted=[];#textureChain=Promise.resolve();#world;#camera;#frame=new renderFrame();#renderers=new Map();#resources=new Map();#backend=null;#backendId=null;#surface=null;
     #effects=Object.freeze([]);#layerEffects=new Map();#collecting=false;#busy=false;#disposed=false;#generation=0;#last=null;#surfaceListeners=new Set();#frameListeners=new Set();#requirements=[];#visible=[];
     constructor({physics_system,camera,create_surface=null}={}){if(create_surface!==null&&typeof create_surface!=='function')throw new TypeError('create_surface makes a surface for a renderer id');this.#createSurface=create_surface;if(!physics_system?.queryEntitiesInBounds||!camera?.getView)throw new TypeError('renderSystem requires native world and camera');this.#world=physics_system;this.#camera=camera;}
     get renderer_id(){return this.#backendId;}
@@ -88,6 +88,11 @@ export class renderSystem {
      */
     setHeightView(options){this.#live();if(options===null){this.#lean=null;return this;}const {eye,lean=1}=options??{};new heightView({camera:[0,0],eye,lean}).k(0);if(!(eye>0))throw new RangeError('A height view needs an eye above the ground');this.#lean={eye,lean};return this;}
     getHeightView(){return this.#lean?{...this.#lean}:null;}
+    /** Still pictures (on by default where the renderer draws pictures): each component layer that is not on a tipped bone is
+     *  painted once into a picture, per its steps and look, and stamped under its place every frame, so detailed furniture
+     *  costs one image a layer. Off, every shape is drawn every frame. */
+    setStillPictures(on){this.#live();this.#still=!!on;return this;}
+    getStillPictures(){return this.#still;}
     /**
      * A paint that names a texture, `{type: 'pattern', texture, values, scale, rotation, offset, repeat}`, as the pattern
      * the backend draws: the texture resource's tile, painted once for these values into a target of its own and
@@ -120,7 +125,7 @@ export class renderSystem {
             for(const dx of [-w,0,w])for(const dy of [-h,0,h])scene.draw(entry.steps,{at:[dx*pw/w,dy*ph/h],scale:[pw/w,ph/h],values:entry.values});
             frame.beginPass({target_id:entry.resource_id,clear_color:'transparent',viewport:{width:pw,height:ph}});
             for(const packet of scene.finish())frame.submit({...packet,space:'screen'});
-            frame.endPass();entry.state='painted';
+            frame.endPass();entry.state='painted';this.#texturesPainted++;
         }
     }
     /** Draws every visible entity's look (a `drawing` asset) and its components into the open frame, at its `look.layer` and `look.depth`; a component layer's depth adds its height, so higher parts draw over lower ones. Returns how many entities it drew. */
@@ -133,7 +138,11 @@ export class renderSystem {
             if(entity.assets?.drawing){const scene=new artScene();if(drawLook(scene,entity,source,blend,{view})){const z=entity.world_elevation??0;for(const packet of scene.finish())this.#frame.submit(this.#textured({...packet,layer,depth:depth+z}));drew=true;}}
             if(entity.has('components')){
                 let pose;const rigs=this.#world.rigs,joints=name=>{pose??=rigs?.getRig(entity)?rigs.getPose(entity,{blend,world_space:true}):null;return pose?.joints[name]??null;};
-                for(const part of drawComponents(entity,source,blend,{joints,view})){for(const packet of part.sides)this.#frame.submit(this.#textured({...packet,layer,depth:depth+part.depth+packet.depth}));for(const packet of part.packets)this.#frame.submit(this.#textured({...packet,layer,depth:depth+part.top}));drew=true;}
+                const pictures=this.#still&&!!this.#backend?.capabilities.includes('picture');
+                for(const part of drawComponents(entity,source,blend,{joints,view,pictures})){for(const packet of part.sides)this.#frame.submit(this.#textured({...packet,layer,depth:depth+part.depth+packet.depth}));for(const packet of part.packets)this.#frame.submit(this.#textured({...packet,layer,depth:depth+part.top}));
+                    if(part.picture){const {key,bounds,matrix,build}=part.picture,gen=this.#texturesPainted;   // (a texture painted later is a new picture: the old one held its base colour)
+                        this.#frame.submit({type:'picture',picture:{key:`${key}@${gen}`,bounds,matrix,layered:true,build:()=>build().map(packet=>this.#textured(packet))},layer,depth:depth+part.top});}
+                    drew=true;}
             }
             if(drew)drawn++;
         }
