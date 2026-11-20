@@ -12,7 +12,7 @@
 // map_layout     { map_id?, props: [placement], ...any other per-map lists (copied as data) }
 //                placement = { type, x, y, ...fields }: fields override the type's defaults, and a
 //                field set to null removes that default.
-// map            { size: [w, h], setting?: 'interior'|'exterior', spawn?, floors?, wall_look?, walls?, placements?, rooms?, doors?, switches?, light_grid?, ... }
+// map            { size: [w, h], setting?: 'interior'|'exterior', spawn?, floors?, wall_look?, walls?, placements?, rooms?, doors?, switches?, light_grid?, height_view?: {eye, lean = 1}, ... }
 //                A whole map as data: the Basement map builder's definition, found by its id like any
 //                resource. `setting` is the builder's `kind` (the resource's own `kind` is 'map'). Fields
 //                the builder does not read (a label, landmarks, windows) are the game's, kept as data.
@@ -212,6 +212,7 @@ export function validateMap(map, where = 'map') {
     if (map.rooms !== undefined && !(plain(map.rooms) && Object.values(map.rooms).every(plain))) fail(where, 'rooms are { id: room }');
     if (map.wall_look !== undefined && !(plain(map.wall_look) && typeof map.wall_look.material === 'string')) fail(where, 'wall_look is { material, sides?, height?, layer? }');
     if (map.switches !== undefined && !(plain(map.switches) && Object.values(map.switches).every(v => typeof v === 'boolean'))) fail(where, 'switches are { system: true | false }');
+    if (map.height_view !== undefined && !(plain(map.height_view) && Object.keys(map.height_view).every(k => k === 'eye' || k === 'lean') && Number.isFinite(map.height_view.eye) && map.height_view.eye > 0 && (map.height_view.lean === undefined || (Number.isFinite(map.height_view.lean) && map.height_view.lean >= 0)))) fail(where, 'height_view is { eye: world units above the ground (> 0), lean: how far walls lean (>= 0, default 1) }');
     if (map.light_grid !== undefined) { try { readLightGrid(map.light_grid); } catch (error) { fail(where, error.message); } }
     if (map.floors?.length) validateDrawing({ steps: map.floors.map(({ elevation, thickness, sides, ...step }) => step) }, `${where}.floors`);
     return map;

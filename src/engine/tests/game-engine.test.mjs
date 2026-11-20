@@ -196,6 +196,16 @@ test('a map level whose switches turn the light grid on bakes it on entry and re
     e.dispose();
 });
 
+test('a map level with a height view sets the camera\'s eye on entry and clears it on leaving', async () => {
+    const { mapLevel } = await import('../lobby/runtime/map-level.mjs');
+    const maps = { tall: { map_id: 'tall', size: [256, 256], height_view: { eye: 280, lean: 1.5 } }, flat: { map_id: 'flat', size: [256, 256] } };
+    class Place extends mapLevel { mapDefinition() { return { definition: maps[this.level_id] }; } }
+    const e = new gameEngine({ asset_library: createEngineRegistry({ libraries: [] }), schedule_frame: null }); e.registerLevel('tall', Place); e.registerLevel('flat', Place);
+    await e.loadLevel('tall'); assert.deepEqual(e.basement.render.getHeightView(), { eye: 280, lean: 1.5 });
+    await e.loadLevel('flat'); assert.equal(e.basement.render.getHeightView(), null);
+    e.dispose();
+});
+
 const toys = { library_id: 'toys', resources: {
     lamp: { kind: 'drawing', steps: [{ shape: 'glow', radius: 60, color: '#ffd27f' }, { shape: 'circle', radius: 10, material: 'brass', solid: true }, { shape: 'rectangle', x: -2, y: 10, width: 4, height: 30, material: 'brass', solid: true }] },
     brass: { kind: 'material', fill: '#b5a642' } },

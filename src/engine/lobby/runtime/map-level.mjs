@@ -25,6 +25,9 @@ export class mapLevel extends gameLevel {
         const travellers = prepared.travellers.map(id => context.basement.elements.fetchEntity(id)).filter(e => e && !e.destroyed);
         if (travellers.length) this.placeTravellers(context, travellers, this.arrivalPose(context, prepared.arrival?.from ?? null, travellers[0]));
         // The light grid, when the map's switches turn it on: its regions bake behind the level change too.
+        // The camera's height view, when the map gives one: how high the eye stands and how far walls lean from it.
+        this.height_view = prepared.definition.height_view ?? null;
+        if (this.height_view) context.basement.render?.setHeightView(this.height_view);
         this.light_grid = prepared.definition.switches?.light_grid ? new lightGridSystem({ settings: prepared.definition.light_grid ?? {}, source: context.assets ?? context.basement.physics.elements?.asset_library ?? null }).attach(this.map, this.lightGridOptions(context)) : null;
         this.map.setFocus(this.mapFocuses(context), { budget_ms: Infinity });   // (the arriving regions, whole, behind the level change)
         this.light_grid?.updateState({ budget_ms: Infinity });
@@ -53,7 +56,7 @@ export class mapLevel extends gameLevel {
     mapStreamBudget(context) { return 3; }
     /** What `map.updateState` is given each step (door ranges, who opens doors). */
     mapUpdateOptions(context) { return {}; }
-    leave(context) { this.map?.destroy(); this.map = null; this.light_grid = null; }
+    leave(context) { this.map?.destroy(); this.map = null; this.light_grid = null; if (this.height_view) context.basement.render?.setHeightView(null); this.height_view = null; }
     /** Every exit: `{entity, target, label, auto, bounds}`. */
     getExits() {
         if (!this.map) return [];

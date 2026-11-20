@@ -20,3 +20,10 @@ test('a map\'s light grid settings and switches are checked', () => {
     assert.throws(()=>validateMap({size:[100,100],light_grid:{regions:{'0,0':{spread:-1}}}}));
     assert.throws(()=>validateMap({size:[100,100],switches:{light_grid:'yes'}}));
 });
+
+test('a map\'s height view is an eye above the ground and how far walls lean', () => {
+    assert.doesNotThrow(()=>validateMap({size:[100,100],height_view:{eye:280,lean:1.5}}));
+    assert.doesNotThrow(()=>validateMap({size:[100,100],height_view:{eye:600}}));
+    assert.throws(()=>validateMap({size:[100,100],height_view:{eye:0}}),/height_view/);
+    assert.throws(()=>validateMap({size:[100,100],height_view:{eye:280,tilt:1}}),/height_view/);
+});

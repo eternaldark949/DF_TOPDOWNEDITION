@@ -453,7 +453,7 @@ A level is a `gameLevel` subclass. It holds content and policy; it never owns th
 
 ### Map levels
 
-`mapLevel` is a level that loads a map: give it a map definition and it builds the map, streams it, places travellers and exposes its exits. With `switches: {light_grid: true}` in the map it also keeps the map's light grid (`level.light_grid`): glowing art lights its surroundings, baked per region and re-baked round moving emitters within a budget after physics. Draw it with `createLightLayerParts({..., grids: level.light_grid.grids(view)})`, add `level.light_grid.liveLights()` to the live lights, and read `level.light_grid.sample(x, y)` for reflections.
+`mapLevel` is a level that loads a map: give it a map definition and it builds the map, streams it, places travellers and exposes its exits. With `switches: {light_grid: true}` in the map it also keeps the map's light grid (`level.light_grid`): glowing art lights its surroundings, baked per region and re-baked round moving emitters within a budget after physics. Draw it with `createLightLayerParts({..., grids: level.light_grid.grids(view)})`, add `level.light_grid.liveLights()` to the live lights, and read `level.light_grid.sample(x, y)` for reflections. A map's `height_view: {eye, lean = 1}` sets the camera's height view on entry (`renderSystem.setHeightView`; how high the eye stands over the ground in world units, and how far walls lean from it) and clears it on leaving: a low eye (a few hundred) shows tall facades, a high one keeps the view near flat.
 
 | Member | What it does |
 |---|---|
