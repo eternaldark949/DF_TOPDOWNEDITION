@@ -199,6 +199,12 @@ function drawSides(steps,{at,rotation,scale},values,fill,view,z0,z1,{shade=.35,f
 // panel (a window, a spandrel, a door) stands in every bay of every storey, piers stand between the bays, and bands
 // run along the whole wall. Every point is placed at its own height, so the art leans exactly with the wall.
 const CORNER=Math.PI/6,SLIVER=.6;
+// A panel's own drawing (a fan, a crest, a sign): each shape's outline in the panel's frame (x across from its middle,
+// y down from its top), scaled to the wall, with its paint.
+function panelShapes(steps,values,h,v){
+    return steps.map(raw=>{const st=readValues(raw,values),[part]=drawingOutline([st],{values,fine:true});
+        return {points:part.points.map(([x,y])=>[x*h,y*v]),fill:st.fill,stroke:st.stroke,line_width:(st.line_width??1)*h,open:st.shape==='line'};});
+}
 const near0=v=>Number.isFinite(v)?v:0;
 /** A facade's fields with its look values read and its lengths in the world (h: along walls, v: up them). */
 const ARTS=new WeakMap();
@@ -214,7 +220,7 @@ function readFacade(facade,values,h,v,H){
     return {
         storeys:{base,height,count},seed:facade.seed??0,top:H,
         bays:{width:Math.max(1e-6,(bays.width??H/v)*h),margin:near0(bays.margin)*h},
-        panels:(facade.panels??[]).map(read).map(p=>({...p,width:p.width*h,height:up(p.height),at:up(p.at??0),line_width:p.line_width??1,bars:p.bars??0,bar_width:(p.bar_width??1)*h,lit:p.lit??0,storeys:p.storeys??null})),
+        panels:(facade.panels??[]).map(read).map(p=>({...p,shapes:p.steps?panelShapes(p.steps,values,h,v):null,width:p.width*h,height:up(p.height),at:up(p.at??0),line_width:p.line_width??1,bars:p.bars??0,bar_width:(p.bar_width??1)*h,lit:p.lit??0,storeys:p.storeys??null})),
         piers:(facade.piers??[]).map(read).map(p=>({...p,width:p.width*h,from:from(p.from,0),to:from(p.to,H),edge_width:(p.edge_width??1)*h})),
         bands:(facade.bands??[]).map(read).map(b=>({...b,from:from(b.from,0),to:from(b.to,H)}))
     };
@@ -238,9 +244,9 @@ function planWalls(pts,art){
     const facet=new Array(n),walls=[];
     starts.forEach((a,w)=>{
         const b=starts[(w+1)%starts.length];let s=0,i=a;
-        do{facet[i]={wall:w,s0:s,s1:s+len[i]};s+=len[i];i=(i+1)%n;}while(i!==b);
+        const list=[];do{facet[i]={wall:w,s0:s,s1:s+len[i]};list.push(i);s+=len[i];i=(i+1)%n;}while(i!==b);
         const {width,margin}=art.bays,m=closed?0:Math.min(margin,s/2),span=s-2*m,count=span>=width*.6?Math.max(1,Math.round(span/width)):0;
-        const [x,y]=pts[a];walls.push({length:s,closed,margin:m,bay:count?span/count:0,count,key:Math.round(x)*73856093^Math.round(y)*19349663});
+        const [x,y]=pts[a];walls.push({facets:list,length:s,closed,margin:m,bay:count?span/count:0,count,key:Math.round(x)*73856093^Math.round(y)*19349663});
     });
     return {facet,walls};
 }
@@ -259,6 +265,13 @@ function paintFacade(scene,view,pts,plan,art,i,len,z0,face,screen){
         const x0=p[0]+(q[0]-p[0])*t0,y0=p[1]+(q[1]-p[1])*t0,x1=p[0]+(q[0]-p[0])*t1,y1=p[1]+(q[1]-p[1])*t1;
         const A=view.scaled(x0,y0,ka),B=view.scaled(x1,y1,ka),C=view.scaled(x1,y1,kb),D=view.scaled(x0,y0,kb);
         out.push(['move',A[0],A[1]],['line',B[0],B[1]],['line',C[0],C[1]],['line',D[0],D[1]],['close']);
+    };
+    // a point s along wall W at height z (above the layer's base), where it is drawn
+    const onWall=(W,s,z)=>{
+        if(W.closed)s=((s%W.length)+W.length)%W.length;
+        const list=W.facets;let lo=0,hi=list.length-1;while(lo<hi){const mid=(lo+hi+1)>>1;if(plan.facet[list[mid]].s0<=s)lo=mid;else hi=mid-1;}
+        const f=list[lo],F=plan.facet[f],t=Math.max(0,Math.min(1,(s-F.s0)/((F.s1-F.s0)||1))),p=pts[f],q=pts[(f+1)%n],k=kOf(z);
+        return view.scaled(p[0]+(q[0]-p[0])*t,p[1]+(q[1]-p[1])*t,k);
     };
     // every stretch [a, b] of a wall, wrapped round a closed one, met by facet f
     const spans=(f,a,b,fn)=>{const F=plan.facet[f],W=plan.walls[F.wall];if(W.closed&&b>W.length){fn(a,b);fn(a-W.length,b-W.length);}else if(W.closed&&a<0){fn(a,b);fn(a+W.length,b+W.length);}else fn(a,b);};
@@ -289,6 +302,17 @@ function paintFacade(scene,view,pts,plan,art,i,len,z0,face,screen){
             art.panels.forEach((panel,k)=>{
                 for(let r=0;r<storeys.count;r++){
                     if(panel.storeys&&!panel.storeys.includes(r)&&!panel.storeys.includes(r-storeys.count))continue;
+                    if(panel.shapes){
+                        // drawn whole, once, from the facet its middle stands on; x runs left to right as seen from outside
+                        const at=W.closed?((mid%W.length)+W.length)%W.length:mid;if(at<F.s0||at>=F.s1||at<v0-W.bay||at>v1+W.bay)continue;
+                        const za=storeys.base+r*storeys.height+panel.at,H=panel.height??storeys.height-panel.at;
+                        if(zoom&&(kOf(za+H)-kOf(za))*face[f].d*zoom<SLIVER*3)continue;
+                        panel.shapes.forEach((sh,j)=>{
+                            const path=sh.points.map(([x,y],q)=>{const [X,Y]=onWall(W,mid-x,za+H-y);return [q?'line':'move',X,Y];});if(!sh.open)path.push(['close']);
+                            if(sh.fill)get(`x${k}.${j}`).push(...path);if(sh.stroke)get(`y${k}.${j}`).push(...path);
+                        });
+                        continue;
+                    }
                     const za=storeys.base+r*storeys.height+panel.at,zb=za+(panel.height??storeys.height-panel.at),on=panel.lit>0&&panel.lit_fill&&hash(W.key,b,r,k,art.seed)<panel.lit;
                     spans(f,mid-panel.width/2,mid+panel.width/2,(a,c)=>{
                         piece(get(on?`l${k}`:`w${k}`),f,a,c,za,zb);
@@ -302,7 +326,8 @@ function paintFacade(scene,view,pts,plan,art,i,len,z0,face,screen){
     const fill=(key,paint)=>{const p=paths.get(key);if(p&&p.length&&paint)scene.fill(p,paint);};
     art.bands.forEach((band,k)=>fill(`b${k}`,band.fill));
     art.piers.forEach((pier,k)=>{fill(`p${k}`,pier.fill);fill(`e${k}`,pier.edge);});
-    art.panels.forEach((panel,k)=>{fill(`w${k}`,panel.fill);fill(`r${k}`,panel.bar_fill);const s=paths.get(`s${k}`);if(s&&s.length)scene.stroke(s,panel.stroke,panel.line_width);});
+    art.panels.forEach((panel,k)=>{fill(`w${k}`,panel.fill);fill(`r${k}`,panel.bar_fill);const s=paths.get(`s${k}`);if(s&&s.length)scene.stroke(s,panel.stroke,panel.line_width);
+        panel.shapes?.forEach((sh,j)=>{fill(`x${k}.${j}`,sh.fill);const t=paths.get(`y${k}.${j}`);if(t&&t.length)scene.stroke(t,sh.stroke,sh.line_width);});});
     return art.panels.some((p,k)=>paths.get(`l${k}`)?.length)?()=>art.panels.forEach((panel,k)=>{fill(`l${k}`,panel.lit_fill);fill(`r${k}`,panel.bar_fill);}):null;
 }
 const LIGHT=(()=>{const x=-.55,y=-.83,l=Math.hypot(x,y);return [x/l,y/l];})();   // toward the light, upper left

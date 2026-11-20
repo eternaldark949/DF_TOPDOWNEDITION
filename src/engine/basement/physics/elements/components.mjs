@@ -17,7 +17,7 @@ const LAYER = Object.freeze(['layer', 'height', 'thickness', 'steps', 'drawing',
 const FACADE = Object.freeze({
     facade: ['storeys', 'bays', 'panels', 'piers', 'bands', 'seed'],
     storeys: 'from height count'.split(' '), bays: ['width', 'margin'],
-    panels: ['width', 'height', 'at', 'fill', 'stroke', 'line_width', 'bars', 'bar_width', 'bar_fill', 'lit', 'lit_fill', 'storeys'],
+    panels: ['width', 'height', 'at', 'fill', 'stroke', 'line_width', 'bars', 'bar_width', 'bar_fill', 'lit', 'lit_fill', 'storeys', 'steps'],
     piers: 'width from to fill edge edge_width'.split(' '), bands: 'from to fill'.split(' ')
 });
 const SAFE = value => typeof value === 'string' && value && !['__proto__', 'prototype', 'constructor'].includes(value);
@@ -67,6 +67,7 @@ function readFacade(facade, where) {
             for (const field of ['height', 'line_width', 'bar_width', 'edge_width']) num(item[field], `${key}[${i}] ${field}`, 0);
             for (const field of 'at from to bars'.split(' ')) num(item[field], `${key}[${i}] ${field}`);
             if (item.lit !== undefined && !lookOr(item.lit, x => Number.isFinite(x) && x >= 0 && x <= 1)) throw new TypeError(`${it}'s lit is the share of them lit, 0..1`);
+            if (item.steps !== undefined && !(Array.isArray(item.steps) && item.steps.every(plain))) throw new TypeError(`${it}'s steps are a drawing (a list of steps) in the panel's frame: x across from its middle, y down from its top`);
             if (item.storeys !== undefined && !(Array.isArray(item.storeys) && item.storeys.every(Number.isInteger))) throw new TypeError(`${it}'s storeys are a list of storey numbers (from 0 at the bottom; -1 is the top one)`);
         });
     }
