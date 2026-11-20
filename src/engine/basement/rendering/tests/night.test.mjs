@@ -101,3 +101,21 @@ test('a lit band, a window drawn as lit steps, and a plain one when it is too sm
  assert.ok(small.shine.includes('#ffcc88')&&!small.all.includes('#e9a775'),'small on screen: the plain panel, lit the same');
  assert.throws(()=>world.elements.createEntity({kind:'static',position:[0,0],components:[{name:'b',layers:[{layer:0,height:0,thickness:40,sides:'#777',facade:{...art,panels:[{width:4,height:4,lit_steps:win('#fff')}]},steps:[box]}]}]}),/lit_steps/);
 });
+
+test('a text step in a panel is text laid on the face: its matrix puts the panel origin where the wall is, lit text shines, detail drops it',()=>{
+ const world=new physicsSystem(),view=new heightView({camera:[0,0],eye:900});
+ const sign=fill=>[{shape:'rectangle',x:-50,y:0,width:100,height:20,fill:'#222'},{shape:'text',text:'SIGN',x:0,y:10,size:12,align:'center',baseline:'middle',fill}];
+ const art={bays:{width:100,margin:0},panels:[{width:100,height:20,at:10,steps:sign('#888'),lit_steps:sign('#fff'),lit:1,fill:'#222',detail:30}]};
+ // a board 100 wide, 2 deep, standing 40 tall at y -300: its south face (y -299) looks at the camera at the origin
+ const e=world.elements.createEntity({kind:'static',position:[0,-300],components:[{name:'b',layers:[{layer:0,height:0,thickness:40,solid:false,sides:'#777',facade:art,steps:[{shape:'rectangle',x:-50,y:-1,width:100,height:2,fill:'#555'}]}]}]});
+ const draw=(zoom,shines=true)=>drawComponents(e,null,1,{view,shines,screen:{bounds:{left:-2000,top:-2000,right:2000,bottom:2000},zoom}})[0].sides;
+ const sides=draw(20),texts=sides.filter(p=>p.type==='text');
+ assert.ok(texts.length>=1&&texts.every(p=>p.text==='SIGN'),'the text is drawn as text');
+ const lit=texts.filter(p=>p.material.fill==='#fff');
+ assert.ok(lit.length&&lit.some(p=>p.shine),'a lit sign\'s text shines');
+ // the panel's origin (its middle, 10 down from its top) sits on the south face (y -299) at height 10 + 20 - 10 = 20
+ const m=lit[0].matrix,k=view.k(20),[X,Y]=view.scaled(0,-299,k);
+ near(m[4],X,'x',1e-6);near(m[5],Y,'y',1e-6);
+ assert.ok(m[0]>0&&m[3]>0,'it reads left to right and upright, as seen from outside');
+ assert.ok(!draw(.5).some(p=>p.type==='text'),'smaller on screen than its detail: no text');
+});
