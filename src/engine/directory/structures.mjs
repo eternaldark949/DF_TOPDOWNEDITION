@@ -12,7 +12,7 @@
 // map_layout     { map_id?, props: [placement], ...any other per-map lists (copied as data) }
 //                placement = { type, x, y, ...fields }: fields override the type's defaults, and a
 //                field set to null removes that default.
-// map            { size: [w, h], setting?: 'interior'|'exterior', spawn?, floors?, wall_look?, walls?, placements?, rooms?, doors?, ... }
+// map            { size: [w, h], setting?: 'interior'|'exterior', spawn?, floors?, wall_look?, walls?, placements?, rooms?, doors?, switches?, light_grid?, ... }
 //                A whole map as data: the Basement map builder's definition, found by its id like any
 //                resource. `setting` is the builder's `kind` (the resource's own `kind` is 'map'). Fields
 //                the builder does not read (a label, landmarks, windows) are the game's, kept as data.
@@ -29,7 +29,7 @@
 //                from its start. A map door names the kind in its `type`. The Basement map builder
 //                has the full rules and the built-in kinds (plain, sliding, hinged, arch).
 import { plain } from './values.mjs';
-import { DRAWING, MATERIAL, validateEffectsPreset } from '../basement/rendering/index.mjs';
+import { DRAWING, MATERIAL, readEmits, readLightGrid, validateEffectsPreset } from '../basement/rendering/index.mjs';
 
 export const STRUCTURES = Object.freeze({
     prop_catalog: 'A catalog of prop types and the families they are presets of: { types: { <type>: { defaults, movable?, blocks_light?, light? } }, families?: { <family>: { look: { <field>: { kind, default } } } } }.',
@@ -162,9 +162,12 @@ export function validateDrawing(drawing, where = 'drawing') {
         else if (!Object.hasOwn(DRAWING, step.shape)) fail(here, `unknown shape ${step.shape} (one of ${Object.keys(DRAWING).join(', ')}, group)`);
         if (step.solid !== undefined && typeof step.solid !== 'boolean') fail(here, 'solid is true or false');
         if (step.material !== undefined && (typeof step.material !== 'string' || !step.material)) fail(here, 'material names a material resource');
+        if (step.emits !== undefined) emitsOf(step.emits, here);
     });
     walk(drawing.steps, `${where}.steps`); return drawing;
 }
+/** Checks a step's or a material's `emits` (true, false, or {strength, reach, color, height}: see the Basement's EMITS). */
+function emitsOf(emits, where) { try { readEmits(emits); } catch (error) { fail(where, error.message); } }
 const SURFACE_FIELDS = ['friction', 'restitution', 'hit_sound', 'hit_effect', 'footstep'];
 /** A material resource: paint fields and an optional physical surface, nothing else. */
 /** Throws unless `texture` is a texture: a tile size, its drawing steps, default values and a base colour. Returns it. */
@@ -183,6 +186,7 @@ export function validateTexture(texture, where = 'texture') {
 export function validateMaterial(material, where = 'material') {
     if (!plain(material)) fail(where, 'a material is an object');
     for (const key of Object.keys(material)) if (!MATERIAL.paint.includes(key) && !MATERIAL.other.includes(key)) fail(where, `unknown field ${key} (a material holds ${[...MATERIAL.paint, ...MATERIAL.other].join(', ')})`);
+    if (material.emits !== undefined) { if (material.emits === false || material.emits === null) fail(where, 'emits on a material is true or {strength, reach, color, height}'); emitsOf(material.emits, where); }
     if (material.surface !== undefined) {
         if (!plain(material.surface)) fail(where, 'surface is an object');
         for (const [key, value] of Object.entries(material.surface)) {
@@ -203,6 +207,8 @@ export function validateMap(map, where = 'map') {
     for (const key of MAP_LISTS) if (map[key] !== undefined && !(Array.isArray(map[key]) && map[key].every(plain))) fail(where, `${key} is a list of objects`);
     if (map.rooms !== undefined && !(plain(map.rooms) && Object.values(map.rooms).every(plain))) fail(where, 'rooms are { id: room }');
     if (map.wall_look !== undefined && !(plain(map.wall_look) && typeof map.wall_look.material === 'string')) fail(where, 'wall_look is { material, sides?, height?, layer? }');
+    if (map.switches !== undefined && !(plain(map.switches) && Object.values(map.switches).every(v => typeof v === 'boolean'))) fail(where, 'switches are { system: true | false }');
+    if (map.light_grid !== undefined) { try { readLightGrid(map.light_grid); } catch (error) { fail(where, error.message); } }
     if (map.floors?.length) validateDrawing({ steps: map.floors.map(({ elevation, thickness, sides, ...step }) => step) }, `${where}.floors`);
     return map;
 }

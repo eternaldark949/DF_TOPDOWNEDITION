@@ -75,6 +75,13 @@ export class artScene{
         this.packets.push({type:'shape',matrix:[...this.matrix],geometry:geometry(commands),material:{fill:null,stroke:null,stroke_width,line_cap,line_join,dash:[...dash],...copy(material)},opacity:this.style.opacity,blend:this.style.blend,clips:this.clips.map(clip=>({geometry:clip.geometry,transform:multiply(inv,clip.matrix),rule:clip.rule}))});return this;
     }
     fill(commands,color){return this.paint(commands,{fill:color});}
+    /**
+     * A small image of its own in the group (`pixels` {width, height, data}: RGBA bytes, rows top down), its
+     * `source` [x, y, w, h] pixels drawn with their top-left at the group's origin, `scale` local units a
+     * pixel, read smoothly between pixel centres. Backends upload a data array once.
+     */
+    sprite(pixels,source=[0,0,pixels.width,pixels.height],scale=1){const inv=this.clips.length?inverse(this.matrix):null;
+        this.packets.push({type:'sprite',matrix:[...this.matrix],pixels,source:[...source],size:[source[2]*scale,source[3]*scale],origin:[0,0],material:{fill:null,stroke:null},opacity:this.style.opacity,blend:this.style.blend,clips:this.clips.map(clip=>({geometry:clip.geometry,transform:multiply(inv,clip.matrix),rule:clip.rule}))});return this;}
     stroke(commands,color,stroke_width=this.style.stroke_width){return this.paint(commands,{stroke:color,stroke_width});}
     /** The fill-then-outline pair the classic art draws for nearly every part. */
     outlined(commands,fill,stroke,stroke_width=this.style.stroke_width){return this.paint(commands,{fill,stroke,stroke_width});}
@@ -128,10 +135,11 @@ export class artScene{
         return this;
     }
     #step(step,values,materials){
-        const {shape,material,solid,...fields}=step??{};
+        const {shape,material,solid,emits,...fields}=step??{};
         if(shape==='group'){const {steps,x=0,y=0,rotation=0,scale=1}=fields;return this.draw(steps,{at:[x,y],rotation,scale,values,materials});}
         const call=DRAWING[shape];if(!call)throw new TypeError(`Unknown drawing shape: ${shape} (one of ${Object.keys(DRAWING).join(', ')}, group)`);
         if(solid!==undefined&&typeof solid!=='boolean')throw new TypeError('solid is true or false');
+        if(emits!==undefined)readEmits(emits);
         return this[call](material===undefined?fields:{...materialPaint(material,materials),...fields});
     }
     #draw(commands,paint){const {material,opacity,blend}=drawPaint(paint);return this.#styled(opacity,blend,()=>this.paint(commands,material));}
@@ -143,7 +151,30 @@ export const DRAWING=Object.freeze({rectangle:'drawRectangle',circle:'drawCircle
 const PAINT_KEYS=new Set(['fill','stroke','line_width','line_cap','line_join','dash','alpha','blend','shadow','blur']);
 const NO_MATERIALS=Object.freeze({});
 /** The fields a material record may hold: its paint, plus `kind` and the physical `surface` that drawing ignores. */
-export const MATERIAL=Object.freeze({paint:Object.freeze([...PAINT_KEYS]),other:Object.freeze(['kind','surface'])});
+export const MATERIAL=Object.freeze({paint:Object.freeze([...PAINT_KEYS]),other:Object.freeze(['kind','surface','emits'])});
+/**
+ * The fields of `emits`, on a drawing step or a material: the shape glows and lights what is round it
+ * (the light grid, reflections). `true` takes every default; `false` or null (on a step) turns off its material's.
+ *  strength  how bright the light it casts is, 0 or more (default 1)
+ *  reach     how far it reaches, world units (default 96)
+ *  color     the light's colour, '#rrggbb' or '#rgb' (default the step's own fill, else its stroke, else white)
+ *  height    how high above the ground it glows, world units (default 0): a high light reaches farther and softer
+ * Drawing ignores it: an emitting step draws as it would without.
+ */
+export const EMITS=Object.freeze({strength:1,reach:96,color:null,height:0});
+/** `emits` in its one form, {strength, reach, color, height}, or null when it is off. Unknown fields are refused. */
+export function readEmits(emits,where='emits'){
+    if(emits===false||emits===null)return null;
+    if(emits===true)return {...EMITS};
+    if(!emits||typeof emits!=='object'||Array.isArray(emits))throw new TypeError(`${where} is true, false or {${Object.keys(EMITS).join(', ')}}`);
+    for(const key of Object.keys(emits))if(!Object.hasOwn(EMITS,key))throw new TypeError(`Unknown ${where} field: ${key} (one of ${Object.keys(EMITS).join(', ')})`);
+    const out={...EMITS,...emits};
+    if(!(Number.isFinite(out.strength)&&out.strength>=0))throw new TypeError(`${where}.strength is a number of 0 or more`);
+    if(!(Number.isFinite(out.reach)&&out.reach>0))throw new TypeError(`${where}.reach is a positive number of world units`);
+    if(!(Number.isFinite(out.height)&&out.height>=0))throw new TypeError(`${where}.height is a number of 0 or more`);
+    if(out.color!==null&&!(typeof out.color==='string'&&/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(out.color)))throw new TypeError(`${where}.color is '#rrggbb' or '#rgb'`);
+    return out;
+}
 /** A material record's paint fields, read by name. A material with an unknown field is refused. */
 function materialPaint(name,materials){
     if(typeof name!=='string'||!name)throw new TypeError('A step names its material by id');

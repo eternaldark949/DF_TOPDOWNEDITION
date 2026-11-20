@@ -323,7 +323,7 @@ The calls are `drawRectangle`, `drawCircle`, `drawEllipse`, `drawCapsule`, `draw
 ]
 ```
 
-**Materials and textures.** A step's `material` names a material record, so many drawings share one substance. A material holds paint fields (`fill`, `stroke`, `line_width`, `alpha`, `blend`, `shadow`, `blur`, …) and an optional `surface` (`friction`, `restitution`, `hit_sound`, `hit_effect`, `footstep`); any other field is refused. A step's own paint wins over its material's. A texture is a fill: `{ "type": "pattern", "image": "bricks", "repeat": "repeat" }` repeats a registered image and moves with its object.
+**Materials and textures.** A step's `material` names a material record, so many drawings share one substance. A material holds paint fields (`fill`, `stroke`, `line_width`, `alpha`, `blend`, `shadow`, `blur`, …) and an optional `surface` (`friction`, `restitution`, `hit_sound`, `hit_effect`, `footstep`); any other field is refused. A step's own paint wins over its material's. **Glowing shapes.** `emits` on a step or a material marks a shape that glows and lights what is round it: `true`, or `{strength = 1, reach = 96, color, height = 0}` (`EMITS`; reach and height in world units, `color` '#rrggbb' defaulting to the step's fill, then its stroke, then white). A step's `emits` wins over its material's, and `false` turns its material's off. Drawing ignores it. `drawingEmitters(steps, {at, rotation, scale, values, materials, elevation})` lists a drawing's glowing shapes in world space (`{outline, open, width, bounds, color, strength, reach, height}`), the one list the light grid and reflections read; `readEmits(emits)` gives the one form or throws. A texture is a fill: `{ "type": "pattern", "image": "bricks", "repeat": "repeat" }` repeats a registered image and moves with its object.
 
 **Looks.** An entity whose `drawing` asset names a drawing is drawn by the engine every frame at its own position and rotation; nothing else is needed. Its `look` property (`{values, scale, layer, depth, visible}`) says what the drawing reads and where it sits, so `entity.set('look', {...})` changes how it looks and `entity.setAsset('drawing', id)` swaps its art.
 
@@ -333,7 +333,7 @@ The calls are `drawRectangle`, `drawCircle`, `drawEllipse`, `drawCapsule`, `draw
 | `fitBounds(steps, bounds)` | The collision shape that fits a drawing's solid steps: `circle`, `box`, `capsule` or `hull` |
 | `drawingReach(steps)` | The circle round everything a drawing paints, glows included |
 
-The light layer (`createLightLayer`) draws lights and shadows. Colour helpers: `rgba`, `mix`, `shade`, `hexToRgb`.
+The light layer (`createLightLayer`) draws lights and shadows. Glowing art lights its surroundings through the light grid: `bakeLightGrid` bakes one region's grid from `emits` shapes (cell 16 or 32, walls stop it), `createLightLayerParts({grids})` draws it into the light tiles as a cut and a colour, and `lightGridSystem` keeps a map's grids current per region (a map's `light_grid: {cell, spread, strength, regions}` settings, moving emitters re-baking what they reach). See the rendering README's Light grid section. Colour helpers: `rgba`, `mix`, `shade`, `hexToRgb`.
 
 Reference: [rendering README](basement/rendering/README.md).
 
@@ -453,7 +453,7 @@ A level is a `gameLevel` subclass. It holds content and policy; it never owns th
 
 ### Map levels
 
-`mapLevel` is a level that loads a map: give it a map definition and it builds the map, streams it, places travellers and exposes its exits.
+`mapLevel` is a level that loads a map: give it a map definition and it builds the map, streams it, places travellers and exposes its exits. With `switches: {light_grid: true}` in the map it also keeps the map's light grid (`level.light_grid`): glowing art lights its surroundings, baked per region and re-baked round moving emitters within a budget after physics. Draw it with `createLightLayerParts({..., grids: level.light_grid.grids(view)})`, add `level.light_grid.liveLights()` to the live lights, and read `level.light_grid.sample(x, y)` for reflections.
 
 | Member | What it does |
 |---|---|

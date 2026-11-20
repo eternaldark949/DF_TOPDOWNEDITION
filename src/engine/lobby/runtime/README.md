@@ -77,6 +77,7 @@ Except `prepare`, hooks must be synchronous. Levels can omit hooks via the base 
 
 - builds the map on `enter` and releases it on `leave`;
 - streams the map after each step round `mapFocuses(context)` (default: every active character body, else the spawn) within `mapStreamBudget(context)` milliseconds (default 3), and builds the arriving regions whole on `enter`;
+- when the map's `switches.light_grid` is true, keeps its light grid (`this.light_grid`, a Basement `lightGridSystem` over the map's `light_grid` settings, tier options from `lightGridOptions(context)`): baked whole on `enter`, and after each step given the glowing movers among `lightGridMovers(context)` (default every character and vehicle) and re-baked within `lightGridBudget(context)` milliseconds (default 2);
 - runs `map.updateState(mapUpdateOptions(context))` after each step, so doors and rooms stay current;
 - lists its exits with `getExits()`: the map's triggers whose data names a `target` level, as `{entity, target, label, auto, bounds}`. `exitAt(body)` gives the exit a body stands in.
 

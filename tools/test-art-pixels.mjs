@@ -159,3 +159,33 @@ test('turned strips, beams and stamped lights draw the same as the whole layer, 
         assert.equal(result.shared, 1, 'two lights of one shape share one colour picture, at their own strengths');
     } finally { await browser.close(); server.close(); }
 });
+
+test('the light grid: a neon bar beside a wall lights its own side of the street, in the cached light tiles, and its tint shows on a walker', { skip: !chromium && 'Playwright is not installed' }, async () => {
+    const server = createServer(async (req, res) => {
+        try { const body = await readFile(join(root, decodeURIComponent(req.url.split('?')[0])));
+            res.writeHead(200, { 'content-type': extname(req.url) === '.mjs' ? 'text/javascript' : extname(req.url) === '.json' ? 'application/json' : 'text/html' }); res.end(body); }
+        catch { res.writeHead(404); res.end(); }
+    }).listen(0);
+    const browser = await chromium.launch();
+    try {
+        const page = await browser.newPage();
+        await page.goto(`http://127.0.0.1:${server.address().port}/tools/fixtures/blank.html`).catch(() => {});
+        const px = await page.evaluate(async () => {
+            const { canvasRenderer, pictureCache, createLightLayerParts, bakeLightGrid, drawingEmitters } = await import('/src/engine/basement/rendering/index.mjs');
+            const extent = { left: 0, top: 0, right: 256, bottom: 256 }, emitters = drawingEmitters([{ shape: 'rectangle', x: 100, y: 112, width: 56, height: 8, fill: '#ff3399', emits: { reach: 110 } }]);
+            const grid = bakeLightGrid({ bounds: extent, cell: 16, emitters, blockers: [[60, 100, 196, 110]] });
+            const pictures = new pictureCache({ densities: [1], budget_ms: Infinity }), canvas = Object.assign(document.createElement('canvas'), { width: 256, height: 256 }), ctx = canvas.getContext('2d');
+            const draw = () => { ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = '#808080'; ctx.fillRect(0, 0, 256, 256); ctx.fillStyle = '#e0e0e0'; ctx.fillRect(122, 150, 12, 12);
+                pictures.beginFrame(); canvasRenderer.drawLayer(ctx, createLightLayerParts({ extent, tint: 'rgb(5,5,20)', grids: [grid], tile_size: 128, view: extent }), { pictures });
+                return (x, y) => [...ctx.getImageData(x, y, 1, 1).data]; };
+            const at = draw(), result = { near: at(128, 135), walker: at(128, 156), beside: at(112, 156), far: at(128, 80), off: at(10, 250) };
+            const painted = pictures.statistics.pictures, again = draw()(128, 135);
+            return { ...result, painted, again, after: pictures.statistics.pictures };
+        });
+        assert.ok(px.near[0] > 90 && px.near[0] > px.near[1] + 40, `the street beside the bar is lit pink (${px.near})`);
+        assert.ok(px.walker[0] > px.beside[0] + 10 && px.walker[0] > px.walker[1] + 20, `a light walker under it shows, tinted pink (${px.walker} on ground ${px.beside})`);
+        assert.ok(px.far[0] < 20, `behind the wall it stays dark (${px.far})`);
+        assert.deepEqual(px.off, [5, 5, 20, 255], 'past its reach, the dark');
+        assert.deepEqual(px.again, px.near, 'a still frame draws the same'); assert.equal(px.after, px.painted, 'from the pictures it painted once');
+    } finally { await browser.close(); server.close(); }
+});
