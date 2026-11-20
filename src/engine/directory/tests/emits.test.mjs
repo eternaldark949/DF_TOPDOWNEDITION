@@ -19,6 +19,10 @@ test('a map\'s light grid settings and switches are checked', () => {
     assert.throws(()=>validateMap({size:[100,100],light_grid:{size:32}}),/Unknown light_grid field/);
     assert.throws(()=>validateMap({size:[100,100],light_grid:{regions:{'0,0':{spread:-1}}}}));
     assert.throws(()=>validateMap({size:[100,100],switches:{light_grid:'yes'}}));
+    assert.doesNotThrow(()=>validateMap({size:[100,100],night:{tint:'rgba(24,0,78,.72)',effects:[{type:'grade',tint:'#d0a0ff',tint_amount:.5}],glare:{reach:58}},rain:{density:10,wind:[.2,0]}}));
+    assert.throws(()=>validateMap({size:[100,100],night:{glare:{size:3}}}),/Unknown night.glare field/);
+    assert.throws(()=>validateMap({size:[100,100],night:{effects:[{type:'sparkle'}]}}),/effects\[0\]/);
+    assert.throws(()=>validateMap({size:[100,100],rain:{amount:2}}),/rain.amount/);
 });
 
 test('a map\'s height view is an eye above the ground and how far walls lean', () => {

@@ -1,7 +1,7 @@
 // ===== LV1 LOBBY =====
 import { gameLevel } from './game-level.mjs';
 import { mapInstance } from '../../basement/maps/index.mjs';
-import { lightGridSystem } from '../../basement/rendering/index.mjs';
+import { lightGridSystem, readNight, readRain } from '../../basement/rendering/index.mjs';
 
 /**
  * A level that is one Basement map. A subclass says which map with `mapDefinition`; the level builds
@@ -28,6 +28,11 @@ export class mapLevel extends gameLevel {
         // The camera's height view, when the map gives one: how high the eye stands and how far walls lean from it.
         this.height_view = prepared.definition.height_view ?? null;
         if (this.height_view) context.basement.render?.setHeightView(this.height_view);
+        // How the map looks at night and in the rain, as its data says: whoever draws the frame reads them
+        // (drawNight with `night`, drawRain with `rain`); setNight turns the night's frame effects on and off.
+        this.night = prepared.definition.night ? readNight(prepared.definition.night) : null;
+        this.rain = prepared.definition.rain ? readRain(prepared.definition.rain) : null;
+        this.night_on = false;
         this.light_grid = prepared.definition.switches?.light_grid ? new lightGridSystem({ settings: prepared.definition.light_grid ?? {}, source: context.assets ?? context.basement.physics.elements?.asset_library ?? null }).attach(this.map, this.lightGridOptions(context)) : null;
         this.map.setFocus(this.mapFocuses(context), { budget_ms: Infinity });   // (the arriving regions, whole, behind the level change)
         this.light_grid?.updateState({ budget_ms: Infinity });
@@ -56,7 +61,17 @@ export class mapLevel extends gameLevel {
     mapStreamBudget(context) { return 3; }
     /** What `map.updateState` is given each step (door ranges, who opens doors). */
     mapUpdateOptions(context) { return {}; }
-    leave(context) { this.map?.destroy(); this.map = null; this.light_grid = null; if (this.height_view) context.basement.render?.setHeightView(null); this.height_view = null; }
+    /**
+     * Turns the map's night on or off for drawing: on, the frame takes the night's `effects` (render.setEffects);
+     * off, they are cleared. The game's clock says when it is night; the level only keeps the look. Returns
+     * whether the night is on. A map with no `night` stays off.
+     */
+    setNight(context, on) {
+        const render = context.basement.render, next = !!on && !!this.night;
+        if (render && next !== this.night_on && this.night?.effects) render.setEffects(next ? this.night.effects : null);
+        this.night_on = next; return next;
+    }
+    leave(context) { if (this.night_on) this.setNight(context, false); this.night = null; this.rain = null; this.map?.destroy(); this.map = null; this.light_grid = null; if (this.height_view) context.basement.render?.setHeightView(null); this.height_view = null; }
     /** Every exit: `{entity, target, label, auto, bounds}`. */
     getExits() {
         if (!this.map) return [];

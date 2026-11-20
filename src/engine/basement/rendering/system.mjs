@@ -7,6 +7,9 @@ import {artScene} from './art.mjs';
 import {drawLook,drawComponents,componentCovers,fallen} from './looks.mjs';
 import {heightView} from './height.mjs';
 import {createLightLayerParts,entityLights} from './lighting.mjs';
+import {GLARE,glarePackets} from './glare.mjs';
+import {rainPackets} from './rain.mjs';
+const OVER_ALL=1e9;   // the layer of what is drawn over everything in its pass (glare, rain)
 const PICK_STEPS=Object.freeze([1,.75,.5,.25,0]);   // top first: what the camera sees of a tall thing is its top
 
 function normalizeResource(description){
@@ -176,15 +179,44 @@ export class renderSystem {
      * the light grids (`grids`, a lightGridSystem's grids(view)), `areas`, and what stood over the light in the last
      * drawLooks({covers}) (nightOver: roofs keep the night, lit windows and glowing steps shine through it). The
      * layer is drawn at `scale` of the frame (the light is soft; half the pixels is a quarter of the cost), in
-     * tiles of `tile_size` world units cached as pictures. Returns how many lights it drew.
+     * tiles of `tile_size` world units cached as pictures. With `glare` (true or the night's glare settings,
+     * readGlare) each of those lights that asks for it (`glare` on the light) gets the lens's star and fog over
+     * the finished layer, at full size (drawGlare). Returns how many lights it drew.
      */
-    drawNight({tint,lights=[],grids=[],areas=[],carried=true,scale=.5,tile_size=256,margin=64,key='night',blend=1}={}){
+    drawNight({tint,lights=[],grids=[],areas=[],carried=true,scale=.5,tile_size=256,margin=64,key='night',blend=1,glare=null}={}){
         this.#live();if(!this.#collecting)throw new Error('Draw the night inside an open render frame');
         const extent=this.#camera.getVisibleBounds({blend,margin}),all=[...(carried?this.visibleLights(blend):[]),...lights];
         const parts=createLightLayerParts({extent,tint,areas,lights:all,grids,over:this.nightOver(),key,tile_size,view:extent});
         this.#frame.beginPass({layer:{scale},clear_color:'transparent'});
         try{for(const part of parts)this.#frame.submit(part.picture&&!part.type?{type:'picture',...part}:part);}finally{this.#frame.endPass();}
+        if(glare)this.drawGlare({lights:all,settings:glare===true?undefined:glare,carried:false,blend});
         return all.length;
+    }
+    /**
+     * The lens's glare (glare.mjs) over the open frame: a star and a fog stamped additively over each light that
+     * asks for it (`glare: true` or its own changes on the light), in its colour, with the visible things' lights
+     * (unless `carried` is false) and `lights`. `settings` are the defaults every glare starts from (GLARE).
+     * Off-screen lights whose star cannot reach the view are skipped. Returns how many it drew.
+     */
+    drawGlare({lights=[],settings,carried=true,blend=1}={}){
+        this.#live();if(!this.#collecting)throw new Error('Draw the glare inside an open render frame');
+        const b=this.#camera.getVisibleBounds({blend}),all=[...(carried?this.visibleLights(blend):[]),...lights];
+        const near=l=>{if(!l.glare)return false;const g=l.glare===true?{}:l.glare,r=(g.reach??settings?.reach??GLARE.reach)*Math.max(1,g.fog??settings?.fog??GLARE.fog),[x,y]=l.position;return x+r>=b.left&&x-r<=b.right&&y+r>=b.top&&y-r<=b.bottom;};
+        const glaring=all.filter(near);for(const packet of glarePackets(glaring,settings))this.#frame.submit({...packet,layer:OVER_ALL});
+        return glaring.length;
+    }
+    /**
+     * Rain (rain.mjs) over the open frame at `time` (seconds on the game clock; rain holds no state, so the
+     * same time draws the same rain): `rain` its settings (RAIN, readRain), leaning with the height view when
+     * one is set. Near the visible things' lights (and `lights`; `carried: false` leaves the visible ones out)
+     * drops take the light's colour. Drawn over everything. Returns how many packets it drew.
+     */
+    drawRain({rain,time,lights=[],carried=true,margin=32,blend=1}={}){
+        this.#live();if(!this.#collecting)throw new Error('Draw the rain inside an open render frame');
+        const v=this.#camera.getView(blend),bounds=this.#camera.getVisibleBounds({blend,margin}),all=[...(carried?this.visibleLights(blend):[]),...lights];
+        const packets=rainPackets({bounds,time:finite(time,'rain time'),settings:rain,view:this.heightViewAt(blend),camera:v.position,zoom:v.zoom,lights:all});
+        for(const packet of packets)this.#frame.submit({...packet,layer:OVER_ALL});
+        return packets.length;
     }
     /**
      * Every visible entity's look as parts, for passes that draw the world again (a reflection, a height layer):
