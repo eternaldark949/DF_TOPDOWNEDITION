@@ -173,15 +173,16 @@ export class renderSystem {
     /**
      * The night over the open frame, after drawLooks: one light layer pass (createLightLayerParts) over the view,
      * `tint` its dark, with the visible things' lights (visibleLights, unless `carried` is false) and `lights`,
-     * the light grids (`grids`, a lightGridSystem's grids(view)), `areas`, and what stood over the light in the last
+     * the light grids (`grids`, a lightGridSystem's grids(view)), `areas`, `cuts` (more packets that thin the dark, as
+     * a reflection pass's darknessCut(), so a reflection shines through the night), and what stood over the light in the last
      * drawLooks({covers}) (nightOver: roofs keep the night, lit windows and glowing steps shine through it). The
      * layer is drawn at `scale` of the frame (the light is soft; half the pixels is a quarter of the cost), in
      * tiles of `tile_size` world units cached as pictures. Returns how many lights it drew.
      */
-    drawNight({tint,lights=[],grids=[],areas=[],carried=true,scale=.5,tile_size=256,margin=64,key='night',blend=1}={}){
+    drawNight({tint,lights=[],grids=[],areas=[],cuts=[],carried=true,scale=.5,tile_size=256,margin=64,key='night',blend=1}={}){
         this.#live();if(!this.#collecting)throw new Error('Draw the night inside an open render frame');
         const extent=this.#camera.getVisibleBounds({blend,margin}),all=[...(carried?this.visibleLights(blend):[]),...lights];
-        const parts=createLightLayerParts({extent,tint,areas,lights:all,grids,over:this.nightOver(),key,tile_size,view:extent});
+        const parts=createLightLayerParts({extent,tint,areas,lights:all,grids,cuts,over:this.nightOver(),key,tile_size,view:extent});
         this.#frame.beginPass({layer:{scale},clear_color:'transparent'});
         try{for(const part of parts)this.#frame.submit(part.picture&&!part.type?{type:'picture',...part}:part);}finally{this.#frame.endPass();}
         return all.length;

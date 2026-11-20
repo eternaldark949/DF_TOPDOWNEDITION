@@ -38,7 +38,8 @@ export const REFLECTION_QUALITY=Object.freeze({
 const LEVELS=Object.freeze(['off','low','medium','high']);
 const WET_STEPS=8;
 const SKIP=new Set(['text','glow','ground_shadow']);
-const PAINT=['fill','stroke','line_cap','line_join','dash','alpha','blend','shadow','blur','material','emits','reflect','solid'];
+// what a mask step drops: its paint, and a raised floor step's walls (`thickness`, `sides`: a kerb), as the mask is its footprint
+const PAINT=['fill','stroke','line_cap','line_join','dash','alpha','blend','shadow','blur','material','emits','reflect','solid','thickness','sides'];
 
 /** Wetness 0..1 in the eight steps the mask is baked at (dry to soaked). */
 export const wetStep=w=>Math.round(Math.max(0,Math.min(1,w))*WET_STEPS)/WET_STEPS;
@@ -170,7 +171,9 @@ const heightColour=(z,hmax)=>`rgb(${Math.round(Math.max(0,Math.min(1,z/hmax))*25
 export function heightPackets(part,{hmax=1024,drawing=false}={}){
     const out=[],top=heightColour(drawing?(part.z0+part.z1)/2:part.z1,hmax);
     for(const packet of part.sides){
-        const c=packet.geometry?.commands;if(!c||c.length<4){const p=painted(packet,top,'normal');if(p)out.push(p);continue;}
+        const c=packet.geometry?.commands;
+        // a wall drawn as a quad (move, line, line, line) shades from its foot to its top; any other side (a triangle, a curve) takes the top's
+        if(!c||c.length<4||!c.slice(0,4).every(k=>Number.isFinite(k[1])&&Number.isFinite(k[2]))){const p=painted(packet,top,'normal');if(p)out.push(p);continue;}
         const p=c[0],q=c[1],r=c[2],t=c[3],from=[(p[1]+q[1])/2,(p[2]+q[2])/2],to=[(r[1]+t[1])/2,(r[2]+t[2])/2];
         out.push(painted(packet,{type:'linear',from,to,stops:[[0,heightColour(part.z0,hmax)],[1,heightColour(part.z1,hmax)]]},'normal'));
     }

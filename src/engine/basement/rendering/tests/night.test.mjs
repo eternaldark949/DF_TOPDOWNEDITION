@@ -101,3 +101,15 @@ test('a lit band, a window drawn as lit steps, and a plain one when it is too sm
  assert.ok(small.shine.includes('#ffcc88')&&!small.all.includes('#e9a775'),'small on screen: the plain panel, lit the same');
  assert.throws(()=>world.elements.createEntity({kind:'static',position:[0,0],components:[{name:'b',layers:[{layer:0,height:0,thickness:40,sides:'#777',facade:{...art,panels:[{width:4,height:4,lit_steps:win('#fff')}]},steps:[box]}]}]}),/lit_steps/);
 });
+
+test('drawNight takes cuts that thin the dark (a reflection pass\'s darknessCut), drawn in the night\'s layer',async()=>{
+ class Rec extends recordingRenderer{constructor(...a){super(...a);Rec.last=this;}}
+ const {render}=fixture();render.registerRenderer('recording',Rec);await render.setRenderer('recording',{surface:null});
+ const cut={type:'shape',geometry:{type:'path',commands:[['move',0,0],['line',40,0],['line',40,40],['close']]},material:{fill:'#ffffff'},blend:'destination-out',opacity:.5};
+ render.beginFrame();render.drawLooks();render.drawNight({tint:'rgba(0,0,20,.8)',cuts:[cut]});render.endFrame();
+ const night=Rec.last.frames.at(-1).passes.flatMap(p=>p.packets);
+ assert.ok(night.some(p=>p.blend==='destination-out'&&p.geometry?.commands?.[1]?.[1]===40),'the cut is in the night\'s pass');
+ render.beginFrame();render.drawLooks();render.drawNight({tint:'rgba(0,0,20,.8)'});render.endFrame();
+ assert.ok(!Rec.last.frames.at(-1).passes.flatMap(p=>p.packets).some(p=>p.geometry?.commands?.[1]?.[1]===40),'and only when given');
+ render.dispose();
+});

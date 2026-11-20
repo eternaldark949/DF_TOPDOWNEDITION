@@ -216,6 +216,22 @@
       "kind": "decoration",
       "look": {"layer": -60},
       "components": [{"name": "ground", "layers": [{"layer": 0, "height": 0, "thickness": "1 cm", "solid": false, "steps": [{"shape": "ellipse", "x": 0, "y": 0, "radius_x": 18, "radius_y": 12, "fill": {"type": "radial", "from": [0, 0], "inner_radius": 0, "to": [0, 0], "outer_radius": 18, "stops": [[0, "rgba(2,2,4,0.6)"], [1, "rgba(2,2,4,0)"]]}}, {"shape": "ellipse", "x": -3, "y": -2, "radius_x": 9, "radius_y": 5, "fill": null, "stroke": "rgba(120,200,255,0.1)", "line_width": 1.2}, {"shape": "ellipse", "x": 2, "y": 1, "radius_x": 6, "radius_y": 3.5, "fill": null, "stroke": "rgba(255,120,220,0.09)", "line_width": 1}]}]}]
+    },
+    "street_lamp": {
+      "kind": "static",
+      "bounds": "circle",
+      "look": {"values": {"lamp": "#ffaa00", "lamp_glass": "#ffbd39", "lamp_hot": "#ffd889"}},
+      "data": {"label": "Street lamp"},
+      "lights": [{"shape": "point", "position": [0, -30], "radius": 190, "color": "$lamp", "intensity": 0.9, "glow": 0.4, "height": 32.0, "glare": true}, {"shape": "point", "position": [0, 30], "radius": 190, "color": "$lamp", "intensity": 0.9, "glow": 0.4, "height": 32.0, "glare": true}],
+      "components": [{"name": "post", "layers": [{"layer": 0, "height": 0, "thickness": 8, "steps": [{"shape": "circle", "x": 0, "y": 0, "radius": 10.5, "fill": "#1d1726", "stroke": "#b08a4a", "line_width": 1}], "sides": "#1d1726"}, {"layer": 1, "height": 8, "thickness": 6, "steps": [{"shape": "circle", "x": 0, "y": 0, "radius": 6.5, "fill": "#b08a4a"}], "sides": "#70532d"}, {"layer": 2, "height": 14, "thickness": 28.0, "steps": [{"shape": "circle", "x": 0, "y": 0, "radius": 3.4, "fill": "#1d1726"}], "sides": "#1d1726"}, {"layer": 3, "height": 42.0, "thickness": 3, "solid": false, "sides": "#1d1726", "steps": [{"shape": "rectangle", "x": -2.2, "y": -30, "width": 4.4, "height": 60, "radius": 2, "fill": "#1d1726", "stroke": "#3a3046", "line_width": 0.6}, {"shape": "circle", "x": 0, "y": 0, "radius": 3.2, "fill": "#b08a4a"}]}]}, {"name": "lanterns", "layers": [{"layer": 0, "height": 25.0, "thickness": 10, "solid": false, "steps": [{"shape": "polygon", "points": [[9.09, -24.75], [0.0, -19.5], [-9.09, -24.75], [-9.09, -35.25], [-0.0, -40.5], [9.09, -35.25]], "fill": "$lamp_glass", "stroke": "#1d1726", "line_width": 1.2, "emits": {"strength": 0.6, "reach": 130, "height": 32.0}}, {"shape": "polygon", "points": [[7.1, -25.9], [0.0, -21.8], [-7.1, -25.9], [-7.1, -34.1], [-0.0, -38.2], [7.1, -34.1]], "fill": "$lamp_hot"}, {"shape": "line", "points": [[9.09, -24.75], [3.81, -27.8], [0.0, -25.6], [0.0, -19.5], [-9.09, -24.75], [-3.81, -27.8], [-3.81, -32.2], [-9.09, -35.25], [-0.0, -40.5], [-0.0, -34.4], [3.81, -32.2], [9.09, -35.25]], "stroke": "#1d1726", "line_width": 1.2}, {"shape": "polygon", "points": [[9.09, 35.25], [0.0, 40.5], [-9.09, 35.25], [-9.09, 24.75], [-0.0, 19.5], [9.09, 24.75]], "fill": "$lamp_glass", "stroke": "#1d1726", "line_width": 1.2, "emits": {"strength": 0.6, "reach": 130, "height": 32.0}}, {"shape": "polygon", "points": [[7.1, 34.1], [0.0, 38.2], [-7.1, 34.1], [-7.1, 25.9], [-0.0, 21.8], [7.1, 25.9]], "fill": "$lamp_hot"}, {"shape": "line", "points": [[9.09, 35.25], [3.81, 32.2], [0.0, 34.4], [0.0, 40.5], [-9.09, 35.25], [-3.81, 32.2], [-3.81, 27.8], [-9.09, 24.75], [-0.0, 19.5], [-0.0, 25.6], [3.81, 27.8], [9.09, 24.75]], "stroke": "#1d1726", "line_width": 1.2}]}, {"layer": 1, "height": 35.0, "thickness": 3, "solid": false, "steps": [{"shape": "polygon", "points": [[3.81, -27.8], [0.0, -25.6], [-3.81, -27.8], [-3.81, -32.2], [-0.0, -34.4], [3.81, -32.2]], "fill": "#1d1726", "stroke": "rgba(176, 138, 74, 0.8)", "line_width": 0.7}, {"shape": "circle", "x": 0, "y": -30, "radius": 1.6, "fill": "#b08a4a"}, {"shape": "polygon", "points": [[3.81, 32.2], [0.0, 34.4], [-3.81, 32.2], [-3.81, 27.8], [-0.0, 25.6], [3.81, 27.8]], "fill": "#1d1726", "stroke": "rgba(176, 138, 74, 0.8)", "line_width": 0.7}, {"shape": "circle", "x": 0, "y": 30, "radius": 1.6, "fill": "#b08a4a"}]}]}]
+    },
+    "street_lamp_rose": {
+      "extends": "street_lamp",
+      "look": {"values": {"lamp": "#ffcfae", "lamp_glass": "#ffd9bc", "lamp_hot": "#ffe6ce"}}
+    },
+    "street_lamp_violet": {
+      "extends": "street_lamp",
+      "look": {"values": {"lamp": "#8142ff", "lamp_glass": "#a06ff8", "lamp_hot": "#cdaeef"}}
     }
   }
 }

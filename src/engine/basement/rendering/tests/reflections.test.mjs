@@ -90,3 +90,13 @@ test('the pass steps its quality down when it runs long and back up after a stea
  for(let i=0;i<30;i++){const f=render.beginFrame();pass.draw(f,{extent:{left:0,top:0,right:50,bottom:50}});render.endFrame();await pass.prepare();}
  assert.equal(pass.quality,'medium','over budget for 30 frames: one step down');
 });
+
+test('a raised floor step (a kerb with thickness and sides) masks as its footprint; a side that is no quad takes its top\'s height',()=>{
+ const materials=name=>({kerb:{fill:'#333',reflect:{strength:.3,wet:true}}})[name];
+ const [clear,shine]=maskSteps([{shape:'polygon',points:[[0,0],[10,0],[10,4],[0,4]],material:'kerb',thickness:5,sides:{material:'kerb_face'}}],{materials,wet:1});
+ for(const p of [clear,shine]){assert.equal(p.thickness,undefined);assert.equal(p.sides,undefined);}
+ assert.equal(shine.fill,'rgba(255,255,255,0.3)');
+ const triangle={type:'geometry',geometry:{commands:[['move',0,0],['line',10,0],['line',5,8],['close']]},material:{fill:'#333'}};
+ const [h]=heightPackets({packets:[],sides:[triangle],z0:0,z1:100},{hmax:200});
+ assert.equal(typeof h.material.fill,'string','a flat height, not a ramp it cannot place');
+});
