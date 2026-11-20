@@ -31,7 +31,7 @@ test('a record made of components: bounds fit its solid layers, and it stands as
 
 test('component layers draw by height, over each other, and a component on a joint follows it', async () => {
     const p = world(), camera = new cameraSystem({ position: [200, 100], viewport: { width: 400, height: 400 } }), render = new renderSystem({ physics_system: p, camera });
-    render.registerRenderer('recording', recordingRenderer); await render.setRenderer('recording', { surface: null });
+    render.registerRenderer('recording', recordingRenderer); await render.setRenderer('recording', { surface: null }); render.setStillPictures(false);   // (these read each shape's packets)
     const shop = createObject(p.elements, 'town:shop', [200, 100]);
     const walker = p.elements.createEntity({ kind: 'character', position: [50, 100], components: [{ name: 'hat', joint: 'head', at: [0, 0], layers: [{ layer: 0, height: 85, thickness: 5, steps: slab(10, '#000') }] }] });
     p.rigs.createRig(walker, { definition: { rig_id: 'tiny', joints: [{ name: 'root' }, { name: 'head', parent: 'root', position: [8, 0] }] } });

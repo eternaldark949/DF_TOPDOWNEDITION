@@ -121,7 +121,7 @@ export function componentSteps(components,source,{solid_only=false}={}){
  * camera, parts at one height draw farthest from the camera first, and a component set on the entity above
  * its base (a bottle on a tray) draws whole from that base, so a near bottle covers the foot of a far one.
  */
-export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,mirror=null}={}){
+export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,mirror=null,pictures=false}={}){
     if(view!==null&&!(view instanceof heightView))throw new TypeError('A height view is a heightView or null');
     if(mirror!==null&&!(Number.isFinite(mirror)&&mirror>=0))throw new TypeError('A mirror is how far a reflection falls per unit of height, 0 or more');
     // A reflection: each part where it falls, in the plane of its depth below the floor (k(-z)) and `mirror` × its height down the world's y.
@@ -159,6 +159,13 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,
         let sides=[],top=key;
         if(view&&layer.sides&&z1>z0){sides=drawSides(steps,place,values,sidesPaint(layer.sides,values,materials),view,z0,z1,layer.sides);if(whole({c}))for(const packet of sides)packet.depth=0;else top=key+z1-z0;}
         if(mirror!==null&&layer.sides&&z1>z0)sides=mirrorSides(steps,place,values,sidesPaint(layer.sides,values,materials),mirror,z0,z1,below);
+        // A still layer (not on a tipped bone) is the same art wherever it stands: with `pictures` it is drawn once
+        // into a picture, keyed by its steps and look, and stamped each frame under its place and its plane.
+        if(pictures&&mirror===null&&fore===1&&!lean){
+            const art=stillArt(steps,values,materials);
+            if(art){const m=placeMatrix(place),matrix=view?compose(view.plane(view.k(z1)),m):m;
+                return {height:z0,peak:z1,depth:key,top,layer:layer.layer,component:c.name,sides,packets:[],picture:{key:art.key,bounds:art.bounds,matrix,build:art.build}};}
+        }
         if(view)scene.enter({matrix:view.plane(view.k(z1))});
         else if(mirror!==null)scene.enter({matrix:fallen(below,mirror,z1)});
         scene.draw(steps,{...place,values,materials});
@@ -302,6 +309,33 @@ function materialOf(source,id){
     out={...m,fill:paint(m.fill),stroke:paint(m.stroke)};if(m.fill===undefined)delete out.fill;if(m.stroke===undefined)delete out.stroke;QUALIFIED.set(m,out);return out;
 }
 function resource(source,id,kind){const value=source.getResource(id);if(value.kind!==kind)throw new TypeError(`${id} is a ${value.kind}, not a ${kind}`);return value;}
+
+
+// ----- Still art ------------------------------------------------------------------------------------
+// A layer's art, painted once: its key names its steps (by identity) and its look values, its bounds hold every
+// shape with room for strokes, blurs and shadows, and `build` draws it at the origin. One record per steps and look.
+const STILL=new WeakMap(),STEPS_ID=new WeakMap(),VALUES_KEY=new WeakMap();
+// Two 32-bit hashes of the drawing's text and its length: a name for its content, made once per steps list.
+function contentKey(steps){const t=JSON.stringify(steps);let a=2166136261,b=5381;for(let i=0;i<t.length;i++){const c=t.charCodeAt(i);a=Math.imul(a^c,16777619);b=Math.imul(b,33)^c;}return `${(a>>>0).toString(36)}${(b>>>0).toString(36)}.${t.length}`;}
+function stillArt(steps,values,materials){
+    if(!Array.isArray(steps)||!steps.length||hasText(steps))return null;   // text's width is the font's: no sure bounds
+    let byValues=STILL.get(steps);if(!byValues)STILL.set(steps,byValues=new Map());
+    const vk=values&&typeof values==='object'?(VALUES_KEY.get(values)??(VALUES_KEY.set(values,JSON.stringify(values)),VALUES_KEY.get(values))):'';
+    if(byValues.has(vk))return byValues.get(vk);
+    let id=STEPS_ID.get(steps);if(id===undefined)STEPS_ID.set(steps,id=contentKey(steps));   // by content: copies of one drawing share it
+    const points=drawingOutline(steps,{values}).flatMap(p=>p.points);let art=null;
+    if(points.length){
+        let x0=Infinity,y0=Infinity,x1=-Infinity,y1=-Infinity;for(const [x,y] of points){x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y);}
+        const pad=reach(steps)+1;
+        art={key:`still:${id}:${vk}`,bounds:[x0-pad,y0-pad,x1-x0+2*pad,y1-y0+2*pad],build:()=>new artScene().draw(steps,{values,materials}).finish()};
+    }
+    byValues.set(vk,art);return art;
+}
+const hasText=steps=>steps.some(st=>st&&(st.shape==='text'||(st.shape==='group'&&Array.isArray(st.steps)&&hasText(st.steps))));
+// How far past its outline a drawing can paint: its widest stroke, its softest blur or shadow.
+function reach(steps){let r=0;for(const st of steps){if(!st||typeof st!=='object')continue;r=Math.max(r,(+st.line_width||0)/2,(+st.blur||0)*3,st.shadow?(+st.shadow.blur||0)*3+Math.hypot(...(st.shadow.offset??[0,0])):0);if(st.shape==='group'&&Array.isArray(st.steps))r=Math.max(r,reach(st.steps)*Math.max(1,Math.abs(+(Array.isArray(st.scale)?Math.max(...st.scale):st.scale??1))));}return r;}
+// The matrix a place draws under: moved to `at`, turned by `rotation`, scaled.
+function placeMatrix({at,rotation,scale}){const [sx,sy]=typeof scale==='number'?[scale,scale]:scale,c=Math.cos(rotation),s=Math.sin(rotation);return [c*sx,s*sx,-s*sy,c*sy,at[0],at[1]];}
 
 // ----- Geometry -------------------------------------------------------------------------------------
 const compose=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];

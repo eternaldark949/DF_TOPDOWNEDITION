@@ -28,7 +28,7 @@ test('a building is one entity: a component per wing and a layer per floor, as t
 
 test('walls lean toward the camera: the roof draws in its own raised plane and the seen sides fill in', async () => {
     const p = world(), camera = new cameraSystem({ position: [-300, 0], viewport: { width: 1200, height: 800 } }), render = new renderSystem({ physics_system: p, camera });
-    render.registerRenderer('recording', recordingRenderer); await render.setRenderer('recording', { surface: null });
+    render.registerRenderer('recording', recordingRenderer); await render.setRenderer('recording', { surface: null }); render.setStillPictures(false);   // (these read each shape's packets)
     createObject(p.elements, 'city:hotel', [0, 0]); p.updateState(1 / 60);
     const draw = () => { render.beginFrame(); render.drawLooks(); render.endFrame(); return render.getFrameSnapshot().passes.flatMap(pass => pass.packets); };
     const flat = draw(), walls = flat.filter(packet => packet.material.fill === '#c9b79c');

@@ -42,7 +42,7 @@ test('the apartment draws from its files: floors textured and anchored to the ma
     assert.deepEqual(cart.position, [619, 781]); assert.equal(cart.get('behaviour'), 'refill_drink', 'a placed object is the catalog record');
     assert.ok(map.entities('wall').every(w => w.components[0].layers[0].thickness === 120), 'walls 2.4 m tall');
     const camera = new cameraSystem({ position: [700, 450], viewport: { width: 1400, height: 900 } }), render = new renderSystem({ physics_system: p, camera });
-    render.registerRenderer('recording', recordingRenderer); await render.setRenderer('recording', { surface: null });
+    render.registerRenderer('recording', recordingRenderer); await render.setRenderer('recording', { surface: null }); render.setStillPictures(false);   // (these read each shape's packets)
     p.updateState(1 / 60);
     const draw = () => { render.beginFrame(); render.drawLooks(); render.endFrame(); return render.getFrameSnapshot(); };
     draw(); await render.texturesReady();

@@ -55,7 +55,7 @@ test('a pick leans like the drawing: a tall thing is hit where it is drawn, from
 });
 
 test('leaning, every wall face draws under every wall top at that height, nearest face last, so walls that meet stand equally tall',async()=>{
- const {world,render}=fixture();render.registerRenderer('recording',recordingRenderer);await render.setRenderer('recording',{surface:null});render.setHeightView({eye:900});
+ const {world,render}=fixture();render.registerRenderer('recording',recordingRenderer);await render.setRenderer('recording',{surface:null});render.setStillPictures(false);render.setHeightView({eye:900});
  const wall=(x,y,w,h,sides)=>world.elements.createEntity({kind:'static',position:[x,y],components:[{name:'wall',layers:[{layer:0,height:0,thickness:120,solid:false,sides,steps:[{shape:'rectangle',x:-w/2,y:-h/2,width:w,height:h,fill:'#222'}]}]}]});
  wall(80,50,8,300,'#444');wall(150,60,120,8,'#555');world.updateState(1/60);   // a T: the second wall's faces cross the first one's top, and hide behind its face
  render.beginFrame();render.drawLooks();render.endFrame();
@@ -67,7 +67,7 @@ test('leaning, every wall face draws under every wall top at that height, neares
 
 test('leaning, walls stand on each shape\'s true outline: rounded corners round, a hollow kept, a shape on another adds none, a curve shaded round',async()=>{
  const run=async steps=>{
-  const {world,render}=fixture();render.registerRenderer('recording',recordingRenderer);await render.setRenderer('recording',{surface:null});render.setHeightView({eye:900});
+  const {world,render}=fixture();render.registerRenderer('recording',recordingRenderer);await render.setRenderer('recording',{surface:null});render.setStillPictures(false);render.setHeightView({eye:900});
   world.elements.createEntity({kind:'static',position:[50,250],components:[{name:'b',layers:[{layer:0,height:0,thickness:120,solid:false,sides:'#777',steps}]}]});world.updateState(1/60);
   render.beginFrame();render.drawLooks();render.endFrame();const walls=render.getFrameSnapshot().passes.flatMap(p=>p.packets).filter(p=>p.depth<0);render.dispose();
   return {walls,points:walls.filter(p=>p.material.fill==='#777').flatMap(p=>p.geometry.commands.filter(c=>c[0]!=='close').map(c=>[c[1],c[2]]))};
@@ -84,4 +84,20 @@ test('leaning, walls stand on each shape\'s true outline: rounded corners round,
  // a button on a cushion adds no walls of its own
  const plain=await run([{shape:'rectangle',x:-30,y:-15,width:60,height:30,fill:'#a33'}]),buttoned=await run([{shape:'rectangle',x:-30,y:-15,width:60,height:30,fill:'#a33'},{shape:'circle',x:0,y:0,radius:3,fill:'#ff0'},{shape:'rectangle',x:-30,y:-15,width:60,height:30,fill:'#fff',alpha:.2}]);
  assert.equal(buttoned.walls.length,plain.walls.length,'shapes covered by a larger one stand no walls');
+});
+
+test('a still layer is one picture, keyed by its steps and look, shared by every object that has them; off, it is its shapes',async()=>{
+ const {world,render}=fixture();render.registerRenderer('recording',recordingRenderer);await render.setRenderer('recording',{surface:null});render.setHeightView({eye:900});
+ assert.equal(render.getStillPictures(),true,'on by default');
+ const steps=[{shape:'rectangle',x:-20,y:-10,width:40,height:20,radius:6,fill:'#a33'},{shape:'circle',x:0,y:0,radius:3,fill:'#ff0'},{shape:'line',points:[[-15,0],[15,0]],stroke:'#000',line_width:4}];
+ const make=(x,y,rotation=0)=>{const e=world.elements.createEntity({kind:'static',position:[x,y],components:[{name:'c',layers:[{layer:0,height:0,thickness:40,solid:false,sides:'#777',steps}]}]});e.rotateTo?.(rotation);return e;};
+ make(60,80);make(160,120,.5);world.updateState(1/60);
+ const frame=()=>{render.beginFrame();render.drawLooks();render.endFrame();return render.getFrameSnapshot().passes.flatMap(p=>p.packets);};
+ const on=frame(),pics=on.filter(p=>p.type==='picture');
+ assert.equal(pics.length,2,'one picture a layer');assert.equal(pics[0].picture.key,pics[1].picture.key,'the same art is one picture for both');
+ const [bx,by,bw,bh]=pics[0].picture.bounds;assert.ok(bx<=-22&&by<=-12&&bw>=44&&bh>=24,`its bounds hold the shapes and the stroke's reach: ${pics[0].picture.bounds}`);
+ assert.ok(!on.some(p=>p.material?.fill==='#a33'),'the shapes are not drawn one by one');assert.ok(on.some(p=>p.material?.fill==='#777'),'its walls are still drawn live');
+ const k=900/(900-40);assert.ok(Math.abs(pics[0].picture.matrix[0]-k)<1e-9,'stamped in the plane of its top');assert.ok(Math.abs(pics[0].picture.matrix[4]-(50+(60-50)*k))<1e-9,'at its place, leaned from the camera');
+ render.setStillPictures(false);const off=frame();assert.ok(!off.some(p=>p.type==='picture')&&off.some(p=>p.material?.fill==='#a33'),'off, every shape is drawn');
+ render.dispose();
 });
