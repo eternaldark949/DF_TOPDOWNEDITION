@@ -327,6 +327,7 @@ export class canvasRenderer {
                 if(e.type==='grade'){
                     const filter=[e.exposure?`brightness(${2**e.exposure})`:'',e.contrast!==1?`contrast(${e.contrast})`:'',e.saturation!==1?`saturate(${e.saturation})`:''].filter(Boolean).join(' ');
                     if(filter){ctx.globalCompositeOperation='copy';ctx.filter=filter;ctx.drawImage(this.#copyOf(surface),0,0);ctx.filter='none';}
+                    if(e.hue_amount>0){const shape=opaque?null:this.#copyOf(surface);ctx.globalCompositeOperation='color';ctx.globalAlpha=e.hue_amount;ctx.fillStyle=e.hue;ctx.fillRect(0,0,W,H);ctx.globalAlpha=1;if(shape){ctx.globalCompositeOperation='destination-in';ctx.drawImage(shape,0,0);}ctx.globalCompositeOperation='source-over';}
                     if(e.tint_amount>0){const shape=opaque?null:this.#copyOf(surface);ctx.globalCompositeOperation='multiply';ctx.globalAlpha=e.tint_amount;ctx.fillStyle=e.tint;ctx.fillRect(0,0,W,H);ctx.globalAlpha=1;if(shape){ctx.globalCompositeOperation='destination-in';ctx.drawImage(shape,0,0);}}
                 }else if(e.type==='vignette'){
                     const reach=Math.hypot(W,H)/2,[r,g,b,a]=readColor(e.color),paint=k=>`rgba(${Math.round(r*255)},${Math.round(g*255)},${Math.round(b*255)},${a*k})`,ring=ctx.createRadialGradient(W/2,H/2,e.radius*reach,W/2,H/2,(e.radius+e.softness)*reach);

@@ -82,7 +82,8 @@ void main(){
 const BLUR_SIGMA=MAX_TAPS/3;   // a wider blur is drawn smaller and stretched back
 
 // One effect over a whole surface, pixel for pixel, matching Canvas's compositing (effects.mjs says what each does).
-// u_type 0 grade: u_a (2^exposure, contrast, saturation, tint amount × tint alpha), u_b the tint.
+// u_type 0 grade: u_a (2^exposure, contrast, saturation, tint amount × tint alpha), u_b the tint, u_c the hue colour
+// with its amount × alpha in w (laid by Canvas's color blend: the hue's hue and saturation at the pixel's luminosity).
 // 1 vignette: u_a (inner, outer radius in pixels, strength), u_b the colour. 2 grain: u_a (amount, size, offset).
 // The light effects' steps, each read linearly from a surface of another size: 3 the bright part, u_a (threshold,
 // tinted), u_b the tint (as Canvas's multiply then destination-in does it); 4 a copy times u_a.x (a level halved, or a spread summed);
@@ -91,9 +92,11 @@ const BLUR_SIGMA=MAX_TAPS/3;   // a wider blur is drawn smaller and stretched ba
 // 7 a copy moved by u_b times u_a.x;
 // 8 the surface less u_glow0 at opacity u_a.x, by Canvas's difference blend.
 const POST_FRAGMENT=`#version 300 es
-precision highp float;uniform sampler2D u_texture,u_grain,u_glow0,u_glow1,u_glow2,u_glow3;uniform int u_type;uniform vec2 u_size;uniform vec4 u_a,u_b;out vec4 color;
+precision highp float;uniform sampler2D u_texture,u_grain,u_glow0,u_glow1,u_glow2,u_glow3;uniform int u_type;uniform vec2 u_size;uniform vec4 u_a,u_b,u_c;out vec4 color;
 // a pixel of the surface at q (pixels, bottom-up), read linearly, clear past the edges as a shifted Canvas draw is
 vec4 edge(vec2 q){vec2 c=clamp(q+.5,0.,1.)*clamp(u_size+.5-q,0.,1.);return texture(u_texture,clamp(q,vec2(.5),u_size-.5)/u_size)*c.x*c.y;}
+float lum(vec3 c){return dot(c,vec3(.3,.59,.11));}
+vec3 setLum(vec3 c,float l){c+=l-lum(c);float L=lum(c),n=min(c.r,min(c.g,c.b)),x=max(c.r,max(c.g,c.b));if(n<0.)c=L+(c-L)*L/(L-n);if(x>1.)c=L+(c-L)*(1.-L)/(x-L);return c;}
 vec3 overlay(vec3 b,vec3 s){return mix(2.*b*s,1.-2.*(1.-b)*(1.-s),step(.5,b));}
 // Canvas: a source of straight colour s and alpha k composited by blend result m over the pixel, then kept to the pixel's shape
 vec4 over(vec3 c,float a,vec3 s,float k,vec3 m){vec3 rgb=s*k*(1.-a)+c*a*(1.-k)+k*a*m;return vec4(rgb,k+a-k*a)*a;}
@@ -115,6 +118,7 @@ void main(){
  if(u_type==0){
   c=clamp(c*u_a.x,0.,1.);c=clamp((c-.5)*u_a.y+.5,0.,1.);float s=u_a.z;
   c=clamp(mat3(.213+.787*s,.213-.213*s,.213-.213*s,.715-.715*s,.715+.285*s,.715-.715*s,.072-.072*s,.072-.072*s,.072+.928*s)*c,0.,1.);
+  if(u_c.w>0.){vec4 h=over(c,src.a,u_c.rgb,u_c.w,setLum(u_c.rgb,lum(c)));c=h.a>0.?h.rgb/h.a:c;}
   color=u_a.w>0.?over(c,src.a,u_b.rgb,u_a.w,c*u_b.rgb):vec4(c*src.a,src.a);return;
  }
  ivec2 g=ivec2(floor(at/u_a.y+u_a.zw))&${GRAIN_SIZE-1};vec3 n=texelFetch(u_grain,g,0).rgb;
@@ -201,7 +205,7 @@ export class webglRenderer {
         this.#blurProgram=blur;gl.useProgram(blur);for(const name of ['u_row0','u_row1','u_texture','u_size','u_region','u_dir','u_sigma','u_edge'])this.#blurUniforms[name]=gl.getUniformLocation(blur,name);gl.uniform1i(this.#blurUniforms.u_texture,0);
         const post=gl.createProgram();gl.attachShader(post,shader(gl.VERTEX_SHADER,VERTEX));gl.attachShader(post,shader(gl.FRAGMENT_SHADER,POST_FRAGMENT));gl.bindAttribLocation(post,0,'a_position');gl.linkProgram(post);
         if(!gl.getProgramParameter(post,gl.LINK_STATUS))throw new Error(`WebGL program: ${gl.getProgramInfoLog(post)}`);
-        this.#postProgram=post;gl.useProgram(post);for(const name of ['u_row0','u_row1','u_texture','u_grain','u_type','u_size','u_a','u_b','u_glow0','u_glow1','u_glow2','u_glow3'])this.#postUniforms[name]=gl.getUniformLocation(post,name);gl.uniform1i(this.#postUniforms.u_texture,0);gl.uniform1i(this.#postUniforms.u_grain,1);for(let i=0;i<4;i++)gl.uniform1i(this.#postUniforms[`u_glow${i}`],2+i);
+        this.#postProgram=post;gl.useProgram(post);for(const name of ['u_row0','u_row1','u_texture','u_grain','u_type','u_size','u_a','u_b','u_c','u_glow0','u_glow1','u_glow2','u_glow3'])this.#postUniforms[name]=gl.getUniformLocation(post,name);gl.uniform1i(this.#postUniforms.u_texture,0);gl.uniform1i(this.#postUniforms.u_grain,1);for(let i=0;i<4;i++)gl.uniform1i(this.#postUniforms[`u_glow${i}`],2+i);
         const reflect=gl.createProgram();gl.attachShader(reflect,shader(gl.VERTEX_SHADER,VERTEX));gl.attachShader(reflect,shader(gl.FRAGMENT_SHADER,REFLECT_FRAGMENT));gl.bindAttribLocation(reflect,0,'a_position');gl.linkProgram(reflect);
         if(!gl.getProgramParameter(reflect,gl.LINK_STATUS))throw new Error(`WebGL program: ${gl.getProgramInfoLog(reflect)}`);
         this.#reflectProgram=reflect;gl.useProgram(reflect);for(const name of ['u_row0','u_row1','u_texture','u_height','u_mask','u_probe','u_plane','u_size','u_dir','u_c','u_k','u_a','u_b','u_steps','u_planes'])this.#reflectUniforms[name]=gl.getUniformLocation(reflect,name);
@@ -517,7 +521,7 @@ export class webglRenderer {
                 this.#postOver(into===this.#main?null:into.resolve,W,H);
                 gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,this.#grain);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,(bokeh??current).texture);
                 if(bokeh){gl.bindSampler(0,this.#samplers.clamp);gl.uniform1i(u.u_type,4);gl.uniform4f(u.u_a,1,0,0,0);}
-                else if(e.type==='grade'){const t=readColor(e.tint);gl.uniform1i(u.u_type,0);gl.uniform4f(u.u_a,2**e.exposure,e.contrast,e.saturation,e.tint_amount*t[3]);gl.uniform4f(u.u_b,t[0],t[1],t[2],1);}
+                else if(e.type==='grade'){const t=readColor(e.tint);gl.uniform1i(u.u_type,0);gl.uniform4f(u.u_a,2**e.exposure,e.contrast,e.saturation,e.tint_amount*t[3]);gl.uniform4f(u.u_b,t[0],t[1],t[2],1);const h=readColor(e.hue);gl.uniform4f(u.u_c,h[0],h[1],h[2],e.hue_amount*h[3]);}
                 else if(e.type==='vignette'){const reach=Math.hypot(W,H)/2,c=readColor(e.color);gl.uniform1i(u.u_type,1);gl.uniform4f(u.u_a,e.radius*reach,(e.radius+e.softness)*reach,e.strength,0);gl.uniform4f(u.u_b,...c);}
                 else if(e.type==='grain'){const [ox,oy]=grainOffset(this.#frames,e.animated);gl.uniform1i(u.u_type,2);gl.uniform4f(u.u_a,e.amount,e.size*sx,ox,oy);}
                 else{

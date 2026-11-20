@@ -8,7 +8,7 @@
       "setting": "exterior",
       "size": [13200, 13200],
       "height_view": {"eye": 280, "lean": 1.5},
-      "night": {"tint": "rgba(24, 0, 78, 0.72)", "scale": 0.5, "effects": [{"type": "grade", "tint": "#d0a0ff", "tint_amount": 0.5}, {"type": "vignette", "strength": 0.5, "radius": 0.5, "softness": 0.6, "color": "#0a0020"}], "glare": {"reach": 58}},
+      "night": {"tint": "rgba(24, 0, 78, 0.72)", "scale": 0.5, "effects": [{"type": "grade", "hue": "#a040ff", "hue_amount": 0.4, "tint": "#e0b0ff", "tint_amount": 0.3}, {"type": "vignette", "strength": 0.5, "radius": 0.5, "softness": 0.6, "color": "#0a0020"}], "glare": {"reach": 58}},
       "rain": {"amount": 1, "density": 10, "color": "#b9c3dc", "alpha": 0.32},
       "spawn": [1200, 550],
       "climate": "city",

@@ -300,7 +300,7 @@ Reference: [maps README](basement/maps/README.md).
 | `render.measureText(text, font)` | One line's width, ascent and descent, as that backend draws it |
 | `render.resize({ width, height, pixel_ratio })` | Matches the screen |
 | `render.getVisibleEntities()` | What is on screen |
-| `render.setEffects(stack)`, `render.setLayerEffects(layer, stack)` | Post effects on the whole picture, or on one drawing layer alone: `grade` (exposure, contrast, saturation, tint), `vignette`, film `grain`, and light: `bloom`, `fog_glow` and `star_glow`, and `bokeh` (lights become sharp aperture-shaped discs over a soft picture). A stack is a list, `[{ type: 'grain', amount: .1 }]`, or a preset from the data with changes, `{ preset: 'engine:film', grain: { amount: .12 } }`; `null` removes it |
+| `render.setEffects(stack)`, `render.setLayerEffects(layer, stack)` | Post effects on the whole picture, or on one drawing layer alone: `grade` (exposure, contrast, saturation, hue, tint), `vignette`, film `grain`, and light: `bloom`, `fog_glow` and `star_glow`, and `bokeh` (lights become sharp aperture-shaped discs over a soft picture). A stack is a list, `[{ type: 'grain', amount: .1 }]`, or a preset from the data with changes, `{ preset: 'engine:film', grain: { amount: .12 } }`; `null` removes it |
 
 **Drawing.** Draw in an `artScene` with readable calls, each placed around the scene's origin, then hand `finish()` to the frame:
 
