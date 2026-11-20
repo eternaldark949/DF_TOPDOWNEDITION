@@ -52,13 +52,16 @@ function validLight(light,i){
  */
 export function entityLights(body,{pose=null,view=null}={}){
     const data=typeof body.get==='function'?{lights:body.get('lights'),emission:body.get('emission'),look:body.get('look')}:body.data??{};
-    const at=pose?.position??body.position,a=pose?.rotation??body.rotation??0,c=Math.cos(a),s=Math.sin(a),values=data.look?.values??{};
-    const moving=body.physics_type==='dynamic'||body.kind==='character'||body.kind==='vehicle';
     const list=[...(data.lights??[]),...(data.emission?[{...data.emission,shape:data.emission.shape==='strip'?'area':data.emission.shape}]:[])];
+    if(!list.length)return [];
+    // (an entity's physics_type and elevation each copy its whole body state: read it once, and only for what carries a light)
+    const state=typeof body.body?.getState==='function'?body.body.getState():body,elevation=state.elevation??0;
+    const at=pose?.position??body.position,a=pose?.rotation??body.rotation??0,c=Math.cos(a),s=Math.sin(a),values=data.look?.values??{};
+    const moving=state.physics_type==='dynamic'||body.kind==='character'||body.kind==='vehicle';
     const read=v=>typeof v==='string'&&v.startsWith('$')?values[v.slice(1)]??null:v;
     return list.map((l,i)=>{
         const {position=[0,0],rotation=0,polygon,animation,shadows,look,soft,...rest}=l,[x,y]=position;
-        let where=[at[0]+x*c-y*s,at[1]+x*s+y*c];if(view&&rest.height>0)where=view.scaled(where[0],where[1],view.k(rest.height+(body.elevation??0)));
+        let where=[at[0]+x*c-y*s,at[1]+x*s+y*c];if(view&&rest.height>0)where=view.scaled(where[0],where[1],view.k(rest.height+elevation));
         const out={...rest,shape:rest.shape??'point',position:where,rotation:a+rotation,still:l.still??!moving};
         for(const k of ['color'])if(out[k]!==undefined)out[k]=read(out[k]);
         if(out.color===null)delete out.color;if(out.intensity===null)delete out.intensity;if(out.glow===null)delete out.glow;
@@ -112,7 +115,7 @@ export function createLightLayer({bounds,tint,areas=[],lights=[],cuts=[],over=[]
  *
  * With `tile_size` the pictures are tiles of that size over the extent (a map's regions), and only the
  * tiles meeting `view` are returned: a big map keeps only the tiles near the camera, and a change repaints
- * only the tiles its light reaches. The tiles within `ahead` of the view (px all round, or per-side margins
+ * only the tiles its light reaches. A tile no still light reaches and no light grid lights (`peakIn`) is the plain dark, with no pictures. The tiles within `ahead` of the view (px all round, or per-side margins
  * `{left, top, right, bottom}` such as camera `aheadOf` gives) come last, marked `prepare`:
  * drawLayer paints them into the cache when the frame's budget allows and draws nothing, so the camera
  * finds them ready. Pass every still light that reaches them; `waiting` lists the reaches
@@ -132,7 +135,7 @@ export function createLightLayerParts({extent,tint,areas=[],lights=[],grids=[],c
     const shades=areas.filter(a=>finite(a.cut,'area cut',0)>=.001).map(a=>[a,null,areaReach(a)]).filter(([,,r])=>r);
     for(const tile of tiles(extent,tile_size,near)){
         const shown=!view||(tile[0]<view.right&&tile[0]+tile[2]>view.left&&tile[1]<view.bottom&&tile[1]+tile[3]>view.top);
-        const cuts=cutStill.filter(meets(tile)),lit=glowStill.filter(meets(tile)).filter(([l])=>l.color&&(l.glow??0)>=.001),thinned=shades.filter(meets(tile)).map(([a])=>a),bright=lighted.filter(meets(tile)).map(([g])=>g);
+        const cuts=cutStill.filter(meets(tile)),lit=glowStill.filter(meets(tile)).filter(([l])=>l.color&&(l.glow??0)>=.001),thinned=shades.filter(meets(tile)).map(([a])=>a),bright=lighted.filter(meets(tile)).map(([g])=>g).filter(g=>typeof g.peakIn!=='function'||g.peakIn(tile)>=.004);
         const picture=(part,list,paint,extra)=>({key:`${key}:${signature(tint,tile,list,part,extra,bright)}:${part}`,bounds:tile,build(){const scene=new artScene();paint(scene);return scene.finish();}});
         // the dark is one plain fill under every tile (tiles laid edge to edge would leave a hairline where their
         // soft edges meet); a tile holds only what is cut out of it, painted white and cut with destination-out
@@ -417,6 +420,18 @@ export class lightGrid{
         for(let ch=0;ch<3;ch++){const a=light[(j*cols+i)*3+ch],b=light[(j*cols+i1)*3+ch],c=light[(j1*cols+i)*3+ch],d=light[(j1*cols+i1)*3+ch];out[ch]=(a*(1-fx)+b*fx)*(1-fy)+(c*(1-fx)+d*fx)*fy;}
         return out;
     }
+    /**
+     * The brightest channel arriving over [x, y, w, h] and a cell round it (as drawLightGrid reads it there, its rim
+     * included), found once per box: a light tile that the grid does not light is left without its pictures.
+     */
+    peakIn([x,y,w,h]){
+        const id=`${x},${y},${w},${h}`;this.#peaks??=new Map();const known=this.#peaks.get(id);if(known!==undefined)return known;
+        const {cols,rows,cell}=this,r=this.rim?1:0,light=this.rim??this.light,stride=cols+2*r;
+        const i0=Math.max(-r,Math.floor((x-this.left)/cell)-1),i1=Math.min(cols-1+r,Math.floor((x+w-this.left)/cell)+1),j0=Math.max(-r,Math.floor((y-this.top)/cell)-1),j1=Math.min(rows-1+r,Math.floor((y+h-this.top)/cell)+1);
+        let m=0;for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){const o=((j+r)*stride+i+r)*3;for(let ch=0;ch<3;ch++)if(light[o+ch]>m)m=light[o+ch];}
+        if(this.#peaks.size>4096)this.#peaks.clear();this.#peaks.set(id,m);return m;
+    }
+    #peaks=null;
 }
 /**
  * The grid in `scene` (an artScene) as one small image, a pixel a cell, scaled up smoothly (read

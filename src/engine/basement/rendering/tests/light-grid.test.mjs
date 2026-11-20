@@ -69,6 +69,15 @@ test('the light layer\'s tiles carry the grid: a cut in the dark and its colour,
     assert.notDeepEqual(keys(moved),keys(withGrid));
 });
 
+test('a tile the grid leaves dark gets no pictures: only the tiles its light reaches are painted', () => {
+    const big={left:0,top:0,right:1024,bottom:1024},grid=bakeLightGrid({bounds:big,emitters:[neon(100,100)]});
+    const parts=createLightLayerParts({extent:big,tint:'rgba(5,5,20,.9)',grids:[grid],tile_size:256,view:big});
+    const tiles=parts.filter(p=>p.picture).map(p=>p.picture.bounds);
+    assert.ok(tiles.length>=2&&tiles.length<=8,`the light near a corner is in a few tiles, not all 16 (${tiles.length / 2})`);
+    assert.ok(tiles.every(([x,y])=>x<512&&y<512),'the far tiles stay the plain dark');
+    assert.ok(grid.peakIn([0,0,256,256])>.004&&grid.peakIn([768,768,256,256])<.004,'peakIn: the brightest light over a box');
+});
+
 test('a map\'s light grid: still emitters bake per region, a mover re-bakes what it reaches, within the budget', () => {
     const p=new physicsSystem();
     const map=new mapInstance(p,{size:[2048,1024],regions:{size:512,radius:4096},

@@ -206,7 +206,7 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,
         let sides=[],top=key;
         if(view&&layer.sides&&z1>z0){sides=drawSides(steps,place,values,sidesPaint(layer.sides,values,materials),view,z0,z1,{...layer.sides,facade:layer.facade,scale:layer.thickness>0?(z1-z0)/layer.thickness:1,screen,shines});if(whole({c}))for(const packet of sides)packet.depth=0;else top=key+z1-z0;}
         // with `covers` (a height), a walled part whose top stands over it gives its silhouette too: where the night comes back over the light on the ground
-        const cover=covers!==null&&view&&layer.sides&&z1>covers&&!c.joint&&!lean?coverOf(steps,place,values,layer.sides.follow??'shapes',view,z0,z1):null;
+        const cover=covers!==null&&view&&layer.sides&&layer.cover!==false&&z1>covers&&!c.joint&&!lean?coverOf(steps,place,values,layer.sides.follow??'shapes',view,z0,z1):null;
         if(mirror!==null&&layer.sides&&z1>z0)sides=mirrorSides(steps,place,values,sidesPaint(layer.sides,values,materials),mirror,z0,z1,below);
         // A still layer (not on a tipped bone) is the same art wherever it stands: with `pictures` it is drawn once
         // into a picture, keyed by its steps and look, and stamped each frame under its place and its plane.
@@ -253,7 +253,7 @@ export function componentCovers(entity,source,view,{blend=1,above=24,paint='#fff
     const pose=entity.getRenderState(blend),scale=look.scale??1,[wx,wy,wz]=entity.world_scale??[1,1,1],values=look.values??{},elevation=pose.elevation??0,out=[];
     const cos=Math.cos(pose.rotation),sin=Math.sin(pose.rotation);
     for(const {component:c,layer} of listLayers(components)){
-        if(c.joint||!layer.sides)continue;
+        if(c.joint||!layer.sides||layer.cover===false)continue;
         const z0=elevation+layer.height*wz,z1=elevation+(layer.height+layer.thickness)*wz;if(!(z1>above))continue;
         const x=c.at[0]*wx*scale,y=c.at[1]*wy*scale,at=[pose.position[0]+x*cos-y*sin,pose.position[1]+x*sin+y*cos],r=pose.rotation+c.rotation,sx=wx*scale,sy=wy*scale;
         const cover=coverOf(layerSteps(layer,source),{at,rotation:r,scale:[sx,sy]},values,layer.sides.follow??'shapes',view,z0,z1,paint);if(cover)out.push(cover);

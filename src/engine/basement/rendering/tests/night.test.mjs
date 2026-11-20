@@ -63,6 +63,32 @@ test('what stands tall covers the light on the ground; lit windows and glowing s
  render.dispose();
 });
 
+test('a walled layer marked cover: false (a post) gives no cover; cover is true or false',async()=>{
+ const {world,render}=fixture();render.registerRenderer('recording',recordingRenderer);await render.setRenderer('recording',{surface:null});render.setHeightView({eye:900});
+ const post=cover=>({name:'post',layers:[{layer:0,height:0,thickness:40,solid:false,sides:'#222',...(cover===undefined?{}:{cover}),steps:[{shape:'circle',x:0,y:0,radius:3,fill:'#222'}]}]});
+ world.elements.createEntity({kind:'static',position:[50,50],components:[post(false)]});world.elements.createEntity({kind:'static',position:[80,50],components:[post()]});
+ world.updateState(1/60);
+ render.beginFrame();render.drawLooks(1,{covers:24});assert.equal(render.nightOver().filter(o=>o.over==='cover').length,1,'only the post without cover: false');render.endFrame();
+ const [thin]=world.elements.getEntities();assert.equal(componentCovers(thin,world.elements.asset_library,new heightView({camera:[50,50],eye:900})).length,0);
+ assert.throws(()=>world.elements.createEntity({kind:'static',position:[0,0],components:[post('no')]}),/cover is true or false/);
+ render.dispose();
+});
+
+test('lights are read once a frame: a thing without lights is not asked for its state, one with lights once',()=>{
+ const {world,render}=fixture();
+ const lamp=world.elements.createEntity({kind:'static',position:[50,50],lights:[{shape:'point',radius:40,height:10}]}),plain=world.elements.createEntity({kind:'static',position:[60,50]});
+ const proto=Object.getPrototypeOf(lamp.body),getState=proto.getState,reads=new Map();
+ proto.getState=function(...a){reads.set(this,(reads.get(this)??0)+1);return getState.apply(this,a);};
+ const lampReads=()=>reads.get(lamp.body)??0,plainReads=()=>reads.get(plain.body)??0;
+ try{
+ assert.equal(entityLights(plain).length,0);assert.equal(plainReads(),0,'no lights: no state read');
+ entityLights(lamp,{view:new heightView({camera:[0,0],eye:500})});assert.equal(lampReads(),1,'its state once, for its motion and its elevation');
+ render.beginFrame();const a=render.visibleLights(),b=render.visibleLights();assert.deepEqual(a,b);assert.notEqual(a,b,'each call its own list');
+ assert.equal(lampReads(),2,'inside a frame the night, its glare and the rain share one look at the lights');render.endFrame();
+ render.beginFrame();render.visibleLights();assert.equal(lampReads(),3,'a new frame reads them again');render.endFrame();
+ }finally{proto.getState=getState;render.dispose();}
+});
+
 test('the light layer draws covers and shines last, and a light aloft after them, uncached',()=>{
  const square={type:'shape',matrix:[1,0,0,1,0,0],geometry:{type:'path',commands:[['move',0,0],['line',10,0],['line',10,10],['close']]},material:{fill:'#fff'},opacity:1,blend:'normal',clips:[]};
  const tint='rgba(0,0,10,.9)',over=[{packet:square,over:'cover'},{packet:{...square,depth:.5},over:'shine'}];

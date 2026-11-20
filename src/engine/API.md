@@ -220,7 +220,7 @@ The world has one vertical axis, z, in the same world units as x and y (50 to a 
 
 #### Components
 
-An entity is made of components, each a list of layers with a base `height` and a `thickness`: a couch is a frame, a seat and a back; a building is one entity with a component per wing and a layer per floor (template `engine:building`). Leaning, a layer with `sides` shows its walls, standing on each shape's true outline. Its `facade` puts windows, doors, piers and bands on those walls, all as data:
+An entity is made of components, each a list of layers with a base `height` and a `thickness`: a couch is a frame, a seat and a back; a building is one entity with a component per wing and a layer per floor (template `engine:building`). Leaning, a layer with `sides` shows its walls, standing on each shape's true outline; `cover: false` on one (a post, a pole) keeps the night from being laid back over it. Its `facade` puts windows, doors, piers and bands on those walls, all as data:
 
 ```json
 { "layer": 1, "height": 22, "thickness": 104, "steps": [{ "shape": "rectangle", "x": 0, "y": 0, "width": 700, "height": 500, "fill": "$stone" }],

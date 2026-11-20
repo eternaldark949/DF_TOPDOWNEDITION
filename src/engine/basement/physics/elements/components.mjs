@@ -6,14 +6,15 @@
 // `sides` (a paint, or {material, shade, follow}) shows its walls when the render system leans heights toward the camera:
 // they follow each solid shape's true outline (rounded corners, curves, hollows), `shade` (0..1, default .35) darkens
 // a face the more it turns from the light, and `follow: 'hull'` wraps the layer in one convex skin instead. The entity's
-// height is the highest top among its components. A layer with sides may carry a `facade`: windows, spandrels and doors
+// height is the highest top among its components. A walled layer marked `cover: false` (a post, a pole: too thin to hide
+// the light under it) gives no cover at night (renderSystem.drawLooks({covers})). A layer with sides may carry a `facade`: windows, spandrels and doors
 // (`panels`) in every bay of every storey, `piers` between the bays and `bands` along the walls (see readFacade). Components are plain data, kept in the entity's
 // `components` property, so they save, load and change like any property. Lengths are world units:
 // data written in metres is turned into units by the Directory when it loads.
 
 const COMPONENT = Object.freeze(['name', 'at', 'rotation', 'joint', 'layers']);
 const SIDES = Object.freeze(['material', 'shade', 'follow']);
-const LAYER = Object.freeze(['layer', 'height', 'thickness', 'steps', 'drawing', 'solid', 'visible', 'sides', 'facade']);
+const LAYER = Object.freeze(['layer', 'height', 'thickness', 'steps', 'drawing', 'solid', 'visible', 'sides', 'facade', 'cover']);
 const FACADE = Object.freeze({
     facade: ['storeys', 'bays', 'panels', 'piers', 'bands', 'seed'],
     storeys: 'from height count'.split(' '), bays: ['width', 'margin'],
@@ -38,11 +39,11 @@ export function readLayer(packet, where = 'A layer') {
     if (sides !== undefined && !(typeof sides === 'string' && sides) && !(sideKeys && typeof material === 'string' && material)) throw new TypeError(`${where}'s sides are a paint colour, a "$look" value, or {material: id or "$look" value, shade: 0..1, follow: 'shapes' or 'hull'}`);
     if (packet.facade !== undefined) readFacade(packet.facade, where);
     if (packet.facade !== undefined && packet.sides === undefined) throw new TypeError(`${where}'s facade is laid on its walls: give it sides too`);
-    for (const flag of ['solid', 'visible']) if (packet[flag] !== undefined && typeof packet[flag] !== 'boolean') throw new TypeError(`${where}'s ${flag} is true or false`);
+    for (const flag of ['solid', 'visible', 'cover']) if (packet[flag] !== undefined && typeof packet[flag] !== 'boolean') throw new TypeError(`${where}'s ${flag} is true or false`);
     return { layer: packet.layer, height: length(packet.height ?? 0, `${where}'s height`, -Infinity), thickness: length(packet.thickness ?? 0, `${where}'s thickness`),
         ...(packet.steps !== undefined ? { steps: structuredClone(packet.steps) } : { drawing: packet.drawing }),
         solid: packet.solid ?? true, visible: packet.visible ?? true, ...(packet.sides !== undefined ? { sides: structuredClone(packet.sides) } : {}),
-        ...(packet.facade !== undefined ? { facade: structuredClone(packet.facade) } : {}) };
+        ...(packet.facade !== undefined ? { facade: structuredClone(packet.facade) } : {}), ...(packet.cover === false ? { cover: false } : {}) };
 }
 // A number, or a "$look" value the drawing reads when it is drawn.
 const lookOr = (value, test) => (typeof value === 'string' && value.startsWith('$')) || test(value);

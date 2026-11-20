@@ -43,9 +43,10 @@ are the source; edit them, not the classic data.
   courts and a paved apron round each building, rain pools, a kerbside hedge), the parks (hedge border, gravel walk round a moon
   pool, beds, benches, the name at the north gate), roads with their markings and names, junctions, crossings, pavements and a
   raised kerb wherever a pavement meets a road. Its street lamps are `city.json`'s `street_lamp` (amber), `street_lamp_rose`
-  and `street_lamp_violet`: the classic's twin lanterns on a fluted iron post, each lantern's glass glowing (`emits`, so the
-  light grid, the reflections and the night's shines read it), a still point light under each lantern for its pool on the
-  pavement, with `glare` for its star; the colour is the look's `lamp` value, so a new colour is a template that `extends`
+  and `street_lamp_violet`: the classic's twin lanterns on a crossarm over an iron post, each lantern's glass glowing (`emits`, so the
+  light grid, the reflections and the night's shines read it), one still point light between them for the pool on the
+  pavement, with `glare` for its star (the star alone, `fog: 0`). A lamp is three layers, kept few because each is a packet a
+  frame: the walled shaft (`cover: false`, too thin to hold the night back over its pool), the crossarm, and the glass; the colour is the look's `lamp` value, so a new colour is a template that `extends`
   `street_lamp` with its own values. They stand on both pavements of every straight road, 20 out from the kerb every 350 or so,
   clear of the junctions, and off each corner of every square junction, as the classic laid them: amber on the north or west
   pavement, rose on the other, and the Silver Queen's violet round its block (978 placements, written by the street lamp

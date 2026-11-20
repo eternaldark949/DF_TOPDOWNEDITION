@@ -35,7 +35,7 @@ const methods=['initialize','resize','render','registerResource','releaseResourc
  */
 export class renderSystem {
     #createSurface=null;#lean=null;#still=true;#texturesPainted=0;#textures=new Map();#texturesWanted=[];#textureChain=Promise.resolve();#world;#camera;#frame=new renderFrame();#renderers=new Map();#resources=new Map();#backend=null;#backendId=null;#surface=null;
-    #effects=Object.freeze([]);#layerEffects=new Map();#collecting=false;#busy=false;#disposed=false;#generation=0;#last=null;#surfaceListeners=new Set();#frameListeners=new Set();#requirements=[];#visible=[];#over=[];
+    #effects=Object.freeze([]);#layerEffects=new Map();#collecting=false;#busy=false;#disposed=false;#generation=0;#last=null;#surfaceListeners=new Set();#frameListeners=new Set();#requirements=[];#visible=[];#over=[];#lightsMemo=null;
     constructor({physics_system,camera,create_surface=null}={}){if(create_surface!==null&&typeof create_surface!=='function')throw new TypeError('create_surface makes a surface for a renderer id');this.#createSurface=create_surface;if(!physics_system?.queryEntitiesInBounds||!camera?.getView)throw new TypeError('renderSystem requires native world and camera');this.#world=physics_system;this.#camera=camera;}
     get renderer_id(){return this.#backendId;}
     get disposed(){return this.#disposed;}
@@ -167,11 +167,17 @@ export class renderSystem {
      * as a `shine` (cut out of the night). Empty without a height view, or when drawLooks was not asked.
      */
     nightOver(){return this.#over.sort((a,b)=>a.layer-b.layer||a.depth-b.depth).map(({packet,over})=>({packet,over}));}
-    /** The lights the visible things carry (their `lights` and `emission`), in the world, leaning with the height view. */
+    /**
+     * The lights the visible things carry (their `lights` and `emission`), in the world, leaning with the height view.
+     * Inside an open frame they are found once for a blend and margin (the night, its glare and the rain share them).
+     */
     visibleLights(blend=1,{margin=512}={}){
-        this.#live();const view=this.heightViewAt(blend),out=[];
+        this.#live();const memo=this.#lightsMemo;
+        if(this.#collecting&&memo&&memo.blend===blend&&memo.margin===margin)return memo.lights.slice();
+        const view=this.heightViewAt(blend),out=[];
         for(const {entity} of this.getVisibleEntities({blend,margin},[]))if(entity)out.push(...entityLights(entity,{pose:entity.getRenderState?.(blend)??null,view}));
-        return out;
+        this.#lightsMemo=this.#collecting?{blend,margin,lights:out}:null;
+        return out.slice();
     }
     /**
      * The night over the open frame, after drawLooks: one light layer pass (createLightLayerParts) over the view,
@@ -286,7 +292,7 @@ export class renderSystem {
     #stack(value){return effectStack(value,id=>this.#world.elements.asset_library.getResource(id));}
     getEffects(){return {frame:this.#effects,layers:Object.fromEntries(this.#layerEffects)};}
     beginFrame(blend=1){
-        this.#live();if(this.#collecting)throw new Error('A render frame is already open');this.#collecting=true;
+        this.#live();if(this.#collecting)throw new Error('A render frame is already open');this.#collecting=true;this.#lightsMemo=null;
         try{const frame=this.#frame.begin(this.#camera.getView(blend));if(this.#effects.length)frame.setEffects(this.#effects);for(const [layer,stack] of this.#layerEffects)frame.setLayerEffects(layer,stack);this.#paintTextures(frame);return frame;}
         catch(error){this.#collecting=false;this.#frame.abort();throw error;}
     }
