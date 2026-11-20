@@ -136,15 +136,15 @@ export class renderSystem {
     /** Draws every visible entity's look (a `drawing` asset) and its components into the open frame, at its `look.layer` and `look.depth`; a component layer's depth adds its height, so higher parts draw over lower ones. Returns how many entities it drew. */
     drawLooks(blend=1){
         this.#live();if(!this.#collecting)throw new Error('Draw looks inside an open render frame');
-        const source=this.#world.elements.asset_library,view=this.#lean?new heightView({camera:this.#camera.getView(blend).position,...this.#lean}):null;let drawn=0;
+        const source=this.#world.elements.asset_library,view=this.#lean?new heightView({camera:this.#camera.getView(blend).position,...this.#lean}):null;let drawn=0,shown=null;
         for(const {entity} of this.getVisibleEntities({blend},this.#visible)){
             if(!entity)continue;
             const look=entity.get('look',{}),layer=look.layer??0,depth=look.depth??0;let drew=false;
             if(entity.assets?.drawing){const scene=new artScene();if(drawLook(scene,entity,source,blend,{view})){const z=entity.world_elevation??0;for(const packet of scene.finish())this.#frame.submit(this.#textured({...packet,layer,depth:depth+z}));drew=true;}}
             if(entity.has('components')){
                 let pose;const rigs=this.#world.rigs,joints=name=>{pose??=rigs?.getRig(entity)?rigs.getPose(entity,{blend,world_space:true}):null;return pose?.joints[name]??null;};
-                const pictures=this.#still&&!!this.#backend?.capabilities.includes('picture');
-                for(const part of drawComponents(entity,source,blend,{joints,view,pictures})){for(const packet of part.sides)this.#frame.submit(this.#textured({...packet,layer,depth:depth+part.depth+packet.depth}));for(const packet of part.packets)this.#frame.submit(this.#textured({...packet,layer,depth:depth+part.top}));
+                const pictures=this.#still&&!!this.#backend?.capabilities.includes('picture'),screen=view?(shown??={bounds:this.#camera.getView(blend).bounds,zoom:this.#camera.getView(blend).zoom}):null;
+                for(const part of drawComponents(entity,source,blend,{joints,view,pictures,screen})){for(const packet of part.sides)this.#frame.submit(this.#textured({...packet,layer,depth:depth+part.depth+packet.depth}));for(const packet of part.packets)this.#frame.submit(this.#textured({...packet,layer,depth:depth+part.top}));
                     if(part.picture){const {key,bounds,matrix,build}=part.picture,gen=this.#texturesPainted;   // (a texture painted later is a new picture: the old one held its base colour)
                         this.#frame.submit({type:'picture',picture:{key:`${key}@${gen}`,bounds,matrix,layered:true,build:()=>build().map(packet=>this.#textured(packet))},layer,depth:depth+part.top});}
                     drew=true;}

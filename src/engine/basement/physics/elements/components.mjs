@@ -6,13 +6,20 @@
 // `sides` (a paint, or {material, shade, follow}) shows its walls when the render system leans heights toward the camera:
 // they follow each solid shape's true outline (rounded corners, curves, hollows), `shade` (0..1, default .35) darkens
 // a face the more it turns from the light, and `follow: 'hull'` wraps the layer in one convex skin instead. The entity's
-// height is the highest top among its components. Components are plain data, kept in the entity's
+// height is the highest top among its components. A layer with sides may carry a `facade`: windows, spandrels and doors
+// (`panels`) in every bay of every storey, `piers` between the bays and `bands` along the walls (see readFacade). Components are plain data, kept in the entity's
 // `components` property, so they save, load and change like any property. Lengths are world units:
 // data written in metres is turned into units by the Directory when it loads.
 
 const COMPONENT = Object.freeze(['name', 'at', 'rotation', 'joint', 'layers']);
 const SIDES = Object.freeze(['material', 'shade', 'follow']);
-const LAYER = Object.freeze(['layer', 'height', 'thickness', 'steps', 'drawing', 'solid', 'visible', 'sides']);
+const LAYER = Object.freeze(['layer', 'height', 'thickness', 'steps', 'drawing', 'solid', 'visible', 'sides', 'facade']);
+const FACADE = Object.freeze({
+    facade: ['storeys', 'bays', 'panels', 'piers', 'bands', 'seed'],
+    storeys: 'from height count'.split(' '), bays: ['width', 'margin'],
+    panels: ['width', 'height', 'at', 'fill', 'stroke', 'line_width', 'bars', 'bar_width', 'bar_fill', 'lit', 'lit_fill', 'storeys'],
+    piers: 'width from to fill edge edge_width'.split(' '), bands: 'from to fill'.split(' ')
+});
 const SAFE = value => typeof value === 'string' && value && !['__proto__', 'prototype', 'constructor'].includes(value);
 const plain = value => value && typeof value === 'object' && !Array.isArray(value);
 const only = (value, allowed, where) => { const extra = Object.keys(value).find(key => !allowed.includes(key)); if (extra) throw new TypeError(`${where} has no field ${extra} (one of ${allowed.join(', ')})`); };
@@ -29,10 +36,40 @@ export function readLayer(packet, where = 'A layer') {
     const sides = packet.sides, material = plain(sides) ? sides.material : undefined;
     const sideKeys = plain(sides) && Object.keys(sides).every(k => SIDES.includes(k)) && (sides.shade === undefined || (Number.isFinite(sides.shade) && sides.shade >= 0 && sides.shade <= 1)) && (sides.follow === undefined || ['shapes', 'hull'].includes(sides.follow));
     if (sides !== undefined && !(typeof sides === 'string' && sides) && !(sideKeys && typeof material === 'string' && material)) throw new TypeError(`${where}'s sides are a paint colour, a "$look" value, or {material: id or "$look" value, shade: 0..1, follow: 'shapes' or 'hull'}`);
+    if (packet.facade !== undefined) readFacade(packet.facade, where);
+    if (packet.facade !== undefined && packet.sides === undefined) throw new TypeError(`${where}'s facade is laid on its walls: give it sides too`);
     for (const flag of ['solid', 'visible']) if (packet[flag] !== undefined && typeof packet[flag] !== 'boolean') throw new TypeError(`${where}'s ${flag} is true or false`);
     return { layer: packet.layer, height: length(packet.height ?? 0, `${where}'s height`, -Infinity), thickness: length(packet.thickness ?? 0, `${where}'s thickness`),
         ...(packet.steps !== undefined ? { steps: structuredClone(packet.steps) } : { drawing: packet.drawing }),
-        solid: packet.solid ?? true, visible: packet.visible ?? true, ...(packet.sides !== undefined ? { sides: structuredClone(packet.sides) } : {}) };
+        solid: packet.solid ?? true, visible: packet.visible ?? true, ...(packet.sides !== undefined ? { sides: structuredClone(packet.sides) } : {}),
+        ...(packet.facade !== undefined ? { facade: structuredClone(packet.facade) } : {}) };
+}
+// A number, or a "$look" value the drawing reads when it is drawn.
+const lookOr = (value, test) => (typeof value === 'string' && value.startsWith('$')) || test(value);
+const paint = value => value === undefined || (typeof value === 'string' && value) || plain(value);
+/** A layer's facade, checked: {storeys, bays, panels, piers, bands, seed}; lengths in world units. */
+function readFacade(facade, where) {
+    const at = `${where}'s facade`, num = (v, name, min = -Infinity) => { if (v !== undefined && !lookOr(v, x => Number.isFinite(x) && x >= min)) throw new TypeError(`${at}'s ${name} is a number of at least ${min} (world units), or a "$look" value`); };
+    if (!plain(facade)) throw new TypeError(`${at} is {storeys, bays, panels, piers, bands, seed}`);
+    only(facade, FACADE.facade, at);
+    for (const key of ['storeys', 'bays']) if (facade[key] !== undefined) { if (!plain(facade[key])) throw new TypeError(`${at}'s ${key} is {${FACADE[key].join(', ')}}`); only(facade[key], FACADE[key], `${at}'s ${key}`); }
+    num(facade.storeys?.height, 'storey height', 1e-6); num(facade.storeys?.from, 'first storey'); num(facade.storeys?.count, 'storey count', 1); num(facade.bays?.width, 'bay width', 1e-6); num(facade.bays?.margin, 'bay margin', 0); num(facade.seed, 'seed');
+    for (const key of ['panels', 'piers', 'bands']) {
+        if (facade[key] === undefined) continue;
+        if (!Array.isArray(facade[key])) throw new TypeError(`${at}'s ${key} are a list of {${FACADE[key].join(', ')}}`);
+        facade[key].forEach((item, i) => {
+            const it = `${at}'s ${key}[${i}]`;
+            if (!plain(item)) throw new TypeError(`${it} is {${FACADE[key].join(', ')}}`);
+            only(item, FACADE[key], it);
+            for (const field of ['fill', 'stroke', 'bar_fill', 'lit_fill', 'edge']) if (!paint(item[field])) throw new TypeError(`${it}'s ${field} is a paint: a colour, a gradient or a "$look" value`);
+            if (key !== 'bands') num(item.width, `${key}[${i}] width`, 1e-6);
+            if (key !== 'bands' && item.width === undefined) throw new TypeError(`${it} needs a width`);
+            for (const field of ['height', 'line_width', 'bar_width', 'edge_width']) num(item[field], `${key}[${i}] ${field}`, 0);
+            for (const field of 'at from to bars'.split(' ')) num(item[field], `${key}[${i}] ${field}`);
+            if (item.lit !== undefined && !lookOr(item.lit, x => Number.isFinite(x) && x >= 0 && x <= 1)) throw new TypeError(`${it}'s lit is the share of them lit, 0..1`);
+            if (item.storeys !== undefined && !(Array.isArray(item.storeys) && item.storeys.every(Number.isInteger))) throw new TypeError(`${it}'s storeys are a list of storey numbers (from 0 at the bottom; -1 is the top one)`);
+        });
+    }
 }
 
 /** One component, checked, with its layers in layer order: {name, at, rotation, joint, layers}. */
