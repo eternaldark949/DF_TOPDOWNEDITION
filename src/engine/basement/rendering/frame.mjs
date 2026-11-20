@@ -32,6 +32,8 @@ export class renderFrame {
         this.#stack.push(previous);
         try{this.#current=this.#pass(target_id,clear_color,viewport??previous.viewport);this.#current.layer=spec;}catch(error){this.#stack.pop();throw error;}return this;
     }
+    /** The frame's effects so far. */
+    getEffects(){this.#require();return this.#effects;}
     /** Effects done to the whole frame once everything is drawn (a list of effects; see effects.mjs). */
     setEffects(effects){this.#require();this.#effects=effectStack(effects);return this;}
     /**

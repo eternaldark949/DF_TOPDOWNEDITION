@@ -17,7 +17,7 @@ export const LIGHT_SHADOWS = Object.freeze(['static', 'dynamic', 'none']);
 export const LIGHT_ANIMATIONS = Object.freeze(['steady', 'flicker', 'pulse', 'stutter']);
 /**
  * A declared light, as a lamp, a placement or a catalog type gives it, in its one runtime form:
- * `{shape: 'point' | 'strip', radius | size + round + soft + rotation, position, color, intensity, glow, look, shadows, animation}`.
+ * `{shape: 'point' | 'strip', radius | size + round + soft + rotation, position, color, intensity, glow, height, look, shadows, animation}`.
  *  position   offset from its body's centre ([dx, dy], or the authored `dx` / `dy`)
  *  intensity  how much of the dark it lifts; `glow` how strong its colour is (a neon sign colours the
  *             street without lifting the dark much)
@@ -26,6 +26,7 @@ export const LIGHT_ANIMATIONS = Object.freeze(['steady', 'flicker', 'pulse', 'st
  *  animation  {kind: 'steady' | 'flicker' | 'pulse' | 'stutter', ...}: flicker and pulse at `rate` (rad/s),
  *             a pulse swinging by `depth` (0..1); a stutter (a faulty lamp) holds steady but for `burst` s
  *             every `period` s, when it drops by `depth` on and off. The older `flicker: rate` is a flicker.
+ *  height     how high it hangs, world units (default 0): its reflection falls that far times the reflection pass's `fall`
  *  look       the name of a profile the game's look gives it (a street lamp's pool), or null
  * `color`, `intensity` and `glow` stay null when unset, for the look to choose.
  */
@@ -39,7 +40,7 @@ export function declaredLight(light, { shadows = 'dynamic' } = {}) {
         : { kind: a.kind, rate: finite(a.rate ?? 1, 'light rate'), ...(a.kind === 'pulse' ? { depth: finite(a.depth ?? .1, 'light depth') } : {}) };
     const shape = light.size ? { shape: 'strip', size: [finite(light.size[0], 'light width'), finite(light.size[1], 'light height')], round: light.round ?? null, soft: !!light.soft, rotation: finite(light.rotation ?? 0, 'light rotation') }
         : { shape: 'point', radius: finite(light.radius, 'light radius') };
-    return { ...shape, position: light.position ? [...light.position] : [light.dx ?? 0, light.dy ?? 0], color: light.color ?? null, intensity: light.intensity ?? null, glow: light.glow ?? null, look: light.look ?? null, shadows: shade, animation };
+    return { ...shape, position: light.position ? [...light.position] : [light.dx ?? 0, light.dy ?? 0], color: light.color ?? null, intensity: light.intensity ?? null, glow: light.glow ?? null, height: finite(light.height ?? 0, 'light height'), look: light.look ?? null, shadows: shade, animation };
 }
 const lightShape = l => l.shape === 'strip' ? { shape_type: 'box', dimensions: l.size, local_position: l.position } : { shape_type: 'circle', radius: l.radius, local_position: l.position };
 

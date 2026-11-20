@@ -121,8 +121,11 @@ export function componentSteps(components,source,{solid_only=false}={}){
  * camera, parts at one height draw farthest from the camera first, and a component set on the entity above
  * its base (a bottle on a tray) draws whole from that base, so a near bottle covers the foot of a far one.
  */
-export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,pictures=false,screen=null}={}){
+export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,mirror=null,pictures=false,screen=null}={}){
     if(view!==null&&!(view instanceof heightView))throw new TypeError('A height view is a heightView or null');
+    if(mirror!==null&&!(Number.isFinite(mirror)&&mirror>=0))throw new TypeError('A mirror is how far a reflection falls per unit of height, 0 or more');
+    // A reflection: each part where it falls, in the plane of its depth below the floor (k(-z)) and `mirror` × its height down the world's y.
+    const below=mirror!==null?view:null;if(mirror!==null)view=null;
     const components=entity.get('components')??[];if(!components.length)return [];
     const look=entity.get('look',{});if(look.visible===false)return [];
     const pose=entity.getRenderState(blend),scale=look.scale??1,[wx,wy,wz]=entity.world_scale??[1,1,1],values=look.values??{},elevation=pose.elevation??0,parts=[];
@@ -155,17 +158,19 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,
         // A part drawn whole (a bottle on a tray) keeps its walls and top together at its base.
         let sides=[],top=key;
         if(view&&layer.sides&&z1>z0){sides=drawSides(steps,place,values,sidesPaint(layer.sides,values,materials),view,z0,z1,{...layer.sides,facade:layer.facade,scale:layer.thickness>0?(z1-z0)/layer.thickness:1,screen});if(whole({c}))for(const packet of sides)packet.depth=0;else top=key+z1-z0;}
+        if(mirror!==null&&layer.sides&&z1>z0)sides=mirrorSides(steps,place,values,sidesPaint(layer.sides,values,materials),mirror,z0,z1,below);
         // A still layer (not on a tipped bone) is the same art wherever it stands: with `pictures` it is drawn once
         // into a picture, keyed by its steps and look, and stamped each frame under its place and its plane.
-        if(pictures&&fore===1&&!lean){
+        if(pictures&&mirror===null&&fore===1&&!lean){
             const art=stillArt(steps,values,materials);
             if(art){const m=placeMatrix(place),matrix=view?compose(view.plane(view.k(z1)),m):m;
-                return {height:z0,depth:key,top,layer:layer.layer,component:c.name,sides,packets:[],picture:{key:art.key,bounds:art.bounds,matrix,build:art.build}};}
+                return {height:z0,peak:z1,depth:key,top,layer:layer.layer,component:c.name,sides,packets:[],picture:{key:art.key,bounds:art.bounds,matrix,build:art.build}};}
         }
         if(view)scene.enter({matrix:view.plane(view.k(z1))});
+        else if(mirror!==null)scene.enter({matrix:fallen(below,mirror,z1)});
         scene.draw(steps,{...place,values,materials});
-        if(view)scene.leave();
-        return {height:z0,depth:key,top,layer:layer.layer,component:c.name,sides,packets:scene.finish()};
+        if(view||mirror!==null)scene.leave();
+        return {height:z0,peak:z1,depth:key,top,layer:layer.layer,component:c.name,sides,packets:scene.finish()};
     });
 }
 // Every visible layer with its component and the component's place in the list.
@@ -222,6 +227,29 @@ function drawSides(steps,{at,rotation,scale},values,fill,view,z0,z1,{shade=.35,f
         }
     }
     return out;
+}
+/**
+ * A layer's walls in a reflection below it: each face of its hull that looks down the screen (+y), from where its
+ * base falls (`fall` × z0 below its foot) to where its top falls (`fall` × z1), as a still wet floor shows it.
+ */
+function mirrorSides(steps,{at,rotation,scale},values,fill,fall,z0,z1,view=null){
+    const [sx,sy]=typeof scale==='number'?[scale,scale]:scale,points=drawingOutline([{shape:'group',x:at[0],y:at[1],rotation,scale:[sx,sy],steps}],{values}).flatMap(part=>part.points),hull=convexHull(points);
+    if(hull.length<3)return [];
+    const cx=hull.reduce((t,p)=>t+p[0],0)/hull.length,cy=hull.reduce((t,p)=>t+p[1],0)/hull.length,m0=fallen(view,fall,z0),m1=fallen(view,fall,z1),at0=p=>[m0[0]*p[0]+m0[4],m0[3]*p[1]+m0[5]],at1=p=>[m1[0]*p[0]+m1[4],m1[3]*p[1]+m1[5]],scene=new artScene();
+    for(let i=0;i<hull.length;i++){
+        const a=hull[i],b=hull[(i+1)%hull.length];let nx=b[1]-a[1],ny=a[0]-b[0];if(nx*((a[0]+b[0])/2-cx)+ny*((a[1]+b[1])/2-cy)<0){nx=-nx;ny=-ny;}
+        if(ny<=0)continue;
+        scene.fill([['move',...at0(a)],['line',...at0(b)],['line',...at1(b)],['line',...at1(a)],['close']],fill);
+    }
+    return scene.finish().map(packet=>({...packet,depth:0}));
+}
+/**
+ * Where a thing at height z shows in a wet floor, as a matrix on world coordinates: in the plane of its depth below the
+ * floor (the view's k(-z), toward the camera, when a height view leans) and `fall` × z down the world's y.
+ */
+export function fallen(view,fall,z){
+    if(!view)return [1,0,0,1,0,fall*z];
+    const [cx,cy]=view.camera,k=view.k(-z);return [k,0,0,k,cx*(1-k),cy*(1-k)+fall*z];
 }
 // ----- Facades ---------------------------------------------------------------------------------------
 // A layer's `facade` is the art on its walls, laid out as an architect would: the walls run from corner to corner

@@ -135,11 +135,12 @@ export class artScene{
         return this;
     }
     #step(step,values,materials){
-        const {shape,material,solid,emits,...fields}=step??{};
+        const {shape,material,solid,emits,reflect,...fields}=step??{};
         if(shape==='group'){const {steps,x=0,y=0,rotation=0,scale=1}=fields;return this.draw(steps,{at:[x,y],rotation,scale,values,materials});}
         const call=DRAWING[shape];if(!call)throw new TypeError(`Unknown drawing shape: ${shape} (one of ${Object.keys(DRAWING).join(', ')}, group)`);
         if(solid!==undefined&&typeof solid!=='boolean')throw new TypeError('solid is true or false');
         if(emits!==undefined)readEmits(emits);
+        if(reflect!==undefined)readReflect(reflect);
         return this[call](material===undefined?fields:{...materialPaint(material,materials),...fields});
     }
     #draw(commands,paint){const {material,opacity,blend}=drawPaint(paint);return this.#styled(opacity,blend,()=>this.paint(commands,material));}
@@ -151,7 +152,7 @@ export const DRAWING=Object.freeze({rectangle:'drawRectangle',circle:'drawCircle
 const PAINT_KEYS=new Set(['fill','stroke','line_width','line_cap','line_join','dash','alpha','blend','shadow','blur']);
 const NO_MATERIALS=Object.freeze({});
 /** The fields a material record may hold: its paint, plus `kind` and the physical `surface` that drawing ignores. */
-export const MATERIAL=Object.freeze({paint:Object.freeze([...PAINT_KEYS]),other:Object.freeze(['kind','surface','emits'])});
+export const MATERIAL=Object.freeze({paint:Object.freeze([...PAINT_KEYS]),other:Object.freeze(['kind','surface','emits','reflect'])});
 /**
  * The fields of `emits`, on a drawing step or a material: the shape glows and lights what is round it
  * (the light grid, reflections). `true` takes every default; `false` or null (on a step) turns off its material's.
@@ -161,6 +162,27 @@ export const MATERIAL=Object.freeze({paint:Object.freeze([...PAINT_KEYS]),other:
  *  height    how high above the ground it glows, world units (default 0): a high light reaches farther and softer
  * Drawing ignores it: an emitting step draws as it would without.
  */
+/**
+ * The fields of `reflect`, on a material or a floor step: the surface shines and shows what stands over it
+ * (reflections.mjs). `true` takes every default; `false` or null turns it off (on a step, its material's too).
+ *  strength  how much it reflects, 0 to 1 (default .5)
+ *  wet       true when it shines only as wet as the weather makes it (asphalt, pavers), false when it
+ *            always shines (marble, polished stone, still water)
+ *  plane     true for a true mirror (a reflection plane): what stands over it is drawn again whole, in full art
+ * Drawing ignores it.
+ */
+export const REFLECT=Object.freeze({strength:.5,wet:false,plane:false});
+/** `reflect` in its one form, {strength, wet, plane}, or null when it is off. Unknown fields are refused. */
+export function readReflect(reflect,where='reflect'){
+    if(reflect===false||reflect===null)return null;
+    if(reflect===true)return {...REFLECT};
+    if(!reflect||typeof reflect!=='object'||Array.isArray(reflect))throw new TypeError(`${where} is true, false or {${Object.keys(REFLECT).join(', ')}}`);
+    for(const key of Object.keys(reflect))if(!Object.hasOwn(REFLECT,key))throw new TypeError(`Unknown ${where} field: ${key} (one of ${Object.keys(REFLECT).join(', ')})`);
+    const out={...REFLECT,...reflect};
+    if(!(Number.isFinite(out.strength)&&out.strength>=0&&out.strength<=1))throw new TypeError(`${where}.strength is a number from 0 to 1`);
+    for(const key of ['wet','plane'])if(typeof out[key]!=='boolean')throw new TypeError(`${where}.${key} is true or false`);
+    return out;
+}
 export const EMITS=Object.freeze({strength:1,reach:96,color:null,height:0});
 /** `emits` in its one form, {strength, reach, color, height}, or null when it is off. Unknown fields are refused. */
 export function readEmits(emits,where='emits'){

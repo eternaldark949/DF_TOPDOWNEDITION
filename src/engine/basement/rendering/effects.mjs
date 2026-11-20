@@ -20,6 +20,17 @@ import {readColor} from './colors.mjs';
  * - bokeh: out of focus, as a lens sees it. What is brighter than `threshold` is taken out and grown into
  *   the aperture's shape (`blades` sides, 4 to 12, turned by `rotation`) `radius` wide, at `highlights`
  *   times its brightness, so lights become discs; the rest is blurred as wide.
+ * - reflection: screen-space reflection on a wet or polished floor (reflections.mjs fills its targets). For
+ *   each pixel of the ground (nothing on it in the `height` target) where the `mask` target says it shines,
+ *   it marches up in height until it meets what stands there (a pixel at that height `fall` × it up the
+ *   world's y, leaning as the height view leans), and adds
+ *   that pixel's colour at the mask's strength × `strength`, fading toward `reach` (world units, `steps`
+ *   samples). Where the walk leaves the picture or passes under something nearer, the `probe` target (the
+ *   baked mirror of what stands still) shows instead. Where the `plane` target's mask covers, it adds
+ *   nothing (a reflection plane draws there). `ripple` (px) shifts each row sideways by a sine of its height
+ *   at `ripple_scale` radians a pixel, moving with `time` (seconds); `hmax` is the height a full `height`
+ *   red stands for; `eye` and `lean` are the height view's (eye 0: drawn flat), so what leans away from the
+ *   camera leans toward it in the floor. The targets are resource ids; `probe` and `plane` may be null.
  */
 export const EFFECTS=Object.freeze({
     grade:Object.freeze({exposure:0,contrast:1,saturation:1,tint:'#ffffff',tint_amount:0}),
@@ -29,8 +40,11 @@ export const EFFECTS=Object.freeze({
     fog_glow:Object.freeze({threshold:.45,strength:2,radius:40,color:'#ffffff'}),
     star_glow:Object.freeze({threshold:.75,strength:1.5,length:60,rays:4,angle:Math.PI/4,color:'#ffffff'}),
     bokeh:Object.freeze({radius:12,blades:6,rotation:0,threshold:.6,highlights:1}),
+    reflection:Object.freeze({height:null,mask:null,probe:null,plane:null,strength:1,fall:.75,reach:360,steps:32,ripple:0,ripple_scale:.12,time:0,hmax:1024,eye:0,lean:1}),
 });
-const RANGES={exposure:[-8,8],contrast:[0,8],saturation:[0,8],tint_amount:[0,1],strength:[0,8],'vignette.radius':[0,4],softness:[.001,4],amount:[0,1],size:[1,64],'vignette.strength':[0,1],threshold:[0,.99],radius:[.5,256],length:[1,512],rays:[2,8],angle:[-7,7],blades:[4,12],rotation:[-7,7],highlights:[0,32]};
+/** Fields that name a render target: `true` when the effect needs one. */
+const TARGETS=Object.freeze({'reflection.height':true,'reflection.mask':true,'reflection.probe':false,'reflection.plane':false});
+const RANGES={exposure:[-8,8],contrast:[0,8],saturation:[0,8],tint_amount:[0,1],strength:[0,8],'vignette.radius':[0,4],softness:[.001,4],amount:[0,1],size:[1,64],'vignette.strength':[0,1],threshold:[0,.99],radius:[.5,256],length:[1,512],rays:[2,8],angle:[-7,7],blades:[4,12],rotation:[-7,7],highlights:[0,32],fall:[0,4],reach:[1,4096],steps:[4,64],ripple:[0,32],ripple_scale:[0,4],time:[-1e9,1e9],hmax:[1,1e5],eye:[0,1e6],'reflection.lean':[0,8]};
 /** One effect, checked and filled in from its defaults. Unknown types or fields are refused. */
 export function effect(spec){
     if(!spec||typeof spec!=='object')throw new TypeError('An effect is {type, ...fields}');
@@ -38,7 +52,8 @@ export function effect(spec){
     const out={type:spec.type};
     for(const key of Object.keys(spec))if(key!=='type'&&!Object.hasOwn(defaults,key))throw new TypeError(`Unknown ${spec.type} field: ${key} (one of ${Object.keys(defaults).join(', ')})`);
     for(const [key,fallback] of Object.entries(defaults)){
-        const value=spec[key]??fallback;
+        const value=spec[key]??fallback,target=TARGETS[`${spec.type}.${key}`];
+        if(target!==undefined){if(value===null){if(target)throw new TypeError(`${spec.type} ${key} names a render target`);out[key]=null;continue;}if(typeof value!=='string'||!value||value==='screen')throw new TypeError(`${spec.type} ${key} names a render target`);out[key]=value;continue;}
         if(typeof fallback==='number'){const [lo,hi]=RANGES[`${spec.type}.${key}`]??RANGES[key];out[key]=finite(value,`${spec.type} ${key}`,lo);if(out[key]>hi)throw new RangeError(`${spec.type} ${key} is at most ${hi}`);
             if(key==='rays'&&out[key]%2)throw new RangeError(`${spec.type} rays is 2, 4, 6 or 8`);
             if(key==='blades'&&out[key]%2)throw new RangeError(`${spec.type} blades is 4, 6, 8, 10 or 12`);}
@@ -65,6 +80,8 @@ export function effectStack(value,resolve=null){
 }
 /** The capabilities a stack needs. */
 export const effectNeeds=stack=>stack.map(e=>`effect:${e.type}`);
+/** The render targets a stack reads (a reflection's height, mask, probe and plane). */
+export const effectTargets=stack=>stack.flatMap(e=>Object.keys(e).filter(k=>TARGETS[`${e.type}.${k}`]!==undefined&&e[k]!==null).map(k=>e[k]));
 /** Checks an `effects` resource for the Directory: a list of valid effects. */
 export function validateEffectsPreset(resource,where='effects'){
     if(!Array.isArray(resource?.effects))throw new TypeError(`${where}: an effects preset holds a list of effects`);

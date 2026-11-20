@@ -54,8 +54,10 @@ function validLight(light,i){
  *           An area light does the same over a rounded strip of `size` turned by `rotation`; a beam (a
  *           headlight) from `near_width` either side at its position to `width` either side `length` ahead
  *           along `rotation`, fading along it, softer toward its edges and limited to `polygon` when given.
+ *  cuts     more packets that thin the dark, drawn as cuts after the lights' (a reflection pass's
+ *           darknessCut(): the night lifted where a reflection shines). createLightLayerParts takes them too.
  */
-export function createLightLayer({bounds,tint,areas=[],lights=[]},{scene=new artScene()}={}){
+export function createLightLayer({bounds,tint,areas=[],lights=[],cuts=[]},{scene=new artScene()}={}){
     const {left,top,right,bottom}=bounds??{};for(const v of [left,top,right,bottom])finite(v,'bounds');
     if(typeof tint!=='string'||!tint)throw new TypeError('The light layer needs a tint colour');
     scene.fill(rect(left,top,right-left,bottom-top),tint);
@@ -63,7 +65,7 @@ export function createLightLayer({bounds,tint,areas=[],lights=[]},{scene=new art
     const shapes=lights.map(validLight);
     lights.forEach((l,i)=>cut(scene,l,shapes[i]));
     lights.forEach((l,i)=>glow(scene,l,shapes[i]));
-    return scene.finish();
+    return [...scene.finish(),...extraCuts(cuts)];
 }
 /**
  * The same layer, split so what holds still between frames is painted once. Lights marked `still: true`
@@ -88,7 +90,7 @@ export function createLightLayer({bounds,tint,areas=[],lights=[]},{scene=new art
  * tile, the areas over it and every still light that reaches it; a light's `polygon` is known by its array, so give a new array when the shadow changes.
  * `key` prefixes the pictures' keys.
  */
-export function createLightLayerParts({extent,tint,areas=[],lights=[],grids=[],key='light',tile_size=null,view=null,ahead=0,waiting=[]}){
+export function createLightLayerParts({extent,tint,areas=[],lights=[],grids=[],cuts:more=[],key='light',tile_size=null,view=null,ahead=0,waiting=[]}){
     const {left,top,right,bottom}=extent??{};for(const v of [left,top,right,bottom])finite(v,'extent');
     if(typeof tint!=='string'||!tint)throw new TypeError('The light layer needs a tint colour');
     const all=lights.map(l=>{const shape=validLight(l);return [l,shape,reach(l,shape),l.still?digests(l):null];});
@@ -112,7 +114,7 @@ export function createLightLayerParts({extent,tint,areas=[],lights=[],grids=[],k
         if(l.still==='stamp'){const [c,g]=stamps(key,l,shape);if(c)cutStamps.push(c);if(g)colourStamps.push(g);continue;}
         if(l.still!==true)cut(cuts,l,shape);if(!l.still)glow(colour,l,shape);
     }
-    return [...darks,...cutStamps,...cuts.finish(),...glows,...colourStamps,...colour.finish(),...ready];
+    return [...darks,...cutStamps,...cuts.finish(),...extraCuts(more),...glows,...colourStamps,...colour.finish(),...ready];
 }
 /**
  * A light whose shape holds still while its strength changes (a pulsing sign, a stuttering lamp, a shot in
@@ -175,6 +177,8 @@ function glow(scene,l,shape,blend='add'){
     if(shape==='beam'){beam(scene,l,stops,k,blend);return;}
     const [x,y]=l.position;scene.enter({},{blend,opacity:k});scene.fill([circle(x,y,l.radius)],radial([x,y],0,[x,y],l.radius,stops));scene.leave();
 }
+/** Packets that lift the dark more (a reflection's light target, a sprite): drawn as cuts, after the lights' (cuts commute). */
+const extraCuts=list=>list.map(p=>({...p,blend:'destination-out'}));
 const polygonIds=new WeakMap();let polygonCount=0;
 const bits=new Float64Array(1),words=new Uint32Array(bits.buffer);
 /** FNV-1a over plain values (numbers, strings, arrays of them, null, booleans) as they are, without text: `hash = 0x811c9dc5`, then `add` each. */
