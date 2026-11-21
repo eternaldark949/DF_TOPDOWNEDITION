@@ -8,7 +8,7 @@ import {artScene,DRAWING,readValues,readEmits} from './art.mjs';
 import {heightView} from './height.mjs';
 
 /** The collision bounds a drawing can be fitted to. */
-export const BOUNDS=Object.freeze(['circle','box','capsule','hull']);
+export const BOUNDS=Object.freeze(['circle','box','capsule','hull','parts']);
 const UNSOLID=new Set(['glow','ground_shadow','text','line']);   // never solid unless a step says so
 const SAMPLES=16;
 
@@ -21,20 +21,21 @@ export function qualifyResource(name,drawing_id){return name.includes(':')||!dra
  * glows, ground shadows, text and lines is.
  */
 export function drawingOutline(steps,{values={},fine=false}={}){
-    const out=[];let marked=false;
-    const walk=(list,m)=>{
+    const out=[];let marked=false,part=0;
+    const walk=(list,m,top=false)=>{
         if(!Array.isArray(list))throw new TypeError('A drawing is a list of steps');
         for(const raw of list){
+            if(top)part++;
             const step=readValues(raw,values),{shape}=step;
             if(shape==='group'){const {steps,x=0,y=0,rotation=0,scale=1}=step,[sx,sy]=typeof scale==='number'?[scale,scale]:scale,c=Math.cos(rotation),s=Math.sin(rotation);
                 walk(steps,compose(m,[c*sx,s*sx,-s*sy,c*sy,x,y]));continue;}
             if(!DRAWING[shape])throw new TypeError(`Unknown drawing shape: ${shape}`);
             if(step.solid===true)marked=true;
-            out.push({points:outline(step,fine).map(p=>apply(m,p)),solid:step.solid,shape});
+            out.push({points:outline(step,fine).map(p=>apply(m,p)),solid:step.solid,shape,part});
         }
     };
-    walk(steps,[1,0,0,1,0,0]);
-    return out.map(({points,solid,shape})=>({points,solid:marked?solid===true:solid!==false&&!UNSOLID.has(shape)}));
+    walk(steps,[1,0,0,1,0,0],true);
+    return out.map(({points,solid,shape,part})=>({points,solid:marked?solid===true:solid!==false&&!UNSOLID.has(shape),part}));
 }
 
 /**
@@ -119,9 +120,17 @@ export function facadeEmitters(steps,facade,{at=[0,0],rotation=0,scale=1}={},val
  */
 export function fitBounds(steps,bounds,{values={}}={}){
     if(!BOUNDS.includes(bounds))throw new TypeError(`Collision bounds are ${BOUNDS.join(', ')}`);
-    const points=drawingOutline(steps,{values}).filter(part=>part.solid).flatMap(part=>part.points);
+    const solid=drawingOutline(steps,{values}).filter(part=>part.solid),points=solid.flatMap(part=>part.points);
     if(!points.length)throw new TypeError('The drawing has no solid steps to fit bounds to');
-    return fit(points,bounds);
+    if(bounds!=='parts')return fit(points,bounds);
+    // One box round each top-level step (a component's layer is one): a building and the lamps before it collide
+    // as themselves, not as one box over the forecourt between them.
+    const groups=new Map();for(const p of solid){if(!groups.has(p.part))groups.set(p.part,[]);groups.get(p.part).push(...p.points);}
+    const boxes=[...groups.values()].map(pts=>fit(pts,'box')),edges=b=>b.shape_type==='box'?[b.local_position[0]-b.dimensions[0]/2,b.local_position[1]-b.dimensions[1]/2,b.local_position[0]+b.dimensions[0]/2,b.local_position[1]+b.dimensions[1]/2]:null;
+    // (a box inside another, a floor's cornice round its walls, adds nothing)
+    const within=(a,b)=>{const p=edges(a),q=edges(b);return p&&q&&p[0]>=q[0]-1e-9&&p[1]>=q[1]-1e-9&&p[2]<=q[2]+1e-9&&p[3]<=q[3]+1e-9;};
+    const kept=boxes.filter((a,i)=>!boxes.some((b,j)=>j!==i&&within(a,b)&&(!within(b,a)||j<i)));
+    return kept.length===1?kept[0]:{shape_type:'compound',children:kept};
 }
 /** A circle round everything the drawing paints, glows included: what the camera must see to draw it. */
 export function drawingReach(steps,{values={}}={}){

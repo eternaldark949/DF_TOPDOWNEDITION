@@ -186,7 +186,8 @@ export class lightGridSystem{
         for(const e of entities){
             if(e.destroyed||e.physics_type==='static')continue;
             const drawing=e.assets?.drawing??null,components=e.get?.('components')??e.components??null;
-            const glows=(drawing!==null&&this.#glows(drawing,()=>entityEmitters({assets:{drawing},position:[0,0]},this.#source).length>0))||(components?.length>0&&this.#glows(components,()=>entityEmitters({components,position:[0,0]},this.#source).length>0));
+            // (the probe carries the entity's look, whose values its drawings read)
+            const look=e.get?.('look')??e.data?.look,glows=(drawing!==null&&this.#glows(drawing,()=>entityEmitters({assets:{drawing},position:[0,0],data:{look}},this.#source).length>0))||(components?.length>0&&this.#glows(components,()=>entityEmitters({components,position:[0,0],data:{look}},this.#source).length>0));
             if(!glows)continue;
             const emitters=entityEmitters(e,this.#source),group=lightGroupOf(e);if(group)for(const em of emitters)em.group=group;if(emitters.length)out.push({id:e.id,emitters});
         }

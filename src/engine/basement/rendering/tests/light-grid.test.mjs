@@ -122,3 +122,12 @@ test('a light group turned off: its things\' glowing steps stop lighting the gri
     grids.setLightGroup('street_lights',true);grids.updateState({budget_ms:Infinity});assert.ok(Math.abs(grids.sample(100,140)[0]-lit)<1e-6,'and on again');
     assert.throws(()=>grids.setLightGroup('',true),/named/);
 });
+
+test('a mover whose layers read its look values is probed with them: a person in a shirt colour walks a lit map', () => {
+    const grids=new lightGridSystem({settings:{cell:32}});
+    const person={physics_type:'character',position:[50,50],rotation:0,get:k=>k==='look'?{values:{shirt:'#3d6b8f',sign:'#ff3399'}}:k==='components'?person.components:undefined,
+        components:[{layers:[{height:20,steps:[{shape:'circle',radius:8,fill:'$shirt'}]}]},{layers:[{height:30,steps:[{shape:'rectangle',x:-4,y:-2,width:8,height:4,fill:'$sign',emits:{reach:60}}]}]}]};
+    const movers=grids.moversOf([person]);
+    assert.equal(movers.length,1,'its glowing badge makes it a mover, and reading $shirt does not throw');
+    assert.ok(movers[0].emitters.length>=1);
+});

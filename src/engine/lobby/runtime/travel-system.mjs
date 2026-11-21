@@ -27,7 +27,7 @@ export class travelSystem {
         if (changed) for (const listener of this.#listeners) listener(offer);
         if (offer?.auto && offer.available) this.travel().catch(() => {});
     }
-    levelLeaving() { this.exit = null; }
+    levelLeaving() { const had = this.exit !== null; this.exit = null; if (had) for (const listener of this.#listeners) listener(null); }
     /** Calls `listener(exit | null)` whenever the exit under the leader changes. Returns an unsubscribe function. */
     onExitChanged(listener) { if (typeof listener !== 'function') throw new TypeError('Listener must be a function'); this.#listeners.add(listener); return () => this.#listeners.delete(listener); }
     /**

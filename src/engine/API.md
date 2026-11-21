@@ -335,7 +335,7 @@ The calls are `drawRectangle`, `drawCircle`, `drawEllipse`, `drawCapsule`, `draw
 | Call | What it does |
 |---|---|
 | `render.drawLooks(blend, {covers, time})` | Draws every visible look into the open frame (the loop calls it for you, with `time: lobby.played`, the seconds of play) |
-| `fitBounds(steps, bounds)` | The collision shape that fits a drawing's solid steps: `circle`, `box`, `capsule` or `hull` |
+| `fitBounds(steps, bounds)` | The collision shape that fits a drawing's solid steps: `circle`, `box`, `capsule`, `hull`, or `parts` (a box round each top-level step, as one compound shape) |
 | `drawingReach(steps)` | The circle round everything a drawing paints, glows included |
 
 The light layer (`createLightLayer`) draws lights and shadows. A night is one call after `drawLooks(1, {covers: 24})`: `renderSystem.drawNight({tint, grids, cuts})` lays the dark over the frame with the lights every visible thing carries (a template's `lights`, in its own frame, placed and turned with it; a light marked `over: true` stands above the roofs; a template's `light_group` puts its lights and glow in a group `render.setLightGroup(name, on)` turns off and on, as the world clock's windows do for street lamps), keeps the night on roofs that lean over the light on the ground, and lets lit windows and glowing steps shine through. A template marked `blocks_light: true` (a building) stops the glow of its own windows at its walls. Glowing art lights its surroundings through the light grid: `bakeLightGrid` bakes one region's grid from `emits` shapes (cell 16 or 32, walls stop it), `createLightLayerParts({grids})` draws it into the light tiles as a cut and a colour, and `lightGridSystem` keeps a map's grids current per region (a map's `light_grid: {cell, spread, strength, regions}` settings, moving emitters re-baking what they reach). See the rendering README's Light grid section. Floors shine through `reflect` on a material or floor step (`{strength, wet, plane}`), and a `reflectionPass` lays the reflection on the ground each frame (give `drawNight` its `darknessCut()` as `cuts` so it shows through the night): lights' mirrored glows, glowing shapes, baked probes, bodies (screen-space reflection on WebGL, silhouettes on Canvas) and reflection planes in full art; see the rendering README's Reflections section. A map light's `height` sets where its reflection falls. **Glare and particles.** A light with `glare: true` (or `{reach, ...}`) gets the lens's star and fog over it when the night is drawn with `drawNight({..., glare})`, or with `render.drawGlare({settings})`; `render.drawParticles({blend})` draws every physics particle system that has a `look` (`streak`, `dot` or `ring`, leaning with the height view, near lights in their colour; `readParticleLook` checks a look). The glare's `rays` (how many long rays, a short one between each two), `hot` and `hot_reach` (the white-hot core and how far along a ray the light's colour takes over) and `color` (for a light with none) are data like its reach; a look's `band_count`, `band_alpha` and `band_width` (its height bands) and `lit_color`, `lit_alpha` and `lit_width` (how it takes a light) too. `drawNight({amount})` lays the night at a strength (0 to 1). A map's `night: {tint, scale, effects, glare, covers}` holds the night as data (`readNight`, `readGlare` check it); see the rendering README's Glare, particles and night settings section. Colour helpers: `rgba`, `mix`, `shade`, `hexToRgb`.
@@ -522,7 +522,7 @@ A level is a `gameLevel` subclass. It holds content and policy; it never owns th
 
 ### Travel
 
-`travelSystem` moves the player and companions through an exit to another map: `await travel.travel(target)`, which defaults to the exit the player stands in. It is a system: register it with `engine.registerSystem`.
+`travelSystem` moves the player and companions through an exit to another map: `await travel.travel(target)`, which defaults to the exit the player stands in. It is a system: register it with `engine.registerSystem`. `travel.onExitChanged(fn)` tells a prompt which exit the player stands in (null on stepping off, or leaving the map). An arriving party steps out of the exit leading back, away from whatever stands behind it: in from a map edge, or out of a door into the street.
 
 ---
 
@@ -563,7 +563,7 @@ One call makes anything: `engine.createObject(record, at)`. A record is a templa
 | `kind` | What it is to physics: `prop`, `static`, `character`, `vehicle`, `trigger`, … |
 | `assets.drawing` | Its look: a drawing resource, drawn every frame |
 | `look` | `{values, scale, layer, depth, visible}`, kept as the object's `look` property |
-| `bounds` | Collision bounds fitted from the drawing's solid steps: `circle`, `box`, `capsule` or `hull` |
+| `bounds` | Collision bounds fitted from the drawing's solid steps: `circle`, `box`, `capsule`, `hull`, or `parts`: a box round each component's layer, so a building collides as its wings and the lamps before it, not one box over its forecourt (the `engine:building` default) |
 | `collision_shape` | An exact shape; it always wins over `bounds` |
 | `assets.material` | A material whose `surface` sets the body's friction and restitution |
 | `components` | The parts it is made of, with layers at their own heights (see [Components](#components)); `bounds` fits every solid layer |

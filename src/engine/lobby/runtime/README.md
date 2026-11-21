@@ -81,13 +81,13 @@ Except `prepare`, hooks must be synchronous. Levels can omit hooks via the base 
 - runs `map.updateState(mapUpdateOptions(context))` after each step, so doors and rooms stay current;
 - lists its exits with `getExits()`: the map's triggers whose data names a `target` level, as `{entity, target, label, auto, bounds}`. `exitAt(body)` gives the exit a body stands in.
 
-Arrival: `loadLevel(id, {arrival: {from}, travellers: [entity ids]})` places the first traveller just inside the exit whose target is `from`. It steps in from the map edge the exit sits on until the spot is clear and outside every exit, and faces into the map. Each later traveller goes to the nearest clear spot beside the first or further in, never inside an exit. With no exit leading back, the first traveller lands at the map's `spawn`.
+Arrival: `loadLevel(id, {arrival: {from}, travellers: [entity ids]})` places the first traveller just inside the exit whose target is `from`. On a streamed map the regions round that exit are built first, wherever it lies. The traveller steps out the way away from what stands right behind the exit (off a map edge: in from it; out of a door in a street front: away from the building), ties going to the map edge the exit sits nearest, until the spot is clear and outside every exit, and faces that way; a blocked way gives way to the next. Each later traveller goes to the nearest clear spot beside the first or further in, never inside an exit. With no exit leading back, the first traveller lands at the map's `spawn`.
 
 ### travelSystem
 
 `travelSystem({get_travellers, can_travel})` (`travel-system.mjs`) moves the party between levels:
 
-- **Exits.** After each step it records the exit the leading traveller stands in as `exit`: `{target, label, auto, available}`. `available` is false when the target is not a registered level or `can_travel(exit, context)` refuses. `onExitChanged(listener)` reports changes. An `auto` exit travels on contact.
+- **Exits.** After each step it records the exit the leading traveller stands in as `exit`: `{target, label, auto, available}`. `available` is false when the target is not a registered level or `can_travel(exit, context)` refuses. `onExitChanged(listener)` reports changes, leaving the level too (with null), so a prompt for the exit goes with it. An `auto` exit travels on contact.
 - **Travel.** `travel(target?)` loads the target with the travellers, resolves to the new level and records `previous_level`. Every traveller must be a session or retained entity, because the runtime retires level entities on the way out.
 - **Saving.** `saveState()` / `loadState()` carry `{level_id, previous_level}`.
 

@@ -20,7 +20,9 @@ test('a building is one entity: a component per wing and a layer per floor, as t
     assert.ok(hotel.tags.includes('building')); assert.equal(hotel.kind, 'static');
     assert.deepEqual(hotel.components.map(c => c.name), ['tower', 'lobby']);
     assert.equal(hotel.height, 600, 'four 3 m floors'); assert.equal(hotel.getComponent('lobby').top, 160);
-    assert.deepEqual(hotel.collision_shape.dimensions, [410, 200], 'its footprint covers both wings');
+    const wings = hotel.collision_shape.children, edge = (i, k, f) => f(...wings.map(b => b.local_position[i] + k * b.dimensions[i] / 2));
+    assert.equal(hotel.collision_shape.shape_type, 'compound', 'a building collides as its parts (bounds: parts)');
+    assert.ok(wings.length >= 2, 'a box per wing (and per floor where a floor steps in)'); assert.deepEqual([edge(0, 1, Math.max) - edge(0, -1, Math.min), edge(1, 1, Math.max) - edge(1, -1, Math.min)], [410, 200], 'together they cover its footprint');
     assert.deepEqual([...hotel.body.getState().height_span], [0, 600]);
     hotel.getComponent('tower').removeLayer(3); p.updateState(1 / 60);
     assert.equal(hotel.height, 450, 'take a floor off and it is a floor shorter');

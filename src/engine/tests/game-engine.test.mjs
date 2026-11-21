@@ -177,6 +177,26 @@ test('engine alone: map levels with exits, an auto exit, and travellers carried 
     e.dispose();
 });
 
+test('a traveller arriving in a streamed map stands at the exit leading back, however far it lies from the spawn', async () => {
+    const { mapLevel } = await import('../lobby/runtime/map-level.mjs');
+    const { travelSystem } = await import('../lobby/runtime/travel-system.mjs');
+    const maps = {
+        flat: { map_id: 'flat', size: [400, 300], spawn: [200, 150], triggers: [{ x: 360, y: 100, w: 40, h: 100, role: 'exit', data: { target: 'city' } }] },
+        // a door in a building's front, mid-map: the building stands on its north side, the street to its south
+        city: { map_id: 'city', size: [6000, 6000], regions: { size: 512 }, spawn: [300, 300], walls: [{ x: 5300, y: 3800, w: 260, h: 180 }], triggers: [{ x: 5400, y: 3980, w: 60, h: 28, role: 'exit', data: { target: 'flat', label: 'Home' } }] }
+    };
+    class Place extends mapLevel { mapDefinition() { return { definition: maps[this.level_id] }; } }
+    const e = runtime(); e.registerLevel('flat', Place).registerLevel('city', Place);
+    let walker; e.registerSystem('party', { attach(c) { walker = c.createEntity({ kind: 'character', position: [200, 150], collision_shape: { shape_type: 'circle', radius: 8 } }, { lifetime: 'session' }); } });
+    const travel = new travelSystem({ get_travellers: () => [walker] }); e.registerSystem('travel', travel);
+    const heard = []; travel.onExitChanged(exit => heard.push(exit?.target ?? null));
+    await e.loadLevel('flat'); e.start(); e.basement.physics.updateBody(walker, { position: [380, 150] }); e.updateState();
+    await travel.travel(); assert.equal(e.active_level.level_id, 'city');
+    assert.deepEqual(heard, ['city', null], 'leaving the map tells the listeners the exit is gone (a prompt for it goes)');
+    assert.ok(Math.abs(walker.position[0] - 5430) < 1 && walker.position[1] > 4008 && walker.position[1] < 4100, `the walker steps out of the far door into the street, away from the building, not at the spawn (${walker.position})`);
+    e.dispose();
+});
+
 test('a map level whose switches turn the light grid on bakes it on entry and re-bakes round a glowing mover after physics', async () => {
     const { mapLevel } = await import('../lobby/runtime/map-level.mjs');
     const glow = { library_id: 'glow', resources: { underglow: { kind: 'drawing', steps: [{ shape: 'ellipse', radius_x: 20, radius_y: 10, fill: '#33ccff', emits: { reach: 80 } }] } } };

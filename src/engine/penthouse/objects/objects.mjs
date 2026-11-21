@@ -4,7 +4,7 @@
 //   kind   what it is to physics (prop, character, vehicle, ...)
 //   assets.drawing  its look: a drawing resource, drawn every frame by the render system
 //   look          {values, scale, layer, depth, visible}: the values the drawing reads, kept as the `look` property
-//   bounds        circle | box | capsule | hull: collision bounds fitted from the drawing's solid steps
+//   bounds        circle | box | capsule | hull | parts: collision bounds fitted from the drawing's solid steps
 //   collision_shape  an explicit shape, which always wins over `bounds`
 //   assets.material  a material resource whose `surface` sets the body's friction and restitution
 //   components    the parts it is made of: [{name, at, rotation, joint, layers: [{layer, height, thickness, steps | drawing, solid, visible}]}]

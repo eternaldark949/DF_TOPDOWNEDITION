@@ -24,7 +24,12 @@ export class mapLevel extends gameLevel {
         this.map = new mapInstance(context.basement.physics, prepared.definition, prepared.map_options);
         this.definition = prepared.definition;
         const travellers = prepared.travellers.map(id => context.basement.elements.fetchEntity(id)).filter(e => e && !e.destroyed);
-        if (travellers.length) this.placeTravellers(context, travellers, this.arrivalPose(context, prepared.arrival?.from ?? null, travellers[0]));
+        if (travellers.length) {
+            // A streamed map builds its exits only round a focus: build round the one leading back before looking for it.
+            const from = prepared.arrival?.from ?? null, gate = from === null ? null : (prepared.definition.triggers ?? []).find(t => t.data?.target === from);
+            if (gate) this.map.setFocus([gate.x + (gate.w ?? gate.width ?? 0) / 2, gate.y + (gate.h ?? gate.height ?? 0) / 2], { budget_ms: Infinity });
+            this.placeTravellers(context, travellers, this.arrivalPose(context, from, travellers[0]));
+        }
         // The light grid, when the map's switches turn it on: its regions bake behind the level change too.
         // The camera's height view, when the map gives one: how high the eye stands and how far walls lean from it.
         this.height_view = prepared.definition.height_view ?? null;
@@ -169,12 +174,17 @@ export class mapLevel extends gameLevel {
         const gate = from === null ? null : this.getExits().find(exit => exit.target === from);
         if (!gate) return { position: [...spawn], rotation: -Math.PI / 2 };
         const b = gate.bounds, cx = (b.left + b.right) / 2, cy = (b.top + b.bottom) / 2;
-        const edges = { S: height - b.bottom, N: b.top, W: b.left, E: width - b.right }, side = Object.keys(edges).reduce((a, k) => edges[a] <= edges[k] ? a : k);
-        const dir = { S: [0, -1], N: [0, 1], W: [1, 0], E: [-1, 0] }[side];
+        // Step out the way away from what stands behind the exit: off a map edge, in from it; out of a door in a street
+        // front, away from the building. Ties go to the map edge the exit sits nearest. A blocked way gives way to the next.
+        const DIRS = { S: [0, -1], N: [0, 1], W: [1, 0], E: [-1, 0] };
+        const out = (side, step) => { const dir = DIRS[side]; return [side === 'S' || side === 'N' ? cx : (dir[0] > 0 ? b.right : b.left) + dir[0] * step, side === 'W' || side === 'E' ? cy : (dir[1] > 0 ? b.bottom : b.top) + dir[1] * step]; };
+        const opposite = { S: 'N', N: 'S', W: 'E', E: 'W' }, clear = p => p[0] > 0 && p[1] > 0 && p[0] < width && p[1] < height && world.isPlacementClear(body, p, { ignore_body: body, include_ghosts: false });
+        const backed = side => [20, 40, 60].some(step => !clear(out(opposite[side], step)));
+        const edges = { S: height - b.bottom, N: b.top, W: b.left, E: width - b.right }, sides = Object.keys(edges).sort((x, y) => (backed(y) - backed(x)) || edges[x] - edges[y]);
         const inExit = p => this.getExits().some(exit => world.containsPoint(exit.entity, p));
-        for (let step = 20; step <= 200; step += 10) {
-            const position = [side === 'S' || side === 'N' ? cx : (dir[0] > 0 ? b.right : b.left) + dir[0] * step, side === 'W' || side === 'E' ? cy : (dir[1] > 0 ? b.bottom : b.top) + dir[1] * step];
-            if (!inExit(position) && world.isPlacementClear(body, position, { ignore_body: body, include_ghosts: false })) return { position, rotation: Math.atan2(dir[1], dir[0]) };
+        for (const side of sides) for (let step = 20; step <= 200; step += 10) {
+            const position = out(side, step), dir = DIRS[side];
+            if (!inExit(position) && clear(position)) return { position, rotation: Math.atan2(dir[1], dir[0]) };
         }
         return { position: [...spawn], rotation: -Math.PI / 2 };
     }

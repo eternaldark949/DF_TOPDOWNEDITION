@@ -10,6 +10,9 @@ On a phone, the easiest download is the whole repo as a ZIP:
 `https://github.com/eternaldark949/DF_TOPDOWNEDITION/archive/refs/heads/main.zip`
 Unzip it with your Files app, then open `DFAB V8.html` in Chrome.
 
+### The new engine: `DFAB Preview.html`
+`DFAB Preview.html` runs the new engine (`src/engine/`) on the game's data (`src/game/data/`). It is not the game yet: no story or mechanics, only the maps to walk. Pick any of the 21 maps from the bar along the top, walk with **WASD** or the arrows (**Shift** runs), and press **E** on an exit's mat to travel through it: the Silver Queen apartment and the city lead to each other. The bar also sets the time of day (☀ ◐ ☾, ⏩ runs the clock fast), the weather, the zoom (**+** and **−**) and the renderer (Canvas or WebGL), and shows the frame rate. A gamepad works (left stick, **A** to use an exit, **RB** to run), and on a phone the left half of the screen is a stick and **USE** takes an exit. It is one file that works offline, like V8. It is built from `tools/preview/` with `node tools/build-preview.mjs`; rebuild it after changing the engine or the data.
+
 ## Quick draw
 Hold **Holster/Draw** for about half a second with a firearm equipped. Drag the fire stick past its ring and release to draw, fire once, and reholster. Drag back inside the ring to cancel. The button shows recovery time; tap it to return to regular drawn fire. Menus and pause preserve the mode but cancel the armed shot, requiring a fresh aim and release. On desktop, aim with the left mouse button held and release to shoot.
 
@@ -23,6 +26,7 @@ Plug in or pair any standard controller (Xbox, PlayStation, most Bluetooth pads)
 
 ## How the project is organised
 - `DFAB V8.html` is the **last build of the classic game**, kept as the playable reference. It is frozen: nothing rebuilds it.
+- `DFAB Preview.html` is the new engine walking the game's maps, built from `tools/preview/` by `tools/build-preview.mjs`.
 - `src/engine/` is **the new engine**, by level: Basement, Lobby, Directory, Penthouse. Start with the [engine user guide](src/engine/API.md) and the [Engine API spec](READ-FIRST/ENGINE-API.md). The game is written again on it, to its rules.
 - `reference/classic/` is the classic code and its `GAME_DB`, read-only, kept for how things looked and felt.
 - `assets/images` and `assets/audio` hold your own images and sounds.
@@ -33,6 +37,7 @@ node tools/check-layout.mjs                       # folder and level rules
 node --test src/engine/tests/*.test.mjs src/engine/*/tests/*.test.mjs src/engine/basement/*/tests/*.test.mjs
 node --test tools/test-art-pixels.mjs             # drawing on a real canvas (needs Playwright with Chromium)
 node tools/migration-inventory.mjs --check        # every classic script has a row
+node tools/build-preview.mjs --check              # the preview builds, every engine module whole
 ```
 
 ## Moving to the new engine

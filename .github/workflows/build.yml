@@ -1,7 +1,7 @@
 name: Engine checks
 
 # Checks the engine in src/engine: every level's tests, run with no game present, the real-canvas pixel
-# tests in Chromium, the folder rules and the classic-code inventory. The classic game is frozen in
+# tests in Chromium, the engine preview built and played, the folder rules and the classic-code inventory. The classic game is frozen in
 # "DFAB V8.html" and reference/classic, and is not rebuilt.
 on:
   push:
@@ -44,3 +44,6 @@ jobs:
 
       - name: Check the migration inventory covers every classic script
         run: node tools/migration-inventory.mjs --check
+
+      - name: Build the engine preview and play it in Chromium (every map loads; the apartment and the city lead to each other)
+        run: node --test tools/test-preview.mjs
