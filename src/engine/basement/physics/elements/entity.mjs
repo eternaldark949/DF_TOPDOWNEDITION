@@ -1,0 +1,171 @@
+// ===== LV0 BASEMENT =====
+import {bodyActive} from '../core/state.mjs';
+import {entityComponent,readComponent,componentSpan,layersSpan} from './components.mjs';
+import {readScale} from './scale.mjs';
+/** Entity metadata/lifecycle only. Physical state lives exclusively in the engine body. */
+const records = new WeakMap();
+const BLOCKED = ['__proto__', 'constructor', 'prototype'];
+const propertyKey = key => { if (typeof key !== 'string' || !key || BLOCKED.includes(key)) throw new TypeError('A property key is a non-empty string'); return key; };
+const pointOf = target => { const p = Array.isArray(target) ? target : target?.position; if (!Array.isArray(p) || p.length !== 2 || !p.every(Number.isFinite)) throw new TypeError('Expected a point [x, y] or something with a position'); return p; };
+const bodyOf = target => target instanceof gameEntity ? target.body : target;
+const legacyFields = Object.fromEntries(['angle', 'angularVelocity', 'lastX', 'lastY', 'x', 'y', 'vx', 'vy', 'velX', 'velY', 'angularVel', 'collisionMask'].map(key => [key, {
+    get() { throw new Error(`Use engine body state instead of legacy ${key}`); },
+    set() { throw new Error(`Use engine requests instead of writing ${key}`); }, configurable: false,
+}]));
+export function entityRecord(entity) {
+    const record = records.get(entity);
+    if (!record) throw new TypeError('Expected a gameEntity');
+    return record;
+}
+function initializeEntity(entity, elements, packet) {
+    if (!elements || typeof elements._construct !== 'function') throw new TypeError('Construct entities through a gameElements owner');
+    records.set(entity, elements._construct(entity, packet));
+    // A subclass field initializer cannot replace identity, a component or the live pose.
+    for (const key of ['entity_id', 'body_id', 'kind', 'template_id', 'name', 'tags', 'assets', 'data', 'physics_system', 'body', 'motor', 'awareness', 'registered', 'pending', 'destroyed', 'active', 'position', 'rotation',
+        'linear_velocity', 'angular_velocity', 'mass', 'physics_type', 'collision_shape', 'collision_group', 'collision_mask', 'query_mask', 'axis_lock', 'ghost', 'parent', 'children', 'components', 'height', 'scale', 'world_scale', 'elevation', 'world_elevation', 'vertical_velocity', 'grounded']) {
+        const getter = Object.getOwnPropertyDescriptor(gameEntity.prototype, key).get;
+        Object.defineProperty(entity, key, { get: getter, configurable: false, enumerable: false });
+    }
+    Object.defineProperties(entity, legacyFields);
+    return entity;
+}
+// Save restoration uses the same base initialization without replaying arbitrary gameplay constructors.
+export function restoreEntity(elements, packet) { return initializeEntity(Object.create(gameEntity.prototype), elements, packet); }
+export class gameEntity {
+    constructor(elements, packet = {}) {
+        if (new.target !== gameEntity) throw new TypeError('There are no entity subclasses: an object is a gameEntity, and its kind, parts and properties are data');
+        initializeEntity(this, elements, packet);
+    }
+    get entity_id() { return entityRecord(this).body.body_id; }
+    get body_id() { return this.entity_id; }
+    /** What it is to physics: the kind preset it was made from. */
+    get kind() { return entityRecord(this).kind; }
+    get template_id() { return entityRecord(this).template_id; }
+    get name() { return entityRecord(this).name; }
+    get tags() { return entityRecord(this).tags; }
+    get assets() { return entityRecord(this).assets; }
+    get data() { return entityRecord(this).data; }
+    get physics_system() { return entityRecord(this).elements.world; }
+    get body() { return entityRecord(this).body; }
+    /** Its motor part (a character, vehicle or projectile motor), or null. */
+    get motor() { return entityRecord(this).motor; }
+    get awareness() { return entityRecord(this).awareness; }
+    get registered() { return entityRecord(this).registered; }
+    get pending() { const r = entityRecord(this); return !r.registered && !r.destroyed; }
+    get destroyed() { return entityRecord(this).destroyed; }
+    get active() { const r = entityRecord(this); return r.registered && !r.destroyed && bodyActive(r.elements.world._record(r.body)); }
+    get position() { return this.body.position; }
+    get rotation() { return this.body.rotation; }
+    get linear_velocity() { return this.body.linear_velocity; }
+    get angular_velocity() { return this.body.angular_velocity; }
+    get mass() { return this.body.getState().mass; }
+    get physics_type() { return this.body.getState().physics_type; }
+    get collision_shape() { return this.body.getState().collision_shape; }
+    get collision_group() { return this.body.getState().collision_group; }
+    get collision_mask() { return this.body.getState().collision_mask; }
+    get query_mask() { return this.body.getState().query_mask; }
+    get axis_lock() { return this.body.getState().axis_lock; }
+    get ghost() { return this.body.getState().ghost; }
+    // ----- Properties: game data on the object, read and written by key. -----
+    get(key, fallback = undefined) { const d = entityRecord(this).data; propertyKey(key); return Object.hasOwn(d, key) ? d[key] : fallback; }
+    has(key) { return Object.hasOwn(entityRecord(this).data, propertyKey(key)); }
+    set(key, value) {
+        const r = entityRecord(this); r.elements._requireLive(this); propertyKey(key);
+        const previous = r.data[key]; if (Object.is(previous, value) && Object.hasOwn(r.data, key)) return this;
+        if (value === undefined) delete r.data[key]; else r.data[key] = value;
+        if (key === 'components' && (r.auto_span || previous === undefined && !r.rest.height_span)) { r.auto_span = true; r.elements._refit(this); }
+        r.elements.world._emit('propertyChanged', { body: r.body, entity: this, key, value, previous }); return this;
+    }
+    // ----- Components: the parts it is made of, each with layers at their own heights. -----
+    /** Its components, in order, as live views (see entityComponent). */
+    get components() { return (this.get('components') ?? []).map(c => new entityComponent(this, c.name)); }
+    getComponent(name) { return (this.get('components') ?? []).some(c => c.name === name) ? new entityComponent(this, name) : null; }
+    hasComponent(name) { return (this.get('components') ?? []).some(c => c.name === name); }
+    /** Adds a component ({name, at, rotation, joint, layers}); its name must be new. Returns its view. */
+    addComponent(packet) {
+        const component = readComponent(packet), list = this.get('components') ?? [];
+        if (list.some(c => c.name === component.name)) throw new TypeError(`There is already a component named ${component.name}`);
+        this.set('components', [...structuredClone(list), component]); return new entityComponent(this, component.name);
+    }
+    removeComponent(name) { const list = this.get('components') ?? []; if (!list.some(c => c.name === name)) return false; this.set('components', structuredClone(list.filter(c => c.name !== name))); return true; }
+    /** How tall it stands above its base: the highest top among its components (0 with none). On a rig, as posed: a crouch is shorter. */
+    get height() {
+        const r = entityRecord(this), list = this.get('components') ?? [];
+        if (!list.length) return 0;
+        const span = layersSpan(list, r.elements.world.rigs._jointHeights(r.body) ?? undefined);
+        return Math.max(0, Math.round(span[1] * 1e6) / 1e6) * r.world_scale[2];
+    }
+    // ----- Scale: its size against its record, [x, y, height]. -----
+    /** Its own scale, [x, y, height] (1 is the size its record makes). */
+    get scale() { return [...entityRecord(this).scale]; }
+    /** Its scale in the world: its own times its parent's, as its body, look, components and rig are sized. */
+    get world_scale() { return [...entityRecord(this).world_scale]; }
+    /**
+     * Resizes it: a number, or [x, y, height]. Its collision, render and light shapes, its height span,
+     * its look, its components and its rig all follow, and so do its attached children (their offsets
+     * stretch with it). Mass changes only under the record's `mass_scales` switch. Emits `entityScaled`.
+     */
+    scaleTo(scale) { const r = entityRecord(this); r.elements._requireLive(this); r.scale = readScale(scale); r.elements._refit(this); return this; }
+    /** Resizes it by a factor of its own scale (a number, or [x, y, height]). */
+    scaleBy(factor) { const f = readScale(factor), s = entityRecord(this).scale; return this.scaleTo([s[0] * f[0], s[1] * f[1], s[2] * f[2]]); }
+    // ----- Elevation: z, how high its base stands. Its layers and rig heights count up from here. -----
+    /** Its own elevation above the ground, in world units (0: on the ground). An attached entity is held by its mount instead. */
+    get elevation() { return entityRecord(this).body.getState().elevation; }
+    /** Where its base is in the world: its own elevation, or, while attached, its parent's plus the anchor's height. */
+    get world_elevation() { return entityRecord(this).body.getState().world_elevation; }
+    /** Raises or lowers it: its collision, queries, drawing and attached children all follow. */
+    setElevation(z) { return this.updateBody({ elevation: z }); }
+    /** Eases a property ('scale', 'elevation', or a data key such as 'look.values.shirt') to `to` over time; see tweens.start. Returns the tween's id. */
+    tween(property, to, options) { const r = entityRecord(this); r.elements._requireLive(this); return r.elements.world.tweens.start(this, property, to, options); }
+    /** Stops its tweens, or the one on `property`; each stays where it got to. */
+    stopTween(property) { return entityRecord(this).elements.world.tweens.stop(this, property); }
+    /** How fast it rises (+) or falls (-), in world units a second. */
+    get vertical_velocity() { return entityRecord(this).body.getState().vertical_velocity; }
+    /** Whether it rests on the floor or on something solid under it. */
+    get grounded() { return entityRecord(this).body.getState().grounded; }
+    /** Sends it up or down: a jump, a toss. World gravity's z brings it back to what is under it. */
+    setVerticalVelocity(vz) { entityRecord(this).body.setVerticalVelocity(vz); return this; }
+    // ----- Placement: readable verbs over the body. -----
+    moveTo(x, y, options) { return this.setPosition(Array.isArray(x) ? x : [x, y], Array.isArray(x) ? y : options); }
+    rotateTo(angle, options) { return this.setRotation(angle, options); }
+    toWorld(local) { const [x, y] = pointOf(local), [px, py] = this.position, a = this.rotation, c = Math.cos(a), s = Math.sin(a); return [px + x * c - y * s, py + x * s + y * c]; }
+    toLocal(point) { const [x, y] = pointOf(point), [px, py] = this.position, a = this.rotation, c = Math.cos(a), s = Math.sin(a), dx = x - px, dy = y - py; return [dx * c + dy * s, -dx * s + dy * c]; }
+    distanceTo(target) { const [x, y] = pointOf(target), [px, py] = this.position; return Math.hypot(x - px, y - py); }
+    directionTo(target) { const [x, y] = pointOf(target), [px, py] = this.position, d = Math.hypot(x - px, y - py); return d ? [(x - px) / d, (y - py) / d] : [0, 0]; }
+    // ----- Parenting: a child rides its parent at a local offset until it is detached. -----
+    get parent() { const r = entityRecord(this), mount = r.elements.world.getAttachmentState(r.body); return mount ? r.elements.fetchEntity(mount.parent_body_id) : null; }
+    get children() { const r = entityRecord(this); return r.elements.world.getAttachedBodies(r.body).map(body => r.elements.getEntityForBody(body)).filter(Boolean); }
+    /** Holds `child` at `at` (and `rotation`), `elevation` above this one's base, or on a rig anchor (which adds the anchor's height). */
+    attach(child, { at = [0, 0], rotation = 0, elevation = 0, combine_mass = false, rig_anchor = null } = {}) {
+        const r = entityRecord(this); r.elements._requireLive(this);
+        r.elements.world.attachBody(bodyOf(child), { parent_body: r.body, local_position: at, local_rotation: rotation, local_elevation: elevation, combine_mass, rig_anchor });
+        if (child instanceof gameEntity) r.elements._refit(child, r.world_scale);   // a child takes its parent's scale
+        return this;
+    }
+    detach(child = null, { exit_points, inherit_velocity } = {}) {   // true when it left; false when no exit point was clear
+        const r = entityRecord(this), body = child === null ? r.body : bodyOf(child), mount = r.elements.world.getAttachmentState(body);
+        if (child !== null && mount?.parent_body_id !== this.entity_id) throw new Error('That object is not attached to this one');
+        if (!mount) return false;
+        const left = r.elements.world.detachBody(body, { exit_points: exit_points ?? [mount.local_position], inherit_velocity }) !== null;
+        const gone = child === null ? this : child instanceof gameEntity ? child : r.elements.getEntityForBody(body);
+        if (left && gone) r.elements._refit(gone, [1, 1, 1]);
+        return left;
+    }
+    activate() { const r = entityRecord(this); r.elements._requireLive(this); r.elements.world.activateBody(r.body); return this; }
+    deactivate() { const r = entityRecord(this); r.elements._requireLive(this); r.elements.world.deactivateBody(r.body); return this; }
+    destroy() { const r = entityRecord(this); if (!r.destroyed) r.elements.world.removeBody(r.body); return this; }
+    updateBody(changes) { const r = entityRecord(this); r.elements._requireLive(this); r.elements.world.updateBody(r.body, changes); return this; }
+    setPosition(position, options) { this.body.setPosition(position, options); return this; }
+    /** Turns it; a character motor turns it its own way (facing, not an instant snap of the body). */
+    setRotation(rotation, options) { (typeof entityRecord(this).motor?.setRotation === 'function' ? entityRecord(this).motor : this.body).setRotation(rotation, options); return this; }
+    getState(result = {}) { return entityRecord(this).elements._snapshotEntity(this, result); }
+    getRenderState(blend, result = {}) { return this.body.getRenderState(blend, result); }
+    getAsset(slot) {
+        const r = entityRecord(this), id = r.assets[slot];
+        if (!id) throw new Error(`Entity has no asset slot: ${slot}`);
+        return r.elements.asset_library.getResource(id);
+    }
+    setAsset(slot, resource_id) { entityRecord(this).elements._setAsset(this, slot, resource_id); return this; }
+    on(event_name, handler) { return entityRecord(this).elements._subscribe(this, event_name, handler); }
+    createConstraint(packet = {}) { const r = entityRecord(this); r.elements._requireLive(this); return r.elements.world.createConstraint({ ...packet, body_a: r.body }); }
+}

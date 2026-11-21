@@ -1,0 +1,291 @@
+// ===== LV0 BASEMENT =====
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {cameraSystem,renderSystem,renderFrame,canvasRenderer,pictureCache} from '../index.mjs';
+import {physicsSystem} from '../../physics/index.mjs';
+
+const near=(a,b)=>assert.ok(Math.abs(a-b)<1e-7,`${a} != ${b}`);
+const view=()=>new cameraSystem({position:[50,50],viewport:{width:100,height:100,pixel_ratio:2}});
+const fixture=()=>{const world=new physicsSystem(),camera=view();return {world,camera,render:new renderSystem({physics_system:world,camera})};};
+const rect=(fill='#f00',extra={})=>({type:'shape',geometry:{type:'rect',size:[20,20]},position:[50,50],material:{fill},...extra});
+class Capture {
+ static instances=[];
+ constructor(){this.capabilities=new canvasRenderer().capabilities;this.frames=[];this.resources=new Map();this.disposed=false;Capture.instances.push(this);}
+ initialize(surface,{viewport}){this.surface=surface;this.resize(viewport);}
+ resize(viewport){this.viewport=viewport;}
+ getSurfaceBounds(){return {left:0,top:0,width:this.viewport.width,height:this.viewport.height};}
+ registerResource(id,data){this.resources.set(id,data);}
+ releaseResource(id){this.resources.delete(id);}
+ render(frame){this.frames.push(structuredClone(frame));}
+ measureText(text){return {width:text.length,ascent:1,descent:0};}
+ dispose(){this.disposed=true;this.resources.clear();}
+}
+
+function context(){
+ const calls=[],ctx={calls,stack:0,createImageData:(w,h)=>({data:new Uint8ClampedArray(w*h*4)})};
+ for(const name of ['setLineDash','setTransform','transform','clearRect','fillRect','beginPath','rect','roundRect','ellipse','closePath','moveTo','lineTo','quadraticCurveTo','bezierCurveTo','clip','fill','stroke','drawImage','fillText','strokeText','putImageData'])ctx[name]=(...args)=>calls.push([name,...args]);
+ ctx.save=()=>{ctx.stack++;calls.push(['save']);};ctx.restore=()=>{ctx.stack--;calls.push(['restore']);};
+ for(const name of ['createLinearGradient','createRadialGradient'])ctx[name]=(...args)=>{calls.push([name,...args]);return {addColorStop(...stop){calls.push(['stop',...stop]);}};};
+ return ctx;
+}
+function surface(ctx=context()){return {width:0,height:0,ctx,getContext(type){assert.equal(type,'2d');return ctx;},getBoundingClientRect(){return {left:10,top:20,width:100,height:100};}};}
+
+test('camera world/screen/client coordinates round-trip with rotation, zoom, CSS scaling and DPR',()=>{
+ const camera=new cameraSystem({position:[12,-40],zoom:2.5,rotation:.7,viewport:{width:300,height:200,pixel_ratio:3}}),p=[45,70],screen=camera.worldToScreen(p),back=camera.screenToWorld(screen);
+ near(back[0],p[0]);near(back[1],p[1]);const bounds={left:17,top:29,width:600,height:400},client=camera.worldToClient(p,bounds),restored=camera.clientToWorld(client,bounds);near(restored[0],p[0]);near(restored[1],p[1]);assert.ok(Object.isFrozen(camera.getView().world_to_screen));
+});
+
+test('rotated view bounds clamp to authored bounds and a small map centers without changing physical poses',()=>{
+ const camera=new cameraSystem({position:[999,999],rotation:Math.PI/2,viewport:{width:200,height:100},bounds:{left:0,top:0,right:500,bottom:500}}),v=camera.getView();near(v.position[0],450);near(v.position[1],400);
+ camera.setBounds({left:0,top:0,right:20,bottom:20});assert.deepEqual(camera.getView().position,[10,10]);assert.throws(()=>camera.setView({zoom:0}),/zoom/);
+});
+
+test('camera follows the official body with fixed-step smoothing/interpolation and never writes physics',()=>{
+ const {world,camera}=fixture(),person=world.createEntity({ kind: 'character', position:[10,20]});camera.follow(person,{smoothing:0});person.motor.setMovement([1,0]);world.updateState();camera.updateState(world.config.fixed_step);
+ const before=world.savePhysicsState(),a=camera.getView(0).position,b=camera.getView(1).position;near(a[0],10);near(b[0],person.position[0]);assert.ok(b[0]>a[0]);camera.getView(.5);assert.deepEqual(world.savePhysicsState(),before);
+ person.destroy();camera.updateState(1/60);assert.doesNotThrow(()=>camera.getView());
+});
+
+test('frames copy submitted data, sort stably within a pass and reuse their packet capacity',()=>{
+ const frame=new renderFrame(),camera=view(),source=rect('#f00',{layer:2});frame.begin(camera.getView());frame.submit(source);source.position[0]=999;frame.submit(rect('#00f',{layer:1}));frame.submit(rect('#0f0',{layer:2}));
+ const first=frame.finish();assert.deepEqual(first.passes[0].packets.map(p=>p.material.fill),['#00f','#f00','#0f0']);assert.equal(first.passes[0].packets[1].transform[4],50);
+ for(let i=0;i<20;i++){frame.begin(camera.getView());frame.submit(rect());frame.finish();}assert.equal(frame.getStatistics().packet_capacity,3);assert.ok(Object.isFrozen(frame.snapshot().passes));
+ assert.throws(()=>frame.submit(rect()),/open/);
+});
+
+test('ordered target passes create continuation barriers and reject unclosed nesting',()=>{
+ const frame=new renderFrame();frame.begin(view().getView());frame.submit(rect());frame.beginPass({target_id:'glow',viewport:{width:20,height:20}});frame.submit(rect());frame.endPass();frame.submit(rect());
+ assert.deepEqual(frame.finish().passes.map(p=>[p.target_id,p.clear_color]),[[null,'transparent'],['glow','transparent'],[null,false]]);
+ frame.begin(view().getView());frame.beginPass({target_id:'glow'});assert.throws(()=>frame.finish(),/Unclosed/);frame.abort();assert.doesNotThrow(()=>frame.begin(view().getView()));frame.abort();
+});
+
+test('data packets reject Canvas callbacks, DOM/image handles and unsupported path commands',()=>{
+ const frame=new renderFrame();frame.begin(view().getView());assert.throws(()=>frame.submit({type:'custom',draw(){}}),/packet/);
+ assert.throws(()=>frame.submit({type:'sprite',resource_id:{getContext(){}},size:[1,1]}),/ID/);
+ assert.throws(()=>frame.submit({...rect(),geometry:{type:'path',commands:[['callback',()=>{}]]}}),/path command/);frame.abort();
+});
+
+test('visibility reads render bounds from the single native grid',()=>{
+ const {world,render}=fixture();const e=world.elements.createEntity({ kind: 'decoration', position:[150,50],render_shape:{shape_type:'box',dimensions:[200,10]}});const original=world.queryEntitiesInBounds.bind(world),queries=[];
+ world.queryEntitiesInBounds=(packet,results)=>{queries.push(packet);return original(packet,results);};
+ assert.equal(render.getVisibleEntities()[0].entity,e);assert.equal(queries[0].bounds_type,'render');assert.deepEqual(queries[0].bounds,{left:0,top:0,right:100,bottom:100});render.dispose();
+});
+
+test('backend selection preserves physical state, uploads resources and requires a fresh surface across types',async()=>{
+ const {world,render}=fixture();render.registerRenderer('first',Capture);class Other extends Capture{}render.registerRenderer('other',Other);
+ await render.registerResource('red',{type:'material',material:{fill:'#f00'}});const oldWorld=world.spatial_grid,s={};await render.setRenderer('first',{surface:s});const old=Capture.instances.at(-1);assert.equal(old.resources.size,1);
+ await assert.rejects(render.setRenderer('other',{surface:s}),/fresh surface/);await render.setRenderer('other',{surface:{}});assert.equal(old.disposed,true);assert.equal(Capture.instances.at(-1).resources.size,1);assert.equal(world.spatial_grid,oldWorld);assert.equal(world.simulation_tick,0);render.dispose();
+});
+
+test('unsupported backend features fail before drawing and resources/feedback loops validate centrally',async()=>{
+ const {render}=fixture();class Limited extends Capture{constructor(){super();this.capabilities=['shape','geometry:rect','blend:normal'];}}render.registerRenderer('limited',Limited);await render.setRenderer('limited',{surface:{}});const b=Capture.instances.at(-1);
+ render.beginFrame().submit(rect('#f00',{material:{fill:{type:'linear',from:[0,0],to:[20,0],stops:[[0,'#000'],[1,'#fff']]}}}));assert.throws(()=>render.endFrame(),/capability/);assert.equal(b.frames.length,0);render.abortFrame();
+ render.beginFrame().submit({type:'sprite',resource_id:'missing',size:[10,10]});assert.throws(()=>render.endFrame(),/Missing/);render.abortFrame();
+ await render.registerResource('layer',{type:'target',width:10,height:10});const frame=render.beginFrame();frame.beginPass({target_id:'layer'});frame.submit({type:'sprite',resource_id:'layer',size:[10,10]});frame.endPass();assert.throws(()=>render.endFrame(),/targets|own render target/);render.dispose();
+});
+
+test('a failing or disposed renderer preparation cannot replace the active backend',async()=>{
+ const {render}=fixture();render.registerRenderer('good',Capture);await render.setRenderer('good',{surface:{}});const old=Capture.instances.at(-1);let resolve;
+ class Slow extends Capture{initialize(){return new Promise(r=>{resolve=r;});}}render.registerRenderer('slow',Slow);const pending=render.setRenderer('slow',{surface:{}}),next=Capture.instances.at(-1);render.dispose();resolve();await assert.rejects(pending,/cancelled/);assert.equal(old.disposed,true);assert.equal(next.disposed,true);assert.equal(render.disposed,true);
+});
+
+test('Canvas executes data packets with balanced transforms, clips, text and cached geometry',async()=>{
+ const {render}=fixture(),main=surface(),paths=[];
+ class Canvas extends canvasRenderer{constructor(){super({create_surface:()=>surface(),create_path:()=>{const p=context();paths.push(p);return p;}});}}
+ render.registerRenderer('canvas',Canvas);await render.setRenderer('canvas',{surface:main});await render.registerResource('shape',{type:'geometry',geometry:{type:'rect',size:[20,20]}});
+ const frame=render.beginFrame();frame.submit({type:'shape',geometry_id:'shape',material:{fill:'#f00'},clips:[{geometry:{type:'ellipse',radii:[5,5]},transform:[1,0,0,1,2,0]}]});frame.submit({type:'text',text:'hello',font:{size:18,family:'sans-serif'},material:{fill:'#fff'}});render.endFrame();
+ assert.equal(main.width,200);assert.equal(main.height,200);assert.equal(main.ctx.stack,0);assert.equal(paths.length,1);assert.ok(main.ctx.calls.some(c=>c[0]==='fillText'&&c[1]==='hello'));assert.ok(main.ctx.calls.some(c=>c[0]==='clip'));
+ render.beginFrame().submit({type:'shape',geometry_id:'shape'});render.endFrame();assert.equal(paths.length,1);render.dispose();
+});
+
+test('Canvas image replacement is atomic and pending decoded images close after disposal',async()=>{
+ const {render}=fixture(),main=surface(),closed=[];let pendingResolve;
+ class Canvas extends canvasRenderer{constructor(){super({decode_image:url=>url==='first'?Promise.resolve({id:'first',close(){closed.push('first');}}):url==='bad'?Promise.reject(Error('decode failed')):new Promise(r=>{pendingResolve=r;}),create_surface:()=>surface()});}}
+ render.registerRenderer('canvas',Canvas);await render.setRenderer('canvas',{surface:main});await render.registerResource('image',{type:'image',url:'first'});await assert.rejects(render.registerResource('image',{type:'image',url:'bad'}),/decode/);
+ render.beginFrame().submit({type:'sprite',resource_id:'image',size:[10,10]});render.endFrame();assert.equal(main.ctx.calls.find(c=>c[0]==='drawImage')[1].id,'first');
+ const pending=render.registerResource('next',{type:'image',url:'later'});render.dispose();pendingResolve({close(){closed.push('later');}});await assert.rejects(pending,/cancelled/);assert.deepEqual(closed,['first','later']);
+});
+
+test('generic rendering and camera have no Canvas calls or private physical/spatial owners',async()=>{
+ const {readFileSync}=await import('node:fs');
+ for(const name of ['system.mjs','frame.mjs','camera.mjs'])assert.doesNotMatch(readFileSync(new URL('../'+name,import.meta.url),'utf8'),/getContext|Path2D|\bdocument\b|new physicsSystem|new spatialGrid/);
+});
+
+test('public rendering and camera members have a shareable API reference',async()=>{
+ const {readFileSync}=await import('node:fs'),api=await import('../index.mjs'),reference=readFileSync(new URL('../README.md',import.meta.url),'utf8');
+ for(const [name,Class]of Object.entries(api)){assert.ok(reference.includes(name),name);for(const member of Object.getOwnPropertyNames(Class.prototype??{}))if(member!=='constructor')assert.ok(reference.includes(member),`${name}.${member}`);}
+});
+
+test('target caches receive only successful backend frames and unsubscribe cleanly',async()=>{
+ const {render}=fixture(),events=[];const off=render.onFrameRendered(event=>events.push(event));
+ await render.registerResource('cache',{type:'target',width:10,height:10});let frame=render.beginFrame();frame.beginPass({target_id:'cache'});frame.endPass();render.endFrame();assert.equal(events.length,0,'headless collection did not draw a target');
+ render.registerRenderer('capture',Capture);await render.setRenderer('capture',{surface:{}});frame=render.beginFrame();frame.beginPass({target_id:'cache'});frame.endPass();render.abortFrame();assert.equal(events.length,0);
+ const backend=Capture.instances.at(-1),draw=backend.render;backend.render=()=>{throw new Error('GPU failure');};frame=render.beginFrame();frame.beginPass({target_id:'cache'});frame.endPass();assert.throws(()=>render.endFrame(),/GPU/);assert.equal(events.length,0);
+ backend.render=draw;frame=render.beginFrame();frame.beginPass({target_id:'cache'});frame.endPass();render.endFrame();assert.deepEqual(events[0].targets,['cache']);assert.ok(Object.isFrozen(events[0].targets));off();render.beginFrame();render.endFrame();assert.equal(events.length,1);render.dispose();
+});
+
+test('Canvas migration overlay preserves host transform, opacity, surface size and state without clearing',()=>{
+ const ctx=context(),cv=surface(ctx);cv.width=100;cv.height=80;ctx.canvas=cv;ctx.globalAlpha=.4;ctx.globalCompositeOperation='screen';ctx.fillStyle='#123456';ctx.getTransform=()=>({a:2,b:0,c:0,d:3,e:11,f:17});
+ const saved=[],save=ctx.save,restore=ctx.restore;ctx.save=()=>{saved.push({globalAlpha:ctx.globalAlpha,globalCompositeOperation:ctx.globalCompositeOperation,fillStyle:ctx.fillStyle});save();};ctx.restore=()=>{restore();Object.assign(ctx,saved.pop());};
+ const drawnOpacity=[],fill=ctx.fill;ctx.fill=(...args)=>{drawnOpacity.push(ctx.globalAlpha);fill(...args);};
+ const original=rect('#ff0000',{opacity:.5});assert.equal(canvasRenderer.drawPackets(ctx,[original]),1);assert.equal(original.opacity,.5);assert.deepEqual(drawnOpacity,[.2]);assert.ok(ctx.calls.some(c=>c[0]==='setTransform'&&c.slice(1).join(',')==='2,0,0,3,11,17'));assert.equal(ctx.calls.some(c=>c[0]==='clearRect'),false);assert.equal(ctx.globalAlpha,.4);assert.equal(ctx.globalCompositeOperation,'screen');assert.equal(ctx.fillStyle,'#123456');assert.equal(ctx.stack,0);assert.deepEqual([cv.width,cv.height],[100,80]);
+});
+test('Canvas overlay validates a complete inline batch before painting and recovers after rejection',()=>{
+ const ctx=context(),cv=surface(ctx);cv.width=cv.height=100;ctx.canvas=cv;ctx.globalAlpha=1;ctx.getTransform=()=>({a:1,b:0,c:0,d:1,e:0,f:0});
+ assert.throws(()=>canvasRenderer.drawPackets(ctx,[rect(),{type:'sprite',resource_id:'unregistered',size:[1,1]}]),/inline packets/);assert.equal(ctx.calls.some(c=>c[0]==='fill'),false);assert.equal(canvasRenderer.drawPackets(ctx,[rect()]),1);assert.equal(ctx.stack,0);
+});
+
+test('a picture is painted once at the density the view needs and stamped after, under the given matrix',()=>{
+ const host=()=>{const ctx=context(),cv=surface(ctx);cv.width=cv.height=200;ctx.canvas=cv;ctx.globalAlpha=1;let m={a:1.2,b:0,c:0,d:1.2,e:0,f:0};ctx.getTransform=()=>m;ctx.zoom=k=>{m={a:k,b:0,c:0,d:k,e:0,f:0};};return ctx;};
+ const made=[],cache=new pictureCache({create_surface:(w,h)=>{const s=surface();s.width=w;s.height=h;s.ctx.canvas=s;s.ctx.globalAlpha=1;s.ctx.getTransform=()=>({a:1,b:0,c:0,d:1,e:0,f:0});made.push(s);return s;}});
+ const ctx=host();let builds=0;const build=()=>{builds++;return [rect('#0f0',{position:[0,0]})];};
+ const at={key:'chair:1',bounds:[-12,-12,24,24],matrix:[1,0,0,1,40,50]};
+ assert.equal(cache.draw(ctx,at,build),'paint');assert.equal(cache.draw(ctx,at,build),'stamp');assert.equal(builds,1);
+ assert.deepEqual([made[0].width,made[0].height],[36,36],'1.2 device px per unit takes the 1.5 density');
+ assert.ok(made[0].ctx.calls.some(c=>c[0]==='fill'),'the packets were painted into the picture');
+ const stamp=ctx.calls.filter(c=>c[0]==='drawImage').at(-1);assert.equal(stamp[1],made[0]);assert.deepEqual(stamp.slice(2),[-12,-12,24,24]);
+ assert.ok(ctx.calls.some(c=>c[0]==='setTransform'&&c.slice(1).join(',')==='1.2,0,0,1.2,48,60'),'stamped under the view times the matrix');assert.equal(ctx.stack,0);
+ ctx.zoom(2.5);assert.equal(cache.draw(ctx,at,build),'paint');assert.deepEqual([made[1].width,made[1].height],[72,72],'zooming in paints a sharper one');
+ ctx.zoom(9);assert.equal(cache.draw(ctx,at,build),'vector','past the last density it draws as vector');
+ assert.equal(cache.statistics.pictures,2);assert.equal(cache.statistics.bytes,(36*36+72*72)*4);
+ cache.release('chair:');assert.equal(cache.statistics.pictures,0);assert.equal(cache.statistics.bytes,0);assert.equal(made[0].width,0,'released surfaces are emptied');
+});
+
+test('the picture cache keeps to its time and memory budgets and never bakes a blend',()=>{
+ let clock=0;const make=(w,h)=>{const s=surface();s.width=w;s.height=h;s.ctx.canvas=s;s.ctx.globalAlpha=1;s.ctx.getTransform=()=>({a:1,b:0,c:0,d:1,e:0,f:0});return s;};
+ const cache=new pictureCache({create_surface:make,budget_ms:2,max_bytes:10*10*4*2,densities:[1],now:()=>clock});
+ const ctx=context(),cv=surface(ctx);cv.width=cv.height=100;ctx.canvas=cv;ctx.globalAlpha=1;ctx.getTransform=()=>({a:1,b:0,c:0,d:1,e:0,f:0});
+ const slow=()=>{clock+=3;return [rect()];},at=key=>({key,bounds:[0,0,10,10]});
+ assert.equal(cache.draw(ctx,at('a'),slow),'paint');assert.equal(cache.draw(ctx,at('b'),slow),'vector','the frame budget is spent');
+ cache.beginFrame();assert.equal(cache.draw(ctx,at('b'),slow),'paint');cache.beginFrame();cache.draw(ctx,at('a'),slow);
+ cache.beginFrame();assert.equal(cache.draw(ctx,at('c'),slow),'paint');assert.equal(cache.statistics.pictures,2);
+ cache.beginFrame();assert.equal(cache.draw(ctx,at('a'),slow),'stamp','the least recently stamped picture went first');assert.equal(cache.draw(ctx,at('b'),slow),'paint','and b, pushed out for c, paints again');
+ cache.beginFrame();assert.equal(cache.draw(ctx,at('glow'),()=>[rect('#fff',{blend:'add'})]),'vector');cache.beginFrame();assert.equal(cache.draw(ctx,at('glow'),()=>[rect('#fff',{blend:'add'})]),'vector','a blended picture stays vector');
+ assert.throws(()=>cache.draw(ctx,{key:'',bounds:[0,0,1,1]},slow),/key/);assert.throws(()=>cache.draw(ctx,{key:'x',bounds:[0,0,0,1]},slow),/bounds/);assert.throws(()=>new pictureCache({densities:[2,1]}),/rise/);
+});
+
+test('text is measured as the backend draws it',()=>{
+ let font;const ctx={set font(v){font=v;},get font(){return font;},measureText:s=>({width:s.length*3,actualBoundingBoxAscent:4,actualBoundingBoxDescent:1})};
+ const size=new canvasRenderer({create_surface:()=>({getContext:()=>ctx})}).measureText('honey',{family:'Georgia, serif',size:5,weight:600});
+ assert.deepEqual({...size},{width:15,ascent:4,descent:1});assert.equal(font,'normal 600 5px Georgia, serif');
+});
+
+test('a view readied ahead grows on the side the camera moves toward',async()=>{
+ const {aheadOf,viewAhead}=await import('../index.mjs'),view={left:0,top:0,right:100,bottom:50};
+ assert.deepEqual({...aheadOf({margin:10,velocity:[200,-40],lead:.5})},{left:10,top:30,right:110,bottom:10});
+ assert.deepEqual(viewAhead(view,aheadOf({margin:10,velocity:[200,-40],lead:.5})),{left:-10,top:-30,right:210,bottom:60});
+ assert.deepEqual(viewAhead(view,5),{left:-5,top:-5,right:105,bottom:55});
+ assert.throws(()=>aheadOf({margin:-1}),/margin/);assert.throws(()=>viewAhead(view,{left:1,top:1,right:1}),/ahead bottom/);
+});
+
+// A context that keeps its transform, so pictures can read it back.
+function tracked(){
+ const ctx=context();let m=[1,0,0,1,0,0];const mul=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
+ const set=ctx.setTransform,turn=ctx.transform,saved=[],save=ctx.save,restore=ctx.restore;ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
+ ctx.setTransform=(...a)=>{set(...a);m=a.length===1?[a[0].a,a[0].b,a[0].c,a[0].d,a[0].e,a[0].f]:a;};ctx.transform=(...a)=>{turn(...a);m=mul(m,a);};
+ ctx.getTransform=()=>({a:m[0],b:m[1],c:m[2],d:m[3],e:m[4],f:m[5]});
+ ctx.save=()=>{save();saved.push([m,ctx.globalAlpha,ctx.globalCompositeOperation]);};ctx.restore=()=>{restore();[m,ctx.globalAlpha,ctx.globalCompositeOperation]=saved.pop();};
+ ctx.drawImage=(...a)=>ctx.calls.push(['drawImage',...a,ctx.globalAlpha,ctx.globalCompositeOperation]);
+ const s=surface(ctx);ctx.canvas=s;return s;
+}
+
+test('picture packets are stamped from the backend\'s cache and keep their build off the data',async()=>{
+ const {render}=fixture(),main=tracked(),made=[];
+ class Canvas extends canvasRenderer{constructor(){super({create_surface:(w,h)=>{const s=tracked();s.width=w;s.height=h;made.push(s);return s;}});}}
+ render.registerRenderer('canvas',Canvas);await render.setRenderer('canvas',{surface:main});
+ let builds=0;const picture={key:'sign:1',bounds:[-10,-10,20,20],build:()=>{builds++;return [rect('#0f0',{position:[0,0]})];}};
+ for(let i=0;i<3;i++){render.beginFrame().submit({type:'picture',picture,position:[50,50],opacity:.5});render.endFrame();}
+ assert.equal(builds,1,'painted once, stamped after');assert.equal(made.length,1);
+ const stamps=main.ctx.calls.filter(c=>c[0]==='drawImage'&&c[1]===made[0]);assert.equal(stamps.length,3);assert.equal(stamps[0].at(-2),.5,'at the packet\'s opacity');
+ const snap=render.getFrameSnapshot().passes[0].packets[0];assert.equal(snap.picture.key,'sign:1');assert.equal(snap.build,undefined,'the snapshot is data only');
+ render.beginFrame().submit({type:'picture',picture,prepare:true});render.endFrame();assert.equal(main.ctx.calls.filter(c=>c[0]==='drawImage'&&c[1]===made[0]).length,3,'a prepare packet draws nothing');
+ const frame=render.beginFrame();assert.throws(()=>frame.submit({type:'picture',picture:{key:'x',bounds:[0,0,1,1]}}),/build/);assert.throws(()=>frame.submit({type:'picture',picture,material:{fill:'#fff'}}),/own paint/);render.abortFrame();
+ render.dispose();
+ const plain=fixture();class Old{constructor(){this.capabilities=['shape','blend:normal'];}initialize(){}resize(){}render(){}registerResource(){}releaseResource(){}getSurfaceBounds(){}measureText(){}dispose(){}}
+ plain.render.registerRenderer('old',Old);await plain.render.setRenderer('old',{surface:{}});plain.render.beginFrame().submit({type:'picture',picture});assert.throws(()=>plain.render.endFrame(),/capability unavailable: picture/);plain.render.dispose();
+});
+
+test('a layer pass draws into a scaled surface laid over its pass at its blend and opacity',async()=>{
+ const frame=new renderFrame();frame.begin(view().getView());frame.submit(rect());frame.beginPass({layer:{scale:.5,blend:'multiply',opacity:.8},clear_color:'#000'});frame.submit(rect());
+ assert.throws(()=>frame.beginPass(),/layer pass cannot/);frame.endPass();frame.submit(rect());
+ assert.deepEqual(frame.finish().passes.map(p=>[p.target_id,p.layer?.blend??null]),[[null,null],[null,'multiply'],[null,null]]);
+ frame.begin(view().getView());assert.throws(()=>frame.beginPass({layer:{scale:2}}),/scale/);assert.throws(()=>frame.beginPass({layer:{},target_id:'t'}),/no target/);frame.abort();
+ const {render}=fixture(),main=tracked(),made=[];
+ class Canvas extends canvasRenderer{constructor(){super({create_surface:(w,h)=>{const s=tracked();s.width=w;s.height=h;made.push(s);return s;}});}}
+ render.registerRenderer('canvas',Canvas);await render.setRenderer('canvas',{surface:main});
+ const f=render.beginFrame();f.submit(rect());f.beginPass({layer:{scale:.5,blend:'multiply',opacity:.8},clear_color:'#000'});f.submit(rect('#fff',{blend:'destination-out'}));f.endPass();render.endFrame();
+ const layer=made[0];assert.deepEqual([layer.width,layer.height],[100,100],'half the 200 px surface');assert.ok(layer.ctx.calls.some(c=>c[0]==='fillRect'),'the layer was cleared to its colour');assert.ok(layer.ctx.calls.some(c=>c[0]==='fill'));
+ const over=main.ctx.calls.find(c=>c[0]==='drawImage'&&c[1]===layer);assert.deepEqual(over.slice(2),[0,0,200,200,.8,'multiply']);assert.equal(main.ctx.stack,0);assert.equal(layer.ctx.stack,0);
+ render.beginFrame().beginPass({layer:{}}).endPass();render.endFrame();assert.equal(made.length,1,'one layer surface serves every frame');render.dispose();
+});
+
+test('a tile of a picture is painted past the frame budget, since as vector it draws the whole picture',()=>{
+ let clock=0;const make=(w,h)=>{const s=surface();s.width=w;s.height=h;s.ctx.canvas=s;s.ctx.globalAlpha=1;s.ctx.getTransform=()=>({a:1,b:0,c:0,d:1,e:0,f:0});return s;};
+ const cache=new pictureCache({create_surface:make,budget_ms:2,densities:[1],now:()=>clock}),host=tracked().ctx,slow=()=>{clock+=3;return [rect()];};
+ assert.equal(cache.draw(host,{key:'a',bounds:[0,0,10,10]},slow),'paint');assert.equal(cache.draw(host,{key:'b',bounds:[0,0,10,10]},slow),'vector','a whole picture waits');
+ assert.equal(cache.draw(host,{key:'strip',bounds:[0,0,40,10],source:[0,0,10,10]},slow),'paint','a tile does not');
+ assert.equal(cache.draw(host,{key:'later',bounds:[0,0,40,10],source:[0,0,10,10],stamp:false},slow),'later','one only readied ahead still waits');
+});
+
+test('a pattern fill repeats a registered image and the frame refuses one it does not have',async()=>{
+ const {render}=fixture(),main=surface(),patterns=[];main.ctx.createPattern=(image,repeat)=>{patterns.push([image.id,repeat]);return {pattern:image.id};};
+ class Canvas extends canvasRenderer{constructor(){super({decode_image:url=>Promise.resolve({id:url,close(){}}),create_surface:()=>surface()});}}
+ render.registerRenderer('canvas',Canvas);await render.setRenderer('canvas',{surface:main});await render.registerResource('bricks',{type:'image',url:'bricks.png'});
+ assert.ok(render.getCapabilities().includes('pattern'));
+ render.beginFrame().submit(rect({type:'pattern',image:'bricks',repeat:'repeat-x'}));render.endFrame();
+ assert.deepEqual(patterns,[['bricks.png','repeat-x']]);
+ render.beginFrame().submit(rect({type:'pattern',image:'missing'}));assert.throws(()=>render.endFrame(),/missing/);
+ assert.throws(()=>new renderFrame().begin(view().getView()).submit(rect({type:'pattern',image:'bricks',repeat:'mirror'})),/repeat/);
+});
+
+test('switching backends is a light switch: one call, resources carried, the same frame drawn',async()=>{
+ const {recordingRenderer,CAPABILITIES}=await import('../index.mjs');
+ const made=[],world=new physicsSystem(),camera=view();
+ const render=new renderSystem({physics_system:world,camera,create_surface:id=>{const s=surface();s.id=id;made.push(s);return s;}});
+ class Canvas extends canvasRenderer{constructor(){super({create_surface:()=>surface(),create_path:()=>null});}}
+ class Recording extends recordingRenderer{static last;constructor(){super();Recording.last=this;}}
+ render.registerRenderer('canvas',Canvas).registerRenderer('recording',Recording);
+ const seen=[];render.onSurfaceChanged(({renderer_id})=>seen.push(renderer_id));
+ await render.registerResource('box',{type:'geometry',geometry:{type:'rect',size:[10,10]}});
+ const draw=()=>{render.beginFrame().submit({type:'shape',geometry_id:'box',position:[50,50],material:{fill:'#0f0',stroke:'#000'},blend:'add'});return render.endFrame();};
+ for(const id of ['recording','canvas','recording','canvas','recording']){await render.setRenderer(id);assert.equal(render.getRenderer(),id);assert.equal(draw(),1);}
+ assert.deepEqual(seen,['recording','canvas','recording','canvas','recording']);assert.equal(made.length,5,'each switch got a fresh surface');
+ const last=Recording.last;assert.deepEqual([...last.resources.keys()],['box']);assert.equal(last.frames.length,1);assert.equal(last.frames[0].passes[0].packets[0].blend,'add','blend names stay the engine\'s own');
+ await render.setRenderer('recording');assert.equal(Recording.last,last,'setting the live backend again does nothing');
+ assert.equal(render.measureText('abc',{size:10}).width,18);
+ assert.ok(new Canvas().capabilities.every(need=>CAPABILITIES.includes(need)));
+ class Unknown extends recordingRenderer{constructor(){super();this.capabilities=['shape','webgl:instancing'];}}render.registerRenderer('unknown',Unknown);
+ await assert.rejects(render.setRenderer('unknown'),/capabilities among/);assert.equal(render.getRenderer(),'recording');
+ assert.throws(()=>new recordingRenderer({capabilities:['bloom']}),/Capabilities are among/);
+ render.dispose();
+});
+
+test('only the Canvas backend touches Canvas, only the WebGL backend touches WebGL, every other rendering module is backend-free',async()=>{
+ const {readFileSync,readdirSync}=await import('node:fs'),dir=new URL('../',import.meta.url);
+ for(const name of readdirSync(dir).filter(n=>n.endsWith('.mjs')&&n!=='canvas.mjs')){
+  let code=readFileSync(new URL(name,dir),'utf8');
+  // the WebGL backend asks its surface for a WebGL 2 context and nothing else; its text is rasterized by canvas.mjs
+  if(name==='webgl.mjs'){assert.equal(code.match(/getContext\(/g).length,1);assert.match(code,/getContext\('webgl2'/);code=code.replace("getContext('webgl2'",'').replace("typeof surface.getContext",'').replace('getContextAttributes','');}
+  for(const word of ['getContext','globalCompositeOperation','Path2D','OffscreenCanvas','drawImage',"'source-over'","'lighter'"])assert.equal(code.includes(word),false,`${name} uses ${word}`);
+  if(name!=='webgl.mjs')for(const word of ['webgl2','WebGL2RenderingContext','gl.drawArrays'])assert.equal(code.includes(word),false,`${name} uses ${word}`);
+ }
+});
+
+test('a pick meets what is drawn at a point top first: layer, then height, and filters with or without x-ray',()=>{
+ const {world,render}=fixture(),E=world.elements;
+ const box=(name,extra={})=>E.createEntity({kind:'static',name,position:[50,50],collision_shape:{shape_type:'box',dimensions:[20,20]},...extra});
+ const floor=box('floor',{components:[{name:'slab',layers:[{layer:0,height:0,thickness:5,steps:[]}]}]});
+ const tower=box('tower',{tags:['tall'],components:[{name:'body',layers:[{layer:0,height:0,thickness:300,steps:[]}]}]});
+ const crate=box('crate',{data:{look:{layer:-1},loot:true}});
+ const flag=box('flag',{position:[90,90]});
+ world.updateState(1/60);
+ assert.deepEqual(render.pickAllAt([50,50]).map(h=>h.entity.name),['tower','floor','crate'],'a higher layer first, then the taller');
+ assert.equal(render.pickAt([50,50]).entity,tower);assert.equal(render.pickAt([50,50]).height,300);
+ assert.equal(render.pickAt([50,50],{property:'loot'}),null,'without x-ray the tower blocks the crate');
+ assert.equal(render.pickAt([50,50],{property:'loot',xray:true}).entity,crate);
+ assert.equal(render.pickAt([50,50],{ignore:[tower]}).entity,floor);
+ assert.equal(render.pickAt([50,50],{tag:'tall'}).entity,tower);assert.equal(render.pickAt([50,50],{kind:'prop'}),null);
+ assert.equal(render.pickAt([90,90]).entity,flag);assert.equal(render.pickAt([200,200]),null);
+ assert.throws(()=>render.pickAt([0,0],{bounds:'light'}),/collision or render/);
+ render.dispose();
+});
