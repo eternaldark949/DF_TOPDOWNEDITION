@@ -2,6 +2,7 @@
 import { gameLevel } from './game-level.mjs';
 import { mapInstance } from '../../basement/maps/index.mjs';
 import { lightGridSystem, readNight } from '../../basement/rendering/index.mjs';
+import { readParticleSystem } from '../../basement/physics/index.mjs';
 
 /**
  * A level that is one Basement map. A subclass says which map with `mapDefinition`; the level builds
@@ -39,13 +40,17 @@ export class mapLevel extends gameLevel {
         // The map's particle systems (rain, snow, embers): made now, stepped by physics, removed on leaving. One
         // whose area is 'view' is kept on what the camera sees after each step, so it falls wherever you look.
         this.particles = (prepared.definition.particles ?? []).map(p => ({ id: context.basement.physics.createParticleSystem(p.system, { ...(Array.isArray(p.area) ? { area: p.area } : {}), ...(p.at ? { at: p.at } : {}) }), view: p.area === 'view', margin: p.margin ?? 96 }));
+        // With the map's `weather` switch, every state of the world's weather brings its particle systems here, each born
+        // at its systems' own rates times how much of that state there is (none while the weather is another).
+        if (prepared.definition.switches?.weather) this.makeWeather(context);
+        this.followWeather(context);
         this.followView(context);
         this.light_grid = prepared.definition.switches?.light_grid ? new lightGridSystem({ settings: prepared.definition.light_grid ?? {}, source: context.assets ?? context.basement.physics.elements?.asset_library ?? null }).attach(this.map, this.lightGridOptions(context)) : null;
         this.map.setFocus(this.mapFocuses(context), { budget_ms: Infinity });   // (the arriving regions, whole, behind the level change)
         this.light_grid?.updateState({ budget_ms: Infinity });
     }
     afterPhysics(context, seconds) {
-        this.followView(context); this.followClock(context);
+        this.followWeather(context); this.followView(context); this.followClock(context);
         this.map.setFocus(this.mapFocuses(context), { budget_ms: this.mapStreamBudget(context) }); this.map.updateState(this.mapUpdateOptions(context));
         if (this.light_grid) { this.light_grid.setMovers(this.light_grid.moversOf(this.lightGridMovers(context))); this.light_grid.updateState({ budget_ms: this.lightGridBudget(context) }); }
     }
@@ -98,6 +103,25 @@ export class mapLevel extends gameLevel {
             render.drawNight({ tint: this.night.tint, scale: this.night.scale, glare: this.night.glare, amount: this.day_night ? this.night_amount : 1, grids: this.light_grid?.grids(view) ?? [], lights: this.light_grid?.liveLights() ?? [], blend });
         }
         if (this.particles?.length) render.drawParticles({ blend });
+    }
+    /** Makes the particle systems of every state of the world's weather (born at none until the weather brings them). */
+    makeWeather(context) {
+        const weather = context.lobby?.weather; if (!weather) return;
+        const physics = context.basement.physics, source = physics.elements?.asset_library;
+        for (const [state, { particles }] of Object.entries(weather.settings.states)) for (const p of particles) {
+            const record = readParticleSystem(typeof p.system === 'string' ? source?.getResource(p.system) ?? (() => { throw new TypeError(`Unknown particle system: ${p.system}`); })() : p.system, p.system);
+            const id = physics.createParticleSystem(p.system, { ...(Array.isArray(p.area) ? { area: p.area } : {}), ...(p.at ? { at: p.at } : {}) });
+            physics.setParticleRate(id, { rate: 0, density: 0 });
+            this.particles.push({ id, view: p.area === 'view', margin: p.margin ?? 96, weather: state, rate: record.rate, density: record.density, amount: 0 });
+        }
+    }
+    /** Sets the weather's particle systems' rates from how much of their state there is now. */
+    followWeather(context) {
+        const weather = context.lobby?.weather; if (!weather) return;
+        for (const p of this.particles ?? []) if (p.weather) {
+            const amount = weather.amount(p.weather); if (Math.abs(amount - p.amount) < .002 && (amount > 0 || p.amount === 0)) continue;
+            p.amount = amount; context.basement.physics.setParticleRate(p.id, { rate: p.rate * amount, density: p.density * amount });
+        }
     }
     /** Keeps the particle systems marked area 'view' on what the camera sees (with their margin). */
     followView(context) {

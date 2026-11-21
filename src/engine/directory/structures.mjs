@@ -32,6 +32,7 @@ import { plain } from './values.mjs';
 import { DRAWING, MATERIAL, readEmits, readReflect, readLightGrid, readNight, readParticleLook, validateEffectsPreset } from '../basement/rendering/index.mjs';
 import { readParticleSystem } from '../basement/physics/index.mjs';
 import { readWorldClock } from '../basement/timers/index.mjs';
+import { readWorldWeather } from '../basement/weather/index.mjs';
 
 export const STRUCTURES = Object.freeze({
     prop_catalog: 'A catalog of prop types and the families they are presets of: { types: { <type>: { defaults, movable?, blocks_light?, light? } }, families?: { <family>: { look: { <field>: { kind, default } } } } }.',
@@ -252,7 +253,15 @@ export function validateParticleSystem(resource, where = 'particle_system') {
 //                The world's clock (the Basement timers' WORLD_CLOCK): `engine.time.configure(record)` takes it.
 /** Throws unless `resource` is a world clock record. Returns it. */
 export function validateWorldClock(resource, where = 'world_clock') { readWorldClock(resource, where); return resource; }
-const VALIDATORS = { world_clock: validateWorldClock, drawing: validateDrawing, material: validateMaterial, texture: validateTexture, prop_catalog: validatePropCatalog, skeleton: validateSkeleton, clip_set: validateClipSet, locomotion: validateLocomotion, door_kind: validateDoorKind, effects: validateEffectsPreset, particle_system: validateParticleSystem, map: validateMap };
+// world_weather  { states: {name: {particles: [{system, area, at, margin}]}}, intensities: {name: scale}, start: {state, intensity}, fade }
+//                The world's weather (the Basement weather's WORLD_WEATHER): `engine.weather.configure(record)` takes it.
+/** Throws unless `resource` is a world weather record (and each inline particle system in it is valid). Returns it. */
+export function validateWorldWeather(resource, where = 'world_weather') {
+    const r = readWorldWeather(resource, where);
+    for (const [name, s] of Object.entries(r.states)) s.particles.forEach((p, i) => { if (typeof p.system !== 'string') validateParticleSystem(p.system, `${where}.states.${name}.particles[${i}].system`); });
+    return resource;
+}
+const VALIDATORS = { world_clock: validateWorldClock, world_weather: validateWorldWeather, drawing: validateDrawing, material: validateMaterial, texture: validateTexture, prop_catalog: validatePropCatalog, skeleton: validateSkeleton, clip_set: validateClipSet, locomotion: validateLocomotion, door_kind: validateDoorKind, effects: validateEffectsPreset, particle_system: validateParticleSystem, map: validateMap };
 /** Validates every resource of a library whose kind has a structure here; other kinds pass through. Returns the library. */
 export function validateLibrary(library) {
     for (const [id, resource] of Object.entries(library?.resources ?? {})) VALIDATORS[resource?.kind]?.(resource, `${library.library_id}:${id}`);

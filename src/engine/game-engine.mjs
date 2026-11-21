@@ -22,7 +22,7 @@ const PENTHOUSE = Object.freeze({ humanoid, objectPacket, createObject });
 export class gameEngine {
     #authority = Symbol('runtime simulation clock'); #basement; #directory; #penthouse; #game; #loop;
 
-    constructor({ asset_library, physics = {}, controls = {}, camera = {}, clock = {}, time = {}, frame_clock, schedule_frame, cancel_frame, render = {}, render_target, services = {} } = {}) {
+    constructor({ asset_library, physics = {}, controls = {}, camera = {}, clock = {}, time = {}, weather = {}, frame_clock, schedule_frame, cancel_frame, render = {}, render_target, services = {} } = {}) {
         if (!services || typeof services !== 'object' || Array.isArray(services) || Object.keys(services).some(key => ['__proto__','constructor','prototype'].includes(key))) throw new TypeError('Game services are a plain object of named services');
         if (render_target !== undefined) throw new TypeError('Mount a renderer surface through basement.render.setRenderer; render hooks receive a frame');
         if (Object.hasOwn(physics, 'step_authority') || Object.hasOwn(physics, 'asset_library')) throw new TypeError('The runtime owns physics authority and its asset library');
@@ -45,7 +45,7 @@ export class gameEngine {
         this.#game = Object.freeze({ ...services });
         const authority = this.#authority;
         this.#loop = new gameLoop({ engine: this, jacks: { basement: this.#basement, directory: this.#directory, penthouse: this.#penthouse, game: this.#game },
-            step_world: seconds => world.updateState(seconds, authority), clock, time, frame_clock,
+            step_world: seconds => world.updateState(seconds, authority), clock, time, weather, frame_clock,
             ...(schedule_frame !== undefined ? { schedule_frame } : {}), ...(cancel_frame !== undefined ? { cancel_frame } : {}) });
     }
     /** LV0: the running systems (physics, elements, rigs, motion, traffic, controls, camera, render) and the units. */
@@ -54,6 +54,8 @@ export class gameEngine {
     get lobby() { return this.#loop; }
     /** The world's clock (`lobby.time`): the date and time of day, the day's phase and how dark it is. */
     get time() { return this.#loop.time; }
+    /** The world's weather (`lobby.weather`): its state and intensity, and how much of each state there is. */
+    get weather() { return this.#loop.weather; }
     /** LV2: the data layer's functions, plus `assets`, this runtime's registry. */
     get directory() { return this.#directory; }
     /** LV3: the prefabs. */

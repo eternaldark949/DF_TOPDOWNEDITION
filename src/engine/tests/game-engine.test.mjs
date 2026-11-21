@@ -269,6 +269,25 @@ test('the loop steps the world clock with the game, and a map with the day_night
     assert.throws(() => new gameEngine({ asset_library: createEngineRegistry({ libraries: [] }), schedule_frame: null, time: { sped: 2 } }), /unknown field sped/);
 });
 
+test('the loop steps the world weather, and a map with the weather switch takes its particle systems, fading as it changes', async () => {
+    const { mapLevel } = await import('../lobby/runtime/map-level.mjs');
+    const rain = { density: 20, height: [30, 30], velocity: [[0, 0], [0, 0], [-60, -60]], look: { shape: 'streak' } }, snow = { rate: 50, height: [30, 30], velocity: [[0, 0], [0, 0], [-10, -10]], look: { shape: 'dot' } };
+    const weather = { states: { clear: {}, rain: { particles: [{ system: rain, area: 'view' }] }, snow: { particles: [{ system: snow, area: 'view' }] } }, start: { state: 'rain', intensity: 'heavy' }, fade: 1 };
+    const maps = { street: { map_id: 'street', size: [256, 256], switches: { weather: true } }, room: { map_id: 'room', size: [256, 256] } };
+    class Place extends mapLevel { mapDefinition() { return { definition: maps[this.level_id] }; } }
+    const e = new gameEngine({ asset_library: createEngineRegistry({ libraries: [] }), schedule_frame: null, weather });
+    e.registerLevel('street', Place); e.registerLevel('room', Place); assert.equal(e.weather, e.lobby.weather);
+    await e.loadLevel('street'); const physics = e.basement.physics, rates = () => physics.readParticleSystems().map(s => [s.look.shape, s.count]);
+    e.start(); for (let i = 0; i < 30; i++) e.updateState();
+    let [r, n] = rates(); assert.ok(r[1] > 0 && n[1] === 0, 'it rains, no snow');
+    e.weather.set('snow', 'normal'); const step = e.basement.physics.config.fixed_step; for (let i = 0; i < Math.round(2 / step); i++) e.updateState();
+    assert.deepEqual(e.weather.amounts(), { clear: 0, rain: 0, snow: 1 }); [r, n] = rates(); assert.ok(n[1] > 0, 'the snow came in');
+    const paused = e.pause('menu'); e.weather.set('rain'); for (let i = 0; i < 60; i++) e.updateState(); assert.equal(e.weather.amount('snow'), 1, 'the weather pauses with the game'); paused();
+    await e.loadLevel('room'); assert.equal(physics.readParticleSystems().length, 0, 'a map without the switch has no weather');
+    e.dispose();
+    assert.throws(() => new gameEngine({ asset_library: createEngineRegistry({ libraries: [] }), schedule_frame: null, weather: { start: { state: 'hail' } } }), /start/);
+});
+
 const toys = { library_id: 'toys', resources: {
     lamp: { kind: 'drawing', steps: [{ shape: 'glow', radius: 60, color: '#ffd27f' }, { shape: 'circle', radius: 10, material: 'brass', solid: true }, { shape: 'rectangle', x: -2, y: 10, width: 4, height: 30, material: 'brass', solid: true }] },
     brass: { kind: 'material', fill: '#b5a642' } },

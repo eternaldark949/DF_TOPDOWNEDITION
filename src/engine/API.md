@@ -21,6 +21,7 @@ What the engine is meant to become is in [READ-FIRST/ENGINE-API.md](../../READ-F
 - [Lobby (LV1)](#lobby-lv1)
   - [The clock and pausing](#the-clock-and-pausing)
   - [The world's clock: time of day](#the-worlds-clock-time-of-day)
+  - [The world's weather](#the-worlds-weather)
   - [Levels](#levels)
   - [Map levels](#map-levels)
   - [Travel](#travel)
@@ -82,8 +83,9 @@ Levels and systems get a **context** with the same jacks (`context.basement`, `c
 
 | Call | What it does |
 |---|---|
-| `new gameEngine({ physics, controls, camera, clock, time, services })` | Makes the engine. `time` is the world clock's record (see [The world's clock](#the-worlds-clock-time-of-day)); `services` are your game's own systems, found later under `engine.game` |
+| `new gameEngine({ physics, controls, camera, clock, time, services })` | Makes the engine (also `weather`, the world weather's record). `time` is the world clock's record (see [The world's clock](#the-worlds-clock-time-of-day)); `services` are your game's own systems, found later under `engine.game` |
 | `engine.time` | The world's clock: date, time of day, the day's phase and how dark it is |
+| `engine.weather` | The world's weather: its state and intensity, fading from one to the next |
 | `engine.registerLevel(id, LevelClass)` | Adds a level (a `gameLevel` subclass) |
 | `await engine.loadLevel(id, options)` | Leaves the current level and enters this one |
 | `engine.unloadLevel()` | Leaves the current level |
@@ -472,6 +474,29 @@ engine.time.setTime({ time: '06:30' }); engine.time.setSpeed(60);
 
 A clock with no phases is always 'day' and never dark. A map with `switches: {day_night: true}` lays its night from the clock (see [Map levels](#map-levels)).
 
+### The world's weather
+
+`engine.weather` (also `lobby.weather`, `context.lobby.weather`) is the world's weather, a Basement `worldWeather` (`basement/weather`) stepped with the game after physics, after the Python 2.0 script's states (CLEAR, RAINING, SNOWING) and intensities (LIGHT, NORMAL, HEAVY, HELLISH). Both are open: a record names its own states and intensities. A state lists the particle systems it brings, as a map's `particles` do; an intensity is a scale on their birth rates. Changing the weather fades the old state out and the new one in, and the intensity across, over `fade` seconds of play.
+
+```js
+const engine = new gameEngine({ asset_library, weather: registry.getResource('weather:city_weather') });
+engine.weather.set('snow', 'heavy');            // fades over the record's `fade` seconds
+engine.weather.set('clear', 'normal', { fade: 0 });
+engine.weather.amount('rain');                 // how much rain now: its share times the intensity's scale
+engine.weather.on('change', ({ state, intensity, previous }) => { /* puddles, sounds */ });
+```
+
+| Call | What it does |
+|---|---|
+| `weather.configure(record)` | Takes a weather record (`world_weather`: `{states: {name: {particles: [{system, area, at, margin}]}}, intensities: {name: scale}, start: {state, intensity}, fade}`) and starts its `start` weather at once |
+| `weather.state`, `weather.intensity`, `weather.changing` | The weather it is (or is turning into), and whether it is still fading |
+| `weather.set(state, intensity, {fade})` | Changes it; tells the `change` listeners |
+| `weather.amount(state)` / `weather.amounts()` | How much of a state there is now (0 while it is another; its intensity's scale when it is fully in) |
+| `weather.on('change', fn)` | Told of each change; returns the call that stops it |
+| `weather.save()` / `weather.restore(saved)` | The weather as plain data, and back at once |
+
+The intensities default to the Python's four: `light` .35, `normal` 1, `heavy` 1.8, `hellish` 3. A map with `switches: {weather: true}` makes every state's particle systems on entry and sets their rates from the weather after each step (see [Map levels](#map-levels)).
+
 ### Levels
 
 A level is a `gameLevel` subclass. It holds content and policy; it never owns the world or the clock.
@@ -486,7 +511,7 @@ A level is a `gameLevel` subclass. It holds content and policy; it never owns th
 
 ### Map levels
 
-`mapLevel` is a level that loads a map: give it a map definition and it builds the map, streams it, places travellers and exposes its exits. With `switches: {light_grid: true}` in the map it also keeps the map's light grid (`level.light_grid`): glowing art lights its surroundings, baked per region and re-baked round moving emitters within a budget after physics. Draw it with `createLightLayerParts({..., grids: level.light_grid.grids(view)})`, add `level.light_grid.liveLights()` to the live lights, and read `level.light_grid.sample(x, y)` for reflections. A map's `height_view: {eye, lean = 1}` sets the camera's height view on entry (`renderSystem.setHeightView`; how high the eye stands over the ground in world units, and how far walls lean from it) and clears it on leaving: a low eye (a few hundred) shows tall facades, a high one keeps the view near flat. A map's `night` record is kept as `level.night` for whoever draws the frame (`drawNight` with the night's tint, scale and glare), its `particles: [{system, area: 'view' | [x, y, w, h], at, margin = 96}]` are made on entry as `level.particles` (a `system` is a record or a `particle_system` resource id; `area: 'view'` keeps the births over the camera's view, `margin` past it, after each step) and drawn by `render.drawParticles`, and `level.setNight(context, on)` puts the night's `effects` on the frame (`render.setEffects`) or takes them off. With `switches: {day_night: true}` the world's clock says when: after each step the night is on while `engine.time.darkness` is above nothing and laid at that darkness (`drawNight({amount})`), so a dusk deepens into the night and a dawn lifts it; a clock with no phases leaves `setNight` to the game. The loop draws the rest itself: a level's `lookOptions(context, blend)` is what its `drawLooks` gets (`{covers: night.covers}` while the night is on), and `mapLevel.render` draws the night (tint, scale, glare, the light grid) and then the particles. Leaving the map takes them off and removes its particle systems.
+`mapLevel` is a level that loads a map: give it a map definition and it builds the map, streams it, places travellers and exposes its exits. With `switches: {light_grid: true}` in the map it also keeps the map's light grid (`level.light_grid`): glowing art lights its surroundings, baked per region and re-baked round moving emitters within a budget after physics. Draw it with `createLightLayerParts({..., grids: level.light_grid.grids(view)})`, add `level.light_grid.liveLights()` to the live lights, and read `level.light_grid.sample(x, y)` for reflections. A map's `height_view: {eye, lean = 1}` sets the camera's height view on entry (`renderSystem.setHeightView`; how high the eye stands over the ground in world units, and how far walls lean from it) and clears it on leaving: a low eye (a few hundred) shows tall facades, a high one keeps the view near flat. A map's `night` record is kept as `level.night` for whoever draws the frame (`drawNight` with the night's tint, scale and glare), its `particles: [{system, area: 'view' | [x, y, w, h], at, margin = 96}]` are made on entry as `level.particles` (a `system` is a record or a `particle_system` resource id; `area: 'view'` keeps the births over the camera's view, `margin` past it, after each step) and drawn by `render.drawParticles`, and `level.setNight(context, on)` puts the night's `effects` on the frame (`render.setEffects`) or takes them off. With `switches: {day_night: true}` the world's clock says when: after each step the night is on while `engine.time.darkness` is above nothing and laid at that darkness (`drawNight({amount})`), so a dusk deepens into the night and a dawn lifts it; a clock with no phases leaves `setNight` to the game. With `switches: {weather: true}` the map takes the world's weather: every state's particle systems are made on entry (with the map's own `particles`) and after each step each is born at its own rate times `engine.weather.amount(state)`, so rain thins out as snow comes in. The loop draws the rest itself: a level's `lookOptions(context, blend)` is what its `drawLooks` gets (`{covers: night.covers}` while the night is on), and `mapLevel.render` draws the night (tint, scale, glare, the light grid) and then the particles. Leaving the map takes them off and removes its particle systems.
 
 | Member | What it does |
 |---|---|
@@ -512,6 +537,7 @@ The data layer, through `engine.directory`. It defines what each kind of data lo
 | `directory.validateMapLayout(layout)`, `validatePropCatalog`, `validateSkeleton`, `validateDrawing`, `validateMaterial`, … | Checks data against its structure (a library is checked when it is registered) |
 | `directory.resolvePlacement`, `resolveLayout`, `resolvePropLook` | Turns layout data into what the map builder reads |
 | a `world_clock` resource | The world's clock as data (checked by `readWorldClock`), handed to `new gameEngine({time})` or `engine.time.configure` |
+| a `world_weather` resource | The world's weather as data (checked by `readWorldWeather`, its inline particle systems too), handed to `new gameEngine({weather})` or `engine.weather.configure` |
 
 Reference: [Directory README](directory/README.md).
 
