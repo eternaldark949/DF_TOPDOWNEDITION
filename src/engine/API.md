@@ -277,7 +277,7 @@ Reference: [physics README](basement/physics/README.md), animation section.
 
 ### Maps
 
-A map is data: size, walls, placements, lights, triggers, rooms, doors and cloth. `mapSystem` turns a map definition into entities in the world and streams them round a focus point.
+A map is data: size, walls, placements, lights, triggers, rooms, doors and cloth. Its `markers: {role: marker}` show triggers on the floor: `{transition: {label: true}}` draws every exit as the classic's glowing mat with its label, fitted to it (see the maps README; `data.quiet: true` on a trigger hides its mat). `mapSystem` turns a map definition into entities in the world and streams them round a focus point.
 
 | Call | What it does |
 |---|---|

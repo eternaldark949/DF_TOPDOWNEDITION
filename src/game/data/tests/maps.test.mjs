@@ -27,7 +27,9 @@ test('every map builds: its size, walls, rooms, exits and landmarks are the clas
         const p = world(), source = classic.maps[library_id], map = build(p, `${library_id}:map`), definition = mapDefinition(p.elements.asset_library, `${library_id}:map`);
         assert.deepEqual(definition.size, [source.width, source.height], library_id);
         assert.equal(definition.kind, source.type === 'outdoor' ? 'exterior' : 'interior');
-        assert.equal(map.packets().filter(packet => packet.data.role === 'transition').length, (source.transitions ?? []).length, `${library_id}: one exit per classic transition`);
+        // (the classic city made its buildings' entrances as it placed them; here they are the map's own triggers)
+        const exits = map.packets().filter(packet => packet.data.role === 'transition').length, classic_exits = (source.transitions ?? []).length;
+        if (library_id === 'sdc') assert.ok(exits >= classic_exits, 'sdc: its exits and its buildings\' entrances'); else assert.equal(exits, classic_exits, `${library_id}: one exit per classic transition`);
         assert.ok(map.packets().filter(packet => packet.data.role === 'wall').length >= (source.walls ?? []).length, `${library_id}: every wall, some cut by doors`);
         assert.equal(map.rooms.rooms.length, Object.keys(classic.rooms[library_id]?.rooms ?? {}).length, `${library_id}: rooms`);
         assert.equal(Object.keys(definition.landmarks ?? {}).length, (source.landmarks ?? []).length, `${library_id}: landmarks`);

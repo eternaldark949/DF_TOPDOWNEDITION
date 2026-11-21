@@ -56,7 +56,9 @@ are the source; edit them, not the classic data.
   on the other streets amber on the north or west pavement and rose on the other; and the Silver Queen's violet round its
   block (978 placements, written by the street lamp
   generator kept with the project's tools). `switches.light_grid` is on. Its night is a deep violet dark with a violet
-  hue grade and the lamps' glare stars. `switches.day_night` lays that night from the world's clock (`time:city_clock`) and `switches.weather` takes the world's weather (`weather:city_weather`: rain at the start, or snow or clear, at an intensity), falling over the camera's view. Its other
+  hue grade and the lamps' glare stars. `switches.day_night` lays that night from the world's clock (`time:city_clock`) and `switches.weather` takes the world's weather (`weather:city_weather`: rain at the start, or snow or clear, at an intensity), falling over the camera's view. Its first entrance is the Silver Queen's (`silver_queen_door`, to `apt_949`), on the forecourt's carpet under the marquee, where
+  "Silver Queen" lies in violet neon script on the marquee's roof as the classic laid it. Every map with exits shows them as
+  the classic's glowing mats with their labels (`markers: {transition: {label: true}}`). Its other
   buildings, trees and props are next.
 - No classic floor painter, so flat colours for now: `ollo_test`, `ollo_interior`.
 - Furniture for every map but the apartment is next. The scene-only maps (`keepers_hill`, `keepers_parlor`,

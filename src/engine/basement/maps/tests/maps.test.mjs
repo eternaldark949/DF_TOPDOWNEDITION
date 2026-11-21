@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { physicsSystem, BODY_GROUP } from '../../physics/index.mjs';
-import { buildMapPackets, declaredLight, mapInstance, mapSystem } from '../index.mjs';
+import { buildMapPackets, declaredLight, mapInstance, mapSystem, MARKER, readMarker } from '../index.mjs';
 
 const room = {
     map_id: 'test_room', kind: 'interior', size: [400, 300], boundary: { thickness: 20 }, spawn: [50, 50],
@@ -349,4 +349,18 @@ test('floors are drawing steps in map space, walls take a drawn look, and a plac
     const [kerb] = buildMapPackets({ floors: [{ shape: 'rectangle', x: 0, y: 0, width: 100, height: 4, fill: '#3b3542', thickness: 6, sides: { material: 'city:kerb' } }] }).entries.map(e => e.packet);
     assert.equal(kerb.components[0].layers[0].thickness, 6, 'a floor step can stand up a little (a kerb), its faces drawn in its sides');
     assert.deepEqual(kerb.components[0].layers[0].sides, { material: 'city:kerb' }); assert.equal(kerb.components[0].layers[0].solid, false, 'and still stops nothing');
+});
+
+test('a map\'s markers draw its triggers of a role on the floor, fitted to each, unless one is quiet', () => {
+    const triggers = [{ x: 10, y: 10, w: 60, h: 40, role: 'transition', data: { target: 'street', label: 'Exit' } }, { x: 100, y: 10, w: 60, h: 40, role: 'transition', data: { target: 'lift', quiet: true } }, { x: 200, y: 10, w: 20, h: 20, role: 'zone' }];
+    const built = kind => buildMapPackets({ size: [400, 400], kind, markers: { transition: { label: true, color: '#ffd27f' }, zone: false }, triggers }).entries.filter(e => e.section === 'triggers').map(e => e.packet);
+    const [exit, lift, zone] = built('exterior');
+    const steps = exit.components[0].layers[0].steps;
+    assert.equal(exit.data.look.layer, MARKER.layer); assert.equal(lift.components, undefined, 'a quiet exit is marked by its map\'s own art'); assert.equal(zone.components, undefined, 'a role without a marker shows nothing');
+    assert.deepEqual(steps.map(s => s.shape), ['rectangle', 'rectangle', 'rectangle', 'line', 'line', 'line', 'line', 'text'], 'glow, fill, border, four corners, label');
+    assert.equal(steps[2].width, 60); assert.equal(steps[2].x, -30, 'fitted to the trigger, in its frame'); assert.ok(steps[1].emits, 'the fill glows');
+    assert.equal(steps[7].text, 'Exit'); assert.equal(steps[7].baseline, 'top', 'outdoors the label is below');
+    assert.equal(built('interior')[0].components[0].layers[0].steps[7].baseline, 'bottom', 'indoors above');
+    assert.equal(readMarker(true), MARKER); assert.throws(() => readMarker({ shimmer: 1 }), /Unknown marker field/); assert.throws(() => readMarker({ color: 'blue' }), /color/);
+    assert.throws(() => buildMapPackets({ size: [10, 10], markers: { transition: { corner: -1 } } }), /corner/);
 });

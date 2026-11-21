@@ -1,6 +1,7 @@
 // ===== LV0 BASEMENT =====
 import { layoutGeometry } from '../physics/index.mjs';
 import { resolveDoorKinds, doorKind, doorLeaves, doorOpening, leafIds } from './doors.mjs';
+import { markerComponent, readMarker } from './markers.mjs';
 export { DOOR_KINDS, HINGE, validateDoorKind } from './doors.mjs';
 
 /**
@@ -149,9 +150,15 @@ export function buildMapPackets(definition, { templates = {}, decorate = null, p
             render_shape: { shape_type: 'circle', radius: l.render_radius ?? 20 }, light_shape: lightShape(emission),
             data: { role: l.role ?? 'lamp', authored_id: l.authored_id ?? `lamp_${i}`, emission, ...l.data } }); });
 
-    // Triggers: exits, rooms, zones. Each names its role.
-    (definition.triggers ?? []).forEach((r, i) => push('triggers', i, r, { ...kind_of('trigger', r.template), ...box(r.x, r.y, r.w, r.h),
-        data: { role: r.role ?? 'trigger', ...(r.authored_id ? { authored_id: r.authored_id } : {}), ...r.data } }));
+    // Triggers: exits, rooms, zones. Each names its role. A role the map's `markers` give a look to is drawn on the
+    // floor with it (markers.mjs), fitted to its rectangle, unless the trigger is `quiet`.
+    const markers = Object.fromEntries(Object.entries(definition.markers ?? {}).filter(([, m]) => m !== false && m !== null).map(([role, m]) => [role, readMarker(m, `markers.${role}`)]));
+    (definition.triggers ?? []).forEach((r, i) => {
+        const role = r.role ?? 'trigger', packet = { ...kind_of('trigger', r.template), ...box(r.x, r.y, r.w, r.h), data: { role, ...(r.authored_id ? { authored_id: r.authored_id } : {}), ...r.data } };
+        const marker = markers[role];
+        if (marker && !r.data?.quiet) { packet.components = [markerComponent(marker, r.w, r.h, { label: r.data?.label ?? null, side: kind === 'interior' ? 'above' : 'below' })]; packet.data.look = { layer: marker.layer }; }
+        push('triggers', i, r, packet);
+    });
 
     // Rooms: one ghost volume per rectangle in the world's spatial grid (an L-shaped hall is two).
     for (const [room_id, room] of Object.entries(definition.rooms ?? {})) {

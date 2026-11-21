@@ -9192,6 +9192,87 @@
      ]
     },
     {
+     "name": "hood_sign",
+     "at": [
+      0,
+      0
+     ],
+     "layers": [
+      {
+       "layer": 0,
+       "height": 31,
+       "thickness": 0.5,
+       "solid": false,
+       "steps": [
+        {
+         "shape": "text",
+         "text": "Silver Queen",
+         "x": -175,
+         "y": 464.20000000000005,
+         "size": 21,
+         "align": "center",
+         "baseline": "middle",
+         "family": "\"Great Vibes\", cursive",
+         "fill": "rgba(10, 4, 24, 0.55)"
+        },
+        {
+         "shape": "text",
+         "text": "Silver Queen",
+         "x": -175,
+         "y": 463,
+         "size": 21,
+         "align": "center",
+         "baseline": "middle",
+         "family": "\"Great Vibes\", cursive",
+         "stroke": "rgba(164, 105, 255, 0.28)",
+         "line_width": 3.2,
+         "line_join": "round",
+         "emits": {
+          "strength": 0.5,
+          "reach": 80,
+          "color": "#b48cff"
+         }
+        },
+        {
+         "shape": "text",
+         "text": "Silver Queen",
+         "x": -175,
+         "y": 463,
+         "size": 21,
+         "align": "center",
+         "baseline": "middle",
+         "family": "\"Great Vibes\", cursive",
+         "stroke": "rgba(190, 150, 255, 0.55)",
+         "line_width": 1.4,
+         "line_join": "round"
+        },
+        {
+         "shape": "text",
+         "text": "Silver Queen",
+         "x": -175,
+         "y": 463,
+         "size": 21,
+         "align": "center",
+         "baseline": "middle",
+         "family": "\"Great Vibes\", cursive",
+         "fill": "#c9a8ff"
+        },
+        {
+         "shape": "text",
+         "text": "Silver Queen",
+         "x": -175,
+         "y": 463,
+         "size": 21,
+         "align": "center",
+         "baseline": "middle",
+         "family": "\"Great Vibes\", cursive",
+         "fill": "rgba(255, 255, 255, 0.6)"
+        }
+       ]
+      }
+     ]
+    },
+    {
      "name": "sign",
      "at": [
       0,
