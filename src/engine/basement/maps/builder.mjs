@@ -125,12 +125,14 @@ export function buildMapPackets(definition, { templates = {}, decorate = null, p
 
     // Placements: catalog props at their authored rectangles.
     // A placement that names a catalog `object` is made from that record at its centre (or `at`), its size and
-    // shape the record's own; `width` and `height` may be left out.
+    // shape the record's own; `width` and `height` may be left out. Its `look` is laid over the object's own (its
+    // `values` merged), so one template stands in many colourways, names on its sign and all.
     (definition.placements ?? []).forEach((p, i) => {
         if (p.object !== undefined) {
             if (typeof make_object !== 'function') throw new TypeError(`Map placement ${i} names the object ${p.object}: give the builder make_object`);
             const at = p.at ?? [finite(p.x, 'x') + (p.width ?? 0) / 2, finite(p.y, 'y') + (p.height ?? 0) / 2];
-            const packet = make_object(p.object, at, { rotation: p.rotation ?? 0, data: { role: p.role ?? 'prop', authored_id: p.authored_id ?? `prop_${i}`, layout_index: i, object: p.object, home_position: [...at], home_rotation: p.rotation ?? 0, ...p.data } });
+            if (p.look !== undefined && !(p.look && typeof p.look === 'object' && !Array.isArray(p.look))) throw new TypeError(`Map placement ${i}'s look is {values, ...}: laid over its object's own`);
+            const packet = make_object(p.object, at, { rotation: p.rotation ?? 0, ...(p.look ? { look: p.look } : {}), data: { role: p.role ?? 'prop', authored_id: p.authored_id ?? `prop_${i}`, layout_index: i, object: p.object, home_position: [...at], home_rotation: p.rotation ?? 0, ...p.data } });
             push('placements', i, p, packet); return;
         }
         const packet = { ...kind_of('prop', p.template), ...box(p.x, p.y, p.width, p.height),

@@ -322,7 +322,7 @@ test('floors are drawing steps in map space, walls take a drawn look, and a plac
         floors: [{ shape: 'rectangle', x: 10, y: 20, width: 100, height: 40, material: 'demo:parquet' }, { shape: 'circle', x: 200, y: 50, radius: 30, fill: '#fff', line_width: 4, elevation: 2 }],
         wall_look: { material: 'demo:plaster', height: 120, layer: 10 },
         walls: [{ x: 0, y: 0, w: 100, h: 8 }, { x: 0, y: 8, w: 8, h: 50, material: 'demo:stone', sides: 'demo:stone_face', height: 60 }],
-        placements: [{ object: 'demo:rug', at: [50, 40], rotation: .5 }, { object: 'demo:cart', x: 100, y: 100, width: 20, height: 10, data: { tag: 1 } }]
+        placements: [{ object: 'demo:rug', at: [50, 40], rotation: .5 }, { object: 'demo:cart', x: 100, y: 100, width: 20, height: 10, data: { tag: 1 }, look: { values: { name: 'Butter Moon' } } }]
     }, { make_object: (record, at, overrides) => { made.push(record); return { kind: 'decoration', position: at, ...overrides }; } });
     const [a, b] = entries.filter(e => e.section === 'floors').map(e => e.packet);
     assert.equal(entries[0].section, 'floors', 'floors are built first');
@@ -342,6 +342,8 @@ test('floors are drawing steps in map space, walls take a drawn look, and a plac
     assert.deepEqual(made, ['demo:rug', 'demo:cart']);
     assert.deepEqual(rug.position, [50, 40]); assert.equal(rug.rotation, .5); assert.equal(rug.data.object, 'demo:rug'); assert.equal(rug.data.authored_id, 'prop_0');
     assert.deepEqual(cart.position, [110, 105], 'without `at`, the middle of its rectangle'); assert.equal(cart.data.tag, 1);
+    assert.deepEqual(cart.look, { values: { name: 'Butter Moon' } }, 'a placement\'s look goes to its object, laid over the record\'s'); assert.equal(rug.look, undefined);
+    assert.throws(() => buildMapPackets({ placements: [{ object: 'demo:rug', at: [0, 0], look: 'red' }] }, { make_object: () => ({}) }), /look/);
     assert.throws(() => buildMapPackets({ placements: [{ object: 'demo:rug', at: [0, 0] }] }), /make_object/);
     assert.throws(() => buildMapPackets({ floors: [{ shape: 'path', commands: [] }] }), /floor/i);
     const [inlay] = buildMapPackets({ floors: [{ shape: 'group', x: 100, y: 0, steps: [{ shape: 'rectangle', x: 0, y: 0, width: 10, height: 10 }, { shape: 'circle', x: 50, y: 50, radius: 5 }] }] }).entries.map(e => e.packet);
