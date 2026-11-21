@@ -46,6 +46,7 @@ export class mapLevel extends gameLevel {
         this.followWeather(context);
         this.followView(context);
         this.light_grid = prepared.definition.switches?.light_grid ? new lightGridSystem({ settings: prepared.definition.light_grid ?? {}, source: context.assets ?? context.basement.physics.elements?.asset_library ?? null }).attach(this.map, this.lightGridOptions(context)) : null;
+        this.followLightGroups(context);
         this.map.setFocus(this.mapFocuses(context), { budget_ms: Infinity });   // (the arriving regions, whole, behind the level change)
         this.light_grid?.updateState({ budget_ms: Infinity });
     }
@@ -89,6 +90,15 @@ export class mapLevel extends gameLevel {
     followClock(context) {
         if (!this.day_night) return; const time = context.lobby?.time; if (!time?.settings.phases.length) return;   // (a clock with no phases says nothing of the night)
         const dark = time.darkness; this.night_amount = dark; this.setNight(context, dark > .001);
+        this.followLightGroups(context);
+    }
+    /**
+     * With the `day_night` switch, each of the clock's windows turns the light group of its name on while it holds and
+     * off when not (renderSystem and light grid setLightGroup): street lamps in 'street_lights' light only in that window.
+     */
+    followLightGroups(context) {
+        if (!this.day_night) return; const time = context.lobby?.time, render = context.basement.render; if (!time) return;
+        for (const name of Object.keys(time.settings.windows)) { const on = time.within(name); render?.setLightGroup(name, on); this.light_grid?.setLightGroup(name, on); (this.light_groups ??= new Set()).add(name); }
     }
     /** At night the looks keep what stands over the night's `covers` height (roofs keep the dark; lit windows shine). */
     lookOptions(context, blend) { return this.night_on ? { covers: this.night.covers } : {}; }
@@ -128,7 +138,7 @@ export class mapLevel extends gameLevel {
         const camera = context.basement.camera; if (!camera) return;
         for (const p of this.particles ?? []) if (p.view) { const b = camera.getVisibleBounds({ margin: p.margin }); context.basement.physics.setParticleArea(p.id, [b.left, b.top, b.right - b.left, b.bottom - b.top]); }
     }
-    leave(context) { for (const p of this.particles ?? []) context.basement.physics.removeParticleSystem(p.id); this.particles = []; if (this.night_on) this.setNight(context, false); this.night = null; this.map?.destroy(); this.map = null; this.light_grid = null; if (this.height_view) context.basement.render?.setHeightView(null); this.height_view = null; }
+    leave(context) { for (const name of this.light_groups ?? []) context.basement.render?.setLightGroup(name, true); this.light_groups = null; for (const p of this.particles ?? []) context.basement.physics.removeParticleSystem(p.id); this.particles = []; if (this.night_on) this.setNight(context, false); this.night = null; this.map?.destroy(); this.map = null; this.light_grid = null; if (this.height_view) context.basement.render?.setHeightView(null); this.height_view = null; }
     /** Every exit: `{entity, target, label, auto, bounds}`. */
     getExits() {
         if (!this.map) return [];

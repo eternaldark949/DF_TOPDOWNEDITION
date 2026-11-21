@@ -50,6 +50,8 @@ function validLight(light,i){
  * heightView, leaning) a light with a `height` is drawn where that height leans to: a lamp on its post, a
  * searchlight on its crown.
  */
+/** The light group a thing is in (its `light_group`: a street lamp's 'street_lights'), or null. */
+export function lightGroupOf(body){const g=(typeof body?.get==='function'?body.get('light_group'):undefined)??body?.light_group??body?.data?.light_group??null;return typeof g==='string'&&g?g:null;}
 export function entityLights(body,{pose=null,view=null}={}){
     const data=typeof body.get==='function'?{lights:body.get('lights'),emission:body.get('emission'),look:body.get('look')}:body.data??{};
     const list=[...(data.lights??[]),...(data.emission?[{...data.emission,shape:data.emission.shape==='strip'?'area':data.emission.shape}]:[])];

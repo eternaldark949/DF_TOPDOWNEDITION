@@ -51,3 +51,12 @@ test('a clock saves and restores, and a speed of 0 stops it', () => {
     c.restore(saved); assert.deepEqual(c.state(), saved); assert.ok(c.is('day'));
     c.setSpeed(0); assert.equal(c.updateState(10), 0); assert.equal(c.text({ seconds: true }), '08:09:10');
 });
+
+test('windows are named spans of the day, told as they open and close', () => {
+    const c = new worldClock({ start: { time: '06:00' }, speed: 600, windows: { rush_hour: [['07:00', '09:30'], ['16:30', '19:00']], street_lights: [['18:30', '06:45']] } });
+    assert.deepEqual(c.windows(), { rush_hour: false, street_lights: true }); assert.equal(c.within('fog'), false);
+    const seen = []; c.on('window', w => seen.push(`${c.text()} ${w.name} ${w.on ? 'on' : 'off'}`));
+    c.updateState(6 * 24);   // (a day)
+    assert.deepEqual(seen, ['06:45 street_lights off', '07:00 rush_hour on', '09:30 rush_hour off', '16:30 rush_hour on', '18:30 street_lights on', '19:00 rush_hour off']);
+    assert.throws(() => readWorldClock({ windows: { a: [['07:00']] } }), /windows.a/);
+});

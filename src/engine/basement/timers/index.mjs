@@ -16,11 +16,13 @@ const MONTHS = [['January', 31], ['February', 28], ['March', 31], ['April', 30],
  * - phases: `[{name, from, dark, colors}]` round the day, in order of `from` ("HH:MM"); each lasts until the next
  *   one starts (the last until the first, past midnight). `dark` (0 to 1) and `colors` ({name: '#rrggbb'}) blend
  *   from a phase's own at its start to the next phase's at its end. No phases: always 'day', never dark.
+ * - windows: `{name: [[from, to], ...]}`: named spans of the day ("HH:MM"; one that ends before it starts runs past
+ *   midnight), as the Python worldSystem's rush_hour and street_lights: `within(name)` says whether one holds now.
  */
 export const WORLD_CLOCK = Object.freeze({
     start: Object.freeze({ year: 1, month: 1, day: 1, time: '12:00' }), speed: 1,
     months: Object.freeze(MONTHS.map(([name, days]) => Object.freeze({ name, days }))),
-    leap: Object.freeze({ month: 2, every: 4, except: 100, unless: 400 }), separator: ':', phases: Object.freeze([])
+    leap: Object.freeze({ month: 2, every: 4, except: 100, unless: 400 }), separator: ':', phases: Object.freeze([]), windows: Object.freeze({})
 });
 const DAY = 86400, COLOUR = /^#[0-9a-f]{6}$/i, plain = v => !!v && typeof v === 'object' && !Array.isArray(v);
 const fail = (where, message) => { throw new TypeError(`${where}: ${message}`); };
@@ -58,7 +60,12 @@ export function readWorldClock(record = {}, where = 'world_clock') {
         return Object.freeze({ name: p.name, from: readTimeOfDay(p.from, `${at}.from`), dark, colors: Object.freeze({ ...colors }) });
     }).sort((a, b) => a.from - b.from);
     for (let i = 1; i < phases.length; i++) if (phases[i].from === phases[i - 1].from) fail(where, `phases ${phases[i - 1].name} and ${phases[i].name} start at the same time`);
-    return Object.freeze({ ...out, start: Object.freeze(start), phases: Object.freeze(phases) });
+    if (!plain(out.windows)) fail(where, 'windows is {name: [[from, to], ...]}');
+    const windows = Object.fromEntries(Object.entries(out.windows).map(([name, spans]) => {
+        if (!Array.isArray(spans) || !spans.length || spans.some(s => !Array.isArray(s) || s.length !== 2)) fail(`${where}.windows.${name}`, 'is [[from, to], ...] ("HH:MM")');
+        return [name, Object.freeze(spans.map(([a, b], i) => Object.freeze([readTimeOfDay(a, `${where}.windows.${name}[${i}][0]`), readTimeOfDay(b, `${where}.windows.${name}[${i}][1]`)])))];
+    }));
+    return Object.freeze({ ...out, start: Object.freeze(start), phases: Object.freeze(phases), windows: Object.freeze(windows) });
 }
 function isLeap(settings, year) { const l = settings.leap; if (!l) return false; return year % l.every === 0 && (!l.except || year % l.except !== 0 || (!!l.unless && year % l.unless === 0)); }
 function daysIn(settings, year, month) { return settings.months[month - 1].days + (settings.leap && month === settings.leap.month && isLeap(settings, year) ? 1 : 0); }
@@ -127,6 +134,10 @@ export class worldClock {
         const now = p[i], next = p[(i + 1) % p.length], length = (next.from - now.from + DAY) % DAY || DAY;
         return { name: now.name, from: now.from, to: next.from, progress: Math.min(1, ((this.#seconds - now.from + DAY) % DAY) / length), dark: now.dark, colors: now.colors, next: next.name };
     }
+    /** True while the window named `name` holds (one of the record's `windows`; false for a name it has not). */
+    within(name) { const spans = this.#settings.windows[name]; if (!spans) return false; const t = this.#seconds; return spans.some(([a, b]) => a <= b ? t >= a && t < b : t >= a || t < b); }
+    /** The windows' names, and whether each holds now: `{name: true | false}`. */
+    windows() { return Object.fromEntries(Object.keys(this.#settings.windows).map(n => [n, this.within(n)])); }
     /** True while the phase named `name` holds. */
     is(name) { return this.phase.name === name; }
     /** How dark it is now (0 to 1): the phase's `dark` blending into the next phase's across it. */
@@ -139,10 +150,11 @@ export class worldClock {
     }
     /**
      * Listens for 'hour' (each new hour, with `{hour, day}`), 'day' (each new day, with `{year, month, day}`) or
-     * 'phase' (each new phase, with `{name, previous}`). Returns the call that stops listening.
+     * 'phase' (each new phase, with `{name, previous}`) or 'window' (a window opening or closing, with `{name, on}`).
+     * Returns the call that stops listening.
      */
     on(event, fn) {
-        if (!['hour', 'day', 'phase'].includes(event)) throw new TypeError("Clock events are 'hour', 'day' and 'phase'");
+        if (!['hour', 'day', 'phase', 'window'].includes(event)) throw new TypeError("Clock events are 'hour', 'day', 'phase' and 'window'");
         if (typeof fn !== 'function') throw new TypeError('A clock listener is a function');
         let set = this.#listeners.get(event); if (!set) this.#listeners.set(event, set = new Set()); set.add(fn); return () => set.delete(fn);
     }
@@ -154,16 +166,17 @@ export class worldClock {
     updateState(seconds) {
         if (!(Number.isFinite(seconds) && seconds >= 0)) throw new RangeError('The clock steps by seconds (>= 0)');
         const moved = seconds * this.#settings.speed; if (!(moved > 0)) return 0;
-        let left = moved;
+        let left = moved; const names = Object.keys(this.#settings.windows), open = names.map(n => this.within(n)), edges = Object.values(this.#settings.windows).flat(2);
         while (left > 0) {
             // To the next hour or phase boundary at most, so each hour, day and phase passed is told in order.
             const p = this.#settings.phases, to_hour = 3600 - (this.#seconds % 3600);
-            const to_phase = p.length > 1 ? ((p[(this.#phase_index + 1) % p.length].from - this.#seconds + DAY) % DAY || DAY) : Infinity, stride = Math.min(left, to_hour, to_phase);
+            const to_phase = p.length > 1 ? ((p[(this.#phase_index + 1) % p.length].from - this.#seconds + DAY) % DAY || DAY) : Infinity, to_window = edges.reduce((m, e) => Math.min(m, (e - this.#seconds + DAY) % DAY || DAY), Infinity), stride = Math.min(left, to_hour, to_phase, to_window);
             this.#seconds += stride; left -= stride;
             if (this.#seconds >= DAY - 1e-9) { this.#seconds = 0; this.#nextDay(); this.#emit('day', { year: this.#year, month: this.#month, day: this.#day }); }
             if (stride === to_hour) this.#emit('hour', { hour: this.hour, day: this.#day });
             const i = this.#phaseIndex();
             if (i !== this.#phase_index) { const previous = this.#settings.phases[this.#phase_index]?.name ?? null; this.#phase_index = i; this.#emit('phase', { name: this.#settings.phases[i].name, previous }); }
+            names.forEach((n, k) => { const now = this.within(n); if (now !== open[k]) { open[k] = now; this.#emit('window', { name: n, on: now }); } });
         }
         return moved;
     }

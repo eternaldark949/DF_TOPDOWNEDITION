@@ -3,7 +3,7 @@
 // drawn from what physics moves, and the night settings a map holds.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {cameraSystem,renderSystem,recordingRenderer,heightView,effectStack,effectsAt,GLARE,readGlare,glarePackets,PARTICLE_LOOK,readParticleLook,particlePackets,NIGHT,readNight} from '../index.mjs';
+import {cameraSystem,renderSystem,recordingRenderer,heightView,effectStack,effectsAt,lightGroupOf,GLARE,readGlare,glarePackets,PARTICLE_LOOK,readParticleLook,particlePackets,NIGHT,readNight} from '../index.mjs';
 import {physicsSystem} from '../../physics/index.mjs';
 
 const fixture=async()=>{const world=new physicsSystem(),camera=new cameraSystem({position:[200,200],viewport:{width:400,height:400}});
@@ -132,4 +132,15 @@ test('an effects stack laid by degrees: strengths blend from none to their own',
     const [g,v]=effectsAt(stack,.5);
     assert.ok(Math.abs(g.hue_amount-.2)<1e-9&&Math.abs(g.tint_amount-.15)<1e-9&&Math.abs(g.contrast-1.2)<1e-9);assert.equal(g.hue,'#a040ff','colours stay');assert.equal(v.strength,.25);
     assert.throws(()=>effectsAt(stack,2),/0 to 1/);
+});
+
+test('a light group turned off carries no lights and keeps the night on its glowing parts',async()=>{
+    const {world,render}=await fixture();
+    world.elements.createEntity({kind:'static',position:[200,200],light_group:'street_lights',lights:[lamp(0,0,{glare:true})]});
+    world.elements.createEntity({kind:'static',position:[100,100],lights:[lamp(0,0)]});
+    assert.equal(lightGroupOf({light_group:'street_lights'}),'street_lights');assert.equal(lightGroupOf({}),null);
+    assert.equal(render.visibleLights().length,2);assert.ok(render.lightGroupOn('street_lights'));
+    assert.equal(render.setLightGroup('street_lights',false),true);assert.equal(render.lightGroupOn('street_lights'),false);
+    assert.equal(render.visibleLights().length,1,'only the light in no group');
+    render.setLightGroup('street_lights',true);assert.equal(render.visibleLights().length,2);
 });

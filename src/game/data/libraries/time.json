@@ -1,6 +1,6 @@
 {
   "library_id": "time",
-  "description": "The world's clock, after the Python timeSystem and sky (docs/engine-reference/base-game-script.py): a game minute every five seconds of play (its 0.2 speed multiplier and 60-second step), starting at 23:00 on 1.1.0001, with the Gregorian months and leap years. The day's phases follow its morning, day, evening and midnight ranges; `dark` is how much of a map's night is laid (maps with the `day_night` switch), and `sky` and `sun` are its colours (DAY, EVENING, MORNING, NIGHT, DEEP_NIGHT and SUN_*), blended across each phase. The game hands it to engine.time.configure.",
+  "description": "The world's clock, after the Python timeSystem and sky (docs/engine-reference/base-game-script.py): a game minute every five seconds of play (its 0.2 speed multiplier and 60-second step), starting at 23:00 on 1.1.0001, with the Gregorian months and leap years. The day's phases follow its morning, day, evening and midnight ranges; `dark` is how much of a map's night is laid (maps with the `day_night` switch), and `sky` and `sun` are its colours (DAY, EVENING, MORNING, NIGHT, DEEP_NIGHT and SUN_*), blended across each phase. Its `windows` are the worldSystem's street_lights and rush_hour: lamps in the light group `street_lights` light only in that window (on maps with `day_night`), and anything may ask `engine.time.within('rush_hour')`. The game hands it to engine.time.configure.",
   "resources": {
     "city_clock": {"kind": "world_clock",
       "start": {"year": 1, "month": 1, "day": 1, "time": "23:00"},
@@ -13,6 +13,7 @@
         {"name": "dusk", "from": "17:00", "dark": 0, "colors": {"sky": "#1e8eff", "sun": "#ffffff"}},
         {"name": "evening", "from": "19:00", "dark": 0.7, "colors": {"sky": "#1b2350", "sun": "#461932"}},
         {"name": "night", "from": "21:00", "dark": 1, "colors": {"sky": "#020204", "sun": "#04010f"}}
-      ]}
+      ],
+      "windows": {"street_lights": [["18:00", "07:00"]], "rush_hour": [["07:00", "09:30"], ["16:30", "19:00"]]}}
   }
 }

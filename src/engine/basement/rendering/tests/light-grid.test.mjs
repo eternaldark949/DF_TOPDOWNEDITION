@@ -110,3 +110,15 @@ test('a map\'s light grid: still emitters bake per region, a mover re-bakes what
     grids.setMovers([]);grids.updateState({budget_ms:Infinity});
     let t=0;grids.setMovers(car(1500));const one=grids.updateState({budget_ms:0,now:()=>t++});assert.equal(one.baked,1,'a spent budget still bakes one a call');
 });
+
+test('a light group turned off: its things\' glowing steps stop lighting the grid, re-baked within the budget', () => {
+    const packet={kind:'static',position:[100,100],rotation:0,light_group:'street_lights',components:[{layers:[{height:0,steps:[{shape:'rectangle',x:-20,y:-5,width:40,height:10,fill:'#ff3399',emits:{reach:140}}]}]}]};
+    const map={region_size:512,packets:()=>[packet],addTier:(name,{load})=>load('0,0')};
+    const grids=new lightGridSystem({settings:{cell:32}}).attach(map);grids.updateState({budget_ms:Infinity});
+    const lit=grids.sample(100,140)[0];assert.ok(lit>.1,'on, it lights');
+    assert.equal(grids.setLightGroup('street_lights',false),true);assert.equal(grids.setLightGroup('street_lights',false),false,'no change, nothing to do');
+    assert.ok(grids.sample(100,140)[0]>.1,'the old grid shows until the new one is baked');
+    grids.updateState({budget_ms:Infinity});assert.ok(grids.sample(100,140)[0]<lit*.05,'off, it does not');
+    grids.setLightGroup('street_lights',true);grids.updateState({budget_ms:Infinity});assert.ok(Math.abs(grids.sample(100,140)[0]-lit)<1e-6,'and on again');
+    assert.throws(()=>grids.setLightGroup('',true),/named/);
+});

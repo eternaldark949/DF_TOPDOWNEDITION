@@ -14,6 +14,7 @@ holds one as `engine.time`; see `src/engine/API.md`, *The world's clock*.
 | `months` | the Gregorian twelve | `[{name, days}]` |
 | `leap` | `{month: 2, every: 4, except: 100, unless: 400}` | A day added to `month` in leap years; `null` for none |
 | `separator` | `':'` | Between hours, minutes and seconds when written |
+| `windows` | none | `{name: [[from, to], ...]}`: named spans of the day ("HH:MM"; one that ends before it starts runs past midnight), as the Python worldSystem's `rush_hour` and `street_lights`. A map with `day_night` turns the light group of each window's name on only while it holds |
 | `phases` | none | `[{name, from, dark = 0, colors = {}}]` round the day. Each lasts until the next starts (the last past midnight to the first). `dark` (0 day, 1 the full night) and each named colour (`'#rrggbb'`) blend from the phase's own at its start to the next phase's at its end, as the Python's `progressSky` did between its ranges |
 
 A clock with no phases is always 'day' and never dark. The Directory's `world_clock` resource kind is this record.
@@ -21,13 +22,13 @@ A clock with no phases is always 'day' and never dark. The Directory's `world_cl
 ## Reading it
 
 `year`, `month`, `month_name`, `day`, `hour`, `minute`, `second`, `time_of_day` (seconds into the day), `text({seconds})`,
-`date()`, `phase` (`{name, from, to, progress, dark, colors, next}`), `is(name)`, `darkness`, `color(name)`.
+`date()`, `within(name)` and `windows()`, `phase` (`{name, from, to, progress, dark, colors, next}`), `is(name)`, `darkness`, `color(name)`.
 
 ## Changing it
 
 `configure(record)`, `setTime({year, month, day, time})` or `setTime({hour, minute, second})` (carrying past 59 and 23),
-`setSpeed(k)`, `restore(state())` for saves. `on('hour' | 'day' | 'phase', fn)` is told of each one passed, in order,
-however far a step moves the clock (a step never crosses more than one hour or phase boundary at a time); it returns
+`setSpeed(k)`, `restore(state())` for saves. `on('hour' | 'day' | 'phase' | 'window', fn)` (a window with `{name, on}`) is told of each one passed, in order,
+however far a step moves the clock (a step never crosses more than one hour, phase or window boundary at a time); it returns
 the call that stops listening.
 
 Tests: `tests/timers.test.mjs`.

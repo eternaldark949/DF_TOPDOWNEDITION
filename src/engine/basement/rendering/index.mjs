@@ -8,7 +8,7 @@ export {webglRenderer,WEBGL_CAPABILITIES} from './webgl.mjs';
 export {BLENDS,CAPABILITIES} from './values.mjs';
 export {EFFECTS,effect,effectStack,effectsAt,validateEffectsPreset} from './effects.mjs';
 export {artScene,DRAWING,MATERIAL,EMITS,readEmits,REFLECT,readReflect,readValues,circle,ellipse,polyline,polygon,rect,roundRect,capsule,limb,smoothShape,linear,radial,glow,groundShadow,hexToRgb,rgbToHex,rgba,mix,shade,seededRandom,hash2} from './art.mjs';
-export {createLightLayer,createLightLayerParts,entityLights,LIGHT_CUT,LIGHT_GRID,LIGHT_GRID_CELLS,readLightGrid,bakeLightGrid,patchLightGrid,lightGrid,drawLightGrid,lightGridPackets} from './lighting.mjs';
+export {createLightLayer,createLightLayerParts,entityLights,lightGroupOf,LIGHT_CUT,LIGHT_GRID,LIGHT_GRID_CELLS,readLightGrid,bakeLightGrid,patchLightGrid,lightGrid,drawLightGrid,lightGridPackets} from './lighting.mjs';
 export {heightScale,heightView,boxFaces} from './height.mjs';
 export {GLARE,readGlare,glarePackets} from './glare.mjs';
 export {PARTICLE_LOOK,readParticleLook,particlePackets} from './particles.mjs';

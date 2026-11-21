@@ -6,7 +6,7 @@ import {finite,identifier,freezeData,CAPABILITIES} from './values.mjs';
 import {artScene} from './art.mjs';
 import {drawLook,drawComponents,componentCovers,fallen} from './looks.mjs';
 import {heightView} from './height.mjs';
-import {createLightLayerParts,entityLights} from './lighting.mjs';
+import {createLightLayerParts,entityLights,lightGroupOf} from './lighting.mjs';
 import {GLARE,glarePackets,readGlare} from './glare.mjs';
 import {particlePackets} from './particles.mjs';
 const OVER_ALL=1e9;   // the layer of what is drawn over everything in its pass (glare, particles)
@@ -35,7 +35,7 @@ const methods=['initialize','resize','render','registerResource','releaseResourc
  */
 export class renderSystem {
     #createSurface=null;#lean=null;#still=true;#texturesPainted=0;#textures=new Map();#texturesWanted=[];#textureChain=Promise.resolve();#world;#camera;#frame=new renderFrame();#renderers=new Map();#resources=new Map();#backend=null;#backendId=null;#surface=null;
-    #effects=Object.freeze([]);#layerEffects=new Map();#collecting=false;#busy=false;#disposed=false;#generation=0;#last=null;#surfaceListeners=new Set();#frameListeners=new Set();#requirements=[];#visible=[];#over=[];#lightsMemo=null;
+    #effects=Object.freeze([]);#layerEffects=new Map();#collecting=false;#busy=false;#disposed=false;#generation=0;#last=null;#surfaceListeners=new Set();#frameListeners=new Set();#requirements=[];#visible=[];#over=[];#lightsMemo=null;#groupsOff=new Set();
     constructor({physics_system,camera,create_surface=null}={}){if(create_surface!==null&&typeof create_surface!=='function')throw new TypeError('create_surface makes a surface for a renderer id');this.#createSurface=create_surface;if(!physics_system?.queryEntitiesInBounds||!camera?.getView)throw new TypeError('renderSystem requires native world and camera');this.#world=physics_system;this.#camera=camera;}
     get renderer_id(){return this.#backendId;}
     get disposed(){return this.#disposed;}
@@ -150,8 +150,8 @@ export class renderSystem {
             if(entity.has('components')){
                 let pose;const rigs=this.#world.rigs,joints=name=>{pose??=rigs?.getRig(entity)?rigs.getPose(entity,{blend,world_space:true}):null;return pose?.joints[name]??null;};
                 const pictures=this.#still&&!!this.#backend?.capabilities.includes('picture'),screen=view?(shown??={bounds:this.#camera.getView(blend).bounds,zoom:this.#camera.getView(blend).zoom}):null;
-                const night=covers!==null&&view;
-                for(const part of drawComponents(entity,source,blend,{joints,view,pictures,screen,shines:night,covers:night?covers:null})){
+                const night=covers!==null&&view,lit=!this.#groupsOff.size||this.lightGroupOn(lightGroupOf(entity));
+                for(const part of drawComponents(entity,source,blend,{joints,view,pictures,screen,shines:night&&lit,covers:night?covers:null})){
                     if(part.cover)this.#over.push({packet:part.cover,over:'cover',layer,depth:depth+part.depth});   // (at its base, before its own: under its walls' windows and its glowing steps, over what stands lower)
                     for(const packet of part.sides){if(packet.shine){this.#over.push({packet,over:'shine',layer,depth:depth+part.depth+packet.depth});continue;}this.#frame.submit(this.#textured({...packet,layer,depth:depth+part.depth+packet.depth}));}for(const packet of part.packets){this.#frame.submit(this.#textured({...packet,layer,depth:depth+part.top}));if(packet.shine)this.#over.push({packet,over:'shine',layer,depth:depth+part.top});}
                     if(part.picture){const {key,bounds,matrix,build}=part.picture,gen=this.#texturesPainted;   // (a texture painted later is a new picture: the old one held its base colour)
@@ -173,11 +173,24 @@ export class renderSystem {
      * The lights the visible things carry (their `lights` and `emission`), in the world, leaning with the height view.
      * Inside an open frame they are found once for a blend and margin (the night, its glare and the particles share them).
      */
+    /**
+     * Turns a light group on or off. A thing joins a group by its `light_group` (a street lamp's 'street_lights'):
+     * while its group is off it carries no lights (visibleLights) and its glowing steps do not shine through the
+     * night (the night stays on them); a light grid is told the same with its own setLightGroup. Returns whether
+     * anything changed.
+     */
+    setLightGroup(name,on){
+        this.#live();if(typeof name!=='string'||!name)throw new TypeError('A light group is named');
+        const was=!this.#groupsOff.has(name);if(was===!!on)return false;
+        if(on)this.#groupsOff.delete(name);else this.#groupsOff.add(name);this.#lightsMemo=null;return true;
+    }
+    /** Whether the light group `name` is on (every group is, until turned off; a thing in no group always is). */
+    lightGroupOn(name){return name===null||name===undefined||!this.#groupsOff.has(name);}
     visibleLights(blend=1,{margin=512}={}){
         this.#live();const memo=this.#lightsMemo;
         if(this.#collecting&&memo&&memo.blend===blend&&memo.margin===margin)return memo.lights.slice();
         const view=this.heightViewAt(blend),out=[];
-        for(const {entity} of this.getVisibleEntities({blend,margin},[]))if(entity)out.push(...entityLights(entity,{pose:entity.getRenderState?.(blend)??null,view}));
+        for(const {entity} of this.getVisibleEntities({blend,margin},[]))if(entity&&(!this.#groupsOff.size||this.lightGroupOn(lightGroupOf(entity))))out.push(...entityLights(entity,{pose:entity.getRenderState?.(blend)??null,view}));
         this.#lightsMemo=this.#collecting?{blend,margin,lights:out}:null;
         return out.slice();
     }
