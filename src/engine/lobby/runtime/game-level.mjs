@@ -10,6 +10,8 @@ export class gameLevel {
     enter(context, prepared) {}
     beforePhysics(context, seconds) {}
     afterPhysics(context, seconds) {}
+    /** What the loop's drawLooks is given this frame (render.drawLooks options, such as `covers` at night). */
+    lookOptions(context, blend) { return {}; }
     render(context, blend, frame) {}
     leave(context) {}
     disposePrepared(prepared) {}

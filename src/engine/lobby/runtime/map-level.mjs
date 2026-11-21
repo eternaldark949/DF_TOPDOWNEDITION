@@ -75,6 +75,20 @@ export class mapLevel extends gameLevel {
         if (render && next !== this.night_on && this.night?.effects) render.setEffects(next ? this.night.effects : null);
         this.night_on = next; return next;
     }
+    /** At night the looks keep what stands over the night's `covers` height (roofs keep the dark; lit windows shine). */
+    lookOptions(context, blend) { return this.night_on ? { covers: this.night.covers } : {}; }
+    /**
+     * Draws what the map's data says over the looks: at night the night (its tint, scale and glare, the light
+     * grid's baked grids and its moving emitters' lights), then the particle systems (rain, snow), day or night.
+     */
+    render(context, blend, frame) {
+        const render = context.basement.render; if (!render) return;
+        if (this.night_on) {
+            const view = context.basement.camera?.getVisibleBounds({ blend, margin: 64 }) ?? null;
+            render.drawNight({ tint: this.night.tint, scale: this.night.scale, glare: this.night.glare, grids: this.light_grid?.grids(view) ?? [], lights: this.light_grid?.liveLights() ?? [], blend });
+        }
+        if (this.particles?.length) render.drawParticles({ blend });
+    }
     /** Keeps the particle systems marked area 'view' on what the camera sees (with their margin). */
     followView(context) {
         const camera = context.basement.camera; if (!camera) return;

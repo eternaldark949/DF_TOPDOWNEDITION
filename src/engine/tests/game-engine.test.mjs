@@ -227,6 +227,25 @@ test('a map level keeps its night and its particle systems, and puts the night\'
     e.dispose();
 });
 
+test('the loop draws a map\'s night and particles from its data: covers in drawLooks, then drawNight and drawParticles', async () => {
+    const { mapLevel } = await import('../lobby/runtime/map-level.mjs');
+    const night = { tint: 'rgba(24, 0, 78, 0.72)', scale: 0.4, glare: { reach: 40 }, covers: 30 };
+    const rain = { density: 20, height: [30, 30], velocity: [[0, 0], [0, 0], [-60, -60]], look: { shape: 'streak' } };
+    const city = { map_id: 'city', size: [256, 256], height_view: { eye: 300 }, night, particles: [{ system: rain, area: 'view' }] };
+    class Place extends mapLevel { mapDefinition() { return { definition: city }; } }
+    const e = new gameEngine({ asset_library: createEngineRegistry({ libraries: [] }), schedule_frame: null, render: { create_surface: () => ({}) } }); e.registerLevel('city', Place);
+    const render = e.basement.render; await render.setRenderer('recording');
+    const calls = []; for (const name of ['drawLooks', 'drawNight', 'drawParticles']) { const own = render[name].bind(render); render[name] = (...args) => { calls.push([name, args[name === 'drawLooks' ? 1 : 0]]); return own(...args); }; }
+    const level = await e.loadLevel('city'), context = { basement: e.basement };
+    e.start(); e.updateState(); calls.length = 0; e.render(1);
+    assert.deepEqual(calls.map(c => c[0]), ['drawLooks', 'drawParticles'], 'by day: the looks and the rain, no night');
+    assert.deepEqual(calls[0][1], {});
+    level.setNight(context, true); calls.length = 0; e.render(1);
+    assert.deepEqual(calls.map(c => c[0]), ['drawLooks', 'drawNight', 'drawParticles'], 'at night: the night between them');
+    assert.deepEqual(calls[0][1], { covers: 30 }, 'the looks keep the night\'s covers'); assert.equal(calls[1][1].tint, night.tint); assert.equal(calls[1][1].scale, 0.4); assert.equal(calls[1][1].glare.reach, 40);
+    e.dispose();
+});
+
 const toys = { library_id: 'toys', resources: {
     lamp: { kind: 'drawing', steps: [{ shape: 'glow', radius: 60, color: '#ffd27f' }, { shape: 'circle', radius: 10, material: 'brass', solid: true }, { shape: 'rectangle', x: -2, y: 10, width: 4, height: 30, material: 'brass', solid: true }] },
     brass: { kind: 'material', fill: '#b5a642' } },

@@ -11,8 +11,9 @@ import {readColor} from './colors.mjs';
  * - scale: the share of the frame the light layer is drawn at (0 to 1), drawNight's `scale`.
  * - effects: the frame's effects at night (a list of effects or {preset, ...changes}; see effects.mjs), or null.
  * - glare: the lens's glare over lights that ask for it (true, or GLARE's fields), or null for none.
+ * - covers: the height (world units) a part stands over to keep the night on it (drawLooks' `covers`).
  */
-export const NIGHT=Object.freeze({tint:'rgba(10,8,30,.86)',scale:.5,effects:null,glare:null});
+export const NIGHT=Object.freeze({tint:'rgba(10,8,30,.86)',scale:.5,effects:null,glare:null,covers:24});
 /** A night record checked and filled in from the defaults. Unknown fields are refused. */
 export function readNight(night,where='night'){
     if(!night||typeof night!=='object'||Array.isArray(night))throw new TypeError(`${where} is {${Object.keys(NIGHT).join(', ')}}`);
@@ -23,6 +24,7 @@ export function readNight(night,where='night'){
     const fx=out.effects;
     if(Array.isArray(fx))fx.forEach((e,i)=>{try{effect(e);}catch(error){throw new TypeError(`${where}.effects[${i}]: ${error.message}`);}});
     else if(fx!==null&&!(fx&&typeof fx==='object'&&typeof fx.preset==='string'))throw new TypeError(`${where}.effects is a list of effects, {preset, ...changes} or null`);
+    if(!(Number.isFinite(out.covers)&&out.covers>=0))throw new RangeError(`${where}.covers is a height, 0 or more`);
     if(out.glare!==null&&out.glare!==false)out.glare=readGlare(out.glare,undefined,`${where}.glare`);else out.glare=null;
     return Object.freeze(out);
 }
