@@ -525,6 +525,9 @@ function paintFacade(scene,view,pts,plan,art,i,len,z0,face,screen){
                         const za=storeys.base+r*storeys.height+panel.at,H=panel.height??storeys.height-panel.at;
                         // a lit one (as many as `lit` says, the same every frame) is drawn as its `lit_steps`, with the lit panels
                         const lit=panel.lit_shapes&&panel.lit>0&&hash(W.key,b,r,k,art.seed)<panel.lit,shapes=lit?panel.lit_shapes:panel.shapes,tag=lit?'u':'x';
+                        // a panel wholly on one flat facet: each point straight from the facet's line and its height's scale (no search along the wall)
+                        const fast=!W.closed&&at-panel.width/2>=F.s0&&at+panel.width/2<=F.s1;let fx=0,fy=0,ux=0,uy=0;
+                        if(fast){const p=pts[f],q=pts[(f+1)%n],L=(F.s1-F.s0)||1;ux=(q[0]-p[0])/L;uy=(q[1]-p[1])/L;fx=p[0]+ux*(at-F.s0);fy=p[1]+uy*(at-F.s0);}
                         shapes.forEach((sh,j)=>{
                             // text: an affine map from the panel's frame onto the face, exact on the panel's own facet
                             // (it leans with the wall; text running past a corner is not bent round it)
@@ -533,7 +536,7 @@ function paintFacade(scene,view,pts,plan,art,i,len,z0,face,screen){
                                 const O=on(u-sh.x,za+H-sh.y),X=on(u-sh.x-sh.h,za+H-sh.y),Y=on(u-sh.x,za+H-sh.y-sh.v);
                                 get(`${lit?'T':'t'}${k}.${j}`).push([X[0]-O[0],X[1]-O[1],Y[0]-O[0],Y[1]-O[1],O[0],O[1]]);return;
                             }
-                            const path=sh.points.map(([x,y],q)=>{const [X,Y]=onWall(W,mid-x,za+H-y);return [q?'line':'move',X,Y];});if(!sh.open)path.push(['close']);
+                            const path=sh.points.map(fast?([x,y],q)=>{const k=view.k(z0+za+H-y),wx=fx-x*ux,wy=fy-x*uy;return [q?'line':'move',cx+(wx-cx)*k,cy+(wy-cy)*k];}:([x,y],q)=>{const [X,Y]=onWall(W,mid-x,za+H-y);return [q?'line':'move',X,Y];});if(!sh.open)path.push(['close']);
                             if(sh.fill)get(`${tag}${k}.${j}`).push(...path);if(sh.stroke)get(`${lit?'v':'y'}${k}.${j}`).push(...path);
                         });
                         continue;
