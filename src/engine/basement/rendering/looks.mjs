@@ -94,7 +94,7 @@ export function facadeEmitters(steps,facade,{at=[0,0],rotation=0,scale=1}={},val
             for(let b=0;b<W.count;b++){
                 const mid=W.margin+(b+.5)*W.bay;
                 for(const {k,emits} of panels){
-                    const panel=art.panels[k];if((panel.shapes&&!panel.lit_shapes&&!panel.lit_fill)||!(panel.lit>0))continue;
+                    const panel=art.panels[k];if(!onFace(panel,W)||!inBays(panel,b,W))continue;if((panel.shapes&&!panel.lit_shapes&&!panel.lit_fill)||!(panel.lit>0))continue;
                     let lit=0,zs=0;
                     for(let r=0;r<storeys.count;r++){
                         if(panel.storeys&&!panel.storeys.includes(r)&&!panel.storeys.includes(r-storeys.count))continue;
@@ -414,9 +414,9 @@ const PLANS=new WeakMap();
 function facadePlan(loop,where,pts,art){
     let byPlace=PLANS.get(loop);if(!byPlace)PLANS.set(loop,byPlace=new Map());
     const key=`${where}|${art.bays.width},${art.bays.margin}`;let plan=byPlace.get(key);
-    if(!plan){if(byPlace.size>256)byPlace.clear();byPlace.set(key,plan=planWalls(pts,art));}return plan;
+    if(!plan){if(byPlace.size>256)byPlace.clear();byPlace.set(key,plan=planWalls(pts,art,loop));}return plan;
 }
-function planWalls(pts,art){
+function planWalls(pts,art,loop=pts){
     const n=pts.length,ang=[],len=[];
     for(let i=0;i<n;i++){const a=pts[i],b=pts[(i+1)%n];len.push(Math.hypot(b[0]-a[0],b[1]-a[1]));ang.push(Math.atan2(b[1]-a[1],b[0]-a[0]));}
     const turn=i=>{let d=ang[i]-ang[(i-1+n)%n];while(d>Math.PI)d-=2*Math.PI;while(d<-Math.PI)d+=2*Math.PI;return Math.abs(d);};
@@ -427,10 +427,16 @@ function planWalls(pts,art){
         const b=starts[(w+1)%starts.length];let s=0,i=a;
         const list=[];do{facet[i]={wall:w,s0:s,s1:s+len[i]};list.push(i);s+=len[i];i=(i+1)%n;}while(i!==b);
         const {width,margin}=art.bays,m=closed?0:Math.min(margin,s/2),span=s-2*m,count=span>=width*.6?Math.max(1,Math.round(span/width)):0;
-        const [x,y]=pts[a];walls.push({facets:list,length:s,closed,margin:m,bay:count?span/count:0,count,key:Math.round(x)*73856093^Math.round(y)*19349663});
+        const [x,y]=pts[a];walls.push({facets:list,length:s,closed,margin:m,bay:count?span/count:0,count,key:Math.round(x)*73856093^Math.round(y)*19349663,facing:closed?null:facingOf(loop[a],loop[b])});
     });
     return {facet,walls};
 }
+// Which way a wall from a to b faces in its thing's own frame (y runs south): the outward side of a loop with a positive area.
+const facingOf=(a,b)=>{const ex=b[0]-a[0],ey=b[1]-a[1],nx=ey,ny=-ex;return Math.abs(nx)>=Math.abs(ny)?(nx>0?'east':'west'):(ny>0?'south':'north');};
+// Whether a facade's panel, pier or band is laid on wall W: on every wall, or on those its `faces` name.
+const onFace=(item,W)=>!item.faces||item.faces.includes(W.facing);
+// Whether a panel goes in bay b of wall W: in every bay, or in those its `bays` name (from 0; -1 is the last).
+const inBays=(panel,b,W)=>!panel.bays||panel.bays.includes(b)||panel.bays.includes(b-W.count);
 // A whole number from a few: which windows are lit is the same every frame and on every machine.
 function hash(...k){let h=2166136261;for(const v of k){h=Math.imul(h^(v|0),16777619);h^=h>>>13;}h=Math.imul(h,0x5bd1e995);h^=h>>>15;return (h>>>0)/4294967296;}
 /** Paints the facade on the run of facets i .. i+len-1 into `scene`; returns a painter for the lit panels (drawn over the shading), or null. */
@@ -473,14 +479,15 @@ function paintFacade(scene,view,pts,plan,art,i,len,z0,face,screen){
             if(!(t0<=t1))continue;
             const pad=W.bay||0;v0=Math.max(F.s0,F.s0+L*t0-pad);v1=Math.min(F.s1,F.s0+L*t1+pad);
         }
-        art.bands.forEach((band,k)=>piece(get(`b${k}`),f,v0,v1,band.from,band.to));
+        art.bands.forEach((band,k)=>{if(onFace(band,W))piece(get(`b${k}`),f,v0,v1,band.from,band.to);});
         if(!W.count)continue;
         // the bays this facet meets
         const b0=Math.max(W.closed?-1:0,Math.floor((v0-W.margin)/W.bay)-1),b1=Math.min(W.closed?W.count+1:W.count,Math.ceil((v1-W.margin)/W.bay)+1);
-        art.piers.forEach((pier,k)=>{for(let b=Math.max(b0,0);b<=Math.min(b1,W.count);b++){if(W.closed&&b===W.count)continue;const s=W.margin+b*W.bay;spans(f,s-pier.width/2,s+pier.width/2,(a,c)=>{piece(get(`p${k}`),f,a,c,pier.from,pier.to);if(pier.edge)piece(get(`e${k}`),f,a,a+pier.edge_width,pier.from,pier.to);});}});
+        art.piers.forEach((pier,k)=>{if(!onFace(pier,W))return;for(let b=Math.max(b0,0);b<=Math.min(b1,W.count);b++){if(W.closed&&b===W.count)continue;const s=W.margin+b*W.bay;spans(f,s-pier.width/2,s+pier.width/2,(a,c)=>{piece(get(`p${k}`),f,a,c,pier.from,pier.to);if(pier.edge)piece(get(`e${k}`),f,a,a+pier.edge_width,pier.from,pier.to);});}});
         for(let b=Math.max(b0,0);b<Math.min(b1,W.count);b++){
             const mid=W.margin+(b+.5)*W.bay;
             art.panels.forEach((panel,k)=>{
+                if(!onFace(panel,W)||!inBays(panel,b,W))return;
                 for(let r=0;r<storeys.count;r++){
                     if(panel.storeys&&!panel.storeys.includes(r)&&!panel.storeys.includes(r-storeys.count))continue;
                     // drawn as its steps when it stands at least `detail` px tall on screen; smaller, as the plain panel if it has one

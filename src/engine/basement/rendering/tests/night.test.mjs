@@ -171,3 +171,13 @@ test('a layer pulses over its period down to its low, and shows only while its e
  assert.throws(()=>world.elements.createEntity({kind:'static',position:[0,0],components:[{name:'x',layers:[{layer:0,pulse:{period:0},steps:[box]}]}]}),/pulse/);
  assert.throws(()=>world.elements.createEntity({kind:'static',position:[0,0],components:[{name:'x',layers:[{layer:0,shown_when:'is occupied',steps:[box]}]}]}),/shown_when/);
 });
+
+test('a facade part can be laid on chosen walls (faces, in the thing\'s own frame) and in chosen bays (from 0; -1 the last)',()=>{
+ const lit=(more,rotation=0)=>facadeEmitters([box],{...facade,panels:[{...facade.panels[0],lit:1,...more}]},{at:[0,0],rotation},{},0,40);
+ const all=lit({}),front=lit({faces:['south']});
+ assert.ok(front.length>0&&front.length<all.length,'only the front');assert.ok(front.every(e=>e.outline[0][1]>30),'the south wall: +y');
+ assert.equal(lit({faces:['south'],bays:[0,-1]}).length,2,'its first and last bays');
+ const turned=lit({faces:['south']},Math.PI/2);assert.ok(turned.every(e=>e.outline[0][0]<-30),'turned a quarter, the front faces west in the world');
+ assert.throws(()=>new physicsSystem().elements.createEntity({kind:'static',position:[0,0],components:[{name:'b',layers:[{layer:0,thickness:40,sides:'#777',steps:[box],facade:{panels:[{width:4,faces:['up']}]}}]}]}),/faces/);
+ assert.throws(()=>new physicsSystem().elements.createEntity({kind:'static',position:[0,0],components:[{name:'b',layers:[{layer:0,thickness:40,sides:'#777',steps:[box],facade:{panels:[{width:4,bays:[.5]}]}}]}]}),/bays/);
+});

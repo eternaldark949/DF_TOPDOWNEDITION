@@ -21,8 +21,8 @@ const SWITCH = /^!?[a-z_][a-z0-9_]*$/i;
 const FACADE = Object.freeze({
     facade: ['storeys', 'bays', 'panels', 'piers', 'bands', 'seed'],
     storeys: 'from height count'.split(' '), bays: ['width', 'margin'],
-    panels: ['width', 'height', 'at', 'fill', 'stroke', 'line_width', 'bars', 'bar_width', 'bar_fill', 'lit', 'lit_fill', 'emits', 'storeys', 'steps', 'lit_steps', 'detail'],
-    piers: 'width from to fill edge edge_width'.split(' '), bands: 'from to fill lit'.split(' ')
+    panels: ['width', 'height', 'at', 'fill', 'stroke', 'line_width', 'bars', 'bar_width', 'bar_fill', 'lit', 'lit_fill', 'emits', 'storeys', 'steps', 'lit_steps', 'detail', 'faces', 'bays'],
+    piers: 'width from to fill edge edge_width faces'.split(' '), bands: 'from to fill lit faces'.split(' ')
 });
 const SAFE = value => typeof value === 'string' && value && !['__proto__', 'prototype', 'constructor'].includes(value);
 const plain = value => value && typeof value === 'object' && !Array.isArray(value);
@@ -79,6 +79,8 @@ function readFacade(facade, where) {
             if (item.emits !== undefined && !(typeof item.emits === 'boolean' || plain(item.emits))) throw new TypeError(`${it}'s emits is true, false or {strength, reach, color, height}: its lit windows light what is round them`);
             if (item.lit_steps !== undefined && !(Array.isArray(item.lit_steps) && item.lit_steps.every(plain) && item.steps !== undefined)) throw new TypeError(`${it}'s lit_steps are the drawing of a lit one (with steps for an unlit one), in the panel's frame`);
             if (item.steps !== undefined && !(Array.isArray(item.steps) && item.steps.every(plain))) throw new TypeError(`${it}'s steps are a drawing (a list of steps) in the panel's frame: x across from its middle, y down from its top`);
+            if (item.faces !== undefined && !(Array.isArray(item.faces) && item.faces.length && item.faces.every(f => ['north', 'south', 'east', 'west'].includes(f)))) throw new TypeError(`${it}'s faces are the walls it is laid on, in its thing's own frame: some of 'north', 'south', 'east', 'west' (south is +y, the way a front usually faces)`);
+            if (key === 'panels' && item.bays !== undefined && !(Array.isArray(item.bays) && item.bays.every(Number.isInteger))) throw new TypeError(`${it}'s bays are a list of bay numbers along each wall (from 0; -1 is the last)`);
             if (item.storeys !== undefined && !(Array.isArray(item.storeys) && item.storeys.every(Number.isInteger))) throw new TypeError(`${it}'s storeys are a list of storey numbers (from 0 at the bottom; -1 is the top one)`);
         });
     }

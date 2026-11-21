@@ -240,8 +240,8 @@ An entity is made of components, each a list of layers with a base `height` and 
 |---|---|
 | `storeys` | `{from, height, count}`: the storeys up the layer |
 | `bays` | `{width, margin}`: each wall cut into equal bays, corner to corner, round a curve too |
-| `panels` | Windows, spandrels, doors: one in every bay of every storey, or the `storeys` named; `lit` is the share lit at night, painted `lit_fill`; `emits` makes the lit ones light the street (the light grid); `steps` and `lit_steps` draw a window in full (panes, frames, a room in silhouette) or a sign (a `text` step stays text, laid on the face and leaning with it), with `detail` the least size on screen to draw it so, the plain panel below that |
-| `piers`, `bands` | Piers between the bays; stripes along the walls |
+| `panels` | Windows, spandrels, doors: one in every bay of every storey, or the `storeys` and `bays` named, on every wall or the ones its `faces` name (`['south']`, the front in the thing's own frame); `lit` is the share lit at night, painted `lit_fill`; `emits` makes the lit ones light the street (the light grid); `steps` and `lit_steps` draw a window in full (panes, frames, a room in silhouette) or a sign (a `text` step stays text, laid on the face and leaning with it), with `detail` the least size on screen to draw it so, the plain panel below that |
+| `piers`, `bands` | Piers between the bays; stripes along the walls (`faces` as panels': a signboard fascia on the front) |
 
 The fields are in [the physics API reference](basement/physics/docs/api-reference.md); any of them may be a `"$look"` value, so `entity.set('look', {values: {lit: .8}})` lights more windows.
 
