@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { physicsSystem, BODY_GROUP } from '../../physics/index.mjs';
-import { buildMapPackets, declaredLight, mapInstance, mapSystem, MARKER, markerComponent, readMarker } from '../index.mjs';
+import { buildMapPackets, declaredLight, mapInstance, mapSystem, MARKER, markerComponent, readMarker, rowPlacements } from '../index.mjs';
 
 const room = {
     map_id: 'test_room', kind: 'interior', size: [400, 300], boundary: { thickness: 20 }, spawn: [50, 50],
@@ -369,4 +369,27 @@ test('a map\'s markers draw its triggers of a role on the floor, fitted to each,
     assert.equal(readMarker(true), MARKER); assert.throws(() => readMarker({ shimmer: 1 }), /Unknown marker field/); assert.throws(() => readMarker({ color: 'blue' }), /color/);
     assert.throws(() => buildMapPackets({ size: [10, 10], markers: { transition: { corner: -1 } } }), /corner/);
     assert.equal(markerComponent({ pulse_low: 1, active_pulse_low: 1 }, 10, 10).layers[1].pulse, undefined, 'pulse_low 1 holds it steady');
+});
+
+test('a map\'s rows line a street with buildings, each turned to face it, picked by seed the same every time', () => {
+    const shop = { object: 'street:shop', width: 250, depth: 200, looks: [{ values: { name: 'A' } }, { values: { name: 'B' } }] }, apt = { object: 'street:apt', width: 300, depth: 250, weight: 2 };
+    const blocks = [{ name: 'b', x: 1000, y: 0, w: 1150, h: 1000 }];
+    const laid = rowPlacements({ blocks, rows: [{ block: 'b', side: 'south', objects: [shop, apt, shop] }] });
+    assert.deepEqual(laid.map(p => p.object), ['street:shop', 'street:apt', 'street:shop']);
+    assert.deepEqual(laid[0].at, [1000 + (1150 - 800) / 2 + 125, 1000 - 12 - 100], 'centred along the side, set back 12 from the street, wall to wall');
+    assert.equal(laid[1].at[0] - laid[0].at[0], 275); assert.equal(laid[0].rotation, 0, 'a south front faces south as built');
+    const east = rowPlacements({ blocks, rows: [{ block: 'b', side: 'east', objects: [apt], justify: 'start' }] })[0];
+    assert.deepEqual(east.at, [1000 + 1150 - 12 - 125, 30 + 150]); assert.equal(east.rotation, -Math.PI / 2, 'turned so its front faces east');
+    const fill = seed => rowPlacements({ blocks, rows: [{ block: 'b', side: 'north', pick: [shop, apt], seed }] });
+    assert.deepEqual(fill(4), fill(4), 'the same seed, the same street'); assert.ok(fill(4).length >= 3, 'as many as fit');
+    assert.ok(fill(4).every(p => p.rotation === Math.PI));
+    assert.notDeepEqual([1, 2, 3, 4, 5, 6].map(s => fill(s).map(p => p.object + (p.look?.values.name ?? '')).join()), Array(6).fill(fill(1).map(p => p.object + (p.look?.values.name ?? '')).join()), 'other seeds, other streets');
+    const corner = rowPlacements({ blocks, rows: [{ block: 'b', side: 'south', objects: [apt], justify: 'start' }, { block: 'b', side: 'west', objects: [apt], justify: 'end' }] });
+    assert.equal(corner.length, 1, 'a building that would stand on one already laid is left out');
+    assert.equal(rowPlacements({ blocks, keep_clear: [{ x: 1000, y: 0, w: 1150, h: 1000 }], rows: [{ block: 'b', objects: [apt] }] }).length, 0, 'nor on a kept-clear rectangle');
+    const built = buildMapPackets({ size: [3000, 1000], blocks, rows: [{ block: 'b', objects: [shop] }] }, { make_object: (record, at, o) => ({ kind: 'static', position: at, ...o }) }).entries.filter(e => e.section === 'placements');
+    assert.equal(built.length, 1); assert.equal(built[0].packet.look.values.name.length, 1, 'built as an object placement, with its look');
+    assert.throws(() => rowPlacements({ blocks, rows: [{ block: 'nowhere', objects: [apt] }] }), /nowhere/);
+    assert.throws(() => rowPlacements({ blocks, rows: [{ block: 'b', side: 'up', objects: [apt] }] }), /side/);
+    assert.throws(() => rowPlacements({ blocks, rows: [{ block: 'b', objects: [{ object: 'x', width: 10 }] }] }), /depth/);
 });

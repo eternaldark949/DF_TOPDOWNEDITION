@@ -174,6 +174,7 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,
     const below=mirror!==null?view:null;if(mirror!==null)view=null;
     const components=entity.get('components')??[];if(!components.length)return [];
     const look=entity.get('look',{});if(look.visible===false)return [];
+    view=leaningView(view,look);   // (a thing that leans harder than the street: its fronts read from across the road)
     const pose=entity.getRenderState(blend),scale=look.scale??1,[wx,wy,wz]=entity.world_scale??[1,1,1],values=look.values??{},elevation=pose.elevation??0,parts=[];
     for(const {component:c,layer,order} of listLayers(components)){
         if(layer.shown_when&&!shownNow(entity,layer.shown_when))continue;
@@ -206,7 +207,7 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,
         // Among faces, the farthest from the camera goes first, so a near wall's face hides the end of one behind it.
         // A part drawn whole (a bottle on a tray) keeps its walls and top together at its base.
         let sides=[],top=key;
-        if(view&&layer.sides&&z1>z0){sides=drawSides(steps,place,values,sidesPaint(layer.sides,values,materials),view,z0,z1,{...layer.sides,facade:layer.facade,scale:layer.thickness>0?(z1-z0)/layer.thickness:1,screen,shines});if(whole({c}))for(const packet of sides)packet.depth=0;else top=key+z1-z0;}
+        if(view&&layer.sides&&z1>z0){sides=drawSides(steps,place,values,sidesPaint(layer.sides,values,materials),view,z0,z1,{...layer.sides,facade:layer.facade,scale:layer.thickness>0?(z1-z0)/layer.thickness:1,screen,shines,slope:layer.slope??null});if(whole({c}))for(const packet of sides)packet.depth=0;else top=key+z1-z0;}
         // with `covers` (a height), a walled part whose top stands over it gives its silhouette too: where the night comes back over the light on the ground
         const cover=covers!==null&&view&&layer.sides&&layer.cover!==false&&z1>covers&&!c.joint&&!lean?coverOf(steps,place,values,layer.sides.follow??'shapes',view,z0,z1):null;
         if(mirror!==null&&layer.sides&&z1>z0)sides=mirrorSides(steps,place,values,sidesPaint(layer.sides,values,materials),mirror,z0,z1,below);
@@ -214,18 +215,40 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,
         // into a picture, keyed by its steps and look, and stamped each frame under its place and its plane.
         // (with `shines`, a layer with glowing steps is drawn each frame, so they are found among its packets)
         if(layer.pulse){const k=pulseAt(layer.pulse,time);for(const packet of sides)packet.opacity=(packet.opacity??1)*k;scene.enter({},{opacity:k});}
+        // a sloped layer's top (an awning) is drawn in its own tilted plane, fitted through three corners of its box
+        const tilt=view&&layer.slope?slopePlane(steps,values,place,view,z1,layer.slope,layer.thickness>0?(z1-z0)/layer.thickness:1):null;
         if(pictures&&!layer.pulse&&mirror===null&&fore===1&&!lean&&!(shines&&glowing(steps,materials))){
             const art=stillArt(steps,values,materials);
-            if(art){const m=placeMatrix(place),matrix=view?compose(view.plane(view.k(z1)),m):m;
+            if(art){const m=placeMatrix(place),matrix=view?compose(tilt??view.plane(view.k(z1)),m):m;
                 return {height:z0,peak:z1,depth:key,top,layer:layer.layer,component:c.name,sides,cover,packets:[],picture:{key:art.key,bounds:art.bounds,matrix,build:art.build}};}
         }
-        if(view)scene.enter({matrix:view.plane(view.k(z1))});
+        if(view)scene.enter({matrix:tilt??view.plane(view.k(z1))});
         else if(mirror!==null)scene.enter({matrix:fallen(below,mirror,z1)});
         scene.mark_shines=shines;scene.draw(steps,{...place,values,materials});
         if(view||mirror!==null)scene.leave();
         if(layer.pulse)scene.leave();
         return {height:z0,peak:z1,depth:key,top,layer:layer.layer,component:c.name,sides,cover,packets:scene.finish()};
     }).filter(Boolean);
+}
+/**
+ * The matrix that draws a sloped layer's top (world to drawn): its height is z1 plus slope[0] per unit across its own
+ * x and slope[1] per unit down its own y (times the vertical scale `vs`), fitted through three corners of its box.
+ */
+function slopePlane(steps,values,place,view,z1,[gx,gy],vs){
+    const box=localBox(steps,values);if(!box)return view.plane(view.k(z1));
+    const m=placeMatrix(place),[l,t,r,b]=box,[sx,sy]=typeof place.scale==='number'?[place.scale,place.scale]:place.scale;
+    const world=([x,y])=>[m[0]*x+m[2]*y+m[4],m[1]*x+m[3]*y+m[5]],corners=[[l,t],[r,t],[l,b]];
+    const W=corners.map(world),S=corners.map(([x,y],i)=>view.at(W[i][0],W[i][1],z1+(gx*x*sx+gy*y*sy)*vs));
+    // the affine map taking W to S: solve for [a, b, c, d, e, f] with x' = a x + c y + e, y' = b x + d y + f
+    const [p,q,u]=W,det=(q[0]-p[0])*(u[1]-p[1])-(u[0]-p[0])*(q[1]-p[1]);if(Math.abs(det)<1e-12)return view.plane(view.k(z1));
+    const solve=k=>{const dq=S[1][k]-S[0][k],du=S[2][k]-S[0][k],A=(dq*(u[1]-p[1])-du*(q[1]-p[1]))/det,C=(du*(q[0]-p[0])-dq*(u[0]-p[0]))/det;return [A,C,S[0][k]-A*p[0]-C*p[1]];};
+    const [a,c,e]=solve(0),[bb,d,f]=solve(1);return [a,bb,c,d,e,f];
+}
+/** The view a thing's parts are drawn in: the view, or (with `look.lean`, a number above 0) one leaning that many times as hard. */
+export function leaningView(view,look){
+    const lean=look?.lean;if(lean===undefined||lean===1||!view)return view;
+    if(!(Number.isFinite(lean)&&lean>0))throw new TypeError('A look\'s lean is how many times as hard as the view its walls lean, above 0');
+    return view.leaning(view.lean*lean);
 }
 /** Whether a layer's `shown_when` ("occupied", "!occupied") holds for an entity now: its property set (truthy), or not. */
 export function shownNow(entity,when){const not=when[0]==='!',value=typeof entity.get==='function'?entity.get(not?when.slice(1):when):entity.data?.[not?when.slice(1):when];return not?!value:!!value;}
@@ -258,6 +281,7 @@ export function componentCovers(entity,source,view,{blend=1,above=24,paint='#fff
     if(!(view instanceof heightView))throw new TypeError('Covers lean: give a heightView');
     const components=entity.get('components')??[];if(!components.length)return [];
     const look=entity.get('look',{});if(look.visible===false)return [];
+    view=leaningView(view,look);
     const pose=entity.getRenderState(blend),scale=look.scale??1,[wx,wy,wz]=entity.world_scale??[1,1,1],values=look.values??{},elevation=pose.elevation??0,out=[];
     const cos=Math.cos(pose.rotation),sin=Math.sin(pose.rotation);
     for(const {component:c,layer} of listLayers(components)){
@@ -305,7 +329,7 @@ function sidesPaint(sides,values,materials){if(typeof sides==='string')return re
  * never behind a farther one where they overlap), and over anything flat at the height they stand on (the top of
  * the floor below, a roof they rise from), but under every top above it.
  */
-function drawSides(steps,{at,rotation,scale},values,fill,view,z0,z1,{shade=.35,follow='shapes',facade=null,scale:vs=1,screen=null,shines=false}={}){
+function drawSides(steps,{at,rotation,scale},values,fill,view,z0,z1,{shade=.35,follow='shapes',facade=null,scale:vs=1,screen=null,shines=false,slope=null}={}){
     if(z1<=z0)return [];
     const [sx,sy]=typeof scale==='number'?[scale,scale]:scale,c=Math.cos(rotation),s=Math.sin(rotation);
     const place=([x,y])=>{const px=x*sx,py=y*sy;return [at[0]+px*c-py*s,at[1]+px*s+py*c];};
@@ -313,14 +337,16 @@ function drawSides(steps,{at,rotation,scale},values,fill,view,z0,z1,{shade=.35,f
     const k0=view.k(z0),k1=view.k(z1),out=[];
     // A curve is many short faces: each unbroken run the camera sees is filled as one shape (no hairline seams
     // between facets), and its shading laid over in bands of faces that turn alike.
+    // (a sloped layer's top stands at its own height at each corner: z1 plus the slope across its own frame)
+    let local=null;const top=m=>slope?view.k(z1+(slope[0]*local[m%local.length][0]*sx+slope[1]*local[m%local.length][1]*sy)*vs):k1;
     const strip=(pts,i,j,path=[])=>{
         for(let m=i;m<=j;m++){const q=pts[m%pts.length],[x,y]=view.scaled(q[0],q[1],k0);path.push([m===i?'move':'line',x,y]);}
-        for(let m=j;m>=i;m--){const q=pts[m%pts.length],[x,y]=view.scaled(q[0],q[1],k1);path.push(['line',x,y]);}
+        for(let m=j;m>=i;m--){const q=pts[m%pts.length],[x,y]=view.scaled(q[0],q[1],top(m));path.push(['line',x,y]);}
         path.push(['close']);return path;
     };
     const art=facade?facadeArt(facade,values,Math.sqrt(Math.abs(sx*sy)),vs,z1-z0):null,where=art?`${at[0]},${at[1]},${rotation},${sx},${sy}`:'';
     for(const loop of loops){
-        const pts=loop.map(place),n=pts.length,face=[],plan=art?facadePlan(loop,where,pts,art):null;
+        local=loop;const pts=loop.map(place),n=pts.length,face=[],plan=art?facadePlan(loop,where,pts,art):null;
         for(let i=0;i<n;i++){
             const a=pts[i],b=pts[(i+1)%n],ex=b[0]-a[0],ey=b[1]-a[1],L=Math.hypot(ex,ey);
             // loops run with a positive signed area, so the outward side is (ey, -ex); a mirror flips it

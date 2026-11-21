@@ -16,7 +16,7 @@
 
 const COMPONENT = Object.freeze(['name', 'at', 'rotation', 'joint', 'layers']);
 const SIDES = Object.freeze(['material', 'shade', 'follow']);
-const LAYER = Object.freeze(['layer', 'height', 'thickness', 'steps', 'drawing', 'solid', 'visible', 'sides', 'facade', 'cover', 'pulse', 'shown_when']);
+const LAYER = Object.freeze(['layer', 'height', 'thickness', 'steps', 'drawing', 'solid', 'visible', 'sides', 'facade', 'cover', 'pulse', 'shown_when', 'slope']);
 const SWITCH = /^!?[a-z_][a-z0-9_]*$/i;
 const FACADE = Object.freeze({
     facade: ['storeys', 'bays', 'panels', 'piers', 'bands', 'seed'],
@@ -45,12 +45,13 @@ export function readLayer(packet, where = 'A layer') {
     const pulse = packet.pulse;
     if (pulse !== undefined && !(plain(pulse) && Object.keys(pulse).every(k => k === 'period' || k === 'low') && Number.isFinite(pulse.period) && pulse.period > 0 && (pulse.low === undefined || (Number.isFinite(pulse.low) && pulse.low >= 0 && pulse.low <= 1)))) throw new TypeError(`${where}'s pulse is {period: seconds above 0, low: 0..1 (its faintest, of its full strength)}`);
     if (packet.shown_when !== undefined && !(typeof packet.shown_when === 'string' && SWITCH.test(packet.shown_when) && !['__proto__', 'prototype', 'constructor'].includes(packet.shown_when.replace('!', '')))) throw new TypeError(`${where}'s shown_when names an entity property ("occupied"), or "!" and one ("!occupied")`);
+    if (packet.slope !== undefined && !(Array.isArray(packet.slope) && packet.slope.length === 2 && packet.slope.every(v => Number.isFinite(v) && Math.abs(v) <= 10))) throw new TypeError(`${where}'s slope is [across, down]: how far its top rises per unit along its own x and y (an awning falling toward the street: [0, -0.5])`);
     for (const flag of ['solid', 'visible', 'cover']) if (packet[flag] !== undefined && typeof packet[flag] !== 'boolean') throw new TypeError(`${where}'s ${flag} is true or false`);
     return { layer: packet.layer, height: length(packet.height ?? 0, `${where}'s height`, -Infinity), thickness: length(packet.thickness ?? 0, `${where}'s thickness`),
         ...(packet.steps !== undefined ? { steps: structuredClone(packet.steps) } : { drawing: packet.drawing }),
         solid: packet.solid ?? true, visible: packet.visible ?? true, ...(packet.sides !== undefined ? { sides: structuredClone(packet.sides) } : {}),
         ...(packet.facade !== undefined ? { facade: structuredClone(packet.facade) } : {}), ...(packet.cover === false ? { cover: false } : {}),
-        ...(pulse !== undefined ? { pulse: { period: pulse.period, low: pulse.low ?? 0 } } : {}), ...(packet.shown_when !== undefined ? { shown_when: packet.shown_when } : {}) };
+        ...(pulse !== undefined ? { pulse: { period: pulse.period, low: pulse.low ?? 0 } } : {}), ...(packet.shown_when !== undefined ? { shown_when: packet.shown_when } : {}), ...(packet.slope !== undefined ? { slope: [...packet.slope] } : {}) };
 }
 // A number, or a "$look" value the drawing reads when it is drawn.
 const lookOr = (value, test) => (typeof value === 'string' && value.startsWith('$')) || test(value);

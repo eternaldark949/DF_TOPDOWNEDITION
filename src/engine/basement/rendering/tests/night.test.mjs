@@ -181,3 +181,20 @@ test('a facade part can be laid on chosen walls (faces, in the thing\'s own fram
  assert.throws(()=>new physicsSystem().elements.createEntity({kind:'static',position:[0,0],components:[{name:'b',layers:[{layer:0,thickness:40,sides:'#777',steps:[box],facade:{panels:[{width:4,faces:['up']}]}}]}]}),/faces/);
  assert.throws(()=>new physicsSystem().elements.createEntity({kind:'static',position:[0,0],components:[{name:'b',layers:[{layer:0,thickness:40,sides:'#777',steps:[box],facade:{panels:[{width:4,bays:[.5]}]}}]}]}),/bays/);
 });
+
+test('a look\'s lean makes a thing lean that many times as hard as the view, so its fronts read from across the road',()=>{
+ const world=new physicsSystem(),make=look=>world.elements.createEntity({kind:'static',position:[0,-200],look,components:[{name:'b',layers:[{layer:0,height:0,thickness:40,solid:false,sides:'#777',steps:[box]}]}]});
+ const view=new heightView({camera:[0,0],eye:300}),top=look=>drawComponents(make(look),null,1,{view}).at(-1).packets[0].matrix[0];
+ near(top({})-1,view.k(40)-1,'as the street');near(top({lean:2})-1,(view.k(40)-1)*2,'twice as hard');
+ assert.throws(()=>drawComponents(make({lean:-1}),null,1,{view}),/lean/);
+});
+
+test('a sloped layer (an awning) draws its top in its own tilted plane, and its walls rise to it corner by corner',()=>{
+ const world=new physicsSystem(),aw={shape:'rectangle',x:-20,y:0,width:40,height:16,fill:'#e2902c'};
+ const e=world.elements.createEntity({kind:'static',position:[0,-100],components:[{name:'a',layers:[{layer:0,height:14,thickness:1,solid:false,slope:[0,-.5],sides:'#c07020',steps:[aw]}]}]});
+ const view=new heightView({camera:[0,0],eye:300}),[part]=drawComponents(e,null,1,{view}),M=part.packets[0].matrix;
+ const on=(x,y)=>[M[0]*x+M[2]*y+M[4],M[1]*x+M[3]*y+M[5]],near2=(a,b,why)=>{near(a[0],b[0],why,1e-6);near(a[1],b[1],why,1e-6);};
+ near2(on(-20,0),view.at(-20,-100,15),'its back edge at its top');near2(on(-20,16),view.at(-20,-84,7),'its front edge 8 lower: half a unit down per unit out');
+ assert.ok(part.sides.length>0,'its valance shows');
+ assert.throws(()=>world.elements.createEntity({kind:'static',position:[0,0],components:[{name:'x',layers:[{layer:0,slope:[0],steps:[aw]}]}]}),/slope/);
+});

@@ -1,0 +1,5221 @@
+{
+ "library_id": "street",
+ "description": "The city's generic shops and apartments (a prototype, from street_kit.py).",
+ "templates": {
+  "brownstone": {
+   "extends": "engine:building",
+   "blocks_light": true,
+   "data": {
+    "label": "Apartments"
+   },
+   "lights": [
+    {
+     "shape": "point",
+     "position": [
+      -9.0,
+      129.0
+     ],
+     "radius": 40,
+     "color": "#ffd9a0",
+     "intensity": 0.8,
+     "glow": 0.35,
+     "height": 20
+    },
+    {
+     "shape": "point",
+     "position": [
+      9.0,
+      129.0
+     ],
+     "radius": 40,
+     "color": "#ffd9a0",
+     "intensity": 0.8,
+     "glow": 0.35,
+     "height": 20
+    }
+   ],
+   "components": [
+    {
+     "name": "house",
+     "at": [
+      0,
+      0
+     ],
+     "layers": [
+      {
+       "layer": 0,
+       "height": 0,
+       "thickness": 10,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -150.0,
+         "y": -125.0,
+         "width": 300,
+         "height": 250,
+         "fill": "$stone"
+        }
+       ],
+       "sides": "$stone",
+       "facade": {
+        "bays": {
+         "width": 42,
+         "margin": 8
+        },
+        "storeys": {
+         "height": 10
+        },
+        "bands": [
+         {
+          "from": 3.2,
+          "to": 3.8000000000000003,
+          "fill": "$groove"
+         },
+         {
+          "from": 6.6,
+          "to": 7.199999999999999,
+          "fill": "$groove"
+         },
+         {
+          "from": 9,
+          "to": 10,
+          "fill": "$trim"
+         }
+        ],
+        "panels": [
+         {
+          "width": 14,
+          "height": 5,
+          "at": 2.5,
+          "fill": "$glass",
+          "lit_fill": "$lit_lo",
+          "lit": "$lit",
+          "bars": 1,
+          "bar_fill": "$frame",
+          "bar_width": 0.6
+         }
+        ]
+       }
+      },
+      {
+       "layer": 1,
+       "height": 10,
+       "thickness": 65,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -150.0,
+         "y": -125.0,
+         "width": 300,
+         "height": 250,
+         "fill": "$brick"
+        }
+       ],
+       "sides": "$brick",
+       "facade": {
+        "bays": {
+         "width": 42,
+         "margin": 8
+        },
+        "storeys": {
+         "height": 13
+        },
+        "seed": 7,
+        "bands": [
+         {
+          "from": 12.1,
+          "to": 12.8,
+          "fill": "$trim"
+         }
+        ],
+        "panels": [
+         {
+          "width": 15,
+          "height": 8.4,
+          "at": 2.8,
+          "steps": [
+           {
+            "shape": "rectangle",
+            "x": -8.7,
+            "y": -2.2,
+            "width": 17.4,
+            "height": 2.2,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.9,
+            "y": 8.4,
+            "width": 17.8,
+            "height": 1.3,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 15,
+            "height": 8.4,
+            "fill": "$glass"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              -7.5,
+              0
+             ],
+             [
+              0.0,
+              0
+             ],
+             [
+              -7.5,
+              5.88
+             ]
+            ],
+            "fill": "rgba(200, 220, 235, 0.12)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 7.6000000000000005,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 0.8,
+            "height": 8.4,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 6.7,
+            "y": 0,
+            "width": 0.8,
+            "height": 8.4,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 3.8000000000000003,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.35,
+            "y": 0,
+            "width": 0.7,
+            "height": 8.4,
+            "fill": "$frame"
+           }
+          ],
+          "lit_steps": [
+           {
+            "shape": "rectangle",
+            "x": -8.7,
+            "y": -2.2,
+            "width": 17.4,
+            "height": 2.2,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.9,
+            "y": 8.4,
+            "width": 17.8,
+            "height": 1.3,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 15,
+            "height": 8.4,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 3.7800000000000002,
+            "width": 15,
+            "height": 4.620000000000001,
+            "fill": "$lit_lo"
+           },
+           {
+            "shape": "circle",
+            "x": 3.0,
+            "y": 3.3600000000000003,
+            "radius": 3.3,
+            "fill": "rgba(255, 246, 215, 0.5)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 7.6000000000000005,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 0.8,
+            "height": 8.4,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 6.7,
+            "y": 0,
+            "width": 0.8,
+            "height": 8.4,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 3.8000000000000003,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.35,
+            "y": 0,
+            "width": 0.7,
+            "height": 8.4,
+            "fill": "$frame"
+           }
+          ],
+          "detail": 5,
+          "fill": "$glass",
+          "lit_fill": "$lit_hi",
+          "lit": "$lit",
+          "emits": {
+           "strength": 0.04,
+           "reach": 60,
+           "color": "#ffcf8a"
+          },
+          "storeys": [
+           1,
+           2,
+           3,
+           4
+          ]
+         },
+         {
+          "width": 15,
+          "height": 8.4,
+          "at": 2.8,
+          "steps": [
+           {
+            "shape": "rectangle",
+            "x": -8.7,
+            "y": -2.2,
+            "width": 17.4,
+            "height": 2.2,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.9,
+            "y": 8.4,
+            "width": 17.8,
+            "height": 1.3,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 15,
+            "height": 8.4,
+            "fill": "$glass"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              -7.5,
+              0
+             ],
+             [
+              0.0,
+              0
+             ],
+             [
+              -7.5,
+              5.88
+             ]
+            ],
+            "fill": "rgba(200, 220, 235, 0.12)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 7.6000000000000005,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 0.8,
+            "height": 8.4,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 6.7,
+            "y": 0,
+            "width": 0.8,
+            "height": 8.4,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 3.8000000000000003,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.35,
+            "y": 0,
+            "width": 0.7,
+            "height": 8.4,
+            "fill": "$frame"
+           }
+          ],
+          "lit_steps": [
+           {
+            "shape": "rectangle",
+            "x": -8.7,
+            "y": -2.2,
+            "width": 17.4,
+            "height": 2.2,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.9,
+            "y": 8.4,
+            "width": 17.8,
+            "height": 1.3,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 15,
+            "height": 8.4,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 3.7800000000000002,
+            "width": 15,
+            "height": 4.620000000000001,
+            "fill": "$lit_lo"
+           },
+           {
+            "shape": "circle",
+            "x": 3.0,
+            "y": 3.3600000000000003,
+            "radius": 3.3,
+            "fill": "rgba(255, 246, 215, 0.5)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 7.6000000000000005,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 0.8,
+            "height": 8.4,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 6.7,
+            "y": 0,
+            "width": 0.8,
+            "height": 8.4,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 3.8000000000000003,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.35,
+            "y": 0,
+            "width": 0.7,
+            "height": 8.4,
+            "fill": "$frame"
+           }
+          ],
+          "detail": 5,
+          "fill": "$glass",
+          "lit_fill": "$lit_hi",
+          "lit": "$lit",
+          "emits": {
+           "strength": 0.04,
+           "reach": 60,
+           "color": "#ffcf8a"
+          },
+          "storeys": [
+           0
+          ],
+          "faces": [
+           "north",
+           "east",
+           "west"
+          ]
+         },
+         {
+          "width": 15,
+          "height": 8.4,
+          "at": 2.8,
+          "steps": [
+           {
+            "shape": "rectangle",
+            "x": -8.7,
+            "y": -2.2,
+            "width": 17.4,
+            "height": 2.2,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.9,
+            "y": 8.4,
+            "width": 17.8,
+            "height": 1.3,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 15,
+            "height": 8.4,
+            "fill": "$glass"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              -7.5,
+              0
+             ],
+             [
+              0.0,
+              0
+             ],
+             [
+              -7.5,
+              5.88
+             ]
+            ],
+            "fill": "rgba(200, 220, 235, 0.12)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 7.6000000000000005,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 0.8,
+            "height": 8.4,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 6.7,
+            "y": 0,
+            "width": 0.8,
+            "height": 8.4,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 3.8000000000000003,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.35,
+            "y": 0,
+            "width": 0.7,
+            "height": 8.4,
+            "fill": "$frame"
+           }
+          ],
+          "lit_steps": [
+           {
+            "shape": "rectangle",
+            "x": -8.7,
+            "y": -2.2,
+            "width": 17.4,
+            "height": 2.2,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.9,
+            "y": 8.4,
+            "width": 17.8,
+            "height": 1.3,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 15,
+            "height": 8.4,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 3.7800000000000002,
+            "width": 15,
+            "height": 4.620000000000001,
+            "fill": "$lit_lo"
+           },
+           {
+            "shape": "circle",
+            "x": 3.0,
+            "y": 3.3600000000000003,
+            "radius": 3.3,
+            "fill": "rgba(255, 246, 215, 0.5)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 7.6000000000000005,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 0.8,
+            "height": 8.4,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 6.7,
+            "y": 0,
+            "width": 0.8,
+            "height": 8.4,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 3.8000000000000003,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.35,
+            "y": 0,
+            "width": 0.7,
+            "height": 8.4,
+            "fill": "$frame"
+           }
+          ],
+          "detail": 5,
+          "fill": "$glass",
+          "lit_fill": "$lit_hi",
+          "lit": "$lit",
+          "emits": {
+           "strength": 0.04,
+           "reach": 60,
+           "color": "#ffcf8a"
+          },
+          "storeys": [
+           0
+          ],
+          "faces": [
+           "south"
+          ],
+          "bays": [
+           0,
+           1,
+           2,
+           4,
+           5,
+           6
+          ]
+         },
+         {
+          "width": 13,
+          "height": 11.5,
+          "at": 1.2,
+          "steps": [
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": -4,
+            "width": 15,
+            "height": 4,
+            "fill": "$trim"
+           },
+           {
+            "shape": "rectangle",
+            "x": -6.5,
+            "y": 0,
+            "width": 13,
+            "height": 11.5,
+            "fill": "$trim"
+           },
+           {
+            "shape": "rectangle",
+            "x": -4.5,
+            "y": 1,
+            "width": 9,
+            "height": 10.5,
+            "fill": "$door"
+           },
+           {
+            "shape": "rectangle",
+            "x": -3.0,
+            "y": 2.5,
+            "width": 6,
+            "height": 4.0249999999999995,
+            "fill": "$glass"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.4,
+            "y": 1,
+            "width": 0.8,
+            "height": 10.5,
+            "fill": "$frame"
+           },
+           {
+            "shape": "circle",
+            "x": 2.0,
+            "y": 7.13,
+            "radius": 0.7,
+            "fill": "$brass"
+           },
+           {
+            "shape": "text",
+            "text": "$number",
+            "x": 0,
+            "y": -2,
+            "size": 2.6,
+            "align": "center",
+            "baseline": "bottom",
+            "family": "Cinzel, serif",
+            "fill": "$brass"
+           }
+          ],
+          "lit_steps": [
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": -4,
+            "width": 15,
+            "height": 4,
+            "fill": "$trim"
+           },
+           {
+            "shape": "rectangle",
+            "x": -6.5,
+            "y": 0,
+            "width": 13,
+            "height": 11.5,
+            "fill": "$trim"
+           },
+           {
+            "shape": "rectangle",
+            "x": -4.5,
+            "y": 1,
+            "width": 9,
+            "height": 10.5,
+            "fill": "$door"
+           },
+           {
+            "shape": "rectangle",
+            "x": -3.0,
+            "y": 2.5,
+            "width": 6,
+            "height": 4.0249999999999995,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.4,
+            "y": 1,
+            "width": 0.8,
+            "height": 10.5,
+            "fill": "$frame"
+           },
+           {
+            "shape": "circle",
+            "x": 2.0,
+            "y": 7.13,
+            "radius": 0.7,
+            "fill": "$brass"
+           },
+           {
+            "shape": "text",
+            "text": "$number",
+            "x": 0,
+            "y": -2,
+            "size": 2.6,
+            "align": "center",
+            "baseline": "bottom",
+            "family": "Cinzel, serif",
+            "fill": "$brass"
+           }
+          ],
+          "lit": 1,
+          "detail": 4,
+          "fill": "$door",
+          "storeys": [
+           0
+          ],
+          "faces": [
+           "south"
+          ],
+          "bays": [
+           3
+          ],
+          "emits": {
+           "strength": 0.12,
+           "reach": 50,
+           "color": "#ffd9a0"
+          }
+         }
+        ]
+       }
+      },
+      {
+       "layer": 2,
+       "height": 75,
+       "thickness": 4,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -153.5,
+         "y": -128.5,
+         "width": 307,
+         "height": 257,
+         "fill": "$trim"
+        },
+        {
+         "shape": "rectangle",
+         "x": -146.0,
+         "y": -121.0,
+         "width": 292,
+         "height": 242,
+         "fill": "$roof"
+        },
+        {
+         "shape": "rectangle",
+         "x": 36.0,
+         "y": -75.0,
+         "width": 34,
+         "height": 26,
+         "fill": "$roof_hi"
+        },
+        {
+         "shape": "rectangle",
+         "x": 40.0,
+         "y": -71.0,
+         "width": 26,
+         "height": 18,
+         "fill": "$roof"
+        },
+        {
+         "shape": "circle",
+         "x": -75.0,
+         "y": -50.0,
+         "radius": 7,
+         "fill": "$roof_hi"
+        },
+        {
+         "shape": "circle",
+         "x": -75.0,
+         "y": -50.0,
+         "radius": 4,
+         "fill": "$frame"
+        }
+       ],
+       "sides": "$trim",
+       "facade": {
+        "bays": {
+         "width": 10
+        },
+        "bands": [
+         {
+          "from": 0,
+          "to": 1.2,
+          "fill": "$trim_lo"
+         }
+        ],
+        "piers": [
+         {
+          "width": 1.6,
+          "to": 2.4,
+          "fill": "$trim_lo"
+         }
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "stoop",
+     "at": [
+      0.0,
+      125.0
+     ],
+     "layers": [
+      {
+       "layer": 0,
+       "height": 0,
+       "thickness": 3.0,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -11,
+         "y": 0,
+         "width": 22,
+         "height": 16,
+         "fill": "$stone"
+        }
+       ],
+       "sides": "$stone"
+      },
+      {
+       "layer": 1,
+       "height": 0,
+       "thickness": 6.4,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -11,
+         "y": 0,
+         "width": 22,
+         "height": 11,
+         "fill": "$stone"
+        }
+       ],
+       "sides": "$stone"
+      },
+      {
+       "layer": 2,
+       "height": 0,
+       "thickness": 9.8,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -11,
+         "y": 0,
+         "width": 22,
+         "height": 6,
+         "fill": "$stone"
+        }
+       ],
+       "sides": "$stone"
+      },
+      {
+       "layer": 3,
+       "height": 0,
+       "thickness": 10,
+       "solid": false,
+       "cover": false,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -13.6,
+         "y": 0,
+         "width": 1.2,
+         "height": 15,
+         "fill": "$iron"
+        }
+       ],
+       "sides": "$iron"
+      },
+      {
+       "layer": 4,
+       "height": 0,
+       "thickness": 10,
+       "solid": false,
+       "cover": false,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": 12.4,
+         "y": 0,
+         "width": 1.2,
+         "height": 15,
+         "fill": "$iron"
+        }
+       ],
+       "sides": "$iron"
+      }
+     ]
+    }
+   ],
+   "look": {
+    "layer": 1,
+    "lean": 2.2,
+    "values": {
+     "stone": "#6b4a3a",
+     "brick": "#7a3f2e",
+     "trim": "#d9c7a6",
+     "trim_lo": "#a8977a",
+     "lintel": "#cdbb98",
+     "groove": "rgba(30, 14, 8, 0.45)",
+     "roof": "#3a3438",
+     "roof_hi": "#4a4448",
+     "glass": "#1d2630",
+     "frame": "#efe6d2",
+     "door": "#2a1a14",
+     "brass": "#d6b26a",
+     "iron": "#1b1a1e",
+     "lit_hi": "#ffd79a",
+     "lit_lo": "#f0a85e",
+     "lit": 0.4,
+     "number": "949"
+    }
+   }
+  },
+  "brownstone_grey": {
+   "extends": "engine:building",
+   "blocks_light": true,
+   "data": {
+    "label": "Apartments"
+   },
+   "lights": [
+    {
+     "shape": "point",
+     "position": [
+      -9.0,
+      129.0
+     ],
+     "radius": 40,
+     "color": "#ffd9a0",
+     "intensity": 0.8,
+     "glow": 0.35,
+     "height": 20
+    },
+    {
+     "shape": "point",
+     "position": [
+      9.0,
+      129.0
+     ],
+     "radius": 40,
+     "color": "#ffd9a0",
+     "intensity": 0.8,
+     "glow": 0.35,
+     "height": 20
+    }
+   ],
+   "components": [
+    {
+     "name": "house",
+     "at": [
+      0,
+      0
+     ],
+     "layers": [
+      {
+       "layer": 0,
+       "height": 0,
+       "thickness": 10,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -150.0,
+         "y": -125.0,
+         "width": 300,
+         "height": 250,
+         "fill": "$stone"
+        }
+       ],
+       "sides": "$stone",
+       "facade": {
+        "bays": {
+         "width": 42,
+         "margin": 8
+        },
+        "storeys": {
+         "height": 10
+        },
+        "bands": [
+         {
+          "from": 3.2,
+          "to": 3.8000000000000003,
+          "fill": "$groove"
+         },
+         {
+          "from": 6.6,
+          "to": 7.199999999999999,
+          "fill": "$groove"
+         },
+         {
+          "from": 9,
+          "to": 10,
+          "fill": "$trim"
+         }
+        ],
+        "panels": [
+         {
+          "width": 14,
+          "height": 5,
+          "at": 2.5,
+          "fill": "$glass",
+          "lit_fill": "$lit_lo",
+          "lit": "$lit",
+          "bars": 1,
+          "bar_fill": "$frame",
+          "bar_width": 0.6
+         }
+        ]
+       }
+      },
+      {
+       "layer": 1,
+       "height": 10,
+       "thickness": 52,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -150.0,
+         "y": -125.0,
+         "width": 300,
+         "height": 250,
+         "fill": "$brick"
+        }
+       ],
+       "sides": "$brick",
+       "facade": {
+        "bays": {
+         "width": 42,
+         "margin": 8
+        },
+        "storeys": {
+         "height": 13
+        },
+        "seed": 7,
+        "bands": [
+         {
+          "from": 12.1,
+          "to": 12.8,
+          "fill": "$trim"
+         }
+        ],
+        "panels": [
+         {
+          "width": 15,
+          "height": 8.4,
+          "at": 2.8,
+          "steps": [
+           {
+            "shape": "rectangle",
+            "x": -8.7,
+            "y": -2.2,
+            "width": 17.4,
+            "height": 2.2,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.9,
+            "y": 8.4,
+            "width": 17.8,
+            "height": 1.3,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 15,
+            "height": 8.4,
+            "fill": "$glass"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              -7.5,
+              0
+             ],
+             [
+              0.0,
+              0
+             ],
+             [
+              -7.5,
+              5.88
+             ]
+            ],
+            "fill": "rgba(200, 220, 235, 0.12)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 7.6000000000000005,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 0.8,
+            "height": 8.4,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 6.7,
+            "y": 0,
+            "width": 0.8,
+            "height": 8.4,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 3.8000000000000003,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.35,
+            "y": 0,
+            "width": 0.7,
+            "height": 8.4,
+            "fill": "$frame"
+           }
+          ],
+          "lit_steps": [
+           {
+            "shape": "rectangle",
+            "x": -8.7,
+            "y": -2.2,
+            "width": 17.4,
+            "height": 2.2,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.9,
+            "y": 8.4,
+            "width": 17.8,
+            "height": 1.3,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 15,
+            "height": 8.4,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 3.7800000000000002,
+            "width": 15,
+            "height": 4.620000000000001,
+            "fill": "$lit_lo"
+           },
+           {
+            "shape": "circle",
+            "x": 3.0,
+            "y": 3.3600000000000003,
+            "radius": 3.3,
+            "fill": "rgba(255, 246, 215, 0.5)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 7.6000000000000005,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 0.8,
+            "height": 8.4,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 6.7,
+            "y": 0,
+            "width": 0.8,
+            "height": 8.4,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 3.8000000000000003,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.35,
+            "y": 0,
+            "width": 0.7,
+            "height": 8.4,
+            "fill": "$frame"
+           }
+          ],
+          "detail": 5,
+          "fill": "$glass",
+          "lit_fill": "$lit_hi",
+          "lit": "$lit",
+          "emits": {
+           "strength": 0.04,
+           "reach": 60,
+           "color": "#ffcf8a"
+          },
+          "storeys": [
+           1,
+           2,
+           3
+          ]
+         },
+         {
+          "width": 15,
+          "height": 8.4,
+          "at": 2.8,
+          "steps": [
+           {
+            "shape": "rectangle",
+            "x": -8.7,
+            "y": -2.2,
+            "width": 17.4,
+            "height": 2.2,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.9,
+            "y": 8.4,
+            "width": 17.8,
+            "height": 1.3,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 15,
+            "height": 8.4,
+            "fill": "$glass"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              -7.5,
+              0
+             ],
+             [
+              0.0,
+              0
+             ],
+             [
+              -7.5,
+              5.88
+             ]
+            ],
+            "fill": "rgba(200, 220, 235, 0.12)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 7.6000000000000005,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 0.8,
+            "height": 8.4,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 6.7,
+            "y": 0,
+            "width": 0.8,
+            "height": 8.4,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 3.8000000000000003,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.35,
+            "y": 0,
+            "width": 0.7,
+            "height": 8.4,
+            "fill": "$frame"
+           }
+          ],
+          "lit_steps": [
+           {
+            "shape": "rectangle",
+            "x": -8.7,
+            "y": -2.2,
+            "width": 17.4,
+            "height": 2.2,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.9,
+            "y": 8.4,
+            "width": 17.8,
+            "height": 1.3,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 15,
+            "height": 8.4,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 3.7800000000000002,
+            "width": 15,
+            "height": 4.620000000000001,
+            "fill": "$lit_lo"
+           },
+           {
+            "shape": "circle",
+            "x": 3.0,
+            "y": 3.3600000000000003,
+            "radius": 3.3,
+            "fill": "rgba(255, 246, 215, 0.5)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 7.6000000000000005,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 0.8,
+            "height": 8.4,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 6.7,
+            "y": 0,
+            "width": 0.8,
+            "height": 8.4,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 3.8000000000000003,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.35,
+            "y": 0,
+            "width": 0.7,
+            "height": 8.4,
+            "fill": "$frame"
+           }
+          ],
+          "detail": 5,
+          "fill": "$glass",
+          "lit_fill": "$lit_hi",
+          "lit": "$lit",
+          "emits": {
+           "strength": 0.04,
+           "reach": 60,
+           "color": "#ffcf8a"
+          },
+          "storeys": [
+           0
+          ],
+          "faces": [
+           "north",
+           "east",
+           "west"
+          ]
+         },
+         {
+          "width": 15,
+          "height": 8.4,
+          "at": 2.8,
+          "steps": [
+           {
+            "shape": "rectangle",
+            "x": -8.7,
+            "y": -2.2,
+            "width": 17.4,
+            "height": 2.2,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.9,
+            "y": 8.4,
+            "width": 17.8,
+            "height": 1.3,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 15,
+            "height": 8.4,
+            "fill": "$glass"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              -7.5,
+              0
+             ],
+             [
+              0.0,
+              0
+             ],
+             [
+              -7.5,
+              5.88
+             ]
+            ],
+            "fill": "rgba(200, 220, 235, 0.12)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 7.6000000000000005,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 0.8,
+            "height": 8.4,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 6.7,
+            "y": 0,
+            "width": 0.8,
+            "height": 8.4,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 3.8000000000000003,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.35,
+            "y": 0,
+            "width": 0.7,
+            "height": 8.4,
+            "fill": "$frame"
+           }
+          ],
+          "lit_steps": [
+           {
+            "shape": "rectangle",
+            "x": -8.7,
+            "y": -2.2,
+            "width": 17.4,
+            "height": 2.2,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.9,
+            "y": 8.4,
+            "width": 17.8,
+            "height": 1.3,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 15,
+            "height": 8.4,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 3.7800000000000002,
+            "width": 15,
+            "height": 4.620000000000001,
+            "fill": "$lit_lo"
+           },
+           {
+            "shape": "circle",
+            "x": 3.0,
+            "y": 3.3600000000000003,
+            "radius": 3.3,
+            "fill": "rgba(255, 246, 215, 0.5)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 7.6000000000000005,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 0,
+            "width": 0.8,
+            "height": 8.4,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 6.7,
+            "y": 0,
+            "width": 0.8,
+            "height": 8.4,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": 3.8000000000000003,
+            "width": 15,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.35,
+            "y": 0,
+            "width": 0.7,
+            "height": 8.4,
+            "fill": "$frame"
+           }
+          ],
+          "detail": 5,
+          "fill": "$glass",
+          "lit_fill": "$lit_hi",
+          "lit": "$lit",
+          "emits": {
+           "strength": 0.04,
+           "reach": 60,
+           "color": "#ffcf8a"
+          },
+          "storeys": [
+           0
+          ],
+          "faces": [
+           "south"
+          ],
+          "bays": [
+           0,
+           1,
+           2,
+           4,
+           5,
+           6
+          ]
+         },
+         {
+          "width": 13,
+          "height": 11.5,
+          "at": 1.2,
+          "steps": [
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": -4,
+            "width": 15,
+            "height": 4,
+            "fill": "$trim"
+           },
+           {
+            "shape": "rectangle",
+            "x": -6.5,
+            "y": 0,
+            "width": 13,
+            "height": 11.5,
+            "fill": "$trim"
+           },
+           {
+            "shape": "rectangle",
+            "x": -4.5,
+            "y": 1,
+            "width": 9,
+            "height": 10.5,
+            "fill": "$door"
+           },
+           {
+            "shape": "rectangle",
+            "x": -3.0,
+            "y": 2.5,
+            "width": 6,
+            "height": 4.0249999999999995,
+            "fill": "$glass"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.4,
+            "y": 1,
+            "width": 0.8,
+            "height": 10.5,
+            "fill": "$frame"
+           },
+           {
+            "shape": "circle",
+            "x": 2.0,
+            "y": 7.13,
+            "radius": 0.7,
+            "fill": "$brass"
+           },
+           {
+            "shape": "text",
+            "text": "$number",
+            "x": 0,
+            "y": -2,
+            "size": 2.6,
+            "align": "center",
+            "baseline": "bottom",
+            "family": "Cinzel, serif",
+            "fill": "$brass"
+           }
+          ],
+          "lit_steps": [
+           {
+            "shape": "rectangle",
+            "x": -7.5,
+            "y": -4,
+            "width": 15,
+            "height": 4,
+            "fill": "$trim"
+           },
+           {
+            "shape": "rectangle",
+            "x": -6.5,
+            "y": 0,
+            "width": 13,
+            "height": 11.5,
+            "fill": "$trim"
+           },
+           {
+            "shape": "rectangle",
+            "x": -4.5,
+            "y": 1,
+            "width": 9,
+            "height": 10.5,
+            "fill": "$door"
+           },
+           {
+            "shape": "rectangle",
+            "x": -3.0,
+            "y": 2.5,
+            "width": 6,
+            "height": 4.0249999999999995,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.4,
+            "y": 1,
+            "width": 0.8,
+            "height": 10.5,
+            "fill": "$frame"
+           },
+           {
+            "shape": "circle",
+            "x": 2.0,
+            "y": 7.13,
+            "radius": 0.7,
+            "fill": "$brass"
+           },
+           {
+            "shape": "text",
+            "text": "$number",
+            "x": 0,
+            "y": -2,
+            "size": 2.6,
+            "align": "center",
+            "baseline": "bottom",
+            "family": "Cinzel, serif",
+            "fill": "$brass"
+           }
+          ],
+          "lit": 1,
+          "detail": 4,
+          "fill": "$door",
+          "storeys": [
+           0
+          ],
+          "faces": [
+           "south"
+          ],
+          "bays": [
+           3
+          ],
+          "emits": {
+           "strength": 0.12,
+           "reach": 50,
+           "color": "#ffd9a0"
+          }
+         }
+        ]
+       }
+      },
+      {
+       "layer": 2,
+       "height": 62,
+       "thickness": 4,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -153.5,
+         "y": -128.5,
+         "width": 307,
+         "height": 257,
+         "fill": "$trim"
+        },
+        {
+         "shape": "rectangle",
+         "x": -146.0,
+         "y": -121.0,
+         "width": 292,
+         "height": 242,
+         "fill": "$roof"
+        },
+        {
+         "shape": "rectangle",
+         "x": 36.0,
+         "y": -75.0,
+         "width": 34,
+         "height": 26,
+         "fill": "$roof_hi"
+        },
+        {
+         "shape": "rectangle",
+         "x": 40.0,
+         "y": -71.0,
+         "width": 26,
+         "height": 18,
+         "fill": "$roof"
+        },
+        {
+         "shape": "circle",
+         "x": -75.0,
+         "y": -50.0,
+         "radius": 7,
+         "fill": "$roof_hi"
+        },
+        {
+         "shape": "circle",
+         "x": -75.0,
+         "y": -50.0,
+         "radius": 4,
+         "fill": "$frame"
+        }
+       ],
+       "sides": "$trim",
+       "facade": {
+        "bays": {
+         "width": 10
+        },
+        "bands": [
+         {
+          "from": 0,
+          "to": 1.2,
+          "fill": "$trim_lo"
+         }
+        ],
+        "piers": [
+         {
+          "width": 1.6,
+          "to": 2.4,
+          "fill": "$trim_lo"
+         }
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "name": "stoop",
+     "at": [
+      0.0,
+      125.0
+     ],
+     "layers": [
+      {
+       "layer": 0,
+       "height": 0,
+       "thickness": 3.0,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -11,
+         "y": 0,
+         "width": 22,
+         "height": 16,
+         "fill": "$stone"
+        }
+       ],
+       "sides": "$stone"
+      },
+      {
+       "layer": 1,
+       "height": 0,
+       "thickness": 6.4,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -11,
+         "y": 0,
+         "width": 22,
+         "height": 11,
+         "fill": "$stone"
+        }
+       ],
+       "sides": "$stone"
+      },
+      {
+       "layer": 2,
+       "height": 0,
+       "thickness": 9.8,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -11,
+         "y": 0,
+         "width": 22,
+         "height": 6,
+         "fill": "$stone"
+        }
+       ],
+       "sides": "$stone"
+      },
+      {
+       "layer": 3,
+       "height": 0,
+       "thickness": 10,
+       "solid": false,
+       "cover": false,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -13.6,
+         "y": 0,
+         "width": 1.2,
+         "height": 15,
+         "fill": "$iron"
+        }
+       ],
+       "sides": "$iron"
+      },
+      {
+       "layer": 4,
+       "height": 0,
+       "thickness": 10,
+       "solid": false,
+       "cover": false,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": 12.4,
+         "y": 0,
+         "width": 1.2,
+         "height": 15,
+         "fill": "$iron"
+        }
+       ],
+       "sides": "$iron"
+      }
+     ]
+    }
+   ],
+   "look": {
+    "layer": 1,
+    "lean": 2.2,
+    "values": {
+     "stone": "#5a5660",
+     "brick": "#6e6a72",
+     "trim": "#e6e1d6",
+     "trim_lo": "#a8977a",
+     "lintel": "#cdbb98",
+     "groove": "rgba(30, 14, 8, 0.45)",
+     "roof": "#3a3438",
+     "roof_hi": "#4a4448",
+     "glass": "#1d2630",
+     "frame": "#efe6d2",
+     "door": "#2a1a14",
+     "brass": "#d6b26a",
+     "iron": "#1b1a1e",
+     "lit_hi": "#ffd79a",
+     "lit_lo": "#f0a85e",
+     "lit": 0.4,
+     "number": "12"
+    }
+   }
+  },
+  "bakery": {
+   "extends": "engine:building",
+   "blocks_light": true,
+   "data": {
+    "label": "Crumb & Co"
+   },
+   "lights": [
+    {
+     "shape": "area",
+     "position": [
+      0,
+      114.0
+     ],
+     "size": [
+      210,
+      16
+     ],
+     "color": "#ffc46a",
+     "intensity": 0.75,
+     "glow": 0.25,
+     "height": 8
+    }
+   ],
+   "components": [
+    {
+     "name": "shop",
+     "at": [
+      0,
+      0
+     ],
+     "layers": [
+      {
+       "layer": 0,
+       "height": 0,
+       "thickness": 22,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -125.0,
+         "y": -100.0,
+         "width": 250,
+         "height": 200,
+         "fill": "$brick"
+        }
+       ],
+       "sides": "$brick",
+       "facade": {
+        "bays": {
+         "width": 46,
+         "margin": 10
+        },
+        "storeys": {
+         "height": 22
+        },
+        "bands": [
+         {
+          "from": 0,
+          "to": 1.4,
+          "fill": "$trim"
+         },
+         {
+          "from": 15.5,
+          "to": 22,
+          "fill": "$board",
+          "faces": [
+           "south"
+          ]
+         },
+         {
+          "from": 15.5,
+          "to": 16.1,
+          "fill": "$edge",
+          "faces": [
+           "south"
+          ]
+         },
+         {
+          "from": 21.4,
+          "to": 22,
+          "fill": "$edge",
+          "faces": [
+           "south"
+          ]
+         }
+        ],
+        "piers": [
+         {
+          "width": 3,
+          "to": 15.5,
+          "fill": "$trim",
+          "faces": [
+           "south"
+          ]
+         }
+        ],
+        "panels": [
+         {
+          "width": 38,
+          "height": 13,
+          "at": 1.6,
+          "steps": [
+           {
+            "shape": "rectangle",
+            "x": -19.0,
+            "y": 0,
+            "width": 38,
+            "height": 13,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -17.5,
+            "y": 1.5,
+            "width": 16.5,
+            "height": 9,
+            "fill": "$glass"
+           },
+           {
+            "shape": "rectangle",
+            "x": 1.0,
+            "y": 1.5,
+            "width": 16.5,
+            "height": 9,
+            "fill": "$glass"
+           },
+           {
+            "shape": "ellipse",
+            "x": -12.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": -9.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": -6.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": 6.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": 9.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": 12.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "rectangle",
+            "x": -19.0,
+            "y": 10.5,
+            "width": 38,
+            "height": 2.5,
+            "fill": "$trim"
+           }
+          ],
+          "lit_steps": [
+           {
+            "shape": "rectangle",
+            "x": -19.0,
+            "y": 0,
+            "width": 38,
+            "height": 13,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -17.5,
+            "y": 1.5,
+            "width": 16.5,
+            "height": 9,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": 1.0,
+            "y": 1.5,
+            "width": 16.5,
+            "height": 9,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -17.5,
+            "y": 6.45,
+            "width": 16.5,
+            "height": 4.05,
+            "fill": "$lit_lo"
+           },
+           {
+            "shape": "rectangle",
+            "x": 1.0,
+            "y": 6.45,
+            "width": 16.5,
+            "height": 4.05,
+            "fill": "$lit_lo"
+           },
+           {
+            "shape": "ellipse",
+            "x": -12.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": -9.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": -6.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": 6.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": 9.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": 12.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "rectangle",
+            "x": -19.0,
+            "y": 10.5,
+            "width": 38,
+            "height": 2.5,
+            "fill": "$trim"
+           }
+          ],
+          "lit": 1,
+          "detail": 4,
+          "fill": "$glass",
+          "lit_fill": "$lit_hi",
+          "faces": [
+           "south"
+          ],
+          "bays": [
+           0,
+           1,
+           3,
+           4
+          ],
+          "emits": {
+           "strength": 0.25,
+           "reach": 90,
+           "color": "#ffc46a"
+          }
+         },
+         {
+          "width": 14,
+          "height": 13,
+          "at": 1.6,
+          "steps": [
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": -4,
+            "width": 16,
+            "height": 4,
+            "fill": "$trim"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.0,
+            "y": 0,
+            "width": 14,
+            "height": 13,
+            "fill": "$trim"
+           },
+           {
+            "shape": "rectangle",
+            "x": -5.0,
+            "y": 1,
+            "width": 10,
+            "height": 12,
+            "fill": "$door"
+           },
+           {
+            "shape": "rectangle",
+            "x": -3.5,
+            "y": 2.5,
+            "width": 7,
+            "height": 4.55,
+            "fill": "$glass"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.4,
+            "y": 1,
+            "width": 0.8,
+            "height": 12,
+            "fill": "$frame"
+           },
+           {
+            "shape": "circle",
+            "x": 2.5,
+            "y": 8.06,
+            "radius": 0.7,
+            "fill": "$brass"
+           },
+           {
+            "shape": "text",
+            "text": "$number",
+            "x": 0,
+            "y": -2,
+            "size": 2.6,
+            "align": "center",
+            "baseline": "bottom",
+            "family": "Cinzel, serif",
+            "fill": "$brass"
+           }
+          ],
+          "lit_steps": [
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": -4,
+            "width": 16,
+            "height": 4,
+            "fill": "$trim"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.0,
+            "y": 0,
+            "width": 14,
+            "height": 13,
+            "fill": "$trim"
+           },
+           {
+            "shape": "rectangle",
+            "x": -5.0,
+            "y": 1,
+            "width": 10,
+            "height": 12,
+            "fill": "$door"
+           },
+           {
+            "shape": "rectangle",
+            "x": -3.5,
+            "y": 2.5,
+            "width": 7,
+            "height": 4.55,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.4,
+            "y": 1,
+            "width": 0.8,
+            "height": 12,
+            "fill": "$frame"
+           },
+           {
+            "shape": "circle",
+            "x": 2.5,
+            "y": 8.06,
+            "radius": 0.7,
+            "fill": "$brass"
+           },
+           {
+            "shape": "text",
+            "text": "$number",
+            "x": 0,
+            "y": -2,
+            "size": 2.6,
+            "align": "center",
+            "baseline": "bottom",
+            "family": "Cinzel, serif",
+            "fill": "$brass"
+           }
+          ],
+          "lit": 1,
+          "detail": 4,
+          "fill": "$door",
+          "faces": [
+           "south"
+          ],
+          "bays": [
+           2
+          ]
+         },
+         {
+          "width": 16,
+          "height": 7,
+          "at": 6,
+          "fill": "$glass",
+          "lit_fill": "$lit_lo",
+          "lit": "$lit",
+          "faces": [
+           "north",
+           "east",
+           "west"
+          ]
+         },
+         {
+          "width": 210,
+          "height": 5.4,
+          "at": 16,
+          "faces": [
+           "south"
+          ],
+          "bays": [
+           2
+          ],
+          "lit": 1,
+          "detail": 3,
+          "steps": [],
+          "lit_steps": [
+           {
+            "shape": "text",
+            "text": "Crumb & Co",
+            "x": 0,
+            "y": 2.9,
+            "size": 4.2,
+            "align": "center",
+            "baseline": "middle",
+            "family": "Cinzel, serif",
+            "fill": "$ink"
+           }
+          ]
+         }
+        ]
+       }
+      },
+      {
+       "layer": 1,
+       "height": 22,
+       "thickness": 13,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -125.0,
+         "y": -100.0,
+         "width": 250,
+         "height": 200,
+         "fill": "$brick"
+        }
+       ],
+       "sides": "$brick",
+       "facade": {
+        "bays": {
+         "width": 46,
+         "margin": 10
+        },
+        "storeys": {
+         "height": 13
+        },
+        "seed": 3,
+        "panels": [
+         {
+          "width": 16,
+          "height": 7.6,
+          "at": 3,
+          "steps": [
+           {
+            "shape": "rectangle",
+            "x": -9.2,
+            "y": -2.2,
+            "width": 18.4,
+            "height": 2.2,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.4,
+            "y": 7.6,
+            "width": 18.8,
+            "height": 1.3,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 0,
+            "width": 16,
+            "height": 7.6,
+            "fill": "$glass"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              -8.0,
+              0
+             ],
+             [
+              0.0,
+              0
+             ],
+             [
+              -8.0,
+              5.319999999999999
+             ]
+            ],
+            "fill": "rgba(200, 220, 235, 0.12)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 0,
+            "width": 16,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 6.8,
+            "width": 16,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 7.2,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 3.4,
+            "width": 16,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.35,
+            "y": 0,
+            "width": 0.7,
+            "height": 7.6,
+            "fill": "$frame"
+           }
+          ],
+          "lit_steps": [
+           {
+            "shape": "rectangle",
+            "x": -9.2,
+            "y": -2.2,
+            "width": 18.4,
+            "height": 2.2,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.4,
+            "y": 7.6,
+            "width": 18.8,
+            "height": 1.3,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 0,
+            "width": 16,
+            "height": 7.6,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 3.42,
+            "width": 16,
+            "height": 4.18,
+            "fill": "$lit_lo"
+           },
+           {
+            "shape": "circle",
+            "x": 3.1999999999999993,
+            "y": 3.04,
+            "radius": 3.52,
+            "fill": "rgba(255, 246, 215, 0.5)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 0,
+            "width": 16,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 6.8,
+            "width": 16,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 7.2,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 3.4,
+            "width": 16,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.35,
+            "y": 0,
+            "width": 0.7,
+            "height": 7.6,
+            "fill": "$frame"
+           }
+          ],
+          "detail": 5,
+          "fill": "$glass",
+          "lit_fill": "$lit_hi",
+          "lit": "$lit",
+          "emits": {
+           "strength": 0.04,
+           "reach": 60,
+           "color": "#ffcf8a"
+          }
+         }
+        ]
+       }
+      },
+      {
+       "layer": 2,
+       "height": 35,
+       "thickness": 3,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -129.0,
+         "y": -104.0,
+         "width": 258,
+         "height": 208,
+         "fill": "$roof"
+        },
+        {
+         "shape": "polygon",
+         "points": [
+          [
+           -129.0,
+           -104.0
+          ],
+          [
+           129.0,
+           -104.0
+          ],
+          [
+           61.0,
+           -36.0
+          ],
+          [
+           -61.0,
+           -36.0
+          ]
+         ],
+         "fill": "$roof_hi"
+        },
+        {
+         "shape": "polygon",
+         "points": [
+          [
+           -129.0,
+           104.0
+          ],
+          [
+           129.0,
+           104.0
+          ],
+          [
+           61.0,
+           36.0
+          ],
+          [
+           -61.0,
+           36.0
+          ]
+         ],
+         "fill": "$roof_lo"
+        },
+        {
+         "shape": "polygon",
+         "points": [
+          [
+           -129.0,
+           -104.0
+          ],
+          [
+           -61.0,
+           -36.0
+          ],
+          [
+           -61.0,
+           36.0
+          ],
+          [
+           -129.0,
+           104.0
+          ]
+         ],
+         "fill": "$roof"
+        },
+        {
+         "shape": "polygon",
+         "points": [
+          [
+           129.0,
+           -104.0
+          ],
+          [
+           61.0,
+           -36.0
+          ],
+          [
+           61.0,
+           36.0
+          ],
+          [
+           129.0,
+           104.0
+          ]
+         ],
+         "fill": "$roof_lo"
+        },
+        {
+         "shape": "line",
+         "points": [
+          [
+           -61.0,
+           -36.0
+          ],
+          [
+           61.0,
+           -36.0
+          ]
+         ],
+         "stroke": "$roof_hi",
+         "line_width": 1.2
+        },
+        {
+         "shape": "rectangle",
+         "x": 50.0,
+         "y": -70.0,
+         "width": 12,
+         "height": 12,
+         "fill": "$brick"
+        },
+        {
+         "shape": "rectangle",
+         "x": 52.0,
+         "y": -68.0,
+         "width": 8,
+         "height": 8,
+         "fill": "$frame"
+        }
+       ],
+       "sides": "$roof_lo"
+      }
+     ]
+    },
+    {
+     "name": "awning",
+     "at": [
+      0,
+      100.0
+     ],
+     "layers": [
+      {
+       "layer": 0,
+       "height": 14.5,
+       "thickness": 1.2,
+       "solid": false,
+       "cover": false,
+       "slope": [
+        0,
+        -0.45
+       ],
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -113.0,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning"
+        },
+        {
+         "shape": "rectangle",
+         "x": -96.85714285714286,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning_2"
+        },
+        {
+         "shape": "rectangle",
+         "x": -80.71428571428572,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning"
+        },
+        {
+         "shape": "rectangle",
+         "x": -64.57142857142857,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning_2"
+        },
+        {
+         "shape": "rectangle",
+         "x": -48.42857142857143,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning"
+        },
+        {
+         "shape": "rectangle",
+         "x": -32.28571428571429,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning_2"
+        },
+        {
+         "shape": "rectangle",
+         "x": -16.14285714285714,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning"
+        },
+        {
+         "shape": "rectangle",
+         "x": 0.0,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning_2"
+        },
+        {
+         "shape": "rectangle",
+         "x": 16.14285714285714,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning"
+        },
+        {
+         "shape": "rectangle",
+         "x": 32.28571428571428,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning_2"
+        },
+        {
+         "shape": "rectangle",
+         "x": 48.428571428571416,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning"
+        },
+        {
+         "shape": "rectangle",
+         "x": 64.57142857142858,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning_2"
+        },
+        {
+         "shape": "rectangle",
+         "x": 80.71428571428572,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning"
+        },
+        {
+         "shape": "rectangle",
+         "x": 96.85714285714286,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning_2"
+        },
+        {
+         "shape": "rectangle",
+         "x": -113.0,
+         "y": 8.4,
+         "width": 226,
+         "height": 1.6,
+         "fill": "rgba(0, 0, 0, 0.25)"
+        }
+       ],
+       "sides": "$awning",
+       "facade": {
+        "bays": {
+         "width": 16.142857142857142
+        },
+        "panels": [
+         {
+          "width": 15.842857142857142,
+          "height": 1.4,
+          "at": 0,
+          "fill": "$awning_2"
+         }
+        ]
+       }
+      }
+     ]
+    }
+   ],
+   "look": {
+    "layer": 1,
+    "lean": 2.2,
+    "values": {
+     "brick": "#5a2b22",
+     "trim": "#efdcb6",
+     "edge": "#c99a52",
+     "board": "#3a2014",
+     "ink": "#ffbf4d",
+     "lintel": "#d9c39a",
+     "glass": "#2a1b14",
+     "frame": "#3a2116",
+     "door": "#3a2116",
+     "brass": "#d6b26a",
+     "bread": "#d89a4e",
+     "roof": "#4a2a20",
+     "roof_hi": "#5e382b",
+     "roof_lo": "#3a2018",
+     "lit_hi": "#ffd28a",
+     "lit_lo": "#f0a050",
+     "lit": 0.45,
+     "awning": "#e2902c",
+     "awning_2": "#f1e0bd",
+     "number": ""
+    }
+   }
+  },
+  "bakery_rose": {
+   "extends": "engine:building",
+   "blocks_light": true,
+   "data": {
+    "label": "Butter Moon"
+   },
+   "lights": [
+    {
+     "shape": "area",
+     "position": [
+      0,
+      114.0
+     ],
+     "size": [
+      210,
+      16
+     ],
+     "color": "#ffc46a",
+     "intensity": 0.75,
+     "glow": 0.25,
+     "height": 8
+    }
+   ],
+   "components": [
+    {
+     "name": "shop",
+     "at": [
+      0,
+      0
+     ],
+     "layers": [
+      {
+       "layer": 0,
+       "height": 0,
+       "thickness": 22,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -125.0,
+         "y": -100.0,
+         "width": 250,
+         "height": 200,
+         "fill": "$brick"
+        }
+       ],
+       "sides": "$brick",
+       "facade": {
+        "bays": {
+         "width": 46,
+         "margin": 10
+        },
+        "storeys": {
+         "height": 22
+        },
+        "bands": [
+         {
+          "from": 0,
+          "to": 1.4,
+          "fill": "$trim"
+         },
+         {
+          "from": 15.5,
+          "to": 22,
+          "fill": "$board",
+          "faces": [
+           "south"
+          ]
+         },
+         {
+          "from": 15.5,
+          "to": 16.1,
+          "fill": "$edge",
+          "faces": [
+           "south"
+          ]
+         },
+         {
+          "from": 21.4,
+          "to": 22,
+          "fill": "$edge",
+          "faces": [
+           "south"
+          ]
+         }
+        ],
+        "piers": [
+         {
+          "width": 3,
+          "to": 15.5,
+          "fill": "$trim",
+          "faces": [
+           "south"
+          ]
+         }
+        ],
+        "panels": [
+         {
+          "width": 38,
+          "height": 13,
+          "at": 1.6,
+          "steps": [
+           {
+            "shape": "rectangle",
+            "x": -19.0,
+            "y": 0,
+            "width": 38,
+            "height": 13,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -17.5,
+            "y": 1.5,
+            "width": 16.5,
+            "height": 9,
+            "fill": "$glass"
+           },
+           {
+            "shape": "rectangle",
+            "x": 1.0,
+            "y": 1.5,
+            "width": 16.5,
+            "height": 9,
+            "fill": "$glass"
+           },
+           {
+            "shape": "ellipse",
+            "x": -12.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": -9.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": -6.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": 6.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": 9.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": 12.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "rectangle",
+            "x": -19.0,
+            "y": 10.5,
+            "width": 38,
+            "height": 2.5,
+            "fill": "$trim"
+           }
+          ],
+          "lit_steps": [
+           {
+            "shape": "rectangle",
+            "x": -19.0,
+            "y": 0,
+            "width": 38,
+            "height": 13,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -17.5,
+            "y": 1.5,
+            "width": 16.5,
+            "height": 9,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": 1.0,
+            "y": 1.5,
+            "width": 16.5,
+            "height": 9,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -17.5,
+            "y": 6.45,
+            "width": 16.5,
+            "height": 4.05,
+            "fill": "$lit_lo"
+           },
+           {
+            "shape": "rectangle",
+            "x": 1.0,
+            "y": 6.45,
+            "width": 16.5,
+            "height": 4.05,
+            "fill": "$lit_lo"
+           },
+           {
+            "shape": "ellipse",
+            "x": -12.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": -9.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": -6.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": 6.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": 9.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": 12.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "rectangle",
+            "x": -19.0,
+            "y": 10.5,
+            "width": 38,
+            "height": 2.5,
+            "fill": "$trim"
+           }
+          ],
+          "lit": 1,
+          "detail": 4,
+          "fill": "$glass",
+          "lit_fill": "$lit_hi",
+          "faces": [
+           "south"
+          ],
+          "bays": [
+           0,
+           1,
+           3,
+           4
+          ],
+          "emits": {
+           "strength": 0.25,
+           "reach": 90,
+           "color": "#ffc46a"
+          }
+         },
+         {
+          "width": 14,
+          "height": 13,
+          "at": 1.6,
+          "steps": [
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": -4,
+            "width": 16,
+            "height": 4,
+            "fill": "$trim"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.0,
+            "y": 0,
+            "width": 14,
+            "height": 13,
+            "fill": "$trim"
+           },
+           {
+            "shape": "rectangle",
+            "x": -5.0,
+            "y": 1,
+            "width": 10,
+            "height": 12,
+            "fill": "$door"
+           },
+           {
+            "shape": "rectangle",
+            "x": -3.5,
+            "y": 2.5,
+            "width": 7,
+            "height": 4.55,
+            "fill": "$glass"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.4,
+            "y": 1,
+            "width": 0.8,
+            "height": 12,
+            "fill": "$frame"
+           },
+           {
+            "shape": "circle",
+            "x": 2.5,
+            "y": 8.06,
+            "radius": 0.7,
+            "fill": "$brass"
+           },
+           {
+            "shape": "text",
+            "text": "$number",
+            "x": 0,
+            "y": -2,
+            "size": 2.6,
+            "align": "center",
+            "baseline": "bottom",
+            "family": "Cinzel, serif",
+            "fill": "$brass"
+           }
+          ],
+          "lit_steps": [
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": -4,
+            "width": 16,
+            "height": 4,
+            "fill": "$trim"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.0,
+            "y": 0,
+            "width": 14,
+            "height": 13,
+            "fill": "$trim"
+           },
+           {
+            "shape": "rectangle",
+            "x": -5.0,
+            "y": 1,
+            "width": 10,
+            "height": 12,
+            "fill": "$door"
+           },
+           {
+            "shape": "rectangle",
+            "x": -3.5,
+            "y": 2.5,
+            "width": 7,
+            "height": 4.55,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.4,
+            "y": 1,
+            "width": 0.8,
+            "height": 12,
+            "fill": "$frame"
+           },
+           {
+            "shape": "circle",
+            "x": 2.5,
+            "y": 8.06,
+            "radius": 0.7,
+            "fill": "$brass"
+           },
+           {
+            "shape": "text",
+            "text": "$number",
+            "x": 0,
+            "y": -2,
+            "size": 2.6,
+            "align": "center",
+            "baseline": "bottom",
+            "family": "Cinzel, serif",
+            "fill": "$brass"
+           }
+          ],
+          "lit": 1,
+          "detail": 4,
+          "fill": "$door",
+          "faces": [
+           "south"
+          ],
+          "bays": [
+           2
+          ]
+         },
+         {
+          "width": 16,
+          "height": 7,
+          "at": 6,
+          "fill": "$glass",
+          "lit_fill": "$lit_lo",
+          "lit": "$lit",
+          "faces": [
+           "north",
+           "east",
+           "west"
+          ]
+         },
+         {
+          "width": 210,
+          "height": 5.4,
+          "at": 16,
+          "faces": [
+           "south"
+          ],
+          "bays": [
+           2
+          ],
+          "lit": 1,
+          "detail": 3,
+          "steps": [],
+          "lit_steps": [
+           {
+            "shape": "text",
+            "text": "Butter Moon",
+            "x": 0,
+            "y": 2.9,
+            "size": 4.2,
+            "align": "center",
+            "baseline": "middle",
+            "family": "Cinzel, serif",
+            "fill": "$ink"
+           }
+          ]
+         }
+        ]
+       }
+      },
+      {
+       "layer": 1,
+       "height": 22,
+       "thickness": 13,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -125.0,
+         "y": -100.0,
+         "width": 250,
+         "height": 200,
+         "fill": "$brick"
+        }
+       ],
+       "sides": "$brick",
+       "facade": {
+        "bays": {
+         "width": 46,
+         "margin": 10
+        },
+        "storeys": {
+         "height": 13
+        },
+        "seed": 3,
+        "panels": [
+         {
+          "width": 16,
+          "height": 7.6,
+          "at": 3,
+          "steps": [
+           {
+            "shape": "rectangle",
+            "x": -9.2,
+            "y": -2.2,
+            "width": 18.4,
+            "height": 2.2,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.4,
+            "y": 7.6,
+            "width": 18.8,
+            "height": 1.3,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 0,
+            "width": 16,
+            "height": 7.6,
+            "fill": "$glass"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              -8.0,
+              0
+             ],
+             [
+              0.0,
+              0
+             ],
+             [
+              -8.0,
+              5.319999999999999
+             ]
+            ],
+            "fill": "rgba(200, 220, 235, 0.12)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 0,
+            "width": 16,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 6.8,
+            "width": 16,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 7.2,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 3.4,
+            "width": 16,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.35,
+            "y": 0,
+            "width": 0.7,
+            "height": 7.6,
+            "fill": "$frame"
+           }
+          ],
+          "lit_steps": [
+           {
+            "shape": "rectangle",
+            "x": -9.2,
+            "y": -2.2,
+            "width": 18.4,
+            "height": 2.2,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.4,
+            "y": 7.6,
+            "width": 18.8,
+            "height": 1.3,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 0,
+            "width": 16,
+            "height": 7.6,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 3.42,
+            "width": 16,
+            "height": 4.18,
+            "fill": "$lit_lo"
+           },
+           {
+            "shape": "circle",
+            "x": 3.1999999999999993,
+            "y": 3.04,
+            "radius": 3.52,
+            "fill": "rgba(255, 246, 215, 0.5)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 0,
+            "width": 16,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 6.8,
+            "width": 16,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 7.2,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 3.4,
+            "width": 16,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.35,
+            "y": 0,
+            "width": 0.7,
+            "height": 7.6,
+            "fill": "$frame"
+           }
+          ],
+          "detail": 5,
+          "fill": "$glass",
+          "lit_fill": "$lit_hi",
+          "lit": "$lit",
+          "emits": {
+           "strength": 0.04,
+           "reach": 60,
+           "color": "#ffcf8a"
+          }
+         }
+        ]
+       }
+      },
+      {
+       "layer": 2,
+       "height": 35,
+       "thickness": 3,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -129.0,
+         "y": -104.0,
+         "width": 258,
+         "height": 208,
+         "fill": "$roof"
+        },
+        {
+         "shape": "polygon",
+         "points": [
+          [
+           -129.0,
+           -104.0
+          ],
+          [
+           129.0,
+           -104.0
+          ],
+          [
+           61.0,
+           -36.0
+          ],
+          [
+           -61.0,
+           -36.0
+          ]
+         ],
+         "fill": "$roof_hi"
+        },
+        {
+         "shape": "polygon",
+         "points": [
+          [
+           -129.0,
+           104.0
+          ],
+          [
+           129.0,
+           104.0
+          ],
+          [
+           61.0,
+           36.0
+          ],
+          [
+           -61.0,
+           36.0
+          ]
+         ],
+         "fill": "$roof_lo"
+        },
+        {
+         "shape": "polygon",
+         "points": [
+          [
+           -129.0,
+           -104.0
+          ],
+          [
+           -61.0,
+           -36.0
+          ],
+          [
+           -61.0,
+           36.0
+          ],
+          [
+           -129.0,
+           104.0
+          ]
+         ],
+         "fill": "$roof"
+        },
+        {
+         "shape": "polygon",
+         "points": [
+          [
+           129.0,
+           -104.0
+          ],
+          [
+           61.0,
+           -36.0
+          ],
+          [
+           61.0,
+           36.0
+          ],
+          [
+           129.0,
+           104.0
+          ]
+         ],
+         "fill": "$roof_lo"
+        },
+        {
+         "shape": "line",
+         "points": [
+          [
+           -61.0,
+           -36.0
+          ],
+          [
+           61.0,
+           -36.0
+          ]
+         ],
+         "stroke": "$roof_hi",
+         "line_width": 1.2
+        },
+        {
+         "shape": "rectangle",
+         "x": 50.0,
+         "y": -70.0,
+         "width": 12,
+         "height": 12,
+         "fill": "$brick"
+        },
+        {
+         "shape": "rectangle",
+         "x": 52.0,
+         "y": -68.0,
+         "width": 8,
+         "height": 8,
+         "fill": "$frame"
+        }
+       ],
+       "sides": "$roof_lo"
+      }
+     ]
+    },
+    {
+     "name": "awning",
+     "at": [
+      0,
+      100.0
+     ],
+     "layers": [
+      {
+       "layer": 0,
+       "height": 14.5,
+       "thickness": 1.2,
+       "solid": false,
+       "cover": false,
+       "slope": [
+        0,
+        -0.45
+       ],
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -113.0,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning"
+        },
+        {
+         "shape": "rectangle",
+         "x": -96.85714285714286,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning_2"
+        },
+        {
+         "shape": "rectangle",
+         "x": -80.71428571428572,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning"
+        },
+        {
+         "shape": "rectangle",
+         "x": -64.57142857142857,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning_2"
+        },
+        {
+         "shape": "rectangle",
+         "x": -48.42857142857143,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning"
+        },
+        {
+         "shape": "rectangle",
+         "x": -32.28571428571429,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning_2"
+        },
+        {
+         "shape": "rectangle",
+         "x": -16.14285714285714,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning"
+        },
+        {
+         "shape": "rectangle",
+         "x": 0.0,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning_2"
+        },
+        {
+         "shape": "rectangle",
+         "x": 16.14285714285714,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning"
+        },
+        {
+         "shape": "rectangle",
+         "x": 32.28571428571428,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning_2"
+        },
+        {
+         "shape": "rectangle",
+         "x": 48.428571428571416,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning"
+        },
+        {
+         "shape": "rectangle",
+         "x": 64.57142857142858,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning_2"
+        },
+        {
+         "shape": "rectangle",
+         "x": 80.71428571428572,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning"
+        },
+        {
+         "shape": "rectangle",
+         "x": 96.85714285714286,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning_2"
+        },
+        {
+         "shape": "rectangle",
+         "x": -113.0,
+         "y": 8.4,
+         "width": 226,
+         "height": 1.6,
+         "fill": "rgba(0, 0, 0, 0.25)"
+        }
+       ],
+       "sides": "$awning",
+       "facade": {
+        "bays": {
+         "width": 16.142857142857142
+        },
+        "panels": [
+         {
+          "width": 15.842857142857142,
+          "height": 1.4,
+          "at": 0,
+          "fill": "$awning_2"
+         }
+        ]
+       }
+      }
+     ]
+    }
+   ],
+   "look": {
+    "layer": 1,
+    "lean": 2.2,
+    "values": {
+     "brick": "#6a3346",
+     "trim": "#efdcb6",
+     "edge": "#c99a52",
+     "board": "#2a1420",
+     "ink": "#ffd3f0",
+     "lintel": "#d9c39a",
+     "glass": "#2a1b14",
+     "frame": "#3a2116",
+     "door": "#3a2116",
+     "brass": "#d6b26a",
+     "bread": "#d89a4e",
+     "roof": "#4a2a20",
+     "roof_hi": "#5e382b",
+     "roof_lo": "#3a2018",
+     "lit_hi": "#ffd28a",
+     "lit_lo": "#f0a050",
+     "lit": 0.45,
+     "awning": "#8a5a9e",
+     "awning_2": "#efe2f2",
+     "number": ""
+    }
+   }
+  },
+  "bakery_teal": {
+   "extends": "engine:building",
+   "blocks_light": true,
+   "data": {
+    "label": "Rye & Rose"
+   },
+   "lights": [
+    {
+     "shape": "area",
+     "position": [
+      0,
+      114.0
+     ],
+     "size": [
+      210,
+      16
+     ],
+     "color": "#ffc46a",
+     "intensity": 0.75,
+     "glow": 0.25,
+     "height": 8
+    }
+   ],
+   "components": [
+    {
+     "name": "shop",
+     "at": [
+      0,
+      0
+     ],
+     "layers": [
+      {
+       "layer": 0,
+       "height": 0,
+       "thickness": 22,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -125.0,
+         "y": -100.0,
+         "width": 250,
+         "height": 200,
+         "fill": "$brick"
+        }
+       ],
+       "sides": "$brick",
+       "facade": {
+        "bays": {
+         "width": 46,
+         "margin": 10
+        },
+        "storeys": {
+         "height": 22
+        },
+        "bands": [
+         {
+          "from": 0,
+          "to": 1.4,
+          "fill": "$trim"
+         },
+         {
+          "from": 15.5,
+          "to": 22,
+          "fill": "$board",
+          "faces": [
+           "south"
+          ]
+         },
+         {
+          "from": 15.5,
+          "to": 16.1,
+          "fill": "$edge",
+          "faces": [
+           "south"
+          ]
+         },
+         {
+          "from": 21.4,
+          "to": 22,
+          "fill": "$edge",
+          "faces": [
+           "south"
+          ]
+         }
+        ],
+        "piers": [
+         {
+          "width": 3,
+          "to": 15.5,
+          "fill": "$trim",
+          "faces": [
+           "south"
+          ]
+         }
+        ],
+        "panels": [
+         {
+          "width": 38,
+          "height": 13,
+          "at": 1.6,
+          "steps": [
+           {
+            "shape": "rectangle",
+            "x": -19.0,
+            "y": 0,
+            "width": 38,
+            "height": 13,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -17.5,
+            "y": 1.5,
+            "width": 16.5,
+            "height": 9,
+            "fill": "$glass"
+           },
+           {
+            "shape": "rectangle",
+            "x": 1.0,
+            "y": 1.5,
+            "width": 16.5,
+            "height": 9,
+            "fill": "$glass"
+           },
+           {
+            "shape": "ellipse",
+            "x": -12.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": -9.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": -6.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": 6.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": 9.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": 12.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "rectangle",
+            "x": -19.0,
+            "y": 10.5,
+            "width": 38,
+            "height": 2.5,
+            "fill": "$trim"
+           }
+          ],
+          "lit_steps": [
+           {
+            "shape": "rectangle",
+            "x": -19.0,
+            "y": 0,
+            "width": 38,
+            "height": 13,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -17.5,
+            "y": 1.5,
+            "width": 16.5,
+            "height": 9,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": 1.0,
+            "y": 1.5,
+            "width": 16.5,
+            "height": 9,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -17.5,
+            "y": 6.45,
+            "width": 16.5,
+            "height": 4.05,
+            "fill": "$lit_lo"
+           },
+           {
+            "shape": "rectangle",
+            "x": 1.0,
+            "y": 6.45,
+            "width": 16.5,
+            "height": 4.05,
+            "fill": "$lit_lo"
+           },
+           {
+            "shape": "ellipse",
+            "x": -12.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": -9.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": -6.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": 6.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": 9.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "ellipse",
+            "x": 12.5,
+            "y": 9.36,
+            "radius_x": 1.6,
+            "radius_y": 1,
+            "fill": "$bread"
+           },
+           {
+            "shape": "rectangle",
+            "x": -19.0,
+            "y": 10.5,
+            "width": 38,
+            "height": 2.5,
+            "fill": "$trim"
+           }
+          ],
+          "lit": 1,
+          "detail": 4,
+          "fill": "$glass",
+          "lit_fill": "$lit_hi",
+          "faces": [
+           "south"
+          ],
+          "bays": [
+           0,
+           1,
+           3,
+           4
+          ],
+          "emits": {
+           "strength": 0.25,
+           "reach": 90,
+           "color": "#ffc46a"
+          }
+         },
+         {
+          "width": 14,
+          "height": 13,
+          "at": 1.6,
+          "steps": [
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": -4,
+            "width": 16,
+            "height": 4,
+            "fill": "$trim"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.0,
+            "y": 0,
+            "width": 14,
+            "height": 13,
+            "fill": "$trim"
+           },
+           {
+            "shape": "rectangle",
+            "x": -5.0,
+            "y": 1,
+            "width": 10,
+            "height": 12,
+            "fill": "$door"
+           },
+           {
+            "shape": "rectangle",
+            "x": -3.5,
+            "y": 2.5,
+            "width": 7,
+            "height": 4.55,
+            "fill": "$glass"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.4,
+            "y": 1,
+            "width": 0.8,
+            "height": 12,
+            "fill": "$frame"
+           },
+           {
+            "shape": "circle",
+            "x": 2.5,
+            "y": 8.06,
+            "radius": 0.7,
+            "fill": "$brass"
+           },
+           {
+            "shape": "text",
+            "text": "$number",
+            "x": 0,
+            "y": -2,
+            "size": 2.6,
+            "align": "center",
+            "baseline": "bottom",
+            "family": "Cinzel, serif",
+            "fill": "$brass"
+           }
+          ],
+          "lit_steps": [
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": -4,
+            "width": 16,
+            "height": 4,
+            "fill": "$trim"
+           },
+           {
+            "shape": "rectangle",
+            "x": -7.0,
+            "y": 0,
+            "width": 14,
+            "height": 13,
+            "fill": "$trim"
+           },
+           {
+            "shape": "rectangle",
+            "x": -5.0,
+            "y": 1,
+            "width": 10,
+            "height": 12,
+            "fill": "$door"
+           },
+           {
+            "shape": "rectangle",
+            "x": -3.5,
+            "y": 2.5,
+            "width": 7,
+            "height": 4.55,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.4,
+            "y": 1,
+            "width": 0.8,
+            "height": 12,
+            "fill": "$frame"
+           },
+           {
+            "shape": "circle",
+            "x": 2.5,
+            "y": 8.06,
+            "radius": 0.7,
+            "fill": "$brass"
+           },
+           {
+            "shape": "text",
+            "text": "$number",
+            "x": 0,
+            "y": -2,
+            "size": 2.6,
+            "align": "center",
+            "baseline": "bottom",
+            "family": "Cinzel, serif",
+            "fill": "$brass"
+           }
+          ],
+          "lit": 1,
+          "detail": 4,
+          "fill": "$door",
+          "faces": [
+           "south"
+          ],
+          "bays": [
+           2
+          ]
+         },
+         {
+          "width": 16,
+          "height": 7,
+          "at": 6,
+          "fill": "$glass",
+          "lit_fill": "$lit_lo",
+          "lit": "$lit",
+          "faces": [
+           "north",
+           "east",
+           "west"
+          ]
+         },
+         {
+          "width": 210,
+          "height": 5.4,
+          "at": 16,
+          "faces": [
+           "south"
+          ],
+          "bays": [
+           2
+          ],
+          "lit": 1,
+          "detail": 3,
+          "steps": [],
+          "lit_steps": [
+           {
+            "shape": "text",
+            "text": "Rye & Rose",
+            "x": 0,
+            "y": 2.9,
+            "size": 4.2,
+            "align": "center",
+            "baseline": "middle",
+            "family": "Cinzel, serif",
+            "fill": "$ink"
+           }
+          ]
+         }
+        ]
+       }
+      },
+      {
+       "layer": 1,
+       "height": 22,
+       "thickness": 26,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -125.0,
+         "y": -100.0,
+         "width": 250,
+         "height": 200,
+         "fill": "$brick"
+        }
+       ],
+       "sides": "$brick",
+       "facade": {
+        "bays": {
+         "width": 46,
+         "margin": 10
+        },
+        "storeys": {
+         "height": 13
+        },
+        "seed": 3,
+        "panels": [
+         {
+          "width": 16,
+          "height": 7.6,
+          "at": 3,
+          "steps": [
+           {
+            "shape": "rectangle",
+            "x": -9.2,
+            "y": -2.2,
+            "width": 18.4,
+            "height": 2.2,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.4,
+            "y": 7.6,
+            "width": 18.8,
+            "height": 1.3,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 0,
+            "width": 16,
+            "height": 7.6,
+            "fill": "$glass"
+           },
+           {
+            "shape": "polygon",
+            "points": [
+             [
+              -8.0,
+              0
+             ],
+             [
+              0.0,
+              0
+             ],
+             [
+              -8.0,
+              5.319999999999999
+             ]
+            ],
+            "fill": "rgba(200, 220, 235, 0.12)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 0,
+            "width": 16,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 6.8,
+            "width": 16,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 7.2,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 3.4,
+            "width": 16,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.35,
+            "y": 0,
+            "width": 0.7,
+            "height": 7.6,
+            "fill": "$frame"
+           }
+          ],
+          "lit_steps": [
+           {
+            "shape": "rectangle",
+            "x": -9.2,
+            "y": -2.2,
+            "width": 18.4,
+            "height": 2.2,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -9.4,
+            "y": 7.6,
+            "width": 18.8,
+            "height": 1.3,
+            "fill": "$lintel"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 0,
+            "width": 16,
+            "height": 7.6,
+            "fill": "$lit_hi"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 3.42,
+            "width": 16,
+            "height": 4.18,
+            "fill": "$lit_lo"
+           },
+           {
+            "shape": "circle",
+            "x": 3.1999999999999993,
+            "y": 3.04,
+            "radius": 3.52,
+            "fill": "rgba(255, 246, 215, 0.5)"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 0,
+            "width": 16,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 6.8,
+            "width": 16,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": 7.2,
+            "y": 0,
+            "width": 0.8,
+            "height": 7.6,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -8.0,
+            "y": 3.4,
+            "width": 16,
+            "height": 0.8,
+            "fill": "$frame"
+           },
+           {
+            "shape": "rectangle",
+            "x": -0.35,
+            "y": 0,
+            "width": 0.7,
+            "height": 7.6,
+            "fill": "$frame"
+           }
+          ],
+          "detail": 5,
+          "fill": "$glass",
+          "lit_fill": "$lit_hi",
+          "lit": "$lit",
+          "emits": {
+           "strength": 0.04,
+           "reach": 60,
+           "color": "#ffcf8a"
+          }
+         }
+        ]
+       }
+      },
+      {
+       "layer": 2,
+       "height": 48,
+       "thickness": 3,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -129.0,
+         "y": -104.0,
+         "width": 258,
+         "height": 208,
+         "fill": "$roof"
+        },
+        {
+         "shape": "polygon",
+         "points": [
+          [
+           -129.0,
+           -104.0
+          ],
+          [
+           129.0,
+           -104.0
+          ],
+          [
+           61.0,
+           -36.0
+          ],
+          [
+           -61.0,
+           -36.0
+          ]
+         ],
+         "fill": "$roof_hi"
+        },
+        {
+         "shape": "polygon",
+         "points": [
+          [
+           -129.0,
+           104.0
+          ],
+          [
+           129.0,
+           104.0
+          ],
+          [
+           61.0,
+           36.0
+          ],
+          [
+           -61.0,
+           36.0
+          ]
+         ],
+         "fill": "$roof_lo"
+        },
+        {
+         "shape": "polygon",
+         "points": [
+          [
+           -129.0,
+           -104.0
+          ],
+          [
+           -61.0,
+           -36.0
+          ],
+          [
+           -61.0,
+           36.0
+          ],
+          [
+           -129.0,
+           104.0
+          ]
+         ],
+         "fill": "$roof"
+        },
+        {
+         "shape": "polygon",
+         "points": [
+          [
+           129.0,
+           -104.0
+          ],
+          [
+           61.0,
+           -36.0
+          ],
+          [
+           61.0,
+           36.0
+          ],
+          [
+           129.0,
+           104.0
+          ]
+         ],
+         "fill": "$roof_lo"
+        },
+        {
+         "shape": "line",
+         "points": [
+          [
+           -61.0,
+           -36.0
+          ],
+          [
+           61.0,
+           -36.0
+          ]
+         ],
+         "stroke": "$roof_hi",
+         "line_width": 1.2
+        },
+        {
+         "shape": "rectangle",
+         "x": 50.0,
+         "y": -70.0,
+         "width": 12,
+         "height": 12,
+         "fill": "$brick"
+        },
+        {
+         "shape": "rectangle",
+         "x": 52.0,
+         "y": -68.0,
+         "width": 8,
+         "height": 8,
+         "fill": "$frame"
+        }
+       ],
+       "sides": "$roof_lo"
+      }
+     ]
+    },
+    {
+     "name": "awning",
+     "at": [
+      0,
+      100.0
+     ],
+     "layers": [
+      {
+       "layer": 0,
+       "height": 14.5,
+       "thickness": 1.2,
+       "solid": false,
+       "cover": false,
+       "slope": [
+        0,
+        -0.45
+       ],
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -113.0,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning"
+        },
+        {
+         "shape": "rectangle",
+         "x": -96.85714285714286,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning_2"
+        },
+        {
+         "shape": "rectangle",
+         "x": -80.71428571428572,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning"
+        },
+        {
+         "shape": "rectangle",
+         "x": -64.57142857142857,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning_2"
+        },
+        {
+         "shape": "rectangle",
+         "x": -48.42857142857143,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning"
+        },
+        {
+         "shape": "rectangle",
+         "x": -32.28571428571429,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning_2"
+        },
+        {
+         "shape": "rectangle",
+         "x": -16.14285714285714,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning"
+        },
+        {
+         "shape": "rectangle",
+         "x": 0.0,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning_2"
+        },
+        {
+         "shape": "rectangle",
+         "x": 16.14285714285714,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning"
+        },
+        {
+         "shape": "rectangle",
+         "x": 32.28571428571428,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning_2"
+        },
+        {
+         "shape": "rectangle",
+         "x": 48.428571428571416,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning"
+        },
+        {
+         "shape": "rectangle",
+         "x": 64.57142857142858,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning_2"
+        },
+        {
+         "shape": "rectangle",
+         "x": 80.71428571428572,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning"
+        },
+        {
+         "shape": "rectangle",
+         "x": 96.85714285714286,
+         "y": 0,
+         "width": 16.34285714285714,
+         "height": 10,
+         "fill": "$awning_2"
+        },
+        {
+         "shape": "rectangle",
+         "x": -113.0,
+         "y": 8.4,
+         "width": 226,
+         "height": 1.6,
+         "fill": "rgba(0, 0, 0, 0.25)"
+        }
+       ],
+       "sides": "$awning",
+       "facade": {
+        "bays": {
+         "width": 16.142857142857142
+        },
+        "panels": [
+         {
+          "width": 15.842857142857142,
+          "height": 1.4,
+          "at": 0,
+          "fill": "$awning_2"
+         }
+        ]
+       }
+      }
+     ]
+    }
+   ],
+   "look": {
+    "layer": 1,
+    "lean": 2.2,
+    "values": {
+     "brick": "#4a3a30",
+     "trim": "#efdcb6",
+     "edge": "#c99a52",
+     "board": "#3a2014",
+     "ink": "#ffbf4d",
+     "lintel": "#d9c39a",
+     "glass": "#2a1b14",
+     "frame": "#3a2116",
+     "door": "#3a2116",
+     "brass": "#d6b26a",
+     "bread": "#d89a4e",
+     "roof": "#4a2a20",
+     "roof_hi": "#5e382b",
+     "roof_lo": "#3a2018",
+     "lit_hi": "#ffd28a",
+     "lit_lo": "#f0a050",
+     "lit": 0.45,
+     "awning": "#3f7f7a",
+     "awning_2": "#efe6cf",
+     "number": ""
+    }
+   }
+  }
+ }
+}

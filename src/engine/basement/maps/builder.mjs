@@ -1,4 +1,5 @@
 // ===== LV0 BASEMENT =====
+import { rowPlacements } from './rows.mjs';
 import { layoutGeometry } from '../physics/index.mjs';
 import { resolveDoorKinds, doorKind, doorLeaves, doorOpening, leafIds } from './doors.mjs';
 import { markerComponent, readMarker } from './markers.mjs';
@@ -127,7 +128,8 @@ export function buildMapPackets(definition, { templates = {}, decorate = null, p
     // A placement that names a catalog `object` is made from that record at its centre (or `at`), its size and
     // shape the record's own; `width` and `height` may be left out. Its `look` is laid over the object's own (its
     // `values` merged), so one template stands in many colourways, names on its sign and all.
-    (definition.placements ?? []).forEach((p, i) => {
+    // A map's `rows` (rows.mjs) line its streets with buildings: each becomes one more object placement after its own.
+    [...(definition.placements ?? []), ...rowPlacements(definition)].forEach((p, i) => {
         if (p.object !== undefined) {
             if (typeof make_object !== 'function') throw new TypeError(`Map placement ${i} names the object ${p.object}: give the builder make_object`);
             const at = p.at ?? [finite(p.x, 'x') + (p.width ?? 0) / 2, finite(p.y, 'y') + (p.height ?? 0) / 2];
