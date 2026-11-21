@@ -1,13 +1,13 @@
 // ===== LV0 BASEMENT =====
 import {renderFrame} from './frame.mjs';
 import {geometry,material,requirements} from './packets.mjs';
-import {effectStack,effectNeeds,effectTargets} from './effects.mjs';
+import {effectStack,effectsAt,effectNeeds,effectTargets} from './effects.mjs';
 import {finite,identifier,freezeData,CAPABILITIES} from './values.mjs';
 import {artScene} from './art.mjs';
 import {drawLook,drawComponents,componentCovers,fallen} from './looks.mjs';
 import {heightView} from './height.mjs';
 import {createLightLayerParts,entityLights} from './lighting.mjs';
-import {GLARE,glarePackets} from './glare.mjs';
+import {GLARE,glarePackets,readGlare} from './glare.mjs';
 import {particlePackets} from './particles.mjs';
 const OVER_ALL=1e9;   // the layer of what is drawn over everything in its pass (glare, particles)
 const PICK_STEPS=Object.freeze([1,.75,.5,.25,0]);   // top first: what the camera sees of a tall thing is its top
@@ -190,15 +190,18 @@ export class renderSystem {
      * layer is drawn at `scale` of the frame (the light is soft; half the pixels is a quarter of the cost), in
      * tiles of `tile_size` world units cached as pictures. With `glare` (true or the night's glare settings,
      * readGlare) each of those lights that asks for it (`glare` on the light) gets the lens's star and fog over
-     * the finished layer, at full size (drawGlare). Returns how many lights it drew.
+     * the finished layer, at full size (drawGlare). `amount` (0 to 1) is how much of the night there is: the layer
+     * and the glare are laid at that strength, so a dusk can deepen into the night (0 draws nothing). Returns how
+     * many lights it drew.
      */
-    drawNight({tint,lights=[],grids=[],areas=[],cuts=[],carried=true,scale=.5,tile_size=256,margin=64,key='night',blend=1,glare=null}={}){
+    drawNight({tint,lights=[],grids=[],areas=[],cuts=[],carried=true,scale=.5,tile_size=256,margin=64,key='night',blend=1,glare=null,amount=1}={}){
         this.#live();if(!this.#collecting)throw new Error('Draw the night inside an open render frame');
+        if(!(amount>=0&&amount<=1))throw new RangeError('Night amount is 0 to 1');if(amount<.001)return 0;
         const extent=this.#camera.getVisibleBounds({blend,margin}),all=[...(carried?this.visibleLights(blend):[]),...lights];
         const parts=createLightLayerParts({extent,tint,areas,lights:all,grids,cuts,over:this.nightOver(),key,tile_size,view:extent});
-        this.#frame.beginPass({layer:{scale},clear_color:'transparent'});
+        this.#frame.beginPass({layer:{scale,opacity:amount},clear_color:'transparent'});
         try{for(const part of parts)this.#frame.submit(part.picture&&!part.type?{type:'picture',...part}:part);}finally{this.#frame.endPass();}
-        if(glare)this.drawGlare({lights:all,settings:glare===true?undefined:glare,carried:false,blend});
+        if(glare){const g=readGlare(glare===true?undefined:glare);this.drawGlare({lights:all,settings:amount<1?{...g,strength:g.strength*amount}:g,carried:false,blend});}
         return all.length;
     }
     /**
@@ -288,7 +291,7 @@ export class renderSystem {
      * Effects on everything drawn from now on (a list of effects, or {preset, ...changes} naming an `effects`
      * resource in the world's data), or null for none. See effects.mjs.
      */
-    setEffects(effects){this.#live();this.#effects=this.#stack(effects);return this;}
+    setEffects(effects,{amount=1}={}){this.#live();this.#effects=effectsAt(this.#stack(effects),amount);return this;}
     /** Effects on one packet layer number alone, drawn as a pass of its own (null removes them). */
     setLayerEffects(layer,effects){this.#live();if(!Number.isFinite(layer))throw new TypeError('A layer is a number');const stack=this.#stack(effects);if(stack.length)this.#layerEffects.set(layer,stack);else this.#layerEffects.delete(layer);return this;}
     /** A stack read from a list or a preset in the world's data. */

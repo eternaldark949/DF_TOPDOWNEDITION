@@ -246,6 +246,29 @@ test('the loop draws a map\'s night and particles from its data: covers in drawL
     e.dispose();
 });
 
+test('the loop steps the world clock with the game, and a map with the day_night switch lays its night from the clock\'s darkness', async () => {
+    const { mapLevel } = await import('../lobby/runtime/map-level.mjs');
+    const phases = [{ name: 'day', from: '07:00', dark: 0 }, { name: 'dusk', from: '17:00', dark: 0 }, { name: 'evening', from: '19:00', dark: 0.5 }, { name: 'night', from: '21:00', dark: 1 }, { name: 'dawn', from: '05:00', dark: 1 }];
+    const city = { map_id: 'city', size: [256, 256], night: { tint: 'rgba(24, 0, 78, 0.72)', effects: [{ type: 'grade', tint: '#d0a0ff', tint_amount: 0.5 }] }, switches: { day_night: true } };
+    class Place extends mapLevel { mapDefinition() { return { definition: city }; } }
+    const e = new gameEngine({ asset_library: createEngineRegistry({ libraries: [] }), schedule_frame: null, render: { create_surface: () => ({}) }, time: { start: { time: '16:00' }, speed: 3600, phases } });
+    e.registerLevel('city', Place); const render = e.basement.render; await render.setRenderer('recording');
+    assert.equal(e.time, e.lobby.time); assert.equal(e.time.text(), '16:00');
+    const amounts = []; const own = render.drawNight.bind(render); render.drawNight = options => { amounts.push(options.amount); return own(options); };
+    const level = await e.loadLevel('city'), step = e.basement.physics.config.fixed_step;
+    assert.equal(level.night_on, false, 'by day its night is off');
+    e.start(); const hour = Math.round(1 / step);
+    for (let i = 0; i < hour * 3.5; i++) e.updateState();
+    assert.equal(e.time.text(), '19:30'); assert.ok(e.time.is('evening')); assert.equal(level.night_on, true, 'the evening turns it on');
+    e.render(1); assert.ok(Math.abs(amounts.at(-1) - 0.625) < 0.01, 'laid at the clock\'s darkness');
+    assert.ok(Math.abs(render.getEffects().frame[0].tint_amount - 0.3125) < 0.01, 'and its effects come in with it');
+    const resume = e.pause('menu'); for (let i = 0; i < hour; i++) e.updateState(); assert.equal(e.time.text(), '19:30', 'the clock pauses with the game'); resume();
+    e.time.setTime({ time: '23:00' }); e.updateState(); e.render(1); assert.ok(amounts.at(-1) > 0.99, 'the full night');
+    e.time.setTime({ time: '12:00' }); e.updateState(); assert.equal(level.night_on, false, 'and the day takes it off'); assert.deepEqual(render.getEffects().frame, []);
+    e.dispose();
+    assert.throws(() => new gameEngine({ asset_library: createEngineRegistry({ libraries: [] }), schedule_frame: null, time: { sped: 2 } }), /unknown field sped/);
+});
+
 const toys = { library_id: 'toys', resources: {
     lamp: { kind: 'drawing', steps: [{ shape: 'glow', radius: 60, color: '#ffd27f' }, { shape: 'circle', radius: 10, material: 'brass', solid: true }, { shape: 'rectangle', x: -2, y: 10, width: 4, height: 30, material: 'brass', solid: true }] },
     brass: { kind: 'material', fill: '#b5a642' } },

@@ -20,6 +20,7 @@ What the engine is meant to become is in [READ-FIRST/ENGINE-API.md](../../READ-F
   - [Controls](#controls)
 - [Lobby (LV1)](#lobby-lv1)
   - [The clock and pausing](#the-clock-and-pausing)
+  - [The world's clock: time of day](#the-worlds-clock-time-of-day)
   - [Levels](#levels)
   - [Map levels](#map-levels)
   - [Travel](#travel)
@@ -81,7 +82,8 @@ Levels and systems get a **context** with the same jacks (`context.basement`, `c
 
 | Call | What it does |
 |---|---|
-| `new gameEngine({ physics, controls, camera, clock, services })` | Makes the engine. `services` are your game's own systems, found later under `engine.game` |
+| `new gameEngine({ physics, controls, camera, clock, time, services })` | Makes the engine. `time` is the world clock's record (see [The world's clock](#the-worlds-clock-time-of-day)); `services` are your game's own systems, found later under `engine.game` |
+| `engine.time` | The world's clock: date, time of day, the day's phase and how dark it is |
 | `engine.registerLevel(id, LevelClass)` | Adds a level (a `gameLevel` subclass) |
 | `await engine.loadLevel(id, options)` | Leaves the current level and enters this one |
 | `engine.unloadLevel()` | Leaves the current level |
@@ -334,7 +336,7 @@ The calls are `drawRectangle`, `drawCircle`, `drawEllipse`, `drawCapsule`, `draw
 | `fitBounds(steps, bounds)` | The collision shape that fits a drawing's solid steps: `circle`, `box`, `capsule` or `hull` |
 | `drawingReach(steps)` | The circle round everything a drawing paints, glows included |
 
-The light layer (`createLightLayer`) draws lights and shadows. A night is one call after `drawLooks(1, {covers: 24})`: `renderSystem.drawNight({tint, grids, cuts})` lays the dark over the frame with the lights every visible thing carries (a template's `lights`, in its own frame, placed and turned with it; a light marked `over: true` stands above the roofs), keeps the night on roofs that lean over the light on the ground, and lets lit windows and glowing steps shine through. A template marked `blocks_light: true` (a building) stops the glow of its own windows at its walls. Glowing art lights its surroundings through the light grid: `bakeLightGrid` bakes one region's grid from `emits` shapes (cell 16 or 32, walls stop it), `createLightLayerParts({grids})` draws it into the light tiles as a cut and a colour, and `lightGridSystem` keeps a map's grids current per region (a map's `light_grid: {cell, spread, strength, regions}` settings, moving emitters re-baking what they reach). See the rendering README's Light grid section. Floors shine through `reflect` on a material or floor step (`{strength, wet, plane}`), and a `reflectionPass` lays the reflection on the ground each frame (give `drawNight` its `darknessCut()` as `cuts` so it shows through the night): lights' mirrored glows, glowing shapes, baked probes, bodies (screen-space reflection on WebGL, silhouettes on Canvas) and reflection planes in full art; see the rendering README's Reflections section. A map light's `height` sets where its reflection falls. **Glare and particles.** A light with `glare: true` (or `{reach, ...}`) gets the lens's star and fog over it when the night is drawn with `drawNight({..., glare})`, or with `render.drawGlare({settings})`; `render.drawParticles({blend})` draws every physics particle system that has a `look` (`streak`, `dot` or `ring`, leaning with the height view, near lights in their colour; `readParticleLook` checks a look). A map's `night: {tint, scale, effects, glare}` holds the night as data (`readNight`, `readGlare` check it); see the rendering README's Glare, particles and night settings section. Colour helpers: `rgba`, `mix`, `shade`, `hexToRgb`.
+The light layer (`createLightLayer`) draws lights and shadows. A night is one call after `drawLooks(1, {covers: 24})`: `renderSystem.drawNight({tint, grids, cuts})` lays the dark over the frame with the lights every visible thing carries (a template's `lights`, in its own frame, placed and turned with it; a light marked `over: true` stands above the roofs), keeps the night on roofs that lean over the light on the ground, and lets lit windows and glowing steps shine through. A template marked `blocks_light: true` (a building) stops the glow of its own windows at its walls. Glowing art lights its surroundings through the light grid: `bakeLightGrid` bakes one region's grid from `emits` shapes (cell 16 or 32, walls stop it), `createLightLayerParts({grids})` draws it into the light tiles as a cut and a colour, and `lightGridSystem` keeps a map's grids current per region (a map's `light_grid: {cell, spread, strength, regions}` settings, moving emitters re-baking what they reach). See the rendering README's Light grid section. Floors shine through `reflect` on a material or floor step (`{strength, wet, plane}`), and a `reflectionPass` lays the reflection on the ground each frame (give `drawNight` its `darknessCut()` as `cuts` so it shows through the night): lights' mirrored glows, glowing shapes, baked probes, bodies (screen-space reflection on WebGL, silhouettes on Canvas) and reflection planes in full art; see the rendering README's Reflections section. A map light's `height` sets where its reflection falls. **Glare and particles.** A light with `glare: true` (or `{reach, ...}`) gets the lens's star and fog over it when the night is drawn with `drawNight({..., glare})`, or with `render.drawGlare({settings})`; `render.drawParticles({blend})` draws every physics particle system that has a `look` (`streak`, `dot` or `ring`, leaning with the height view, near lights in their colour; `readParticleLook` checks a look). The glare's `rays` (how many long rays, a short one between each two), `hot` and `hot_reach` (the white-hot core and how far along a ray the light's colour takes over) and `color` (for a light with none) are data like its reach; a look's `band_count`, `band_alpha` and `band_width` (its height bands) and `lit_color`, `lit_alpha` and `lit_width` (how it takes a light) too. `drawNight({amount})` lays the night at a strength (0 to 1). A map's `night: {tint, scale, effects, glare, covers}` holds the night as data (`readNight`, `readGlare` check it); see the rendering README's Glare, particles and night settings section. Colour helpers: `rgba`, `mix`, `shade`, `hexToRgb`.
 
 Reference: [rendering README](basement/rendering/README.md).
 
@@ -441,6 +443,35 @@ const resume = engine.pause('menu');
 resume();
 ```
 
+### The world's clock: time of day
+
+`engine.time` (also `engine.lobby.time`, and `context.lobby.time` in hooks) is the world's clock, a Basement `worldClock` (`basement/timers`) that the loop steps after physics each fixed step, so it pauses and speeds up with the game. It is a calendar clock after the Python `timeSystem` in `docs/engine-reference/`: it moves `speed` game seconds a second of play and carries seconds into minutes, hours, days, months (with their lengths and leap years as data) and years. The day is cut into phases as data; each starts at a time of day and says how dark it is (`dark`, 0 day to 1 the full night) and may name colours (a sky, a sun), and both blend into the next phase's across it.
+
+```js
+const engine = new gameEngine({ asset_library, time: registry.getResource('time:city_clock') });
+engine.time.text();            // "23:00"
+engine.time.phase.name;        // "night"; also .from, .to, .progress, .next
+engine.time.darkness;          // 1
+engine.time.color('sky');      // "#020204"
+engine.time.on('phase', ({ name, previous }) => { /* lamps on at dusk */ });
+engine.time.setTime({ time: '06:30' }); engine.time.setSpeed(60);
+```
+
+| Call | What it does |
+|---|---|
+| `time.configure(record)` | Takes a clock record (`world_clock`: `{start: {year, month, day, time}, speed, months, leap, separator, phases: [{name, from, dark, colors}]}`) and sets the clock to its start |
+| `time.year`, `month`, `month_name`, `day`, `hour`, `minute`, `second`, `time_of_day` | The date and time now (`time_of_day` in seconds into the day) |
+| `time.text({seconds})` / `time.date()` | "HH:MM" (or "HH:MM:SS") with the record's separator; "month.day.year" |
+| `time.setTime({year, month, day, time})` or `({hour, minute, second})` | Sets it; minutes and seconds past 59 and hours past 23 carry over |
+| `time.setSpeed(k)` / `time.speed` | Game seconds a second of play (0 stops the clock) |
+| `time.phase` / `time.is(name)` | The phase now `{name, from, to, progress, dark, colors, next}` |
+| `time.darkness` / `time.color(name)` | How dark it is now (0 to 1) and a phase colour now, both blended across the phase |
+| `time.on('hour' or 'day' or 'phase', fn)` | Told of each new hour, day and phase as the clock passes them (in order, however fast it runs); returns the call that stops it |
+| `time.state()` / `time.restore(state)` | The clock as plain data for a save, and back |
+| `time.updateState(seconds)` | Moves it on (only the loop calls this) |
+
+A clock with no phases is always 'day' and never dark. A map with `switches: {day_night: true}` lays its night from the clock (see [Map levels](#map-levels)).
+
 ### Levels
 
 A level is a `gameLevel` subclass. It holds content and policy; it never owns the world or the clock.
@@ -455,7 +486,7 @@ A level is a `gameLevel` subclass. It holds content and policy; it never owns th
 
 ### Map levels
 
-`mapLevel` is a level that loads a map: give it a map definition and it builds the map, streams it, places travellers and exposes its exits. With `switches: {light_grid: true}` in the map it also keeps the map's light grid (`level.light_grid`): glowing art lights its surroundings, baked per region and re-baked round moving emitters within a budget after physics. Draw it with `createLightLayerParts({..., grids: level.light_grid.grids(view)})`, add `level.light_grid.liveLights()` to the live lights, and read `level.light_grid.sample(x, y)` for reflections. A map's `height_view: {eye, lean = 1}` sets the camera's height view on entry (`renderSystem.setHeightView`; how high the eye stands over the ground in world units, and how far walls lean from it) and clears it on leaving: a low eye (a few hundred) shows tall facades, a high one keeps the view near flat. A map's `night` record is kept as `level.night` for whoever draws the frame (`drawNight` with the night's tint, scale and glare), its `particles: [{system, area: 'view' | [x, y, w, h], at, margin = 96}]` are made on entry as `level.particles` (a `system` is a record or a `particle_system` resource id; `area: 'view'` keeps the births over the camera's view, `margin` past it, after each step) and drawn by `render.drawParticles`, and `level.setNight(context, on)` puts the night's `effects` on the frame (`render.setEffects`) or takes them off; the game's clock says when it is night. The loop draws the rest itself: a level's `lookOptions(context, blend)` is what its `drawLooks` gets (`{covers: night.covers}` while the night is on), and `mapLevel.render` draws the night (tint, scale, glare, the light grid) and then the particles. Leaving the map takes them off and removes its particle systems.
+`mapLevel` is a level that loads a map: give it a map definition and it builds the map, streams it, places travellers and exposes its exits. With `switches: {light_grid: true}` in the map it also keeps the map's light grid (`level.light_grid`): glowing art lights its surroundings, baked per region and re-baked round moving emitters within a budget after physics. Draw it with `createLightLayerParts({..., grids: level.light_grid.grids(view)})`, add `level.light_grid.liveLights()` to the live lights, and read `level.light_grid.sample(x, y)` for reflections. A map's `height_view: {eye, lean = 1}` sets the camera's height view on entry (`renderSystem.setHeightView`; how high the eye stands over the ground in world units, and how far walls lean from it) and clears it on leaving: a low eye (a few hundred) shows tall facades, a high one keeps the view near flat. A map's `night` record is kept as `level.night` for whoever draws the frame (`drawNight` with the night's tint, scale and glare), its `particles: [{system, area: 'view' | [x, y, w, h], at, margin = 96}]` are made on entry as `level.particles` (a `system` is a record or a `particle_system` resource id; `area: 'view'` keeps the births over the camera's view, `margin` past it, after each step) and drawn by `render.drawParticles`, and `level.setNight(context, on)` puts the night's `effects` on the frame (`render.setEffects`) or takes them off. With `switches: {day_night: true}` the world's clock says when: after each step the night is on while `engine.time.darkness` is above nothing and laid at that darkness (`drawNight({amount})`), so a dusk deepens into the night and a dawn lifts it; a clock with no phases leaves `setNight` to the game. The loop draws the rest itself: a level's `lookOptions(context, blend)` is what its `drawLooks` gets (`{covers: night.covers}` while the night is on), and `mapLevel.render` draws the night (tint, scale, glare, the light grid) and then the particles. Leaving the map takes them off and removes its particle systems.
 
 | Member | What it does |
 |---|---|
@@ -480,6 +511,7 @@ The data layer, through `engine.directory`. It defines what each kind of data lo
 | `assets.getTemplate(id)` / `assets.getResource(id)` / `assets.listTemplates()` | Finds data by id |
 | `directory.validateMapLayout(layout)`, `validatePropCatalog`, `validateSkeleton`, `validateDrawing`, `validateMaterial`, … | Checks data against its structure (a library is checked when it is registered) |
 | `directory.resolvePlacement`, `resolveLayout`, `resolvePropLook` | Turns layout data into what the map builder reads |
+| a `world_clock` resource | The world's clock as data (checked by `readWorldClock`), handed to `new gameEngine({time})` or `engine.time.configure` |
 
 Reference: [Directory README](directory/README.md).
 

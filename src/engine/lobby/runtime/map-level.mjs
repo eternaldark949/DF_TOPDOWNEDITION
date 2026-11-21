@@ -31,7 +31,11 @@ export class mapLevel extends gameLevel {
         // How the map looks at night, as its data says: whoever draws the frame reads it (drawNight with `night`);
         // setNight turns the night's frame effects on and off.
         this.night = prepared.definition.night ? readNight(prepared.definition.night) : null;
-        this.night_on = false;
+        this.night_on = false; this.night_amount = 1;
+        // With the map's `day_night` switch its night follows the world's clock: on while the clock's darkness is
+        // above nothing, laid at that darkness (a dusk deepens into the night, a dawn lifts it).
+        this.day_night = !!(prepared.definition.switches?.day_night && this.night);
+        this.followClock(context);
         // The map's particle systems (rain, snow, embers): made now, stepped by physics, removed on leaving. One
         // whose area is 'view' is kept on what the camera sees after each step, so it falls wherever you look.
         this.particles = (prepared.definition.particles ?? []).map(p => ({ id: context.basement.physics.createParticleSystem(p.system, { ...(Array.isArray(p.area) ? { area: p.area } : {}), ...(p.at ? { at: p.at } : {}) }), view: p.area === 'view', margin: p.margin ?? 96 }));
@@ -41,7 +45,7 @@ export class mapLevel extends gameLevel {
         this.light_grid?.updateState({ budget_ms: Infinity });
     }
     afterPhysics(context, seconds) {
-        this.followView(context);
+        this.followView(context); this.followClock(context);
         this.map.setFocus(this.mapFocuses(context), { budget_ms: this.mapStreamBudget(context) }); this.map.updateState(this.mapUpdateOptions(context));
         if (this.light_grid) { this.light_grid.setMovers(this.light_grid.moversOf(this.lightGridMovers(context))); this.light_grid.updateState({ budget_ms: this.lightGridBudget(context) }); }
     }
@@ -67,13 +71,19 @@ export class mapLevel extends gameLevel {
     mapUpdateOptions(context) { return {}; }
     /**
      * Turns the map's night on or off for drawing: on, the frame takes the night's `effects` (render.setEffects);
-     * off, they are cleared. The game's clock says when it is night; the level only keeps the look. Returns
-     * whether the night is on. A map with no `night` stays off.
+     * off, they are cleared. The world's clock says when it is night (the `day_night` switch calls this from it);
+     * the level only keeps the look. Returns whether the night is on. A map with no `night` stays off.
      */
     setNight(context, on) {
-        const render = context.basement.render, next = !!on && !!this.night;
-        if (render && next !== this.night_on && this.night?.effects) render.setEffects(next ? this.night.effects : null);
+        const render = context.basement.render, next = !!on && !!this.night, amount = this.day_night ? this.night_amount : 1;
+        // The night's effects come in with it, at as much of the night as there is (re-laid as that changes by a step's worth).
+        if (render && this.night?.effects && (next !== this.night_on || (next && Math.abs(amount - (this.effects_amount ?? 1)) > .01))) { render.setEffects(next ? this.night.effects : null, { amount: next ? amount : 1 }); this.effects_amount = amount; }
         this.night_on = next; return next;
+    }
+    /** With the `day_night` switch, turns the night on and off and sets how much of it there is from the world's clock. */
+    followClock(context) {
+        if (!this.day_night) return; const time = context.lobby?.time; if (!time?.settings.phases.length) return;   // (a clock with no phases says nothing of the night)
+        const dark = time.darkness; this.night_amount = dark; this.setNight(context, dark > .001);
     }
     /** At night the looks keep what stands over the night's `covers` height (roofs keep the dark; lit windows shine). */
     lookOptions(context, blend) { return this.night_on ? { covers: this.night.covers } : {}; }
@@ -85,7 +95,7 @@ export class mapLevel extends gameLevel {
         const render = context.basement.render; if (!render) return;
         if (this.night_on) {
             const view = context.basement.camera?.getVisibleBounds({ blend, margin: 64 }) ?? null;
-            render.drawNight({ tint: this.night.tint, scale: this.night.scale, glare: this.night.glare, grids: this.light_grid?.grids(view) ?? [], lights: this.light_grid?.liveLights() ?? [], blend });
+            render.drawNight({ tint: this.night.tint, scale: this.night.scale, glare: this.night.glare, amount: this.day_night ? this.night_amount : 1, grids: this.light_grid?.grids(view) ?? [], lights: this.light_grid?.liveLights() ?? [], blend });
         }
         if (this.particles?.length) render.drawParticles({ blend });
     }

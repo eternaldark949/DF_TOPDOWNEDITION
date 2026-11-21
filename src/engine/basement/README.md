@@ -4,6 +4,7 @@ The mechanisms any game could use: physics, forces, joints, motors, rigs and ani
 
 - **May import:** only `src/engine/basement/`.
 - **Must never:** import another level or the game, contain a game name, read game globals, or advance itself. Each system exposes `updateState()` and the Lobby calls it.
+- **Timers:** the world's clock, [`timers/`](timers/README.md): the date and time of day, the day's phases and how dark each is, stepped by the Lobby.
 - **Units:** one length unit everywhere, the world unit; [`units/`](units/README.md) says how many make a metre and reads `"3 m"` or `"24 cm"` in data.
 - **Layout:** one package per folder, each with its own `README.md` (API), `tests/` and, where useful, `examples/` and `benchmarks/`.
 - **Banner:** every `.mjs` file starts with `// ===== LV0 BASEMENT =====`.

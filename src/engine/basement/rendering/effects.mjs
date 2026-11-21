@@ -80,6 +80,18 @@ export function effectStack(value,resolve=null){
     }
     throw new TypeError('Effects are a list of effects or {preset, ...changes}');
 }
+// Each effect's fields at no effect at all: `effectsAt` blends towards them.
+const NEUTRAL=Object.freeze({grade:{exposure:0,contrast:1,saturation:1,hue_amount:0,tint_amount:0},vignette:{strength:0},grain:{amount:0},
+    bloom:{strength:0},fog_glow:{strength:0},star_glow:{strength:0},bokeh:{highlights:0},reflection:{strength:0}});
+/**
+ * A read stack (effectStack) laid at `amount` (0 to 1): each effect's strengths blended from none (0) to its own (1),
+ * so a stack can come in by degrees (a night's grade at dusk). 1 gives the stack itself; 0 an empty one.
+ */
+export function effectsAt(stack,amount){
+    if(!(amount>=0&&amount<=1))throw new RangeError('An effects amount is 0 to 1');
+    if(amount>=1)return stack;if(amount<=0)return Object.freeze([]);
+    return Object.freeze(stack.map(e=>{const none=NEUTRAL[e.type],out={...e};for(const [k,v] of Object.entries(none))out[k]=v+(e[k]-v)*amount;return Object.freeze(out);}));
+}
 /** The capabilities a stack needs. */
 export const effectNeeds=stack=>stack.map(e=>`effect:${e.type}`);
 /** The render targets a stack reads (a reflection's height, mask, probe and plane). */

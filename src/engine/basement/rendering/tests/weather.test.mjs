@@ -3,7 +3,7 @@
 // drawn from what physics moves, and the night settings a map holds.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {cameraSystem,renderSystem,recordingRenderer,heightView,GLARE,readGlare,glarePackets,PARTICLE_LOOK,readParticleLook,particlePackets,NIGHT,readNight} from '../index.mjs';
+import {cameraSystem,renderSystem,recordingRenderer,heightView,effectStack,effectsAt,GLARE,readGlare,glarePackets,PARTICLE_LOOK,readParticleLook,particlePackets,NIGHT,readNight} from '../index.mjs';
 import {physicsSystem} from '../../physics/index.mjs';
 
 const fixture=async()=>{const world=new physicsSystem(),camera=new cameraSystem({position:[200,200],viewport:{width:400,height:400}});
@@ -100,4 +100,36 @@ test('the render system draws glare after the night and particles over everythin
     const last=passes[passes.length-1].packets;assert.ok(last.some(p=>p.type==='sprite'),'the glare comes after the night\'s layer');
     assert.ok(last[last.length-1].type==='shape','the particles are drawn last');
     render.beginFrame();assert.equal(render.drawGlare({settings:{reach:20}}),1);render.endFrame();
+});
+
+test('the glare\'s rays, hot colour and fallback light colour are data',()=>{
+    assert.throws(()=>readGlare({rays:2.5}),/whole number/);assert.throws(()=>readGlare({hot:'white'}),/colour/);assert.throws(()=>readGlare({rays:40}),/rays/);
+    const star=settings=>glarePackets([{shape:'point',position:[0,0],radius:80,intensity:1,glare:{fog:0,...settings}}]).find(p=>p.type==='sprite').pixels;
+    const lit=px=>{let n=0;for(let i=3;i<px.data.length;i+=4)if(px.data[i]>0)n++;return n;};
+    assert.ok(lit(star({rays:6}))>lit(star({rays:4})),'more rays light more of the star');
+    assert.ok(lit(star({diagonal:0}))<lit(star({})),'no short rays without a diagonal');
+    const px=star({});
+    const tinted=star({color:'#40ff40'}),core=star({hot:'#ff0000',core:.3});
+    assert.notEqual(tinted,px,'a light with no colour takes the glare\'s colour');assert.ok(tinted.data[(64*128+100)*4+1]>=tinted.data[(64*128+100)*4],'green along the ray');
+    assert.ok(core.data[(64*128+64)*4]>200&&core.data[(64*128+64)*4+1]<120,'the hot colour at the core');
+});
+
+test('a particle look\'s height bands and its lit colour are data',()=>{
+    assert.throws(()=>readParticleLook({band_count:2.5}),/whole number/);assert.throws(()=>readParticleLook({lit_color:'pink'}));
+    const world=rained(60,{...RAIN,on_land:null,look:{...RAIN.look,lit:false}}),systems=world.readParticleSystems();
+    const bandsOf=look=>particlePackets(systems.map(s=>({...s,look:{...s.look,...look}})),{bounds}).length;
+    assert.equal(bandsOf({}),4,'four bands by default');assert.equal(bandsOf({band_count:8}),8);
+    const widths=look=>particlePackets(systems.map(s=>({...s,look:{...s.look,...look}})),{bounds}).map(p=>p.material.stroke_width).filter(Number.isFinite);
+    const w=widths({band_width:4});assert.ok(Math.max(...w)/Math.min(...w)>2.5,'the highest band as many times as wide as asked');
+    const plainLamp=[{shape:'point',position:[200,200],radius:400,intensity:1}];
+    const lit=rained().readParticleSystems().map(s=>({...s,look:{...s.look,lit_color:'#00ff00'}}));
+    assert.ok(particlePackets(lit,{bounds,lights:plainLamp}).some(p=>/rgba\(0,255,0,/.test(p.material.stroke??'')),'a light with no colour lends the look\'s lit_color');
+});
+
+test('an effects stack laid by degrees: strengths blend from none to their own',()=>{
+    const stack=effectStack([{type:'grade',hue:'#a040ff',hue_amount:.4,tint_amount:.3,contrast:1.4},{type:'vignette',strength:.5}]);
+    assert.equal(effectsAt(stack,1),stack);assert.deepEqual(effectsAt(stack,0),[]);
+    const [g,v]=effectsAt(stack,.5);
+    assert.ok(Math.abs(g.hue_amount-.2)<1e-9&&Math.abs(g.tint_amount-.15)<1e-9&&Math.abs(g.contrast-1.2)<1e-9);assert.equal(g.hue,'#a040ff','colours stay');assert.equal(v.strength,.25);
+    assert.throws(()=>effectsAt(stack,2),/0 to 1/);
 });

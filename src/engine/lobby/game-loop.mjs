@@ -5,6 +5,7 @@
 // running systems and the other jacks; it builds none of them and knows nothing about the game.
 import { levelLobby } from './level-lobby.mjs';
 import { gameLevel } from './runtime/game-level.mjs';
+import { worldClock } from '../basement/timers/index.mjs';
 
 const hooks = ['attach', 'detach', 'beforePhysics', 'afterPhysics', 'render', 'levelEntered', 'levelLeaving','gameplayPaused'];
 function synchronous(fn, receiver, args) {
@@ -23,16 +24,17 @@ function failures(errors, message) { if (errors.length) throw new AggregateError
 
 
 export class gameLoop {
-    #engine; #jacks; #world; #step; #controls; #camera; #render; #clock;
+    #engine; #jacks; #world; #step; #controls; #camera; #render; #clock; #time;
     #levels = new Map(); #systems = new Map(); #active = null; #persistent = new Set();
     #running = false; #destroyed = false; #phase = 'idle'; #loading = false; #pauses = new Map();
     #schedule; #cancel; #frame = null; #generation = 0;
 
     /**
      * `engine` is what contexts call `engine`; `jacks` are `{basement, directory, penthouse, game}`;
-     * `step_world(seconds)` advances the physics world one fixed step (only the loop may).
+     * `step_world(seconds)` advances the physics world one fixed step (only the loop may); `time` is the world
+     * clock's record (WORLD_CLOCK's fields), which the loop steps with the game.
      */
-    constructor({ engine, jacks, step_world, clock = {}, frame_clock,
+    constructor({ engine, jacks, step_world, clock = {}, time = {}, frame_clock,
         schedule_frame = typeof requestAnimationFrame === 'function' ? callback => requestAnimationFrame(callback) : null,
         cancel_frame = typeof cancelAnimationFrame === 'function' ? handle => cancelAnimationFrame(handle) : null }) {
         if (schedule_frame !== null && typeof schedule_frame !== 'function' || cancel_frame !== null && typeof cancel_frame !== 'function') throw new TypeError('Frame scheduling requires functions');
@@ -46,6 +48,7 @@ export class gameLoop {
         if (![config.MAX_FRAME_MS, config.MAX_STEPS, config.GAME_SPEED].every(v => Number.isFinite(v) && v > 0) || !Number.isInteger(config.MAX_STEPS)) throw new TypeError('Invalid Lobby clock configuration');
         this.#schedule = schedule_frame; this.#cancel = cancel_frame;
         this.#clock = new levelLobby(Object.freeze(config), frame_clock);
+        this.#time = time instanceof worldClock ? time : new worldClock(time);
         this.#clock.plugIn({ isRunning: () => this.running, isPaused: () => this.paused || !this.active_level,
             beginFrame: () => { if(this.paused || !this.active_level)this.#pollControls(); },
             simulateStep: () => this.updateState(), renderFrame: blend => this.render(blend),
@@ -53,6 +56,8 @@ export class gameLoop {
     }
     /** The clock: fixed steps, frames drawn between them. */
     get clock() { return this.#clock; }
+    /** The world's clock (the date, the time of day, its phase and darkness): it moves with the game's steps, so it pauses with it. */
+    get time() { return this.#time; }
     get active_level() { return this.#active?.level ?? null; }
     get running() { return this.#running; }
     get loading() { return this.#loading; }
@@ -195,7 +200,7 @@ export class gameLoop {
             this.#phase = 'beforePhysics';
             this.#callSystems('beforePhysics', seconds); synchronous(level.beforePhysics, level, [context, seconds]);
             this.#phase = 'physics'; this.#step(seconds);
-            this.#phase = 'afterPhysics';
+            this.#phase = 'afterPhysics'; this.#time.updateState(seconds);
             synchronous(level.afterPhysics, level, [context, seconds]); this.#callSystems('afterPhysics', seconds);this.#world.commitCommands();
             this.#camera.updateState(seconds);
             return true;
