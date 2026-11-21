@@ -166,7 +166,8 @@ export function componentSteps(components,source,{solid_only=false}={}){
  * camera, parts at one height draw farthest from the camera first, and a component set on the entity above
  * its base (a bottle on a tray) draws whole from that base, so a near bottle covers the foot of a far one.
  */
-export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,mirror=null,pictures=false,screen=null,shines=false,covers=null}={}){
+export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,mirror=null,pictures=false,screen=null,shines=false,covers=null,time=0}={}){
+    if(!Number.isFinite(time))throw new TypeError('time is the seconds of play a pulsing layer follows');
     if(view!==null&&!(view instanceof heightView))throw new TypeError('A height view is a heightView or null');
     if(mirror!==null&&!(Number.isFinite(mirror)&&mirror>=0))throw new TypeError('A mirror is how far a reflection falls per unit of height, 0 or more');
     // A reflection: each part where it falls, in the plane of its depth below the floor (k(-z)) and `mirror` × its height down the world's y.
@@ -175,6 +176,7 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,
     const look=entity.get('look',{});if(look.visible===false)return [];
     const pose=entity.getRenderState(blend),scale=look.scale??1,[wx,wy,wz]=entity.world_scale??[1,1,1],values=look.values??{},elevation=pose.elevation??0,parts=[];
     for(const {component:c,layer,order} of listLayers(components)){
+        if(layer.shown_when&&!shownNow(entity,layer.shown_when))continue;
         // A joint's world pose carries the rig's scale (a taller rig, a scaled entity) and its height; off a joint the entity's scale and the look's apply.
         const joint=c.joint?joints(c.joint):null,base=joint??{position:pose.position,rotation:pose.rotation},pitch=joint?.pitch??0,fore=Math.cos(pitch);
         const size=joint?.scale?[joint.scale[0]*scale,joint.scale[1]*scale]:[wx*scale,wy*scale],kx=joint?fore:wx*scale,ky=joint?1:wy*scale;
@@ -211,7 +213,8 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,
         // A still layer (not on a tipped bone) is the same art wherever it stands: with `pictures` it is drawn once
         // into a picture, keyed by its steps and look, and stamped each frame under its place and its plane.
         // (with `shines`, a layer with glowing steps is drawn each frame, so they are found among its packets)
-        if(pictures&&mirror===null&&fore===1&&!lean&&!(shines&&glowing(steps,materials))){
+        if(layer.pulse){const k=pulseAt(layer.pulse,time);for(const packet of sides)packet.opacity=(packet.opacity??1)*k;scene.enter({},{opacity:k});}
+        if(pictures&&!layer.pulse&&mirror===null&&fore===1&&!lean&&!(shines&&glowing(steps,materials))){
             const art=stillArt(steps,values,materials);
             if(art){const m=placeMatrix(place),matrix=view?compose(view.plane(view.k(z1)),m):m;
                 return {height:z0,peak:z1,depth:key,top,layer:layer.layer,component:c.name,sides,cover,packets:[],picture:{key:art.key,bounds:art.bounds,matrix,build:art.build}};}
@@ -220,9 +223,14 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,
         else if(mirror!==null)scene.enter({matrix:fallen(below,mirror,z1)});
         scene.mark_shines=shines;scene.draw(steps,{...place,values,materials});
         if(view||mirror!==null)scene.leave();
+        if(layer.pulse)scene.leave();
         return {height:z0,peak:z1,depth:key,top,layer:layer.layer,component:c.name,sides,cover,packets:scene.finish()};
     }).filter(Boolean);
 }
+/** Whether a layer's `shown_when` ("occupied", "!occupied") holds for an entity now: its property set (truthy), or not. */
+export function shownNow(entity,when){const not=when[0]==='!',value=typeof entity.get==='function'?entity.get(not?when.slice(1):when):entity.data?.[not?when.slice(1):when];return not?!value:!!value;}
+/** A pulse's strength at `time` seconds: from `low` to 1 and back over `period` (the classic's exit mats, (sin+1)/2). */
+export function pulseAt({period,low=0},time){return low+(1-low)*(.5+.5*Math.sin(2*Math.PI*time/period));}
 // A drawing's box in its own frame [left, top, right, bottom], once per steps and look values (null when it paints nothing).
 const BOXES=new WeakMap();
 function localBox(steps,values){

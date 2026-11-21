@@ -3,7 +3,7 @@
 // and what stands over the light on the ground (covers) or shines through the dark (shines).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {cameraSystem,renderSystem,recordingRenderer,drawComponents,entityLights,facadeEmitters,entityEmitters,entityBlockers,componentCovers,heightView,createLightLayer,createLightLayerParts} from '../index.mjs';
+import {cameraSystem,renderSystem,recordingRenderer,drawComponents,pulseAt,entityLights,facadeEmitters,entityEmitters,entityBlockers,componentCovers,heightView,createLightLayer,createLightLayerParts} from '../index.mjs';
 import {physicsSystem} from '../../physics/index.mjs';
 
 const near=(a,b,why='',e=1e-6)=>assert.ok(Math.abs(a-b)<e,`${why} ${a} != ${b}`);
@@ -156,4 +156,18 @@ test('drawNight takes cuts that thin the dark (a reflection pass\'s darknessCut)
  render.beginFrame();render.drawLooks();render.drawNight({tint:'rgba(0,0,20,.8)'});render.endFrame();
  assert.ok(!Rec.last.frames.at(-1).passes.flatMap(p=>p.packets).some(p=>p.geometry?.commands?.[1]?.[1]===40),'and only when given');
  render.dispose();
+});
+
+test('a layer pulses over its period down to its low, and shows only while its entity\'s switch says so; a switched layer lights no grid',()=>{
+ const world=new physicsSystem(),glowing={shape:'rectangle',x:-5,y:-5,width:10,height:10,fill:'#a6f',emits:{strength:1,reach:20}};
+ const e=world.elements.createEntity({kind:'static',position:[0,0],components:[{name:'mat',layers:[{layer:0,height:0,thickness:0,solid:false,steps:[box]},
+  {layer:1,height:0,thickness:0,solid:false,shown_when:'!occupied',pulse:{period:2,low:.5},steps:[box]},{layer:2,height:0,thickness:0,solid:false,shown_when:'occupied',steps:[glowing]}]}]});
+ const layers=t=>drawComponents(e,null,1,{time:t}).map(p=>[p.layer,p.packets[0].opacity]);
+ assert.deepEqual(layers(0),[[0,1],[1,.75]],'at rest: the steady one and the pulsing one, halfway up its swell');
+ near(layers(.5)[1][1],1,'a quarter period on: full');near(layers(1.5)[1][1],.5,'three quarters: its low');near(pulseAt({period:2,low:.5},1),.75);
+ e.set('occupied',true);assert.deepEqual(layers(0).map(l=>l[0]),[0,2],'occupied: the other look');
+ assert.equal(entityEmitters(e,null).length,0,'a switched layer comes and goes, so it does not light the baked grid');
+ e.set('occupied',false);assert.equal(drawComponents(e,null,1,{time:0,pictures:true}).find(p=>p.layer===1).picture,undefined,'a pulsing layer is drawn each frame, never a picture');
+ assert.throws(()=>world.elements.createEntity({kind:'static',position:[0,0],components:[{name:'x',layers:[{layer:0,pulse:{period:0},steps:[box]}]}]}),/pulse/);
+ assert.throws(()=>world.elements.createEntity({kind:'static',position:[0,0],components:[{name:'x',layers:[{layer:0,shown_when:'is occupied',steps:[box]}]}]}),/shown_when/);
 });

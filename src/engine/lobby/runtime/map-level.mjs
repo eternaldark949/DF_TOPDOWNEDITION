@@ -51,7 +51,7 @@ export class mapLevel extends gameLevel {
         this.light_grid?.updateState({ budget_ms: Infinity });
     }
     afterPhysics(context, seconds) {
-        this.followWeather(context); this.followView(context); this.followClock(context);
+        this.followWeather(context); this.followView(context); this.followClock(context); this.followExits(context);
         this.map.setFocus(this.mapFocuses(context), { budget_ms: this.mapStreamBudget(context) }); this.map.updateState(this.mapUpdateOptions(context));
         if (this.light_grid) { this.light_grid.setMovers(this.light_grid.moversOf(this.lightGridMovers(context))); this.light_grid.updateState({ budget_ms: this.lightGridBudget(context) }); }
     }
@@ -139,6 +139,17 @@ export class mapLevel extends gameLevel {
         for (const p of this.particles ?? []) if (p.view) { const b = camera.getVisibleBounds({ margin: p.margin }); context.basement.physics.setParticleArea(p.id, [b.left, b.top, b.right - b.left, b.bottom - b.top]); }
     }
     leave(context) { for (const name of this.light_groups ?? []) context.basement.render?.setLightGroup(name, true); this.light_groups = null; for (const p of this.particles ?? []) context.basement.physics.removeParticleSystem(p.id); this.particles = []; if (this.night_on) this.setNight(context, false); this.night = null; this.map?.destroy(); this.map = null; this.light_grid = null; if (this.height_view) context.basement.render?.setHeightView(null); this.height_view = null; }
+    /**
+     * Who counts as standing on an exit (its `occupied` property, which a marker's look switches on): by default
+     * every active character. A level overrides it for the player alone.
+     */
+    exitFocuses(context) { return context.basement.physics.elements.getEntities({ kind: 'character' }).filter(e => e.active !== false && !e.destroyed); }
+    /** Sets each exit's `occupied` property (only when it changes): true while one of exitFocuses stands in it. */
+    followExits(context) {
+        const exits = this.getExits(); if (!exits.length) return;
+        const on = new Set(); for (const body of this.exitFocuses(context)) { const exit = this.exitAt(body, exits); if (exit) on.add(exit.entity); }
+        for (const { entity } of exits) { const now = on.has(entity); if (!!entity.get('occupied') !== now) entity.set('occupied', now); }
+    }
     /** Every exit: `{entity, target, label, auto, bounds}`. */
     getExits() {
         if (!this.map) return [];
@@ -147,9 +158,9 @@ export class mapLevel extends gameLevel {
         });
     }
     /** The exit a body stands in, or null. */
-    exitAt(body) {
+    exitAt(body, exits = this.getExits()) {
         const [x, y] = body.position;
-        for (const exit of this.getExits()) { const b = exit.bounds; if (x >= b.left && x <= b.right && y >= b.top && y <= b.bottom && exit.entity.physics_system.containsPoint(exit.entity, body.position)) return exit; }
+        for (const exit of exits) { const b = exit.bounds; if (x >= b.left && x <= b.right && y >= b.top && y <= b.bottom && exit.entity.physics_system.containsPoint(exit.entity, body.position)) return exit; }
         return null;
     }
     /** Where someone arriving from `from` stands: inside the exit leading back there, else the map's spawn. */

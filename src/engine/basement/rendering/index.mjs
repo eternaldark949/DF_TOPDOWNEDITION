@@ -14,6 +14,6 @@ export {GLARE,readGlare,glarePackets} from './glare.mjs';
 export {PARTICLE_LOOK,readParticleLook,particlePackets} from './particles.mjs';
 export {NIGHT,readNight} from './night.mjs';
 export {depthBatches} from './depth.mjs';
-export {BOUNDS,fitBounds,drawingReach,drawingOutline,drawingEmitters,facadeEmitters,drawLook,drawComponents,componentCovers,componentSteps,foreshorten,qualifyResource} from './looks.mjs';
+export {BOUNDS,fitBounds,drawingReach,drawingOutline,drawingEmitters,facadeEmitters,drawLook,drawComponents,componentCovers,pulseAt,shownNow,componentSteps,foreshorten,qualifyResource} from './looks.mjs';
 export {lightGridSystem,entityEmitters,entityBlockers} from './light-grid.mjs';
 export {reflectionPass,REFLECTION_QUALITY,createReflectionMask,createReflectionProbes,maskSteps,heightPackets,drawLightReflection,drawEmitterReflection,reflectionMatrix,wetStep} from './reflections.mjs';

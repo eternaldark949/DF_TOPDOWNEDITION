@@ -139,8 +139,8 @@ export class renderSystem {
             frame.endPass();entry.state='painted';this.#texturesPainted++;
         }
     }
-    /** Draws every visible entity's look (a `drawing` asset) and its components into the open frame, at its `look.layer` and `look.depth`; a component layer's depth adds its height, so higher parts draw over lower ones. Returns how many entities it drew. */
-    drawLooks(blend=1,{covers=null}={}){
+    /** Draws every visible entity's look (a `drawing` asset) and its components into the open frame, at its `look.layer` and `look.depth`; a component layer's depth adds its height, so higher parts draw over lower ones. `time` (seconds of play) sets where pulsing layers are in their pulse. Returns how many entities it drew. */
+    drawLooks(blend=1,{covers=null,time=0}={}){
         this.#live();if(!this.#collecting)throw new Error('Draw looks inside an open render frame');
         const source=this.#world.elements.asset_library,view=this.#height?new heightView({camera:this.#camera.getView(blend).position,...this.#height}):null;let drawn=0,shown=null;this.#over=[];if(covers!==null&&!(Number.isFinite(covers)))throw new TypeError('covers is the height (world units) a part stands over to cover the light under it');
         for(const {entity} of this.getVisibleEntities({blend},this.#visible)){
@@ -151,7 +151,7 @@ export class renderSystem {
                 let pose;const rigs=this.#world.rigs,joints=name=>{pose??=rigs?.getRig(entity)?rigs.getPose(entity,{blend,world_space:true}):null;return pose?.joints[name]??null;};
                 const pictures=this.#still&&!!this.#backend?.capabilities.includes('picture'),screen=view?(shown??={bounds:this.#camera.getView(blend).bounds,zoom:this.#camera.getView(blend).zoom}):null;
                 const night=covers!==null&&view,lit=!this.#groupsOff.size||this.lightGroupOn(lightGroupOf(entity));
-                for(const part of drawComponents(entity,source,blend,{joints,view,pictures,screen,shines:night&&lit,covers:night?covers:null})){
+                for(const part of drawComponents(entity,source,blend,{joints,view,pictures,screen,shines:night&&lit,covers:night?covers:null,time})){
                     if(part.cover)this.#over.push({packet:part.cover,over:'cover',layer,depth:depth+part.depth});   // (at its base, before its own: under its walls' windows and its glowing steps, over what stands lower)
                     for(const packet of part.sides){if(packet.shine){this.#over.push({packet,over:'shine',layer,depth:depth+part.depth+packet.depth});continue;}this.#frame.submit(this.#textured({...packet,layer,depth:depth+part.depth+packet.depth}));}for(const packet of part.packets){this.#frame.submit(this.#textured({...packet,layer,depth:depth+part.top}));if(packet.shine)this.#over.push({packet,over:'shine',layer,depth:depth+part.top});}
                     if(part.picture){const {key,bounds,matrix,build}=part.picture,gen=this.#texturesPainted;   // (a texture painted later is a new picture: the old one held its base colour)

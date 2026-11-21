@@ -45,7 +45,7 @@ export function entityBlockers(packet,source=null){
 /**
  * The glowing shapes of an entity or entity packet, in the world at its pose: its drawing asset's steps
  * (read from `source`) and its components' layers, each at its elevation and layer height, and the lit
- * windows of any layer's facade whose panels say `emits` (facadeEmitters).
+ * windows of any layer's facade whose panels say `emits` (facadeEmitters). A layer `shown_when` a property gives none.
  */
 export function entityEmitters(body,source,{pose=null}={}){
     const at=pose?.position??body.position,rotation=pose?.rotation??body.rotation??0,elevation=pose?.elevation??body.elevation??0;
@@ -54,7 +54,7 @@ export function entityEmitters(body,source,{pose=null}={}){
     const drawing=body.assets?.drawing;
     if(drawing&&source){const steps=source.getResource(drawing)?.steps;if(steps)out.push(...drawingEmitters(steps,{at,rotation,values,materials,elevation}));}
     const components=typeof body.get==='function'?body.get('components')??body.components??[]:body.components??[];
-    for(const c of components)for(const layer of c.layers??[]){
+    for(const c of components)for(const layer of c.layers??[]){if(layer.shown_when)continue;   // (a switched layer comes and goes: it does not light the baked grid)
         const steps=layer.steps??(layer.drawing&&source?source.getResource(layer.drawing)?.steps:null);if(!steps)continue;
         const [cx,cy]=c.at??[0,0];
         out.push(...drawingEmitters([{shape:'group',x:cx,y:cy,rotation:c.rotation??0,steps}],{at,rotation,values,materials,elevation:elevation+(layer.height??0)}));

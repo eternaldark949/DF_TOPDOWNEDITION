@@ -169,6 +169,9 @@ test('engine alone: map levels with exits, an auto exit, and travellers carried 
     e.updateState(); assert.equal(travel.exit, null);
     e.basement.physics.updateBody(walker, { position: [15, 150] }); e.updateState();
     assert.deepEqual(travel.exit, { target: 'hall', label: 'Back in', auto: false, available: true });
+    const back = e.active_level.getExits()[0].entity; assert.equal(back.get('occupied'), true, 'someone stands on it: its marker\'s look switches');
+    e.basement.physics.updateBody(walker, { position: [150, 150] }); e.updateState(); assert.equal(back.get('occupied'), false, 'and back when they step off');
+    e.basement.physics.updateBody(walker, { position: [15, 150] }); e.updateState();
     await travel.travel(); assert.equal(e.active_level.level_id, 'hall');
     assert.ok(walker.position[0] < 360 && walker.position[0] > 300, `back in the hall beside its east exit (${walker.position})`);
     e.dispose();
@@ -239,10 +242,10 @@ test('the loop draws a map\'s night and particles from its data: covers in drawL
     const level = await e.loadLevel('city'), context = { basement: e.basement };
     e.start(); e.updateState(); calls.length = 0; e.render(1);
     assert.deepEqual(calls.map(c => c[0]), ['drawLooks', 'drawParticles'], 'by day: the looks and the rain, no night');
-    assert.deepEqual(calls[0][1], {});
+    assert.deepEqual(calls[0][1], { time: e.lobby.played }, 'the seconds played, for pulsing looks'); assert.ok(e.lobby.played > 0);
     level.setNight(context, true); calls.length = 0; e.render(1);
     assert.deepEqual(calls.map(c => c[0]), ['drawLooks', 'drawNight', 'drawParticles'], 'at night: the night between them');
-    assert.deepEqual(calls[0][1], { covers: 30 }, 'the looks keep the night\'s covers'); assert.equal(calls[1][1].tint, night.tint); assert.equal(calls[1][1].scale, 0.4); assert.equal(calls[1][1].glare.reach, 40);
+    assert.deepEqual(calls[0][1], { time: e.lobby.played, covers: 30 }, 'the looks keep the night\'s covers'); assert.equal(calls[1][1].tint, night.tint); assert.equal(calls[1][1].scale, 0.4); assert.equal(calls[1][1].glare.reach, 40);
     e.dispose();
 });
 

@@ -25,7 +25,7 @@ function failures(errors, message) { if (errors.length) throw new AggregateError
 
 
 export class gameLoop {
-    #engine; #jacks; #world; #step; #controls; #camera; #render; #clock; #time; #weather;
+    #engine; #jacks; #world; #step; #controls; #camera; #render; #clock; #time; #weather; #played = 0;
     #levels = new Map(); #systems = new Map(); #active = null; #persistent = new Set();
     #running = false; #destroyed = false; #phase = 'idle'; #loading = false; #pauses = new Map();
     #schedule; #cancel; #frame = null; #generation = 0;
@@ -60,6 +60,8 @@ export class gameLoop {
     get clock() { return this.#clock; }
     /** The world's clock (the date, the time of day, its phase and darkness): it moves with the game's steps, so it pauses with it. */
     get time() { return this.#time; }
+    /** Seconds of play stepped so far (not while paused): what pulsing looks follow. */
+    get played() { return this.#played; }
     /** The world's weather (its state and intensity, fading from one to the next): it moves with the game's steps. */
     get weather() { return this.#weather; }
     get active_level() { return this.#active?.level ?? null; }
@@ -204,7 +206,7 @@ export class gameLoop {
             this.#phase = 'beforePhysics';
             this.#callSystems('beforePhysics', seconds); synchronous(level.beforePhysics, level, [context, seconds]);
             this.#phase = 'physics'; this.#step(seconds);
-            this.#phase = 'afterPhysics'; this.#time.updateState(seconds); this.#weather.updateState(seconds);
+            this.#phase = 'afterPhysics'; this.#played += seconds; this.#time.updateState(seconds); this.#weather.updateState(seconds);
             synchronous(level.afterPhysics, level, [context, seconds]); this.#callSystems('afterPhysics', seconds);this.#world.commitCommands();
             this.#camera.updateState(seconds);
             return true;
@@ -224,7 +226,7 @@ export class gameLoop {
         try {
             this.#phase = 'render'; const alpha = this.paused ? 1 : blend;
             const frame=this.#render.beginFrame(alpha);
-            this.#render.drawLooks(alpha, synchronous(level.lookOptions, level, [context, alpha]) ?? {});
+            this.#render.drawLooks(alpha, { time: this.#played, ...(synchronous(level.lookOptions, level, [context, alpha]) ?? {}) });
             synchronous(level.render, level, [context, alpha, frame]); this.#callSystems('render', alpha, frame);
             this.#render.endFrame();
             return true;

@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { physicsSystem, BODY_GROUP } from '../../physics/index.mjs';
-import { buildMapPackets, declaredLight, mapInstance, mapSystem, MARKER, readMarker } from '../index.mjs';
+import { buildMapPackets, declaredLight, mapInstance, mapSystem, MARKER, markerComponent, readMarker } from '../index.mjs';
 
 const room = {
     map_id: 'test_room', kind: 'interior', size: [400, 300], boundary: { thickness: 20 }, spawn: [50, 50],
@@ -355,12 +355,16 @@ test('a map\'s markers draw its triggers of a role on the floor, fitted to each,
     const triggers = [{ x: 10, y: 10, w: 60, h: 40, role: 'transition', data: { target: 'street', label: 'Exit' } }, { x: 100, y: 10, w: 60, h: 40, role: 'transition', data: { target: 'lift', quiet: true } }, { x: 200, y: 10, w: 20, h: 20, role: 'zone' }];
     const built = kind => buildMapPackets({ size: [400, 400], kind, markers: { transition: { label: true, color: '#ffd27f' }, zone: false }, triggers }).entries.filter(e => e.section === 'triggers').map(e => e.packet);
     const [exit, lift, zone] = built('exterior');
-    const steps = exit.components[0].layers[0].steps;
+    const [base, rest, active] = exit.components[0].layers, steps = rest.steps;
+    assert.ok(base.steps[0].emits && base.shown_when === undefined, 'a steady fill lights the light grid');
+    assert.equal(rest.shown_when, '!occupied'); assert.equal(active.shown_when, 'occupied', 'someone on it swaps the mat for its deeper one');
+    assert.deepEqual(rest.pulse, { period: MARKER.pulse_period, low: MARKER.pulse_low }); assert.equal(active.steps[2].stroke.startsWith('rgba(154, 107, 255'), true, 'the active mat is the deeper purple');
     assert.equal(exit.data.look.layer, MARKER.layer); assert.equal(lift.components, undefined, 'a quiet exit is marked by its map\'s own art'); assert.equal(zone.components, undefined, 'a role without a marker shows nothing');
     assert.deepEqual(steps.map(s => s.shape), ['rectangle', 'rectangle', 'rectangle', 'line', 'line', 'line', 'line', 'text'], 'glow, fill, border, four corners, label');
-    assert.equal(steps[2].width, 60); assert.equal(steps[2].x, -30, 'fitted to the trigger, in its frame'); assert.ok(steps[1].emits, 'the fill glows');
+    assert.equal(steps[2].width, 60); assert.equal(steps[2].x, -30, 'fitted to the trigger, in its frame'); assert.ok(steps[1].emits, 'the fill shines at night');
     assert.equal(steps[7].text, 'Exit'); assert.equal(steps[7].baseline, 'top', 'outdoors the label is below');
-    assert.equal(built('interior')[0].components[0].layers[0].steps[7].baseline, 'bottom', 'indoors above');
+    assert.equal(built('interior')[0].components[0].layers[1].steps[7].baseline, 'bottom', 'indoors above');
     assert.equal(readMarker(true), MARKER); assert.throws(() => readMarker({ shimmer: 1 }), /Unknown marker field/); assert.throws(() => readMarker({ color: 'blue' }), /color/);
     assert.throws(() => buildMapPackets({ size: [10, 10], markers: { transition: { corner: -1 } } }), /corner/);
+    assert.equal(markerComponent({ pulse_low: 1, active_pulse_low: 1 }, 10, 10).layers[1].pulse, undefined, 'pulse_low 1 holds it steady');
 });
