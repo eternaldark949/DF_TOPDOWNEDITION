@@ -270,6 +270,7 @@
     "layer": 5
    },
    "data": {
+    "fire_interval": 0.2,
     "label": "Gatling Gunner",
     "muzzle": [35,0],
     "effect_scale": 1.55,
@@ -289,6 +290,7 @@
     "layer": 5
    },
    "data": {
+    "fire_interval": 0.366667,
     "label": "FP-X",
     "muzzle": [13.4,1],
     "effect_scale": 1,
@@ -308,6 +310,7 @@
     "layer": 5
    },
    "data": {
+    "fire_interval": 0.066667,
     "label": "Anavia",
     "muzzle": [13.4,1],
     "effect_scale": 1,
@@ -327,6 +330,7 @@
     "layer": 5
    },
    "data": {
+    "fire_interval": 0.2,
     "label": "Ganger Pistol",
     "muzzle": [12.9,1],
     "effect_scale": 1,
@@ -346,6 +350,7 @@
     "layer": 5
    },
    "data": {
+    "fire_interval": 0.1,
     "label": "RB-98",
     "muzzle": [29.3,1.5],
     "effect_scale": 1,
@@ -365,6 +370,8 @@
     "layer": 5
    },
    "data": {
+    "fire_interval": 1.166667,
+    "fire_on_release": true,
     "label": "YourGirlSara",
     "muzzle": [55.2,0.5],
     "effect_scale": 1.55,
@@ -384,6 +391,8 @@
     "layer": 5
    },
    "data": {
+    "fire_interval": 0.833333,
+    "fire_on_release": true,
     "label": "SR-86",
     "muzzle": [55.2,0.5],
     "effect_scale": 1.55,
@@ -403,6 +412,7 @@
     "layer": 5
    },
    "data": {
+    "fire_interval": 0.633333,
     "label": "Golden Child",
     "muzzle": [20,1],
     "effect_scale": 1,
@@ -422,6 +432,7 @@
     "layer": 5
    },
    "data": {
+    "fire_interval": 0.266667,
     "label": "Maiden's Kukri",
     "muzzle": [19,1.6],
     "effect_scale": 1,
@@ -438,6 +449,7 @@
     "layer": 5
    },
    "data": {
+    "fire_interval": 0.533333,
     "label": "Blood Pact",
     "muzzle": [50,-1.6],
     "effect_scale": 1,
@@ -454,6 +466,7 @@
     "layer": 5
    },
    "data": {
+    "fire_interval": 0.2,
     "label": "EMP Blaster",
     "muzzle": [14.6,1],
     "effect_scale": 1,
@@ -473,6 +486,7 @@
     "layer": 5
    },
    "data": {
+    "fire_interval": 0.25,
     "label": "Golden Retribution",
     "muzzle": [6,0],
     "effect_scale": 1,

@@ -19,12 +19,18 @@ export function previewWeapons(engine, registry, walker) {
     let held = null;
     let selection = 'none';
     let requested = false;
+    let released = null;
+    let cooldown = 0;
+
+    const aimDirection = () => released ?? controls.direction('aim');
+    const firesOnRelease = () => Boolean(held?.get('fire_on_release'));
 
     function equip(id) {
         held?.destroy();
         held = id === 'none' ? null : engine.createEntity({ template: 'weapons:' + id });
         if (held) walker.attach(held, { rig_anchor: 'hand_r', rotation: .52 });
         selection = id;
+        cooldown = 0;
     }
 
     function fire() {
@@ -64,6 +70,9 @@ export function previewWeapons(engine, registry, walker) {
     }
 
     return {
+        aimDirection,
+        firesOnRelease,
+        releaseShot(direction) { released = direction; },
         attach(context) {
             context.defer(ui.on('preview_fire', () => { requested = true; }));
             context.defer(physics.on('projectileHit', ({ body, world_point, sensor_only }) => {
@@ -74,10 +83,27 @@ export function previewWeapons(engine, registry, walker) {
         beforePhysics() {
             const next = ui.getValue('preview_weapon');
             if (next !== selection) equip(next);
-            if (held && (requested || controls.justActivated('preview_fire'))) fire();
-            requested = false;
+            requested ||= controls.justActivated('preview_fire');
         },
         afterPhysics(context, seconds) {
+            const direction = aimDirection(), aiming = direction.some(Boolean);
+            if (held) {
+                const anchor = physics.rigs.getAnchor(walker, 'hand_r');
+                const rotation = aiming ? Math.atan2(direction[1], direction[0]) - anchor.rotation : .52;
+                const mount = physics.getAttachmentState(held);
+                if (Math.abs(rotation - mount.anchor_offset_rotation) > 1e-5) {
+                    physics.setAttachmentPose(held, { local_rotation: rotation });
+                }
+                cooldown = Math.max(0, cooldown - seconds);
+                const firing = aiming && controls.active('aim_fire') &&
+                    (!firesOnRelease() || controls.gamepad.isActive('gamepadRTrigger'));
+                if (requested || ((released || firing) && cooldown === 0)) {
+                    fire();
+                    cooldown = held.get('fire_interval', .25);
+                }
+            }
+            requested = false;
+            released = null;
             for (const [effect, time] of effects) {
                 if (time <= seconds) {
                     effect.destroy();
@@ -99,10 +125,12 @@ export function previewWeapons(engine, registry, walker) {
                 } else if (shot.points.length > 1) paintTrail(shot, shot.remaining / TRAIL_FADE);
             }
         },
+        gameplayPaused() { released = null; },
         levelLeaving() {
             held = null;
             selection = 'none';
             requested = false;
+            released = null;
             effects.clear();
             projectiles.clear();
         }

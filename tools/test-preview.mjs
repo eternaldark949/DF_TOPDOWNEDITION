@@ -110,3 +110,58 @@ test('the preview boots, loads every map and travels between the apartment and t
         assert.deepEqual(errors, []);
     } finally { await browser.close(); rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('the touch HUD moves and aims independently, and only an armed sniper release fires', { skip: !chromium && 'Playwright is not installed', timeout: 90000 }, async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'preview-touch-')), out = join(dir, 'preview.html');
+    execFileSync(process.execPath, [join(root, 'tools/build-preview.mjs'), '--out', out]);
+    const browser = await chromium.launch();
+    try {
+        const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+        const errors = [];
+        page.on('pageerror', error => errors.push(error.message));
+        await page.goto(pathToFileURL(out).href + '?nomenu');
+        const aim = page.locator('[data-ui-item="touch_aim"]'), move = page.locator('[data-ui-item="touch_move"]');
+        await aim.waitFor({ timeout: 30000 });
+        const cdp = await page.context().newCDPSession(page);
+        const touch = (type, touchPoints) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints });
+        const a = await aim.boundingBox(), m = await move.boundingBox();
+        const right = { id: 2, x: Math.round(a.x + a.width / 2), y: Math.round(a.y + a.height / 2) };
+        const left = { id: 1, x: Math.round(m.x + m.width / 2), y: Math.round(m.y + m.height / 2) };
+        const walked = { ...left, x: left.x + 38 }, aimed = { ...right, y: right.y - 33 }, armed = { ...right, y: right.y - 73 };
+        await page.evaluate(() => {
+            preview.ui.setValue('preview_weapon', 'sniper_sara');
+            window.previewFlashes = 0;
+            const seen = new Set();
+            const sample = () => {
+                for (const e of preview.basement.elements.getEntities()) {
+                    if (e.template_id !== 'weapons:flash' || seen.has(e.entity_id)) continue;
+                    seen.add(e.entity_id);
+                    window.previewFlashes++;
+                }
+                requestAnimationFrame(sample);
+            };
+            requestAnimationFrame(sample);
+        });
+        await page.waitForFunction(() => preview.basement.elements.getEntities().some(e => e.template_id === 'weapons:sniper_sara'));
+        await touch('touchStart', [left, right]);
+        await touch('touchMove', [walked, aimed]);
+        await page.waitForFunction(() => {
+            const controls = preview.basement.controls;
+            return controls.direction('move')[0] > .3 && controls.direction('aim')[1] < -.2;
+        });
+        assert.equal(await aim.getAttribute('data-stick-state'), 'aiming');
+        await touch('touchMove', [walked, armed]);
+        assert.equal(await aim.getAttribute('data-stick-state'), 'armed');
+        await touch('touchCancel', []);
+        assert.equal(await aim.getAttribute('data-stick-state'), 'idle');
+        assert.equal(await page.evaluate(() => window.previewFlashes), 0);
+
+        await touch('touchStart', [right]);
+        await touch('touchMove', [armed]);
+        await touch('touchEnd', []);
+        await page.waitForFunction(() => window.previewFlashes === 1);
+        await page.evaluate(() => preview.ui.open('pause'));
+        await aim.waitFor({ state: 'hidden' });
+        assert.deepEqual(errors, []);
+    } finally { await browser.close(); rmSync(dir, { recursive: true, force: true }); }
+});

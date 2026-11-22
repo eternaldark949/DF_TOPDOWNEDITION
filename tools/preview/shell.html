@@ -34,11 +34,9 @@ button.on { background: var(--accent); border-color: var(--accent); color: #fff;
 #help { position: fixed; left: 12px; bottom: max(12px, env(safe-area-inset-bottom)); color: var(--dim); font-size: 12px; max-width: 46vw; }
 #err { position: fixed; right: 12px; bottom: 12px; max-width: 60vw; color: #ffb3c1; font-size: 12px; white-space: pre-wrap; }
 #loading { position: fixed; inset: 0; display: grid; place-items: center; font-family: Cinzel, serif; font-size: 20px; letter-spacing: .1em; color: var(--dim); }
-/* Touch: a stick on the left half, the use button on the right. */
-#stick { position: fixed; left: 0; bottom: 0; width: 50vw; height: 55vh; display: none; }
-#knob { position: absolute; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; background: rgba(154, 107, 255, .35); border: 2px solid rgba(239, 230, 255, .6); left: 25vw; top: 60%; pointer-events: none; }
-#use { position: fixed; right: 24px; bottom: max(90px, calc(env(safe-area-inset-bottom) + 80px)); width: 72px; height: 72px; border-radius: 50%; display: none; font-weight: 800; background: rgba(154, 107, 255, .4); }
-body.touch #stick, body.touch #use { display: block; }
+/* The touch sticks are supplied by the native HUD. */
+#use { position: fixed; right: 24px; bottom: max(155px, calc(env(safe-area-inset-bottom) + 145px)); width: 72px; height: 72px; border-radius: 50%; display: none; font-weight: 800; background: rgba(154, 107, 255, .4); }
+body.touch #use { display: block; }
 body.touch #help { display: none; }
 body.no-bar .bar, body.no-bar #help { display: none; }
 @media (max-width: 640px) { .chip { padding: 5px 7px; } .hide-sm { display: none; } }
@@ -60,7 +58,6 @@ body.no-bar .bar, body.no-bar #help { display: none; }
 </div>
 <div id="prompt" class="chip"><kbd>E</kbd><span id="exit-label"></span></div>
 <div id="help">WASD or arrows to walk, Shift to run, E to use an exit, + and − to zoom. A gamepad works too.</div>
-<div id="stick"><div id="knob"></div></div>
 <button id="use" aria-label="Use">USE</button>
 <div id="fade"></div>
 <div id="err"></div>

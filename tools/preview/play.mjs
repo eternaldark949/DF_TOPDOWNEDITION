@@ -6,12 +6,13 @@ import { readComponents } from '../../src/engine/basement/physics/index.mjs';
 import { mapLevel } from '../../src/engine/lobby/runtime/map-level.mjs';
 import { travelSystem } from '../../src/engine/lobby/runtime/travel-system.mjs';
 import { createEngineRegistry, mapDefinition, doorKindsOf, screensOf, fontsOf } from '../../src/engine/directory/index.mjs';
+import { mountPreviewSticks } from './sticks.mjs';
 import { previewWeapons, weaponChoices } from './weapons.mjs';
 import { humanoid, objectPacket } from '../../src/engine/penthouse/index.mjs';
 
 const KEYMAP = {
     move_left: ['a', 'ArrowLeft'], move_right: ['d', 'ArrowRight'], move_up: ['w', 'ArrowUp'], move_down: ['s', 'ArrowDown'],
-    preview_fire: ['f'],
+    preview_fire: ['f'], aim_fire: ['touchAimFire', 'gamepadRTrigger'],
     interact: ['e', 'Enter', 'space', 'gamepadA', 'gamepadY', 'touchInteract'],
     run: ['Shift', 'gamepadRBumper'], pause: ['Escape', 'p', 'gamepadStart'], zoom_in: ['=', '+', 'gamepadDUp'], zoom_out: ['-', '_', 'gamepadDDown']
 };
@@ -23,7 +24,7 @@ export async function bootPreview({ libraries, hud }) {
     const maps = libraries.filter(l => l.resources?.map?.kind === 'map').map(l => ({ id: l.library_id, label: l.resources.map.label ?? l.library_id }));
     const engine = new gameEngine({
         asset_library: registry, time: registry.getResource('time:city_clock'), weather: registry.getResource('weather:city_weather'),
-        controls: { keymap: KEYMAP, vectors: { move: { gamepad: 'left', touch: 'move', dead_zone: .15 } } },
+        controls: { keymap: KEYMAP, vectors: { move: { gamepad: 'left', touch: 'move', dead_zone: .15 }, aim: { gamepad: 'right', touch: 'aim', dead_zone: .08 } } },
         camera: { zoom: 1 },
         // Each backend draws on a fresh canvas (a canvas keeps the first kind of context it gives): it takes the old one's place.
         render: { create_surface: () => { const next = document.createElement('canvas'); next.id = 'view'; document.getElementById('view').replaceWith(next); return next; } }
@@ -76,7 +77,8 @@ export async function bootPreview({ libraries, hud }) {
       .provide('player', { health: 100, pp: 0 }).provide('saves', { can_save: false, slots: [] });
     ui.setValue('options', { time_speed: 12, weather: engine.weather.state, zoom: ZOOMS[zoom], renderer: 'canvas', dev_bar: true });
     ui.setValue('preview_weapon', 'none');
-    engine.registerSystem('preview_weapons', previewWeapons(engine, registry, person.entity));
+    const weapons = previewWeapons(engine, registry, person.entity);
+    engine.registerSystem('preview_weapons', weapons);
     ui.setValue('wardrobe', { available: true, outfit_sorcerer_long: false, wig_ponytail_black: false });
     ui.on('set', ({ path, value }) => {
         if (path === 'wardrobe.outfit_sorcerer_long' || path === 'wardrobe.wig_ponytail_black') wardrobe_changed = true;
@@ -122,7 +124,11 @@ export async function bootPreview({ libraries, hud }) {
         beforePhysics(context) {
             if (wardrobe_changed) applyWardrobe();
             const [x, y] = controls.direction('move'), fast = controls.active('run') ? 1.8 : 1;
-            person.entity.motor.setMovement([x * speed * fast, y * speed * fast], { face_movement: true });
+            const aim = weapons.aimDirection(), aiming = aim.some(Boolean);
+            const motor = person.entity.motor;
+            motor.setMovement([x * speed * fast, y * speed * fast], { face_movement: !aiming });
+            if (aiming) motor.lookInDirection(aim, { turn_speed: 60 });
+            else if (motor.facing) motor.clearFacing();
             person.updateState();
             if (controls.justActivated('interact') && travel.exit?.available) go();
             if (controls.justActivated('zoom_in')) setZoom(zoom + 1);
@@ -161,7 +167,6 @@ export async function bootPreview({ libraries, hud }) {
         setSpeed: k => { engine.time.setSpeed(k); ui.setValue('options.time_speed', k); },
         setWeather: (state, intensity) => { engine.weather.set(state, intensity); ui.setValue('options.weather', state); },
         zoom: d => setZoom(zoom + d),
-        stick: (zone, knob) => controls.touch.stick('move', { zone, knob, anchor: 'touch', travel: 48 }),
         button: element => controls.touch.button(element, 'touchInteract'),
         clock: () => engine.time.text(),
         weather: () => ({ state: engine.weather.state, intensity: engine.weather.intensity }),
@@ -171,6 +176,7 @@ export async function bootPreview({ libraries, hud }) {
     const start = decodeURIComponent(location.hash.slice(1)) || new URLSearchParams(location.search).get('map') || 'apt_949';   // (#sdc or ?map=sdc opens on that map)
     await go(maps.some(m => m.id === start) ? start : maps[0].id);
     ui.open('hud');
+    mountPreviewSticks(ui, controls, weapons);
     if (!new URLSearchParams(location.search).has('nomenu')) ui.open('main');   // (?nomenu goes straight to walking)
     engine.start();
     return engine;

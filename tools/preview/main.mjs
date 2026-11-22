@@ -1,4 +1,4 @@
-// The preview page's own controls: the bar along the top, the exit prompt, the touch stick and button. It reads the
+// The preview page's own controls: the bar along the top, the exit prompt, the touch use button. It reads the
 // game's libraries from the page (the build put them there) and boots the preview with them.
 import { bootPreview } from './play.mjs';
 
@@ -19,7 +19,7 @@ const hud = {
         for (const b of document.querySelectorAll('[data-weather]')) b.onclick = () => a.setWeather(b.dataset.weather, 'normal');
         $('zin').onclick = () => a.zoom(1); $('zout').onclick = () => a.zoom(-1);
         $('prompt').onclick = () => a.take();
-        if (touch) { a.stick($('stick'), $('knob')); a.button($('use')); }
+        if (touch) a.button($('use'));
         this.zoomed(a.zoom_now);
         const backend = $('renderer');
         backend.onchange = async () => { backend.blur(); try { backend.value = await a.renderer(backend.value); } catch (e) { this.error(e); backend.value = 'canvas'; } };

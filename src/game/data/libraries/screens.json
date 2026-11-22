@@ -962,6 +962,52 @@
    },
    "items": [
     {
+     "id": "touch_move",
+     "type": "panel",
+     "class": "df-move-zone",
+     "items": [
+      {
+       "id": "touch_move_base",
+       "type": "panel",
+       "class": "df-stick df-move-base",
+       "items": [
+        {
+         "id": "touch_move_knob",
+         "type": "panel",
+         "class": "df-stick-knob"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "touch_aim",
+     "type": "panel",
+     "class": "df-aim-zone",
+     "items": [
+      {
+       "id": "touch_aim_base",
+       "type": "panel",
+       "class": "df-stick df-aim-base"
+      },
+      {
+       "id": "touch_aim_ring",
+       "type": "panel",
+       "class": "df-aim-ring"
+      },
+      {
+       "id": "touch_aim_band",
+       "type": "panel",
+       "class": "df-aim-band"
+      },
+      {
+       "id": "touch_aim_knob",
+       "type": "panel",
+       "class": "df-stick-knob"
+      }
+     ]
+    },
+    {
      "id": "health",
      "type": "bar",
      "class": "hud-health",
@@ -1037,6 +1083,7 @@
     }
    ],
    "css": [
+    "\n.ui-root :is(.df-move-zone, .df-aim-zone) { display: none; }\nbody.touch .ui-root[data-ui-top=\"hud\"] :is(.df-move-zone, .df-aim-zone) { display: block; position: absolute; pointer-events: auto; touch-action: none; }\n.df-move-zone { left: 0; bottom: 0; width: 50%; height: 55%; }\n.df-aim-zone { right: max(36px, calc(env(safe-area-inset-right) + 24px)); bottom: max(42px, calc(env(safe-area-inset-bottom) + 32px)); width: 100px; height: 100px; }\n.df-stick { position: absolute; border-radius: 50%; background: rgba(20, 0, 10, .4); box-shadow: 0 4px 15px rgba(0, 0, 0, .5); backdrop-filter: blur(2px); pointer-events: none; }\n.ui-root .df-move-base { display: none; position: fixed; width: 128px; height: 128px; }\n.df-aim-base { left: 50%; top: 50%; translate: -50% -50%; width: 80px; height: 80px; }\n.df-stick-knob { position: absolute; top: 50%; left: 50%; width: 36px; height: 36px; border-radius: 50%; pointer-events: none;\n  transform: translate(calc(-50% + var(--lx, 0px)), calc(-50% + var(--ly, 0px)));\n  background: radial-gradient(circle at 35% 35%, #fffbf2 0%, #e8dcc0 40%, #c4a980 100%);\n  box-shadow: inset 2px 2px 3px #fff, inset -2px -2px 4px rgba(100, 80, 60, .4), 0 5px 10px rgba(0, 0, 0, .5); }\n.df-aim-ring, .df-aim-band { position: absolute; left: 50%; top: 50%; translate: -50% -50%; border-radius: 50%; pointer-events: none; }\n.df-aim-ring { width: 84px; height: 84px; border: 1.5px solid rgba(232, 194, 122, .35); box-shadow: 0 0 6px rgba(232, 194, 122, .15); }\n.df-aim-band { width: 128px; height: 128px; border: 3px solid currentColor; color: rgba(232, 194, 122, .55); opacity: 0; transition: opacity .15s, color .12s; }\n.df-aim-zone[data-stick-state]:not([data-stick-state=\"idle\"]) .df-aim-band { opacity: 1; }\n.df-aim-zone[data-stick-state=\"firing\"] :is(.df-aim-ring,.df-aim-band) { color: #ffd68c; border-color: #ffd68c; box-shadow: 0 0 14px rgba(255, 190, 90, .75); }\n.df-aim-zone[data-stick-state=\"armed\"] :is(.df-aim-ring,.df-aim-band) { color: #c8aaff; border-color: #c8aaff; box-shadow: 0 0 14px rgba(170, 130, 255, .8); animation: df-aim-armed .8s ease-in-out infinite; }\n@keyframes df-aim-armed { 50% { box-shadow: 0 0 22px #aa82ff; } }\n@media (prefers-reduced-motion: reduce) { .df-aim-zone[data-stick-state=\"armed\"] :is(.df-aim-ring,.df-aim-band) { animation: none; } }\n@media (orientation: landscape) and (max-height: 540px) { .df-aim-zone { bottom: max(16px, env(safe-area-inset-bottom)); } }\n",
     "@import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Montserrat:wght@400;500;600;700&family=Orbitron:wght@500;700&family=Raleway:wght@400;500&display=swap');",
     ".ui-root { --font-script: 'Anthropology', 'Great Vibes', cursive; --font-ui: 'Montserrat', sans-serif; --font-menu: 'Feminine', 'Raleway', 'Montserrat', sans-serif;\n  --font-menu-body: 'Brooklyn', 'Raleway', 'Montserrat', sans-serif; --font-tech: 'Orbitron', sans-serif;\n  --lavender: #cab0fa; --lavender-pale: #f1e8fe; --lilac-grey: #b9aec4; --cream: #f3e4c6; --champagne: #d8c6a2; --gold: #ffc248; }",
     "\n.hud-health { width: 200px; height: 12px; border-radius: 0; background: rgba(30,5,5,.95); color: #8b0000; }\n.hud-health .ui-fill { background: linear-gradient(90deg, #3a0000, #6b0000, #8b0000); box-shadow: inset 0 1px 0 rgba(255,100,100,.15); border-radius: 0; transition: width .2s ease-out; }\n.hud-pause { width: 44px; height: 44px; padding: 0 !important; border-radius: 50% !important; display: flex; align-items: center; justify-content: center;\n  background: rgba(20,0,10,.4) !important; border: 1px solid rgba(255,255,255,.2); color: #fff; font-size: calc(1.2rem - 2px); }\n.hud-pause.is-hover { background: rgba(60,10,40,.6) !important; }\n.hud-time { font: 500 calc(1.2rem - 2px) var(--font-tech); color: #fff; text-shadow: 0 0 5px #fff; letter-spacing: 2px; }\n.hud-money { font: 400 calc(.9rem - 2px) var(--font-ui); color: #ffd700; text-shadow: 0 0 5px #ffd700; }\n.hud-location { font: 400 calc(1.3rem - 2px) var(--font-script); color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.8), 0 0 15px rgba(164,105,255,.3); }\n"
