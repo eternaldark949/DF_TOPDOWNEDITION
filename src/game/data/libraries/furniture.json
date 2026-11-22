@@ -2,6 +2,11 @@
   "library_id": "furniture",
   "description": "Furniture as data: every piece built from layers at their heights and recoloured by its look values (main, dark, seam, leg, button, frame). The couches are the upgrades of the classic sofas.",
   "resources": {
+    "booth_table_underside": {"kind": "material", "fill": "#332328"},
+    "booth_table_edge": {"kind": "material", "fill": "#b18750"},
+    "booth_bucket_metal": {"kind": "material", "fill": "#9b9daa"},
+    "booth_bottle_glass": {"kind": "material", "fill": "#273e34"},
+    "booth_flute_glass": {"kind": "material", "fill": "#d7b990"},
     "glitter": {
       "kind": "texture",
       "size": [44, 44],
@@ -46,6 +51,37 @@
     "crescent_sofa_frame": {"kind": "material", "fill": "#5a3a26", "stroke": "#5a3a26"}
   },
   "templates": {
+    "champagne_table": {
+      "kind": "prop",
+      "physics_type": "static",
+      "look": {"layer": 1},
+      "bounds": "box",
+      "components": [
+        {"name": "table", "at": [0, 0], "layers": [
+          {"layer": -1, "height": 0, "thickness": "1 cm", "steps": [{"shape": "rectangle", "x": -23, "y": -31, "width": 46, "height": 64, "radius": 8, "fill": "rgba(0,0,0,.52)", "blur": 4}], "solid": false},
+          {"layer": 0, "height": 0, "thickness": "39 cm", "steps": [{"shape": "rectangle", "x": -18, "y": -26, "width": 36, "height": 52, "radius": 4, "fill": "#423125"}], "sides": {"material": "booth_table_underside"}},
+          {"layer": 1, "height": "39 cm", "thickness": "5 cm", "steps": [{"shape": "rectangle", "x": -22, "y": -30, "width": 44, "height": 60, "radius": 6, "fill": {"type": "linear", "from": [-22, -30], "to": [22, 30], "stops": [[0, "#f6d89d"], [0.28, "#b48245"], [0.68, "#d6a45e"], [1, "#ffe0a4"]]}}, {"shape": "rectangle", "x": -20.65, "y": -28.65, "width": 41.3, "height": 57.3, "radius": 5.2, "fill": {"type": "linear", "from": [-12, -30], "to": [13, 30], "stops": [[0, "#3b2f45"], [0.24, "#221a29"], [0.65, "#160f1d"], [1, "#312334"]]}, "stroke": "#715438", "line_width": 0.45}, {"shape": "polygon", "points": [[-19, -24], [-17, -26], [-12, -27], [18, 13], [17, 17]], "fill": "rgba(213,182,241,.075)"}, {"shape": "line", "points": [[-17.7, -25], [15.8, -25], [18.7, -22]], "stroke": "rgba(255,231,187,.43)", "line_width": 0.6, "line_cap": "round"}, {"shape": "line", "points": [[19, 19], [19, 24], [16.5, 26.5], [6, 26.5]], "stroke": "rgba(255,190,115,.44)", "line_width": 0.72, "line_cap": "round"}], "sides": {"material": "booth_table_edge"}}
+        ]},
+        {"name": "petals", "at": [0, 0], "layers": [
+          {"layer": 0, "height": "44 cm", "thickness": "1 cm", "steps": [{"shape": "group", "x": 13, "y": 18, "rotation": 0.27, "steps": [{"shape": "polygon", "points": [[-1.8, 1], [0.1, -1.5], [2, -1.2], [1.55, 0.25], [-0.35, 1.45]], "fill": "#96314f"}, {"shape": "line", "points": [[-0.9, 0.6], [0.7, -0.6]], "stroke": "rgba(237,112,151,.58)", "line_width": 0.33, "line_cap": "round"}]}, {"shape": "group", "x": 16.5, "y": 12, "rotation": 1.26, "steps": [{"shape": "polygon", "points": [[-1.8, 1], [0.1, -1.5], [2, -1.2], [1.55, 0.25], [-0.35, 1.45]], "fill": "#96314f"}, {"shape": "line", "points": [[-0.9, 0.6], [0.7, -0.6]], "stroke": "rgba(237,112,151,.58)", "line_width": 0.33, "line_cap": "round"}]}, {"shape": "group", "x": 11.9, "y": 23, "rotation": -0.45, "steps": [{"shape": "polygon", "points": [[-1.8, 1], [0.1, -1.5], [2, -1.2], [1.55, 0.25], [-0.35, 1.45]], "fill": "#96314f"}, {"shape": "line", "points": [[-0.9, 0.6], [0.7, -0.6]], "stroke": "rgba(237,112,151,.58)", "line_width": 0.33, "line_cap": "round"}]}, {"shape": "group", "x": 15.2, "y": 25, "rotation": 0.85, "steps": [{"shape": "polygon", "points": [[-1.8, 1], [0.1, -1.5], [2, -1.2], [1.55, 0.25], [-0.35, 1.45]], "fill": "#96314f"}, {"shape": "line", "points": [[-0.9, 0.6], [0.7, -0.6]], "stroke": "rgba(237,112,151,.58)", "line_width": 0.33, "line_cap": "round"}]}], "solid": false}
+        ]},
+        {"name": "ice_bucket", "at": [-1, -1], "layers": [
+          {"layer": 0, "height": "44 cm", "thickness": "1 cm", "steps": [{"shape": "circle", "x": 0.9, "y": 1.4, "radius": 9.4, "fill": "rgba(0,0,0,.55)", "blur": 1.8}], "solid": false},
+          {"layer": 1, "height": "45 cm", "thickness": "16 cm", "steps": [{"shape": "circle", "x": 0, "y": 0, "radius": 8.15, "fill": {"type": "linear", "from": [-10, -5], "to": [10, 6], "stops": [[0, "#423344"], [0.19, "#a2aab9"], [0.37, "#eff4ff"], [0.51, "#9b8b94"], [0.72, "#626174"], [1, "#d1b597"]]}, "stroke": "#49404a", "line_width": 0.45}, {"shape": "circle", "x": 0, "y": 0, "radius": 6.85, "fill": "#29313f", "stroke": "#ebd5ad", "line_width": 0.48}, {"shape": "polygon", "points": [[-6.7, -2.9], [-4.8, -5.7], [-1.2, -4.5], [-2.2, -1.1]], "fill": "#9ab6c5", "stroke": "rgba(235,249,255,.48)", "line_width": 0.32}, {"shape": "polygon", "points": [[1.1, -6.6], [4.8, -5.1], [5.6, -2.3], [2.8, -0.5]], "fill": "#c4d8dd", "stroke": "rgba(235,249,255,.48)", "line_width": 0.32}, {"shape": "polygon", "points": [[-6.1, 0.4], [-2.5, -0.6], [-1, 2.9], [-4.9, 4.7]], "fill": "#789aa8", "stroke": "rgba(235,249,255,.48)", "line_width": 0.32}, {"shape": "polygon", "points": [[3.4, -0.3], [6.6, 1.1], [5.1, 4.8], [2.1, 3.4]], "fill": "#8ebac6", "stroke": "rgba(235,249,255,.48)", "line_width": 0.32}, {"shape": "polygon", "points": [[-2.1, 3.7], [1.1, 2.4], [3.2, 5.0], [0.5, 6.7]], "fill": "#b1cfd8", "stroke": "rgba(235,249,255,.48)", "line_width": 0.32}, {"shape": "line", "points": [[-6.2, -2.9], [-4.8, -5.15], [-2.3, -4.25]], "stroke": "rgba(255,255,255,.78)", "line_width": 0.46, "line_cap": "round"}, {"shape": "line", "points": [[3, -5.4], [4.55, -4.6], [5.1, -2.75]], "stroke": "rgba(255,255,255,.74)", "line_width": 0.43, "line_cap": "round"}, {"shape": "line", "points": [[-3.15, -6.8], [-0.3, -7.55], [2.75, -7.25]], "stroke": "#fff0cf", "line_width": 0.56, "line_cap": "round"}], "solid": false, "sides": {"material": "booth_bucket_metal"}},
+          {"layer": 2, "height": "61 cm", "thickness": "8 cm", "steps": [{"shape": "circle", "x": 0.65, "y": -0.35, "radius": 2.85, "fill": "#233d32", "stroke": "#a38347", "line_width": 0.55}, {"shape": "circle", "x": 0.65, "y": -0.35, "radius": 1.7, "fill": "#462f27", "stroke": "#e4bc76", "line_width": 0.38}, {"shape": "line", "points": [[-0.25, -0.85], [0.15, -1.35]], "stroke": "#f2d9a8", "line_width": 0.42, "line_cap": "round"}], "solid": false, "sides": {"material": "booth_bottle_glass"}}
+        ]},
+        {"name": "champagne_flute_1", "at": [-11, 12], "layers": [
+          {"layer": 0, "height": "44 cm", "thickness": "1 cm", "steps": [{"shape": "circle", "x": 0.5, "y": 1, "radius": 3.7, "fill": "rgba(0,0,0,.43)", "blur": 1.5}], "solid": false},
+          {"layer": 1, "height": "45 cm", "thickness": "7 cm", "steps": [{"shape": "circle", "x": 0, "y": 0, "radius": 2.35, "fill": "rgba(226,208,236,.22)", "stroke": "rgba(255,238,210,.67)", "line_width": 0.34}], "solid": false},
+          {"layer": 2, "height": "52 cm", "thickness": "7 cm", "steps": [{"shape": "circle", "x": 0, "y": 0, "radius": 2.85, "fill": "rgba(225,213,232,.35)", "stroke": "#f0dab6", "line_width": 0.48}, {"shape": "circle", "x": 0.08, "y": 0.1, "radius": 2.12, "fill": "rgba(242,185,94,.68)"}, {"shape": "line", "points": [[-1.72, -1.02], [-0.97, -1.73], [0.31, -2.02]], "stroke": "#fff1d7", "line_width": 0.42, "line_cap": "round"}, {"shape": "circle", "x": 0.62, "y": 0.55, "radius": 0.26, "fill": "#ffedbd"}], "solid": false, "sides": {"material": "booth_flute_glass"}}
+        ]},
+        {"name": "champagne_flute_2", "at": [11, -15], "layers": [
+          {"layer": 0, "height": "44 cm", "thickness": "1 cm", "steps": [{"shape": "circle", "x": 0.5, "y": 1, "radius": 3.7, "fill": "rgba(0,0,0,.43)", "blur": 1.5}], "solid": false},
+          {"layer": 1, "height": "45 cm", "thickness": "7 cm", "steps": [{"shape": "circle", "x": 0, "y": 0, "radius": 2.35, "fill": "rgba(226,208,236,.22)", "stroke": "rgba(255,238,210,.67)", "line_width": 0.34}], "solid": false},
+          {"layer": 2, "height": "52 cm", "thickness": "7 cm", "steps": [{"shape": "circle", "x": 0, "y": 0, "radius": 2.85, "fill": "rgba(225,213,232,.35)", "stroke": "#f0dab6", "line_width": 0.48}, {"shape": "circle", "x": 0.08, "y": 0.1, "radius": 2.12, "fill": "rgba(242,185,94,.68)"}, {"shape": "line", "points": [[-1.72, -1.02], [-0.97, -1.73], [0.31, -2.02]], "stroke": "#fff1d7", "line_width": 0.42, "line_cap": "round"}, {"shape": "circle", "x": 0.62, "y": 0.55, "radius": 0.26, "fill": "#ffedbd"}], "solid": false, "sides": {"material": "booth_flute_glass"}}
+        ]}
+      ]
+    },
     "velvet_sofa": {
       "kind": "prop",
       "physics_type": "static",
