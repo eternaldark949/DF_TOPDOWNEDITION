@@ -5,6 +5,8 @@
 // Draw it over the finished scene at the dark's strength (a layer pass in the frame, which every backend draws).
 import {artScene,rect,polygon,circle,radial,linear} from './art.mjs';
 import {viewAhead} from './camera.mjs';
+import {inverse} from './values.mjs';
+import {flattenGeometry,pathBounds} from './paths.mjs';
 
 const finite=(value,name,min=-Infinity)=>{if(!Number.isFinite(value)||value<min)throw new TypeError(`Light ${name} must be a finite number`);return value;};
 export const LIGHT_CUT=Object.freeze([[0,1],[1,0]]);
@@ -223,13 +225,33 @@ function glow(scene,l,shape,blend='add'){
 /** Packets that lift the dark more (a reflection's light target, a sprite): drawn as cuts, after the lights' (cuts commute). */
 const extraCuts=list=>list.map(p=>({...p,blend:'destination-out'}));
 // What stands over the light, in the order it is drawn: a cover lays the plain dark back (the layer cleared
-// there, then the dark alone), a shine is cut out of it (see renderSystem.nightOver).
-const nightOver=(list,tint)=>list.flatMap(({packet:p,over})=>{
-    // (one depth for all: the frame sorts a pass by depth, and these keep the order they come in)
-    if(over==='shine')return [{...p,blend:'destination-out',layer:0,depth:0}];
-    if(over==='cover')return [{...p,blend:'destination-out',layer:0,depth:0},{...p,material:{...p.material,fill:tint,stroke:null},blend:'normal',layer:0,depth:0}];
-    throw new TypeError('A light layer `over` entry is {packet, over: "cover" | "shine"}');
-});
+// there, then the dark alone), a shine is cut out of it, and a veil (a low part over glowing ground: a car on a lit
+// stop bar) lays the dark back only where it covers a shine drawn before it (see renderSystem.nightOver).
+const nightOver=(list,tint)=>{
+    const shines=[];
+    return list.flatMap(({packet:p,over})=>{
+        // (one depth for all: the frame sorts a pass by depth, and these keep the order they come in)
+        if(over==='shine'){shines.push(p);return [{...p,blend:'destination-out',layer:0,depth:0}];}
+        if(over==='cover')return [{...p,blend:'destination-out',layer:0,depth:0},{...p,material:{...p.material,fill:tint,stroke:null},blend:'normal',layer:0,depth:0}];
+        if(over==='veil'){
+            const box=packetBox(p);if(!box)return [];
+            // each shine under it painted again in the dark, inside the veil's outline
+            return shines.filter(s=>{const b=packetBox(s);return b&&b[0]<box[2]&&b[2]>box[0]&&b[1]<box[3]&&b[3]>box[1];}).map(s=>({...s,material:{...s.material,fill:s.material?.fill!=null?tint:null,stroke:s.material?.stroke!=null?tint:null},opacity:1,blend:'normal',layer:0,depth:0,
+                clips:[...(s.clips??[]),{geometry:p.geometry,transform:multiply(inverse(s.matrix??IDENTITY),p.matrix??IDENTITY),rule:'nonzero'}]}));
+        }
+        throw new TypeError('A light layer `over` entry is {packet, over: "cover" | "shine" | "veil"}');
+    });
+};
+const IDENTITY=[1,0,0,1,0,0];
+const multiply=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
+// A shape packet's box where it is drawn (its matrix applied, its stroke's width round it); cached on the packet.
+const BOXES=new WeakMap();
+function packetBox(p){
+    if(BOXES.has(p))return BOXES.get(p);let box=null;
+    if(p.type==='shape'&&p.geometry){const local=pathBounds(flattenGeometry(p.geometry,1),(p.material?.stroke!=null?(p.material.stroke_width??1):0)+1);
+        if(local){const m=p.matrix??IDENTITY,xs=[],ys=[];for(const [x,y] of [[local[0],local[1]],[local[2],local[1]],[local[2],local[3]],[local[0],local[3]]]){xs.push(m[0]*x+m[2]*y+m[4]);ys.push(m[1]*x+m[3]*y+m[5]);}box=[Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)];}}
+    BOXES.set(p,box);return box;
+}
 const polygonIds=new WeakMap();let polygonCount=0;
 const bits=new Float64Array(1),words=new Uint32Array(bits.buffer);
 /** FNV-1a over plain values (numbers, strings, arrays of them, null, booleans) as they are, without text: `hash = 0x811c9dc5`, then `add` each. */

@@ -153,7 +153,7 @@ export class renderSystem {
                 const pictures=this.#still&&!!this.#backend?.capabilities.includes('picture'),screen=view?(shown??={bounds:this.#camera.getView(blend).bounds,zoom:this.#camera.getView(blend).zoom}):null;
                 const night=covers!==null&&view,lit=!this.#groupsOff.size||this.lightGroupOn(lightGroupOf(entity));
                 for(const part of drawComponents(entity,source,blend,{joints,view,pictures,screen,shines:night&&lit,covers:night?covers:null,time})){
-                    if(part.cover)this.#over.push({packet:part.cover,over:'cover',layer,depth:depth+part.depth,solid:part.cover_solid??null});   // (at its base, before its own: under its walls' windows and its glowing steps, over what stands lower)
+                    if(part.cover)this.#over.push({packet:part.cover,over:part.cover_low?'veil':'cover',layer,depth:depth+part.depth,solid:part.cover_solid??null});   // (at its base, before its own: under its walls' windows and its glowing steps, over what stands lower)
                     for(const packet of part.sides){if(packet.shine){this.#over.push({packet,over:'shine',layer,depth:depth+part.depth+packet.depth,solid:packet.solid??null});continue;}this.#frame.submit(this.#textured({...packet,layer,depth:depth+part.depth+packet.depth}));}
                     for(const packet of part.packets){this.#frame.submit(this.#textured({...packet,layer,depth:depth+part.top,solid:part.solid??null}));if(packet.shine)this.#over.push({packet,over:'shine',layer,depth:depth+part.top,solid:part.solid??null});}
                     if(part.picture){const {key,bounds,matrix,build}=part.picture,gen=this.#texturesPainted;   // (a texture painted later is a new picture: the old one held its base colour)

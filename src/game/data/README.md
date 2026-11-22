@@ -87,5 +87,10 @@ are the source; edit them, not the classic data.
   `weather`, `player` and `saves`, and hears `new_game`, `exit`, `save`, `load` and the `options.*` they set.
 - `libraries/traffic.json`: the city's cars, `sedan` (72 by 40), `suv` (78 by 44) and `sports` (63 by 36), the classic's
   brand sizes, each extending the engine's `vehicle`: tyres, a body in `$paint` with a `$paint_hi` swage and `$paint_lo` sides,
-  the glass cabin set back as the classic's cabin fractions, the roof, mirrors, and headlights and tail lights that glow.
+  the glass cabin set back as the classic's cabin fractions, the roof, mirrors, and headlights and tail lights that glow;
+  their bodies are `cover: true`, so at night a car hides the lit road markings under it. And the junctions' lights as the
+  classic drew them, in its colours: `signal_head` (a housing on the kerb, its green, amber and red lamps lit by the
+  properties `go`, `amber` and `red`), `stop_bar` (across the way in) and `walk_strip` (along each kerb of a crossing:
+  `walk`, `wait`, and `flash` blinking), on the ground under cars and people, their lit parts glowing at night. The city's
+  `agents.settings.looks` names them.
   The city's `agents` profiles pick their paints.

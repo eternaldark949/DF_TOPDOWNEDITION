@@ -7,7 +7,8 @@
 // they follow each solid shape's true outline (rounded corners, curves, hollows), `shade` (0..1, default .35) darkens
 // a face the more it turns from the light, and `follow: 'hull'` wraps the layer in one convex skin instead. The entity's
 // height is the highest top among its components. A walled layer marked `cover: false` (a post, a pole: too thin to hide
-// the light under it) gives no cover at night (renderSystem.drawLooks({covers})). A layer with sides may carry a `facade`: windows, spandrels and doors
+// the light under it) gives no cover at night (renderSystem.drawLooks({covers})); one marked `cover: true` (a car's body)
+// also hides, however low it stands, any glowing ground it stands over. A layer with sides may carry a `facade`: windows, spandrels and doors
 // (`panels`) in every bay of every storey, `piers` between the bays and `bands` along the walls (see readFacade). Components are plain data, kept in the entity's
 // `components` property, so they save, load and change like any property. A layer may `pulse` ({period, low}: its strength
 // swells and fades over `period` seconds of play, down to `low` of full) and be `shown_when` a property of its entity is
@@ -50,7 +51,7 @@ export function readLayer(packet, where = 'A layer') {
     return { layer: packet.layer, height: length(packet.height ?? 0, `${where}'s height`, -Infinity), thickness: length(packet.thickness ?? 0, `${where}'s thickness`),
         ...(packet.steps !== undefined ? { steps: structuredClone(packet.steps) } : { drawing: packet.drawing }),
         solid: packet.solid ?? true, visible: packet.visible ?? true, ...(packet.sides !== undefined ? { sides: structuredClone(packet.sides) } : {}),
-        ...(packet.facade !== undefined ? { facade: structuredClone(packet.facade) } : {}), ...(packet.cover === false ? { cover: false } : {}),
+        ...(packet.facade !== undefined ? { facade: structuredClone(packet.facade) } : {}), ...(typeof packet.cover === 'boolean' ? { cover: packet.cover } : {}),
         ...(pulse !== undefined ? { pulse: { period: pulse.period, low: pulse.low ?? 0 } } : {}), ...(packet.shown_when !== undefined ? { shown_when: packet.shown_when } : {}), ...(packet.slope !== undefined ? { slope: [...packet.slope] } : {}) };
 }
 // A number, or a "$look" value the drawing reads when it is drawn.

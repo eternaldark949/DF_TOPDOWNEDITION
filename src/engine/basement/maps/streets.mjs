@@ -17,11 +17,15 @@ export const STREETS = Object.freeze({
     join: 120,                 // a pavement end this near another foot end is joined to it
     stop_setback: 4,           // a car stops this far before a stop line or a crosswalk
     box_exit: 110,             // past a junction, how far a car must have room (and the crosswalk be clear) before it goes in
+    bar_back: 8,               // a light's stop bar, this far behind its stop line
+    bar_inset: 5,              // and this far in from the centre line and the kerb
+    head_at: [6, 22],          // a light's head: this far on from its bar, and out past the kerb
+    strip_inset: [3, 7],       // a crossing's walk strips: in from its ends, and from its sides
     car: 'car', foot: 'foot'   // the profiles on the lanes
 });
 
 const sub = (a, b) => [a[0] - b[0], a[1] - b[1]], add = (a, b) => [a[0] + b[0], a[1] + b[1]], mul = (a, k) => [a[0] * k, a[1] * k];
-const len = v => Math.hypot(v[0], v[1]), unit = v => { const l = len(v) || 1; return [v[0] / l, v[1] / l]; }, cross = (a, b) => a[0] * b[1] - a[1] * b[0];
+const dot = (a, b) => a[0] * b[0] + a[1] * b[1], len = v => Math.hypot(v[0], v[1]), unit = v => { const l = len(v) || 1; return [v[0] / l, v[1] / l]; }, cross = (a, b) => a[0] * b[1] - a[1] * b[0];
 const right = d => [-d[1], d[0]];   // the right hand of a heading, y down
 const angleDelta = (a, b) => { let d = b - a; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; };
 const heading = d => Math.atan2(d[1], d[0]);
@@ -144,7 +148,8 @@ export function streetNetwork({ streets = null, pavements = [], crosswalks = [],
             lanes.push({ lane_id: `${a.lane_id}>${b.lane_id}`, from: a.to, to: b.from, points, all: [p0, ...points, p2], speed_limit: kind === 'straight' ? S.speed_limit : S.turn_speed, profiles: [S.car], kind: 'turn', turn: kind, junction: j.id, signal_id, stops: [] });
         }
         const order = [0, 1, 2, 3].map(p => `${j.id}/${p}`).filter(id => used.has(id));
-        out_junctions.push({ junction_id: j.id, position: round(j.centre), phases: order.map(id => [id]) });
+        const [l, t, r, b] = box(j.poly);
+        out_junctions.push({ junction_id: j.id, position: round(j.centre), phases: order.map(id => [id]), area: { left: l, top: t, right: r, bottom: b } });
     }
     // On foot: each pavement along its length, each crosswalk across its road, joined end to end.
     const foot = [];
@@ -153,10 +158,10 @@ export function streetNetwork({ streets = null, pavements = [], crosswalks = [],
         foot.push({ lane_id: `pave${i}`, ends: c, kind: 'pavement' });
     });
     crosswalks.forEach((x, i) => {
-        let ends;
-        if (x.orientation === 'D' && x.axis) { const { ux, uy, nx, ny, ox, oy, a0 = 0, a1 = 0, hT } = x.axis, c = [ox + ux * (a0 + a1) / 2, oy + uy * (a0 + a1) / 2]; ends = [add(c, mul([nx, ny], -hT)), add(c, mul([nx, ny], hT))]; }
-        else { const along = x.orientation === 'V' ? x.w >= x.h : x.w >= x.h; ends = along ? [[x.x, x.y + x.h / 2], [x.x + x.w, x.y + x.h / 2]] : [[x.x + x.w / 2, x.y], [x.x + x.w / 2, x.y + x.h]]; }
-        foot.push({ lane_id: `cross${i}`, ends, kind: 'crossing', walkway_id: `cross${i}`, poly: rectPoly(x) });
+        let ends, width;   // (the walk across, from kerb to kerb, and how wide the crossing is)
+        if (x.orientation === 'D' && x.axis) { const { ux, uy, nx, ny, ox, oy, a0 = 0, a1 = 0, hT } = x.axis, c = [ox + ux * (a0 + a1) / 2, oy + uy * (a0 + a1) / 2]; ends = [add(c, mul([nx, ny], -hT)), add(c, mul([nx, ny], hT))]; width = Math.abs(a1 - a0); }
+        else { const along = x.w >= x.h; ends = along ? [[x.x, x.y + x.h / 2], [x.x + x.w, x.y + x.h / 2]] : [[x.x + x.w / 2, x.y], [x.x + x.w / 2, x.y + x.h]]; width = Math.min(x.w, x.h); }
+        foot.push({ lane_id: `cross${i}`, ends, width, kind: 'crossing', walkway_id: `cross${i}`, poly: rectPoly(x) });
     });
     // Ends that touch are one node; a loose end is joined to the nearest other end within `join`.
     const ends = foot.flatMap(f => f.ends.map((p, e) => ({ f, e, p, id: null })));
@@ -218,23 +223,45 @@ export function streetNetwork({ streets = null, pavements = [], crosswalks = [],
     for (const t of lanes) if (t.kind === 'turn' && t.signal_id) { if (!by_junction.has(t.junction)) by_junction.set(t.junction, []); by_junction.get(t.junction).push(t); }
     for (const f of foot) if (f.walkway_id) f.box = box(f.poly);
     for (const f of foot) if (f.walkway_id) {
-        const waits = new Set();
+        const waits = new Set(), at_junctions = new Set();
         for (const l of lanes) if (l.profiles.includes(S.car)) {
             if (!overlaps(box(l.all), f.box)) continue;
             const span = through(l.all, f.poly); if (!span) continue;
             l.stops.push({ distance: Math.max(0, span[0] - S.stop_setback), walkway_id: f.walkway_id });
             // At a junction those on foot cross while every way in has its red (the walk between the phases), so
             // no car turns across them and none waits in the junction for them.
-            const j = l.kind === 'road' ? (l.to_junction ?? l.from_junction) : null;
-            if (j) for (const t of by_junction.get(j) ?? []) waits.add(t.signal_id);
+            // (the junction it is at: of the two an arm runs between, the nearer; its cars come through that one's lights)
+            const centre = [(f.box[0] + f.box[2]) / 2, (f.box[1] + f.box[3]) / 2], near = id => { const jj = junctions.find(x => x.id === id); return jj ? len(sub(jj.centre, centre)) : Infinity; };
+            const j = l.kind === 'road' ? [l.to_junction, l.from_junction].filter(Boolean).sort((a, b) => near(a) - near(b))[0] ?? null : null;
+            if (j && by_junction.has(j)) { at_junctions.add(j); for (const t of by_junction.get(j)) waits.add(t.signal_id); }
         }
-        crossings.push({ walkway_id: f.walkway_id, lane_id: f.lane_id, waits_for: [...waits] });
+        // Its area (what those on foot look over for cars before stepping off) and a strip along each kerb it meets,
+        // a little in from its ends and its sides (where a walk light is drawn).
+        const [p, q] = f.ends, d = unit(sub(q, p)), n = right(d), half = Math.max(0, f.width / 2 - S.strip_inset[1]);
+        const strip = e => [round(add(e, mul(n, -half))), round(add(e, mul(n, half)))];
+        crossings.push({ walkway_id: f.walkway_id, lane_id: f.lane_id, waits_for: [...waits], junctions: [...at_junctions], area: { left: f.box[0], top: f.box[1], right: f.box[2], bottom: f.box[3] }, strips: [strip(add(p, mul(d, S.strip_inset[0]))), strip(add(q, mul(d, -S.strip_inset[0])))] });
     }
     // A signal's stop line: before the turn, or before a crosswalk the arm reaches just before it.
+    const ways = new Map();   // signal_id: the lanes in under it, each with where its line is
     for (const t of lanes) if (t.kind === 'turn' && t.signal_id) {
         const a = lanes.find(l => l.kind === 'road' && l.to === t.from), last = a.stops.filter(s => s.walkway_id).map(s => s.distance).filter(d => d > lengths(a.all).at(-1) - 160);
-        a.stops.push({ distance: Math.max(0, (last.length ? Math.min(...last) : lengths(a.all).at(-1) - S.stop_setback)), signal_id: t.signal_id, turn: t.lane_id, clearance: Math.round(lengths(a.all).at(-1) - (last.length ? Math.min(...last) : lengths(a.all).at(-1)) + lengths(t.all).at(-1) + S.box_exit) });
+        const distance = Math.max(0, (last.length ? Math.min(...last) : lengths(a.all).at(-1) - S.stop_setback));
+        a.stops.push({ distance, signal_id: t.signal_id, turn: t.lane_id, clearance: Math.round(lengths(a.all).at(-1) - (last.length ? Math.min(...last) : lengths(a.all).at(-1)) + lengths(t.all).at(-1) + S.box_exit) });
+        if (!ways.has(t.signal_id)) ways.set(t.signal_id, { junction_id: t.junction, lanes: new Map() });
+        ways.get(t.signal_id).lanes.set(a.lane_id, { lane: a, distance });
+    }
+    // How each light looks where it stands: a stop bar across its way in on the line, from the centre line to the
+    // kerb, and its head on the kerb beside the line, turned the way the cars come in.
+    const signals = [];
+    for (const [signal_id, { junction_id, lanes: way }] of ways) {
+        const ins = [...way.values()], { lane: first, distance } = ins[0], cum = lengths(first.all), at_line = at(first.all, cum, distance);
+        const ahead = unit(sub(at(first.all, cum, Math.min(cum.at(-1), distance + 1)), at(first.all, cum, Math.max(0, distance - 1)))), side = right(ahead), w = first.road ? (roads.find(r => r.id === first.road)?.lane_width ?? S.lane_width) : S.lane_width;
+        // across the way in: each lane's line, measured to the right of the first's
+        let lo = Infinity, hi = -Infinity;
+        for (const { lane, distance: dd } of ins) { const o = dot(sub(at(lane.all, lengths(lane.all), dd), at_line), side); lo = Math.min(lo, o - w / 2); hi = Math.max(hi, o + w / 2); }
+        const back = -S.bar_back, place = (along, across) => round(add(add(at_line, mul(ahead, along)), mul(side, across)));
+        signals.push({ signal_id, junction_id, bar: [place(back, lo + S.bar_inset), place(back, hi - S.bar_inset)], head: place(back + S.head_at[0], hi + S.head_at[1]), rotation: Math.round(heading(ahead) * 1e4) / 1e4 });
     }
     for (const l of lanes) { l.stops?.sort((a, b) => a.distance - b.distance); delete l.all; }
-    return { nodes: [...nodes.values()], lanes, junctions: out_junctions, crossings, size };
+    return { nodes: [...nodes.values()], lanes, junctions: out_junctions, crossings, signals, size };
 }

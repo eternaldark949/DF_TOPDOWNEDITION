@@ -250,8 +250,10 @@ export class trafficController {
                 if (admitted && stop.conflict_id && remaining <= horizon) this.#reservations.set(stop.conflict_id, id);
                 // One that must wait gives the crossing back, so it never holds a junction it is not in.
                 if (!admitted && owner === id) this.#reservations.delete(stop.conflict_id);
-                if (!admitted) d.speed_cap = Math.min(d.speed_cap, Math.sqrt(2 * braking * Math.max(0, remaining - motor.config.wheel_base / 2 - d.config.following_distance)));
-                break;
+                if (!admitted) { d.speed_cap = Math.min(d.speed_cap, Math.sqrt(2 * braking * Math.max(0, remaining - motor.config.wheel_base / 2 - d.config.following_distance))); break; }
+                // Let through here: heed the next stop too while it is within stopping reach (a light on the same line
+                // as the crosswalk before it), else it is met in its turn.
+                if (!(k + 1 < stops.length && stops[k + 1].distance - d.progress <= horizon)) break;
             }
             const lanes = this.#onLanes.has(id);
             if (lanes) {

@@ -97,3 +97,63 @@ test('people on foot steer round posts on the pavement and round each other, ins
     assert.ok(aware.touching < blind.touching / 8, `with it they go round (${aware.touching} steps touching, ${blind.touching} without)`);
     assert.ok(aware.trips >= blind.trips * .8, `and still get where they are going (${aware.trips} trips, ${blind.trips} without)`);
 });
+
+test('cars go into a junction only on their own green (a crosswalk on the stop line does not hide the light)', () => {
+    const { agents, run } = world({ cars: { network: 'car', count: 14, speed: 160 } });
+    const net = town(), boxes = net.junctions.map(j => ({ j, a: j.area })), signals = net.signals;
+    agents.populate({ focus: [1600, 1600] });
+    const was = new Map(), bad = []; let entered = 0;
+    for (let t = 0; t < 40; t += 1 / 30) {
+        run(1 / 30);
+        for (const a of agents.agents) {
+            const [x, y] = a.entity.position, box = boxes.find(b => x > b.a.left && x < b.a.right && y > b.a.top && y < b.a.bottom);
+            if (box && !was.get(a.entity)) {
+                // its way in: the light of this junction that faces the way it drives
+                const heading = Math.atan2(a.entity.linear_velocity[1], a.entity.linear_velocity[0]), turn = s => Math.abs(Math.atan2(Math.sin(s.rotation - heading), Math.cos(s.rotation - heading)));
+                const way = signals.filter(s => s.junction_id === box.j.junction_id).sort((p, q) => turn(p) - turn(q))[0];
+                if (way && turn(way) < .5) { entered++; if (agents.getLight(way.signal_id) === 'stop') bad.push({ t: +t.toFixed(2), sig: way.signal_id, at: [x, y].map(Math.round), v: a.entity.linear_velocity.map(Math.round) }); }
+            }
+            was.set(a.entity, !!box);
+        }
+    }
+    // (one already over its line when the light changed may still roll in slowly behind the car ahead, to clear the crossing)
+    assert.deepEqual(bad.filter(b => Math.hypot(...b.v) > 60), [], 'no car drives in on its red'); assert.ok(entered > 10, `cars went through junctions (${entered})`);
+});
+
+test('the all-red holds while a car is still in the junction, and the walk waits for it', () => {
+    const { physics, agents } = world({}, { signals: { green: 2, clear: 1, walk: 3, hold: 2, flash: 1 } });
+    const j = town().junctions.find(x => x.junction_id === 'X1200_1200'), ids = j.phases.map(p => p[0]);
+    // run to a clear, then park a car in the middle of the box
+    let t = 0; while (!ids.some(id => agents.getLight(id) === 'amber') && t < 30) { agents.updateState(.1, {}); t += .1; }
+    const car = physics.elements.createEntity({ kind: 'vehicle', position: [1200, 1200], mass: 1000, collision_shape: { shape_type: 'box', dimensions: [56, 28] } });
+    physics.updateState(1 / 30);
+    for (let s = 0; s < 20; s += .1) { agents.updateState(.1, {}); assert.ok(ids.every(id => agents.getSignal(id) === 'stop'), 'nobody gets a green while a car is in the box'); }
+    car.destroy(); physics.updateState(1 / 30);
+    let green = false; for (let s = 0; s < 3; s += .1) { agents.updateState(.1, {}); green ||= ids.some(id => agents.getSignal(id) === 'go') || agents.getWalk('cross0') !== 'wait'; }
+    assert.ok(green, 'once it is out the lights move on');
+});
+
+test('the lights look as they are: a head and a stop bar for each way in and walk strips at each crossing, round the focus', () => {
+    const placed = [];
+    const { agents } = world({}, { looks: { head: 'head', bar: 'bar', strip: 'strip' } });
+    agents.dispose();
+    const physics = new physicsSystem();
+    const looks = new agentSystem(physics, { network: town(), profiles: {}, spawn: () => null, near: 300, far: 600, gone: 900, looks: { head: 'head', bar: 'bar', strip: 'strip' },
+        place: (template, { position, rotation, values }) => { const e = physics.elements.createEntity({ kind: 'decoration', position, rotation }); placed.push({ template, e, values }); return e; } });
+    looks.updateState(1 / 30, { focus: [1200, 1200] });
+    const count = k => placed.filter(p => p.template === k && !p.e.destroyed).length;
+    assert.ok(count('head') >= 4 && count('head') === count('bar'), `heads and bars (${count('head')}, ${count('bar')})`);
+    assert.ok(count('strip') >= 8, `strips (${count('strip')})`);
+    const bar = placed.find(p => p.template === 'bar'); assert.ok(bar.values.right > 10 && bar.values.left === -bar.values.right);
+    // each look shows its light: one of go, amber and red set on a head; walk, flash or wait on a strip
+    for (let s = 0; s < 30; s += .5) {
+        looks.updateState(.5, { focus: [1200, 1200] });
+        for (const p of placed) if (!p.e.destroyed) {
+            const on = (p.template === 'strip' ? ['walk', 'flash', 'wait'] : ['go', 'amber', 'red']).filter(k => p.e.get(k));
+            assert.equal(on.length, 1, `${p.template} shows one light (${on})`);
+        }
+    }
+    looks.updateState(1 / 30, { focus: [3200 * 4, 3200 * 4] }); for (let i = 0; i < 40; i++) looks.updateState(1 / 30, { focus: [3200 * 4, 3200 * 4] });
+    assert.equal(placed.filter(p => !p.e.destroyed).length, 0, 'taken away far behind the focus');
+    looks.dispose();
+});
