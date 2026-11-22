@@ -1,9 +1,8 @@
 // Preview controls exercise the game's weapon art without involving mission or inventory state.
 import { readComponents } from '../../src/engine/basement/physics/index.mjs';
+import { shotSteps } from './shot-effects.mjs';
 
 const CATALOG = 'weapons:catalog';
-const TRAIL_SAMPLES = 9;
-const TRAIL_FADE = .12;
 
 export function weaponChoices(registry) {
     return [{ value: 'none', text: 'Unarmed' }, ...registry.getResource(CATALOG).entries.map(id => ({
@@ -34,39 +33,52 @@ export function previewWeapons(engine, registry, walker) {
     }
 
     function fire() {
-        const { effect, effect_scale, muzzle, projectile, color, trail, core } = held.data;
+        const { effect, effect_scale, muzzle, projectile, color, trail, core, trail_color, streak_length } = held.data;
         const position = held.toWorld(muzzle), rotation = held.rotation, elevation = held.world_elevation;
         const look = { values: { color, core } };
         const flash = engine.createEntity({ template: 'weapons:' + effect, position, rotation, elevation, look: { ...look, scale: effect_scale } });
-        effects.set(flash, flash.get('lifetime'));
+        const lifetime = flash.get('lifetime');
+        effects.set(flash, { lifetime, remaining: lifetime, scale: effect_scale, fade: effect === 'flash' });
         if (!projectile) return;
         const round = engine.createEntity({
             template: projectile, position, rotation, elevation, look,
             owner_id: walker.entity_id, direction: [Math.cos(rotation), Math.sin(rotation)]
         });
         const trace = engine.createEntity({ template: 'engine:decoration', position, elevation, look: { layer: 4 } });
-        projectiles.set(round.entity_id, { round, trace, points: [position], color, style: trail, hit: null, remaining: TRAIL_FADE });
+        const style = registry.getResource(trail);
+        projectiles.set(round.entity_id, {
+            round, trace, points: [[0, 0]], style, color, core, trail_color, streak_length,
+            hit: null, age: 0, seed: round.entity_id, remaining: style.fade,
+            lifetime: registry.getTemplate(projectile).lifetime, puffs: [], next_puff: style.sample_interval
+        });
     }
 
-    function paintTrail({ trace, points, color, style }, alpha) {
-        const steps = [];
-        for (let index = 1; index < points.length; index++) {
-            const from = trace.toLocal(points[index - 1]);
-            const to = trace.toLocal(points[index]);
-            const dx = to[0] - from[0], dy = to[1] - from[1];
-            const width = style === 'wisp' ? 2.4 : style === 'tracer' ? .65 : 1;
-            const opacity = alpha * index / points.length;
-            let path = [from, to];
-            if (style === 'crackle' || style === 'static') {
-                const sway = (index % 2 ? 1 : -1) * (style === 'static' ? .25 : .12);
-                path = [from, [(from[0] + to[0]) / 2 - dy * sway, (from[1] + to[1]) / 2 + dx * sway], to];
+    function updateTrail(shot, seconds) {
+        shot.age += seconds;
+        const position = shot.hit ?? (shot.round.destroyed ? null : shot.round.position);
+        if (position) {
+            const at = shot.trace.toLocal(position);
+            const previous = shot.points.at(-1);
+            if (at[0] !== previous[0] || at[1] !== previous[1]) {
+                shot.points.push(at);
+                if (shot.points.length > shot.style.samples) shot.points.shift();
+                if (shot.style.sample_interval && shot.age >= shot.next_puff) {
+                    const phase = (shot.seed * 2.39996323 + shot.age * 37) % (2 * Math.PI);
+                    shot.puffs.push({ at, born: shot.age, phase });
+                    shot.next_puff = shot.age + shot.style.sample_interval;
+                }
             }
-            if (style === 'wisp') {
-                steps.push({ shape: 'glow', x: from[0], y: from[1], radius: 2.8, color, alpha: opacity * .45 });
-            }
-            steps.push({ shape: 'line', points: path, stroke: color, line_width: width, alpha: opacity });
+            shot.hit = null;
         }
-        trace.set('components', readComponents([{ name: 'trail', layers: [{ layer: 4, solid: false, steps }] }]));
+        while (shot.puffs.length && shot.age - shot.puffs[0].born >= shot.style.lifetime) shot.puffs.shift();
+        if (shot.round.destroyed) shot.remaining = Math.max(0, shot.remaining - seconds);
+        if (!shot.remaining && !shot.puffs.length) return false;
+
+        const steps = shotSteps(shot);
+        if (steps.length) {
+            shot.trace.set('components', readComponents([{ name: 'trail', layers: [{ layer: 4, solid: false, steps }] }]));
+        }
+        return true;
     }
 
     return {
@@ -86,6 +98,18 @@ export function previewWeapons(engine, registry, walker) {
             requested ||= controls.justActivated('preview_fire');
         },
         afterPhysics(context, seconds) {
+            for (const [effect, shot] of effects) {
+                shot.remaining -= seconds;
+                if (shot.remaining <= 1e-8) {
+                    effect.destroy();
+                    effects.delete(effect);
+                } else if (shot.fade) {
+                    const ratio = shot.remaining / shot.lifetime;
+                    const look = effect.get('look');
+                    effect.set('look', { ...look, scale: shot.scale * (.7 + .3 * ratio),
+                        values: { ...look.values, fade: .35 + .65 * ratio } });
+                }
+            }
             const direction = aimDirection(), aiming = direction.some(Boolean);
             if (held) {
                 const anchor = physics.rigs.getAnchor(walker, 'hand_r');
@@ -104,25 +128,10 @@ export function previewWeapons(engine, registry, walker) {
             }
             requested = false;
             released = null;
-            for (const [effect, time] of effects) {
-                if (time <= seconds) {
-                    effect.destroy();
-                    effects.delete(effect);
-                } else effects.set(effect, time - seconds);
-            }
             for (const [id, shot] of projectiles) {
-                const position = shot.hit ?? (shot.round.destroyed ? null : shot.round.position);
-                if (position) {
-                    const previous = shot.points.at(-1);
-                    if (position[0] !== previous[0] || position[1] !== previous[1]) shot.points.push(position);
-                    if (shot.points.length > TRAIL_SAMPLES) shot.points.shift();
-                    shot.hit = null;
-                }
-                if (shot.round.destroyed) shot.remaining -= seconds;
-                if (shot.remaining <= 0) {
-                    shot.trace.destroy();
-                    projectiles.delete(id);
-                } else if (shot.points.length > 1) paintTrail(shot, shot.remaining / TRAIL_FADE);
+                if (updateTrail(shot, seconds)) continue;
+                shot.trace.destroy();
+                projectiles.delete(id);
             }
         },
         gameplayPaused() { released = null; },

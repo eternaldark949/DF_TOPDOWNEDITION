@@ -37,7 +37,9 @@ test('the weapon catalog includes all Classic gear weapons and every model and e
         const look = { values: { color, core } };
         draw({ template: 'weapons:' + effect, look });
         if (projectile) {
-            assert.ok(['tracer', 'crackle', 'static', 'wisp'].includes(trail));
+            const profile = registry.getResource(trail);
+            assert.equal(profile.kind, 'weapon_trail');
+            assert.ok(profile.fade > 0 && profile.samples >= 2);
             draw({ template: projectile, direction: [1, 0], look });
         }
     }

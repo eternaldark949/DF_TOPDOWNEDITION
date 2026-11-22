@@ -230,16 +230,22 @@
   "flash": {
    "kind": "drawing",
    "steps": [
-    {"shape":"glow","x":2,"y":0,"radius":12,"color":"$color","alpha":0.85},
-    {"shape":"polygon","points":[[-1,0],[1,-1.2],[2,-5],[3,-1.9],[9,-4],[5,-0.9],[15,0],[5,0.9],[9,4],[3,1.9],[2,5],[1,1.2]],"fill":"$color"},
-    {"shape":"ellipse","x":2,"y":0,"radius_x":3,"radius_y":1,"fill":"#fff8e9"}
+    {"shape":"glow","x":0,"y":0,"radius":22,"core":0.3,"color":"$color","alpha":"$fade","blend":"add"},
+    {"shape":"polygon","points":[[0.0,7.0],[72,0],[-0.0,-7.0]],"fill":"$color","alpha":"$fade","blend":"add"},
+    {"shape":"polygon","points":[[1.625,3.655],[36,-16],[-1.625,-3.655]],"fill":"$color","alpha":"$fade","blend":"add"},
+    {"shape":"polygon","points":[[-1.625,3.655],[36,16],[1.625,-3.655]],"fill":"$color","alpha":"$fade","blend":"add"},
+    {"shape":"polygon","points":[[3.5,0.0],[0,-20],[-3.5,-0.0]],"fill":"$color","alpha":"$fade","blend":"add"},
+    {"shape":"polygon","points":[[-3.5,0.0],[0,20],[3.5,-0.0]],"fill":"$color","alpha":"$fade","blend":"add"},
+    {"shape":"polygon","points":[[0.0,3.0],[46,0],[-0.0,-3.0]],"fill":"#fffaf2","alpha":"$fade","blend":"add"},
+    {"shape":"circle","radius":5,"fill":"#ffffff","alpha":"$fade","blend":"add"}
    ]
   },
   "round": {
    "kind": "drawing",
    "steps": [
-    {"shape":"glow","x":0,"y":0,"radius":3.4,"color":"$color","alpha":0.65},
-    {"shape":"ellipse","x":0,"y":0,"radius_x":2.4,"radius_y":0.8,"fill":"$core"}
+    {"shape":"glow","x":0,"y":0,"radius":5,"color":"$color","alpha":0.85,"blend":"add"},
+    {"shape":"circle","radius":1.55,"fill":"$color","blend":"add"},
+    {"shape":"circle","radius":0.8,"fill":"$core","blend":"add"}
    ]
   },
   "slash": {
@@ -255,6 +261,11 @@
     {"shape":"polygon","points":[[0,0],[4,-2],[7,-6],[7,-2],[13,0],[7,2],[7,6],[4,2]],"fill":"$color"}
    ]
   },
+  "trail_tracer": {"kind": "weapon_trail", "fade": 0.065, "samples": 8},
+  "trail_sniper": {"kind": "weapon_trail", "fade": 0.13, "samples": 30, "long_tail": 300},
+  "trail_crackle": {"kind": "weapon_trail", "fade": 0.12, "samples": 8, "flicker": 0.045, "passes": 1, "amplitude": 2.4},
+  "trail_static": {"kind": "weapon_trail", "fade": 0.12, "samples": 8, "flicker": 0.045, "passes": 2, "amplitude": 3.4},
+  "trail_wisp": {"kind": "weapon_trail", "fade": 0.065, "samples": 8, "sample_interval": 0.033333, "lifetime": 0.833333, "dust": "#ffd76a"},
   "catalog": {
    "kind": "weapon_catalog",
    "entries": ["gatling_gunner","pistol_fpx","pistol_anavia","pistol_ganger","rifle_rb98","sniper_sara","sniper_sr86","golden_child","maiden_kukri","blood_pact","empg","golden_retribution"]
@@ -273,11 +284,13 @@
     "fire_interval": 0.2,
     "label": "Gatling Gunner",
     "muzzle": [35,0],
-    "effect_scale": 1.55,
+    "effect_scale": 0.294118,
     "effect": "flash",
     "color": "#ffbd79",
+    "trail_color": "#ffbd79",
+    "streak_length": 12.0,
     "projectile": "weapons:round",
-    "trail": "tracer",
+    "trail": "weapons:trail_tracer",
     "core": "#fff5dc"
    }
   },
@@ -293,11 +306,13 @@
     "fire_interval": 0.366667,
     "label": "FP-X",
     "muzzle": [13.4,1],
-    "effect_scale": 1,
+    "effect_scale": 0.294118,
     "effect": "flash",
-    "color": "#79a0ff",
+    "color": "#00f3ff",
+    "trail_color": "#79a0ff",
+    "streak_length": 12.5,
     "projectile": "weapons:round",
-    "trail": "tracer",
+    "trail": "weapons:trail_tracer",
     "core": "#fff5dc"
    }
   },
@@ -313,11 +328,13 @@
     "fire_interval": 0.066667,
     "label": "Anavia",
     "muzzle": [13.4,1],
-    "effect_scale": 1,
+    "effect_scale": 0.264706,
     "effect": "flash",
-    "color": "#a9b4ff",
+    "color": "#CCCCFF",
+    "trail_color": "#a9b4ff",
+    "streak_length": 12.0,
     "projectile": "weapons:round",
-    "trail": "crackle",
+    "trail": "weapons:trail_crackle",
     "core": "#f1ecff"
    }
   },
@@ -333,11 +350,13 @@
     "fire_interval": 0.2,
     "label": "Ganger Pistol",
     "muzzle": [12.9,1],
-    "effect_scale": 1,
+    "effect_scale": 0.294118,
     "effect": "flash",
     "color": "#ff69bb",
+    "trail_color": "#ff69bb",
+    "streak_length": 12.0,
     "projectile": "weapons:round",
-    "trail": "tracer",
+    "trail": "weapons:trail_tracer",
     "core": "#fff5dc"
    }
   },
@@ -353,11 +372,13 @@
     "fire_interval": 0.1,
     "label": "RB-98",
     "muzzle": [29.3,1.5],
-    "effect_scale": 1,
+    "effect_scale": 0.235294,
     "effect": "flash",
-    "color": "#cfeee9",
+    "color": "#00ffcc",
+    "trail_color": "#cfeee9",
+    "streak_length": 14.0,
     "projectile": "weapons:round",
-    "trail": "tracer",
+    "trail": "weapons:trail_tracer",
     "core": "#fff5dc"
    }
   },
@@ -374,11 +395,13 @@
     "fire_on_release": true,
     "label": "YourGirlSara",
     "muzzle": [55.2,0.5],
-    "effect_scale": 1.55,
+    "effect_scale": 0.470588,
     "effect": "flash",
-    "color": "#ff9a3c",
+    "color": "#FFD700",
+    "trail_color": "#ff9a3c",
+    "streak_length": 40.0,
     "projectile": "weapons:round",
-    "trail": "tracer",
+    "trail": "weapons:trail_sniper",
     "core": "#fff5dc"
    }
   },
@@ -395,11 +418,13 @@
     "fire_on_release": true,
     "label": "SR-86",
     "muzzle": [55.2,0.5],
-    "effect_scale": 1.55,
+    "effect_scale": 0.352941,
     "effect": "flash",
-    "color": "#d9d2de",
+    "color": "#DC143C",
+    "trail_color": "#d9d2de",
+    "streak_length": 20.0,
     "projectile": "weapons:round",
-    "trail": "tracer",
+    "trail": "weapons:trail_sniper",
     "core": "#fff5dc"
    }
   },
@@ -415,11 +440,13 @@
     "fire_interval": 0.633333,
     "label": "Golden Child",
     "muzzle": [20,1],
-    "effect_scale": 1,
+    "effect_scale": 0.264706,
     "effect": "flash",
-    "color": "#f3e4c6",
+    "color": "#FFD700",
+    "trail_color": "#f3e4c6",
+    "streak_length": 9.0,
     "projectile": "weapons:round",
-    "trail": "wisp",
+    "trail": "weapons:trail_wisp",
     "core": "#fff5dc"
    }
   },
@@ -469,11 +496,13 @@
     "fire_interval": 0.2,
     "label": "EMP Blaster",
     "muzzle": [14.6,1],
-    "effect_scale": 1,
+    "effect_scale": 0.294118,
     "effect": "flash",
     "color": "#b48cff",
+    "trail_color": "#b48cff",
+    "streak_length": 12.0,
     "projectile": "weapons:round",
-    "trail": "static",
+    "trail": "weapons:trail_static",
     "core": "#efe4ff"
    }
   },
@@ -500,10 +529,11 @@
     "drawing": "flash"
    },
    "look": {
-    "layer": 6
+    "layer": 6,
+    "values": {"fade": 1}
    },
    "data": {
-    "lifetime": 0.09
+    "lifetime": 0.05
    }
   },
   "round": {

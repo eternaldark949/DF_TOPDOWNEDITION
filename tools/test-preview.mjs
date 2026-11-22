@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
+import { shotSteps } from './preview/shot-effects.mjs';
 
 const root = join(fileURLToPath(import.meta.url), '../..');
 let chromium = null; try { ({ chromium } = createRequire(import.meta.url)('playwright')); } catch {}
@@ -131,16 +132,9 @@ test('the touch HUD moves and aims independently, and only an armed sniper relea
         await page.evaluate(() => {
             preview.ui.setValue('preview_weapon', 'sniper_sara');
             window.previewFlashes = 0;
-            const seen = new Set();
-            const sample = () => {
-                for (const e of preview.basement.elements.getEntities()) {
-                    if (e.template_id !== 'weapons:flash' || seen.has(e.entity_id)) continue;
-                    seen.add(e.entity_id);
-                    window.previewFlashes++;
-                }
-                requestAnimationFrame(sample);
-            };
-            requestAnimationFrame(sample);
+            preview.basement.physics.on('entityRegistered', ({ entity }) => {
+                if (entity.template_id === 'weapons:flash') window.previewFlashes++;
+            });
         });
         await page.waitForFunction(() => preview.basement.elements.getEntities().some(e => e.template_id === 'weapons:sniper_sara'));
         await touch('touchStart', [left, right]);
@@ -164,4 +158,29 @@ test('the touch HUD moves and aims independently, and only an armed sniper relea
         await aim.waitFor({ state: 'hidden' });
         assert.deepEqual(errors, []);
     } finally { await browser.close(); rmSync(dir, { recursive: true, force: true }); }
+});
+
+
+test('Classic shot effects use the traveled path and keep distinct trail signatures', () => {
+    const shot = {
+        points: [[0, 0], [100, 0], [325, 0], [350, 0]],
+        color: '#ffd700', core: '#fffaff', trail_color: '#b48cff',
+        streak_length: 25, remaining: .1, age: .1, lifetime: .7, seed: 4
+    };
+    const sniper = shotSteps({ ...shot, style: { fade: .1, long_tail: 300 } });
+    assert.deepEqual(sniper[0].points[0], [50, 0]);
+    assert.ok(sniper.every(step => step.points.at(-1)[0] === 350));
+
+    const crackle = { fade: .1, flicker: .045, amplitude: 2.4, passes: 1 };
+    const first = shotSteps({ ...shot, style: crackle });
+    const next = shotSteps({ ...shot, style: crackle, age: .145 });
+    assert.notDeepEqual(first, next, 'electrical trail changes at the flicker cadence');
+    assert.ok(shotSteps({ ...shot, style: { ...crackle, passes: 2 } }).length > first.length);
+
+    const wisp = shotSteps({ ...shot, remaining: 0,
+        puffs: [{ at: [325, 0], born: 0, phase: 0 }],
+        style: { fade: .065, sample_interval: .033333, lifetime: .833333, dust: '#ffd76a' }
+    });
+    assert.deepEqual(wisp.map(step => step.shape), ['glow', 'rectangle']);
+    assert.ok(wisp.every(step => step.x < 350 && step.alpha > 0), 'dust lingers behind the ended streak');
 });
