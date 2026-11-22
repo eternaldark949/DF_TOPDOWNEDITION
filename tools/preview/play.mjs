@@ -2,6 +2,7 @@
 // src/game/data with a person to walk them, their exits to travel through, the world's clock and weather to change.
 // It is built into one page by tools/build-preview.mjs, which hands it every library as `libraries`.
 import { gameEngine } from '../../src/engine/game-engine.mjs';
+import { readComponents } from '../../src/engine/basement/physics/index.mjs';
 import { mapLevel } from '../../src/engine/lobby/runtime/map-level.mjs';
 import { travelSystem } from '../../src/engine/lobby/runtime/travel-system.mjs';
 import { createEngineRegistry, mapDefinition, doorKindsOf, screensOf, fontsOf } from '../../src/engine/directory/index.mjs';
@@ -32,7 +33,31 @@ export async function bootPreview({ libraries, hud }) {
 
     // The person who walks: the engine's humanoid, kept across every map.
     const look = registry.resolveTemplate('engine:humanoid').look;
-    const person = new humanoid(physics, { position: [0, 0], name: 'walker', look: { ...look, lean: .35, values: { ...look.values, shirt: '#6b3fa0', hair: '#1d1520' } } });
+    const walker_look = { ...look, lean: .35, values: { ...look.values, shirt: '#6b3fa0', hair: '#1d1520' } };
+    const template = 'wardrobe:preview_walker';
+    const person = new humanoid(physics, { template, position: [0, 0], name: 'walker', look: walker_look });
+    const base_parts = registry.resolveTemplate(template).components;
+    const outfit = registry.resolveTemplate('wardrobe:outfit_sorcerer_long');
+    const wig = registry.resolveTemplate('wardrobe:wig_ponytail_black');
+    const chain = wig.data.chain;
+    let wardrobe_changed = false;
+
+    function applyWardrobe() {
+        wardrobe_changed = false;
+        const outfit_on = ui.getValue('wardrobe.outfit_sorcerer_long');
+        const wig_on = ui.getValue('wardrobe.wig_ponytail_black');
+        const parts = new Map(base_parts.map(part => [part.name, part]));
+        const values = { ...walker_look.values };
+        for (const item of [outfit_on && outfit, wig_on && wig].filter(Boolean)) {
+            for (const part of item.components) parts.set(part.name, part);
+            Object.assign(values, item.look.values);
+        }
+        person.entity.set('components', readComponents([...parts.values()]));
+        person.entity.set('look', { ...walker_look, values });
+        const wearing_wig = physics.rigs.getPhysicalChains(person.entity).some(current => current.chain_id === chain.chain_id);
+        if (wig_on && !wearing_wig) physics.rigs.createPhysicalChain(person.entity, chain);
+        if (!wig_on && wearing_wig) physics.rigs.removePhysicalChain(person.entity, chain.chain_id);
+    }
     engine.retainEntity(person.entity);
     let zoom = 3, speed = 1, place = '';
 
@@ -44,7 +69,9 @@ export async function bootPreview({ libraries, hud }) {
     ui.provide('place', () => place).provide('clock', () => engine.time.text()).provide('weather', () => titled(engine.weather.state))
       .provide('player', { health: 100, pp: 0 }).provide('saves', { can_save: false, slots: [] });
     ui.setValue('options', { time_speed: 12, weather: engine.weather.state, zoom: ZOOMS[zoom], renderer: 'canvas', dev_bar: true });
+    ui.setValue('wardrobe', { available: true, outfit_sorcerer_long: false, wig_ponytail_black: false });
     ui.on('set', ({ path, value }) => {
+        if (path === 'wardrobe.outfit_sorcerer_long' || path === 'wardrobe.wig_ponytail_black') wardrobe_changed = true;
         if (path === 'options.time_speed') engine.time.setSpeed(value);
         if (path === 'options.weather' && engine.weather.state !== value) engine.weather.set(value, 'normal');
         if (path === 'options.zoom' && ZOOMS[zoom] !== value) setZoom(ZOOMS.indexOf(value));
@@ -85,6 +112,7 @@ export async function bootPreview({ libraries, hud }) {
     // Each step: walk where the stick or keys say, face the way you walk, animate, take an exit when asked.
     engine.registerSystem('walker', {
         beforePhysics(context) {
+            if (wardrobe_changed) applyWardrobe();
             const [x, y] = controls.direction('move'), fast = controls.active('run') ? 1.8 : 1;
             person.entity.motor.setMovement([x * speed * fast, y * speed * fast], { face_movement: true });
             person.updateState();

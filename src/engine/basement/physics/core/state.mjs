@@ -24,7 +24,7 @@ export function bodyConfig(packet = {}) {
         position: vector(p.position ?? [0, 0]), rotation: number(p.rotation ?? 0, 'rotation'),
         linear_velocity: vector(p.linear_velocity ?? [0, 0]), angular_velocity: number(p.angular_velocity ?? 0, 'angular_velocity'),
         mass: number(p.mass ?? 1, 'mass', 1e-7),
-        friction: number(p.friction ?? 0.5, 'friction', 0), restitution: number(p.restitution ?? 0, 'restitution', 0, 1),
+        friction: number(p.friction ?? (type === 'character' ? 0 : 0.5), 'friction', 0), restitution: number(p.restitution ?? 0, 'restitution', 0, 1),
         linear_damping: number(p.linear_damping ?? 0, 'linear_damping', 0), angular_damping: number(p.angular_damping ?? 0, 'angular_damping', 0),
         collision_group: mask(p.collision_group ?? BODY_GROUP.PROP, 'collision_group'),
         collision_mask: mask(p.collision_mask ?? BODY_GROUP.ALL, 'collision_mask'), query_mask: mask(p.query_mask ?? BODY_GROUP.ALL, 'query_mask'),

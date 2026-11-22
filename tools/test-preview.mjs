@@ -40,9 +40,40 @@ test('the preview boots, loads every map and travels between the apartment and t
         const sky = await page.evaluate(() => preview.weather.state);
         await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowRight');   // Weather: one choice on
         await page.waitForFunction(sky => preview.weather.state !== sky, sky);
+        const outfit = page.getByRole('switch', { name: 'Street Sorcerer (Long Sleeve)' });
+        const wig = page.getByRole('switch', { name: 'Sorcerer’s Tail' });
+        await outfit.click();
+        await wig.click();
+        assert.equal(await outfit.getAttribute('aria-checked'), 'true');
+        assert.equal(await wig.getAttribute('aria-checked'), 'true');
         await page.keyboard.press('Escape'); await page.keyboard.press('Escape'); await page.waitForFunction(() => !preview.ui.isOpen('pause'));
         assert.deepEqual(await screens(), { stack: ['hud'], paused: false, input: 'gameplay' });
         assert.equal(await page.evaluate(() => document.querySelector('[data-ui-item="location"]').textContent), 'Silver Queen Apartments', 'the HUD reads the place it is in');
+        const wardrobe = () => page.evaluate(() => {
+            const { elements, rigs } = preview.basement.physics;
+            const walker = elements.getEntities({ kind: 'character' }).find(entity => entity.name === 'walker');
+            return {
+                id: walker.entity_id,
+                top: walker.get('look').values.sleeved_top ?? null,
+                tail: walker.hasComponent('ponytail_0'),
+                segments: rigs.getPhysicalChains(walker).find(chain => chain.chain_id === 'ponytail')?.segments.length ?? 0
+            };
+        });
+        await page.waitForFunction(() => preview.ui.getValue('wardrobe.wig_ponytail_black') &&
+            preview.basement.physics.elements.getEntities({ kind: 'character' })[0].hasComponent('ponytail_0'));
+        const dressed = await wardrobe();
+        assert.deepEqual(dressed, { id: dressed.id, top: '#1a0a2a', tail: true, segments: 6 });
+
+        // Clear just the wig, leaving the outfit equipped and the player on the same entity.
+        await page.keyboard.press('Escape');
+        await page.waitForFunction(() => preview.ui.isOpen('pause'));
+        await page.locator('[data-ui="pause"] [data-ui-item="settings"]').first().click();
+        await page.waitForFunction(() => preview.ui.isOpen('pause.settings'));
+        await wig.click();
+        await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
+        await page.waitForFunction(() => !preview.paused &&
+            !preview.basement.physics.elements.getEntities({ kind: 'character' })[0].hasComponent('ponytail_0'));
+        assert.deepEqual(await wardrobe(), { ...dressed, tail: false, segments: 0 });
         // Every map from the picker.
         const maps = await page.evaluate(async () => {
             const out = {}, select = document.getElementById('maps');

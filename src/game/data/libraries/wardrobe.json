@@ -1,0 +1,451 @@
+{
+ "library_id": "wardrobe",
+ "resources": {
+  "humanoid_skeleton": {
+   "kind": "skeleton",
+   "rig_id": "wardrobe:humanoid",
+   "joints": [
+    {"name": "root"},
+    {"name": "pelvis", "parent": "root", "position": [-1, 0], "height": "92 cm"},
+    {"name": "torso", "parent": "root", "height": "1.2 m"},
+    {"name": "head", "parent": "torso", "position": [1, 0], "height": "40 cm", "limits": {"min_rotation": -1.3, "max_rotation": 1.3}},
+    {"name": "shoulder_l", "parent": "torso", "position": [0, -11], "height": "22 cm", "rotation": -0.7854, "pitch": -1.2629},
+    {"name": "elbow_l", "parent": "shoulder_l", "position": [14, 0], "rotation": 1.3045, "pitch": 0.3611},
+    {"name": "hand_l", "parent": "elbow_l", "position": [13, 0], "pitch": 0.9018},
+    {"name": "hip_l", "parent": "pelvis", "position": [0, -5], "pitch": -1.5708},
+    {"name": "knee_l", "parent": "hip_l", "position": ["44 cm", 0]},
+    {"name": "foot_l", "parent": "knee_l", "position": ["42 cm", 0], "pitch": 1.5708},
+    {"name": "shoulder_r", "parent": "torso", "position": [0, 11], "height": "22 cm", "rotation": 0.7854, "pitch": -1.2629},
+    {"name": "elbow_r", "parent": "shoulder_r", "position": [14, 0], "rotation": -1.3045, "pitch": 0.3611},
+    {"name": "hand_r", "parent": "elbow_r", "position": [13, 0], "pitch": 0.9018},
+    {"name": "hip_r", "parent": "pelvis", "position": [0, 5], "pitch": -1.5708},
+    {"name": "knee_r", "parent": "hip_r", "position": ["44 cm", 0]},
+    {"name": "foot_r", "parent": "knee_r", "position": ["42 cm", 0], "pitch": 1.5708},
+    {"name": "ponytail_0", "parent": "head", "position": [-9, 0], "rotation": 3.141592653589793},
+    {"name": "ponytail_1", "parent": "ponytail_0", "position": [4.4, 0]},
+    {"name": "ponytail_2", "parent": "ponytail_1", "position": [4.4, 0]},
+    {"name": "ponytail_3", "parent": "ponytail_2", "position": [4.4, 0]},
+    {"name": "ponytail_4", "parent": "ponytail_3", "position": [4.4, 0]},
+    {"name": "ponytail_5", "parent": "ponytail_4", "position": [4.4, 0]},
+    {"name": "ponytail_6", "parent": "ponytail_5", "position": [4.4, 0]}
+   ],
+   "anchors": {
+    "hand_l": {
+     "joint": "hand_l"
+    },
+    "hand_r": {
+     "joint": "hand_r"
+    },
+    "head": {
+     "joint": "head"
+    },
+    "back": {
+     "joint": "torso",
+     "position": [-8, 0]
+    },
+    "seat": {
+     "joint": "pelvis"
+    }
+   }
+  }
+ },
+ "templates": {
+  "preview_walker": {
+   "extends": "engine:humanoid",
+   "assets": {
+    "skeleton": "humanoid_skeleton"
+   }
+  },
+  "outfit_sorcerer_long": {
+   "kind": "decoration",
+   "components": [
+    {
+     "name": "foot_l",
+     "joint": "foot_l",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-6 cm",
+       "thickness": "8 cm",
+       "steps": [
+        {"shape": "curve", "points": [[-1.2, -1.5], [2.2, -1.9], [6, -0.2], [5.7, 0.75], [2.6, 1.9], [-0.9, 1.1]], "fill": "$heels"},
+        {"shape": "ellipse", "x": -0.45, "y": 0, "radius_x": 1, "radius_y": 1.15, "fill": "$heels"},
+        {"shape": "line", "points": [[2.5, -0.85], [4.4, -0.5], [5, -0.2]], "stroke": "$heel_sheen", "line_width": 0.45}
+       ]
+      }
+     ]
+    },
+    {
+     "name": "shin_l",
+     "joint": "knee_l",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-8 cm",
+       "thickness": "10 cm",
+       "steps": [
+        {"shape": "limb", "from": [0, 0], "to": [21, 0], "radii": [3.45, 3.75, 2.2], "belly_at": 0.3, "fill": "$skin"}
+       ]
+      }
+     ]
+    },
+    {
+     "name": "thigh_l",
+     "joint": "hip_l",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-8 cm",
+       "thickness": "12 cm",
+       "steps": [
+        {"shape": "limb", "from": [0, 0], "to": [22, 0], "radii": [4.75, 4.55, 3.45], "belly_at": 0.28, "fill": "$skin"}
+       ]
+      },
+      {
+       "layer": 1,
+       "height": "-7 cm",
+       "thickness": "10 cm",
+       "steps": [
+        {"shape": "limb", "from": [0, 0], "to": [12.1, 0], "radii": [5.05, 4.65, 3.25], "belly_at": 0.35, "fill": "$skirt"}
+       ]
+      }
+     ]
+    },
+    {
+     "name": "upper_arm_l",
+     "joint": "shoulder_l",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-4 cm",
+       "thickness": "8 cm",
+       "steps": [
+        {"shape": "limb", "from": [0, 0], "to": [14, 0], "radii": [3.8, 3.6, 2.75], "belly_at": 0.35, "fill": "$sleeved_top"}
+       ]
+      }
+     ]
+    },
+    {
+     "name": "shoulder_l",
+     "joint": "shoulder_l",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-2 cm",
+       "thickness": "6 cm",
+       "steps": [
+        {"shape": "circle", "radius": 4.3, "fill": "$sleeved_top"}
+       ]
+      }
+     ]
+    },
+    {
+     "name": "forearm_l",
+     "joint": "elbow_l",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-4 cm",
+       "thickness": "8 cm",
+       "steps": [
+        {"shape": "limb", "from": [0, 0], "to": [13, 0], "radii": [2.85, 2.95, 2.05], "belly_at": 0.35, "fill": "$sleeved_top"},
+        {"shape": "line", "points": [[11.9, -1.65], [11.9, 1.65]], "stroke": "$top_seam", "line_width": 0.5}
+       ]
+      }
+     ]
+    },
+    {
+     "name": "foot_r",
+     "joint": "foot_r",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-6 cm",
+       "thickness": "8 cm",
+       "steps": [
+        {"shape": "curve", "points": [[-1.2, -1.5], [2.2, -1.9], [6, -0.2], [5.7, 0.75], [2.6, 1.9], [-0.9, 1.1]], "fill": "$heels"},
+        {"shape": "ellipse", "x": -0.45, "y": 0, "radius_x": 1, "radius_y": 1.15, "fill": "$heels"},
+        {"shape": "line", "points": [[2.5, -0.85], [4.4, -0.5], [5, -0.2]], "stroke": "$heel_sheen", "line_width": 0.45}
+       ]
+      }
+     ]
+    },
+    {
+     "name": "shin_r",
+     "joint": "knee_r",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-8 cm",
+       "thickness": "10 cm",
+       "steps": [
+        {"shape": "limb", "from": [0, 0], "to": [21, 0], "radii": [3.45, 3.75, 2.2], "belly_at": 0.3, "fill": "$skin"}
+       ]
+      }
+     ]
+    },
+    {
+     "name": "thigh_r",
+     "joint": "hip_r",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-8 cm",
+       "thickness": "12 cm",
+       "steps": [
+        {"shape": "limb", "from": [0, 0], "to": [22, 0], "radii": [4.75, 4.55, 3.45], "belly_at": 0.28, "fill": "$skin"}
+       ]
+      },
+      {
+       "layer": 1,
+       "height": "-7 cm",
+       "thickness": "10 cm",
+       "steps": [
+        {"shape": "limb", "from": [0, 0], "to": [12.1, 0], "radii": [5.05, 4.65, 3.25], "belly_at": 0.35, "fill": "$skirt"}
+       ]
+      }
+     ]
+    },
+    {
+     "name": "upper_arm_r",
+     "joint": "shoulder_r",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-4 cm",
+       "thickness": "8 cm",
+       "steps": [
+        {"shape": "limb", "from": [0, 0], "to": [14, 0], "radii": [3.8, 3.6, 2.75], "belly_at": 0.35, "fill": "$sleeved_top"}
+       ]
+      }
+     ]
+    },
+    {
+     "name": "shoulder_r",
+     "joint": "shoulder_r",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-2 cm",
+       "thickness": "6 cm",
+       "steps": [
+        {"shape": "circle", "radius": 4.3, "fill": "$sleeved_top"}
+       ]
+      }
+     ]
+    },
+    {
+     "name": "forearm_r",
+     "joint": "elbow_r",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-4 cm",
+       "thickness": "8 cm",
+       "steps": [
+        {"shape": "limb", "from": [0, 0], "to": [13, 0], "radii": [2.85, 2.95, 2.05], "belly_at": 0.35, "fill": "$sleeved_top"},
+        {"shape": "line", "points": [[11.9, -1.65], [11.9, 1.65]], "stroke": "$top_seam", "line_width": 0.5}
+       ]
+      }
+     ]
+    },
+    {
+     "name": "pelvis",
+     "joint": "pelvis",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-6 cm",
+       "thickness": "14 cm",
+       "steps": [
+        {"shape": "curve", "points": [[2.6, 0], [1.8, 6.16], [-0.6, 10.416], [-3.3, 11.2], [-5.6, 9.632], [-7.75, 4.704], [-7.4, 0], [-7.75, -4.704], [-5.6, -9.632], [-3.3, -11.2], [-0.6, -10.416], [1.8, -6.16]], "fill": "$skirt"},
+        {"shape": "line", "points": [[-7.1, -2], [-6.5, 0], [-7.1, 2]], "stroke": "$skirt_seam", "line_width": 0.6},
+        {"shape": "line", "points": [[0.8, -6], [1.4, 0], [0.8, 6]], "stroke": "$skirt_seam", "line_width": 0.6}
+       ]
+      }
+     ]
+    },
+    {
+     "name": "torso",
+     "joint": "torso",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-30 cm",
+       "thickness": "52 cm",
+       "steps": [
+        {"shape": "curve", "points": [[6.3, 0], [5.4, 4.84], [3.7, 8.8], [1.505, 12.204], [-2.795, 11.516], [-5.8, 9.4], [-7.8, 3.948], [-7.45, 0], [-7.8, -3.948], [-5.8, -9.4], [-2.795, -11.516], [1.505, -12.204], [3.7, -8.8], [5.4, -4.84]], "fill": "$skin"}
+       ]
+      },
+      {
+       "layer": 1,
+       "height": "-10 cm",
+       "thickness": "32 cm",
+       "steps": [
+        {"shape": "curve", "points": [[5.9, 0], [5.4, 5.2], [2.9, 10.3], [-1.8, 11.7], [-5.3, 8.5], [-6.2, 3.7], [-6.2, -3.7], [-5.3, -8.5], [-1.8, -11.7], [2.9, -10.3], [5.4, -5.2]], "fill": "$sleeved_top"},
+        {"shape": "curve", "points": [[5.3, 0], [5.9, 2.4], [5, 4.6], [3.2, 3.8], [2.4, 0], [3.2, -3.8], [5, -4.6], [5.9, -2.4]], "fill": "$skin"},
+        {"shape": "line", "points": [[-5.4, -6.5], [-6, 0], [-5.4, 6.5]], "stroke": "$top_seam", "line_width": 0.65}
+       ]
+      }
+     ]
+    }
+   ],
+   "look": {
+    "values": {
+     "sleeved_top": "#1a0a2a",
+     "top_seam": "#38234e",
+     "skirt": "#0a0a1a",
+     "skirt_seam": "#29253b",
+     "heels": "#2a1a3a",
+     "heel_sheen": "#69507d"
+    }
+   }
+  },
+  "wig_ponytail_black": {
+   "kind": "decoration",
+   "components": [
+    {
+     "name": "head",
+     "joint": "head",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-5 cm",
+       "thickness": "20 cm",
+       "steps": [
+        {"shape": "ellipse", "x": -0.4, "y": -7.05, "radius_x": 1.7, "radius_y": 1.15, "fill": "$skin"},
+        {"shape": "ellipse", "x": -0.4, "y": 7.05, "radius_x": 1.7, "radius_y": 1.15, "fill": "$skin"},
+        {"shape": "curve", "points": [[7.8, 0], [6.5, 4.9], [2.6, 7], [-1, 7.35], [-5, 6.4], [-7.6, 3.6], [-8.4, 0], [-7.6, -3.6], [-5, -6.4], [-1, -7.35], [2.6, -7], [6.5, -4.9]], "fill": "$skin"}
+       ]
+      },
+      {
+       "layer": 1,
+       "height": "-2 cm",
+       "thickness": "17 cm",
+       "steps": [
+        {"shape": "ellipse", "x": 0, "y": 0, "radius_x": 9.7, "radius_y": 8.5, "fill": "$wig"},
+        {"shape": "ellipse", "x": -6.8, "y": -3, "radius_x": 3.5, "radius_y": 3.5, "fill": "$wig"},
+        {"shape": "ellipse", "x": -6.8, "y": 3, "radius_x": 3.5, "radius_y": 3.5, "fill": "$wig"},
+        {"shape": "curve", "points": [[6.3, -2.8], [2, -5.2], [-3.5, -4.6], [-8.3, -1.3], [-2.4, -3.3], [2, -3.9]], "fill": "$wig_sheen"},
+        {"shape": "line", "points": [[4.6, 2.8], [0.1, 3.9], [-4.4, 2.6], [-8.5, 0.7]], "stroke": "$wig_sheen", "line_width": 0.4},
+        {"shape": "ellipse", "x": -9, "y": 0, "radius_x": 2.4, "radius_y": 2.6, "fill": "$wig_tie"}
+       ]
+      }
+     ]
+    },
+    {
+     "name": "ponytail_0",
+     "joint": "ponytail_0",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-3 cm",
+       "thickness": "6 cm",
+       "steps": [
+        {"shape": "limb", "from": [0, 0], "to": [4.4, 0], "radii": [2.5, 2.416666666666667, 2.3333333333333335], "belly_at": 0.35, "fill": "$wig"},
+        {"shape": "line", "points": [[0, -0.4], [2.2, -0.55], [4.4, -0.4]], "stroke": "$wig_sheen", "line_width": 0.35}
+       ]
+      }
+     ]
+    },
+    {
+     "name": "ponytail_1",
+     "joint": "ponytail_1",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-3 cm",
+       "thickness": "6 cm",
+       "steps": [
+        {"shape": "limb", "from": [0, 0], "to": [4.4, 0], "radii": [2.3333333333333335, 2.25, 2.166666666666667], "belly_at": 0.35, "fill": "$wig"},
+        {"shape": "line", "points": [[0, -0.4], [2.2, -0.55], [4.4, -0.4]], "stroke": "$wig_sheen", "line_width": 0.35}
+       ]
+      }
+     ]
+    },
+    {
+     "name": "ponytail_2",
+     "joint": "ponytail_2",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-3 cm",
+       "thickness": "6 cm",
+       "steps": [
+        {"shape": "limb", "from": [0, 0], "to": [4.4, 0], "radii": [2.1666666666666665, 2.083333333333333, 1.9999999999999998], "belly_at": 0.35, "fill": "$wig"},
+        {"shape": "line", "points": [[0, -0.4], [2.2, -0.55], [4.4, -0.4]], "stroke": "$wig_sheen", "line_width": 0.35}
+       ]
+      }
+     ]
+    },
+    {
+     "name": "ponytail_3",
+     "joint": "ponytail_3",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-3 cm",
+       "thickness": "6 cm",
+       "steps": [
+        {"shape": "limb", "from": [0, 0], "to": [4.4, 0], "radii": [2, 1.9166666666666665, 1.8333333333333333], "belly_at": 0.35, "fill": "$wig"},
+        {"shape": "line", "points": [[0, -0.4], [2.2, -0.55], [4.4, -0.4]], "stroke": "$wig_sheen", "line_width": 0.35}
+       ]
+      }
+     ]
+    },
+    {
+     "name": "ponytail_4",
+     "joint": "ponytail_4",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-3 cm",
+       "thickness": "6 cm",
+       "steps": [
+        {"shape": "limb", "from": [0, 0], "to": [4.4, 0], "radii": [1.8333333333333335, 1.75, 1.6666666666666667], "belly_at": 0.35, "fill": "$wig"},
+        {"shape": "line", "points": [[0, -0.4], [2.2, -0.55], [4.4, -0.4]], "stroke": "$wig_sheen", "line_width": 0.35}
+       ]
+      }
+     ]
+    },
+    {
+     "name": "ponytail_5",
+     "joint": "ponytail_5",
+     "layers": [
+      {
+       "layer": 0,
+       "height": "-3 cm",
+       "thickness": "6 cm",
+       "steps": [
+        {"shape": "limb", "from": [0, 0], "to": [4.4, 0], "radii": [1.6666666666666665, 1.1583333333333332, 0.65], "belly_at": 0.35, "fill": "$wig"},
+        {"shape": "line", "points": [[0, -0.4], [2.2, -0.55], [4.4, -0.4]], "stroke": "$wig_sheen", "line_width": 0.35}
+       ]
+      }
+     ]
+    }
+   ],
+   "look": {
+    "values": {
+     "wig": "#0a0008",
+     "wig_sheen": "#35223b",
+     "wig_tie": "#1e0c24"
+    }
+   },
+   "data": {
+    "chain": {
+     "chain_id": "ponytail",
+     "joints": ["ponytail_0", "ponytail_1", "ponytail_2", "ponytail_3", "ponytail_4", "ponytail_5", "ponytail_6"],
+     "radius": 0.45,
+     "mass": 0.025,
+     "follow_rate": 13,
+     "follow_torque": 30,
+     "linear_damping": 2,
+     "angular_damping": 3,
+     "collision_group": 0,
+     "collision_mask": 0,
+     "reaction": false
+    }
+   }
+  }
+ }
+}

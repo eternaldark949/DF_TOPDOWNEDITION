@@ -798,6 +798,29 @@
        }
       },
       {
+       "id": "wardrobe_label",
+       "type": "label",
+       "class": "set-section",
+       "text": "Preview Wardrobe",
+       "visible": "{wardrobe.available}"
+      },
+      {
+       "id": "outfit_sorcerer_long",
+       "type": "toggle",
+       "text": "Street Sorcerer (Long Sleeve)",
+       "class": "set-row",
+       "visible": "{wardrobe.available}",
+       "value": "{wardrobe.outfit_sorcerer_long}"
+      },
+      {
+       "id": "wig_ponytail_black",
+       "type": "toggle",
+       "text": "Sorcerer’s Tail",
+       "class": "set-row",
+       "visible": "{wardrobe.available}",
+       "value": "{wardrobe.wig_ponytail_black}"
+      },
+      {
        "id": "back",
        "type": "button",
        "class": "set-back",
