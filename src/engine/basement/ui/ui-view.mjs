@@ -117,11 +117,13 @@ export class uiView {
         for (const child of node.children) el.append(this.#build(screen, child));
         if (d.type === 'list' && d.empty !== undefined) { const empty = doc.createElement('div'); empty.className = 'ui-empty'; empty.textContent = d.empty; el.append(empty); }
         const h = this.#handlers;
-        el.addEventListener('pointerenter', () => h.hover(screen, node, true));
+        // Hover starts when the pointer moves over an item, not when a screen opens under a pointer that is standing still.
+        el.addEventListener('pointermove', () => { if (!node.hovered) h.hover(screen, node, true); });
         el.addEventListener('pointerleave', () => { h.hover(screen, node, false); h.press(screen, node, false); });
         el.addEventListener('pointerdown', e => { if (e.target.tagName !== 'INPUT') e.preventDefault(); h.press(screen, node, true); });
         el.addEventListener('pointerup', () => h.press(screen, node, false));
-        el.addEventListener('click', e => { e.stopPropagation(); if (d.type !== 'panel' && d.type !== 'list' && d.type !== 'label' || d.focusable || d.on_click) h.click(screen, node); });
+        // A click is the item's own when it can be pressed; a label or panel inside a pressable row lets it rise to the row.
+        el.addEventListener('click', e => { if (!(d.type !== 'panel' && d.type !== 'list' && d.type !== 'label' || d.focusable || d.on_click)) return; e.stopPropagation(); h.click(screen, node); });
         node.rendered = null;
         return el;
     }

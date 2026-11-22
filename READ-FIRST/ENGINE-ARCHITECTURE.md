@@ -54,7 +54,7 @@ Each level below lists what it is, what it owns, what it may import, what it mus
 - Rigs and keyframe animation (`basement/physics/animation/`).
 - Attachments and snapshots. The Basement *uses* data from the Directory's registry, which it is handed as an object (for example `new physicsSystem({asset_library})`); it never imports the Directory.
 - The map system and room graph (`basement/maps/`), rendering (`basement/rendering/`), controls (`basement/controls/`) and maths.
-- Services that are still missing are Basement work too: the audio service (channels, mixing, reverb, through-door muffling), a UI layer, lighting, timers, decals and the game-wide save envelope. See `docs/migration/README.md`. Data loading is not one of them: it is the Directory's job.
+- Services that are still missing are Basement work too: the audio service (channels, mixing, reverb, through-door muffling), lighting, decals and the game-wide save envelope. See `docs/migration/README.md`. Data loading is not one of them: it is the Directory's job.
 
 **It may import:** only other Basement code. Each package should depend on as few of its neighbours as it can. For example, `maps` imports only `physics`.
 
@@ -270,8 +270,10 @@ src/
                                   navigation, traffic primitives, animation (rigs), attachments
       maps/                       map builder, mapInstance (interior/exterior streaming), roomGraph
       rendering/                  render system and canvas backend; consumes render packets
-      controls/                   input devices and bindings
-      audio/ ui/ lighting/ timers/ saves/   (to build) the services the migration still lacks
+      controls/                   input devices, bindings and input contexts
+      ui/                         the UI overlay: screens as data on a stack, focus, menu actions, live values
+      timers/ weather/ agents/    the world's clock, its weather, and street life
+      audio/ lighting/ saves/     (to build) the services the migration still lacks
     lobby/                        LV1  level-lobby.mjs (the clock)
       runtime/                         gameEngine and gameLevel: the coordinator that runs the phases
     directory/                    LV2  the data layer: registry.mjs, structures.mjs, loading.mjs (to build: defaults)

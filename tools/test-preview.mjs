@@ -29,7 +29,8 @@ test('the preview boots, loads every map and travels between the apartment and t
         const screens = () => page.evaluate(() => ({ stack: preview.ui.stack, paused: preview.paused, input: preview.basement.controls.input_context }));
         await page.waitForFunction(() => preview.ui.isOpen('main'), null, { timeout: 10000 });
         assert.deepEqual(await screens(), { stack: ['hud', 'main'], paused: true, input: 'menu' });
-        await page.keyboard.press('Enter'); await page.waitForFunction(() => !preview.ui.isOpen('main'));
+        // A click on the words of a row starts the game as Enter would (the words are labels inside the pressable row).
+        await page.click('[data-ui-item="new_game_text"]'); await page.waitForFunction(() => !preview.ui.isOpen('main'));
         assert.deepEqual(await screens(), { stack: ['hud'], paused: false, input: 'gameplay' });
         // Escape pauses into the pause menu; down twice reaches Settings (inactive items are skipped), Enter opens it, and Escape twice returns to play.
         await page.keyboard.press('Escape'); await page.waitForFunction(() => preview.ui.isOpen('pause'));

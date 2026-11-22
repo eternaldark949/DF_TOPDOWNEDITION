@@ -147,12 +147,12 @@ The Basement `controlSystem` already works this way. What is left is input conte
 
 | Call | What it does | Today |
 | --- | --- | --- |
-| `bindings` file: `{context: {action: [input, …]}}` | Every binding as data; an input is a name (`e`, `gamepadA`, `mouseLeft`, `touchFire`) or `[name, type, seconds]` | partly: one keymap, no contexts |
+| `bindings` file: `{context: {action: [input, …]}}` | Every binding as data; an input is a name (`e`, `gamepadA`, `mouseLeft`, `touchFire`) or `[name, type, seconds]` | have: `contexts` on the controls, types by name (`"repeat"`); not yet one file |
 | `type`: `press`, `release`, `tap`, `doubletap`, `held`, `repeat`, `chord` | How an input must be used for the action to fire; the timing logic stays hidden | have, except `chord` |
 | `controls.active(action)` / `justActivated` / `justReleased` / `held` / `value` | Reads an action this tick | have |
 | `controls.direction('move')` | One `[x, y]` from keys, stick or touch stick, with dead zones | have |
 | `controls.readQueue(action, type)` | Takes a recognised tap, double tap or hold off the queue | have |
-| `controls.useContext(name)` | Switches which bindings are live: `gameplay`, `menu`, `dialogue`, `vehicle` | missing |
+| `controls.useContext(name)` | Switches which bindings are live: `gameplay`, `menu`, `dialogue`, `vehicle` | have, with `defineContext`; the UI uses `menu` |
 | `controls.rebind(context, action, inputs)` and `controls.saveBindings()` | Player rebinding, kept in the save | partly: `bind` exists, no save |
 | `controls.rumble(name)` | Plays a vibration template from data (`punch`, `bad_fall`, `explosion_near`), as in the Python templates | partly: a raw `rumble(ms, strength)` |
 | `controls.hit()` / `hitOf(action)` / `entity.on('pointerHit')` | What a click or tap lands on: the top thing drawn there, like UPBGE's mouse-over sensor, with kind, tag, property and x-ray filters | have: picks through the camera, `touchScreen` for taps, hover enter and leave |
@@ -219,11 +219,14 @@ Pages are contexts too: "Settings" in the pause menu is `{"open": "pause.setting
 
 | Call | What it does | Today |
 | --- | --- | --- |
-| `ui.define(context)` | Adds a context from data | missing |
-| `ui.open(name, data)` / `ui.back()` / `ui.close(name)` | Switches screens with their transitions, along the stack | missing |
-| `ui.focus(item)` / `ui.get(item)` / `ui.set(item, key, value)` | Moves focus or changes an item live | missing |
-| `ui.on(event, fn)` | The game hears `resume`, `save`, `quit` and its own events | missing |
-| Menu actions `ui_up`, `ui_down`, `ui_left`, `ui_right`, `ui_accept`, `ui_back` | Keyboard, gamepad and mouse drive every menu the same way through Controls | missing |
+| `ui.define(context)` | Adds a context from data | have |
+| `ui.open(name, data)` / `ui.back()` / `ui.close(name)` | Switches screens with their transitions, along the stack | have |
+| `ui.focus(item)` / `ui.get(item)` / `ui.set(item, key, value)` | Moves focus or changes an item live | have |
+| `ui.on(event, fn)` | The game hears `resume`, `save`, `quit` and its own events | have |
+| Menu actions `ui_up`, `ui_down`, `ui_left`, `ui_right`, `ui_accept`, `ui_back` | Keyboard, gamepad and mouse drive every menu the same way through Controls | have |
+| `ui.setValue(path, value)` / `ui.provide(name, source)` | The values items read: a store, and live game data by name (`"{clock}"`) | have |
+| Screen switches `open_with` and `closes_on_back` | A gameplay action that opens the screen (`pause`); `false` keeps a modal screen open on Back (a main menu) | have |
+| `font` resources and `ui.addFonts(fonts)` | Fonts the screens' CSS names, loaded from data | have |
 
 ## Build order
 
@@ -232,7 +235,7 @@ Each step makes later steps smaller. A step is done when the game uses the new c
 1. **Lobby.** `pausable` systems, time scale, `step`, timers and engine events.
 2. **Controls as data.** Input contexts, chords and rumble templates, with every binding in one file.
 3. **Drawing backend.** The readable drawing calls and drawings as data in local space (done); then prop drawings move out of code into the catalog, one family at a time.
-4. **UI system.** The overlay with items, states, styles and transitions; then the main menu, pause and its pages, and the HUD as data.
+4. **UI system.** The overlay with items, states, styles and transitions; then the main menu, pause and its pages, and the HUD as data. (Done 2026-11-22: `basement/ui`, and the game's `screens.json`. Next: dialogue and the phone as screens.)
 5. **Objects.** One `createObject` from a catalog record, with parts switched on by data (done: look, materials, fitted bounds, surface). Next, every placement, light and character goes through it.
 6. **One map drawer.** Ground, buildings, plants and interiors drawn by one drawer that reads the map's sections and switches. Drop the city names. Spawn layout characters on load.
 7. **Agents and one network.** Merge the walker network into the navigation network with profiles. Run cars and walkers on one agent loop with behaviour tables.
