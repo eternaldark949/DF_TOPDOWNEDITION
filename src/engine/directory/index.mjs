@@ -2,6 +2,6 @@
 // The engine's data layer: the registry, data structures, loading and default libraries. See README.md.
 export { assetLibrary, mergeDefinition } from './registry.mjs';
 export { identifier, nonnegative, jsonCopy } from './values.mjs';
-export { STRUCTURES, validatePropCatalog, validateMapLayout, checkLook, validateSkeleton, validateClipSet, validateLocomotion, validateDoorKind, validateDrawing, validateMaterial, validateTexture, validateMap, mapDefinition, validateLibrary, doorKindsOf } from './structures.mjs';
+export { STRUCTURES, validatePropCatalog, validateMapLayout, checkLook, validateSkeleton, validateClipSet, validateLocomotion, validateDoorKind, validateDrawing, validateMaterial, validateTexture, validateMap, mapDefinition, validateLibrary, doorKindsOf, validateScreen, screensOf, validateFont, fontsOf } from './structures.mjs';
 export { ENGINE_LIBRARIES, createEngineRegistry } from './defaults/index.mjs';
 export { resolvePlacement, resolveLayout, resolvePropLook, isMovable } from './loading.mjs';

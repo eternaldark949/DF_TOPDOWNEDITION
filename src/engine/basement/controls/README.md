@@ -28,6 +28,12 @@ A state packet contains `{active,just_activated,just_released,value,held}`. Dire
 
 The source is sampled centrally; querying does not poll hardware or create another clock. Held state is available between steps. A press/release entirely between ticks retains both edges for the next step. Action edges represent the combined action: releasing one binding while another remains held does not release the action.
 
+## Input contexts
+
+`contexts: { name: keymap }` on the constructor names sets of bindings; the plain `keymap` is `gameplay`. `useContext(name)` makes one live (it lets go of everything held, so a key that opened a menu does not also act in it), `input_context` names the live one, and `defineContext(name, keymap)` adds or replaces one. `bind` and `setKeymap` change the live context. The UI system adds a `menu` context (`UI_BINDINGS`) when there is none and switches to it while a menu is on top.
+
+Binding types may be named in data (`"press"`, `"release"`, `"tap"`, `"doubletap"`, `"held"`, `"repeat"`, `"drag"`) as well as given as the constants.
+
 ## Directory definitions
 
 Bindings belong to the game's Directory, as data.

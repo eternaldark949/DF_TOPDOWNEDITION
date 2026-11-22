@@ -39,6 +39,7 @@ const hud = {
         p.classList.toggle('show', !!next); p.classList.toggle('locked', !!next && !next.available);
         if (next) { p.querySelector('kbd').textContent = touch ? 'USE' : 'E'; $('exit-label').textContent = next.available ? (next.label ?? `Go to ${next.target}`) : `${next.label ?? next.target} (not built yet)`; }
     },
+    rendered(id) { $('renderer').value = id; },
     zoomed(k) { $('zoom').textContent = `${k}×`; },
     fade(on) { $('fade').classList.toggle('on', on); },
     error(e) { console.error(e); $('err').textContent = String(e?.stack ?? e).split('\n').slice(0, 4).join('\n'); }

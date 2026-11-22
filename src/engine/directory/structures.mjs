@@ -35,6 +35,7 @@ import { readWorldClock } from '../basement/timers/index.mjs';
 import { readWorldWeather } from '../basement/weather/index.mjs';
 import { readMarker, readRow } from '../basement/maps/index.mjs';
 import { readAgents } from '../basement/agents/index.mjs';
+import { readScreen } from '../basement/ui/index.mjs';
 
 export const STRUCTURES = Object.freeze({
     prop_catalog: 'A catalog of prop types and the families they are presets of: { types: { <type>: { defaults, movable?, blocks_light?, light? } }, families?: { <family>: { look: { <field>: { kind, default } } } } }.',
@@ -46,6 +47,8 @@ export const STRUCTURES = Object.freeze({
     door_kind: 'The leaves that fill a door\'s opening: { name, leaves: [{ from, to, motion, travel?, pivot?, hinge?, suffix? }] }.',
     drawing: 'An object\'s art in its own space, back to front: { steps: [{ shape, material?, solid?, ...fields }] }; shape is a drawing shape or group ({ shape: "group", x?, y?, rotation?, scale?, steps }). "$name" values are read from the object\'s look.',
     material: 'How a substance looks and behaves: { fill?, stroke?, line_width?, line_cap?, line_join?, dash?, alpha?, blend?, shadow?, surface?: { friction?, restitution?, hit_sound?, hit_effect?, footstep? }, emits?, reflect?: true | { strength? (0..1), wet?, plane? } }; fill may be a colour, a gradient or a pattern { type: "pattern", image, repeat? }.',
+    font: 'A font the UI\'s screens may name in their CSS: { family, src (a path or URL), weight?, style? }. Loaded with ui.addFonts(fontsOf(registry)).',
+    screen: 'A UI screen (context) for the Basement UI: { name, items: [{ id, type, text?, value?, position?, style?, states?, animations?, on_click?, ... }], layout?, focus?, transition?, pauses_game?, controls?, modal?, closes_on_back?, open_with?, style?, css?, layer? }. Defined with ui.define(...screensOf(registry)).',
     texture: 'A surface that repeats, drawn once per set of values and tiled: { size: [w, h] (world units), steps (drawing steps, "$name" read from values), values (the default colours), base (the colour shown until the tile is ready), pixels_per_unit? (default 4) }. A material repeats it with fill: { type: "pattern", texture, values?, scale?, rotation?, offset? }.',
 });
 
@@ -273,13 +276,31 @@ export function validateWorldWeather(resource, where = 'world_weather') {
     for (const [name, s] of Object.entries(r.states)) s.particles.forEach((p, i) => { if (typeof p.system !== 'string') validateParticleSystem(p.system, `${where}.states.${name}.particles[${i}].system`); });
     return resource;
 }
-const VALIDATORS = { world_clock: validateWorldClock, world_weather: validateWorldWeather, drawing: validateDrawing, material: validateMaterial, texture: validateTexture, prop_catalog: validatePropCatalog, skeleton: validateSkeleton, clip_set: validateClipSet, locomotion: validateLocomotion, door_kind: validateDoorKind, effects: validateEffectsPreset, particle_system: validateParticleSystem, map: validateMap };
+/** Throws unless `resource` is a UI screen (see readScreen in basement/ui). Returns it. */
+export function validateScreen(resource, where = 'screen') { const { kind, ...screen } = resource; readScreen(screen, where); return resource; }
+/** Throws unless `resource` is a font: { family, src, weight?, style? }. Returns it. */
+export function validateFont(resource, where = 'font') {
+    for (const k of Object.keys(resource)) if (!['kind', 'family', 'src', 'weight', 'style'].includes(k)) fail(where, `unknown font field ${k}`);
+    if (typeof resource.family !== 'string' || !resource.family || typeof resource.src !== 'string' || !resource.src) fail(where, 'a font has a family and a src');
+    if (resource.weight !== undefined && !(typeof resource.weight === 'string' || Number.isInteger(resource.weight))) fail(where, 'weight is a CSS weight');
+    if (resource.style !== undefined && !['normal', 'italic', 'oblique'].includes(resource.style)) fail(where, 'style is normal, italic or oblique');
+    return resource;
+}
+const VALIDATORS = { font: validateFont, screen: validateScreen, world_clock: validateWorldClock, world_weather: validateWorldWeather, drawing: validateDrawing, material: validateMaterial, texture: validateTexture, prop_catalog: validatePropCatalog, skeleton: validateSkeleton, clip_set: validateClipSet, locomotion: validateLocomotion, door_kind: validateDoorKind, effects: validateEffectsPreset, particle_system: validateParticleSystem, map: validateMap };
 /** Validates every resource of a library whose kind has a structure here; other kinds pass through. Returns the library. */
 export function validateLibrary(library) {
     for (const [id, resource] of Object.entries(library?.resources ?? {})) VALIDATORS[resource?.kind]?.(resource, `${library.library_id}:${id}`);
     return library;
 }
 
+/** A registry's UI screens, ready for ui.define (each without its kind), in library order. */
+export function screensOf(registry) {
+    return registry.listResources({ kind: 'screen' }).map(id => { const { kind, ...screen } = registry.getResource(id); return structuredClone(screen); });
+}
+/** A registry's fonts, ready for ui.addFonts (each without its kind). */
+export function fontsOf(registry) {
+    return registry.listResources({ kind: 'font' }).map(id => { const { kind, ...font } = registry.getResource(id); return structuredClone(font); });
+}
 /** A registry's door kinds by name, ready for the map builder's `door_kinds` option. */
 export function doorKindsOf(registry) {
     return Object.fromEntries(registry.listResources({ kind: 'door_kind' }).map(id => { const { kind, name: kind_name, ...door } = registry.getResource(id); return [kind_name, structuredClone(door)]; }));

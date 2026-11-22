@@ -1,6 +1,7 @@
 // ===== LV0 BASEMENT =====
 import { TAP, DOUBLETAP, HELD, PRESS, REPEAT, RELEASE, DRAG } from './values.mjs';
 import { radialStick, cleanupAll } from './values.mjs';
+const INPUT_TYPES = Object.freeze({ tap: TAP, doubletap: DOUBLETAP, held: HELD, press: PRESS, repeat: REPEAT, release: RELEASE, drag: DRAG });
 import { keyboardInstance, mouseInstance, touchInstance, gamepadInstance } from './devices.mjs';
 
 export class controlSystem {
@@ -11,7 +12,7 @@ export class controlSystem {
     #disposed = false;
     #picker = null; #lastEv = new Map(); #claimed = new WeakSet();
     /** { keymap, actions: [ACTION ROW...], context: () => the game (handed to when / run), timing } */
-    constructor({ keymap = {}, actions = [], context = () => null, timing = {}, vectors = {},
+    constructor({ keymap = {}, contexts = {}, actions = [], context = () => null, timing = {}, vectors = {},
         now = controlSystem.now, auto_update = false, query_actions = true,
         event_target = typeof window === 'undefined' ? null : window,
         document: document_target = typeof document === 'undefined' ? null : document,
@@ -43,7 +44,11 @@ export class controlSystem {
         this.muted = false;         // true: devices are not heard (a playback), except the inputs in unmuted
         this.unmuted = ['Escape'];
         for (const [name, when, run] of actions) this.actions[name] = [when, run];
-        this.setKeymap(keymap);
+        // Input contexts: named keymaps, one live at a time (useContext). The plain `keymap` is the `gameplay` context.
+        if(!contexts||typeof contexts!=='object'||Array.isArray(contexts))throw new TypeError('contexts is an object of named keymaps');
+        this.contexts=Object.create(null);for(const [name,map] of Object.entries(contexts))this.contexts[name]=structuredClone(map);
+        this.contexts.gameplay??=structuredClone(keymap);
+        this.setKeymap(this.contexts.gameplay);this.input_context='gameplay';
         this.keyboard = new keyboardInstance(this);
         this.mouse = new mouseInstance(this, mouse_target);
         this.touch = new touchInstance(this);
@@ -73,7 +78,8 @@ export class controlSystem {
         for (const action of Object.keys(next)) {
           if(!Array.isArray(next[action]))throw new TypeError('Action bindings must be arrays');
           for (const b of next[action]) {
-            const [input, type = PRESS, hold] = Array.isArray(b) ? b : [b];
+            const [input, named = PRESS, hold] = Array.isArray(b) ? b : [b];
+            const type = typeof named === 'string' ? INPUT_TYPES[named] : named;   // data names the type: 'tap', 'held', 'repeat', …
             // The third value is the binding's own threshold: seconds for TAP (longest tap), DOUBLETAP
             // (longest gap between the taps) and HELD (shortest hold); pixels for DRAG.
             if(typeof input!=='string'||!input||![TAP,DOUBLETAP,HELD,PRESS,REPEAT,RELEASE,DRAG].includes(type)||hold!==undefined&&(!Number.isFinite(hold)||hold<0))throw new TypeError('Invalid input binding');
@@ -83,8 +89,24 @@ export class controlSystem {
         }
         if(this.keyboard)this.clear();
         this.keymap=next;this.bindings=bindings;this.inputs=inputs;
+        if(this.contexts&&this.input_context)this.contexts[this.input_context]=structuredClone(next);
     }
     bind(action, ...bindings) { this.setKeymap({ ...this.keymap, [action]: bindings }); }
+    /** Adds or replaces a named input context (a keymap); the live one is re-read at once. */
+    defineContext(name, keymap) {
+        if (typeof name !== 'string' || !name) throw new TypeError('An input context needs a name');
+        const previous = this.contexts[name]; this.contexts[name] = structuredClone(keymap);
+        if (name === this.input_context) try { this.setKeymap(this.contexts[name]); } catch (error) { this.contexts[name] = previous; throw error; }
+        return this;
+    }
+    /** Makes `name`'s bindings the live ones (gameplay, menu, dialogue, vehicle…). Everything held is let go. */
+    useContext(name) {
+        if (!Object.hasOwn(this.contexts, name)) throw new TypeError(`Unknown input context ${name} (known: ${Object.keys(this.contexts).join(', ')})`);
+        if (name === this.input_context) return this;
+        const was = this.input_context; this.input_context = name;
+        try { this.setKeymap(this.contexts[name]); } catch (error) { this.input_context = was; throw error; }
+        return this;
+    }
     bound(action, input) { return !!this.inputs[action]?.includes(input); }
     instanceOf(input) { return input.startsWith('gamepad') ? this.gamepad : input.startsWith('mouse') ? this.mouse : input.startsWith('touch') ? this.touch : this.keyboard; }
 
