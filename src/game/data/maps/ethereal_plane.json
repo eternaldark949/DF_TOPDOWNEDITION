@@ -22,6 +22,7 @@
     "pearl_face": {"kind": "material", "fill": "#dcc0cf"},
     "map": {
       "kind": "map",
+      "height_view": {"eye": 600, "lean": 1},
       "label": "The Ethereal Plane",
       "setting": "interior",
       "size": [1200, 1200],

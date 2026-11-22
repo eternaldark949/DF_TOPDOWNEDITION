@@ -184,7 +184,7 @@ One drawing contract in the Basement, with Canvas as its first backend and WebGL
 | `material: "brass"` on a step | Names a material record: paint fields plus a physical `surface` (friction, restitution, hit sound, hit effect, footstep); unknown fields refused | have |
 | `fill: {type: "pattern", image, repeat}` | A texture: a registered image repeated across the shape, moving with its object | have |
 | An object's `drawing` asset and `look` property | The render system draws every visible look each frame at the object's pose | have |
-| `bounds: circle, box, capsule, hull` | Collision bounds fitted once from the drawing's solid steps; an explicit `collision_shape` wins | have |
+| `bounds: circle, box, capsule, hull, parts` | Collision bounds fitted once from the drawing's solid steps; `parts` is a box round each component layer, as one compound shape (a building and the lamps before it, not one box over its forecourt); an explicit `collision_shape` wins | have |
 | Variants | The same drawing in different colours or sizes: a look's values, chosen per object | have, through `values` |
 
 **Made efficient by the backend, never by the game:** a drawing is compiled once into paths and cached; drawings that never move are baked into a layer image once; steps with the same paint are drawn together; the grid skips anything off screen.

@@ -11,6 +11,7 @@
     },
     "map": {
       "kind": "map",
+      "height_view": {"eye": 600, "lean": 1},
       "label": "Dr. Yin's Clinic",
       "setting": "interior",
       "size": [800, 800],

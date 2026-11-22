@@ -4,6 +4,7 @@
   "resources": {
     "map": {
       "kind": "map",
+      "height_view": {"eye": 600, "lean": 1},
       "label": "Biggs Amusement Park — Crash Royale",
       "setting": "interior",
       "size": [900, 900],

@@ -4,6 +4,7 @@
   "resources": {
     "map": {
       "kind": "map",
+      "height_view": {"eye": 600, "lean": 1},
       "label": "Neural Systems — Identity Atelier",
       "setting": "interior",
       "size": [1000, 800],

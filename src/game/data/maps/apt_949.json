@@ -61,6 +61,7 @@
     "blush_lattice": {"kind": "material", "fill": {"type": "pattern", "texture": "diamond_lattice"}},
     "map": {
       "kind": "map",
+      "height_view": {"eye": 600, "lean": 1},
       "label": "Silver Queen Apartments",
       "setting": "interior",
       "size": [1400, 900],

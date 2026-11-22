@@ -20,6 +20,7 @@
     },
     "map": {
       "kind": "map",
+      "height_view": {"eye": 600, "lean": 1},
       "label": "Torque Auto — Service Bay",
       "setting": "interior",
       "size": [1400, 1000],

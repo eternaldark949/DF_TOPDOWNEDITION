@@ -4,6 +4,7 @@
   "resources": {
     "map": {
       "kind": "map",
+      "height_view": {"eye": 600, "lean": 1},
       "label": "En route to Double Nights",
       "setting": "interior",
       "size": [400, 820],

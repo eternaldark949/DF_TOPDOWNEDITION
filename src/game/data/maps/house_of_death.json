@@ -91,6 +91,7 @@
     },
     "map": {
       "kind": "map",
+      "height_view": {"eye": 600, "lean": 1},
       "label": "The House of Death",
       "setting": "interior",
       "size": [1800, 1500],
