@@ -334,7 +334,7 @@ Entity packets/templates may include `constraints:[joint_packet,...]`. The engin
 
 ## Navigation
 
-Every world owns `physics.navigation`, a `navigationSystem` with two layers: a cached clearance `navigationField` for open-space travel by any radius, and a `roadNetwork` lane graph for vehicles. Methods: `navigate`, `findPath`, `findRoute`, `registerProfile`, `getProfile`, `agentRadius`, `configureField`, `invalidateRegion`, `getStatistics`. Field methods: `clearanceAtCell`, `clearanceAt`, `exactSegmentClearance`, `cellOf`, `cellCenter`, `chunk`, `chunkRevision`, `isObstacle`, `invalidateRegion`, `invalidateAll`, `getConfig`. Road methods: `addNode`, `addLane`, `removeLane`, `setLaneOpen`, `getLane`, `getNode`, `snapToLane`, `findRoute`. The complete keyword reference, guarantees and measurements are in [navigation](navigation.md).
+Every world owns `physics.navigation`, a `navigationSystem` with two layers: a cached clearance `navigationField` for open-space travel by any radius, and a `roadNetwork` lane graph for vehicles. Methods: `navigate`, `findPath`, `findRoute`, `registerProfile`, `getProfile`, `agentRadius`, `configureField`, `invalidateRegion`, `getStatistics`. Field methods: `clearanceAtCell`, `clearanceAt`, `exactSegmentClearance`, `cellOf`, `cellCenter`, `chunk`, `chunkRevision`, `isObstacle`, `invalidateRegion`, `invalidateAll`, `getConfig`. Road methods: `addNode`, `addLane`, `removeLane`, `removeNode`, `setLaneOpen`, `getLane`, `getNode`, `snapToLane`, `findRoute`. The complete keyword reference, guarantees and measurements are in [navigation](navigation.md).
 
 ## trafficController
 

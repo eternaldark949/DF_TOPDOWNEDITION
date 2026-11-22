@@ -58,6 +58,12 @@ export class roadNetwork {
         this.#world._mutate(() => this.#world.spatial_grid.removeInstance(SPATIAL + lane_id));
         this.#changed(); return true;
     }
+    /** Removes a node no lane starts or ends at (false when unknown); one a lane still uses is refused. */
+    removeNode(node_id) {
+        if (!this.#nodes.has(node_id)) return false;
+        if (this.#out.get(node_id).length || [...this.#lanes.values()].some(l => l.to === node_id)) throw new Error(`Road node ${node_id} still has lanes`);
+        this.#nodes.delete(node_id); this.#out.delete(node_id); this.#changed(); return true;
+    }
     /** Closed lanes are skipped by routing (roadworks, a crash, a story block). */
     setLaneOpen(lane_id, open) {
         const lane = this.#lanes.get(lane_id); if (!lane) throw new TypeError(`Unknown lane: ${lane_id}`);

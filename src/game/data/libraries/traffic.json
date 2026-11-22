@@ -1,0 +1,975 @@
+{
+ "library_id": "traffic",
+ "description": "The city's traffic: car bodies after the classic's brands' sizes (sedan, SUV, sports), each a drawing whose paint is its look's values; their headlights and tail lights glow.",
+ "templates": {
+  "sedan": {
+   "extends": "engine:vehicle",
+   "data": {
+    "label": "Sedan"
+   },
+   "collision_shape": {
+    "shape_type": "box",
+    "dimensions": [
+     72,
+     40
+    ]
+   },
+   "components": [
+    {
+     "name": "tyres",
+     "layers": [
+      {
+       "layer": -1,
+       "height": 0,
+       "thickness": 0.5,
+       "solid": false,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -39.0,
+         "y": -22.0,
+         "width": 78,
+         "height": 44,
+         "radius": 12.0,
+         "fill": "rgba(0,0,0,0.42)",
+         "blur": 4
+        }
+       ]
+      },
+      {
+       "layer": 0,
+       "height": 0,
+       "thickness": 5,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": 14.6,
+         "y": 15.5,
+         "width": 14,
+         "height": 7,
+         "radius": 2,
+         "fill": "#101014"
+        },
+        {
+         "shape": "rectangle",
+         "x": 14.6,
+         "y": -22.5,
+         "width": 14,
+         "height": 7,
+         "radius": 2,
+         "fill": "#101014"
+        },
+        {
+         "shape": "rectangle",
+         "x": -27.88,
+         "y": 15.5,
+         "width": 14,
+         "height": 7,
+         "radius": 2,
+         "fill": "#101014"
+        },
+        {
+         "shape": "rectangle",
+         "x": -27.88,
+         "y": -22.5,
+         "width": 14,
+         "height": 7,
+         "radius": 2,
+         "fill": "#101014"
+        }
+       ],
+       "sides": "#0b0b0e"
+      }
+     ]
+    },
+    {
+     "name": "car",
+     "layers": [
+      {
+       "layer": 0,
+       "height": 3,
+       "thickness": 9,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -36.0,
+         "y": -20.0,
+         "width": 72,
+         "height": 40,
+         "radius": 10.0,
+         "fill": "$paint"
+        },
+        {
+         "shape": "rectangle",
+         "x": -33.0,
+         "y": -17.0,
+         "width": 66,
+         "height": 34,
+         "radius": 8.0,
+         "fill": "$paint_hi"
+        },
+        {
+         "shape": "rectangle",
+         "x": -31.0,
+         "y": -14.5,
+         "width": 62,
+         "height": 29,
+         "radius": 7.0,
+         "fill": "$paint"
+        },
+        {
+         "shape": "line",
+         "points": [
+          [
+           15.4,
+           -8.8
+          ],
+          [
+           31.0,
+           -5.6
+          ]
+         ],
+         "stroke": "$paint_lo",
+         "line_width": 0.8
+        },
+        {
+         "shape": "line",
+         "points": [
+          [
+           15.4,
+           8.8
+          ],
+          [
+           31.0,
+           5.6
+          ]
+         ],
+         "stroke": "$paint_lo",
+         "line_width": 0.8
+        },
+        {
+         "shape": "rectangle",
+         "x": 34.4,
+         "y": -15.0,
+         "width": 1.6,
+         "height": 30,
+         "fill": "$trim"
+        },
+        {
+         "shape": "rectangle",
+         "x": -36.0,
+         "y": -14.0,
+         "width": 1.6,
+         "height": 28,
+         "fill": "$trim"
+        },
+        {
+         "shape": "ellipse",
+         "x": 33.0,
+         "y": -14.0,
+         "radius_x": 2.4,
+         "radius_y": 3.6,
+         "fill": "#fff4d6",
+         "emits": {
+          "strength": 0.55,
+          "reach": 110,
+          "color": "#ffe7b8"
+         }
+        },
+        {
+         "shape": "ellipse",
+         "x": 33.0,
+         "y": 14.0,
+         "radius_x": 2.4,
+         "radius_y": 3.6,
+         "fill": "#fff4d6",
+         "emits": {
+          "strength": 0.55,
+          "reach": 110,
+          "color": "#ffe7b8"
+         }
+        },
+        {
+         "shape": "rectangle",
+         "x": -35.6,
+         "y": -16.5,
+         "width": 2.4,
+         "height": 6,
+         "radius": 1,
+         "fill": "#c8142e",
+         "emits": {
+          "strength": 0.22,
+          "reach": 34,
+          "color": "#ff2a40"
+         }
+        },
+        {
+         "shape": "rectangle",
+         "x": -35.6,
+         "y": 10.5,
+         "width": 2.4,
+         "height": 6,
+         "radius": 1,
+         "fill": "#c8142e",
+         "emits": {
+          "strength": 0.22,
+          "reach": 34,
+          "color": "#ff2a40"
+         }
+        },
+        {
+         "shape": "rectangle",
+         "x": 11.4,
+         "y": -22.5,
+         "width": 3,
+         "height": 3,
+         "radius": 1,
+         "fill": "$paint_lo"
+        },
+        {
+         "shape": "rectangle",
+         "x": 11.4,
+         "y": 19.5,
+         "width": 3,
+         "height": 3,
+         "radius": 1,
+         "fill": "$paint_lo"
+        }
+       ],
+       "sides": "$paint_lo"
+      },
+      {
+       "layer": 1,
+       "height": 12,
+       "thickness": 7,
+       "steps": [
+        {
+         "shape": "polygon",
+         "points": [
+          [
+           14.4,
+           -14.72
+          ],
+          [
+           15.84,
+           -9.6
+          ],
+          [
+           16.2,
+           0
+          ],
+          [
+           15.84,
+           9.6
+          ],
+          [
+           14.4,
+           14.72
+          ],
+          [
+           -22.32,
+           15.2
+          ],
+          [
+           -23.18,
+           0
+          ],
+          [
+           -22.32,
+           -15.2
+          ]
+         ],
+         "fill": "$glass"
+        }
+       ],
+       "sides": "$glass"
+      },
+      {
+       "layer": 2,
+       "height": 19,
+       "thickness": 0.6,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -14.4,
+         "y": -14.4,
+         "width": 19.44,
+         "height": 28.8,
+         "radius": 4,
+         "fill": "$paint"
+        },
+        {
+         "shape": "rectangle",
+         "x": -12.4,
+         "y": -8.8,
+         "width": 15.44,
+         "height": 5.6,
+         "radius": 2,
+         "fill": "rgba(255,255,255,0.12)"
+        }
+       ],
+       "sides": "$paint_lo"
+      }
+     ]
+    }
+   ],
+   "look": {
+    "layer": 1,
+    "lean": 0.6,
+    "values": {
+     "paint": "#c0c0c8",
+     "paint_hi": "#dadae2",
+     "paint_lo": "#8a8a94",
+     "glass": "#1a2230",
+     "trim": "#2a2a30"
+    }
+   }
+  },
+  "suv": {
+   "extends": "engine:vehicle",
+   "data": {
+    "label": "SUV"
+   },
+   "collision_shape": {
+    "shape_type": "box",
+    "dimensions": [
+     78,
+     44
+    ]
+   },
+   "components": [
+    {
+     "name": "tyres",
+     "layers": [
+      {
+       "layer": -1,
+       "height": 0,
+       "thickness": 0.5,
+       "solid": false,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -42.0,
+         "y": -24.0,
+         "width": 84,
+         "height": 48,
+         "radius": 13.2,
+         "fill": "rgba(0,0,0,0.42)",
+         "blur": 4
+        }
+       ]
+      },
+      {
+       "layer": 0,
+       "height": 0,
+       "thickness": 5,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": 16.4,
+         "y": 17.5,
+         "width": 14,
+         "height": 7,
+         "radius": 2,
+         "fill": "#101014"
+        },
+        {
+         "shape": "rectangle",
+         "x": 16.4,
+         "y": -24.5,
+         "width": 14,
+         "height": 7,
+         "radius": 2,
+         "fill": "#101014"
+        },
+        {
+         "shape": "rectangle",
+         "x": -29.62,
+         "y": 17.5,
+         "width": 14,
+         "height": 7,
+         "radius": 2,
+         "fill": "#101014"
+        },
+        {
+         "shape": "rectangle",
+         "x": -29.62,
+         "y": -24.5,
+         "width": 14,
+         "height": 7,
+         "radius": 2,
+         "fill": "#101014"
+        }
+       ],
+       "sides": "#0b0b0e"
+      }
+     ]
+    },
+    {
+     "name": "car",
+     "layers": [
+      {
+       "layer": 0,
+       "height": 3,
+       "thickness": 10,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -39.0,
+         "y": -22.0,
+         "width": 78,
+         "height": 44,
+         "radius": 11.0,
+         "fill": "$paint"
+        },
+        {
+         "shape": "rectangle",
+         "x": -36.0,
+         "y": -19.0,
+         "width": 72,
+         "height": 38,
+         "radius": 8.8,
+         "fill": "$paint_hi"
+        },
+        {
+         "shape": "rectangle",
+         "x": -34.0,
+         "y": -16.5,
+         "width": 68,
+         "height": 33,
+         "radius": 7.7,
+         "fill": "$paint"
+        },
+        {
+         "shape": "line",
+         "points": [
+          [
+           21.28,
+           -9.68
+          ],
+          [
+           34.0,
+           -6.16
+          ]
+         ],
+         "stroke": "$paint_lo",
+         "line_width": 0.8
+        },
+        {
+         "shape": "line",
+         "points": [
+          [
+           21.28,
+           9.68
+          ],
+          [
+           34.0,
+           6.16
+          ]
+         ],
+         "stroke": "$paint_lo",
+         "line_width": 0.8
+        },
+        {
+         "shape": "rectangle",
+         "x": 37.4,
+         "y": -17.0,
+         "width": 1.6,
+         "height": 34,
+         "fill": "$trim"
+        },
+        {
+         "shape": "rectangle",
+         "x": -39.0,
+         "y": -16.0,
+         "width": 1.6,
+         "height": 32,
+         "fill": "$trim"
+        },
+        {
+         "shape": "ellipse",
+         "x": 36.0,
+         "y": -16.0,
+         "radius_x": 2.4,
+         "radius_y": 3.6,
+         "fill": "#fff4d6",
+         "emits": {
+          "strength": 0.55,
+          "reach": 110,
+          "color": "#ffe7b8"
+         }
+        },
+        {
+         "shape": "ellipse",
+         "x": 36.0,
+         "y": 16.0,
+         "radius_x": 2.4,
+         "radius_y": 3.6,
+         "fill": "#fff4d6",
+         "emits": {
+          "strength": 0.55,
+          "reach": 110,
+          "color": "#ffe7b8"
+         }
+        },
+        {
+         "shape": "rectangle",
+         "x": -38.6,
+         "y": -18.5,
+         "width": 2.4,
+         "height": 6,
+         "radius": 1,
+         "fill": "#c8142e",
+         "emits": {
+          "strength": 0.22,
+          "reach": 34,
+          "color": "#ff2a40"
+         }
+        },
+        {
+         "shape": "rectangle",
+         "x": -38.6,
+         "y": 12.5,
+         "width": 2.4,
+         "height": 6,
+         "radius": 1,
+         "fill": "#c8142e",
+         "emits": {
+          "strength": 0.22,
+          "reach": 34,
+          "color": "#ff2a40"
+         }
+        },
+        {
+         "shape": "rectangle",
+         "x": 17.28,
+         "y": -24.5,
+         "width": 3,
+         "height": 3,
+         "radius": 1,
+         "fill": "$paint_lo"
+        },
+        {
+         "shape": "rectangle",
+         "x": 17.28,
+         "y": 21.5,
+         "width": 3,
+         "height": 3,
+         "radius": 1,
+         "fill": "$paint_lo"
+        }
+       ],
+       "sides": "$paint_lo"
+      },
+      {
+       "layer": 1,
+       "height": 13,
+       "thickness": 9,
+       "steps": [
+        {
+         "shape": "polygon",
+         "points": [
+          [
+           20.28,
+           -16.19
+          ],
+          [
+           21.84,
+           -10.56
+          ],
+          [
+           22.23,
+           0
+          ],
+          [
+           21.84,
+           10.56
+          ],
+          [
+           20.28,
+           16.19
+          ],
+          [
+           -34.32,
+           16.72
+          ],
+          [
+           -35.26,
+           0
+          ],
+          [
+           -34.32,
+           -16.72
+          ]
+         ],
+         "fill": "$glass"
+        }
+       ],
+       "sides": "$glass"
+      },
+      {
+       "layer": 2,
+       "height": 22,
+       "thickness": 0.6,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -28.08,
+         "y": -15.84,
+         "width": 39.78,
+         "height": 31.68,
+         "radius": 4,
+         "fill": "$paint"
+        },
+        {
+         "shape": "rectangle",
+         "x": -26.08,
+         "y": -9.68,
+         "width": 35.78,
+         "height": 6.16,
+         "radius": 2,
+         "fill": "rgba(255,255,255,0.12)"
+        }
+       ],
+       "sides": "$paint_lo"
+      }
+     ]
+    }
+   ],
+   "look": {
+    "layer": 1,
+    "lean": 0.6,
+    "values": {
+     "paint": "#c0c0c8",
+     "paint_hi": "#dadae2",
+     "paint_lo": "#8a8a94",
+     "glass": "#1a2230",
+     "trim": "#2a2a30"
+    }
+   }
+  },
+  "sports": {
+   "extends": "engine:vehicle",
+   "data": {
+    "label": "Sports car"
+   },
+   "collision_shape": {
+    "shape_type": "box",
+    "dimensions": [
+     63,
+     36
+    ]
+   },
+   "components": [
+    {
+     "name": "tyres",
+     "layers": [
+      {
+       "layer": -1,
+       "height": 0,
+       "thickness": 0.5,
+       "solid": false,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -34.5,
+         "y": -20.0,
+         "width": 69,
+         "height": 40,
+         "radius": 10.8,
+         "fill": "rgba(0,0,0,0.42)",
+         "blur": 4
+        }
+       ]
+      },
+      {
+       "layer": 0,
+       "height": 0,
+       "thickness": 5,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": 11.9,
+         "y": 13.5,
+         "width": 14,
+         "height": 7,
+         "radius": 2,
+         "fill": "#101014"
+        },
+        {
+         "shape": "rectangle",
+         "x": 11.9,
+         "y": -20.5,
+         "width": 14,
+         "height": 7,
+         "radius": 2,
+         "fill": "#101014"
+        },
+        {
+         "shape": "rectangle",
+         "x": -25.27,
+         "y": 13.5,
+         "width": 14,
+         "height": 7,
+         "radius": 2,
+         "fill": "#101014"
+        },
+        {
+         "shape": "rectangle",
+         "x": -25.27,
+         "y": -20.5,
+         "width": 14,
+         "height": 7,
+         "radius": 2,
+         "fill": "#101014"
+        }
+       ],
+       "sides": "#0b0b0e"
+      }
+     ]
+    },
+    {
+     "name": "car",
+     "layers": [
+      {
+       "layer": 0,
+       "height": 3,
+       "thickness": 7,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -31.5,
+         "y": -18.0,
+         "width": 63,
+         "height": 36,
+         "radius": 9.0,
+         "fill": "$paint"
+        },
+        {
+         "shape": "rectangle",
+         "x": -28.5,
+         "y": -15.0,
+         "width": 57,
+         "height": 30,
+         "radius": 7.2,
+         "fill": "$paint_hi"
+        },
+        {
+         "shape": "rectangle",
+         "x": -26.5,
+         "y": -12.5,
+         "width": 53,
+         "height": 25,
+         "radius": 6.3,
+         "fill": "$paint"
+        },
+        {
+         "shape": "line",
+         "points": [
+          [
+           8.559999999999999,
+           -7.92
+          ],
+          [
+           26.5,
+           -5.04
+          ]
+         ],
+         "stroke": "$paint_lo",
+         "line_width": 0.8
+        },
+        {
+         "shape": "line",
+         "points": [
+          [
+           8.559999999999999,
+           7.92
+          ],
+          [
+           26.5,
+           5.04
+          ]
+         ],
+         "stroke": "$paint_lo",
+         "line_width": 0.8
+        },
+        {
+         "shape": "rectangle",
+         "x": 29.9,
+         "y": -13.0,
+         "width": 1.6,
+         "height": 26,
+         "fill": "$trim"
+        },
+        {
+         "shape": "rectangle",
+         "x": -31.5,
+         "y": -12.0,
+         "width": 1.6,
+         "height": 24,
+         "fill": "$trim"
+        },
+        {
+         "shape": "ellipse",
+         "x": 28.5,
+         "y": -12.0,
+         "radius_x": 2.4,
+         "radius_y": 3.6,
+         "fill": "#fff4d6",
+         "emits": {
+          "strength": 0.55,
+          "reach": 110,
+          "color": "#ffe7b8"
+         }
+        },
+        {
+         "shape": "ellipse",
+         "x": 28.5,
+         "y": 12.0,
+         "radius_x": 2.4,
+         "radius_y": 3.6,
+         "fill": "#fff4d6",
+         "emits": {
+          "strength": 0.55,
+          "reach": 110,
+          "color": "#ffe7b8"
+         }
+        },
+        {
+         "shape": "rectangle",
+         "x": -31.1,
+         "y": -14.5,
+         "width": 2.4,
+         "height": 6,
+         "radius": 1,
+         "fill": "#c8142e",
+         "emits": {
+          "strength": 0.22,
+          "reach": 34,
+          "color": "#ff2a40"
+         }
+        },
+        {
+         "shape": "rectangle",
+         "x": -31.1,
+         "y": 8.5,
+         "width": 2.4,
+         "height": 6,
+         "radius": 1,
+         "fill": "#c8142e",
+         "emits": {
+          "strength": 0.22,
+          "reach": 34,
+          "color": "#ff2a40"
+         }
+        },
+        {
+         "shape": "rectangle",
+         "x": 4.56,
+         "y": -20.5,
+         "width": 3,
+         "height": 3,
+         "radius": 1,
+         "fill": "$paint_lo"
+        },
+        {
+         "shape": "rectangle",
+         "x": 4.56,
+         "y": 17.5,
+         "width": 3,
+         "height": 3,
+         "radius": 1,
+         "fill": "$paint_lo"
+        }
+       ],
+       "sides": "$paint_lo"
+      },
+      {
+       "layer": 1,
+       "height": 10,
+       "thickness": 6,
+       "steps": [
+        {
+         "shape": "polygon",
+         "points": [
+          [
+           7.56,
+           -13.25
+          ],
+          [
+           8.82,
+           -8.64
+          ],
+          [
+           9.14,
+           0
+          ],
+          [
+           8.82,
+           8.64
+          ],
+          [
+           7.56,
+           13.25
+          ],
+          [
+           -21.42,
+           13.68
+          ],
+          [
+           -22.18,
+           0
+          ],
+          [
+           -21.42,
+           -13.68
+          ]
+         ],
+         "fill": "$glass"
+        }
+       ],
+       "sides": "$glass"
+      },
+      {
+       "layer": 2,
+       "height": 16,
+       "thickness": 0.6,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -13.86,
+         "y": -12.96,
+         "width": 12.6,
+         "height": 25.92,
+         "radius": 4,
+         "fill": "$paint"
+        },
+        {
+         "shape": "rectangle",
+         "x": -11.86,
+         "y": -7.92,
+         "width": 8.6,
+         "height": 5.04,
+         "radius": 2,
+         "fill": "rgba(255,255,255,0.12)"
+        }
+       ],
+       "sides": "$paint_lo"
+      }
+     ]
+    }
+   ],
+   "look": {
+    "layer": 1,
+    "lean": 0.6,
+    "values": {
+     "paint": "#c0c0c8",
+     "paint_hi": "#dadae2",
+     "paint_lo": "#8a8a94",
+     "glass": "#1a2230",
+     "trim": "#2a2a30"
+    }
+   }
+  }
+ }
+}

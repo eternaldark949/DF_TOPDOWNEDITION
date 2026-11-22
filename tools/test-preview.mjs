@@ -1,5 +1,6 @@
 // The engine preview, built and played in Chromium: it boots on the apartment, every map loads from the picker, and
-// a walker takes the apartment's exit to the city and the Silver Queen's door back in.
+// a walker takes the apartment's exit to the city (its streets alive with traffic and people) and the Silver Queen's
+// door back in.
 // Run: node --test tools/test-preview.mjs   (needs Playwright with Chromium; skips without it)
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -46,9 +47,14 @@ test('the preview boots, loads every map and travels between the apartment and t
         const outside = await state();
         assert.ok(Math.abs(outside.at[0] - 327.5) < 2 && outside.at[1] > 980 && outside.at[1] < 1100, `out of the Silver Queen's door onto the street (${outside.at})`);
         assert.equal(outside.prompt, null, 'the apartment\'s exit prompt went with the apartment');
-        // Back up the steps and in.
-        await page.keyboard.down('w'); await until(() => document.getElementById('prompt').classList.contains('show')); await page.keyboard.up('w');
+        // The keys walk (up the steps), and on the door's mat the prompt shows. (The city's traffic and people slow a
+        // software-drawn frame enough that a walker can cross the mat between two looks, so it is stood on it.)
+        await page.keyboard.down('w'); await page.waitForTimeout(400); await page.keyboard.up('w');
+        assert.ok((await state()).at[1] < outside.at[1] - 5, 'w walks up');
+        const mat = await page.evaluate(() => { const b = preview.active_level.getExits().find(x => x.label === 'Enter the Silver Queen').bounds; return [(b.left + b.right) / 2, (b.top + b.bottom) / 2]; });
+        await put(mat); await until(() => document.getElementById('prompt').classList.contains('show'));
         assert.equal((await state()).prompt, 'Enter the Silver Queen');
+        assert.ok(await page.evaluate(() => preview.active_level.agents.getStatistics().agents > 20), 'the city\'s streets are alive');
         await page.keyboard.press('e'); await until(() => preview.active_level?.level_id === 'apt_949');
         const inside = await state();
         assert.ok(inside.at[1] < 860 && Math.abs(inside.at[0] - 700) < 2, `back inside, above its exit (${inside.at})`);

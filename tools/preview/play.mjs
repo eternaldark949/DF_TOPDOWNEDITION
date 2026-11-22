@@ -43,6 +43,13 @@ export async function bootPreview({ libraries, hud }) {
         // Only the walker streams the map and stands on its exits.
         mapFocuses() { return [{ position: person.entity.position, velocity: person.entity.linear_velocity }]; }
         exitFocuses() { return [person.entity]; }
+        // The city's people are humanoids (a rig to animate each step); its cars are plain entities of their templates.
+        makeAgent(context, name, profile, pose) {
+            if (profile.template !== 'engine:humanoid') return super.makeAgent(context, name, profile, pose);
+            const pick = profile.looks?.[Math.floor(Math.random() * profile.looks.length)] ?? {};
+            const someone = new humanoid(physics, { position: pose.position, rotation: pose.rotation, name, look: { ...look, lean: .35, values: { ...look.values, ...pick } } });
+            return { entity: someone.entity, updateState: () => someone.updateState(), remove: () => someone.remove() };
+        }
         enter(context, prepared) {
             super.enter(context, prepared);
             const [w, h] = this.definition.size, top = this.definition.camera_bounds?.top ?? 0;

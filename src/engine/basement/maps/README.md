@@ -80,6 +80,29 @@ One path for every map:
 
 The map system uses the world's one spatial grid and navigation field. It never keeps its own index of bodies; it only remembers which entity it built for each authored id.
 
+## Streets
+
+`streetNetwork(map, settings)` turns a map's `streets` (`roads` as centrelines with `lanes` each way and a
+`lane_width`, and `intersections`), `pavements` and `crosswalks` into one navigation network, as data: `{nodes, lanes,
+junctions, crossings}`, ready for `physics.navigation.roads` and the [agents](../agents/README.md).
+
+- **Roads.** Each road is cut into arms by the junctions it passes through (the authored ones, and one where a road's end
+  meets another road). Each arm has a lane per lane each way, driven on the right (`kind: 'road'`).
+- **Turns.** Through a junction the lanes join by turns (`kind: 'turn'`, `turn: straight | right | left`, a curve through
+  the junction). Straight on keeps its lane, and a middle lane may also move into the lanes either side. A right turn goes
+  from the kerb lane, a left from the inner lane, and nobody turns back. Each turn is under its way in's light
+  (`signal_id`), and `junctions[].phases` lists the lights in turn round the junction.
+- **On foot.** Pavements run along their length and crosswalks across their road (`kind: 'pavement' | 'crossing'`, two-way,
+  profile `foot`). Where one pavement meets another's side, or two cross, it is cut and joined there, and a loose end is
+  linked to the nearest end within `join`. Ends at one spot are one node.
+- **Stops.** A car lane's `stops` are its stop line before each turn's light (`{distance, signal_id, turn, clearance}`, set
+  before a crosswalk just ahead of the junction) and each crosswalk it crosses (`{distance, walkway_id}`). `crossings`
+  lists each crosswalk's walkway and the lights it waits for: every light of its junction, so people cross in the walk.
+
+`STREETS` holds the settings: `lane_width` 60, `speed_limit` 180, `turn_speed` 90, `turn_samples` 6, `straight_angle`
+.6, `join` 120, `stop_setback` 4, `box_exit` 110 (how far past a junction a car needs room, and the crosswalk clear,
+before it goes in), and the lane profiles `car` and `foot`.
+
 ## API
 
 | Call | Result |
@@ -93,6 +116,7 @@ The map system uses the world's one spatial grid and navigation field. It never 
 | `HINGE` | Defaults for a hinged leaf: `{mass: 12, damping: 7.7, closing_stiffness: 64.8, swing_limit: π − 0.25}`. A kind's leaf `hinge`, then the door's `hinge` field, override them. |
 | `DOOR_KINDS` / `validateDoorKind(kind, name?)` | The built-in kinds / the check every kind passes before it is built. |
 | `mapInstance.setFocus(focuses, {radius, keep, budget_ms, lead})` / `.addTier(name, {radius, keep, load, release, every})` / `.loaded_regions` / `.region_size` | Streaming (see above). `setFocus` returns `{loaded, unloaded, pending}`. |
+| `streetNetwork(map, settings)` / `STREETS` | The map's streets as one navigation network (see Streets). |
 | `mapInstance.reconnect()` / `.saveState()` / `.loadState(state)` / `.getStatistics()` / `.destroy()` | Lifecycle. |
 
 ## Game data

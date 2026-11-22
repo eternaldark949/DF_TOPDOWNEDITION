@@ -213,6 +213,8 @@ test('a map level whose switches turn the light grid on bakes it on entry and re
     for (let k = 0; k < 10 && grid.pending; k++) e.updateState(1 / 60);
     assert.ok(grid.sample(700, 300)[2] > .3, 'the moving car lights the ground under it');
     assert.equal(grid.liveLights().length, 1);
+    const other = e.basement.physics.createEntity({ kind: 'vehicle', position: [950, 450], collision_shape: { shape_type: 'circle', radius: 10 }, assets: { drawing: 'glow:underglow' } });
+    e.updateState(1 / 60); assert.equal(grid.liveLights().length, 2, 'each glowing mover is its own (by its entity id)');
     e.basement.physics.updateBody(car, { position: [300, 300] }); e.updateState(1 / 60);
     for (let k = 0; k < 10 && grid.pending; k++) e.updateState(1 / 60);   // (a step bakes within its budget, the rest on the next steps)
     assert.ok(grid.sample(300, 300)[2] > .3 && grid.sample(700, 300)[2] < .01, 'and its light moves with it');

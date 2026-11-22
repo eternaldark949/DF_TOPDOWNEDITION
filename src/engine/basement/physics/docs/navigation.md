@@ -111,7 +111,7 @@ Constructor options come from `new physicsSystem({ navigation: { field: {...}, m
 |---|---|
 | `addNode(node_id, {position})` | Registers a junction. |
 | `addLane(lane_id, {from, to, points=[], speed_limit=180, cost_scale=1, profiles=['car'], two_way=false, open=true})` | Registers one directed lane, or two. Returns their ids. |
-| `removeLane(lane_id)` / `setLaneOpen(lane_id, open)` | Edit the network; routing caches clear. |
+| `removeLane(lane_id)` / `removeNode(node_id)` / `setLaneOpen(lane_id, open)` | Edit the network; routing caches clear. A node is removed only once no lane uses it. |
 | `getLane(lane_id)` / `getNode(node_id)` | Detached copies, or `null`. |
 | `snapToLane(position, {profile='car', near_range=200}, results?)` | Nearest permitted open lane `{lane, along, position, distance}`; with `results`, all of them sorted by distance. |
 | `findRoute({from, to, profile, near_range, max_candidates})` | As `navigationSystem.findRoute`, without profile lookup. |

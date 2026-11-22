@@ -671,6 +671,27 @@
     "arrival_distance": 2
    }
   },
+  "vehicle": {
+   "extends": "entity",
+   "kind": "vehicle",
+   "physics_type": "rigid",
+   "collision_group": 4,
+   "collision_mask": 2147483647,
+   "collision_shape": {
+    "shape_type": "box",
+    "dimensions": [
+     64,
+     30
+    ]
+   },
+   "mass": 1000,
+   "vehicle_template": {
+    "max_speed": 240,
+    "acceleration": 140,
+    "braking": 320,
+    "wheel_base": 40
+   }
+  },
   "prop": {
    "extends": "entity",
    "kind": "prop",

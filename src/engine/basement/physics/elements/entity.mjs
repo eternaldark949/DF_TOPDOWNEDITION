@@ -1,5 +1,5 @@
 // ===== LV0 BASEMENT =====
-import {bodyActive} from '../core/state.mjs';
+import {bodyActive,worldElevation} from '../core/state.mjs';
 import {entityComponent,readComponent,componentSpan,layersSpan} from './components.mjs';
 import {readScale} from './scale.mjs';
 /** Entity metadata/lifecycle only. Physical state lives exclusively in the engine body. */
@@ -59,7 +59,7 @@ export class gameEntity {
     get linear_velocity() { return this.body.linear_velocity; }
     get angular_velocity() { return this.body.angular_velocity; }
     get mass() { return this.body.getState().mass; }
-    get physics_type() { return this.body.getState().physics_type; }
+    get physics_type() { const r = entityRecord(this); return r.elements.world._record(r.body).config.physics_type; }   // (read in place: no state copy)
     get collision_shape() { return this.body.getState().collision_shape; }
     get collision_group() { return this.body.getState().collision_group; }
     get collision_mask() { return this.body.getState().collision_mask; }
@@ -110,7 +110,7 @@ export class gameEntity {
     scaleBy(factor) { const f = readScale(factor), s = entityRecord(this).scale; return this.scaleTo([s[0] * f[0], s[1] * f[1], s[2] * f[2]]); }
     // ----- Elevation: z, how high its base stands. Its layers and rig heights count up from here. -----
     /** Its own elevation above the ground, in world units (0: on the ground). An attached entity is held by its mount instead. */
-    get elevation() { return entityRecord(this).body.getState().elevation; }
+    get elevation() { const r = entityRecord(this); return worldElevation(r.elements.world._record(r.body)); }
     /** Where its base is in the world: its own elevation, or, while attached, its parent's plus the anchor's height. */
     get world_elevation() { return entityRecord(this).body.getState().world_elevation; }
     /** Raises or lowers it: its collision, queries, drawing and attached children all follow. */

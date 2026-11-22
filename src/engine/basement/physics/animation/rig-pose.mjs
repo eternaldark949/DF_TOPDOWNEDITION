@@ -1,7 +1,7 @@
 // ===== LV0 BASEMENT =====
 import {clone,number} from '../core/values.mjs';
 import {rigDefinition,definitionRecord} from './rig-definition.mjs';
-import {name,transform,fields,matrix,multiply,describe,blendTransform,CHANNELS} from './values.mjs';
+import {name,transform,fields,matrix,multiply,describe,blendTransform,copyTransform,CHANNELS} from './values.mjs';
 /** Mutable local pose with cached hierarchy resolution; all public reads are detached. */
 export class rigPose{
  #definition;#local;#rest;#resolved=[];#heights=[];#pitches=[];#dirty=true;#revision=0;
@@ -19,8 +19,8 @@ export class rigPose{
   }
   this.#install(next);return this;
  }
- getLocalJoint(id){return clone(this.#local[this.#index(id)]);}
- getLocalPose(){return Object.fromEntries(this.#definition.getJointNames().map((id,i)=>[id,clone(this.#local[i])]));}
+ getLocalJoint(id){return copyTransform(this.#local[this.#index(id)]);}
+ getLocalPose(){return Object.fromEntries(this.#definition.getJointNames().map((id,i)=>[id,copyTransform(this.#local[i])]));}
  // A joint's frame on the ground is its parent's, carried along the parent's bone: [x, y] with x shortened
  // by the cosine of the parent's pitch (a tilted bone looks shorter from above) and the rest of x rising
  // as height. Heights count in the parent's length along x, so a bigger rig is taller too. Pitch adds up

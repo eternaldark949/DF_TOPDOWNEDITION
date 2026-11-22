@@ -4,3 +4,4 @@ export { mapInstance, mapSystem } from './system.mjs';
 export { roomGraph } from './rooms.mjs';
 export { MARKER, readMarker, markerComponent } from './markers.mjs';
 export { ROW, readRow, rowPlacements } from './rows.mjs';
+export { STREETS, streetNetwork } from './streets.mjs';

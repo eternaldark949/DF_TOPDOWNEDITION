@@ -1,6 +1,7 @@
 // ===== LV1 LOBBY =====
 import { gameLevel } from './game-level.mjs';
-import { mapInstance } from '../../basement/maps/index.mjs';
+import { mapInstance, streetNetwork } from '../../basement/maps/index.mjs';
+import { agentSystem } from '../../basement/agents/index.mjs';
 import { lightGridSystem, readNight } from '../../basement/rendering/index.mjs';
 import { readParticleSystem } from '../../basement/physics/index.mjs';
 
@@ -53,12 +54,43 @@ export class mapLevel extends gameLevel {
         this.light_grid = prepared.definition.switches?.light_grid ? new lightGridSystem({ settings: prepared.definition.light_grid ?? {}, source: context.assets ?? context.basement.physics.elements?.asset_library ?? null }).attach(this.map, this.lightGridOptions(context)) : null;
         this.followLightGroups(context);
         this.map.setFocus(this.mapFocuses(context), { budget_ms: Infinity });   // (the arriving regions, whole, behind the level change)
+        // With the map's `traffic` and `walkers` switches its streets come alive: the cars and those on foot its `agents`
+        // record names, kept round the first focus, the city filled round it at once (behind the level change).
+        this.agents = this.makeAgents(context, prepared.definition);
+        if (this.agents) this.agents.populate(this.agentFocus(context));
         this.light_grid?.updateState({ budget_ms: Infinity });
+    }
+    beforePhysics(context, seconds) { this.agents?.updateState(seconds, this.agentFocus(context)); }
+    /**
+     * The map's street life (`agents: {settings?, profiles: {name: profile}}`, see the Basement's AGENT_PROFILE), when
+     * its `traffic` switch (the profiles on the car lanes) or `walkers` switch (the rest) is on; else null.
+     */
+    makeAgents(context, definition) {
+        const on = definition.switches ?? {}, record = definition.agents;
+        if (!record || !(on.traffic || on.walkers)) return null;
+        const profiles = Object.fromEntries(Object.entries(record.profiles ?? {}).filter(([, p]) => (p.network ?? 'car') === 'car' ? on.traffic : on.walkers));
+        if (!Object.keys(profiles).length) return null;
+        return new agentSystem(context.basement.physics, { network: streetNetwork(definition), profiles, spawn: (name, profile, pose) => this.makeAgent(context, name, profile, pose), ...(record.settings ?? {}) });
+    }
+    /**
+     * Makes one agent at `pose` ({position, rotation}): by default an entity of its profile's `template`, in one of its
+     * `looks` (values over the template's look), or null. A level overrides it for agents that need more (a rig).
+     */
+    makeAgent(context, name, profile, { position, rotation }) {
+        const elements = context.basement.physics.elements, look = elements.asset_library?.resolveTemplate?.(profile.template)?.look;
+        const pick = profile.looks?.length ? profile.looks[Math.floor(Math.random() * profile.looks.length)] : null;
+        return elements.createEntity({ template: profile.template, position, rotation, ...(look && pick ? { look: { ...look, values: { ...look.values, ...pick } } } : {}) });
+    }
+    /** Where the street life is kept round: the first map focus, and what the camera sees (agents appear out of it). */
+    agentFocus(context) {
+        const first = this.mapFocuses(context)[0], focus = first?.position ?? first, b = context.basement.camera?.getVisibleBounds?.();
+        return { focus: focus ? [focus[0], focus[1]] : null, view: b ? [b.left, b.top, b.right, b.bottom] : null };
     }
     afterPhysics(context, seconds) {
         this.followWeather(context); this.followView(context); this.followClock(context); this.followExits(context);
         this.map.setFocus(this.mapFocuses(context), { budget_ms: this.mapStreamBudget(context) }); this.map.updateState(this.mapUpdateOptions(context));
-        if (this.light_grid) { this.light_grid.setMovers(this.light_grid.moversOf(this.lightGridMovers(context))); this.light_grid.updateState({ budget_ms: this.lightGridBudget(context) }); }
+        // (on a map with a night, its movers only while the night shows: by day the grid is not drawn, and dusk brings them in again)
+        if (this.light_grid) { if (this.night_on || !this.night) this.light_grid.setMovers(this.light_grid.moversOf(this.lightGridMovers(context))); this.light_grid.updateState({ budget_ms: this.lightGridBudget(context) }); }
     }
     /** The light grid's tier options (`radius`: how far round a focus regions keep a baked grid). */
     lightGridOptions(context) { return {}; }
@@ -143,7 +175,7 @@ export class mapLevel extends gameLevel {
         const camera = context.basement.camera; if (!camera) return;
         for (const p of this.particles ?? []) if (p.view) { const b = camera.getVisibleBounds({ margin: p.margin }); context.basement.physics.setParticleArea(p.id, [b.left, b.top, b.right - b.left, b.bottom - b.top]); }
     }
-    leave(context) { for (const name of this.light_groups ?? []) context.basement.render?.setLightGroup(name, true); this.light_groups = null; for (const p of this.particles ?? []) context.basement.physics.removeParticleSystem(p.id); this.particles = []; if (this.night_on) this.setNight(context, false); this.night = null; this.map?.destroy(); this.map = null; this.light_grid = null; if (this.height_view) context.basement.render?.setHeightView(null); this.height_view = null; }
+    leave(context) { this.agents?.dispose(); this.agents = null; for (const name of this.light_groups ?? []) context.basement.render?.setLightGroup(name, true); this.light_groups = null; for (const p of this.particles ?? []) context.basement.physics.removeParticleSystem(p.id); this.particles = []; if (this.night_on) this.setNight(context, false); this.night = null; this.map?.destroy(); this.map = null; this.light_grid = null; if (this.height_view) context.basement.render?.setHeightView(null); this.height_view = null; }
     /**
      * Who counts as standing on an exit (its `occupied` property, which a marker's look switches on): by default
      * every active character. A level overrides it for the player alone.

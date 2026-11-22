@@ -71,8 +71,9 @@ export function entityEmitters(body,source,{pose=null}={}){
  *
  *  attach(map, {radius})   gathers the map's still emitters and blockers from its packets and joins it as
  *                          the tier `light_grid`: a region's grid is queued to bake when it comes in reach
- *  setMovers(movers)       the moving emitters this step: [{id, emitters}] (emitters as entityEmitters
- *                          gives them); one that moved half a cell, appeared or went re-bakes what it reaches
+ *  setMovers(movers)       the moving emitters this step: [{id, emitters, live}] (emitters as entityEmitters
+ *                          gives them); one that moved half a cell, appeared or went re-bakes what it reaches,
+ *                          unless it is `live` (going by): that one only shows as a live light
  *  updateState({budget_ms})  bakes queued regions until the budget is spent (at least one a call), the
  *                          old grid showing until its new one is ready. The Lobby calls it.
  *  grids(view)             the baked grids meeting view {left, top, right, bottom}, for createLightLayerParts
@@ -114,8 +115,11 @@ export class lightGridSystem{
     #bounds(key){const [x,y]=key.split(',').map(Number),s=this.#size;return {left:x*s,top:y*s,right:(x+1)*s,bottom:(y+1)*s};}
     setMovers(movers=[]){
         const seen=new Set();
-        for(const {id,emitters} of movers){
+        for(const {id,emitters,live=false} of movers){
             seen.add(id);
+            // A live mover (one going by) is drawn by liveLights only: its light is not baked, so passing traffic
+            // re-bakes nothing; the cells it lit while it stood are baked again without it.
+            if(live){const before=this.#movers.get(id);if(before&&!before.live)for(const k of before.keys)this.#want(k,before.area);this.#movers.set(id,{emitters,keys:new Set(),sign:'live',area:null,live:true});continue;}
             const reach=emitters.map(e=>{const R=e.reach+(e.height??0),[l,t,r,b]=e.bounds;return [l-R,t-R,r+R,b+R];});
             const area=reach.length?[Math.min(...reach.map(b=>b[0])),Math.min(...reach.map(b=>b[1])),Math.max(...reach.map(b=>b[2])),Math.max(...reach.map(b=>b[3]))]:null;
             const keys=new Set(reach.flatMap(box=>this.#keysOf(box,EDGE)));
@@ -179,9 +183,10 @@ export class lightGridSystem{
     }
     /**
      * Movers from live entities: each that is not static and whose drawing or components glow, at its
-     * pose now, by its id. Whether a drawing or a component list glows is worked out once and kept.
+     * pose now, by its id, `live` while it goes faster than `bake_below` (units a second): only what stands
+     * still or creeps is baked into the grid. Whether a drawing or a component list glows is worked out once and kept.
      */
-    moversOf(entities){
+    moversOf(entities,{bake_below=8}={}){
         const out=[];
         for(const e of entities){
             if(e.destroyed||e.physics_type==='static')continue;
@@ -189,11 +194,23 @@ export class lightGridSystem{
             // (the probe carries the entity's look, whose values its drawings read)
             const look=e.get?.('look')??e.data?.look,glows=(drawing!==null&&this.#glows(drawing,()=>entityEmitters({assets:{drawing},position:[0,0],data:{look}},this.#source).length>0))||(components?.length>0&&this.#glows(components,()=>entityEmitters({components,position:[0,0],data:{look}},this.#source).length>0));
             if(!glows)continue;
-            const emitters=entityEmitters(e,this.#source),group=lightGroupOf(e);if(group)for(const em of emitters)em.group=group;if(emitters.length)out.push({id:e.id,emitters});
+            const emitters=this.#placed(e,drawing,components,look),group=lightGroupOf(e);if(group)for(const em of emitters)em.group=group;const v=e.linear_velocity,speed=v?Math.hypot(v[0],v[1]):0,was=this.#movers.get(e.entity_id??e.id)?.live;if(emitters.length)out.push({id:e.entity_id??e.id,emitters,live:speed>bake_below||(!!was&&speed>bake_below/4)});   // (one creeping in a queue stays live: no re-bake each time it inches)
         }
         return out;
     }
-    #glowing=new Map();#glowingLists=new WeakMap();
+    #glowing=new Map();#glowingLists=new WeakMap();#local=new WeakMap();
+    // An entity's emitters where it stands now: worked out once about its own origin (for as long as its look and
+    // parts stay the same) and moved there, as a mover's glow is read every step.
+    #placed(e,drawing,components,look){
+        let c=this.#local.get(e);
+        if(!c||c.drawing!==drawing||c.components!==components||c.look!==look){c={drawing,components,look,emitters:entityEmitters({assets:{drawing},components:components??[],position:[0,0],rotation:0,elevation:0,data:{look}},this.#source)};this.#local.set(e,c);}
+        const [x,y]=e.position,r=e.rotation??0,z=e.elevation??0,cs=Math.cos(r),sn=Math.sin(r);
+        return c.emitters.map(em=>{
+            const outline=em.outline.map(([px,py])=>[x+px*cs-py*sn,y+px*sn+py*cs]),h=em.width/2;
+            let l=Infinity,t=Infinity,R=-Infinity,b=-Infinity;for(const [px,py] of outline){l=Math.min(l,px);t=Math.min(t,py);R=Math.max(R,px);b=Math.max(b,py);}
+            return {...em,outline,bounds:[l-h,t-h,R+h,b+h],height:em.height+z};
+        });
+    }
     #glows(key,test){const store=typeof key==='string'?this.#glowing:this.#glowingLists;let v=store.get(key);if(v===undefined){v=test();store.set(key,v);}return v;}
     get pending(){return this.#queue.length;}
     getStatistics(){return {...this.#stats,grids:this.#grids.size,pending:this.#queue.length,movers:this.#movers.size,still_emitters:new Set([...this.#still.values()].flat()).size,walls:new Set([...this.#walls.values()].flat()).size};}

@@ -12,7 +12,7 @@
 // map_layout     { map_id?, props: [placement], ...any other per-map lists (copied as data) }
 //                placement = { type, x, y, ...fields }: fields override the type's defaults, and a
 //                field set to null removes that default.
-// map            { size: [w, h], setting?: 'interior'|'exterior', spawn?, floors?, wall_look?, walls?, placements?, rooms?, doors?, switches?, light_grid?, height_view?: {eye, lean = 1}, night?: {tint, scale, effects, glare}, particles?: [{system, area?: 'view' | [x, y, w, h], at?, margin?}], markers?: {role: marker}, rows?: [{block | rect, side, objects | pick, ...}], keep_clear?: [{x, y, w, h}], ... }
+// map            { size: [w, h], setting?: 'interior'|'exterior', spawn?, floors?, wall_look?, walls?, placements?, rooms?, doors?, switches?, light_grid?, agents?: {settings?, profiles}, height_view?: {eye, lean = 1}, night?: {tint, scale, effects, glare}, particles?: [{system, area?: 'view' | [x, y, w, h], at?, margin?}], markers?: {role: marker}, rows?: [{block | rect, side, objects | pick, ...}], keep_clear?: [{x, y, w, h}], ... }
 //                A whole map as data: the Basement map builder's definition, found by its id like any
 //                resource. `setting` is the builder's `kind` (the resource's own `kind` is 'map'). Fields
 //                the builder does not read (a label, landmarks, windows) are the game's, kept as data.
@@ -34,6 +34,7 @@ import { readParticleSystem } from '../basement/physics/index.mjs';
 import { readWorldClock } from '../basement/timers/index.mjs';
 import { readWorldWeather } from '../basement/weather/index.mjs';
 import { readMarker, readRow } from '../basement/maps/index.mjs';
+import { readAgents } from '../basement/agents/index.mjs';
 
 export const STRUCTURES = Object.freeze({
     prop_catalog: 'A catalog of prop types and the families they are presets of: { types: { <type>: { defaults, movable?, blocks_light?, light? } }, families?: { <family>: { look: { <field>: { kind, default } } } } }.',
@@ -219,6 +220,7 @@ export function validateMap(map, where = 'map') {
     if (map.height_view !== undefined && !(plain(map.height_view) && Object.keys(map.height_view).every(k => k === 'eye' || k === 'lean') && Number.isFinite(map.height_view.eye) && map.height_view.eye > 0 && (map.height_view.lean === undefined || (Number.isFinite(map.height_view.lean) && map.height_view.lean >= 0)))) fail(where, 'height_view is { eye: world units above the ground (> 0), lean: how far walls lean (>= 0, default 1) }');
     if (map.light_grid !== undefined) { try { readLightGrid(map.light_grid); } catch (error) { fail(where, error.message); } }
     if (map.night !== undefined) { try { readNight(map.night); } catch (error) { fail(where, error.message); } }
+    if (map.agents !== undefined) { try { readAgents(map.agents); } catch (error) { fail(where, error.message); } }
     if (map.rows !== undefined) {
         if (!Array.isArray(map.rows)) fail(where, 'rows is a list of {block | rect, side, objects | pick, ...}');
         map.rows.forEach((row, i) => { try { readRow(row, `rows[${i}]`); } catch (error) { fail(where, error.message); } });

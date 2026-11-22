@@ -16,6 +16,7 @@ export const STREETS = Object.freeze({
     straight_angle: .6,        // a turn within this many radians of straight on is straight on
     join: 120,                 // a pavement end this near another foot end is joined to it
     stop_setback: 4,           // a car stops this far before a stop line or a crosswalk
+    box_exit: 110,             // past a junction, how far a car must have room (and the crosswalk be clear) before it goes in
     car: 'car', foot: 'foot'   // the profiles on the lanes
 });
 
@@ -66,13 +67,15 @@ const rectPoly = r => r.poly ?? [[r.x, r.y], [r.x + r.w, r.y], [r.x + r.w, r.y +
 /** Where a lane's polyline first enters a convex polygon and leaves it again, by distance along it, or null. */
 function through(points, poly) { const cum = lengths(points), parts = clip(points, cum, poly); return parts.length ? [parts[0][0], parts.at(-1)[1]] : null; }
 function bezier(a, c, b, samples) { const out = []; for (let i = 1; i < samples; i++) { const t = i / samples, u = 1 - t; out.push([u * u * a[0] + 2 * u * t * c[0] + t * t * b[0], u * u * a[1] + 2 * u * t * c[1] + t * t * b[1]]); } return out; }
+const box = ps => { const b = [Infinity, Infinity, -Infinity, -Infinity]; for (const p of ps) { b[0] = Math.min(b[0], p[0]); b[1] = Math.min(b[1], p[1]); b[2] = Math.max(b[2], p[0]); b[3] = Math.max(b[3], p[1]); } return b; };
+const overlaps = (a, b) => a[0] <= b[2] && b[0] <= a[2] && a[1] <= b[3] && b[1] <= a[3];
 function meet(p, d, q, e) { const den = cross(d, e); if (Math.abs(den) < 1e-6) return null; const t = cross(sub(q, p), e) / den; return add(p, mul(d, t)); }
 
 /**
  * The street network of a map's `streets` (`{roads: [{id, lanes, lane_width, thickness, stops: [[x, y, ...]]}],
  * intersections: [{id, x, y, w, h, poly?}]}`), `pavements` ([{x, y, w, h}]) and `crosswalks` ([{x, y, w, h,
  * orientation: 'H' | 'V' | 'D', poly?, axis?}]): `{nodes: [{node_id, position}], lanes: [{lane_id, from, to, points,
- * speed_limit, profiles, kind, ...}], junctions: [{junction_id, position, phases: [[signal_id]]}], crossings:
+ * speed_limit, profiles, kind, ...}], junctions: [{junction_id, position, phases: [[signal_id]]}] (a phase for each way in, round the junction), crossings:
  * [{walkway_id, lane_id, waits_for: [signal_id]}]}`. A car lane's `stops` are `[{distance, signal_id | walkway_id}]`
  * along it, ready for a traffic route. `kind` is `road` (an arm's lane), `turn` (through a junction), `pavement` or
  * `crossing`.
@@ -120,24 +123,27 @@ export function streetNetwork({ streets = null, pavements = [], crosswalks = [],
         const ins = lanes.filter(l => l.kind === 'road' && l.to_junction === j.id), outs = lanes.filter(l => l.kind === 'road' && l.from_junction === j.id);
         if (!ins.length || !outs.length) continue;
         const end_heading = l => unit(sub(l.all.at(-1), l.all.at(-2))), start_heading = l => unit(sub(l.all[1], l.all[0]));
-        // Two phases: the arms along the first arm's axis, and the arms across it.
-        const axis = heading(end_heading(ins[0])), phase = l => { let d = Math.abs(angleDelta(axis, heading(end_heading(l)))) % Math.PI; d = Math.min(d, Math.PI - d); return d < Math.PI / 4 ? 0 : 1; };
+        // A phase for each way in, in turn round the junction (straight on, right and left together): no two ways that
+        // are green at once cross, so a junction needs no arbitration inside it.
+        const axis = heading(end_heading(ins[0])), phase = l => (Math.round(angleDelta(axis, heading(end_heading(l))) / (Math.PI / 2)) + 4) % 4;
         const phases = new Set(ins.map(phase)), signalled = phases.size > 1, used = new Set();
         for (const a of ins) for (const b of outs) {
             if (a.arm === b.arm) continue;   // (no U-turns)
             const ha = end_heading(a), hb = start_heading(b), turn = angleDelta(heading(ha), heading(hb));
             const kind = Math.abs(turn) < S.straight_angle ? 'straight' : Math.abs(turn) > Math.PI - .5 ? null : turn > 0 ? 'right' : 'left';
             if (!kind) continue;
-            if (kind === 'straight' && !(a.k === b.k || (a.k >= b.per_side && b.k === b.per_side - 1))) continue;
+            // Straight on in the same lane; from a middle lane (no turns of its own) also into the lanes either side.
+            const middle = a.k > 0 && a.k < a.per_side - 1;
+            if (kind === 'straight' && !(a.k === b.k || (a.k >= b.per_side && b.k === b.per_side - 1) || (middle && Math.abs(a.k - b.k) === 1))) continue;
             if (kind === 'right' && !(a.k === a.per_side - 1 && b.k === b.per_side - 1)) continue;
             if (kind === 'left' && !(a.k === 0 && b.k === 0)) continue;
             const p0 = a.all.at(-1), p2 = b.all[0], c = kind === 'straight' ? null : meet(p0, ha, p2, hb);
             const points = (c ? bezier(p0, c, p2, S.turn_samples) : []).map(round);
-            const signal_id = signalled ? `${j.id}/${phase(a)}${kind === 'left' ? 'L' : 'S'}` : null;
+            const signal_id = signalled ? `${j.id}/${phase(a)}` : null;
             if (signal_id) used.add(signal_id);
             lanes.push({ lane_id: `${a.lane_id}>${b.lane_id}`, from: a.to, to: b.from, points, all: [p0, ...points, p2], speed_limit: kind === 'straight' ? S.speed_limit : S.turn_speed, profiles: [S.car], kind: 'turn', turn: kind, junction: j.id, signal_id, stops: [] });
         }
-        const order = ['0S', '0L', '1S', '1L'].map(p => `${j.id}/${p}`).filter(id => used.has(id));
+        const order = [0, 1, 2, 3].map(p => `${j.id}/${p}`).filter(id => used.has(id));
         out_junctions.push({ junction_id: j.id, position: round(j.centre), phases: order.map(id => [id]) });
     }
     // On foot: each pavement along its length, each crosswalk across its road, joined end to end.
@@ -157,9 +163,38 @@ export function streetNetwork({ streets = null, pavements = [], crosswalks = [],
     const near = (a, b) => len(sub(a.p, b.p));
     for (const a of ends) if (!a.id) { a.id = `${a.f.lane_id}:${a.e ? 'b' : 'a'}`; for (const b of ends) if (!b.id && b.f !== a.f && near(a, b) < 14) b.id = a.id; }
     for (const a of ends) node(a.id, a.p);
-    for (const f of foot) { const [a, b] = ends.filter(x => x.f === f); lanes.push({ lane_id: f.lane_id, from: a.id, to: b.id, points: [], all: [a.p, b.p].map(round), speed_limit: 60, profiles: [S.foot], two_way: true, kind: f.kind, ...(f.walkway_id ? { walkway_id: f.walkway_id } : {}) }); }
+    // Pavements meet side on (one runs into the side of another, or two cross): each is cut where another's end
+    // reaches it, or where they cross, and joined there. Crosswalks are never cut: each stays one walkway.
+    const cuts = new Map(foot.map(f => [f, []])), joins = [];
+    const reach = S.join / 3;
+    for (const f of foot) if (f.kind === 'pavement') {
+        const [p, q] = f.ends, d = sub(q, p), L2 = d[0] * d[0] + d[1] * d[1], L = Math.sqrt(L2);
+        for (const e of ends) {
+            if (e.f === f) continue;
+            const t = ((e.p[0] - p[0]) * d[0] + (e.p[1] - p[1]) * d[1]) / L2; if (t * L < 14 || (1 - t) * L < 14) continue;
+            const c = add(p, mul(d, t)); if (len(sub(c, e.p)) > reach) continue;
+            if (!cuts.get(f).some(k => Math.abs(k.t - t) * L < 14)) cuts.get(f).push({ t, id: `${f.lane_id}@${cuts.get(f).length}`, p: c });
+            joins.push([e, cuts.get(f).find(k => Math.abs(k.t - t) * L < 14)]);
+        }
+        for (const g of foot) if (g !== f && g.kind === 'pavement' && g.lane_id > f.lane_id) {
+            const [r, w] = g.ends, e = sub(w, r), den = cross(d, e); if (Math.abs(den) < 1e-9) continue;
+            const t = cross(sub(r, p), e) / den, u = cross(sub(r, p), d) / den, Lg = len(e);
+            if (t * L < 14 || (1 - t) * L < 14 || u * Lg < 14 || (1 - u) * Lg < 14) continue;
+            const c = add(p, mul(d, t)), have_f = cuts.get(f).find(k => Math.abs(k.t - t) * L < 14), have_g = cuts.get(g).find(k => Math.abs(k.t - u) * Lg < 14);
+            const id = have_f?.id ?? have_g?.id ?? `${f.lane_id}x${g.lane_id}`;
+            if (!have_f) cuts.get(f).push({ t, id, p: have_g?.p ?? c }); if (!have_g) cuts.get(g).push({ t: u, id, p: have_f?.p ?? c });
+            if (have_f && have_g && have_f.id !== have_g.id) joins.push([{ id: have_f.id, p: have_f.p }, have_g]);
+        }
+    }
+    for (const f of foot) {
+        const [a, b] = ends.filter(x => x.f === f), stops = [{ t: 0, id: a.id, p: a.p }, ...cuts.get(f).sort((x, y) => x.t - y.t), { t: 1, id: b.id, p: b.p }];
+        for (const k of stops) node(k.id, k.p);
+        for (let i = 1; i < stops.length; i++) lanes.push({ lane_id: stops.length > 2 ? `${f.lane_id}.${i - 1}` : f.lane_id, from: stops[i - 1].id, to: stops[i].id, points: [], all: [stops[i - 1].p, stops[i].p].map(round), speed_limit: 60, profiles: [S.foot], two_way: true, kind: f.kind, ...(f.walkway_id ? { walkway_id: f.walkway_id } : {}) });
+    }
+    const joined = new Set();
+    for (const [e, k] of joins) { const key = [e.id, k.id].sort().join('~'); if (e.id === k.id || joined.has(key)) continue; joined.add(key); lanes.push({ lane_id: `link:${key}`, from: e.id, to: k.id, points: [], all: [e.p, k.p].map(round), speed_limit: 60, profiles: [S.foot], two_way: true, kind: 'link' }); }
     const degree = new Map(); for (const l of lanes) if (l.profiles.includes(S.foot)) for (const n of [l.from, l.to]) degree.set(n, (degree.get(n) ?? 0) + 1);
-    const ids = [...new Set(ends.map(e => e.id))].map(id => nodes.get(id)), linked = new Set();
+    const ids = [...new Set(ends.map(e => e.id))].map(id => nodes.get(id)), linked = joined;
     for (const a of ids) if (degree.get(a.node_id) === 1) {
         const others = ids.filter(b => b !== a && len(sub(a.position, b.position)) < S.join).sort((x, y) => len(sub(a.position, x.position)) - len(sub(a.position, y.position)));
         for (const b of others.slice(0, 2)) {
@@ -167,23 +202,38 @@ export function streetNetwork({ streets = null, pavements = [], crosswalks = [],
             lanes.push({ lane_id: `link:${key}`, from: a.node_id, to: b.node_id, points: [], all: [a.position, b.position], speed_limit: 60, profiles: [S.foot], two_way: true, kind: 'link' });
         }
     }
+    // Foot nodes at one spot are one node (a pavement's cut where another's end already is): their links go.
+    const same = new Map(), alias = new Map();
+    for (const l of lanes) if (l.profiles.includes(S.foot)) for (const id of [l.from, l.to]) {
+        const p = nodes.get(id).position, key = `${Math.round(p[0])},${Math.round(p[1])}`;
+        if (!same.has(key)) same.set(key, id); else if (same.get(key) !== id) alias.set(id, same.get(key));
+    }
+    if (alias.size) {
+        for (const l of lanes) { l.from = alias.get(l.from) ?? l.from; l.to = alias.get(l.to) ?? l.to; }
+        for (const id of alias.keys()) nodes.delete(id);
+        for (let i = lanes.length - 1; i >= 0; i--) if (lanes[i].from === lanes[i].to) lanes.splice(i, 1);
+    }
     // Where the cars cross a crosswalk they stop before it while someone is on it; those on foot wait for the red.
-    const crossings = [];
+    const crossings = [], by_junction = new Map();
+    for (const t of lanes) if (t.kind === 'turn' && t.signal_id) { if (!by_junction.has(t.junction)) by_junction.set(t.junction, []); by_junction.get(t.junction).push(t); }
+    for (const f of foot) if (f.walkway_id) f.box = box(f.poly);
     for (const f of foot) if (f.walkway_id) {
         const waits = new Set();
         for (const l of lanes) if (l.profiles.includes(S.car)) {
+            if (!overlaps(box(l.all), f.box)) continue;
             const span = through(l.all, f.poly); if (!span) continue;
             l.stops.push({ distance: Math.max(0, span[0] - S.stop_setback), walkway_id: f.walkway_id });
-            // The arm's own junction's signals for it: whichever junction the lane runs into or out of.
+            // At a junction those on foot cross while every way in has its red (the walk between the phases), so
+            // no car turns across them and none waits in the junction for them.
             const j = l.kind === 'road' ? (l.to_junction ?? l.from_junction) : null;
-            if (j) { const jr = out_junctions.find(x => x.junction_id === j); if (jr) { const lane_in = l.to_junction === j ? l : null, ph = lane_in ? null : null; for (const t of lanes) if (t.kind === 'turn' && t.junction === j && t.signal_id && (t.from === l.to || t.to === l.from)) waits.add(t.signal_id); } }
+            if (j) for (const t of by_junction.get(j) ?? []) waits.add(t.signal_id);
         }
         crossings.push({ walkway_id: f.walkway_id, lane_id: f.lane_id, waits_for: [...waits] });
     }
     // A signal's stop line: before the turn, or before a crosswalk the arm reaches just before it.
     for (const t of lanes) if (t.kind === 'turn' && t.signal_id) {
         const a = lanes.find(l => l.kind === 'road' && l.to === t.from), last = a.stops.filter(s => s.walkway_id).map(s => s.distance).filter(d => d > lengths(a.all).at(-1) - 160);
-        a.stops.push({ distance: Math.max(0, (last.length ? Math.min(...last) : lengths(a.all).at(-1) - S.stop_setback)), signal_id: t.signal_id, turn: t.lane_id });
+        a.stops.push({ distance: Math.max(0, (last.length ? Math.min(...last) : lengths(a.all).at(-1) - S.stop_setback)), signal_id: t.signal_id, turn: t.lane_id, clearance: Math.round(lengths(a.all).at(-1) - (last.length ? Math.min(...last) : lengths(a.all).at(-1)) + lengths(t.all).at(-1) + S.box_exit) });
     }
     for (const l of lanes) { l.stops?.sort((a, b) => a.distance - b.distance); delete l.all; }
     return { nodes: [...nodes.values()], lanes, junctions: out_junctions, crossings, size };

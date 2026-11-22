@@ -7,7 +7,7 @@ import { gameEntity, entityRecord, restoreEntity } from './entity.mjs';
 import { KINDS, MOTORS } from './elements.mjs';
 
 const UNSAFE = ['__proto__', 'constructor', 'prototype'];
-const SPAN_STEP = .5;   // world units a posed span moves before the body is told: breathing does not churn the broadphase
+const SPAN_STEP = 2;   // world units a posed span moves before the body is told: breathing and a walk's bob do not churn the broadphase
 function checkKind(kind, preset) {
     if (typeof kind !== 'string' || !kind || UNSAFE.includes(kind)) throw new TypeError('A kind is named by a non-empty string');
     const { body = {}, motor = null, awareness = false, ...rest } = preset ?? {};
@@ -118,7 +118,7 @@ export class gameElements {
     /** After its rig moves: an entity whose span comes from its components follows its pose (a crouch is shorter). */
     _rigPosed(entity) {
         const r = entityRecord(entity); if (!r.auto_span || !(r.data.components ?? []).some(c => c.joint)) return;
-        const next = scaleSpan(this.#posedSpan(r), r.world_scale[2]), now = r.body.getState().height_span;
+        const next = scaleSpan(this.#posedSpan(r), r.world_scale[2]), now = this.world._record(r.body).config.height_span;   // (read in place: a whole state copy each step for one field is waste)
         if (!next !== !now || next && (Math.abs(next[0] - now[0]) > SPAN_STEP || Math.abs(next[1] - now[1]) > SPAN_STEP)) this.world.updateBody(r.body, { height_span: next });
     }
     /**
