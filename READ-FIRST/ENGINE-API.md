@@ -85,10 +85,11 @@ An object is like Blender's `KX_GameObject`: a name, an id, a position, a rotati
 
 | Call | What it does | Today |
 | --- | --- | --- |
-| `createAgent(record, at)` | An object with a profile and a behaviour table | partly: cars and walkers are two separate systems |
-| `agent.goTo(place)` | Plans a route on the network and follows it | partly, twice over |
-| `profile: {network: 'foot' or 'car', speed, gap, …}` | What a car or a walker is, as data | missing |
-| `rules: [{when, do}]` | The behaviour table: sense, decide, act | missing as data; written as code per system |
+| `createAgent(record, at)` | An object with a profile and a behaviour table | partly: `agentSystem` makes cars and people on foot round the focus from profiles, through the game's `spawn` hook; there is no call for one agent yet |
+| `agent.goTo(place)` | Plans a route on the network and follows it | partly: agents plan their own trips on the one network; no call to send one somewhere |
+| `profile: {network: 'foot' or 'car', speed, gap, …}` | What a car or a walker is, as data | have: `AGENT_PROFILE`, from a map's `agents` record |
+| `signals: {green, clear, walk, hold, flash}` and `looks: {head, bar, strip}` | Junction lights and how they are drawn, as data | have: lights per junction, drawn from templates through the `place` hook |
+| `rules: [{when, do}]` | The behaviour table: sense, decide, act | missing as data; the one loop is written in code |
 
 ### Audio, saves, time
 
@@ -109,7 +110,7 @@ Controls, drawing and UI have their own sections below.
 
 ## Agents and navigation
 
-Cars and walkers are the same thing. Both sense what is around them, decide what to do, and move along a network. Today they are two systems: cars on the road network with lane occupancy, walkers on a separate sidewalk network with their own manager. That is why moving walkers over was hard: every fix had to be made twice, and the two had to be taught about each other at crosswalks.
+Cars and walkers are the same thing. Both sense what is around them, decide what to do, and move along a network. In classic they were two systems, cars on the road network and walkers on a separate sidewalk network, so every fix was made twice and the two had to be taught about each other at crosswalks. The Basement `agentSystem` now runs both on one network and one loop (see `src/engine/basement/agents/README.md`); what is left is the behaviour table as data.
 
 1. **One network.** Every map has one navigation network of nodes and lanes. Each lane lists the `profiles` that may use it, such as `foot` or `car`. A crosswalk is a lane both profiles share, and a signal on it is data.
 2. **One agent loop.** Every agent runs the same three steps each tick:
@@ -118,6 +119,8 @@ Cars and walkers are the same thing. Both sense what is around them, decide what
    - **Move**: a motor turns the decision into motion: steering and speed for a car, steps for a walker.
 3. **Car or walker is data.** A profile sets the network, speed, size, following gap and which rules apply. An enemy, a guard, a shopper or a boss is a profile too.
 4. **Following works the same for both.** An agent keeps a gap to whatever occupies its lane ahead, whether that is a car, a walker or the player.
+5. **Awareness is the spatial grid.** Whether a car is over a crossing, a car is still in a junction's box, or someone is in a walker's path is asked of the world's one spatial grid (`queryBounds` with a groups select). No system keeps its own list of what is where, as classic did for its crosswalks.
+6. **Lights are safe by construction.** A car heeds every stop on its route within stopping reach, so a light is never skipped because a crosswalk sits on its stop line. Walkers cross only on the walk and only while no car is over the crossing. The all-red holds while a car is in the box, and for a short `hold` while people are still crossing.
 
 The tuning already in `game-street-life.json` (`walk_close`, `crosswalk_reach`, `stop_before_walkway`) becomes profile and rule data.
 
@@ -179,6 +182,7 @@ One drawing contract in the Basement, with Canvas as its first backend and WebGL
 | `drawText`, `drawImage` | Words and pictures | have `drawText`; `drawImage` missing |
 | `fill` and `stroke`: a colour or a gradient (`linear`, `radial`) | How a shape is painted | have |
 | `shadow`, `blur`, `alpha`, `blend` on a step; `glow` and `ground_shadow` steps | Shadow, see-through, blending, light | have |
+| `cover: true` on a look layer | At night the layer hides the glow of anything drawn under it (a car over a lit stop bar), so ground light never shows through what stands on it | have |
 | `render.setEffects(stack)`, `render.setLayerEffects(layer, stack)`; `effects` presets in the Directory | Post effects on the whole picture or one layer, as data: colour grade, vignette, film grain, bloom, fog glow, star glow, bokeh | have on Canvas and WebGL |
 | `scene.draw(drawing, {at, rotation, scale, values})` | Draws a whole drawing in the object's local space, `group` steps nested, `"$name"` values from its look | have |
 | `material: "brass"` on a step | Names a material record: paint fields plus a physical `surface` (friction, restitution, hit sound, hit effect, footstep); unknown fields refused | have |
@@ -238,7 +242,7 @@ Each step makes later steps smaller. A step is done when the game uses the new c
 4. **UI system.** The overlay with items, states, styles and transitions; then the main menu, pause and its pages, and the HUD as data. (Done 2026-11-22: `basement/ui`, and the game's `screens.json`. Next: dialogue and the phone as screens.)
 5. **Objects.** One `createObject` from a catalog record, with parts switched on by data (done: look, materials, fitted bounds, surface). Next, every placement, light and character goes through it.
 6. **One map drawer.** Ground, buildings, plants and interiors drawn by one drawer that reads the map's sections and switches. Drop the city names. Spawn layout characters on load.
-7. **Agents and one network.** Merge the walker network into the navigation network with profiles. Run cars and walkers on one agent loop with behaviour tables.
+7. **Agents and one network.** Merge the walker network into the navigation network with profiles. Run cars and walkers on one agent loop with behaviour tables. (Done 2026-11-22: one network with lane profiles, one loop, junction lights and their looks as data. Next: the behaviour table as data, and `createAgent` and `goTo` for single agents.)
 8. **Audio and saves.** Built once each, on the game clock and the object properties.
 9. **Delete the classic path** in `reference/classic/` for each part as its native replacement ships.
 
