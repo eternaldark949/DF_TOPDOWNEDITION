@@ -25,6 +25,23 @@ test('the preview boots, loads every map and travels between the apartment and t
         await page.waitForFunction(() => window.preview?.active_level, null, { timeout: 60000 });
         const state = () => page.evaluate(() => ({ level: preview.active_level?.level_id, at: [...preview.basement.elements.getEntities({ kind: 'character' })[0].position], prompt: document.getElementById('prompt').classList.contains('show') ? document.getElementById('exit-label').textContent : null }));
         assert.equal((await state()).level, 'apt_949', 'it opens in the apartment');
+        // The main menu (engine UI, screens from data) is up over a paused game; Start New Game lets the game run.
+        const screens = () => page.evaluate(() => ({ stack: preview.ui.stack, paused: preview.paused, input: preview.basement.controls.input_context }));
+        await page.waitForFunction(() => preview.ui.isOpen('main'), null, { timeout: 10000 });
+        assert.deepEqual(await screens(), { stack: ['hud', 'main'], paused: true, input: 'menu' });
+        await page.keyboard.press('Enter'); await page.waitForFunction(() => !preview.ui.isOpen('main'));
+        assert.deepEqual(await screens(), { stack: ['hud'], paused: false, input: 'gameplay' });
+        // Escape pauses into the pause menu; down twice reaches Settings (inactive items are skipped), Enter opens it, and Escape twice returns to play.
+        await page.keyboard.press('Escape'); await page.waitForFunction(() => preview.ui.isOpen('pause'));
+        assert.deepEqual(await screens(), { stack: ['hud', 'pause'], paused: true, input: 'menu' });
+        await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
+        await page.waitForFunction(() => preview.ui.isOpen('pause.settings'));
+        const sky = await page.evaluate(() => preview.weather.state);
+        await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowRight');   // Weather: one choice on
+        await page.waitForFunction(sky => preview.weather.state !== sky, sky);
+        await page.keyboard.press('Escape'); await page.keyboard.press('Escape'); await page.waitForFunction(() => !preview.ui.isOpen('pause'));
+        assert.deepEqual(await screens(), { stack: ['hud'], paused: false, input: 'gameplay' });
+        assert.equal(await page.evaluate(() => document.querySelector('[data-ui-item="location"]').textContent), 'Silver Queen Apartments', 'the HUD reads the place it is in');
         // Every map from the picker.
         const maps = await page.evaluate(async () => {
             const out = {}, select = document.getElementById('maps');

@@ -1,6 +1,6 @@
 // ===== LV1 LOBBY =====
 // The game loop: time and order. It runs levels and systems through their hooks in a fixed order each
-// tick (input, before physics, physics, after physics, camera, then render), keeps the pause reasons,
+// tick (input, UI, before physics, physics, after physics, camera, then render), keeps the pause reasons,
 // loads and unloads levels between ticks, and drives the clock (levelLobby). It is handed the Basement's
 // running systems and the other jacks; it builds none of them and knows nothing about the game.
 import { levelLobby } from './level-lobby.mjs';
@@ -25,7 +25,7 @@ function failures(errors, message) { if (errors.length) throw new AggregateError
 
 
 export class gameLoop {
-    #engine; #jacks; #world; #step; #controls; #camera; #render; #clock; #time; #weather; #played = 0;
+    #engine; #jacks; #world; #step; #controls; #ui; #camera; #render; #clock; #time; #weather; #played = 0;
     #levels = new Map(); #systems = new Map(); #active = null; #persistent = new Set();
     #running = false; #destroyed = false; #phase = 'idle'; #loading = false; #pauses = new Map();
     #schedule; #cancel; #frame = null; #generation = 0;
@@ -42,7 +42,7 @@ export class gameLoop {
         if (typeof step_world !== 'function') throw new TypeError('The loop needs step_world');
         this.#engine = engine; this.#jacks = jacks; this.#step = step_world;
         const { physics, controls, camera, render } = jacks.basement;
-        this.#world = physics; this.#controls = controls; this.#camera = camera; this.#render = render;
+        this.#world = physics; this.#controls = controls; this.#ui = jacks.basement.ui ?? null; this.#camera = camera; this.#render = render;
         this.#world.rigs._setGuard(()=>{if(this.#phase==='render')throw new Error('Render hooks cannot change animation');});
         const config = { STEP_MS: this.#world.config.fixed_step * 1000, MAX_FRAME_MS: 100, MAX_STEPS: 6, GAME_SPEED: 1, ...clock };
         if (config.STEP_MS !== this.#world.config.fixed_step * 1000) throw new TypeError('Lobby and physics fixed steps must match');
@@ -215,7 +215,7 @@ export class gameLoop {
     }
     #pollControls() {
         this.#phase='input';
-        try { this.#controls.updateState(); }
+        try { this.#controls.updateState(); this.#ui?.updateState(); }   // UI runs paused or not: it is how a pause ends
         catch(error){this.stop();throw error;}
         finally{this.#phase='idle';}
     }
@@ -256,6 +256,7 @@ export class gameLoop {
                 attempt(errors, () => synchronous(entry.system.detach, entry.system, [entry.context])); this.#clean(entry.cleanups, errors);
             }
             this.#systems.clear(); this.#persistent.clear(); this.#pauses.clear();
+            attempt(errors, () => this.#ui?.dispose());
             attempt(errors, () => this.#controls.dispose());
             attempt(errors, () => this.#render.dispose());
             attempt(errors, () => this.#camera.stopFollowing());

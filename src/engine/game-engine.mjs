@@ -5,13 +5,14 @@
 import { physicsSystem } from './basement/physics/index.mjs';
 import { controlSystem } from './basement/controls/index.mjs';
 import { cameraSystem, renderSystem, canvasRenderer, recordingRenderer, webglRenderer } from './basement/rendering/index.mjs';
+import { uiSystem } from './basement/ui/index.mjs';
 import { gameLoop } from './lobby/game-loop.mjs';
 import { UNITS_PER_METRE, metres, centimetres, toMetres, isLength, readLength, readLengths } from './basement/units/index.mjs';
-import { assetLibrary, mergeDefinition, identifier, nonnegative, jsonCopy, STRUCTURES, validatePropCatalog, validateMapLayout, checkLook, validateSkeleton, validateClipSet, validateLocomotion, validateDoorKind, validateDrawing, validateMaterial, validateTexture, validateMap, mapDefinition, validateLibrary, doorKindsOf, ENGINE_LIBRARIES, createEngineRegistry, resolvePlacement, resolveLayout, resolvePropLook, isMovable } from './directory/index.mjs';
+import { assetLibrary, mergeDefinition, identifier, nonnegative, jsonCopy, STRUCTURES, validatePropCatalog, validateMapLayout, checkLook, validateSkeleton, validateClipSet, validateLocomotion, validateDoorKind, validateDrawing, validateMaterial, validateTexture, validateMap, mapDefinition, validateLibrary, doorKindsOf, screensOf, fontsOf, ENGINE_LIBRARIES, createEngineRegistry, resolvePlacement, resolveLayout, resolvePropLook, isMovable } from './directory/index.mjs';
 import { humanoid, objectPacket, createObject } from './penthouse/index.mjs';
 
 /** What each jack carries besides the running systems: the Directory's functions and the Penthouse's prefabs. */
-const DIRECTORY = Object.freeze({ assetLibrary, mergeDefinition, identifier, nonnegative, jsonCopy, STRUCTURES, validatePropCatalog, validateMapLayout, checkLook, validateSkeleton, validateClipSet, validateLocomotion, validateDoorKind, validateDrawing, validateMaterial, validateTexture, validateMap, mapDefinition, validateLibrary, doorKindsOf, ENGINE_LIBRARIES, createEngineRegistry, resolvePlacement, resolveLayout, resolvePropLook, isMovable });
+const DIRECTORY = Object.freeze({ assetLibrary, mergeDefinition, identifier, nonnegative, jsonCopy, STRUCTURES, validatePropCatalog, validateMapLayout, checkLook, validateSkeleton, validateClipSet, validateLocomotion, validateDoorKind, validateDrawing, validateMaterial, validateTexture, validateMap, mapDefinition, validateLibrary, doorKindsOf, screensOf, fontsOf, ENGINE_LIBRARIES, createEngineRegistry, resolvePlacement, resolveLayout, resolvePropLook, isMovable });
 const UNITS = Object.freeze({ UNITS_PER_METRE, metres, centimetres, toMetres, isLength, readLength, readLengths });
 const PENTHOUSE = Object.freeze({ humanoid, objectPacket, createObject });
 
@@ -22,7 +23,7 @@ const PENTHOUSE = Object.freeze({ humanoid, objectPacket, createObject });
 export class gameEngine {
     #authority = Symbol('runtime simulation clock'); #basement; #directory; #penthouse; #game; #loop;
 
-    constructor({ asset_library, physics = {}, controls = {}, camera = {}, clock = {}, time = {}, weather = {}, frame_clock, schedule_frame, cancel_frame, render = {}, render_target, services = {} } = {}) {
+    constructor({ asset_library, physics = {}, controls = {}, camera = {}, clock = {}, time = {}, weather = {}, frame_clock, schedule_frame, cancel_frame, render = {}, render_target, ui = {}, services = {} } = {}) {
         if (!services || typeof services !== 'object' || Array.isArray(services) || Object.keys(services).some(key => ['__proto__','constructor','prototype'].includes(key))) throw new TypeError('Game services are a plain object of named services');
         if (render_target !== undefined) throw new TypeError('Mount a renderer surface through basement.render.setRenderer; render hooks receive a frame');
         if (Object.hasOwn(physics, 'step_authority') || Object.hasOwn(physics, 'asset_library')) throw new TypeError('The runtime owns physics authority and its asset library');
@@ -38,8 +39,12 @@ export class gameEngine {
             if (previous && !previous.destroyed) world._emit('pointerLeave', { body: previous.body, entity: previous });
             if (hit) world._emit('pointerEnter', { body: hit.body, entity: hit.entity, position: hit.position });
         });
+        // The UI overlay: drawn into `ui.root`, or on a page into a layer of its own over everything; `ui: false` keeps state only.
+        const overlay = ui === false ? null : ui.root ?? (typeof document !== 'undefined' && document.body ? document.body.appendChild(Object.assign(document.createElement('div'), { className: 'engine-ui' })) : null);
+        if (overlay && !ui.root) Object.assign(overlay.style, { position: 'fixed', inset: '0', zIndex: '20' });
+        const screens = new uiSystem({ controls: input, root: overlay, values: ui.values ?? {}, pause: reason => this.pause(reason) });
         this.#basement = Object.freeze({ physics: world, elements: world.elements, rigs: world.rigs, motion: world.motion,
-            traffic: world.traffic, controls: input, camera: view, render: draw, units: UNITS });
+            traffic: world.traffic, controls: input, camera: view, render: draw, ui: screens, units: UNITS });
         this.#directory = Object.freeze({ ...DIRECTORY, assets: world.elements.asset_library });
         this.#penthouse = Object.freeze({ ...PENTHOUSE });
         this.#game = Object.freeze({ ...services });
@@ -48,8 +53,10 @@ export class gameEngine {
             step_world: seconds => world.updateState(seconds, authority), clock, time, weather, frame_clock,
             ...(schedule_frame !== undefined ? { schedule_frame } : {}), ...(cancel_frame !== undefined ? { cancel_frame } : {}) });
     }
-    /** LV0: the running systems (physics, elements, rigs, motion, traffic, controls, camera, render) and the units. */
+    /** LV0: the running systems (physics, elements, rigs, motion, traffic, controls, camera, render, ui) and the units. */
     get basement() { return this.#basement; }
+    /** LV0: the UI overlay (`basement.ui`): screens as data, opened along a stack. */
+    get ui() { return this.#basement.ui; }
     /** LV1: the game loop (its clock is `lobby.clock`). */
     get lobby() { return this.#loop; }
     /** The world's clock (`lobby.time`): the date and time of day, the day's phase and how dark it is. */

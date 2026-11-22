@@ -355,3 +355,16 @@ test('a click on an entity reaches it: pointerHit, and pointerEnter and pointerL
     assert.deepEqual(heard, ['pointerEnter', 'pointerHit:select', 'pointerLeave']);
     engine.dispose();
 });
+
+test('the UI runs in the input phase while paused: a pausing screen opens from a gameplay action, stops play and gives the controls back', async () => {
+    const e = runtime({ controls: { keymap: { pause: ['Escape'] }, event_target: null, document: null }, ui: false });
+    e.registerLevel('room', class extends gameLevel {}); await e.loadLevel('room'); e.start();
+    e.ui.define({ name: 'pause', modal: true, pauses_game: true, controls: 'menu', open_with: 'pause', items: [{ id: 'resume', type: 'button', text: 'Resume', on_click: { close: 'pause' } }] });
+    const controls = e.basement.controls, key = k => { controls.setInput('keyboard', k, true); controls.setInput('keyboard', k, false); };
+    key('Escape'); e.updateState();
+    assert.deepEqual([e.ui.stack, e.paused, e.pause_reasons, controls.input_context], [['pause'], true, ['ui:pause'], 'menu']);
+    assert.equal(e.updateState(), false, 'the world does not step while the menu pauses it');
+    key('Enter'); e.updateState();
+    assert.deepEqual([e.ui.stack, e.paused, controls.input_context], [[], false, 'gameplay']);
+    e.dispose();
+});

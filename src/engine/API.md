@@ -18,6 +18,7 @@ What the engine is meant to become is in [READ-FIRST/ENGINE-API.md](../../READ-F
   - [Rendering](#rendering)
   - [Camera](#camera)
   - [Controls](#controls)
+  - [UI](#ui)
 - [Lobby (LV1)](#lobby-lv1)
   - [The clock and pausing](#the-clock-and-pausing)
   - [The world's clock: time of day](#the-worlds-clock-time-of-day)
@@ -66,7 +67,7 @@ Each level plugs in through one jack. Every jack is frozen.
 
 | Jack | What it holds |
 |---|---|
-| `engine.basement` | The running systems: `physics`, `elements`, `rigs`, `motion`, `traffic`, `controls`, `camera`, `render`, and `units` |
+| `engine.basement` | The running systems: `physics`, `elements`, `rigs`, `motion`, `traffic`, `controls`, `camera`, `render`, `ui`, and `units` (`engine.ui` is `basement.ui`) |
 | `engine.lobby` | The game loop: levels, systems, pausing and the clock (`lobby.clock`) |
 | `engine.directory` | The data functions (`assetLibrary`, `validateMapLayout`, `resolvePlacement`, …) plus `assets`, this engine's registry |
 | `engine.penthouse` | The prefabs: `createObject`, `objectPacket`, `humanoid` |
@@ -423,15 +424,58 @@ if (hit?.entity.has('usable')) hit.entity.set('open', true);
 controls.hit({ property: 'usable', xray: true });     // what usable thing is under the mouse, through anything else
 ```
 
-Input contexts and rumble templates from the API spec are documented here when built.
+#### Input contexts
+
+Bindings come in named sets, one live at a time: `gameplay`, `menu`, `dialogue`, `vehicle`, or any name. The plain `keymap` is the `gameplay` context. The UI switches to `menu` while a menu is on top and back afterwards; a game switches for itself with `useContext`.
+
+```js
+new gameEngine({ controls: { contexts: { gameplay: { fire: ['mouseLeft'] }, vehicle: { brake: ['space'] } } } });
+controls.useContext('vehicle');
+```
+
+| Call | What it does |
+| --- | --- |
+| `controls.useContext(name)` / `controls.input_context` | Makes a context's bindings live (everything held is let go); the name of the live one |
+| `controls.defineContext(name, keymap)` | Adds or replaces one |
+
+A binding's type can be written by name in data: `["ArrowDown", "repeat"]`, `["e", "held", 0.6]` (`press`, `release`, `tap`, `doubletap`, `held`, `repeat`, `drag`).
+
+Rumble templates from the API spec are documented here when built.
 
 Reference: [controls README](basement/controls/README.md).
+
+### UI
+
+`engine.ui` is one overlay for every screen: main menu, pause and its pages, HUD, dialogue, phone. A screen is data: items, a layout, transitions, and switches such as `pauses_game` and `modal`. Screens open along a stack; the menu actions (keyboard, gamepad and mouse alike) move focus and press items; items read live values with `"{path}"` and do what their data says.
+
+```js
+ui.define({ name: 'pause', modal: true, pauses_game: true, controls: 'menu', open_with: 'pause',
+    items: [{ id: 'resume', type: 'button', text: 'Resume', on_click: { close: 'pause' } },
+            { id: 'music', type: 'toggle', text: 'Music', value: '{options.music}' },
+            { id: 'quit', type: 'button', text: 'Quit', on_click: { event: 'quit' } }] });
+ui.provide('clock', () => engine.time.text());          // "{clock}" now reads the game's clock
+ui.on('quit', () => engine.loadLevel('title'));
+ui.on('set', ({ path, value }) => settings.apply(path, value));
+```
+
+| Call | What it does |
+| --- | --- |
+| `ui.define(...screens)` | Adds screens from data (`screensOf(registry)` gives a registry's) |
+| `ui.open(name, data)` / `ui.back()` / `ui.close(name)` | Moves along the stack, with each screen's transitions |
+| `ui.focus(item)` / `ui.get(item)` / `ui.set(item, key, value)` / `ui.press(item)` | Reads or changes an item live |
+| `ui.setValue(path, value)` / `ui.getValue(path)` / `ui.provide(name, source)` | The values items read: a store, plus live game data by name |
+| `ui.on(event, fn)` | The game's own events (`{event: "save"}`) and `open`, `close`, `focus`, `click`, `change`, `set` |
+| `ui.addFonts(...fonts)` | Loads fonts (`fontsOf(registry)`) |
+
+Item types: `button`, `label`, `list`, `slider`, `toggle`, `image`, `bar`, `panel`, `input`. Verbs: `open`, `back`, `close`, `event`, `set`, `focus`. The game's own screens are in `src/game/data/libraries/screens.json`.
+
+Reference: [UI README](basement/ui/README.md).
 
 ---
 
 ## Lobby (LV1)
 
-The game loop. It owns time and runs every system in order each tick: input, before physics, physics, after physics, camera, then render.
+The game loop. It owns time and runs every system in order each tick: input, UI, before physics, physics, after physics, camera, then render.
 
 ### The clock and pausing
 

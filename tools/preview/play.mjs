@@ -4,13 +4,13 @@
 import { gameEngine } from '../../src/engine/game-engine.mjs';
 import { mapLevel } from '../../src/engine/lobby/runtime/map-level.mjs';
 import { travelSystem } from '../../src/engine/lobby/runtime/travel-system.mjs';
-import { createEngineRegistry, mapDefinition, doorKindsOf } from '../../src/engine/directory/index.mjs';
+import { createEngineRegistry, mapDefinition, doorKindsOf, screensOf, fontsOf } from '../../src/engine/directory/index.mjs';
 import { humanoid, objectPacket } from '../../src/engine/penthouse/index.mjs';
 
 const KEYMAP = {
     move_left: ['a', 'ArrowLeft'], move_right: ['d', 'ArrowRight'], move_up: ['w', 'ArrowUp'], move_down: ['s', 'ArrowDown'],
     interact: ['e', 'Enter', 'space', 'gamepadA', 'gamepadY', 'touchInteract'],
-    run: ['Shift', 'gamepadRBumper'], zoom_in: ['=', '+', 'gamepadDUp'], zoom_out: ['-', '_', 'gamepadDDown']
+    run: ['Shift', 'gamepadRBumper'], pause: ['Escape', 'p', 'gamepadStart'], zoom_in: ['=', '+', 'gamepadDUp'], zoom_out: ['-', '_', 'gamepadDDown']
 };
 const ZOOMS = [.5, .7, 1, 1.4, 2, 2.8];
 
@@ -34,7 +34,25 @@ export async function bootPreview({ libraries, hud }) {
     const look = registry.resolveTemplate('engine:humanoid').look;
     const person = new humanoid(physics, { position: [0, 0], name: 'walker', look: { ...look, lean: .35, values: { ...look.values, shirt: '#6b3fa0', hair: '#1d1520' } } });
     engine.retainEntity(person.entity);
-    let zoom = 3, speed = 1;
+    let zoom = 3, speed = 1, place = '';
+
+    // The screens: the game's main menu, pause menu and its pages and HUD, all data (src/game/data/libraries/screens.json).
+    // The preview hands them live values by name and hears what they set and ask for.
+    const ui = engine.ui;
+    ui.define(screensOf(registry)); ui.addFonts(fontsOf(registry)).catch(error => console.warn('A font did not load', error));
+    const titled = word => word ? word[0].toUpperCase() + word.slice(1) : '';
+    ui.provide('place', () => place).provide('clock', () => engine.time.text()).provide('weather', () => titled(engine.weather.state))
+      .provide('player', { health: 100, pp: 0 }).provide('saves', { can_save: false, slots: [] });
+    ui.setValue('options', { time_speed: 12, weather: engine.weather.state, zoom: ZOOMS[zoom], renderer: 'canvas', dev_bar: true });
+    ui.on('set', ({ path, value }) => {
+        if (path === 'options.time_speed') engine.time.setSpeed(value);
+        if (path === 'options.weather' && engine.weather.state !== value) engine.weather.set(value, 'normal');
+        if (path === 'options.zoom' && ZOOMS[zoom] !== value) setZoom(ZOOMS.indexOf(value));
+        if (path === 'options.renderer' && render.renderer_id !== value) switchRenderer(value).then(id => hud.rendered(id), error => { hud.error(error); ui.setValue('options.renderer', render.renderer_id); });
+        if (path === 'options.dev_bar') document.body.classList.toggle('no-bar', !value);
+    });
+    ui.on('new_game', () => ui.close('main'));
+    ui.on('exit', () => ui.close('main'));
 
     class mapPlace extends mapLevel {
         mapDefinition({ assets }) {
@@ -55,7 +73,8 @@ export async function bootPreview({ libraries, hud }) {
             const [w, h] = this.definition.size, top = this.definition.camera_bounds?.top ?? 0;
             camera.setBounds({ left: 0, top, right: w, bottom: h });
             camera.follow(person.entity, { smoothing: .12 });
-            hud.arrived(this.level_id, this.definition.label ?? this.level_id);
+            place = this.definition.label ?? this.level_id;
+            hud.arrived(this.level_id, place);
         }
     }
     for (const { id } of maps) engine.registerLevel(id, mapPlace);
@@ -80,7 +99,10 @@ export async function bootPreview({ libraries, hud }) {
             if (cx !== x || cy !== y) physics.updateBody(person.entity, { position: [cx, cy] });
         }
     });
-    const setZoom = k => { zoom = Math.max(0, Math.min(ZOOMS.length - 1, k)); camera.setView({ zoom: ZOOMS[zoom] }); hud.zoomed(ZOOMS[zoom]); };
+    const setZoom = k => { zoom = Math.max(0, Math.min(ZOOMS.length - 1, k)); camera.setView({ zoom: ZOOMS[zoom] }); hud.zoomed(ZOOMS[zoom]); if (ui.getValue('options.zoom') !== ZOOMS[zoom]) ui.setValue('options.zoom', ZOOMS[zoom]); };
+
+    // A backend that cannot start (no WebGL 2) leaves the old one drawing: its canvas goes back on the page.
+    async function switchRenderer(id) { const old = document.getElementById('view'); try { await render.setRenderer(id); } catch (error) { document.getElementById('view').replaceWith(old); throw error; } fit(); return render.renderer_id; }
 
     let busy = null;
     const go = async (target) => {
@@ -100,19 +122,20 @@ export async function bootPreview({ libraries, hud }) {
         pick: id => go(id),
         take: () => travel.exit?.available && go(),
         setTime: hhmm => engine.time.setTime({ time: hhmm }),
-        setSpeed: k => engine.time.setSpeed(k),
-        setWeather: (state, intensity) => engine.weather.set(state, intensity),
+        setSpeed: k => { engine.time.setSpeed(k); ui.setValue('options.time_speed', k); },
+        setWeather: (state, intensity) => { engine.weather.set(state, intensity); ui.setValue('options.weather', state); },
         zoom: d => setZoom(zoom + d),
         stick: (zone, knob) => controls.touch.stick('move', { zone, knob, anchor: 'touch', travel: 48 }),
         button: element => controls.touch.button(element, 'touchInteract'),
         clock: () => engine.time.text(),
         weather: () => ({ state: engine.weather.state, intensity: engine.weather.intensity }),
         where: () => person.entity.position,
-        // A backend that cannot start (no WebGL 2) leaves the old one drawing: its canvas goes back on the page.
-        renderer: async id => { const old = document.getElementById('view'); try { await render.setRenderer(id); } catch (error) { document.getElementById('view').replaceWith(old); throw error; } fit(); return render.renderer_id; }
+        renderer: async id => { const now = await switchRenderer(id); ui.setValue('options.renderer', now); return now; }
     });
     const start = decodeURIComponent(location.hash.slice(1)) || new URLSearchParams(location.search).get('map') || 'apt_949';   // (#sdc or ?map=sdc opens on that map)
     await go(maps.some(m => m.id === start) ? start : maps[0].id);
+    ui.open('hud');
+    if (!new URLSearchParams(location.search).has('nomenu')) ui.open('main');   // (?nomenu goes straight to walking)
     engine.start();
     return engine;
 }

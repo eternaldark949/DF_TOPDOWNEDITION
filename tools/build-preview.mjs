@@ -74,6 +74,9 @@ if (process.argv.includes('--check')) {
 const data = dir => readdirSync(join(ROOT, dir)).filter(f => f.endsWith('.json')).sort().map(f => JSON.parse(readFileSync(join(ROOT, dir, f), 'utf8')));
 // The game's libraries and maps, and the engine's example bar cart, which the apartment stands in its kitchen.
 const libraries = [JSON.parse(readFileSync(join(ROOT, 'src/engine/penthouse/examples/bar-cart.json'), 'utf8')), ...data('src/game/data/libraries'), ...data('src/game/data/maps')];
+// Fonts the screens name are files under the repository: each goes in the page as a data URL, so the page stays one file.
+for (const library of libraries) for (const resource of Object.values(library.resources ?? {}))
+    if (resource?.kind === 'font' && !/^(data:|https?:)/.test(resource.src)) resource.src = `data:font/${resource.src.split('.').pop()};base64,${readFileSync(join(ROOT, resource.src)).toString('base64')}`;
 // Inside a script element only "</script" could end it early; "<\/" means the same in JSON and in a string.
 const safe = text => text.replace(/<\/(script)/gi, '<\\/$1');
 const script = `"use strict";
