@@ -11,7 +11,11 @@ loop each step: sense (its lane ahead, the light it meets, the crosswalk), decid
 - **Someone on foot** walks the pavements and crossings of a foot route. Each keeps to the right of the way it walks by
   its own amount, so two ways pass and a crowd spreads. At a junction's crosswalk they wait on the kerb for the walk, each
   on a spot of their own set back from the road, then hold the crosswalk while they cross; a car stops before a crosswalk
-  that is in use.
+  that is in use. Every third step (staggered) each looks ahead through the world's grid for people, the player and props
+  (lamps, benches, planters; buildings and walls are left to collision), and steers round what is in its path: it keeps
+  to one side till past, the side it is already on (the right when square behind), within `room` of the way, and tries
+  the other side when that one has no room. Someone ahead going its way is followed rather than overtaken; with no way
+  round it waits, and the longer it is held up the further aside it may step.
 - **The lights** cycle each junction through its ways in, one at a time (straight on, right and left together, so no two
   green ways cross). An all-red clear comes between them, and once round there is a walk, when every way in is red and
   people cross. Junctions start at their own point in the cycle.
@@ -48,6 +52,9 @@ readAgents(record);                                    // a map's agents record 
 | `gap` | 12 | Kept to whatever is ahead in its lane |
 | `spacing` | 90 | No two are made closer than this |
 | `spread` | 18 | On foot, how far to the right of the way each keeps (up to) |
+| `avoid` | true | On foot, steers round people and props ahead (false: walks straight through, as collision allows) |
+| `look_ahead` | 48 | How far ahead it looks, in units |
+| `room` | 24 | How far either side of the way it may step to get round (a pavement's half width less a body) |
 | `template`, `looks` | null | What the game makes it from, for `spawn` |
 
 | Setting (`AGENTS`) | Default | Meaning |
@@ -63,11 +70,11 @@ Lobby runtime's README).
 
 ## Cost
 
-Measured in the engine preview on the city (Chromium, software canvas, 1280×800), 14 cars and 26 people:
+Measured in the engine preview on the city (Chromium, software canvas, 1280×800), 14 cars and 26 people, the people steering round each other:
 
 | Per 60 Hz step | ms |
 |---|---|
-| The agents' own loop (sense, decide, lights, trips) | about 0.4 |
+| The agents' own loop (sense through the grid, steer, lights, trips) | about 0.3 |
 | Physics with them, the people's rigs animated (without them: 0.1) | about 2.8 |
 | The light grid after physics at night | about 0.4 |
 

@@ -75,3 +75,25 @@ test('an agents record is checked: unknown fields and bad numbers are refused', 
     assert.throws(() => readAgents({ settings: { radius: 3 }, profiles: {} }), /unknown setting radius/);
     assert.throws(() => readAgents({ profiles: { cars: { count: -1 } } }), /count is a number/);
 });
+
+test('people on foot steer round posts on the pavement and round each other, instead of walking into them', () => {
+    const contacts = avoid => {
+        const { physics, agents, run } = world({ people: { network: 'foot', count: 24, speed: 70, avoid } }, { seed: 7 });
+        // A post in the middle of every pavement between junctions, and one more a third of the way along.
+        const posts = [];
+        for (const c of [400, 1200, 2000, 2800]) for (const m of [800, 1600, 2400, 640, 1440, 2240]) for (const at of [[m, c - 70], [m, c + 70], [c - 70, m], [c + 70, m]])
+            posts.push(physics.elements.createEntity({ kind: 'static', position: at, collision_shape: { shape_type: 'circle', radius: 6 } }));
+        agents.populate({ focus: [1600, 1600] });
+        let touching = 0;
+        const step = () => { for (const a of agents.agents) for (const p of posts) if (Math.hypot(a.entity.position[0] - p.position[0], a.entity.position[1] - p.position[1]) < 14.5) touching++; };
+        for (let t = 0; t < 30; t += 1 / 30) { run(1 / 30); step(); }
+        const people = agents.agents.map(a => a.entity.position); let close = 0;
+        for (let i = 0; i < people.length; i++) for (let j = i + 1; j < people.length; j++) if (Math.hypot(people[i][0] - people[j][0], people[i][1] - people[j][1]) < 15) close++;
+        const trips = agents.getStatistics().trips; agents.dispose();
+        return { touching, close, trips };
+    };
+    const blind = contacts(false), aware = contacts(true); if (process.env.SHOW) console.log(JSON.stringify({ blind, aware }));
+    assert.ok(blind.touching > 30, `without avoidance they walk into the posts (${blind.touching} steps touching)`);
+    assert.ok(aware.touching < blind.touching / 8, `with it they go round (${aware.touching} steps touching, ${blind.touching} without)`);
+    assert.ok(aware.trips >= blind.trips * .8, `and still get where they are going (${aware.trips} trips, ${blind.trips} without)`);
+});

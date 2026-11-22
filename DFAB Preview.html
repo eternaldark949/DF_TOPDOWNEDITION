@@ -14222,6 +14222,9 @@ const AGENT_PROFILE = Object.freeze({
     gap: 12,                 // kept to whatever is ahead in its lane
     spacing: 90,             // no two are made closer than this
     spread: 18,              // on foot, how far to the right of the way each keeps (up to)
+    avoid: true,             // on foot, steers round what is in its way (people, the player, props) instead of walking into it
+    look_ahead: 48,          // how far ahead it looks for what is in its way
+    room: 24,                // how far either side of the way it may step to get round
     template: null,          // what the game makes it from (read by `spawn`, not here)
     looks: null              // the looks to pick from (read by `spawn`)
 });
@@ -14245,7 +14248,8 @@ function readAgents(record, where = 'agents') {
     for (const [name, p] of Object.entries(record.profiles)) {
         if (!plain(p)) throw new TypeError(`${where}.profiles.${name} is a profile`);
         for (const key of Object.keys(p)) if (!Object.hasOwn(AGENT_PROFILE, key)) throw new TypeError(`${where}.profiles.${name}: unknown field ${key} (one of ${Object.keys(AGENT_PROFILE).join(', ')})`);
-        for (const key of ['count', 'speed', 'gap', 'spacing', 'spread']) if (p[key] !== undefined && !(Number.isFinite(p[key]) && p[key] >= 0)) throw new TypeError(`${where}.profiles.${name}.${key} is a number (>= 0)`);
+        if (p.avoid !== undefined && typeof p.avoid !== 'boolean') throw new TypeError(`${where}.profiles.${name}.avoid is true or false`);
+        for (const key of ['count', 'speed', 'gap', 'spacing', 'spread', 'look_ahead', 'room']) if (p[key] !== undefined && !(Number.isFinite(p[key]) && p[key] >= 0)) throw new TypeError(`${where}.profiles.${name}.${key} is a number (>= 0)`);
         if (p.looks !== undefined && p.looks !== null && !(Array.isArray(p.looks) && p.looks.every(plain))) throw new TypeError(`${where}.profiles.${name}.looks is a list of look values`);
     }
     return record;
@@ -14254,6 +14258,12 @@ const hash = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = M
 const random = seed => () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const inside = (p, v, margin) => v && p[0] > v[0] - margin && p[0] < v[2] + margin && p[1] > v[1] - margin && p[1] < v[3] + margin;
+const SENSE_EVERY = 3;                 // steps between a walker's looks ahead (they are staggered)
+const TURNS = [.45, .9, 1.3, 1.6];   // the headings tried to a side, nearest the way first (radians off it; plus is right)
+const GRID_PEOPLE = Object.freeze({ groups: 2, skip: 0, loose: false, instances: false });
+const GRID_THINGS = Object.freeze({ groups: 1 | 8, skip: 0, loose: false, instances: false });
+const BIG = 160;                       // wider than this both ways: a building or wall, left to collision
+const KEEP = Object.freeze({ angle: 0, pace: 1 });
 const base = id => id.endsWith(':reverse') ? id.slice(0, -8) : id;
 
 /**
@@ -14264,7 +14274,7 @@ const base = id => id.endsWith(':reverse') ? id.slice(0, -8) : id;
  */
 class agentSystem {
     #physics; #net; #lanes = new Map(); #crossing = new Map(); #signals = new Map(); #junctions; #spawn; #remove;
-    #pool = new Map(); #agents = []; #time = 0; #serial = 0; #rand; #stats = { made: 0, gone: 0, trips: 0, no_route: 0, ms: 0 };
+    #boxes = []; #near = []; #pool = new Map(); #agents = []; #time = 0; #serial = 0; #rand; #stats = { made: 0, gone: 0, trips: 0, no_route: 0, ms: 0 };
     constructor(physics, { network, profiles = {}, spawn, remove = null, ...settings } = {}) {
         if (!physics?.navigation?.roads || !physics.traffic) throw new TypeError('agentSystem needs a physicsSystem with navigation and traffic');
         if (!network?.lanes) throw new TypeError('agentSystem needs a street network (streetNetwork)');
@@ -14352,7 +14362,7 @@ class agentSystem {
     #make(name, profile, focus, view, anywhere = false) {
         const at = this.#place(profile, focus, view, anywhere); if (!at) return false;
         const handle = this.#spawn(name, profile, { position: at.position, rotation: at.rotation }); if (!handle) return false;
-        const entity = handle.entity ?? handle, a = { id: ++this.#serial, name, profile, handle, entity, car: profile.network === 'car', side: 4 + this.#rand() * profile.spread, focus, state: 'new', route_id: null, way: null, step: 0, on: null, spot: null };
+        const entity = handle.entity ?? handle, a = { id: ++this.#serial, name, profile, handle, entity, car: profile.network === 'car', side: 4 + this.#rand() * profile.spread, sense_in: Math.floor(this.#rand() * SENSE_EVERY), steer: KEEP, focus, state: 'new', route_id: null, way: null, step: 0, on: null, spot: null };
         this.#agents.push(a); this.#stats.made++;
         if (!this.#trip(a, focus)) { this.#take(a); return false; }
         return true;
@@ -14452,15 +14462,86 @@ class agentSystem {
             if (red(crossing) && dist(here, leg.from) < 26) { motor.setMovement([0, 0]); a.state = 'waiting'; return; }
             traffic.enterWalkway(crossing.walkway_id, a.entity); a.on = crossing.walkway_id;
         }
-        // Keep the gap to anyone just ahead on the way, else walk on.
-        let pace = a.profile.speed;
-        for (const o of this.#agents) {
-            if (o === a || o.car) continue;
-            const ox = o.entity.position[0] - here[0], oy = o.entity.position[1] - here[1], ahead = (ox * dx + oy * dy) / d;
-            if (ahead > 0 && ahead < 22 + a.profile.gap && Math.abs((ox * dy - oy * dx) / d) < 12) pace = Math.min(pace, a.profile.speed * (o.state === 'waiting' ? .3 : .6));   // (round one waiting, slowly: it stands to one side)
+        // Sense what is in the way and steer round it (or follow it, if it goes our way); else walk on.
+        let ux = dx / d, uy = dy / d, pace = a.profile.speed;
+        if (a.profile.avoid !== false) {
+            if (!(a.sense_in-- > 0)) { a.sense_in = SENSE_EVERY - 1; a.steer = this.#steer(a, leg, [ux, uy]); }
+            const { angle, pace: k } = a.steer, c = Math.cos(angle), sn = Math.sin(angle);
+            [ux, uy] = [ux * c - uy * sn, ux * sn + uy * c]; pace *= k;
         }
-        motor.setMovement([dx / d, dy / d], { speed: pace, face_movement: true });
+        motor.setMovement(pace > 0 ? [ux, uy] : [0, 0], { speed: pace, face_movement: true });
         a.state = pace > 0 ? 'walking' : 'waiting';
+    }
+    /**
+     * Sense and decide for one walker. Sense: the spatial grid gives what is near (people, the player, lamps, benches,
+     * planters); each is its box, grown by the walker's own size. Decide: the way ahead clear, straight on; something
+     * going its way, follow it, slower; else the first clear heading of a few to one side, kept to that side till past
+     * (the side it is on of what is in the way, the right when square behind it, so two people meeting both step
+     * right), within `room` of the way by the time it is level; that side without room, the other. None clear, the one
+     * that gets furthest, slowly, or wait; held up, it may step further aside and try both sides. Buildings and walls (anything wider than BIG both ways) are left to collision: the pavements run beside
+     * them, and a building's box would cover its forecourt. Returns { angle, pace } (radians off the way, a share of speed).
+     */
+    #steer(a, leg, dir) {
+        const physics = this.#physics, here = a.entity.position, look = a.profile.look_ahead, room = a.profile.room, self = a.entity.body;
+        // Its own size from its collision shape (a rig's drawn bounds are wider, arms and all).
+        a.radius ??= (() => { const c = a.entity.collision_shape ?? {}; return Math.max(3, c.radius ?? (c.dimensions ? Math.min(...c.dimensions) / 2 : 8)); })();
+        const r = a.radius, reach = look + r, boxes = this.#boxes; boxes.length = 0;
+        const area = { left: here[0] - reach, right: here[0] + reach, top: here[1] - reach, bottom: here[1] + reach };
+        // People (and the player) are their body's middle and about its own size, not the box round their swinging arms.
+        for (const body of physics.spatial_grid.queryBounds(area, this.#near, GRID_PEOPLE)) {
+            if (body === self) continue;
+            const bb = physics.getBodyBounds(body), cx = (bb.left + bb.right) / 2, cy = (bb.top + bb.bottom) / 2, k = 1.9 * r;   // two people about its size
+            const box = [cx - k, cy - k, cx + k, cy + k]; if (!(here[0] > box[0] && here[0] < box[2] && here[1] > box[1] && here[1] < box[3])) { box.body = body; boxes.push(box); }
+        }
+        // Lamps, benches, planters, props: their boxes. Buildings and walls are left to collision.
+        for (const body of physics.spatial_grid.queryBounds(area, this.#near, GRID_THINGS)) {
+            const bb = physics.getBodyBounds(body);
+            if (bb.right - bb.left > BIG && bb.bottom - bb.top > BIG) continue;
+            const box = [bb.left - r, bb.top - r, bb.right + r, bb.bottom + r];
+            if (here[0] > box[0] && here[0] < box[2] && here[1] > box[1] && here[1] < box[3]) continue;   // already against it: collision parts them
+            box.body = body; boxes.push(box);
+        }
+        if (!boxes.length) return KEEP;
+        const lx = leg.to[0] - leg.from[0], ly = leg.to[1] - leg.from[1], ln = Math.hypot(lx, ly) || 1;
+        const off = p => ((p[0] - leg.from[0]) * ly - (p[1] - leg.from[1]) * lx) / ln;   // signed distance from the way's line
+        let need = look, past = look, wide = room + (a.held ?? 0) * r;   // how far a heading must be clear, where it is judged past, and how far aside it may go (wider the longer it has been held up)
+        const probe = angle => {
+            const c = Math.cos(angle), sn = Math.sin(angle), vx = dir[0] * c - dir[1] * sn, vy = dir[0] * sn + dir[1] * c;
+            // Stepping aside may take it up to `room` from the way (and further only back towards it), by the time it is past.
+            if (angle) { const end = Math.abs(off([here[0] + vx * past, here[1] + vy * past])); if (end > wide && end > Math.abs(off(here))) return { clear: -1 }; }
+            let clear = look, hit = null;
+            for (const box of boxes) {   // where the walker's path enters the grown box (the slab test)
+                let t0 = 0, t1 = clear;
+                for (const [p, v, lo, hi] of [[here[0], vx, box[0], box[2]], [here[1], vy, box[1], box[3]]]) {
+                    if (Math.abs(v) < 1e-9) { if (p < lo || p > hi) { t0 = Infinity; break; } continue; }
+                    const ta = (lo - p) / v, tb = (hi - p) / v; t0 = Math.max(t0, Math.min(ta, tb)); t1 = Math.min(t1, Math.max(ta, tb));
+                }
+                if (t0 <= t1 && t0 < clear) { clear = t0; hit = box; }
+            }
+            return { clear, hit };
+        };
+        const ahead = probe(0);
+        if (ahead.clear >= look) { a.held = 0; a.pass = 0; return KEEP; }
+        // Going our way, about as fast: follow it at a distance rather than weave round it.
+        const v = ahead.hit.body.linear_velocity;
+        if (v && v[0] * dir[0] + v[1] * dir[1] > a.profile.speed * .4) return { angle: 0, pace: ahead.clear > a.profile.gap ? .8 : .35 };
+        need = Math.min(look * .9, ahead.clear + 4 * r); past = Math.min(need, ahead.clear + r);
+        let best = { angle: 0, clear: ahead.clear };
+        // It keeps to one side till past: the side it is already on of what is in the way (the right when square behind it).
+        if (!a.pass) { const h = ahead.hit, q = ((h[0] + h[2]) / 2 - here[0]) * -dir[1] + ((h[1] + h[3]) / 2 - here[1]) * dir[0]; a.pass = q > r / 4 ? -1 : 1; }
+        // Its side; the other when its side has no room, or after it has been held up a while.
+        for (let sides = 0; sides < 2; sides++) {
+            let roomy = false;
+            for (const turn of TURNS) {
+                const angle = turn * a.pass, { clear } = probe(angle);
+                if (clear >= need) return { angle, pace: 1 };
+                if (clear >= 0) roomy = true;
+                if (clear > best.clear) best = { angle, clear };
+            }
+            if (sides || roomy && !(a.held > 1)) break; a.pass = -a.pass;
+        }
+        if (best.clear < r / 2) { a.held = Math.min(4, (a.held ?? 0) + 1); return { angle: 0, pace: 0 }; }
+        return { angle: best.angle, pace: Math.max(.25, best.clear / look) };
     }
     dispose() {
         for (const a of [...this.#agents]) this.#take(a);
