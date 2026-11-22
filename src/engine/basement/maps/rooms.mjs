@@ -19,7 +19,9 @@ export class roomGraph {
         for (const [id, room] of Object.entries(definition.rooms ?? {})) {
             const rects = (room.rects ?? [{ x: room.x, y: room.y, w: room.w, h: room.h }]).map(r => ({ x: r.x, y: r.y, w: r.w, h: r.h }));
             const x0 = Math.min(...rects.map(r => r.x)), y0 = Math.min(...rects.map(r => r.y)), x1 = Math.max(...rects.map(r => r.x + r.w)), y1 = Math.max(...rects.map(r => r.y + r.h));
-            this.#rooms.set(id, { id, type: room.type ?? 'indoor', label: room.label ?? id, rects, bounds: { left: x0, top: y0, right: x1, bottom: y1 }, flags: {} });
+            const fill = room.fill ?? null;
+            if (fill !== null && !(Number.isFinite(fill) && fill >= 0 && fill <= 1)) throw new RangeError(`Room ${id}: fill is how dark it stands with its lights on, 0 to 1`);
+            this.#rooms.set(id, { id, type: room.type ?? 'indoor', label: room.label ?? id, fill, rects, bounds: { left: x0, top: y0, right: x1, bottom: y1 }, flags: {} });
             this.#adjacent.set(id, []);
         }
         const add = (rooms, link) => {
@@ -37,7 +39,7 @@ export class roomGraph {
         (definition.room_links ?? []).forEach((l, i) => add(l.rooms, { link_id: l.link_id ?? `link_${i}`, kind: 'opening', openness: clamp01(l.openness ?? 1) }));
     }
 
-    /** Room records `{id, type, label, rects, bounds, flags}` (read-only views; use setFlag to change flags). */
+    /** Room records `{id, type, label, fill, rects, bounds, flags}` (read-only views; use setFlag to change flags). `fill`: how dark the room stands with its lights on (0..1), or null. */
     get rooms() { return [...this.#rooms.values()]; }
     room(id) { return this.#rooms.get(id) ?? null; }
     contains(id, [x, y]) { const r = this.#rooms.get(id); return !!r && r.rects.some(rect => inside(rect, x, y)); }

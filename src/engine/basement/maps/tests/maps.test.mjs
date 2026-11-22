@@ -313,6 +313,10 @@ test('lights are declared one way on a lamp, a placement or a catalog type, and 
     assert.throws(() => declaredLight({ radius: 10, shadows: 'soft' }), /shadows/);
     assert.deepEqual(declaredLight({ radius: 150, glow: .3, intensity: 0, animation: { kind: 'stutter', period: 9 } }).animation, { kind: 'stutter', period: 9, burst: .9, depth: .7, offset: 0 }, 'a faulty lamp stutters now and then');
     assert.equal(declaredLight({ size: [60, 3], rotation: .4 }).rotation, .4, 'a strip can be turned');
+    const lamp2 = declaredLight({ radius: 300, inner_radius: 10, cut: [[0, 1], [.45, .45], [1, 0]], glow_stops: [[0, '#fff'], [1, 'rgba(0,0,0,0)']] });
+    assert.deepEqual([lamp2.inner_radius, lamp2.cut[1], lamp2.glow_stops[0]], [10, [.45, .45], [0, '#fff']], 'how its light falls off, when it says');
+    assert.equal('cut' in declaredLight({ radius: 5 }), false, 'and nothing when it does not');
+    assert.throws(() => declaredLight({ radius: 5, cut: [[0, 1]] }), /cut/); assert.throws(() => declaredLight({ radius: 5, glow_stops: [[0, 1], [1, 2]] }), /glow_stops/);
 });
 
 test('floors are drawing steps in map space, walls take a drawn look, and a placement can name a catalog object', () => {

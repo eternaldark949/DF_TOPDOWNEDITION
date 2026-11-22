@@ -36,7 +36,7 @@ const methods=['initialize','resize','render','registerResource','releaseResourc
  */
 export class renderSystem {
     #createSurface=null;#lean=null;#still=true;#texturesPainted=0;#textures=new Map();#texturesWanted=[];#textureChain=Promise.resolve();#world;#camera;#frame=new renderFrame();#renderers=new Map();#resources=new Map();#backend=null;#backendId=null;#surface=null;
-    #effects=Object.freeze([]);#layerEffects=new Map();#collecting=false;#busy=false;#disposed=false;#generation=0;#last=null;#surfaceListeners=new Set();#frameListeners=new Set();#requirements=[];#visible=[];#over=[];#lightsMemo=null;#groupsOff=new Set();
+    #effects=Object.freeze([]);#layerEffects=new Map();#collecting=false;#busy=false;#disposed=false;#generation=0;#last=null;#surfaceListeners=new Set();#frameListeners=new Set();#requirements=[];#visible=[];#over=[];#lightsMemo=null;#groupsOff=new Set();#shadows=null;#shadowCache=new WeakMap();
     constructor({physics_system,camera,create_surface=null}={}){if(create_surface!==null&&typeof create_surface!=='function')throw new TypeError('create_surface makes a surface for a renderer id');this.#createSurface=create_surface;if(!physics_system?.queryEntitiesInBounds||!camera?.getView)throw new TypeError('renderSystem requires native world and camera');this.#world=physics_system;this.#camera=camera;}
     get renderer_id(){return this.#backendId;}
     get disposed(){return this.#disposed;}
@@ -192,9 +192,44 @@ export class renderSystem {
         this.#live();const memo=this.#lightsMemo;
         if(this.#collecting&&memo&&memo.blend===blend&&memo.margin===margin)return memo.lights.slice();
         const view=this.heightViewAt(blend),out=[];
-        for(const {entity} of this.getVisibleEntities({blend,margin},[]))if(entity&&(!this.#groupsOff.size||this.lightGroupOn(lightGroupOf(entity))))out.push(...entityLights(entity,{pose:entity.getRenderState?.(blend)??null,view}));
+        for(const {entity} of this.getVisibleEntities({blend,margin},[]))if(entity&&(!this.#groupsOff.size||this.lightGroupOn(lightGroupOf(entity)))){
+            const lights=entityLights(entity,{pose:entity.getRenderState?.(blend)??null,view});
+            if(this.#shadows)lights.forEach((l,i)=>this.#shade(entity,i,l));
+            out.push(...lights);
+        }
         this.#lightsMemo=this.#collecting?{blend,margin,lights:out}:null;
         return out.slice();
+    }
+    /**
+     * Turns lights' shadows on or off (a map's `lighting` switch turns them on). On, every point light a thing carries
+     * that says `shadows` 'static' (walls and other still bodies that block light) or 'dynamic' (moving ones too) is
+     * limited to what it can reach: the world's getVisibilityPolygon from where it stands on the ground, at the height
+     * it shines from, shifted with it when it leans. Each polygon is kept, the same array, until the light moves,
+     * changes its reach or something that blocks light changes near it (getLightRevision), so a still lamp's light
+     * stays in the cached tiles. `settings`: true, or {resolution} (rays round each light, default 96); null or false
+     * turns them off. Returns whether they are on.
+     */
+    setLightShadows(settings){
+        this.#live();
+        if(settings===null||settings===false||settings===undefined){this.#shadows=null;}
+        else{const resolution=settings===true?96:settings.resolution??96;if(!(Number.isInteger(resolution)&&resolution>=8&&resolution<=4096))throw new RangeError('Light shadows resolution is a whole number of rays, 8 to 4096');this.#shadows={resolution};}
+        this.#shadowCache=new WeakMap();this.#lightsMemo=null;return !!this.#shadows;
+    }
+    /** Whether lights cast shadows (setLightShadows). */
+    get light_shadows(){return !!this.#shadows;}
+    // A light's polygon from its kept one, or cast again when it moved, its reach changed or a blocker near it changed.
+    #shade(entity,i,l){
+        if(l.shape!=='point'||(l.shadows!=='static'&&l.shadows!=='dynamic')||!l.origin||!(l.radius>0))return;
+        let kept=this.#shadowCache.get(entity);if(!kept)this.#shadowCache.set(entity,kept=[]);
+        const [ox,oy]=l.origin,r=l.radius,h=l.at_height??0,dx=l.position[0]-ox,dy=l.position[1]-oy,rev=this.#world.getLightRevision({origin:l.origin,radius:r});
+        let k=kept[i];
+        if(!k||k.x!==ox||k.y!==oy||k.r!==r||k.h!==h||k.kind!==l.shadows||k.rev!==rev){
+            const cast=this.#world.getVisibilityPolygon({origin:l.origin,radius:r,resolution:this.#shadows.resolution,...(h>0?{at_height:h}:{}),...(l.shadows==='static'?{include_moving:false}:{})});
+            k=kept[i]={x:ox,y:oy,r,h,kind:l.shadows,rev,points:cast.points,dx:NaN,dy:NaN,polygon:null};
+        }
+        if(k.points.length<3)return;
+        if(k.dx!==dx||k.dy!==dy){k.dx=dx;k.dy=dy;k.polygon=dx||dy?k.points.map(([x,y])=>[x+dx,y+dy]):k.points;}   // (a new array only when the lean moves it)
+        l.polygon=k.polygon;
     }
     /**
      * The night over the open frame, after drawLooks: one light layer pass (createLightLayerParts) over the view,
