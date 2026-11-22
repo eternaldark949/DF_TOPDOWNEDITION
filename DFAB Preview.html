@@ -312,7 +312,7 @@ function bodyConfig(packet = {}) {
         position: vector(p.position ?? [0, 0]), rotation: number(p.rotation ?? 0, 'rotation'),
         linear_velocity: vector(p.linear_velocity ?? [0, 0]), angular_velocity: number(p.angular_velocity ?? 0, 'angular_velocity'),
         mass: number(p.mass ?? 1, 'mass', 1e-7),
-        friction: number(p.friction ?? 0.5, 'friction', 0), restitution: number(p.restitution ?? 0, 'restitution', 0, 1),
+        friction: number(p.friction ?? (type === 'character' ? 0 : 0.5), 'friction', 0), restitution: number(p.restitution ?? 0, 'restitution', 0, 1),
         linear_damping: number(p.linear_damping ?? 0, 'linear_damping', 0), angular_damping: number(p.angular_damping ?? 0, 'angular_damping', 0),
         collision_group: mask(p.collision_group ?? BODY_GROUP.PROP, 'collision_group'),
         collision_mask: mask(p.collision_mask ?? BODY_GROUP.ALL, 'collision_mask'), query_mask: mask(p.query_mask ?? BODY_GROUP.ALL, 'query_mask'),
@@ -5685,6 +5685,31 @@ class physicsSystem {
         }
     }
     #collisionBounds(r) { return sweptBounds(r); }
+    #findContact(a, b, sweep) {
+        let contact = collisionDetector.contact(a.shape, pose(a), b.shape, pose(b));
+        if (sweep && (a.config.continuous_collision || b.config.continuous_collision)) {
+            const pa = a.config.physics_type === 'static' ? pose(a) : previousPose(a), pb = b.config.physics_type === 'static' ? pose(b) : previousPose(b);
+            const start = collisionDetector.contact(a.shape, pa, b.shape, pb);
+            // Touching and approaching is a t=0 hit, not permission to tunnel through the solid.
+            if (start && !contact) {
+                const stepAt = (r, p) => {
+                    const d = sub(r.position, p.position), angle = r.rotation - p.rotation, off = sub(start.world_point, p.position);
+                    return [d[0] - angle * off[1], d[1] + angle * off[0]];
+                };
+                // Only the body whose own step carries it into the other is rewound; one already
+                // moving away (a pushed leaf turning on its pivot) keeps its step.
+                const into = (r, p, sign) => r.config.physics_type !== 'static' && sign * dot(stepAt(r, p), start.normal) > EPS;
+                const sa = stepAt(a, pa), sb = stepAt(b, pb), relative = sub(sb, sa);
+                if (dot(relative, start.normal) < -EPS) contact = { ...start, fraction: 0, rewind: [into(a, pa, 1), into(b, pb, -1)] };
+            } else if (!start) {
+                // First impact gives the entry normal even if the step ends past the
+                // obstacle's midpoint, where a discrete overlap would push out the far side.
+                const impact = collisionDetector.sweep(a.shape, pa, pose(a), b.shape, pb, pose(b));
+                if (impact && (!contact || dot(impact.normal, contact.normal) <= 0)) contact = impact;
+            }
+        }
+        return contact;
+    }
     #collide(moving, iteration) {
         let candidates;
         const revision=this.spatial_grid.revision,cache=this.#candidateCache;
@@ -5703,38 +5728,35 @@ class physicsSystem {
             const a = this._record(ha), b = this._record(hb);
             if (!this.#meets(a, b) || a.motor instanceof projectileMotor || b.motor instanceof projectileMotor) continue;
             this.#stats.narrow_checks++;
-            let contact = collisionDetector.contact(a.shape, pose(a), b.shape, pose(b));
-            if (!contact && iteration === 0 && (a.config.continuous_collision || b.config.continuous_collision)) {
-                const pa = a.config.physics_type === 'static' ? pose(a) : previousPose(a), pb = b.config.physics_type === 'static' ? pose(b) : previousPose(b);
-                const start = collisionDetector.contact(a.shape, pa, b.shape, pb);
-                // Touching and approaching is a t=0 hit, not permission to tunnel through the solid.
-                if (start) {
-                    const stepAt = (r, p) => {
-                        const d = sub(r.position, p.position), angle = r.rotation - p.rotation, off = sub(start.world_point, p.position);
-                        return [d[0] - angle * off[1], d[1] + angle * off[0]];
-                    };
-                    // Only the body whose own step carries it into the other is rewound; one already
-                    // moving away (a pushed leaf turning on its pivot) keeps its step.
-                    const into = (r, p, sign) => r.config.physics_type !== 'static' && sign * dot(stepAt(r, p), start.normal) > EPS;
-                    const sa = stepAt(a, pa), sb = stepAt(b, pb), relative = sub(sb, sa);
-                    if (dot(relative, start.normal) < -EPS) contact = { ...start, fraction: 0, rewind: [into(a, pa, 1), into(b, pb, -1)] };
-                } else contact = collisionDetector.sweep(a.shape, pa, pose(a), b.shape, pb, pose(b));
-            }
+            const contact = this.#findContact(a, b, iteration === 0);
             if (contact) contacts.push({ a, b, contact });
         }
         contacts.sort((a, b) => (a.contact.fraction ?? 1) - (b.contact.fraction ?? 1) || a.a.id - b.a.id || a.b.id - b.b.id);
         let changed = false;
+        const corrected = new Set();
         for (const entry of contacts) {
             const { a, b } = entry; let c = entry.contact;
             const sensor = a.config.ghost || b.config.ghost;
+            // An earlier impact can shorten either body's sweep. Recheck the later hit against the
+            // clipped motion so an obstacle or sensor behind it can't act on a path that was never taken.
+            if (c.fraction !== undefined && (corrected.has(a) || corrected.has(b))) {
+                this.#stats.narrow_checks++;
+                c = this.#findContact(a, b, true);
+                if (!c) continue;
+            }
             if (c.fraction !== undefined && !sensor) {
                 for (const [i, r] of [a, b].entries()) if (r.config.physics_type !== 'static' && (c.rewind?.[i] ?? true)) {
                     r.position = add(r.previous_position, scale(sub(r.position, r.previous_position), c.fraction));
                     r.rotation = r.previous_rotation + (r.rotation - r.previous_rotation) * c.fraction;
+                    corrected.add(r);
                 }
-            } else c = collisionDetector.contact(a.shape, pose(a), b.shape, pose(b));
+            } else if (c.fraction === undefined) c = collisionDetector.contact(a.shape, pose(a), b.shape, pose(b));
             if (!c) continue;
             const response = sensor ? {} : contactSolver.resolve(a, b, c);
+            if (!sensor && c.penetration_depth > EPS) {
+                corrected.add(a);
+                corrected.add(b);
+            }
             if (!sensor && (c.penetration_depth > 1e-5 || c.fraction !== undefined || response.normal_impulse > EPS)) changed = true;
             this.#report(a, b, c, response);
             if (!sensor) {

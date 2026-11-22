@@ -50,7 +50,7 @@ Constructor options:
 | `physics_type` | `rigid` for a generic body/vehicle/projectile; `character` for characters. |
 | `linear_velocity`, `angular_velocity` | `[0,0]`, `0`; units/s and radians/s. |
 | `mass` | `1`, strictly positive and finite. Static/kinematic effective inverse mass is zero. |
-| `friction`, `restitution` | `0.5`, `0`; nonnegative friction, restitution in 0–1. |
+| `friction`, `restitution` | Nonnegative friction defaults to `0` for characters and `0.5` for other bodies. Restitution defaults to `0` and ranges from 0 to 1. |
 | `linear_damping`, `angular_damping` | `0`, `0`; nonnegative exponential decay rates per second. |
 | `collision_group`, `collision_mask`, `query_mask` | Default role group, `BODY_GROUP.ALL`, `BODY_GROUP.ALL`. |
 | `height_span` | `null` (every height) or `[base, top]` above the ground in world units. Two bodies touch only when their spans overlap, as well as their masks allowing it: a shot at 1.5 m passes over a 1 m wall, a car under a bridge deck. An entity made of components gets the span its solid layers fill unless the packet gives one, and keeps following them as they change. |
