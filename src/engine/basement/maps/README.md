@@ -84,7 +84,7 @@ The map system uses the world's one spatial grid and navigation field. It never 
 
 `streetNetwork(map, settings)` turns a map's `streets` (`roads` as centrelines with `lanes` each way and a
 `lane_width`, and `intersections`), `pavements` and `crosswalks` into one navigation network, as data: `{nodes, lanes,
-junctions, crossings}`, ready for `physics.navigation.roads` and the [agents](../agents/README.md).
+junctions, crossings, signals}`, ready for `physics.navigation.roads` and the [agents](../agents/README.md).
 
 - **Roads.** Each road is cut into arms by the junctions it passes through (the authored ones, and one where a road's end
   meets another road). Each arm has a lane per lane each way, driven on the right (`kind: 'road'`).
@@ -97,11 +97,19 @@ junctions, crossings}`, ready for `physics.navigation.roads` and the [agents](..
   linked to the nearest end within `join`. Ends at one spot are one node.
 - **Stops.** A car lane's `stops` are its stop line before each turn's light (`{distance, signal_id, turn, clearance}`, set
   before a crosswalk just ahead of the junction) and each crosswalk it crosses (`{distance, walkway_id}`). `crossings`
-  lists each crosswalk's walkway and the lights it waits for: every light of its junction, so people cross in the walk.
+  lists each crosswalk's walkway and the lights it waits for: every light of its junction (of the two an arm runs
+  between, the nearer: its cars come through that one's lights), so people cross in the walk. Each also has its `area`
+  (`{left, top, right, bottom}`), the `junctions` it is at, and `strips`: a line along each kerb it meets, a little in
+  from its ends and sides, where a walk light is drawn.
+- **Junctions and lights.** Each junction has its box (`area`). `signals` lists every light where it stands: `{signal_id,
+  junction_id, bar: [[x, y], [x, y]], head: [x, y], rotation}`, its stop bar across its way in just behind the line (from
+  the centre line to the kerb) and its head on the kerb beside it, turned the way the cars come in.
 
 `STREETS` holds the settings: `lane_width` 60, `speed_limit` 180, `turn_speed` 90, `turn_samples` 6, `straight_angle`
 .6, `join` 120, `stop_setback` 4, `box_exit` 110 (how far past a junction a car needs room, and the crosswalk clear,
-before it goes in), and the lane profiles `car` and `foot`.
+before it goes in), `bar_back` 8 and `bar_inset` 5 (a stop bar behind its line, and in from the centre line and the
+kerb), `head_at` [6, 22] (a head on from its bar and out past the kerb), `strip_inset` [3, 7] (a walk strip in from a
+crossing's ends and sides), and the lane profiles `car` and `foot`.
 
 ## API
 

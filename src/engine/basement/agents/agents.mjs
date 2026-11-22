@@ -30,7 +30,8 @@ export const AGENTS = Object.freeze({
     gone: 1900,              // and go once further than this
     trip: [700, 2400],       // how far a trip is, as the crow flies
     per_step: 2,             // at most this many appear each step
-    signals: Object.freeze({ green: 7, clear: 2, walk: 8 }),   // seconds each way in is green, the all-red between, and the walk (every way red) once round
+    signals: Object.freeze({ green: 7, clear: 2, walk: 8, hold: 6, flash: 2 }),   // seconds each way in is green, the all-red between, the walk (every way red) once round, how much longer the all-red may hold while the junction or its crossings are still in use, and the end of the walk when nobody starts across
+    looks: Object.freeze({ head: null, bar: null, strip: null }),   // what the lights look like: templates for a light's head, its stop bar and a crossing's walk strips (none drawn when null)
     seed: 1
 });
 
@@ -40,6 +41,8 @@ export function readAgents(record, where = 'agents') {
     if (!plain(record) || Object.keys(record).some(k => k !== 'settings' && k !== 'profiles') || !plain(record.profiles)) throw new TypeError(`${where} is {settings?, profiles: {name: profile}}`);
     for (const key of Object.keys(record.settings ?? {})) if (!Object.hasOwn(AGENTS, key)) throw new TypeError(`${where}.settings: unknown setting ${key} (one of ${Object.keys(AGENTS).join(', ')})`);
     for (const key of Object.keys(record.settings?.signals ?? {})) if (!Object.hasOwn(AGENTS.signals, key)) throw new TypeError(`${where}.settings.signals: unknown ${key} (one of ${Object.keys(AGENTS.signals).join(', ')})`);
+    for (const [key, v] of Object.entries(record.settings?.signals ?? {})) if (!(Number.isFinite(v) && v >= 0)) throw new TypeError(`${where}.settings.signals.${key} is seconds (>= 0)`);
+    for (const [key, v] of Object.entries(record.settings?.looks ?? {})) { if (!Object.hasOwn(AGENTS.looks, key)) throw new TypeError(`${where}.settings.looks: unknown ${key} (one of ${Object.keys(AGENTS.looks).join(', ')})`); if (v !== null && typeof v !== 'string') throw new TypeError(`${where}.settings.looks.${key} is a template id or null`); }
     for (const [name, p] of Object.entries(record.profiles)) {
         if (!plain(p)) throw new TypeError(`${where}.profiles.${name} is a profile`);
         for (const key of Object.keys(p)) if (!Object.hasOwn(AGENT_PROFILE, key)) throw new TypeError(`${where}.profiles.${name}: unknown field ${key} (one of ${Object.keys(AGENT_PROFILE).join(', ')})`);
@@ -53,6 +56,9 @@ const hash = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = M
 const random = seed => () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
 const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 const inside = (p, v, margin) => v && p[0] > v[0] - margin && p[0] < v[2] + margin && p[1] > v[1] - margin && p[1] < v[3] + margin;
+const GRID_CARS = Object.freeze({ groups: 4, skip: 0, loose: false, instances: false });
+const NOT_BY_LINE = 160;              // no car is made this near the end of a lane into a junction
+const LOOKS_EVERY = 30;                // steps between looks for the lights round the focus to place or take away
 const SENSE_EVERY = 3;                 // steps between a walker's looks ahead (they are staggered)
 const TURNS = [.45, .9, 1.3, 1.6];   // the headings tried to a side, nearest the way first (radians off it; plus is right)
 const GRID_PEOPLE = Object.freeze({ groups: 2, skip: 0, loose: false, instances: false });
@@ -63,24 +69,26 @@ const base = id => id.endsWith(':reverse') ? id.slice(0, -8) : id;
 
 /**
  * The life of a street network: `new agentSystem(physics, {network, profiles: {name: profile}, spawn(name, profile,
- * {position, rotation}) → entity | {entity, updateState?, remove?}, remove?(handle), ...settings})`. It lays the
+ * {position, rotation}) → entity | {entity, updateState?, remove?}, remove?(handle), place?(template, {position,
+ * rotation, values}) → entity, ...settings})`. It lays the
  * network's lanes into `physics.navigation.roads`; `updateState(seconds, {focus: [x, y], view?: [left, top, right,
  * bottom]})` runs a step; `dispose()` takes every agent away and clears the lanes and lights.
  */
 export class agentSystem {
-    #physics; #net; #lanes = new Map(); #crossing = new Map(); #signals = new Map(); #junctions; #spawn; #remove;
+    #physics; #net; #lanes = new Map(); #crossing = new Map(); #signals = new Map(); #light = new Map(); #junctions; #junction = new Map(); #spawn; #remove; #placeLook;
+    #carOn = new Map(); #looks_in = 0; #looking = new Set();
     #boxes = []; #near = []; #pool = new Map(); #agents = []; #time = 0; #serial = 0; #rand; #stats = { made: 0, gone: 0, trips: 0, no_route: 0, ms: 0 };
-    constructor(physics, { network, profiles = {}, spawn, remove = null, ...settings } = {}) {
+    constructor(physics, { network, profiles = {}, spawn, remove = null, place = null, ...settings } = {}) {
         if (!physics?.navigation?.roads || !physics.traffic) throw new TypeError('agentSystem needs a physicsSystem with navigation and traffic');
         if (!network?.lanes) throw new TypeError('agentSystem needs a street network (streetNetwork)');
         if (typeof spawn !== 'function') throw new TypeError('agentSystem needs a spawn(name, profile, pose) hook');
         for (const key of Object.keys(settings)) if (!Object.hasOwn(AGENTS, key)) throw new TypeError(`agents: unknown setting ${key}`);
-        this.settings = Object.freeze({ ...AGENTS, ...settings, signals: Object.freeze({ ...AGENTS.signals, ...settings.signals }) });
+        this.settings = Object.freeze({ ...AGENTS, ...settings, signals: Object.freeze({ ...AGENTS.signals, ...settings.signals }), looks: Object.freeze({ ...AGENTS.looks, ...settings.looks }) });
         this.profiles = Object.freeze(Object.fromEntries(Object.entries(profiles).map(([name, p]) => {
             for (const key of Object.keys(p)) if (!Object.hasOwn(AGENT_PROFILE, key)) throw new TypeError(`agents.${name}: unknown field ${key}`);
             return [name, Object.freeze({ ...AGENT_PROFILE, ...p })];
         })));
-        this.#physics = physics; this.#net = network; this.#spawn = spawn; this.#remove = remove; this.#rand = random(this.settings.seed);
+        this.#physics = physics; this.#net = network; this.#spawn = spawn; this.#remove = remove; this.#placeLook = place; this.#rand = random(this.settings.seed);
         const roads = physics.navigation.roads;
         for (const n of network.nodes) roads.addNode(n.node_id, n);
         for (const l of network.lanes) { roads.addLane(l.lane_id, l); this.#lanes.set(l.lane_id, l); }
@@ -92,33 +100,110 @@ export class agentSystem {
             const a = nodes.get(l.from), b = nodes.get(l.to), points = [a, ...l.points, b];
             for (const p of l.profiles) { if (!this.#pool.has(p)) this.#pool.set(p, []); this.#pool.get(p).push({ lane: l, points }); }
         }
-        // The lights: each junction's phases in turn, each followed by the clear; junctions start at their own point.
+        // The lights: each junction's phases in turn (a green for each way in, then the walk), each followed by the
+        // all-red clear; junctions start at their own point of the round.
         const { green, clear, walk } = this.settings.signals;
         this.#junctions = network.junctions.map(j => {
-            const spans = [...j.phases.map(ids => ({ ids, seconds: green })), ...(walk > 0 ? [{ ids: [], seconds: walk }] : [])];
-            const cycle = spans.reduce((s, p) => s + p.seconds + clear, 0);
-            return { spans, cycle, offset: (hash(j.junction_id) % 1000) / 1000 * cycle };
+            const spans = [...j.phases.map(ids => ({ ids, seconds: green, walk: false })), ...(walk > 0 ? [{ ids: [], seconds: walk, walk: true }] : [])];
+            let t = (hash(j.junction_id) % 1000) / 1000 * spans.reduce((s, p) => s + p.seconds + clear, 0), i = 0, clearing = false;
+            for (;;) { if (t < spans[i].seconds) break; t -= spans[i].seconds; if (t < clear) { clearing = true; break; } t -= clear; i = (i + 1) % spans.length; }
+            const rec = { id: j.junction_id, position: j.position, area: j.area ?? null, spans, i, t, clearing, crossings: [], signals: [], looks: null };
+            this.#junction.set(rec.id, rec); return rec;
         });
+        for (const c of network.crossings) for (const id of c.junctions ?? []) this.#junction.get(id)?.crossings.push(c);
+        for (const s of network.signals ?? []) this.#junction.get(s.junction_id)?.signals.push(s);
         this.#lights(0);
     }
     get agents() { return this.#agents.map(a => ({ name: a.name, entity: a.entity, state: a.state })); }
     getStatistics() { return { ...this.#stats, agents: this.#agents.length, by_profile: Object.fromEntries(Object.keys(this.profiles).map(n => [n, this.#agents.filter(a => a.name === n).length])) }; }
-    /** A light's state now: 'go' or 'stop'. */
+    /** A light's state for the traffic now: 'go' or 'stop'. */
     getSignal(signal_id) { return this.#signals.get(signal_id) ?? 'stop'; }
-    #lights(time) {
-        const clear = this.settings.signals.clear;
+    /** What a light shows now: 'go', 'amber' (its green just ended: the all-red after it) or 'stop'. */
+    getLight(signal_id) { return this.#light.get(signal_id) ?? 'stop'; }
+    /** A crossing's walk light now: 'walk', 'flash' (the walk is ending: nobody starts across) or 'wait'. Unlit crossings always walk. */
+    getWalk(walkway_id) {
+        const c = this.#net.crossings.find(x => x.walkway_id === walkway_id); return c ? this.#walkLight(c) : 'wait';
+    }
+    #walkLight(c) {
+        let out = 'walk';
+        for (const id of c.junctions ?? []) { const j = this.#junction.get(id); if (!j) continue; const w = this.#junctionWalk(j); if (w === 'wait') return 'wait'; if (w === 'flash') out = 'flash'; }
+        return out;
+    }
+    #junctionWalk(j) { const s = j.spans[j.i]; return !s.walk || j.clearing ? 'wait' : s.seconds - j.t <= this.settings.signals.flash ? 'flash' : 'walk'; }
+    /**
+     * Each junction's lights move on: a green or the walk runs its seconds, then every light is red for `clear`
+     * seconds, and longer while a car is still in the junction (the spatial grid) or (up to `hold` more) anyone is
+     * still on its crossings, so the next way in or the walk never starts into them.
+     */
+    #lights(seconds) {
+        const { clear, hold } = this.settings.signals;
         for (const j of this.#junctions) {
-            let t = (time + j.offset) % j.cycle, on = null;
-            for (const s of j.spans) { if (t < s.seconds) { on = s; break; } t -= s.seconds; if (t < clear) break; t -= clear; }
-            for (const s of j.spans) for (const id of s.ids) {
-                const state = s === on ? 'go' : 'stop';
-                if (this.#signals.get(id) !== state) { this.#signals.set(id, state); this.#physics.traffic.setSignal(id, state); }
-            }
+            j.t += seconds;
+            if (!j.clearing && j.t >= j.spans[j.i].seconds) { j.t -= j.spans[j.i].seconds; j.clearing = true; }
+            if (j.clearing && j.t >= clear && !(j.area && this.#carIn(j.area, 0)) && (j.t >= clear + hold || this.#crossingsClear(j))) { j.clearing = false; j.t = 0; j.i = (j.i + 1) % j.spans.length; }
+            this.#show(j);
+        }
+    }
+    /** Nobody on the junction's crossings. */
+    #crossingsClear(j) {
+        const traffic = this.#physics.traffic;
+        for (const c of j.crossings) if (traffic.getWalkway(c.walkway_id).length) return false;
+        return true;
+    }
+    /** Is a car's body over `area` (shrunk by `inset`)? Asked of the spatial grid. */
+    #carIn(area, inset) {
+        const physics = this.#physics, a = { left: area.left + inset, top: area.top + inset, right: area.right - inset, bottom: area.bottom - inset };
+        for (const body of physics.spatial_grid.queryBounds(a, this.#near, GRID_CARS)) {
+            const b = physics.getBodyBounds(body); if (b.right > a.left && b.left < a.right && b.bottom > a.top && b.top < a.bottom) return true;
+        }
+        return false;
+    }
+    /** May someone on foot start across `c` now: its walk light walks and no car is on it (asked once a step). */
+    #mayCross(c) {
+        if (this.#walkLight(c) !== 'walk') return false;
+        let on = this.#carOn.get(c.walkway_id); if (on === undefined) this.#carOn.set(c.walkway_id, on = this.#carIn(c.area ?? { left: 0, top: 0, right: 0, bottom: 0 }, 2));
+        return !on;
+    }
+    /** Sets each of the junction's lights (for the traffic and for its looks) and its crossings' walk looks. */
+    #show(j) {
+        const span = j.spans[j.i];
+        for (const s of j.spans) for (const id of s.ids) {
+            const light = s === span ? (j.clearing ? 'amber' : 'go') : 'stop', go = light === 'go' ? 'go' : 'stop';
+            if (this.#signals.get(id) !== go) { this.#signals.set(id, go); this.#physics.traffic.setSignal(id, go); }
+            if (this.#light.get(id) !== light) { this.#light.set(id, light); for (const l of j.looks ?? []) if (l.signal_id === id) this.#lookShows(l); }
+        }
+        const walk = this.#junctionWalk(j);
+        if (j.walk !== walk) { j.walk = walk; for (const l of j.looks ?? []) if (l.walkway_id) this.#lookShows(l); }
+    }
+    /** A look's properties from its light: a head's or a bar's `go`, `amber` and `red`, a walk strip's `walk`, `flash` and `wait` (one of them set). */
+    #lookShows(l) {
+        const set = (k, v) => { if (!!l.entity.get(k) !== v) l.entity.set(k, v); };
+        if (l.signal_id) { const light = this.getLight(l.signal_id); set('go', light === 'go'); set('amber', light === 'amber'); set('red', light === 'stop'); }
+        else { const w = this.#walkLight(l.crossing); set('walk', w === 'walk'); set('flash', w === 'flash'); set('wait', w === 'wait'); }
+    }
+    /**
+     * The lights' looks round the focus (with `settings.looks` and a `place(template, {position, rotation, values})`
+     * hook): each light's head and stop bar and each crossing's walk strips, placed for the junctions within `far` and
+     * taken away past `gone`. A bar and a strip lie along their own x, from the value `left` to `right`.
+     */
+    #placeLooks(focus) {
+        const L = this.settings.looks; if (!this.#placeLook || !(L.head || L.bar || L.strip)) return;
+        const { far, gone } = this.settings;
+        for (const j of this.#junctions) {
+            const d = dist(j.position, focus);
+            if (j.looks && d > gone) { for (const l of j.looks) l.entity.destroy?.(); j.looks = null; this.#looking.delete(j); continue; }
+            if (j.looks || d > far) continue;
+            j.looks = []; this.#looking.add(j);
+            const line = ([p, q]) => ({ position: [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2], rotation: Math.atan2(q[1] - p[1], q[0] - p[0]), values: { left: -dist(p, q) / 2, right: dist(p, q) / 2 } });
+            const put = (template, pose, rec) => { if (!template) return; const entity = this.#placeLook(template, pose); if (entity) { const l = { entity, ...rec }; j.looks.push(l); this.#lookShows(l); } };
+            for (const s of j.signals) { put(L.head, { position: s.head, rotation: s.rotation, values: {} }, { signal_id: s.signal_id }); put(L.bar, line(s.bar), { signal_id: s.signal_id }); }
+            for (const c of j.crossings) if (c.junctions[0] === j.id) for (const strip of c.strips ?? []) put(L.strip, line(strip), { walkway_id: c.walkway_id, crossing: c });
         }
     }
     updateState(seconds, { focus, view = null } = {}) {
         const t0 = performance.now();
-        this.#time += seconds; this.#lights(this.#time);
+        this.#time += seconds; this.#carOn.clear(); this.#lights(seconds);
+        if (focus && !(this.#looks_in-- > 0)) { this.#looks_in = LOOKS_EVERY - 1; this.#placeLooks(focus); }
         if (focus) {
             // Those far behind go; the rest sense, decide and move.
             for (const a of [...this.#agents]) if (a.entity.destroyed || dist(a.entity.position, focus) > this.settings.gone) this.#take(a);
@@ -149,6 +234,8 @@ export class agentSystem {
             const p = [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u], d = dist(p, focus);
             if (d > far || (!anywhere && (d < near || inside(p, view, 80)))) continue;
             if (this.#agents.some(o => dist(o.entity.position, p) < profile.spacing)) continue;
+            // (no car is made where the lights could not stop it: past its stop line, or too near it to stop)
+            if (profile.network === 'car' && lane.to_junction && dist(p, points.at(-1)) < NOT_BY_LINE) continue;
             const reverse = lane.two_way && this.#rand() < .5;
             return { lane, position: p, rotation: Math.atan2((b[1] - a[1]) * (reverse ? -1 : 1), (b[0] - a[0]) * (reverse ? -1 : 1)) };
         }
@@ -238,10 +325,9 @@ export class agentSystem {
         }
         if (!leg) { if (!this.#trip(a, a.focus)) this.#take(a); else this.#walk(a, seconds); return; }
         const to = target(leg), dx = to[0] - here[0], dy = to[1] - here[1], d = Math.hypot(dx, dy) || 1;
-        // Coming up to a crossing: wait on the kerb while the road it crosses has a green, then hold the crosswalk.
-        const red = c => c.waits_for.some(id => this.getSignal(id) === 'go');
+        // Coming up to a crossing: wait on the kerb until its walk light walks and no car is on it, then hold the crosswalk.
         const next = a.way[a.step + 1], ahead_crossing = next && this.#crossing.get(next.lane), crossing = this.#crossing.get(leg.lane);
-        if (ahead_crossing && d < 40 && red(ahead_crossing)) {
+        if (ahead_crossing && d < 40 && !this.#mayCross(ahead_crossing)) {
             // Waiting for the walk: a spot of its own on the kerb, set back from the road and along the crossing's
             // width, so a crowd stands spread along the kerb and clear of the turning cars.
             if (!a.spot) {
@@ -254,7 +340,7 @@ export class agentSystem {
         }
         a.spot = null;
         if (crossing && a.on !== crossing.walkway_id) {
-            if (red(crossing) && dist(here, leg.from) < 26) { motor.setMovement([0, 0]); a.state = 'waiting'; return; }
+            if (!this.#mayCross(crossing) && dist(here, leg.from) < 26) { motor.setMovement([0, 0]); a.state = 'waiting'; return; }
             traffic.enterWalkway(crossing.walkway_id, a.entity); a.on = crossing.walkway_id;
         }
         // Sense what is in the way and steer round it (or follow it, if it goes our way); else walk on.
@@ -342,6 +428,8 @@ export class agentSystem {
         for (const a of [...this.#agents]) this.#take(a);
         for (const id of this.#signals.keys()) this.#physics.traffic.setSignal(id, 'stop');
         this.#signals.clear();
+        for (const j of this.#looking) { for (const l of j.looks) l.entity.destroy?.(); j.looks = null; }
+        this.#looking.clear();
         // Its lanes and nodes out of the roads (and the world's grid), whatever else they hold.
         const roads = this.#physics.navigation.roads, ids = [];
         for (const l of this.#lanes.values()) { ids.push(l.lane_id); if (l.two_way) ids.push(`${l.lane_id}:reverse`); }

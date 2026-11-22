@@ -70,7 +70,12 @@ export class mapLevel extends gameLevel {
         if (!record || !(on.traffic || on.walkers)) return null;
         const profiles = Object.fromEntries(Object.entries(record.profiles ?? {}).filter(([, p]) => (p.network ?? 'car') === 'car' ? on.traffic : on.walkers));
         if (!Object.keys(profiles).length) return null;
-        return new agentSystem(context.basement.physics, { network: streetNetwork(definition), profiles, spawn: (name, profile, pose) => this.makeAgent(context, name, profile, pose), ...(record.settings ?? {}) });
+        return new agentSystem(context.basement.physics, { network: streetNetwork(definition), profiles, spawn: (name, profile, pose) => this.makeAgent(context, name, profile, pose), place: (template, pose) => this.makeStreetLook(context, template, pose), ...(record.settings ?? {}) });
+    }
+    /** Makes one of the lights' looks (a head, a stop bar, a walk strip: `settings.looks`) at `{position, rotation, values}`, its values over the template's look. */
+    makeStreetLook(context, template, { position, rotation, values }) {
+        const elements = context.basement.physics.elements, look = elements.asset_library?.resolveTemplate?.(template)?.look ?? {};
+        return elements.createEntity({ template, position, rotation, look: { ...look, values: { ...look.values, ...values } } });
     }
     /**
      * Makes one agent at `pose` ({position, rotation}): by default an entity of its profile's `template`, in one of its

@@ -222,7 +222,8 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,
         let sides=[],top=key;
         if(view&&layer.sides&&z1>z0){sides=drawSides(steps,place,values,sidesPaint(layer.sides,values,materials),view,z0,z1,{...layer.sides,facade:layer.facade,scale:layer.thickness>0?(z1-z0)/layer.thickness:1,screen,shines,slope:layer.slope??null,solid:fills});if(whole({c}))for(const packet of sides)packet.depth=0;else top=key+z1-z0;}
         // with `covers` (a height), a walled part whose top stands over it gives its silhouette too: where the night comes back over the light on the ground
-        const cover=covers!==null&&view&&layer.sides&&layer.cover!==false&&z1>covers&&!c.joint&&!lean?coverOf(steps,place,values,layer.sides.follow??'shapes',view,z0,z1):null;
+        // (one marked `cover: true` gives it however low it stands, as a veil: only over glowing ground under it, a car on a lit stop bar)
+        const low=layer.cover===true&&!(z1>covers),cover=covers!==null&&view&&layer.sides&&layer.cover!==false&&(z1>covers||low)&&!c.joint&&!lean?coverOf(steps,place,values,layer.sides.follow??'shapes',view,z0,z1):null;
         const solid=fills?partSolid(steps,values,place,view,z1,z1,fills.eye,fills.bias):null,whole_solid=cover&&fills?partSolid(steps,values,place,view,z0,z1,fills.eye,fills.bias):null;
         if(mirror!==null&&layer.sides&&z1>z0)sides=mirrorSides(steps,place,values,sidesPaint(layer.sides,values,materials),mirror,z0,z1,below);
         // A still layer (not on a tipped bone) is the same art wherever it stands: with `pictures` it is drawn once
@@ -234,14 +235,14 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,
         if(pictures&&!layer.pulse&&mirror===null&&fore===1&&!lean&&!(shines&&glowing(steps,materials))){
             const art=stillArt(steps,values,materials);
             if(art){const m=placeMatrix(place),matrix=view?compose(tilt??view.plane(view.k(z1)),m):m;
-                return {height:z0,peak:z1,depth:key,top,layer:layer.layer,component:c.name,sides,cover,cover_solid:whole_solid,solid,packets:[],picture:{key:art.key,bounds:art.bounds,matrix,build:art.build}};}
+                return {height:z0,peak:z1,depth:key,top,layer:layer.layer,component:c.name,sides,cover,cover_low:!!(cover&&low),cover_solid:whole_solid,solid,packets:[],picture:{key:art.key,bounds:art.bounds,matrix,build:art.build}};}
         }
         if(view)scene.enter({matrix:tilt??view.plane(view.k(z1))});
         else if(mirror!==null)scene.enter({matrix:fallen(below,mirror,z1)});
         scene.mark_shines=shines;scene.draw(steps,{...place,values,materials});
         if(view||mirror!==null)scene.leave();
         if(layer.pulse)scene.leave();
-        return {height:z0,peak:z1,depth:key,top,layer:layer.layer,component:c.name,sides,cover,cover_solid:whole_solid,solid,packets:scene.finish()};
+        return {height:z0,peak:z1,depth:key,top,layer:layer.layer,component:c.name,sides,cover,cover_low:!!(cover&&low),cover_solid:whole_solid,solid,packets:scene.finish()};
     }).filter(Boolean);
 }
 /**

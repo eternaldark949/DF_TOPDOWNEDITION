@@ -1,6 +1,6 @@
 {
  "library_id": "traffic",
- "description": "The city's traffic: car bodies after the classic's brands' sizes (sedan, SUV, sports), each a drawing whose paint is its look's values; their headlights and tail lights glow.",
+ "description": "The city's traffic: car bodies after the classic's brands' sizes (sedan, SUV, sports), each a drawing whose paint is its look's values; their headlights and tail lights glow, and at night their bodies hide the glowing ground under them (`cover: true`). And the junctions' lights as the classic drew them on the ground: a light's head on the kerb (`signal_head`: green, amber and red lamps, lit by its `go`, `amber` and `red`), its stop bar across the way in (`stop_bar`), and a crossing's walk strips along its kerbs (`walk_strip`: lit by `walk`, `wait` and `flash`); a bar and a strip run from `$left` to `$right`. The lit parts glow.",
  "templates": {
   "sedan": {
    "extends": "engine:vehicle",
@@ -236,7 +236,8 @@
          "fill": "$paint_lo"
         }
        ],
-       "sides": "$paint_lo"
+       "sides": "$paint_lo",
+       "cover": true
       },
       {
        "layer": 1,
@@ -282,7 +283,8 @@
          "fill": "$glass"
         }
        ],
-       "sides": "$glass"
+       "sides": "$glass",
+       "cover": true
       },
       {
        "layer": 2,
@@ -308,7 +310,8 @@
          "fill": "rgba(255,255,255,0.12)"
         }
        ],
-       "sides": "$paint_lo"
+       "sides": "$paint_lo",
+       "cover": true
       }
      ]
     }
@@ -559,7 +562,8 @@
          "fill": "$paint_lo"
         }
        ],
-       "sides": "$paint_lo"
+       "sides": "$paint_lo",
+       "cover": true
       },
       {
        "layer": 1,
@@ -605,7 +609,8 @@
          "fill": "$glass"
         }
        ],
-       "sides": "$glass"
+       "sides": "$glass",
+       "cover": true
       },
       {
        "layer": 2,
@@ -631,7 +636,8 @@
          "fill": "rgba(255,255,255,0.12)"
         }
        ],
-       "sides": "$paint_lo"
+       "sides": "$paint_lo",
+       "cover": true
       }
      ]
     }
@@ -882,7 +888,8 @@
          "fill": "$paint_lo"
         }
        ],
-       "sides": "$paint_lo"
+       "sides": "$paint_lo",
+       "cover": true
       },
       {
        "layer": 1,
@@ -928,7 +935,8 @@
          "fill": "$glass"
         }
        ],
-       "sides": "$glass"
+       "sides": "$glass",
+       "cover": true
       },
       {
        "layer": 2,
@@ -954,7 +962,8 @@
          "fill": "rgba(255,255,255,0.12)"
         }
        ],
-       "sides": "$paint_lo"
+       "sides": "$paint_lo",
+       "cover": true
       }
      ]
     }
@@ -970,6 +979,368 @@
      "trim": "#2a2a30"
     }
    }
+  },
+  "signal_head": {
+   "extends": "engine:decoration",
+   "data": {
+    "label": "Traffic light"
+   },
+   "components": [
+    {
+     "name": "head",
+     "layers": [
+      {
+       "layer": 0,
+       "height": 0,
+       "thickness": 0,
+       "solid": false,
+       "steps": [
+        {
+         "shape": "rectangle",
+         "x": -16,
+         "y": -6,
+         "width": 32,
+         "height": 12,
+         "radius": 5,
+         "fill": "#120a1e",
+         "stroke": "rgba(202,176,250,0.35)",
+         "line_width": 1
+        },
+        {
+         "shape": "circle",
+         "x": -9.5,
+         "y": 0,
+         "radius": 3.4,
+         "fill": "rgba(70,255,110,0.16)"
+        },
+        {
+         "shape": "circle",
+         "x": 0,
+         "y": 0,
+         "radius": 3.4,
+         "fill": "rgba(255,176,32,0.16)"
+        },
+        {
+         "shape": "circle",
+         "x": 9.5,
+         "y": 0,
+         "radius": 3.4,
+         "fill": "rgba(255,45,85,0.16)"
+        }
+       ]
+      },
+      {
+       "layer": 1,
+       "height": 0,
+       "thickness": 0,
+       "solid": false,
+       "steps": [
+        {
+         "shape": "circle",
+         "x": -9.5,
+         "y": 0,
+         "radius": 3.4,
+         "fill": "rgba(70,255,110,1)",
+         "emits": {
+          "strength": 0.6,
+          "reach": 40,
+          "color": "#46ff6e"
+         }
+        }
+       ],
+       "shown_when": "go"
+      },
+      {
+       "layer": 2,
+       "height": 0,
+       "thickness": 0,
+       "solid": false,
+       "steps": [
+        {
+         "shape": "circle",
+         "x": 0,
+         "y": 0,
+         "radius": 3.4,
+         "fill": "rgba(255,176,32,1)",
+         "emits": {
+          "strength": 0.6,
+          "reach": 40,
+          "color": "#ffb020"
+         }
+        }
+       ],
+       "shown_when": "amber"
+      },
+      {
+       "layer": 3,
+       "height": 0,
+       "thickness": 0,
+       "solid": false,
+       "steps": [
+        {
+         "shape": "circle",
+         "x": 9.5,
+         "y": 0,
+         "radius": 3.4,
+         "fill": "rgba(255,45,85,1)",
+         "emits": {
+          "strength": 0.6,
+          "reach": 40,
+          "color": "#ff2d55"
+         }
+        }
+       ],
+       "shown_when": "red"
+      }
+     ]
+    }
+   ]
+  },
+  "stop_bar": {
+   "extends": "engine:decoration",
+   "look": {
+    "values": {
+     "left": -20,
+     "right": 20
+    }
+   },
+   "data": {
+    "label": "Stop bar"
+   },
+   "components": [
+    {
+     "name": "bar",
+     "layers": [
+      {
+       "layer": 0,
+       "height": 0,
+       "thickness": 0,
+       "solid": false,
+       "steps": [
+        {
+         "shape": "line",
+         "points": [
+          [
+           "$left",
+           0
+          ],
+          [
+           "$right",
+           0
+          ]
+         ],
+         "stroke": "rgba(8,4,16,0.55)",
+         "line_width": 8,
+         "line_cap": "round"
+        }
+       ]
+      },
+      {
+       "layer": 1,
+       "height": 0,
+       "thickness": 0,
+       "solid": false,
+       "steps": [
+        {
+         "shape": "line",
+         "points": [
+          [
+           "$left",
+           0
+          ],
+          [
+           "$right",
+           0
+          ]
+         ],
+         "stroke": "rgba(70,255,110,0.92)",
+         "line_width": 4,
+         "line_cap": "round",
+         "emits": {
+          "strength": 0.6,
+          "reach": 70,
+          "color": "#46ff6e"
+         }
+        }
+       ],
+       "shown_when": "go"
+      },
+      {
+       "layer": 2,
+       "height": 0,
+       "thickness": 0,
+       "solid": false,
+       "steps": [
+        {
+         "shape": "line",
+         "points": [
+          [
+           "$left",
+           0
+          ],
+          [
+           "$right",
+           0
+          ]
+         ],
+         "stroke": "rgba(255,176,32,0.92)",
+         "line_width": 4,
+         "line_cap": "round",
+         "emits": {
+          "strength": 0.6,
+          "reach": 70,
+          "color": "#ffb020"
+         }
+        }
+       ],
+       "shown_when": "amber"
+      },
+      {
+       "layer": 3,
+       "height": 0,
+       "thickness": 0,
+       "solid": false,
+       "steps": [
+        {
+         "shape": "line",
+         "points": [
+          [
+           "$left",
+           0
+          ],
+          [
+           "$right",
+           0
+          ]
+         ],
+         "stroke": "rgba(255,45,85,0.92)",
+         "line_width": 4,
+         "line_cap": "round",
+         "emits": {
+          "strength": 0.6,
+          "reach": 70,
+          "color": "#ff2d55"
+         }
+        }
+       ],
+       "shown_when": "red"
+      }
+     ]
+    }
+   ]
+  },
+  "walk_strip": {
+   "extends": "engine:decoration",
+   "look": {
+    "values": {
+     "left": -20,
+     "right": 20
+    }
+   },
+   "data": {
+    "label": "Walk strip"
+   },
+   "components": [
+    {
+     "name": "strip",
+     "layers": [
+      {
+       "layer": 0,
+       "height": 0,
+       "thickness": 0,
+       "solid": false,
+       "steps": [
+        {
+         "shape": "line",
+         "points": [
+          [
+           "$left",
+           0
+          ],
+          [
+           "$right",
+           0
+          ]
+         ],
+         "stroke": "rgba(190,240,255,0.9)",
+         "line_width": 3,
+         "line_cap": "round",
+         "emits": {
+          "strength": 0.6,
+          "reach": 40,
+          "color": "#bef0ff"
+         }
+        }
+       ],
+       "shown_when": "walk"
+      },
+      {
+       "layer": 1,
+       "height": 0,
+       "thickness": 0,
+       "solid": false,
+       "steps": [
+        {
+         "shape": "line",
+         "points": [
+          [
+           "$left",
+           0
+          ],
+          [
+           "$right",
+           0
+          ]
+         ],
+         "stroke": "rgba(255,70,90,0.9)",
+         "line_width": 3,
+         "line_cap": "round",
+         "emits": {
+          "strength": 0.6,
+          "reach": 40,
+          "color": "#ff465a"
+         }
+        }
+       ],
+       "shown_when": "wait"
+      },
+      {
+       "layer": 2,
+       "height": 0,
+       "thickness": 0,
+       "solid": false,
+       "steps": [
+        {
+         "shape": "line",
+         "points": [
+          [
+           "$left",
+           0
+          ],
+          [
+           "$right",
+           0
+          ]
+         ],
+         "stroke": "rgba(255,70,90,0.9)",
+         "line_width": 3,
+         "line_cap": "round",
+         "emits": {
+          "strength": 0.6,
+          "reach": 40,
+          "color": "#ff465a"
+         }
+        }
+       ],
+       "shown_when": "flash",
+       "pulse": {
+        "period": 0.56,
+        "low": 0.2
+       }
+      }
+     ]
+    }
+   ]
   }
  }
 }
