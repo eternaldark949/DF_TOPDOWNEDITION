@@ -51,6 +51,26 @@ test('swept collision catches a thin wall far outside any rendering view', () =>
     const p = new physicsSystem(), a = ball(p, [10000, 10000], { linear_velocity: [10000, 0] }); wall(p, [10050, 10000]);
     tick(p); assert.ok(a.position[0] < 10050); near(a.linear_velocity[0], 0);
 });
+test('a sweep stops at the entry side even when the end pose overlaps the far side', () => {
+    const p = new physicsSystem(), actor = ball(p, [0, 0], { linear_velocity: [1245, 0] });
+    wall(p, [20, 0]);
+    tick(p);
+    near(actor.position[0], 17.5);
+    near(actor.linear_velocity[0], 0);
+});
+test('a sweep reports the sensor it crosses before a wall and ignores contacts behind the impact', () => {
+    const p = new physicsSystem(), actor = ball(p, [0, 0], { linear_velocity: [6000, 0] });
+    wall(p, [40, 0]);
+    wall(p, [60, 0], [1, 100], { ghost: true });
+    wall(p, [10, 0], [1, 100], { ghost: true });
+    wall(p, [20, 0]); // The first hit in time, despite being the last wall created.
+    const contacts = [];
+    p.on('contactBegin', event => contacts.push(event.sensor_only));
+    tick(p);
+    near(actor.position[0], 17.5);
+    near(actor.linear_velocity[0], 0);
+    assert.deepEqual(contacts, [true, false]);
+});
 test('sweeps account for both moving bodies', () => {
     const p = new physicsSystem(), a = ball(p, [-50, 0], { linear_velocity: [6000, 0] }), b = ball(p, [50, 0], { linear_velocity: [-6000, 0] });
     tick(p); assert.ok(a.position[0] <= b.position[0]); near(a.linear_velocity[0], 0); near(b.linear_velocity[0], 0);

@@ -212,6 +212,38 @@ test('motor requests against an existing wall contact preserve tangential walkin
     actor.motor.setMovement([1, 1], { speed: 60 }); step(p, 30);
     assert.ok(actor.position[0] <= 1e-5); assert.ok(actor.position[1] > 5);
 });
+test('default character contact slides along a stopped or moving car and can back away', () => {
+    for (const linear_velocity of [[0, 0], [0, -20], [20, 0]]) {
+        const p = new physicsSystem();
+        const actor = p.createEntity({ kind: 'character', position: [0, -32], collision_shape: { shape_type: 'circle', radius: 12 }, mass: 15 });
+        const car = p.createEntity({
+            kind: 'vehicle', position: [0, 0], collision_shape: { shape_type: 'box', dimensions: [72, 40] }, mass: 1000, linear_velocity
+        });
+        actor.motor.setMovement([.22, 1], { speed: 180 });
+        step(p, 60);
+        assert.ok(actor.position[0] > 20, `walker should slide along the car: ${actor.position}`);
+        assert.ok(actor.position[1] < car.position[1] - 25, 'walker should remain on the near side');
+        const side = actor.position[1];
+        actor.motor.setMovement([0, -1], { speed: 180 });
+        step(p, 30);
+        assert.ok(actor.position[1] < side - 30, 'walker should be able to back away');
+    }
+});
+test('two simultaneous wall contacts block the corner without trapping a retreat', () => {
+    const p = new physicsSystem();
+    const actor = p.createEntity({ kind: 'character', position: [-20, -20], collision_shape: { shape_type: 'circle', radius: 2 } });
+    for (const [position, dimensions] of [[[0, -30], [1, 100]], [[-30, 0], [100, 1]]]) {
+        p.createBody({ physics_type: 'static', position, collision_shape: { shape_type: 'box', dimensions } });
+    }
+    actor.motor.setMovement([1, 1], { speed: 120 });
+    step(p, 60);
+    close(actor.position[0], -2.5);
+    close(actor.position[1], -2.5);
+    actor.motor.setMovement([-1, 0], { speed: 120 });
+    step(p, 30);
+    assert.ok(actor.position[0] < -40);
+    close(actor.position[1], -2.5);
+});
 test('a one-trip route is released once no driver follows it', () => {
     const p = new physicsSystem(), v = p.createEntity({ kind: 'vehicle',  vehicle_template: { max_speed: 40, wheel_base: 4, braking: 40 } });
     p.traffic.registerRoute('trip', { points: [[0, 0], [100, 0]] }); p.traffic.addVehicle(v, { route_id: 'trip' });
