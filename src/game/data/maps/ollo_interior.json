@@ -1,0 +1,24 @@
+{
+  "library_id": "ollo_interior",
+  "description": "OllO Lounge: the classic geometry (floors as flat colours, walls, rooms, doors, exits, landmarks). Its floor art and furniture are still to be built as data.",
+  "resources": {
+    "map": {
+      "kind": "map",
+      "height_view": {"eye": 600, "lean": 1},
+      "label": "OllO Lounge",
+      "setting": "interior",
+      "switches": {"lighting": true},
+      "night": {"tint": "rgba(22,10,48,0.95)"},
+      "lights": [{"authored_id": "lamp_0", "position": [200, 150], "radius": 300, "inner_radius": 10, "color": "#ffac47", "intensity": 1, "glow": 0.08, "glow_stops": [[0, "#ffffff"], [0.1, "#ffac47"], [0.6, "#ffac47"], [1, "rgba(0,0,0,0)"]], "shadows": "static"}, {"authored_id": "lamp_1", "position": [600, 150], "radius": 300, "inner_radius": 10, "color": "#ffac47", "intensity": 1, "glow": 0.08, "glow_stops": [[0, "#ffffff"], [0.1, "#ffac47"], [0.6, "#ffac47"], [1, "rgba(0,0,0,0)"]], "shadows": "static"}, {"authored_id": "lamp_2", "position": [400, 300], "radius": 350, "inner_radius": 10, "color": "#ff6633", "intensity": 1, "glow": 0.08, "glow_stops": [[0, "#ffffff"], [0.1, "#ff6633"], [0.6, "#ff6633"], [1, "rgba(0,0,0,0)"]], "shadows": "static"}, {"authored_id": "lamp_3", "position": [100, 500], "radius": 200, "inner_radius": 10, "color": "#cc2200", "intensity": 1, "glow": 0.08, "glow_stops": [[0, "#ffffff"], [0.1, "#cc2200"], [0.6, "#cc2200"], [1, "rgba(0,0,0,0)"]], "shadows": "static"}, {"authored_id": "lamp_4", "position": [700, 500], "radius": 200, "inner_radius": 10, "color": "#cc2200", "intensity": 1, "glow": 0.08, "glow_stops": [[0, "#ffffff"], [0.1, "#cc2200"], [0.6, "#cc2200"], [1, "rgba(0,0,0,0)"]], "shadows": "static"}],
+      "size": [800, 600],
+      "spawn": [400, 500],
+      "floors": [{"shape": "rectangle", "x": 0, "y": 0, "width": 800, "height": 600, "fill": "#1a0a0a"}, {"shape": "rectangle", "x": 50, "y": 50, "width": 700, "height": 500, "fill": "#2a1515"}, {"shape": "rectangle", "x": 300, "y": 200, "width": 200, "height": 250, "fill": "#3d1a1a"}],
+      "wall_look": {"material": "surfaces:plaster", "sides": "surfaces:plaster_face", "height": 120, "layer": 10},
+      "walls": [{"x": 0, "y": 0, "w": 800, "h": 30}, {"x": 0, "y": 570, "w": 300, "h": 30}, {"x": 500, "y": 570, "w": 300, "h": 30}, {"x": 0, "y": 0, "w": 30, "h": 600}, {"x": 770, "y": 0, "w": 30, "h": 600}],
+      "rooms": {"shop": {"x": 0, "y": 0, "w": 800, "h": 600, "type": "indoor", "label": "Shop"}},
+      "markers": {"transition": {"label": true}},
+      "triggers": [{"x": 300, "y": 560, "w": 200, "h": 40, "role": "transition", "authored_id": "exit_0", "data": {"target": "ollo_test", "label": "Exit to Plaza"}}],
+      "landmarks": {"ollo_bar": [400, 100]}
+    }
+  }
+}

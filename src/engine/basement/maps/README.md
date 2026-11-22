@@ -1,0 +1,157 @@
+# Basement map system
+
+`mapSystem` builds one map into one physics world from plain data. Every map loads the same way, a cafe or a city: it is streamed by region round its focuses, and a map smaller than its streaming radius is simply whole. It knows no game names: the Directory supplies the data, the entity templates, and a `decorate` hook for game fields.
+
+```js
+import { physicsSystem } from '../physics/index.mjs';
+import { mapSystem } from './index.mjs';
+
+const physics = new physicsSystem({ asset_library });
+const maps = new mapSystem(physics);
+const map = maps.load(definition, { templates, prop_types, decorate });
+map.entity('door_0');            // live entity by authored id
+map.entities('prop');            // live entities by role, in build order
+map.updateState({ near_range: door => 90, duration: 0.35 });
+map.setFocus([{position: player.position, velocity: player.linear_velocity}]);   // build near regions, release far ones
+```
+
+## Map definition
+
+Every section is optional. Rectangles are top-left: `{x, y, w, h}` for walls, triggers and doors; `{x, y, width, height}` for placements.
+
+| Field | Meaning |
+|---|---|
+| `map_id`, `kind` | `kind` is `'interior'` (default) or `'exterior'`: a label for the game (and `decorate`), never a loading path. |
+| `size: [w, h]`, `boundary: {thickness}` | A ring of four walls just outside the map. |
+| `floors`, `floor_layer = -100` | The ground, as drawing steps in map space (any paint: a colour, a gradient, a material, a textured pattern). Each step is its own flat decoration at the centre of its bounds (a rectangle, circle, ellipse, polygon, curve, line, capsule or text, widened by half its `line_width`; a `group` is one decoration round its children, moved, turned and scaled by its `x`, `y`, `rotation` and `scale`, so many small steps cost one entity), drawn back by that much, so a texture's `offset` is in map coordinates and stays put as regions stream. Steps draw in order at look layer `floor_layer`; a step's `elevation` lifts it (a raised dais), and its `thickness` (world units) and `sides` (a colour or `{material}`) stand it up a little, its faces showing when the height view leans (a kerb, a step, a plinth). It stays something to walk over: a floor never stops anything. |
+| `walls`, `wall_openings` | Static walls. Doors and openings are cut out of them. |
+| `wall_look: {material, sides?, height = 0, layer = 0}` | Draws every wall: its top in `material`, its faces in `sides` (default the same material) when the height view leans them, `height` world units tall. A wall's own `material`, `sides` and `height` override it. Without either, walls stay undrawn (the game draws them). The look never changes what a wall stops. |
+| `placements` | Props: `{type, x, y, width, height, rotation?, movable?, blocks_light?, light?, template?, data?}`. `prop_types[type]` gives the defaults for `movable`, `blocks_light` (a big prop that casts a shadow) and `light`. A placement with `object` (a catalog record id: a rug, a cart) is made by the `make_object` option at `at`, or the middle of its rectangle, with its size, shape and look from the record; `rotation` and `data` still apply, and its `look` (`{values: {brick: "#6a3346", name: "Butter Moon"}}`) is laid over the record's, its values merged, so one template stands in many colourways with its own name on its sign. |
+| `lights` | Free lamps: `{position, radius, render_radius = 20, ...light}`. A light carried by a prop is that placement's `light`. |
+| `triggers` | Exits, rooms, zones: `{x, y, w, h, role, authored_id?, data?}`. |
+| `markers` | `{role: marker}`: how triggers of a role show on the floor (`markers.mjs`). A marker (`MARKER`, checked by `readMarker`; `true` is the defaults) is the classic's glowing exit mat fitted to each trigger's rectangle: a soft glow round it in rings that follow its rectangle (`glow`, `glow_alpha`, `glow_reach`), a faint fill that glows (`fill_alpha`, `emits`), a lit border (`border_alpha`, `border_width`), corner brackets (`corner`, `corner_alpha`) and a `label` (text, or `true` for the trigger's `data.label`; `label_size`, `label_family`, `label_color`, `label_side`: below outdoors, above indoors by default; `label_plate`, `label_plate_color`: a dark plate behind it so it reads over a busy floor), all in `color`, on look `layer` -1. Its lines and label shine through the night. The mat breathes over `pulse_period` seconds (1.26, the classic's), down to `pulse_low` of its strength (1 holds it steady), and while the trigger's `occupied` property is set (a map level sets it while someone stands in it) it is drawn instead in `active_color`, `active_glow` at `active_glow_alpha` and `active_label_color`, a deeper purple glowing harder, pulsing down to `active_pulse_low`. The faint fill under both lights the light grid, steady. A trigger with `data.quiet: true` shows none (its map's own art marks it). `markerComponent(marker, w, h, {label, side})` gives the component on its own. |
+| `rows`, `keep_clear` | Buildings along a street front (`rows.mjs`, checked by `readRow`, laid by `rowPlacements`): `[{block | rect, side, objects | pick, count, seed, gap = 0, setback = 12, margin = 30, justify = 'center', span}]`. A row lines `side` (`'south'`, `'north'`, `'east'`, `'west'`: the street it fronts) of a block named in the map's `blocks` or of `rect` `{x, y, w, h}`, its fronts `setback` in from that edge, along the side west to east (north to south on the east and west sides), `margin` clear at each end or within `span: [from, to]`, `gap` apart (0: wall to wall), by `justify`. Its items `{object, width, depth, weight = 1, looks, data}` are catalog objects built with their front facing south (+y), `width` along the street and `depth` back from it; each is turned to face its street. `objects` are laid in order while they fit; `pick` chooses by weight from `seed` until no more fit (or `count` are laid), the same street every load. Each takes one of its `looks` by the seed (laid over its object's own, as a placement's `look`), so one shop is a bakery in five colourways with five names. A building that would stand on one a row already laid, or on a `keep_clear` rectangle (a landmark, a plaza), is left out. Every one becomes an object placement after the map's own. |
+| `rooms` | `{id: {x, y, w, h} or {rects: [...]}, type: 'indoor' or 'outdoor', label}`. One ghost volume per rectangle, in the shared grid. |
+| `doors` | `{x, y, w, h, orientation: 'H' or 'V', type?, hingeSide?, hinge?, rooms?: [a, b]}`. `type` names a door kind (default `plain`; see *Door kinds*). `hingeSide: 'right'` mirrors the kind end to end; `hinge` overrides a hinged leaf's `HINGE` values. `rooms` links the two rooms it joins. |
+| `room_links` | Extra links without a door (a wide wall gap): `{rooms: [a, b], openness = 1}`. |
+| `cloths` | Hanging strips with a cloth mesh: `{x, y, width, length, segments = 5, role?}`. |
+| `spawn: [x, y]` | Returned as `map.spawn`. |
+| `regions: {size = 1024, radius = 4096, keep = size}` | Region size, how far round a focus regions are built, and how much further they stay before release. |
+
+### Lights
+
+A light is declared the same way on a lamp, a placement or a catalog type: `{radius | size + round + soft + rotation, position | dx + dy, color, intensity, glow, look, shadows, animation}`. The builder turns each into `declaredLight(light)`, kept on the packet as `data.emission`, with a matching `light_shape`:
+
+| Field | Meaning |
+|---|---|
+| `shape` | `'point'` (a `radius`) or `'strip'` (a `size: [w, h]` with `round`, `soft` and `rotation`, a rounded rectangle). |
+| `position` | Offset from its body's centre. |
+| `color`, `intensity`, `glow` | `null` when unset, for the game's look to choose. `intensity` is how much of the dark it lifts, `glow` how strong its colour is: a neon sign has `intensity: 0` and a glow. |
+| `look` | The name of a profile the game's look gives the light (a street lamp's pool), or `null`. |
+| `shadows` | `'dynamic'` (default): walls and every body that blocks light; `'static'`: walls only; `'none'`: no shadow. |
+| `inner_radius`, `cut`, `glow_stops` | How its light falls off, kept only when given (the light layer's own fields): a point light's cut begins `inner_radius` out; `cut` is `[[offset, alpha]]`, how much of the dark it lifts from its middle out; `glow_stops` is `[[offset, colour]]`, its colour from its middle out. |
+| `animation` | `{kind: 'steady' \| 'flicker' \| 'pulse' \| 'stutter', ...}`: flicker and pulse at `rate` rad/s, a pulse swinging by `depth`; a stutter (a faulty lamp) holds steady but for `burst` s every `period` s (shifted by `offset`), dropping by `depth`. The older `flicker: rate` is a flicker. |
+
+Door leaves always block light (`blocks_light: true`). A placement blocks light when it or its type sets `blocks_light`; ghosts never do.
+
+Ids are `wall_<i>`, `prop_<i>`, `lamp_<i>`, `door_<i>` (`door_<i>_right` for the second leaf), `<role>_<i>` for cloths, or the entry's own `authored_id`. The same definition always gives the same ids, which saves and region memory rely on.
+
+Without `templates[section]`, each section uses the engine's own types: walls `static`, props `prop` (static), lights and cloths `decoration`, triggers ghost `trigger`, doors kinematic `prop`.
+
+## Rooms
+
+`map.rooms` is the map's room graph (empty when the map has no rooms).
+
+- **Where:** `roomAt(point)` checks the last answer's rectangles, then the shared spatial grid. `contains(id, point)`, `room(id)` and `rooms` give the records `{id, type, label, fill, rects, bounds, flags}`. A room's `fill` (0 to 1, or null) is how dark it stands with its lights on, whatever the map's night: the light layer thins the dark there to it (`nightAreas`), and its `lights_off` flag takes that away.
+- **Links:** `connections(id)` lists `{room, link_id, kind, openness}`. A door's openness follows its leaf from closed (0) to open (1) as it moves; an arch is 1; a `room_links` entry has its fixed value. `openness(a, b)` is the most open direct link.
+- **Routes and spill:** `route(a, b, {min_openness})` is the fewest-rooms route through open links, or null; `reachable(a, b)`. `exposure(from, {falloff})` gives every room the best product of openness along any route, for light spill, sound and awareness.
+- **Occupancy:** `track(body)` follows any body; `updateState()` re-reads tracked bodies (a body still inside its room costs one rectangle test, no grid query). `roomOf(body)`, `occupants(id)`, and `onRoomChange(fn)` for `{entity, from, to}`. With `keep_in_gaps` (default) a body standing in a doorway stays in its last room.
+- **Flags:** `setFlag(id, key, value)` / `getFlag` for per-room game state such as lights off (`lights_off: true` drops the room's `fill`). They save with `map.saveState()`.
+
+## Streaming
+
+One path for every map:
+
+- **Regions:** entries are bucketed by the region their centre falls in. An entry larger than one region (the boundary, a long wall, a big building) stays loaded.
+- **Focuses:** `setFocus(focuses, {radius, keep, budget_ms = 3, lead = 1})` takes points `[x, y]` or moving focuses `{position, velocity}`; a moving focus also reaches `lead` seconds ahead. Regions within `radius` of the nearest focus are built, nearest first; regions past `radius + keep` are released, so walking along a border does not thrash. It returns `{loaded, unloaded, pending}`.
+- **Budget:** building stops once `budget_ms` is spent, and `pending` regions wait for the next call. The constructor builds round `options.focus` (default: the spawn, else the map's centre) all at once, as a level change does behind its fade. A map that fits inside the radius is therefore whole from the start, built in authored order.
+- **Tiers:** `addTier(name, {radius, keep, load(key, bounds), release(key, bounds), every})` adds per-region work beside the bodies (ground tiles, baked light, navigation), each tier at its own radius. The bodies are the `entities` tier. A tier streams the regions that hold entries, or with `every: true` every region over the map's size, empty ones too (the light grid, whose light spills onto bare ground).
+- **Region memory:** a released entity that was moved (a pushed bin, a knocked-over sign) keeps its pose. It is rebuilt there when its region loads again. `saveState()` / `loadState()` carry that memory as plain data, and `loadState` puts an already-built entity back where it was left.
+- **Snapshots:** after a physics snapshot is restored, `reconnect()` re-links ids to the restored entities; regions the snapshot held count as loaded, and the rest build as a focus reaches them.
+
+The map system uses the world's one spatial grid and navigation field. It never keeps its own index of bodies; it only remembers which entity it built for each authored id.
+
+## Streets
+
+`streetNetwork(map, settings)` turns a map's `streets` (`roads` as centrelines with `lanes` each way and a
+`lane_width`, and `intersections`), `pavements` and `crosswalks` into one navigation network, as data: `{nodes, lanes,
+junctions, crossings, signals}`, ready for `physics.navigation.roads` and the [agents](../agents/README.md).
+
+- **Roads.** Each road is cut into arms by the junctions it passes through (the authored ones, and one where a road's end
+  meets another road). Each arm has a lane per lane each way, driven on the right (`kind: 'road'`).
+- **Turns.** Through a junction the lanes join by turns (`kind: 'turn'`, `turn: straight | right | left`, a curve through
+  the junction). Straight on keeps its lane, and a middle lane may also move into the lanes either side. A right turn goes
+  from the kerb lane, a left from the inner lane, and nobody turns back. Each turn is under its way in's light
+  (`signal_id`), and `junctions[].phases` lists the lights in turn round the junction.
+- **On foot.** Pavements run along their length and crosswalks across their road (`kind: 'pavement' | 'crossing'`, two-way,
+  profile `foot`). Where one pavement meets another's side, or two cross, it is cut and joined there, and a loose end is
+  linked to the nearest end within `join`. Ends at one spot are one node.
+- **Stops.** A car lane's `stops` are its stop line before each turn's light (`{distance, signal_id, turn, clearance}`, set
+  before a crosswalk just ahead of the junction) and each crosswalk it crosses (`{distance, walkway_id}`). `crossings`
+  lists each crosswalk's walkway and the lights it waits for: every light of its junction (of the two an arm runs
+  between, the nearer: its cars come through that one's lights), so people cross in the walk. Each also has its `area`
+  (`{left, top, right, bottom}`), the `junctions` it is at, and `strips`: a line along each kerb it meets, a little in
+  from its ends and sides, where a walk light is drawn.
+- **Junctions and lights.** Each junction has its box (`area`). `signals` lists every light where it stands: `{signal_id,
+  junction_id, bar: [[x, y], [x, y]], head: [x, y], rotation}`, its stop bar across its way in just behind the line (from
+  the centre line to the kerb) and its head on the kerb beside it, turned the way the cars come in.
+
+`STREETS` holds the settings: `lane_width` 60, `speed_limit` 180, `turn_speed` 90, `turn_samples` 6, `straight_angle`
+.6, `join` 120, `stop_setback` 4, `box_exit` 110 (how far past a junction a car needs room, and the crosswalk clear,
+before it goes in), `bar_back` 8 and `bar_inset` 5 (a stop bar behind its line, and in from the centre line and the
+kerb), `head_at` [6, 22] (a head on from its bar and out past the kerb), `strip_inset` [3, 7] (a walk strip in from a
+crossing's ends and sides), and the lane profiles `car` and `foot`.
+
+## API
+
+| Call | Result |
+|---|---|
+| `buildMapPackets(definition, {templates, prop_types, decorate, door_kinds, make_object})` | `{kind, spawn, entries, openings, door_kinds}`. `openings` lists every door, arches included: `{door_key, index, type, opening, leaf_ids}`. Floors build first. `make_object(record, at, overrides)` returns the packet of an `object` placement (the Penthouse passes `objectPacket` on the world's data); a map with such placements needs it. Each entry is `{section, index, source, packet, joints?}`; `joints` are constraint packets the map creates with the entity (a hinged door's hinge). Pure, no world. |
+| `new mapSystem(physics)` / `.load(definition, options)` / `.unload()` / `.current` | One active map per world. Loading releases the previous map. |
+| `mapInstance.entity(id)` / `.entities(role?, {section}?)` / `.packets()` | Lookups. `entities` reads lists sorted by role and by section (`walls`, `placements`, `lights`, `triggers`, ...) when the map is built, so it walks only its own entries. |
+| `mapInstance.getDoors()` | Every door, arches included, in authored order: `{door_key, index, type, opening, leaves}`. `opening` is `{position, length, across, rotation}` (centre, along, the wall's thickness, and the turn that lays +x along it); `leaves` holds each leaf's live entity, or null while it is unloaded. Each leaf's `data.opening` carries the same opening. Artists draw doors from this. |
+| `mapInstance(physics, definition, {…, door_kinds})` | `door_kinds` adds kinds or replaces built-in ones, for both the leaves and the room links. |
+| `mapInstance.updateState({near_range, duration, easing, include_groups})` | Opens and closes sliding and plain doors by proximity, with timed kinematic moves, then updates room occupancy. Hinged doors are skipped: they are physical. |
+| `HINGE` | Defaults for a hinged leaf: `{mass: 12, damping: 7.7, closing_stiffness: 64.8, swing_limit: π − 0.25}`. A kind's leaf `hinge`, then the door's `hinge` field, override them. |
+| `DOOR_KINDS` / `validateDoorKind(kind, name?)` | The built-in kinds / the check every kind passes before it is built. |
+| `mapInstance.setFocus(focuses, {radius, keep, budget_ms, lead})` / `.addTier(name, {radius, keep, load, release, every})` / `.loaded_regions` / `.region_size` | Streaming (see above). `setFocus` returns `{loaded, unloaded, pending}`. |
+| `streetNetwork(map, settings)` / `STREETS` | The map's streets as one navigation network (see Streets). |
+| `mapInstance.reconnect()` / `.saveState()` / `.loadState(state)` / `.getStatistics()` / `.destroy()` | Lifecycle. |
+
+## Game data
+
+A game's prop catalog and per-map layouts are Directory libraries it registers at boot.
+
+Run `node --test src/engine/basement/maps/tests/*.test.mjs tools/test-map-layouts.mjs`.
+
+## Door kinds
+
+A door is an opening in a wall plus the leaves that fill it. A kind is data that says what those leaves are; the builder has no per-type code. Positions run along the opening from its start (left for `H`, top for `V`) as `[fraction, px]`, meaning fraction × the opening's length + px.
+
+| Leaf field | Meaning |
+|---|---|
+| `from`, `to` | Where the leaf starts and ends. |
+| `motion` | `slide`: a kinematic leaf that `updateState` moves by proximity, by `travel` (`[fraction, px]`, signed along the opening). `hinge`: a rigid leaf on a hinge joint at `pivot` (0 = the leaf's start, 1 its end). Bodies push it open and its return spring swings it shut; `hinge` overrides `HINGE`. |
+| `side` | Which side of the door the leaf is on, −1 or 1 (default −1 for the first leaf, 1 after). |
+| `suffix` | Required after the first leaf: its id is `<door id>_<suffix>`. The first leaf takes the door's id. |
+
+The built-in kinds:
+
+| Kind | Leaves |
+|---|---|
+| `plain` | One leaf that slides its own length out of the opening. |
+| `sliding` | Two half leaves, 2 px apart at the middle, that slide apart (`door_0` and `door_0_right`). |
+| `hinged` | One leaf hinged at its start. |
+| `arch` | None. The opening still cuts the wall and links its rooms, always fully open. |
+
+A room link through a door is as open as its most open leaf. The engine's Directory ships `double` and `saloon` kinds as data (`doorKindsOf(registry)` collects a registry's kinds for `door_kinds`).

@@ -1,0 +1,1006 @@
+{
+ "library_id": "screens",
+ "description": "The game's screens for the engine UI, after the classic look: the main menu, the pause menu and its pages (settings, saved games), the HUD, and the classic's three fonts.",
+ "resources": {
+  "font_anthropology": {
+   "kind": "font",
+   "family": "Anthropology",
+   "src": "assets/fonts/Anthropology.ttf"
+  },
+  "font_feminine": {
+   "kind": "font",
+   "family": "Feminine",
+   "src": "assets/fonts/Feminine.ttf"
+  },
+  "font_brooklyn": {
+   "kind": "font",
+   "family": "Brooklyn",
+   "src": "assets/fonts/Brooklyn.ttf"
+  },
+  "main": {
+   "kind": "screen",
+   "name": "main",
+   "modal": true,
+   "pauses_game": true,
+   "controls": "menu",
+   "closes_on_back": false,
+   "focus": "new_game",
+   "class": "mm",
+   "layer": 1,
+   "layout": {
+    "kind": "free"
+   },
+   "transition": {
+    "in": {
+     "kind": "fade",
+     "seconds": 0.6
+    },
+    "out": {
+     "kind": "fade",
+     "seconds": 0.4
+    }
+   },
+   "items": [
+    {
+     "id": "title",
+     "type": "panel",
+     "class": "mm-title",
+     "position": {
+      "anchor": "centre",
+      "offset": [
+       0,
+       -60
+      ]
+     },
+     "layout": {
+      "kind": "list",
+      "align": "centre"
+     },
+     "animations": {
+      "enter": {
+       "name": "fade",
+       "seconds": 1.2
+      }
+     },
+     "items": [
+      {
+       "id": "title_script",
+       "type": "label",
+       "class": "mm-script",
+       "text": "Dimensions"
+      },
+      {
+       "id": "title_sub",
+       "type": "label",
+       "class": "mm-sub",
+       "text": "Freelancer"
+      }
+     ]
+    },
+    {
+     "id": "menu",
+     "type": "list",
+     "class": "mm-list",
+     "position": {
+      "anchor": "top",
+      "offset": [
+       0,
+       0
+      ]
+     },
+     "layout": {
+      "kind": "list",
+      "spacing": 6,
+      "align": "stretch"
+     },
+     "items": [
+      {
+       "id": "new_game",
+       "type": "panel",
+       "focusable": true,
+       "class": "mm-row",
+       "on_click": {
+        "event": "new_game"
+       },
+       "layout": {
+        "kind": "grid",
+        "columns": 3
+       },
+       "animations": {
+        "enter": {
+         "name": "slide_up",
+         "seconds": 0.5,
+         "stagger": 0.08,
+         "delay": 0.25
+        }
+       },
+       "items": [
+        {
+         "id": "new_game_desc",
+         "type": "label",
+         "class": "mm-desc",
+         "text": "Starts a new journey."
+        },
+        {
+         "id": "new_game_text",
+         "type": "label",
+         "class": "mm-btn",
+         "text": "Start New Game"
+        },
+        {
+         "id": "new_game_key",
+         "type": "label",
+         "class": "mm-key",
+         "text": "enter"
+        }
+       ]
+      },
+      {
+       "id": "load_game",
+       "type": "panel",
+       "focusable": true,
+       "class": "mm-row",
+       "on_click": {
+        "open": "pause.saves"
+       },
+       "layout": {
+        "kind": "grid",
+        "columns": 3
+       },
+       "animations": {
+        "enter": {
+         "name": "slide_up",
+         "seconds": 0.5,
+         "stagger": 0.08,
+         "delay": 0.25
+        }
+       },
+       "items": [
+        {
+         "id": "load_game_desc",
+         "type": "label",
+         "class": "mm-desc",
+         "text": "Choose a save slot to resume."
+        },
+        {
+         "id": "load_game_text",
+         "type": "label",
+         "class": "mm-btn",
+         "text": "Load Saved Game"
+        },
+        {
+         "id": "load_game_key",
+         "type": "label",
+         "class": "mm-key",
+         "text": "L"
+        }
+       ]
+      },
+      {
+       "id": "settings",
+       "type": "panel",
+       "focusable": true,
+       "class": "mm-row",
+       "on_click": {
+        "open": "pause.settings"
+       },
+       "layout": {
+        "kind": "grid",
+        "columns": 3
+       },
+       "animations": {
+        "enter": {
+         "name": "slide_up",
+         "seconds": 0.5,
+         "stagger": 0.08,
+         "delay": 0.25
+        }
+       },
+       "items": [
+        {
+         "id": "settings_desc",
+         "type": "label",
+         "class": "mm-desc",
+         "text": "Graphics & Performance."
+        },
+        {
+         "id": "settings_text",
+         "type": "label",
+         "class": "mm-btn",
+         "text": "Settings"
+        },
+        {
+         "id": "settings_key",
+         "type": "label",
+         "class": "mm-key",
+         "text": "S"
+        }
+       ]
+      },
+      {
+       "id": "exit",
+       "type": "panel",
+       "focusable": true,
+       "class": "mm-row",
+       "on_click": {
+        "event": "exit"
+       },
+       "layout": {
+        "kind": "grid",
+        "columns": 3
+       },
+       "animations": {
+        "enter": {
+         "name": "slide_up",
+         "seconds": 0.5,
+         "stagger": 0.08,
+         "delay": 0.25
+        }
+       },
+       "items": [
+        {
+         "id": "exit_desc",
+         "type": "label",
+         "class": "mm-desc",
+         "text": "Quits game."
+        },
+        {
+         "id": "exit_text",
+         "type": "label",
+         "class": "mm-btn",
+         "text": "Exit"
+        },
+        {
+         "id": "exit_key",
+         "type": "label",
+         "class": "mm-key",
+         "text": "esc"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "css": [
+    "@import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Montserrat:wght@400;500;600;700&family=Orbitron:wght@500;700&family=Raleway:wght@400;500&display=swap');",
+    ".ui-root { --font-script: 'Anthropology', 'Great Vibes', cursive; --font-ui: 'Montserrat', sans-serif; --font-menu: 'Feminine', 'Raleway', 'Montserrat', sans-serif;\n  --font-menu-body: 'Brooklyn', 'Raleway', 'Montserrat', sans-serif; --font-tech: 'Orbitron', sans-serif;\n  --lavender: #cab0fa; --lavender-pale: #f1e8fe; --lilac-grey: #b9aec4; --cream: #f3e4c6; --champagne: #d8c6a2; --gold: #ffc248; }",
+    "\n.mm { background: radial-gradient(ellipse at 50% 40%, rgba(40,10,48,.55), rgba(6,1,8,.94) 70%); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }\n.mm-title { --title-size: min(18.5vh, 11.5vw); top: 39% !important; z-index: 0; }\n.mm-title::before { content: ''; position: absolute; left: 50%; top: 50%; width: min(64vh, 40vw); height: 118%; translate: -50% -50%; border-radius: 18px;\n  background: rgba(26,8,28,.35); box-shadow: 0 0 40px 24px rgba(26,8,28,.35); z-index: -1; }\n.mm-script { font: 400 calc(var(--title-size) - 2px)/1 var(--font-script); color: transparent; -webkit-text-stroke: 1.2px #f1eaff;\n  filter: drop-shadow(0 0 1px rgba(240,228,255,.7)) drop-shadow(0 0 5px rgba(170,120,255,.6)) drop-shadow(0 0 16px rgba(120,60,220,.35)); }\n.mm-sub { font: 400 calc(var(--title-size) * .6 - 2px)/1 var(--font-script); letter-spacing: .34em; margin: .02em 0 0 .34em; color: transparent; -webkit-text-stroke: 1px #f1eaff;\n  filter: drop-shadow(0 0 1px rgba(240,228,255,.7)) drop-shadow(0 0 4px rgba(170,120,255,.6)) drop-shadow(0 0 12px rgba(120,60,220,.35)); }\n.mm-list { top: 63% !important; width: 90%; max-width: 1000px; }\n.mm-row { grid-template-columns: 1fr auto 1fr !important; align-items: center; gap: 20px; min-height: 40px; padding: 5px 0; background: none !important; }\n.mm-btn { font: 400 calc(.75rem - 2px) var(--font-menu); letter-spacing: .42em; text-transform: uppercase; white-space: nowrap; text-align: center;\n  color: transparent; background: linear-gradient(90deg, #e2dbec 0%, #cfc7da 52%, #6b6376 100%); -webkit-background-clip: text; background-clip: text; transition: all .3s; }\n.mm-row.is-focus .mm-btn { background: none; color: #fff; text-shadow: 0 0 8px rgba(255,255,255,.85); }\n.mm-desc, .mm-key { opacity: 0; transition: opacity .2s; font: 400 calc(.65rem - 2px) var(--font-menu-body); color: #e8e2f0; white-space: nowrap; }\n.mm-row.is-focus .mm-desc, .mm-row.is-focus .mm-key { opacity: 1; }\n.mm-desc { justify-self: end; min-width: 190px; padding: 2px 26px 2px 24px; text-align: center; position: relative;\n  background: linear-gradient(90deg, rgba(30,6,40,0) 0%, rgba(34,8,46,.92) 18%, rgba(34,8,46,.95) 100%); }\n.mm-desc::after { content: '▶'; position: absolute; right: 8px; color: #f4eeff; font-size: calc(.55rem - 2px); top: 50%; translate: 0 -50%; }\n.mm-key { justify-self: start; min-width: 76px; text-align: center; padding: 3px 12px; color: #ece6f6; background: #170c20; border: 2.5px solid #9a85c8; border-radius: 20px;\n  box-shadow: 0 0 8px rgba(154,133,200,.7), inset 0 0 6px rgba(154,133,200,.35); }\n"
+   ]
+  },
+  "pause": {
+   "kind": "screen",
+   "name": "pause",
+   "modal": true,
+   "pauses_game": true,
+   "controls": "menu",
+   "open_with": "pause",
+   "focus": "resume",
+   "class": "pm",
+   "layout": {
+    "kind": "list",
+    "direction": "row",
+    "align": "centre",
+    "justify": "start"
+   },
+   "transition": {
+    "in": {
+     "kind": "fade",
+     "seconds": 0.5
+    },
+    "out": {
+     "kind": "fade",
+     "seconds": 0.25
+    }
+   },
+   "items": [
+    {
+     "id": "left",
+     "type": "panel",
+     "class": "pm-left",
+     "layout": {
+      "kind": "list",
+      "spacing": 8
+     },
+     "items": [
+      {
+       "id": "where",
+       "type": "panel",
+       "class": "pm-block story",
+       "layout": {
+        "kind": "list",
+        "spacing": 3
+       },
+       "animations": {
+        "enter": {
+         "name": "slide_left",
+         "seconds": 0.5,
+         "delay": 0.18
+        }
+       },
+       "items": [
+        {
+         "id": "where_label",
+         "type": "label",
+         "class": "pm-block-label",
+         "text": "Location"
+        },
+        {
+         "id": "where_text",
+         "type": "label",
+         "class": "pm-block-text",
+         "text": "{place}"
+        }
+       ]
+      },
+      {
+       "id": "time",
+       "type": "panel",
+       "class": "pm-block optional",
+       "layout": {
+        "kind": "list",
+        "spacing": 3
+       },
+       "animations": {
+        "enter": {
+         "name": "slide_left",
+         "seconds": 0.5,
+         "delay": 0.18
+        }
+       },
+       "items": [
+        {
+         "id": "time_label",
+         "type": "label",
+         "class": "pm-block-label",
+         "text": "Time"
+        },
+        {
+         "id": "time_text",
+         "type": "label",
+         "class": "pm-block-text",
+         "text": "{clock}"
+        }
+       ]
+      },
+      {
+       "id": "weather",
+       "type": "panel",
+       "class": "pm-block side",
+       "layout": {
+        "kind": "list",
+        "spacing": 3
+       },
+       "animations": {
+        "enter": {
+         "name": "slide_left",
+         "seconds": 0.5,
+         "delay": 0.18
+        }
+       },
+       "items": [
+        {
+         "id": "weather_label",
+         "type": "label",
+         "class": "pm-block-label",
+         "text": "Weather"
+        },
+        {
+         "id": "weather_text",
+         "type": "label",
+         "class": "pm-block-text",
+         "text": "{weather}"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "id": "right",
+     "type": "panel",
+     "class": "pm-right",
+     "layout": {
+      "kind": "list",
+      "align": "stretch"
+     },
+     "items": [
+      {
+       "id": "title",
+       "type": "label",
+       "class": "pm-title",
+       "text": "Paused",
+       "animations": {
+        "enter": {
+         "name": "slide_right",
+         "seconds": 0.46,
+         "delay": 0.12
+        }
+       }
+      },
+      {
+       "id": "nav",
+       "type": "list",
+       "class": "pm-nav",
+       "layout": {
+        "kind": "list",
+        "spacing": 6,
+        "align": "stretch"
+       },
+       "items": [
+        {
+         "id": "resume",
+         "type": "button",
+         "text": "Resume Game",
+         "class": "pm-item",
+         "on_click": {
+          "close": "pause"
+         },
+         "animations": {
+          "enter": {
+           "name": "slide_right",
+           "seconds": 0.46,
+           "stagger": 0.035,
+           "delay": 0.12
+          }
+         }
+        },
+        {
+         "id": "save",
+         "type": "button",
+         "text": "Save Game",
+         "class": "pm-item",
+         "on_click": {
+          "event": "save"
+         },
+         "animations": {
+          "enter": {
+           "name": "slide_right",
+           "seconds": 0.46,
+           "stagger": 0.035,
+           "delay": 0.12
+          }
+         },
+         "enabled": "{saves.can_save}"
+        },
+        {
+         "id": "load",
+         "type": "button",
+         "text": "Switch to Another Saved Game",
+         "class": "pm-item",
+         "on_click": {
+          "open": "pause.saves"
+         },
+         "animations": {
+          "enter": {
+           "name": "slide_right",
+           "seconds": 0.46,
+           "stagger": 0.035,
+           "delay": 0.12
+          }
+         }
+        },
+        {
+         "id": "inventory",
+         "type": "button",
+         "text": "Inventory",
+         "class": "pm-item",
+         "on_click": {
+          "event": "inventory"
+         },
+         "animations": {
+          "enter": {
+           "name": "slide_right",
+           "seconds": 0.46,
+           "stagger": 0.035,
+           "delay": 0.12
+          }
+         },
+         "enabled": false
+        },
+        {
+         "id": "map",
+         "type": "button",
+         "text": "Map",
+         "class": "pm-item",
+         "on_click": {
+          "event": "map"
+         },
+         "animations": {
+          "enter": {
+           "name": "slide_right",
+           "seconds": 0.46,
+           "stagger": 0.035,
+           "delay": 0.12
+          }
+         },
+         "enabled": false
+        },
+        {
+         "id": "team",
+         "type": "button",
+         "text": "Team Management",
+         "class": "pm-item",
+         "on_click": {
+          "event": "team"
+         },
+         "animations": {
+          "enter": {
+           "name": "slide_right",
+           "seconds": 0.46,
+           "stagger": 0.035,
+           "delay": 0.12
+          }
+         },
+         "enabled": false
+        },
+        {
+         "id": "settings",
+         "type": "button",
+         "text": "Settings",
+         "class": "pm-item",
+         "on_click": {
+          "open": "pause.settings"
+         },
+         "animations": {
+          "enter": {
+           "name": "slide_right",
+           "seconds": 0.46,
+           "stagger": 0.035,
+           "delay": 0.12
+          }
+         }
+        },
+        {
+         "id": "dlc",
+         "type": "button",
+         "text": "Manage DLC",
+         "class": "pm-item",
+         "on_click": {
+          "event": "dlc"
+         },
+         "animations": {
+          "enter": {
+           "name": "slide_right",
+           "seconds": 0.46,
+           "stagger": 0.035,
+           "delay": 0.12
+          }
+         },
+         "enabled": false
+        },
+        {
+         "id": "manual",
+         "type": "button",
+         "text": "Game Manual",
+         "class": "pm-item",
+         "on_click": {
+          "event": "manual"
+         },
+         "animations": {
+          "enter": {
+           "name": "slide_right",
+           "seconds": 0.46,
+           "stagger": 0.035,
+           "delay": 0.12
+          }
+         },
+         "enabled": false
+        },
+        {
+         "id": "quit",
+         "type": "button",
+         "text": "Quit to Main Menu",
+         "class": "pm-item",
+         "on_click": [
+          {
+           "close": "pause"
+          },
+          {
+           "open": "main"
+          }
+         ],
+         "animations": {
+          "enter": {
+           "name": "slide_right",
+           "seconds": 0.46,
+           "stagger": 0.035,
+           "delay": 0.12
+          }
+         }
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "css": [
+    "@import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Montserrat:wght@400;500;600;700&family=Orbitron:wght@500;700&family=Raleway:wght@400;500&display=swap');",
+    ".ui-root { --font-script: 'Anthropology', 'Great Vibes', cursive; --font-ui: 'Montserrat', sans-serif; --font-menu: 'Feminine', 'Raleway', 'Montserrat', sans-serif;\n  --font-menu-body: 'Brooklyn', 'Raleway', 'Montserrat', sans-serif; --font-tech: 'Orbitron', sans-serif;\n  --lavender: #cab0fa; --lavender-pale: #f1e8fe; --lilac-grey: #b9aec4; --cream: #f3e4c6; --champagne: #d8c6a2; --gold: #ffc248; }",
+    "\n.pm { padding: 24px 7% 24px 3%; gap: 4vw; justify-content: space-between !important;\n  background: linear-gradient(90deg, rgba(20,4,10,.25) 0%, rgba(14,3,12,.55) 45%, rgba(10,2,10,.93) 70%, rgba(8,1,8,.96) 100%),\n    radial-gradient(ellipse 60% 70% at 20% 40%, rgba(120,30,10,.18), transparent 70%);\n  backdrop-filter: blur(9px) saturate(1.25); -webkit-backdrop-filter: blur(9px) saturate(1.25); }\n.pm-left { width: min(380px, 40vw); flex-shrink: 0; margin-top: 8vh; }\n.pm-right { width: min(520px, 46vw); align-self: center; }\n.pm-block { padding: 7px 12px; border-left: 2px solid rgba(255,255,255,.1); background: linear-gradient(90deg, rgba(20,6,26,.55), transparent); }\n.pm-block.story { border-left-color: var(--lavender); } .pm-block.optional { border-left-color: rgba(120,220,205,.6); } .pm-block.side { border-left-color: var(--gold); }\n.pm-block-label { font: 600 7px var(--font-ui); color: var(--champagne); letter-spacing: 2.5px; text-transform: uppercase; }\n.pm-block-text { font: 400 10px/1.35 var(--font-ui); color: #e6dff0; }\n.pm-title { font-family: var(--font-script); font-size: calc(3.4rem - 2px); color: var(--lavender-pale); text-align: center; margin-bottom: 26px; padding-bottom: 14px;\n  text-shadow: 0 0 18px rgba(202,176,250,.55), 0 0 2px rgba(255,255,255,.6); border-bottom: 1px solid;\n  border-image: linear-gradient(90deg, transparent, rgba(216,198,162,.55), rgba(255,255,255,.6), rgba(216,198,162,.55), transparent) 1; }\n.pm-item { background: none !important; font: 400 calc(.74rem - 2px) var(--font-ui); letter-spacing: 4px; text-transform: uppercase; color: var(--lilac-grey);\n  padding: 10px 24px; position: relative; z-index: 0; transition: color .25s ease; border-radius: 0; }\n.pm-item.is-hover { color: #fff; }\n.pm-item.is-focus { color: #120818; font-weight: 700; }\n.pm-item::before { content: ''; position: absolute; left: -2%; right: -2%; top: 50%; translate: 0 -50%; height: 32px; border-radius: 16px; z-index: -1; opacity: 0; transition: opacity .2s;\n  background: linear-gradient(90deg, transparent 0%, rgba(176,150,210,.7) 12%, #f2ecf4 40%, #f2ecf4 60%, rgba(176,150,210,.7) 88%, transparent 100%); box-shadow: 0 0 22px rgba(202,176,250,.35); }\n.pm-item.is-focus::before { opacity: 1; }\n.pm-item.is-inactive { opacity: .32; }\n.ui-root[data-ui-open~=\"pause.settings\"] .pm-nav, .ui-root[data-ui-open~=\"pause.saves\"] .pm-nav { visibility: hidden; }\n"
+   ]
+  },
+  "pause_settings": {
+   "kind": "screen",
+   "name": "pause.settings",
+   "modal": true,
+   "controls": "menu",
+   "class": "pm-page",
+   "layout": {
+    "kind": "list",
+    "direction": "row",
+    "justify": "end"
+   },
+   "transition": {
+    "in": {
+     "kind": "slide",
+     "from": "right",
+     "seconds": 0.3
+    },
+    "out": {
+     "kind": "fade",
+     "seconds": 0.15
+    }
+   },
+   "items": [
+    {
+     "id": "panel",
+     "type": "panel",
+     "class": "pm-page-panel",
+     "layout": {
+      "kind": "list",
+      "spacing": 6,
+      "align": "stretch"
+     },
+     "items": [
+      {
+       "id": "world_label",
+       "type": "label",
+       "class": "set-section",
+       "text": "World"
+      },
+      {
+       "id": "time_speed",
+       "type": "slider",
+       "text": "Time Speed",
+       "class": "set-row",
+       "value": "{options.time_speed}",
+       "animations": {
+        "enter": {
+         "name": "slide_up",
+         "seconds": 0.3,
+         "stagger": 0.03
+        }
+       },
+       "choices": [
+        {
+         "value": 12,
+         "text": "Normal"
+        },
+        {
+         "value": 120,
+         "text": "Quick"
+        },
+        {
+         "value": 600,
+         "text": "Fast"
+        }
+       ]
+      },
+      {
+       "id": "weather",
+       "type": "slider",
+       "text": "Weather",
+       "class": "set-row",
+       "value": "{options.weather}",
+       "animations": {
+        "enter": {
+         "name": "slide_up",
+         "seconds": 0.3,
+         "stagger": 0.03
+        }
+       },
+       "choices": [
+        {
+         "value": "clear",
+         "text": "Clear"
+        },
+        {
+         "value": "rain",
+         "text": "Rain"
+        },
+        {
+         "value": "snow",
+         "text": "Snow"
+        }
+       ]
+      },
+      {
+       "id": "display_label",
+       "type": "label",
+       "class": "set-section",
+       "text": "Display"
+      },
+      {
+       "id": "zoom",
+       "type": "slider",
+       "text": "Base Zoom",
+       "class": "set-row",
+       "value": "{options.zoom}",
+       "animations": {
+        "enter": {
+         "name": "slide_up",
+         "seconds": 0.3,
+         "stagger": 0.03
+        }
+       },
+       "choices": [
+        {
+         "value": 0.5,
+         "text": "50%"
+        },
+        {
+         "value": 0.7,
+         "text": "70%"
+        },
+        {
+         "value": 1,
+         "text": "100%"
+        },
+        {
+         "value": 1.4,
+         "text": "140%"
+        },
+        {
+         "value": 2,
+         "text": "200%"
+        },
+        {
+         "value": 2.8,
+         "text": "280%"
+        }
+       ]
+      },
+      {
+       "id": "renderer",
+       "type": "slider",
+       "text": "Renderer",
+       "class": "set-row",
+       "value": "{options.renderer}",
+       "animations": {
+        "enter": {
+         "name": "slide_up",
+         "seconds": 0.3,
+         "stagger": 0.03
+        }
+       },
+       "choices": [
+        {
+         "value": "canvas",
+         "text": "Canvas"
+        },
+        {
+         "value": "webgl",
+         "text": "WebGL"
+        }
+       ]
+      },
+      {
+       "id": "dev_bar",
+       "type": "toggle",
+       "text": "Developer Bar",
+       "class": "set-row",
+       "value": "{options.dev_bar}",
+       "animations": {
+        "enter": {
+         "name": "slide_up",
+         "seconds": 0.3,
+         "stagger": 0.03
+        }
+       }
+      },
+      {
+       "id": "back",
+       "type": "button",
+       "class": "set-back",
+       "text": "Back",
+       "on_click": {
+        "back": true
+       },
+       "animations": {
+        "enter": {
+         "name": "fade",
+         "seconds": 0.3,
+         "delay": 0.2
+        }
+       }
+      }
+     ]
+    }
+   ],
+   "css": [
+    ".ui-root { --font-script: 'Anthropology', 'Great Vibes', cursive; --font-ui: 'Montserrat', sans-serif; --font-menu: 'Feminine', 'Raleway', 'Montserrat', sans-serif;\n  --font-menu-body: 'Brooklyn', 'Raleway', 'Montserrat', sans-serif; --font-tech: 'Orbitron', sans-serif;\n  --lavender: #cab0fa; --lavender-pale: #f1e8fe; --lilac-grey: #b9aec4; --cream: #f3e4c6; --champagne: #d8c6a2; --gold: #ffc248; }",
+    "\n.pm-page { padding: 24px 7% 24px 3%; }\n.pm-page-panel { width: min(520px, 46vw); margin-top: calc(3.4rem + 54px); max-height: 74vh; overflow-y: auto; }\n.set-section { font: 600 calc(.6rem - 2px) var(--font-ui); letter-spacing: 4px; color: var(--champagne); text-transform: uppercase; text-align: right; margin-top: 10px; }\n.set-row { padding: 8px 16px !important; border-radius: 4px; background: none !important; align-items: center; transition: background .2s; }\n.set-row.is-focus { background: rgba(255,255,255,.05) !important; }\n.set-row .ui-label { font: 500 calc(.75rem - 2px) var(--font-ui); letter-spacing: 2px; text-transform: uppercase; color: var(--lilac-grey); }\n.set-row.is-focus .ui-label { color: var(--lavender-pale); }\n.set-row .ui-value { font: 600 calc(.64rem - 2px) var(--font-ui); letter-spacing: 1.5px; color: var(--lavender-pale); padding: 4px 14px; min-width: 60px; text-align: center;\n  border: 1px dotted rgba(202,176,250,.5); border-radius: 12px; transition: all .2s; }\n.set-row.is-focus .ui-value { border-color: var(--lavender); color: #fff; box-shadow: 0 0 10px rgba(202,176,250,.35); }\n.set-row.ui-toggle .ui-value { color: rgba(185,174,196,.5); border-color: rgba(185,174,196,.18); }\n.set-row.ui-toggle.is-active .ui-value { color: #1b0d2e; border: 1px solid rgba(255,255,255,.7); background: radial-gradient(ellipse 70% 120% at 50% 50%, #f2ecf4 0%, var(--lavender) 90%); }\n.set-back { align-self: center; margin-top: 14px; background: none !important; font: 500 calc(.8rem - 2px) var(--font-ui); letter-spacing: 3px; text-transform: uppercase; color: #888; padding: 12px 30px; }\n.set-back.is-focus { color: #fff; text-shadow: 0 0 8px rgba(255,255,255,.7); }\n.ui-root:not([data-ui-open~=\"pause\"]) .pm-page { background: rgba(8,1,8,.86); backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px); }\n.ui-root:not([data-ui-open~=\"pause\"]) .pm-page-panel { margin: auto; }\n"
+   ]
+  },
+  "pause_saves": {
+   "kind": "screen",
+   "name": "pause.saves",
+   "modal": true,
+   "controls": "menu",
+   "class": "pm-page",
+   "layout": {
+    "kind": "list",
+    "direction": "row",
+    "justify": "end"
+   },
+   "transition": {
+    "in": {
+     "kind": "slide",
+     "from": "right",
+     "seconds": 0.3
+    },
+    "out": {
+     "kind": "fade",
+     "seconds": 0.15
+    }
+   },
+   "items": [
+    {
+     "id": "panel",
+     "type": "panel",
+     "class": "pm-page-panel",
+     "layout": {
+      "kind": "list",
+      "spacing": 6,
+      "align": "stretch"
+     },
+     "items": [
+      {
+       "id": "saves_label",
+       "type": "label",
+       "class": "set-section",
+       "text": "Saved Games"
+      },
+      {
+       "id": "slots",
+       "type": "list",
+       "class": "save-slots",
+       "from": "{saves.slots}",
+       "empty": "No saved games yet",
+       "layout": {
+        "kind": "list",
+        "spacing": 6,
+        "align": "stretch"
+       },
+       "template": {
+        "type": "button",
+        "class": "save-slot",
+        "text": "{item.label}",
+        "on_click": {
+         "event": "load",
+         "data": {
+          "slot": "{item.slot}"
+         }
+        },
+        "animations": {
+         "enter": {
+          "name": "slide_up",
+          "seconds": 0.3,
+          "stagger": 0.04
+         }
+        }
+       }
+      },
+      {
+       "id": "back",
+       "type": "button",
+       "class": "set-back",
+       "text": "Back",
+       "on_click": {
+        "back": true
+       }
+      }
+     ]
+    }
+   ],
+   "css": [
+    ".ui-root { --font-script: 'Anthropology', 'Great Vibes', cursive; --font-ui: 'Montserrat', sans-serif; --font-menu: 'Feminine', 'Raleway', 'Montserrat', sans-serif;\n  --font-menu-body: 'Brooklyn', 'Raleway', 'Montserrat', sans-serif; --font-tech: 'Orbitron', sans-serif;\n  --lavender: #cab0fa; --lavender-pale: #f1e8fe; --lilac-grey: #b9aec4; --cream: #f3e4c6; --champagne: #d8c6a2; --gold: #ffc248; }",
+    "\n.save-slots .ui-empty { font: italic 400 calc(.68rem - 2px) var(--font-ui); color: rgba(185,174,196,.55); text-align: center; padding: 18px 0; }\n.save-slot { background: linear-gradient(90deg, rgba(20,6,26,.55), transparent) !important; border-left: 2px solid var(--lavender); border-radius: 0; text-align: left;\n  font: 500 calc(.72rem - 2px) var(--font-ui); letter-spacing: 2px; color: #e6dff0; }\n.save-slot.is-focus { background: linear-gradient(90deg, rgba(202,176,250,.25), transparent) !important; color: #fff; }\n.ui-root:not([data-ui-open~=\"pause\"]) .pm-page { background: rgba(8,1,8,.86); backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px); }\n.ui-root:not([data-ui-open~=\"pause\"]) .pm-page-panel { margin: auto; }\n"
+   ]
+  },
+  "hud": {
+   "kind": "screen",
+   "name": "hud",
+   "class": "hud",
+   "layout": {
+    "kind": "free"
+   },
+   "transition": {
+    "in": {
+     "kind": "fade",
+     "seconds": 0.4
+    }
+   },
+   "items": [
+    {
+     "id": "health",
+     "type": "bar",
+     "class": "hud-health",
+     "value": "{player.health}",
+     "max": 100,
+     "position": {
+      "anchor": "top_left",
+      "offset": [
+       20,
+       56
+      ]
+     }
+    },
+    {
+     "id": "pause_button",
+     "type": "button",
+     "class": "hud-pause",
+     "text": "⏸",
+     "position": {
+      "anchor": "top_right",
+      "offset": [
+       -20,
+       56
+      ]
+     },
+     "on_click": {
+      "open": "pause"
+     }
+    },
+    {
+     "id": "stats",
+     "type": "panel",
+     "class": "hud-stats",
+     "position": {
+      "anchor": "top_right",
+      "offset": [
+       -20,
+       112
+      ]
+     },
+     "layout": {
+      "kind": "list",
+      "align": "end",
+      "spacing": 5
+     },
+     "items": [
+      {
+       "id": "time",
+       "type": "label",
+       "class": "hud-time",
+       "text": "{clock}"
+      },
+      {
+       "id": "money",
+       "type": "label",
+       "class": "hud-money",
+       "text": "PP: {player.pp}"
+      }
+     ]
+    },
+    {
+     "id": "location",
+     "type": "label",
+     "class": "hud-location",
+     "text": "{place}",
+     "position": {
+      "anchor": "bottom_right",
+      "offset": [
+       -20,
+       -20
+      ]
+     }
+    }
+   ],
+   "css": [
+    "@import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Montserrat:wght@400;500;600;700&family=Orbitron:wght@500;700&family=Raleway:wght@400;500&display=swap');",
+    ".ui-root { --font-script: 'Anthropology', 'Great Vibes', cursive; --font-ui: 'Montserrat', sans-serif; --font-menu: 'Feminine', 'Raleway', 'Montserrat', sans-serif;\n  --font-menu-body: 'Brooklyn', 'Raleway', 'Montserrat', sans-serif; --font-tech: 'Orbitron', sans-serif;\n  --lavender: #cab0fa; --lavender-pale: #f1e8fe; --lilac-grey: #b9aec4; --cream: #f3e4c6; --champagne: #d8c6a2; --gold: #ffc248; }",
+    "\n.hud-health { width: 200px; height: 12px; border-radius: 0; background: rgba(30,5,5,.95); color: #8b0000; }\n.hud-health .ui-fill { background: linear-gradient(90deg, #3a0000, #6b0000, #8b0000); box-shadow: inset 0 1px 0 rgba(255,100,100,.15); border-radius: 0; transition: width .2s ease-out; }\n.hud-pause { width: 44px; height: 44px; padding: 0 !important; border-radius: 50% !important; display: flex; align-items: center; justify-content: center;\n  background: rgba(20,0,10,.4) !important; border: 1px solid rgba(255,255,255,.2); color: #fff; font-size: calc(1.2rem - 2px); }\n.hud-pause.is-hover { background: rgba(60,10,40,.6) !important; }\n.hud-time { font: 500 calc(1.2rem - 2px) var(--font-tech); color: #fff; text-shadow: 0 0 5px #fff; letter-spacing: 2px; }\n.hud-money { font: 400 calc(.9rem - 2px) var(--font-ui); color: #ffd700; text-shadow: 0 0 5px #ffd700; }\n.hud-location { font: 400 calc(1.3rem - 2px) var(--font-script); color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,.8), 0 0 15px rgba(164,105,255,.3); }\n"
+   ]
+  }
+ }
+}

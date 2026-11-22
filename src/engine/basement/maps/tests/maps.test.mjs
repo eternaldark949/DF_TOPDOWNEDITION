@@ -1,0 +1,399 @@
+// ===== LV0 BASEMENT =====
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { physicsSystem, BODY_GROUP } from '../../physics/index.mjs';
+import { buildMapPackets, declaredLight, mapInstance, mapSystem, MARKER, markerComponent, readMarker, rowPlacements } from '../index.mjs';
+
+const room = {
+    map_id: 'test_room', kind: 'interior', size: [400, 300], boundary: { thickness: 20 }, spawn: [50, 50],
+    walls: [{ x: 0, y: 150, w: 400, h: 10 }],
+    doors: [{ x: 180, y: 150, w: 40, h: 10, orientation: 'H', type: 'sliding' }],
+    placements: [{ type: 'crate', x: 40, y: 40, width: 30, height: 20 }, { type: 'sofa', x: 200, y: 200, width: 80, height: 30, light: { radius: 60 } }],
+    lights: [{ position: [300, 60], radius: 120 }],
+    triggers: [{ x: 380, y: 0, w: 20, h: 40, role: 'transition', authored_id: 'exit_0', data: { target: 'street' } }],
+    cloths: [{ x: 10, y: 10, width: 20, length: 40, segments: 2, role: 'curtain' }]
+};
+
+test('the builder cuts door openings, rings the boundary and gives stable ids', () => {
+    const { entries, spawn } = buildMapPackets(room, { prop_types: { sofa: { movable: true } } });
+    const walls = entries.filter(e => e.section === 'walls');
+    assert.equal(walls.length, 2 + 4, 'the wall is split around the door, plus four boundary walls');
+    assert.ok(walls.every(w => w.source.x + w.source.w <= 178 || w.source.x >= 222 || w.source.y !== 150));
+    assert.deepEqual(entries.map(e => e.packet.data.authored_id).filter(Boolean), ['wall_0', 'wall_1', 'wall_2', 'wall_3', 'wall_4', 'wall_5', 'prop_0', 'prop_1', 'lamp_0', 'exit_0', 'door_0', 'door_0_right', 'curtain_0']);
+    const [crate, sofa] = entries.filter(e => e.section === 'placements').map(e => e.packet);
+    assert.deepEqual(crate.position, [55, 50]); assert.deepEqual(crate.collision_shape.dimensions, [30, 20]);
+    assert.equal(crate.data.movable, false); assert.equal(sofa.data.movable, true); assert.equal(sofa.data.prop_type, 'sofa');
+    assert.deepEqual(sofa.light_shape, { shape_type: 'circle', radius: 60, local_position: [0, 0] });
+    const leaves = entries.filter(e => e.section === 'doors').map(e => e.packet);
+    assert.deepEqual(leaves.map(l => l.data.role), ['door', 'door_panel']);
+    assert.ok(leaves[0].data.open_position[0] < leaves[0].position[0] && leaves[1].data.open_position[0] > leaves[1].position[0], 'leaves slide apart');
+    const cloth = entries.find(e => e.section === 'cloths').packet;
+    assert.equal(cloth.data.mesh.points.length, 6); assert.deepEqual(cloth.data.mesh.anchors, [0, 1]);
+    assert.deepEqual(spawn, [50, 50]);
+    assert.deepEqual(buildMapPackets(room).entries.map(e => e.packet), buildMapPackets(room).entries.map(e => e.packet), 'deterministic');
+    assert.throws(() => buildMapPackets({ kind: 'cave' }), /Unknown map kind/);
+    assert.throws(() => buildMapPackets({ placements: [{ x: 0, y: 0, width: NaN, height: 1 }] }), /finite/);
+});
+
+test('decorate adds game data without the builder knowing it', () => {
+    const { entries } = buildMapPackets(room, { templates: { prop: 'game:furniture' }, decorate: (packet, { section, source }) => {
+        if (section === 'placements') packet.data.art = `${source.type}_art`;
+        return packet;
+    } });
+    const props = entries.filter(e => e.section === 'placements').map(e => e.packet);
+    assert.deepEqual(props.map(p => [p.template, p.data.art]), [['game:furniture', 'crate_art'], ['game:furniture', 'sofa_art']]);
+});
+
+test('an interior builds every entity at load, finds them by id and role, and opens doors by proximity', () => {
+    const physics = new physicsSystem(), map = new mapInstance(physics, room);
+    assert.equal(map.entities().length, map.packets().length);
+    assert.equal(map.entities('door').length, 1); assert.equal(map.entities('door_panel').length, 1);
+    assert.deepEqual(map.entities(undefined, { section: 'triggers' }).map(e => e.data.authored_id), ['exit_0']); assert.equal(map.entities('wall', { section: 'walls' }).length, 6); assert.deepEqual(map.entities('wall', { section: 'triggers' }), []);
+    assert.equal(map.entity('exit_0').data.target, 'street');
+    const door = map.entity('door_0'), closed = [...door.position];
+    const walker = physics.elements.createEntity({ kind: 'character',  position: [200, 120], collision_shape: { shape_type: 'circle', radius: 8 } });
+    map.updateState({ duration: 0.1 });
+    for (let i = 0; i < 20; i++) physics.updateState();
+    assert.equal(door.data.open, true);
+    assert.ok(Math.abs(door.position[0] - closed[0]) > 10, 'the leaf moved');
+    walker.motor.teleportTo([50, 280]);
+    map.updateState({ duration: 0.1 });
+    for (let i = 0; i < 20; i++) physics.updateState();
+    assert.equal(door.data.open, false);
+    assert.ok(Math.hypot(door.position[0] - closed[0], door.position[1] - closed[1]) < 1e-6, 'and closed again');
+    assert.deepEqual(map.setFocus([0, 0]), { loaded: 0, unloaded: 0, pending: 0 }, 'a map smaller than its radius is whole from the start, so focus changes nothing');
+    map.destroy();
+    assert.equal(physics.elements.getEntities().filter(e => e.data?.authored_id).length, 0);
+});
+
+const city = () => {
+    const placements = [];
+    for (let x = 0; x < 8; x++) for (let y = 0; y < 8; y++) placements.push({ type: 'bin', x: x * 500 + 10, y: y * 500 + 10, width: 20, height: 20, movable: true });
+    return { map_id: 'city', kind: 'exterior', size: [4000, 4000], boundary: { thickness: 50 }, regions: { size: 1000, radius: 500, keep: 500 }, spawn: [100, 100], placements, walls: [{ x: 0, y: 1990, w: 4000, h: 20 }] };
+};
+
+test('a map larger than its radius streams regions around the focus and keeps large entries loaded', () => {
+    const physics = new physicsSystem(), map = new mapInstance(physics, city());
+    assert.equal(map.entities().filter(e => e.data.role !== 'prop').length, 5, 'the boundary ring and the long wall stay loaded');
+    assert.deepEqual(map.loaded_regions, ['0,0'], 'built round its spawn at construction');
+    assert.ok(map.entity('prop_0'), 'the bin next to the focus exists');
+    assert.equal(map.entity('prop_63'), null, 'a far bin is not built');
+    const before = map.entities('prop').length;
+    map.setFocus([3900, 3900], { radius: 500, keep: 500 });
+    assert.equal(map.entity('prop_0'), null, 'leaving releases the old regions');
+    assert.ok(map.entity('prop_63'));
+    assert.ok(map.entities('prop').length <= before + 4);
+    assert.equal(physics.spatial_grid, physics.spatial_grid, 'one world index throughout');
+    const stats = map.getStatistics();
+    assert.ok(stats.region_loads >= 2 && stats.region_unloads >= 1 && stats.regions === 16);
+    assert.equal(map.kind, 'exterior', 'kind is kept as a label; the loader never branches on it');
+});
+
+test('streaming follows several focuses, reaches ahead of a moving one, spreads its building over calls and drives every tier', () => {
+    const physics = new physicsSystem(), map = new mapInstance(physics, city());
+    map.setFocus([[100, 100], [3900, 3900]], { budget_ms: Infinity });
+    assert.ok(map.entity('prop_0') && map.entity('prop_63'), 'two focuses keep both corners built');
+    map.setFocus([{ position: [100, 100], velocity: [2000, 0] }], { budget_ms: Infinity });
+    assert.ok(map.entity('prop_32'), 'a focus moving east builds the region a second ahead of it');
+    assert.equal(map.entity('prop_63'), null, 'and the far corner is released');
+    let clock = 0; const now = () => (clock += 2);                  // (each region costs 2 ms on this clock)
+    const first = map.setFocus([2000, 2000], { radius: 1500, budget_ms: 3, now });
+    assert.ok(first.loaded >= 1 && first.pending > 0, `a 3 ms budget leaves regions for the next call (${JSON.stringify(first)})`);
+    let calls = 1; while (map.setFocus([2000, 2000], { radius: 1500, budget_ms: 3, now }).pending) calls++;
+    assert.ok(calls > 1 && map.loaded_regions.length === 16, 'the rest build over later calls');
+    const ground = []; map.addTier('ground', { radius: 0, keep: 0, load: key => ground.push(`+${key}`), release: key => ground.push(`-${key}`) });
+    map.setFocus([500, 500], { budget_ms: Infinity }); map.setFocus([1500, 500], { budget_ms: Infinity });
+    assert.deepEqual(ground, ['+0,0', '-0,0', '+1,0'], 'a tier loads and releases its own regions at its own radius');
+    assert.throws(() => map.addTier('ground', { radius: 0, load() {}, release() {} }), /new name/);
+    map.destroy(); assert.equal(ground.at(-1), '-1,0', 'and lets go of them with the map');
+});
+
+test('a moved movable entity keeps its pose across unloads and saves', () => {
+    const physics = new physicsSystem(), map = new mapInstance(physics, city());
+    map.setFocus([100, 100], { radius: 400, keep: 400 });
+    map.entity('prop_0').updateBody({ position: [60, 80] });
+    map.setFocus([3900, 3900], { radius: 400, keep: 400 });
+    assert.equal(map.entity('prop_0'), null);
+    const saved = map.saveState();
+    assert.deepEqual(saved.memory.prop_0.position, [60, 80]);
+    map.setFocus([100, 100], { radius: 400, keep: 400 });
+    assert.deepEqual([...map.entity('prop_0').position], [60, 80], 'rebuilt where it was left');
+    map.destroy();
+
+    const next = new mapInstance(new physicsSystem(), city()).loadState(JSON.parse(JSON.stringify(saved)));
+    next.setFocus([100, 100], { radius: 400, keep: 400 });
+    assert.deepEqual([...next.entity('prop_0').position], [60, 80], 'memory survives a save');
+    assert.equal(next.loadState({ memory: { nowhere: { position: [0, 0], rotation: 0 } } }).getStatistics().remembered, 0, 'unknown ids are dropped');
+});
+
+test('a mapSystem holds one map per world and releases the previous one', () => {
+    const physics = new physicsSystem(), maps = new mapSystem(physics);
+    const a = maps.load(room);
+    assert.equal(maps.current, a);
+    const count = physics.elements.getEntities().length;
+    maps.load({ ...room, map_id: 'other', placements: [] });
+    assert.equal(physics.elements.getEntities().length, count - 2, 'the old map is gone, the new one has no props');
+    maps.unload();
+    assert.equal(maps.current, null); assert.equal(physics.elements.getEntities().length, 0);
+    assert.throws(() => new mapSystem({}), /physicsSystem/);
+    assert.throws(() => new mapInstance(physics, { placements: [{ x: 0, y: 0, width: 1, height: 1, authored_id: 'a' }, { x: 5, y: 0, width: 1, height: 1, authored_id: 'a' }] }), /Duplicate/);
+});
+
+test('the map system stays game-neutral', async () => {
+    const { readFileSync, readdirSync } = await import('node:fs');
+    for (const file of readdirSync(new URL('..', import.meta.url)).filter(f => f.endsWith('.mjs'))) {
+        const source = readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
+        assert.doesNotMatch(source, /directory\/|df_|apartment/i, file);
+        for (const [, path] of source.matchAll(/from '([^']+)'/g)) assert.ok(path.startsWith('./') || path.startsWith('../physics/'), `${file} imports ${path}`);
+    }
+});
+
+// Hall (L-shaped, two rects) -- door -- study; hall -- arch -- yard (outdoor); study -- fixed gap -- vault
+const house = {
+    map_id: 'house', size: [600, 400], boundary: { thickness: 10 },
+    walls: [{ x: 300, y: 0, w: 8, h: 200 }],
+    rooms: {
+        hall: { rects: [{ x: 0, y: 0, w: 300, h: 100 }, { x: 0, y: 100, w: 100, h: 300 }], label: 'Hall' },
+        study: { x: 308, y: 0, w: 292, h: 200 },
+        yard: { x: 100, y: 200, w: 200, h: 200, type: 'outdoor' },
+        vault: { x: 400, y: 200, w: 200, h: 200 }
+    },
+    doors: [{ x: 300, y: 40, w: 8, h: 40, orientation: 'V', type: 'sliding', rooms: ['hall', 'study'] },
+        { x: 100, y: 200, w: 60, h: 8, orientation: 'H', type: 'arch', rooms: ['hall', 'yard'] }],
+    room_links: [{ rooms: ['study', 'vault'], openness: 0.5 }]
+};
+
+test('rooms are volumes in the shared grid, with multi-rect rooms and gaps between them', () => {
+    const physics = new physicsSystem(), map = new mapInstance(physics, house), rooms = map.rooms;
+    assert.equal(map.entities('room').length, 5, 'one volume per rectangle');
+    assert.equal(map.entities('door').length, 1, 'an arch has no leaf');
+    assert.equal(rooms.roomAt([50, 300]).id, 'hall', 'the L-shaped leg');
+    assert.equal(rooms.roomAt([200, 50]).id, 'hall');
+    assert.equal(rooms.roomAt([304, 150]), null, 'inside the wall');
+    assert.equal(rooms.roomAt([150, 300]).type, 'outdoor');
+    assert.deepEqual(rooms.room('hall').bounds, { left: 0, top: 0, right: 300, bottom: 400 });
+    assert.throws(() => new mapInstance(new physicsSystem(), { ...house, room_links: [{ rooms: ['hall', 'attic'] }] }), /known rooms/);
+});
+
+test('room links report live openness, routes and exposure', () => {
+    const physics = new physicsSystem(), map = new mapInstance(physics, house), rooms = map.rooms;
+    assert.deepEqual(rooms.connections('hall').map(c => [c.room, c.kind]).sort(), [['study', 'door'], ['yard', 'arch']]);
+    assert.equal(rooms.openness('hall', 'study'), 0, 'the door starts shut');
+    assert.equal(rooms.openness('hall', 'yard'), 1);
+    assert.equal(rooms.openness('yard', 'study'), 0, 'not directly linked');
+    assert.equal(rooms.route('yard', 'vault'), null, 'shut door blocks the only way');
+    physics.elements.createEntity({ kind: 'character',  position: [290, 60], collision_shape: { shape_type: 'circle', radius: 8 } });
+    map.updateState({ duration: 0.1 });
+    for (let i = 0; i < 4; i++) physics.updateState();
+    const partly = rooms.openness('hall', 'study');
+    assert.ok(partly > 0 && partly < 1, `openness follows the leaf (${partly})`);
+    for (let i = 0; i < 20; i++) physics.updateState();
+    assert.equal(rooms.openness('hall', 'study'), 1);
+    assert.deepEqual(rooms.route('yard', 'vault'), ['yard', 'hall', 'study', 'vault']);
+    assert.equal(rooms.route('yard', 'vault', { min_openness: 0.6 }), null, 'the half-open gap is too narrow');
+    const reach = rooms.exposure('yard', { falloff: 0.8 });
+    assert.equal(reach.get('yard'), 1); assert.ok(Math.abs(reach.get('hall') - 0.8) < 1e-9); assert.ok(Math.abs(reach.get('vault') - 0.8 * 0.8 * 0.8 * 0.5) < 1e-9);
+});
+
+test('occupancy tracks any body, keeps it in its room across doorways and reports changes', () => {
+    const physics = new physicsSystem(), map = new mapInstance(physics, house), rooms = map.rooms, changes = [];
+    const cat = physics.elements.createEntity({ kind: 'character',  position: [50, 50], collision_shape: { shape_type: 'circle', radius: 4 } });
+    const guest = physics.elements.createEntity({ kind: 'character',  position: [500, 300], collision_shape: { shape_type: 'circle', radius: 4 } });
+    const stop = rooms.onRoomChange(c => changes.push([c.from, c.to]));
+    assert.equal(rooms.track(cat).id, 'hall'); assert.equal(rooms.track(guest).id, 'vault');
+    cat.motor.teleportTo([304, 60]); rooms.updateState();
+    assert.equal(rooms.roomOf(cat).id, 'hall', 'in the doorway, still the hall');
+    cat.motor.teleportTo([400, 60]); rooms.updateState();
+    assert.equal(rooms.roomOf(cat).id, 'study');
+    assert.deepEqual(rooms.occupants('study'), [cat]);
+    assert.deepEqual(changes, [['hall', 'study']]);
+    const before = rooms.getStatistics().grid_lookups;
+    for (let i = 0; i < 10; i++) rooms.updateState();
+    assert.equal(rooms.getStatistics().grid_lookups, before, 'staying put needs no grid query');
+    stop(); guest.destroy(); rooms.updateState();
+    assert.equal(rooms.getStatistics().tracked, 1, 'destroyed bodies drop out');
+    rooms.setFlag('study', 'lights_off', true);
+    const saved = JSON.parse(JSON.stringify(map.saveState()));
+    const next = new mapInstance(new physicsSystem(), house).loadState(saved);
+    assert.equal(next.rooms.getFlag('study', 'lights_off'), true, 'room flags save with the map');
+});
+
+test('a hinged door is a physical leaf: a body pushes it open, its spring swings it shut, and it stops short of the wall', () => {
+    const hall = { map_id: 'hinge', size: [400, 300], walls: [{ x: 0, y: 150, w: 400, h: 10 }],
+        rooms: { north: { x: 0, y: 0, w: 400, h: 150 }, south: { x: 0, y: 160, w: 400, h: 140 } },
+        doors: [{ x: 180, y: 150, w: 40, h: 10, orientation: 'H', type: 'hinged', rooms: ['north', 'south'] }] };
+    const physics = new physicsSystem(), map = new mapInstance(physics, hall), door = map.entity('door_0');
+    assert.equal(door.data.hinged, true);
+    assert.equal(physics.getBodyConstraints(door).length, 1, 'the map built its hinge');
+    // An actor-weight walker (the game's people weigh 8 to 12); a 1 kg body cannot shift a 12 kg leaf.
+    const walker = physics.elements.createEntity({ kind: 'character',  position: [205, 110], mass: 10, collision_shape: { shape_type: 'circle', radius: 8 }, movement: { max_speed: 90 } });
+    let widest = 0, passed = false;
+    walker.motor.setMovement([0, 1]);
+    for (let i = 0; i < 120; i++) { map.updateState(); physics.updateState(); widest = Math.max(widest, Math.abs(door.rotation)); if (walker.position[1] > 180) { passed = true; break; } }
+    assert.ok(passed, `the walker got through (at ${walker.position[1].toFixed(1)})`);
+    assert.ok(widest > 0.5, `the walker swung the leaf open (${widest.toFixed(2)} rad)`);
+    assert.ok(map.rooms.openness('north', 'south') > 0, 'the open leaf opens the room link');
+    walker.motor.setMovement([0, 0]); walker.motor.teleportTo([60, 260]);
+    for (let i = 0; i < 300; i++) { map.updateState(); physics.updateState(); widest = Math.max(widest, Math.abs(door.rotation)); }
+    assert.ok(widest <= Math.PI - 0.25 + 1e-3, 'it never folds back flat against the wall');
+    assert.ok(Math.abs(door.rotation) < 0.05, `and the spring swung it shut (${door.rotation.toFixed(3)} rad)`);
+    assert.ok(Math.hypot(door.position[0] - 180, door.position[1] - 155) < 0.5, 'on its hinge');
+    const copy = new physicsSystem(); copy.loadPhysicsState(physics.savePhysicsState());
+    const restored = copy.elements.getEntities().find(e => e.data?.authored_id === door.data.authored_id);
+    assert.equal(copy.getBodyConstraints(restored).length, 1, 'the hinge saves with the world');
+});
+
+test('reconnect adds a hinge a restored world lacks', () => {
+    const hall = { doors: [{ x: 0, y: 0, w: 40, h: 10, orientation: 'H', type: 'hinged' }] };
+    const physics = new physicsSystem(), map = new mapInstance(physics, hall), door = map.entity('door_0');
+    physics.removeConstraint(physics.getBodyConstraints(door)[0]);
+    assert.equal(physics.getBodyConstraints(door).length, 0);
+    map.reconnect();
+    assert.equal(physics.getBodyConstraints(door).length, 1);
+    map.reconnect();
+    assert.equal(physics.getBodyConstraints(door).length, 1, 'never a second hinge');
+});
+
+test('door kinds are data: a double door is two hinged leaves, and a game may add its own kind', () => {
+    const double = { leaves: [{ from: [0, 0], to: [0.5, -1], motion: 'hinge', pivot: 0, hinge: { mass: 6 } }, { from: [0.5, 1], to: [1, 0], motion: 'hinge', pivot: 1, hinge: { mass: 6 }, suffix: 'right' }] };
+    const hall = { map_id: 'double', size: [400, 300], walls: [{ x: 0, y: 150, w: 400, h: 10 }],
+        rooms: { north: { x: 0, y: 0, w: 400, h: 150 }, south: { x: 0, y: 160, w: 400, h: 140 } },
+        doors: [{ x: 160, y: 150, w: 80, h: 10, orientation: 'H', type: 'double', rooms: ['north', 'south'] }] };
+    assert.throws(() => buildMapPackets(hall), /Unknown door kind double/);
+    assert.throws(() => buildMapPackets(hall, { door_kinds: { double: { leaves: [{ from: [0, 0], to: [1, 0], motion: 'spin' }] } } }), /slide or hinge/);
+    const physics = new physicsSystem(), map = new mapInstance(physics, hall, { door_kinds: { double } });
+    const left = map.entity('door_0'), right = map.entity('door_0_right');
+    assert.deepEqual([left.position, right.position], [[160, 155], [240, 155]], 'each leaf hangs on its own end');
+    assert.equal(physics.getBodyConstraints(left).length + physics.getBodyConstraints(right).length, 2);
+    assert.equal(map.rooms.openness('north', 'south'), 0);
+    const walker = physics.elements.createEntity({ kind: 'character',  position: [200, 110], mass: 10, collision_shape: { shape_type: 'circle', radius: 8 }, movement: { max_speed: 90 } });
+    walker.motor.setMovement([0, 1]); let passed = false;
+    for (let i = 0; i < 120 && !passed; i++) { map.updateState(); physics.updateState(); passed = walker.position[1] > 180; }
+    assert.ok(passed, `the walker parts both leaves (at ${walker.position[1].toFixed(1)})`);
+    assert.ok(Math.abs(left.rotation) > .3 && Math.abs(right.rotation) > .3, `both leaves swing (${left.rotation.toFixed(2)}, ${right.rotation.toFixed(2)})`);
+    assert.ok(Math.sign(left.rotation) !== Math.sign(right.rotation), 'away from each other');
+    assert.ok(map.rooms.openness('north', 'south') > 0);
+});
+
+test('a mirrored door hangs on its far end, and the built-in kinds build as before', () => {
+    const one = d => buildMapPackets({ doors: [d] }).entries.map(e => e.packet);
+    const [right] = one({ x: 0, y: 0, w: 40, h: 10, orientation: 'H', type: 'hinged', hingeSide: 'right' });
+    assert.deepEqual(right.position, [40, 5]); assert.deepEqual(right.collision_shape.local_position, [-20, 0]);
+    const sliding = one({ x: 0, y: 0, w: 40, h: 10, orientation: 'H', type: 'sliding' });
+    assert.deepEqual(sliding.map(p => p.data.authored_id), ['door_0', 'door_0_right']);
+    assert.deepEqual(sliding.map(p => p.position), [[9, 5], [31, 5]]);
+    assert.deepEqual(sliding.map(p => p.data.open_position), [[-15, 5], [55, 5]]);
+    assert.deepEqual(one({ x: 0, y: 0, w: 10, h: 40, orientation: 'V' })[0].data.open_position, [5, 60], 'no type is plain');
+    assert.equal(one({ x: 0, y: 0, w: 40, h: 10, orientation: 'H', type: 'arch' }).length, 0);
+});
+test('getDoors lists every door with its opening and live leaves, arches included', () => {
+    const physics = new physicsSystem(), map = new mapInstance(physics, { map_id: 'd', size: [400, 300], doors: [
+        { x: 180, y: 150, w: 40, h: 10, orientation: 'H', type: 'sliding' }, { x: 100, y: 40, w: 20, h: 80, orientation: 'V', type: 'arch' }, { x: 300, y: 100, w: 8, h: 60, orientation: 'V', type: 'hinged' }] });
+    const doors = map.getDoors();
+    assert.deepEqual(doors.map(d => [d.door_key, d.type, d.leaves.length]), [['door_0', 'sliding', 2], ['door_1', 'arch', 0], ['door_2', 'hinged', 1]]);
+    assert.deepEqual(doors[1].opening, { position: [110, 80], length: 80, across: 20, rotation: Math.PI / 2 });
+    assert.deepEqual(doors[0].opening, { position: [200, 155], length: 40, across: 10, rotation: 0 });
+    assert.equal(doors[0].leaves[1], map.entity('door_0_right')); assert.deepEqual(doors[2].leaves[0].data.opening, doors[2].opening);
+    doors[1].opening.position[0] = 999; assert.equal(map.getDoors()[1].opening.position[0], 110, 'callers get copies');
+});
+
+test('lights are declared one way on a lamp, a placement or a catalog type, and door leaves and big props block light', () => {
+    const prop_types = { vending: { light: { radius: 175, color: '#00f3ff', shadows: 'none', animation: { kind: 'pulse', rate: 20, depth: .04 } } }, shelf: { blocks_light: true }, chair: {} };
+    const { entries } = buildMapPackets({ lights: [{ position: [10, 10], radius: 120, color: '#fff', flicker: 3 }],
+        placements: [{ type: 'vending', x: 0, y: 0, width: 40, height: 60 }, { type: 'shelf', x: 100, y: 0, width: 80, height: 20 }, { type: 'chair', x: 200, y: 0, width: 10, height: 10, light: { radius: 50, dx: 2, size: null } }],
+        doors: [{ x: 300, y: 0, w: 40, h: 8, orientation: 'H', type: 'sliding' }] }, { prop_types });
+    const [lamp] = entries.filter(e => e.section === 'lights').map(e => e.packet), [vending, shelf, chair] = entries.filter(e => e.section === 'placements').map(e => e.packet);
+    assert.deepEqual(lamp.data.emission, { shape: 'point', radius: 120, position: [0, 0], color: '#fff', intensity: null, glow: null, height: 0, look: null, shadows: 'dynamic', animation: { kind: 'flicker', rate: 3 } });
+    assert.deepEqual(vending.data.emission.animation, { kind: 'pulse', rate: 20, depth: .04 }, 'the type gives its light');
+    assert.equal(vending.light_shape.radius, 175);
+    assert.deepEqual(chair.data.emission.position, [2, 0]);
+    assert.equal(shelf.blocks_light, true, 'the type says the shelf blocks light'); assert.equal(chair.blocks_light, undefined);
+    assert.ok(entries.filter(e => e.section === 'doors').every(e => e.packet.blocks_light === true), 'every door leaf blocks light');
+    assert.throws(() => declaredLight({ radius: 10, animation: { kind: 'strobe' } }), /animation/);
+    assert.throws(() => declaredLight({ radius: 10, shadows: 'soft' }), /shadows/);
+    assert.deepEqual(declaredLight({ radius: 150, glow: .3, intensity: 0, animation: { kind: 'stutter', period: 9 } }).animation, { kind: 'stutter', period: 9, burst: .9, depth: .7, offset: 0 }, 'a faulty lamp stutters now and then');
+    assert.equal(declaredLight({ size: [60, 3], rotation: .4 }).rotation, .4, 'a strip can be turned');
+    const lamp2 = declaredLight({ radius: 300, inner_radius: 10, cut: [[0, 1], [.45, .45], [1, 0]], glow_stops: [[0, '#fff'], [1, 'rgba(0,0,0,0)']] });
+    assert.deepEqual([lamp2.inner_radius, lamp2.cut[1], lamp2.glow_stops[0]], [10, [.45, .45], [0, '#fff']], 'how its light falls off, when it says');
+    assert.equal('cut' in declaredLight({ radius: 5 }), false, 'and nothing when it does not');
+    assert.throws(() => declaredLight({ radius: 5, cut: [[0, 1]] }), /cut/); assert.throws(() => declaredLight({ radius: 5, glow_stops: [[0, 1], [1, 2]] }), /glow_stops/);
+});
+
+test('floors are drawing steps in map space, walls take a drawn look, and a placement can name a catalog object', () => {
+    const made = [];
+    const { entries } = buildMapPackets({
+        floor_layer: -90,
+        floors: [{ shape: 'rectangle', x: 10, y: 20, width: 100, height: 40, material: 'demo:parquet' }, { shape: 'circle', x: 200, y: 50, radius: 30, fill: '#fff', line_width: 4, elevation: 2 }],
+        wall_look: { material: 'demo:plaster', height: 120, layer: 10 },
+        walls: [{ x: 0, y: 0, w: 100, h: 8 }, { x: 0, y: 8, w: 8, h: 50, material: 'demo:stone', sides: 'demo:stone_face', height: 60 }],
+        placements: [{ object: 'demo:rug', at: [50, 40], rotation: .5 }, { object: 'demo:cart', x: 100, y: 100, width: 20, height: 10, data: { tag: 1 }, look: { values: { name: 'Butter Moon' } } }]
+    }, { make_object: (record, at, overrides) => { made.push(record); return { kind: 'decoration', position: at, ...overrides }; } });
+    const [a, b] = entries.filter(e => e.section === 'floors').map(e => e.packet);
+    assert.equal(entries[0].section, 'floors', 'floors are built first');
+    assert.deepEqual(a.position, [60, 40]); assert.deepEqual(a.render_shape.dimensions, [100, 40]);
+    assert.deepEqual(a.components[0].layers[0].steps, [{ shape: 'group', x: -60, y: -40, steps: [{ shape: 'rectangle', x: 10, y: 20, width: 100, height: 40, material: 'demo:parquet' }] }], 'drawn back by its centre, so its texture stays anchored to the map');
+    assert.deepEqual(a.data, { role: 'floor', authored_id: 'floor_0', look: { layer: -90, depth: 0 } });
+    assert.deepEqual(b.render_shape.dimensions, [64, 64], 'a stroke widens the bounds by half its width');
+    assert.equal(b.elevation, 2); assert.equal(b.components[0].layers[0].steps[0].steps[0].elevation, undefined);
+    assert.ok(b.data.look.depth > a.data.look.depth, 'later steps draw over earlier ones');
+    const [plain, stone] = entries.filter(e => e.section === 'walls').map(e => e.packet);
+    assert.deepEqual(plain.components[0].layers[0], { layer: 0, height: 0, thickness: 120, solid: false, sides: { material: 'demo:plaster' }, steps: [{ shape: 'rectangle', x: -50, y: -4, width: 100, height: 8, material: 'demo:plaster' }] });
+    assert.deepEqual(plain.collision_shape, { shape_type: 'box', dimensions: [100, 8] }, 'the look never changes what a wall stops');
+    assert.equal(stone.components[0].layers[0].thickness, 60); assert.deepEqual(stone.components[0].layers[0].sides, { material: 'demo:stone_face' });
+    assert.deepEqual(plain.data.look, { layer: 10 });
+    assert.equal(buildMapPackets({ walls: [{ x: 0, y: 0, w: 1, h: 1 }] }).entries[0].packet.components, undefined, 'a wall without a look stays undrawn');
+    const [rug, cart] = entries.filter(e => e.section === 'placements').map(e => e.packet);
+    assert.deepEqual(made, ['demo:rug', 'demo:cart']);
+    assert.deepEqual(rug.position, [50, 40]); assert.equal(rug.rotation, .5); assert.equal(rug.data.object, 'demo:rug'); assert.equal(rug.data.authored_id, 'prop_0');
+    assert.deepEqual(cart.position, [110, 105], 'without `at`, the middle of its rectangle'); assert.equal(cart.data.tag, 1);
+    assert.deepEqual(cart.look, { values: { name: 'Butter Moon' } }, 'a placement\'s look goes to its object, laid over the record\'s'); assert.equal(rug.look, undefined);
+    assert.throws(() => buildMapPackets({ placements: [{ object: 'demo:rug', at: [0, 0], look: 'red' }] }, { make_object: () => ({}) }), /look/);
+    assert.throws(() => buildMapPackets({ placements: [{ object: 'demo:rug', at: [0, 0] }] }), /make_object/);
+    assert.throws(() => buildMapPackets({ floors: [{ shape: 'path', commands: [] }] }), /floor/i);
+    const [inlay] = buildMapPackets({ floors: [{ shape: 'group', x: 100, y: 0, steps: [{ shape: 'rectangle', x: 0, y: 0, width: 10, height: 10 }, { shape: 'circle', x: 50, y: 50, radius: 5 }] }] }).entries.map(e => e.packet);
+    assert.deepEqual(inlay.position, [127.5, 27.5], 'a group is one floor entity, bounded by its children where it places them'); assert.deepEqual(inlay.render_shape.dimensions, [55, 55]);
+    const [kerb] = buildMapPackets({ floors: [{ shape: 'rectangle', x: 0, y: 0, width: 100, height: 4, fill: '#3b3542', thickness: 6, sides: { material: 'city:kerb' } }] }).entries.map(e => e.packet);
+    assert.equal(kerb.components[0].layers[0].thickness, 6, 'a floor step can stand up a little (a kerb), its faces drawn in its sides');
+    assert.deepEqual(kerb.components[0].layers[0].sides, { material: 'city:kerb' }); assert.equal(kerb.components[0].layers[0].solid, false, 'and still stops nothing');
+});
+
+test('a map\'s markers draw its triggers of a role on the floor, fitted to each, unless one is quiet', () => {
+    const triggers = [{ x: 10, y: 10, w: 60, h: 40, role: 'transition', data: { target: 'street', label: 'Exit' } }, { x: 100, y: 10, w: 60, h: 40, role: 'transition', data: { target: 'lift', quiet: true } }, { x: 200, y: 10, w: 20, h: 20, role: 'zone' }];
+    const built = kind => buildMapPackets({ size: [400, 400], kind, markers: { transition: { label: true, color: '#ffd27f' }, zone: false }, triggers }).entries.filter(e => e.section === 'triggers').map(e => e.packet);
+    const [exit, lift, zone] = built('exterior');
+    const [base, rest, active] = exit.components[0].layers, steps = rest.steps;
+    assert.ok(base.steps[0].emits && base.shown_when === undefined, 'a steady fill lights the light grid');
+    assert.equal(rest.shown_when, '!occupied'); assert.equal(active.shown_when, 'occupied', 'someone on it swaps the mat for its deeper one');
+    assert.deepEqual(rest.pulse, { period: MARKER.pulse_period, low: MARKER.pulse_low }); assert.equal(active.steps[11].stroke.startsWith('rgba(154, 107, 255'), true, 'the active mat is the deeper purple');
+    assert.equal(exit.data.look.layer, MARKER.layer); assert.equal(lift.components, undefined, 'a quiet exit is marked by its map\'s own art'); assert.equal(zone.components, undefined, 'a role without a marker shows nothing');
+    assert.deepEqual(steps.map(s => s.shape), [...Array(10).fill('rectangle'), 'rectangle', 'rectangle', 'line', 'line', 'line', 'line', 'rectangle', 'text'], 'ten glow rings, fill, border, four corners, the label\'s plate and the label');
+    assert.equal(steps[11].width, 60); assert.equal(steps[11].x, -30, 'fitted to the trigger, in its frame'); assert.ok(steps[10].emits, 'the fill shines at night'); assert.ok(steps[0].width > steps[9].width && steps[0].fill.endsWith(', 0.0442)'), 'the outer glow rings widest and faint');
+    assert.equal(steps[17].text, 'Exit'); assert.equal(steps[17].baseline, 'top', 'outdoors the label is below');
+    assert.equal(built('interior')[0].components[0].layers[1].steps[17].baseline, 'bottom', 'indoors above');
+    assert.equal(readMarker(true), MARKER); assert.throws(() => readMarker({ shimmer: 1 }), /Unknown marker field/); assert.throws(() => readMarker({ color: 'blue' }), /color/);
+    assert.throws(() => buildMapPackets({ size: [10, 10], markers: { transition: { corner: -1 } } }), /corner/);
+    assert.equal(markerComponent({ pulse_low: 1, active_pulse_low: 1 }, 10, 10).layers[1].pulse, undefined, 'pulse_low 1 holds it steady');
+});
+
+test('a map\'s rows line a street with buildings, each turned to face it, picked by seed the same every time', () => {
+    const shop = { object: 'street:shop', width: 250, depth: 200, looks: [{ values: { name: 'A' } }, { values: { name: 'B' } }] }, apt = { object: 'street:apt', width: 300, depth: 250, weight: 2 };
+    const blocks = [{ name: 'b', x: 1000, y: 0, w: 1150, h: 1000 }];
+    const laid = rowPlacements({ blocks, rows: [{ block: 'b', side: 'south', objects: [shop, apt, shop] }] });
+    assert.deepEqual(laid.map(p => p.object), ['street:shop', 'street:apt', 'street:shop']);
+    assert.deepEqual(laid[0].at, [1000 + (1150 - 800) / 2 + 125, 1000 - 12 - 100], 'centred along the side, set back 12 from the street, wall to wall');
+    assert.equal(laid[1].at[0] - laid[0].at[0], 275); assert.equal(laid[0].rotation, 0, 'a south front faces south as built');
+    const east = rowPlacements({ blocks, rows: [{ block: 'b', side: 'east', objects: [apt], justify: 'start' }] })[0];
+    assert.deepEqual(east.at, [1000 + 1150 - 12 - 125, 30 + 150]); assert.equal(east.rotation, -Math.PI / 2, 'turned so its front faces east');
+    const fill = seed => rowPlacements({ blocks, rows: [{ block: 'b', side: 'north', pick: [shop, apt], seed }] });
+    assert.deepEqual(fill(4), fill(4), 'the same seed, the same street'); assert.ok(fill(4).length >= 3, 'as many as fit');
+    assert.ok(fill(4).every(p => p.rotation === Math.PI));
+    assert.notDeepEqual([1, 2, 3, 4, 5, 6].map(s => fill(s).map(p => p.object + (p.look?.values.name ?? '')).join()), Array(6).fill(fill(1).map(p => p.object + (p.look?.values.name ?? '')).join()), 'other seeds, other streets');
+    const corner = rowPlacements({ blocks, rows: [{ block: 'b', side: 'south', objects: [apt], justify: 'start' }, { block: 'b', side: 'west', objects: [apt], justify: 'end' }] });
+    assert.equal(corner.length, 1, 'a building that would stand on one already laid is left out');
+    assert.equal(rowPlacements({ blocks, keep_clear: [{ x: 1000, y: 0, w: 1150, h: 1000 }], rows: [{ block: 'b', objects: [apt] }] }).length, 0, 'nor on a kept-clear rectangle');
+    const built = buildMapPackets({ size: [3000, 1000], blocks, rows: [{ block: 'b', objects: [shop] }] }, { make_object: (record, at, o) => ({ kind: 'static', position: at, ...o }) }).entries.filter(e => e.section === 'placements');
+    assert.equal(built.length, 1); assert.equal(built[0].packet.look.values.name.length, 1, 'built as an object placement, with its look');
+    assert.throws(() => rowPlacements({ blocks, rows: [{ block: 'nowhere', objects: [apt] }] }), /nowhere/);
+    assert.throws(() => rowPlacements({ blocks, rows: [{ block: 'b', side: 'up', objects: [apt] }] }), /side/);
+    assert.throws(() => rowPlacements({ blocks, rows: [{ block: 'b', objects: [{ object: 'x', width: 10 }] }] }), /depth/);
+});

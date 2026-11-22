@@ -1,0 +1,21 @@
+{
+  "library_id": "ollo_test",
+  "description": "OllO Plaza: the classic geometry (floors as flat colours, walls, rooms, doors, exits, landmarks). Its floor art and furniture are still to be built as data.",
+  "resources": {
+    "map": {
+      "kind": "map",
+      "height_view": {"eye": 600, "lean": 1},
+      "label": "OllO Plaza",
+      "setting": "exterior",
+      "size": [2000, 1500],
+      "spawn": [1000, 1200],
+      "floors": [{"shape": "rectangle", "x": 0, "y": 0, "width": 2000, "height": 1500, "fill": "#1a1215"}, {"shape": "rectangle", "x": 400, "y": 200, "width": 1200, "height": 800, "fill": "#4a2020"}, {"shape": "rectangle", "x": 500, "y": 1000, "width": 1000, "height": 300, "fill": "#3d3030"}, {"shape": "rectangle", "x": 0, "y": 0, "width": 2000, "height": 200, "fill": "#1a1018"}],
+      "wall_look": {"material": "surfaces:plaster", "sides": "surfaces:plaster_face", "height": 120, "layer": 10},
+      "walls": [{"x": 0, "y": 0, "w": 2000, "h": 30}, {"x": 0, "y": 1470, "w": 400, "h": 30}, {"x": 1600, "y": 1470, "w": 400, "h": 30}, {"x": 0, "y": 0, "w": 30, "h": 1500}, {"x": 1970, "y": 0, "w": 30, "h": 1500}],
+      "markers": {"transition": {"label": true}},
+      "triggers": [{"x": 400, "y": 1450, "w": 1200, "h": 50, "role": "transition", "authored_id": "exit_0", "data": {"target": "sdc", "label": "Return to City"}}],
+      "landmarks": {"ollo_entrance": [1000, 700]},
+      "climate": "plaza"
+    }
+  }
+}

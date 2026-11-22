@@ -1,0 +1,217 @@
+// ===== LV0 BASEMENT =====
+// THE LIGHT GRID OF A MAP: one baked light grid (lighting.mjs) per streamed region, from the steps marked
+// `emits` in the map's floors, walls and objects, stopped by its walls. It joins a map as a tier, so a
+// region's grid is baked when the region comes near a focus and let go when it goes far. A moving
+// emitter (a car's underglow, a glowing character) re-bakes the regions it reaches as it moves on, and
+// keeps a small live light of its own on top. Nothing here knows which map it is: the map's
+// `light_grid` settings say the cell size (16 or 32, with per-region overrides) and how strong it is.
+import {bakeLightGrid,patchLightGrid,readLightGrid,lightGroupOf} from './lighting.mjs';
+import {drawingEmitters,facadeEmitters,drawingOutline} from './looks.mjs';
+
+// How far past a region its bake reaches: the spread's margin at most (8 passes of 32) and a cell more.
+const EDGE=8*32+32;
+const finiteBox=([l,t,r,b])=>[l,t,r,b].every(Number.isFinite);
+/** A packet's collision box as an outline in the world ([x, y] corners), or null. */
+function boxOutline(packet){
+    const s=packet.collision_shape;if(!s||s.shape_type!=='box'||!Array.isArray(s.dimensions))return null;
+    const [w,h]=s.dimensions,[x,y]=packet.position,a=packet.rotation??0,c=Math.cos(a),n=Math.sin(a);
+    return [[-w/2,-h/2],[w/2,-h/2],[w/2,h/2],[-w/2,h/2]].map(([u,v])=>[x+u*c-v*n,y+u*n+v*c]);
+}
+/** Whether a packet stops light: a wall unless it says not (glass), or anything marked `blocks_light`. */
+function blocksLight(packet){
+    if(packet.blocks_light!==undefined)return !!packet.blocks_light;
+    const layers=(packet.components??[]).flatMap(c=>c.layers??[]);
+    if(layers.some(l=>l.blocks_light===false))return false;
+    return packet.data?.role==='wall';
+}
+/**
+ * What of a thing marked `blocks_light: true` stops the light grid's glow: the footprint of each of its
+ * components' walled layers (a layer with `sides`, the lowest of each component), in the world. A building
+ * so marked keeps its lit windows' glow on the street outside, off its own roofs. Others give its box.
+ */
+export function entityBlockers(packet,source=null){
+    const components=packet.components??[];
+    if(!components.length){const outline=boxOutline(packet);return outline?[{outline}]:[];}
+    const at=packet.position,a=packet.rotation??0,c=Math.cos(a),s=Math.sin(a),values=packet.data?.look?.values??{},out=[];
+    for(const comp of components){
+        const layer=(comp.layers??[]).filter(l=>l.sides&&l.blocks_light!==false&&l.thickness>0).sort((x,y)=>x.height-y.height)[0];if(!layer)continue;
+        const steps=layer.steps??(layer.drawing&&source?source.getResource(layer.drawing)?.steps:null);if(!steps)continue;
+        const [cx,cy]=comp.at??[0,0],r=comp.rotation??0,cr=Math.cos(r),sr=Math.sin(r);
+        for(const part of drawingOutline([{shape:'group',steps}],{values}).filter(p=>p.solid&&p.points.length>=3))
+            out.push({outline:part.points.map(([x,y])=>{const u=cx+x*cr-y*sr,v=cy+x*sr+y*cr;return [at[0]+u*c-v*s,at[1]+u*s+v*c];})});
+    }
+    return out;
+}
+/**
+ * The glowing shapes of an entity or entity packet, in the world at its pose: its drawing asset's steps
+ * (read from `source`) and its components' layers, each at its elevation and layer height, and the lit
+ * windows of any layer's facade whose panels say `emits` (facadeEmitters). A layer `shown_when` a property gives none.
+ */
+export function entityEmitters(body,source,{pose=null}={}){
+    const at=pose?.position??body.position,rotation=pose?.rotation??body.rotation??0,elevation=pose?.elevation??body.elevation??0;
+    const materials=source?name=>source.getResource(name):null,out=[];
+    const values=(typeof body.get==='function'?body.get('look',{}):body.data?.look)?.values??{};
+    const drawing=body.assets?.drawing;
+    if(drawing&&source){const steps=source.getResource(drawing)?.steps;if(steps)out.push(...drawingEmitters(steps,{at,rotation,values,materials,elevation}));}
+    const components=typeof body.get==='function'?body.get('components')??body.components??[]:body.components??[];
+    for(const c of components)for(const layer of c.layers??[]){if(layer.shown_when)continue;   // (a switched layer comes and goes: it does not light the baked grid)
+        const steps=layer.steps??(layer.drawing&&source?source.getResource(layer.drawing)?.steps:null);if(!steps)continue;
+        const [cx,cy]=c.at??[0,0];
+        out.push(...drawingEmitters([{shape:'group',x:cx,y:cy,rotation:c.rotation??0,steps}],{at,rotation,values,materials,elevation:elevation+(layer.height??0)}));
+        if(layer.facade&&layer.sides){const cs=Math.cos(rotation),sn=Math.sin(rotation),z0=elevation+(layer.height??0);
+            out.push(...facadeEmitters(steps,layer.facade,{at:[at[0]+cx*cs-cy*sn,at[1]+cx*sn+cy*cs],rotation:rotation+(c.rotation??0),scale:1},values,z0,z0+(layer.thickness??0),{follow:layer.sides.follow}));}
+    }
+    return out;
+}
+
+/**
+ * A map's light grids, kept current. `settings` is the map's `light_grid` (see readLightGrid): cell
+ * 16 or 32 by default and per region (`regions: {'<rx>,<ry>': {cell}}`, the map's region keys), blur
+ * passes, strength. `source` is the world's data source (drawings and materials by id).
+ *
+ *  attach(map, {radius})   gathers the map's still emitters and blockers from its packets and joins it as
+ *                          the tier `light_grid`: a region's grid is queued to bake when it comes in reach
+ *  setMovers(movers)       the moving emitters this step: [{id, emitters, live}] (emitters as entityEmitters
+ *                          gives them); one that moved half a cell, appeared or went re-bakes what it reaches,
+ *                          unless it is `live` (going by): that one only shows as a live light
+ *  updateState({budget_ms})  bakes queued regions until the budget is spent (at least one a call), the
+ *                          old grid showing until its new one is ready. The Lobby calls it.
+ *  grids(view)             the baked grids meeting view {left, top, right, bottom}, for createLightLayerParts
+ *  sample(x, y)            the light arriving at a point, [r, g, b] (reflections and tools read it)
+ *  liveLights()            a small live point light per moving emitter, for the light layer's live lights
+ */
+export class lightGridSystem{
+    #settings;#source;#map=null;#size=0;#still=new Map();#walls=new Map();#grids=new Map();#loaded=new Set();#queue=[];#queued=new Map();#movers=new Map();#groupsOff=new Set();
+    #stats={bakes:0,patches:0,bake_ms:0,last_bake_ms:0,max_bake_ms:0};
+    constructor({settings={},source=null}={}){this.#settings=readLightGrid(settings);this.#source=source;}
+    get settings(){return this.#settings;}
+    /** The settings a region bakes with: the map's, or its region's override. */
+    regionSettings(key){return this.#settings.regions[key]??this.#settings;}
+    attach(map,{radius=2048,keep}={}){
+        if(this.#map)throw new Error('A light grid system serves one map');
+        this.#map=map;this.#size=map.region_size;
+        for(const packet of map.packets()){
+            if(packet.blocks_light===true&&packet.components?.length){for(const b of entityBlockers(packet,this.#source))this.#bucket(this.#walls,b,b.outline,EDGE);}
+            else if(blocksLight(packet)){const outline=boxOutline(packet);if(outline)this.#bucket(this.#walls,{outline},outline,EDGE);}
+            if(packet.physics_type==='dynamic'||packet.kind==='character')continue;    // (moving things are movers)
+            const group=lightGroupOf(packet);for(const e of entityEmitters(packet,this.#source)){if(group)e.group=group;this.#bucket(this.#still,e,null,e.reach+(e.height??0)+EDGE);}
+        }
+        map.addTier('light_grid',{radius,keep:keep??this.#size,every:true,load:key=>{this.#loaded.add(key);this.#want(key);},release:key=>{this.#loaded.delete(key);this.#grids.delete(key);this.#queued.delete(key);}});
+        return this;
+    }
+    #keysOf([l,t,r,b],pad){const s=this.#size,out=[];for(let x=Math.floor((l-pad)/s);x<=Math.floor((r+pad)/s);x++)for(let y=Math.floor((t-pad)/s);y<=Math.floor((b+pad)/s);y++)out.push(`${x},${y}`);return out;}
+    #bucket(index,item,outline,pad){
+        const box=item.bounds??(item.bounds=[Math.min(...outline.map(p=>p[0])),Math.min(...outline.map(p=>p[1])),Math.max(...outline.map(p=>p[0])),Math.max(...outline.map(p=>p[1]))]);
+        if(!finiteBox(box))return;
+        for(const key of this.#keysOf(box,pad)){let list=index.get(key);if(!list)index.set(key,list=[]);list.push(item);}
+    }
+    // A region to re-bake: whole (`box` null), or only the cells round `box` [left, top, right, bottom] (a mover's reach).
+    #want(key,box=null){
+        if(!this.#loaded.has(key))return;
+        const was=this.#queued.get(key);
+        if(was===undefined)this.#queue.push(key);
+        this.#queued.set(key,was===null||box===null||!this.#grids.has(key)?null:was?[Math.min(was[0],box[0]),Math.min(was[1],box[1]),Math.max(was[2],box[2]),Math.max(was[3],box[3])]:box);
+    }
+    #bounds(key){const [x,y]=key.split(',').map(Number),s=this.#size;return {left:x*s,top:y*s,right:(x+1)*s,bottom:(y+1)*s};}
+    setMovers(movers=[]){
+        const seen=new Set();
+        for(const {id,emitters,live=false} of movers){
+            seen.add(id);
+            // A live mover (one going by) is drawn by liveLights only: its light is not baked, so passing traffic
+            // re-bakes nothing; the cells it lit while it stood are baked again without it.
+            if(live){const before=this.#movers.get(id);if(before&&!before.live)for(const k of before.keys)this.#want(k,before.area);this.#movers.set(id,{emitters,keys:new Set(),sign:'live',area:null,live:true});continue;}
+            const reach=emitters.map(e=>{const R=e.reach+(e.height??0),[l,t,r,b]=e.bounds;return [l-R,t-R,r+R,b+R];});
+            const area=reach.length?[Math.min(...reach.map(b=>b[0])),Math.min(...reach.map(b=>b[1])),Math.max(...reach.map(b=>b[2])),Math.max(...reach.map(b=>b[3]))]:null;
+            const keys=new Set(reach.flatMap(box=>this.#keysOf(box,EDGE)));
+            const half=Math.min(...[...keys].map(k=>this.regionSettings(k).cell))/2;
+            const sign=emitters.map(e=>[Math.round(e.bounds[0]/half),Math.round(e.bounds[1]/half),e.color,Math.round(e.strength*64),Math.round(e.reach)].join(':')).join('|');
+            const before=this.#movers.get(id);
+            if(!before||before.sign!==sign){for(const k of before?.keys??[])this.#want(k,before.area);for(const k of keys)this.#want(k,area);}
+            this.#movers.set(id,{emitters,keys,sign,area});
+        }
+        for(const [id,m] of this.#movers)if(!seen.has(id)){for(const k of m.keys)this.#want(k,m.area);this.#movers.delete(id);}
+        return this;
+    }
+    #lit(emitters){return this.#groupsOff.size?emitters.filter(e=>!e.group||!this.#groupsOff.has(e.group)):emitters;}
+    /**
+     * Turns a light group on or off (as renderSystem.setLightGroup): the still emitters of things in it (their
+     * `light_group`) stop or start lighting, and each loaded region holding one is re-baked within the step budget,
+     * its old grid showing until then (so a street's lamps come on block by block). Returns whether anything changed.
+     */
+    setLightGroup(name,on){
+        if(typeof name!=='string'||!name)throw new TypeError('A light group is named');
+        const was=!this.#groupsOff.has(name);if(was===!!on)return false;
+        if(on)this.#groupsOff.delete(name);else this.#groupsOff.add(name);
+        for(const [key,list] of this.#still)if(list.some(e=>e.group===name))this.#want(key);
+        for(const m of this.#movers.values())if(m.emitters.some(e=>e.group===name))for(const k of m.keys)this.#want(k,m.area);
+        return true;
+    }
+    /** Bakes queued regions until `budget_ms` is spent; returns {baked, pending}. */
+    updateState({budget_ms=2,now=()=>performance.now()}={}){
+        const t0=now();let baked=0;
+        while(this.#queue.length&&(!baked||now()-t0<budget_ms)){
+            const key=this.#queue.shift(),box=this.#queued.get(key);if(box===undefined||!this.#loaded.has(key)){this.#queued.delete(key);continue;}this.#queued.delete(key);
+            const t=now();this.#grids.set(key,box?this.bakeCells(key,box):this.bakeRegion(key));const ms=now()-t;
+            baked++;this.#stats.bakes++;if(box)this.#stats.patches++;this.#stats.bake_ms+=ms;this.#stats.last_bake_ms=ms;this.#stats.max_bake_ms=Math.max(this.#stats.max_bake_ms,ms);
+        }
+        return {baked,pending:this.#queue.length};
+    }
+    /** One region's grid from its still emitters, the movers reaching it and its walls. */
+    bakeRegion(key){
+        const s=this.regionSettings(key),movers=[...this.#movers.values()].filter(m=>m.keys.has(key)).flatMap(m=>m.emitters);
+        return bakeLightGrid({bounds:this.#bounds(key),margin:s.spread,cell:s.cell,spread:s.spread,strength:s.strength,cut:s.cut,glow:s.glow,pass:s.pass,emitters:this.#lit([...(this.#still.get(key)??[]),...movers]),blockers:this.#walls.get(key)??[]});
+    }
+    /**
+     * The region's grid with only the cells round `box` (a mover's reach, grown by the spread) baked again,
+     * over an area `spread` cells wider still so the copied cells see all the light they would in a whole bake.
+     */
+    bakeCells(key,box){
+        const s=this.regionSettings(key),r=this.#bounds(key),grid=this.#grids.get(key),c=s.cell,g=s.spread*c;
+        const snap=(v,o,f)=>o+f((v-o)/c)*c,clamp=b=>({left:Math.max(r.left,b.left),top:Math.max(r.top,b.top),right:Math.min(r.right,b.right),bottom:Math.min(r.bottom,b.bottom)});
+        const part=clamp({left:snap(box[0]-g,r.left,Math.floor),top:snap(box[1]-g,r.top,Math.floor),right:snap(box[2]+g,r.left,Math.ceil),bottom:snap(box[3]+g,r.top,Math.ceil)});
+        if(part.right<=part.left||part.bottom<=part.top)return grid;
+        const area={left:part.left-g,top:part.top-g,right:part.right+g,bottom:part.bottom+g};   // (past the region too, as its whole bake reaches)
+        const movers=[...this.#movers.values()].filter(m=>m.keys.has(key)).flatMap(m=>m.emitters);
+        const patch=bakeLightGrid({bounds:area,cell:c,spread:s.spread,strength:s.strength,cut:s.cut,glow:s.glow,pass:s.pass,emitters:this.#lit([...(this.#still.get(key)??[]),...movers]),blockers:this.#walls.get(key)??[]});
+        return patchLightGrid(grid,patch,part);
+    }
+    grids(view=null){const out=[];for(const g of this.#grids.values())if(!view||(g.left<view.right&&g.right>view.left&&g.top<view.bottom&&g.bottom>view.top))out.push(g);return out;}
+    sample(x,y){const g=this.#grids.get(`${Math.floor(x/this.#size)},${Math.floor(y/this.#size)}`);return g?g.sample(x,y):[0,0,0];}
+    liveLights({radius=.5,glow=.35,intensity=.2}={}){
+        const out=[];for(const m of this.#movers.values())for(const e of m.emitters){if(e.group&&this.#groupsOff.has(e.group))continue;const [l,t,r,b]=e.bounds;out.push({position:[(l+r)/2,(t+b)/2],radius:Math.max(8,e.reach*radius),color:e.color,glow:glow*Math.min(1,e.strength),intensity:intensity*Math.min(1,e.strength)});}
+        return out;
+    }
+    /**
+     * Movers from live entities: each that is not static and whose drawing or components glow, at its
+     * pose now, by its id, `live` while it goes faster than `bake_below` (units a second): only what stands
+     * still or creeps is baked into the grid. Whether a drawing or a component list glows is worked out once and kept.
+     */
+    moversOf(entities,{bake_below=8}={}){
+        const out=[];
+        for(const e of entities){
+            if(e.destroyed||e.physics_type==='static')continue;
+            const drawing=e.assets?.drawing??null,components=e.get?.('components')??e.components??null;
+            // (the probe carries the entity's look, whose values its drawings read)
+            const look=e.get?.('look')??e.data?.look,glows=(drawing!==null&&this.#glows(drawing,()=>entityEmitters({assets:{drawing},position:[0,0],data:{look}},this.#source).length>0))||(components?.length>0&&this.#glows(components,()=>entityEmitters({components,position:[0,0],data:{look}},this.#source).length>0));
+            if(!glows)continue;
+            const emitters=this.#placed(e,drawing,components,look),group=lightGroupOf(e);if(group)for(const em of emitters)em.group=group;const v=e.linear_velocity,speed=v?Math.hypot(v[0],v[1]):0,was=this.#movers.get(e.entity_id??e.id)?.live;if(emitters.length)out.push({id:e.entity_id??e.id,emitters,live:speed>bake_below||(!!was&&speed>bake_below/4)});   // (one creeping in a queue stays live: no re-bake each time it inches)
+        }
+        return out;
+    }
+    #glowing=new Map();#glowingLists=new WeakMap();#local=new WeakMap();
+    // An entity's emitters where it stands now: worked out once about its own origin (for as long as its look and
+    // parts stay the same) and moved there, as a mover's glow is read every step.
+    #placed(e,drawing,components,look){
+        let c=this.#local.get(e);
+        if(!c||c.drawing!==drawing||c.components!==components||c.look!==look){c={drawing,components,look,emitters:entityEmitters({assets:{drawing},components:components??[],position:[0,0],rotation:0,elevation:0,data:{look}},this.#source)};this.#local.set(e,c);}
+        const [x,y]=e.position,r=e.rotation??0,z=e.elevation??0,cs=Math.cos(r),sn=Math.sin(r);
+        return c.emitters.map(em=>{
+            const outline=em.outline.map(([px,py])=>[x+px*cs-py*sn,y+px*sn+py*cs]),h=em.width/2;
+            let l=Infinity,t=Infinity,R=-Infinity,b=-Infinity;for(const [px,py] of outline){l=Math.min(l,px);t=Math.min(t,py);R=Math.max(R,px);b=Math.max(b,py);}
+            return {...em,outline,bounds:[l-h,t-h,R+h,b+h],height:em.height+z};
+        });
+    }
+    #glows(key,test){const store=typeof key==='string'?this.#glowing:this.#glowingLists;let v=store.get(key);if(v===undefined){v=test();store.set(key,v);}return v;}
+    get pending(){return this.#queue.length;}
+    getStatistics(){return {...this.#stats,grids:this.#grids.size,pending:this.#queue.length,movers:this.#movers.size,still_emitters:new Set([...this.#still.values()].flat()).size,walls:new Set([...this.#walls.values()].flat()).size};}
+}

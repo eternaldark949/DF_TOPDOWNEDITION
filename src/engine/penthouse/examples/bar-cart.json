@@ -1,0 +1,101 @@
+{
+ "library_id": "examples",
+ "description": "An example object built only from data: a bar cart made of components, each part at its own height, painted in materials that its look picks. A game's own catalog holds records like these.",
+ "resources": {
+  "brass": {"kind": "material", "fill": "#c9a46a", "stroke": "#c9a46a"},
+  "chrome": {"kind": "material", "fill": "#c8ccd4", "stroke": "#c8ccd4"},
+  "rubber": {"kind": "material", "fill": "#1a1416"},
+  "smoked_glass": {"kind": "material", "fill": "rgba(40,30,36,0.92)"},
+  "tinted_glass": {"kind": "material", "fill": "rgba(30,34,40,0.92)"},
+  "glass_shine": {"kind": "material", "fill": "rgba(255,240,220,0.08)"},
+  "bottle_glass": {"kind": "material", "fill": "#14100f", "stroke": "rgba(255,255,255,0.18)", "line_width": 0.6},
+  "highlight": {"kind": "material", "fill": "rgba(255,255,255,0.6)"},
+  "cork": {"kind": "material", "fill": "#c8a27a"},
+  "red_wine": {"kind": "material", "fill": "#6a0c20"},
+  "port": {"kind": "material", "fill": "#3a1a4a"},
+  "whiskey": {"kind": "material", "fill": "#b5641a"},
+  "green_glass": {"kind": "material", "fill": "#2c4a2a"},
+  "crystal": {"kind": "material", "fill": "rgba(225,240,255,0.25)", "stroke": "rgba(240,250,255,0.75)", "line_width": 0.6},
+  "crystal_stopper": {"kind": "material", "fill": "rgba(240,250,255,0.85)"},
+  "steel": {"kind": "material", "fill": "#b8bcc8", "stroke": "#e6e8f0", "line_width": 0.8},
+  "ice": {"kind": "material", "fill": "#dfe9f2"},
+  "ice_cube": {"kind": "material", "fill": "rgba(255,255,255,0.85)"},
+  "coupe_glass": {"kind": "material", "fill": "rgba(220,240,255,0.2)", "stroke": "rgba(245,252,255,0.8)", "line_width": 0.5},
+  "stem_glass": {"kind": "material", "fill": "rgba(245,252,255,0.7)"}
+ },
+ "templates": {
+  "bar_cart": {
+   "kind": "prop",
+   "physics_type": "static",
+   "look": {"layer": 1, "values": {"frame": "brass", "tray": "smoked_glass", "wheel": "rubber", "bottle_1": "red_wine", "bottle_2": "green_glass", "bottle_3": "whiskey", "decanter": "whiskey"}},
+   "bounds": "box",
+   "data": {"behaviour": "refill_drink", "label": "Pour"},
+   "components": [
+    {"name": "frame", "layers": [
+      {"layer": 0, "height": 0, "thickness": "8 cm", "sides": {"material": "$wheel"}, "steps": [
+        {"shape": "circle", "x": -16, "y": -9, "radius": 3.2, "material": "$wheel"},
+        {"shape": "circle", "x": -16, "y": -9, "radius": 3.2, "material": "$frame", "fill": null, "line_width": 0.8},
+        {"shape": "circle", "x": -16, "y": 9, "radius": 3.2, "material": "$wheel"},
+        {"shape": "circle", "x": -16, "y": 9, "radius": 3.2, "material": "$frame", "fill": null, "line_width": 0.8}]},
+      {"layer": 1, "height": "25 cm", "thickness": "2 cm", "sides": {"material": "$frame"}, "steps": [
+        {"shape": "rectangle", "x": -19, "y": -11, "width": 38, "height": 22, "radius": 3, "material": "$tray"},
+        {"shape": "rectangle", "x": -19, "y": -11, "width": 38, "height": 22, "radius": 3, "material": "$frame", "fill": null, "line_width": 1.4}]},
+      {"layer": 2, "height": "8 cm", "thickness": "72 cm", "sides": {"material": "$frame"}, "steps": [
+        {"shape": "circle", "x": -17, "y": -9, "radius": 1, "material": "$frame"},
+        {"shape": "circle", "x": -17, "y": 9, "radius": 1, "material": "$frame"},
+        {"shape": "circle", "x": 17, "y": -9, "radius": 1, "material": "$frame"},
+        {"shape": "circle", "x": 17, "y": 9, "radius": 1, "material": "$frame"}]},
+      {"layer": 3, "height": "80 cm", "thickness": "3 cm", "sides": {"material": "$frame"}, "steps": [
+        {"shape": "rectangle", "x": -19, "y": -11, "width": 38, "height": 22, "radius": 3, "material": "$tray"},
+        {"shape": "rectangle", "x": -19, "y": -11, "width": 38, "height": 22, "radius": 3, "material": "$frame", "fill": null, "line_width": 1.4},
+        {"shape": "rectangle", "x": -17, "y": -9, "width": 34, "height": 2.5, "material": "glass_shine"}]},
+      {"layer": 4, "height": "76 cm", "thickness": "4 cm", "solid": false, "steps": [
+        {"shape": "line", "points": [[16.0, -9.0], [17.75, -6.75], [19.0, -4.5], [19.75, -2.25], [20.0, 0.0], [19.75, 2.25], [19.0, 4.5], [17.75, 6.75], [16.0, 9.0]], "material": "$frame", "line_width": 1.6, "line_cap": "round"}]}]},
+    {"name": "bottle_left", "at": [-12, -5], "layers": [
+      {"layer": 0, "height": "83 cm", "thickness": "20 cm", "sides": {"material": "$bottle_1"}, "steps": [
+        {"shape": "circle", "x": 0, "y": 0, "radius": 3.4, "material": "bottle_glass"},
+        {"shape": "circle", "x": 0, "y": 0, "radius": 2.3, "material": "$bottle_1"}]},
+      {"layer": 1, "height": "103 cm", "thickness": "10 cm", "sides": {"material": "bottle_glass"}, "steps": [
+        {"shape": "circle", "x": 0, "y": 0, "radius": 1.2, "material": "cork"},
+        {"shape": "circle", "x": -1.1, "y": -1.1, "radius": 0.6, "material": "highlight"}]}]},
+    {"name": "bottle_right", "at": [-12, 5], "layers": [
+      {"layer": 0, "height": "83 cm", "thickness": "20 cm", "sides": {"material": "$bottle_2"}, "steps": [
+        {"shape": "circle", "x": 0, "y": 0, "radius": 3.4, "material": "bottle_glass"},
+        {"shape": "circle", "x": 0, "y": 0, "radius": 2.3, "material": "$bottle_2"}]},
+      {"layer": 1, "height": "103 cm", "thickness": "10 cm", "sides": {"material": "bottle_glass"}, "steps": [
+        {"shape": "circle", "x": 0, "y": 0, "radius": 1.2, "material": "cork"},
+        {"shape": "circle", "x": -1.1, "y": -1.1, "radius": 0.6, "material": "highlight"}]}]},
+    {"name": "bottle_middle", "at": [-5, 0], "layers": [
+      {"layer": 0, "height": "83 cm", "thickness": "17 cm", "sides": {"material": "$bottle_3"}, "steps": [
+        {"shape": "circle", "x": 0, "y": 0, "radius": 3.4, "material": "bottle_glass"},
+        {"shape": "circle", "x": 0, "y": 0, "radius": 2.3, "material": "$bottle_3"}]},
+      {"layer": 1, "height": "100 cm", "thickness": "9 cm", "sides": {"material": "bottle_glass"}, "steps": [
+        {"shape": "circle", "x": 0, "y": 0, "radius": 1.2, "material": "cork"},
+        {"shape": "circle", "x": -1.1, "y": -1.1, "radius": 0.6, "material": "highlight"}]}]},
+    {"name": "decanter", "at": [3, -4], "layers": [
+      {"layer": 0, "height": "83 cm", "thickness": "15 cm", "sides": {"material": "crystal"}, "steps": [
+        {"shape": "circle", "x": 0, "y": 0, "radius": 3.6, "material": "crystal"},
+        {"shape": "circle", "x": 0, "y": 0, "radius": 2.4, "material": "$decanter"}]},
+      {"layer": 1, "height": "98 cm", "thickness": "7 cm", "sides": {"material": "crystal_stopper"}, "steps": [
+        {"shape": "circle", "x": 0, "y": 0, "radius": 1.1, "material": "crystal_stopper"}]}]},
+    {"name": "ice_bucket", "at": [4, 4], "layers": [
+      {"layer": 0, "height": "83 cm", "thickness": "18 cm", "sides": {"material": "steel"}, "steps": [
+        {"shape": "circle", "x": 0, "y": 0, "radius": 4, "material": "steel"},
+        {"shape": "circle", "x": 0, "y": 0, "radius": 3, "material": "ice"},
+        {"shape": "rectangle", "x": -1.5, "y": -1.5, "width": 1.6, "height": 1.6, "material": "ice_cube"},
+        {"shape": "rectangle", "x": 0.5, "y": 0, "width": 1.4, "height": 1.4, "material": "ice_cube"}]}]},
+    {"name": "coupe_left", "at": [11, -5], "layers": [
+      {"layer": 0, "height": "83 cm", "thickness": "10 cm", "sides": {"material": "stem_glass"}, "steps": [
+        {"shape": "circle", "x": 0, "y": 0, "radius": 0.5, "material": "stem_glass"}]},
+      {"layer": 1, "height": "93 cm", "thickness": "4 cm", "sides": {"material": "coupe_glass"}, "steps": [
+        {"shape": "circle", "x": 0, "y": 0, "radius": 2.6, "material": "coupe_glass"}]}]},
+    {"name": "coupe_right", "at": [11, 5], "layers": [
+      {"layer": 0, "height": "83 cm", "thickness": "10 cm", "sides": {"material": "stem_glass"}, "steps": [
+        {"shape": "circle", "x": 0, "y": 0, "radius": 0.5, "material": "stem_glass"}]},
+      {"layer": 1, "height": "93 cm", "thickness": "4 cm", "sides": {"material": "coupe_glass"}, "steps": [
+        {"shape": "circle", "x": 0, "y": 0, "radius": 2.6, "material": "coupe_glass"}]}]}
+   ]
+  },
+  "bar_cart_chrome": {"extends": "bar_cart", "look": {"layer": 1, "values": {"frame": "chrome", "tray": "tinted_glass", "wheel": "rubber", "bottle_1": "port", "bottle_2": "green_glass", "bottle_3": "whiskey", "decanter": "whiskey"}}}
+ }
+}

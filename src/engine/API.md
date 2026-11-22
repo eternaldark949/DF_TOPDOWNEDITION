@@ -1,0 +1,638 @@
+# Engine user guide
+
+How to use the engine, for someone making a game with it. It is split by concern: the engine and its jacks first, then each level and every system under it. Each section says what the system is for, the calls you use, and a short example. Deeper reference for a system lives in its own README, linked from its section.
+
+What the engine is meant to become is in [READ-FIRST/ENGINE-API.md](../../READ-FIRST/ENGINE-API.md). This guide documents what works today. When a call in the API spec is built, it gets documented here.
+
+**Contents**
+
+- [Getting started](#getting-started)
+- [The engine](#the-engine)
+- [Basement (LV0)](#basement-lv0)
+  - [Physics](#physics)
+  - [Elements and entities](#elements-and-entities)
+  - [Spatial queries](#spatial-queries)
+  - [Navigation, motion and traffic](#navigation-motion-and-traffic)
+  - [Animation rigs](#animation-rigs)
+  - [Maps](#maps)
+  - [Rendering](#rendering)
+  - [Camera](#camera)
+  - [Controls](#controls)
+  - [UI](#ui)
+- [Lobby (LV1)](#lobby-lv1)
+  - [The clock and pausing](#the-clock-and-pausing)
+  - [The world's clock: time of day](#the-worlds-clock-time-of-day)
+  - [The world's weather](#the-worlds-weather)
+  - [Levels](#levels)
+  - [Map levels](#map-levels)
+  - [Travel](#travel)
+- [Directory (LV2)](#directory-lv2)
+- [Penthouse (LV3)](#penthouse-lv3)
+
+---
+
+## Getting started
+
+A level with one character, moved by the `move` direction each tick:
+
+```js
+import { gameEngine } from './engine/game-engine.mjs';
+import { gameLevel } from './engine/lobby/runtime/game-level.mjs';
+
+class Room extends gameLevel {
+    enter(context) {
+        this.hero = context.createEntity({ kind: 'character', position: [100, 100] });
+    }
+    beforePhysics(context, seconds) {
+        const [x, y] = context.basement.controls.direction('move');
+        this.hero.motor.setMovement([x, y]);
+    }
+}
+
+const engine = new gameEngine();
+engine.registerLevel('room', Room);
+await engine.loadLevel('room');
+engine.start();
+```
+
+---
+
+## The engine
+
+`gameEngine` (`src/engine/game-engine.mjs`) brings every level together. You make one, register levels and systems on it, load a level and start it. It knows nothing about your game.
+
+### Jacks
+
+Each level plugs in through one jack. Every jack is frozen.
+
+| Jack | What it holds |
+|---|---|
+| `engine.basement` | The running systems: `physics`, `elements`, `rigs`, `motion`, `traffic`, `controls`, `camera`, `render`, `ui`, and `units` (`engine.ui` is `basement.ui`) |
+| `engine.lobby` | The game loop: levels, systems, pausing and the clock (`lobby.clock`) |
+| `engine.directory` | The data functions (`assetLibrary`, `validateMapLayout`, `resolvePlacement`, …) plus `assets`, this engine's registry |
+| `engine.penthouse` | The prefabs: `createObject`, `objectPacket`, `humanoid` |
+| `engine.game` | The services your game passes in as `services` |
+
+Levels and systems get a **context** with the same jacks (`context.basement`, `context.lobby`, `context.directory`, `context.penthouse`, `context.game`), plus:
+
+- `context.engine`: the engine
+- `context.createEntity(packet, {lifetime})`: an entity that lives for the level (`'level'`, the default) or the whole session (`'session'`)
+- `context.on(event, handler)`: a physics event handler, removed automatically when the level or system goes away
+- `context.defer(cleanup)`: a function run when the level or system goes away
+
+### Calls
+
+| Call | What it does |
+|---|---|
+| `new gameEngine({ physics, controls, camera, clock, time, services })` | Makes the engine (also `weather`, the world weather's record). `time` is the world clock's record (see [The world's clock](#the-worlds-clock-time-of-day)); `services` are your game's own systems, found later under `engine.game` |
+| `engine.time` | The world's clock: date, time of day, the day's phase and how dark it is |
+| `engine.weather` | The world's weather: its state and intensity, fading from one to the next |
+| `engine.registerLevel(id, LevelClass)` | Adds a level (a `gameLevel` subclass) |
+| `await engine.loadLevel(id, options)` | Leaves the current level and enters this one |
+| `engine.unloadLevel()` | Leaves the current level |
+| `engine.registerSystem(id, system)` / `engine.removeSystem(id)` | Adds or removes a system that runs every tick (see [Systems](#systems)) |
+| `engine.start()` / `engine.stop()` | Starts or stops the loop |
+| `const resume = engine.pause(reason)` | Pauses for a reason; call `resume()` to release it (see [The clock and pausing](#the-clock-and-pausing)) |
+| `engine.createObject(record, at, overrides, {lifetime})` | Makes any object from a catalog record (a template id or a record) at `at`; it leaves with the level unless `lifetime` is `session` (see [Objects](#objects)) |
+| `engine.createEntity(packet, {lifetime})` | Makes an entity outside a context from a raw packet |
+| `engine.retainEntity(entity)` / `engine.releaseEntity(entity)` | Keeps an entity across level changes, or lets it go |
+| `engine.updateState()` / `engine.render(blend)` | Runs one tick or one frame by hand (the loop does this for you) |
+| `engine.dispose()` | Shuts everything down |
+| `engine.active_level`, `engine.running`, `engine.paused`, `engine.pause_reasons`, `engine.phase` | Read the state |
+
+### Systems
+
+A system is any object with some of these hooks. Each receives its context first.
+
+| Hook | When it runs |
+|---|---|
+| `attach(context)` / `detach(context)` | When it is registered or removed |
+| `levelEntered(context, level)` / `levelLeaving(context, level)` | Around each level change |
+| `beforePhysics(context, seconds)` / `afterPhysics(context, seconds)` | Every tick, around the physics step |
+| `render(context, blend, frame)` | Every frame |
+| `gameplayPaused(context)` | When the game pauses |
+
+Hooks must be synchronous. Load anything slow in a level's `prepare`.
+
+---
+
+## Basement (LV0)
+
+### Units
+
+The engine has one length unit, the **world unit**, used by every position, size, radius, speed and height. **50 world units make a metre** (`basement.units.UNITS_PER_METRE`), so one unit is 2 cm. Mass is in kilograms, time in seconds, angles in radians.
+
+| Call | What it does |
+|---|---|
+| `units.metres(n)` / `units.centimetres(n)` | World units in a length |
+| `units.toMetres(n)` | Metres in a number of world units |
+| `units.readLength(value)` | A number, or a string such as `"1.75 m"` or `"24 cm"`, as world units |
+
+Data can write lengths in metres or centimetres: `"radius": "24 cm"`, `"dimensions": ["30 cm", "3 m"]`. The Directory turns them into world units when a library is registered, so the rest of the engine only sees world units. A plain number is already world units.
+
+
+The systems and operations. Everything here runs on its own, without a game. Reach it through `engine.basement` or `context.basement`.
+
+### Physics
+
+`basement.physics` is the world: bodies, collisions, constraints, projectiles, particles, cloth and chains, all on one fixed step and one spatial grid. The engine steps it; you never call its update yourself.
+
+| Call | What it does |
+|---|---|
+| `physics.createEntity(packet)` | Any entity; `kind` says what it is (see [Elements and entities](#elements-and-entities)) |
+| `physics.createConstraint(packet)` / `physics.createChain(packet)` / `physics.createCloth(packet)` | Joints, chains and cloth |
+| `physics.createParticleSystem(record or resource_id, {area, at})`, `setParticleArea`, `setParticleRate`, `burstParticles`, `removeParticleSystem`, `readParticleSystems()` | Particle systems as data (rain, snow, sparks, splashes): births by rate or by area, gravity, wind, drag, life, what happens on landing (`die`, `stop`, `bounce`, or a burst of another system), packed and cheap or real bodies that land on roofs (`collide: true`), and a `look` rendering draws. A `particle_system` resource in a library is one; see the physics API reference's Particle systems |
+| `physics.emitParticles(pool, packet)` | Particles from a pool made with `createParticlePool` |
+| `physics.attachBody(body, packet)` / `physics.detachBody(body)` / `physics.getAttachmentState(body)` | Riding one body on another, such as a driver in a car |
+| `physics.on(event, handler)` | Events such as `contactBegin` |
+| `physics.savePhysicsState()` / `physics.loadPhysicsState(state)` | Save and restore the world |
+| `physics.getStatistics()` | Body and contact counts |
+
+Reference: [physics README](basement/physics/README.md) and [physics API reference](basement/physics/docs/api-reference.md).
+
+### Elements and entities
+
+`basement.elements` is the registry of every entity in the world. Every entity is one `gameEntity`: a body, a position, a rotation, properties and parts. There are no entity classes to extend. What an object is comes from its `kind`, a preset of body defaults and parts:
+
+| Kind | What it is | Parts |
+|---|---|---|
+| `prop` | A rigid thing that can be pushed | none |
+| `static` | A wall or anything fixed | none |
+| `character` | Something that walks | character `motor`, `awareness` |
+| `vehicle` | Something that drives | vehicle `motor` |
+| `projectile` | Something that flies | projectile `motor` |
+| `trigger` | An invisible sensor | none |
+| `decoration`, `entity` | Something that touches nothing | none |
+
+A record may override any of it: `{kind: 'prop', physics_type: 'static'}`, or `{kind: 'prop', motor: 'character'}` for a walking crate. Motor calls go through the part: `entity.motor.setMovement([1, 0])`, `entity.motor.steerVehicle(0.2)`.
+
+| Call | What it does |
+|---|---|
+| `elements.createEntity({kind, ...packet})` | Any entity (`engine.createObject` makes one from a catalog record) |
+| `elements.defineKind(name, {body, motor, awareness})` | Adds your own kind, as data |
+| `elements.getEntities({kind, tag})` / `elements.fetchEntity(id)` | Finds entities by kind, by tag, or by id |
+| `entity.destroy()` | Removes it from the world |
+
+#### gameEntity
+
+Every object in the world is a `gameEntity`, the way every object in a Blender game is a `KX_GameObject`. It has a name, an id, a position, a rotation, a parent, children and properties. Every call that changes it returns the entity, so calls chain.
+
+| Call | What it does |
+|---|---|
+| `entity.name`, `entity.entity_id`, `entity.kind`, `entity.tags` | Who it is |
+| `entity.motor`, `entity.awareness` | Its parts, or `null` |
+| `entity.position`, `entity.rotation`, `entity.linear_velocity` | Where it is and how it moves (read only; change them with the calls below) |
+| `entity.get(key, fallback)` / `entity.has(key)` | Reads a property |
+| `entity.set(key, value)` | Writes a property; `undefined` removes it. Fires `propertyChanged` with `{key, value, previous}` on the next step |
+| `entity.moveTo(x, y)` / `entity.rotateTo(angle)` | Places or turns it |
+| `entity.toWorld([x, y])` / `entity.toLocal([x, y])` | Turns a point in its own frame into a world point, and back |
+| `entity.distanceTo(target)` / `entity.directionTo(target)` | Distance and unit direction to a point or another entity |
+| `entity.attach(child, {at, rotation})` | Parents `child` at a local offset; the child rides along until it is detached |
+| `entity.detach()` / `entity.detach(child)` | Lets go of its parent, or of one child. Returns `false` when there was nothing to leave or no clear spot to leave at |
+| `entity.parent` / `entity.children` | Its parent entity (or `null`) and its attached children |
+| `entity.components` / `entity.getComponent(name)` | The parts it is made of (see [Components](#components)) |
+| `entity.addComponent({...})` / `entity.removeComponent(name)` | Adds or removes a part |
+| `entity.height` | How tall it stands: the highest top among its components |
+| `entity.scaleTo(2)` / `entity.scaleBy([1, 1, 3])` / `entity.scale` / `entity.world_scale` | Resizes it whole (see [Scale](#scale)) |
+| `entity.setElevation(z)` / `entity.elevation` / `entity.world_elevation` / `entity.setVerticalVelocity(vz)` / `entity.grounded` | Raises it off the ground: its base stands at z. Collision, height queries, drawing, the camera lean and picking all use it; an attached child stands on its parent's elevation plus the anchor's height (see [Heights](#heights-z)) |
+| `entity.on(event, handler)` | Events on this entity, such as `propertyChanged` or a contact; returns a call that stops listening |
+| `entity.activate()` / `entity.deactivate()` / `entity.destroy()` | Turns it on or off, or removes it |
+
+```js
+const lamp = elements.createEntity({ kind: 'prop', name: 'lamp', position: [0, 0], data: { on: true } });
+const car = elements.createEntity({ kind: 'prop', name: 'car', position: [100, 40] });
+car.attach(lamp, { at: [12, 0] });
+lamp.on('propertyChanged', ({ key, value }) => console.log(key, value));
+lamp.set('on', false);
+car.moveTo(200, 40);           // the lamp follows at [212, 40] after the next step
+car.distanceTo([200, 70]);     // 30
+```
+
+Reference: [entities](basement/physics/docs/entities.md).
+
+#### Heights (z)
+
+The world has one vertical axis, z, in the same world units as x and y (50 to a metre; data may write "1.75 m").
+
+- **An entity's base** stands at its `elevation` (0: on the ground). `entity.setElevation(z)` raises it; `entity.world_elevation` is where it is now.
+- **Its parts** count up from there: a component layer's `height` is above the entity's base, or above its rig joint when it rides one.
+- **A rig stands up.** A joint has a `height` and a `pitch` as well as a position and a turn: a hip pitched straight down puts its knee and foot below it, and a walk swings the pitch, so from above the leg shortens and the foot reaches forward on its own. A part on a pitched bone is drawn shorter along the bone and keeps its size, because body parts are round.
+- **Its collision height follows its pose.** An entity whose height span comes from its components takes it from the posed joints: a crouch is shorter, and `entity.height` reads the pose.
+- **Attached things stand where they are held**: a cup in a hand is at the hand's height, a hat at the head's. A detached thing keeps standing at its parent's elevation, or drops from the hand when things fall.
+- **Everything reads z**: collision (`height_span` raised by the elevation), queries (`at_height`), drawing order, the camera lean, and picking, which leans like the drawing so a tall thing is hit where it is drawn.
+- **So does the rest of the world**: walkers path under what is above their `headroom` and over what is under their `step_height` (`navigation.configureField`); a shot leaves at its source's height (`local_elevation`) as a point that flies over a low wall; a lamp's light (`getVisibilityPolygon({at_height})`) shines over walls that do not reach it; particles are born at an `elevation`.
+- **Things rise and fall.** Give the world a gravity with a z part (`gravity: [0, 0, -490]` is 9.8 m/s²) and an entity in the air falls and lands on the floor or on the top of a solid under it, and is `grounded`; `bodyLanded` reports the landing. `entity.setVerticalVelocity(vz)` is a jump; a projectile made with a `vertical_velocity` arcs. A body's `gravity_scale` (0 floats) and the world's `floor` (null for none) are data. By default gravity's z is 0 and a flat world stays flat.
+- **Not yet**: tilting a whole body (pitch and roll) and IK reaching a point at a height (it solves on the ground).
+
+#### Components
+
+An entity is made of components, each a list of layers with a base `height` and a `thickness`: a couch is a frame, a seat and a back; a building is one entity with a component per wing and a layer per floor (template `engine:building`). Leaning, a layer with `sides` shows its walls, standing on each shape's true outline; `cover: false` on one (a post, a pole) keeps the night from being laid back over it, and `cover: true` (a car's body) hides any glowing ground it stands over at night, however low it is. A layer's `pulse: {period, low}` makes it swell and fade over `period` seconds of play, and `shown_when: "occupied"` (or `"!occupied"`) shows it only while that property of its entity is set (or not), so one switch in data swaps a look; such a layer does not light the light grid. A layer's `slope: [across, down]` tilts its top (an awning falling to the street: `[0, -0.5]`), and a look's `lean` makes the whole thing lean that many times as hard as the street, as the classic leaned its shops and houses so their fronts read from across the road. Its `facade` puts windows, doors, piers and bands on those walls, all as data:
+
+```json
+{ "layer": 1, "height": 22, "thickness": 104, "steps": [{ "shape": "rectangle", "x": 0, "y": 0, "width": 700, "height": 500, "fill": "$stone" }],
+  "sides": { "material": "stone" },
+  "facade": { "storeys": { "height": 13 }, "bays": { "width": 40 },
+              "panels": [{ "width": 19, "height": 7.6, "at": 3, "fill": "$glass", "bars": 1, "bar_fill": "$frame", "lit": "$lit", "lit_fill": "$warm" }],
+              "piers": [{ "width": 3.4, "fill": "$stone_lt" }],
+              "bands": [{ "from": 0, "to": 0.9, "fill": "$stone_hi" }] } }
+```
+
+| Field | What it does |
+|---|---|
+| `storeys` | `{from, height, count}`: the storeys up the layer |
+| `bays` | `{width, margin}`: each wall cut into equal bays, corner to corner, round a curve too |
+| `panels` | Windows, spandrels, doors: one in every bay of every storey, or the `storeys` and `bays` named, on every wall or the ones its `faces` name (`['south']`, the front in the thing's own frame); `lit` is the share lit at night, painted `lit_fill`; `emits` makes the lit ones light the street (the light grid); `steps` and `lit_steps` draw a window in full (panes, frames, a room in silhouette) or a sign (a `text` step stays text, laid on the face and leaning with it), with `detail` the least size on screen to draw it so, the plain panel below that |
+| `piers`, `bands` | Piers between the bays; stripes along the walls (`faces` as panels': a signboard fascia on the front) |
+
+The fields are in [the physics API reference](basement/physics/docs/api-reference.md); any of them may be a `"$look"` value, so `entity.set('look', {values: {lit: .8}})` lights more windows.
+
+### Spatial queries
+
+Everything in the world sits on one shared spatial grid, so asking what is around is cheap.
+
+| Call | What it does |
+|---|---|
+| `physics.raycast(packet)` | The first thing along a line |
+| `physics.queryRadialRegion(source, {radius, …})` | Everything in a circle or ring around a point |
+| `physics.queryEntitiesInBounds(packet)` | Everything in a box |
+| `physics.findNearestEntity(reference, options)` | The closest match |
+| `physics.observeTarget(observer, target, options)` | Whether one character can see another (range, cone, walls) |
+| `physics.findClearPlacement(packet)` and the other `find…Placement` calls | A free spot to put something |
+
+### Navigation, motion and traffic
+
+| System | What it does |
+|---|---|
+| `physics.findPath(packet)` | A path around walls |
+| `basement.motion` | Moves bodies along paths and lanes |
+| `physics.tweens` / `entity.tween(property, to, {duration, easing, delay, repeat, yoyo})` | Eases any value over time: a size, a height, a colour in the look, any number in the entity's data. Easings are data: a name (`smooth`, `ease_out`, `back_out`, `bounce_out`…), a bezier `[x1, y1, x2, y2]` or `{steps}` |
+| `basement.traffic` | Runs vehicles on a road network, with lane occupancy |
+
+Reference: [navigation](basement/physics/docs/navigation.md). The API spec merges cars and walkers into one agent system on one network; that section of this guide is written when it is built.
+
+### Animation rigs
+
+`basement.rigs` runs skeletal animation: rig definitions, poses, clips, an animation controller per body, and inverse kinematics (`solveIk`). It shares the physics world's step.
+
+Reference: [physics README](basement/physics/README.md), animation section.
+
+### Maps
+
+A map is data: size, walls, placements, lights, triggers, rooms, doors and cloth. Its `rows` line its streets with buildings: `{block: 'block_0_4', side: 'south', pick: [{object: 'street:bakery', width: 250, depth: 200, looks: [...]}, ...], seed: 4}` fills that street front wall to wall, each turned to face the street, picked the same way every load (see the maps README; `keep_clear` rectangles stay empty). Its `markers: {role: marker}` show triggers on the floor: `{transition: {label: true}}` draws every exit as the classic's glowing mat with its label, fitted to it, breathing (`pulse_period`, `pulse_low`) and turning a deeper purple (`active_color`, `active_glow`) while someone stands on it (see the maps README; `data.quiet: true` on a trigger hides its mat). `mapSystem` turns a map definition into entities in the world and streams them round a focus point.
+
+| Call | What it does |
+|---|---|
+| `new mapSystem(physics)` | The map service for a world |
+| `maps.load(definition, options)` / `maps.unload()` | Builds a map's entities, or removes them |
+| `maps.setFocus(focuses, { radius })` / `maps.updateState()` | Streams regions in and out round the player |
+| `maps.getDoors()` | The map's doors |
+| `maps.saveState()` / `maps.loadState(state)` | Door and prop state |
+
+Usually you don't call this yourself: a [map level](#map-levels) does it for you.
+
+Reference: [maps README](basement/maps/README.md).
+
+### Rendering
+
+`basement.render` draws frames through a backend. Each frame it hands your `render` hooks a `frame` to draw into. The backend is a light switch: the engine registers `canvas`, `webgl` (WebGL 2) and `recording` (headless, keeps frames as data), and nothing above the backend knows which one is drawing. Give `new gameEngine({ render: { create_surface: id => freshCanvas } })` and a switch is just `setRenderer('webgl')` or `setRenderer('canvas')`.
+
+`webgl` draws the same frames as `canvas` (checked pixel by pixel in `tools/test-webgl-pixels.mjs`), except for what it does not declare yet: the blends `overlay`, `soft-light`, `lighten`, `darken`, `source-in`, `source-out` and `destination-in`. A frame that asks for one of those is refused before it is drawn, so check `render.getCapabilities()` or keep to the rest. `WEBGL_CAPABILITIES` lists what it draws.
+
+| Call | What it does |
+|---|---|
+| `render.registerRenderer(id, Class)` | Adds a backend, such as `canvasRenderer` |
+| `await render.setRenderer(id, { surface })` | Switches to it between frames, resources and all (the surface may be left out with `create_surface`) |
+| `render.getRenderer()`, `render.getCapabilities()` | Which backend is drawing, and what it can draw |
+| `render.measureText(text, font)` | One line's width, ascent and descent, as that backend draws it |
+| `render.resize({ width, height, pixel_ratio })` | Matches the screen |
+| `render.getVisibleEntities()` | What is on screen |
+| `render.setEffects(stack)`, `render.setLayerEffects(layer, stack)` | Post effects on the whole picture, or on one drawing layer alone: `grade` (exposure, contrast, saturation, hue, tint), `vignette`, film `grain`, and light: `bloom`, `fog_glow` and `star_glow`, and `bokeh` (lights become sharp aperture-shaped discs over a soft picture). A stack is a list, `[{ type: 'grain', amount: .1 }]`, or a preset from the data with changes, `{ preset: 'engine:film', grain: { amount: .12 } }`; `null` removes it |
+
+**Drawing.** Draw in an `artScene` with readable calls, each placed around the scene's origin, then hand `finish()` to the frame:
+
+```js
+const art = new artScene();
+art.drawRectangle({ x: -10, y: -6, width: 20, height: 12, radius: 2, fill: '#5a4632' });
+art.drawCircle({ x: 0, y: 0, radius: 3, fill: '#c9b28a', alpha: 0.8 });
+art.drawLine({ points: [[-8, 6], [8, 6]], stroke: '#2b2118', line_width: 1 });
+for (const packet of art.finish()) frame.submit(packet);
+```
+
+The calls are `drawRectangle`, `drawCircle`, `drawEllipse`, `drawCapsule`, `drawLimb`, `drawLine`, `drawPolygon`, `drawCurve`, `drawText`, `drawGlow` and `drawGroundShadow`. Paint fields on any of them: `fill`, `stroke`, `line_width`, `alpha`, `blend`, `shadow`, and gradients through `linear` and `radial`.
+
+**Drawings as data.** The same shapes can be a list of steps in data, so a thing's appearance needs no code. `art.draw(steps, { at, rotation, scale, values })` paints them; a `group` step nests steps at its own offset, turn and size, and a value `"$name"` is read from `values` (a look's fields), so one drawing serves every variant:
+
+```json
+[
+  { "shape": "rectangle", "x": -10, "y": -6, "width": 20, "height": 12, "radius": 2, "fill": "$body" },
+  { "shape": "group", "x": 5, "rotation": 1.57, "steps": [{ "shape": "circle", "radius": 3, "fill": "$lamp" }] }
+]
+```
+
+**Materials and textures.** A step's `material` names a material record, so many drawings share one substance. A material holds paint fields (`fill`, `stroke`, `line_width`, `alpha`, `blend`, `shadow`, `blur`, …) and an optional `surface` (`friction`, `restitution`, `hit_sound`, `hit_effect`, `footstep`); any other field is refused. A step's own paint wins over its material's. **Glowing shapes.** `emits` on a step or a material marks a shape that glows and lights what is round it: `true`, or `{strength = 1, reach = 96, color, height = 0}` (`EMITS`; reach and height in world units, `color` '#rrggbb' defaulting to the step's fill, then its stroke, then white). A step's `emits` wins over its material's, and `false` turns its material's off. Drawing ignores it. `drawingEmitters(steps, {at, rotation, scale, values, materials, elevation})` lists a drawing's glowing shapes in world space (`{outline, open, width, bounds, color, strength, reach, height}`), the one list the light grid and reflections read; `readEmits(emits)` gives the one form or throws. A texture is a fill: `{ "type": "pattern", "image": "bricks", "repeat": "repeat" }` repeats a registered image and moves with its object.
+
+**Looks.** An entity whose `drawing` asset names a drawing is drawn by the engine every frame at its own position and rotation; nothing else is needed. Its `look` property (`{values, scale, layer, depth, visible}`) says what the drawing reads and where it sits, so `entity.set('look', {...})` changes how it looks and `entity.setAsset('drawing', id)` swaps its art.
+
+| Call | What it does |
+|---|---|
+| `render.drawLooks(blend, {covers, time})` | Draws every visible look into the open frame (the loop calls it for you, with `time: lobby.played`, the seconds of play) |
+| `fitBounds(steps, bounds)` | The collision shape that fits a drawing's solid steps: `circle`, `box`, `capsule`, `hull`, or `parts` (a box round each top-level step, as one compound shape) |
+| `drawingReach(steps)` | The circle round everything a drawing paints, glows included |
+
+The light layer (`createLightLayer`) draws lights and shadows. A night is one call after `drawLooks(1, {covers: 24})`: `renderSystem.drawNight({tint, grids, cuts})` lays the dark over the frame with the lights every visible thing carries (a template's `lights`, in its own frame, placed and turned with it; a light marked `over: true` stands above the roofs; a template's `light_group` puts its lights and glow in a group `render.setLightGroup(name, on)` turns off and on, as the world clock's windows do for street lamps), keeps the night on roofs that lean over the light on the ground, and lets lit windows and glowing steps shine through. A template marked `blocks_light: true` (a building) stops the glow of its own windows at its walls. Glowing art lights its surroundings through the light grid: `bakeLightGrid` bakes one region's grid from `emits` shapes (cell 16 or 32, walls stop it), `createLightLayerParts({grids})` draws it into the light tiles as a cut and a colour, and `lightGridSystem` keeps a map's grids current per region (a map's `light_grid: {cell, spread, strength, regions}` settings, moving emitters re-baking what they reach). See the rendering README's Light grid section. Floors shine through `reflect` on a material or floor step (`{strength, wet, plane}`), and a `reflectionPass` lays the reflection on the ground each frame (give `drawNight` its `darknessCut()` as `cuts` so it shows through the night): lights' mirrored glows, glowing shapes, baked probes, bodies (screen-space reflection on WebGL, silhouettes on Canvas) and reflection planes in full art; see the rendering README's Reflections section. A map light's `height` sets where its reflection falls. **Glare and particles.** A light with `glare: true` (or `{reach, ...}`) gets the lens's star and fog over it when the night is drawn with `drawNight({..., glare})`, or with `render.drawGlare({settings})`; `render.drawParticles({blend})` draws every physics particle system that has a `look` (`streak`, `dot` or `ring`, leaning with the height view, near lights in their colour; `readParticleLook` checks a look). The glare's `rays` (how many long rays, a short one between each two), `hot` and `hot_reach` (the white-hot core and how far along a ray the light's colour takes over) and `color` (for a light with none) are data like its reach; a look's `band_count`, `band_alpha` and `band_width` (its height bands) and `lit_color`, `lit_alpha` and `lit_width` (how it takes a light) too. `drawNight({amount})` lays the night at a strength (0 to 1). A map's `night: {tint, scale, effects, glare, covers}` holds the night as data (`readNight`, `readGlare` check it); see the rendering README's Glare, particles and night settings section. Colour helpers: `rgba`, `mix`, `shade`, `hexToRgb`.
+
+Reference: [rendering README](basement/rendering/README.md).
+
+### Camera
+
+| Call | What it does |
+|---|---|
+| `camera.follow(entity, { offset, smoothing })` / `camera.stopFollowing()` | Tracks an entity |
+| `camera.setView({ position, zoom, rotation })` / `camera.getView()` | Places the camera |
+| `camera.setBounds(bounds)` | Keeps it inside the map |
+| `camera.screenToWorld(point)` / `camera.worldToScreen(point)` | Converts between screen and world |
+| `camera.inView(entity, { margin })` / `camera.pointInView([x, y], { height })` / `camera.boundsInView(box, { height })` | Is it on screen: an entity's render bounds from its base to its top, a point at a height, a box; they lean with the height view as the drawing does |
+
+### Controls
+
+`basement.controls` gives one API for keyboard, mouse, gamepad (buttons, triggers and sticks) and touch (buttons and sticks). Your code asks about **actions**, never keys or devices. Taps, double taps, holds and drags are recognised for you, each above a threshold you can set.
+
+A binding is an input name (`'e'`, `'space'`, `'mouseLeft'`, `'gamepadA'`, `'gamepadRTrigger'`, `'touchFire'`), or `[input, type, threshold]`:
+
+| Type | Fires when | Threshold (third value) | Default |
+|---|---|---|---|
+| `PRESS` | the input goes down | — | |
+| `RELEASE` | it comes up | — | |
+| `REPEAT` | it goes down, and again on each key repeat | — | |
+| `TAP` | it is pressed and let go quickly | longest tap, seconds | `tap_threshold` 0.195 |
+| `DOUBLETAP` | it is tapped twice in a row | longest gap between the taps, seconds | `tap_wait_time` 0.25 |
+| `HELD` | it stays down long enough | shortest hold, seconds | `hold_wait_time` 1.0 |
+| `DRAG` | a pointer press (mouse button or touch button) moves far enough before it is let go | shortest drag, pixels | `drag_threshold` 8 |
+
+A press that became a hold or a drag is not also a tap. The defaults are changed for every binding at once with `timing`.
+
+```js
+import { TAP, DOUBLETAP, HELD, DRAG } from './engine/basement/controls/index.mjs';
+
+new gameEngine({ controls: {
+    keymap: {
+        interact: ['e', 'gamepadA', 'touchInteract'],
+        dash: [['space', DOUBLETAP, 0.3]],
+        charge: [['mouseRight', HELD, 0.5]],
+        pan: [['mouseLeft', DRAG, 12]],
+        move_left: ['a'], move_right: ['d'], move_up: ['w'], move_down: ['s']
+    },
+    vectors: { move: { gamepad: 'left', touch: 'move', dead_zone: 0.15 } },
+    timing: { tap_threshold: 0.2, drag_threshold: 10 }
+} });
+```
+
+| Call | What it does |
+|---|---|
+| `controls.active(action)` | Held right now |
+| `controls.justActivated(action)` / `controls.justReleased(action)` | Pressed or let go this tick |
+| `controls.held(action)` | Seconds held |
+| `controls.value(action)` | 0 to 1, for triggers |
+| `controls.direction(name)` | One `[x, y]` from keys, gamepad stick or touch stick, with dead zones |
+| `controls.readQueue(action, type)` | Takes a recognised `TAP`, `DOUBLETAP`, `HELD` or `DRAG` off the queue (true or false) |
+| `controls.drag(action)` | While a drag is under way: `{ origin, position, delta, distance }` in screen pixels; otherwise null |
+| `controls.pointer()` | Mouse position, movement and wheel |
+| `controls.bind(action, ...bindings)` / `controls.setKeymap(keymap)` | Changes bindings |
+| `controls.touch.button(element, 'touchFire')` / `controls.touch.stick('move', { zone })` | Wires on-screen touch buttons and sticks |
+
+#### Hits: what a click or tap lands on
+
+Like UPBGE's mouse-over sensor: the camera casts a ray down through the screen point, and the first thing it meets is the hit. Top-down, that is the thing drawn on top: the higher `look.layer`, then the taller entity (its components' highest top), then the one made later. A finger on the screen itself (not on a touch button) is the input `touchScreen`, so `select: ['mouseLeft', 'touchScreen']` covers both.
+
+| Call | What it does |
+|---|---|
+| `controls.hit(filters)` | What the mouse is over now (UPBGE's `hitObject`), or null: `{ entity, body, position, height, layer }`, `position` in the world |
+| `controls.hitAt([x, y], filters)` | The same for any point on the page |
+| `controls.hitOf(action)` | What the last click or tap of `action` landed on, while it waits in the queue |
+| `controls.onHover(handler, filters)` | `handler({ entity, hit, previous })` whenever what the mouse is over changes; returns a call that stops |
+| `render.pickAt([x, y], filters)` / `render.pickAllAt([x, y], filters)` | The same picks from a world point: the top hit, or every hit top first |
+
+Filters: `kind`, `tag`, `property` (it must have that property, like UPBGE's `propName`), `ignore` (entities to look past), `bounds` (`collision`, the default, or `render`), and `xray`. Without `xray` the top thing blocks the ray: a crate under a roof can't be clicked through it. With `xray: true` the ray passes everything that fails the filters.
+
+Entities hear it too, with no wiring: `entity.on('pointerHit', ({ action, position }) => ...)` when a fired action's click or tap lands on it, and `pointerEnter` and `pointerLeave` as the mouse moves over and off.
+
+```js
+const door = context.createEntity({ kind: 'static', name: 'door', data: { usable: true }, /* ... */ });
+door.on('pointerHit', ({ action }) => { if (action === 'select') door.set('open', !door.get('open')); });
+const hit = controls.hitOf('select');                 // or ask in a system
+if (hit?.entity.has('usable')) hit.entity.set('open', true);
+controls.hit({ property: 'usable', xray: true });     // what usable thing is under the mouse, through anything else
+```
+
+#### Input contexts
+
+Bindings come in named sets, one live at a time: `gameplay`, `menu`, `dialogue`, `vehicle`, or any name. The plain `keymap` is the `gameplay` context. The UI switches to `menu` while a menu is on top and back afterwards; a game switches for itself with `useContext`.
+
+```js
+new gameEngine({ controls: { contexts: { gameplay: { fire: ['mouseLeft'] }, vehicle: { brake: ['space'] } } } });
+controls.useContext('vehicle');
+```
+
+| Call | What it does |
+| --- | --- |
+| `controls.useContext(name)` / `controls.input_context` | Makes a context's bindings live (everything held is let go); the name of the live one |
+| `controls.defineContext(name, keymap)` | Adds or replaces one |
+
+A binding's type can be written by name in data: `["ArrowDown", "repeat"]`, `["e", "held", 0.6]` (`press`, `release`, `tap`, `doubletap`, `held`, `repeat`, `drag`).
+
+Rumble templates from the API spec are documented here when built.
+
+Reference: [controls README](basement/controls/README.md).
+
+### UI
+
+`engine.ui` is one overlay for every screen: main menu, pause and its pages, HUD, dialogue, phone. A screen is data: items, a layout, transitions, and switches such as `pauses_game` and `modal`. Screens open along a stack; the menu actions (keyboard, gamepad and mouse alike) move focus and press items; items read live values with `"{path}"` and do what their data says.
+
+```js
+ui.define({ name: 'pause', modal: true, pauses_game: true, controls: 'menu', open_with: 'pause',
+    items: [{ id: 'resume', type: 'button', text: 'Resume', on_click: { close: 'pause' } },
+            { id: 'music', type: 'toggle', text: 'Music', value: '{options.music}' },
+            { id: 'quit', type: 'button', text: 'Quit', on_click: { event: 'quit' } }] });
+ui.provide('clock', () => engine.time.text());          // "{clock}" now reads the game's clock
+ui.on('quit', () => engine.loadLevel('title'));
+ui.on('set', ({ path, value }) => settings.apply(path, value));
+```
+
+| Call | What it does |
+| --- | --- |
+| `ui.define(...screens)` | Adds screens from data (`screensOf(registry)` gives a registry's) |
+| `ui.open(name, data)` / `ui.back()` / `ui.close(name)` | Moves along the stack, with each screen's transitions |
+| `ui.focus(item)` / `ui.get(item)` / `ui.set(item, key, value)` / `ui.press(item)` | Reads or changes an item live |
+| `ui.setValue(path, value)` / `ui.getValue(path)` / `ui.provide(name, source)` | The values items read: a store, plus live game data by name |
+| `ui.on(event, fn)` | The game's own events (`{event: "save"}`) and `open`, `close`, `focus`, `click`, `change`, `set` |
+| `ui.addFonts(...fonts)` | Loads fonts (`fontsOf(registry)`) |
+
+Item types: `button`, `label`, `list`, `slider`, `toggle`, `image`, `bar`, `panel`, `input`. Verbs: `open`, `back`, `close`, `event`, `set`, `focus`. The game's own screens are in `src/game/data/libraries/screens.json`.
+
+Reference: [UI README](basement/ui/README.md).
+
+---
+
+## Lobby (LV1)
+
+The game loop. It owns time and runs every system in order each tick: input, UI, before physics, physics, after physics, camera, then render.
+
+### The clock and pausing
+
+`engine.lobby` is the game loop, and `engine.lobby.clock` its clock: a fixed step, with frames drawn between steps. The engine's own loop calls (`loadLevel`, `start`, `pause`, …) are the loop's.
+
+`engine.pause(reason)` pauses for a named reason and returns that reason's own `resume`. The game runs again only when every reason is released, so a menu and a lost window focus can both pause without fighting.
+
+```js
+const resume = engine.pause('menu');
+// later
+resume();
+```
+
+### The world's clock: time of day
+
+`engine.time` (also `engine.lobby.time`, and `context.lobby.time` in hooks) is the world's clock, a Basement `worldClock` (`basement/timers`) that the loop steps after physics each fixed step, so it pauses and speeds up with the game. It is a calendar clock after the Python `timeSystem` in `docs/engine-reference/`: it moves `speed` game seconds a second of play and carries seconds into minutes, hours, days, months (with their lengths and leap years as data) and years. The day is cut into phases as data; each starts at a time of day and says how dark it is (`dark`, 0 day to 1 the full night) and may name colours (a sky, a sun), and both blend into the next phase's across it.
+
+```js
+const engine = new gameEngine({ asset_library, time: registry.getResource('time:city_clock') });
+engine.time.text();            // "23:00"
+engine.time.phase.name;        // "night"; also .from, .to, .progress, .next
+engine.time.darkness;          // 1
+engine.time.color('sky');      // "#020204"
+engine.time.on('phase', ({ name, previous }) => { /* lamps on at dusk */ });
+engine.time.setTime({ time: '06:30' }); engine.time.setSpeed(60);
+```
+
+| Call | What it does |
+|---|---|
+| `time.configure(record)` | Takes a clock record (`world_clock`: `{start: {year, month, day, time}, speed, months, leap, separator, phases: [{name, from, dark, colors}], windows}`) and sets the clock to its start |
+| `time.year`, `month`, `month_name`, `day`, `hour`, `minute`, `second`, `time_of_day` | The date and time now (`time_of_day` in seconds into the day) |
+| `time.text({seconds})` / `time.date()` | "HH:MM" (or "HH:MM:SS") with the record's separator; "month.day.year" |
+| `time.setTime({year, month, day, time})` or `({hour, minute, second})` | Sets it; minutes and seconds past 59 and hours past 23 carry over |
+| `time.setSpeed(k)` / `time.speed` | Game seconds a second of play (0 stops the clock) |
+| `time.phase` / `time.is(name)` | The phase now `{name, from, to, progress, dark, colors, next}` |
+| `time.within(name)` / `time.windows()` | Whether a window holds now: the record's `windows: {name: [[from, to], ...]}`, named spans of the day (`rush_hour`, `street_lights`; one ending before it starts runs past midnight) |
+| `time.darkness` / `time.color(name)` | How dark it is now (0 to 1) and a phase colour now, both blended across the phase |
+| `time.on('hour' or 'day' or 'phase' or 'window', fn)` | Told of each new hour, day and phase, and each window opening or closing (`{name, on}`), as the clock passes them (in order, however fast it runs); returns the call that stops it |
+| `time.state()` / `time.restore(state)` | The clock as plain data for a save, and back |
+| `time.updateState(seconds)` | Moves it on (only the loop calls this) |
+
+A clock with no phases is always 'day' and never dark. A map with `switches: {day_night: true}` lays its night from the clock (see [Map levels](#map-levels)).
+
+### The world's weather
+
+`engine.weather` (also `lobby.weather`, `context.lobby.weather`) is the world's weather, a Basement `worldWeather` (`basement/weather`) stepped with the game after physics, after the Python 2.0 script's states (CLEAR, RAINING, SNOWING) and intensities (LIGHT, NORMAL, HEAVY, HELLISH). Both are open: a record names its own states and intensities. A state lists the particle systems it brings, as a map's `particles` do; an intensity is a scale on their birth rates. Changing the weather fades the old state out and the new one in, and the intensity across, over `fade` seconds of play.
+
+```js
+const engine = new gameEngine({ asset_library, weather: registry.getResource('weather:city_weather') });
+engine.weather.set('snow', 'heavy');            // fades over the record's `fade` seconds
+engine.weather.set('clear', 'normal', { fade: 0 });
+engine.weather.amount('rain');                 // how much rain now: its share times the intensity's scale
+engine.weather.on('change', ({ state, intensity, previous }) => { /* puddles, sounds */ });
+```
+
+| Call | What it does |
+|---|---|
+| `weather.configure(record)` | Takes a weather record (`world_weather`: `{states: {name: {particles: [{system, area, at, margin}]}}, intensities: {name: scale}, start: {state, intensity}, fade}`) and starts its `start` weather at once |
+| `weather.state`, `weather.intensity`, `weather.changing` | The weather it is (or is turning into), and whether it is still fading |
+| `weather.set(state, intensity, {fade})` | Changes it; tells the `change` listeners |
+| `weather.amount(state)` / `weather.amounts()` | How much of a state there is now (0 while it is another; its intensity's scale when it is fully in) |
+| `weather.on('change', fn)` | Told of each change; returns the call that stops it |
+| `weather.save()` / `weather.restore(saved)` | The weather as plain data, and back at once |
+
+The intensities default to the Python's four: `light` .35, `normal` 1, `heavy` 1.8, `hellish` 3. A map with `switches: {weather: true}` makes every state's particle systems on entry and sets their rates from the weather after each step (see [Map levels](#map-levels)).
+
+### Levels
+
+A level is a `gameLevel` subclass. It holds content and policy; it never owns the world or the clock.
+
+| Hook | What it does |
+|---|---|
+| `async prepare({ assets }, options)` | Loads what the level needs. The only hook that may be asynchronous |
+| `enter(context, prepared)` / `leave(context)` | Builds and tears down the level |
+| `beforePhysics(context, seconds)` / `afterPhysics(context, seconds)` | Runs each tick |
+| `render(context, blend, frame)` | Draws each frame |
+| `disposePrepared(prepared)` | Frees what `prepare` loaded |
+
+### Map levels
+
+`mapLevel` is a level that loads a map: give it a map definition and it builds the map, streams it, places travellers and exposes its exits. With `switches: {light_grid: true}` in the map it also keeps the map's light grid (`level.light_grid`): glowing art lights its surroundings, baked per region and re-baked round moving emitters within a budget after physics. Draw it with `createLightLayerParts({..., grids: level.light_grid.grids(view)})`, add `level.light_grid.liveLights()` to the live lights, and read `level.light_grid.sample(x, y)` for reflections. With `switches: {traffic: true, walkers: true}` and an `agents` record it brings its streets to life (`level.agents`, see [the Basement's agents](basement/agents/README.md)): cars and people on foot on the map's street network (`streetNetwork`), kept round the first focus, the junctions' lights cycling, and with the record's `settings.looks` their heads, stop bars and walk strips drawn on the ground (`level.makeStreetLook(context, template, pose)` makes each; a level overrides it). A map's `height_view: {eye, lean = 1}` sets the camera's height view on entry (`renderSystem.setHeightView`; how high the eye stands over the ground in world units, and how far walls lean from it) and clears it on leaving: a low eye (a few hundred) shows tall facades, a high one keeps the view near flat. A map's `night` record is kept as `level.night` for whoever draws the frame (`drawNight` with the night's tint, scale and glare), its `particles: [{system, area: 'view' | [x, y, w, h], at, margin = 96}]` are made on entry as `level.particles` (a `system` is a record or a `particle_system` resource id; `area: 'view'` keeps the births over the camera's view, `margin` past it, after each step) and drawn by `render.drawParticles`, and `level.setNight(context, on)` puts the night's `effects` on the frame (`render.setEffects`) or takes them off. With `switches: {day_night: true}` the world's clock says when: after each step the night is on while `engine.time.darkness` is above nothing and laid at that darkness (`drawNight({amount})`), so a dusk deepens into the night and a dawn lifts it; a clock with no phases leaves `setNight` to the game. With `switches: {lighting: true}` (a lamp-lit interior) the night is on from entry at full strength without the clock (its `night`, or the engine's `NIGHT` when it gives none), every lamp with `shadows: 'static'` or `'dynamic'` is stopped by the walls (`render.setLightShadows`), and the map's rooms thin the dark: an indoor room to its `fill` while its `lights_off` flag is unset, an outdoor one (a veranda) to the clock's darkness (`nightAreas`). Each of the clock's windows also turns the light group of its name on while it holds and off when not, in the render system and the light grid: street lamps with `light_group: 'street_lights'` light from 18:00 to 07:00 in the game's clock, so the last of the dawn's dark is unlit. With `switches: {weather: true}` the map takes the world's weather: every state's particle systems are made on entry (with the map's own `particles`) and after each step each is born at its own rate times `engine.weather.amount(state)`, so rain thins out as snow comes in. After each step each exit's `occupied` property is set while one of `level.exitFocuses(context)` (by default every active character; a game overrides it for the player) stands in it, which is what a marker's active look follows. The loop draws the rest itself: a level's `lookOptions(context, blend)` is what its `drawLooks` gets (`{covers: night.covers}` while the night is on), and `mapLevel.render` draws the night (tint, scale, glare, the light grid) and then the particles. Leaving the map takes them off and removes its particle systems.
+
+| Member | What it does |
+|---|---|
+| `mapDefinition({ assets }, options)` | Returns the map's definition (override this) |
+| `getExits()` / `exitAt(body)` | The map's exits, or the one a body stands in |
+| `mapFocuses(context)` | What the map streams round |
+
+### Travel
+
+`travelSystem` moves the player and companions through an exit to another map: `await travel.travel(target)`, which defaults to the exit the player stands in. It is a system: register it with `engine.registerSystem`. `travel.onExitChanged(fn)` tells a prompt which exit the player stands in (null on stepping off, or leaving the map). An arriving party steps out of the exit leading back, away from whatever stands behind it: in from a map edge, or out of a door into the street.
+
+---
+
+## Directory (LV2)
+
+The data layer, through `engine.directory`. It defines what each kind of data looks like, keeps the registry where everything is found by id, and loads library files. It has no behaviour.
+
+| Call | What it does |
+|---|---|
+| `directory.assets` | This engine's registry |
+| `assets.registerLibrary(library)` | Adds a library of templates and resources |
+| `assets.getTemplate(id)` / `assets.getResource(id)` / `assets.listTemplates()` | Finds data by id |
+| `directory.validateMapLayout(layout)`, `validatePropCatalog`, `validateSkeleton`, `validateDrawing`, `validateMaterial`, … | Checks data against its structure (a library is checked when it is registered) |
+| `directory.resolvePlacement`, `resolveLayout`, `resolvePropLook` | Turns layout data into what the map builder reads |
+| a `world_clock` resource | The world's clock as data (checked by `readWorldClock`), handed to `new gameEngine({time})` or `engine.time.configure` |
+| a `world_weather` resource | The world's weather as data (checked by `readWorldWeather`, its inline particle systems too), handed to `new gameEngine({weather})` or `engine.weather.configure` |
+
+Reference: [Directory README](directory/README.md).
+
+---
+
+## Penthouse (LV3)
+
+Prefabs built only from the levels below, through `engine.penthouse`.
+
+| Prefab | What it is |
+|---|---|
+| `createObject(elements, record, at, overrides)` | Any object from a catalog record (see [Objects](#objects)); `engine.createObject` is the same with level lifetime |
+| `objectPacket(assets, record, at, overrides)` | The entity packet a record makes, without making it |
+| `humanoid` | A procedural humanoid with a rig, IK and physical arms, its body made of components on the rig's joints |
+
+### Objects
+
+One call makes anything: `engine.createObject(record, at)`. A record is a template in a library (or an inline record), and its fields switch its parts on. Nothing in the call knows which record it is.
+
+| Field | What it switches on |
+|---|---|
+| `kind` | What it is to physics: `prop`, `static`, `character`, `vehicle`, `trigger`, … |
+| `assets.drawing` | Its look: a drawing resource, drawn every frame |
+| `look` | `{values, scale, layer, depth, visible}`, kept as the object's `look` property |
+| `bounds` | Collision bounds fitted from the drawing's solid steps: `circle`, `box`, `capsule`, `hull`, or `parts`: a box round each component's layer, so a building collides as its wings and the lamps before it, not one box over its forecourt (the `engine:building` default) |
+| `collision_shape` | An exact shape; it always wins over `bounds` |
+| `assets.material` | A material whose `surface` sets the body's friction and restitution |
+| `components` | The parts it is made of, with layers at their own heights (see [Components](#components)); `bounds` fits every solid layer |
+| `scale`, `mass_scales` | Its size against the record (a number or `[x, y, height]`), and whether mass follows it (`'area'`, `'volume'` or false) (see [Scale](#scale)) |
+| `data` | Its starting properties |
+
+```js
+engine.directory.assets.registerLibrary({
+  library_id: 'yard',
+  resources: {
+    lamp: { kind: 'drawing', steps: [
+      { shape: 'glow', radius: 60, color: '$light' },
+      { shape: 'circle', radius: 10, material: 'brass', solid: true },
+      { shape: 'rectangle', x: -2, y: 10, width: 4, height: 30, material: 'brass', solid: true }] },
+    brass: { kind: 'material', fill: '#b5a642', stroke: '#5a4f1c', surface: { friction: 0.3 } }
+  },
+  templates: {
+    lamp: { kind: 'prop', assets: { drawing: 'lamp', material: 'brass' },
+            look: { values: { light: '#ffd27f' }, layer: 2 }, bounds: 'circle', data: { on: true } }
+  }
+});
+// In a level's enter(context), or with { lifetime: 'session' } outside one:
+const lamp = context.engine.createObject('yard:lamp', [100, 50]);   // drawn every frame; its hitbox fits the head and post, not the glow
+```
+
+A drawing step is solid when it says `solid: true`; when no step says so, every shape but glows, ground shadows, text and lines is. Bounds are fitted once, from the drawing at rest, so an animation never changes the hitbox.
+
+Reference: [Penthouse README](penthouse/README.md).
