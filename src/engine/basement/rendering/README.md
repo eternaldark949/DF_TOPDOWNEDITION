@@ -455,6 +455,8 @@ render.endFrame();
 | `color`, `alpha`, `width` | `'#ffffff'`, 1, 1 | Its colour; a streak's or ring's line width in screen pixels. |
 | `trail`, `size` | .05, 1 | Seconds of motion a streak spans; a dot's or ring's radius in world units. |
 | `grow`, `fade` | false, false | It grows from nothing to `size` over its life; its alpha falls to nothing over its life. |
+| `trail_top`, `trail_curve` | none, 1 | A streak's `trail` at the top of its system's fall: it eases from this at the top to `trail` at the ground along `trail_curve` (1 straight, more keeps it short until high up), so rain high up draws as long streaks and shortens as it lands. Left out, one `trail` at every height. |
+| `size_end`, `size_curve` | 1, 1 | A dot's or ring's size at the end of its life as a share of `size`, eased along `size_curve` (1 straight, more keeps it big for longer), so snow shrinks as it falls. With `grow`, the size it grows to. |
 | `bands`, `band_count`, `band_alpha`, `band_width` | false, 4, 3, 2 | Higher is nearer the lens: `band_count` height bands, the highest `band_width` times as wide and `band_alpha` times as bright as the lowest. |
 | `lit`, `lit_reach`, `lit_color`, `lit_alpha`, `lit_width` | false, .6, `'#ffeebb'`, 1.6, 1.3 | Near a point light (within `lit_reach` of its radius) it takes the light's colour (`lit_color` for a light that gives none), `lit_alpha` times as bright and `lit_width` times as wide. |
 | `eye` | 700 | The camera's height when the frame has no height view: particles still lean from it. |
