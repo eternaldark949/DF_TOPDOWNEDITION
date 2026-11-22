@@ -49,6 +49,8 @@ export function packet(input,out={}){
     out.opacity=finite(input.opacity??1,'opacity',0);if(out.opacity>1)throw new TypeError('Opacity must be in [0,1]');out.blend=input.blend??'normal';if(!BLENDS.includes(out.blend))throw new TypeError('Unsupported blend');
     out.transform=transform(input,out.transform);out.material_id=input.material_id===undefined?null:identifier(input.material_id);out.material=out.material_id||input.type==='picture'?null:material(input.material,out.material??{});
     if(input.type==='picture'){if(input.material_id!==undefined||input.material!==undefined)throw new TypeError('A picture carries its own paint');picture(input,out);}else{out.picture=null;out.prepare=false;if(out.build)out.build=null;}
+    // what the packet fills, for the frame's occlusion order (occlusionOrder in depth.mjs): kept by reference, shared by a piece's packets
+    if(input.solid!==undefined&&input.solid!==null&&(typeof input.solid!=='object'||!Array.isArray(input.solid.hulls)))throw new TypeError('A solid is {hulls, z0, z1, box, eye}');out.solid=input.solid??null;
     out.geometry_id=null;out.geometry=null;out.resource_id=null;out.pixels=null;out.text=null;
     if(input.type!=='sprite'){out.size=null;out.source=null;out.origin=null;}
     if(input.type!=='text'){out.font=null;out.align=null;out.baseline=null;}

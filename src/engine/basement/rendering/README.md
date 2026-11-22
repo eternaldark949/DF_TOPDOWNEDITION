@@ -57,6 +57,7 @@ Common packet fields:
 | `type` | `shape`, `sprite`, `text`, or `picture`. |
 | `space` | `world` (default) or viewport-relative `screen`. |
 | `layer`, `depth` | Finite numbers; lower first, then stable submission order. |
+| `solid` | Optional `{hulls, z0, z1, box, eye, bias}`: what the packet fills, for the occlusion order (below). Packets that share one solid object move together. |
 | `position`, `rotation`, `scale` | Local-to-world/screen transform; centers, radians, `[1,1]` default scale. |
 | `matrix` | Optional six-number affine transform overriding position/rotation/scale. |
 | `opacity` | 0..1; default 1. |
@@ -245,6 +246,12 @@ Art that stands up from the ground under a camera above it. A point at height `z
 ## Depth batches (`depth.mjs`)
 
 Things that stand up toward the camera (trunk faces, posts, canopies) are painted lowest first, but a frame of them is hundreds of small shapes. `depthBatches(items, {lookback = 64})` groups `items` (`{z, key, box: [left, top, right, bottom], convex}`) for painting: lowest `z` first (ties in the order given), each group one `key`. An item joins the latest group of its key unless a group of another key painted after it overlaps the item; `convex` (its outline as `[[x, y], ...]`, when convex) makes that test exact, so shapes touching along an edge (the faces of one post) do not hold each other apart. A null key never groups (a picture). A group is one paint, so where its members overlap they are covered once: the same for opaque paint, so give translucent paint a null key. It returns the groups, arrays of items, in paint order; the artist paints each as one shape.
+
+### Occlusion order
+
+Heights alone cannot order a scene seen from an eye above the camera: a rail in front of a tall wall starts lower than the wall's foot, yet stands between the eye and the wall. `occlusionOrder(items, {solid, group})` keeps `items` in the order given except where what they fill says otherwise. `solid(item)` (default `item.solid`) is null or `{hulls: [[[x, y], ...], ...], z0, z1, box: [left, top, right, bottom], eye: [x, y], bias}`: its convex footprints in the world (a wall's foot is two points), the heights it spans, its box as drawn, the camera under the eye, and a bias (its look's depth: solids of different biases are never reordered). Items in a row that share one solid object move together; items of different `group`s (layers) are never compared. `canHide(a, b)` is false only when it is proved that `a` cannot hide any of `b`: when `a` is wholly lower than `b` (every sight line comes down from above), or when, for each pair of their footprints, a line holds `a` on the far side from `b` with the eye on `b`'s side (no sight line to `b` crosses it). Where two solids' boxes meet and one can hide the other but not the other way round, the one that can hide goes after; among the rest the given order holds, and where solids contradict each other (a cycle), the earliest given goes on. This is exact for the height view's projection (any `k(z)` that grows with height), and is safe to be conservative: a footprint drawn larger than the thing only proves less.
+
+The frame's `finish()` applies it to each pass after its sort by layer, depth and sequence, and `drawLooks` gives every still component part a solid (each run of walls, each top; a part on a rig joint, a tipped bone or a sloped top gives none and keeps its height order), so across entities too whatever stands between the eye and another thing draws after it. `nightOver()` is ordered the same way.
 
 ## Rendering resources
 

@@ -2,6 +2,7 @@
 import {packet} from './packets.mjs';
 import {color,finite,freezeData,BLENDS} from './values.mjs';
 import {effectStack} from './effects.mjs';
+import {occlusionOrder} from './depth.mjs';
 
 /** Reused command buffers. Producers submit data; a backend borrows a completed frame. */
 export class renderFrame {
@@ -44,7 +45,11 @@ export class renderFrame {
     endPass(){this.#require();if(!this.#stack.length)throw new Error('No nested render pass');const previous=this.#stack.pop();this.#current=this.#pass(previous.target_id,false,previous.viewport);return this;}
     finish(){
         this.#require();if(this.#stack.length)throw new Error('Unclosed render pass');
-        for(const pass of this.#passes)pass.packets.sort((a,b)=>a.layer-b.layer||a.depth-b.depth||a.sequence-b.sequence);
+        for(const pass of this.#passes){
+            pass.packets.sort((a,b)=>a.layer-b.layer||a.depth-b.depth||a.sequence-b.sequence);
+            // then, where packets say what they fill, what stands between the eye and another goes after it
+            if(pass.packets.some(p=>p.solid)){const ordered=occlusionOrder(pass.packets,{group:p=>p.layer});if(ordered!==pass.packets)for(let i=0;i<ordered.length;i++)pass.packets[i]=ordered[i];}
+        }
         if(this.#layerEffects.size)this.#splitLayers();
         this.#open=false;return {format_version:1,view:this.#view,passes:this.#passes,packet_count:this.#count,effects:this.#effects};
     }

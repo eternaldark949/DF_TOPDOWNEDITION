@@ -48,3 +48,76 @@ export function depthBatches(items,{lookback=64}={}){
     }
     return groups.map(group=>group.items);
 }
+
+// OCCLUSION ORDER: heights alone cannot order a scene seen from an eye above the camera. A rail in front of a
+// tall wall starts lower than the wall's foot, yet stands between the eye and the wall. Two pieces that each
+// say what they fill (a solid: convex footprints and the heights they span) are ordered by what can hide what:
+// a piece wholly lower than another never hides it (every sight line comes down from above), and a piece on
+// the far side of a line from the other, with the eye on the other's side, never hides it either (the eye's
+// sight lines to the near one never cross the line). Everything else keeps the order it was given.
+const EPS_Z=1e-6,EPS_XY=.01;
+// Whether `a` (one convex footprint) is held off `b` by a line with the eye on b's side.
+function heldOff(a,b,eye){
+    for(const p of [a,b])for(let i=0;i<p.length;i++){
+        const u=p[i],v=p[(i+1)%p.length];let nx=u[1]-v[1],ny=v[0]-u[0];
+        for(let turn=0;turn<(p.length===2?2:1);turn++){
+            if(turn){const t=nx;nx=-ny;ny=t;}   // (a footprint two points long is a wall: its line, and across its ends)
+            const len=Math.hypot(nx,ny);if(!len)continue;
+            let a0=Infinity,a1=-Infinity,b0=Infinity,b1=-Infinity;
+            for(const q of a){const d=(q[0]*nx+q[1]*ny)/len;if(d<a0)a0=d;if(d>a1)a1=d;}
+            for(const q of b){const d=(q[0]*nx+q[1]*ny)/len;if(d<b0)b0=d;if(d>b1)b1=d;}
+            const e=(eye[0]*nx+eye[1]*ny)/len;
+            // a line between them with the eye on b's side of it: at a's edge, when the eye is past that edge
+            if(a1<=b0+EPS_XY&&e>=a1-EPS_XY)return true;
+            if(b1<=a0+EPS_XY&&e<=a0+EPS_XY)return true;
+        }
+    }
+    return false;
+}
+/** Whether solid `a` can hide any of solid `b` from an eye above `a.eye` (false only when it is proved it cannot). */
+export function canHide(a,b){
+    if(a.z1<=b.z0+EPS_Z)return false;
+    if(!a.hulls.length||!b.hulls.length)return true;
+    for(const p of a.hulls)for(const q of b.hulls)if(!heldOff(p,q,a.eye))return true;
+    return false;
+}
+const boxesMeet=(a,b)=>a[0]<b[2]&&a[2]>b[0]&&a[1]<b[3]&&a[3]>b[1];
+/**
+ * `items` in paint order, kept where they are unless what they fill says otherwise. `solid(item)` is null or
+ * `{hulls: [[[x, y], ...], ...], z0, z1, box: [left, top, right, bottom], eye: [x, y]}`: its convex
+ * footprints in the world, the heights it spans, its box as drawn and the camera under the eye. Items in a
+ * row that share one solid move together. `group(item)` keeps items of different groups (layers) apart.
+ * Where two solids' boxes meet and one can hide the other but not the other way round, the one that can
+ * hide goes after; among the rest, and where solids contradict each other, the given order holds.
+ */
+export function occlusionOrder(items,{solid=item=>item.solid??null,group=()=>0}={}){
+    const pieces=[];
+    for(const item of items){const s=solid(item),last=pieces[pieces.length-1];if(s&&last&&last.solid===s&&last.group===group(item))last.items.push(item);else pieces.push({solid:s,group:group(item),items:[item],after:[],need:0,firm:0});}
+    const solids=pieces.filter(p=>p.solid);if(solids.length<2)return items;
+    // pairs whose boxes meet, by a sweep across x
+    const byLeft=solids.slice().sort((a,b)=>a.solid.box[0]-b.solid.box[0]);let edges=0;
+    pieces.forEach((p,i)=>p.index=i);
+    for(let i=0;i<byLeft.length;i++){const p=byLeft[i],pb=p.solid.box;
+        for(let j=i+1;j<byLeft.length&&byLeft[j].solid.box[0]<pb[2];j++){
+            const q=byLeft[j];if(q.group!==p.group||q.solid.bias!==p.solid.bias||!boxesMeet(pb,q.solid.box))continue;
+            const pq=canHide(p.solid,q.solid),qp=canHide(q.solid,p.solid);if(pq===qp)continue;
+            // (a solid of one convex footprint is firm; one of several, spread apart, can stand on both sides of another)
+            const [first,then]=pq?[q,p]:[p,q],firm=p.solid.hulls.length===1&&q.solid.hulls.length===1;first.after.push({then,firm});then.need++;if(firm)then.firm++;edges++;
+        }
+    }
+    if(!edges)return items;
+    // the given order, bent only where a piece must wait for the ones it can hide
+    const heap=[],push=p=>{heap.push(p);let i=heap.length-1;while(i){const up=(i-1)>>1;if(heap[up].index<=heap[i].index)break;[heap[up],heap[i]]=[heap[i],heap[up]];i=up;}},
+        pop=()=>{const top=heap[0],last=heap.pop();if(heap.length){heap[0]=last;let i=0;for(;;){const l=2*i+1,r=l+1;let m=i;if(l<heap.length&&heap[l].index<heap[m].index)m=l;if(r<heap.length&&heap[r].index<heap[m].index)m=r;if(m===i)break;[heap[m],heap[i]]=[heap[i],heap[m]];i=m;}}return top;};
+    for(const p of pieces)if(!p.need)push(p);
+    const out=[],done=new Set();
+    while(out.length<items.length){
+        let p=heap.length?pop():null;
+        // Solids that contradict each other (a ring, which only pieces of several footprints can make): the earliest
+        // left that waits on no firm piece goes on, so what a firm piece says still holds; failing that, the earliest.
+        if(!p){let loose=null,any=null;for(const q of pieces)if(!done.has(q)){any??=q;if(!q.firm){loose=q;break;}}p=loose??any;}
+        if(done.has(p))continue;done.add(p);out.push(...p.items);
+        for(const {then,firm} of p.after){if(firm)then.firm--;if(--then.need===0&&!done.has(then))push(then);}
+    }
+    return out;
+}

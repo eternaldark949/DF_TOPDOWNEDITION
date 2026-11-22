@@ -215,10 +215,15 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,
         // walls meet, every face goes under every top at that height and none stands taller than the other.
         // Among faces, the farthest from the camera goes first, so a near wall's face hides the end of one behind it.
         // A part drawn whole (a bottle on a tray) keeps its walls and top together at its base.
+        // A still part says what it fills (its walls run by run, its top), so the frame puts whatever stands
+        // between the eye and it after it, whatever their heights (occlusionOrder): a rail in front of a tall
+        // wall starts under the wall's foot, yet covers it. (parts on joints keep their rig's order)
+        const fills=view&&!c.joint&&!lean&&!layer.slope?{eye:view.camera,bias:look.depth??0}:null;
         let sides=[],top=key;
-        if(view&&layer.sides&&z1>z0){sides=drawSides(steps,place,values,sidesPaint(layer.sides,values,materials),view,z0,z1,{...layer.sides,facade:layer.facade,scale:layer.thickness>0?(z1-z0)/layer.thickness:1,screen,shines,slope:layer.slope??null});if(whole({c}))for(const packet of sides)packet.depth=0;else top=key+z1-z0;}
+        if(view&&layer.sides&&z1>z0){sides=drawSides(steps,place,values,sidesPaint(layer.sides,values,materials),view,z0,z1,{...layer.sides,facade:layer.facade,scale:layer.thickness>0?(z1-z0)/layer.thickness:1,screen,shines,slope:layer.slope??null,solid:fills});if(whole({c}))for(const packet of sides)packet.depth=0;else top=key+z1-z0;}
         // with `covers` (a height), a walled part whose top stands over it gives its silhouette too: where the night comes back over the light on the ground
         const cover=covers!==null&&view&&layer.sides&&layer.cover!==false&&z1>covers&&!c.joint&&!lean?coverOf(steps,place,values,layer.sides.follow??'shapes',view,z0,z1):null;
+        const solid=fills?partSolid(steps,values,place,view,z1,z1,fills.eye,fills.bias):null,whole_solid=cover&&fills?partSolid(steps,values,place,view,z0,z1,fills.eye,fills.bias):null;
         if(mirror!==null&&layer.sides&&z1>z0)sides=mirrorSides(steps,place,values,sidesPaint(layer.sides,values,materials),mirror,z0,z1,below);
         // A still layer (not on a tipped bone) is the same art wherever it stands: with `pictures` it is drawn once
         // into a picture, keyed by its steps and look, and stamped each frame under its place and its plane.
@@ -229,14 +234,14 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,
         if(pictures&&!layer.pulse&&mirror===null&&fore===1&&!lean&&!(shines&&glowing(steps,materials))){
             const art=stillArt(steps,values,materials);
             if(art){const m=placeMatrix(place),matrix=view?compose(tilt??view.plane(view.k(z1)),m):m;
-                return {height:z0,peak:z1,depth:key,top,layer:layer.layer,component:c.name,sides,cover,packets:[],picture:{key:art.key,bounds:art.bounds,matrix,build:art.build}};}
+                return {height:z0,peak:z1,depth:key,top,layer:layer.layer,component:c.name,sides,cover,cover_solid:whole_solid,solid,packets:[],picture:{key:art.key,bounds:art.bounds,matrix,build:art.build}};}
         }
         if(view)scene.enter({matrix:tilt??view.plane(view.k(z1))});
         else if(mirror!==null)scene.enter({matrix:fallen(below,mirror,z1)});
         scene.mark_shines=shines;scene.draw(steps,{...place,values,materials});
         if(view||mirror!==null)scene.leave();
         if(layer.pulse)scene.leave();
-        return {height:z0,peak:z1,depth:key,top,layer:layer.layer,component:c.name,sides,cover,packets:scene.finish()};
+        return {height:z0,peak:z1,depth:key,top,layer:layer.layer,component:c.name,sides,cover,cover_solid:whole_solid,solid,packets:scene.finish()};
     }).filter(Boolean);
 }
 /**
@@ -338,7 +343,7 @@ function sidesPaint(sides,values,materials){if(typeof sides==='string')return re
  * never behind a farther one where they overlap), and over anything flat at the height they stand on (the top of
  * the floor below, a roof they rise from), but under every top above it.
  */
-function drawSides(steps,{at,rotation,scale},values,fill,view,z0,z1,{shade=.35,follow='shapes',facade=null,scale:vs=1,screen=null,shines=false,slope=null}={}){
+function drawSides(steps,{at,rotation,scale},values,fill,view,z0,z1,{shade=.35,follow='shapes',facade=null,scale:vs=1,screen=null,shines=false,slope=null,solid=null}={}){
     if(z1<=z0)return [];
     const [sx,sy]=typeof scale==='number'?[scale,scale]:scale,c=Math.cos(rotation),s=Math.sin(rotation);
     const place=([x,y])=>{const px=x*sx,py=y*sy;return [at[0]+px*c-py*s,at[1]+px*s+py*c];};
@@ -373,9 +378,11 @@ function drawSides(steps,{at,rotation,scale},values,fill,view,z0,z1,{shade=.35,f
             for(let u=0;u<len;){let v=u;while(v+1<len&&face[(i+v+1)%n].dark===face[(i+u)%n].dark)v++;const dk=face[(i+u)%n].dark;if(dk>.004)scene.fill(strip(pts,i+u,i+v+1),`rgba(0,0,0,${dk})`);u=v+1;}
             if(lit)lit(scene);
             let d=Infinity;for(let q=0;q<len;q++)d=Math.min(d,face[(i+q)%n].d);const depth=1/(d+1000);
-            for(const packet of scene.finish())out.push({...packet,depth});
+            // with `solid` ({eye, bias}), what the run fills: the hull of its foot and the heights it spans, its box as drawn
+            const fills=solid?runSolid(pts,i,len,z0,z1,view,solid):null;
+            for(const packet of scene.finish())out.push({...packet,depth,solid:fills});
             // with `shines`, the lit windows again, marked: what shows through the night (the light layer's shines)
-            if(lit&&shines){const glow=new artScene();lit(glow);for(const packet of glow.finish())out.push({...packet,depth,shine:true});}
+            if(lit&&shines){const glow=new artScene();lit(glow);for(const packet of glow.finish())out.push({...packet,depth,shine:true,solid:fills});}
             m+=len;
         }
     }
@@ -604,6 +611,37 @@ function signedArea(pts){let a=0;for(let i=0;i<pts.length;i++){const p=pts[i],q=
 function counterClockwise(pts){return signedArea(pts)<0?[...pts].reverse():pts;}
 function inside([x,y],pts){let c=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const [xi,yi]=pts[i],[xj,yj]=pts[j];if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)c=!c;}return c;}
 // How far a point is from the segment a–b.
+// What a run of faces fills (see occlusionOrder in depth.mjs): its foot's hull, from z0 to z1, boxed as drawn.
+function runSolid(pts,i,len,z0,z1,view,{eye,bias}){
+    const foot=[];for(let m=i;m<=i+len;m++)foot.push(pts[m%pts.length]);
+    return {hulls:[convexHull(foot)],z0,z1,box:drawnBox(foot,view,[view.k(z0),view.k(z1)]),eye,bias};
+}
+function drawnBox(points,view,ks){
+    let l=Infinity,t=Infinity,r=-Infinity,b=-Infinity;
+    for(const k of ks)for(const [x,y] of points){const [X,Y]=view.scaled(x,y,k);if(X<l)l=X;if(X>r)r=X;if(Y<t)t=Y;if(Y>b)b=Y;}
+    return [l,t,r,b];
+}
+// A drawing's footprints in its own frame, for what its parts fill: the hull of each loop it stands on, or its box
+// when a step reaches past them (a sign, a glow) or there are too many to be worth telling apart.
+const FEET=new WeakMap();
+function footprints(steps,values,follow){
+    let byValues=FEET.get(steps);if(!byValues)FEET.set(steps,byValues=new WeakMap());
+    const key=values&&typeof values==='object'&&Object.keys(values).length?values:EMPTY;let byFollow=byValues.get(key);if(!byFollow)byValues.set(key,byFollow={});
+    if(byFollow[follow])return byFollow[follow];
+    const box=localBox(steps,values);if(!box)return byFollow[follow]=[];
+    const rect=[[box[0],box[1]],[box[2],box[1]],[box[2],box[3]],[box[0],box[3]]];
+    let hulls=sideLoops(steps,values,follow==='hull'?'hull':'shapes').map(convexHull).filter(h=>h.length>=2);
+    if(hulls.length){let l=Infinity,t=Infinity,r=-Infinity,b=-Infinity;for(const h of hulls)for(const [x,y] of h){if(x<l)l=x;if(x>r)r=x;if(y<t)t=y;if(y>b)b=y;}
+        if(box[0]<l-.5||box[1]<t-.5||box[2]>r+.5||box[3]>b+.5)hulls=[];}
+    return byFollow[follow]=hulls.length&&hulls.length<=24?hulls:[rect];
+}
+// What a still part fills, placed in the world: its footprints from z0 to z1, boxed as drawn between `ks`.
+function partSolid(steps,values,{at,rotation,scale},view,z0,z1,eye,bias){
+    const [sx,sy]=typeof scale==='number'?[scale,scale]:scale,c=Math.cos(rotation),s=Math.sin(rotation);
+    const hulls=footprints(steps,values,'shapes').map(h=>h.map(([x,y])=>{const px=x*sx,py=y*sy;return [at[0]+px*c-py*s,at[1]+px*s+py*c];}));
+    if(!hulls.length)return null;
+    return {hulls,z0,z1,box:drawnBox(hulls.flat(),view,z0===z1?[view.k(z1)]:[view.k(z0),view.k(z1)]),eye,bias};
+}
 function nearest([px,py],a,b){const ex=b[0]-a[0],ey=b[1]-a[1],L=ex*ex+ey*ey,t=L?Math.max(0,Math.min(1,((px-a[0])*ex+(py-a[1])*ey)/L)):0;return Math.hypot(a[0]+ex*t-px,a[1]+ey*t-py);}
 /**
  * Steps seen along a tilted bone: every place along x (a step's x, from, to and points) is shortened by `k`,
