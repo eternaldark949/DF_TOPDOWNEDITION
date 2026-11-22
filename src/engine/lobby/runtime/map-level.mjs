@@ -2,7 +2,7 @@
 import { gameLevel } from './game-level.mjs';
 import { mapInstance, streetNetwork } from '../../basement/maps/index.mjs';
 import { agentSystem } from '../../basement/agents/index.mjs';
-import { lightGridSystem, readNight } from '../../basement/rendering/index.mjs';
+import { lightGridSystem, readNight, nightAreas } from '../../basement/rendering/index.mjs';
 import { readParticleSystem } from '../../basement/physics/index.mjs';
 
 /**
@@ -37,12 +37,16 @@ export class mapLevel extends gameLevel {
         if (this.height_view) context.basement.render?.setHeightView(this.height_view);
         // How the map looks at night, as its data says: whoever draws the frame reads it (drawNight with `night`);
         // setNight turns the night's frame effects on and off.
-        this.night = prepared.definition.night ? readNight(prepared.definition.night) : null;
+        // With the map's `lighting` switch its dark is always there (a lamp-lit interior): its `night` record, or the
+        // engine's when it gives none, at full strength, its lights casting shadows on the walls (render.setLightShadows).
+        this.lighting = !!prepared.definition.switches?.lighting;
+        this.night = prepared.definition.night ? readNight(prepared.definition.night) : this.lighting ? readNight({}) : null;
         this.night_on = false; this.night_amount = 1;
         // With the map's `day_night` switch its night follows the world's clock: on while the clock's darkness is
         // above nothing, laid at that darkness (a dusk deepens into the night, a dawn lifts it).
         this.day_night = !!(prepared.definition.switches?.day_night && this.night);
         this.followClock(context);
+        if (this.lighting) { context.basement.render?.setLightShadows(true); if (!this.day_night) this.setNight(context, true); }
         // The map's particle systems (rain, snow, embers): made now, stepped by physics, removed on leaving. One
         // whose area is 'view' is kept on what the camera sees after each step, so it falls wherever you look.
         this.particles = (prepared.definition.particles ?? []).map(p => ({ id: context.basement.physics.createParticleSystem(p.system, { ...(Array.isArray(p.area) ? { area: p.area } : {}), ...(p.at ? { at: p.at } : {}) }), view: p.area === 'view', margin: p.margin ?? 96 }));
@@ -141,15 +145,24 @@ export class mapLevel extends gameLevel {
     lookOptions(context, blend) { return this.night_on ? { covers: this.night.covers } : {}; }
     /**
      * Draws what the map's data says over the looks: at night the night (its tint, scale and glare, the light
-     * grid's baked grids and its moving emitters' lights), then the particle systems (rain, snow), day or night.
+     * grid's baked grids, its moving emitters' lights and where its rooms thin it), then the particle systems (rain, snow), day or night.
      */
     render(context, blend, frame) {
         const render = context.basement.render; if (!render) return;
         if (this.night_on) {
             const view = context.basement.camera?.getVisibleBounds({ blend, margin: 64 }) ?? null;
-            render.drawNight({ tint: this.night.tint, scale: this.night.scale, glare: this.night.glare, amount: this.day_night ? this.night_amount : 1, grids: this.light_grid?.grids(view) ?? [], lights: this.light_grid?.liveLights() ?? [], blend });
+            render.drawNight({ tint: this.night.tint, scale: this.night.scale, glare: this.night.glare, amount: this.day_night ? this.night_amount : 1, grids: this.light_grid?.grids(view) ?? [], lights: this.light_grid?.liveLights() ?? [], areas: this.nightAreas(context), blend });
         }
         if (this.particles?.length) render.drawParticles({ blend });
+    }
+    /**
+     * Where the map's rooms thin its night (nightAreas): an outdoor room down to the sky's darkness on the world's clock
+     * (none, without a clock with phases), an indoor room with a `fill` to its fill while its `lights_off` flag is unset.
+     */
+    nightAreas(context) {
+        const rooms = this.map?.rooms?.rooms; if (!rooms?.length) return [];
+        const time = context.lobby?.time, sky = time?.settings.phases.length ? time.darkness : 0;
+        return nightAreas(rooms, this.night, { sky });
     }
     /** Makes the particle systems of every state of the world's weather (born at none until the weather brings them). */
     makeWeather(context) {
@@ -175,7 +188,7 @@ export class mapLevel extends gameLevel {
         const camera = context.basement.camera; if (!camera) return;
         for (const p of this.particles ?? []) if (p.view) { const b = camera.getVisibleBounds({ margin: p.margin }); context.basement.physics.setParticleArea(p.id, [b.left, b.top, b.right - b.left, b.bottom - b.top]); }
     }
-    leave(context) { this.agents?.dispose(); this.agents = null; for (const name of this.light_groups ?? []) context.basement.render?.setLightGroup(name, true); this.light_groups = null; for (const p of this.particles ?? []) context.basement.physics.removeParticleSystem(p.id); this.particles = []; if (this.night_on) this.setNight(context, false); this.night = null; this.map?.destroy(); this.map = null; this.light_grid = null; if (this.height_view) context.basement.render?.setHeightView(null); this.height_view = null; }
+    leave(context) { this.agents?.dispose(); this.agents = null; for (const name of this.light_groups ?? []) context.basement.render?.setLightGroup(name, true); this.light_groups = null; for (const p of this.particles ?? []) context.basement.physics.removeParticleSystem(p.id); this.particles = []; if (this.night_on) this.setNight(context, false); if (this.lighting) context.basement.render?.setLightShadows(null); this.lighting = false; this.night = null; this.map?.destroy(); this.map = null; this.light_grid = null; if (this.height_view) context.basement.render?.setHeightView(null); this.height_view = null; }
     /**
      * Who counts as standing on an exit (its `occupied` property, which a marker's look switches on): by default
      * every active character. A level overrides it for the player alone.

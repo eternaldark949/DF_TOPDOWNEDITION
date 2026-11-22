@@ -48,7 +48,8 @@ function validLight(light,i){
  * is an area light). They turn and move with the object; each is `still` (cached in the light tiles) unless it
  * says otherwise or the object moves. A "$name" colour is read from the object's look values. With `view` (a
  * heightView, leaning) a light with a `height` is drawn where that height leans to: a lamp on its post, a
- * searchlight on its crown.
+ * searchlight on its crown. A light that says `shadows` ('static', 'dynamic' or 'none') keeps it, with its `origin` on
+ * the ground (before any lean) and the height it shines from (`at_height`), for renderSystem.setLightShadows.
  */
 /** The light group a thing is in (its `light_group`: a street lamp's 'street_lights'), or null. */
 export function lightGroupOf(body){const g=(typeof body?.get==='function'?body.get('light_group'):undefined)??body?.light_group??body?.data?.light_group??null;return typeof g==='string'&&g?g:null;}
@@ -63,8 +64,10 @@ export function entityLights(body,{pose=null,view=null}={}){
     const read=v=>typeof v==='string'&&v.startsWith('$')?values[v.slice(1)]??null:v;
     return list.map((l,i)=>{
         const {position=[0,0],rotation=0,polygon,animation,shadows,look,soft,...rest}=l,[x,y]=position;
-        let where=[at[0]+x*c-y*s,at[1]+x*s+y*c];if(view&&rest.height>0)where=view.scaled(where[0],where[1],view.k(rest.height+elevation));
+        const ground=[at[0]+x*c-y*s,at[1]+x*s+y*c];let where=ground;if(view&&rest.height>0)where=view.scaled(where[0],where[1],view.k(rest.height+elevation));
         const out={...rest,shape:rest.shape??'point',position:where,rotation:a+rotation,still:l.still??!moving};
+        // (what casts its shadow, for renderSystem.setLightShadows: its `shadows` and where it stands on the ground, before any lean)
+        if(shadows!==undefined&&shadows!==null){out.shadows=shadows;out.origin=ground;out.at_height=(rest.height??0)+elevation;}
         for(const k of ['color'])if(out[k]!==undefined)out[k]=read(out[k]);
         if(out.color===null)delete out.color;if(out.intensity===null)delete out.intensity;if(out.glow===null)delete out.glow;
         validLight(out,i);return out;

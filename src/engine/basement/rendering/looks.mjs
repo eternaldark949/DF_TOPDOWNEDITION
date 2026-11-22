@@ -231,7 +231,7 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,
         if(layer.pulse){const k=pulseAt(layer.pulse,time);for(const packet of sides)packet.opacity=(packet.opacity??1)*k;scene.enter({},{opacity:k});}
         // a sloped layer's top (an awning) is drawn in its own tilted plane, fitted through three corners of its box
         const tilt=view&&layer.slope?slopePlane(steps,values,place,view,z1,layer.slope,layer.thickness>0?(z1-z0)/layer.thickness:1):null;
-        if(pictures&&!layer.pulse&&mirror===null&&fore===1&&!lean&&!(shines&&glowing(steps,materials))){
+        if(pictures&&!layer.pulse&&mirror===null&&fore===1&&!lean&&!(shines&&glowing(steps,materials,values))){
             const art=stillArt(steps,values,materials);
             if(art){const m=placeMatrix(place),matrix=view?compose(tilt??view.plane(view.k(z1)),m):m;
                 return {height:z0,peak:z1,depth:key,top,layer:layer.layer,component:c.name,sides,cover,cover_solid:whole_solid,solid,packets:[],picture:{key:art.key,bounds:art.bounds,matrix,build:art.build}};}
@@ -320,12 +320,16 @@ function coverOf(steps,{at,rotation,scale},values,follow,view,z0,z1,paint='#ffff
     if(!path.length)return null;
     const scene=new artScene();scene.fill(path,paint);return scene.finish()[0];
 }
-// Whether a drawing has a glowing step (`emits` on it or its material), once per steps list.
+// Whether a drawing has a glowing step (`emits` on it or its material), once per steps list. A material named by a
+// "$name" look value is read through `values` (a bar cart's "$wheel"), and such a list is asked again each time, as
+// another thing drawn from it may name another material.
 const GLOWING=new WeakMap();
-function glowing(steps,materials){
+function glowing(steps,materials,values={}){
     let v=GLOWING.get(steps);if(v!==undefined)return v;
-    const walk=list=>list.some(st=>st?.shape==='group'?Array.isArray(st.steps)&&walk(st.steps):st?.emits!==undefined&&st.emits!==false||(typeof st?.material==='string'&&!!materials(st.material)?.emits));
-    v=Array.isArray(steps)&&walk(steps);GLOWING.set(steps,v);return v;
+    let looked=false;
+    const material=name=>{if(name.startsWith('$')){looked=true;name=values[name.slice(1)];if(typeof name!=='string'||!name||name.startsWith('$'))return null;}return materials(name);};
+    const walk=list=>list.some(st=>st?.shape==='group'?Array.isArray(st.steps)&&walk(st.steps):st?.emits!==undefined&&st.emits!==false||(typeof st?.material==='string'&&!!material(st.material)?.emits));
+    v=Array.isArray(steps)&&walk(steps);if(!looked)GLOWING.set(steps,v);return v;
 }
 // Every visible layer with its component and the component's place in the list.
 function listLayers(components){const out=[];components.forEach((component,order)=>{for(const layer of component.layers)if(layer.visible!==false)out.push({component,layer,order});});return out.sort((a,b)=>a.layer.height-b.layer.height||a.layer.layer-b.layer.layer||a.order-b.order);}

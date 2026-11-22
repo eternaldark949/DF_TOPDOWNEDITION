@@ -3,7 +3,7 @@
 // and what stands over the light on the ground (covers) or shines through the dark (shines).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {cameraSystem,renderSystem,recordingRenderer,drawComponents,pulseAt,entityLights,facadeEmitters,entityEmitters,entityBlockers,componentCovers,heightView,createLightLayer,createLightLayerParts} from '../index.mjs';
+import {nightAreas,cameraSystem,renderSystem,recordingRenderer,drawComponents,pulseAt,entityLights,facadeEmitters,entityEmitters,entityBlockers,componentCovers,heightView,createLightLayer,createLightLayerParts} from '../index.mjs';
 import {physicsSystem} from '../../physics/index.mjs';
 
 const near=(a,b,why='',e=1e-6)=>assert.ok(Math.abs(a-b)<e,`${why} ${a} != ${b}`);
@@ -197,4 +197,44 @@ test('a sloped layer (an awning) draws its top in its own tilted plane, and its 
  near2(on(-20,0),view.at(-20,-100,15),'its back edge at its top');near2(on(-20,16),view.at(-20,-84,7),'its front edge 8 lower: half a unit down per unit out');
  assert.ok(part.sides.length>0,'its valance shows');
  assert.throws(()=>world.elements.createEntity({kind:'static',position:[0,0],components:[{name:'x',layers:[{layer:0,slope:[0],steps:[aw]}]}]}),/slope/);
+});
+
+test('lights cast shadows on the walls while the switch is on: kept until the light moves or a blocker near it changes',()=>{
+ const {world,render}=fixture();
+ world.elements.createEntity({kind:'static',position:[150,50],collision_shape:{shape_type:'box',dimensions:[10,1000]}});
+ const lamp=world.elements.createEntity({kind:'static',position:[50,50],data:{emission:{shape:'point',radius:200,position:[0,0],shadows:'static'}}});
+ const free=world.elements.createEntity({kind:'static',position:[60,60],data:{emission:{shape:'point',radius:50,position:[0,0],shadows:'none'}}});
+ const lights=()=>{render.beginFrame();const out=render.visibleLights();render.abortFrame();return out;};
+ const [a]=lights();assert.equal(a.polygon,undefined,'off by default');assert.equal(a.shadows,'static');assert.deepEqual(a.origin,[50,50]);
+ assert.equal(render.setLightShadows(true),true);
+ const [b,c]=lights();assert.ok(b.polygon.length>=3);assert.ok(Math.max(...b.polygon.map(p=>p[0]))<=145.001,'stopped at the near face of the wall');assert.equal(c.polygon,undefined,'shadows none: no polygon');
+ const [b2]=lights();assert.equal(b2.polygon,b.polygon,'the same array while nothing changes (so the tiles stay cached)');
+ world.elements.createEntity({kind:'static',position:[50,0],collision_shape:{shape_type:'box',dimensions:[1000,10]}});
+ const [b3]=lights();assert.notEqual(b3.polygon,b.polygon,'a new wall in reach casts it again');assert.ok(Math.min(...b3.polygon.map(p=>p[1]))>=4.999);
+ lamp.moveTo(40,50);const [b4]=lights();assert.notEqual(b4.polygon,b3.polygon,'and so does moving');
+ assert.throws(()=>render.setLightShadows({resolution:2}),/resolution/);
+ assert.equal(render.setLightShadows(null),false);const [d]=lights();assert.equal(d.polygon,undefined,'off again');
+ render.dispose();
+});
+
+test('rooms thin the night: an outdoor room to the sky\'s darkness, an indoor room to its fill while its lights are on',()=>{
+ const rects=[{x:0,y:0,w:10,h:10}],night={tint:'rgba(0,0,0,.8)'};
+ const areas=nightAreas([{type:'outdoor',rects,flags:{}},{type:'indoor',fill:.4,rects,flags:{}},{type:'indoor',fill:.4,rects,flags:{lights_off:true}},{type:'indoor',fill:null,rects,flags:{}},{type:'indoor',fill:.9,rects,flags:{}}],night,{sky:.2});
+ assert.deepEqual(areas.map(a=>a.cut),[.75,.5],'the sky lets .75 of the dark through... away; the fill .5; lights off, no fill, or a fill darker than the night: none');
+ assert.equal(nightAreas([{type:'outdoor',rects,flags:{}}],night,{sky:.8}).length,0,'a full night sky thins nothing');
+ assert.equal(nightAreas([{type:'outdoor',rects,flags:{}}],night,{sky:.31})[0].cut,39/64,'in steps of 1/64');
+});
+
+test('a step whose material is a "$name" look value is read through the look when the night looks for glowing steps',async()=>{
+ const materials={'kit:chrome':{kind:'material',fill:'#ccd'},'kit:neon':{kind:'material',fill:'#f0a',emits:true}};
+ const world=new physicsSystem({asset_library:{getResource:id=>{if(!materials[id])throw new Error(`Unknown asset resource: ${id}`);return materials[id];},resolveTemplate:(id,packet={})=>structuredClone(packet)}});
+ const render=new renderSystem({physics_system:world,camera:new cameraSystem({position:[50,50],viewport:{width:400,height:400}})});
+ render.registerRenderer('recording',recordingRenderer);await render.setRenderer('recording',{surface:null});render.setHeightView({eye:900});
+ const part=m=>({name:'wheel',layers:[{layer:0,height:0,thickness:4,solid:false,steps:[{shape:'circle',x:0,y:0,radius:5,material:'$wheel'}]}]});
+ world.elements.createEntity({kind:'static',position:[40,50],look:{values:{wheel:'kit:chrome'}},components:[part()]});
+ world.elements.createEntity({kind:'static',position:[80,50],look:{values:{wheel:'kit:neon'}},components:[part()]});
+ world.updateState(1/60);
+ render.beginFrame();render.drawLooks(1,{covers:24});const shines=render.nightOver().filter(o=>o.over==='shine');render.endFrame();
+ assert.equal(shines.length,1,'the neon one shines, the chrome one does not, from one drawing');
+ render.dispose();
 });

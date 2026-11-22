@@ -12,7 +12,7 @@ export {createLightLayer,createLightLayerParts,entityLights,lightGroupOf,LIGHT_C
 export {heightScale,heightView,boxFaces} from './height.mjs';
 export {GLARE,readGlare,glarePackets} from './glare.mjs';
 export {PARTICLE_LOOK,readParticleLook,particlePackets} from './particles.mjs';
-export {NIGHT,readNight} from './night.mjs';
+export {NIGHT,readNight,nightAreas} from './night.mjs';
 export {depthBatches,occlusionOrder,canHide} from './depth.mjs';
 export {BOUNDS,fitBounds,drawingReach,drawingOutline,drawingEmitters,facadeEmitters,drawLook,drawComponents,componentCovers,pulseAt,shownNow,leaningView,componentSteps,foreshorten,qualifyResource} from './looks.mjs';
 export {lightGridSystem,entityEmitters,entityBlockers} from './light-grid.mjs';
