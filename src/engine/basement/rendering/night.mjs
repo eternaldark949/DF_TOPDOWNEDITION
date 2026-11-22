@@ -28,3 +28,20 @@ export function readNight(night,where='night'){
     if(out.glare!==null&&out.glare!==false)out.glare=readGlare(out.glare,undefined,`${where}.glare`);else out.glare=null;
     return Object.freeze(out);
 }
+/**
+ * Where rooms thin the night, as the light layer's `areas` (drawNight's `areas`): an outdoor room lets the sky's
+ * light in, so the dark there is only as deep as the sky's (`sky`: the world clock's darkness, 0 by day, up to the
+ * night's own); an indoor room with a `fill` stands no darker than its fill while its lights are on (its `lights_off`
+ * flag not set), however dark the night. `rooms` are room records ({type, fill, rects, flags}, as roomGraph.rooms
+ * gives them) and `night` a night record (readNight): the dark is its tint's alpha. Each cut is kept to steps of
+ * 1/64, so a sky that darkens slowly repaints the cached tiles only now and then.
+ */
+export function nightAreas(rooms,night,{sky=0}={}){
+    const dark=readColor(night.tint)[3];if(!(dark>0))return [];
+    const step=v=>Math.round(Math.max(0,Math.min(1,v))*64)/64,out=[];
+    for(const room of rooms??[]){
+        const cut=room.type==='outdoor'?1-Math.min(1,Math.max(0,sky)/dark):Number.isFinite(room.fill)&&!room.flags?.lights_off?1-Math.min(1,room.fill/dark):0;
+        const k=step(cut);if(k>0&&room.rects?.length)out.push({rects:room.rects,cut:k});
+    }
+    return out;
+}

@@ -271,6 +271,32 @@ test('the loop draws a map\'s night and particles from its data: covers in drawL
     e.dispose();
 });
 
+test('a map with the lighting switch is lamp-lit: its night always on, its lamps stopped by its walls, its rooms thinning the dark', async () => {
+    const { mapLevel } = await import('../lobby/runtime/map-level.mjs');
+    const room = { map_id: 'room', size: [400, 300], switches: { lighting: true }, night: { tint: 'rgba(22, 10, 48, 0.8)' },
+        walls: [{ x: 200, y: -400, w: 10, h: 1100 }], lights: [{ position: [100, 150], radius: 300, color: '#ffcc88', glow: 0.1, shadows: 'static' }],
+        rooms: { parlour: { x: 0, y: 0, w: 200, h: 300, fill: 0.4 }, porch: { x: 210, y: 0, w: 190, h: 300, type: 'outdoor' } } };
+    class Place extends mapLevel { mapDefinition() { return { definition: room }; } }
+    const plain = { map_id: 'plain', size: [256, 256] };
+    class Plain extends mapLevel { mapDefinition() { return { definition: plain }; } }
+    const e = new gameEngine({ asset_library: createEngineRegistry({ libraries: [] }), schedule_frame: null, render: { create_surface: () => ({}) } });
+    e.registerLevel('room', Place); e.registerLevel('plain', Plain); const render = e.basement.render; await render.setRenderer('recording');
+    const drawn = []; const own = render.drawNight.bind(render); render.drawNight = options => { drawn.push(options); return own(options); };
+    const level = await e.loadLevel('room');
+    assert.equal(level.night_on, true, 'no clock needed: the night is on from entry'); assert.equal(render.light_shadows, true, 'and lamps cast shadows');
+    e.start(); e.updateState(); e.render(1);
+    const night = drawn.at(-1); assert.equal(night.amount, 1, 'at full strength'); assert.equal(night.tint, room.night.tint);
+    assert.deepEqual(night.areas.map(a => a.cut), [0.5, 1], 'the parlour down to its fill (1 - .4/.8), the porch open to a sky with no clock');
+    render.beginFrame(); const [lamp] = render.visibleLights(); render.abortFrame();
+    assert.ok(lamp.polygon?.length >= 3, 'the lamp has a shadow polygon'); assert.ok(Math.max(...lamp.polygon.map(p => p[0])) <= 200.001, 'stopped at the wall');
+    render.beginFrame(); const [again] = render.visibleLights(); render.abortFrame(); assert.equal(again.polygon, lamp.polygon, 'kept, the same array, while nothing changes');
+    level.map.rooms.setFlag('parlour', 'lights_off', true); e.render(1); assert.deepEqual(drawn.at(-1).areas.map(a => a.cut), [1], 'its lights off, the parlour keeps the whole dark');
+    await e.loadLevel('plain'); assert.equal(render.light_shadows, false, 'leaving turns the shadows off');
+    const without = { ...room, night: undefined }; class Bare extends mapLevel { mapDefinition() { return { definition: without }; } }
+    e.registerLevel('bare', Bare); const bare = await e.loadLevel('bare'); assert.equal(bare.night.tint, 'rgba(10,8,30,.86)', 'no night record: the engine\'s');
+    e.dispose();
+});
+
 test('the loop steps the world clock with the game, and a map with the day_night switch lays its night from the clock\'s darkness', async () => {
     const { mapLevel } = await import('../lobby/runtime/map-level.mjs');
     const phases = [{ name: 'day', from: '07:00', dark: 0 }, { name: 'dusk', from: '17:00', dark: 0 }, { name: 'evening', from: '19:00', dark: 0.5 }, { name: 'night', from: '21:00', dark: 1 }, { name: 'dawn', from: '05:00', dark: 1 }];

@@ -49,6 +49,7 @@ A light is declared the same way on a lamp, a placement or a catalog type: `{rad
 | `color`, `intensity`, `glow` | `null` when unset, for the game's look to choose. `intensity` is how much of the dark it lifts, `glow` how strong its colour is: a neon sign has `intensity: 0` and a glow. |
 | `look` | The name of a profile the game's look gives the light (a street lamp's pool), or `null`. |
 | `shadows` | `'dynamic'` (default): walls and every body that blocks light; `'static'`: walls only; `'none'`: no shadow. |
+| `inner_radius`, `cut`, `glow_stops` | How its light falls off, kept only when given (the light layer's own fields): a point light's cut begins `inner_radius` out; `cut` is `[[offset, alpha]]`, how much of the dark it lifts from its middle out; `glow_stops` is `[[offset, colour]]`, its colour from its middle out. |
 | `animation` | `{kind: 'steady' \| 'flicker' \| 'pulse' \| 'stutter', ...}`: flicker and pulse at `rate` rad/s, a pulse swinging by `depth`; a stutter (a faulty lamp) holds steady but for `burst` s every `period` s (shifted by `offset`), dropping by `depth`. The older `flicker: rate` is a flicker. |
 
 Door leaves always block light (`blocks_light: true`). A placement blocks light when it or its type sets `blocks_light`; ghosts never do.
@@ -61,11 +62,11 @@ Without `templates[section]`, each section uses the engine's own types: walls `s
 
 `map.rooms` is the map's room graph (empty when the map has no rooms).
 
-- **Where:** `roomAt(point)` checks the last answer's rectangles, then the shared spatial grid. `contains(id, point)`, `room(id)` and `rooms` give the records `{id, type, label, rects, bounds, flags}`.
+- **Where:** `roomAt(point)` checks the last answer's rectangles, then the shared spatial grid. `contains(id, point)`, `room(id)` and `rooms` give the records `{id, type, label, fill, rects, bounds, flags}`. A room's `fill` (0 to 1, or null) is how dark it stands with its lights on, whatever the map's night: the light layer thins the dark there to it (`nightAreas`), and its `lights_off` flag takes that away.
 - **Links:** `connections(id)` lists `{room, link_id, kind, openness}`. A door's openness follows its leaf from closed (0) to open (1) as it moves; an arch is 1; a `room_links` entry has its fixed value. `openness(a, b)` is the most open direct link.
 - **Routes and spill:** `route(a, b, {min_openness})` is the fewest-rooms route through open links, or null; `reachable(a, b)`. `exposure(from, {falloff})` gives every room the best product of openness along any route, for light spill, sound and awareness.
 - **Occupancy:** `track(body)` follows any body; `updateState()` re-reads tracked bodies (a body still inside its room costs one rectangle test, no grid query). `roomOf(body)`, `occupants(id)`, and `onRoomChange(fn)` for `{entity, from, to}`. With `keep_in_gaps` (default) a body standing in a doorway stays in its last room.
-- **Flags:** `setFlag(id, key, value)` / `getFlag` for per-room game state such as lights off. They save with `map.saveState()`.
+- **Flags:** `setFlag(id, key, value)` / `getFlag` for per-room game state such as lights off (`lights_off: true` drops the room's `fill`). They save with `map.saveState()`.
 
 ## Streaming
 
