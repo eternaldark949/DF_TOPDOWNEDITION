@@ -6,10 +6,12 @@ import { readComponents } from '../../src/engine/basement/physics/index.mjs';
 import { mapLevel } from '../../src/engine/lobby/runtime/map-level.mjs';
 import { travelSystem } from '../../src/engine/lobby/runtime/travel-system.mjs';
 import { createEngineRegistry, mapDefinition, doorKindsOf, screensOf, fontsOf } from '../../src/engine/directory/index.mjs';
+import { previewWeapons, weaponChoices } from './weapons.mjs';
 import { humanoid, objectPacket } from '../../src/engine/penthouse/index.mjs';
 
 const KEYMAP = {
     move_left: ['a', 'ArrowLeft'], move_right: ['d', 'ArrowRight'], move_up: ['w', 'ArrowUp'], move_down: ['s', 'ArrowDown'],
+    preview_fire: ['f'],
     interact: ['e', 'Enter', 'space', 'gamepadA', 'gamepadY', 'touchInteract'],
     run: ['Shift', 'gamepadRBumper'], pause: ['Escape', 'p', 'gamepadStart'], zoom_in: ['=', '+', 'gamepadDUp'], zoom_out: ['-', '_', 'gamepadDDown']
 };
@@ -64,11 +66,17 @@ export async function bootPreview({ libraries, hud }) {
     // The screens: the game's main menu, pause menu and its pages and HUD, all data (src/game/data/libraries/screens.json).
     // The preview hands them live values by name and hears what they set and ask for.
     const ui = engine.ui;
-    ui.define(screensOf(registry)); ui.addFonts(fontsOf(registry)).catch(error => console.warn('A font did not load', error));
+    const choices = weaponChoices(registry);
+    const screens = screensOf(registry);
+    const settings = screens.find(screen => screen.name === 'pause.settings');
+    settings.items.find(item => item.id === 'panel').items.find(item => item.id === 'preview_weapon').choices = choices;
+    ui.define(screens); ui.addFonts(fontsOf(registry)).catch(error => console.warn('A font did not load', error));
     const titled = word => word ? word[0].toUpperCase() + word.slice(1) : '';
     ui.provide('place', () => place).provide('clock', () => engine.time.text()).provide('weather', () => titled(engine.weather.state))
       .provide('player', { health: 100, pp: 0 }).provide('saves', { can_save: false, slots: [] });
     ui.setValue('options', { time_speed: 12, weather: engine.weather.state, zoom: ZOOMS[zoom], renderer: 'canvas', dev_bar: true });
+    ui.setValue('preview_weapon', 'none');
+    engine.registerSystem('preview_weapons', previewWeapons(engine, registry, person.entity));
     ui.setValue('wardrobe', { available: true, outfit_sorcerer_long: false, wig_ponytail_black: false });
     ui.on('set', ({ path, value }) => {
         if (path === 'wardrobe.outfit_sorcerer_long' || path === 'wardrobe.wig_ponytail_black') wardrobe_changed = true;

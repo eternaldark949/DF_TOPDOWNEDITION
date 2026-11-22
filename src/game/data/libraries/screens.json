@@ -821,6 +821,23 @@
        "value": "{wardrobe.wig_ponytail_black}"
       },
       {
+       "id": "preview_weapon",
+       "type": "slider",
+       "text": "Preview Weapon",
+       "class": "set-row",
+       "visible": "{wardrobe.available}",
+       "value": "{preview_weapon}",
+       "choices": [{"value": "none", "text": "Unarmed"}]
+      },
+      {
+       "id": "preview_fire",
+       "type": "button",
+       "text": "Test Attack (F while walking)",
+       "class": "set-back",
+       "visible": "{wardrobe.available}",
+       "on_click": [{"event": "preview_fire"}, {"close": "pause"}]
+      },
+      {
        "id": "back",
        "type": "button",
        "class": "set-back",
