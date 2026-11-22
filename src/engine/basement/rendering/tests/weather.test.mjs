@@ -144,3 +144,23 @@ test('a light group turned off carries no lights and keeps the night on its glow
     assert.equal(render.visibleLights().length,1,'only the light in no group');
     render.setLightGroup('street_lights',true);assert.equal(render.visibleLights().length,2);
 });
+
+test('a streak is longer high in its fall (trail_top) and a dot shrinks over its life (size_end)',()=>{
+    assert.equal(readParticleLook({}).trail_top,null);assert.equal(readParticleLook({trail_top:null}).trail_top,null);
+    assert.throws(()=>readParticleLook({trail_top:11}),/trail_top/);assert.throws(()=>readParticleLook({size_end:-1}),/size_end/);
+    const view=new heightView({camera:[200,200],eye:500}),s=rained(30,{...RAIN,on_land:null}).readParticleSystems().find(x=>x.look.shape==='streak');
+    // One drop at the view's edge, at a height: its streak's length on screen.
+    const at=(z,look)=>{const one={...s,count:1,x:[340],px:[340],y:[200],py:[200],z:[z],pz:[z],vx:[0],vy:[0],vz:[-65],look:{...s.look,lit:false,...look}};
+        const [[m,l]]=segments(particlePackets([one],{bounds,view}));return Math.hypot(l[1]-m[1],l[2]-m[2]);};
+    const look={trail:.05,trail_top:.4};
+    assert.ok(at(s.top,look)>at(s.top,{trail:.05})*5,'high up it spans trail_top');
+    assert.ok(Math.abs(at(.05,look)-at(.05,{trail:.05}))<at(.05,{trail:.05})*.02,'near the ground it spans trail');
+    assert.ok(at(s.top*.5,look)<at(s.top,look)&&at(s.top*.5,look)>at(.05,look),'and shortens as it falls');
+    assert.ok(at(s.top*.5,{...look,trail_curve:3})<at(s.top*.5,look),'a steeper curve keeps it short for longer');
+    // One flake on the ground, early and late in its life: its radius.
+    const flake=(t,look)=>{const one={...s,count:1,x:[200],px:[200],y:[200],py:[200],z:[0],pz:[0],age:[t*2],life:[2],look:{shape:'dot',size:4,...look}};
+        const [p]=particlePackets([one],{bounds,view});return p.geometry.commands[0][1]-200;};
+    assert.ok(Math.abs(flake(0,{size_end:.25})-4)<1e-6,'born at size');assert.ok(Math.abs(flake(1,{size_end:.25})-1)<1e-6,'ends at size_end of it');
+    assert.ok(Math.abs(flake(.5,{size_end:.25})-2.5)<1e-6,'straight between');assert.ok(flake(.5,{size_end:.25,size_curve:2})>2.5,'a curve over 1 keeps it big for longer');
+    assert.ok(Math.abs(flake(1,{size_end:.25,grow:true})-1)<1e-6&&Math.abs(flake(.5,{grow:true})-2)<1e-6,'with grow it grows to size_end of size');
+});
