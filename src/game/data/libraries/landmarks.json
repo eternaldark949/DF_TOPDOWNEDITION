@@ -49,8 +49,14 @@
  "templates": {
   "silver_queen": {
    "extends": "engine:building",
+   "scale": [
+    1,
+    1,
+    2
+   ],
    "look": {
     "layer": 1,
+    "lean": 1.5,
     "values": {
      "stone": "#a4a0ae",
      "stone_mid": "#96919f",
@@ -23433,6 +23439,11 @@
   },
   "silver_queen_forecourt": {
    "kind": "decoration",
+   "scale": [
+    1,
+    1,
+    2
+   ],
    "look": {
     "layer": -60,
     "values": {
