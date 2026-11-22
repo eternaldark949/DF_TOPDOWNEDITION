@@ -1,6 +1,6 @@
 {
   "library_id": "moon_city_nightclub",
-  "description": "Moon City Nightclub: the map, its floor textures and materials. Its furniture is still to be built as data.",
+  "description": "Moon City Nightclub: the map, its floor textures, lighting, and furniture placements.",
   "resources": {
     "obsidian": {
       "kind": "texture",
@@ -58,6 +58,20 @@
       "rooms": {"powder": {"x": 14, "y": 14, "w": 346, "h": 546, "type": "indoor", "label": "Powder Room"}, "gents": {"x": 14, "y": 574, "w": 346, "h": 612, "type": "indoor", "label": "Gents"}, "hall": {"x": 374, "y": 14, "w": 852, "h": 972, "type": "indoor", "label": "The Floor"}, "foyer": {"x": 374, "y": 1000, "w": 852, "h": 186, "type": "indoor", "label": "Foyer"}, "lounge": {"x": 1240, "y": 14, "w": 346, "h": 262, "type": "indoor", "label": "Mirabel's Lounge"}, "corridor": {"x": 1240, "y": 290, "w": 90, "h": 896, "type": "indoor", "label": "VIP"}, "suite1": {"x": 1344, "y": 290, "w": 242, "h": 290, "type": "indoor", "label": "Suite I"}, "suite2": {"x": 1344, "y": 594, "w": 242, "h": 290, "type": "indoor", "label": "Suite II"}, "suite3": {"x": 1344, "y": 898, "w": 242, "h": 288, "type": "indoor", "label": "Suite III"}},
       "doors": [{"x": 730, "y": 986, "w": 140, "h": 14, "type": "arch", "orientation": "H", "rooms": ["foyer", "hall"]}, {"x": 360, "y": 90, "w": 14, "h": 80, "type": "hinged", "orientation": "V", "rooms": ["powder", "hall"], "hingeSide": "left"}, {"x": 360, "y": 880, "w": 14, "h": 80, "type": "hinged", "orientation": "V", "rooms": ["gents", "hall"], "hingeSide": "right"}, {"x": 1226, "y": 560, "w": 14, "h": 120, "type": "arch", "orientation": "V", "rooms": ["hall", "corridor"]}, {"x": 1240, "y": 276, "w": 90, "h": 14, "type": "arch", "orientation": "H", "rooms": ["corridor", "lounge"]}, {"x": 1330, "y": 390, "w": 14, "h": 90, "type": "sliding", "orientation": "V", "rooms": ["corridor", "suite1"]}, {"x": 1330, "y": 694, "w": 14, "h": 90, "type": "sliding", "orientation": "V", "rooms": ["corridor", "suite2"]}, {"x": 1330, "y": 1000, "w": 14, "h": 90, "type": "sliding", "orientation": "V", "rooms": ["corridor", "suite3"]}],
       "cloths": [{"x": 1222, "y": 546, "width": 12, "length": 50, "segments": 3, "role": "curtain", "data": {"color": "rgba(150, 30, 80, 0.2)", "light_color": "rgba(255, 120, 170, 0.04)", "anchor": "right"}}, {"x": 1222, "y": 694, "width": 12, "length": 50, "segments": 3, "role": "curtain", "data": {"color": "rgba(150, 30, 80, 0.2)", "light_color": "rgba(255, 120, 170, 0.04)", "anchor": "right"}}],
+      "placements": [
+        {"authored_id": "high_top_northwest", "object": "furniture:moon_city_high_top", "at": [555, 155]},
+        {"authored_id": "high_top_northeast", "object": "furniture:moon_city_high_top", "at": [1125, 165]},
+        {"authored_id": "high_top_southeast", "object": "furniture:moon_city_high_top", "at": [1125, 835]},
+        {"authored_id": "booth_table_west", "object": "furniture:moon_city_booth_table", "at": [535, 906]},
+        {"authored_id": "booth_table_east", "object": "furniture:moon_city_booth_table", "at": [1125, 906]},
+        {"authored_id": "back_bar", "object": "furniture:moon_city_back_bar", "at": [390, 500]},
+        {"authored_id": "bar_counter_north", "object": "furniture:moon_city_bar_counter", "at": [462, 352.5]},
+        {"authored_id": "bar_counter_south", "object": "furniture:moon_city_bar_counter", "at": [462, 647.5]},
+        {"authored_id": "mirabel_champagne_table", "object": "furniture:moon_city_lounge_table", "at": [1480, 121]},
+        {"authored_id": "suite_1_champagne_table", "object": "furniture:champagne_table", "at": [1472, 435]},
+        {"authored_id": "suite_2_champagne_table", "object": "furniture:champagne_table", "at": [1472, 739]},
+        {"authored_id": "suite_3_champagne_table", "object": "furniture:champagne_table", "at": [1472, 1043]}
+      ],
       "markers": {"transition": {"label": true}},
       "triggers": [{"x": 740, "y": 1170, "w": 120, "h": 30, "role": "transition", "authored_id": "exit_0", "data": {"target": "sdc", "label": "Exit Nightclub"}}],
       "landmarks": {"club_exit": [800, 1165], "mirabel_booth": [1470, 200], "club_bar": [530, 500], "club_dancefloor": [800, 500], "club_dj_booth": [800, 150]},
