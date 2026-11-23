@@ -18,6 +18,18 @@ const hud = {
         let fast = false; $('fast').onclick = () => { fast = !fast; $('fast').classList.toggle('on', fast); a.setSpeed(fast ? 600 : 12); };
         for (const b of document.querySelectorAll('[data-weather]')) b.onclick = () => a.setWeather(b.dataset.weather, 'normal');
         $('zin').onclick = () => a.zoom(1); $('zout').onclick = () => a.zoom(-1);
+        const fullscreen = $('fullscreen');
+        const showFullscreen = () => fullscreen.setAttribute('aria-pressed', String(Boolean(document.fullscreenElement)));
+        fullscreen.disabled = !document.fullscreenEnabled;
+        fullscreen.title = fullscreen.disabled ? 'Fullscreen is unavailable in this window' : 'Toggle fullscreen';
+        document.addEventListener('fullscreenchange', showFullscreen);
+        fullscreen.onclick = async () => {
+            fullscreen.blur();
+            try {
+                if (document.fullscreenElement) await document.exitFullscreen();
+                else await document.documentElement.requestFullscreen();
+            } catch (error) { this.error(error); }
+        };
         $('prompt').onclick = () => a.take();
         if (touch) a.button($('use'));
         this.zoomed(a.zoom_now);

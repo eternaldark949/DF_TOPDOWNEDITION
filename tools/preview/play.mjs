@@ -27,12 +27,33 @@ export async function bootPreview({ libraries, hud }) {
         controls: { keymap: KEYMAP, vectors: { move: { gamepad: 'left', touch: 'move', dead_zone: .15 }, aim: { gamepad: 'right', touch: 'aim', dead_zone: .08 } } },
         camera: { zoom: 1 },
         // Each backend draws on a fresh canvas (a canvas keeps the first kind of context it gives): it takes the old one's place.
-        render: { create_surface: () => { const next = document.createElement('canvas'); next.id = 'view'; document.getElementById('view').replaceWith(next); return next; } }
+        render: { create_surface: () => { const old = document.getElementById('view'), next = old.cloneNode(false); old.replaceWith(next); return next; } }
     });
     const { physics, camera, render, controls } = engine.basement;
     await render.setRenderer('canvas');
-    const fit = () => { const ratio = Math.min(devicePixelRatio || 1, 2); render.resize({ width: innerWidth, height: innerHeight, pixel_ratio: ratio }); };
-    fit(); addEventListener('resize', fit);
+    const stage = document.getElementById('stage'), visible = window.visualViewport;
+    const fit = () => {
+        const { width, height } = stage.getBoundingClientRect(), pixel_ratio = Math.min(devicePixelRatio || 1, 2);
+        const old = camera.viewport;
+        if (width >= 1 && height >= 1 && (width !== old.width || height !== old.height || pixel_ratio !== old.pixel_ratio)) {
+            render.resize({ width, height, pixel_ratio });
+        }
+    };
+    const fitVisible = () => {
+        if (visible) {
+            stage.style.left = `${visible.offsetLeft}px`;
+            stage.style.top = `${visible.offsetTop}px`;
+            stage.style.maxWidth = `${visible.width}px`;
+            stage.style.maxHeight = `${visible.height}px`;
+        }
+        fit();
+    };
+    new ResizeObserver(fit).observe(stage);
+    addEventListener('resize', fitVisible);
+    visible?.addEventListener('resize', fitVisible);
+    visible?.addEventListener('scroll', fitVisible);
+    document.addEventListener('fullscreenchange', fitVisible);
+    fitVisible();
 
     // The person who walks: the engine's humanoid, kept across every map.
     const look = registry.resolveTemplate('engine:humanoid').look;

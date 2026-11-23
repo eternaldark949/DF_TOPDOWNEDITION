@@ -11,7 +11,8 @@
 :root { color-scheme: dark; --ink: #efe6ff; --dim: #a99cc4; --panel: rgba(14, 10, 24, .78); --edge: rgba(154, 107, 255, .35); --accent: #9a6bff; --bg: #07060b; }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink); font: 14px/1.35 Montserrat, system-ui, sans-serif; -webkit-user-select: none; user-select: none; touch-action: none; }
-canvas#view { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
+#stage { position: fixed; top: 0; left: 0; width: 100%; height: 100%; height: 100dvh; overflow: hidden; }
+canvas#view { width: 100%; height: 100%; display: block; }
 .bar { position: fixed; top: max(10px, env(safe-area-inset-top)); left: 12px; right: 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; pointer-events: none; }
 .bar > * { pointer-events: auto; }
 .chip { background: var(--panel); border: 1px solid var(--edge); border-radius: 10px; padding: 6px 10px; display: flex; gap: 6px; align-items: center; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
@@ -34,6 +35,7 @@ button.on { background: var(--accent); border-color: var(--accent); color: #fff;
 #help { position: fixed; left: 12px; bottom: max(12px, env(safe-area-inset-bottom)); color: var(--dim); font-size: 12px; max-width: 46vw; }
 #err { position: fixed; right: 12px; bottom: 12px; max-width: 60vw; color: #ffb3c1; font-size: 12px; white-space: pre-wrap; }
 #loading { position: fixed; inset: 0; display: grid; place-items: center; font-family: Cinzel, serif; font-size: 20px; letter-spacing: .1em; color: var(--dim); }
+#stage > .bar, #stage > #prompt, #stage > #help, #stage > #fade, #stage > #err, #stage > #loading, #stage > #use { position: absolute; }
 /* The touch sticks are supplied by the native HUD. */
 #use { position: fixed; right: 24px; bottom: max(194px, calc(env(safe-area-inset-bottom) + 182px)); width: 72px; height: 72px; border-radius: 50%; display: none; font-weight: 800; background: rgba(154, 107, 255, .4); }
 body.touch #use { display: block; }
@@ -43,6 +45,7 @@ body.no-bar .bar, body.no-bar #help { display: none; }
 </style>
 </head>
 <body>
+<div id="stage">
 <canvas id="view" aria-label="The map, drawn by the engine"></canvas>
 <div id="loading">Loading the city…</div>
 <div class="bar">
@@ -54,6 +57,7 @@ body.no-bar .bar, body.no-bar #help { display: none; }
   <div class="chip"><span class="k hide-sm">Sky</span>
     <button data-weather="clear">Clear</button><button data-weather="rain">Rain</button><button data-weather="snow">Snow</button></div>
   <div class="chip"><button id="zout" aria-label="Zoom out">−</button><span id="zoom">1×</span><button id="zin" aria-label="Zoom in">+</button></div>
+  <div class="chip"><button id="fullscreen" type="button" aria-pressed="false">Fullscreen</button></div>
   <div class="chip hide-sm"><select id="renderer" aria-label="Renderer"><option value="canvas">Canvas</option><option value="webgl">WebGL</option></select><span id="fps" class="k">— fps</span></div>
 </div>
 <div id="prompt" class="chip"><kbd>E</kbd><span id="exit-label"></span></div>
@@ -61,6 +65,7 @@ body.no-bar .bar, body.no-bar #help { display: none; }
 <button id="use" aria-label="Use">USE</button>
 <div id="fade"></div>
 <div id="err"></div>
+</div>
 <!--PREVIEW-->
 </body>
 </html>
