@@ -283,6 +283,7 @@
    "data": {
     "fire_interval": 0.2,
     "label": "Gatling Gunner",
+    "hold": "long",
     "muzzle": [35,0],
     "effect_scale": 0.294118,
     "effect": "flash",
@@ -371,6 +372,7 @@
    "data": {
     "fire_interval": 0.1,
     "label": "RB-98",
+    "hold": "long",
     "muzzle": [29.3,1.5],
     "effect_scale": 0.235294,
     "effect": "flash",
@@ -394,6 +396,7 @@
     "fire_interval": 1.166667,
     "fire_on_release": true,
     "label": "YourGirlSara",
+    "hold": "long",
     "muzzle": [55.2,0.5],
     "effect_scale": 0.470588,
     "effect": "flash",
@@ -417,6 +420,7 @@
     "fire_interval": 0.833333,
     "fire_on_release": true,
     "label": "SR-86",
+    "hold": "long",
     "muzzle": [55.2,0.5],
     "effect_scale": 0.352941,
     "effect": "flash",
@@ -439,6 +443,7 @@
    "data": {
     "fire_interval": 0.633333,
     "label": "Golden Child",
+    "hold": "long",
     "muzzle": [20,1],
     "effect_scale": 0.264706,
     "effect": "flash",
@@ -478,6 +483,7 @@
    "data": {
     "fire_interval": 0.533333,
     "label": "Blood Pact",
+    "attack_clip": "heavy_slash",
     "muzzle": [50,-1.6],
     "effect_scale": 1,
     "effect": "slash",

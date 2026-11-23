@@ -3,6 +3,9 @@ import { readComponents } from '../../src/engine/basement/physics/index.mjs';
 import { shotSteps } from './shot-effects.mjs';
 
 const CATALOG = 'weapons:catalog';
+const STANCE = 'weapon_stance';
+const ATTACK = 'weapon_attack';
+const ARM_JOINTS = ['shoulder_l', 'elbow_l', 'hand_l', 'shoulder_r', 'elbow_r', 'hand_r'];
 
 export function weaponChoices(registry) {
     return [{ value: 'none', text: 'Unarmed' }, ...registry.getResource(CATALOG).entries.map(id => ({
@@ -13,6 +16,8 @@ export function weaponChoices(registry) {
 export function previewWeapons(engine, registry, walker) {
     const { physics, controls } = engine.basement;
     const { ui } = engine;
+    const rig = physics.rigs.getRig(walker);
+    for (const clip of registry.getResource('wardrobe:preview_combat_clips').clips) rig.addClip(clip);
     const projectiles = new Map();
     const effects = new Map();
     let held = null;
@@ -20,11 +25,24 @@ export function previewWeapons(engine, registry, walker) {
     let requested = false;
     let released = null;
     let cooldown = 0;
+    let attack = null;
+    let contact = false;
+    let recovered = false;
 
     const aimDirection = () => released ?? controls.direction('aim');
-    const firesOnRelease = () => Boolean(held?.get('fire_on_release'));
+    const melee = () => held?.get('effect') === 'slash' || held?.get('effect') === 'strike';
+    const firesOnRelease = () => !held || melee() || Boolean(held.get('fire_on_release'));
+
+    function resetAttack() {
+        rig.stop(ATTACK);
+        attack = null;
+        contact = false;
+        recovered = false;
+    }
 
     function equip(id) {
+        resetAttack();
+        rig.stop(STANCE);
         held?.destroy();
         held = id === 'none' ? null : engine.createEntity({ template: 'weapons:' + id });
         if (held) walker.attach(held, { rig_anchor: 'hand_r', rotation: .52 });
@@ -87,6 +105,11 @@ export function previewWeapons(engine, registry, walker) {
         releaseShot(direction) { released = direction; },
         attach(context) {
             context.defer(ui.on('preview_fire', () => { requested = true; }));
+            context.defer(physics.on('animationMarker', ({ body, layer, clip_id, name }) => {
+                if (body.body_id !== walker.entity_id || layer !== ATTACK || clip_id !== attack) return;
+                if (name === 'contact') contact = true;
+                if (name === 'recovered') recovered = true;
+            }));
             context.defer(physics.on('projectileHit', ({ body, world_point, sensor_only }) => {
                 const shot = projectiles.get(body.body_id);
                 if (shot && !sensor_only) shot.hit = world_point;
@@ -96,6 +119,17 @@ export function previewWeapons(engine, registry, walker) {
             const next = ui.getValue('preview_weapon');
             if (next !== selection) equip(next);
             requested ||= controls.justActivated('preview_fire');
+            const aiming = aimDirection().some(Boolean);
+            if (held) {
+                const family = held.get('hold', 'pistol');
+                const pose = melee() ? 'melee_hold' : family + (aiming ? '_aim' : '_hold');
+                rig.play(pose, { layer: STANCE, mask: ARM_JOINTS, fade: .12 });
+            }
+            const trigger = aiming && controls.gamepad.isActive('gamepadRTrigger') && controls.justActivated('aim_fire');
+            if ((!held || melee()) && !attack && (requested || released || trigger)) {
+                attack = !held ? 'punch' : held.get('attack_clip', held.get('effect'));
+                rig.play(attack, { layer: ATTACK, mask: ARM_JOINTS });
+            }
         },
         afterPhysics(context, seconds) {
             for (const [effect, shot] of effects) {
@@ -113,7 +147,7 @@ export function previewWeapons(engine, registry, walker) {
             const direction = aimDirection(), aiming = direction.some(Boolean);
             if (held) {
                 const anchor = physics.rigs.getAnchor(walker, 'hand_r');
-                const rotation = aiming ? Math.atan2(direction[1], direction[0]) - anchor.rotation : .52;
+                const rotation = melee() ? .08 : aiming ? Math.atan2(direction[1], direction[0]) - anchor.rotation : .20;
                 const mount = physics.getAttachmentState(held);
                 if (Math.abs(rotation - mount.anchor_offset_rotation) > 1e-5) {
                     physics.setAttachmentPose(held, { local_rotation: rotation });
@@ -121,11 +155,14 @@ export function previewWeapons(engine, registry, walker) {
                 cooldown = Math.max(0, cooldown - seconds);
                 const firing = aiming && controls.active('aim_fire') &&
                     (!firesOnRelease() || controls.gamepad.isActive('gamepadRTrigger'));
-                if (requested || ((released || firing) && cooldown === 0)) {
+                if (!melee() && (requested || ((released || firing) && cooldown === 0))) {
                     fire();
                     cooldown = held.get('fire_interval', .25);
                 }
+                if (melee() && contact) fire();
             }
+            contact = false;
+            if (recovered) resetAttack();
             requested = false;
             released = null;
             for (const [id, shot] of projectiles) {
@@ -136,6 +173,8 @@ export function previewWeapons(engine, registry, walker) {
         },
         gameplayPaused() { released = null; },
         levelLeaving() {
+            resetAttack();
+            rig.stop(STANCE);
             held = null;
             selection = 'none';
             requested = false;
