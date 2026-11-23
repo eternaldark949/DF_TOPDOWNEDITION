@@ -70,7 +70,11 @@
         {"authored_id": "mirabel_champagne_table", "object": "furniture:moon_city_lounge_table", "at": [1480, 121]},
         {"authored_id": "suite_1_champagne_table", "object": "furniture:champagne_table", "at": [1472, 435]},
         {"authored_id": "suite_2_champagne_table", "object": "furniture:champagne_table", "at": [1472, 739]},
-        {"authored_id": "suite_3_champagne_table", "object": "furniture:champagne_table", "at": [1472, 1043]}
+        {"authored_id": "suite_3_champagne_table", "object": "furniture:champagne_table", "at": [1472, 1043]},
+        {"authored_id": "mirabel_crescent_sofa", "object": "furniture:crescent_sofa", "at": [1475, 54]},
+        {"authored_id": "suite_1_couch", "object": "furniture:channel_couch", "at": [1550, 435], "rotation": 1.5707963267948966},
+        {"authored_id": "suite_2_couch", "object": "furniture:channel_couch", "at": [1550, 739], "rotation": 1.5707963267948966},
+        {"authored_id": "suite_3_couch", "object": "furniture:channel_couch", "at": [1550, 1043], "rotation": 1.5707963267948966}
       ],
       "markers": {"transition": {"label": true}},
       "triggers": [{"x": 740, "y": 1170, "w": 120, "h": 30, "role": "transition", "authored_id": "exit_0", "data": {"target": "sdc", "label": "Exit Nightclub"}}],
