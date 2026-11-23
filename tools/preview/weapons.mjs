@@ -31,7 +31,7 @@ export function previewWeapons(engine, registry, walker) {
 
     const aimDirection = () => released ?? controls.direction('aim');
     const melee = () => held?.get('effect') === 'slash' || held?.get('effect') === 'strike';
-    const firesOnRelease = () => !held || melee() || Boolean(held.get('fire_on_release'));
+    const firesOnRelease = () => Boolean(held?.get('fire_on_release'));
 
     function resetAttack() {
         rig.stop(ATTACK);
@@ -125,8 +125,8 @@ export function previewWeapons(engine, registry, walker) {
                 const pose = melee() ? 'melee_hold' : family + (aiming ? '_aim' : '_hold');
                 rig.play(pose, { layer: STANCE, mask: ARM_JOINTS, fade: .12 });
             }
-            const trigger = aiming && controls.gamepad.isActive('gamepadRTrigger') && controls.justActivated('aim_fire');
-            if ((!held || melee()) && !attack && (requested || released || trigger)) {
+            const attackHeld = controls.active('preview_fire') || (aiming && controls.active('aim_fire'));
+            if ((!held || melee()) && !attack && (requested || attackHeld)) {
                 attack = !held ? 'punch' : held.get('attack_clip', held.get('effect'));
                 rig.play(attack, { layer: ATTACK, mask: ARM_JOINTS });
             }
