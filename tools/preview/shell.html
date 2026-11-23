@@ -40,6 +40,7 @@ button.on { background: var(--accent); border-color: var(--accent); color: #fff;
 #use { position: fixed; right: 24px; bottom: max(194px, calc(env(safe-area-inset-bottom) + 182px)); width: 72px; height: 72px; border-radius: 50%; display: none; font-weight: 800; background: rgba(154, 107, 255, .4); }
 body.touch #use { display: block; }
 body.touch #help { display: none; }
+body.touch .fullscreen-chip { order: -1; }
 body.no-bar .bar, body.no-bar #help { display: none; }
 @media (max-width: 640px) { .chip { padding: 5px 7px; } .hide-sm { display: none; } }
 </style>
@@ -57,7 +58,7 @@ body.no-bar .bar, body.no-bar #help { display: none; }
   <div class="chip"><span class="k hide-sm">Sky</span>
     <button data-weather="clear">Clear</button><button data-weather="rain">Rain</button><button data-weather="snow">Snow</button></div>
   <div class="chip"><button id="zout" aria-label="Zoom out">−</button><span id="zoom">1×</span><button id="zin" aria-label="Zoom in">+</button></div>
-  <div class="chip"><button id="fullscreen" type="button" aria-pressed="false">Fullscreen</button></div>
+  <div class="chip fullscreen-chip"><button id="fullscreen" type="button" aria-pressed="false">Fullscreen</button></div>
   <div class="chip hide-sm"><select id="renderer" aria-label="Renderer"><option value="canvas">Canvas</option><option value="webgl">WebGL</option></select><span id="fps" class="k">— fps</span></div>
 </div>
 <div id="prompt" class="chip"><kbd>E</kbd><span id="exit-label"></span></div>

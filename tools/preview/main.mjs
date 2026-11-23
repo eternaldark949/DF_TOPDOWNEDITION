@@ -19,15 +19,35 @@ const hud = {
         for (const b of document.querySelectorAll('[data-weather]')) b.onclick = () => a.setWeather(b.dataset.weather, 'normal');
         $('zin').onclick = () => a.zoom(1); $('zout').onclick = () => a.zoom(-1);
         const fullscreen = $('fullscreen');
-        const showFullscreen = () => fullscreen.setAttribute('aria-pressed', String(Boolean(document.fullscreenElement)));
+        const orientation = window.screen.orientation;
+        let lockedLandscape = false;
+        const showFullscreen = () => {
+            const active = Boolean(document.fullscreenElement);
+            fullscreen.setAttribute('aria-pressed', String(active));
+            if (!active && lockedLandscape) {
+                orientation.unlock?.();
+                lockedLandscape = false;
+            }
+        };
         fullscreen.disabled = !document.fullscreenEnabled;
-        fullscreen.title = fullscreen.disabled ? 'Fullscreen is unavailable in this window' : 'Toggle fullscreen';
+        fullscreen.title = fullscreen.disabled ? 'Fullscreen is unavailable in this window' : touch ? 'Toggle landscape fullscreen' : 'Toggle fullscreen';
         document.addEventListener('fullscreenchange', showFullscreen);
         fullscreen.onclick = async () => {
             fullscreen.blur();
             try {
                 if (document.fullscreenElement) await document.exitFullscreen();
-                else await document.documentElement.requestFullscreen();
+                else {
+                    await document.documentElement.requestFullscreen();
+                    if (touch && document.fullscreenElement && orientation?.lock) {
+                        try {
+                            await orientation.lock('landscape');
+                            lockedLandscape = true;
+                            showFullscreen();
+                        } catch {
+                            // Some mobile browsers allow fullscreen while leaving rotation to the device.
+                        }
+                    }
+                }
             } catch (error) { this.error(error); }
         };
         $('prompt').onclick = () => a.take();
