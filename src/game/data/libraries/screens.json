@@ -484,7 +484,7 @@
          "text": "Inventory",
          "class": "pm-item",
          "on_click": {
-          "event": "inventory"
+          "open": "pause.inventory"
          },
          "animations": {
           "enter": {
@@ -493,8 +493,7 @@
            "stagger": 0.035,
            "delay": 0.12
           }
-         },
-         "enabled": false
+         }
         },
         {
          "id": "map",
@@ -947,6 +946,53 @@
     "\n.save-slots .ui-empty { font: italic 400 calc(.68rem - 2px) var(--font-ui); color: rgba(185,174,196,.55); text-align: center; padding: 18px 0; }\n.save-slot { background: linear-gradient(90deg, rgba(20,6,26,.55), transparent) !important; border-left: 2px solid var(--lavender); border-radius: 0; text-align: left;\n  font: 500 calc(.72rem - 2px) var(--font-ui); letter-spacing: 2px; color: #e6dff0; }\n.save-slot.is-focus { background: linear-gradient(90deg, rgba(202,176,250,.25), transparent) !important; color: #fff; }\n.ui-root:not([data-ui-open~=\"pause\"]) .pm-page { background: rgba(8,1,8,.86); backdrop-filter: blur(9px); -webkit-backdrop-filter: blur(9px); }\n.ui-root:not([data-ui-open~=\"pause\"]) .pm-page-panel { margin: auto; }\n"
    ]
   },
+  "pause_inventory": {
+   "kind": "screen",
+   "name": "pause.inventory",
+   "modal": true,
+   "controls": "menu",
+   "class": "pm-page",
+   "layout": {
+    "kind": "list",
+    "direction": "row",
+    "justify": "end"
+   },
+   "items": [
+    {
+     "id": "panel",
+     "type": "panel",
+     "class": "pm-page-panel",
+     "layout": {
+      "kind": "list",
+      "spacing": 10,
+      "align": "stretch"
+     },
+     "items": [
+      {
+       "id": "inventory_title",
+       "type": "label",
+       "class": "set-section",
+       "text": "Inventory"
+      },
+      {
+       "id": "inventory_wallet",
+       "type": "label",
+       "class": "set-section",
+       "text": "Personics · {player.pp} PP"
+      },
+      {
+       "id": "back",
+       "type": "button",
+       "class": "set-back",
+       "text": "Back",
+       "on_click": {
+        "back": true
+       }
+      }
+     ]
+    }
+   ]
+  },
   "hud": {
    "kind": "screen",
    "name": "hud",
@@ -961,6 +1007,8 @@
     }
    },
    "items": [
+    {"id": "loot_prompt", "type": "button", "class": "loot-prompt", "text": "{loot.prompt}", "visible": "{loot.prompt}", "focusable": false, "on_click": {"event": "search_lost_property"}},
+    {"id": "loot_notice", "type": "label", "class": "loot-notice", "text": "{loot.notice}", "visible": "{loot.notice}"},
     {
      "id": "touch_move",
      "type": "panel",
@@ -1083,6 +1131,7 @@
     }
    ],
    "css": [
+    ".ui-root .loot-prompt, .ui-root .loot-notice { position: absolute; left: 50%; transform: translateX(-50%); max-width: min(70vw, 570px); padding: 8px 14px; text-align: center; border: 1px solid rgba(232,194,122,.5); border-radius: 8px; color: #fff0d3; background: rgba(20,10,24,.9); } .ui-root .loot-prompt { bottom: max(30px, calc(env(safe-area-inset-bottom) + 22px)); pointer-events: auto; } .ui-root .loot-notice { bottom: max(82px, calc(env(safe-area-inset-bottom) + 74px)); pointer-events: none; } .ui-root:not([data-ui-top=\"hud\"]) :is(.loot-prompt,.loot-notice) { display: none; }",
     "\n.ui-root :is(.df-move-zone, .df-aim-zone) { display: none; }\nbody.touch .ui-root[data-ui-top=\"hud\"] :is(.df-move-zone, .df-aim-zone) { display: block; position: absolute; pointer-events: auto; touch-action: none; }\n.df-move-zone { left: 0; bottom: 0; width: 50%; height: 55%; }\n.df-aim-zone { right: max(44px, calc(env(safe-area-inset-right) + 32px)); bottom: max(44px, calc(env(safe-area-inset-bottom) + 32px)); width: 100px; height: 100px; }\n.df-stick { position: absolute; border-radius: 50%; background: rgba(20, 0, 10, .4); box-shadow: 0 4px 15px rgba(0, 0, 0, .5); backdrop-filter: blur(2px); pointer-events: none; }\n.ui-root .df-move-base { display: none; position: fixed; width: 128px; height: 128px; }\n.df-aim-base { left: 50%; top: 50%; translate: -50% -50%; width: 80px; height: 80px; }\n.df-stick-knob { position: absolute; top: 50%; left: 50%; width: 36px; height: 36px; border-radius: 50%; pointer-events: none;\n  transform: translate(calc(-50% + var(--lx, 0px)), calc(-50% + var(--ly, 0px)));\n  background: radial-gradient(circle at 35% 35%, #fffbf2 0%, #e8dcc0 40%, #c4a980 100%);\n  box-shadow: inset 2px 2px 3px #fff, inset -2px -2px 4px rgba(100, 80, 60, .4), 0 5px 10px rgba(0, 0, 0, .5); }\n.df-aim-ring, .df-aim-band { position: absolute; left: 50%; top: 50%; translate: -50% -50%; border-radius: 50%; pointer-events: none; }\n.df-aim-ring { width: 84px; height: 84px; border: 1.5px solid rgba(232, 194, 122, .35); box-shadow: 0 0 6px rgba(232, 194, 122, .15); }\n.df-aim-band { width: 128px; height: 128px; border: 3px solid currentColor; color: rgba(232, 194, 122, .55); opacity: 0; transition: opacity .15s, color .12s; }\n.df-aim-zone[data-stick-state]:not([data-stick-state=\"idle\"]) .df-aim-band { opacity: 1; }\n.df-aim-zone[data-stick-state=\"firing\"] :is(.df-aim-ring,.df-aim-band) { color: #ffd68c; border-color: #ffd68c; box-shadow: 0 0 14px rgba(255, 190, 90, .75); }\n.df-aim-zone[data-stick-state=\"armed\"] :is(.df-aim-ring,.df-aim-band) { color: #c8aaff; border-color: #c8aaff; box-shadow: 0 0 14px rgba(170, 130, 255, .8); animation: df-aim-armed .8s ease-in-out infinite; }\n@keyframes df-aim-armed { 50% { box-shadow: 0 0 22px #aa82ff; } }\n@media (prefers-reduced-motion: reduce) { .df-aim-zone[data-stick-state=\"armed\"] :is(.df-aim-ring,.df-aim-band) { animation: none; } }\n",
     "@import url('https://fonts.googleapis.com/css2?family=Great+Vibes&family=Montserrat:wght@400;500;600;700&family=Orbitron:wght@500;700&family=Raleway:wght@400;500&display=swap');",
     ".ui-root { --font-script: 'Anthropology', 'Great Vibes', cursive; --font-ui: 'Montserrat', sans-serif; --font-menu: 'Feminine', 'Raleway', 'Montserrat', sans-serif;\n  --font-menu-body: 'Brooklyn', 'Raleway', 'Montserrat', sans-serif; --font-tech: 'Orbitron', sans-serif;\n  --lavender: #cab0fa; --lavender-pale: #f1e8fe; --lilac-grey: #b9aec4; --cream: #f3e4c6; --champagne: #d8c6a2; --gold: #ffc248; }",

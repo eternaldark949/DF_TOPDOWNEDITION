@@ -113,6 +113,8 @@
   "templates": {
     "sequined_clutch": {
       "kind": "decoration",
+      "tags": ["lost_property"],
+      "data": {"loot": {"label": "Sequined clutch", "minimum": 20, "maximum": 60, "messages": ["LIPSTICK, A KEYCARD… AND PERSONICS", "SHE'LL CALL IT A NIGHT'S TIP", "LEFT WITH THE LAST SONG"]}},
       "look": {"layer": 2},
       "components": [{"name": "loot", "layers": [{"layer": 0, "height": 0, "thickness": "1 cm", "solid": false, "steps": [
         {"shape": "rectangle", "x": -9.63, "y": -4.95, "width": 20, "height": 11.5, "radius": 2.1, "fill": "rgba(16,5,21,0.30)", "blur": 1.45, "solid": false},
@@ -147,10 +149,12 @@
         {"shape": "polygon", "points": [[5.75, 3.68], [6.07, 4.0], [5.75, 4.32], [5.43, 4.0]], "fill": "#ed9fc6", "alpha": 0.58},
         {"shape": "polygon", "points": [[-7.27, 2.58], [-6.95, 2.9], [-7.27, 3.22], [-7.59, 2.9]], "fill": "#ed9fc6", "alpha": 0.58},
         {"shape": "polygon", "points": [[6.23, -2.87], [6.55, -2.55], [6.23, -2.23], [5.91, -2.55]], "fill": "#ed9fc6", "alpha": 0.58}
-      ]}]}]
+      ]}, {"layer": 1, "height": 0, "thickness": "1 cm", "solid": false, "shown_when": "searched", "steps": [{"shape": "polygon", "points": [[-8, -4.3], [8, -4.3], [0, 2.4]], "fill": "#271021", "stroke": "#b58356", "line_width": 0.44}]}]}]
     },
     "beaded_clutch": {
       "kind": "decoration",
+      "tags": ["lost_property"],
+      "data": {"loot": {"label": "Beaded clutch", "minimum": 20, "maximum": 60, "messages": ["LIPSTICK, A KEYCARD… AND PERSONICS", "SHE'LL CALL IT A NIGHT'S TIP", "LEFT WITH THE LAST SONG"]}},
       "look": {"layer": 2},
       "components": [{"name": "loot", "layers": [{"layer": 0, "height": 0, "thickness": "1 cm", "solid": false, "steps": [
         {"shape": "rectangle", "x": -9.63, "y": -4.95, "width": 20, "height": 11.5, "radius": 2.1, "fill": "rgba(16,5,21,0.30)", "blur": 1.45, "solid": false},
@@ -184,10 +188,12 @@
         {"shape": "polygon", "points": [[5.52, 0.11], [5.84, 0.43], [5.52, 0.75], [5.2, 0.43]], "fill": "#aacdf0", "alpha": 0.58},
         {"shape": "polygon", "points": [[4.89, 0.9], [5.35, 1.36], [4.89, 1.82], [4.43, 1.36]], "fill": "#f9ddb0", "alpha": 0.58},
         {"shape": "polygon", "points": [[5.39, -2.63], [5.71, -2.31], [5.39, -1.99], [5.07, -2.31]], "fill": "#aacdf0", "alpha": 0.58}
-      ]}]}]
+      ]}, {"layer": 1, "height": 0, "thickness": "1 cm", "solid": false, "shown_when": "searched", "steps": [{"shape": "polygon", "points": [[-8, -4.3], [8, -4.3], [0, 2.4]], "fill": "#101526", "stroke": "#aa9271", "line_width": 0.44}]}]}]
     },
     "fur_trimmed_coat": {
       "kind": "decoration",
+      "tags": ["lost_property"],
+      "data": {"loot": {"label": "Fur-trimmed coat", "minimum": 30, "maximum": 90, "messages": ["CHECK YOUR POCKETS, DARLING", "FOLDED BILLS IN THE LINING"]}},
       "look": {"layer": 2},
       "components": [{"name": "loot", "layers": [{"layer": 0, "height": 0, "thickness": "1 cm", "solid": false, "steps": [
         {"shape": "polygon", "points": [[-12.63, -9.25], [-6.63, -10.25], [7.37, -10.25], [13.37, -9.25], [18.87, -3.25], [19.37, 10.75], [14.97, 13.75], [10.07, 10.75], [6.57, 12.65], [-5.03, 13.45], [-9.63, 10.65], [-14.13, 13.75], [-18.63, 10.85], [-18.03, -3.25]], "fill": "rgba(16,5,21,0.30)", "blur": 1.45, "solid": false},
@@ -233,10 +239,12 @@
         {"shape": "line", "points": [[-4.1, 4.8], [-7.6, 6.3]], "stroke": "rgba(221,157,195,.5)", "line_width": 0.33, "line_cap": "round", "line_join": "round"},
         {"shape": "line", "points": [[4.1, 5.2], [7.6, 6.7]], "stroke": "#281226", "line_width": 0.68, "line_cap": "round", "line_join": "round"},
         {"shape": "line", "points": [[4.1, 4.8], [7.6, 6.3]], "stroke": "rgba(221,157,195,.5)", "line_width": 0.33, "line_cap": "round", "line_join": "round"}
-      ]}]}]
+      ]}, {"layer": 1, "height": 0, "thickness": "1 cm", "solid": false, "shown_when": "searched", "steps": [{"shape": "rectangle", "x": -13, "y": 2.8, "width": 6, "height": 4.6, "radius": 1.2, "fill": "#be9bb6", "stroke": "#5b334b", "line_width": 0.42}, {"shape": "rectangle", "x": 6, "y": 2.8, "width": 6, "height": 4.6, "radius": 1.2, "fill": "#be9bb6", "stroke": "#5b334b", "line_width": 0.42}]}]}]
     },
     "chain_strap_handbag": {
       "kind": "decoration",
+      "tags": ["lost_property"],
+      "data": {"loot": {"label": "Chain-strap handbag", "minimum": 25, "maximum": 75, "messages": ["DROPPED ON THE DANCE FLOOR", "FINDERS KEEPERS"]}},
       "look": {"layer": 2},
       "components": [{"name": "loot", "layers": [{"layer": 0, "height": 0, "thickness": "1 cm", "solid": false, "steps": [
         {"shape": "polygon", "points": [[-10.03, -3.25], [-8.23, -6.75], [8.97, -6.75], [10.77, -3.25], [11.57, 4.75], [8.47, 8.15], [-7.73, 8.15], [-10.83, 4.75]], "fill": "rgba(16,5,21,0.30)", "blur": 1.45, "solid": false},
@@ -277,10 +285,12 @@
         {"shape": "ellipse", "x": -8.6069, "y": 2.5359, "radius_x": 0.68, "radius_y": 0.43, "fill": null, "rotation": -0.65, "stroke": "#edc379", "line_width": 0.29},
         {"shape": "ellipse", "x": -8.9759, "y": 1.039, "radius_x": 0.68, "radius_y": 0.43, "fill": null, "rotation": 0.65, "stroke": "#edc379", "line_width": 0.29},
         {"shape": "ellipse", "x": -9.1, "y": -0.5, "radius_x": 0.68, "radius_y": 0.43, "fill": null, "rotation": -0.65, "stroke": "#edc379", "line_width": 0.29}
-      ]}]}]
+      ]}, {"layer": 1, "height": 0, "thickness": "1 cm", "solid": false, "shown_when": "searched", "steps": [{"shape": "rectangle", "x": -7.6, "y": -4.2, "width": 15.2, "height": 6, "radius": 2.3, "fill": "#100d18", "stroke": "#b58356", "line_width": 0.42}]}]}]
     },
     "velvet_purse": {
       "kind": "decoration",
+      "tags": ["lost_property"],
+      "data": {"loot": {"label": "Velvet purse", "minimum": 40, "maximum": 120, "messages": ["WHAT HAPPENS IN THE SUITES…", "VIP MONEY SPENDS THE SAME", "A THANK-YOU NOTE AND A THICK ROLL"]}},
       "look": {"layer": 2},
       "components": [{"name": "loot", "layers": [{"layer": 0, "height": 0, "thickness": "1 cm", "solid": false, "steps": [
         {"shape": "rectangle", "x": -10.63, "y": -6.75, "width": 22, "height": 15, "radius": 3.6, "fill": "rgba(16,5,21,0.30)", "blur": 1.45, "solid": false},
@@ -1591,7 +1601,7 @@
         {"shape": "line", "points": [[-5.99, -5.8753], [-5.8654, -6.0763]], "stroke": "rgba(247,140,185,0.133)", "line_width": 0.05, "line_cap": "round"},
         {"shape": "line", "points": [[-0.2717, -1.9737], [-0.1458, -2.1768]], "stroke": "rgba(247,140,185,0.122)", "line_width": 0.05, "line_cap": "round"},
         {"shape": "polygon", "points": [[1.73, -2.05], [0.25, -2.55], [-1.2, -2.13], [-1.94, -0.96], [-1.81, 0.39], [-0.7, 1.33], [0.73, 1.29], [1.83, 0.42], [0.67, 0.51], [-0.23, -0.08], [-0.38, -1.11], [0.15, -1.87]], "fill": {"type": "linear", "from": [-4, -3], "to": [4, 3], "stops": [[0.0, "#9c602b"], [0.5, "#ffe5a3"], [1.0, "#b27b38"]]}, "stroke": "#eecd93", "line_width": 0.16}
-      ]}]}]
+      ]}, {"layer": 1, "height": 0, "thickness": "1 cm", "solid": false, "shown_when": "searched", "steps": [{"shape": "rectangle", "x": -10, "y": -13.5, "width": 20, "height": 8.1, "radius": 3.6, "fill": "#843251", "stroke": "#b58356", "line_width": 0.42}, {"shape": "rectangle", "x": -9, "y": -5.4, "width": 18, "height": 8.5, "radius": 2.8, "fill": "#2b0f23", "stroke": "#b58356", "line_width": 0.42}]}]}]
     }
   }
 }
