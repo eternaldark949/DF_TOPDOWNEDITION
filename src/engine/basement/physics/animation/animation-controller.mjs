@@ -34,6 +34,14 @@ export class animationController {
         this.#evaluate();return this;
     }
     stop(layer='base'){this.#guard();if(this.#layers.delete(name(layer)))this.#evaluate();return this;}
+    /** Changes a playing layer's blend without restarting its clip or marker clock. */
+    setLayerWeight(layer,weight){
+        this.#guard();const state=this.#layers.get(name(layer));
+        if(!state)throw new TypeError('Unknown animation layer');
+        number(weight,'layer weight',0,1);
+        if(state.weight!==weight){state.weight=weight;this.#evaluate();}
+        return this;
+    }
     pause(){this.#guard();this.#paused=true;return this;}
     resume(){this.#guard();this.#paused=false;return this;}
     seek(time,{layer='base'}={}){this.#guard();number(time,'seek seconds',0,1e9);const state=this.#layers.get(name(layer));if(!state)throw new TypeError('Unknown animation layer');state.time=time;state.started=true;this.#evaluate();return this;}

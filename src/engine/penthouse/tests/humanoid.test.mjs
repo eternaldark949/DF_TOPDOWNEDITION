@@ -127,6 +127,28 @@ test('it stands up from the ground: legs hang from the hips, a stride reaches fo
     assert.ok(crouching.entity.body.getState().height_span[1] < tall - 15, 'and so is its body: it fits under what it could not');
 });
 
+test('the feet stride sideways, diagonally and backwards without rotating the aimed torso', () => {
+    for (const direction of [[0, 1], [-1, -1], [-1, 0]]) {
+        const p = world(), person = new humanoid(p);
+        const length = Math.hypot(...direction), [x, y] = direction.map(n => n / length);
+        person.entity.motor.setMovement(direction.map(n => n / length), { face_movement: false });
+        const along = [0, 0];
+        for (let i = 0; i < 80; i++) {
+            steps(p, person, 1);
+            if (i < 24) continue;
+            const { joints } = p.rigs.getPose(person.entity, { world_space: true });
+            assert.ok(Math.abs(person.entity.rotation) < 1e-5, 'movement leaves the facing alone');
+            for (const side of ['l', 'r']) {
+                const [dx, dy] = joints['foot_' + side].position.map((n, j) => n - joints['hip_' + side].position[j]);
+                assert.ok(Math.abs(dx * y - dy * x) < .01, 'the leg travels along the movement axis');
+                along[0] = Math.min(along[0], dx * x + dy * y);
+                along[1] = Math.max(along[1], dx * x + dy * y);
+            }
+        }
+        assert.ok(along[0] < -6 && along[1] > 6, 'the feet alternate forward and back along the actual stride');
+    }
+});
+
 test('a humanoid on a raised floor stands on it, and what it holds is at its hand', () => {
     const p = world(), person = new humanoid(p, { position: [0, 0] }), cup = p.elements.createEntity({ position: [0, 0], components: [{ name: 'cup', layers: [{ layer: 0, height: 0, thickness: 4, steps: [] }] }] });
     person.entity.setElevation(150); p.updateState();
