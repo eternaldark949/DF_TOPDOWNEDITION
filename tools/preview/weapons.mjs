@@ -9,6 +9,8 @@ const ATTACK = 'weapon_attack';
 const ARM_JOINTS = ['shoulder_l', 'elbow_l', 'hand_l', 'shoulder_r', 'elbow_r', 'hand_r'];
 const ATTACK_JOINTS = [...ARM_JOINTS, 'torso'];
 const GUN_JOINTS = [...ATTACK_JOINTS, 'head'];
+const UNARMED_COMBO = ['unarmed_jab', 'unarmed_jab', 'unarmed_cross', 'unarmed_hook', 'unarmed_uppercut'];
+const COMBO_WINDOW = .85;
 const JAB_TRAIL = { cut: [.015, .084], span: .069, life: .22, copies: 3 };
 const HOOK_TRAIL = { cut: [.036, .14], span: .104, life: .32, copies: 4 };
 
@@ -38,6 +40,9 @@ export function previewWeapons(engine, registry, walker) {
     let punches = 0;
     let sincePunch = Infinity;
     let activeTrace = null;
+    let comboStep = 0;
+    let queuedPunch = false;
+    let guarding = false;
 
     const aimDirection = () => released ?? controls.direction('aim');
     const melee = () => held?.get('effect') === 'slash' || held?.get('effect') === 'strike';
@@ -68,9 +73,21 @@ export function previewWeapons(engine, registry, walker) {
         nextSide = 'left';
         punches = 0;
         sincePunch = Infinity;
+        comboStep = 0;
+        queuedPunch = false;
+        guarding = false;
     }
 
     function startAttack() {
+        if (!held) {
+            if (sincePunch > COMBO_WINDOW) comboStep = 0;
+            attack = UNARMED_COMBO[comboStep];
+            comboStep = (comboStep + 1) % UNARMED_COMBO.length;
+            queuedPunch = false;
+            sincePunch = 0;
+            rig.play(attack, { layer: ATTACK, mask: ATTACK_JOINTS, fade: .025 });
+            return;
+        }
         const side = nextSide;
         nextSide = side === 'left' ? 'right' : 'left';
         const blade = bladeClip(), haymakerEvery = held?.get('haymaker_every');
@@ -81,7 +98,6 @@ export function previewWeapons(engine, registry, walker) {
         attack = clip + '_' + side;
         rig.play(attack, { layer: ATTACK, mask: ATTACK_JOINTS });
         cooldown = held?.get('fire_interval', .25) ?? .25;
-        if (!held) return;
         const hand = blade || side === 'right' ? 'hand_r' : 'hand_l';
         const profile = blade ? held.get('swing_trail') : hook ? HOOK_TRAIL : JAB_TRAIL;
         activeTrace = meleeTrace(engine, walker, physics.rigs.getAnchor(walker, hand), profile);
@@ -160,15 +176,22 @@ export function previewWeapons(engine, registry, walker) {
             if (next !== selection) equip(next);
             requested ||= controls.justActivated('preview_fire');
             const aiming = aimDirection().some(Boolean);
+            const attackHeld = controls.active('preview_fire') || (aiming && controls.active('aim_fire'));
             if (held) {
                 const family = held.get('hold', 'pistol');
                 const blade = bladeClip();
                 const pose = blade ? blade + '_guard' : melee() ? 'melee_hold' : family + (aiming ? '_aim' : '_hold');
                 const fade = family === 'sniper' ? (aiming ? .25 : .20) : .12;
                 rig.play(pose, { layer: STANCE, mask: melee() ? ARM_JOINTS : GUN_JOINTS, fade });
+            } else {
+                if (requested && attack) queuedPunch = true;
+                const guardNow = Boolean(attack || requested || attackHeld || queuedPunch || sincePunch <= COMBO_WINDOW);
+                if (guardNow !== guarding) {
+                    rig.play(guardNow ? 'unarmed_guard' : 'unarmed_release', { layer: STANCE, mask: ATTACK_JOINTS, fade: .15 });
+                    guarding = guardNow;
+                }
             }
-            const attackHeld = controls.active('preview_fire') || (aiming && controls.active('aim_fire'));
-            if ((!held || melee()) && !attack && cooldown <= 1e-8 && (requested || attackHeld)) startAttack();
+            if ((!held || melee()) && !attack && cooldown <= 1e-8 && (requested || attackHeld || queuedPunch)) startAttack();
         },
         afterPhysics(context, seconds) {
             sincePunch += seconds;
@@ -213,7 +236,7 @@ export function previewWeapons(engine, registry, walker) {
                 projectiles.delete(id);
             }
         },
-        gameplayPaused() { released = null; },
+        gameplayPaused() { released = null; queuedPunch = false; },
         levelLeaving() {
             resetAttack();
             rig.stop(STANCE);
@@ -222,6 +245,10 @@ export function previewWeapons(engine, registry, walker) {
             selection = 'none';
             requested = false;
             released = null;
+            comboStep = 0;
+            queuedPunch = false;
+            guarding = false;
+            sincePunch = Infinity;
             effects.clear();
             meleeTraces.clear();
             projectiles.clear();
