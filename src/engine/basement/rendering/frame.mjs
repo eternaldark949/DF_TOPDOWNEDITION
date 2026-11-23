@@ -48,7 +48,11 @@ export class renderFrame {
         for(const pass of this.#passes){
             pass.packets.sort((a,b)=>a.layer-b.layer||a.depth-b.depth||a.sequence-b.sequence);
             // then, where packets say what they fill, what stands between the eye and another goes after it
-            if(pass.packets.some(p=>p.solid)){const ordered=occlusionOrder(pass.packets,{group:p=>p.layer});if(ordered!==pass.packets)for(let i=0;i<ordered.length;i++)pass.packets[i]=ordered[i];}
+            if(pass.packets.some(p=>p.solid)){
+                const group=p=>p.space==='world'&&p.solid?.world&&!this.#layerEffects.size?'world':p.layer;
+                const ordered=occlusionOrder(pass.packets,{group});
+                if(ordered!==pass.packets)for(let i=0;i<ordered.length;i++)pass.packets[i]=ordered[i];
+            }
         }
         if(this.#layerEffects.size)this.#splitLayers();
         this.#open=false;return {format_version:1,view:this.#view,passes:this.#passes,packet_count:this.#count,effects:this.#effects};

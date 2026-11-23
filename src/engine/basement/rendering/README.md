@@ -307,6 +307,8 @@ Screen coordinates are logical viewport units; client conversions account for th
 
 `drawLooks(blend=1, {covers, time = 0})` draws every visible entity's look into the open frame and returns how many it drew (see Materials, textures and looks). `time` is the seconds of play that pulsing layers follow (the loop passes `lobby.played`). With `covers` (a height, leaning) it also keeps what stands over the light for the night (`nightOver`, see The night).
 
+In the height view, generated world solids share an occlusion order across authored layers. Posed joint parts provide their footprint and height span, and held drawings use their interpolated attachment plane. Both backends use the resulting packet order. A layer effect still separates its layer into a pass. Intersecting shapes that cannot be ordered as a whole keep their authored order.
+
 | Method/member | Purpose |
 |---|---|
 | `registerRenderer(id, Constructor)`, `listRenderers()` | Register backend classes without constructing a surface/context. |

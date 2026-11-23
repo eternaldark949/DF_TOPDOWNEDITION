@@ -154,6 +154,14 @@ export function drawLook(scene,entity,source,blend=1,{view=null}={}){
     if(view)scene.leave();
     return true;
 }
+
+/** A carried drawing occupies the plane of its interpolated attachment. */
+export function carriedLookSolid(entity,source,blend,view){
+    const look=entity.get('look',{}),pose=entity.getRenderState(blend);
+    const [wx,wy]=entity.world_scale??[1,1],scale=look.scale??1,z=pose.elevation??0;
+    const drawing=resource(source,entity.assets.drawing,'drawing');
+    return partSolid(drawing.steps,look.values??EMPTY,{at:pose.position,rotation:pose.rotation,scale:[wx*scale,wy*scale]},view,z,z,view.camera,look.depth??0);
+}
 /**
  * The steps of an entity's components, placed in the entity's own space, as one drawing: each layer a
  * group at its component's `at` and `rotation`. `solid_only` keeps the solid layers (for collision
@@ -208,7 +216,8 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,
         const lean=view&&rise?boneLean(view,place,z1,rise):null;
         // what the screen cannot show at all is not drawn: a still part whose box, leaning from its base to its top, misses it
         if(screen?.bounds&&view&&!c.joint&&offScreen(layerSteps(layer,source),values,place,view,z0,z1,screen.bounds))return null;
-        const scene=new artScene(),steps=fore===1&&!lean?layerSteps(layer,source):foreshorten(layerSteps(layer,source),fore,lean??[0,0]);
+        const authored=layerSteps(layer,source);
+        const scene=new artScene(),steps=fore===1&&!lean?authored:foreshorten(authored,fore,lean??[0,0]);
         // Leaning toward the camera: the walls from the layer's base to its top, then its shapes in the plane of its top.
         const materials=name=>materialOf(source,qualifyResource(name,layer.drawing??entity.template_id??name));
         // A layer with walls draws them at its base's depth and its top at its top's height, so wherever two
@@ -224,7 +233,10 @@ export function drawComponents(entity,source,blend=1,{joints=()=>null,view=null,
         // with `covers` (a height), a walled part whose top stands over it gives its silhouette too: where the night comes back over the light on the ground
         // (one marked `cover: true` gives it however low it stands, as a veil: only over glowing ground under it, a car on a lit stop bar)
         const low=layer.cover===true&&!(z1>covers),cover=covers!==null&&view&&layer.sides&&layer.cover!==false&&(z1>covers||low)&&!c.joint&&!lean?coverOf(steps,place,values,layer.sides.follow??'shapes',view,z0,z1):null;
-        const solid=fills?partSolid(steps,values,place,view,z1,z1,fills.eye,fills.bias):null,whole_solid=cover&&fills?partSolid(steps,values,place,view,z0,z1,fills.eye,fills.bias):null;
+        const solid=view&&!layer.slope?(c.joint
+            ? jointSolid(authored,steps,values,place,view,z1,fore,rise,look.depth??0)
+            : partSolid(steps,values,place,view,z1,z1,fills.eye,fills.bias)):null;
+        const whole_solid=cover&&fills?partSolid(steps,values,place,view,z0,z1,fills.eye,fills.bias):null;
         if(mirror!==null&&layer.sides&&z1>z0)sides=mirrorSides(steps,place,values,sidesPaint(layer.sides,values,materials),mirror,z0,z1,below);
         // A still layer (not on a tipped bone) is the same art wherever it stands: with `pictures` it is drawn once
         // into a picture, keyed by its steps and look, and stamped each frame under its place and its plane.
@@ -619,7 +631,7 @@ function inside([x,y],pts){let c=false;for(let i=0,j=pts.length-1;i<pts.length;j
 // What a run of faces fills (see occlusionOrder in depth.mjs): its foot's hull, from z0 to z1, boxed as drawn.
 function runSolid(pts,i,len,z0,z1,view,{eye,bias}){
     const foot=[];for(let m=i;m<=i+len;m++)foot.push(pts[m%pts.length]);
-    return {hulls:[convexHull(foot)],z0,z1,box:drawnBox(foot,view,[view.k(z0),view.k(z1)]),eye,bias};
+    return {hulls:[convexHull(foot)],z0,z1,box:drawnBox(foot,view,[view.k(z0),view.k(z1)]),eye,bias,world:true};
 }
 function drawnBox(points,view,ks){
     let l=Infinity,t=Infinity,r=-Infinity,b=-Infinity;
@@ -645,7 +657,16 @@ function partSolid(steps,values,{at,rotation,scale},view,z0,z1,eye,bias){
     const [sx,sy]=typeof scale==='number'?[scale,scale]:scale,c=Math.cos(rotation),s=Math.sin(rotation);
     const hulls=footprints(steps,values,'shapes').map(h=>h.map(([x,y])=>{const px=x*sx,py=y*sy;return [at[0]+px*c-py*s,at[1]+px*s+py*c];}));
     if(!hulls.length)return null;
-    return {hulls,z0,z1,box:drawnBox(hulls.flat(),view,z0===z1?[view.k(z1)]:[view.k(z0),view.k(z1)]),eye,bias};
+    return {hulls,z0,z1,box:drawnBox(hulls.flat(),view,z0===z1?[view.k(z1)]:[view.k(z0),view.k(z1)]),eye,bias,world:true};
+}
+function jointSolid(authored,drawn,values,place,view,z,fore,rise,bias){
+    const projected=partSolid(drawn,values,place,view,z,z,view.camera,bias);
+    if(!projected||!rise)return projected;
+    const local=localBox(authored,values);
+    if(!local)return projected;
+    const a=z+local[0]*rise,b=z+local[2]*rise;
+    const footprint=partSolid(authored,values,{...place,scale:[place.scale[0]*fore,place.scale[1]]},view,z,z,view.camera,bias);
+    return {...projected,hulls:footprint?.hulls??projected.hulls,z0:Math.min(a,b),z1:Math.max(a,b)};
 }
 function nearest([px,py],a,b){const ex=b[0]-a[0],ey=b[1]-a[1],L=ex*ex+ey*ey,t=L?Math.max(0,Math.min(1,((px-a[0])*ex+(py-a[1])*ey)/L)):0;return Math.hypot(a[0]+ex*t-px,a[1]+ey*t-py);}
 /**

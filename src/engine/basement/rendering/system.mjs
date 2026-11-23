@@ -4,7 +4,7 @@ import {geometry,material,requirements} from './packets.mjs';
 import {effectStack,effectsAt,effectNeeds,effectTargets} from './effects.mjs';
 import {finite,identifier,freezeData,CAPABILITIES} from './values.mjs';
 import {artScene} from './art.mjs';
-import {drawLook,drawComponents,componentCovers,fallen} from './looks.mjs';
+import {drawLook,drawComponents,componentCovers,carriedLookSolid,fallen} from './looks.mjs';
 import {heightView} from './height.mjs';
 import {occlusionOrder} from './depth.mjs';
 import {createLightLayerParts,entityLights,lightGroupOf} from './lighting.mjs';
@@ -147,7 +147,14 @@ export class renderSystem {
         for(const {entity} of this.getVisibleEntities({blend},this.#visible)){
             if(!entity)continue;
             const look=entity.get('look',{}),layer=look.layer??0,depth=look.depth??0;let drew=false;
-            if(entity.assets?.drawing){const scene=new artScene();if(drawLook(scene,entity,source,blend,{view})){const z=entity.world_elevation??0;for(const packet of scene.finish())this.#frame.submit(this.#textured({...packet,layer,depth:depth+z}));drew=true;}}
+            if(entity.assets?.drawing){
+                const scene=new artScene();
+                if(drawLook(scene,entity,source,blend,{view})){
+                    const z=entity.world_elevation??0,solid=view&&entity.parent?carriedLookSolid(entity,source,blend,view):null;
+                    for(const packet of scene.finish())this.#frame.submit(this.#textured({...packet,layer,depth:depth+z,solid}));
+                    drew=true;
+                }
+            }
             if(entity.has('components')){
                 let pose;const rigs=this.#world.rigs,joints=name=>{pose??=rigs?.getRig(entity)?rigs.getPose(entity,{blend,world_space:true}):null;return pose?.joints[name]??null;};
                 const pictures=this.#still&&!!this.#backend?.capabilities.includes('picture'),screen=view?(shown??={bounds:this.#camera.getView(blend).bounds,zoom:this.#camera.getView(blend).zoom}):null;
@@ -170,7 +177,7 @@ export class renderSystem {
      * silhouette, leaning as drawn, where the night comes back over the light on the ground) and each lit window
      * as a `shine` (cut out of the night). Empty without a height view, or when drawLooks was not asked.
      */
-    nightOver(){return occlusionOrder(this.#over.sort((a,b)=>a.layer-b.layer||a.depth-b.depth),{group:item=>item.layer}).map(({packet,over,height})=>({packet,over,...(height===undefined?{}:{height})}));}
+    nightOver(){return occlusionOrder(this.#over.sort((a,b)=>a.layer-b.layer||a.depth-b.depth),{group:item=>item.solid?.world?'world':item.layer}).map(({packet,over,height})=>({packet,over,...(height===undefined?{}:{height})}));}
     /**
      * The lights the visible things carry (their `lights` and `emission`), in the world, leaning with the height view.
      * Inside an open frame they are found once for a blend and margin (the night, its glare and the particles share them).
