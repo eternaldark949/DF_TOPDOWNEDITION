@@ -51,6 +51,915 @@
     "crescent_sofa_frame": {"kind": "material", "fill": "#5a3a26", "stroke": "#5a3a26"}
   },
   "templates": {
+    "moon_city_club_stage": {
+      "kind": "prop",
+      "physics_type": "static",
+      "look": {"layer": 1},
+      "collision_shape": {"shape_type": "box", "dimensions": [360, 104]},
+      "components": [{
+        "name": "club_stage",
+        "layers": [
+          {
+            "layer": -1,
+            "height": 0,
+            "thickness": 0.5,
+            "solid": false,
+            "steps": [
+              {"shape": "rectangle", "x": -179.0, "y": -50.0, "width": 360, "height": 104, "radius": 5, "fill": "rgba(13,6,21,.68)", "blur": 2.7}
+            ]
+          },
+          {
+            "layer": 0,
+            "height": 0,
+            "thickness": 33,
+            "sides": {"material": "booth_table_underside"},
+            "steps": [
+              {"shape": "rectangle", "x": -180, "y": -52, "width": 360, "height": 104, "radius": 6, "fill": {"type": "linear", "to": [0, 52], "stops": [[0.0, "#322437"], [0.5, "#201622"], [1.0, "#463248"]], "from": [0, -52]}, "stroke": "#cba46d", "line_width": 0.75},
+              {"shape": "rectangle", "x": -175, "y": -48, "width": 350, "height": 90, "radius": 3, "fill": {"type": "linear", "to": [0, 42], "stops": [[0.0, "#302432"], [0.5, "#453248"], [1.0, "#271e2c"]], "from": [0, -48]}},
+              {"shape": "line", "points": [[-160, -47], [-160, 40]], "stroke": "#594359", "line_width": 0.6, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-140, -47], [-140, 40]], "stroke": "#594359", "line_width": 0.6, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-120, -47], [-120, 40]], "stroke": "#594359", "line_width": 0.6, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-100, -47], [-100, 40]], "stroke": "#594359", "line_width": 0.6, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-80, -47], [-80, 40]], "stroke": "#594359", "line_width": 0.6, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-60, -47], [-60, 40]], "stroke": "#594359", "line_width": 0.6, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-40, -47], [-40, 40]], "stroke": "#594359", "line_width": 0.6, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-20, -47], [-20, 40]], "stroke": "#594359", "line_width": 0.6, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[0, -47], [0, 40]], "stroke": "#594359", "line_width": 0.6, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[20, -47], [20, 40]], "stroke": "#594359", "line_width": 0.6, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[40, -47], [40, 40]], "stroke": "#594359", "line_width": 0.6, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[60, -47], [60, 40]], "stroke": "#594359", "line_width": 0.6, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[80, -47], [80, 40]], "stroke": "#594359", "line_width": 0.6, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[100, -47], [100, 40]], "stroke": "#594359", "line_width": 0.6, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[120, -47], [120, 40]], "stroke": "#594359", "line_width": 0.6, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[140, -47], [140, 40]], "stroke": "#594359", "line_width": 0.6, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[160, -47], [160, 40]], "stroke": "#594359", "line_width": 0.6, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-152, -42], [-151, 7], [-152, 35]], "stroke": "#352738", "line_width": 0.45, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-132, -42], [-131, 7], [-132, 35]], "stroke": "#352738", "line_width": 0.45, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-112, -42], [-111, 7], [-112, 35]], "stroke": "#352738", "line_width": 0.45, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-92, -42], [-91, 7], [-92, 35]], "stroke": "#352738", "line_width": 0.45, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-72, -42], [-71, 7], [-72, 35]], "stroke": "#352738", "line_width": 0.45, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-52, -42], [-51, 7], [-52, 35]], "stroke": "#352738", "line_width": 0.45, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-32, -42], [-31, 7], [-32, 35]], "stroke": "#352738", "line_width": 0.45, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-12, -42], [-11, 7], [-12, 35]], "stroke": "#352738", "line_width": 0.45, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[8, -42], [9, 7], [8, 35]], "stroke": "#352738", "line_width": 0.45, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[28, -42], [29, 7], [28, 35]], "stroke": "#352738", "line_width": 0.45, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[48, -42], [49, 7], [48, 35]], "stroke": "#352738", "line_width": 0.45, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[68, -42], [69, 7], [68, 35]], "stroke": "#352738", "line_width": 0.45, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[88, -42], [89, 7], [88, 35]], "stroke": "#352738", "line_width": 0.45, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[108, -42], [109, 7], [108, 35]], "stroke": "#352738", "line_width": 0.45, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[128, -42], [129, 7], [128, 35]], "stroke": "#352738", "line_width": 0.45, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[148, -42], [149, 7], [148, 35]], "stroke": "#352738", "line_width": 0.45, "line_cap": "round", "line_join": "round"},
+              {"shape": "rectangle", "x": -176, "y": 43, "width": 352, "height": 5, "radius": 2, "fill": "#695087"},
+              {"shape": "rectangle", "x": -175, "y": 44, "width": 350, "height": 2.1, "radius": 1, "fill": "#c8a1ee"},
+              {"shape": "rectangle", "x": -177, "y": 49, "width": 354, "height": 2, "radius": 1, "fill": "#cba46d"},
+              {"shape": "curve", "points": [[8, -41], [1, -41], [-8, -35], [-10, -28], [-5, -20], [2, -17], [9, -21], [3, -22], [-1, -27], [-1, -33]], "fill": "#f3d49c"},
+              {"shape": "polygon", "points": [[13, -37], [14, -33], [18, -32], [14, -31], [13, -27], [12, -31], [8, -32], [12, -33]], "fill": "#e5c7f3"}
+            ]
+          }
+        ]
+      }]
+    },
+    "moon_city_dj_booth": {
+      "kind": "prop",
+      "physics_type": "static",
+      "look": {"layer": 1},
+      "collision_shape": {"shape_type": "box", "dimensions": [140, 40]},
+      "components": [{
+        "name": "dj_booth",
+        "layers": [
+          {
+            "layer": 0,
+            "height": 33,
+            "thickness": 22,
+            "sides": {"material": "booth_table_underside"},
+            "steps": [
+              {"shape": "rectangle", "x": -70, "y": -20, "width": 140, "height": 40, "radius": 4, "fill": {"type": "linear", "to": [0, 25], "stops": [[0.0, "#5b465a"], [0.5, "#2a1c31"], [1.0, "#160f1d"]], "from": [0, -24]}, "stroke": "#cba46d", "line_width": 0.75},
+              {"shape": "rectangle", "x": -67, "y": 14, "width": 134, "height": 3, "radius": 1.5, "fill": "#c65a91"},
+              {"shape": "rectangle", "x": -67, "y": 15, "width": 134, "height": 1, "radius": 0.5, "fill": "#f29ac1"},
+              {"shape": "rectangle", "x": -61, "y": -17, "width": 34, "height": 30, "radius": 3, "fill": "#392d42", "stroke": "#786682", "line_width": 0.5},
+              {"shape": "circle", "x": -44, "y": -3, "radius": 12, "fill": "#170f1b", "stroke": "#a69bab", "line_width": 0.6},
+              {"shape": "circle", "x": -44, "y": -3, "radius": 4, "fill": null, "stroke": "#51445f", "line_width": 0.44},
+              {"shape": "circle", "x": -44, "y": -3, "radius": 7, "fill": null, "stroke": "#51445f", "line_width": 0.44},
+              {"shape": "circle", "x": -44, "y": -3, "radius": 9.5, "fill": null, "stroke": "#51445f", "line_width": 0.44},
+              {"shape": "line", "points": [[-44, -3], [-36, -9]], "stroke": "#bd99ea", "line_width": 0.75, "line_cap": "round", "line_join": "round"},
+              {"shape": "circle", "x": -44, "y": -3, "radius": 2, "fill": "#f3d49c"},
+              {"shape": "line", "points": [[-31, -11], [-31, 6]], "stroke": "#8d7b93", "line_width": 0.66, "line_cap": "round", "line_join": "round"},
+              {"shape": "rectangle", "x": -32, "y": 0, "width": 2, "height": 3, "radius": 0.5, "fill": "#d1bcca"},
+              {"shape": "rectangle", "x": 27, "y": -17, "width": 34, "height": 30, "radius": 3, "fill": "#392d42", "stroke": "#786682", "line_width": 0.5},
+              {"shape": "circle", "x": 44, "y": -3, "radius": 12, "fill": "#170f1b", "stroke": "#a69bab", "line_width": 0.6},
+              {"shape": "circle", "x": 44, "y": -3, "radius": 4, "fill": null, "stroke": "#51445f", "line_width": 0.44},
+              {"shape": "circle", "x": 44, "y": -3, "radius": 7, "fill": null, "stroke": "#51445f", "line_width": 0.44},
+              {"shape": "circle", "x": 44, "y": -3, "radius": 9.5, "fill": null, "stroke": "#51445f", "line_width": 0.44},
+              {"shape": "line", "points": [[44, -3], [52, -9]], "stroke": "#bd99ea", "line_width": 0.75, "line_cap": "round", "line_join": "round"},
+              {"shape": "circle", "x": 44, "y": -3, "radius": 2, "fill": "#f3d49c"},
+              {"shape": "line", "points": [[57, -11], [57, 6]], "stroke": "#8d7b93", "line_width": 0.66, "line_cap": "round", "line_join": "round"},
+              {"shape": "rectangle", "x": 56, "y": 0, "width": 2, "height": 3, "radius": 0.5, "fill": "#d1bcca"},
+              {"shape": "rectangle", "x": -15, "y": -13, "width": 30, "height": 25, "radius": 2, "fill": "#221929", "stroke": "#897793", "line_width": 0.65},
+              {"shape": "line", "points": [[-10, -8], [-10, 8]], "stroke": "#736182", "line_width": 0.8, "line_cap": "round", "line_join": "round"},
+              {"shape": "rectangle", "x": -11, "y": 3, "width": 2.3, "height": 2.6, "radius": 0.4, "fill": "#dec3ef"},
+              {"shape": "line", "points": [[-4, -8], [-4, 8]], "stroke": "#736182", "line_width": 0.8, "line_cap": "round", "line_join": "round"},
+              {"shape": "rectangle", "x": -5, "y": 0, "width": 2.3, "height": 2.6, "radius": 0.4, "fill": "#dec3ef"},
+              {"shape": "line", "points": [[3, -8], [3, 8]], "stroke": "#736182", "line_width": 0.8, "line_cap": "round", "line_join": "round"},
+              {"shape": "rectangle", "x": 2, "y": -3, "width": 2.3, "height": 2.6, "radius": 0.4, "fill": "#ec90b6"},
+              {"shape": "line", "points": [[9, -8], [9, 8]], "stroke": "#736182", "line_width": 0.8, "line_cap": "round", "line_join": "round"},
+              {"shape": "rectangle", "x": 8, "y": -6, "width": 2.3, "height": 2.6, "radius": 0.4, "fill": "#ec90b6"},
+              {"shape": "rectangle", "x": -13, "y": -23, "width": 26, "height": 7, "radius": 1, "fill": "#181421", "stroke": "#908699", "line_width": 0.6},
+              {"shape": "rectangle", "x": -11, "y": -22, "width": 22, "height": 4, "radius": 1, "fill": {"type": "linear", "to": [0, -18], "stops": [[0.0, "#b7d5e6"], [1.0, "#685c91"]], "from": [0, -22]}},
+              {"shape": "line", "points": [[-9, -21], [-5, -21]], "stroke": "#fff3de", "line_width": 0.35, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-2, -21], [2, -21]], "stroke": "#fff3de", "line_width": 0.35, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[5, -21], [9, -21]], "stroke": "#fff3de", "line_width": 0.35, "line_cap": "round", "line_join": "round"}
+            ]
+          }
+        ]
+      }]
+    },
+    "moon_city_speaker_stack": {
+      "kind": "prop",
+      "physics_type": "static",
+      "look": {"layer": 1},
+      "collision_shape": {"shape_type": "box", "dimensions": [48, 72]},
+      "components": [{
+        "name": "speaker_stack",
+        "layers": [
+          {
+            "layer": -1,
+            "height": 0,
+            "thickness": 0.5,
+            "solid": false,
+            "steps": [
+              {"shape": "rectangle", "x": -23.0, "y": -34.0, "width": 48, "height": 72, "radius": 5, "fill": "rgba(13,6,21,.68)", "blur": 2.7}
+            ]
+          },
+          {
+            "layer": 0,
+            "height": 0,
+            "thickness": 62,
+            "sides": {"material": "booth_table_underside"},
+            "steps": [
+              {"shape": "rectangle", "x": -24, "y": -36, "width": 48, "height": 72, "radius": 4, "fill": {"type": "linear", "to": [0, 25], "stops": [[0.0, "#5b465a"], [0.5, "#2a1c31"], [1.0, "#160f1d"]], "from": [0, -24]}, "stroke": "#887291", "line_width": 0.85},
+              {"shape": "rectangle", "x": -21, "y": -32, "width": 42, "height": 64, "radius": 3, "fill": "#211923", "stroke": "#524256", "line_width": 0.6},
+              {"shape": "line", "points": [[-19, -30], [19, -30]], "stroke": "#302533", "line_width": 0.52, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-19, -27], [19, -27]], "stroke": "#302533", "line_width": 0.52, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-19, -24], [19, -24]], "stroke": "#302533", "line_width": 0.52, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-19, -21], [19, -21]], "stroke": "#302533", "line_width": 0.52, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-19, -18], [19, -18]], "stroke": "#302533", "line_width": 0.52, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-19, -15], [19, -15]], "stroke": "#302533", "line_width": 0.52, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-19, -12], [19, -12]], "stroke": "#302533", "line_width": 0.52, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-19, -9], [19, -9]], "stroke": "#302533", "line_width": 0.52, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-19, -6], [19, -6]], "stroke": "#302533", "line_width": 0.52, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-19, -3], [19, -3]], "stroke": "#302533", "line_width": 0.52, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-19, 0], [19, 0]], "stroke": "#302533", "line_width": 0.52, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-19, 3], [19, 3]], "stroke": "#302533", "line_width": 0.52, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-19, 6], [19, 6]], "stroke": "#302533", "line_width": 0.52, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-19, 9], [19, 9]], "stroke": "#302533", "line_width": 0.52, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-19, 12], [19, 12]], "stroke": "#302533", "line_width": 0.52, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-19, 15], [19, 15]], "stroke": "#302533", "line_width": 0.52, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-19, 18], [19, 18]], "stroke": "#302533", "line_width": 0.52, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-19, 21], [19, 21]], "stroke": "#302533", "line_width": 0.52, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-19, 24], [19, 24]], "stroke": "#302533", "line_width": 0.52, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-19, 27], [19, 27]], "stroke": "#302533", "line_width": 0.52, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-19, 30], [19, 30]], "stroke": "#302533", "line_width": 0.52, "line_cap": "round", "line_join": "round"},
+              {"shape": "circle", "x": 0, "y": -12, "radius": 13, "fill": "#140f19", "stroke": "#827183", "line_width": 0.7},
+              {"shape": "circle", "x": 0, "y": -12, "radius": 10, "fill": {"type": "linear", "to": [0, -2], "stops": [[0.0, "#534358"], [0.5, "#25202d"], [1.0, "#17121e"]], "from": [0, -22]}},
+              {"shape": "circle", "x": 0, "y": -12, "radius": 5, "fill": null, "stroke": "#61526a", "line_width": 0.5},
+              {"shape": "circle", "x": 0, "y": -12, "radius": 3, "fill": {"type": "linear", "to": [0, -9], "stops": [[0.0, "#ae91b3"], [1.0, "#3d2d49"]], "from": [0, -15]}},
+              {"shape": "circle", "x": 0, "y": 16, "radius": 13, "fill": "#140f19", "stroke": "#827183", "line_width": 0.7},
+              {"shape": "circle", "x": 0, "y": 16, "radius": 10, "fill": {"type": "linear", "to": [0, 26], "stops": [[0.0, "#534358"], [0.5, "#25202d"], [1.0, "#17121e"]], "from": [0, 6]}},
+              {"shape": "circle", "x": 0, "y": 16, "radius": 5, "fill": null, "stroke": "#61526a", "line_width": 0.5},
+              {"shape": "circle", "x": 0, "y": 16, "radius": 3, "fill": {"type": "linear", "to": [0, 19], "stops": [[0.0, "#ae91b3"], [1.0, "#3d2d49"]], "from": [0, 13]}},
+              {"shape": "circle", "x": 0, "y": -26, "radius": 3, "fill": "#1d1624", "stroke": "#cba46d", "line_width": 0.6},
+              {"shape": "circle", "x": 17, "y": 27, "radius": 1.1, "fill": "#d299f1"},
+              {"shape": "circle", "x": -18, "y": -28, "radius": 1.25, "fill": "#917d92"},
+              {"shape": "circle", "x": -18, "y": 30, "radius": 1.25, "fill": "#917d92"},
+              {"shape": "circle", "x": 18, "y": -28, "radius": 1.25, "fill": "#917d92"},
+              {"shape": "circle", "x": 18, "y": 30, "radius": 1.25, "fill": "#917d92"}
+            ]
+          }
+        ]
+      }]
+    },
+    "moon_city_chrome_pole": {
+      "kind": "prop",
+      "physics_type": "static",
+      "look": {"layer": 1},
+      "collision_shape": {"shape_type": "circle", "radius": 4},
+      "components": [{
+        "name": "chrome_pole",
+        "layers": [
+          {
+            "layer": -1,
+            "height": 0,
+            "thickness": 0.5,
+            "solid": false,
+            "steps": [
+              {"shape": "rectangle", "x": -4.0, "y": -3.0, "width": 10, "height": 10, "radius": 5, "fill": "rgba(13,6,21,.68)", "blur": 2.7}
+            ]
+          },
+          {
+            "layer": 0,
+            "height": 0,
+            "thickness": 2,
+            "sides": {"material": "booth_table_edge"},
+            "solid": false,
+            "steps": [
+              {"shape": "circle", "x": 0, "y": 0, "radius": 7, "fill": "#342637", "stroke": "#cba46d", "line_width": 0.7},
+              {"shape": "circle", "x": 0, "y": 0, "radius": 5, "fill": null, "stroke": "#d1a6e2", "line_width": 0.6}
+            ]
+          },
+          {
+            "layer": 1,
+            "height": 2,
+            "thickness": 104,
+            "sides": {"material": "booth_bucket_metal"},
+            "steps": [
+              {"shape": "circle", "x": 0, "y": 0, "radius": 2.6, "fill": {"type": "linear", "to": [0, 12], "stops": [[0.0, "#4d465a"], [0.333, "#eee4ef"], [0.667, "#777184"], [1.0, "#333044"]], "from": [0, -12]}, "stroke": "#c1b4c9", "line_width": 0.65},
+              {"shape": "circle", "x": -0.8, "y": -0.65, "radius": 0.65, "fill": "#fff1e6"}
+            ]
+          }
+        ]
+      }]
+    },
+    "moon_city_bar_stool": {
+      "kind": "prop",
+      "physics_type": "static",
+      "look": {"layer": 1},
+      "collision_shape": {"shape_type": "circle", "radius": 10},
+      "components": [{
+        "name": "bar_stool",
+        "layers": [
+          {
+            "layer": -1,
+            "height": 0,
+            "thickness": 0.5,
+            "solid": false,
+            "steps": [
+              {"shape": "rectangle", "x": -9.0, "y": -8.0, "width": 20, "height": 20, "radius": 5, "fill": "rgba(13,6,21,.68)", "blur": 2.7}
+            ]
+          },
+          {
+            "layer": 0,
+            "height": 0,
+            "thickness": 4,
+            "sides": {"material": "booth_bucket_metal"},
+            "steps": [
+              {"shape": "circle", "x": 0, "y": 0, "radius": 8.5, "fill": {"type": "linear", "to": [0, 12], "stops": [[0.0, "#4d465a"], [0.333, "#eee4ef"], [0.667, "#777184"], [1.0, "#333044"]], "from": [0, -12]}, "stroke": "#a892a1", "line_width": 0.65}
+            ]
+          },
+          {
+            "layer": 1,
+            "height": 4,
+            "thickness": 30,
+            "sides": {"material": "booth_bucket_metal"},
+            "steps": [
+              {"shape": "circle", "x": 0, "y": 0, "radius": 2.6, "fill": {"type": "linear", "to": [0, 12], "stops": [[0.0, "#4d465a"], [0.333, "#eee4ef"], [0.667, "#777184"], [1.0, "#333044"]], "from": [0, -12]}}
+            ]
+          },
+          {
+            "layer": 2,
+            "height": 34,
+            "thickness": 3,
+            "sides": {"material": "booth_table_edge"},
+            "solid": false,
+            "steps": [
+              {"shape": "circle", "x": 0, "y": 0, "radius": 6.7, "fill": null, "stroke": "#cba46d", "line_width": 1.15}
+            ]
+          },
+          {
+            "layer": 3,
+            "height": 37,
+            "thickness": 5,
+            "sides": {"material": "channel_couch_dark"},
+            "steps": [
+              {"shape": "circle", "x": 0, "y": 0, "radius": 10, "fill": {"type": "linear", "to": [0, 10], "stops": [[0.0, "#c46a94"], [0.5, "#8b315b"], [1.0, "#561737"]], "from": [0, -10]}, "stroke": "#cba46d", "line_width": 0.85},
+              {"shape": "circle", "x": 0, "y": 0, "radius": 8.1, "fill": null, "stroke": "#622744", "line_width": 0.55},
+              {"shape": "circle", "x": -0.4, "y": -0.7, "radius": 1.25, "fill": "#dfa877", "stroke": "#642740", "line_width": 0.55}
+            ]
+          }
+        ]
+      }]
+    },
+    "moon_city_coat_check_rail": {
+      "kind": "prop",
+      "physics_type": "static",
+      "look": {"layer": 1},
+      "collision_shape": {"shape_type": "box", "dimensions": [146, 10]},
+      "components": [{
+        "name": "coat_check_rail",
+        "layers": [
+          {
+            "layer": 0,
+            "height": 0,
+            "thickness": 57,
+            "sides": {"material": "booth_table_underside"},
+            "steps": [
+              {"shape": "rectangle", "x": -73, "y": -5, "width": 146, "height": 10, "radius": 2, "fill": {"type": "linear", "to": [0, 25], "stops": [[0.0, "#5b465a"], [0.5, "#2a1c31"], [1.0, "#160f1d"]], "from": [0, -24]}, "stroke": "#cba46d", "line_width": 0.75},
+              {"shape": "line", "points": [[-70, -2], [70, -2]], "stroke": "#f3d49c", "line_width": 0.78, "line_cap": "round", "line_join": "round"},
+              {"shape": "curve", "points": [[-69, 3], [-69, -1], [-67, -3], [-63, -3], [-61, -1], [-60, 3], [-63, 4], [-66, 4]], "fill": "#73506b", "stroke": "#33243a", "line_width": 0.52},
+              {"shape": "line", "points": [[-66, -2], [-65, 1], [-64, 3]], "stroke": "#c9a1be", "line_width": 0.48, "line_cap": "round", "line_join": "round"},
+              {"shape": "curve", "points": [[-56, 3], [-56, -1], [-54, -3], [-50, -3], [-48, -1], [-47, 3], [-50, 4], [-53, 4]], "fill": "#a04d75", "stroke": "#33243a", "line_width": 0.52},
+              {"shape": "line", "points": [[-53, -2], [-52, 1], [-51, 3]], "stroke": "#c9a1be", "line_width": 0.48, "line_cap": "round", "line_join": "round"},
+              {"shape": "curve", "points": [[-43, 3], [-43, -1], [-41, -3], [-37, -3], [-35, -1], [-34, 3], [-37, 4], [-40, 4]], "fill": "#40556f", "stroke": "#33243a", "line_width": 0.52},
+              {"shape": "line", "points": [[-40, -2], [-39, 1], [-38, 3]], "stroke": "#c9a1be", "line_width": 0.48, "line_cap": "round", "line_join": "round"},
+              {"shape": "curve", "points": [[-30, 3], [-30, -1], [-28, -3], [-24, -3], [-22, -1], [-21, 3], [-24, 4], [-27, 4]], "fill": "#64546f", "stroke": "#33243a", "line_width": 0.52},
+              {"shape": "line", "points": [[-27, -2], [-26, 1], [-25, 3]], "stroke": "#c9a1be", "line_width": 0.48, "line_cap": "round", "line_join": "round"},
+              {"shape": "curve", "points": [[-17, 3], [-17, -1], [-15, -3], [-11, -3], [-9, -1], [-8, 3], [-11, 4], [-14, 4]], "fill": "#8c507b", "stroke": "#33243a", "line_width": 0.52},
+              {"shape": "line", "points": [[-14, -2], [-13, 1], [-12, 3]], "stroke": "#c9a1be", "line_width": 0.48, "line_cap": "round", "line_join": "round"},
+              {"shape": "curve", "points": [[-4, 3], [-4, -1], [-2, -3], [2, -3], [4, -1], [5, 3], [2, 4], [-1, 4]], "fill": "#4e444b", "stroke": "#33243a", "line_width": 0.52},
+              {"shape": "line", "points": [[-1, -2], [0, 1], [1, 3]], "stroke": "#c9a1be", "line_width": 0.48, "line_cap": "round", "line_join": "round"},
+              {"shape": "curve", "points": [[9, 3], [9, -1], [11, -3], [15, -3], [17, -1], [18, 3], [15, 4], [12, 4]], "fill": "#77658e", "stroke": "#33243a", "line_width": 0.52},
+              {"shape": "line", "points": [[12, -2], [13, 1], [14, 3]], "stroke": "#c9a1be", "line_width": 0.48, "line_cap": "round", "line_join": "round"},
+              {"shape": "curve", "points": [[22, 3], [22, -1], [24, -3], [28, -3], [30, -1], [31, 3], [28, 4], [25, 4]], "fill": "#73506b", "stroke": "#33243a", "line_width": 0.52},
+              {"shape": "line", "points": [[25, -2], [26, 1], [27, 3]], "stroke": "#c9a1be", "line_width": 0.48, "line_cap": "round", "line_join": "round"},
+              {"shape": "curve", "points": [[35, 3], [35, -1], [37, -3], [41, -3], [43, -1], [44, 3], [41, 4], [38, 4]], "fill": "#a04d75", "stroke": "#33243a", "line_width": 0.52},
+              {"shape": "line", "points": [[38, -2], [39, 1], [40, 3]], "stroke": "#c9a1be", "line_width": 0.48, "line_cap": "round", "line_join": "round"},
+              {"shape": "curve", "points": [[48, 3], [48, -1], [50, -3], [54, -3], [56, -1], [57, 3], [54, 4], [51, 4]], "fill": "#40556f", "stroke": "#33243a", "line_width": 0.52},
+              {"shape": "line", "points": [[51, -2], [52, 1], [53, 3]], "stroke": "#c9a1be", "line_width": 0.48, "line_cap": "round", "line_join": "round"},
+              {"shape": "curve", "points": [[61, 3], [61, -1], [63, -3], [67, -3], [69, -1], [70, 3], [67, 4], [64, 4]], "fill": "#64546f", "stroke": "#33243a", "line_width": 0.52},
+              {"shape": "line", "points": [[64, -2], [65, 1], [66, 3]], "stroke": "#c9a1be", "line_width": 0.48, "line_cap": "round", "line_join": "round"}
+            ]
+          }
+        ]
+      }]
+    },
+    "moon_city_coat_check_counter": {
+      "kind": "prop",
+      "physics_type": "static",
+      "look": {"layer": 1},
+      "collision_shape": {"shape_type": "box", "dimensions": [150, 40]},
+      "components": [{
+        "name": "coat_check_counter",
+        "layers": [
+          {
+            "layer": -1,
+            "height": 0,
+            "thickness": 0.5,
+            "solid": false,
+            "steps": [
+              {"shape": "rectangle", "x": -74.0, "y": -18.0, "width": 150, "height": 40, "radius": 5, "fill": "rgba(13,6,21,.68)", "blur": 2.7}
+            ]
+          },
+          {
+            "layer": 0,
+            "height": 0,
+            "thickness": 44,
+            "sides": {"material": "booth_table_underside"},
+            "steps": [
+              {"shape": "rectangle", "x": -75, "y": -20, "width": 150, "height": 40, "radius": 4, "fill": {"type": "linear", "to": [0, 25], "stops": [[0.0, "#5b465a"], [0.5, "#2a1c31"], [1.0, "#160f1d"]], "from": [0, -24]}, "stroke": "#cba46d", "line_width": 0.75},
+              {"shape": "rectangle", "x": -72, "y": -17, "width": 144, "height": 34, "radius": 3, "fill": {"type": "linear", "to": [0, 17], "stops": [[0.0, "#614050"], [0.5, "#352331"], [1.0, "#211621"]], "from": [0, -17]}, "stroke": "#cba46d", "line_width": 0.75},
+              {"shape": "line", "points": [[-68, -13], [-55, -15], [-30, -13]], "stroke": "#7c5865", "line_width": 0.48, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-13, -13], [0, -15], [25, -13]], "stroke": "#7c5865", "line_width": 0.48, "line_cap": "round", "line_join": "round"},
+              {"shape": "circle", "x": -52, "y": 1, "radius": 5.8, "fill": "#241723", "blur": 0.8},
+              {"shape": "circle", "x": -53, "y": 0, "radius": 4.6, "fill": {"type": "linear", "to": [0, 5], "stops": [[0.0, "#fae2a5"], [0.5, "#a27343"], [1.0, "#684128"]], "from": [0, -5]}, "stroke": "#f3d49c", "line_width": 0.7},
+              {"shape": "circle", "x": -54, "y": -1, "radius": 1.4, "fill": "#ffe7b8"},
+              {"shape": "rectangle", "x": -25, "y": -4, "width": 9, "height": 9, "radius": 1, "fill": "#dfc399", "stroke": "#5d3c52", "line_width": 0.55},
+              {"shape": "line", "points": [[-23, -1], [-19, -1]], "stroke": "#946a77", "line_width": 0.4, "line_cap": "round", "line_join": "round"},
+              {"shape": "rectangle", "x": -13, "y": -4, "width": 9, "height": 9, "radius": 1, "fill": "#c89cba", "stroke": "#5d3c52", "line_width": 0.55},
+              {"shape": "line", "points": [[-11, -1], [-7, -1]], "stroke": "#946a77", "line_width": 0.4, "line_cap": "round", "line_join": "round"},
+              {"shape": "rectangle", "x": -1, "y": -4, "width": 9, "height": 9, "radius": 1, "fill": "#dfc399", "stroke": "#5d3c52", "line_width": 0.55},
+              {"shape": "line", "points": [[1, -1], [5, -1]], "stroke": "#946a77", "line_width": 0.4, "line_cap": "round", "line_join": "round"},
+              {"shape": "rectangle", "x": 11, "y": -4, "width": 9, "height": 9, "radius": 1, "fill": "#c89cba", "stroke": "#5d3c52", "line_width": 0.55},
+              {"shape": "line", "points": [[13, -1], [17, -1]], "stroke": "#946a77", "line_width": 0.4, "line_cap": "round", "line_join": "round"},
+              {"shape": "rectangle", "x": 33, "y": -7, "width": 29, "height": 15, "radius": 2, "fill": "#181321", "stroke": "#af92a5", "line_width": 0.65},
+              {"shape": "rectangle", "x": 35, "y": -5, "width": 25, "height": 8, "radius": 1, "fill": {"type": "linear", "to": [0, 3], "stops": [[0.0, "#c3a8d9"], [1.0, "#725d8f"]], "from": [0, -5]}},
+              {"shape": "circle", "x": 40, "y": 5, "radius": 0.64, "fill": "#d2a4bd"},
+              {"shape": "circle", "x": 44, "y": 5, "radius": 0.64, "fill": "#d2a4bd"},
+              {"shape": "circle", "x": 48, "y": 5, "radius": 0.64, "fill": "#d2a4bd"},
+              {"shape": "circle", "x": 52, "y": 5, "radius": 0.64, "fill": "#d2a4bd"},
+              {"shape": "circle", "x": 56, "y": 5, "radius": 0.64, "fill": "#d2a4bd"}
+            ]
+          }
+        ]
+      }]
+    },
+    "moon_city_velvet_rope": {
+      "kind": "prop",
+      "physics_type": "static",
+      "look": {"layer": 1},
+      "collision_shape": {"shape_type": "box", "dimensions": [8, 118]},
+      "components": [{
+        "name": "velvet_rope",
+        "layers": [
+          {
+            "layer": 0,
+            "height": 0,
+            "thickness": 3,
+            "sides": {"material": "booth_table_edge"},
+            "steps": [
+              {"shape": "circle", "x": 0, "y": -55, "radius": 5, "fill": {"type": "linear", "to": [0, 12], "stops": [[0.0, "#4d465a"], [0.333, "#eee4ef"], [0.667, "#777184"], [1.0, "#333044"]], "from": [0, -12]}, "stroke": "#cba46d", "line_width": 0.7},
+              {"shape": "circle", "x": 0, "y": -18.33, "radius": 5, "fill": {"type": "linear", "to": [0, 12], "stops": [[0.0, "#4d465a"], [0.333, "#eee4ef"], [0.667, "#777184"], [1.0, "#333044"]], "from": [0, -12]}, "stroke": "#cba46d", "line_width": 0.7},
+              {"shape": "circle", "x": 0, "y": 18.33, "radius": 5, "fill": {"type": "linear", "to": [0, 12], "stops": [[0.0, "#4d465a"], [0.333, "#eee4ef"], [0.667, "#777184"], [1.0, "#333044"]], "from": [0, -12]}, "stroke": "#cba46d", "line_width": 0.7},
+              {"shape": "circle", "x": 0, "y": 55, "radius": 5, "fill": {"type": "linear", "to": [0, 12], "stops": [[0.0, "#4d465a"], [0.333, "#eee4ef"], [0.667, "#777184"], [1.0, "#333044"]], "from": [0, -12]}, "stroke": "#cba46d", "line_width": 0.7}
+            ]
+          },
+          {
+            "layer": 1,
+            "height": 3,
+            "thickness": 34,
+            "sides": {"material": "booth_bucket_metal"},
+            "steps": [
+              {"shape": "circle", "x": 0, "y": -55, "radius": 1.5, "fill": {"type": "linear", "to": [0, 12], "stops": [[0.0, "#4d465a"], [0.333, "#eee4ef"], [0.667, "#777184"], [1.0, "#333044"]], "from": [0, -12]}},
+              {"shape": "circle", "x": 0, "y": -18.33, "radius": 1.5, "fill": {"type": "linear", "to": [0, 12], "stops": [[0.0, "#4d465a"], [0.333, "#eee4ef"], [0.667, "#777184"], [1.0, "#333044"]], "from": [0, -12]}},
+              {"shape": "circle", "x": 0, "y": 18.33, "radius": 1.5, "fill": {"type": "linear", "to": [0, 12], "stops": [[0.0, "#4d465a"], [0.333, "#eee4ef"], [0.667, "#777184"], [1.0, "#333044"]], "from": [0, -12]}},
+              {"shape": "circle", "x": 0, "y": 55, "radius": 1.5, "fill": {"type": "linear", "to": [0, 12], "stops": [[0.0, "#4d465a"], [0.333, "#eee4ef"], [0.667, "#777184"], [1.0, "#333044"]], "from": [0, -12]}}
+            ]
+          },
+          {
+            "layer": 2,
+            "height": 37,
+            "thickness": 2,
+            "solid": false,
+            "steps": [
+              {"shape": "line", "points": [[0.0, -55.0], [1.3, -50.42], [2.4, -45.83], [3.14, -41.25], [3.4, -36.67], [3.14, -32.08], [2.4, -27.5], [1.3, -22.92], [0.0, -18.33], [1.3, -13.75], [2.4, -9.17], [3.14, -4.58], [3.4, 0.0], [3.14, 4.58], [2.4, 9.17], [1.3, 13.75], [0.0, 18.33], [1.3, 22.92], [2.4, 27.5], [3.14, 32.08], [3.4, 36.67], [3.14, 41.25], [2.4, 45.83], [1.3, 50.42], [0.0, 55.0]], "stroke": "#401830", "line_width": 4.3, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[0.0, -55.0], [1.3, -50.42], [2.4, -45.83], [3.14, -41.25], [3.4, -36.67], [3.14, -32.08], [2.4, -27.5], [1.3, -22.92], [0.0, -18.33], [1.3, -13.75], [2.4, -9.17], [3.14, -4.58], [3.4, 0.0], [3.14, 4.58], [2.4, 9.17], [1.3, 13.75], [0.0, 18.33], [1.3, 22.92], [2.4, 27.5], [3.14, 32.08], [3.4, 36.67], [3.14, 41.25], [2.4, 45.83], [1.3, 50.42], [0.0, 55.0]], "stroke": "#ab3f69", "line_width": 2.6, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-0.45, -55.0], [0.85, -50.42], [1.95, -45.83], [2.69, -41.25], [2.95, -36.67], [2.69, -32.08], [1.95, -27.5], [0.85, -22.92], [-0.45, -18.33], [0.85, -13.75], [1.95, -9.17], [2.69, -4.58], [2.95, 0.0], [2.69, 4.58], [1.95, 9.17], [0.85, 13.75], [-0.45, 18.33], [0.85, 22.92], [1.95, 27.5], [2.69, 32.08], [2.95, 36.67], [2.69, 41.25], [1.95, 45.83], [0.85, 50.42], [-0.45, 55.0]], "stroke": "#eb9ab0", "line_width": 0.65, "line_cap": "round"},
+              {"shape": "circle", "x": 0, "y": -55, "radius": 2.35, "fill": "#cba46d", "stroke": "#f3d49c", "line_width": 0.6},
+              {"shape": "circle", "x": 0, "y": -18.33, "radius": 2.35, "fill": "#cba46d", "stroke": "#f3d49c", "line_width": 0.6},
+              {"shape": "circle", "x": 0, "y": 18.33, "radius": 2.35, "fill": "#cba46d", "stroke": "#f3d49c", "line_width": 0.6},
+              {"shape": "circle", "x": 0, "y": 55, "radius": 2.35, "fill": "#cba46d", "stroke": "#f3d49c", "line_width": 0.6}
+            ]
+          }
+        ]
+      }]
+    },
+    "moon_city_moon_orb": {
+      "kind": "prop",
+      "physics_type": "static",
+      "look": {"layer": 1},
+      "collision_shape": {"shape_type": "circle", "radius": 15},
+      "components": [{
+        "name": "moon_orb",
+        "layers": [
+          {
+            "layer": -1,
+            "height": 0,
+            "thickness": 0.5,
+            "solid": false,
+            "steps": [
+              {"shape": "rectangle", "x": -14.0, "y": -13.0, "width": 30, "height": 30, "radius": 5, "fill": "rgba(13,6,21,.68)", "blur": 2.7}
+            ]
+          },
+          {
+            "layer": 0,
+            "height": 0,
+            "thickness": 10,
+            "sides": {"material": "booth_table_underside"},
+            "steps": [
+              {"shape": "circle", "x": 0, "y": 0, "radius": 15, "fill": {"type": "linear", "to": [0, 25], "stops": [[0.0, "#5b465a"], [0.5, "#2a1c31"], [1.0, "#160f1d"]], "from": [0, -24]}, "stroke": "#cba46d", "line_width": 0.8},
+              {"shape": "circle", "x": 0, "y": 0, "radius": 12, "fill": null, "stroke": "#a580b5", "line_width": 0.6},
+              {"shape": "circle", "x": 0, "y": 0, "radius": 7, "fill": "#5a4470"}
+            ]
+          },
+          {
+            "layer": 1,
+            "height": 10,
+            "thickness": 30,
+            "sides": {"material": "booth_bucket_metal"},
+            "steps": [
+              {"shape": "circle", "x": 0, "y": 0, "radius": 3, "fill": {"type": "linear", "to": [0, 12], "stops": [[0.0, "#4d465a"], [0.333, "#eee4ef"], [0.667, "#777184"], [1.0, "#333044"]], "from": [0, -12]}}
+            ]
+          },
+          {
+            "layer": 2,
+            "height": 40,
+            "thickness": 11,
+            "sides": {"material": "booth_bucket_metal"},
+            "steps": [
+              {"shape": "circle", "x": 0, "y": -1, "radius": 11, "fill": {"type": "linear", "to": [0, 10], "stops": [[0.0, "#fff5e9"], [0.333, "#dfc7ed"], [0.667, "#977eb8"], [1.0, "#5c487d"]], "from": [0, -12]}, "stroke": "#e9d2ee", "line_width": 0.52},
+              {"shape": "ellipse", "x": -4, "y": -4, "radius_x": 3.2, "radius_y": 2, "fill": "#b4a0cb", "alpha": 0.62, "rotation": -0.45},
+              {"shape": "ellipse", "x": 2, "y": 2.4, "radius_x": 3.4, "radius_y": 2.8, "fill": "#8978a6", "alpha": 0.54, "rotation": -0.4},
+              {"shape": "ellipse", "x": 5, "y": -5, "radius_x": 1.55, "radius_y": 1.2, "fill": "#af96ca"},
+              {"shape": "circle", "x": -3, "y": 4, "radius": 1.2, "fill": "#9c86bd"},
+              {"shape": "circle", "x": -6, "y": -6, "radius": 1.3, "fill": "#fff7ed", "alpha": 0.8}
+            ]
+          }
+        ]
+      }]
+    },
+    "moon_city_powder_room_vanity": {
+      "kind": "prop",
+      "physics_type": "static",
+      "look": {"layer": 1},
+      "collision_shape": {"shape_type": "box", "dimensions": [230, 40]},
+      "components": [{
+        "name": "powder_room_vanity",
+        "layers": [
+          {
+            "layer": -1,
+            "height": 0,
+            "thickness": 0.5,
+            "solid": false,
+            "steps": [
+              {"shape": "rectangle", "x": -114.0, "y": -18.0, "width": 230, "height": 40, "radius": 5, "fill": "rgba(13,6,21,.68)", "blur": 2.7}
+            ]
+          },
+          {
+            "layer": 0,
+            "height": 0,
+            "thickness": 42,
+            "sides": {"material": "booth_table_underside"},
+            "steps": [
+              {"shape": "rectangle", "x": -115.0, "y": -20, "width": 230, "height": 40, "radius": 4, "fill": {"type": "linear", "to": [0, 25], "stops": [[0.0, "#5b465a"], [0.5, "#2a1c31"], [1.0, "#160f1d"]], "from": [0, -24]}, "stroke": "#cba46d", "line_width": 0.75}
+            ]
+          },
+          {
+            "layer": 1,
+            "height": 42,
+            "thickness": 4,
+            "sides": {"material": "booth_table_edge"},
+            "steps": [
+              {"shape": "rectangle", "x": -115.0, "y": -20, "width": 230, "height": 40, "radius": 4, "fill": {"type": "linear", "to": [0, 20], "stops": [[0.0, "#ead6d7"], [0.5, "#caaabb"], [1.0, "#a17e99"]], "from": [0, -20]}, "stroke": "#cba46d", "line_width": 0.75},
+              {"shape": "curve", "points": [[-110, -18], [-105, -12], [-106, -4], [-101, 7], [-98, 18]], "fill": null, "stroke": "#82667e", "line_width": 0.52, "alpha": 0.64},
+              {"shape": "curve", "points": [[-82, -18], [-77, -12], [-78, -4], [-73, 7], [-70, 18]], "fill": null, "stroke": "#82667e", "line_width": 0.52, "alpha": 0.64},
+              {"shape": "curve", "points": [[-54, -18], [-49, -12], [-50, -4], [-45, 7], [-42, 18]], "fill": null, "stroke": "#82667e", "line_width": 0.52, "alpha": 0.64},
+              {"shape": "curve", "points": [[-26, -18], [-21, -12], [-22, -4], [-17, 7], [-14, 18]], "fill": null, "stroke": "#82667e", "line_width": 0.52, "alpha": 0.64},
+              {"shape": "curve", "points": [[2, -18], [7, -12], [6, -4], [11, 7], [14, 18]], "fill": null, "stroke": "#82667e", "line_width": 0.52, "alpha": 0.64},
+              {"shape": "curve", "points": [[30, -18], [35, -12], [34, -4], [39, 7], [42, 18]], "fill": null, "stroke": "#82667e", "line_width": 0.52, "alpha": 0.64},
+              {"shape": "curve", "points": [[58, -18], [63, -12], [62, -4], [67, 7], [70, 18]], "fill": null, "stroke": "#82667e", "line_width": 0.52, "alpha": 0.64},
+              {"shape": "curve", "points": [[86, -18], [91, -12], [90, -4], [95, 7], [98, 18]], "fill": null, "stroke": "#82667e", "line_width": 0.52, "alpha": 0.64},
+              {"shape": "ellipse", "x": -86.25, "y": 4, "radius_x": 11, "radius_y": 8, "fill": "#615263", "blur": 0.65},
+              {"shape": "ellipse", "x": -86.25, "y": 3, "radius_x": 10, "radius_y": 7.4, "fill": {"type": "linear", "to": [0, 10], "stops": [[0.0, "#fff6ee"], [0.5, "#e9dfeb"], [1.0, "#ab9eb7"]], "from": [0, -10]}, "stroke": "#9a8b9c", "line_width": 0.54},
+              {"shape": "ellipse", "x": -86.25, "y": 3, "radius_x": 7.1, "radius_y": 5.4, "fill": {"type": "linear", "to": [0, 9], "stops": [[0.0, "#aaa2ba"], [0.5, "#d5cde1"], [1.0, "#fff6e8"]], "from": [0, -2]}},
+              {"shape": "circle", "x": -86.25, "y": 4, "radius": 1.15, "fill": "#625c72"},
+              {"shape": "rectangle", "x": -87.65, "y": -12, "width": 2.8, "height": 8, "radius": 1.2, "fill": "#cba46d", "stroke": "#eed5a5", "line_width": 0.52},
+              {"shape": "circle", "x": -90.25, "y": -10, "radius": 1.25, "fill": "#f3d49c"},
+              {"shape": "circle", "x": -82.25, "y": -10, "radius": 1.25, "fill": "#cba46d"},
+              {"shape": "ellipse", "x": -28.75, "y": 4, "radius_x": 11, "radius_y": 8, "fill": "#615263", "blur": 0.65},
+              {"shape": "ellipse", "x": -28.75, "y": 3, "radius_x": 10, "radius_y": 7.4, "fill": {"type": "linear", "to": [0, 10], "stops": [[0.0, "#fff6ee"], [0.5, "#e9dfeb"], [1.0, "#ab9eb7"]], "from": [0, -10]}, "stroke": "#9a8b9c", "line_width": 0.54},
+              {"shape": "ellipse", "x": -28.75, "y": 3, "radius_x": 7.1, "radius_y": 5.4, "fill": {"type": "linear", "to": [0, 9], "stops": [[0.0, "#aaa2ba"], [0.5, "#d5cde1"], [1.0, "#fff6e8"]], "from": [0, -2]}},
+              {"shape": "circle", "x": -28.75, "y": 4, "radius": 1.15, "fill": "#625c72"},
+              {"shape": "rectangle", "x": -30.15, "y": -12, "width": 2.8, "height": 8, "radius": 1.2, "fill": "#cba46d", "stroke": "#eed5a5", "line_width": 0.52},
+              {"shape": "circle", "x": -32.75, "y": -10, "radius": 1.25, "fill": "#f3d49c"},
+              {"shape": "circle", "x": -24.75, "y": -10, "radius": 1.25, "fill": "#cba46d"},
+              {"shape": "ellipse", "x": 28.75, "y": 4, "radius_x": 11, "radius_y": 8, "fill": "#615263", "blur": 0.65},
+              {"shape": "ellipse", "x": 28.75, "y": 3, "radius_x": 10, "radius_y": 7.4, "fill": {"type": "linear", "to": [0, 10], "stops": [[0.0, "#fff6ee"], [0.5, "#e9dfeb"], [1.0, "#ab9eb7"]], "from": [0, -10]}, "stroke": "#9a8b9c", "line_width": 0.54},
+              {"shape": "ellipse", "x": 28.75, "y": 3, "radius_x": 7.1, "radius_y": 5.4, "fill": {"type": "linear", "to": [0, 9], "stops": [[0.0, "#aaa2ba"], [0.5, "#d5cde1"], [1.0, "#fff6e8"]], "from": [0, -2]}},
+              {"shape": "circle", "x": 28.75, "y": 4, "radius": 1.15, "fill": "#625c72"},
+              {"shape": "rectangle", "x": 27.35, "y": -12, "width": 2.8, "height": 8, "radius": 1.2, "fill": "#cba46d", "stroke": "#eed5a5", "line_width": 0.52},
+              {"shape": "circle", "x": 24.75, "y": -10, "radius": 1.25, "fill": "#f3d49c"},
+              {"shape": "circle", "x": 32.75, "y": -10, "radius": 1.25, "fill": "#cba46d"},
+              {"shape": "ellipse", "x": 86.25, "y": 4, "radius_x": 11, "radius_y": 8, "fill": "#615263", "blur": 0.65},
+              {"shape": "ellipse", "x": 86.25, "y": 3, "radius_x": 10, "radius_y": 7.4, "fill": {"type": "linear", "to": [0, 10], "stops": [[0.0, "#fff6ee"], [0.5, "#e9dfeb"], [1.0, "#ab9eb7"]], "from": [0, -10]}, "stroke": "#9a8b9c", "line_width": 0.54},
+              {"shape": "ellipse", "x": 86.25, "y": 3, "radius_x": 7.1, "radius_y": 5.4, "fill": {"type": "linear", "to": [0, 9], "stops": [[0.0, "#aaa2ba"], [0.5, "#d5cde1"], [1.0, "#fff6e8"]], "from": [0, -2]}},
+              {"shape": "circle", "x": 86.25, "y": 4, "radius": 1.15, "fill": "#625c72"},
+              {"shape": "rectangle", "x": 84.85, "y": -12, "width": 2.8, "height": 8, "radius": 1.2, "fill": "#cba46d", "stroke": "#eed5a5", "line_width": 0.52},
+              {"shape": "circle", "x": 82.25, "y": -10, "radius": 1.25, "fill": "#f3d49c"},
+              {"shape": "circle", "x": 90.25, "y": -10, "radius": 1.25, "fill": "#cba46d"},
+              {"shape": "rectangle", "x": 98.0, "y": 6, "width": 5, "height": 7, "radius": 1, "fill": "#a15c90", "stroke": "#f3bdd9", "line_width": 0.52},
+              {"shape": "rectangle", "x": 99.2, "y": 4, "width": 2.6, "height": 2.5, "radius": 0.5, "fill": "#cba46d"},
+              {"shape": "circle", "x": 91.0, "y": 9, "radius": 2.5, "fill": "#e0cadf", "stroke": "#8c719b", "line_width": 0.52}
+            ]
+          },
+          {
+            "layer": 2,
+            "height": 46,
+            "thickness": 12,
+            "sides": {"material": "booth_table_edge"},
+            "steps": [
+              {"shape": "rectangle", "x": -115.0, "y": -20, "width": 230, "height": 5, "radius": 1.5, "fill": {"type": "linear", "to": [0, -15], "stops": [[0.0, "#cab7d1"], [1.0, "#66607c"]], "from": [0, -20]}, "stroke": "#cba46d", "line_width": 0.75},
+              {"shape": "rectangle", "x": -112.0, "y": -19, "width": 224, "height": 1, "radius": 0.5, "fill": "#e6d8ef"},
+              {"shape": "circle", "x": -107, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": -93, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": -79, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": -65, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": -51, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": -37, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": -23, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": -9, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": 5, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": 19, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": 33, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": 47, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": 61, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": 75, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": 89, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": 103, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38}
+            ]
+          }
+        ]
+      }]
+    },
+    "moon_city_gents_vanity": {
+      "kind": "prop",
+      "physics_type": "static",
+      "look": {"layer": 1},
+      "collision_shape": {"shape_type": "box", "dimensions": [200, 40]},
+      "components": [{
+        "name": "gents_vanity",
+        "layers": [
+          {
+            "layer": -1,
+            "height": 0,
+            "thickness": 0.5,
+            "solid": false,
+            "steps": [
+              {"shape": "rectangle", "x": -99.0, "y": -18.0, "width": 200, "height": 40, "radius": 5, "fill": "rgba(13,6,21,.68)", "blur": 2.7}
+            ]
+          },
+          {
+            "layer": 0,
+            "height": 0,
+            "thickness": 42,
+            "sides": {"material": "booth_table_underside"},
+            "steps": [
+              {"shape": "rectangle", "x": -100.0, "y": -20, "width": 200, "height": 40, "radius": 4, "fill": {"type": "linear", "to": [0, 25], "stops": [[0.0, "#5b465a"], [0.5, "#2a1c31"], [1.0, "#160f1d"]], "from": [0, -24]}, "stroke": "#cba46d", "line_width": 0.75}
+            ]
+          },
+          {
+            "layer": 1,
+            "height": 42,
+            "thickness": 4,
+            "sides": {"material": "booth_table_edge"},
+            "steps": [
+              {"shape": "rectangle", "x": -100.0, "y": -20, "width": 200, "height": 40, "radius": 4, "fill": {"type": "linear", "to": [0, 20], "stops": [[0.0, "#e4e3f0"], [0.5, "#abaac5"], [1.0, "#706882"]], "from": [0, -20]}, "stroke": "#cba46d", "line_width": 0.75},
+              {"shape": "curve", "points": [[-95, -18], [-90, -12], [-91, -4], [-86, 7], [-83, 18]], "fill": null, "stroke": "#82667e", "line_width": 0.52, "alpha": 0.64},
+              {"shape": "curve", "points": [[-67, -18], [-62, -12], [-63, -4], [-58, 7], [-55, 18]], "fill": null, "stroke": "#82667e", "line_width": 0.52, "alpha": 0.64},
+              {"shape": "curve", "points": [[-39, -18], [-34, -12], [-35, -4], [-30, 7], [-27, 18]], "fill": null, "stroke": "#82667e", "line_width": 0.52, "alpha": 0.64},
+              {"shape": "curve", "points": [[-11, -18], [-6, -12], [-7, -4], [-2, 7], [1, 18]], "fill": null, "stroke": "#82667e", "line_width": 0.52, "alpha": 0.64},
+              {"shape": "curve", "points": [[17, -18], [22, -12], [21, -4], [26, 7], [29, 18]], "fill": null, "stroke": "#82667e", "line_width": 0.52, "alpha": 0.64},
+              {"shape": "curve", "points": [[45, -18], [50, -12], [49, -4], [54, 7], [57, 18]], "fill": null, "stroke": "#82667e", "line_width": 0.52, "alpha": 0.64},
+              {"shape": "curve", "points": [[73, -18], [78, -12], [77, -4], [82, 7], [85, 18]], "fill": null, "stroke": "#82667e", "line_width": 0.52, "alpha": 0.64},
+              {"shape": "ellipse", "x": -66.66666666666666, "y": 4, "radius_x": 11, "radius_y": 8, "fill": "#615263", "blur": 0.65},
+              {"shape": "ellipse", "x": -66.66666666666666, "y": 3, "radius_x": 10, "radius_y": 7.4, "fill": {"type": "linear", "to": [0, 10], "stops": [[0.0, "#fff6ee"], [0.5, "#e9dfeb"], [1.0, "#ab9eb7"]], "from": [0, -10]}, "stroke": "#9a8b9c", "line_width": 0.54},
+              {"shape": "ellipse", "x": -66.66666666666666, "y": 3, "radius_x": 7.1, "radius_y": 5.4, "fill": {"type": "linear", "to": [0, 9], "stops": [[0.0, "#aaa2ba"], [0.5, "#d5cde1"], [1.0, "#fff6e8"]], "from": [0, -2]}},
+              {"shape": "circle", "x": -66.66666666666666, "y": 4, "radius": 1.15, "fill": "#625c72"},
+              {"shape": "rectangle", "x": -68.06666666666666, "y": -12, "width": 2.8, "height": 8, "radius": 1.2, "fill": "#cba46d", "stroke": "#eed5a5", "line_width": 0.52},
+              {"shape": "circle", "x": -70.66666666666666, "y": -10, "radius": 1.25, "fill": "#f3d49c"},
+              {"shape": "circle", "x": -62.66666666666666, "y": -10, "radius": 1.25, "fill": "#cba46d"},
+              {"shape": "ellipse", "x": 0.0, "y": 4, "radius_x": 11, "radius_y": 8, "fill": "#615263", "blur": 0.65},
+              {"shape": "ellipse", "x": 0.0, "y": 3, "radius_x": 10, "radius_y": 7.4, "fill": {"type": "linear", "to": [0, 10], "stops": [[0.0, "#fff6ee"], [0.5, "#e9dfeb"], [1.0, "#ab9eb7"]], "from": [0, -10]}, "stroke": "#9a8b9c", "line_width": 0.54},
+              {"shape": "ellipse", "x": 0.0, "y": 3, "radius_x": 7.1, "radius_y": 5.4, "fill": {"type": "linear", "to": [0, 9], "stops": [[0.0, "#aaa2ba"], [0.5, "#d5cde1"], [1.0, "#fff6e8"]], "from": [0, -2]}},
+              {"shape": "circle", "x": 0.0, "y": 4, "radius": 1.15, "fill": "#625c72"},
+              {"shape": "rectangle", "x": -1.4, "y": -12, "width": 2.8, "height": 8, "radius": 1.2, "fill": "#cba46d", "stroke": "#eed5a5", "line_width": 0.52},
+              {"shape": "circle", "x": -4.0, "y": -10, "radius": 1.25, "fill": "#f3d49c"},
+              {"shape": "circle", "x": 4.0, "y": -10, "radius": 1.25, "fill": "#cba46d"},
+              {"shape": "ellipse", "x": 66.66666666666666, "y": 4, "radius_x": 11, "radius_y": 8, "fill": "#615263", "blur": 0.65},
+              {"shape": "ellipse", "x": 66.66666666666666, "y": 3, "radius_x": 10, "radius_y": 7.4, "fill": {"type": "linear", "to": [0, 10], "stops": [[0.0, "#fff6ee"], [0.5, "#e9dfeb"], [1.0, "#ab9eb7"]], "from": [0, -10]}, "stroke": "#9a8b9c", "line_width": 0.54},
+              {"shape": "ellipse", "x": 66.66666666666666, "y": 3, "radius_x": 7.1, "radius_y": 5.4, "fill": {"type": "linear", "to": [0, 9], "stops": [[0.0, "#aaa2ba"], [0.5, "#d5cde1"], [1.0, "#fff6e8"]], "from": [0, -2]}},
+              {"shape": "circle", "x": 66.66666666666666, "y": 4, "radius": 1.15, "fill": "#625c72"},
+              {"shape": "rectangle", "x": 65.26666666666665, "y": -12, "width": 2.8, "height": 8, "radius": 1.2, "fill": "#cba46d", "stroke": "#eed5a5", "line_width": 0.52},
+              {"shape": "circle", "x": 62.66666666666666, "y": -10, "radius": 1.25, "fill": "#f3d49c"},
+              {"shape": "circle", "x": 70.66666666666666, "y": -10, "radius": 1.25, "fill": "#cba46d"},
+              {"shape": "rectangle", "x": 83.0, "y": 6, "width": 5, "height": 7, "radius": 1, "fill": "#a15c90", "stroke": "#f3bdd9", "line_width": 0.52},
+              {"shape": "rectangle", "x": 84.2, "y": 4, "width": 2.6, "height": 2.5, "radius": 0.5, "fill": "#cba46d"},
+              {"shape": "circle", "x": 76.0, "y": 9, "radius": 2.5, "fill": "#e0cadf", "stroke": "#8c719b", "line_width": 0.52}
+            ]
+          },
+          {
+            "layer": 2,
+            "height": 46,
+            "thickness": 12,
+            "sides": {"material": "booth_table_edge"},
+            "steps": [
+              {"shape": "rectangle", "x": -100.0, "y": -20, "width": 200, "height": 5, "radius": 1.5, "fill": {"type": "linear", "to": [0, -15], "stops": [[0.0, "#cab7d1"], [1.0, "#66607c"]], "from": [0, -20]}, "stroke": "#cba46d", "line_width": 0.75},
+              {"shape": "rectangle", "x": -97.0, "y": -19, "width": 194, "height": 1, "radius": 0.5, "fill": "#e6d8ef"},
+              {"shape": "circle", "x": -92, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": -78, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": -64, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": -50, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": -36, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": -22, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": -8, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": 6, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": 20, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": 34, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": 48, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": 62, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": 76, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38},
+              {"shape": "circle", "x": 90, "y": -17, "radius": 1.42, "fill": "#fff3d9", "stroke": "#cba46d", "line_width": 0.38}
+            ]
+          }
+        ]
+      }]
+    },
+    "moon_city_restroom_stall": {
+      "kind": "prop",
+      "physics_type": "static",
+      "look": {"layer": 1},
+      "collision_shape": {"shape_type": "box", "dimensions": [80, 84]},
+      "components": [{
+        "name": "restroom_stall",
+        "layers": [
+          {
+            "layer": -1,
+            "height": 0,
+            "thickness": 0.5,
+            "solid": false,
+            "steps": [
+              {"shape": "rectangle", "x": -39.0, "y": -40.0, "width": 80, "height": 84, "radius": 5, "fill": "rgba(13,6,21,.68)", "blur": 2.7}
+            ]
+          },
+          {
+            "layer": 0,
+            "height": 0,
+            "thickness": 0.5,
+            "solid": false,
+            "steps": [
+              {"shape": "rectangle", "x": -40, "y": -42, "width": 80, "height": 84, "radius": 2, "fill": {"type": "linear", "to": [0, 42], "stops": [[0.0, "#9e8c9f"], [0.5, "#afa1af"], [1.0, "#807287"]], "from": [0, -42]}},
+              {"shape": "line", "points": [[-30, -40], [-30, 40]], "stroke": "#796a7d", "line_width": 0.47, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-20, -40], [-20, 40]], "stroke": "#796a7d", "line_width": 0.47, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-10, -40], [-10, 40]], "stroke": "#796a7d", "line_width": 0.47, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[0, -40], [0, 40]], "stroke": "#796a7d", "line_width": 0.47, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[10, -40], [10, 40]], "stroke": "#796a7d", "line_width": 0.47, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[20, -40], [20, 40]], "stroke": "#796a7d", "line_width": 0.47, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[30, -40], [30, 40]], "stroke": "#796a7d", "line_width": 0.47, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-39, -32], [39, -32]], "stroke": "#796a7d", "line_width": 0.47, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-39, -22], [39, -22]], "stroke": "#796a7d", "line_width": 0.47, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-39, -12], [39, -12]], "stroke": "#796a7d", "line_width": 0.47, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-39, -2], [39, -2]], "stroke": "#796a7d", "line_width": 0.47, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-39, 8], [39, 8]], "stroke": "#796a7d", "line_width": 0.47, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-39, 18], [39, 18]], "stroke": "#796a7d", "line_width": 0.47, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-39, 28], [39, 28]], "stroke": "#796a7d", "line_width": 0.47, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-39, 38], [39, 38]], "stroke": "#796a7d", "line_width": 0.47, "line_cap": "round", "line_join": "round"}
+            ]
+          },
+          {
+            "layer": 1,
+            "height": 0.5,
+            "thickness": 20,
+            "sides": {"material": "booth_bucket_metal"},
+            "solid": false,
+            "steps": [
+              {"shape": "ellipse", "x": -20, "y": 1, "radius_x": 14, "radius_y": 10, "fill": "rgba(31,15,36,.65)", "blur": 1.1},
+              {"shape": "rectangle", "x": -37, "y": -10, "width": 9, "height": 20, "radius": 2, "fill": {"type": "linear", "to": [0, 10], "stops": [[0.0, "#fff6ee"], [0.5, "#e9dfeb"], [1.0, "#ab9eb7"]], "from": [0, -10]}, "stroke": "#9e91a6", "line_width": 0.55},
+              {"shape": "ellipse", "x": -20, "y": 0, "radius_x": 12, "radius_y": 8, "fill": {"type": "linear", "to": [0, 10], "stops": [[0.0, "#fff6ee"], [0.5, "#e9dfeb"], [1.0, "#ab9eb7"]], "from": [0, -10]}, "stroke": "#82758f", "line_width": 0.6},
+              {"shape": "ellipse", "x": -18, "y": 0, "radius_x": 7, "radius_y": 5, "fill": {"type": "linear", "to": [0, 5], "stops": [[0.0, "#887e9c"], [0.5, "#c0bada"], [1.0, "#e8dce3"]], "from": [0, -5]}},
+              {"shape": "ellipse", "x": -18, "y": 1, "radius_x": 3.8, "radius_y": 2.2, "fill": "#c6c7db"}
+            ]
+          },
+          {
+            "layer": 2,
+            "height": 0,
+            "thickness": 78,
+            "sides": {"material": "booth_table_underside"},
+            "steps": [
+              {"shape": "rectangle", "x": -40, "y": -42, "width": 80, "height": 4, "radius": 1, "fill": {"type": "linear", "to": [0, 25], "stops": [[0.0, "#5b465a"], [0.5, "#2a1c31"], [1.0, "#160f1d"]], "from": [0, -24]}, "stroke": "#cba46d", "line_width": 0.75},
+              {"shape": "rectangle", "x": -40, "y": 38, "width": 80, "height": 4, "radius": 1, "fill": {"type": "linear", "to": [0, 25], "stops": [[0.0, "#5b465a"], [0.5, "#2a1c31"], [1.0, "#160f1d"]], "from": [0, -24]}, "stroke": "#cba46d", "line_width": 0.75},
+              {"shape": "polygon", "points": [[35, -38], [40, -38], [39, 29], [36, 34], [33, 34]], "fill": {"type": "linear", "to": [0, 25], "stops": [[0.0, "#5b465a"], [0.5, "#2a1c31"], [1.0, "#160f1d"]], "from": [0, -24]}, "stroke": "#cba46d", "line_width": 0.7},
+              {"shape": "circle", "x": 36.5, "y": 1, "radius": 1.35, "fill": "#f3d49c"},
+              {"shape": "rectangle", "x": 35, "y": 7, "width": 2.9, "height": 4, "radius": 1, "fill": "#81bb9c"}
+            ]
+          }
+        ]
+      }]
+    },
+    "moon_city_porcelain_urinal": {
+      "kind": "prop",
+      "physics_type": "static",
+      "look": {"layer": 1},
+      "collision_shape": {"shape_type": "box", "dimensions": [26, 20]},
+      "components": [{
+        "name": "porcelain_urinal",
+        "layers": [
+          {
+            "layer": -1,
+            "height": 0,
+            "thickness": 0.5,
+            "solid": false,
+            "steps": [
+              {"shape": "rectangle", "x": -12.0, "y": -8.0, "width": 26, "height": 20, "radius": 5, "fill": "rgba(13,6,21,.68)", "blur": 2.7}
+            ]
+          },
+          {
+            "layer": 0,
+            "height": 13,
+            "thickness": 20,
+            "sides": {"material": "booth_bucket_metal"},
+            "steps": [
+              {"shape": "curve", "points": [[-13, -9], [-11, -10], [11, -10], [13, -9], [11, 1], [7, 8], [0, 10], [-7, 8], [-11, 1]], "fill": {"type": "linear", "to": [0, 10], "stops": [[0.0, "#fff6ee"], [0.5, "#e9dfeb"], [1.0, "#ab9eb7"]], "from": [0, -10]}, "stroke": "#8f819c", "line_width": 0.65},
+              {"shape": "ellipse", "x": 0, "y": 2, "radius_x": 8.6, "radius_y": 5.5, "fill": {"type": "linear", "to": [0, 8], "stops": [[0.0, "#716682"], [0.5, "#a9a0bb"], [1.0, "#e8e1ea"]], "from": [0, -4]}, "stroke": "#c3b8ca", "line_width": 0.6},
+              {"shape": "circle", "x": 0, "y": 4, "radius": 1.25, "fill": "#70667e"},
+              {"shape": "rectangle", "x": -3, "y": -8, "width": 6, "height": 3.7, "radius": 1, "fill": "#cba46d", "stroke": "#f3d49c", "line_width": 0.5},
+              {"shape": "line", "points": [[-6, 8], [0, 9], [5, 8]], "stroke": "#fff2e9", "line_width": 0.54, "line_cap": "round", "line_join": "round"}
+            ]
+          }
+        ]
+      }]
+    },
+    "moon_city_hand_dryer": {
+      "kind": "prop",
+      "physics_type": "static",
+      "look": {"layer": 1},
+      "collision_shape": {"shape_type": "box", "dimensions": [44, 14]},
+      "components": [{
+        "name": "hand_dryer",
+        "layers": [
+          {
+            "layer": -1,
+            "height": 0,
+            "thickness": 0.5,
+            "solid": false,
+            "steps": [
+              {"shape": "rectangle", "x": -21.0, "y": -5.0, "width": 44, "height": 14, "radius": 5, "fill": "rgba(13,6,21,.68)", "blur": 2.7}
+            ]
+          },
+          {
+            "layer": 0,
+            "height": 37,
+            "thickness": 16,
+            "sides": {"material": "booth_bucket_metal"},
+            "steps": [
+              {"shape": "rectangle", "x": -22, "y": -7, "width": 44, "height": 14, "radius": 4, "fill": {"type": "linear", "to": [0, 12], "stops": [[0.0, "#4d465a"], [0.333, "#eee4ef"], [0.667, "#777184"], [1.0, "#333044"]], "from": [0, -12]}, "stroke": "#b5a8bb", "line_width": 0.75},
+              {"shape": "rectangle", "x": -15, "y": -4, "width": 31, "height": 8, "radius": 2, "fill": {"type": "linear", "to": [0, 4], "stops": [[0.0, "#25202e"], [0.5, "#52425c"], [1.0, "#211a28"]], "from": [0, -4]}, "stroke": "#675970", "line_width": 0.5},
+              {"shape": "line", "points": [[-12, -2], [-12, 2]], "stroke": "#8b7992", "line_width": 0.48, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-9, -2], [-9, 2]], "stroke": "#8b7992", "line_width": 0.48, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-6, -2], [-6, 2]], "stroke": "#8b7992", "line_width": 0.48, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[-3, -2], [-3, 2]], "stroke": "#8b7992", "line_width": 0.48, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[0, -2], [0, 2]], "stroke": "#8b7992", "line_width": 0.48, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[3, -2], [3, 2]], "stroke": "#8b7992", "line_width": 0.48, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[6, -2], [6, 2]], "stroke": "#8b7992", "line_width": 0.48, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[9, -2], [9, 2]], "stroke": "#8b7992", "line_width": 0.48, "line_cap": "round", "line_join": "round"},
+              {"shape": "line", "points": [[12, -2], [12, 2]], "stroke": "#8b7992", "line_width": 0.48, "line_cap": "round", "line_join": "round"},
+              {"shape": "circle", "x": -18, "y": 0, "radius": 1.5, "fill": "#96d3e9", "stroke": "#d8eff8", "line_width": 0.42},
+              {"shape": "line", "points": [[-13, -6], [13, -6]], "stroke": "#f5e5ea", "line_width": 0.52, "line_cap": "round", "line_join": "round"}
+            ]
+          }
+        ]
+      }]
+    },
+    "moon_city_blush_settee": {
+      "kind": "prop",
+      "physics_type": "static",
+      "look": {"layer": 1},
+      "collision_shape": {"shape_type": "box", "dimensions": [44, 120]},
+      "components": [{
+        "name": "blush_settee",
+        "layers": [
+          {
+            "layer": -1,
+            "height": 0,
+            "thickness": 0.5,
+            "solid": false,
+            "steps": [
+              {"shape": "rectangle", "x": -21.0, "y": -58.0, "width": 44, "height": 120, "radius": 5, "fill": "rgba(13,6,21,.68)", "blur": 2.7}
+            ]
+          },
+          {
+            "layer": 0,
+            "height": 0,
+            "thickness": 12,
+            "sides": {"material": "booth_table_edge"},
+            "steps": [
+              {"shape": "circle", "x": -15, "y": -49, "radius": 3, "fill": "#cba46d"},
+              {"shape": "circle", "x": -15, "y": 49, "radius": 3, "fill": "#cba46d"},
+              {"shape": "circle", "x": 15, "y": -49, "radius": 3, "fill": "#cba46d"},
+              {"shape": "circle", "x": 15, "y": 49, "radius": 3, "fill": "#cba46d"}
+            ]
+          },
+          {
+            "layer": 1,
+            "height": 12,
+            "thickness": 12,
+            "sides": {"material": "channel_couch_dark"},
+            "steps": [
+              {"shape": "rectangle", "x": -22, "y": -60, "width": 44, "height": 120, "radius": 11, "fill": {"type": "linear", "to": [0, 60], "stops": [[0.0, "#a45078"], [0.5, "#723552"], [1.0, "#4e253e"]], "from": [0, -60]}, "stroke": "#cba46d", "line_width": 0.75}
+            ]
+          },
+          {
+            "layer": 2,
+            "height": 24,
+            "thickness": 3,
+            "sides": {"material": "channel_couch_dark"},
+            "steps": [
+              {"shape": "rectangle", "x": -19, "y": -38, "width": 29, "height": 93, "radius": 7, "fill": {"type": "linear", "to": [0, 55], "stops": [[0.0, "#eb9bb6"], [0.5, "#c8779a"], [1.0, "#995472"]], "from": [0, -38]}, "stroke": "#cba46d", "line_width": 0.75},
+              {"shape": "circle", "x": -11, "y": -26, "radius": 2.2, "fill": "#984769", "blur": 0.7},
+              {"shape": "circle", "x": -11, "y": -26, "radius": 1.12, "fill": "#ecb4c6", "stroke": "#a65f82", "line_width": 0.45},
+              {"shape": "circle", "x": -11, "y": -13, "radius": 2.2, "fill": "#984769", "blur": 0.7},
+              {"shape": "circle", "x": -11, "y": -13, "radius": 1.12, "fill": "#ecb4c6", "stroke": "#a65f82", "line_width": 0.45},
+              {"shape": "circle", "x": -11, "y": 0, "radius": 2.2, "fill": "#984769", "blur": 0.7},
+              {"shape": "circle", "x": -11, "y": 0, "radius": 1.12, "fill": "#ecb4c6", "stroke": "#a65f82", "line_width": 0.45},
+              {"shape": "circle", "x": -11, "y": 13, "radius": 2.2, "fill": "#984769", "blur": 0.7},
+              {"shape": "circle", "x": -11, "y": 13, "radius": 1.12, "fill": "#ecb4c6", "stroke": "#a65f82", "line_width": 0.45},
+              {"shape": "circle", "x": -11, "y": 26, "radius": 2.2, "fill": "#984769", "blur": 0.7},
+              {"shape": "circle", "x": -11, "y": 26, "radius": 1.12, "fill": "#ecb4c6", "stroke": "#a65f82", "line_width": 0.45},
+              {"shape": "circle", "x": 1, "y": -26, "radius": 2.2, "fill": "#984769", "blur": 0.7},
+              {"shape": "circle", "x": 1, "y": -26, "radius": 1.12, "fill": "#ecb4c6", "stroke": "#a65f82", "line_width": 0.45},
+              {"shape": "circle", "x": 1, "y": -13, "radius": 2.2, "fill": "#984769", "blur": 0.7},
+              {"shape": "circle", "x": 1, "y": -13, "radius": 1.12, "fill": "#ecb4c6", "stroke": "#a65f82", "line_width": 0.45},
+              {"shape": "circle", "x": 1, "y": 0, "radius": 2.2, "fill": "#984769", "blur": 0.7},
+              {"shape": "circle", "x": 1, "y": 0, "radius": 1.12, "fill": "#ecb4c6", "stroke": "#a65f82", "line_width": 0.45},
+              {"shape": "circle", "x": 1, "y": 13, "radius": 2.2, "fill": "#984769", "blur": 0.7},
+              {"shape": "circle", "x": 1, "y": 13, "radius": 1.12, "fill": "#ecb4c6", "stroke": "#a65f82", "line_width": 0.45},
+              {"shape": "circle", "x": 1, "y": 26, "radius": 2.2, "fill": "#984769", "blur": 0.7},
+              {"shape": "circle", "x": 1, "y": 26, "radius": 1.12, "fill": "#ecb4c6", "stroke": "#a65f82", "line_width": 0.45},
+              {"shape": "rectangle", "x": -14, "y": 32, "width": 18, "height": 14, "radius": 4, "fill": "rgba(57,23,52,.65)", "blur": 1.55},
+              {"shape": "rectangle", "x": -15, "y": 30, "width": 18, "height": 13, "radius": 4, "fill": {"type": "linear", "to": [0, 43], "stops": [[0.0, "#e6c4df"], [0.5, "#b68bb8"], [1.0, "#805a94"]], "from": [0, 30]}, "stroke": "#805575", "line_width": 0.58},
+              {"shape": "line", "points": [[-12, 32], [-5, 31.6], [0, 32]], "stroke": "#eed3e5", "line_width": 0.5, "line_cap": "round", "line_join": "round"}
+            ]
+          },
+          {
+            "layer": 3,
+            "height": 27,
+            "thickness": 13,
+            "sides": {"material": "channel_couch_dark"},
+            "steps": [
+              {"shape": "rectangle", "x": 9, "y": -55, "width": 11, "height": 108, "radius": 5, "fill": {"type": "linear", "to": [0, 53], "stops": [[0.0, "#db8fab"], [0.5, "#a7527a"], [1.0, "#774362"]], "from": [0, -55]}, "stroke": "#cba46d", "line_width": 0.75},
+              {"shape": "rectangle", "x": -19, "y": -56, "width": 37, "height": 17, "radius": 7, "fill": {"type": "linear", "to": [0, -39], "stops": [[0.0, "#e2a0b5"], [0.5, "#a85b81"], [1.0, "#884563"]], "from": [0, -56]}, "stroke": "#cba46d", "line_width": 0.75},
+              {"shape": "line", "points": [[-13, -52], [6, -53], [13, -51]], "stroke": "#f4b9c7", "line_width": 0.58, "line_cap": "round", "line_join": "round"}
+            ]
+          }
+        ]
+      }]
+    },
     "moon_city_booth_seat": {
       "kind": "prop",
       "physics_type": "static",
