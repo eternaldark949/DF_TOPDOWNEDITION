@@ -24,13 +24,16 @@ const hud = {
         const showFullscreen = () => {
             const active = Boolean(document.fullscreenElement);
             fullscreen.setAttribute('aria-pressed', String(active));
+            const label = active ? 'Exit fullscreen' : 'Enter fullscreen';
+            fullscreen.setAttribute('aria-label', label);
+            fullscreen.title = fullscreen.disabled ? 'Fullscreen is unavailable in this window' : label;
             if (!active && lockedLandscape) {
                 orientation.unlock?.();
                 lockedLandscape = false;
             }
         };
         fullscreen.disabled = !document.fullscreenEnabled;
-        fullscreen.title = fullscreen.disabled ? 'Fullscreen is unavailable in this window' : touch ? 'Toggle landscape fullscreen' : 'Toggle fullscreen';
+        showFullscreen();
         document.addEventListener('fullscreenchange', showFullscreen);
         fullscreen.onclick = async () => {
             fullscreen.blur();
