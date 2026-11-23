@@ -8,6 +8,7 @@ const STANCE = 'weapon_stance';
 const ATTACK = 'weapon_attack';
 const ARM_JOINTS = ['shoulder_l', 'elbow_l', 'hand_l', 'shoulder_r', 'elbow_r', 'hand_r'];
 const ATTACK_JOINTS = [...ARM_JOINTS, 'torso'];
+const GUN_JOINTS = [...ATTACK_JOINTS, 'head'];
 const JAB_TRAIL = { cut: [.015, .084], span: .069, life: .22, copies: 3 };
 const HOOK_TRAIL = { cut: [.036, .14], span: .104, life: .32, copies: 4 };
 
@@ -163,7 +164,8 @@ export function previewWeapons(engine, registry, walker) {
                 const family = held.get('hold', 'pistol');
                 const blade = bladeClip();
                 const pose = blade ? blade + '_guard' : melee() ? 'melee_hold' : family + (aiming ? '_aim' : '_hold');
-                rig.play(pose, { layer: STANCE, mask: ARM_JOINTS, fade: .12 });
+                const fade = family === 'sniper' ? (aiming ? .25 : .20) : .12;
+                rig.play(pose, { layer: STANCE, mask: melee() ? ARM_JOINTS : GUN_JOINTS, fade });
             }
             const attackHeld = controls.active('preview_fire') || (aiming && controls.active('aim_fire'));
             if ((!held || melee()) && !attack && cooldown <= 1e-8 && (requested || attackHeld)) startAttack();
@@ -186,7 +188,8 @@ export function previewWeapons(engine, registry, walker) {
             cooldown = Math.max(0, cooldown - seconds);
             if (held) {
                 const anchor = physics.rigs.getAnchor(walker, 'hand_r');
-                const rotation = melee() ? 0 : aiming ? Math.atan2(direction[1], direction[0]) - anchor.rotation : .20;
+                const bearing = aiming ? Math.atan2(direction[1], direction[0]) : walker.rotation;
+                const rotation = melee() ? 0 : bearing - anchor.rotation;
                 const mount = physics.getAttachmentState(held);
                 if (Math.abs(rotation - mount.anchor_offset_rotation) > 1e-5) {
                     physics.setAttachmentPose(held, { local_rotation: rotation });
