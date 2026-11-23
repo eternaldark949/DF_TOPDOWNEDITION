@@ -55,6 +55,7 @@ test('what stands tall covers the light on the ground; lit windows and glowing s
  render.beginFrame();render.drawLooks(1,{covers:24});const over=render.nightOver();
  const covers=over.filter(o=>o.over==='cover'),shines=over.filter(o=>o.over==='shine');
  assert.equal(covers.length,1,'only the tower stands over 24');
+ assert.equal(covers[0].height,40,'the lighting pass receives the surface height');
  assert.ok(shines.some(s=>s.packet.material.fill==='#ffcc88'),'its lit windows shine');
  assert.ok(shines.some(s=>s.packet.material.fill==='#fe8'),'a glowing step shines');
  assert.ok(over.indexOf(covers[0])<over.findIndex(s=>s.packet.material.fill==='#ffcc88'),'a part\'s cover goes before its own windows');
@@ -103,6 +104,23 @@ test('the light layer draws covers and shines last, and a light aloft after them
  assert.ok(parts.slice(at+2).some(p=>!p.picture),'the light aloft is drawn after the covers, as shapes');
  const keys=list=>list.filter(p=>p.picture).map(p=>p.picture.key).sort();
  assert.deepEqual(keys(parts),keys(createLightLayerParts({extent:{left:0,top:0,right:100,bottom:100},tint,lights:lights.slice(0,1),over,tile_size:64})),'and kept out of the cached tiles');
+});
+
+test('only lights above a cover relight its silhouette',()=>{
+ const bounds={left:0,top:0,right:100,bottom:100},tint='rgba(0,0,10,.9)';
+ const packet={type:'shape',geometry:{type:'path',commands:[['move',0,0],['line',10,0],['line',10,10],['close']]},material:{fill:'#fff'}};
+ const low={position:[5,5],radius:20,height:30,color:'#f00',glow:.5,still:true};
+ const high={...low,height:50,color:'#0f0'};
+ const distant={...high,position:[90,90],radius:4};
+ const over=[{packet,over:'cover',height:30}];
+ const lights=[low,high,distant];
+ for(const parts of [createLightLayer({bounds,tint,over,lights}),createLightLayerParts({extent:bounds,tint,over,lights,tile_size:64})]){
+    const cover=parts.findLastIndex(p=>p.material?.fill===tint);
+    const relit=parts.slice(cover+1);
+    assert.deepEqual(relit.map(p=>p.blend),['destination-out','add']);
+    assert.ok(relit.every(p=>p.clips.some(c=>c.geometry===packet.geometry)));
+    assert.equal(relit[1].material.fill.stops[0][1],high.color);
+ }
 });
 
 test('a part the screen cannot show at all is not drawn, leaning from its base to its top',()=>{
