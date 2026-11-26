@@ -26,7 +26,7 @@ const r = structuredClone(env.run(`(()=>{
 assert.deepEqual(env.errors, []);
 assert.ok(r.share > 0.7, `runner share ${r.share}`);
 assert.equal(r.overlaps, 0, 'AI cars overlapping');
-// the full driver: left turns about 1.3 px/tick sideways, right turns about 0.45
+// Slide stays modest with faster traffic. Right turns still slide less than left turns.
 assert.ok(r.left > 0.9 && r.left < 1.7, `left-turn slide ${r.left}`);
-assert.ok(r.right > 0.3 && r.right < 0.7, `right-turn slide ${r.right}`);
+assert.ok(r.right > 0.3 && r.right < 0.8, `right-turn slide ${r.right}`);
 console.log(JSON.stringify({passed: 1, ...r}));

@@ -86,13 +86,15 @@ const SCENES={
 const FRAME='game.update();frame_clock.setGameTime(_simTick/60);_frameTime=1000+_simTick*1000/60;game.draw();';
 const WARM=240, MEASURE=60;
 test('The trees, street lamps and buildings\' ledges are batched, the crowd stands from its bakes, and every scene draws within its canvas-call budget',()=>{
- const e=fresh(); const got={};
- e.scope.__calls=()=>e.counters.canvasCalls;
- e.run(`game.story.update=()=>{}; game.showProfiler=false; GameSettings.profilerMode='off';
+ const got={};
+ for(const [name,setup] of Object.entries(SCENES)){
+  // Each scene starts with the same seed, regardless of traffic and other random activity in the previous scene.
+  const e=fresh();
+  e.scope.__calls=()=>e.counters.canvasCalls;
+  e.run(`game.story.update=()=>{}; game.showProfiler=false; GameSettings.profilerMode='off';
   globalThis.__crowd={live:0,baked:0,calls:0}; const B=CrowdBakes.draw.bind(CrowdBakes); CrowdBakes.draw=(ctx,w,c)=>{const r=B(ctx,w,c); __crowd[r?'baked':'live']++; return r;};
   globalThis.__ledges={shapes:0,batches:0}; const LQ=TierKit.ledgeQueue||(TierKit.ledgeQueue=new renderQueue()); const LF=LQ.flush; LQ.flush=function(ctx){LF.call(this,ctx); __ledges.shapes+=this.stats.shapes; __ledges.batches+=this.stats.batches;};
   const D=drawCrowdHumanoid; drawCrowdHumanoid=function(ctx,w,c){const c0=__calls(); try{return D(ctx,w,c);}finally{__crowd.calls+=__calls()-c0;}};`);
- for(const [name,setup] of Object.entries(SCENES)){
   e.run(setup+'game.running=true;game.paused=false;'); for(let i=0;i<WARM;i++) e.run(FRAME);
   e.run('__crowd.live=__crowd.baked=__crowd.calls=0; __ledges.shapes=__ledges.batches=0;');
   const c0=e.counters.canvasCalls; for(let i=0;i<MEASURE;i++) e.run(FRAME); got[name]=Math.round((e.counters.canvasCalls-c0)/MEASURE);
@@ -102,10 +104,10 @@ test('The trees, street lamps and buildings\' ledges are batched, the crowd stan
    assert.ok(s.shapes>300,'tiered buildings in view'); assert.ok(s.batches<s.shapes*0.45,`ledges: ${s.batches} draws for ${s.shapes} shapes`);}
   if(name==='cozy_cafe'){const c=JSON.parse(e.run('JSON.stringify(__crowd)'));    // the café's crowd is seated or standing: pose frames
    assert.ok(c.baked>=c.live*9,`café crowd: ${c.baked} bodies from bakes, ${c.live} live`); assert.ok(c.calls/MEASURE<600,`café crowd: ${Math.round(c.calls/MEASURE)} canvas calls a frame`);}
+  assert.deepEqual(e.errors,[]);
  }
  for(const [name,n] of Object.entries(got)) assert.ok(n<=CALL_BUDGET[name],`${name}: ${n} canvas calls a frame, over its budget of ${CALL_BUDGET[name]}`);
  console.log('  canvas calls a frame:',JSON.stringify(got));
- assert.deepEqual(e.errors,[]);
 });
 
 console.log(`test-render-system: ${tests.length} passed`);
