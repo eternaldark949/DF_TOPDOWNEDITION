@@ -10,6 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
+import { shotSteps } from './preview/shot-effects.mjs';
 
 const root = join(fileURLToPath(import.meta.url), '../..');
 let chromium = null; try { ({ chromium } = createRequire(import.meta.url)('playwright')); } catch {}
@@ -32,10 +33,10 @@ test('the preview boots, loads every map and travels between the apartment and t
         // A click on the words of a row starts the game as Enter would (the words are labels inside the pressable row).
         await page.click('[data-ui-item="new_game_text"]'); await page.waitForFunction(() => !preview.ui.isOpen('main'));
         assert.deepEqual(await screens(), { stack: ['hud'], paused: false, input: 'gameplay' });
-        // Escape pauses into the pause menu; down twice reaches Settings (inactive items are skipped), Enter opens it, and Escape twice returns to play.
+        // Escape pauses into the pause menu; down four times reaches Settings past Save, Load and Inventory (inactive items are skipped), Enter opens it, and Escape twice returns to play.
         await page.keyboard.press('Escape'); await page.waitForFunction(() => preview.ui.isOpen('pause'));
         assert.deepEqual(await screens(), { stack: ['hud', 'pause'], paused: true, input: 'menu' });
-        await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
+        for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
         await page.waitForFunction(() => preview.ui.isOpen('pause.settings'));
         const sky = await page.evaluate(() => preview.weather.state);
         await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowRight');   // Weather: one choice on
@@ -109,4 +110,77 @@ test('the preview boots, loads every map and travels between the apartment and t
         assert.ok(inside.at[1] < 860 && Math.abs(inside.at[0] - 700) < 2, `back inside, above its exit (${inside.at})`);
         assert.deepEqual(errors, []);
     } finally { await browser.close(); rmSync(dir, { recursive: true, force: true }); }
+});
+
+test('the touch HUD moves and aims independently, and only an armed sniper release fires', { skip: !chromium && 'Playwright is not installed', timeout: 90000 }, async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'preview-touch-')), out = join(dir, 'preview.html');
+    execFileSync(process.execPath, [join(root, 'tools/build-preview.mjs'), '--out', out]);
+    const browser = await chromium.launch();
+    try {
+        const page = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+        const errors = [];
+        page.on('pageerror', error => errors.push(error.message));
+        await page.goto(pathToFileURL(out).href + '?nomenu');
+        const aim = page.locator('[data-ui-item="touch_aim"]'), move = page.locator('[data-ui-item="touch_move"]');
+        await aim.waitFor({ timeout: 30000 });
+        const cdp = await page.context().newCDPSession(page);
+        const touch = (type, touchPoints) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints });
+        const a = await aim.boundingBox(), m = await move.boundingBox();
+        const right = { id: 2, x: Math.round(a.x + a.width / 2), y: Math.round(a.y + a.height / 2) };
+        const left = { id: 1, x: Math.round(m.x + m.width / 2), y: Math.round(m.y + m.height / 2) };
+        const walked = { ...left, x: left.x + 38 }, aimed = { ...right, y: right.y - 33 }, armed = { ...right, y: right.y - 73 };
+        await page.evaluate(() => {
+            preview.ui.setValue('preview_weapon', 'sniper_sara');
+            window.previewFlashes = 0;
+            preview.basement.physics.on('entityRegistered', ({ entity }) => {
+                if (entity.template_id === 'weapons:flash') window.previewFlashes++;
+            });
+        });
+        await page.waitForFunction(() => preview.basement.elements.getEntities().some(e => e.template_id === 'weapons:sniper_sara'));
+        await touch('touchStart', [left, right]);
+        await touch('touchMove', [walked, aimed]);
+        await page.waitForFunction(() => {
+            const controls = preview.basement.controls;
+            return controls.direction('move')[0] > .3 && controls.direction('aim')[1] < -.2;
+        });
+        assert.equal(await aim.getAttribute('data-stick-state'), 'aiming');
+        await touch('touchMove', [walked, armed]);
+        assert.equal(await aim.getAttribute('data-stick-state'), 'armed');
+        await touch('touchCancel', []);
+        assert.equal(await aim.getAttribute('data-stick-state'), 'idle');
+        assert.equal(await page.evaluate(() => window.previewFlashes), 0);
+
+        await touch('touchStart', [right]);
+        await touch('touchMove', [armed]);
+        await touch('touchEnd', []);
+        await page.waitForFunction(() => window.previewFlashes === 1);
+        await page.evaluate(() => preview.ui.open('pause'));
+        await aim.waitFor({ state: 'hidden' });
+        assert.deepEqual(errors, []);
+    } finally { await browser.close(); rmSync(dir, { recursive: true, force: true }); }
+});
+
+
+test('Classic shot effects use the traveled path and keep distinct trail signatures', () => {
+    const shot = {
+        points: [[0, 0], [100, 0], [325, 0], [350, 0]],
+        color: '#ffd700', core: '#fffaff', trail_color: '#b48cff',
+        streak_length: 25, remaining: .1, age: .1, lifetime: .7, seed: 4
+    };
+    const sniper = shotSteps({ ...shot, style: { fade: .1, long_tail: 300 } });
+    assert.deepEqual(sniper[0].points[0], [50, 0]);
+    assert.ok(sniper.every(step => step.points.at(-1)[0] === 350));
+
+    const crackle = { fade: .1, flicker: .045, amplitude: 2.4, passes: 1 };
+    const first = shotSteps({ ...shot, style: crackle });
+    const next = shotSteps({ ...shot, style: crackle, age: .145 });
+    assert.notDeepEqual(first, next, 'electrical trail changes at the flicker cadence');
+    assert.ok(shotSteps({ ...shot, style: { ...crackle, passes: 2 } }).length > first.length);
+
+    const wisp = shotSteps({ ...shot, remaining: 0,
+        puffs: [{ at: [325, 0], born: 0, phase: 0 }],
+        style: { fade: .065, sample_interval: .033333, lifetime: .833333, dust: '#ffd76a' }
+    });
+    assert.deepEqual(wisp.map(step => step.shape), ['glow', 'rectangle']);
+    assert.ok(wisp.every(step => step.x < 350 && step.alpha > 0), 'dust lingers behind the ended streak');
 });

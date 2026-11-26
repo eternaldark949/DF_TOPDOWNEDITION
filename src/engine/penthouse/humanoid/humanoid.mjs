@@ -10,9 +10,19 @@ import { validateSkeleton, validateClipSet, validateLocomotion } from '../../dir
 const SIDES = Object.freeze(['l', 'r']);
 const side = value => { if (!SIDES.includes(value)) throw new TypeError('A side is l or r'); return value; };
 const strip = ({ kind, ...data }) => data;
+const STEP_AXIS = 'step_axis', WALK_ANGLE = Math.PI;
+const LEG_TURNS = ['hip_l', 'hip_r', 'foot_l', 'foot_r'];
+// Turn the two gait planes toward the motion. The shoes counter-turn to keep facing with the body.
+const TURN_CLIPS = [-1, 1].map(sign => ({
+    clip_id: sign < 0 ? 'step_axis_left' : 'step_axis_right', duration: 1,
+    tracks: LEG_TURNS.map(joint => ({
+        joint, channel: 'rotation',
+        keys: [{ time: 0, value: (joint.startsWith('hip') ? sign : -sign) * WALK_ANGLE }]
+    }))
+}));
 
 export class humanoid {
-    #physics; #kit; #arms = new Set();
+    #physics; #kit; #arms = new Set(); #directional = false; #stepAxis = null; #stepWeight = 0;
     /**
      * `physics` is the world; its data source must hold `template` (the engine registry from
      * `createEngineRegistry()` does). Pass `entity` instead to take over a humanoid restored from a save.
@@ -40,13 +50,43 @@ export class humanoid {
         }
         const joints = new Set(this.rig.definition.getJointNames());
         for (const part of this.entity.components) if (part.joint && !joints.has(part.joint)) throw new TypeError(`Component ${part.name} rides a joint the skeleton lacks: ${part.joint}`);
+        this.#directional = LEG_TURNS.every(joint => joints.has(joint));
+        if (this.#directional) {
+            const saved = entity ? this.rig.getSnapshot() : null;
+            for (const clip of TURN_CLIPS) if (!saved?.clips.some(existing => existing.clip_id === clip.clip_id)) this.rig.addClip(clip);
+            this.#stepAxis = saved?.layers[STEP_AXIS]?.clip_id ?? null;
+            this.#stepWeight = saved?.layers[STEP_AXIS]?.weight ?? 0;
+        }
     }
 
-    /** Stands or walks by how fast the body is going; walking runs on distance, so a blocked body stops stepping. */
+    /** Steers the distance-driven walk toward actual movement, independently of where the torso faces. */
     updateState() {
         const { idle, walk, stride, moving_speed } = this.#kit.locomotion, [vx, vy] = this.entity.linear_velocity;
-        if (Math.hypot(vx, vy) > moving_speed) this.rig.play(walk, { fade: .15, distance_per_cycle: stride });
+        const moving = Math.hypot(vx, vy) > moving_speed;
+        if (moving) this.rig.play(walk, { fade: .15, distance_per_cycle: stride });
         else this.rig.play(idle, { fade: .25 });
+        if (!this.#directional) return this;
+        if (moving) {
+            const direction = Math.atan2(vy, vx) - this.entity.rotation;
+            const angle = Math.atan2(Math.sin(direction), Math.cos(direction));
+            const clip = TURN_CLIPS[angle < 0 ? 0 : 1].clip_id;
+            const weight = Math.abs(angle) / WALK_ANGLE;
+            if (weight < 1e-5) {
+                if (this.#stepAxis) this.rig.stop(STEP_AXIS);
+                this.#stepAxis = null;
+                this.#stepWeight = 0;
+                return this;
+            }
+            if (clip !== this.#stepAxis) {
+                this.rig.play(clip, { layer: STEP_AXIS, additive: true, weight });
+                this.#stepAxis = clip;
+            } else this.rig.setLayerWeight(STEP_AXIS, weight);
+            this.#stepWeight = weight;
+        } else if (this.#stepAxis) {
+            this.#stepWeight = Math.max(0, this.#stepWeight - this.#physics.config.fixed_step / .25);
+            if (this.#stepWeight > 0) this.rig.setLayerWeight(STEP_AXIS, this.#stepWeight);
+            else { this.rig.stop(STEP_AXIS); this.#stepAxis = null; }
+        }
         return this;
     }
 

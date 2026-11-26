@@ -1,0 +1,588 @@
+{
+ "library_id": "weapons",
+ "resources": {
+  "gatling_gunner": {
+   "kind": "drawing",
+   "steps": [
+    {"shape":"rectangle","x":-5,"y":-8.5,"width":13,"height":17,"radius":2,"fill":{"type":"linear","from":[0,-8.5],"to":[0,8.5],"stops":[[0,"#202024"],[0.1,"#969ba4"],[0.29,"#36363a"],[0.65,"#36363a"],[1,"#202024"]]}},
+    {"shape":"rectangle","x":5,"y":-9.6,"width":30,"height":3.2,"radius":0.3,"fill":{"type":"linear","from":[0,-9.6],"to":[0,-6.3999999999999995],"stops":[[0,"#202024"],[0.1,"#969ba4"],[0.29,"#36363a"],[0.65,"#36363a"],[1,"#202024"]]}},
+    {"shape":"rectangle","x":5,"y":-6.4,"width":30,"height":3.2,"radius":0.3,"fill":{"type":"linear","from":[0,-6.4],"to":[0,-3.2],"stops":[[0,"#202024"],[0.1,"#969ba4"],[0.29,"#36363a"],[0.65,"#36363a"],[1,"#202024"]]}},
+    {"shape":"rectangle","x":5,"y":-3.2,"width":30,"height":3.2,"radius":0.3,"fill":{"type":"linear","from":[0,-3.2],"to":[0,0],"stops":[[0,"#202024"],[0.1,"#969ba4"],[0.29,"#36363a"],[0.65,"#36363a"],[1,"#202024"]]}},
+    {"shape":"rectangle","x":5,"y":0,"width":30,"height":3.2,"radius":0.3,"fill":{"type":"linear","from":[0,0],"to":[0,3.2],"stops":[[0,"#202024"],[0.1,"#969ba4"],[0.29,"#36363a"],[0.65,"#36363a"],[1,"#202024"]]}},
+    {"shape":"rectangle","x":5,"y":3.1999999999999997,"width":30,"height":3.2,"radius":0.3,"fill":{"type":"linear","from":[0,3.1999999999999997],"to":[0,6.4],"stops":[[0,"#202024"],[0.1,"#969ba4"],[0.29,"#36363a"],[0.65,"#36363a"],[1,"#202024"]]}},
+    {"shape":"rectangle","x":5,"y":6.4,"width":30,"height":3.2,"radius":0.3,"fill":{"type":"linear","from":[0,6.4],"to":[0,9.600000000000001],"stops":[[0,"#202024"],[0.1,"#969ba4"],[0.29,"#36363a"],[0.65,"#36363a"],[1,"#202024"]]}},
+    {"shape":"rectangle","x":25,"y":-10,"width":3,"height":20,"radius":0.5,"fill":{"type":"linear","from":[0,-10],"to":[0,10],"stops":[[0,"#202024"],[0.1,"#969ba4"],[0.29,"#36363a"],[0.65,"#36363a"],[1,"#202024"]]}}
+   ]
+  },
+  "pistol_fpx": {
+   "kind": "drawing",
+   "steps": [
+    {"shape":"glow","x":0.4,"y":-1.8,"radius":2.6,"color":"#4a78ff","alpha":0.32},
+    {"shape":"glow","x":0.4,"y":3.8,"radius":2.6,"color":"#4a78ff","alpha":0.32},
+    {"shape":"glow","x":6.5,"y":1,"radius":2.6,"color":"#4a78ff","alpha":0.32},
+    {"shape":"glow","x":11.1,"y":1,"radius":2.2,"color":"#8fb0ff","alpha":0.32},
+    {"shape":"circle","x":-2,"y":1,"radius":2.4,"fill":{"type":"linear","from":[0,-1.4],"to":[0,3.4],"stops":[[0,"#0e0926"],[0.1,"#5c4fa0"],[0.29,"#1a1436"],[0.65,"#1a1436"],[1,"#0e0926"]]}},
+    {"shape":"circle","x":-2.2,"y":1,"radius":1.05,"fill":{"type":"linear","from":[0,-0.050000000000000044],"to":[0,2.05],"stops":[[0,"#0c1858"],[0.1,"#6f8cff"],[0.29,"#172a86"],[0.65,"#172a86"],[1,"#0c1858"]]}},
+    {"shape":"rectangle","x":1,"y":-1.2000000000000002,"width":11.2,"height":4.4,"radius":1.2,"fill":{"type":"linear","from":[0,-1.2000000000000002],"to":[0,3.2],"stops":[[0,"#0e0926"],[0.1,"#5c4fa0"],[0.29,"#1a1436"],[0.65,"#1a1436"],[1,"#0e0926"]]}},
+    {"shape":"rectangle","x":3.4,"y":0.775,"width":6.199999999999999,"height":0.45,"radius":0.2,"fill":"#4a78ff"},
+    {"shape":"rectangle","x":3,"y":0.25,"width":7,"height":1.5,"radius":0.75,"fill":"rgba(226,218,255,.22)","stroke":"rgba(255,255,255,.55)","line_width":0.16},
+    {"shape":"rectangle","x":10.3,"y":0.5,"width":1.5999999999999996,"height":1,"radius":0.2,"fill":{"type":"linear","from":[0,0.5],"to":[0,1.5],"stops":[[0,"#0c1858"],[0.1,"#6f8cff"],[0.29,"#172a86"],[0.65,"#172a86"],[1,"#0c1858"]]}},
+    {"shape":"rectangle","x":10.6,"y":0.775,"width":1,"height":0.45,"radius":0.2,"fill":"#8fb0ff"},
+    {"shape":"rectangle","x":11.6,"y":-0.30000000000000004,"width":1.8000000000000007,"height":2.6,"radius":1.3,"fill":{"type":"linear","from":[0,-0.30000000000000004],"to":[0,2.3],"stops":[[0,"#0c1858"],[0.1,"#6f8cff"],[0.29,"#172a86"],[0.65,"#172a86"],[1,"#0c1858"]]}},
+    {"shape":"rectangle","x":-1.4,"y":-2.4,"width":3.6,"height":6.8,"radius":3.4,"fill":{"type":"linear","from":[0,-2.4],"to":[0,4.4],"stops":[[0,"#0c1858"],[0.1,"#6f8cff"],[0.29,"#172a86"],[0.65,"#172a86"],[1,"#0c1858"]]}},
+    {"shape":"rectangle","x":-0.6,"y":-1.6,"width":2,"height":5.2,"radius":2.6,"fill":{"type":"linear","from":[0,-1.6],"to":[0,3.6],"stops":[[0,"#0e0926"],[0.1,"#5c4fa0"],[0.29,"#1a1436"],[0.65,"#1a1436"],[1,"#0e0926"]]}},
+    {"shape":"circle","x":0.4,"y":-1.8,"radius":0.75,"fill":"#4a78ff"},
+    {"shape":"circle","x":0.4,"y":3.8,"radius":0.75,"fill":"#4a78ff"}
+   ]
+  },
+  "pistol_anavia": {
+   "kind": "drawing",
+   "steps": [
+    {"shape":"glow","x":2,"y":-2,"radius":2.2,"color":"#9fb0ff","alpha":0.32},
+    {"shape":"glow","x":2,"y":4,"radius":2.2,"color":"#9fb0ff","alpha":0.32},
+    {"shape":"glow","x":7,"y":1,"radius":2.8,"color":"#a58ee6","alpha":0.32},
+    {"shape":"glow","x":12.5,"y":1,"radius":3.2,"color":"#8c9cff","alpha":0.32},
+    {"shape":"circle","x":-1.8,"y":1,"radius":2.3,"fill":{"type":"linear","from":[0,-1.2999999999999998],"to":[0,3.3],"stops":[[0,"#4a3790"],[0.1,"#f0e8ff"],[0.29,"#a891ec"],[0.65,"#a891ec"],[1,"#4a3790"]]}},
+    {"shape":"circle","x":-2,"y":1,"radius":1,"fill":{"type":"linear","from":[0,0],"to":[0,2],"stops":[[0,"#2e3796"],[0.1,"#e2e6ff"],[0.29,"#8392f7"],[0.65,"#8392f7"],[1,"#2e3796"]]}},
+    {"shape":"rectangle","x":0.6,"y":-1.4,"width":10.8,"height":4.8,"radius":2,"fill":{"type":"linear","from":[0,-1.4],"to":[0,3.4],"stops":[[0,"#4a3790"],[0.1,"#f0e8ff"],[0.29,"#a891ec"],[0.65,"#a891ec"],[1,"#4a3790"]]}},
+    {"shape":"rectangle","x":4,"y":0.55,"width":6.199999999999999,"height":0.9,"radius":0.2,"fill":"#9aa6ff"},
+    {"shape":"rectangle","x":3.6,"y":0,"width":7,"height":2,"radius":1,"fill":"rgba(226,218,255,.22)","stroke":"rgba(255,255,255,.55)","line_width":0.16},
+    {"shape":"circle","x":12.2,"y":1,"radius":2,"fill":{"type":"linear","from":[0,-1],"to":[0,3],"stops":[[0,"#2e3796"],[0.1,"#e2e6ff"],[0.29,"#8392f7"],[0.65,"#8392f7"],[1,"#2e3796"]]}},
+    {"shape":"circle","x":12.5,"y":1,"radius":0.9,"fill":"#c4cbff"},
+    {"shape":"rectangle","x":0.6,"y":-2.5,"width":2.8,"height":7,"radius":3.5,"fill":{"type":"linear","from":[0,-2.5],"to":[0,4.5],"stops":[[0,"#2e3796"],[0.1,"#e2e6ff"],[0.29,"#8392f7"],[0.65,"#8392f7"],[1,"#2e3796"]]}},
+    {"shape":"circle","x":2,"y":-2,"radius":0.7,"fill":"#9fb0ff"},
+    {"shape":"circle","x":2,"y":4,"radius":0.7,"fill":"#9fb0ff"}
+   ]
+  },
+  "pistol_ganger": {
+   "kind": "drawing",
+   "steps": [
+    {"shape":"glow","x":0.65,"y":1,"radius":2.6,"color":"#ff6ab8","alpha":0.32},
+    {"shape":"circle","x":-2,"y":1,"radius":2.3,"fill":{"type":"linear","from":[0,-1.2999999999999998],"to":[0,3.3],"stops":[[0,"#8a0a4a"],[0.1,"#ffa0d0"],[0.29,"#e81c84"],[0.65,"#e81c84"],[1,"#8a0a4a"]]}},
+    {"shape":"rectangle","x":1,"y":-1.1,"width":10.6,"height":4.2,"radius":1.2,"fill":{"type":"linear","from":[0,-1.1],"to":[0,3.1],"stops":[[0,"#8a0a4a"],[0.1,"#ffa0d0"],[0.29,"#e81c84"],[0.65,"#e81c84"],[1,"#8a0a4a"]]}},
+    {"shape":"rectangle","x":11.2,"y":-0.19999999999999996,"width":1.700000000000001,"height":2.4,"radius":1.2,"fill":{"type":"linear","from":[0,-0.19999999999999996],"to":[0,2.2],"stops":[[0,"#0e0926"],[0.1,"#5c4fa0"],[0.29,"#1a1436"],[0.65,"#1a1436"],[1,"#0e0926"]]}},
+    {"shape":"rectangle","x":-1.4,"y":-2.2,"width":3.4,"height":6.4,"radius":3.2,"fill":{"type":"linear","from":[0,-2.2],"to":[0,4.2],"stops":[[0,"#0e0926"],[0.1,"#5c4fa0"],[0.29,"#1a1436"],[0.65,"#1a1436"],[1,"#0e0926"]]}},
+    {"shape":"rectangle","x":0.3,"y":-1.7000000000000002,"width":0.7,"height":5.4,"radius":0.2,"fill":"#ff9ad2"}
+   ]
+  },
+  "rifle_rb98": {
+   "kind": "drawing",
+   "steps": [
+    {"shape":"glow","x":-1,"y":1.5,"radius":2.2,"color":"#3dffe0","alpha":0.32},
+    {"shape":"glow","x":4.8,"y":-1.9,"radius":2.4,"color":"#3dffe0","alpha":0.32},
+    {"shape":"glow","x":4.8,"y":4.9,"radius":2.4,"color":"#3dffe0","alpha":0.32},
+    {"shape":"glow","x":16,"y":1.5,"radius":3.2,"color":"#3dffe0","alpha":0.32},
+    {"shape":"rectangle","x":-10,"y":-0.7999999999999998,"width":5.4,"height":4.6,"radius":2.3,"fill":{"type":"linear","from":[0,-0.7999999999999998],"to":[0,3.8],"stops":[[0,"#8f86b8"],[0.1,"#ffffff"],[0.29,"#ece8fb"],[0.65,"#ece8fb"],[1,"#8f86b8"]]}},
+    {"shape":"rectangle","x":-5.6,"y":-1.4,"width":18.799999999999997,"height":5.8,"radius":2.2,"fill":{"type":"linear","from":[0,-1.4],"to":[0,4.4],"stops":[[0,"#8f86b8"],[0.1,"#ffffff"],[0.29,"#ece8fb"],[0.65,"#ece8fb"],[1,"#8f86b8"]]}},
+    {"shape":"rectangle","x":-3.4,"y":1.25,"width":14.8,"height":0.5,"radius":0.2,"fill":"#3dffe0"},
+    {"shape":"rectangle","x":-3.8,"y":0.65,"width":15.600000000000001,"height":1.7,"radius":0.85,"fill":"rgba(226,218,255,.22)","stroke":"rgba(255,255,255,.55)","line_width":0.16},
+    {"shape":"rectangle","x":13,"y":-1,"width":6,"height":5,"radius":0.6,"fill":{"type":"linear","from":[0,-1],"to":[0,4],"stops":[[0,"#066a5e"],[0.1,"#9cfff2"],[0.29,"#12b8a4"],[0.65,"#12b8a4"],[1,"#066a5e"]]}},
+    {"shape":"rectangle","x":13.8,"y":-0.010000000000000037,"width":4.399999999999999,"height":0.42,"radius":0.2,"fill":"#3dffe0"},
+    {"shape":"rectangle","x":13.8,"y":1.29,"width":4.399999999999999,"height":0.42,"radius":0.2,"fill":"#3dffe0"},
+    {"shape":"rectangle","x":13.8,"y":2.59,"width":4.399999999999999,"height":0.42,"radius":0.2,"fill":"#3dffe0"},
+    {"shape":"rectangle","x":19,"y":0.3999999999999999,"width":8.399999999999999,"height":2.2,"radius":1.1,"fill":{"type":"linear","from":[0,0.3999999999999999],"to":[0,2.6],"stops":[[0,"#0e0926"],[0.1,"#5c4fa0"],[0.29,"#1a1436"],[0.65,"#1a1436"],[1,"#0e0926"]]}},
+    {"shape":"rectangle","x":26.4,"y":-0.10000000000000009,"width":2.900000000000002,"height":3.2,"radius":1.6,"fill":{"type":"linear","from":[0,-0.10000000000000009],"to":[0,3.1],"stops":[[0,"#8f86b8"],[0.1,"#ffffff"],[0.29,"#ece8fb"],[0.65,"#ece8fb"],[1,"#8f86b8"]]}},
+    {"shape":"rectangle","x":3.2,"y":-2.2,"width":3.2,"height":7.4,"radius":3.7,"fill":{"type":"linear","from":[0,-2.2],"to":[0,5.2],"stops":[[0,"#066a5e"],[0.1,"#9cfff2"],[0.29,"#12b8a4"],[0.65,"#12b8a4"],[1,"#066a5e"]]}},
+    {"shape":"circle","x":4.8,"y":-1.9,"radius":0.7,"fill":"#3dffe0"},
+    {"shape":"circle","x":4.8,"y":4.9,"radius":0.7,"fill":"#3dffe0"}
+   ]
+  },
+  "sniper_sara": {
+   "kind": "drawing",
+   "steps": [
+    {"shape":"glow","x":-7,"y":0.5,"radius":2.4,"color":"#ff6a1a","alpha":0.32},
+    {"shape":"glow","x":13,"y":0.5,"radius":3.2,"color":"#ff7a24","alpha":0.32},
+    {"shape":"glow","x":16.6,"y":0.5,"radius":3,"color":"#ff6a1a","alpha":0.32},
+    {"shape":"glow","x":21.2,"y":0.5,"radius":3,"color":"#ff6a1a","alpha":0.32},
+    {"shape":"glow","x":38,"y":0.5,"radius":3,"color":"#ff5a12","alpha":0.32},
+    {"shape":"rectangle","x":-12,"y":-2.2,"width":10,"height":5.4,"radius":2.7,"fill":{"type":"linear","from":[0,-2.2],"to":[0,3.2],"stops":[[0,"#0e0926"],[0.1,"#5c4fa0"],[0.29,"#1a1436"],[0.65,"#1a1436"],[1,"#0e0926"]]}},
+    {"shape":"rectangle","x":-10,"y":0.15000000000000002,"width":6,"height":0.7,"radius":0.2,"fill":"#ff6a1a"},
+    {"shape":"rectangle","x":-2.6,"y":-2.3,"width":16.8,"height":5.6,"radius":1.2,"fill":{"type":"linear","from":[0,-2.3],"to":[0,3.3],"stops":[[0,"#5a2a10"],[0.1,"#f6b477"],[0.29,"#a0602e"],[0.65,"#a0602e"],[1,"#5a2a10"]]}},
+    {"shape":"circle","x":6,"y":3.8,"radius":1.3,"fill":{"type":"linear","from":[0,2.5],"to":[0,5.1],"stops":[[0,"#5a2a10"],[0.1,"#f6b477"],[0.29,"#a0602e"],[0.65,"#a0602e"],[1,"#5a2a10"]]}},
+    {"shape":"rectangle","x":14.6,"y":-1.9,"width":4.000000000000002,"height":4.8,"radius":0.4,"fill":{"type":"linear","from":[0,-1.9],"to":[0,2.9],"stops":[[0,"#5a2a10"],[0.1,"#f6b477"],[0.29,"#a0602e"],[0.65,"#a0602e"],[1,"#5a2a10"]]}},
+    {"shape":"rectangle","x":15.2,"y":-1.01,"width":2.8000000000000007,"height":0.42,"radius":0.2,"fill":"#ff7a24"},
+    {"shape":"rectangle","x":15.2,"y":0.29000000000000004,"width":2.8000000000000007,"height":0.42,"radius":0.2,"fill":"#ff7a24"},
+    {"shape":"rectangle","x":15.2,"y":1.59,"width":2.8000000000000007,"height":0.42,"radius":0.2,"fill":"#ff7a24"},
+    {"shape":"rectangle","x":19.2,"y":-1.9,"width":4,"height":4.8,"radius":0.4,"fill":{"type":"linear","from":[0,-1.9],"to":[0,2.9],"stops":[[0,"#5a2a10"],[0.1,"#f6b477"],[0.29,"#a0602e"],[0.65,"#a0602e"],[1,"#5a2a10"]]}},
+    {"shape":"rectangle","x":19.8,"y":-1.01,"width":2.8000000000000007,"height":0.42,"radius":0.2,"fill":"#ff7a24"},
+    {"shape":"rectangle","x":19.8,"y":0.29000000000000004,"width":2.8000000000000007,"height":0.42,"radius":0.2,"fill":"#ff7a24"},
+    {"shape":"rectangle","x":19.8,"y":1.59,"width":2.8000000000000007,"height":0.42,"radius":0.2,"fill":"#ff7a24"},
+    {"shape":"rectangle","x":23.2,"y":-0.8999999999999999,"width":28.2,"height":2.8,"radius":1.4,"fill":{"type":"linear","from":[0,-0.8999999999999999],"to":[0,1.9],"stops":[[0,"#626d86"],[0.1,"#f4f7ff"],[0.29,"#c4ccd9"],[0.65,"#c4ccd9"],[1,"#626d86"]]}},
+    {"shape":"rectangle","x":24.5,"y":0.25,"width":25.5,"height":0.5,"radius":0.2,"fill":"#ff5a12"},
+    {"shape":"rectangle","x":24,"y":-0.30000000000000004,"width":26.6,"height":1.6,"radius":0.8,"fill":"rgba(226,218,255,.22)","stroke":"rgba(255,255,255,.55)","line_width":0.16},
+    {"shape":"rectangle","x":51,"y":-1.5,"width":4.200000000000003,"height":4,"radius":0.8,"fill":{"type":"linear","from":[0,-1.5],"to":[0,2.5],"stops":[[0,"#5a2a10"],[0.1,"#f6b477"],[0.29,"#a0602e"],[0.65,"#a0602e"],[1,"#5a2a10"]]}},
+    {"shape":"rectangle","x":52.1,"y":-1.5,"width":0.6000000000000014,"height":4,"radius":0.3,"fill":{"type":"linear","from":[0,-1.5],"to":[0,2.5],"stops":[[0,"#8e7446"],[0.1,"#fffaea"],[0.29,"#eddcb2"],[0.65,"#eddcb2"],[1,"#8e7446"]]}},
+    {"shape":"rectangle","x":53.5,"y":-1.5,"width":0.6000000000000014,"height":4,"radius":0.3,"fill":{"type":"linear","from":[0,-1.5],"to":[0,2.5],"stops":[[0,"#8e7446"],[0.1,"#fffaea"],[0.29,"#eddcb2"],[0.65,"#eddcb2"],[1,"#8e7446"]]}},
+    {"shape":"rectangle","x":0.4,"y":-1,"width":13.2,"height":3,"radius":1.5,"fill":{"type":"linear","from":[0,-1],"to":[0,2],"stops":[[0,"#0e0926"],[0.1,"#5c4fa0"],[0.29,"#1a1436"],[0.65,"#1a1436"],[1,"#0e0926"]]}},
+    {"shape":"rectangle","x":3.4,"y":-1.3,"width":1.1999999999999997,"height":3.6,"radius":0.3,"fill":{"type":"linear","from":[0,-1.3],"to":[0,2.3],"stops":[[0,"#5a2a10"],[0.1,"#f6b477"],[0.29,"#a0602e"],[0.65,"#a0602e"],[1,"#5a2a10"]]}},
+    {"shape":"rectangle","x":9.4,"y":-1.3,"width":1.1999999999999993,"height":3.6,"radius":0.3,"fill":{"type":"linear","from":[0,-1.3],"to":[0,2.3],"stops":[[0,"#5a2a10"],[0.1,"#f6b477"],[0.29,"#a0602e"],[0.65,"#a0602e"],[1,"#5a2a10"]]}},
+    {"shape":"circle","x":13,"y":0.5,"radius":0.95,"fill":"#ffb060"}
+   ]
+  },
+  "sniper_sr86": {
+   "kind": "drawing",
+   "steps": [
+    {"shape":"glow","x":6,"y":0.5,"radius":3.2,"color":"#ff2448","alpha":0.32},
+    {"shape":"glow","x":16.6,"y":0.5,"radius":3,"color":"#ff2448","alpha":0.32},
+    {"shape":"glow","x":21.2,"y":0.5,"radius":3,"color":"#ff2448","alpha":0.32},
+    {"shape":"glow","x":54.4,"y":0.5,"radius":2.4,"color":"#ff2448","alpha":0.32},
+    {"shape":"rectangle","x":-12,"y":-2,"width":10,"height":5,"radius":2.5,"fill":{"type":"linear","from":[0,-2],"to":[0,3],"stops":[[0,"#0e0926"],[0.1,"#5c4fa0"],[0.29,"#1a1436"],[0.65,"#1a1436"],[1,"#0e0926"]]}},
+    {"shape":"rectangle","x":-9.6,"y":0,"width":5.6,"height":1,"radius":0.3,"fill":{"type":"linear","from":[0,0],"to":[0,1],"stops":[[0,"#6a0828"],[0.1,"#ff7a98"],[0.29,"#c0143e"],[0.65,"#c0143e"],[1,"#6a0828"]]}},
+    {"shape":"rectangle","x":-2,"y":-2,"width":16.2,"height":5,"radius":0.5,"fill":{"type":"linear","from":[0,-2],"to":[0,3],"stops":[[0,"#8f86b8"],[0.1,"#ffffff"],[0.29,"#ece8fb"],[0.65,"#ece8fb"],[1,"#8f86b8"]]}},
+    {"shape":"circle","x":6,"y":3.6,"radius":1.3,"fill":{"type":"linear","from":[0,2.3],"to":[0,4.9],"stops":[[0,"#8f86b8"],[0.1,"#ffffff"],[0.29,"#ece8fb"],[0.65,"#ece8fb"],[1,"#8f86b8"]]}},
+    {"shape":"rectangle","x":4.4,"y":0.2,"width":3.1999999999999993,"height":0.6,"radius":0.2,"fill":"#ff2448"},
+    {"shape":"rectangle","x":5.7,"y":-0.8,"width":0.5999999999999996,"height":2.6,"radius":0.2,"fill":"#ff2448"},
+    {"shape":"rectangle","x":14.6,"y":-2,"width":4.000000000000002,"height":5,"radius":0.4,"fill":{"type":"linear","from":[0,-2],"to":[0,3],"stops":[[0,"#0e0926"],[0.1,"#5c4fa0"],[0.29,"#1a1436"],[0.65,"#1a1436"],[1,"#0e0926"]]}},
+    {"shape":"rectangle","x":15.2,"y":-1.01,"width":2.8000000000000007,"height":0.42,"radius":0.2,"fill":"#ff2448"},
+    {"shape":"rectangle","x":15.2,"y":0.29000000000000004,"width":2.8000000000000007,"height":0.42,"radius":0.2,"fill":"#ff2448"},
+    {"shape":"rectangle","x":15.2,"y":1.59,"width":2.8000000000000007,"height":0.42,"radius":0.2,"fill":"#ff2448"},
+    {"shape":"rectangle","x":19.2,"y":-2,"width":4,"height":5,"radius":0.4,"fill":{"type":"linear","from":[0,-2],"to":[0,3],"stops":[[0,"#0e0926"],[0.1,"#5c4fa0"],[0.29,"#1a1436"],[0.65,"#1a1436"],[1,"#0e0926"]]}},
+    {"shape":"rectangle","x":19.8,"y":-1.01,"width":2.8000000000000007,"height":0.42,"radius":0.2,"fill":"#ff2448"},
+    {"shape":"rectangle","x":19.8,"y":0.29000000000000004,"width":2.8000000000000007,"height":0.42,"radius":0.2,"fill":"#ff2448"},
+    {"shape":"rectangle","x":19.8,"y":1.59,"width":2.8000000000000007,"height":0.42,"radius":0.2,"fill":"#ff2448"},
+    {"shape":"rectangle","x":23.2,"y":-2,"width":32,"height":5,"radius":1.2,"fill":{"type":"linear","from":[0,-2],"to":[0,3],"stops":[[0,"#0e0926"],[0.1,"#5c4fa0"],[0.29,"#1a1436"],[0.65,"#1a1436"],[1,"#0e0926"]]}},
+    {"shape":"rectangle","x":25,"y":-0.875,"width":25,"height":0.35,"radius":0.2,"fill":"#ff2448"},
+    {"shape":"rectangle","x":25,"y":1.525,"width":25,"height":0.35,"radius":0.2,"fill":"#ff2448"},
+    {"shape":"rectangle","x":24.6,"y":-1.3,"width":25.799999999999997,"height":3.6,"radius":1.8,"fill":"rgba(226,218,255,.22)","stroke":"rgba(255,255,255,.55)","line_width":0.16},
+    {"shape":"circle","x":51.6,"y":0.5,"radius":0.9,"fill":"#020104"},
+    {"shape":"rectangle","x":53.6,"y":-2,"width":1.6000000000000014,"height":5,"radius":1.2,"fill":{"type":"linear","from":[0,-2],"to":[0,3],"stops":[[0,"#6a0828"],[0.1,"#ff7a98"],[0.29,"#c0143e"],[0.65,"#c0143e"],[1,"#6a0828"]]}}
+   ]
+  },
+  "golden_child": {
+   "kind": "drawing",
+   "steps": [
+    {"shape":"glow","x":5.6,"y":1,"radius":4.2,"color":"#ffd76a","alpha":0.32},
+    {"shape":"glow","x":17.6,"y":1,"radius":3.6,"color":"#ffe7a0","alpha":0.32},
+    {"shape":"rectangle","x":-3.6,"y":-3.2,"width":17.6,"height":8.4,"radius":4.2,"fill":{"type":"linear","from":[0,-3.2],"to":[0,5.2],"stops":[[0,"#7a5414"],[0.1,"#fff0b0"],[0.29,"#d2a038"],[0.65,"#d2a038"],[1,"#7a5414"]]}},
+    {"shape":"rectangle","x":-1.6,"y":0.75,"width":13.6,"height":0.5,"radius":0.2,"fill":"#ffe7a0"},
+    {"shape":"rectangle","x":-2,"y":0,"width":14.4,"height":2,"radius":1,"fill":"rgba(226,218,255,.22)","stroke":"rgba(255,255,255,.55)","line_width":0.16},
+    {"shape":"rectangle","x":3.8,"y":-3.8,"width":3.6000000000000005,"height":9.6,"radius":4.8,"fill":{"type":"linear","from":[0,-3.8],"to":[0,5.8],"stops":[[0,"#8e7446"],[0.1,"#fffaea"],[0.29,"#eddcb2"],[0.65,"#eddcb2"],[1,"#8e7446"]]}},
+    {"shape":"circle","x":5.6,"y":1,"radius":1.7,"fill":"#fff1c4"},
+    {"shape":"circle","x":16.6,"y":1,"radius":3.3,"fill":{"type":"linear","from":[0,-2.3],"to":[0,4.3],"stops":[[0,"#8e7446"],[0.1,"#fffaea"],[0.29,"#eddcb2"],[0.65,"#eddcb2"],[1,"#8e7446"]]}},
+    {"shape":"circle","x":17.6,"y":1,"radius":1.35,"fill":"#ffd76a"}
+   ]
+  },
+  "maiden_kukri": {
+   "kind": "drawing",
+   "steps": [
+    {"shape":"glow","x":3.6,"y":0,"radius":1.6,"color":"#ffd76a","alpha":0.32},
+    {"shape":"glow","x":18,"y":2,"radius":1.4,"color":"#fff1c4","alpha":0.32},
+    {"shape":"circle","x":-5.2,"y":0,"radius":1.9,"fill":{"type":"linear","from":[0,-1.9],"to":[0,1.9],"stops":[[0,"#7a5414"],[0.1,"#fff0b0"],[0.29,"#d2a038"],[0.65,"#d2a038"],[1,"#7a5414"]]}},
+    {"shape":"circle","x":-5.2,"y":0,"radius":0.85,"fill":"#020104"},
+    {"shape":"rectangle","x":-4,"y":-1.3,"width":7,"height":2.6,"radius":1.1,"fill":{"type":"linear","from":[0,-1.3],"to":[0,1.3],"stops":[[0,"#7ca8c5"],[0.1,"#ffffff"],[0.29,"#e1f5ff"],[0.65,"#e1f5ff"],[1,"#7ca8c5"]]}},
+    {"shape":"rectangle","x":-2.6,"y":-1.4,"width":0.6000000000000001,"height":2.8,"radius":0.3,"fill":{"type":"linear","from":[0,-1.4],"to":[0,1.4],"stops":[[0,"#7a5414"],[0.1,"#fff0b0"],[0.29,"#d2a038"],[0.65,"#d2a038"],[1,"#7a5414"]]}},
+    {"shape":"rectangle","x":0.4,"y":-1.4,"width":0.6,"height":2.8,"radius":0.3,"fill":{"type":"linear","from":[0,-1.4],"to":[0,1.4],"stops":[[0,"#7a5414"],[0.1,"#fff0b0"],[0.29,"#d2a038"],[0.65,"#d2a038"],[1,"#7a5414"]]}},
+    {"shape":"rectangle","x":3,"y":-2.3,"width":1.2000000000000002,"height":4.6,"radius":0.5,"fill":{"type":"linear","from":[0,-2.3],"to":[0,2.3],"stops":[[0,"#7a5414"],[0.1,"#fff0b0"],[0.29,"#d2a038"],[0.65,"#d2a038"],[1,"#7a5414"]]}},
+    {"shape":"polygon","points":[[4,-1.3],[8.5,-1.7],[12.5,-1.3],[16,-0.2],[18.6,1.4],[19.4,2.6],[17.2,2.6],[13.6,2.1],[9.4,1.6],[4,1.1]],"fill":{"type":"linear","from":[0,-1.7],"to":[0,2.6],"stops":[[0,"#7a5414"],[0.1,"#fff0b0"],[0.29,"#d2a038"],[0.65,"#d2a038"],[1,"#7a5414"]]}},
+    {"shape":"polygon","points":[[5,0.4],[9.5,0.9],[13.8,1.4],[17.4,2.2],[13.6,1.8],[9.4,1.3],[5,0.9]],"fill":{"type":"linear","from":[0,0.4],"to":[0,2.2],"stops":[[0,"#8e7446"],[0.1,"#fffaea"],[0.29,"#eddcb2"],[0.65,"#eddcb2"],[1,"#8e7446"]]}},
+    {"shape":"polygon","points":[[5,-0.05],[9.5,0.08],[13.5,0.62],[16.7,1.52],[18.35,2.2],[16.55,1.8],[13.4,0.9],[9.4,0.32],[5,0.17]],"fill":{"type":"linear","from":[0,-0.05],"to":[0,2.2],"stops":[[0,"#626d86"],[0.1,"#f4f7ff"],[0.29,"#c4ccd9"],[0.65,"#c4ccd9"],[1,"#626d86"]]}},
+    {"shape":"circle","x":3.6,"y":0,"radius":0.6,"fill":"#ffe7a0"}
+   ]
+  },
+  "blood_pact": {
+   "kind": "drawing",
+   "steps": [
+    {"shape":"glow","x":2.4,"y":0,"radius":1.8,"color":"#ff2448","alpha":0.32},
+    {"shape":"glow","x":30,"y":-0.2,"radius":1.6,"color":"#ff5a78","alpha":0.32},
+    {"shape":"glow","x":49,"y":-1.6,"radius":1.6,"color":"#ffb0c0","alpha":0.32},
+    {"shape":"rectangle","x":-10.4,"y":-1.35,"width":2,"height":2.7,"radius":1.35,"fill":{"type":"linear","from":[0,-1.35],"to":[0,1.35],"stops":[[0,"#6a0828"],[0.1,"#ff7a98"],[0.29,"#c0143e"],[0.65,"#c0143e"],[1,"#6a0828"]]}},
+    {"shape":"rectangle","x":-9,"y":-1.2,"width":10.8,"height":2.4,"radius":0.8,"fill":{"type":"linear","from":[0,-1.2],"to":[0,1.2],"stops":[[0,"#0e0926"],[0.1,"#5c4fa0"],[0.29,"#1a1436"],[0.65,"#1a1436"],[1,"#0e0926"]]}},
+    {"shape":"rectangle","x":-7.4,"y":-1.25,"width":0.9000000000000004,"height":2.5,"radius":0.4,"fill":{"type":"linear","from":[0,-1.25],"to":[0,1.25],"stops":[[0,"#6a0828"],[0.1,"#ff7a98"],[0.29,"#c0143e"],[0.65,"#c0143e"],[1,"#6a0828"]]}},
+    {"shape":"rectangle","x":-5.2,"y":-1.25,"width":0.9000000000000004,"height":2.5,"radius":0.4,"fill":{"type":"linear","from":[0,-1.25],"to":[0,1.25],"stops":[[0,"#6a0828"],[0.1,"#ff7a98"],[0.29,"#c0143e"],[0.65,"#c0143e"],[1,"#6a0828"]]}},
+    {"shape":"rectangle","x":-3,"y":-1.25,"width":0.8999999999999999,"height":2.5,"radius":0.4,"fill":{"type":"linear","from":[0,-1.25],"to":[0,1.25],"stops":[[0,"#6a0828"],[0.1,"#ff7a98"],[0.29,"#c0143e"],[0.65,"#c0143e"],[1,"#6a0828"]]}},
+    {"shape":"rectangle","x":-0.8,"y":-1.25,"width":0.9,"height":2.5,"radius":0.4,"fill":{"type":"linear","from":[0,-1.25],"to":[0,1.25],"stops":[[0,"#6a0828"],[0.1,"#ff7a98"],[0.29,"#c0143e"],[0.65,"#c0143e"],[1,"#6a0828"]]}},
+    {"shape":"rectangle","x":1.8,"y":-2.8,"width":1.2,"height":5.6,"radius":0.6,"fill":{"type":"linear","from":[0,-2.8],"to":[0,2.8],"stops":[[0,"#0e0926"],[0.1,"#5c4fa0"],[0.29,"#1a1436"],[0.65,"#1a1436"],[1,"#0e0926"]]}},
+    {"shape":"circle","x":2.4,"y":0,"radius":0.7,"fill":"#ff2448"},
+    {"shape":"rectangle","x":3,"y":-1.15,"width":1.5999999999999996,"height":2.3,"radius":0.3,"fill":{"type":"linear","from":[0,-1.15],"to":[0,1.15],"stops":[[0,"#7a5414"],[0.1,"#fff0b0"],[0.29,"#d2a038"],[0.65,"#d2a038"],[1,"#7a5414"]]}},
+    {"shape":"polygon","points":[[3.5,-1],[10,-0.99],[17,-1.04],[24,-1.14],[31,-1.31],[38,-1.54],[44,-1.79],[47,-1.93],[50.5,-1.9],[47.6,-0.5],[44,-0.25],[38,0.07],[31,0.37],[24,0.62],[17,0.81],[10,0.94],[3.5,1]],"fill":{"type":"linear","from":[0,-1.93],"to":[0,1],"stops":[[0,"#6a0828"],[0.1,"#ff7a98"],[0.29,"#c0143e"],[0.65,"#c0143e"],[1,"#6a0828"]]}},
+    {"shape":"polygon","points":[[4.6,0.45],[17,0.3],[31,-0.1],[44,-0.65],[49.6,-1.6],[47.4,-0.62],[44,-0.32],[31,0.3],[17,0.74],[4.6,0.9]],"fill":"#ff5a78"},
+    {"shape":"polygon","points":[[6,-0.48],[20,-0.5],[36,-0.85],[36,-0.62],[20,-0.28],[6,-0.26]],"fill":"#3a0412"}
+   ]
+  },
+  "empg": {
+   "kind": "drawing",
+   "steps": [
+    {"shape":"glow","x":1,"y":1,"radius":2,"color":"#c9a6ff","alpha":0.32},
+    {"shape":"glow","x":13,"y":-1.5,"radius":2.8,"color":"#b48cff","alpha":0.32},
+    {"shape":"glow","x":13,"y":3.5,"radius":2.8,"color":"#b48cff","alpha":0.32},
+    {"shape":"circle","x":-2,"y":1,"radius":2.4,"fill":{"type":"linear","from":[0,-1.4],"to":[0,3.4],"stops":[[0,"#0e0926"],[0.1,"#5c4fa0"],[0.29,"#1a1436"],[0.65,"#1a1436"],[1,"#0e0926"]]}},
+    {"shape":"rectangle","x":-1.2,"y":-2.7,"width":13.6,"height":7.4,"radius":3.7,"fill":{"type":"linear","from":[0,-2.7],"to":[0,4.7],"stops":[[0,"#24105e"],[0.1,"#b596ff"],[0.29,"#4a24a0"],[0.65,"#4a24a0"],[1,"#24105e"]]}},
+    {"shape":"circle","x":1,"y":1,"radius":0.75,"fill":"#c9a6ff"},
+    {"shape":"rectangle","x":3.6,"y":0.75,"width":6.4,"height":0.5,"radius":0.2,"fill":"#b48cff"},
+    {"shape":"rectangle","x":3.2,"y":-0.10000000000000009,"width":7.2,"height":2.2,"radius":1.1,"fill":"rgba(226,218,255,.22)","stroke":"rgba(255,255,255,.55)","line_width":0.16},
+    {"shape":"circle","x":12.6,"y":-1.5,"radius":1.6,"fill":{"type":"linear","from":[0,-3.1],"to":[0,0.10000000000000009],"stops":[[0,"#8f86b8"],[0.1,"#ffffff"],[0.29,"#ece8fb"],[0.65,"#ece8fb"],[1,"#8f86b8"]]}},
+    {"shape":"circle","x":13,"y":-1.5,"radius":0.7,"fill":"#dcc6ff"},
+    {"shape":"circle","x":12.6,"y":3.5,"radius":1.6,"fill":{"type":"linear","from":[0,1.9],"to":[0,5.1],"stops":[[0,"#8f86b8"],[0.1,"#ffffff"],[0.29,"#ece8fb"],[0.65,"#ece8fb"],[1,"#8f86b8"]]}},
+    {"shape":"circle","x":13,"y":3.5,"radius":0.7,"fill":"#dcc6ff"}
+   ]
+  },
+  "golden_retribution": {
+   "kind": "drawing",
+   "steps": [
+    {"shape":"rectangle","x":-0.8,"y":-3.1,"width":5.8,"height":6.2,"radius":1.2,"fill":{"type":"linear","from":[0,-3.1],"to":[0,3.1],"stops":[[0,"#7a5414"],[0.1,"#fff0b0"],[0.29,"#d2a038"],[0.65,"#d2a038"],[1,"#7a5414"]]}},
+    {"shape":"circle","x":4.6,"y":-2,"radius":0.72,"fill":{"type":"linear","from":[0,-2.7199999999999998],"to":[0,-1.28],"stops":[[0,"#8e7446"],[0.1,"#fffaea"],[0.29,"#eddcb2"],[0.65,"#eddcb2"],[1,"#8e7446"]]}},
+    {"shape":"circle","x":4.6,"y":-0.65,"radius":0.72,"fill":{"type":"linear","from":[0,-1.37],"to":[0,0.06999999999999995],"stops":[[0,"#8e7446"],[0.1,"#fffaea"],[0.29,"#eddcb2"],[0.65,"#eddcb2"],[1,"#8e7446"]]}},
+    {"shape":"circle","x":4.6,"y":0.65,"radius":0.72,"fill":{"type":"linear","from":[0,-0.06999999999999995],"to":[0,1.37],"stops":[[0,"#8e7446"],[0.1,"#fffaea"],[0.29,"#eddcb2"],[0.65,"#eddcb2"],[1,"#8e7446"]]}},
+    {"shape":"circle","x":4.6,"y":2,"radius":0.72,"fill":{"type":"linear","from":[0,1.28],"to":[0,2.7199999999999998],"stops":[[0,"#8e7446"],[0.1,"#fffaea"],[0.29,"#eddcb2"],[0.65,"#eddcb2"],[1,"#8e7446"]]}},
+    {"shape":"rectangle","x":0.15,"y":-1.55,"width":2.15,"height":3.1,"radius":0.5,"fill":"#4f3016"}
+   ]
+  },
+  "flash": {
+   "kind": "drawing",
+   "steps": [
+    {"shape":"glow","x":0,"y":0,"radius":22,"core":0.3,"color":"$color","alpha":"$fade","blend":"add"},
+    {"shape":"polygon","points":[[0.0,7.0],[72,0],[-0.0,-7.0]],"fill":"$color","alpha":"$fade","blend":"add"},
+    {"shape":"polygon","points":[[1.625,3.655],[36,-16],[-1.625,-3.655]],"fill":"$color","alpha":"$fade","blend":"add"},
+    {"shape":"polygon","points":[[-1.625,3.655],[36,16],[1.625,-3.655]],"fill":"$color","alpha":"$fade","blend":"add"},
+    {"shape":"polygon","points":[[3.5,0.0],[0,-20],[-3.5,-0.0]],"fill":"$color","alpha":"$fade","blend":"add"},
+    {"shape":"polygon","points":[[-3.5,0.0],[0,20],[3.5,-0.0]],"fill":"$color","alpha":"$fade","blend":"add"},
+    {"shape":"polygon","points":[[0.0,3.0],[46,0],[-0.0,-3.0]],"fill":"#fffaf2","alpha":"$fade","blend":"add"},
+    {"shape":"circle","radius":5,"fill":"#ffffff","alpha":"$fade","blend":"add"}
+   ]
+  },
+  "round": {
+   "kind": "drawing",
+   "steps": [
+    {"shape":"glow","x":0,"y":0,"radius":5,"color":"$color","alpha":0.85,"blend":"add"},
+    {"shape":"circle","radius":1.55,"fill":"$color","blend":"add"},
+    {"shape":"circle","radius":0.8,"fill":"$core","blend":"add"}
+   ]
+  },
+  "slash": {
+   "kind": "drawing",
+   "steps": [
+    {"shape":"curve","points":[[1,-10],[10,-8],[15,0],[10,8],[1,10],[7,6],[10,0],[7,-6]],"fill":"$color","alpha":0.85}
+   ]
+  },
+  "strike": {
+   "kind": "drawing",
+   "steps": [
+    {"shape":"glow","x":4,"y":0,"radius":9,"color":"$color","alpha":0.8},
+    {"shape":"polygon","points":[[0,0],[4,-2],[7,-6],[7,-2],[13,0],[7,2],[7,6],[4,2]],"fill":"$color"}
+   ]
+  },
+  "trail_tracer": {"kind": "weapon_trail", "fade": 0.065, "samples": 8},
+  "trail_sniper": {"kind": "weapon_trail", "fade": 0.13, "samples": 30, "long_tail": 300},
+  "trail_crackle": {"kind": "weapon_trail", "fade": 0.12, "samples": 8, "flicker": 0.045, "passes": 1, "amplitude": 2.4},
+  "trail_static": {"kind": "weapon_trail", "fade": 0.12, "samples": 8, "flicker": 0.045, "passes": 2, "amplitude": 3.4},
+  "trail_wisp": {"kind": "weapon_trail", "fade": 0.065, "samples": 8, "sample_interval": 0.033333, "lifetime": 0.833333, "dust": "#ffd76a"},
+  "catalog": {
+   "kind": "weapon_catalog",
+   "entries": ["gatling_gunner","pistol_fpx","pistol_anavia","pistol_ganger","rifle_rb98","sniper_sara","sniper_sr86","golden_child","maiden_kukri","blood_pact","empg","golden_retribution"]
+  }
+ },
+ "templates": {
+  "gatling_gunner": {
+   "extends": "engine:decoration",
+   "assets": {
+    "drawing": "gatling_gunner"
+   },
+   "look": {
+    "layer": 5
+   },
+   "data": {
+    "fire_interval": 0.2,
+    "label": "Gatling Gunner",
+    "muzzle": [35,0],
+    "effect_scale": 0.294118,
+    "effect": "flash",
+    "color": "#ffbd79",
+    "trail_color": "#ffbd79",
+    "streak_length": 12.0,
+    "projectile": "weapons:round",
+    "trail": "weapons:trail_tracer",
+    "core": "#fff5dc"
+   }
+  },
+  "pistol_fpx": {
+   "extends": "engine:decoration",
+   "assets": {
+    "drawing": "pistol_fpx"
+   },
+   "look": {
+    "layer": 5
+   },
+   "data": {
+    "fire_interval": 0.366667,
+    "label": "FP-X",
+    "muzzle": [13.4,1],
+    "effect_scale": 0.294118,
+    "effect": "flash",
+    "color": "#00f3ff",
+    "trail_color": "#79a0ff",
+    "streak_length": 12.5,
+    "projectile": "weapons:round",
+    "trail": "weapons:trail_tracer",
+    "core": "#fff5dc"
+   }
+  },
+  "pistol_anavia": {
+   "extends": "engine:decoration",
+   "assets": {
+    "drawing": "pistol_anavia"
+   },
+   "look": {
+    "layer": 5
+   },
+   "data": {
+    "fire_interval": 0.066667,
+    "label": "Anavia",
+    "muzzle": [13.4,1],
+    "effect_scale": 0.264706,
+    "effect": "flash",
+    "color": "#CCCCFF",
+    "trail_color": "#a9b4ff",
+    "streak_length": 12.0,
+    "projectile": "weapons:round",
+    "trail": "weapons:trail_crackle",
+    "core": "#f1ecff"
+   }
+  },
+  "pistol_ganger": {
+   "extends": "engine:decoration",
+   "assets": {
+    "drawing": "pistol_ganger"
+   },
+   "look": {
+    "layer": 5
+   },
+   "data": {
+    "fire_interval": 0.2,
+    "label": "Ganger Pistol",
+    "muzzle": [12.9,1],
+    "effect_scale": 0.294118,
+    "effect": "flash",
+    "color": "#ff69bb",
+    "trail_color": "#ff69bb",
+    "streak_length": 12.0,
+    "projectile": "weapons:round",
+    "trail": "weapons:trail_tracer",
+    "core": "#fff5dc"
+   }
+  },
+  "rifle_rb98": {
+   "extends": "engine:decoration",
+   "assets": {
+    "drawing": "rifle_rb98"
+   },
+   "look": {
+    "layer": 5
+   },
+   "data": {
+    "fire_interval": 0.1,
+    "label": "RB-98",
+    "hold": "rifle",
+    "muzzle": [29.3,1.5],
+    "effect_scale": 0.235294,
+    "effect": "flash",
+    "color": "#00ffcc",
+    "trail_color": "#cfeee9",
+    "streak_length": 14.0,
+    "projectile": "weapons:round",
+    "trail": "weapons:trail_tracer",
+    "core": "#fff5dc"
+   }
+  },
+  "sniper_sara": {
+   "extends": "engine:decoration",
+   "assets": {
+    "drawing": "sniper_sara"
+   },
+   "look": {
+    "layer": 5
+   },
+   "data": {
+    "fire_interval": 1.166667,
+    "fire_on_release": true,
+    "label": "YourGirlSara",
+    "hold": "sniper",
+    "muzzle": [55.2,0.5],
+    "effect_scale": 0.470588,
+    "effect": "flash",
+    "color": "#FFD700",
+    "trail_color": "#ff9a3c",
+    "streak_length": 40.0,
+    "projectile": "weapons:round",
+    "trail": "weapons:trail_sniper",
+    "core": "#fff5dc"
+   }
+  },
+  "sniper_sr86": {
+   "extends": "engine:decoration",
+   "assets": {
+    "drawing": "sniper_sr86"
+   },
+   "look": {
+    "layer": 5
+   },
+   "data": {
+    "fire_interval": 0.833333,
+    "fire_on_release": true,
+    "label": "SR-86",
+    "hold": "sniper",
+    "muzzle": [55.2,0.5],
+    "effect_scale": 0.352941,
+    "effect": "flash",
+    "color": "#DC143C",
+    "trail_color": "#d9d2de",
+    "streak_length": 20.0,
+    "projectile": "weapons:round",
+    "trail": "weapons:trail_sniper",
+    "core": "#fff5dc"
+   }
+  },
+  "golden_child": {
+   "extends": "engine:decoration",
+   "assets": {
+    "drawing": "golden_child"
+   },
+   "look": {
+    "layer": 5
+   },
+   "data": {
+    "fire_interval": 0.633333,
+    "label": "Golden Child",
+    "muzzle": [20,1],
+    "effect_scale": 0.264706,
+    "effect": "flash",
+    "color": "#FFD700",
+    "trail_color": "#f3e4c6",
+    "streak_length": 9.0,
+    "projectile": "weapons:round",
+    "trail": "weapons:trail_wisp",
+    "core": "#fff5dc"
+   }
+  },
+  "maiden_kukri": {
+   "extends": "engine:decoration",
+   "assets": {
+    "drawing": "maiden_kukri"
+   },
+   "look": {
+    "layer": 5
+   },
+   "data": {
+    "fire_interval": 0.266667,
+    "label": "Maiden's Kukri",
+    "swing_trail": {"edge": [19.4, 2.6], "cut": [0.0264, 0.1584], "span": 0.065, "life": 0.3, "strokes": [[7, "255, 200, 100", 0.22], [3, "255, 231, 160", 0.55], [1.2, "255, 250, 230", 0.85]]},
+    "muzzle": [19,1.6],
+    "effect_scale": 1,
+    "effect": "slash",
+    "color": "#ffdc8f"
+   }
+  },
+  "blood_pact": {
+   "extends": "engine:decoration",
+   "assets": {
+    "drawing": "blood_pact"
+   },
+   "look": {
+    "layer": 5
+   },
+   "data": {
+    "fire_interval": 0.533333,
+    "label": "Blood Pact",
+    "swing_trail": {"edge": [50.5, -1.9], "cut": [0.0704, 0.224], "span": 0.1152, "life": 0.436364, "strokes": [[9, "200, 20, 50", 0.26], [3.4, "255, 70, 100", 0.6], [1.3, "255, 210, 220", 0.9]]},
+    "attack_clip": "heavy_slash",
+    "muzzle": [50,-1.6],
+    "effect_scale": 1,
+    "effect": "slash",
+    "color": "#ff456e"
+   }
+  },
+  "empg": {
+   "extends": "engine:decoration",
+   "assets": {
+    "drawing": "empg"
+   },
+   "look": {
+    "layer": 5
+   },
+   "data": {
+    "fire_interval": 0.2,
+    "label": "EMP Blaster",
+    "muzzle": [14.6,1],
+    "effect_scale": 0.294118,
+    "effect": "flash",
+    "color": "#b48cff",
+    "trail_color": "#b48cff",
+    "streak_length": 12.0,
+    "projectile": "weapons:round",
+    "trail": "weapons:trail_static",
+    "core": "#efe4ff"
+   }
+  },
+  "golden_retribution": {
+   "extends": "engine:decoration",
+   "assets": {
+    "drawing": "golden_retribution"
+   },
+   "look": {
+    "layer": 5
+   },
+   "data": {
+    "fire_interval": 0.25,
+    "label": "Golden Retribution",
+    "haymaker_every": 3,
+    "combo_reset": 1.2,
+    "muzzle": [6,0],
+    "effect_scale": 1,
+    "effect": "strike",
+    "color": "#ffe498"
+   }
+  },
+  "flash": {
+   "extends": "engine:decoration",
+   "assets": {
+    "drawing": "flash"
+   },
+   "look": {
+    "layer": 6,
+    "values": {"fade": 1}
+   },
+   "data": {
+    "lifetime": 0.05
+   }
+  },
+  "round": {
+   "kind": "projectile",
+   "assets": {
+    "drawing": "round"
+   },
+   "look": {
+    "layer": 5
+   },
+   "speed": 780,
+   "lifetime": 0.7,
+   "impact_strength": 0,
+   "collision_shape": {
+    "shape_type": "circle",
+    "radius": 0.65
+   }
+  },
+  "slash": {
+   "extends": "engine:decoration",
+   "assets": {
+    "drawing": "slash"
+   },
+   "look": {
+    "layer": 6
+   },
+   "data": {
+    "lifetime": 0.16
+   }
+  },
+  "strike": {
+   "extends": "engine:decoration",
+   "assets": {
+    "drawing": "strike"
+   },
+   "look": {
+    "layer": 6
+   },
+   "data": {
+    "lifetime": 0.09
+   }
+  }
+ }
+}

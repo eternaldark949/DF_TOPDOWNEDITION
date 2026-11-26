@@ -77,3 +77,27 @@ test('a frame orders by solids after layer and depth, and leaves packets without
  frame.submit({type:'shape',geometry:g,material:{fill:'#fff'},depth:1,layer:5,solid:wall});
  assert.deepEqual(frame.finish().passes[0].packets.map(p=>p.material.fill),['#555','#c00','#000','#fff']);
 });
+
+test('a posed hand shares world occlusion with a higher-layer table and wall',async()=>{
+ async function order(camera,wall){
+    const {world,frame,render}=await scene({camera});
+    const actor=world.elements.createEntity({kind:'character',position:[0,20],components:[
+        {name:'hand',joint:'hand',layers:[{layer:0,height:0,thickness:2,solid:false,steps:[rect(-8,-8,16,16,'#e94')]}]}
+    ]});
+    world.rigs.createRig(actor,{definition:{joints:[{name:'hand',height:35}]},clips:[]});
+    world.elements.createEntity({kind:'static',position:[0,wall?0:20],look:{layer:wall?10:1},components:[
+        {name:'fixture',layers:[{layer:0,height:0,thickness:wall?85:20,solid:false,sides:'#348',steps:[rect(-25,-10,50,20,'#452')]}]}
+    ]});
+    try{
+        const packets=frame(),hand=packets.findIndex(p=>p.solid?.z0===37),fixture=packets.flatMap((p,i)=>p.layer===(wall?10:1)&&p.solid?[i]:[]);
+        assert.ok(hand>=0&&fixture.length, JSON.stringify(packets.map(p=>[p.material?.fill,p.solid?.z0,p.layer])));
+        return {hand,fixture};
+    }finally{render.dispose();}
+ }
+ const table=await order([0,300],false);
+ assert.ok(table.hand>Math.max(...table.fixture),'the tabletop cannot cover the hand');
+ const near=await order([0,300],true);
+ assert.ok(near.hand>Math.min(...near.fixture),'the hand can draw ahead of the wall from its own side');
+ const far=await order([0,-300],true);
+ assert.ok(far.hand<Math.max(...far.fixture),'the opposite view can hide the hand behind the wall');
+});

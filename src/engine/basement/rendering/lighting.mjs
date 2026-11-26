@@ -66,10 +66,11 @@ export function entityLights(body,{pose=null,view=null}={}){
     const read=v=>typeof v==='string'&&v.startsWith('$')?values[v.slice(1)]??null:v;
     return list.map((l,i)=>{
         const {position=[0,0],rotation=0,polygon,animation,shadows,look,soft,...rest}=l,[x,y]=position;
-        const ground=[at[0]+x*c-y*s,at[1]+x*s+y*c];let where=ground;if(view&&rest.height>0)where=view.scaled(where[0],where[1],view.k(rest.height+elevation));
-        const out={...rest,shape:rest.shape??'point',position:where,rotation:a+rotation,still:l.still??!moving};
+        const height=(rest.height??0)+elevation,ground=[at[0]+x*c-y*s,at[1]+x*s+y*c];
+        const where=view&&height>0?view.scaled(ground[0],ground[1],view.k(height)):ground;
+        const out={...rest,height,shape:rest.shape??'point',position:where,rotation:a+rotation,still:l.still??!moving};
         // (what casts its shadow, for renderSystem.setLightShadows: its `shadows` and where it stands on the ground, before any lean)
-        if(shadows!==undefined&&shadows!==null){out.shadows=shadows;out.origin=ground;out.at_height=(rest.height??0)+elevation;}
+        if(shadows!==undefined&&shadows!==null){out.shadows=shadows;out.origin=ground;out.at_height=height;}
         for(const k of ['color'])if(out[k]!==undefined)out[k]=read(out[k]);
         if(out.color===null)delete out.color;if(out.intensity===null)delete out.intensity;if(out.glow===null)delete out.glow;
         validLight(out,i);return out;
@@ -106,7 +107,7 @@ export function createLightLayer({bounds,tint,areas=[],lights=[],cuts=[],over=[]
     const shapes=lights.map(validLight);
     lights.forEach((l,i)=>cut(scene,l,shapes[i]));
     lights.forEach((l,i)=>glow(scene,l,shapes[i]));
-    return [...scene.finish(),...extraCuts(cuts),...nightOver(over,tint)];
+    return [...scene.finish(),...extraCuts(cuts),...nightOver(over,tint,lights.map((l,i)=>[l,shapes[i],reach(l,shapes[i])]))];
 }
 /**
  * The same layer, split so what holds still between frames is painted once. Lights marked `still: true`
@@ -159,7 +160,7 @@ export function createLightLayerParts({extent,tint,areas=[],lights=[],grids=[],c
         if(l.still!==true)cut(cuts,l,shape);if(!l.still)glow(colour,l,shape);
     }
     const plain=new artScene();plain.fill(rect(left,top,right-left,bottom-top),tint);
-    return [...plain.finish(),...darks,...cutStamps,...cuts.finish(),...extraCuts(more),...glows,...colourStamps,...colour.finish(),...nightOver(over,tint),...aloft.finish(),...ready];
+    return [...plain.finish(),...darks,...cutStamps,...cuts.finish(),...extraCuts(more),...glows,...colourStamps,...colour.finish(),...nightOver(over,tint,all),...aloft.finish(),...ready];
 }
 /**
  * A light whose shape holds still while its strength changes (a pulsing sign, a stuttering lamp, a shot in
@@ -227,12 +228,13 @@ const extraCuts=list=>list.map(p=>({...p,blend:'destination-out'}));
 // What stands over the light, in the order it is drawn: a cover lays the plain dark back (the layer cleared
 // there, then the dark alone), a shine is cut out of it, and a veil (a low part over glowing ground: a car on a lit
 // stop bar) lays the dark back only where it covers a shine drawn before it (see renderSystem.nightOver).
-const nightOver=(list,tint)=>{
+const nightOver=(list,tint,lights)=>{
     const shines=[];
-    return list.flatMap(({packet:p,over})=>{
+    const elevated=lights.filter(([light])=>light.height>0&&light.over!==true);
+    return list.flatMap(({packet:p,over,height})=>{
         // (one depth for all: the frame sorts a pass by depth, and these keep the order they come in)
         if(over==='shine'){shines.push(p);return [{...p,blend:'destination-out',layer:0,depth:0}];}
-        if(over==='cover')return [{...p,blend:'destination-out',layer:0,depth:0},{...p,material:{...p.material,fill:tint,stroke:null},blend:'normal',layer:0,depth:0}];
+        if(over==='cover')return [{...p,blend:'destination-out',layer:0,depth:0},{...p,material:{...p.material,fill:tint,stroke:null},blend:'normal',layer:0,depth:0},...surfaceLights(p,height,elevated)];
         if(over==='veil'){
             const box=packetBox(p);if(!box)return [];
             // each shine under it painted again in the dark, inside the veil's outline
@@ -242,6 +244,25 @@ const nightOver=(list,tint)=>{
         throw new TypeError('A light layer `over` entry is {packet, over: "cover" | "shine" | "veil"}');
     });
 };
+// The cover removes ground lighting. Put back only the lights above that surface, clipped to its silhouette.
+function surfaceLights(packet,height,lights){
+    if(height===undefined||!lights.length)return [];
+    const box=packetBox(packet);
+    if(!box)return [];
+    const touching=lights.filter(([l,,r])=>l.height>height&&r[0]<box[2]&&r[2]>box[0]&&r[1]<box[3]&&r[3]>box[1]);
+    if(!touching.length)return [];
+    const scene=new artScene();
+    for(const [light,shape] of touching)cut(scene,light,shape);
+    for(const [light,shape] of touching){
+        scene.enter();
+        if(light.polygon)scene.clip(polygonPath(light.polygon));
+        glow(scene,light,shape);
+        scene.leave();
+    }
+    return scene.finish().map(p=>({...p,layer:0,depth:0,clips:[...(p.clips??[]),{
+        geometry:packet.geometry,transform:multiply(inverse(p.matrix??IDENTITY),packet.matrix??IDENTITY),rule:'nonzero'
+    }]}));
+}
 const IDENTITY=[1,0,0,1,0,0];
 const multiply=(a,b)=>[a[0]*b[0]+a[2]*b[1],a[1]*b[0]+a[3]*b[1],a[0]*b[2]+a[2]*b[3],a[1]*b[2]+a[3]*b[3],a[0]*b[4]+a[2]*b[5]+a[4],a[1]*b[4]+a[3]*b[5]+a[5]];
 // A shape packet's box where it is drawn (its matrix applied, its stroke's width round it); cached on the packet.

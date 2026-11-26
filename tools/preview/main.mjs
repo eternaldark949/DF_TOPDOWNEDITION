@@ -1,4 +1,4 @@
-// The preview page's own controls: the bar along the top, the exit prompt, the touch stick and button. It reads the
+// The preview page's own controls: the bar along the top, the exit prompt, the touch use button. It reads the
 // game's libraries from the page (the build put them there) and boots the preview with them.
 import { bootPreview } from './play.mjs';
 
@@ -18,8 +18,43 @@ const hud = {
         let fast = false; $('fast').onclick = () => { fast = !fast; $('fast').classList.toggle('on', fast); a.setSpeed(fast ? 600 : 12); };
         for (const b of document.querySelectorAll('[data-weather]')) b.onclick = () => a.setWeather(b.dataset.weather, 'normal');
         $('zin').onclick = () => a.zoom(1); $('zout').onclick = () => a.zoom(-1);
+        const fullscreen = $('fullscreen');
+        const orientation = window.screen.orientation;
+        let lockedLandscape = false;
+        const showFullscreen = () => {
+            const active = Boolean(document.fullscreenElement);
+            fullscreen.setAttribute('aria-pressed', String(active));
+            const label = active ? 'Exit fullscreen' : 'Enter fullscreen';
+            fullscreen.setAttribute('aria-label', label);
+            fullscreen.title = fullscreen.disabled ? 'Fullscreen is unavailable in this window' : label;
+            if (!active && lockedLandscape) {
+                orientation.unlock?.();
+                lockedLandscape = false;
+            }
+        };
+        fullscreen.disabled = !document.fullscreenEnabled;
+        showFullscreen();
+        document.addEventListener('fullscreenchange', showFullscreen);
+        fullscreen.onclick = async () => {
+            fullscreen.blur();
+            try {
+                if (document.fullscreenElement) await document.exitFullscreen();
+                else {
+                    await document.documentElement.requestFullscreen();
+                    if (touch && document.fullscreenElement && orientation?.lock) {
+                        try {
+                            await orientation.lock('landscape');
+                            lockedLandscape = true;
+                            showFullscreen();
+                        } catch {
+                            // Some mobile browsers allow fullscreen while leaving rotation to the device.
+                        }
+                    }
+                }
+            } catch (error) { this.error(error); }
+        };
         $('prompt').onclick = () => a.take();
-        if (touch) { a.stick($('stick'), $('knob')); a.button($('use')); }
+        if (touch) a.button($('use'));
         this.zoomed(a.zoom_now);
         const backend = $('renderer');
         backend.onchange = async () => { backend.blur(); try { backend.value = await a.renderer(backend.value); } catch (e) { this.error(e); backend.value = 'canvas'; } };

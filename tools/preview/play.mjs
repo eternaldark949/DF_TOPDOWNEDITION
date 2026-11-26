@@ -1,15 +1,18 @@
-// THE ENGINE PREVIEW: walk the game's maps on the new engine. Not the game: no story, no mechanics, only the maps in
-// src/game/data with a person to walk them, their exits to travel through, the world's clock and weather to change.
+// THE ENGINE PREVIEW: explore the native maps, try combat presentation, and search lost property.
 // It is built into one page by tools/build-preview.mjs, which hands it every library as `libraries`.
 import { gameEngine } from '../../src/engine/game-engine.mjs';
 import { readComponents } from '../../src/engine/basement/physics/index.mjs';
 import { mapLevel } from '../../src/engine/lobby/runtime/map-level.mjs';
 import { travelSystem } from '../../src/engine/lobby/runtime/travel-system.mjs';
 import { createEngineRegistry, mapDefinition, doorKindsOf, screensOf, fontsOf } from '../../src/engine/directory/index.mjs';
+import { mountPreviewSticks } from './sticks.mjs';
+import { previewWeapons, weaponChoices } from './weapons.mjs';
+import { lostProperty, readPreviewSave, writePreviewSave } from './lost-property.mjs';
 import { humanoid, objectPacket } from '../../src/engine/penthouse/index.mjs';
 
 const KEYMAP = {
     move_left: ['a', 'ArrowLeft'], move_right: ['d', 'ArrowRight'], move_up: ['w', 'ArrowUp'], move_down: ['s', 'ArrowDown'],
+    preview_fire: ['f'], aim_fire: ['touchAimFire', 'gamepadRTrigger'],
     interact: ['e', 'Enter', 'space', 'gamepadA', 'gamepadY', 'touchInteract'],
     run: ['Shift', 'gamepadRBumper'], pause: ['Escape', 'p', 'gamepadStart'], zoom_in: ['=', '+', 'gamepadDUp'], zoom_out: ['-', '_', 'gamepadDDown']
 };
@@ -21,15 +24,36 @@ export async function bootPreview({ libraries, hud }) {
     const maps = libraries.filter(l => l.resources?.map?.kind === 'map').map(l => ({ id: l.library_id, label: l.resources.map.label ?? l.library_id }));
     const engine = new gameEngine({
         asset_library: registry, time: registry.getResource('time:city_clock'), weather: registry.getResource('weather:city_weather'),
-        controls: { keymap: KEYMAP, vectors: { move: { gamepad: 'left', touch: 'move', dead_zone: .15 } } },
+        controls: { keymap: KEYMAP, vectors: { move: { gamepad: 'left', touch: 'move', dead_zone: .15 }, aim: { gamepad: 'right', touch: 'aim', dead_zone: .08 } } },
         camera: { zoom: 1 },
         // Each backend draws on a fresh canvas (a canvas keeps the first kind of context it gives): it takes the old one's place.
-        render: { create_surface: () => { const next = document.createElement('canvas'); next.id = 'view'; document.getElementById('view').replaceWith(next); return next; } }
+        render: { create_surface: () => { const old = document.getElementById('view'), next = old.cloneNode(false); old.replaceWith(next); return next; } }
     });
     const { physics, camera, render, controls } = engine.basement;
     await render.setRenderer('canvas');
-    const fit = () => { const ratio = Math.min(devicePixelRatio || 1, 2); render.resize({ width: innerWidth, height: innerHeight, pixel_ratio: ratio }); };
-    fit(); addEventListener('resize', fit);
+    const stage = document.getElementById('stage'), visible = window.visualViewport;
+    const fit = () => {
+        const { width, height } = stage.getBoundingClientRect(), pixel_ratio = Math.min(devicePixelRatio || 1, 2);
+        const old = camera.viewport;
+        if (width >= 1 && height >= 1 && (width !== old.width || height !== old.height || pixel_ratio !== old.pixel_ratio)) {
+            render.resize({ width, height, pixel_ratio });
+        }
+    };
+    const fitVisible = () => {
+        if (visible) {
+            stage.style.left = `${visible.offsetLeft}px`;
+            stage.style.top = `${visible.offsetTop}px`;
+            stage.style.maxWidth = `${visible.width}px`;
+            stage.style.maxHeight = `${visible.height}px`;
+        }
+        fit();
+    };
+    new ResizeObserver(fit).observe(stage);
+    addEventListener('resize', fitVisible);
+    visible?.addEventListener('resize', fitVisible);
+    visible?.addEventListener('scroll', fitVisible);
+    document.addEventListener('fullscreenchange', fitVisible);
+    fitVisible();
 
     // The person who walks: the engine's humanoid, kept across every map.
     const look = registry.resolveTemplate('engine:humanoid').look;
@@ -64,11 +88,25 @@ export async function bootPreview({ libraries, hud }) {
     // The screens: the game's main menu, pause menu and its pages and HUD, all data (src/game/data/libraries/screens.json).
     // The preview hands them live values by name and hears what they set and ask for.
     const ui = engine.ui;
-    ui.define(screensOf(registry)); ui.addFonts(fontsOf(registry)).catch(error => console.warn('A font did not load', error));
+    const choices = weaponChoices(registry);
+    const screens = screensOf(registry);
+    const settings = screens.find(screen => screen.name === 'pause.settings');
+    settings.items.find(item => item.id === 'panel').items.find(item => item.id === 'preview_weapon').choices = choices;
+    ui.define(screens); ui.addFonts(fontsOf(registry)).catch(error => console.warn('A font did not load', error));
     const titled = word => word ? word[0].toUpperCase() + word.slice(1) : '';
+    let saved = null;
+    try { saved = readPreviewSave(); } catch (error) { console.warn('Could not read the preview save', error); }
+    const saveSlots = () => saved ? [{ slot: 'preview', label: (maps.find(map => map.id === saved.level)?.label ?? saved.level) + ' · ' + saved.loot.balance + ' PP' }] : [];
+    const travel = new travelSystem({ get_travellers: () => [person.entity] });
+    const loot = lostProperty({ engine, walker: person.entity, canInteract: () => !travel.exit?.available });
     ui.provide('place', () => place).provide('clock', () => engine.time.text()).provide('weather', () => titled(engine.weather.state))
-      .provide('player', { health: 100, pp: 0 }).provide('saves', { can_save: false, slots: [] });
+      .provide('player', () => ({ health: 100, pp: loot.balance }));
+    ui.setValue('saves', { can_save: true, slots: saveSlots() });
+    ui.setValue('loot', { prompt: '', notice: '' });
     ui.setValue('options', { time_speed: 12, weather: engine.weather.state, zoom: ZOOMS[zoom], renderer: 'canvas', dev_bar: true });
+    ui.setValue('preview_weapon', 'none');
+    const weapons = previewWeapons(engine, registry, person.entity);
+    engine.registerSystem('preview_weapons', weapons);
     ui.setValue('wardrobe', { available: true, outfit_sorcerer_long: false, wig_ponytail_black: false });
     ui.on('set', ({ path, value }) => {
         if (path === 'wardrobe.outfit_sorcerer_long' || path === 'wardrobe.wig_ponytail_black') wardrobe_changed = true;
@@ -78,8 +116,29 @@ export async function bootPreview({ libraries, hud }) {
         if (path === 'options.renderer' && render.renderer_id !== value) switchRenderer(value).then(id => hud.rendered(id), error => { hud.error(error); ui.setValue('options.renderer', render.renderer_id); });
         if (path === 'options.dev_bar') document.body.classList.toggle('no-bar', !value);
     });
-    ui.on('new_game', () => ui.close('main'));
+    ui.on('new_game', () => { loot.restore(null); ui.close('main'); });
     ui.on('exit', () => ui.close('main'));
+    ui.on('search_lost_property', () => { if (!engine.paused && !busy) loot.search(); });
+    ui.on('save', () => {
+        if (!engine.active_level || busy) return;
+        const next = { level: engine.active_level.level_id, position: person.entity.position, rotation: person.entity.rotation, clock: engine.time.state(), loot: loot.state() };
+        try {
+            writePreviewSave(next);
+            saved = next;
+            ui.setValue('saves.slots', saveSlots());
+            loot.notify('GAME SAVED');
+        }
+        catch (error) { hud.error(error); }
+    });
+    ui.on('load', async ({ data }) => {
+        if (data?.slot !== 'preview' || !saved || busy || !maps.some(map => map.id === saved.level)) return;
+        const snapshot = saved;
+        if (!await go(snapshot.level, snapshot)) return;
+        ui.close('pause.saves');
+        ui.close('pause');
+        ui.close('main');
+        loot.notify('GAME LOADED');
+    });
 
     class mapPlace extends mapLevel {
         mapDefinition({ assets }) {
@@ -106,17 +165,24 @@ export async function bootPreview({ libraries, hud }) {
     }
     for (const { id } of maps) engine.registerLevel(id, mapPlace);
 
-    const travel = new travelSystem({ get_travellers: () => [person.entity] });
     engine.registerSystem('travel', travel);
+    engine.registerSystem('lost_property', loot);
     travel.onExitChanged(exit => hud.exit(exit));
     // Each step: walk where the stick or keys say, face the way you walk, animate, take an exit when asked.
     engine.registerSystem('walker', {
         beforePhysics(context) {
             if (wardrobe_changed) applyWardrobe();
             const [x, y] = controls.direction('move'), fast = controls.active('run') ? 1.8 : 1;
-            person.entity.motor.setMovement([x * speed * fast, y * speed * fast], { face_movement: true });
+            const aim = weapons.aimDirection(), aiming = aim.some(Boolean);
+            const motor = person.entity.motor;
+            motor.setMovement([x * speed * fast, y * speed * fast], { face_movement: !aiming });
+            if (aiming) motor.lookInDirection(aim, { turn_speed: 60 });
+            else if (motor.facing) motor.clearFacing();
             person.updateState();
-            if (controls.justActivated('interact') && travel.exit?.available) go();
+            if (controls.justActivated('interact') && !busy) {
+                if (travel.exit?.available) go();
+                else loot.search();
+            }
             if (controls.justActivated('zoom_in')) setZoom(zoom + 1);
             if (controls.justActivated('zoom_out')) setZoom(zoom - 1);
         },
@@ -133,14 +199,23 @@ export async function bootPreview({ libraries, hud }) {
     async function switchRenderer(id) { const old = document.getElementById('view'); try { await render.setRenderer(id); } catch (error) { document.getElementById('view').replaceWith(old); throw error; } fit(); return render.renderer_id; }
 
     let busy = null;
-    const go = async (target) => {
+    const go = async (target, snapshot = null) => {
         if (busy) return busy;
         busy = (async () => {
             hud.fade(true); await new Promise(r => setTimeout(r, 180));
-            try { if (target) await engine.loadLevel(target, { travellers: [person.entity.entity_id] }); else await travel.travel(); }
-            catch (error) { hud.error(error); }
-            camera.setView({ position: person.entity.position, zoom: ZOOMS[zoom] });
-            hud.fade(false);
+            try {
+                if (target) await engine.loadLevel(target, { travellers: [person.entity.entity_id] });
+                else await travel.travel();
+                if (snapshot) {
+                    engine.time.restore(snapshot.clock);
+                    ui.setValue('options.time_speed', snapshot.clock.speed);
+                    physics.updateBody(person.entity, { position: snapshot.position, rotation: snapshot.rotation, linear_velocity: [0, 0] });
+                    loot.restore(snapshot.loot);
+                }
+                camera.setView({ position: person.entity.position, zoom: ZOOMS[zoom] });
+                return true;
+            } catch (error) { hud.error(error); return false; }
+            finally { hud.fade(false); }
         })();
         try { return await busy; } finally { busy = null; }
     };
@@ -153,7 +228,6 @@ export async function bootPreview({ libraries, hud }) {
         setSpeed: k => { engine.time.setSpeed(k); ui.setValue('options.time_speed', k); },
         setWeather: (state, intensity) => { engine.weather.set(state, intensity); ui.setValue('options.weather', state); },
         zoom: d => setZoom(zoom + d),
-        stick: (zone, knob) => controls.touch.stick('move', { zone, knob, anchor: 'touch', travel: 48 }),
         button: element => controls.touch.button(element, 'touchInteract'),
         clock: () => engine.time.text(),
         weather: () => ({ state: engine.weather.state, intensity: engine.weather.intensity }),
@@ -163,6 +237,7 @@ export async function bootPreview({ libraries, hud }) {
     const start = decodeURIComponent(location.hash.slice(1)) || new URLSearchParams(location.search).get('map') || 'apt_949';   // (#sdc or ?map=sdc opens on that map)
     await go(maps.some(m => m.id === start) ? start : maps[0].id);
     ui.open('hud');
+    mountPreviewSticks(ui, controls, weapons);
     if (!new URLSearchParams(location.search).has('nomenu')) ui.open('main');   // (?nomenu goes straight to walking)
     engine.start();
     return engine;

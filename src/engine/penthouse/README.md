@@ -34,7 +34,7 @@ person.entity.setMovement([1, 0]);
 |---|---|
 | `new humanoid(physics, {template:'engine:humanoid', height:1, entity:null, ...packet})` | Creates the body (the rest of the packet: position, rotation, name, data…) and its rig, playing the idle clip. The world's data source must hold `template` and its `skeleton`, `clips` and `locomotion` assets; every component's joint must be in the skeleton. `height` scales the skeleton. Pass a restored `entity` instead to take over a humanoid loaded from a save. |
 | `entity`, `rig` | The character entity and its animation controller. |
-| `updateState()` | Plays the walk clip, on distance travelled, while the body moves faster than the locomotion's `moving_speed`, otherwise idle. Call it once per step before the world steps. |
+| `updateState()` | Plays the walk clip, on distance travelled, while the body moves faster than the locomotion's `moving_speed`, otherwise idle. Steers the leg stride toward actual movement while leaving the torso’s facing free. Call it once per step before the world steps. |
 | `reachFor(hand, target, {weight})` / `release(hand)` | Two-bone IK puts hand `l` or `r` on a world point, elbow outward / removes it. |
 | `lookAt(target, {max_angle:1.2, weight})` / `stopLooking()` | Turns the head toward a world point. |
 | `setPhysicalArm(arm, on, {follow_rate:20, follow_torque:1e5, mass:1})` / `physical_arms` | Makes an arm two hinged bodies that follow the pose, trail and take hits; `follow_torque:0` is limp. |

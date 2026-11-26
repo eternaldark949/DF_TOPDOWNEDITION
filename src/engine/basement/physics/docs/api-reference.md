@@ -590,6 +590,7 @@ Markers are `{name,time,data:null}` with portable JSON payloads. A separate tran
 - `stop(layer='base')`: remove a layer and reevaluate remaining layers.
 - `pause()` / `resume()`: pause/resume this controller, including distance playback.
 - `seek(time,{layer:'base'})`: set an absolute clip clock, suppressing skipped markers.
+- `setLayerWeight(layer, weight)`: changes the blend of a playing layer (0–1) without changing its clock or marker cursor.
 - `setProceduralPose(joints={})`: replace the final partial local-pose overlay; other joints remain clip controlled. No callback or render-time evaluator is stored.
 - `advance(seconds,{distance:0})`: evaluate a standalone controller and return crossed marker packets. Owned controllers reject direct calls. Steps are 0..0.1 seconds; speed is 0..16. Non-looping end markers emit once. Markers at zero emit on the first positive advance; endpoint and next-loop zero markers are separate authored crossings. Pathological crossings over the marker budget reject before advancing any layer.
 - `getRootMotion(seconds)`: preview the base layer's requested local displacement, or `null` when root motion is disabled/paused.
