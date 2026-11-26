@@ -6,6 +6,7 @@
         // ║                     TRAFFIC SYSTEM                                ║
         // ╚══════════════════════════════════════════════════════════════════╝
         const EMPTY_SOLIDS = [];
+        const CAR_TOP_SPEED_MULTIPLIER = 2;
         class TrafficVehicle extends VehicleEntity {
             constructor(lane, brand = null, model = null, controlMode = 'AI', along = null) {
                 // --- RESOLVE BRAND/MODEL BEFORE SUPER ---
@@ -54,11 +55,12 @@
                 // TrafficVehicle uses this.width for vehicle's physical width (shorter dimension)
                 this.length = vehicleLength;
                 this.width = vehicleWidth;  // Override for backward compatibility with draw()
-                this.maxSpeed = brandData.baseStats.maxSpeed * modelData.speedMod + (Math.random() * 1 - 0.5);
+                const modelTopSpeed = brandData.baseStats.maxSpeed * modelData.speedMod;
+                this.maxSpeed = (modelTopSpeed + Math.random() - 0.5) * CAR_TOP_SPEED_MULTIPLIER;
                 this.acceleration = brandData.baseStats.acceleration;
                 // What it does with the player at the wheel (applyDrivePhysics): traffic keeps the numbers above
                 const dv = modelData.driven || {};
-                this.drivenTop = dv.top || brandData.baseStats.maxSpeed * modelData.speedMod;
+                this.drivenTop = (dv.top || modelTopSpeed) * CAR_TOP_SPEED_MULTIPLIER;
                 this.drivenAccel = dv.accel || this.acceleration;
                 this.handling = brandData.baseStats.handling;
                 this.brake = brandData.baseStats.brake || 0.3;        // px/tick² at full brake
@@ -90,7 +92,7 @@
                     
                     if (this.driverType === 'ganger') {
                         this.color = '#550000'; 
-                        this.maxSpeed += 2; 
+                        this.maxSpeed += 2 * CAR_TOP_SPEED_MULTIPLIER;
                     }
                 }
                 // How it treats people in the road (traffic/traffic-people.js): the gangers push; a third of the rest are in no hurry
